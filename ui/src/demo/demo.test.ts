@@ -34,7 +34,12 @@ describe('demo backend', () => {
     const { body } = await get<Catalog>('api/v1/catalog')
     const browser = body.models.filter((m) => m.runtime === 'browser')
     const server = body.models.filter((m) => m.runtime === 'server')
-    expect(browser.map((m) => m.id)).toEqual(['moonshine-tiny'])
+    expect(browser.map((m) => m.id)).toEqual([
+      'moonshine-tiny',
+      'whisper-tiny-hindi',
+      'whisper-tiny-q8',
+      'whisper-base-q8',
+    ])
     expect(browser[0]).toMatchObject({ license: 'MIT', engine: 'onnxruntime-web', task: 'stt' })
     expect(server.length).toBeGreaterThan(50)
     expect(server.every((m) => !m.installed && !m.loaded && m.pulling === null)).toBe(true)

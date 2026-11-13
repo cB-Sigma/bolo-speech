@@ -91,7 +91,7 @@
 </p>
 
 <p align="center">
-  <sub>Left: the latency timeline for one utterance. Right: the same screen at phone width. A light theme is included (<a href="docs/assets/console-light.png">screenshot</a>), as is the browser-only <a href="docs/assets/console-demo.png">live demo</a>.</sub>
+  <sub>Left: the latency timeline for one utterance. Right: the same screen at phone width. A light theme is included (<a href="docs/assets/console-light.png">screenshot</a>), as is the browser-only <a href="docs/assets/console-demo.png">live demo</a>. Indian languages are listed under their own names (<a href="docs/assets/console-hindi.png">Hindi on the server</a>).</sub>
 </p>
 
 <p align="center">

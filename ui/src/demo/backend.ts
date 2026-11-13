@@ -20,6 +20,8 @@ import { browserTraces, onBrowserTrace, recordBrowserTrace } from '@/lib/browser
 import { percentile } from '@/lib/latency/stats'
 import longUrl from '../mock/assets/en-ask-not.wav?url'
 import shortUrl from '../mock/assets/en-fellow-americans.wav?url'
+import hindiUrl from './assets/hi-short.wav?url'
+import { prefs, setPref } from '@/lib/prefs'
 import snapshot from './catalog-snapshot.json'
 
 /**
@@ -31,7 +33,11 @@ import snapshot from './catalog-snapshot.json'
 
 export const NEEDS_SERVER = 'This needs a bolo server. The live demo runs entirely in your browser.'
 
-const SAMPLE_FILES: Record<string, string> = { 'en-ask-not': longUrl, 'en-fellow-americans': shortUrl }
+const SAMPLE_FILES: Record<string, string> = {
+  'en-ask-not': longUrl,
+  'en-fellow-americans': shortUrl,
+  'hi-short': hindiUrl,
+}
 
 export const DEMO_SAMPLES: Sample[] = [
   {
@@ -50,6 +56,15 @@ export const DEMO_SAMPLES: Sample[] = [
     url: '/api/v1/samples/en-ask-not.wav',
     text: 'And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.',
   },
+  {
+    // The server's built-in Hindi sample (synthesised speech; see NOTICE).
+    id: 'hi-short',
+    kind: 'audio',
+    language: 'hi',
+    seconds: 4.1,
+    url: '/api/v1/samples/hi-short.wav',
+    text: 'नमस्ते, आप कैसे हैं? आज मौसम बहुत अच्छा है।',
+  },
 ]
 
 function browserEntry(m: BrowserModel, installed: boolean, loaded: boolean, progress: number | null): CatalogModel {
@@ -58,13 +73,13 @@ function browserEntry(m: BrowserModel, installed: boolean, loaded: boolean, prog
     aliases: [m.repo],
     task: 'stt',
     engine: 'onnxruntime-web',
-    family: 'Moonshine',
+    family: m.family,
     languages: m.languages,
-    tier: 'realtime',
+    tier: m.family === 'Whisper' ? 'balanced' : 'realtime',
     streaming: false,
     sample_rate: 16000,
     size_bytes: m.approxBytes,
-    params: 27_000_000,
+    params: m.params,
     license: m.license,
     commercial_use: true,
     gated: false,
@@ -73,8 +88,7 @@ function browserEntry(m: BrowserModel, installed: boolean, loaded: boolean, prog
     installed,
     loaded,
     pulling: progress != null ? { job_id: 'browser-load', progress } : null,
-    description:
-      'Moonshine Tiny, 8-bit quantised, running in this page with ONNX Runtime Web. Downloaded once from the Hugging Face Hub, then kept in the browser cache.',
+    description: `${m.label}, 8-bit quantised, running in this page with ONNX Runtime Web. ${m.blurb} Downloaded once from the Hugging Face Hub, then kept in the browser cache.`,
     source_url: m.source,
     validated: 'untested',
     measured: null,
@@ -121,10 +135,16 @@ export class DemoBackend {
   async catalog(): Promise<CatalogModel[]> {
     const engine = sharedEngine()
     const e = engine.store.get()
-    const cached = e.cached ?? (await isModelCached(e.model))
-    const browser = BROWSER_MODELS.map((m) =>
-      browserEntry(m, cached || e.status === 'ready', e.status === 'ready', e.status === 'loading' ? e.progress : null),
-    )
+    const cached = await Promise.all(BROWSER_MODELS.map((m) => isModelCached(m)))
+    const browser = BROWSER_MODELS.map((m, i) => {
+      const current = m.id === e.model.id
+      return browserEntry(
+        m,
+        Boolean(cached[i]) || (current && e.status === 'ready'),
+        current && e.status === 'ready',
+        current && e.status === 'loading' ? e.progress : null,
+      )
+    })
     const server = (snapshot.models as unknown as CatalogModel[]).map((m) => ({
       ...m,
       installed: false,
@@ -228,11 +248,18 @@ export class DemoBackend {
     return new Response(body, { headers: { 'Content-Type': 'text/event-stream' } })
   }
 
+  /** Make `id` the model the in-browser recogniser runs (it holds one at a time). */
+  private use(id: string): void {
+    sharedEngine().setModel(id)
+    if (prefs.get().browserModel !== id) setPref('browserModel', id)
+  }
+
   /** Download and compile the browser model, reported as a pull job. */
   private pull(id: string): Response {
     const model = BROWSER_MODELS.find((m) => m.id === id)
     if (!model) return needsServer()
     const engine = sharedEngine()
+    this.use(id)
     const job: Job = {
       id: `j_${this.jobSeq++}`,
       kind: 'pull',
@@ -291,6 +318,7 @@ export class DemoBackend {
     this.benchRunning = true
     const run = async () => {
       const engine = sharedEngine()
+      this.use(req.model)
       await engine.load()
       const wav = decodeWav(await (await fetch(file)).arrayBuffer())
       const audio = resample(wav.samples, wav.sampleRate, STT_RATE)
@@ -305,7 +333,7 @@ export class DemoBackend {
           const t0 = performance.now()
           const results = await Promise.all(
             Array.from({ length: c }, async () => {
-              const r = await engine.transcribe(audio)
+              const r = await engine.transcribe(audio, { language: sampleId.startsWith('hi') ? 'hi' : 'en' })
               return { total: performance.now() - t0, ms: r.ms, text: r.text }
             }),
           )
@@ -413,17 +441,26 @@ export class DemoBackend {
     if (action && method === 'POST') {
       const id = decodeURIComponent(action[1] as string)
       if (!BROWSER_MODELS.some((m) => m.id === id)) return needsServer()
-      if (action[2] === 'load') await sharedEngine().load()
-      else sharedEngine().dispose()
+      if (action[2] === 'load') {
+        this.use(id)
+        await sharedEngine().load()
+      } else if (sharedEngine().store.get().model.id === id) sharedEngine().dispose()
       return json({ id, loaded: action[2] === 'load' })
     }
     const del = /^\/api\/v1\/models\/([^/]+)$/.exec(path)
     if (del && method === 'DELETE') {
       const id = decodeURIComponent(del[1] as string)
       if (!BROWSER_MODELS.some((m) => m.id === id)) return needsServer()
-      sharedEngine().dispose()
-      await caches.delete('transformers-cache').catch(() => false)
-      sharedEngine().store.patch({ cached: false })
+      const model = BROWSER_MODELS.find((m) => m.id === id)
+      if (sharedEngine().store.get().model.id === id) sharedEngine().dispose()
+      // Remove only this model's files from the cache.
+      try {
+        const cache = await caches.open('transformers-cache')
+        for (const key of await cache.keys()) if (model && key.url.includes(model.repo)) await cache.delete(key)
+      } catch {
+        // no Cache Storage: nothing to remove
+      }
+      await sharedEngine().refreshCached()
       return new Response(null, { status: 204 })
     }
     if (path === '/api/v1/bench' && method === 'POST')

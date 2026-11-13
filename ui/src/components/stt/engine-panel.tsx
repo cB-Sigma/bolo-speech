@@ -2,11 +2,13 @@ import { Cpu, Download, HardDrive, Trash2, Zap } from 'lucide-react'
 import { toast } from 'sonner'
 import { Panel } from '@/components/panel'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 import { useStore } from '@/hooks/use-store'
 import type { SupportState } from '@/hooks/use-support'
 import { sharedEngine } from '@/lib/browser-stt/engine'
-import { fmtBytes, fmtMs } from '@/lib/format'
+import { fmtBytes, fmtMs, languageName } from '@/lib/format'
+import { isIndic } from '@/lib/languages'
+import { INSTALL_COMMAND } from '@/lib/api/config'
+import { LoadProgress, LoadTrouble } from './model-status'
 
 function Fact({ label, ok, children }: { label: string; ok: boolean | null; children: React.ReactNode }) {
   return (
@@ -23,19 +25,40 @@ function Fact({ label, ok, children }: { label: string; ok: boolean | null; chil
   )
 }
 
+/*
+ * Measured, not assumed: 13 Hindi recordings (12 from FLEURS dev, 1 synthesised) through the same 8-bit ONNX weights.
+ * Figures and transcripts are in docs/measurements/browser-whisper-hindi.json.
+ */
+const HINDI_MODEL_NOTE =
+  'On 13 Hindi test recordings (12 of them real speakers) this model got about 4 words in 10 wrong (word error rate 40%, character error rate 27%). Good enough to see Hindi working, not for real use.'
+const MULTILINGUAL_HINDI_NOTE =
+  'On the same 13 Hindi recordings Whisper Tiny and Whisper Base got more words wrong than right (word error rate above 100%) and mostly wrote in Latin or Urdu script. Choose Whisper Tiny Hindi instead.'
+const MULTILINGUAL_INDIC_NOTE =
+  'We have only measured Hindi, where Whisper Tiny and Base were unusable; other Indian languages are unlikely to be better, and the text may come out in the wrong script.'
+const WHISPER_GENERAL_NOTE =
+  'Whisper Tiny and Base are small general-purpose models: reasonable for major European languages, poor for Indian ones. Audio is decoded a stretch at a time, so text arrives later than with Moonshine.'
+
 /** Status of the in-browser recogniser: download, cache, and what the browser offers it. */
-export function BrowserEnginePanel({ support }: { support: SupportState }) {
+export function BrowserEnginePanel({
+  support,
+  language,
+  picker,
+}: {
+  support: SupportState
+  /** Language the recogniser is set to (`auto` or a code). */
+  language?: string
+  /** Model and language controls, when the page wants them in this panel. */
+  picker?: React.ReactNode
+}) {
   const engine = sharedEngine()
   const s = useStore(engine.store)
-  const loaded = s.files.reduce((a, f) => a + f.loaded, 0)
-  const total = s.files.reduce((a, f) => a + f.total, 0)
 
   const clear = async () => {
     engine.dispose()
     try {
       await caches.delete('transformers-cache')
-      engine.store.patch({ cached: false })
-      toast.success('Removed the downloaded model from this browser')
+      engine.store.patch({ cached: false, cachedIds: [] })
+      toast.success('Removed the downloaded models from this browser')
     } catch {
       toast.error('Could not clear the cache')
     }
@@ -52,17 +75,21 @@ export function BrowserEnginePanel({ support }: { support: SupportState }) {
             <Download /> {s.cached ? 'Load' : 'Download'}
           </Button>
         ) : s.cached ? (
-          <Button size="icon-sm" variant="ghost" aria-label="Remove downloaded model" onClick={() => void clear()}>
+          <Button size="icon-sm" variant="ghost" aria-label="Remove downloaded models" onClick={() => void clear()}>
             <Trash2 />
           </Button>
         ) : null
       }
     >
+      {picker}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="truncate num text-[13px] font-medium">{s.model.label}</div>
           <div className="mt-0.5 text-xs text-muted-foreground">
-            English · {fmtBytes(s.model.approxBytes)} · {s.model.license} ·{' '}
+            {s.model.multilingual
+              ? `${s.model.languages.length} languages`
+              : languageName(s.model.languages[0] ?? 'en')}{' '}
+            · {fmtBytes(s.model.approxBytes)} · {s.model.license} ·{' '}
             <a
               className="text-link underline underline-offset-2"
               href={s.model.source}
@@ -90,21 +117,32 @@ export function BrowserEnginePanel({ support }: { support: SupportState }) {
         </span>
       </div>
 
-      {s.status === 'loading' && (
-        <div className="mt-3">
-          <Progress value={s.progress * 100} aria-label="Model download progress" className="h-1.5" />
-          <div className="mt-1 flex justify-between num text-[11px] text-muted-foreground">
-            <span>{total > 0 ? `${fmtBytes(loaded)} of ${fmtBytes(total)}` : 'Preparing…'}</span>
-            <span>{s.progress >= 0.999 ? 'Compiling…' : `${Math.round(s.progress * 100)}%`}</span>
-          </div>
-        </div>
-      )}
-      {s.status === 'error' && (
+      <LoadProgress className="mt-3" />
+      <LoadTrouble className="mt-3" />
+      {s.model.family === 'Whisper' && (
         <p
-          role="alert"
-          className="mt-3 rounded-md border border-critical/30 bg-critical/10 px-2.5 py-2 text-xs text-foreground"
+          className="mt-3 rounded-md border border-border bg-muted/40 px-2.5 py-2 text-xs leading-[1.15rem] text-muted-foreground"
+          data-testid="whisper-note"
         >
-          {s.error}
+          {!s.model.multilingual ? (
+            <>
+              <span className="font-medium text-foreground">Expect mistakes.</span> {HINDI_MODEL_NOTE}
+            </>
+          ) : language === 'hi' ? (
+            <>
+              <span className="font-medium text-foreground">Not usable for Hindi.</span> {MULTILINGUAL_HINDI_NOTE}
+            </>
+          ) : language && language !== 'auto' && isIndic(language) ? (
+            <>
+              <span className="font-medium text-foreground">Expect a rough guess in {languageName(language)}.</span>{' '}
+              {MULTILINGUAL_INDIC_NOTE}
+            </>
+          ) : (
+            WHISPER_GENERAL_NOTE
+          )}{' '}
+          The bolo server runs much better models for Indian languages (larger fine-tuned Hindi Whisper models, the
+          IndicConformer community export and others): install it with{' '}
+          <span className="num break-all text-foreground">{INSTALL_COMMAND}</span> and pull one from Models.
         </p>
       )}
 

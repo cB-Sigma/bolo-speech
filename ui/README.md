@@ -77,11 +77,17 @@ storage key at run time, to point the console at a different origin.
 `.github/workflows/pages.yml` to <https://cb-sigma.github.io/bolo/>. In this build:
 
 - Speech to text really runs, in the page, with the in-browser recogniser (microphone, file upload
-  and two bundled samples). Nothing is simulated and no audio leaves the device.
+  and three bundled samples, one of them Hindi). Nothing is simulated and no audio leaves the
+  device. The model picker offers Moonshine Tiny (English), a Hindi fine-tune of Whisper Tiny and
+  multilingual Whisper Tiny and Base; what was measured for Hindi, and how poorly the multilingual
+  ones did, is in `../docs/ui-server-notes.md`.
+- The microphone is requested at the tap, the model loads in parallel with visible stages, and
+  what is said in the meantime is kept and transcribed once the model is ready. A blocked
+  microphone gets an explanation with steps for the device. `?debug=1` adds a diagnostics panel.
 - The Latency screen shows only the traces of what was run in the tab during the visit (model load,
   endpointing, queueing, decode). The Benchmark screen runs a real sweep in the page and says plainly
   that it measures a single in-page recogniser, not server concurrency.
-- The Models screen lists the browser model (download and cache state, size, licence) and a
+- The Models screen lists the browser models (download and cache state, size, licence) and a
   read-only snapshot of a server's catalog, `src/demo/catalog-snapshot.json`, labelled "available
   when you run the server". Refresh it with `node scripts/export-catalog.mjs --base <server>`.
 - Everything that needs a server (text to speech, pull/load/unload, the phone-line simulation,
@@ -144,8 +150,9 @@ e2e-demo/           Playwright specs for the live demo build
 
 ## In-browser speech recognition
 
-The playground can run a small English model in the page, with no server round trip, and compare it
-with the server on the same audio. The runtime (`@huggingface/transformers` with ONNX Runtime Web)
+The playground can run a small model in the page (English by default; Hindi and multilingual
+Whisper models can be chosen), with no server round trip, and compare it with the server on the
+same audio. The runtime (`@huggingface/transformers` with ONNX Runtime Web)
 lives in a web worker that is only fetched when the mode is first used. It prefers WebGPU and falls
 back to WebAssembly with SIMD; WebAssembly threads need a cross-origin-isolated page. The model
 weights and the ONNX Runtime binary are downloaded on first use and cached by the browser. Details,

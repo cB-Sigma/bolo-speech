@@ -45,14 +45,62 @@ worker-src  'self' blob:
 
 ## What the in-browser mode downloads
 
-Nothing is downloaded until the user switches the playground to "In browser" or "Compare" and
-starts a take (or presses Download). Files are then cached by the browser (Cache Storage,
-`transformers-cache`) and can be removed from the same panel.
+In the console served by the server, nothing is downloaded until the user switches the playground
+to "In browser" or "Compare" and starts a take, presses down on the microphone button, or presses
+the model status. The live demo fetches the selected model while the page is idle, unless the
+browser reports Save-Data or a 2G connection, in which case it waits to be asked. Files are cached
+by the browser (Cache Storage, `transformers-cache`) and can be removed from the same panel.
 
 | What | Source | Size | Licence |
 | --- | --- | --- | --- |
-| Moonshine Tiny, English, 8-bit quantised ONNX (`encoder_model_quantized.onnx`, `decoder_model_merged_quantized.onnx`, tokenizer and config JSON) | <https://huggingface.co/onnx-community/moonshine-tiny-ONNX> (conversion of <https://huggingface.co/UsefulSensors/moonshine-tiny>) | about 28 MB | MIT |
+| Moonshine Tiny, English, 8-bit quantised ONNX (`encoder_model_quantized.onnx`, `decoder_model_merged_quantized.onnx`, tokenizer and config JSON). The default. | <https://huggingface.co/onnx-community/moonshine-tiny-ONNX> (conversion of <https://huggingface.co/UsefulSensors/moonshine-tiny>) | 32.1 MB | MIT |
+| Whisper Tiny Hindi, 8-bit quantised ONNX. Hindi only. | <https://huggingface.co/astronova001/whisper-tiny-hindi-ONNX>, a community conversion of <https://huggingface.co/ARTPARK-IISc/whisper-tiny-vaani-hindi>. The conversion repository carries no licence tag of its own; the weights it converts are Apache-2.0. | 124 MB | Apache-2.0 |
+| Whisper Tiny, multilingual (99 languages), 8-bit quantised ONNX | <https://huggingface.co/onnx-community/whisper-tiny> (conversion of <https://huggingface.co/openai/whisper-tiny>, Apache-2.0; the conversion repository has no licence tag) | 43.6 MB | Apache-2.0 |
+| Whisper Base, multilingual (99 languages), 8-bit quantised ONNX | <https://huggingface.co/onnx-community/whisper-base> | 79.7 MB | Apache-2.0 |
 | ONNX Runtime Web WebAssembly binary and loader (`ort-wasm-simd-threaded.wasm` / `.mjs`; the `.asyncify` build when WebGPU is used) | jsDelivr, `onnxruntime-web` at the exact version `@huggingface/transformers` depends on | about 14 MB (27 MB for the WebGPU build) | MIT |
+
+Sizes are the sums of the files listed on the Hub on 2026-11-13. Whisper Small was left out: its
+8-bit files come to 249 MB, too much for a phone, and it was not measured.
+
+### Indian languages in the browser: what was measured
+
+The language select lists Hindi, Bengali, Tamil, Telugu, Marathi, Gujarati, Kannada, Malayalam,
+Punjabi, Urdu, Nepali and Assamese (the ones in Whisper's language list; Odia is not) with their own
+names. Choosing one while an English-only model is selected opens a dialog that names the models
+that can do it and their download size.
+
+Accuracy was measured on Hindi only (13 recordings: 12 real speakers from the FLEURS dev split and
+the built-in sample; full record in `docs/measurements/browser-whisper-hindi.json`):
+
+| Model | Word error rate | Character error rate | Script of the output |
+| --- | --- | --- | --- |
+| Whisper Tiny Hindi | 40 % | 27 % | Devanagari |
+| Whisper Base (multilingual) | 102 % | 110 % | mostly Latin, some Urdu |
+| Whisper Tiny (multilingual) | 231 % | 264 % | mostly Latin |
+
+So the multilingual Tiny and Base models are not usable for Hindi, and the console says so next to
+the model; "Whisper Tiny Hindi" is the suggested choice and is good enough to show Hindi working,
+not for real use. No fine-tuned model in a browser-ready ONNX layout with a clear permissive licence
+was found for the other languages, so they fall back to multilingual Whisper with a plain warning.
+All Whisper models decode a fixed 30-second window per pass; in headless Chromium on the (busy)
+4-core build machine they ran slower than real time, so partial results are skipped for them and
+text arrives seconds late. The server's models for Indian languages are much better and faster.
+
+### Runtime and model hosts under cross-origin isolation
+
+Checked with `curl` on 2026-11-13, sending `Origin: https://cb-sigma.github.io`:
+
+- jsDelivr (`ort-wasm-simd-threaded.wasm`, `.mjs`, and the `.asyncify` build) answers 200 with
+  `access-control-allow-origin: *` and `cross-origin-resource-policy: cross-origin`.
+- `huggingface.co/<repo>/resolve/main/...` answers 302 (large files) or 307 (small files) with
+  `access-control-allow-origin` set to the requesting origin; the CDN it redirects to answers 200
+  with `access-control-allow-origin: *`.
+
+Both are fetched with CORS, which is what `Cross-Origin-Embedder-Policy: require-corp` (the mode the
+demo's service worker uses outside Chromium) requires. The runtime files are therefore still loaded
+from jsDelivr rather than copied into the Pages artifact. The first download of the runtime binary
+is now made by the worker itself into the same cache entry the library uses, so that progress can be
+shown; the library then finds it there, as on any later visit.
 
 The JavaScript side (`@huggingface/transformers`, Apache-2.0) is part of the console bundle as a
 lazily loaded worker chunk (about 550 kB before compression). The ~27 MB WebAssembly binary is
@@ -73,6 +121,28 @@ localStorage.setItem('bolo.browserStt', JSON.stringify({
 
 A natural follow-up would be for the server to offer both under its own origin (for example
 `/api/v1/browser-assets/...`) and advertise that in `/api/v1/info`; the console would then prefer it.
+
+`stallSeconds` in the same object changes how long a load may go without progress before the
+console reports it as stuck (default 40).
+
+## Microphone, first use and diagnostics
+
+- The microphone is requested in the same turn as the click or tap (`getUserMedia` first, then the
+  `AudioContext`, both before anything is awaited), in parallel with connecting or loading the
+  in-browser model. Audio captured in the meantime is buffered (up to 60 s) and handed over when
+  the recogniser is ready. Latency for that first stretch is measured from the hand-over.
+- A refused or failed microphone opens a help panel in place of a one-line message. It names the
+  likely cause for this browser (an in-app browser, a saved block for the site, the operating
+  system, a dismissed prompt, no device, a busy device, an insecure page) with steps for the
+  detected platform. In-app browsers are detected conservatively from the user agent and the
+  attempt is never blocked on that detection.
+- Loading shows the stage (runtime, model, compile, warm-up) with bytes. If nothing moves for
+  `stallSeconds` the console says which stage is stuck and offers "Retry single-threaded" (one
+  WebAssembly thread, no WebGPU).
+- `?debug=1` (before or after the `#`) adds a diagnostics panel to every screen: user agent, secure
+  context, cross-origin isolation, SharedArrayBuffer, the COEP mode, service-worker state, the
+  microphone permission, every model and runtime request with status, size and time, and errors.
+  It has a Copy button. `?debug=0` turns it off again.
 
 ## API usage
 

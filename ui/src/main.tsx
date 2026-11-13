@@ -6,9 +6,11 @@ import { Toaster } from './components/ui/sonner'
 import { TooltipProvider } from './components/ui/tooltip'
 import { ThemeProvider } from './hooks/use-theme'
 import './index.css'
+import { installErrorCapture } from './lib/diagnostics'
 import { live } from './lib/live'
 
 async function boot() {
+  installErrorCapture()
   if (import.meta.env.VITE_BOLO_DEMO === '1') {
     const [{ ensureIsolation }, { installDemo }] = await Promise.all([import('./demo/isolation'), import('./demo')])
     if (await ensureIsolation()) return // reloading to become cross-origin isolated
@@ -16,6 +18,12 @@ async function boot() {
   } else if (import.meta.env.VITE_BOLO_MOCK === '1') {
     const { installMock } = await import('./mock')
     installMock()
+    const { FakeSpeechWorker, readFakeSttOptions } = await import('./mock/fake-stt-worker')
+    const fake = readFakeSttOptions()
+    if (fake) {
+      const { setSpeechWorkerFactory } = await import('./lib/browser-stt/engine')
+      setSpeechWorkerFactory(() => new FakeSpeechWorker(fake))
+    }
   }
   const queryClient = new QueryClient({
     defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },

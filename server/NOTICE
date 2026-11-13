@@ -57,6 +57,16 @@ Models
     from their publishers, under the licences recorded for each entry in
     the catalog (server/src/bolo/catalog/*.yaml).
 
+Fonts
+    The web console bundles Inter and JetBrains Mono, and Noto Sans
+    (Devanagari, Bengali, Tamil, Telugu, Gujarati, Kannada, Malayalam,
+    Gurmukhi, Oriya) and Noto Naskh Arabic for text in those scripts, all
+    under the SIL Open Font License 1.1, from the @fontsource packages.
+    The word "बोलो" in the logo is outlined from Hind SemiBold
+    (Copyright (c) 2014 Indian Type Foundry, SIL Open Font License 1.1);
+    the font itself is not distributed.
+
 Built-in audio samples
     The files in server/src/bolo/samples/*.wav were synthesised with bolo
-    using the models named in server/src/bolo/samples/index.json.
+    using the models named in server/src/bolo/samples/index.json. The live
+    demo bundles a copy of hi-short.wav.

@@ -1,5 +1,5 @@
 import { BookOpen, Menu, Monitor, Moon, Search, Sun } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Logo } from '@/components/logo'
 import { Badge } from '@/components/ui/badge'
@@ -17,11 +17,16 @@ import { useInfo, useLive } from '@/hooks/use-api'
 import { useTheme, type ThemeChoice } from '@/hooks/use-theme'
 import { DemoBanner } from '@/components/demo'
 import { isDemo, isMock } from '@/lib/api/config'
+import { isDebug } from '@/lib/diagnostics'
 import { fmtDuration } from '@/lib/format'
 import { NAV, type NavItem } from '@/lib/nav'
 import { cn } from '@/lib/utils'
 import { openCommandPalette, PaletteHost } from './palette-host'
 import { ApiKeyDialog, ConnectionIndicator, OfflineBanner } from './connection'
+
+const DiagnosticsPanel = lazy(() =>
+  import('@/components/diagnostics-panel').then((m) => ({ default: m.DiagnosticsPanel })),
+)
 
 export const DOCS_URL = 'https://github.com/cb-Sigma/bolo/tree/main/docs'
 
@@ -161,10 +166,11 @@ export function AppShell() {
     document.title = current ? `${current.label} · bolo` : 'bolo'
   }, [current])
 
+  const debug = useMemo(() => isDebug(), [])
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 
   return (
-    <div className="flex min-h-svh bg-background">
+    <div className="flex min-h-svh bg-background pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
       <a
         href="#main"
         onClick={(e) => {
@@ -189,7 +195,7 @@ export function AppShell() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-background/85 px-3 backdrop-blur-md sm:px-5">
+        <header className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-2 border-b border-border bg-background/85 px-3 pt-[env(safe-area-inset-top)] backdrop-blur-md sm:px-5">
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Open navigation">
@@ -210,7 +216,7 @@ export function AppShell() {
             </SheetContent>
           </Sheet>
           <NavLink to="/stt" aria-label="bolo home" className="rounded-md lg:hidden">
-            <Logo />
+            <Logo hindi="wide" />
           </NavLink>
           <div className="hidden min-w-0 items-baseline gap-2.5 lg:flex">
             <h1 className="truncate text-sm font-semibold">{current?.label ?? 'bolo'}</h1>
@@ -256,8 +262,18 @@ export function AppShell() {
         </header>
         {isDemo && <DemoBanner />}
         <OfflineBanner />
-        <main id="main" ref={mainRef} tabIndex={-1} className="min-w-0 flex-1 outline-none">
+        <main
+          id="main"
+          ref={mainRef}
+          tabIndex={-1}
+          className="min-w-0 flex-1 pb-[env(safe-area-inset-bottom)] outline-none"
+        >
           <Outlet />
+          {debug && (
+            <Suspense fallback={null}>
+              <DiagnosticsPanel />
+            </Suspense>
+          )}
         </main>
       </div>
       <PaletteHost />

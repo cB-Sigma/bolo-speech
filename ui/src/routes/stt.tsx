@@ -12,7 +12,7 @@ import {
   Upload,
   Volume2,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { BudgetBar } from '@/components/charts/budget-bar'
 import { LatencyTimeline, UtteranceList } from '@/components/charts/latency-timeline'
@@ -22,13 +22,15 @@ import { Page } from '@/components/layout/app-shell'
 import { ModelPicker } from '@/components/model-picker'
 import { Panel, Readout } from '@/components/panel'
 import { BrowserEnginePanel } from '@/components/stt/engine-panel'
+import { BrowserModelPicker, LanguageSelect, SwitchModelDialog } from '@/components/stt/language-controls'
+import { MicHelpPanel, MicStatusLine } from '@/components/stt/mic-help'
+import { LoadProgress, LoadTrouble, ModelStatusChip } from '@/components/stt/model-status'
 import { Transcript } from '@/components/stt/transcript'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -42,7 +44,11 @@ import { api } from '@/lib/api/client'
 import type { Sample } from '@/lib/api/types'
 import { isDemo } from '@/lib/api/config'
 import { STT_RATE } from '@/lib/audio/capture'
-import { BROWSER_MODELS } from '@/lib/browser-stt/models'
+import { describeLoad, sharedEngine } from '@/lib/browser-stt/engine'
+import { browserModel, BROWSER_MODELS } from '@/lib/browser-stt/models'
+import { prefersLessData } from '@/lib/diagnostics'
+import { INDIC_LANGUAGES, supportsLanguage } from '@/lib/languages'
+import type { MicFailure } from '@/lib/mic-help'
 import { decodeShare, shareUrl } from '@/lib/share'
 import { SERVER_ONLY_HINT } from '@/components/demo'
 import { useSearchParams } from 'react-router-dom'
@@ -232,31 +238,84 @@ export default function SttPage() {
     speechRef.current = primary.speech
   }, [primary.speech])
 
+  // In-browser model and its language.
+  const engine = sharedEngine()
+  const engineState = useStore(engine.store)
+  const bModel = browserModel(p.browserModel)
+  const bLanguage = bModel.multilingual ? p.browserLanguage : (bModel.languages[0] ?? 'en')
+  const browserLanguages = useMemo(() => [...new Set(BROWSER_MODELS.flatMap((m) => m.languages))], [])
+  const [switchFor, setSwitchFor] = useState<string | null>(null)
+  const [helpOpen, setHelpOpen] = useState(false)
+  const lessData = useMemo(() => prefersLessData(), [])
+  useEffect(() => {
+    if (!running) engine.setModel(p.browserModel)
+  }, [engine, p.browserModel, running])
+
+  // Server models: the language list is everything the usable models cover; choosing one narrows the model list.
+  const usableModels = useMemo(() => {
+    const installed = models.filter((m) => m.installed)
+    return installed.length ? installed : models
+  }, [models])
   const languages = useMemo(() => {
     const set = new Set<string>()
-    for (const l of model?.languages ?? []) if (l !== 'multi') set.add(l)
+    for (const m of usableModels) for (const l of m.languages) if (l !== 'multi') set.add(l)
+    // A model listed only as "multi" takes any language: offer at least English and the Indian languages for it.
+    if (set.size > 0 && usableModels.some((m) => m.languages.includes('multi'))) {
+      set.add('en')
+      for (const l of INDIC_LANGUAGES) if (l.code !== 'or') set.add(l.code)
+    }
     return [...set]
-  }, [model])
+  }, [usableModels])
   const language = languages.includes(p.language) ? p.language : 'auto'
+
+  const chooseServerLanguage = (code: string) => {
+    setPref('language', code)
+    if (code === 'auto' || !model || supportsLanguage(model.languages, code)) return
+    const other = usableModels.find((m) => m.installed && supportsLanguage(m.languages, code))
+    if (other) {
+      select(other.id)
+      toast.message(`Switched to ${other.id}`, {
+        description: `${model.id} does not support ${languageName(code)}.`,
+      })
+    }
+  }
+  const chooseBrowserLanguage = (code: string) => {
+    if (code !== 'auto' && !bModel.languages.includes(code)) {
+      setSwitchFor(code)
+      return
+    }
+    if (bModel.multilingual) setPref('browserLanguage', code)
+  }
+  const chooseBrowserModel = (id: string) => {
+    engine.setModel(id)
+    setPref('browserModel', id)
+  }
 
   const audioSamples = (samples.data?.samples ?? []).filter((s) => s.kind === 'audio' && s.url)
   const needsModel = mode !== 'browser'
   const canStart = !running && (!needsModel || Boolean(model?.installed))
   const micBlocked = !support.getUserMedia || !support.audioWorklet || !support.secureContext
 
-  const begin = (input: SessionInput) => {
+  const begin = (input: SessionInput, browserLanguage: string = bLanguage) => {
     if (needsModel && !model) {
       toast.error('Choose a model first')
       return
     }
-    void session.start(input, { mode, model: model?.id ?? '', language, telephony: telephony && mode !== 'browser' })
+    setHelpOpen(false)
+    session.start(input, {
+      mode,
+      model: model?.id ?? '',
+      language,
+      telephony: telephony && mode !== 'browser',
+      browserLanguage,
+    })
   }
 
-  const startFile = async (name: string, data: ArrayBuffer) => {
+  const startFile = async (name: string, data: ArrayBuffer, browserLanguage?: string) => {
     try {
       const audio = await decodeAudio(data)
       if (audio.samples.length === 0) throw new Error('The file contains no audio')
-      begin({ kind: 'file', label: name, samples: audio.samples, sampleRate: audio.sampleRate })
+      begin({ kind: 'file', label: name, samples: audio.samples, sampleRate: audio.sampleRate }, browserLanguage)
     } catch (err) {
       toast.error(`Could not read ${name}`, { description: err instanceof Error ? err.message : undefined })
     }
@@ -264,9 +323,20 @@ export default function SttPage() {
 
   const startSample = async (s: Sample) => {
     if (!s.url) return
+    if (mode === 'browser' && s.language && !bModel.languages.includes(s.language)) {
+      // The sample is in a language this model cannot do: offer the ones that can.
+      setSwitchFor(s.language)
+      return
+    }
+    let sampleLanguage: string | undefined
+    if (mode === 'browser' && bModel.multilingual && s.language && bLanguage !== 'auto' && bLanguage !== s.language) {
+      sampleLanguage = s.language
+      setPref('browserLanguage', s.language)
+      toast.message(`Language set to ${languageName(s.language)} for this sample`)
+    }
     setBusySample(s.id)
     try {
-      await startFile(s.id, await api.bytes(s.url))
+      await startFile(s.id, await api.bytes(s.url), sampleLanguage)
     } catch (err) {
       toast.error('Could not load the sample', { description: describeError(err) })
     } finally {
@@ -280,12 +350,32 @@ export default function SttPage() {
     void f.arrayBuffer().then((buf) => startFile(f.name, buf))
   }
 
+  // Microphone problems are explained in place (see MicHelpPanel); anything else is a toast.
+  const micFailure: MicFailure | null =
+    session.error?.mic ??
+    (helpOpen ? { kind: 'denied', name: '', detail: '', elapsedMs: 0, permission: support.micPermission } : null)
   useEffect(() => {
-    if (session.error)
-      toast.error(session.error.kind === 'denied' ? 'Microphone blocked' : 'Could not start', {
-        description: session.error.message,
-      })
+    if (session.error && !session.error.mic) toast.error('Could not start', { description: session.error.message })
   }, [session.error])
+
+  // Fetch the model before it is needed: when the demo is idle, and when a finger lands on the microphone button.
+  const preload = useCallback(() => {
+    void engine.load({ background: true }).catch(() => undefined)
+  }, [engine])
+  useEffect(() => {
+    if (!isDemo || mode !== 'browser' || !support.wasm || lessData) return
+    const w = globalThis as typeof globalThis & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number
+      cancelIdleCallback?: (id: number) => void
+    }
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(preload, { timeout: 3000 })
+      return () => w.cancelIdleCallback?.(id)
+    }
+    const id = setTimeout(preload, 1200)
+    return () => clearTimeout(id)
+  }, [mode, support.wasm, lessData, preload, p.browserModel])
+  const warmOnPress = mode !== 'server' && support.wasm ? preload : undefined
   useEffect(() => {
     if (serverState.status === 'error' && serverState.error)
       toast.error('Stream failed', { description: serverState.error })
@@ -318,19 +408,34 @@ export default function SttPage() {
   }
 
   const hasTake = !running && session.input != null
+  const loadText = mode !== 'server' ? describeLoad(engineState, fmtBytes) : ''
   const statusLine =
     session.phase === 'idle'
       ? session.input
         ? `Last take: ${session.input.kind === 'mic' ? 'microphone' : session.input.label} · ${fmtSeconds(primary.audioSeconds)}`
         : 'Nothing recorded yet'
-      : `${STATUS_TEXT[primary.status]} · ${session.input?.kind === 'mic' ? 'microphone' : session.input?.label} · ${fmtSeconds(primary.audioSeconds)}`
+      : session.phase === 'starting' && session.mic === 'requesting'
+        ? 'Waiting for microphone permission'
+        : session.phase === 'starting' && session.mic === 'live'
+          ? `Listening · ${loadText || STATUS_TEXT[primary.status]} · ${fmtSeconds(session.buffered ?? 0)} held`
+          : session.phase === 'starting' && loadText
+            ? `${loadText} · ${session.input?.label}`
+            : `${STATUS_TEXT[primary.status]} · ${session.input?.kind === 'mic' ? 'microphone' : session.input?.label} · ${fmtSeconds(primary.audioSeconds)}`
+  const playDefaultSample = () => {
+    const wanted = bLanguage !== 'auto' && mode === 'browser' ? bLanguage : 'en'
+    const s =
+      audioSamples.find((x) => x.language === wanted && x.id !== 'en-fellow-americans') ??
+      audioSamples.find((x) => x.id === 'en-ask-not') ??
+      audioSamples[0]
+    if (s) void startSample(s)
+  }
 
   const stats = sessionStats(primary)
   const canShare = stats.count > 0 && Number.isFinite(stats.final.p50)
   const share = async () => {
     if (!canShare) return
     const url = shareUrl({
-      m: BROWSER_MODELS[0]?.label ?? 'in-browser model',
+      m: bModel.label,
       d: (primary.backend ?? 'browser').replace(/^browser · /, ''),
       n: stats.count,
       fp: Number.isFinite(stats.firstPartial.p50) ? stats.firstPartial.p50 : null,
@@ -387,30 +492,36 @@ export default function SttPage() {
           Compare
         </ToggleGroupItem>
       </ToggleGroup>
-      <ModelPicker
-        models={models}
-        value={model?.id ?? null}
-        onChange={select}
-        loading={modelsLoading}
-        disabled={running || mode === 'browser'}
-        className="w-52 max-sm:min-w-44 max-sm:flex-1"
-      />
-      <Select value={language} onValueChange={(v) => setPref('language', v)} disabled={running || mode === 'browser'}>
-        <SelectTrigger className="h-8 w-36" aria-label="Language">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent position="popper" align="start">
-          <SelectItem value="auto">
-            {languages.length === 1 ? languageName(languages[0] as string) : 'Auto-detect'}
-          </SelectItem>
-          {languages.length > 1 &&
-            languages.map((l) => (
-              <SelectItem key={l} value={l}>
-                {languageName(l)}
-              </SelectItem>
-            ))}
-        </SelectContent>
-      </Select>
+      {mode === 'browser' ? (
+        <>
+          <BrowserModelPicker
+            value={bModel.id}
+            onChange={chooseBrowserModel}
+            disabled={running}
+            className="w-52 max-sm:min-w-44 max-sm:flex-1"
+          />
+          <LanguageSelect
+            languages={browserLanguages}
+            value={bLanguage}
+            onChange={chooseBrowserLanguage}
+            disabled={running}
+            autoDetect={bModel.multilingual}
+          />
+        </>
+      ) : (
+        <>
+          <ModelPicker
+            models={models}
+            value={model?.id ?? null}
+            onChange={select}
+            loading={modelsLoading}
+            disabled={running}
+            language={language}
+            className="w-52 max-sm:min-w-44 max-sm:flex-1"
+          />
+          <LanguageSelect languages={languages} value={language} onChange={chooseServerLanguage} disabled={running} />
+        </>
+      )}
       <Tooltip>
         <TooltipTrigger asChild>
           <label
@@ -470,14 +581,14 @@ export default function SttPage() {
 
   return (
     <Page title="Speech to text" toolbar={toolbar}>
-      {micBlocked && (
+      {micBlocked && !micFailure && (
         <Alert className="mb-4">
           <MicOff />
           <AlertTitle>Microphone capture is unavailable</AlertTitle>
           <AlertDescription>
             {!support.secureContext
               ? 'Browsers only allow microphone access on HTTPS or localhost. Open the console through one of those, or use a file or sample instead.'
-              : 'This browser lacks AudioWorklet or getUserMedia. You can still upload a file or use a sample.'}
+              : 'This browser lacks AudioWorklet or getUserMedia (built-in browsers inside other apps often do). You can still upload a file or use a sample.'}
           </AlertDescription>
         </Alert>
       )}
@@ -542,12 +653,13 @@ export default function SttPage() {
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
             A speech recogniser will run right here in this tab and show you where every millisecond went. Nothing you
-            say leaves your device. The first run downloads a {fmtBytes(BROWSER_MODELS[0]?.approxBytes)} model (
-            {BROWSER_MODELS[0]?.license}) plus the runtime; after that it is cached and works offline.
+            say leaves your device. The first run downloads the {bModel.label} model ({fmtBytes(bModel.approxBytes)},{' '}
+            {bModel.license}) plus a 14 MB runtime; after that both are cached and it works offline.
           </p>
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <Button
               className="h-10 px-4 text-[15px]"
+              onPointerDown={lessData ? undefined : warmOnPress}
               onClick={() => begin({ kind: 'mic', label: 'microphone' })}
               disabled={micBlocked || !support.wasm}
               data-testid="hero-mic"
@@ -557,15 +669,39 @@ export default function SttPage() {
             <Button
               variant="outline"
               className="h-10 px-4 text-[15px]"
-              onClick={() => {
-                const s = audioSamples.find((x) => x.id === 'en-ask-not') ?? audioSamples[0]
-                if (s) void startSample(s)
-              }}
+              onClick={playDefaultSample}
               disabled={!support.wasm || audioSamples.length === 0 || busySample != null}
               data-testid="hero-sample"
             >
               <Play className="fill-current" /> No microphone? Play a sample
             </Button>
+            {!bModel.languages.includes('hi') && (
+              <Button
+                variant="ghost"
+                className="h-10 px-3 text-[15px]"
+                onClick={() => chooseBrowserLanguage('hi')}
+                disabled={!support.wasm}
+                data-testid="hero-hindi"
+              >
+                <span lang="hi">हिन्दी</span> · Try Hindi
+              </Button>
+            )}
+          </div>
+          <div className="mt-4 flex max-w-2xl flex-col gap-2">
+            <ModelStatusChip className="self-start" />
+            <LoadProgress />
+            <LoadTrouble onSample={playDefaultSample} />
+            {lessData && engineState.status === 'idle' && !engineState.cached && (
+              <p className="text-xs leading-5 text-muted-foreground" data-testid="data-saver-note">
+                Your browser asks sites to save data, so the model is not fetched in advance. It downloads (
+                {fmtBytes(bModel.approxBytes)}) when you press a button above or the model status.
+              </p>
+            )}
+            <MicStatusLine
+              permission={support.micPermission}
+              available={!micBlocked}
+              onShowHelp={() => setHelpOpen(true)}
+            />
           </div>
           {!support.wasm && (
             <p className="mt-3 text-sm text-warning-text">
@@ -574,6 +710,30 @@ export default function SttPage() {
           )}
         </div>
       )}
+
+      {micFailure && (
+        <MicHelpPanel
+          className="mb-4"
+          failure={micFailure}
+          onRetry={() => begin({ kind: 'mic', label: 'microphone' })}
+          onSample={audioSamples.length > 0 && canStart ? playDefaultSample : undefined}
+          onUpload={canStart ? () => fileInput.current?.click() : undefined}
+          onDismiss={() => {
+            setHelpOpen(false)
+            session.clearError()
+          }}
+        />
+      )}
+      <SwitchModelDialog
+        language={switchFor}
+        current={bModel}
+        onCancel={() => setSwitchFor(null)}
+        onChoose={(id) => {
+          chooseBrowserModel(id)
+          if (switchFor) setPref('browserLanguage', switchFor)
+          setSwitchFor(null)
+        }}
+      />
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         <div className="flex min-w-0 flex-col gap-4 xl:col-start-1 xl:row-start-1">
@@ -612,6 +772,7 @@ export default function SttPage() {
                 </Button>
               ) : (
                 <Button
+                  onPointerDown={lessData ? undefined : warmOnPress}
                   onClick={() => begin({ kind: 'mic', label: 'microphone' })}
                   className="h-9 min-w-28"
                   disabled={!canStart || micBlocked}
@@ -636,7 +797,41 @@ export default function SttPage() {
                 }}
               />
               <span className="hidden text-xs text-muted-foreground sm:inline">or drop a file here</span>
+              {mode !== 'server' && <ModelStatusChip className="sm:ml-auto" />}
             </div>
+
+            {session.phase === 'starting' && (
+              <p
+                role="status"
+                className="mt-3 rounded-lg border border-chart-1/30 bg-chart-1/10 px-3 py-2 text-[13px] leading-5"
+                data-testid="starting-note"
+                data-mic={session.mic}
+              >
+                {session.mic === 'requesting' ? (
+                  'Your browser is asking for the microphone. Choose Allow to start.'
+                ) : session.mic === 'live' ? (
+                  <>
+                    <span className="font-medium">The microphone is on. Go ahead and talk.</span>{' '}
+                    {mode === 'server' ? 'Connecting to the server.' : 'The model is still getting ready.'} What you say
+                    is being kept (
+                    <span className="num" data-testid="buffered-seconds">
+                      {(session.buffered ?? 0).toFixed(1)} s
+                    </span>{' '}
+                    so far) and will be transcribed the moment it is.
+                  </>
+                ) : mode === 'server' ? (
+                  'Connecting to the server.'
+                ) : (
+                  'The audio starts as soon as the model is ready.'
+                )}
+              </p>
+            )}
+            {mode !== 'server' && (running || engineState.status === 'error') && (
+              <>
+                <LoadProgress className="mt-3" />
+                <LoadTrouble className="mt-3" onSample={audioSamples.length > 0 ? playDefaultSample : undefined} />
+              </>
+            )}
 
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
               <span className="mr-1 text-xs text-muted-foreground">Samples</span>
@@ -715,7 +910,7 @@ export default function SttPage() {
                   <Transcript state={serverState} placeholder="The server transcript appears here." />
                 </div>
                 <div className="min-w-0 sm:border-l sm:border-border sm:pl-4">
-                  <div className="mb-1 eyebrow">In browser · moonshine-tiny</div>
+                  <div className="mb-1 eyebrow">In browser · {bModel.id}</div>
                   <Transcript state={browserState} placeholder="The in-browser transcript appears here." />
                 </div>
               </div>
@@ -784,7 +979,31 @@ export default function SttPage() {
             )}
           </Panel>
 
-          {mode !== 'server' && <BrowserEnginePanel support={support} />}
+          {mode !== 'server' && (
+            <BrowserEnginePanel
+              support={support}
+              language={bLanguage}
+              picker={
+                mode === 'compare' ? (
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    <BrowserModelPicker
+                      value={bModel.id}
+                      onChange={chooseBrowserModel}
+                      disabled={running}
+                      className="min-w-44 flex-1"
+                    />
+                    <LanguageSelect
+                      languages={browserLanguages}
+                      value={bLanguage}
+                      onChange={chooseBrowserLanguage}
+                      disabled={running}
+                      autoDetect={bModel.multilingual}
+                    />
+                  </div>
+                ) : undefined
+              }
+            />
+          )}
 
           {mode === 'server' && (
             <Panel title="Try it without the network" bodyClassName="flex items-start gap-3">
@@ -793,9 +1012,10 @@ export default function SttPage() {
               </span>
               <div className="min-w-0 text-[13px] leading-5 text-muted-foreground">
                 <p>
-                  <span className="text-foreground">In browser</span> runs a small English model on this device with
-                  WebAssembly: no round trip at all. <span className="text-foreground">Compare</span> feeds the same
-                  audio to both and lines the timelines up.
+                  <span className="text-foreground">In browser</span> runs a small model on this device with WebAssembly
+                  (English, or multilingual Whisper for Hindi and other languages): no round trip at all.{' '}
+                  <span className="text-foreground">Compare</span> feeds the same audio to both and lines the timelines
+                  up.
                 </p>
                 {!support.wasm && <p className="mt-1 text-warning-text">This browser does not support WebAssembly.</p>}
               </div>

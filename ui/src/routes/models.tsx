@@ -54,6 +54,7 @@ import { ComponentNotice, ComponentsCard, NeedsComponentMark } from '@/component
 import { describeError, missingComponent, useCatalog, useComponents, useLive, useModelActions } from '@/hooks/use-api'
 import { useStore } from '@/hooks/use-store'
 import type { CatalogModel, ModelStats, Task } from '@/lib/api/types'
+import { groupLanguages, languageLabel } from '@/lib/languages'
 import { fmtBytes, fmtInt, fmtMs, fmtParams, fmtRtf, fmtSpeed, languageName } from '@/lib/format'
 import { prefs, setPref } from '@/lib/prefs'
 import { NeedsServer, SERVER_ONLY_HINT } from '@/components/demo'
@@ -630,7 +631,10 @@ export default function ModelsPage() {
         'Language',
         lang,
         setLang,
-        options.langs.filter((l) => l !== 'multi').map((l) => ({ value: l, label: languageName(l) })),
+        (() => {
+          const g = groupLanguages(options.langs)
+          return [...g.indic, ...g.english, ...g.other].map((l) => ({ value: l, label: languageLabel(l) }))
+        })(),
         'w-36',
       )}
       {filterSelect(

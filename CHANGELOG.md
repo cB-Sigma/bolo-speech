@@ -10,6 +10,19 @@ First public version.
 
 ### Added
 
+- Console: the microphone is requested at the tap, in parallel with loading the
+  in-browser model; speech said in the meantime is buffered and transcribed
+  once the model is ready. Loading shows its stage and bytes, a stuck load is
+  reported with a single-threaded retry, and a refused microphone is explained
+  with steps for the device (including in-app browsers). `?debug=1` adds a
+  diagnostics panel.
+- Console: Indian languages. The language select lists them under their own
+  names, the model picker narrows to models that support the chosen language,
+  and the in-browser mode gains a Hindi model and multilingual Whisper Tiny and
+  Base, with measured error rates shown next to them. Fonts for Indian scripts
+  ship with the console and load on demand.
+- New mark (a person speaking) and a "bolo · बोलो" wordmark.
+
 - Speech-to-text, text-to-speech and voice-activity detection behind one
   server, without PyTorch: engines are plugins for sherpa-onnx (ONNX Runtime)
   and faster-whisper (CTranslate2), with optional plugins for

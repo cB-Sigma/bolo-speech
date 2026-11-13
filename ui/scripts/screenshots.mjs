@@ -4,10 +4,14 @@
 //
 // --base     where the console is served (a real `bolo serve`, or `npm run preview:mock`)
 // --speech   a speech recording to transcribe in the playground (WAV)
-// --only     comma-separated subset: playground,latency,models,tts,benchmark,light,timeline,phone,compare,animation,demo
+// --only     comma-separated subset: playground,latency,models,tts,benchmark,light,timeline,phone,hindi,compare,
+//            animation,demo,components
 // --demo     where the live demo build is served (for `demo`), e.g. http://127.0.0.1:4174/bolo
 // --browser-stt  JSON for the in-browser recogniser's local mirror (for `compare` and `demo`)
 // --stt/--tts  model ids to select (default: whatever the console picks)
+// --hindi-model  an installed model that supports Hindi (for `hindi`), e.g. faster-whisper-tiny-hindi
+// --components   where a server WITHOUT eSpeak NG is served (for `components`), e.g. one started with BOLO_ESPEAK=off
+// --components-tts  a voice that needs eSpeak NG (default piper-en-us-amy-low)
 //
 // Nothing is faked: each image is the page as it looked after really doing the thing.
 import { execFileSync } from 'node:child_process'
@@ -32,6 +36,9 @@ const { values: args } = parseArgs({
     demo: { type: 'string' },
     'browser-stt': { type: 'string' },
     sample: { type: 'string', default: 'en-long' },
+    'hindi-model': { type: 'string' },
+    components: { type: 'string' },
+    'components-tts': { type: 'string', default: 'piper-en-us-amy-low' },
   },
 })
 const only = args.only ? new Set(args.only.split(',')) : null
@@ -151,6 +158,48 @@ await shot('console-phone', {
   prefs: playgroundPrefs,
   act: transcribe,
 })
+
+// Hindi on the server: the language select, a Hindi model and the built-in Hindi sample.
+if (args['hindi-model']) {
+  await shot('console-hindi', {
+    route: '/stt',
+    height: 1080,
+    prefs: { ...playgroundPrefs, sttModel: args['hindi-model'], language: 'hi' },
+    act: async (page) => {
+      await page.getByTestId('sample-hi-short').click()
+      await page.getByTestId('stop').waitFor()
+      await page.getByTestId('mic').waitFor({ timeout: 60_000 })
+      await page.waitForTimeout(500)
+    },
+  })
+}
+
+// A voice that needs eSpeak NG on a server that does not have it: the notice, then the confirmation dialog.
+if (args.components && (!only || only.has('components'))) {
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 1000 },
+    deviceScaleFactor: 2,
+    colorScheme: 'dark',
+  })
+  const page = await context.newPage()
+  await page.addInitScript((tts) => {
+    localStorage.setItem('bolo.theme', 'dark')
+    localStorage.setItem('bolo.prefs', JSON.stringify({ ttsModel: tts }))
+  }, args['components-tts'])
+  await page.goto(`${args.components}/#/tts`)
+  const notice = page.getByTestId('component-notice')
+  await notice.waitFor({ timeout: 20_000 })
+  await page.mouse.move(700, 5)
+  await page.screenshot({ path: path.join(out, 'console-components.png') })
+  console.log('wrote', path.join(out, 'console-components.png'))
+  await notice.getByTestId('install-component').click()
+  await page.getByTestId('install-dialog').waitFor()
+  await page.waitForTimeout(400)
+  // The dialog is photographed, not confirmed: nothing is installed by taking the picture.
+  await page.screenshot({ path: path.join(out, 'console-components-dialog.png') })
+  console.log('wrote', path.join(out, 'console-components-dialog.png'))
+  await context.close()
+}
 
 // Browser vs server on the same audio (needs --browser-stt or internet access for the model).
 await shot('console-compare', {

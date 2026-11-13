@@ -116,13 +116,18 @@ test('server-only features are disabled with an explanation and the install comm
   await page.goto('./#/models')
   await expect(page.getByRole('heading', { name: /Runs in your browser/ })).toBeVisible()
   await expect(page.getByRole('heading', { name: /Speech to text.*available when you run the server/ })).toBeVisible()
-  await page.getByLabel('Search models').fill('whisper-tiny')
-  const serverCard = page.getByTestId('model-card').filter({ hasText: 'whisper-tiny' }).first()
+  await page.getByLabel('Search models').fill('faster-whisper-tiny')
+  const serverCard = page.getByTestId('model-card').filter({ hasText: 'faster-whisper-tiny' }).first()
   await expect(serverCard).toContainText('Needs the server')
   await expect(serverCard.getByRole('button', { name: /Pull/ })).toHaveCount(0)
   await page.getByLabel('Search models').fill('')
-  const browserCard = page.getByTestId('model-card').filter({ hasText: 'onnxruntime-web' })
+  // Four models run in the page; each says what it is and what it costs.
+  await expect(page.getByTestId('model-card').filter({ hasText: 'onnxruntime-web' })).toHaveCount(4)
+  const browserCard = page.getByTestId('model-card').filter({ has: page.getByTestId('pull-moonshine-tiny') })
   await expect(browserCard).toContainText('MIT')
+  await expect(
+    page.getByTestId('model-card').filter({ has: page.getByTestId('pull-whisper-tiny-hindi') }),
+  ).toContainText('Apache-2.0')
   await expect(browserCard.getByTestId('pull-moonshine-tiny')).toContainText('Download')
 
   // Optional components are listed read-only.
@@ -218,7 +223,7 @@ test.describe('with the model available', () => {
 
     // Models: the browser model is now loaded.
     await page.goto('./#/models')
-    await expect(page.getByTestId('model-card').filter({ hasText: 'onnxruntime-web' })).toContainText('Loaded')
+    await expect(page.getByTestId('model-card').filter({ hasText: 'onnxruntime-web' }).first()).toContainText('Loaded')
 
     // A real in-page sweep.
     await page.goto('./#/benchmark')
@@ -253,5 +258,184 @@ test.describe('with the model available', () => {
     await expect(page.getByTestId('latency-timeline').getByRole('img')).toHaveAccessibleName(
       /final \d[\d,]* ms after speech ended/,
     )
+  })
+})
+
+test.describe('first visit: microphone and model status', () => {
+  test('the hero says what the microphone and the model will do, and offers Hindi', async ({ page }) => {
+    await open(page, 'stt')
+    const hero = page.getByTestId('demo-hero')
+    // The test browser has the permission granted.
+    await expect(hero.getByTestId('mic-status')).toHaveAttribute('data-permission', 'granted')
+    await expect(hero.getByTestId('mic-status')).toContainText('allowed for this site')
+    await expect(hero.getByTestId('model-chip')).toContainText('Moonshine Tiny')
+    await expect(hero).toContainText('32.1 MB')
+    await expect(page.getByTestId('sample-hi-short')).toBeVisible()
+    await hero.getByTestId('hero-hindi').click()
+    const dialog = page.getByTestId('switch-model-dialog')
+    await expect(dialog.getByRole('heading')).toHaveText('Hindi needs a different model')
+    await expect(dialog.getByTestId('switch-to-whisper-tiny-hindi')).toContainText('Suggested')
+    await expect(dialog.getByTestId('switch-to-whisper-tiny-hindi')).toContainText('124 MB download')
+    await axe(page)
+    await dialog.getByRole('button', { name: 'Keep Moonshine Tiny' }).click()
+    await expect(page.locator('meta[name="viewport"]')).toHaveAttribute('content', /viewport-fit=cover/)
+  })
+
+  test('a blocked microphone is flagged before the tap and explained after it, at phone width', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.addInitScript(() => {
+      navigator.mediaDevices.getUserMedia = () =>
+        new Promise((_r, reject) =>
+          setTimeout(() => reject(new DOMException('Permission denied', 'NotAllowedError')), 5),
+        )
+      const query = navigator.permissions.query.bind(navigator.permissions)
+      navigator.permissions.query = (d: PermissionDescriptor) =>
+        (d.name as string) === 'microphone'
+          ? Promise.resolve({ state: 'denied', onchange: null } as unknown as PermissionStatus)
+          : query(d)
+    })
+    await open(page, 'stt')
+    const status = page.getByTestId('mic-status')
+    await expect(status).toContainText('blocked for this site')
+    // The explanation is available before trying.
+    await status.getByRole('button', { name: 'How to allow it' }).click()
+    await expect(page.getByTestId('mic-help').getByRole('heading')).toHaveText(
+      'The microphone is blocked for this site',
+    )
+    await page.getByTestId('mic-help').getByRole('button', { name: 'Dismiss' }).click()
+    await expect(page.getByTestId('mic-help')).toHaveCount(0)
+    // And the attempt itself is never blocked by the page.
+    await page.getByTestId('hero-mic').click()
+    const help = page.getByTestId('mic-help')
+    await expect(help).toContainText('NotAllowedError: Permission denied')
+    await expect(help.getByTestId('mic-retry')).toBeVisible()
+    await expect(help.getByTestId('mic-help-sample')).toBeVisible()
+    await expect(help.getByTestId('mic-help-upload')).toBeVisible()
+    await axe(page)
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    )
+    expect(overflow).toBeLessThanOrEqual(1)
+  })
+
+  test('the banner dot stays on the first line of its text at 390 px', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await open(page, 'stt')
+    const banner = page.getByTestId('demo-banner')
+    const dot = await banner.locator('span[aria-hidden]').first().boundingBox()
+    const text = await banner.getByText('Live demo.').boundingBox()
+    if (!dot || !text) throw new Error('banner not laid out')
+    // Same line: the dot's centre lies within the first line of text, and to its left.
+    const centre = dot.y + dot.height / 2
+    expect(centre).toBeGreaterThan(text.y)
+    expect(centre).toBeLessThan(text.y + text.height)
+    expect(dot.x + dot.width).toBeLessThanOrEqual(text.x)
+  })
+
+  test('with data saver on, nothing is fetched until asked', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'connection', {
+        configurable: true,
+        value: { saveData: true, effectiveType: '4g' },
+      })
+    })
+    const modelRequests: string[] = []
+    page.on('request', (r) => {
+      if (/\.onnx|ort-wasm/.test(r.url())) modelRequests.push(r.url())
+    })
+    await open(page, 'stt')
+    await expect(page.getByTestId('data-saver-note')).toContainText('not fetched in advance')
+    await page.waitForTimeout(4000)
+    await expect(page.getByTestId('demo-hero').getByTestId('model-chip')).toHaveAttribute('data-status', 'idle')
+    expect(modelRequests).toEqual([])
+  })
+
+  test('?debug=1 reports the service worker and isolation', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('bolo.theme', 'dark'))
+    await page.goto('./?debug=1#/stt')
+    await expect.poll(() => page.evaluate(() => crossOriginIsolated), { timeout: 20_000 }).toBe(true)
+    const env = page.getByTestId('diagnostics-env')
+    await expect(env).toContainText(/crossOriginIsolated\s*yes/)
+    await expect(env).toContainText('credentialless (added by the service worker)')
+    await expect(env).toContainText('controlling this page')
+    await expect(env).toContainText(/SharedArrayBuffer\s*available/)
+  })
+})
+
+test.describe('with the models available: first use and Hindi', () => {
+  test.skip(!MIRROR, 'set BOLO_E2E_MODEL_DIR to a local model mirror to run')
+
+  test('the model is fetched while the page is idle, with real stages, before anything is pressed', async ({
+    page,
+  }) => {
+    await open(page, 'stt')
+    const chip = page.getByTestId('demo-hero').getByTestId('model-chip')
+    await expect(chip).toHaveAttribute('data-status', /loading|ready/, { timeout: 20_000 })
+    await expect(chip).toContainText('Ready', { timeout: 120_000 })
+    // Then talking starts at once.
+    await page.getByTestId('hero-mic').click()
+    await expect(page.getByTestId('stop')).toBeVisible()
+    await expect(page.getByTestId('final-text').first()).toBeVisible({ timeout: 60_000 })
+    await page.getByTestId('stop').click()
+  })
+
+  test('tapping the microphone before the model is there: live at once, speech kept, then transcribed', async ({
+    page,
+  }) => {
+    // Hold the model back so the wait is long enough to observe.
+    await page.route('**/onnx/*.onnx', async (route) => {
+      await new Promise((r) => setTimeout(r, 4000))
+      await route.continue()
+    })
+    await open(page, 'stt')
+    await page.getByTestId('hero-mic').click()
+    const note = page.getByTestId('starting-note')
+    await expect(note).toHaveAttribute('data-mic', 'live', { timeout: 10_000 })
+    await expect(page.getByTestId('load-stage').first()).toContainText(/Downloading|Compiling|Warming/)
+    await expect
+      .poll(
+        async () =>
+          Number.parseFloat(
+            await page
+              .getByTestId('buffered-seconds')
+              .innerText()
+              .catch(() => '99'),
+          ),
+        {
+          timeout: 20_000,
+        },
+      )
+      .toBeGreaterThan(1.5)
+    await expect(page.getByTestId('final-text').first()).toBeVisible({ timeout: 150_000 })
+    // The fake microphone plays the Kennedy sample from its start: the transcript begins with its opening words,
+    // which were spoken while the model was still loading.
+    expect((await page.getByTestId('transcript').innerText()).trim()).toMatch(/^and so,? my fellow america/i)
+    await page.getByTestId('stop').click()
+    await expect(page.getByTestId('mic')).toBeVisible({ timeout: 60_000 })
+  })
+
+  test('Hindi: the fine-tuned model transcribes the bundled Hindi sample in Devanagari', async ({ page }) => {
+    await page.addInitScript(() => {
+      if (!localStorage.getItem('bolo.prefs'))
+        localStorage.setItem('bolo.prefs', JSON.stringify({ browserModel: 'whisper-tiny-hindi' }))
+    })
+    await open(page, 'stt')
+    await expect(page.getByTestId('browser-model-picker')).toContainText('Whisper Tiny Hindi')
+    await expect(page.getByTestId('language-select')).toContainText('हिन्दी · Hindi')
+    const t0 = Date.now()
+    await page.getByTestId('sample-hi-short').click()
+    const engine = page.getByTestId('browser-engine')
+    await expect(engine.getByTestId('engine-status')).toHaveAttribute('data-status', 'ready', { timeout: 180_000 })
+    const readyMs = Date.now() - t0
+    await expect(page.getByTestId('mic')).toBeVisible({ timeout: 120_000 })
+    const transcript = await page.getByTestId('transcript').innerText()
+    expect(transcript).toContain('नमस्ते')
+    expect(transcript).toMatch(/मौसम|अच्छा/)
+    const p50 = await page.getByTestId('readout').filter({ hasText: 'Final p50' }).innerText()
+    const rtf = await page.getByTestId('readout').filter({ hasText: 'Real-time factor' }).innerText()
+    console.log(
+      `[demo-hindi] ready ${readyMs} ms · ${p50.replace(/\s+/g, ' ')} · ${rtf.replace(/\s+/g, ' ')} · ${transcript.trim()}`,
+    )
+    await axe(page)
   })
 })

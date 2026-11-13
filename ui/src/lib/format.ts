@@ -79,6 +79,9 @@ let displayNames: Intl.DisplayNames | null | undefined
 export function languageName(code: string): string {
   if (!code) return 'Any'
   if (code === 'multi') return 'Multilingual'
+  // The names most people in India use, where the CLDR default differs.
+  if (code === 'bn') return 'Bengali'
+  if (code === 'or') return 'Odia'
   if (displayNames === undefined) {
     try {
       displayNames = new Intl.DisplayNames(['en'], { type: 'language', fallback: 'none' })

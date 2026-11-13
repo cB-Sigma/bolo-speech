@@ -1,0 +1,147 @@
+{
+ "what": "Hindi accuracy of the models the in-browser recogniser can run, and their speed in a browser",
+ "date": "2026-11-13",
+ "accuracy": {
+  "method": "Each model's 8-bit ONNX files (the same files the browser downloads) were run with @huggingface/transformers 4.3.2 on onnxruntime-node, greedy decoding, language forced to Hindi, on the first 12 clips of the FLEURS Hindi dev split (real speakers, 141 s in total with the bundled sample) plus bolo's built-in hi-short sample (synthesised). Word and character error rates after removing punctuation; no other normalisation. Twelve clips is a small test: read the numbers as 'usable or not', not to the last digit.",
+  "test_audio": "google/fleurs, config hi_in, dev split, first 12 files of the archive (CC-BY-4.0; not redistributed here); server/src/bolo/samples/hi-short.wav",
+  "results": [
+   {
+    "model": "whisper-tiny-q8",
+    "repo": "onnx-community/whisper-tiny",
+    "clips": 13,
+    "audio_s": 140.9,
+    "wer": 2.305,
+    "cer": 2.64,
+    "output_characters_by_script": {
+     "devanagari": 134,
+     "arabic": 0,
+     "latin": 2810
+    },
+    "examples": [
+     {
+      "reference": "मेजरकेन खाना, भूमध्य सागर में समान क्षेत्रों की तरह, रोटी, सब्जियों और मांस (विशेष रूप से सूअर का मांस) पर आधारित है, और जैतून के तेल का उपयोग करता है।",
+      "hypothesis": "Major kinkanam pohma de saagar mein samashheetroom ki tarar roti, sab jiya and mass Vishesh Roop se sur ka maas par adhari thet. And jetoon ki tel kao piya kar thetai."
+     },
+     {
+      "reference": "वैज्ञानिकों का मानना है कि ओसेलोट्स गंध के द्वारा जानवरों का पीछा करते और खाते (शिकार) हैं, यह सूँघते हुए कि वे ज़मीन पर कहाँ रहे होंगे।",
+      "hypothesis": "ilga nahe ki ose loads gunnd ki doara januari ka pi cha kar de and khade hai."
+     },
+     {
+      "reference": "नमस्ते, आप कैसे हैं? आज मौसम बहुत अच्छा है।",
+      "hypothesis": "Namaste, your所謂 today, Mohan Singh is a good child."
+     }
+    ]
+   },
+   {
+    "model": "whisper-base-q8",
+    "repo": "onnx-community/whisper-base",
+    "clips": 13,
+    "audio_s": 140.9,
+    "wer": 1.016,
+    "cer": 1.101,
+    "output_characters_by_script": {
+     "devanagari": 0,
+     "arabic": 108,
+     "latin": 1121
+    },
+    "examples": [
+     {
+      "reference": "मेजरकेन खाना, भूमध्य सागर में समान क्षेत्रों की तरह, रोटी, सब्जियों और मांस (विशेष रूप से सूअर का मांस) पर आधारित है, और जैतून के तेल का उपयोग करता है।",
+      "hypothesis": "Mejr ki ngaanam phumadhi sagar me saman shetra ki tarar roti sabjiya aur mas, vise shrupp se swar ka mas, par adharaath hai, aur jai tun ki tel kaupi hokkaar tha hai."
+     },
+     {
+      "reference": "वैज्ञानिकों का मानना है कि ओसेलोट्स गंध के द्वारा जानवरों का पीछा करते और खाते (शिकार) हैं, यह सूँघते हुए कि वे ज़मीन पर कहाँ रहे होंगे।",
+      "hypothesis": "Ngyanikho ka manna hai ki ose Lord Skandke Dwara Janwaro ka pichakadhe aur khathe hai, ye sunte hua ki vezameen par kaha raayun hua."
+     },
+     {
+      "reference": "नमस्ते, आप कैसे हैं? आज मौसम बहुत अच्छा है।",
+      "hypothesis": "Namaste, آپ کیsai hain, aaj morsam, buhut, aajshahe."
+     }
+    ]
+   },
+   {
+    "model": "whisper-tiny-hindi",
+    "repo": "astronova001/whisper-tiny-hindi-ONNX",
+    "clips": 13,
+    "audio_s": 140.9,
+    "wer": 0.403,
+    "cer": 0.265,
+    "output_characters_by_script": {
+     "devanagari": 1065,
+     "arabic": 0,
+     "latin": 0
+    },
+    "examples": [
+     {
+      "reference": "मेजरकेन खाना, भूमध्य सागर में समान क्षेत्रों की तरह, रोटी, सब्जियों और मांस (विशेष रूप से सूअर का मांस) पर आधारित है, और जैतून के तेल का उपयोग करता है।",
+      "hypothesis": "मेजर किन खाना भूमिद्धिसागर में समान क्षेत्रों की तरह रोटी सब्जियों और मास विशेष रूप से सूअर का मास पर आधारित है और जैसे तो उनके देखों पर उपयोग करता है"
+     },
+     {
+      "reference": "वैज्ञानिकों का मानना है कि ओसेलोट्स गंध के द्वारा जानवरों का पीछा करते और खाते (शिकार) हैं, यह सूँघते हुए कि वे ज़मीन पर कहाँ रहे होंगे।",
+      "hypothesis": "जानिकों का मानना है कि ओर से लोड गंद के द्वारा जानवरों का पीछा करते और खाते हैं यह सुनते हुए कि वह जमीन पर कहाँ रहे होंगे"
+     },
+     {
+      "reference": "नमस्ते, आप कैसे हैं? आज मौसम बहुत अच्छा है।",
+      "hypothesis": "नमस्ते आप कैसे हैं आज मौसम बहुत अच्छा है"
+     }
+    ]
+   }
+  ]
+ },
+ "speed_in_browser": {
+  "method": "Headless Chromium 153 on the build machine (4 vCPU Intel Xeon 2.1 GHz, no GPU), demo build, WebAssembly with 4 threads, model files served from a local mirror so download time is excluded. The machine was running other jobs at the time (load average 9 to 13 on 4 cores), so these are pessimistic; a quiet machine or a recent phone will do better. 'session_rtf' is all compute (partials and finals) divided by the audio length; above 1 means the transcript falls behind the speaker.",
+  "results": [
+   {
+    "model": "moonshine-tiny",
+    "audio": "en-ask-not (11.0 s, English)",
+    "load_ms": 4742,
+    "final_p50_ms": 1297,
+    "session_rtf": 0.63
+   },
+   {
+    "model": "whisper-tiny-q8",
+    "audio": "en-ask-not (11.0 s, English)",
+    "load_ms": 10500,
+    "final_p50_ms": 9977,
+    "session_rtf": 1.91
+   },
+   {
+    "model": "whisper-base-q8",
+    "audio": "en-ask-not (11.0 s, English)",
+    "load_ms": 14000,
+    "final_p50_ms": 25607,
+    "session_rtf": 3.87
+   },
+   {
+    "model": "whisper-tiny-hindi",
+    "audio": "hi-short (4.1 s, Hindi)",
+    "load_ms": 12900,
+    "final_p50_ms": 8380,
+    "session_rtf": 2.84,
+    "transcript": "नमस्ते आप कैसे हैं आज मौसम बहुत अच्छा है"
+   },
+   {
+    "model": "whisper-base-q8",
+    "audio": "hi-short (4.1 s, Hindi)",
+    "load_ms": 14700,
+    "final_p50_ms": 23857,
+    "session_rtf": 6.59,
+    "transcript": "Namaste, آپ kye si hai, aaj morsam, buhut aajsh hai."
+   },
+   {
+    "model": "whisper-tiny-q8",
+    "audio": "hi-short (4.1 s, Hindi)",
+    "load_ms": 9574,
+    "final_p50_ms": 7335,
+    "session_rtf": 2.6,
+    "transcript": "Namaste, your所謂 today, Mohan Singh is a good."
+   }
+  ],
+  "note": "These runs were made before partial results were switched off for models that need more than 1.5 s per pass; with that change a slow model spends its time on finals only."
+ },
+ "conclusions": [
+  "Whisper Tiny and Whisper Base (multilingual, 8-bit) are not usable for Hindi: word error rate above 100 %, output mostly in Latin or Urdu script.",
+  "Whisper Tiny fine-tuned for Hindi (ARTPARK-IISc/whisper-tiny-vaani-hindi, Apache-2.0) is usable for a demonstration: about 40 % of words wrong on this test. Its model card reports 26 % on the FLEURS test split for the original weights.",
+  "All Whisper models decode a fixed 30 s window per pass and ran slower than real time in the browser on this (busy) machine; Moonshine Tiny did not."
+ ]
+}

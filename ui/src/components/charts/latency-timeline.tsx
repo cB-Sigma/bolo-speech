@@ -102,6 +102,7 @@ export function LatencyTimeline({
                 className="absolute top-[18px] flex h-5 w-5 -translate-x-1/2 items-center justify-center"
                 style={{ left: pct(m.pos) }}
                 tabIndex={0}
+                role="note"
                 aria-label={`${MARKER_LABEL[m.kind]} at ${fmtMs(m.at)}`}
               >
                 {m.kind === 'first_partial' ? (

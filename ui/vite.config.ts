@@ -42,7 +42,8 @@ function demoSite(): Plugin {
     generateBundle(_options, bundle) {
       // Everything except the page itself is precached by the service worker (about 2 MB).
       const files = Object.keys(bundle)
-        .filter((f) => f !== 'index.html')
+        // Fonts for other scripts are fetched (and then cached) only by pages that show them.
+        .filter((f) => f !== 'index.html' && !/noto-(sans|naskh)-/.test(f))
         .concat('favicon.svg')
         .sort()
       const source = readFileSync(path.resolve(import.meta.dirname, 'src/demo/sw.js'), 'utf8').replace(

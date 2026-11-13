@@ -9,7 +9,8 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { CatalogModel } from '@/lib/api/types'
-import { fmtBytes } from '@/lib/format'
+import { fmtBytes, languageName } from '@/lib/format'
+import { supportsLanguage } from '@/lib/languages'
 import { cn } from '@/lib/utils'
 import { languageSummary, TIER_LABEL, TIERS } from './model-bits'
 
@@ -23,6 +24,7 @@ export function ModelPicker({
   id,
   className,
   label = 'Model',
+  language,
 }: {
   models: CatalogModel[]
   value: string | null
@@ -32,12 +34,19 @@ export function ModelPicker({
   id?: string
   className?: string
   label?: string
+  /** When set (and not `auto`), only models that cover this language are offered. */
+  language?: string
 }) {
   if (loading) return <Skeleton className={cn('h-8 w-56', className)} />
   // Catalogs run to hundreds of entries; the picker offers what can be used now.
   const installed = models.filter((m) => m.installed)
-  const shown = installed.length ? installed : models
-  const hidden = models.length - shown.length
+  const usable = installed.length ? installed : models
+  const filtering = Boolean(language && language !== 'auto')
+  const matching = filtering ? usable.filter((m) => supportsLanguage(m.languages, language as string)) : usable
+  // Never hide the current choice, and never show an empty list.
+  const shown = matching.length ? usable.filter((m) => matching.includes(m) || m.id === value) : usable
+  const hidden = models.length - usable.length
+  const filteredOut = usable.length - shown.length
   return (
     <Select value={value ?? undefined} onValueChange={onChange} disabled={disabled || models.length === 0}>
       <SelectTrigger
@@ -86,6 +95,15 @@ export function ModelPicker({
             </SelectGroup>
           )
         })}
+        {filteredOut > 0 && (
+          <p
+            className="border-t border-border px-3 py-2 text-xs text-muted-foreground"
+            data-testid="picker-language-note"
+          >
+            Showing models that support {languageName(language as string)}. {filteredOut} more are hidden; set the
+            language to Auto-detect to see them.
+          </p>
+        )}
         {hidden > 0 && (
           <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
             {hidden} more in the catalog are not installed. Pull them from Models.

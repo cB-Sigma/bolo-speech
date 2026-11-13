@@ -6,6 +6,10 @@ export interface Prefs {
   ttsModel: string | null
   ttsVoice: string | null
   language: string
+  /** Model used by the in-browser recogniser. */
+  browserModel: string
+  /** Language for the in-browser recogniser (`auto` or a code); only multilingual models use it. */
+  browserLanguage: string
   /** End-to-end latency target in ms used by budget bars and target lines. */
   targetMs: number
   modelsView: 'cards' | 'table'
@@ -17,6 +21,8 @@ const defaults: Prefs = {
   ttsModel: null,
   ttsVoice: null,
   language: 'auto',
+  browserModel: 'moonshine-tiny',
+  browserLanguage: 'auto',
   // A tab's recogniser waits half a second of silence before it answers, so the demo starts with a looser target.
   targetMs: isDemo ? 800 : 300,
   modelsView: 'cards',

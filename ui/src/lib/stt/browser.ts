@@ -10,7 +10,16 @@ export interface BrowserTranscriberOptions {
   partialEveryMs?: number
   /** Silence that ends an utterance (ms). */
   endpointMs?: number
+  /** Language to decode in, or `auto` to let a multilingual model guess per utterance. */
+  language?: string
 }
+
+/** Whisper sees 30 s at a time; cut a non-stop utterance before that. */
+const MAX_UTTERANCE_S = 24
+/** Above this time per decode, partial results are skipped. */
+const SLOW_DECODE_MS = 1500
+/** A language guess from less audio than this is not trusted for the rest of the utterance. */
+const DETECT_MIN_S = 1.5
 
 function commonPrefix(a: string, b: string): number {
   const n = Math.min(a.length, b.length)
@@ -44,11 +53,16 @@ export class BrowserTranscriber implements Transcriber {
   private idle: (() => void) | null = null
   /** Compute time of the first partial of the current utterance. */
   private firstPartialMs: number | null = null
+  private lastDecodeMs = 0
+  private readonly language: string
+  /** The model's guess for the utterance being spoken (auto mode). */
+  private guessed: string | null = null
 
   constructor(engine: BrowserSttEngine, opts: BrowserTranscriberOptions = {}) {
     this.engine = engine
     this.partialEvery = ((opts.partialEveryMs ?? 600) / 1000) * STT_RATE
     this.vad = new EnergyVad({ sampleRate: STT_RATE, endMs: opts.endpointMs ?? 500 })
+    this.language = opts.language ?? 'auto'
   }
 
   async start(): Promise<void> {
@@ -81,10 +95,21 @@ export class BrowserTranscriber implements Transcriber {
       if (ev.event === 'speech_start') this.onStart(ev.t)
       else this.onEnd(ev.t)
     }
+    if (this.vad.isSpeaking && this.utteranceSamples >= MAX_UTTERANCE_S * STT_RATE) {
+      // Still talking: close this stretch and carry on in a new one.
+      const t = this.tracker.clock.sentSeconds
+      this.onEnd(t)
+      this.preroll = []
+      this.onStart(t)
+    }
     if (
       this.vad.isSpeaking &&
       this.decoding === 0 &&
-      this.utteranceSamples - this.lastPartialSamples >= this.partialEvery
+      // A model that needs this long per pass cannot keep up with partials; every pass then goes to finals.
+      this.lastDecodeMs <= SLOW_DECODE_MS &&
+      // A slow model gets fewer partials, so the final is never stuck behind a queue of them.
+      this.utteranceSamples - this.lastPartialSamples >=
+        Math.max(this.partialEvery, (this.lastDecodeMs / 1000) * 1.5 * STT_RATE)
     ) {
       this.decodePartial()
     }
@@ -98,6 +123,7 @@ export class BrowserTranscriber implements Transcriber {
     this.utteranceT0 = Math.max(0, this.tracker.clock.sentSeconds - this.utteranceSamples / STT_RATE)
     this.lastPartialSamples = 0
     this.lastPartialText = ''
+    this.guessed = null
     this.generation += 1
     this.tracker.speechStart(t)
   }
@@ -114,8 +140,9 @@ export class BrowserTranscriber implements Transcriber {
     this.utterance = []
     this.utteranceSamples = 0
     this.generation += 1
-    void this.decode(audio, (text, ms) => {
-      this.tracker.final({ text, t0, t1: t, words: null, language: 'en', latencyMs: ms })
+    const language = this.guessed ?? this.language
+    void this.decode(audio, language, (text, ms, spoken) => {
+      this.tracker.final({ text, t0, t1: t, words: null, language: spoken, latencyMs: ms })
       const finalMs = performance.now() - speechEndAt
       const endpointMs = Math.max(0, decidedAt - speechEndAt)
       recordBrowserTrace({
@@ -139,8 +166,10 @@ export class BrowserTranscriber implements Transcriber {
     const gen = this.generation
     const audio = concatFloat(this.utterance)
     this.lastPartialSamples = this.utteranceSamples
-    void this.decode(audio, (text, ms) => {
-      if (gen !== this.generation || !text) return // the utterance moved on
+    void this.decode(audio, this.guessed ?? this.language, (text, ms, spoken) => {
+      if (gen !== this.generation) return // the utterance moved on
+      if (this.language === 'auto' && spoken && audio.length >= DETECT_MIN_S * STT_RATE) this.guessed = spoken
+      if (!text) return
       this.firstPartialMs ??= ms
       const stable = commonPrefix(this.lastPartialText, text)
       this.lastPartialText = text
@@ -148,19 +177,24 @@ export class BrowserTranscriber implements Transcriber {
     })
   }
 
-  private async decode(audio: Float32Array, done: (text: string, ms: number) => void): Promise<void> {
+  private async decode(
+    audio: Float32Array,
+    language: string,
+    done: (text: string, ms: number, language: string | null) => void,
+  ): Promise<void> {
     if (audio.length < STT_RATE * 0.1) {
-      done('', 0)
+      done('', 0, null)
       return
     }
     this.decoding += 1
     try {
-      const { text, ms } = await this.engine.transcribe(audio)
+      const { text, ms, language: spoken } = await this.engine.transcribe(audio, { language })
       if (this.cancelled) return
       this.processedMs += ms
+      this.lastDecodeMs = ms
       this.processedAudio += audio.length / STT_RATE
       this.store.patch({ rtf: this.processedMs / 1000 / Math.max(0.001, this.tracker.clock.sentSeconds) })
-      done(text, ms)
+      done(text, ms, spoken)
     } catch (err) {
       if (!this.cancelled)
         this.store.patch({ status: 'error', error: err instanceof Error ? err.message : String(err) })

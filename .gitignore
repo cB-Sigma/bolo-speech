@@ -50,3 +50,6 @@ bolo.toml
 # Working notes that are not part of the project
 CONTRACT.md
 SERVER_STATUS.md
+
+# internal working notes
+docs/_*

@@ -55,10 +55,13 @@ export function DemoBanner() {
       className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border bg-chart-1/10 px-4 py-2 text-[13px] sm:px-5"
       data-testid="demo-banner"
     >
-      <span className="size-1.5 shrink-0 rounded-full bg-chart-1" aria-hidden />
-      <span>
-        <span className="font-medium">Live demo.</span> Everything here runs in your browser.{' '}
-        <span className="text-muted-foreground">Install bolo to serve models over an API.</span>
+      {/* The dot stays with the first line of the text at any width. */}
+      <span className="flex min-w-0 flex-1 basis-64 items-baseline gap-2">
+        <span className="size-1.5 shrink-0 -translate-y-0.5 rounded-full bg-chart-1" aria-hidden />
+        <span className="min-w-0">
+          <span className="font-medium">Live demo.</span> Everything here runs in your browser.{' '}
+          <span className="text-muted-foreground">Install bolo to serve models over an API.</span>
+        </span>
       </span>
       <a
         href={`${REPO_URL}#readme`}
