@@ -1,0 +1,829 @@
+import {
+  Copy,
+  FileAudio,
+  Info,
+  Mic,
+  MicOff,
+  Phone,
+  Play,
+  Settings2,
+  Share2,
+  Square,
+  Upload,
+  Volume2,
+} from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
+import { BudgetBar } from '@/components/charts/budget-bar'
+import { LatencyTimeline, UtteranceList } from '@/components/charts/latency-timeline'
+import { LevelStrip } from '@/components/charts/level-strip'
+import { SegmentedBar } from '@/components/charts/segmented-bar'
+import { Page } from '@/components/layout/app-shell'
+import { ModelPicker } from '@/components/model-picker'
+import { Panel, Readout } from '@/components/panel'
+import { BrowserEnginePanel } from '@/components/stt/engine-panel'
+import { Transcript } from '@/components/stt/transcript'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { describeError, useSamples, useSelectedModel } from '@/hooks/use-api'
+import { usePing } from '@/hooks/use-ping'
+import { useStore } from '@/hooks/use-store'
+import { useSttSession, type EngineMode, type SessionInput } from '@/hooks/use-stt-session'
+import { useSupport } from '@/hooks/use-support'
+import { api } from '@/lib/api/client'
+import type { Sample } from '@/lib/api/types'
+import { isDemo } from '@/lib/api/config'
+import { STT_RATE } from '@/lib/audio/capture'
+import { BROWSER_MODELS } from '@/lib/browser-stt/models'
+import { decodeShare, shareUrl } from '@/lib/share'
+import { SERVER_ONLY_HINT } from '@/components/demo'
+import { useSearchParams } from 'react-router-dom'
+import { concatFloat } from '@/lib/audio/pcm'
+import { simulateTelephony, TELEPHONY_RATE } from '@/lib/audio/telephony'
+import { decodeAudio } from '@/lib/audio/wav'
+import { fmtBytes, fmtMs, fmtRtf, fmtSeconds, fmtSpeed, languageName } from '@/lib/format'
+import { breakdown, summarize } from '@/lib/latency/stats'
+import { utteranceLatency, type Utterance } from '@/lib/latency/timeline'
+import { prefs, setPref } from '@/lib/prefs'
+import { Store } from '@/lib/store'
+import { emptyTranscript, transcriptText, type Transcriber, type TranscriptState } from '@/lib/stt/transcriber'
+import { cn } from '@/lib/utils'
+
+const idleStore = new Store<TranscriptState>(emptyTranscript())
+
+function useTranscript(t: Transcriber | null): TranscriptState {
+  return useStore(t?.store ?? idleStore)
+}
+
+function lastFinal(utterances: Utterance[]): Utterance | null {
+  for (let i = utterances.length - 1; i >= 0; i--) {
+    if ((utterances[i] as Utterance).finalAt != null) return utterances[i] as Utterance
+  }
+  return utterances[utterances.length - 1] ?? null
+}
+
+function sessionStats(s: TranscriptState) {
+  const lats = s.utterances.filter((u) => u.finalAt != null).map(utteranceLatency)
+  return {
+    count: lats.length,
+    firstPartial: summarize(lats.map((l) => l.firstPartialMs).filter((v): v is number => v != null)),
+    final: summarize(lats.map((l) => l.finalMs).filter((v): v is number => v != null)),
+  }
+}
+
+const STATUS_TEXT: Record<TranscriptState['status'], string> = {
+  idle: 'Idle',
+  loading: 'Loading model',
+  connecting: 'Connecting',
+  streaming: 'Streaming',
+  reconnecting: 'Reconnecting',
+  finishing: 'Finishing',
+  done: 'Done',
+  error: 'Error',
+}
+
+function EngineColumn({
+  title,
+  state,
+  targetMs,
+  rttMs,
+  placeholder,
+  showSplit,
+}: {
+  title: string | null
+  state: TranscriptState
+  targetMs: number
+  rttMs: number | null
+  placeholder: string
+  showSplit: boolean
+}) {
+  const u = lastFinal(state.utterances)
+  const lat = u ? utteranceLatency(u) : null
+  const b = lat?.finalMs != null ? breakdown(lat.finalMs, u?.finalServerMs, rttMs) : null
+  return (
+    <div className="min-w-0">
+      {title && (
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h3 className="text-xs font-semibold">{title}</h3>
+          <span className="text-[11px] text-muted-foreground">{state.backend ?? ''}</span>
+        </div>
+      )}
+      <LatencyTimeline utterance={u} targetMs={targetMs} />
+      <BudgetBar className="mt-4" measuredMs={lat?.finalMs ?? null} targetMs={targetMs} label="Speech end → final" />
+      {showSplit && (
+        <div className="mt-4 border-t border-border pt-3">
+          <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+            Where the wait went
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" className="rounded-sm" aria-label="About this split">
+                  <Info className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-64">
+                Model time is what the recogniser reports for the final. Network is the measured round trip to the
+                server. The rest is the silence the endpointer waits for before deciding you have stopped, plus
+                queueing.
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          <SegmentedBar
+            ariaLabel="Latency split"
+            segments={[
+              {
+                key: 'wait',
+                label: 'Endpointing and queue',
+                value: b?.waitMs ?? 0,
+                color: 'var(--chart-mute)',
+                display: b ? fmtMs(b.waitMs) : '–',
+              },
+              {
+                key: 'model',
+                label: 'Model',
+                value: b?.modelMs ?? 0,
+                color: 'var(--chart-1)',
+                display: b ? fmtMs(b.modelMs) : '–',
+              },
+              {
+                key: 'net',
+                label: 'Network',
+                value: b?.networkMs ?? 0,
+                color: 'var(--chart-2)',
+                display: b ? fmtMs(b.networkMs) : '–',
+              },
+            ]}
+          />
+        </div>
+      )}
+      <div className="sr-only" data-testid="engine-placeholder">
+        {placeholder}
+      </div>
+    </div>
+  )
+}
+
+function SessionStats({
+  state,
+  targetMs,
+  title,
+  compact,
+}: {
+  state: TranscriptState
+  targetMs: number
+  title?: string
+  compact?: boolean
+}) {
+  const st = sessionStats(state)
+  const v = (n: number) => (Number.isFinite(n) ? Math.round(n).toString() : '–')
+  return (
+    <div className="min-w-0">
+      {title && <h3 className="mb-2 text-xs font-semibold">{title}</h3>}
+      <div className={cn('grid grid-cols-2 gap-x-4 gap-y-3', !compact && 'sm:grid-cols-4')}>
+        <Readout
+          label="First partial p50"
+          value={v(st.firstPartial.p50)}
+          unit="ms"
+          hint={`p95 ${v(st.firstPartial.p95)} ms`}
+        />
+        <Readout label="Final p50" value={v(st.final.p50)} unit="ms" hint={`p95 ${v(st.final.p95)} ms`} />
+        <Readout
+          label="Real-time factor"
+          value={fmtRtf(state.rtf)}
+          hint={state.rtf ? `${fmtSpeed(state.rtf)} real time` : 'lower is faster'}
+        />
+        <Readout label="Utterances" value={st.count} hint={`${fmtSeconds(state.audioSeconds)} of audio`} />
+      </div>
+      {st.count > 0 && <UtteranceList className="mt-4" utterances={state.utterances} targetMs={targetMs} />}
+    </div>
+  )
+}
+
+export default function SttPage() {
+  const { models, model, select, isLoading: modelsLoading, error: modelsError } = useSelectedModel('stt')
+  const p = useStore(prefs)
+  const samples = useSamples()
+  const support = useSupport()
+  const session = useSttSession()
+  const [mode, setMode] = useState<EngineMode>(isDemo ? 'browser' : 'server')
+  const [params, setParams] = useSearchParams()
+  const shared = isDemo ? decodeShare(params.get('r')) : null
+  const [telephony, setTelephony] = useState(false)
+  const [dragging, setDragging] = useState(false)
+  const [busySample, setBusySample] = useState<string | null>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const serverState = useTranscript(session.server)
+  const browserState = useTranscript(session.browser)
+  const running = session.phase !== 'idle'
+  const httpRtt = usePing(mode !== 'browser')
+  // Prefer the round trip measured on the stream itself; fall back to a small HTTP request.
+  const rtt = serverState.rttMs ?? httpRtt
+
+  const primary = mode === 'browser' ? browserState : serverState
+  const speechRef = useRef(primary.speech)
+  useEffect(() => {
+    speechRef.current = primary.speech
+  }, [primary.speech])
+
+  const languages = useMemo(() => {
+    const set = new Set<string>()
+    for (const l of model?.languages ?? []) if (l !== 'multi') set.add(l)
+    return [...set]
+  }, [model])
+  const language = languages.includes(p.language) ? p.language : 'auto'
+
+  const audioSamples = (samples.data?.samples ?? []).filter((s) => s.kind === 'audio' && s.url)
+  const needsModel = mode !== 'browser'
+  const canStart = !running && (!needsModel || Boolean(model?.installed))
+  const micBlocked = !support.getUserMedia || !support.audioWorklet || !support.secureContext
+
+  const begin = (input: SessionInput) => {
+    if (needsModel && !model) {
+      toast.error('Choose a model first')
+      return
+    }
+    void session.start(input, { mode, model: model?.id ?? '', language, telephony: telephony && mode !== 'browser' })
+  }
+
+  const startFile = async (name: string, data: ArrayBuffer) => {
+    try {
+      const audio = await decodeAudio(data)
+      if (audio.samples.length === 0) throw new Error('The file contains no audio')
+      begin({ kind: 'file', label: name, samples: audio.samples, sampleRate: audio.sampleRate })
+    } catch (err) {
+      toast.error(`Could not read ${name}`, { description: err instanceof Error ? err.message : undefined })
+    }
+  }
+
+  const startSample = async (s: Sample) => {
+    if (!s.url) return
+    setBusySample(s.id)
+    try {
+      await startFile(s.id, await api.bytes(s.url))
+    } catch (err) {
+      toast.error('Could not load the sample', { description: describeError(err) })
+    } finally {
+      setBusySample(null)
+    }
+  }
+
+  const onFiles = (files: FileList | null) => {
+    const f = files?.[0]
+    if (!f) return
+    void f.arrayBuffer().then((buf) => startFile(f.name, buf))
+  }
+
+  useEffect(() => {
+    if (session.error)
+      toast.error(session.error.kind === 'denied' ? 'Microphone blocked' : 'Could not start', {
+        description: session.error.message,
+      })
+  }, [session.error])
+  useEffect(() => {
+    if (serverState.status === 'error' && serverState.error)
+      toast.error('Stream failed', { description: serverState.error })
+  }, [serverState.status, serverState.error])
+
+  const playTake = () => {
+    const take = concatFloat(session.taken.current)
+    if (take.length === 0) return
+    const data = telephony ? simulateTelephony(take, STT_RATE) : take
+    const rate = telephony ? TELEPHONY_RATE : STT_RATE
+    const ctx = new AudioContext()
+    const buf = ctx.createBuffer(1, data.length, rate)
+    buf.getChannelData(0).set(data)
+    const src = ctx.createBufferSource()
+    src.buffer = buf
+    src.connect(ctx.destination)
+    src.onended = () => void ctx.close()
+    src.start()
+  }
+
+  const copy = async () => {
+    const text = transcriptText(primary)
+    if (!text) return
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success('Transcript copied')
+    } catch {
+      toast.error('Could not copy to the clipboard')
+    }
+  }
+
+  const hasTake = !running && session.input != null
+  const statusLine =
+    session.phase === 'idle'
+      ? session.input
+        ? `Last take: ${session.input.kind === 'mic' ? 'microphone' : session.input.label} · ${fmtSeconds(primary.audioSeconds)}`
+        : 'Nothing recorded yet'
+      : `${STATUS_TEXT[primary.status]} · ${session.input?.kind === 'mic' ? 'microphone' : session.input?.label} · ${fmtSeconds(primary.audioSeconds)}`
+
+  const stats = sessionStats(primary)
+  const canShare = stats.count > 0 && Number.isFinite(stats.final.p50)
+  const share = async () => {
+    if (!canShare) return
+    const url = shareUrl({
+      m: BROWSER_MODELS[0]?.label ?? 'in-browser model',
+      d: (primary.backend ?? 'browser').replace(/^browser · /, ''),
+      n: stats.count,
+      fp: Number.isFinite(stats.firstPartial.p50) ? stats.firstPartial.p50 : null,
+      f50: stats.final.p50,
+      f95: stats.final.p95,
+      rtf: primary.rtf,
+    })
+    try {
+      if (navigator.share && /Mobi|Android/i.test(navigator.userAgent)) {
+        await navigator.share({
+          title: 'bolo live demo',
+          text: `Speech recognised in my browser: final in ${Math.round(stats.final.p50)} ms`,
+          url,
+        })
+      } else {
+        await navigator.clipboard.writeText(url)
+        toast.success('Link copied', { description: 'It carries the latency summary in the URL. Nothing is uploaded.' })
+      }
+    } catch {
+      // cancelled share sheet, or clipboard blocked: show the link instead
+      toast.message('Copy this link', { description: url })
+    }
+  }
+
+  const toolbar = (
+    <>
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        size="sm"
+        value={mode}
+        onValueChange={(v) => v && setMode(v as EngineMode)}
+        aria-label="Where recognition runs"
+        disabled={running}
+      >
+        <ToggleGroupItem
+          value="server"
+          className="px-3 text-xs"
+          disabled={isDemo}
+          title={isDemo ? SERVER_ONLY_HINT : undefined}
+        >
+          Server
+        </ToggleGroupItem>
+        <ToggleGroupItem value="browser" className="px-3 text-xs" disabled={!support.wasm} data-testid="mode-browser">
+          In browser
+        </ToggleGroupItem>
+        <ToggleGroupItem
+          value="compare"
+          className="px-3 text-xs"
+          disabled={!support.wasm || isDemo}
+          title={isDemo ? SERVER_ONLY_HINT : undefined}
+          data-testid="mode-compare"
+        >
+          Compare
+        </ToggleGroupItem>
+      </ToggleGroup>
+      <ModelPicker
+        models={models}
+        value={model?.id ?? null}
+        onChange={select}
+        loading={modelsLoading}
+        disabled={running || mode === 'browser'}
+        className="w-52 max-sm:min-w-44 max-sm:flex-1"
+      />
+      <Select value={language} onValueChange={(v) => setPref('language', v)} disabled={running || mode === 'browser'}>
+        <SelectTrigger className="h-8 w-36" aria-label="Language">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent position="popper" align="start">
+          <SelectItem value="auto">
+            {languages.length === 1 ? languageName(languages[0] as string) : 'Auto-detect'}
+          </SelectItem>
+          {languages.length > 1 &&
+            languages.map((l) => (
+              <SelectItem key={l} value={l}>
+                {languageName(l)}
+              </SelectItem>
+            ))}
+        </SelectContent>
+      </Select>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <label
+            className={cn(
+              'flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-input px-2.5 text-xs dark:bg-input/30',
+              (running || mode === 'browser') && 'cursor-not-allowed text-muted-foreground',
+            )}
+          >
+            <Phone className="size-3.5 text-muted-foreground" aria-hidden />
+            Phone line
+            <Switch
+              checked={telephony}
+              onCheckedChange={setTelephony}
+              disabled={running || mode === 'browser'}
+              size="sm"
+            />
+          </label>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-64">
+          {isDemo && `${SERVER_ONLY_HINT} `}
+          Downsamples to 8 kHz and applies G.711 μ-law in the browser, so the server hears what a phone call sounds
+          like.
+        </TooltipContent>
+      </Tooltip>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className="ml-auto h-8 gap-1.5 font-normal">
+            <Settings2 className="size-3.5" />
+            Target <span className="num">{p.targetMs} ms</span>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-64">
+          <Label htmlFor="target-ms" className="text-xs">
+            Latency target (ms)
+          </Label>
+          <Input
+            id="target-ms"
+            type="number"
+            min={50}
+            max={5000}
+            step={50}
+            className="mt-1.5 h-8 num"
+            value={p.targetMs}
+            onChange={(e) => {
+              const v = Number(e.target.value)
+              if (v >= 50 && v <= 5000) setPref('targetMs', Math.round(v))
+            }}
+          />
+          <p className="mt-2 text-xs leading-4 text-muted-foreground">
+            The longest acceptable gap between the end of speech and the final transcript. Used by the budget bars here
+            and the target lines on the dashboard.
+          </p>
+        </PopoverContent>
+      </Popover>
+    </>
+  )
+
+  return (
+    <Page title="Speech to text" toolbar={toolbar}>
+      {micBlocked && (
+        <Alert className="mb-4">
+          <MicOff />
+          <AlertTitle>Microphone capture is unavailable</AlertTitle>
+          <AlertDescription>
+            {!support.secureContext
+              ? 'Browsers only allow microphone access on HTTPS or localhost. Open the console through one of those, or use a file or sample instead.'
+              : 'This browser lacks AudioWorklet or getUserMedia. You can still upload a file or use a sample.'}
+          </AlertDescription>
+        </Alert>
+      )}
+      {modelsError && !modelsLoading && mode !== 'browser' && (
+        <Alert className="mb-4" variant="destructive">
+          <Info />
+          <AlertTitle>Could not load the model list</AlertTitle>
+          <AlertDescription>{describeError(modelsError)} In-browser mode still works.</AlertDescription>
+        </Alert>
+      )}
+      {needsModel && model && !model.installed && (
+        <Alert className="mb-4">
+          <Info />
+          <AlertTitle>
+            <span className="num">{model.id}</span> is not installed
+          </AlertTitle>
+          <AlertDescription>Pull it from the Models screen, or pick an installed model.</AlertDescription>
+        </Alert>
+      )}
+
+      {shared && (
+        <div
+          className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-border bg-card px-4 py-3"
+          data-testid="shared-result"
+        >
+          <div className="min-w-0">
+            <div className="text-xs text-muted-foreground">
+              Shared result · measured on someone else&apos;s device, not yours
+            </div>
+            <div className="mt-0.5 truncate num text-[13px]">
+              {shared.m} · {shared.d}
+            </div>
+          </div>
+          <Readout
+            label="Final p50"
+            value={Math.round(shared.f50)}
+            unit="ms"
+            hint={`p95 ${Math.round(shared.f95)} ms`}
+          />
+          {shared.fp != null && <Readout label="First partial p50" value={Math.round(shared.fp)} unit="ms" />}
+          {shared.rtf != null && (
+            <Readout label="Real-time factor" value={fmtRtf(shared.rtf)} hint={`${fmtSpeed(shared.rtf)} real time`} />
+          )}
+          <Readout label="Utterances" value={shared.n} />
+          <Button
+            size="sm"
+            variant="ghost"
+            className="ml-auto"
+            onClick={() => {
+              params.delete('r')
+              setParams(params, { replace: true })
+            }}
+          >
+            Dismiss
+          </Button>
+        </div>
+      )}
+      {isDemo && !running && session.input == null && (
+        <div className="mb-4 rounded-xl border border-border bg-card px-5 py-6 sm:px-8 sm:py-8" data-testid="demo-hero">
+          <h2 className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
+            Try it: press the mic and talk.
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            A speech recogniser will run right here in this tab and show you where every millisecond went. Nothing you
+            say leaves your device. The first run downloads a {fmtBytes(BROWSER_MODELS[0]?.approxBytes)} model (
+            {BROWSER_MODELS[0]?.license}) plus the runtime; after that it is cached and works offline.
+          </p>
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <Button
+              className="h-10 px-4 text-[15px]"
+              onClick={() => begin({ kind: 'mic', label: 'microphone' })}
+              disabled={micBlocked || !support.wasm}
+              data-testid="hero-mic"
+            >
+              <Mic /> Start talking
+            </Button>
+            <Button
+              variant="outline"
+              className="h-10 px-4 text-[15px]"
+              onClick={() => {
+                const s = audioSamples.find((x) => x.id === 'en-ask-not') ?? audioSamples[0]
+                if (s) void startSample(s)
+              }}
+              disabled={!support.wasm || audioSamples.length === 0 || busySample != null}
+              data-testid="hero-sample"
+            >
+              <Play className="fill-current" /> No microphone? Play a sample
+            </Button>
+          </div>
+          {!support.wasm && (
+            <p className="mt-3 text-sm text-warning-text">
+              This browser does not support WebAssembly, which the demo needs.
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+        <div className="flex min-w-0 flex-col gap-4 xl:col-start-1 xl:row-start-1">
+          <Panel
+            title="Input"
+            description={statusLine}
+            actions={
+              hasTake ? (
+                <Button size="sm" variant="ghost" onClick={playTake}>
+                  <Volume2 /> {telephony ? 'Hear it as a phone line' : 'Replay'}
+                </Button>
+              ) : undefined
+            }
+            onDragOver={(e) => {
+              e.preventDefault()
+              if (!running) setDragging(true)
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault()
+              setDragging(false)
+              if (!running) onFiles(e.dataTransfer.files)
+            }}
+            className={cn('transition-colors duration-150', dragging && 'border-ring bg-chart-1/5')}
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              {running ? (
+                <Button
+                  onClick={() => void session.stop()}
+                  variant="destructive"
+                  className="h-9 min-w-28"
+                  disabled={session.phase === 'finishing'}
+                  data-testid="stop"
+                >
+                  <Square className="fill-current" /> {session.phase === 'finishing' ? 'Finishing…' : 'Stop'}
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => begin({ kind: 'mic', label: 'microphone' })}
+                  className="h-9 min-w-28"
+                  disabled={!canStart || micBlocked}
+                  data-testid="mic"
+                >
+                  <Mic /> Start talking
+                </Button>
+              )}
+              <Button variant="outline" className="h-9" onClick={() => fileInput.current?.click()} disabled={!canStart}>
+                <Upload /> Upload audio
+              </Button>
+              <input
+                ref={fileInput}
+                type="file"
+                accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a,.webm"
+                className="sr-only"
+                tabIndex={-1}
+                aria-label="Audio file"
+                onChange={(e) => {
+                  onFiles(e.target.files)
+                  e.target.value = ''
+                }}
+              />
+              <span className="hidden text-xs text-muted-foreground sm:inline">or drop a file here</span>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-xs text-muted-foreground">Samples</span>
+              {samples.isLoading && (
+                <>
+                  <Skeleton className="h-7 w-28" />
+                  <Skeleton className="h-7 w-28" />
+                </>
+              )}
+              {samples.isError && <span className="text-xs text-muted-foreground">unavailable</span>}
+              {!samples.isLoading && !samples.isError && audioSamples.length === 0 && (
+                <span className="text-xs text-muted-foreground">none on this server</span>
+              )}
+              {audioSamples.map((s) => (
+                <Tooltip key={s.id}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={!canStart || busySample != null}
+                      onClick={() => void startSample(s)}
+                      data-testid={`sample-${s.id}`}
+                    >
+                      {busySample === s.id ? <FileAudio className="live-dot" /> : <Play className="fill-current" />}
+                      <span className="num text-xs">{s.id}</span>
+                      <span className="num text-muted-foreground">
+                        {s.seconds != null ? `${s.seconds.toFixed(1)}s` : ''}
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-72">
+                    {languageName(s.language)} · “{s.text}”
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+
+            <div className="mt-4 rounded-lg border border-border bg-background/60 px-2 py-1">
+              <LevelStrip
+                track={session.levels}
+                speech={speechRef}
+                active={running}
+                label={running ? 'Audio level, live' : 'Audio level of the last take'}
+              />
+            </div>
+            <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-3">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-3 rounded-[2px] bg-chart-1" aria-hidden /> speech
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-3 rounded-[2px] bg-chart-mute" aria-hidden /> silence
+                </span>
+              </span>
+              <span className="num">last 12 s</span>
+            </div>
+          </Panel>
+
+          <Panel
+            title="Transcript"
+            description={
+              primary.finals.length
+                ? `${primary.finals.length} final segment${primary.finals.length === 1 ? '' : 's'}`
+                : 'Solid text is final; lighter text may still change'
+            }
+            actions={
+              <Button size="sm" variant="ghost" onClick={() => void copy()} disabled={primary.finals.length === 0}>
+                <Copy /> Copy
+              </Button>
+            }
+          >
+            {mode === 'compare' ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="min-w-0">
+                  <div className="mb-1 eyebrow">Server · {model?.id ?? '–'}</div>
+                  <Transcript state={serverState} placeholder="The server transcript appears here." />
+                </div>
+                <div className="min-w-0 sm:border-l sm:border-border sm:pl-4">
+                  <div className="mb-1 eyebrow">In browser · moonshine-tiny</div>
+                  <Transcript state={browserState} placeholder="The in-browser transcript appears here." />
+                </div>
+              </div>
+            ) : (
+              <Transcript
+                state={primary}
+                placeholder="Press Start talking, or play a sample. Words appear as you speak."
+              />
+            )}
+          </Panel>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-4 xl:col-start-2 xl:row-span-2 xl:row-start-1">
+          <Panel
+            title="Latency timeline"
+            description="Last utterance"
+            actions={
+              mode !== 'browser' ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      tabIndex={0}
+                      className="rounded-md border border-border px-1.5 py-0.5 num text-[11px] text-muted-foreground"
+                      data-testid="rtt"
+                    >
+                      network {rtt != null ? `${Math.max(1, Math.round(rtt))} ms` : '–'}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Median round trip to the server: a ping on the open stream, or a small HTTP request when idle.
+                  </TooltipContent>
+                </Tooltip>
+              ) : undefined
+            }
+          >
+            {mode === 'compare' ? (
+              <div className="grid gap-6">
+                <EngineColumn
+                  title="Server"
+                  state={serverState}
+                  targetMs={p.targetMs}
+                  rttMs={rtt}
+                  placeholder="server"
+                  showSplit
+                />
+                <div className="border-t border-border pt-5">
+                  <EngineColumn
+                    title="In browser"
+                    state={browserState}
+                    targetMs={p.targetMs}
+                    rttMs={0}
+                    placeholder="browser"
+                    showSplit
+                  />
+                </div>
+              </div>
+            ) : (
+              <EngineColumn
+                title={null}
+                state={primary}
+                targetMs={p.targetMs}
+                rttMs={mode === 'browser' ? 0 : rtt}
+                placeholder={mode}
+                showSplit
+              />
+            )}
+          </Panel>
+
+          {mode !== 'server' && <BrowserEnginePanel support={support} />}
+
+          {mode === 'server' && (
+            <Panel title="Try it without the network" bodyClassName="flex items-start gap-3">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/50 text-muted-foreground">
+                <Mic className="size-4" aria-hidden />
+              </span>
+              <div className="min-w-0 text-[13px] leading-5 text-muted-foreground">
+                <p>
+                  <span className="text-foreground">In browser</span> runs a small English model on this device with
+                  WebAssembly: no round trip at all. <span className="text-foreground">Compare</span> feeds the same
+                  audio to both and lines the timelines up.
+                </p>
+                {!support.wasm && <p className="mt-1 text-warning-text">This browser does not support WebAssembly.</p>}
+              </div>
+            </Panel>
+          )}
+        </div>
+        <Panel
+          className="xl:col-start-1 xl:row-start-2 xl:self-start"
+          title="This session"
+          description="Measured in this browser, from audio leaving the page to text arriving"
+          actions={
+            isDemo ? (
+              <Button size="sm" variant="outline" onClick={() => void share()} disabled={!canShare} data-testid="share">
+                <Share2 /> Share this result
+              </Button>
+            ) : undefined
+          }
+        >
+          {mode === 'compare' ? (
+            <div className="grid gap-6 lg:grid-cols-2">
+              <SessionStats state={serverState} targetMs={p.targetMs} title="Server" compact />
+              <SessionStats state={browserState} targetMs={p.targetMs} title="In browser" compact />
+            </div>
+          ) : (
+            <SessionStats state={primary} targetMs={p.targetMs} />
+          )}
+        </Panel>
+      </div>
+    </Page>
+  )
+}

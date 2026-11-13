@@ -1,0 +1,62 @@
+bolo
+Copyright 2026 The bolo Authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+bolo's own source code contains no third-party source code. It talks to the
+following components, which are installed separately as Python dependencies
+or optional extras and keep their own licences:
+
+  Runtime dependencies
+    FastAPI (MIT), Starlette (BSD-3-Clause), Uvicorn (BSD-3-Clause),
+    python-multipart (Apache-2.0), NumPy (BSD-3-Clause), httpx (BSD-3-Clause),
+    PyYAML (MIT), psutil (BSD-3-Clause),
+    soundfile (BSD-3-Clause; its wheels bundle libsndfile, LGPL-2.1-or-later,
+      with libFLAC, libogg, libvorbis, libopus (BSD-style), mpg123 (LGPL-2.1)
+      and LAME (LGPL-2.0-or-later)),
+    soxr (the Python binding and libsoxr are LGPL-2.1-or-later).
+
+  Optional inference engines
+    sherpa-onnx (Apache-2.0)        https://github.com/k2-fsa/sherpa-onnx
+    ONNX Runtime (MIT), bundled in the sherpa-onnx wheel
+    faster-whisper (MIT)            https://github.com/SYSTRAN/faster-whisper
+    CTranslate2 (MIT)               https://github.com/OpenNMT/CTranslate2
+    useful-moonshine-onnx (MIT), pywhispercpp / whisper.cpp (MIT)
+    kokoro-onnx (MIT; depends on phonemizer, GPL-3.0-or-later; not part of
+      the "all" extra)
+
+  Optional protocol and codec libraries
+    wyoming (MIT)                   https://github.com/OHF-Voice/wyoming
+    PyAV (BSD-3-Clause; its wheels bundle FFmpeg libraries, LGPL-2.1-or-later)
+
+  Speaker diarization uses the pyannote segmentation-3.0 model (MIT) in its
+  ONNX export and a 3D-Speaker ERes2Net speaker-embedding model (Apache-2.0),
+  both run by sherpa-onnx. Model files are downloaded by the user, not
+  distributed with bolo.
+
+  eSpeak NG (GPL-3.0-or-later, https://github.com/espeak-ng/espeak-ng) is an
+  OPTIONAL component. It is NOT bundled with bolo, not linked into it, not a
+  dependency of the "all" extra and not in the default container images. It
+  is installed only when the operator asks for it (the console, "bolo
+  components install espeak-ng", the "espeak" extra, which pulls the
+  third-party espeakng-loader wheel, or the system package manager) and
+  after accepting its licence. Piper-format voices, KittenTTS, Matcha-TTS
+  (English) and the non-English Kokoro voices need it; the default voice
+  (Kokoro, English) does not. See docs/models.md, "Licences and the
+  espeak-ng question".
+
+API compatibility
+    The routes under "speaches-compatible" mirror the HTTP interface of
+    speaches (https://github.com/speaches-ai/speaches, MIT licence,
+    Copyright (c) 2024 Fedir Zadniprovskyi) so that its clients keep
+    working. The interface was re-implemented from its route definitions;
+    no speaches source code is included.
+
+Models
+    Models are not distributed with bolo. They are downloaded on request
+    from their publishers, under the licences recorded for each entry in
+    the catalog (server/src/bolo/catalog/*.yaml).
+
+Built-in audio samples
+    The files in server/src/bolo/samples/*.wav were synthesised with bolo
+    using the models named in server/src/bolo/samples/index.json.

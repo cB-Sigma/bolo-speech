@@ -1,0 +1,1180 @@
+# Text-to-speech models run by the sherpa-onnx engine (Piper-format voices are in tts-piper.yaml).
+
+- id: kokoro-v1.0-int8
+  aliases:
+  - kokoro
+  - speaches-ai/Kokoro-82M-v1.0-ONNX-int8
+  task: tts
+  engine: sherpa-onnx
+  kind: kokoro
+  family: Kokoro
+  languages: &id001
+  - en
+  - es
+  - fr
+  - hi
+  - it
+  - ja
+  - pt
+  - zh
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 171888125
+  params: 82000000
+  license: Apache-2.0
+  voices: &id002
+  - id: af_heart
+    name: Heart
+    language: en-US
+    gender: f
+    sid: 3
+  - id: af_alloy
+    name: Alloy
+    language: en-US
+    gender: f
+    sid: 0
+  - id: af_aoede
+    name: Aoede
+    language: en-US
+    gender: f
+    sid: 1
+  - id: af_bella
+    name: Bella
+    language: en-US
+    gender: f
+    sid: 2
+  - id: af_jessica
+    name: Jessica
+    language: en-US
+    gender: f
+    sid: 4
+  - id: af_kore
+    name: Kore
+    language: en-US
+    gender: f
+    sid: 5
+  - id: af_nicole
+    name: Nicole
+    language: en-US
+    gender: f
+    sid: 6
+  - id: af_nova
+    name: Nova
+    language: en-US
+    gender: f
+    sid: 7
+  - id: af_river
+    name: River
+    language: en-US
+    gender: f
+    sid: 8
+  - id: af_sarah
+    name: Sarah
+    language: en-US
+    gender: f
+    sid: 9
+  - id: af_sky
+    name: Sky
+    language: en-US
+    gender: f
+    sid: 10
+  - id: am_adam
+    name: Adam
+    language: en-US
+    gender: m
+    sid: 11
+  - id: am_echo
+    name: Echo
+    language: en-US
+    gender: m
+    sid: 12
+  - id: am_eric
+    name: Eric
+    language: en-US
+    gender: m
+    sid: 13
+  - id: am_fenrir
+    name: Fenrir
+    language: en-US
+    gender: m
+    sid: 14
+  - id: am_liam
+    name: Liam
+    language: en-US
+    gender: m
+    sid: 15
+  - id: am_michael
+    name: Michael
+    language: en-US
+    gender: m
+    sid: 16
+  - id: am_onyx
+    name: Onyx
+    language: en-US
+    gender: m
+    sid: 17
+  - id: am_puck
+    name: Puck
+    language: en-US
+    gender: m
+    sid: 18
+  - id: am_santa
+    name: Santa
+    language: en-US
+    gender: m
+    sid: 19
+  - id: bf_alice
+    name: Alice
+    language: en-GB
+    gender: f
+    sid: 20
+  - id: bf_emma
+    name: Emma
+    language: en-GB
+    gender: f
+    sid: 21
+  - id: bf_isabella
+    name: Isabella
+    language: en-GB
+    gender: f
+    sid: 22
+  - id: bf_lily
+    name: Lily
+    language: en-GB
+    gender: f
+    sid: 23
+  - id: bm_daniel
+    name: Daniel
+    language: en-GB
+    gender: m
+    sid: 24
+  - id: bm_fable
+    name: Fable
+    language: en-GB
+    gender: m
+    sid: 25
+  - id: bm_george
+    name: George
+    language: en-GB
+    gender: m
+    sid: 26
+  - id: bm_lewis
+    name: Lewis
+    language: en-GB
+    gender: m
+    sid: 27
+  - id: ef_dora
+    name: Dora
+    language: es-ES
+    gender: f
+    sid: 28
+  - id: em_alex
+    name: Alex
+    language: es-ES
+    gender: m
+    sid: 29
+  - id: ff_siwis
+    name: Siwis
+    language: fr-FR
+    gender: f
+    sid: 30
+  - id: hf_alpha
+    name: Alpha
+    language: hi-IN
+    gender: f
+    sid: 31
+  - id: hf_beta
+    name: Beta
+    language: hi-IN
+    gender: f
+    sid: 32
+  - id: hm_omega
+    name: Omega
+    language: hi-IN
+    gender: m
+    sid: 33
+  - id: hm_psi
+    name: Psi
+    language: hi-IN
+    gender: m
+    sid: 34
+  - id: if_sara
+    name: Sara
+    language: it-IT
+    gender: f
+    sid: 35
+  - id: im_nicola
+    name: Nicola
+    language: it-IT
+    gender: m
+    sid: 36
+  - id: jf_alpha
+    name: Alpha
+    language: ja-JP
+    gender: f
+    sid: 37
+  - id: jf_gongitsune
+    name: Gongitsune
+    language: ja-JP
+    gender: f
+    sid: 38
+  - id: jf_nezumi
+    name: Nezumi
+    language: ja-JP
+    gender: f
+    sid: 39
+  - id: jf_tebukuro
+    name: Tebukuro
+    language: ja-JP
+    gender: f
+    sid: 40
+  - id: jm_kumo
+    name: Kumo
+    language: ja-JP
+    gender: m
+    sid: 41
+  - id: pf_dora
+    name: Dora
+    language: pt-BR
+    gender: f
+    sid: 42
+  - id: pm_alex
+    name: Alex
+    language: pt-BR
+    gender: m
+    sid: 43
+  - id: pm_santa
+    name: Santa
+    language: pt-BR
+    gender: m
+    sid: 44
+  - id: zf_xiaobei
+    name: Xiaobei
+    language: zh-CN
+    gender: f
+    sid: 45
+  - id: zf_xiaoni
+    name: Xiaoni
+    language: zh-CN
+    gender: f
+    sid: 46
+  - id: zf_xiaoxiao
+    name: Xiaoxiao
+    language: zh-CN
+    gender: f
+    sid: 47
+  - id: zf_xiaoyi
+    name: Xiaoyi
+    language: zh-CN
+    gender: f
+    sid: 48
+  - id: zm_yunjian
+    name: Yunjian
+    language: zh-CN
+    gender: m
+    sid: 49
+  - id: zm_yunxi
+    name: Yunxi
+    language: zh-CN
+    gender: m
+    sid: 50
+  - id: zm_yunxia
+    name: Yunxia
+    language: zh-CN
+    gender: m
+    sid: 51
+  - id: zm_yunyang
+    name: Yunyang
+    language: zh-CN
+    gender: m
+    sid: 52
+  - id: em_santa
+    name: Santa
+    language: es-ES
+    gender: m
+    sid: 53
+  features:
+  - multi-voice
+  - telephony
+  description: 'Kokoro-82M v1.0, int8: 54 voices in American and British English, Spanish, French, Hindi, Italian,
+    Japanese, Portuguese and Mandarin. English and Mandarin use bundled lexicons; other languages are phonemised
+    with espeak-ng inside sherpa-onnx.'
+  source_url: https://huggingface.co/hexgrad/Kokoro-82M
+  validated: cpu
+  measured:
+    rtf: 0.884
+    round_trip_wer: 0.0
+    round_trip_stt: moonshine-tiny-en
+    ttfa_ms: 2406
+    audio_s: 6.3
+    load_s: 1.83
+    memory_mb: 240
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/kokoro-int8-multi-lang-v1_0
+    revision: 57adb37fc0e8d4bd430cfc1b8f8c2294945b9af2
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    multi_lang: true
+    lexicons:
+    - lexicon-us-en.txt
+    - lexicon-zh.txt
+- id: kokoro-v1.0
+  aliases:
+  - speaches-ai/Kokoro-82M-v1.0-ONNX
+  - hexgrad/Kokoro-82M
+  task: tts
+  engine: sherpa-onnx
+  kind: kokoro
+  family: Kokoro
+  languages: *id001
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 383245688
+  params: 82000000
+  license: Apache-2.0
+  voices: *id002
+  features:
+  - multi-voice
+  description: Kokoro-82M v1.0, float32 weights (slower than the int8 export, marginally cleaner audio). Same 54
+    voices.
+  source_url: https://huggingface.co/hexgrad/Kokoro-82M
+  validated: cpu
+  measured:
+    rtf: 0.7586
+    round_trip_wer: 0.0
+    round_trip_stt: moonshine-tiny-en
+    ttfa_ms: 2004
+    audio_s: 6.2
+    load_s: 1.86
+    memory_mb: 356
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/kokoro-multi-lang-v1_0
+    revision: f7b96bb6bef5c5da4d3aa4f4e0498fbbf62dc78b
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    multi_lang: true
+    lexicons:
+    - lexicon-us-en.txt
+    - lexicon-zh.txt
+- id: kitten-nano-0.8-int8
+  task: tts
+  engine: sherpa-onnx
+  kind: kitten
+  family: KittenTTS
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 27660100
+  params: 15000000
+  license: Apache-2.0
+  voices: &id003
+  - id: expr-voice-2-m
+    name: Voice 2 (male)
+    language: en-US
+    gender: m
+    sid: 0
+  - id: expr-voice-2-f
+    name: Voice 2 (female)
+    language: en-US
+    gender: f
+    sid: 1
+  - id: expr-voice-3-m
+    name: Voice 3 (male)
+    language: en-US
+    gender: m
+    sid: 2
+  - id: expr-voice-3-f
+    name: Voice 3 (female)
+    language: en-US
+    gender: f
+    sid: 3
+  - id: expr-voice-4-m
+    name: Voice 4 (male)
+    language: en-US
+    gender: m
+    sid: 4
+  - id: expr-voice-4-f
+    name: Voice 4 (female)
+    language: en-US
+    gender: f
+    sid: 5
+  - id: expr-voice-5-m
+    name: Voice 5 (male)
+    language: en-US
+    gender: m
+    sid: 6
+  - id: expr-voice-5-f
+    name: Voice 5 (female)
+    language: en-US
+    gender: f
+    sid: 7
+  features:
+  - multi-voice
+  description: 'KittenTTS nano v0.8 (KittenML), int8, about 25 MB: a very small English voice model with eight voices.
+    Uses espeak-ng for phonemes.'
+  source_url: https://github.com/KittenML/KittenTTS
+  validated: cpu
+  measured:
+    rtf: 0.2655
+    round_trip_wer: 0.0
+    round_trip_stt: moonshine-tiny-en
+    ttfa_ms: 977
+    audio_s: 7.8
+    load_s: 0.71
+    memory_mb: 0
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj2/kitten-nano-en-v0_8-int8
+    revision: 90dfe12687f7822a90e5afc5931b536ba6caf22a
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  requires:
+  - espeak-ng
+- id: kitten-nano-0.8
+  task: tts
+  engine: sherpa-onnx
+  kind: kitten
+  family: KittenTTS
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 60057224
+  params: 15000000
+  license: Apache-2.0
+  voices: *id003
+  features:
+  - multi-voice
+  description: 'KittenTTS nano v0.8 (KittenML), float32: a very small English voice model with eight voices. Uses
+    espeak-ng for phonemes.'
+  source_url: https://github.com/KittenML/KittenTTS
+  validated: cpu
+  measured:
+    rtf: 0.1071
+    round_trip_wer: 0.0
+    round_trip_stt: moonshine-tiny-en
+    ttfa_ms: 396
+    audio_s: 7.7
+    load_s: 0.49
+    memory_mb: 0
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj2/kitten-nano-en-v0_8-fp32
+    revision: eb4fe4f70801b2eb1c3f45be046ccd553c7575e7
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  requires:
+  - espeak-ng
+- id: kitten-micro-0.8
+  task: tts
+  engine: sherpa-onnx
+  kind: kitten
+  family: KittenTTS
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 44675091
+  params: 40000000
+  license: Apache-2.0
+  voices: *id003
+  features:
+  - multi-voice
+  description: 'KittenTTS micro v0.8 (KittenML), float32: a very small English voice model with eight voices. Uses
+    espeak-ng for phonemes.'
+  source_url: https://github.com/KittenML/KittenTTS
+  validated: cpu
+  measured:
+    rtf: 0.319
+    round_trip_wer: 0.0
+    round_trip_stt: moonshine-tiny-en
+    ttfa_ms: 1329
+    audio_s: 7.2
+    load_s: 0.69
+    memory_mb: 49
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj2/kitten-micro-en-v0_8
+    revision: 7131b31e5fbe7da21e32f84899d1d273a1477e15
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  requires:
+  - espeak-ng
+- id: kitten-mini-0.8
+  task: tts
+  engine: sherpa-onnx
+  kind: kitten
+  family: KittenTTS
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 81558135
+  params: 80000000
+  license: Apache-2.0
+  voices: *id003
+  features:
+  - multi-voice
+  description: 'KittenTTS mini v0.8 (KittenML), float32: a very small English voice model with eight voices. Uses
+    espeak-ng for phonemes.'
+  source_url: https://github.com/KittenML/KittenTTS
+  validated: cpu
+  measured:
+    rtf: 1.1122
+    round_trip_wer: 0.0
+    round_trip_stt: moonshine-tiny-en
+    ttfa_ms: 3312
+    audio_s: 6.4
+    load_s: 0.67
+    memory_mb: 90
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj2/kitten-mini-en-v0_8
+    revision: 5e67e1579d5119f606e95632a4852b6af936e765
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  requires:
+  - espeak-ng
+- id: matcha-en-ljspeech
+  task: tts
+  engine: sherpa-onnx
+  kind: matcha
+  family: Matcha-TTS
+  languages:
+  - en
+  tier: balanced
+  sample_rate: 22050
+  size_bytes: 77907925
+  license: Apache-2.0
+  voices:
+  - id: ljspeech
+    name: LJSpeech
+    language: en-US
+    gender: f
+  description: Matcha-TTS (icefall) trained on LJSpeech (public-domain recordings) with a HiFi-GAN v2 vocoder. Uses
+    espeak-ng for phonemes.
+  source_url: https://github.com/k2-fsa/icefall
+  validated: cpu
+  measured:
+    rtf: 0.2054
+    round_trip_wer: 0.0
+    round_trip_stt: moonshine-tiny-en
+    ttfa_ms: 761
+    audio_s: 8.1
+    load_s: 1.71
+    memory_mb: 0
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/matcha-icefall-en_US-ljspeech
+    revision: 75e35f8d4e001e53fa998a8642685d28b8b3ba3e
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    urls:
+    - path: hifigan_v2.onnx
+      url: https://huggingface.co/csukuangfj/sherpa-onnx-hifigan/resolve/48a5037022fc2a88c480a7c63a7e22b9fda97431/hifigan_v2.onnx
+      size: 3749714
+      sha256: a41d404cce7924493540238da5b30a4bc14b6ddaf1a37f3c79fa4f59548c19f0
+  requires:
+  - espeak-ng
+- id: matcha-zh-baker
+  task: tts
+  engine: sherpa-onnx
+  kind: matcha
+  family: Matcha-TTS
+  languages:
+  - zh
+  tier: balanced
+  sample_rate: 22050
+  size_bytes: 95540623
+  license: 'Research only (Baker dataset: non-commercial)'
+  commercial_use: false
+  voices:
+  - id: baker
+    name: Baker
+    language: zh-CN
+    gender: f
+  description: Matcha-TTS (icefall) trained on the Baker Mandarin corpus, lexicon front end (no espeak-ng). The
+    corpus licence is non-commercial.
+  source_url: https://github.com/k2-fsa/icefall
+  validated: untested
+  source:
+    repo: csukuangfj/matcha-icefall-zh-baker
+    revision: 6ccce73a41f1f4be966c485c75bcbf9d13df4819
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    urls:
+    - path: hifigan_v2.onnx
+      url: https://huggingface.co/csukuangfj/sherpa-onnx-hifigan/resolve/48a5037022fc2a88c480a7c63a7e22b9fda97431/hifigan_v2.onnx
+      size: 3749714
+      sha256: a41d404cce7924493540238da5b30a4bc14b6ddaf1a37f3c79fa4f59548c19f0
+- id: melo-tts-en
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MeloTTS
+  languages:
+  - en
+  tier: balanced
+  sample_rate: 44100
+  size_bytes: 175421518
+  license: MIT
+  description: 'MeloTTS English (MyShell), VITS with a lexicon front end: no espeak-ng involved. Multi-accent speakers.'
+  source_url: https://github.com/myshell-ai/MeloTTS
+  validated: cpu
+  measured:
+    rtf: 0.2784
+    round_trip_wer: 0.3
+    round_trip_stt: moonshine-tiny-en
+    ttfa_ms: 768
+    audio_s: 6.5
+    load_s: 1.75
+    memory_mb: 63
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-melo-tts-en
+    revision: 9969cf40233d9ee504a6e1cde8aee9bab3ecf985
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: mms-tts-eng
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - en
+  tier: balanced
+  size_bytes: 114017251
+  license: CC-BY-NC-4.0
+  commercial_use: false
+  voices:
+  - id: default
+    name: MMS
+    language: en
+    gender: ''
+  description: Meta MMS-TTS for 'en' (VITS, character input, no espeak-ng). Non-commercial licence.
+  source_url: https://huggingface.co/facebook/mms-tts
+  validated: cpu
+  measured:
+    rtf: 0.1955
+    round_trip_wer: 0.05
+    round_trip_stt: moonshine-tiny-en
+    ttfa_ms: 590
+    audio_s: 7.0
+    load_s: 0.72
+    memory_mb: 97
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-mms-eng
+    revision: 38c2aff000713a5f58fb2d6254606ec47bc9012b
+    include:
+    - model.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: mms-tts-deu
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - de
+  tier: balanced
+  size_bytes: 114022702
+  license: CC-BY-NC-4.0
+  commercial_use: false
+  voices:
+  - id: default
+    name: MMS
+    language: de
+    gender: ''
+  description: Meta MMS-TTS for 'de' (VITS, character input, no espeak-ng). Non-commercial licence.
+  source_url: https://huggingface.co/facebook/mms-tts
+  validated: untested
+  source:
+    repo: csukuangfj/vits-mms-deu
+    revision: 292c76f971f41c5ae6cdf5f9939f8dce3ff38341
+    include:
+    - model.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: mms-tts-fra
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - fr
+  tier: balanced
+  size_bytes: 114021982
+  license: CC-BY-NC-4.0
+  commercial_use: false
+  voices:
+  - id: default
+    name: MMS
+    language: fr
+    gender: ''
+  description: Meta MMS-TTS for 'fr' (VITS, character input, no espeak-ng). Non-commercial licence.
+  source_url: https://huggingface.co/facebook/mms-tts
+  validated: untested
+  source:
+    repo: csukuangfj/vits-mms-fra
+    revision: 4f4ed88e041edbade1f45311dcbfa8a5e096622d
+    include:
+    - model.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: mms-tts-spa
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - es
+  tier: balanced
+  size_bytes: 114022710
+  license: CC-BY-NC-4.0
+  commercial_use: false
+  voices:
+  - id: default
+    name: MMS
+    language: es
+    gender: ''
+  description: Meta MMS-TTS for 'es' (VITS, character input, no espeak-ng). Non-commercial licence.
+  source_url: https://huggingface.co/facebook/mms-tts
+  validated: untested
+  source:
+    repo: csukuangfj/vits-mms-spa
+    revision: 0575b4abf92ec6aeba40cb7e1672c146886efc7f
+    include:
+    - model.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: mms-tts-rus
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - ru
+  tier: balanced
+  size_bytes: 114022003
+  license: CC-BY-NC-4.0
+  commercial_use: false
+  voices:
+  - id: default
+    name: MMS
+    language: ru
+    gender: ''
+  description: Meta MMS-TTS for 'ru' (VITS, character input, no espeak-ng). Non-commercial licence.
+  source_url: https://huggingface.co/facebook/mms-tts
+  validated: untested
+  source:
+    repo: csukuangfj/vits-mms-rus
+    revision: 5c26f7a5a27586cce93327be98201f680f9a93ca
+    include:
+    - model.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: mms-tts-ukr
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - uk
+  tier: balanced
+  size_bytes: 114018127
+  license: CC-BY-NC-4.0
+  commercial_use: false
+  voices:
+  - id: default
+    name: MMS
+    language: uk
+    gender: ''
+  description: Meta MMS-TTS for 'uk' (VITS, character input, no espeak-ng). Non-commercial licence.
+  source_url: https://huggingface.co/facebook/mms-tts
+  validated: untested
+  source:
+    repo: csukuangfj/vits-mms-ukr
+    revision: 945bb2df07c2348e53820bc54dd84f5a91470927
+    include:
+    - model.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: mms-tts-tha
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - th
+  tier: balanced
+  size_bytes: 114042765
+  license: CC-BY-NC-4.0
+  commercial_use: false
+  voices:
+  - id: default
+    name: MMS
+    language: th
+    gender: ''
+  description: Meta MMS-TTS for 'th' (VITS, character input, no espeak-ng). Non-commercial licence.
+  source_url: https://huggingface.co/facebook/mms-tts
+  validated: untested
+  source:
+    repo: csukuangfj/vits-mms-tha
+    revision: 816cee81ebb6b4f94712a18331e62d9f4ca50609
+    include:
+    - model.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: coqui-bn-female
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: VITS
+  languages:
+  - bn
+  tier: balanced
+  sample_rate: 22050
+  size_bytes: 114287914
+  license: Apache-2.0
+  description: Bengali female voice from the Coqui TTS model zoo (VITS, character input, no espeak-ng).
+  source_url: https://huggingface.co/csukuangfj/vits-coqui-bn-custom_female
+  validated: cpu
+  measured:
+    rtf: 0.5743
+    ttfa_ms: 1119
+    audio_s: 3.8
+    load_s: 1.06
+    memory_mb: 59
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-coqui-bn-custom_female
+    revision: 67008db0c4edb2c4fb20d57ccba91b7e4df50ae1
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+    - '*.json'
+- id: mimic3-gu-cmu-indic
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: VITS
+  languages:
+  - gu
+  tier: balanced
+  sample_rate: 22050
+  size_bytes: 76338568
+  license: See voice card (CMU Indic dataset)
+  description: Gujarati voices from Mycroft Mimic 3 (CMU Indic corpus), VITS. Uses espeak-ng for phonemes.
+  source_url: https://huggingface.co/csukuangfj/vits-mimic3-gu_IN-cmu-indic_low
+  validated: cpu
+  measured:
+    rtf: 0.0461
+    ttfa_ms: 82
+    audio_s: 3.6
+    load_s: 0.69
+    memory_mb: 84
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-mimic3-gu_IN-cmu-indic_low
+    revision: adde0f7d14ad6e4080066c45cd0a5cbf923860da
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  requires:
+  - espeak-ng
+- id: mimic3-bn-multi
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: VITS
+  languages:
+  - bn
+  tier: balanced
+  sample_rate: 22050
+  size_bytes: 76367510
+  license: See voice card (OpenSLR Bengali, CC-BY-SA-4.0)
+  description: Bengali multi-speaker voices from Mycroft Mimic 3, VITS. Uses espeak-ng for phonemes.
+  source_url: https://huggingface.co/csukuangfj/vits-mimic3-bn-multi_low
+  validated: cpu
+  measured:
+    rtf: 0.1389
+    ttfa_ms: 282
+    audio_s: 4.0
+    load_s: 0.56
+    memory_mb: 84
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-mimic3-bn-multi_low
+    revision: 17b1dfd307305470cbbf222a3c980be6c2e80c57
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  requires:
+  - espeak-ng
+- id: mimic3-ne-google
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: VITS
+  languages:
+  - ne
+  tier: balanced
+  sample_rate: 22050
+  size_bytes: 76370227
+  license: See voice card (OpenSLR Nepali, CC-BY-SA-4.0)
+  description: Nepali multi-speaker voices from Mycroft Mimic 3, VITS. Uses espeak-ng for phonemes.
+  source_url: https://huggingface.co/csukuangfj/vits-mimic3-ne_NP-ne-google_low
+  validated: cpu
+  measured:
+    rtf: 0.1471
+    ttfa_ms: 248
+    audio_s: 3.5
+    load_s: 0.58
+    memory_mb: 84
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-mimic3-ne_NP-ne-google_low
+    revision: 8a551f5699f873f4c8d4fe77da6035338b2c3e43
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  requires:
+  - espeak-ng

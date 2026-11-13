@@ -1,0 +1,1508 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "bolo",
+  "description": "\nbolo serves speech-to-text, text-to-speech and voice-activity detection.\n\n* **openai** - drop-in `/v1/audio/*` and `/v1/models`\n* **speaches** - model-management routes compatible with speaches\n* **native** - `/api/v1/*`: catalog, pulls, stats, request traces, events, benchmark\n* WebSockets (not shown by OpenAPI): `/api/v1/stt/stream`, `/api/v1/tts/stream` - see docs/api.md\n",
+  "license": {
+   "name": "Apache-2.0",
+   "url": "https://www.apache.org/licenses/LICENSE-2.0"
+  },
+  "version": "0.1.0"
+ },
+ "paths": {
+  "/v1/models": {
+   "get": {
+    "tags": [
+     "openai"
+    ],
+    "summary": "List installed models",
+    "operationId": "list_models_v1_models_get",
+    "parameters": [
+     {
+      "name": "task",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Task"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/models/{model_id}": {
+   "get": {
+    "tags": [
+     "openai"
+    ],
+    "summary": "Retrieve a model",
+    "operationId": "get_model_v1_models__model_id__get",
+    "parameters": [
+     {
+      "name": "model_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Model Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "speaches"
+    ],
+    "summary": "Download a model (blocks until done)",
+    "operationId": "download_model_v1_models__model_id__post",
+    "parameters": [
+     {
+      "name": "model_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Model Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "speaches"
+    ],
+    "summary": "Delete an installed model",
+    "operationId": "delete_model_v1_models__model_id__delete",
+    "parameters": [
+     {
+      "name": "model_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Model Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio/transcriptions": {
+   "post": {
+    "tags": [
+     "openai"
+    ],
+    "summary": "Transcribe audio",
+    "description": "Multipart form: ``file``, ``model``, optional ``language``, ``prompt``,\n``response_format`` (json, text, srt, vtt, verbose_json), ``temperature``,\n``timestamp_granularities[]`` (word, segment) and ``stream``.\n\nExtensions: ``vad_filter`` (force or disable silence removal) and ``hotwords``.",
+    "operationId": "create_transcription_v1_audio_transcriptions_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio/translations": {
+   "post": {
+    "tags": [
+     "openai"
+    ],
+    "summary": "Translate audio to English",
+    "description": "Same form as transcriptions; needs a multilingual Whisper model.",
+    "operationId": "create_translation_v1_audio_translations_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio/speech": {
+   "post": {
+    "tags": [
+     "openai"
+    ],
+    "summary": "Synthesise speech",
+    "description": "Returns audio as it is synthesised (chunked transfer).\n\n``response_format``: mp3 (default), opus, aac, flac, wav, pcm, plus the\ntelephony extensions ``mulaw`` and ``alaw`` (8 kHz G.711).\n``stream_format``: ``audio`` (default) or ``sse`` (``speech.audio.delta`` events).",
+    "operationId": "create_speech_v1_audio_speech_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SpeechRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/registry": {
+   "get": {
+    "tags": [
+     "speaches"
+    ],
+    "summary": "List every model in the catalog",
+    "operationId": "registry_v1_registry_get",
+    "parameters": [
+     {
+      "name": "task",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Task"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio/models": {
+   "get": {
+    "tags": [
+     "speaches"
+    ],
+    "summary": "List installed text-to-speech models",
+    "operationId": "audio_models_v1_audio_models_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio/voices": {
+   "get": {
+    "tags": [
+     "speaches"
+    ],
+    "summary": "List voices of installed text-to-speech models",
+    "operationId": "audio_voices_v1_audio_voices_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/ps": {
+   "get": {
+    "tags": [
+     "speaches"
+    ],
+    "summary": "List loaded models",
+    "operationId": "ps_api_ps_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/ps/{model_id}": {
+   "post": {
+    "tags": [
+     "speaches"
+    ],
+    "summary": "Load a model into memory",
+    "operationId": "ps_load_api_ps__model_id__post",
+    "parameters": [
+     {
+      "name": "model_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Model Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "speaches"
+    ],
+    "summary": "Unload a model from memory",
+    "operationId": "ps_unload_api_ps__model_id__delete",
+    "parameters": [
+     {
+      "name": "model_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Model Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio/speech/timestamps": {
+   "post": {
+    "tags": [
+     "speaches"
+    ],
+    "summary": "Voice-activity timestamps (milliseconds)",
+    "description": "Multipart form: ``file`` and optional ``model``, ``threshold``, ``min_silence_duration_ms``,\n``min_speech_duration_ms``, ``max_speech_duration_s``, ``speech_pad_ms``.\nReturns ``[{\"start\": ms, \"end\": ms}, …]``.",
+    "operationId": "speech_timestamps_v1_audio_speech_timestamps_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/info": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Server, engine and platform information",
+    "operationId": "info_api_v1_info_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/catalog": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Model catalog with install and load state",
+    "operationId": "catalog_api_v1_catalog_get",
+    "parameters": [
+     {
+      "name": "task",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Task"
+      }
+     },
+     {
+      "name": "q",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
+      }
+     },
+     {
+      "name": "installed",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Installed"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/models/pull": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Start downloading a model",
+    "operationId": "pull_api_v1_models_pull_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PullRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/jobs/{job_id}": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Poll a background job",
+    "operationId": "job_api_v1_jobs__job_id__get",
+    "parameters": [
+     {
+      "name": "job_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Job Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/jobs": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "List background jobs",
+    "operationId": "jobs_api_v1_jobs_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/models/{model_id}/load": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Load a model into memory",
+    "operationId": "load_api_v1_models__model_id__load_post",
+    "parameters": [
+     {
+      "name": "model_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Model Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/models/{model_id}/unload": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Unload a model from memory",
+    "operationId": "unload_api_v1_models__model_id__unload_post",
+    "parameters": [
+     {
+      "name": "model_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Model Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/models/{model_id}": {
+   "delete": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Delete an installed model",
+    "operationId": "delete_api_v1_models__model_id__delete",
+    "parameters": [
+     {
+      "name": "model_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Model Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "One catalog entry",
+    "operationId": "show_api_v1_models__model_id__get",
+    "parameters": [
+     {
+      "name": "model_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Model Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/diarize": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Speaker diarization: who spoke when",
+    "description": "Multipart form: ``file`` and optional ``model``, ``num_speakers``, ``min_speakers``,\n``max_speakers``, ``threshold`` (clustering distance; lower finds more speakers).",
+    "operationId": "diarize_api_v1_diarize_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/components": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Optional third-party components (espeak-ng)",
+    "operationId": "components_api_v1_components_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/components/{component_id}/install": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Install an optional component",
+    "description": "Installs the component into the running environment and activates it without a restart.\nRequires ``{\"accept_license\": true}``: eSpeak NG is GPL-3.0-or-later.",
+    "operationId": "install_component_api_v1_components__component_id__install_post",
+    "parameters": [
+     {
+      "name": "component_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Component Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/InstallRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/stats": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Live server statistics",
+    "operationId": "stats_api_v1_stats_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/requests": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Recent request traces, newest first",
+    "operationId": "requests_api_v1_requests_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "default": 100,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "kind",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Kind"
+      }
+     },
+     {
+      "name": "model",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Model"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/requests/{request_id}": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "One request trace",
+    "operationId": "request_trace_api_v1_requests__request_id__get",
+    "parameters": [
+     {
+      "name": "request_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Request Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/events": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Server-Sent Events: stats, request, request_progress, job, model, log",
+    "operationId": "events_api_v1_events_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/bench": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Start a concurrency sweep",
+    "operationId": "bench_api_v1_bench_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BenchRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/samples": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Built-in audio and text samples",
+    "operationId": "list_samples_api_v1_samples_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/samples/{name}": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Download a built-in audio sample",
+    "operationId": "get_sample_api_v1_samples__name__get",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Name"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/metrics": {
+   "get": {
+    "tags": [
+     "operations"
+    ],
+    "summary": "Prometheus metrics",
+    "operationId": "metrics_metrics_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/healthz": {
+   "get": {
+    "tags": [
+     "operations"
+    ],
+    "summary": "Liveness",
+    "operationId": "healthz_healthz_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/health": {
+   "get": {
+    "tags": [
+     "operations"
+    ],
+    "summary": "Liveness (speaches-compatible name)",
+    "operationId": "health_health_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/readyz": {
+   "get": {
+    "tags": [
+     "operations"
+    ],
+    "summary": "Readiness (preloaded models are loaded)",
+    "operationId": "readyz_readyz_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/chat/completions": {
+   "post": {
+    "tags": [
+     "openai"
+    ],
+    "summary": "Chat completions with audio in and out (speech front end to your LLM)",
+    "description": "Needs ``llm_base_url``. Audio parts are transcribed, the text request goes to the configured\nmodel, and the reply is synthesised when ``modalities`` contains ``\"audio\"``. Requests without\naudio are proxied unchanged. Extensions (not forwarded): ``transcription_model``,\n``transcription_language``, ``speech_model``.",
+    "operationId": "chat_completions_v1_chat_completions_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "BenchRequest": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "title": "Kind",
+      "default": "stt"
+     },
+     "model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model"
+     },
+     "concurrency": {
+      "items": {
+       "type": "integer"
+      },
+      "type": "array",
+      "title": "Concurrency"
+     },
+     "duration_s": {
+      "type": "number",
+      "title": "Duration S",
+      "default": 10.0
+     },
+     "sample": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sample"
+     },
+     "mode": {
+      "type": "string",
+      "title": "Mode",
+      "description": "`batch` (back-to-back requests) or `realtime` (1x paced streams); STT only.",
+      "default": "batch"
+     },
+     "voice": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Voice"
+     }
+    },
+    "type": "object",
+    "title": "BenchRequest"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "InstallRequest": {
+    "properties": {
+     "accept_license": {
+      "type": "boolean",
+      "title": "Accept License",
+      "default": false
+     }
+    },
+    "type": "object",
+    "title": "InstallRequest"
+   },
+   "PullRequest": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id",
+      "description": "Catalog id or alias, or `hf:<repo>` for any compatible Hugging Face model."
+     },
+     "kind": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Kind",
+      "description": "Only for `hf:` pulls: loader kind when it cannot be detected."
+     },
+     "task": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Task"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id"
+    ],
+    "title": "PullRequest"
+   },
+   "SpeechRequest": {
+    "properties": {
+     "model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model"
+     },
+     "input": {
+      "type": "string",
+      "title": "Input"
+     },
+     "voice": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Voice"
+     },
+     "instructions": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Instructions",
+      "description": "Accepted for compatibility; ignored."
+     },
+     "response_format": {
+      "type": "string",
+      "title": "Response Format",
+      "default": "mp3"
+     },
+     "speed": {
+      "type": "number",
+      "title": "Speed",
+      "default": 1.0
+     },
+     "stream_format": {
+      "type": "string",
+      "title": "Stream Format",
+      "default": "audio"
+     },
+     "sample_rate": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 48000.0,
+        "minimum": 8000.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sample Rate",
+      "description": "Extension: resample the output."
+     },
+     "language": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Language",
+      "description": "Extension: language hint for text normalisation."
+     },
+     "normalize": {
+      "type": "boolean",
+      "title": "Normalize",
+      "description": "Extension: set false to skip text normalisation.",
+      "default": true
+     }
+    },
+    "type": "object",
+    "required": [
+     "input"
+    ],
+    "title": "SpeechRequest"
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "ctx": {
+      "type": "object",
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   }
+  }
+ }
+}

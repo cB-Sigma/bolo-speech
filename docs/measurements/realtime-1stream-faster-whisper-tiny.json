@@ -1,0 +1,30 @@
+{
+  "kind": "stt",
+  "model": "faster-whisper-tiny",
+  "mode": "realtime",
+  "sample": "en-long",
+  "duration_s": 40.0,
+  "points": [
+    {
+      "concurrency": 1,
+      "ok": 4,
+      "errors": 0,
+      "first_partial_ms": {
+        "p50": 569.6,
+        "p95": 640.1
+      },
+      "final_ms": {
+        "p50": 860.5,
+        "p95": 885.1
+      },
+      "ttfa_ms": null,
+      "rtf": {
+        "p50": 0.6802,
+        "p95": 0.6982
+      },
+      "throughput_x_realtime": 0.88,
+      "elapsed_s": 53.41,
+      "mean_batch": 1.0
+    }
+  ]
+}

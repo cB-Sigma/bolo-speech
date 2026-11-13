@@ -1,0 +1,72 @@
+{
+  "kind": "tts",
+  "model": "kokoro-v1.0-int8",
+  "mode": "batch",
+  "sample": "en-text-long",
+  "duration_s": 20.0,
+  "points": [
+    {
+      "concurrency": 1,
+      "ok": 3,
+      "errors": 0,
+      "first_partial_ms": null,
+      "final_ms": {
+        "p50": 9509.1,
+        "p95": 9782.9
+      },
+      "ttfa_ms": {
+        "p50": 3414.2,
+        "p95": 3569.3
+      },
+      "rtf": {
+        "p50": 0.9157,
+        "p95": 0.9425
+      },
+      "throughput_x_realtime": 1.1,
+      "elapsed_s": 28.22,
+      "mean_batch": 1.0
+    },
+    {
+      "concurrency": 2,
+      "ok": 3,
+      "errors": 0,
+      "first_partial_ms": null,
+      "final_ms": {
+        "p50": 16359.8,
+        "p95": 22022.8
+      },
+      "ttfa_ms": {
+        "p50": 9469.5,
+        "p95": 10114.0
+      },
+      "rtf": {
+        "p50": 1.5762,
+        "p95": 2.1201
+      },
+      "throughput_x_realtime": 0.99,
+      "elapsed_s": 31.57,
+      "mean_batch": 1.0
+    },
+    {
+      "concurrency": 4,
+      "ok": 5,
+      "errors": 0,
+      "first_partial_ms": null,
+      "final_ms": {
+        "p50": 27261.8,
+        "p95": 35339.6
+      },
+      "ttfa_ms": {
+        "p50": 9151.4,
+        "p95": 19358.7
+      },
+      "rtf": {
+        "p50": 2.6258,
+        "p95": 3.4053
+      },
+      "throughput_x_realtime": 1.13,
+      "elapsed_s": 45.88,
+      "mean_batch": 1.0
+    }
+  ]
+}

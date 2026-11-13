@@ -1,0 +1,3405 @@
+# Piper-format VITS voices, run by sherpa-onnx (never by the GPL piper runtime).
+# Licences are those stated on each voice's model card; many depend on the training data.
+
+- id: piper-hi-in-pratham-medium
+  aliases:
+  - piper-hi_IN-pratham-medium
+  - speaches-ai/piper-hi_IN-pratham-medium
+  - rhasspy/piper-voices/hi_IN-pratham-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - hi
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63151392
+  license: 'See dataset licence: http://creativecommons.org/licenses/by-nc-sa/4.0/'
+  commercial_use: false
+  voices:
+  - id: pratham
+    name: Pratham
+    language: hi-IN
+    gender: ''
+  description: 'Piper voice ''pratham'' (Hindi, hi-IN, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.1522
+    ttfa_ms: 238
+    audio_s: 3.4
+    load_s: 0.74
+    memory_mb: 69
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-piper-hi_IN-pratham-medium
+    revision: 94517289ea9291e9a76ace527d8c34d6b170aa97
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: hi-IN
+  requires:
+  - espeak-ng
+- id: piper-hi-in-priyamvada-medium
+  aliases:
+  - piper-hi_IN-priyamvada-medium
+  - speaches-ai/piper-hi_IN-priyamvada-medium
+  - rhasspy/piper-voices/hi_IN-priyamvada-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - hi
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63151398
+  license: 'See dataset licence: http://creativecommons.org/licenses/by-nc-sa/4.0/'
+  commercial_use: false
+  voices:
+  - id: priyamvada
+    name: Priyamvada
+    language: hi-IN
+    gender: ''
+  description: 'Piper voice ''priyamvada'' (Hindi, hi-IN, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.0558
+    ttfa_ms: 96
+    audio_s: 3.9
+    load_s: 0.85
+    memory_mb: 69
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-piper-hi_IN-priyamvada-medium
+    revision: ec05e05b3eae80817ea62258d13f4d42e46cd1c2
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: hi-IN
+  requires:
+  - espeak-ng
+- id: piper-hi-in-rohan-medium
+  aliases:
+  - piper-hi_IN-rohan-medium
+  - speaches-ai/piper-hi_IN-rohan-medium
+  - rhasspy/piper-voices/hi_IN-rohan-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - hi
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 62952796
+  license: 'See dataset licence: https://www.iitm.ac.in/donlab/indictts/downloads/license.pdf'
+  voices:
+  - id: rohan
+    name: Rohan
+    language: hi-IN
+    gender: ''
+  description: 'Piper voice ''rohan'' (Hindi, hi-IN, medium quality), VITS in Piper format run by sherpa-onnx; phonemes
+    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.0919
+    ttfa_ms: 164
+    audio_s: 3.6
+    load_s: 0.64
+    memory_mb: 89
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-piper-hi_IN-rohan-medium
+    revision: fe149a55f4949f711d42bfca3e214d5c6c8d797b
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: hi-IN
+  requires:
+  - espeak-ng
+- id: piper-ne-np-google-medium
+  aliases:
+  - piper-ne_NP-google-medium
+  - speaches-ai/piper-ne_NP-google-medium
+  - rhasspy/piper-voices/ne_NP-google-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - ne
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 76772898
+  license: 'Voice: CC-BY-SA-4.0 International'
+  features:
+  - multi-voice
+  description: 'Piper voice ''google'' (Nepali, ne-NP, medium quality, 18 speakers), VITS in Piper format run by
+    sherpa-onnx; phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it
+    before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.0404
+    ttfa_ms: 88
+    audio_s: 4.0
+    load_s: 1.38
+    memory_mb: 37
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-piper-ne_NP-google-medium
+    revision: 0f9c5a81be073c810490427dd3bc5743cca32585
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: ne-NP
+  requires:
+  - espeak-ng
+- id: piper-ne-np-google-x-low
+  aliases:
+  - piper-ne_NP-google-x_low
+  - speaches-ai/piper-ne_NP-google-x_low
+  - rhasspy/piper-voices/ne_NP-google-x_low
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - ne
+  tier: realtime
+  size_bytes: 27698757
+  license: 'Voice: CC-BY-SA-4.0 International'
+  features:
+  - multi-voice
+  description: 'Piper voice ''google'' (Nepali, ne-NP, x_low quality, 18 speakers), VITS in Piper format run by
+    sherpa-onnx; phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it
+    before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-ne_NP-google-x_low
+    revision: 49d596b2c0e4b4378ff619a500ff949977e1e77e
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: ne-NP
+  requires:
+  - espeak-ng
+- id: piper-ur-pk-fasih-medium
+  aliases:
+  - piper-ur_PK-fasih-medium
+  - speaches-ai/piper-ur_PK-fasih-medium
+  - rhasspy/piper-voices/ur_PK-fasih-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - ur
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63539300
+  license: See voice card
+  voices:
+  - id: fasih
+    name: Fasih
+    language: ur-PK
+    gender: ''
+  description: 'Piper voice ''fasih'' (Urdu, ur-PK, medium quality), VITS in Piper format run by sherpa-onnx; phonemes
+    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.0901
+    ttfa_ms: 191
+    audio_s: 3.7
+    load_s: 1.47
+    memory_mb: 57
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj2/vits-piper-ur_PK-fasih-medium
+    revision: f9ccfa0b17b80e5558d2f223971f87e13ba7fb9c
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: ur-PK
+  requires:
+  - espeak-ng
+- id: piper-en-us-lessac-medium
+  aliases:
+  - piper-en_US-lessac-medium
+  - speaches-ai/piper-en_US-lessac-medium
+  - rhasspy/piper-voices/en_US-lessac-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207582
+  license: 'See dataset licence: https://www.cstr.ed.ac.uk/projects/blizzard/2013/lessac_blizzard2013/license.html'
+  commercial_use: false
+  voices:
+  - id: lessac
+    name: Lessac
+    language: en-US
+    gender: ''
+  description: 'Piper voice ''lessac'' (English, en-US, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.1255
+    round_trip_wer: 0.05
+    round_trip_stt: moonshine-tiny-en
+    ttfa_ms: 325
+    audio_s: 6.2
+    load_s: 1.46
+    memory_mb: 78
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-piper-en_US-lessac-medium
+    revision: 83f7470750b36549037551ef7007fa3b4b8697e0
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: en-US
+  requires:
+  - espeak-ng
+- id: piper-en-us-lessac-low
+  aliases:
+  - piper-en_US-lessac-low
+  - speaches-ai/piper-en_US-lessac-low
+  - rhasspy/piper-voices/en_US-lessac-low
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - en
+  tier: realtime
+  size_bytes: 63207573
+  license: 'See dataset licence: https://www.cstr.ed.ac.uk/projects/blizzard/2013/lessac_blizzard2013/license.html'
+  commercial_use: false
+  voices:
+  - id: lessac
+    name: Lessac
+    language: en-US
+    gender: ''
+  description: 'Piper voice ''lessac'' (English, en-US, low quality), VITS in Piper format run by sherpa-onnx; phonemes
+    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-en_US-lessac-low
+    revision: 7f5edb341cadf35daab356f857ed5ae8545d22bf
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: en-US
+  requires:
+  - espeak-ng
+- id: piper-en-us-amy-low
+  aliases:
+  - piper-en_US-amy-low
+  - speaches-ai/piper-en_US-amy-low
+  - rhasspy/piper-voices/en_US-amy-low
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - en
+  tier: realtime
+  size_bytes: 63109857
+  license: 'See dataset licence: https://github.com/MycroftAI/mimic3-voices'
+  voices:
+  - id: amy
+    name: Amy
+    language: en-US
+    gender: ''
+  description: 'Piper voice ''amy'' (English, en-US, low quality), VITS in Piper format run by sherpa-onnx; phonemes
+    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.0489
+    round_trip_wer: 0.0
+    round_trip_stt: moonshine-tiny-en
+    ttfa_ms: 189
+    audio_s: 7.7
+    load_s: 1.25
+    memory_mb: 0
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-piper-en_US-amy-low
+    revision: 76da6ca287517a49f58b943c4c4fdb0c1e94d61f
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: en-US
+  requires:
+  - espeak-ng
+- id: piper-en-us-amy-medium
+  aliases:
+  - piper-en_US-amy-medium
+  - speaches-ai/piper-en_US-amy-medium
+  - rhasspy/piper-voices/en_US-amy-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207509
+  license: 'See dataset licence: https://github.com/MycroftAI/mimic3-voices'
+  voices:
+  - id: amy
+    name: Amy
+    language: en-US
+    gender: ''
+  description: 'Piper voice ''amy'' (English, en-US, medium quality), VITS in Piper format run by sherpa-onnx; phonemes
+    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-en_US-amy-medium
+    revision: 79936839cc9409b1a752a45c629fe21639e1c1b2
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: en-US
+  requires:
+  - espeak-ng
+- id: piper-en-us-ryan-medium
+  aliases:
+  - piper-en_US-ryan-medium
+  - speaches-ai/piper-en_US-ryan-medium
+  - rhasspy/piper-voices/en_US-ryan-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207535
+  license: 'Voice: CC BY-NC-SA 4.0'
+  commercial_use: false
+  voices:
+  - id: ryan
+    name: Ryan
+    language: en-US
+    gender: ''
+  description: 'Piper voice ''ryan'' (English, en-US, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.1177
+    round_trip_wer: 0.0
+    round_trip_stt: moonshine-tiny-en
+    ttfa_ms: 259
+    audio_s: 5.6
+    load_s: 1.05
+    memory_mb: 70
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-piper-en_US-ryan-medium
+    revision: 2784cf0f7510312ed567a5d227bcbec28dcd661e
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: en-US
+  requires:
+  - espeak-ng
+- id: piper-en-us-ryan-high
+  aliases:
+  - piper-en_US-ryan-high
+  - speaches-ai/piper-en_US-ryan-high
+  - rhasspy/piper-voices/en_US-ryan-high
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 120792117
+  license: 'Voice: CC BY-NC-SA 4.0'
+  commercial_use: false
+  voices:
+  - id: ryan
+    name: Ryan
+    language: en-US
+    gender: ''
+  description: 'Piper voice ''ryan'' (English, en-US, high quality), VITS in Piper format run by sherpa-onnx; phonemes
+    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-en_US-ryan-high
+    revision: 8454dfc37b2e296399b4429eef62f9c74230309c
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: en-US
+  requires:
+  - espeak-ng
+- id: piper-en-us-hfc-female-medium
+  aliases:
+  - piper-en_US-hfc_female-medium
+  - speaches-ai/piper-en_US-hfc_female-medium
+  - rhasspy/piper-voices/en_US-hfc_female-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207766
+  license: 'See dataset licence: https://creativecommons.org/licenses/by-nc-sa/4.0/deed.en'
+  commercial_use: false
+  voices:
+  - id: hfc_female
+    name: Hfc Female
+    language: en-US
+    gender: ''
+  description: 'Piper voice ''hfc_female'' (English, en-US, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-en_US-hfc_female-medium
+    revision: 127829225a73a7f87cb0f07be5aef40895b87abd
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: en-US
+  requires:
+  - espeak-ng
+- id: piper-en-us-hfc-male-medium
+  aliases:
+  - piper-en_US-hfc_male-medium
+  - speaches-ai/piper-en_US-hfc_male-medium
+  - rhasspy/piper-voices/en_US-hfc_male-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207764
+  license: 'See dataset licence: https://creativecommons.org/licenses/by-nc-sa/4.0/deed.en'
+  commercial_use: false
+  voices:
+  - id: hfc_male
+    name: Hfc Male
+    language: en-US
+    gender: ''
+  description: 'Piper voice ''hfc_male'' (English, en-US, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-en_US-hfc_male-medium
+    revision: fa0e01a13f2076da2ddaa7fbce30d64f319b4d25
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: en-US
+  requires:
+  - espeak-ng
+- id: piper-en-us-libritts-r-medium
+  aliases:
+  - piper-en_US-libritts_r-medium
+  - speaches-ai/piper-en_US-libritts_r-medium
+  - rhasspy/piper-voices/en_US-libritts_r-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 78602403
+  license: 'Voice: CC BY 4.0'
+  features:
+  - multi-voice
+  description: 'Piper voice ''libritts_r'' (English, en-US, medium quality, 904 speakers), VITS in Piper format
+    run by sherpa-onnx; phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check
+    it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.1371
+    round_trip_wer: 0.0
+    round_trip_stt: moonshine-tiny-en
+    ttfa_ms: 309
+    audio_s: 5.5
+    load_s: 1.41
+    memory_mb: 0
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-piper-en_US-libritts_r-medium
+    revision: fe872db7e697e9f2a45d09328953f1fd2a9df630
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: en-US
+  requires:
+  - espeak-ng
+- id: piper-en-us-ljspeech-medium
+  aliases:
+  - piper-en_US-ljspeech-medium
+  - speaches-ai/piper-en_US-ljspeech-medium
+  - rhasspy/piper-voices/en_US-ljspeech-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63537936
+  license: 'Voice: public domain'
+  voices:
+  - id: ljspeech
+    name: Ljspeech
+    language: en-US
+    gender: ''
+  description: 'Piper voice ''ljspeech'' (English, en-US, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-en_US-ljspeech-medium
+    revision: 34f390d13b9edbaa30c339127de0f9c4c5948c90
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: en-US
+  requires:
+  - espeak-ng
+- id: piper-en-us-joe-medium
+  aliases:
+  - piper-en_US-joe-medium
+  - speaches-ai/piper-en_US-joe-medium
+  - rhasspy/piper-voices/en_US-joe-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207398
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: joe
+    name: Joe
+    language: en-US
+    gender: ''
+  description: 'Piper voice ''joe'' (English, en-US, medium quality), VITS in Piper format run by sherpa-onnx; phonemes
+    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-en_US-joe-medium
+    revision: cda0697165d154bb152754dcdf4ea4ad13650e37
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: en-US
+  requires:
+  - espeak-ng
+- id: piper-en-us-kristin-medium
+  aliases:
+  - piper-en_US-kristin-medium
+  - speaches-ai/piper-en_US-kristin-medium
+  - rhasspy/piper-voices/en_US-kristin-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63537894
+  license: 'Voice: public domain'
+  voices:
+  - id: kristin
+    name: Kristin
+    language: en-US
+    gender: ''
+  description: 'Piper voice ''kristin'' (English, en-US, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-en_US-kristin-medium
+    revision: 6fdc68249ba2b1b41c1c42ec74341d1599e2c96e
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: en-US
+  requires:
+  - espeak-ng
+- id: piper-en-gb-alan-medium
+  aliases:
+  - piper-en_GB-alan-medium
+  - speaches-ai/piper-en_GB-alan-medium
+  - rhasspy/piper-voices/en_GB-alan-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207559
+  license: 'See dataset licence: https://github.com/MycroftAI/mimic3-voices/blob/master/voices/en_UK/apope_low'
+  voices:
+  - id: alan
+    name: Alan
+    language: en-GB
+    gender: ''
+  description: 'Piper voice ''alan'' (English, en-GB, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-en_GB-alan-medium
+    revision: a449faf03a5e8e2eed012793ce95441d0738b605
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: en-GB
+  requires:
+  - espeak-ng
+- id: piper-en-gb-alba-medium
+  aliases:
+  - piper-en_GB-alba-medium
+  - speaches-ai/piper-en_GB-alba-medium
+  - rhasspy/piper-voices/en_GB-alba-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207563
+  license: 'See dataset licence: https://creativecommons.org/licenses/by/4.0/'
+  voices:
+  - id: alba
+    name: Alba
+    language: en-GB
+    gender: ''
+  description: 'Piper voice ''alba'' (English, en-GB, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.1466
+    round_trip_wer: 0.15
+    round_trip_stt: moonshine-tiny-en
+    ttfa_ms: 380
+    audio_s: 6.2
+    load_s: 1.14
+    memory_mb: 9
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-piper-en_GB-alba-medium
+    revision: 7e469a54c7a4f5bd191cae788e197266e2c9c5ac
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: en-GB
+  requires:
+  - espeak-ng
+- id: piper-en-gb-cori-medium
+  aliases:
+  - piper-en_GB-cori-medium
+  - speaches-ai/piper-en_GB-cori-medium
+  - rhasspy/piper-voices/en_GB-cori-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63537887
+  license: 'Voice: public domain'
+  voices:
+  - id: cori
+    name: Cori
+    language: en-GB
+    gender: ''
+  description: 'Piper voice ''cori'' (English, en-GB, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-en_GB-cori-medium
+    revision: e304c95c578725ba9cab0cff451c4e5d9aaf889e
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: en-GB
+  requires:
+  - espeak-ng
+- id: piper-en-gb-jenny-dioco-medium
+  aliases:
+  - piper-en_GB-jenny_dioco-medium
+  - speaches-ai/piper-en_GB-jenny_dioco-medium
+  - rhasspy/piper-voices/en_GB-jenny_dioco-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207544
+  license: 'See dataset licence: https://github.com/dioco-group/jenny-tts-dataset'
+  voices:
+  - id: jenny_dioco
+    name: Jenny Dioco
+    language: en-GB
+    gender: ''
+  description: 'Piper voice ''jenny_dioco'' (English, en-GB, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-en_GB-jenny_dioco-medium
+    revision: 00bac9d2e32e93b1e60237d26b85971bba95092d
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: en-GB
+  requires:
+  - espeak-ng
+- id: piper-en-gb-northern-english-male-medium
+  aliases:
+  - piper-en_GB-northern_english_male-medium
+  - speaches-ai/piper-en_GB-northern_english_male-medium
+  - rhasspy/piper-voices/en_GB-northern_english_male-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207489
+  license: 'Voice: CC-BY-SA 4.0 International'
+  voices:
+  - id: northern_english_male
+    name: Northern English Male
+    language: en-GB
+    gender: ''
+  description: 'Piper voice ''northern_english_male'' (English, en-GB, medium quality), VITS in Piper format run
+    by sherpa-onnx; phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check
+    it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-en_GB-northern_english_male-medium
+    revision: 1d9a616e1cdeb91d8bc0b921a8b31296e2c9ff75
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: en-GB
+  requires:
+  - espeak-ng
+- id: piper-en-gb-southern-english-female-medium
+  aliases:
+  - piper-en_GB-southern_english_female-medium
+  - speaches-ai/piper-en_GB-southern_english_female-medium
+  - rhasspy/piper-voices/en_GB-southern_english_female-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 77067553
+  license: See voice card
+  voices:
+  - id: southern_english_female
+    name: Southern English Female
+    language: en-GB
+    gender: ''
+  description: 'Piper voice ''southern_english_female'' (English, en-GB, medium quality), VITS in Piper format run
+    by sherpa-onnx; phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check
+    it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-en_GB-southern_english_female-medium
+    revision: e9e3d1f04e42bbffc8379436840646dc2856dbc7
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: en-GB
+  requires:
+  - espeak-ng
+- id: piper-de-de-thorsten-medium
+  aliases:
+  - piper-de_DE-thorsten-medium
+  - speaches-ai/piper-de_DE-thorsten-medium
+  - rhasspy/piper-voices/de_DE-thorsten-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - de
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207432
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: thorsten
+    name: Thorsten
+    language: de-DE
+    gender: ''
+  description: 'Piper voice ''thorsten'' (German, de-DE, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.2514
+    ttfa_ms: 187
+    audio_s: 3.2
+    load_s: 1.3
+    memory_mb: 42
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-piper-de_DE-thorsten-medium
+    revision: da8bed7888b27d17e1aa8fbd53e6703ab939583a
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: de-DE
+  requires:
+  - espeak-ng
+- id: piper-de-de-thorsten-high
+  aliases:
+  - piper-de_DE-thorsten-high
+  - speaches-ai/piper-de_DE-thorsten-high
+  - rhasspy/piper-voices/de_DE-thorsten-high
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - de
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 113901405
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: thorsten
+    name: Thorsten
+    language: de-DE
+    gender: ''
+  description: 'Piper voice ''thorsten'' (German, de-DE, high quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-de_DE-thorsten-high
+    revision: d0d70c92994440adabb10804fdbe9f075f066c7b
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: de-DE
+  requires:
+  - espeak-ng
+- id: piper-de-de-kerstin-low
+  aliases:
+  - piper-de_DE-kerstin-low
+  - speaches-ai/piper-de_DE-kerstin-low
+  - rhasspy/piper-voices/de_DE-kerstin-low
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - de
+  tier: realtime
+  size_bytes: 63109846
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: kerstin
+    name: Kerstin
+    language: de-DE
+    gender: ''
+  description: 'Piper voice ''kerstin'' (German, de-DE, low quality), VITS in Piper format run by sherpa-onnx; phonemes
+    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-de_DE-kerstin-low
+    revision: 7bc6590b34162daac7af36a49817c5ac9799eced
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: de-DE
+  requires:
+  - espeak-ng
+- id: piper-es-es-davefx-medium
+  aliases:
+  - piper-es_ES-davefx-medium
+  - speaches-ai/piper-es_ES-davefx-medium
+  - rhasspy/piper-voices/es_ES-davefx-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - es
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207421
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: davefx
+    name: Davefx
+    language: es-ES
+    gender: ''
+  description: 'Piper voice ''davefx'' (Spanish, es-ES, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.1731
+    ttfa_ms: 191
+    audio_s: 2.4
+    load_s: 1.48
+    memory_mb: 0
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-piper-es_ES-davefx-medium
+    revision: d5cddb304d484989611c1684db8878d4ef2fc506
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: es-ES
+  requires:
+  - espeak-ng
+- id: piper-es-es-sharvard-medium
+  aliases:
+  - piper-es_ES-sharvard-medium
+  - speaches-ai/piper-es_ES-sharvard-medium
+  - rhasspy/piper-voices/es_ES-sharvard-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - es
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 76739959
+  license: 'See dataset licence: http://creativecommons.org/licenses/by/3.0/'
+  features:
+  - multi-voice
+  description: 'Piper voice ''sharvard'' (Spanish, es-ES, medium quality, 2 speakers), VITS in Piper format run
+    by sherpa-onnx; phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check
+    it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-es_ES-sharvard-medium
+    revision: 2306b73bae558eddfdaee0a7ef3048a966a291d4
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: es-ES
+  requires:
+  - espeak-ng
+- id: piper-es-mx-ald-medium
+  aliases:
+  - piper-es_MX-ald-medium
+  - speaches-ai/piper-es_MX-ald-medium
+  - rhasspy/piper-voices/es_MX-ald-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - es
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207556
+  license: 'See dataset licence: http://unlicense.org'
+  voices:
+  - id: ald
+    name: Ald
+    language: es-MX
+    gender: ''
+  description: 'Piper voice ''ald'' (Spanish, es-MX, medium quality), VITS in Piper format run by sherpa-onnx; phonemes
+    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-es_MX-ald-medium
+    revision: 7e97a71dada30e05c6bdb069f64c9e021401bfef
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: es-MX
+  requires:
+  - espeak-ng
+- id: piper-es-ar-daniela-high
+  aliases:
+  - piper-es_AR-daniela-high
+  - speaches-ai/piper-es_AR-daniela-high
+  - rhasspy/piper-voices/es_AR-daniela-high
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - es
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 113860434
+  license: 'Voice: Attribution-ShareAlike 4.0 International'
+  voices:
+  - id: daniela
+    name: Daniela
+    language: es-AR
+    gender: ''
+  description: 'Piper voice ''daniela'' (Spanish, es-AR, high quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-es_AR-daniela-high
+    revision: b95fc6d7ff65e5da79796531cb4e760931b89888
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: es-AR
+  requires:
+  - espeak-ng
+- id: piper-fr-fr-siwis-medium
+  aliases:
+  - piper-fr_FR-siwis-medium
+  - speaches-ai/piper-fr_FR-siwis-medium
+  - rhasspy/piper-voices/fr_FR-siwis-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - fr
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207501
+  license: 'Voice: CC-BY 4.0'
+  voices:
+  - id: siwis
+    name: Siwis
+    language: fr-FR
+    gender: ''
+  description: 'Piper voice ''siwis'' (French, fr-FR, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.1316
+    ttfa_ms: 225
+    audio_s: 3.3
+    load_s: 1.22
+    memory_mb: 0
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-piper-fr_FR-siwis-medium
+    revision: 6b956227093bc8f9c05e5549508c4a510e97ef26
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: fr-FR
+  requires:
+  - espeak-ng
+- id: piper-fr-fr-upmc-medium
+  aliases:
+  - piper-fr_FR-upmc-medium
+  - speaches-ai/piper-fr_FR-upmc-medium
+  - rhasspy/piper-voices/fr_FR-upmc-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - fr
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 76739994
+  license: 'See dataset licence: http://creativecommons.org/licenses/by-sa/4.0/'
+  features:
+  - multi-voice
+  description: 'Piper voice ''upmc'' (French, fr-FR, medium quality, 2 speakers), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-fr_FR-upmc-medium
+    revision: 282bacef30b429ca30676bdd0eec155ea8d1b402
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: fr-FR
+  requires:
+  - espeak-ng
+- id: piper-fr-fr-tom-medium
+  aliases:
+  - piper-fr_FR-tom-medium
+  - speaches-ai/piper-fr_FR-tom-medium
+  - rhasspy/piper-voices/fr_FR-tom-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - fr
+  tier: realtime
+  sample_rate: 44100
+  size_bytes: 63517297
+  license: 'Voice: AGPLv3'
+  voices:
+  - id: tom
+    name: Tom
+    language: fr-FR
+    gender: ''
+  description: 'Piper voice ''tom'' (French, fr-FR, medium quality), VITS in Piper format run by sherpa-onnx; phonemes
+    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-fr_FR-tom-medium
+    revision: b06801cef7edce85e3a23acb9cc3526560e7075d
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: fr-FR
+  requires:
+  - espeak-ng
+- id: piper-it-it-paola-medium
+  aliases:
+  - piper-it_IT-paola-medium
+  - speaches-ai/piper-it_IT-paola-medium
+  - rhasspy/piper-voices/it_IT-paola-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - it
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63519489
+  license: 'See dataset licence: https://huggingface.co/datasets/paolapersico1/Voice-Dataset-Italian'
+  voices:
+  - id: paola
+    name: Paola
+    language: it-IT
+    gender: ''
+  description: 'Piper voice ''paola'' (Italian, it-IT, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.1728
+    ttfa_ms: 300
+    audio_s: 2.8
+    load_s: 1.4
+    memory_mb: 82
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-piper-it_IT-paola-medium
+    revision: b2d11ae8ce81120ba05f39fb43ecbff2d6d634ea
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: it-IT
+  requires:
+  - espeak-ng
+- id: piper-it-it-riccardo-x-low
+  aliases:
+  - piper-it_IT-riccardo-x_low
+  - speaches-ai/piper-it_IT-riccardo-x_low
+  - rhasspy/piper-voices/it_IT-riccardo-x_low
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - it
+  tier: realtime
+  size_bytes: 28136103
+  license: 'See dataset licence: https://www.caito.de/2019/01/03/the-m-ailabs-speech-dataset/'
+  voices:
+  - id: riccardo
+    name: Riccardo
+    language: it-IT
+    gender: ''
+  description: 'Piper voice ''riccardo'' (Italian, it-IT, x_low quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-it_IT-riccardo-x_low
+    revision: e951548ed9492b44509cdc22e31db407b3ee76b4
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: it-IT
+  requires:
+  - espeak-ng
+- id: piper-pt-br-faber-medium
+  aliases:
+  - piper-pt_BR-faber-medium
+  - speaches-ai/piper-pt_BR-faber-medium
+  - rhasspy/piper-voices/pt_BR-faber-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - pt
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207468
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: faber
+    name: Faber
+    language: pt-BR
+    gender: ''
+  description: 'Piper voice ''faber'' (Portuguese, pt-BR, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.1812
+    ttfa_ms: 287
+    audio_s: 2.6
+    load_s: 1.43
+    memory_mb: 1
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-piper-pt_BR-faber-medium
+    revision: 4f385076a8f9d5bc7b4cd9fea4dc77e6e8ca8167
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: pt-BR
+  requires:
+  - espeak-ng
+- id: piper-pt-pt-tugao-medium
+  aliases:
+  - piper-pt_PT-tugao-medium
+  - speaches-ai/piper-pt_PT-tugao-medium
+  - rhasspy/piper-voices/pt_PT-tugao-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - pt
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207686
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: tugao
+    name: Tugao
+    language: pt-PT
+    gender: ''
+  description: 'Piper voice ''tugao'' (Portuguese, pt-PT, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-pt_PT-tugao-medium
+    revision: 612042d3d5a504d6c65080b1b2b2f7981b831954
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: pt-PT
+  requires:
+  - espeak-ng
+- id: piper-nl-nl-mls-medium
+  aliases:
+  - piper-nl_NL-mls-medium
+  - speaches-ai/piper-nl_NL-mls-medium
+  - rhasspy/piper-voices/nl_NL-mls-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - nl
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 76591408
+  license: 'Voice: CC-BY 4.0'
+  features:
+  - multi-voice
+  description: 'Piper voice ''mls'' (Dutch, nl-NL, medium quality, 52 speakers), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-nl_NL-mls-medium
+    revision: 12a0255aae38537f7511b7139e3445b84866e771
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: nl-NL
+  requires:
+  - espeak-ng
+- id: piper-nl-be-nathalie-medium
+  aliases:
+  - piper-nl_BE-nathalie-medium
+  - speaches-ai/piper-nl_BE-nathalie-medium
+  - rhasspy/piper-voices/nl_BE-nathalie-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - nl
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207504
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: nathalie
+    name: Nathalie
+    language: nl-BE
+    gender: ''
+  description: 'Piper voice ''nathalie'' (Dutch, nl-BE, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-nl_BE-nathalie-medium
+    revision: 1356793b677b4effa325817d758902c88d775709
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: nl-BE
+  requires:
+  - espeak-ng
+- id: piper-pl-pl-gosia-medium
+  aliases:
+  - piper-pl_PL-gosia-medium
+  - speaches-ai/piper-pl_PL-gosia-medium
+  - rhasspy/piper-voices/pl_PL-gosia-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - pl
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207416
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: gosia
+    name: Gosia
+    language: pl-PL
+    gender: ''
+  description: 'Piper voice ''gosia'' (Polish, pl-PL, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-pl_PL-gosia-medium
+    revision: bdee685fb766e9f9c97caa75094f9a3d13441521
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: pl-PL
+  requires:
+  - espeak-ng
+- id: piper-pl-pl-darkman-medium
+  aliases:
+  - piper-pl_PL-darkman-medium
+  - speaches-ai/piper-pl_PL-darkman-medium
+  - rhasspy/piper-voices/pl_PL-darkman-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - pl
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207420
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: darkman
+    name: Darkman
+    language: pl-PL
+    gender: ''
+  description: 'Piper voice ''darkman'' (Polish, pl-PL, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-pl_PL-darkman-medium
+    revision: 2a1dfbd2449c2a19bf794f3977bb5088a83c3cce
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: pl-PL
+  requires:
+  - espeak-ng
+- id: piper-ru-ru-irina-medium
+  aliases:
+  - piper-ru_RU-irina-medium
+  - speaches-ai/piper-ru_RU-irina-medium
+  - rhasspy/piper-voices/ru_RU-irina-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - ru
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207357
+  license: 'Voice: Unknown'
+  voices:
+  - id: irina
+    name: Irina
+    language: ru-RU
+    gender: ''
+  description: 'Piper voice ''irina'' (Russian, ru-RU, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.2326
+    ttfa_ms: 381
+    audio_s: 4.0
+    load_s: 1.22
+    memory_mb: 70
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-piper-ru_RU-irina-medium
+    revision: b095bed45c39813266edf14ffa2bade5ebfc929c
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: ru-RU
+  requires:
+  - espeak-ng
+- id: piper-ru-ru-denis-medium
+  aliases:
+  - piper-ru_RU-denis-medium
+  - speaches-ai/piper-ru_RU-denis-medium
+  - rhasspy/piper-voices/ru_RU-denis-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - ru
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207427
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: denis
+    name: Denis
+    language: ru-RU
+    gender: ''
+  description: 'Piper voice ''denis'' (Russian, ru-RU, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-ru_RU-denis-medium
+    revision: 1e2f78fc13100abc60bf56264dc2ee254b4c5f8e
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: ru-RU
+  requires:
+  - espeak-ng
+- id: piper-ru-ru-dmitri-medium
+  aliases:
+  - piper-ru_RU-dmitri-medium
+  - speaches-ai/piper-ru_RU-dmitri-medium
+  - rhasspy/piper-voices/ru_RU-dmitri-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - ru
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207429
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: dmitri
+    name: Dmitri
+    language: ru-RU
+    gender: ''
+  description: 'Piper voice ''dmitri'' (Russian, ru-RU, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-ru_RU-dmitri-medium
+    revision: 51cc3e9ea521e33ef3771f11e02b29ecb42a91f1
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: ru-RU
+  requires:
+  - espeak-ng
+- id: piper-ru-ru-ruslan-medium
+  aliases:
+  - piper-ru_RU-ruslan-medium
+  - speaches-ai/piper-ru_RU-ruslan-medium
+  - rhasspy/piper-voices/ru_RU-ruslan-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - ru
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207538
+  license: 'See dataset licence: https://creativecommons.org/licenses/by-nc-sa/4.0/'
+  commercial_use: false
+  voices:
+  - id: ruslan
+    name: Ruslan
+    language: ru-RU
+    gender: ''
+  description: 'Piper voice ''ruslan'' (Russian, ru-RU, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-ru_RU-ruslan-medium
+    revision: 22c226825c24319e30cbf8a3844a240b9f6b1951
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: ru-RU
+  requires:
+  - espeak-ng
+- id: piper-uk-ua-ukrainian-tts-medium
+  aliases:
+  - piper-uk_UA-ukrainian_tts-medium
+  - speaches-ai/piper-uk_UA-ukrainian_tts-medium
+  - rhasspy/piper-voices/uk_UA-ukrainian_tts-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - uk
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 76738334
+  license: 'Voice: CC0-1.0'
+  features:
+  - multi-voice
+  description: 'Piper voice ''ukrainian_tts'' (Ukrainian, uk-UA, medium quality, 3 speakers), VITS in Piper format
+    run by sherpa-onnx; phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check
+    it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-uk_UA-ukrainian_tts-medium
+    revision: 4fd40e3e9fc24f8d95cc4dec05fa2ad6bd749c62
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: uk-UA
+  requires:
+  - espeak-ng
+- id: piper-tr-tr-dfki-medium
+  aliases:
+  - piper-tr_TR-dfki-medium
+  - speaches-ai/piper-tr_TR-dfki-medium
+  - rhasspy/piper-voices/tr_TR-dfki-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - tr
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207622
+  license: 'See dataset licence: https://creativecommons.org/licenses/by-nc-sa/4.0/'
+  commercial_use: false
+  voices:
+  - id: dfki
+    name: Dfki
+    language: tr-TR
+    gender: ''
+  description: 'Piper voice ''dfki'' (Turkish, tr-TR, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-tr_TR-dfki-medium
+    revision: a802000f81ce62c67b49ea3dbfcc185e8c352b7f
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: tr-TR
+  requires:
+  - espeak-ng
+- id: piper-tr-tr-fahrettin-medium
+  aliases:
+  - piper-tr_TR-fahrettin-medium
+  - speaches-ai/piper-tr_TR-fahrettin-medium
+  - rhasspy/piper-voices/tr_TR-fahrettin-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - tr
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207677
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: fahrettin
+    name: Fahrettin
+    language: tr-TR
+    gender: ''
+  description: 'Piper voice ''fahrettin'' (Turkish, tr-TR, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-tr_TR-fahrettin-medium
+    revision: ec73b891c2f4f9b14b1f14dab62b90ea0eb983ad
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: tr-TR
+  requires:
+  - espeak-ng
+- id: piper-ar-jo-kareem-medium
+  aliases:
+  - piper-ar_JO-kareem-medium
+  - speaches-ai/piper-ar_JO-kareem-medium
+  - rhasspy/piper-voices/ar_JO-kareem-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - ar
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207682
+  license: 'See dataset licence: https://github.com/AliMokhammad/arabicttstrain/'
+  voices:
+  - id: kareem
+    name: Kareem
+    language: ar-JO
+    gender: ''
+  description: 'Piper voice ''kareem'' (Arabic, ar-JO, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-ar_JO-kareem-medium
+    revision: d05103ccf42f2b625d36c406da2646edd95ea353
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: ar-JO
+  requires:
+  - espeak-ng
+- id: piper-fa-ir-amir-medium
+  aliases:
+  - piper-fa_IR-amir-medium
+  - speaches-ai/piper-fa_IR-amir-medium
+  - rhasspy/piper-voices/fa_IR-amir-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - fa
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63537669
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: amir
+    name: Amir
+    language: fa-IR
+    gender: ''
+  description: 'Piper voice ''amir'' (Persian, fa-IR, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-fa_IR-amir-medium
+    revision: e852208889c7cb924b8b43eace4e8bff847b13a1
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: fa-IR
+  requires:
+  - espeak-ng
+- id: piper-fa-ir-gyro-medium
+  aliases:
+  - piper-fa_IR-gyro-medium
+  - speaches-ai/piper-fa_IR-gyro-medium
+  - rhasspy/piper-voices/fa_IR-gyro-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - fa
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63130723
+  license: 'See dataset licence: https://github.com/gyroing'
+  voices:
+  - id: gyro
+    name: Gyro
+    language: fa-IR
+    gender: ''
+  description: 'Piper voice ''gyro'' (Persian, fa-IR, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-fa_IR-gyro-medium
+    revision: 1ebba162a6721b2b497ed2d80b6b498b0087a79e
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: fa-IR
+  requires:
+  - espeak-ng
+- id: piper-zh-cn-huayan-medium
+  aliases:
+  - piper-zh_CN-huayan-medium
+  - speaches-ai/piper-zh_CN-huayan-medium
+  - rhasspy/piper-voices/zh_CN-huayan-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - zh
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207428
+  license: 'Voice: Unknown'
+  voices:
+  - id: huayan
+    name: Huayan
+    language: zh-CN
+    gender: ''
+  description: 'Piper voice ''huayan'' (Mandarin, zh-CN, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.0467
+    ttfa_ms: 160
+    audio_s: 3.1
+    load_s: 1.19
+    memory_mb: 70
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+  source:
+    repo: csukuangfj/vits-piper-zh_CN-huayan-medium
+    revision: 8baec97632a57257b09073b7986f4d319efdc29a
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: zh-CN
+  requires:
+  - espeak-ng
+- id: piper-vi-vn-vais1000-medium
+  aliases:
+  - piper-vi_VN-vais1000-medium
+  - speaches-ai/piper-vi_VN-vais1000-medium
+  - rhasspy/piper-voices/vi_VN-vais1000-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - vi
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207567
+  license: 'See dataset licence: https://creativecommons.org/licenses/by/4.0/'
+  voices:
+  - id: vais1000
+    name: Vais1000
+    language: vi-VN
+    gender: ''
+  description: 'Piper voice ''vais1000'' (Vietnamese, vi-VN, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-vi_VN-vais1000-medium
+    revision: 3d92898cf942406c23330da466a831d3d923c2a2
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: vi-VN
+  requires:
+  - espeak-ng
+- id: piper-id-id-news-tts-medium
+  aliases:
+  - piper-id_ID-news_tts-medium
+  - speaches-ai/piper-id_ID-news_tts-medium
+  - rhasspy/piper-voices/id_ID-news_tts-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - id
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 62952764
+  license: 'See dataset licence: https://www.kaggle.com/code/mpwolke/indic-tts-malayalam-speech-corpus'
+  voices:
+  - id: news_tts
+    name: News Tts
+    language: id-ID
+    gender: ''
+  description: 'Piper voice ''news_tts'' (Indonesian, id-ID, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-id_ID-news_tts-medium
+    revision: 92e236bcdec557d138aaa96bea6944dfa856f4d4
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: id-ID
+  requires:
+  - espeak-ng
+- id: piper-sv-se-nst-medium
+  aliases:
+  - piper-sv_SE-nst-medium
+  - speaches-ai/piper-sv_SE-nst-medium
+  - rhasspy/piper-voices/sv_SE-nst-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - sv
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63109880
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: nst
+    name: Nst
+    language: sv-SE
+    gender: ''
+  description: 'Piper voice ''nst'' (Swedish, sv-SE, medium quality), VITS in Piper format run by sherpa-onnx; phonemes
+    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-sv_SE-nst-medium
+    revision: 04df2eea5794c14b235bb25f35f69bf4f7d5592d
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: sv-SE
+  requires:
+  - espeak-ng
+- id: piper-da-dk-talesyntese-medium
+  aliases:
+  - piper-da_DK-talesyntese-medium
+  - speaches-ai/piper-da_DK-talesyntese-medium
+  - rhasspy/piper-voices/da_DK-talesyntese-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - da
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207528
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: talesyntese
+    name: Talesyntese
+    language: da-DK
+    gender: ''
+  description: 'Piper voice ''talesyntese'' (Danish, da-DK, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-da_DK-talesyntese-medium
+    revision: f2c1614417beec702b8cb3d28b10ae0bf7a1af1c
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: da-DK
+  requires:
+  - espeak-ng
+- id: piper-no-no-talesyntese-medium
+  aliases:
+  - piper-no_NO-talesyntese-medium
+  - speaches-ai/piper-no_NO-talesyntese-medium
+  - rhasspy/piper-voices/no_NO-talesyntese-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - 'no'
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207537
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: talesyntese
+    name: Talesyntese
+    language: no-NO
+    gender: ''
+  description: 'Piper voice ''talesyntese'' (Norwegian, no-NO, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-no_NO-talesyntese-medium
+    revision: c9003dc23feabf3579bf390238955ac2e88c179e
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: no-NO
+  requires:
+  - espeak-ng
+- id: piper-fi-fi-harri-medium
+  aliases:
+  - piper-fi_FI-harri-medium
+  - speaches-ai/piper-fi_FI-harri-medium
+  - rhasspy/piper-voices/fi_FI-harri-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - fi
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207520
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: harri
+    name: Harri
+    language: fi-FI
+    gender: ''
+  description: 'Piper voice ''harri'' (Finnish, fi-FI, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-fi_FI-harri-medium
+    revision: 6c1264e0997582ccdd6c54de1e22698d460c40ea
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: fi-FI
+  requires:
+  - espeak-ng
+- id: piper-cs-cz-jirka-medium
+  aliases:
+  - piper-cs_CZ-jirka-medium
+  - speaches-ai/piper-cs_CZ-jirka-medium
+  - rhasspy/piper-voices/cs_CZ-jirka-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - cs
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207682
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: jirka
+    name: Jirka
+    language: cs-CZ
+    gender: ''
+  description: 'Piper voice ''jirka'' (Czech, cs-CZ, medium quality), VITS in Piper format run by sherpa-onnx; phonemes
+    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-cs_CZ-jirka-medium
+    revision: 14061e2f0c1b212be50bc32445e77b490c041ef4
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: cs-CZ
+  requires:
+  - espeak-ng
+- id: piper-el-gr-rapunzelina-low
+  aliases:
+  - piper-el_GR-rapunzelina-low
+  - speaches-ai/piper-el_GR-rapunzelina-low
+  - rhasspy/piper-voices/el_GR-rapunzelina-low
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - el
+  tier: realtime
+  size_bytes: 63109931
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: rapunzelina
+    name: Rapunzelina
+    language: el-GR
+    gender: ''
+  description: 'Piper voice ''rapunzelina'' (Greek, el-GR, low quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-el_GR-rapunzelina-low
+    revision: b16a9198ecb66e5361f3d0c01a181afa0ea28fff
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: el-GR
+  requires:
+  - espeak-ng
+- id: piper-hu-hu-anna-medium
+  aliases:
+  - piper-hu_HU-anna-medium
+  - speaches-ai/piper-hu_HU-anna-medium
+  - rhasspy/piper-voices/hu_HU-anna-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - hu
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207673
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: anna
+    name: Anna
+    language: hu-HU
+    gender: ''
+  description: 'Piper voice ''anna'' (Hungarian, hu-HU, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-hu_HU-anna-medium
+    revision: dec1dc1120c96916b49c71e3ac199e83beee341a
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: hu-HU
+  requires:
+  - espeak-ng
+- id: piper-ro-ro-mihai-medium
+  aliases:
+  - piper-ro_RO-mihai-medium
+  - speaches-ai/piper-ro_RO-mihai-medium
+  - rhasspy/piper-voices/ro_RO-mihai-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - ro
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207498
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: mihai
+    name: Mihai
+    language: ro-RO
+    gender: ''
+  description: 'Piper voice ''mihai'' (Romanian, ro-RO, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-ro_RO-mihai-medium
+    revision: b7955c4f2151846c863e197689ec2bcb74b1de8d
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: ro-RO
+  requires:
+  - espeak-ng
+- id: piper-sk-sk-lili-medium
+  aliases:
+  - piper-sk_SK-lili-medium
+  - speaches-ai/piper-sk_SK-lili-medium
+  - rhasspy/piper-voices/sk_SK-lili-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - sk
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207599
+  license: 'Voice: CC0-1.0'
+  voices:
+  - id: lili
+    name: Lili
+    language: sk-SK
+    gender: ''
+  description: 'Piper voice ''lili'' (Slovak, sk-SK, medium quality), VITS in Piper format run by sherpa-onnx; phonemes
+    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-sk_SK-lili-medium
+    revision: e24926b2960bdd9f471d40384adb33558b14e3b5
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: sk-SK
+  requires:
+  - espeak-ng
+- id: piper-sr-rs-serbski-institut-medium
+  aliases:
+  - piper-sr_RS-serbski_institut-medium
+  - speaches-ai/piper-sr_RS-serbski_institut-medium
+  - rhasspy/piper-voices/sr_RS-serbski_institut-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - sr
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 76740025
+  license: 'See dataset licence: https://creativecommons.org/licenses/by-nc-sa/4.0/'
+  commercial_use: false
+  features:
+  - multi-voice
+  description: 'Piper voice ''serbski_institut'' (Serbian, sr-RS, medium quality, 2 speakers), VITS in Piper format
+    run by sherpa-onnx; phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check
+    it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-sr_RS-serbski_institut-medium
+    revision: c11ecae3cda764e16fd861ed8ebb44bb2e1191ad
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: sr-RS
+  requires:
+  - espeak-ng
+- id: piper-sl-si-artur-medium
+  aliases:
+  - piper-sl_SI-artur-medium
+  - speaches-ai/piper-sl_SI-artur-medium
+  - rhasspy/piper-voices/sl_SI-artur-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - sl
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63206861
+  license: 'See dataset licence: https://creativecommons.org/licenses/by/4.0/'
+  voices:
+  - id: artur
+    name: Artur
+    language: sl-SI
+    gender: ''
+  description: 'Piper voice ''artur'' (Slovenian, sl-SI, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-sl_SI-artur-medium
+    revision: 6d8fe8757edf4d3481543621d645ab87fd09538b
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: sl-SI
+  requires:
+  - espeak-ng
+- id: piper-ca-es-upc-ona-medium
+  aliases:
+  - piper-ca_ES-upc_ona-medium
+  - speaches-ai/piper-ca_ES-upc_ona-medium
+  - rhasspy/piper-voices/ca_ES-upc_ona-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - ca
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207514
+  license: 'Voice: CC BY-SA 3.0 ES'
+  voices:
+  - id: upc_ona
+    name: Upc Ona
+    language: ca-ES
+    gender: ''
+  description: 'Piper voice ''upc_ona'' (Catalan, ca-ES, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-ca_ES-upc_ona-medium
+    revision: 814326c793214a358024edcf2d17e6de1acf0280
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: ca-ES
+  requires:
+  - espeak-ng
+- id: piper-cy-gb-gwryw-gogleddol-medium
+  aliases:
+  - piper-cy_GB-gwryw_gogleddol-medium
+  - speaches-ai/piper-cy_GB-gwryw_gogleddol-medium
+  - rhasspy/piper-voices/cy_GB-gwryw_gogleddol-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - cy
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63517416
+  license: 'See dataset licence: https://git.techiaith.bangor.ac.uk/data-porth-technolegau-iaith/corpws-talentau-llais'
+  voices:
+  - id: gwryw_gogleddol
+    name: Gwryw Gogleddol
+    language: cy-GB
+    gender: ''
+  description: 'Piper voice ''gwryw_gogleddol'' (Welsh, cy-GB, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-cy_GB-gwryw_gogleddol-medium
+    revision: 33ce1a5f9b8c5dd06eb7d11a061710929c8dd72e
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: cy-GB
+  requires:
+  - espeak-ng
+- id: piper-is-is-bui-medium
+  aliases:
+  - piper-is_IS-bui-medium
+  - speaches-ai/piper-is_IS-bui-medium
+  - rhasspy/piper-voices/is_IS-bui-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - is
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 76500766
+  license: 'See dataset licence: http://hdl.handle.net/20.500.12537/104'
+  voices:
+  - id: bui
+    name: Bui
+    language: is-IS
+    gender: ''
+  description: 'Piper voice ''bui'' (Icelandic, is-IS, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-is_IS-bui-medium
+    revision: cb53280ea64b94ae1ecbec1cb575f66979b04da7
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: is-IS
+  requires:
+  - espeak-ng
+- id: piper-ka-ge-natia-medium
+  aliases:
+  - piper-ka_GE-natia-medium
+  - speaches-ai/piper-ka_GE-natia-medium
+  - rhasspy/piper-voices/ka_GE-natia-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - ka
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207460
+  license: See LICENSE file
+  voices:
+  - id: natia
+    name: Natia
+    language: ka-GE
+    gender: ''
+  description: 'Piper voice ''natia'' (Georgian, ka-GE, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-ka_GE-natia-medium
+    revision: 5e74711897e753af5ca8e7a8e4c380998d8c788f
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: ka-GE
+  requires:
+  - espeak-ng
+- id: piper-kk-kz-issai-high
+  aliases:
+  - piper-kk_KZ-issai-high
+  - speaches-ai/piper-kk_KZ-issai-high
+  - rhasspy/piper-voices/kk_KZ-issai-high
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - kk
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 127869743
+  license: 'Voice: CC-BY-4.0'
+  features:
+  - multi-voice
+  description: 'Piper voice ''issai'' (Kazakh, kk-KZ, high quality, 6 speakers), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-kk_KZ-issai-high
+    revision: 22e6357072c742143b1fa7704391386a3756e8a4
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: kk-KZ
+  requires:
+  - espeak-ng
+- id: piper-lb-lu-marylux-medium
+  aliases:
+  - piper-lb_LU-marylux-medium
+  - speaches-ai/piper-lb_LU-marylux-medium
+  - rhasspy/piper-voices/lb_LU-marylux-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - lb
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207677
+  license: 'See dataset licence: http://creativecommons.org/licenses/by-nc-sa/4.0/'
+  commercial_use: false
+  voices:
+  - id: marylux
+    name: Marylux
+    language: lb-LU
+    gender: ''
+  description: 'Piper voice ''marylux'' (Luxembourgish, lb-LU, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-lb_LU-marylux-medium
+    revision: a7af6b47cf3d1dc061a66f2ee9a3f835f6abd455
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: lb-LU
+  requires:
+  - espeak-ng
+- id: piper-lv-lv-aivars-medium
+  aliases:
+  - piper-lv_LV-aivars-medium
+  - speaches-ai/piper-lv_LV-aivars-medium
+  - rhasspy/piper-voices/lv_LV-aivars-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - lv
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63519605
+  license: 'Voice: CC0 1.0 Universal'
+  voices:
+  - id: aivars
+    name: Aivars
+    language: lv-LV
+    gender: ''
+  description: 'Piper voice ''aivars'' (Latvian, lv-LV, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-lv_LV-aivars-medium
+    revision: 5dabfb0558f9b4046598c9d50599e6004a9544c6
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: lv-LV
+  requires:
+  - espeak-ng
+- id: piper-sw-cd-lanfrica-medium
+  aliases:
+  - piper-sw_CD-lanfrica-medium
+  - speaches-ai/piper-sw_CD-lanfrica-medium
+  - rhasspy/piper-voices/sw_CD-lanfrica-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - sw
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63207579
+  license: 'See dataset licence: https://lanfrica.com/record/kiswahili-tts-dataset'
+  voices:
+  - id: lanfrica
+    name: Lanfrica
+    language: sw-CD
+    gender: ''
+  description: 'Piper voice ''lanfrica'' (Swahili, sw-CD, medium quality), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: untested
+  source:
+    repo: csukuangfj/vits-piper-sw_CD-lanfrica-medium
+    revision: 627325ced1dfadc02e5e2b6c1b2dbe546e66485f
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - '*.py'
+  options:
+    language: sw-CD
+  requires:
+  - espeak-ng

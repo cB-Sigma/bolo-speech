@@ -1,0 +1,64 @@
+{
+ "auto": {
+  "der": 0.0516,
+  "missed": 0.0516,
+  "false_alarm": 0.0,
+  "confusion": 0.0,
+  "reference_speech_s": 18.61,
+  "der_collar_250ms": 0.0,
+  "speakers_found": 2,
+  "rtf": 0.106
+ },
+ "num_speakers=2": {
+  "der": 0.0516,
+  "missed": 0.0516,
+  "false_alarm": 0.0,
+  "confusion": 0.0,
+  "reference_speech_s": 18.61,
+  "der_collar_250ms": 0.0,
+  "speakers_found": 2,
+  "rtf": 0.1
+ },
+ "max_speakers=1": {
+  "der": 0.4643,
+  "missed": 0.0516,
+  "false_alarm": 0.0,
+  "confusion": 0.4127,
+  "reference_speech_s": 18.61,
+  "der_collar_250ms": 0.4176,
+  "speakers_found": 1,
+  "rtf": 0.502
+ },
+ "1-two-speakers-en.wav": {
+  "seconds": 16.0,
+  "speakers_found": 2,
+  "turns": 4
+ },
+ "2-two-speakers-en.wav": {
+  "seconds": 34.0,
+  "speakers_found": 4,
+  "turns": 9
+ },
+ "0-four-speakers-zh.wav": {
+  "seconds": 56.9,
+  "speakers_found": 7,
+  "turns": 11
+ },
+ "online": {
+  "der": 0.0747,
+  "missed": 0.0,
+  "false_alarm": 0.0747,
+  "confusion": 0.0,
+  "reference_speech_s": 18.61,
+  "labels": [
+   "A",
+   "B",
+   "A",
+   "B",
+   "A",
+   "B"
+  ],
+  "diarize_ms_total": 535,
+  "finals": 6
+ }
+}

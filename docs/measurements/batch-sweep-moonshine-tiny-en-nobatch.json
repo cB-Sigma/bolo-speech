@@ -1,0 +1,93 @@
+{
+  "kind": "stt",
+  "model": "moonshine-tiny-en",
+  "mode": "batch",
+  "sample": "en-long",
+  "duration_s": 12.0,
+  "points": [
+    {
+      "concurrency": 1,
+      "ok": 31,
+      "errors": 0,
+      "first_partial_ms": {
+        "p50": 397.4,
+        "p95": 432.9
+      },
+      "final_ms": {
+        "p50": 397.4,
+        "p95": 433.0
+      },
+      "ttfa_ms": null,
+      "rtf": {
+        "p50": 0.0336,
+        "p95": 0.0366
+      },
+      "throughput_x_realtime": 30.23,
+      "elapsed_s": 12.12,
+      "mean_batch": 1.0
+    },
+    {
+      "concurrency": 2,
+      "ok": 31,
+      "errors": 0,
+      "first_partial_ms": {
+        "p50": 813.8,
+        "p95": 1026.2
+      },
+      "final_ms": {
+        "p50": 813.8,
+        "p95": 1026.2
+      },
+      "ttfa_ms": null,
+      "rtf": {
+        "p50": 0.0689,
+        "p95": 0.0869
+      },
+      "throughput_x_realtime": 28.54,
+      "elapsed_s": 12.83,
+      "mean_batch": 1.0
+    },
+    {
+      "concurrency": 4,
+      "ok": 31,
+      "errors": 0,
+      "first_partial_ms": {
+        "p50": 1635.7,
+        "p95": 1962.1
+      },
+      "final_ms": {
+        "p50": 1635.7,
+        "p95": 1962.1
+      },
+      "ttfa_ms": null,
+      "rtf": {
+        "p50": 0.1384,
+        "p95": 0.1661
+      },
+      "throughput_x_realtime": 27.41,
+      "elapsed_s": 13.36,
+      "mean_batch": 1.0
+    },
+    {
+      "concurrency": 8,
+      "ok": 35,
+      "errors": 0,
+      "first_partial_ms": {
+        "p50": 3425.9,
+        "p95": 3922.1
+      },
+      "final_ms": {
+        "p50": 3425.9,
+        "p95": 3922.1
+      },
+      "ttfa_ms": null,
+      "rtf": {
+        "p50": 0.29,
+        "p95": 0.332
+      },
+      "throughput_x_realtime": 27.45,
+      "elapsed_s": 15.07,
+      "mean_batch": 1.0
+    }
+  ]
+}

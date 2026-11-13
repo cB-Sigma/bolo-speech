@@ -1,0 +1,30 @@
+{
+  "kind": "stt",
+  "model": "zipformer-en-20m-streaming",
+  "mode": "realtime",
+  "sample": "en-long",
+  "duration_s": 40.0,
+  "points": [
+    {
+      "concurrency": 1,
+      "ok": 4,
+      "errors": 0,
+      "first_partial_ms": {
+        "p50": 19.1,
+        "p95": 21.3
+      },
+      "final_ms": {
+        "p50": 22.4,
+        "p95": 30.4
+      },
+      "ttfa_ms": null,
+      "rtf": {
+        "p50": 0.0714,
+        "p95": 0.0735
+      },
+      "throughput_x_realtime": 0.91,
+      "elapsed_s": 51.94,
+      "mean_batch": 1.0
+    }
+  ]
+}

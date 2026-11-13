@@ -1,0 +1,37 @@
+# docker compose -f deploy/docker-compose.yml up --build
+#
+# Serves http://localhost:8000 (API + web console) and, optionally, the Wyoming
+# protocol on tcp://localhost:10300 for Home Assistant.
+services:
+  bolo:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      # args:
+      #   WITH_ESPEAK: "1"     # include eSpeak NG (GPL-3.0-or-later) for Piper-format voices
+    image: bolo:cpu
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+      # - "10300:10300"        # Wyoming (also set BOLO_WYOMING below)
+    environment:
+      # BOLO_API_KEY: "change-me"            # required if you publish the port beyond localhost
+      BOLO_PRELOAD: "silero-vad,moonshine-tiny-en"
+      # BOLO_WYOMING: "1"
+      # BOLO_WYOMING_HOST: "0.0.0.0"
+      # BOLO_HF_TOKEN: ""                    # only for gated models you add yourself
+      # BOLO_THREADS: "4"
+      # Voice agents: any OpenAI-compatible chat endpoint (Ollama shown; add an `ollama` service or point at a host)
+      # BOLO_LLM_BASE_URL: "http://ollama:11434/v1"
+      # BOLO_LLM_MODEL: "llama3.2"
+    volumes:
+      - bolo-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  bolo-data:

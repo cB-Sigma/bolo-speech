@@ -1,0 +1,567 @@
+import { CircleCheck, Download, Info, Languages, Play, Repeat2, Square, TriangleAlert, Volume2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
+import { BudgetBar } from '@/components/charts/budget-bar'
+import { Page } from '@/components/layout/app-shell'
+import { ModelPicker } from '@/components/model-picker'
+import { Empty, Panel, Readout } from '@/components/panel'
+import { ChunkTimeline } from '@/components/tts/chunk-timeline'
+import { PlaybackWave } from '@/components/tts/playback-wave'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { ComponentNotice } from '@/components/component-install'
+import { describeError, missingComponent, useComponents, useSamples, useSelectedModel } from '@/hooks/use-api'
+import { useStore } from '@/hooks/use-store'
+import type { Sample } from '@/lib/api/types'
+import { STT_RATE } from '@/lib/audio/capture'
+import { resample } from '@/lib/audio/resample'
+import { encodeWav } from '@/lib/audio/wav'
+import { download } from '@/lib/bench'
+import { fmtMs, fmtPercent, fmtRtf, fmtSeconds, fmtSpeed, languageName } from '@/lib/format'
+import { wordErrorRate, type WerResult } from '@/lib/latency/wer'
+import { prefs, setPref } from '@/lib/prefs'
+import { Store } from '@/lib/store'
+import { ServerTranscriber } from '@/lib/stt/server'
+import { transcriptText } from '@/lib/stt/transcriber'
+import { emptyTts, TtsSession, type TtsState, type TtsTransport } from '@/lib/tts/session'
+import { NeedsServer } from '@/components/demo'
+import { isDemo } from '@/lib/api/config'
+import { cn } from '@/lib/utils'
+
+const FALLBACK_TEXTS: Sample[] = [
+  {
+    id: 'en',
+    kind: 'text',
+    language: 'en',
+    text: 'Thanks for calling. I can help you check an order, change a delivery slot, or talk to a person. What would you like to do?',
+  },
+  { id: 'hi', kind: 'text', language: 'hi', text: 'नमस्ते, बोलो में आपका स्वागत है। मैं आपकी क्या मदद कर सकता हूँ?' },
+  { id: 'es', kind: 'text', language: 'es', text: 'Hola, gracias por llamar. ¿En qué puedo ayudarte hoy?' },
+]
+
+const idle = new Store<TtsState>(emptyTts())
+
+interface RoundTrip {
+  status: 'running' | 'done' | 'error'
+  model: string
+  hypothesis: string
+  result: WerResult | null
+  error?: string
+}
+
+function WerDiff({ r }: { r: WerResult }) {
+  return (
+    <p className="text-[15px] leading-8" data-testid="wer-diff">
+      {r.alignment.map((s, i) => {
+        if (s.op === 'equal') return <span key={i}>{s.hyp} </span>
+        if (s.op === 'insert')
+          return (
+            <span
+              key={i}
+              className="rounded-sm bg-chart-1/15 px-0.5 underline decoration-chart-1 decoration-2 underline-offset-4"
+              title="Inserted: not in the text"
+            >
+              {s.hyp}
+              <span className="sr-only"> (inserted)</span>{' '}
+            </span>
+          )
+        if (s.op === 'delete')
+          return (
+            <span
+              key={i}
+              className="rounded-sm bg-critical/10 px-0.5 text-muted-foreground line-through decoration-critical"
+              title="Missing from the transcript"
+            >
+              {s.ref}
+              <span className="sr-only"> (missing)</span>{' '}
+            </span>
+          )
+        return (
+          <span key={i} title={`Expected “${s.ref}”`}>
+            <span className="rounded-sm bg-critical/10 px-0.5 text-muted-foreground line-through decoration-critical">
+              {s.ref}
+            </span>
+            <span className="rounded-sm bg-chart-1/15 px-0.5 underline decoration-chart-1 decoration-2 underline-offset-4">
+              {s.hyp}
+            </span>
+            <span className="sr-only"> (substituted)</span>{' '}
+          </span>
+        )
+      })}
+    </p>
+  )
+}
+
+function DemoTts() {
+  return (
+    <Page title="Text to speech">
+      <NeedsServer title="Text to speech needs the server">
+        <p>
+          Speech synthesis is not part of the browser demo. The small open voices either depend on a GPL-licensed
+          phonemiser when compiled for the web, or need a download of well over 150 MB to run in a tab, and neither is
+          something to spring on a visitor.
+        </p>
+        <p className="mt-2">
+          With bolo installed this screen streams audio over a WebSocket, shows time to first audio, the real-time
+          factor and a per-chunk timeline, flags playback underruns, and can feed the result back into speech
+          recognition to report a word error rate.
+        </p>
+      </NeedsServer>
+    </Page>
+  )
+}
+
+export default function TtsPage() {
+  return isDemo ? <DemoTts /> : <ServerTts />
+}
+
+function ServerTts() {
+  const { models, model, select, isLoading, error: modelsError } = useSelectedModel('tts')
+  const stt = useSelectedModel('stt')
+  const samples = useSamples()
+  const p = useStore(prefs)
+  const [text, setText] = useState(FALLBACK_TEXTS[0]?.text ?? '')
+  const [transport, setTransport] = useState<TtsTransport>('websocket')
+  const [session, setSession] = useState<TtsSession | null>(null)
+  const [trip, setTrip] = useState<RoundTrip | null>(null)
+  const previewRef = useRef<TtsSession | null>(null)
+  const state = useStore(session?.store ?? idle)
+  const busy = state.status === 'connecting' || state.status === 'synthesizing' || state.status === 'playing'
+
+  const voices = useMemo(() => model?.voices ?? [], [model])
+  const voice = voices.find((v) => v.id === p.ttsVoice) ?? voices[0] ?? null
+  const fromServer = (samples.data?.samples ?? []).filter((s) => s.kind === 'text')
+  const texts = fromServer.length ? fromServer : FALLBACK_TEXTS
+
+  useEffect(() => () => void session?.dispose(), [session])
+  useEffect(() => () => void previewRef.current?.dispose(), [])
+  useEffect(() => {
+    // A missing component gets an inline notice with a way forward instead of a toast.
+    if (state.status === 'error' && state.error && state.errorCode !== 'component_missing') {
+      toast.error('Synthesis failed', { description: state.error })
+    }
+  }, [state.status, state.error, state.errorCode])
+
+  const speak = (): TtsSession | null => {
+    if (!model || !text.trim()) return null
+    void previewRef.current?.dispose()
+    const s = new TtsSession({ model: model.id, voice: voice?.id, text: text.trim(), transport })
+    setSession(s)
+    setTrip(null)
+    s.start()
+    return s
+  }
+
+  const preview = () => {
+    if (!model || !voice) return
+    void previewRef.current?.dispose()
+    session?.stop()
+    const s = new TtsSession({
+      model: model.id,
+      voice: voice.id,
+      text: voice.language.startsWith('hi') ? `नमस्ते, मैं ${voice.name} हूँ।` : `Hello, this is ${voice.name}.`,
+    })
+    previewRef.current = s
+    s.start()
+  }
+
+  const save = () => {
+    if (!session || !state.sampleRate) return
+    download(`bolo-${model?.id ?? 'speech'}.wav`, encodeWav(session.audio(), state.sampleRate), 'audio/wav')
+  }
+
+  /** Feed the synthesised audio to the recogniser and score the transcript against the input text. */
+  const transcribe = async (s: TtsSession, reference: string) => {
+    const sttModel = stt.model
+    if (!sttModel?.installed) {
+      toast.error('No speech-to-text model is installed for the round trip')
+      return
+    }
+    setTrip({ status: 'running', model: sttModel.id, hypothesis: '', result: null })
+    try {
+      // Wait until synthesis (not playback) has finished.
+      await new Promise<void>((resolve, reject) => {
+        const check = () => {
+          const st = s.store.get()
+          if (st.status === 'error') reject(new Error(st.error ?? 'Synthesis failed'))
+          else if (st.totalMs != null) resolve()
+          else return false
+          return true
+        }
+        if (check()) return
+        const off = s.store.subscribe(() => check() && off())
+      })
+      const st = s.store.get()
+      const audio = resample(s.audio(), st.sampleRate ?? 24000, STT_RATE)
+      const t = new ServerTranscriber({ model: sttModel.id })
+      await t.start()
+      const block = STT_RATE / 50
+      for (let o = 0; o < audio.length; o += block) t.push(audio.subarray(o, Math.min(audio.length, o + block)))
+      t.push(new Float32Array(STT_RATE * 0.6)) // trailing silence so the endpointer closes the last utterance
+      await t.finish()
+      const final = t.store.get()
+      if (final.status === 'error') throw new Error(final.error ?? 'Transcription failed')
+      const hypothesis = transcriptText(final)
+      setTrip({ status: 'done', model: sttModel.id, hypothesis, result: wordErrorRate(reference, hypothesis) })
+    } catch (err) {
+      setTrip({ status: 'error', model: sttModel.id, hypothesis: '', result: null, error: describeError(err) })
+    }
+  }
+
+  const roundTrip = () => {
+    const s = state.totalMs != null && session && !busy ? session : speak()
+    if (s) void transcribe(s, text.trim())
+  }
+
+  const hasAudio = state.audioSeconds > 0 && state.totalMs != null
+  const components = useComponents().data?.components
+  // Known up front from the catalog, or learnt the hard way from a `component_missing` error.
+  const missing =
+    missingComponent(model, components) ??
+    (state.errorCode === 'component_missing' ? (components?.find((c) => !c.installed) ?? null) : null)
+  const blocked = missing != null && model?.available === false
+  const underrun = state.underruns > 0
+
+  const toolbar = (
+    <>
+      <ModelPicker
+        models={models}
+        value={model?.id ?? null}
+        onChange={select}
+        loading={isLoading}
+        disabled={busy}
+        className="w-52 max-sm:min-w-44 max-sm:flex-1"
+      />
+      <div className="flex items-center gap-1">
+        <Select
+          value={voice?.id ?? undefined}
+          onValueChange={(v) => setPref('ttsVoice', v)}
+          disabled={busy || voices.length === 0}
+        >
+          <SelectTrigger className="h-8 w-48" aria-label="Voice">
+            <SelectValue placeholder={voices.length ? 'Voice' : 'Default voice'} />
+          </SelectTrigger>
+          <SelectContent position="popper" align="start" className="max-h-72">
+            {voices.map((v) => (
+              <SelectItem key={v.id} value={v.id}>
+                {v.name}
+                <span className="ml-2 num text-xs text-muted-foreground">
+                  {v.language}
+                  {v.gender ? ` · ${v.gender}` : ''}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={preview}
+              disabled={!voice || busy || model?.available === false}
+              aria-label="Preview this voice"
+            >
+              <Volume2 />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Preview this voice</TooltipContent>
+        </Tooltip>
+      </div>
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        size="sm"
+        value={transport}
+        onValueChange={(v) => v && setTransport(v as TtsTransport)}
+        aria-label="Transport"
+        disabled={busy}
+        className="ml-auto"
+      >
+        <ToggleGroupItem value="websocket" className="px-3 text-xs">
+          WebSocket
+        </ToggleGroupItem>
+        <ToggleGroupItem value="http" className="px-3 text-xs">
+          Chunked HTTP
+        </ToggleGroupItem>
+      </ToggleGroup>
+    </>
+  )
+
+  return (
+    <Page title="Text to speech" toolbar={toolbar}>
+      {modelsError && !isLoading && (
+        <Alert className="mb-4" variant="destructive">
+          <Info />
+          <AlertTitle>Could not load the model list</AlertTitle>
+          <AlertDescription>{describeError(modelsError)}</AlertDescription>
+        </Alert>
+      )}
+      {!isLoading && !modelsError && models.length === 0 && (
+        <Alert className="mb-4">
+          <Info />
+          <AlertTitle>No text-to-speech models</AlertTitle>
+          <AlertDescription>Pull one from the Models screen to use this playground.</AlertDescription>
+        </Alert>
+      )}
+      {missing && model && <ComponentNotice component={missing} subject={model.id} className="mb-4" />}
+      {model && !model.installed && (
+        <Alert className="mb-4">
+          <Info />
+          <AlertTitle>
+            <span className="num">{model.id}</span> is not installed
+          </AlertTitle>
+          <AlertDescription>Pull it from the Models screen, or pick an installed model.</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <Panel title="Text" description={`${text.trim().length} characters`}>
+            <Textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              aria-label="Text to speak"
+              placeholder="Type something to say…"
+              className="min-h-32 resize-y text-[15px] leading-7"
+              lang={/[ऀ-ॿ]/.test(text) ? 'hi' : undefined}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !busy) speak()
+              }}
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <Languages className="mr-0.5 size-3.5 text-muted-foreground" aria-hidden />
+              <span className="mr-1 text-xs text-muted-foreground">Try</span>
+              {texts.map((s) => (
+                <Button
+                  key={s.id}
+                  size="xs"
+                  variant={text === s.text ? 'secondary' : 'ghost'}
+                  onClick={() => setText(s.text)}
+                  title={s.text}
+                  className="border border-border"
+                >
+                  {languageName(s.language)}
+                  {texts.filter((x) => x.language === s.language).length > 1 && (
+                    <span className="text-muted-foreground">
+                      {texts.filter((x) => x.language === s.language).indexOf(s) + 1}
+                    </span>
+                  )}
+                </Button>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {busy ? (
+                <Button
+                  onClick={() => session?.stop()}
+                  variant="destructive"
+                  className="h-9 min-w-24"
+                  data-testid="tts-stop"
+                >
+                  <Square className="fill-current" /> Stop
+                </Button>
+              ) : (
+                <Button
+                  onClick={speak}
+                  className="h-9 min-w-24"
+                  disabled={!model?.installed || !text.trim() || blocked}
+                  data-testid="speak"
+                >
+                  <Play className="fill-current" /> Speak
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                className="h-9"
+                onClick={roundTrip}
+                disabled={!model?.installed || !text.trim() || busy || blocked || trip?.status === 'running'}
+                data-testid="round-trip"
+              >
+                <Repeat2 /> Speak, then transcribe
+              </Button>
+              <Button variant="ghost" className="h-9" onClick={save} disabled={!hasAudio}>
+                <Download /> WAV
+              </Button>
+              <span className="ml-auto hidden text-xs text-muted-foreground sm:inline">
+                <kbd className="rounded border border-border bg-muted px-1 num text-[10px]">Ctrl</kbd>{' '}
+                <kbd className="rounded border border-border bg-muted px-1 num text-[10px]">Enter</kbd> to speak
+              </span>
+            </div>
+          </Panel>
+
+          <Panel
+            title="Audio"
+            description={
+              state.status === 'idle'
+                ? 'Nothing synthesised yet'
+                : `${state.status === 'connecting' ? 'Connecting' : state.status === 'synthesizing' ? 'Receiving and playing' : state.status === 'playing' ? 'Playing' : state.status === 'error' ? 'Failed' : 'Done'} · ${fmtSeconds(state.audioSeconds)}${state.sampleRate ? ` · ${(state.sampleRate / 1000).toFixed(state.sampleRate % 1000 ? 2 : 0)} kHz` : ''}`
+            }
+            actions={
+              state.status !== 'idle' ? (
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-md border px-1.5 py-0.5 text-[11px]',
+                    underrun ? 'border-warning/50 text-foreground' : 'border-border text-muted-foreground',
+                  )}
+                  data-testid="underruns"
+                >
+                  {underrun ? (
+                    <TriangleAlert className="size-3 text-warning-text" aria-hidden />
+                  ) : (
+                    <CircleCheck className="size-3 text-good-text" aria-hidden />
+                  )}
+                  {underrun ? (
+                    <>
+                      {state.underruns} underrun{state.underruns === 1 ? '' : 's'} · waited{' '}
+                      <span className="num">{fmtMs(state.starvedMs)}</span>
+                    </>
+                  ) : (
+                    'No underruns'
+                  )}
+                </span>
+              ) : undefined
+            }
+          >
+            <div className="rounded-lg border border-border bg-background/60 px-2 py-1">
+              <PlaybackWave session={session} />
+            </div>
+            {state.chunks.length > 0 ? (
+              <ChunkTimeline chunks={state.chunks} className="mt-4" />
+            ) : (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Audio is scheduled back to back as it streams in. If playback ever catches up with synthesis, that gap
+                is counted as an underrun.
+              </p>
+            )}
+          </Panel>
+
+          {trip && (
+            <Panel
+              title="Round trip"
+              description={
+                <span>
+                  Synthesised audio transcribed by <span className="num">{trip.model}</span>
+                </span>
+              }
+              data-testid="round-trip-panel"
+            >
+              {trip.status === 'running' ? (
+                <p className="text-sm text-muted-foreground" role="status">
+                  Synthesising, then transcribing…
+                </p>
+              ) : trip.status === 'error' ? (
+                <p role="alert" className="text-sm text-critical-text">
+                  {trip.error}
+                </p>
+              ) : trip.result ? (
+                <div className="grid gap-4 sm:grid-cols-[9rem_minmax(0,1fr)]">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Word error rate</div>
+                    <div className="mt-0.5 text-3xl leading-9 font-semibold tracking-tight" data-testid="wer">
+                      {fmtPercent(trip.result.wer, trip.result.wer > 0 && trip.result.wer < 0.1 ? 1 : 0)}
+                    </div>
+                    <div className="mt-1 num text-[11px] leading-4 text-muted-foreground">
+                      {trip.result.substitutions} sub · {trip.result.deletions} del · {trip.result.insertions} ins
+                      <br />
+                      of {trip.result.refWords} words
+                    </div>
+                  </div>
+                  <div className="min-w-0">
+                    <WerDiff r={trip.result} />
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="rounded-sm bg-critical/10 px-1 line-through decoration-critical">word</span>{' '}
+                        expected, not heard
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="rounded-sm bg-chart-1/15 px-1 underline decoration-chart-1 decoration-2 underline-offset-2">
+                          word
+                        </span>{' '}
+                        heard instead
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </Panel>
+          )}
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-4">
+          <Panel title="Latency" description="Measured in this browser from sending the text">
+            {state.status === 'idle' ? (
+              <Empty title="No measurement yet" className="py-6">
+                Press Speak. Time to first audio and the real-time factor appear as the stream arrives.
+              </Empty>
+            ) : (
+              <>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-5xl leading-none font-semibold tracking-tight" data-testid="ttfa">
+                    {state.ttfaMs != null ? Math.round(state.ttfaMs) : '–'}
+                  </span>
+                  <span className="text-sm text-muted-foreground">ms to first audio</span>
+                </div>
+                <BudgetBar
+                  className="mt-4"
+                  measuredMs={state.ttfaMs}
+                  targetMs={p.targetMs}
+                  label="Time to first audio"
+                />
+                <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-border pt-4">
+                  <Readout
+                    label="Server-reported first audio"
+                    value={state.serverTtfaMs != null ? Math.round(state.serverTtfaMs) : '–'}
+                    unit="ms"
+                    hint={
+                      state.ttfaMs != null && state.serverTtfaMs != null
+                        ? `${fmtMs(Math.max(0, state.ttfaMs - state.serverTtfaMs))} network and client`
+                        : transport === 'http'
+                          ? 'not sent over HTTP'
+                          : undefined
+                    }
+                  />
+                  <Readout
+                    label="Real-time factor"
+                    value={fmtRtf(state.rtf)}
+                    hint={state.rtf ? `${fmtSpeed(state.rtf)} real time` : 'when synthesis completes'}
+                  />
+                  <Readout
+                    label="Audio"
+                    value={state.audioSeconds.toFixed(2)}
+                    unit="s"
+                    hint={`${state.chunks.length} chunk${state.chunks.length === 1 ? '' : 's'}`}
+                  />
+                  <Readout
+                    label="All audio received"
+                    value={state.totalMs != null ? Math.round(state.totalMs) : '–'}
+                    unit="ms"
+                    hint={state.serverRtf != null ? `server RTF ${fmtRtf(state.serverRtf)}` : undefined}
+                  />
+                </div>
+              </>
+            )}
+          </Panel>
+
+          <Panel title="Reading the numbers" bodyClassName="grid gap-2.5 text-[13px] leading-5 text-muted-foreground">
+            <p>
+              <span className="text-foreground">Time to first audio</span> is what a caller waits before hearing
+              anything. It matters far more than total synthesis time.
+            </p>
+            <p>
+              <span className="text-foreground">Real-time factor</span> below 1 means audio is produced faster than it
+              plays, so playback never has to wait once it starts.
+            </p>
+            <p>
+              <span className="text-foreground">Headroom</span> in the chunk timeline is how long each chunk sat ready
+              before it was needed.
+            </p>
+          </Panel>
+        </div>
+      </div>
+    </Page>
+  )
+}

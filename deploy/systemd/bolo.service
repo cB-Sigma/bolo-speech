@@ -1,0 +1,40 @@
+# /etc/systemd/system/bolo.service
+#
+#   sudo useradd --system --home /var/lib/bolo --create-home bolo
+#   sudo -u bolo python3 -m venv /var/lib/bolo/venv
+#   sudo -u bolo /var/lib/bolo/venv/bin/pip install 'bolo-speech[all]'
+#   sudo install -m 600 -o bolo /dev/null /etc/bolo.env     # put BOLO_API_KEY=... in it
+#   sudo systemctl daemon-reload && sudo systemctl enable --now bolo
+[Unit]
+Description=bolo speech server
+Documentation=https://github.com/cb-Sigma/bolo
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bolo
+Group=bolo
+Environment=BOLO_DATA_DIR=/var/lib/bolo/models
+Environment=BOLO_HOST=127.0.0.1
+Environment=BOLO_PORT=8000
+EnvironmentFile=-/etc/bolo.env
+ExecStart=/var/lib/bolo/venv/bin/bolo serve
+Restart=on-failure
+RestartSec=3
+# Unloading models and finishing in-flight requests can take a moment.
+TimeoutStopSec=30
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/bolo
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,83 @@
+[
+  {
+    "id": "en-short",
+    "kind": "audio",
+    "language": "en",
+    "seconds": 3.0,
+    "file": "en-short.wav",
+    "text": "Good morning. Could you tell me when my order will arrive?",
+    "description": "English, one speaker, 16 kHz. Synthesised with kokoro-v1.0-int8, voice af_heart (Kokoro-82M, Apache-2.0)."
+  },
+  {
+    "id": "en-long",
+    "kind": "audio",
+    "language": "en",
+    "seconds": 11.8,
+    "file": "en-long.wav",
+    "text": "Speech servers are judged by how quickly the first sound arrives. A good one starts speaking before it has finished reading, keeps a steady pace under load, and tells you honestly how long each step took.",
+    "description": "English, one speaker, 16 kHz. Synthesised with kokoro-v1.0-int8, voice am_michael (Kokoro-82M, Apache-2.0)."
+  },
+  {
+    "id": "hi-short",
+    "kind": "audio",
+    "language": "hi",
+    "seconds": 4.1,
+    "file": "hi-short.wav",
+    "text": "नमस्ते, आप कैसे हैं? आज मौसम बहुत अच्छा है।",
+    "description": "Hindi, one speaker, 16 kHz. Synthesised with kokoro-v1.0-int8, voice hf_alpha (Kokoro-82M, Apache-2.0); phonemes from espeak-ng."
+  },
+  {
+    "id": "en-text-short",
+    "kind": "text",
+    "language": "en",
+    "text": "The quick brown fox jumps over the lazy dog."
+  },
+  {
+    "id": "en-text-long",
+    "kind": "text",
+    "language": "en",
+    "text": "Speech servers are judged by how quickly the first sound arrives. A good one starts speaking before it has finished reading, keeps a steady pace under load, and tells you honestly how long each step took."
+  },
+  {
+    "id": "hi-text-short",
+    "kind": "text",
+    "language": "hi",
+    "text": "नमस्ते, आप कैसे हैं? आज मौसम बहुत अच्छा है।"
+  },
+  {
+    "id": "hi-en-text-mixed",
+    "kind": "text",
+    "language": "hi",
+    "text": "मेरा order कल deliver होगा या आज? Please confirm कर दीजिए।"
+  },
+  {
+    "id": "es-text-short",
+    "kind": "text",
+    "language": "es",
+    "text": "Hola, ¿cómo estás? Hoy hace muy buen tiempo."
+  },
+  {
+    "id": "de-text-short",
+    "kind": "text",
+    "language": "de",
+    "text": "Guten Morgen! Wie geht es Ihnen heute?"
+  },
+  {
+    "id": "fr-text-short",
+    "kind": "text",
+    "language": "fr",
+    "text": "Bonjour, comment allez-vous aujourd'hui ?"
+  },
+  {
+    "id": "bn-text-short",
+    "kind": "text",
+    "language": "bn",
+    "text": "নমস্কার, আপনি কেমন আছেন?"
+  },
+  {
+    "id": "te-text-short",
+    "kind": "text",
+    "language": "te",
+    "text": "నమస్కారం, మీరు ఎలా ఉన్నారు?"
+  }
+]

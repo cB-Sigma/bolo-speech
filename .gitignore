@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.venvs/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Node / web console sources (the built bundle in server/src/bolo/_ui/ IS committed)
+node_modules/
+ui/dist/
+ui/.vite/
+ui/coverage/
+ui/playwright-report/
+ui/test-results/
+*.tsbuildinfo
+npm-debug.log*
+
+# Models, caches and data
+/.bolo-cache/
+/.cache/
+/models/
+*.onnx
+*.ort
+*.bin
+*.gguf
+*.safetensors
+*.part
+
+# Editors and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Local configuration and secrets
+bolo.toml
+.env
+.env.*
+
+# Working notes that are not part of the project
+CONTRACT.md
+SERVER_STATUS.md

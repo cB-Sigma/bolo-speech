@@ -1,0 +1,93 @@
+{
+  "kind": "stt",
+  "model": "zipformer-en-20m-streaming",
+  "mode": "realtime",
+  "sample": "en-long",
+  "duration_s": 30.0,
+  "points": [
+    {
+      "concurrency": 1,
+      "ok": 3,
+      "errors": 0,
+      "first_partial_ms": {
+        "p50": 20.7,
+        "p95": 21.6
+      },
+      "final_ms": {
+        "p50": 31.6,
+        "p95": 35.3
+      },
+      "ttfa_ms": null,
+      "rtf": {
+        "p50": 0.0712,
+        "p95": 0.0989
+      },
+      "throughput_x_realtime": 0.91,
+      "elapsed_s": 38.96,
+      "mean_batch": 1.0
+    },
+    {
+      "concurrency": 2,
+      "ok": 6,
+      "errors": 0,
+      "first_partial_ms": {
+        "p50": 27.9,
+        "p95": 31.1
+      },
+      "final_ms": {
+        "p50": 40.2,
+        "p95": 43.7
+      },
+      "ttfa_ms": null,
+      "rtf": {
+        "p50": 0.0966,
+        "p95": 0.1404
+      },
+      "throughput_x_realtime": 1.81,
+      "elapsed_s": 39.07,
+      "mean_batch": 2.0
+    },
+    {
+      "concurrency": 4,
+      "ok": 12,
+      "errors": 0,
+      "first_partial_ms": {
+        "p50": 36.8,
+        "p95": 55.3
+      },
+      "final_ms": {
+        "p50": 53.8,
+        "p95": 114.0
+      },
+      "ttfa_ms": null,
+      "rtf": {
+        "p50": 0.1297,
+        "p95": 0.1908
+      },
+      "throughput_x_realtime": 3.6,
+      "elapsed_s": 39.35,
+      "mean_batch": 4.0
+    },
+    {
+      "concurrency": 8,
+      "ok": 24,
+      "errors": 0,
+      "first_partial_ms": {
+        "p50": 75.1,
+        "p95": 86.3
+      },
+      "final_ms": {
+        "p50": 171.8,
+        "p95": 274.5
+      },
+      "ttfa_ms": null,
+      "rtf": {
+        "p50": 0.3182,
+        "p95": 0.3843
+      },
+      "throughput_x_realtime": 7.03,
+      "elapsed_s": 40.34,
+      "mean_batch": 7.94
+    }
+  ]
+}

@@ -1,0 +1,646 @@
+# API reference
+
+bolo listens on `http://127.0.0.1:8000` by default. This page describes every
+interface; the machine-readable schema is [`openapi.json`](openapi.json)
+(also served live at `/openapi.json`, with an interactive page at `/docs`).
+
+* [Conventions](#conventions): authentication, errors, model names
+* [OpenAI-compatible endpoints](#openai-compatible-endpoints)
+* [speaches-compatible endpoints](#speaches-compatible-endpoints)
+* [Native API](#native-api-apiv1)
+* [Realtime speech-to-text WebSocket](#ws-apiv1sttstream)
+* [Streaming text-to-speech WebSocket](#ws-apiv1ttsstream)
+* [Speaker diarization](#speaker-diarization)
+* [Realtime API and chat completions](#realtime-api-and-chat-completions)
+* [Optional components](#optional-components)
+* [Latency definitions](#latency-definitions)
+* [Wyoming protocol](#wyoming-protocol)
+* [Operations](#operations)
+
+## All routes
+
+<!-- BEGIN GENERATED: routes -->
+**openai**
+
+| Method | Path | Summary |
+| --- | --- | --- |
+| `GET` | `/v1/models` | List installed models |
+| `GET` | `/v1/models/{model_id}` | Retrieve a model |
+| `POST` | `/v1/audio/transcriptions` | Transcribe audio |
+| `POST` | `/v1/audio/translations` | Translate audio to English |
+| `POST` | `/v1/audio/speech` | Synthesise speech |
+| `POST` | `/v1/chat/completions` | Chat completions with audio in and out (speech front end to your LLM) |
+
+**speaches**
+
+| Method | Path | Summary |
+| --- | --- | --- |
+| `POST` | `/v1/models/{model_id}` | Download a model (blocks until done) |
+| `DELETE` | `/v1/models/{model_id}` | Delete an installed model |
+| `GET` | `/v1/registry` | List every model in the catalog |
+| `GET` | `/v1/audio/models` | List installed text-to-speech models |
+| `GET` | `/v1/audio/voices` | List voices of installed text-to-speech models |
+| `GET` | `/api/ps` | List loaded models |
+| `POST` | `/api/ps/{model_id}` | Load a model into memory |
+| `DELETE` | `/api/ps/{model_id}` | Unload a model from memory |
+| `POST` | `/v1/audio/speech/timestamps` | Voice-activity timestamps (milliseconds) |
+
+**native**
+
+| Method | Path | Summary |
+| --- | --- | --- |
+| `GET` | `/api/v1/info` | Server, engine and platform information |
+| `GET` | `/api/v1/catalog` | Model catalog with install and load state |
+| `POST` | `/api/v1/models/pull` | Start downloading a model |
+| `GET` | `/api/v1/jobs/{job_id}` | Poll a background job |
+| `GET` | `/api/v1/jobs` | List background jobs |
+| `POST` | `/api/v1/models/{model_id}/load` | Load a model into memory |
+| `POST` | `/api/v1/models/{model_id}/unload` | Unload a model from memory |
+| `DELETE` | `/api/v1/models/{model_id}` | Delete an installed model |
+| `GET` | `/api/v1/models/{model_id}` | One catalog entry |
+| `POST` | `/api/v1/diarize` | Speaker diarization: who spoke when |
+| `GET` | `/api/v1/components` | Optional third-party components (espeak-ng) |
+| `POST` | `/api/v1/components/{component_id}/install` | Install an optional component |
+| `GET` | `/api/v1/stats` | Live server statistics |
+| `GET` | `/api/v1/requests` | Recent request traces, newest first |
+| `GET` | `/api/v1/requests/{request_id}` | One request trace |
+| `GET` | `/api/v1/events` | Server-Sent Events: stats, request, request_progress, job, model, log |
+| `POST` | `/api/v1/bench` | Start a concurrency sweep |
+| `GET` | `/api/v1/samples` | Built-in audio and text samples |
+| `GET` | `/api/v1/samples/{name}` | Download a built-in audio sample |
+
+**operations**
+
+| Method | Path | Summary |
+| --- | --- | --- |
+| `GET` | `/metrics` | Prometheus metrics |
+| `GET` | `/healthz` | Liveness |
+| `GET` | `/health` | Liveness (speaches-compatible name) |
+| `GET` | `/readyz` | Readiness (preloaded models are loaded) |
+
+WebSockets (not part of OpenAPI): `WS /api/v1/stt/stream`, `WS /api/v1/tts/stream`.
+<!-- END GENERATED: routes -->
+
+## Conventions
+
+**Authentication.** Off by default. With `api_key` set, send
+`Authorization: Bearer <key>`. `X-API-Key: <key>` and, for browsers that
+cannot set headers on WebSockets or EventSource, `?api_key=<key>` are also
+accepted. `/healthz`, `/readyz`, `/health`, `/metrics` and the console's
+static files are never authenticated.
+
+**Errors.** Every error has the OpenAI envelope plus a `detail` copy of the
+message:
+
+```json
+{"error": {"message": "The model 'x' does not exist. …", "type": "invalid_request_error",
+           "param": "model", "code": "model_not_found"},
+ "detail": "The model 'x' does not exist. …"}
+```
+
+| Status | `code` | When |
+| --- | --- | --- |
+| 400 | `invalid_request`, `audio_decode_error`, `unsupported_format` | bad parameters, undecodable audio |
+| 401 | `invalid_api_key`, `model_gated` | missing/wrong key; gated model without a token |
+| 404 | `model_not_found`, `model_not_installed`, `not_found` | unknown model; not installed and `auto_pull` off |
+| 424 | `component_missing` | the voice needs an optional component (espeak-ng) that is not installed; the message says how to install it |
+| 429 | `overloaded` (`type: rate_limit_error`) | the model's queue is full, or the memory budget is exhausted. `Retry-After` is set |
+| 500 | `synthesis_failed`, `internal_error` | the engine failed, or a voice produced no audio for the text (never an empty 200) |
+| 502 | `download_failed`, `llm_error` | a model download failed; the configured language model could not be reached or answered with an error |
+| 503 | `llm_not_configured` | `/v1/chat/completions` or a Realtime conversation without `llm_base_url` |
+| 503 | `engine_unavailable` | the engine for this model is not installed, or the model failed its load probe |
+
+**Model names.** Anywhere a model is expected you may send a catalog id
+(`moonshine-tiny-en`), one of its aliases (often the upstream repository id,
+for example `Systran/faster-whisper-small`), or an OpenAI name: `whisper-1`,
+`gpt-4o-transcribe`, `gpt-4o-mini-transcribe` map to `default_stt`; `tts-1`,
+`tts-1-hd`, `gpt-4o-mini-tts` map to `default_tts`. Omitting the model uses
+the default. A model that is in the catalog but not installed is downloaded
+on first use unless `auto_pull` is off (the request waits for the download).
+
+**Response headers.** `x-request-id` is the trace id (look it up at
+`/api/v1/requests/{id}`); `openai-processing-ms` on transcriptions;
+`x-sample-rate` on speech.
+
+## OpenAI-compatible endpoints
+
+Verified with the official `openai` Python SDK in the test-suite.
+
+### `POST /v1/audio/transcriptions`
+
+Multipart form.
+
+| Field | | |
+| --- | --- | --- |
+| `file` | required | audio. WAV, FLAC, OGG/Vorbis, OGG/Opus, MP3, AIFF decode with no extra install; M4A/AAC, WebM, MP4 and others need `bolo-speech[av]` or `ffmpeg` on `PATH`. Raw headerless audio is accepted when the part's content type says so: `audio/basic` or `audio/x-mulaw` (8 kHz μ-law), `audio/x-alaw`, `audio/pcm;rate=16000` (16-bit little-endian) |
+| `model` | optional | see model names |
+| `language` | optional | ISO-639-1 code. Improves accuracy and latency for multilingual models |
+| `prompt` | optional | initial prompt (Whisper models) |
+| `response_format` | `json` | `json`, `text`, `srt`, `vtt`, `verbose_json`, `diarized_json` |
+| `timestamp_granularities[]` | `segment` | `word` and/or `segment`; used with `verbose_json` |
+| `temperature` | `0` | Whisper models |
+| `stream` | `false` | `true`: Server-Sent Events (below) |
+| `diarize` | `false` | extension. `true` labels segments with speakers (see [Speaker diarization](#speaker-diarization)); also switched on by `response_format=diarized_json` or the model name `gpt-4o-transcribe-diarize` |
+| `num_speakers`, `min_speakers`, `max_speakers` | - | extension, with diarization: fix or bound the number of speakers |
+| `vad_filter` | auto | extension. `true` forces silence removal before decoding; by default VAD is used only to split audio longer than the model's window |
+| `hotwords` | - | extension, passed to engines that support it |
+
+Responses:
+
+```jsonc
+// json
+{"text": "Good morning.", "usage": {"type": "duration", "seconds": 3}}
+
+// verbose_json
+{"task": "transcribe", "language": "english", "duration": 3.0, "text": "Good morning.",
+ "words":    [{"word": "Good", "start": 0.12, "end": 0.38}, …],           // if "word" was requested
+ "segments": [{"id": 0, "seek": 0, "start": 0.0, "end": 3.0, "text": "Good morning.", "tokens": [],
+               "temperature": 0.0, "avg_logprob": -0.21, "compression_ratio": 0.0, "no_speech_prob": 0.01}],
+ "usage": {"type": "duration", "seconds": 3}}
+```
+
+`text`, `srt` and `vtt` return plain text. Fields bolo cannot fill honestly
+are present with neutral values (`tokens: []`, `compression_ratio: 0.0`;
+`avg_logprob`/`no_speech_prob` are real only for faster-whisper models).
+Word timestamps need a model with the `timestamps` feature; others return an
+empty `words` list.
+
+With `stream=true` the response is `text/event-stream`:
+
+```
+data: {"type":"transcript.text.delta","delta":"After early nightfall, the yellow lamps"}
+data: {"type":"transcript.text.delta","delta":" would light up here and there."}
+data: {"type":"transcript.text.done","text":"After early nightfall, …","usage":{"type":"duration","seconds":42}}
+```
+
+One delta is sent per decoded segment (long audio is split at pauses), so a
+short clip produces a single delta. An error after streaming has started is
+sent as `{"type":"error","error":{…}}`. Disconnecting cancels the remaining work.
+
+### `POST /v1/audio/translations`
+
+Same form without `language` and `stream`; translates to English. Needs a
+multilingual Whisper model (feature `translate`); other models answer 400.
+
+### `POST /v1/audio/speech`
+
+JSON body.
+
+| Field | | |
+| --- | --- | --- |
+| `input` | required | text. Split into sentences and synthesised one at a time |
+| `model` | optional | see model names |
+| `voice` | optional | a voice id of the model (`GET /api/v1/models/{id}`), or `{"id": …}`. OpenAI voice names (`alloy`, `echo`, `nova`, …) are mapped onto the model's voices so stock clients work |
+| `response_format` | `mp3` | `mp3`, `opus` (Ogg), `aac` (ADTS; needs `bolo-speech[av]` or ffmpeg), `flac`, `wav`, `pcm` (16-bit little-endian mono at the model's rate), and the telephony extensions `mulaw` / `alaw` (raw 8 kHz G.711) |
+| `speed` | `1.0` | 0.25 to 4.0 |
+| `stream_format` | `audio` | `sse` wraps the audio in `speech.audio.delta` events (base64) followed by `speech.audio.done` |
+| `instructions` | - | accepted and ignored |
+| `sample_rate` | model's | extension: resample the output (8000 to 48000) |
+| `language` | voice's | extension: language for text normalisation |
+| `normalize` | `true` | extension: `false` sends the text to the voice untouched |
+
+The body is streamed (chunked transfer) while synthesis is still running:
+the first sentence is audible while the rest is being generated. `pcm`,
+`wav` and `mp3` are forwarded as soon as each piece exists; Ogg/Opus is
+emitted in pages of roughly one second, so prefer `pcm` or `mp3` when
+time-to-first-audio matters. A streamed `wav` has a header that declares an
+unknown length, as is usual for streams.
+
+Text normalisation (on by default): Unicode NFC, Markdown emphasis, links and
+emoji removed, numbers spelled out for English and Hindi. Code-mixed text is
+passed through as written.
+
+### `GET /v1/models`, `GET /v1/models/{id}`
+
+Installed models in OpenAI's list shape, with extra fields (`task`,
+`language`, `aliases`, `tier`, `license`; `voices` and `sample_rate` for
+text-to-speech models). `?task=automatic-speech-recognition|text-to-speech|voice-activity-detection` filters.
+
+## speaches-compatible endpoints
+
+For clients written against speaches; details and differences are in
+[migration-from-speaches.md](migration-from-speaches.md).
+
+| Endpoint | Behaviour |
+| --- | --- |
+| `GET /v1/registry?task=` | every catalog model, installed or not |
+| `POST /v1/models/{id}` | download and wait: `200` downloaded, `201` already present, `401` gated, `404` unknown |
+| `DELETE /v1/models/{id}` | delete from disk |
+| `GET /v1/audio/models`, `GET /v1/audio/voices` | installed text-to-speech models / their voices |
+| `GET /api/ps` | `{"models": [ids in memory]}` |
+| `POST /api/ps/{id}` / `DELETE /api/ps/{id}` | load (`201`, `409` if loaded) / unload (`200`, `404`, `409` if busy) |
+| `POST /v1/audio/speech/timestamps` | multipart `file` (+ `threshold`, `min_silence_duration_ms`, `min_speech_duration_ms`, `max_speech_duration_s`, `speech_pad_ms`) → `[{"start": ms, "end": ms}]` |
+| `GET /health` | `{"message": "OK"}` |
+
+## Native API (`/api/v1`)
+
+### `GET /api/v1/info`
+
+```json
+{"name": "bolo", "version": "0.1.0",
+ "engines": [{"id": "sherpa-onnx", "version": "2.0.1", "available": true, "reason": null},
+             {"id": "whisper.cpp", "version": null, "available": false, "reason": "ModuleNotFoundError: …"}],
+ "device": "cpu", "cpu_count": 4, "platform": "linux-x86_64", "python": "3.12.3",
+ "auth_required": false, "data_dir": "/home/u/.cache/bolo",
+ "defaults": {"stt": "whisper-base", "realtime_stt": "moonshine-tiny-en", "tts": "kokoro-v1.0-int8", "vad": "silero-vad"},
+ "wyoming": {"enabled": false, "host": "127.0.0.1", "port": 10300},
+ "scheduler": {"workers": 1, "threads": 4, "max_batch": 8, "batch_wait_ms": 0.0, "max_queue": 64},
+ "components": [ … the list from GET /api/v1/components … ],
+ "capabilities": {
+   "diarization": {"available": true, "installed": false, "default_model": "pyannote-3.0-eres2net",
+                   "http": {"endpoint": "/api/v1/diarize", "transcriptions": ["diarize", "diarized_json"]},
+                   "websocket": "diarize=true (one speaker per utterance, labelled online)"},
+   "realtime": {"endpoint": "/v1/realtime", "transcription_sessions": true,
+                "conversation_sessions": false,          // true once a language model is configured
+                "audio_formats": ["audio/pcm (24 kHz)", "audio/pcmu", "audio/pcma"], "reference": "…"},
+   "chat_completions": {"endpoint": "/v1/chat/completions", "available": false, "audio": false},
+   "llm": {"configured": false, "base_url": null, "model": null}}}
+```
+
+### `GET /api/v1/catalog?task=&q=&installed=`
+
+`task`: `stt`, `tts`, `vad`, `diarization`. `q`: space-separated words that must all appear
+in the id, aliases, family, engine, languages, licence or description.
+`installed`: `true` / `false`.
+
+```jsonc
+{"models": [{
+  "id": "moonshine-tiny-en", "aliases": ["moonshine-tiny", "UsefulSensors/moonshine-tiny"],
+  "task": "stt", "engine": "sherpa-onnx", "family": "Moonshine", "languages": ["en"],
+  "tier": "realtime",                 // realtime | balanced | accuracy
+  "streaming": false,                 // true only for natively incremental models
+  "sample_rate": 16000, "size_bytes": 123985408, "params": 27000000,
+  "license": "MIT", "license_url": null, "commercial_use": true, "gated": false,
+  "voices": [],                       // tts: [{"id","name","language","gender"}]
+  "features": ["punctuation", "partials"],
+  "installed": true, "loaded": false,
+  "pulling": null,                    // or {"job_id": "j_3", "progress": 0.42}
+  "description": "…", "source_url": "https://github.com/moonshine-ai/moonshine",
+  "validated": "cpu",                 // cpu | untested
+  "measured": {"rtf": 0.033, "wer": 0.021, "threads": 4, "hardware": "…", "date": "…", …},  // null when untested
+  "custom": false,                    // true for models added with hf:
+  "requires": [],                     // optional components, e.g. ["espeak-ng"]
+  "available": true                   // false while a required component is not installed
+}]}
+```
+
+Feature tags: `partials` (interim results on the realtime WebSocket: every
+speech-to-text model), `timestamps` (word times), `punctuation`, `translate`,
+`language-detect`, `multi-voice`, `telephony` (the 8 kHz path was exercised
+with this model).
+
+`GET /api/v1/models/{id}` returns one such entry.
+
+### Model management
+
+| Call | Result |
+| --- | --- |
+| `POST /api/v1/models/pull` `{"id": "…"}` | `202 {"job_id": "j_1"}`. `id` may be `hf:<owner>/<repo>[@rev]` with optional `"kind"`, `"task"` |
+| `GET /api/v1/jobs/{job_id}` | `{"id","kind":"pull"\|"bench"\|"install","model","state":"queued"\|"running"\|"done"\|"error","progress":0..1,"bytes_done","bytes_total","error"}` (+ `result` for bench jobs) |
+| `GET /api/v1/jobs` | all recent jobs, newest first |
+| `POST /api/v1/models/{id}/load` | `200 {"id","loaded":true,"memory_bytes","load_ms"}` |
+| `POST /api/v1/models/{id}/unload` | `200 {"id","loaded":false}` |
+| `DELETE /api/v1/models/{id}` | `204`; unloads first |
+
+Pulling an installed model yields a job that is already `done`. Pulling a
+gated model without a token yields a job in state `error` that says what to do.
+
+### `GET /api/v1/stats`
+
+```jsonc
+{"uptime_s": 123.4, "active_streams": 2, "queue_depth": 0,
+ "system": {"cpu_percent": 41.0,          // this process, as a share of all cores
+            "rss_bytes": 734003200, "threads": 12},
+ "totals": {"requests": 120, "errors": 1, "audio_seconds_in": 812.5, "audio_seconds_out": 96.2},
+ "models": [{
+   "id": "moonshine-tiny-en", "task": "stt", "loaded": true,
+   "memory_bytes": 210000000,             // estimate: RSS growth while loading
+   "idle_s": 3.2, "ttl_s": 300, "active": 1, "requests": 80, "errors": 0,
+   "latency_ms": {"first_partial": {"p50": 180, "p95": 320, "p99": 410},
+                  "final":         {"p50": 260, "p95": 480, "p99": 600},
+                  "ttfa": null},
+   "rtf": {"p50": 0.08, "p95": 0.15},
+   "queue": {"depth": 0, "inflight": 1, "workers": 1, "batches": 61, "mean_batch": 1.31, "max_batch": 4,
+             "rejected": 0, "queue_ms": {"p50": 0.1, "p95": 38.0, "p99": 71.2}}
+ }]}
+```
+
+Quantiles are over a rolling window (the most recent 2,048 observations, at
+most 15 minutes old) and are `null` until there is data. `queue` is present
+for loaded models.
+
+### `GET /api/v1/requests?limit=100&kind=&model=` and `GET /api/v1/requests/{id}`
+
+The most recent request traces, newest first (kept in memory, 1,000 by default).
+
+```jsonc
+{"requests": [{
+  "id": "r_000042", "kind": "stt",        // stt | tts | vad | diarization | agent
+  "transport": "http",                    // http | websocket | wyoming | realtime | chat | cli | bench
+  "model": "moonshine-tiny-en", "started_at": "2026-11-13T10:00:00.000Z",
+  "status": "ok",                         // ok | error | cancelled
+  "error": null, "audio_seconds": 4.2, "chars": 61, "language": "en",
+  "phases": [{"name": "resample", "start_ms": 0.0, "dur_ms": 1.9},
+             {"name": "queue",    "start_ms": 2.0, "dur_ms": 0.1},
+             {"name": "decode",   "start_ms": 2.1, "dur_ms": 139.0},
+             {"name": "finalize", "start_ms": 141.1, "dur_ms": 0.0}],
+  "first_partial_ms": null, "final_ms": 141.2, "ttfa_ms": null, "total_ms": 141.2,
+  "rtf": 0.0336, "batch_size": 1, "text_preview": "After early nightfall, the yellow lamps…"}]}
+```
+
+Phase names: speech-to-text `queue`, `resample`, `vad`, `decode`, `finalize`;
+text-to-speech `queue`, `normalize`, `synthesize_first`, `synthesize_rest`,
+`encode`. A phase can occur more than once (a stream decodes many times);
+very long streams fold later occurrences into earlier ones so a trace stays
+bounded. See [latency definitions](#latency-definitions).
+
+### `GET /api/v1/events`
+
+Server-Sent Events; each `data:` line is one JSON object with a `type`:
+
+| `type` | Payload | When |
+| --- | --- | --- |
+| `stats` | the fields of `/api/v1/stats` | once on connect, then every second |
+| `request` | the fields of one trace | when a request (or stream) finishes |
+| `request_progress` | `id`, `phase: "final"`, `utterance`, `model`, `first_partial_ms`, `final_ms`, `t0`, `t1`, `text_preview` | each finalised utterance of a realtime stream |
+| `job` | the fields of a job | pull progress (about four per second), bench progress |
+| `model` | `id`, `event`: `loaded` \| `unloaded` \| `installed` \| `removed` (+ `reason` on unload) | |
+| `component` | `id`, `event`: `installed` | an optional component was installed and activated |
+| `log` | `level`, `message` | notable server messages |
+
+Comment lines (`: keep-alive`) are sent when idle. A subscriber that reads
+too slowly loses its oldest events rather than slowing the server.
+
+### `POST /api/v1/bench`
+
+```json
+{"kind": "stt", "model": "moonshine-tiny-en", "concurrency": [1, 2, 4, 8], "duration_s": 10,
+ "sample": "builtin:en-short", "mode": "batch"}
+```
+
+→ `202 {"job_id": "j_7"}`; poll the job. `kind`: `stt` or `tts`. `mode`
+(speech-to-text only): `batch` (default: each virtual client sends the sample
+back to back) or `realtime` (each client streams it at 1× through a realtime
+session). `sample`: an audio sample id for `stt` (default `en-short`), a text
+sample id for `tts` (default `en-text-long`). `voice` is optional for `tts`.
+The job's `result`, updated after each concurrency level:
+
+```jsonc
+{"kind": "stt", "model": "moonshine-tiny-en", "mode": "batch", "sample": "en-short", "duration_s": 10,
+ "points": [{"concurrency": 1, "ok": 20, "errors": 0,
+             "first_partial_ms": {"p50": 140, "p95": 180}, "final_ms": {"p50": 140, "p95": 181},
+             "ttfa_ms": null, "rtf": {"p50": 0.047, "p95": 0.06},
+             "throughput_x_realtime": 11.8,     // audio seconds processed per wall-clock second
+             "elapsed_s": 10.1, "mean_batch": 1.0}]}
+```
+
+The load is generated inside the server process, so it measures the engine
+and the scheduler, not HTTP parsing or your network.
+
+### `GET /api/v1/samples`, `GET /api/v1/samples/{file}`
+
+```json
+{"samples": [{"id": "en-short", "kind": "audio", "language": "en", "seconds": 3.0,
+              "url": "/api/v1/samples/en-short.wav", "text": "Good morning. Could you tell me when my order will arrive?",
+              "description": "…"},
+             {"id": "hi-text-short", "kind": "text", "language": "hi", "text": "नमस्ते, …", "url": null}]}
+```
+
+The audio samples were synthesised with open models (named in each
+`description`); `tone-bursts` is a synthetic non-speech signal.
+
+## `WS /api/v1/stt/stream`
+
+Realtime transcription. Query parameters:
+
+| Parameter | Default | |
+| --- | --- | --- |
+| `model` | `realtime` (= `default_realtime_stt`) | any speech-to-text model |
+| `language` | - | hint for multilingual models |
+| `encoding` | `pcm_s16le` | `pcm_s16le`, `pcm_f32le`, `mulaw`, `alaw` |
+| `sample_rate` | `16000` (`8000` for `mulaw`/`alaw`) | rate of the audio you send; the server resamples |
+| `interim` | `true` | send `partial` messages |
+| `vad` | `true` | detect speech boundaries. With `false`, an utterance ends only on `flush`/`stop` (or the model's own endpointing for native streaming models) |
+| `words` | `true` | include word timestamps in finals when the model has them |
+| `diarize` | `false` | add a `speaker` label (`A`, `B`, …) to every final; optional `max_speakers`. See [Speaker diarization](#speaker-diarization) |
+| `endpointing` | `balanced` | how long a pause ends an utterance: `fast` (250 ms), `balanced` (500 ms), `patient` (900 ms). The server default is `endpoint_silence_ms` |
+| `endpoint_ms` | - | the same as an exact number of milliseconds (100 to 5000); wins over `endpointing` |
+
+Client → server:
+
+* **binary frames**: raw audio in the declared encoding, any frame size
+  (20 ms frames are typical: 640 bytes of 16 kHz PCM, 160 bytes of 8 kHz G.711);
+* text frames (JSON): `{"type":"config", …}` (same keys as the query
+  parameters; only before any audio; the server answers with a new `ready`),
+  `{"type":"flush"}` (finalise what has been said, keep the stream open),
+  `{"type":"stop"}` (finalise and close), `{"type":"ping"}`.
+
+Server → client (JSON text frames):
+
+```jsonc
+{"type":"ready","model":"moonshine-tiny-en","sample_rate":16000,"request_id":"r_000051",
+ "encoding":"pcm_s16le","mode":"pseudo","vad":"silero-vad","endpoint_ms":500}   // mode: native | pseudo
+{"type":"vad","event":"speech_start","t":1.23}                      // t: seconds into the stream
+{"type":"partial","text":"hello wor","t0":1.1,"t1":1.9,"latency_ms":140.2,"stable_chars":6}
+{"type":"final","text":"Hello world.","t0":1.1,"t1":2.5,"latency_ms":210.4,
+ "words":[{"w":"Hello","t0":1.2,"t1":1.5},{"w":"world.","t0":1.6,"t1":2.1}],"language":"en"}
+{"type":"vad","event":"speech_end","t":2.3}
+{"type":"metrics","audio_seconds":3.2,"rtf":0.07,"queue_ms":2.0}   // after each final and before done
+{"type":"error","code":"overloaded","message":"…"}
+{"type":"done","request_id":"r_000051"}
+```
+
+`text[:stable_chars]` of a partial is the part that will not change within
+the utterance; the rest may still be revised. `t0`/`t1` are seconds from the
+start of the stream (in the time base of the audio you sent). Errors that
+make the stream unusable are followed by a close: code 1000 for request
+errors (so the message can be read), 1008 for authentication, 1011 for
+internal errors. If you send audio faster than it can be transcribed and the
+backlog passes 30 seconds, the stream ends with `overloaded`.
+
+A connection produces one trace in `/api/v1/requests` (`request_id`), with
+`utterances`, and one `request_progress` event per final.
+
+## `WS /api/v1/tts/stream`
+
+Streaming synthesis with text that may arrive in pieces. Query parameters:
+`model`, `voice`, `format` (`pcm_s16le` default, `pcm_f32le`, `mulaw`, `alaw`,
+`wav`, `mp3`, `opus`, `flac`, `aac`), `sample_rate`, `speed`, `language`.
+
+Client → server (JSON): `{"type":"text","text":"…"}` (optionally
+`"flush": true`), `{"type":"flush"}`, `{"type":"stop"}`, `{"type":"ping"}`.
+Text is buffered until a sentence is complete, so you can forward language
+model tokens as they come. `flush` speaks whatever is buffered and keeps the
+stream open for more text; only `stop` ends it (`done` follows the last audio).
+If a voice cannot produce audio for a sentence you get an `error` message,
+never silence.
+
+Server → client:
+
+```jsonc
+{"type":"ready","model":"kokoro-v1.0-int8","voice":"af_heart","format":"pcm_s16le","sample_rate":24000,"request_id":"ws_…"}
+{"type":"chunk","seq":0,"t0":0.0,"dur":1.42,"ttfa_ms":118.0,"text":"Hello there."}   // then one binary frame with that audio
+{"type":"chunk","seq":1,"t0":1.42,"dur":0.8,"ttfa_ms":null,"text":""}
+{"type":"metrics","rtf":0.31,"audio_seconds":2.22,"ttfa_ms":117.6,"request_id":"r_000060"}   // one per sentence
+{"type":"done"}
+```
+
+`ttfa_ms` is set on the first chunk of each sentence: milliseconds from the
+server receiving the text that completed the sentence to that audio being
+sent. Each sentence is one trace (`request_id` in `metrics`).
+
+## Speaker diarization
+
+Who spoke when, without PyTorch: pyannote's segmentation-3.0 model and a
+speaker-embedding model (both ONNX, run by sherpa-onnx) with clustering. The
+default pipeline is `pyannote-3.0-eres2net` (about 32 MB; pulled on first use).
+
+**With a transcription** (`POST /v1/audio/transcriptions`): add `diarize=true`,
+optionally `num_speakers` or `min_speakers` / `max_speakers`,
+`diarization_model`, `diarization_threshold`. The recording is cut at the
+speaker turns and each turn is transcribed, so every segment has exactly one
+speaker, labelled `A`, `B`, `C`, … in order of first appearance:
+
+| `response_format` | Speakers appear as |
+| --- | --- |
+| `verbose_json` | `"speaker": "A"` on every segment |
+| `diarized_json` | OpenAI's diarized shape: `{"task","duration","text","segments":[{"type":"transcript.text.segment","id","start","end","text","speaker"}],"usage"}` |
+| `srt` | `[A] text` |
+| `vtt` | `<v A>text` |
+| `text` | one line per turn: `A: text` |
+| `json` | not shown (text only) |
+| `stream=true` | one `transcript.text.segment` event per turn instead of `transcript.text.delta`, then `transcript.text.done` |
+
+Word timestamps cannot be combined with diarization (400). OpenAI's
+`known_speaker_names[]` / `known_speaker_references[]` are not supported (400).
+
+**On its own**: `POST /api/v1/diarize`, multipart `file` plus optional `model`,
+`num_speakers`, `min_speakers`, `max_speakers`, `threshold`:
+
+```json
+{"model": "pyannote-3.0-eres2net", "duration": 21.5, "speakers": ["A", "B"],
+ "segments": [{"start": 0.03, "end": 2.98, "speaker": "A"}, {"start": 3.7, "end": 6.4, "speaker": "B"}],
+ "request_id": "r_000012"}
+```
+
+**Live** (`WS /api/v1/stt/stream?diarize=true`, optional `max_speakers`):
+every `final` gets a `"speaker"` field and `ready` reports
+`"diarization": "<model>"`. This is *online* labelling: when an utterance is
+finalised its audio is embedded and assigned to the closest speaker heard so
+far in this stream, or to a new one. It therefore assumes **one speaker per
+utterance** (a pause between speakers), cannot split overlapping speech, and
+never revises an earlier label. It adds one embedding computation to each
+final (about 90 ms in our runs; visible as the `diarize` phase and included
+in `latency_ms`). For an authoritative result on a finished recording use the
+HTTP routes, which cluster the whole file.
+
+Traces: kind `diarization` for `/api/v1/diarize`; a `diarize` phase and the
+extra fields `diarization_model` and `speakers` on transcription traces.
+
+The speaker *count* is the weak point of clustering: on real recordings it
+tends to find too many speakers. Pass `num_speakers` when you know it.
+
+## Realtime API and chat completions
+
+Both need a language model configured with `llm_base_url` (except Realtime
+transcription sessions). The full description, the supported events and the
+differences from OpenAI are in [voice-agents.md](voice-agents.md).
+
+| Endpoint | Summary |
+| --- | --- |
+| `WS /v1/realtime?model=…` | OpenAI Realtime API over WebSocket (GA event names, as typed in `openai` 3.50.0). `?intent=transcription` or `session.update` with `type: "transcription"` for transcription-only sessions. Audio: base64 `audio/pcm` (24 kHz PCM16), `audio/pcmu`, `audio/pcma`. Auth: `Authorization: Bearer`, or subprotocols `realtime` + `openai-insecure-api-key.<key>` |
+| `POST /v1/chat/completions` | `input_audio` content parts are transcribed; `modalities: ["text","audio"]` + `audio: {voice, format}` adds a spoken reply (`message.audio`, or `delta.audio` when streaming); everything else is forwarded to the language model untouched; requests without audio are proxied as they are |
+
+Voice-agent turns are traces of kind `agent` (transport `realtime` or `chat`)
+with `first_token_ms` and `ttfa_ms`; see
+[voice-agents.md](voice-agents.md#latency-and-where-to-look).
+
+## Optional components
+
+Third-party pieces bolo can use but does not ship. Today there is one,
+eSpeak NG (GPL-3.0-or-later), needed by the catalog models whose `requires`
+list contains `"espeak-ng"`.
+
+`GET /api/v1/components`
+
+```json
+{"components": [{
+  "id": "espeak-ng", "name": "eSpeak NG", "installed": false,
+  "source": null,                       // "system-executable" | "python-package" | "configured" | null
+  "version": null, "license": "GPL-3.0-or-later",
+  "license_url": "https://github.com/espeak-ng/espeak-ng/blob/master/COPYING",
+  "required_by_count": 82,              // catalog models that need it
+  "installable": true, "install_blocked_reason": null,
+  "manual_command": "pip install 'bolo-speech[espeak]'",
+  "description": "…"}]}
+```
+
+`POST /api/v1/components/espeak-ng/install` with `{"accept_license": true}` →
+`202 {"job_id": "j_4"}`. The job has `kind: "install"`; progress arrives as
+`job` events and, on success, a `component` event
+`{"type":"component","id":"espeak-ng","event":"installed"}`. The server runs
+`python -m pip install espeakng-loader` (or `uv pip install` when pip is
+absent) in its own environment and then starts using the library **without a
+restart**. `400` when `accept_license` is not `true`, or when installation is
+not possible; `installable` is `false` and `install_blocked_reason` says why
+when the environment is read-only, has neither pip nor uv, the operator set
+`allow_component_install = false`, or the server listens on a non-loopback
+address without an API key (never allowed). A failed download shows up as a
+job in state `error`.
+
+Catalog entries carry `requires` (for example `["espeak-ng"]`, else `[]`) and
+`available` (false while a requirement is missing). Synthesis with such a
+voice fails fast with `424 component_missing` and a message that names the
+component and the ways to install it; over WebSockets it is an `error`
+message with that code. `/api/v1/info` includes the same `components` list.
+`bolo components list` and `bolo components install espeak-ng --accept-license`
+do the same from the command line.
+
+## Latency definitions
+
+All times are measured on the server with one monotonic clock.
+
+| Quantity | Where | Definition |
+| --- | --- | --- |
+| `latency_ms` | `partial`, `final` on the STT WebSocket | from the server **receiving the last audio frame that contributed to the text** until the message is handed to the socket. It excludes the trailing silence the endpointer waits for (`endpoint_silence_ms`), which is a property of the conversation, not of the server |
+| `first_partial_ms` (trace) | realtime stream | `latency_ms` of the first partial of the stream |
+| | HTTP transcription with `stream=true` | from the upload being fully received until the first delta is ready |
+| `final_ms` (trace) | realtime stream | `latency_ms` of the last final |
+| | HTTP transcription | from the upload being fully received until the full transcript is ready |
+| `ttfa_ms` (trace) | text-to-speech over HTTP | from the request being parsed until the first encoded audio bytes are handed to the response |
+| `total_ms` | all | the whole request (for a stream: its whole lifetime) |
+| `rtf` | speech-to-text over HTTP | `total_ms` / audio duration |
+| | realtime stream | time spent decoding / audio duration |
+| | text-to-speech | `total_ms` / duration of the audio produced |
+| `queue` phase | all | from a job being queued until the engine call that contains it starts |
+| `stats.latency_ms.first_partial`, `.final` | per model | rolling quantiles of the per-**utterance** values for streams, and of the per-request values for HTTP |
+
+Uploading time is not part of any of these: the clock starts when the server
+has the audio. Client-side latency (network, audio capture, playback
+buffers) comes on top.
+
+## Wyoming protocol
+
+`bolo serve --wyoming` listens on `tcp://127.0.0.1:10300` (`--wyoming-host`,
+`--wyoming-port`). One port serves speech-to-text and text-to-speech.
+
+| Client sends | bolo answers |
+| --- | --- |
+| `describe` | `info` with one ASR program (installed speech-to-text models) and one TTS program (installed voices; multi-voice models appear once per language as `<model>:<language>` with their voices as speakers) |
+| `transcribe` (`name`, `language`), `audio-start`, `audio-chunk`…, `audio-stop` | `transcript` (`text`, `language`) |
+| `synthesize` (`text`, `voice.name`, `voice.speaker`) | `audio-start`, `audio-chunk`… (16-bit PCM at the voice's rate), `audio-stop` |
+| `synthesize-start`, `synthesize-chunk`…, `synthesize-stop` | audio as sentences complete, then `audio-stop`, `synthesize-stopped` |
+
+Errors are sent as Wyoming `error` events and the connection stays usable.
+The protocol has no authentication. Tested with the `wyoming` Python client;
+not tested against a Home Assistant instance.
+
+## Operations
+
+| Endpoint | |
+| --- | --- |
+| `GET /healthz` | `200 {"status":"ok"}` as soon as the process serves requests |
+| `GET /readyz` | `200 {"status":"ready"}` once every `preload` model is in memory, else `503 {"status":"starting","loading":[…]}` |
+| `GET /metrics` | Prometheus text: `bolo_requests_total`, `bolo_request_errors_total`, `bolo_audio_seconds_total{direction}`, `bolo_active_streams`, `bolo_queue_depth`, `bolo_process_*`, and per model `bolo_model_loaded`, `bolo_model_memory_bytes`, `bolo_model_requests_total`, `bolo_latency_ms{metric,quantile}`, `bolo_real_time_factor{quantile}`, `bolo_model_queue_depth`, `bolo_model_mean_batch_size`, `bolo_queue_time_ms{quantile}`, `bolo_model_queue_rejected_total` |
+| `GET /` | the web console (single-page app; unknown paths fall back to it). Served with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: credentialless` so its in-browser recogniser can use WebAssembly threads; turn off with `cross_origin_isolation = false` |
+| `GET /docs`, `GET /openapi.json` | interactive API page and schema |

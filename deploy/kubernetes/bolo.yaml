@@ -1,0 +1,91 @@
+# A minimal single-replica deployment. Not applied to a cluster by the
+# maintainers for 0.1.0: treat it as an example to adapt.
+#
+#   kubectl create secret generic bolo --from-literal=api-key="$(openssl rand -hex 24)"
+#   kubectl apply -f deploy/kubernetes/bolo.yaml
+#
+# Notes
+# * Models live on the PersistentVolumeClaim, so restarts do not download again.
+# * Speech models are CPU-bound: give the pod whole cores and set BOLO_THREADS to
+#   match the CPU limit, otherwise the runtime sizes its thread pools from the
+#   node's core count and gets throttled.
+# * Realtime WebSocket streams are stateful. Scale out with session affinity at
+#   the ingress, not with a plain round-robin Service.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bolo-data
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bolo
+  labels: {app: bolo}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}   # the volume is ReadWriteOnce
+  selector:
+    matchLabels: {app: bolo}
+  template:
+    metadata:
+      labels: {app: bolo}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: /metrics
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: bolo
+          image: ghcr.io/cb-sigma/bolo:latest
+          args: ["serve"]
+          ports:
+            - {name: http, containerPort: 8000}
+            - {name: wyoming, containerPort: 10300}
+          env:
+            - {name: BOLO_HOST, value: "0.0.0.0"}
+            - {name: BOLO_DATA_DIR, value: /data}
+            - {name: BOLO_THREADS, value: "4"}
+            - {name: BOLO_PRELOAD, value: "silero-vad,moonshine-tiny-en"}
+            - name: BOLO_API_KEY
+              valueFrom:
+                secretKeyRef: {name: bolo, key: api-key}
+          resources:
+            requests: {cpu: "4", memory: 2Gi}
+            limits: {cpu: "4", memory: 4Gi}
+          volumeMounts:
+            - {name: data, mountPath: /data}
+          startupProbe:
+            httpGet: {path: /healthz, port: http}
+            failureThreshold: 30
+            periodSeconds: 2
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 20
+          readinessProbe:
+            # ready once the preloaded models are in memory (the first start downloads them)
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 5
+            failureThreshold: 120
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: bolo-data}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bolo
+  labels: {app: bolo}
+spec:
+  selector: {app: bolo}
+  ports:
+    - {name: http, port: 8000, targetPort: http}
+    - {name: wyoming, port: 10300, targetPort: wyoming}

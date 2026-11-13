@@ -1,0 +1,198 @@
+import type { BenchRequest, CatalogModel } from '@/lib/api/types'
+import { encodeWav } from '@/lib/audio/wav'
+import { SAMPLE_SEGMENTS, SAMPLES } from './catalog'
+import { HttpError, MOCK_KEY, sleep, type MockServer } from './engine'
+import { babble, splitChunks } from './speech'
+import longUrl from './assets/en-ask-not.wav?url'
+import shortUrl from './assets/en-fellow-americans.wav?url'
+
+const SAMPLE_FILES: Record<string, string> = { 'en-ask-not': longUrl, 'en-fellow-americans': shortUrl }
+
+const json = (body: unknown, status = 200): Response =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+
+function pathOf(url: string): { path: string; query: URLSearchParams } {
+  const u = new URL(url, 'http://mock.local/')
+  const i = u.pathname.search(/\/(api\/v1|v1|healthz|readyz|metrics)(\/|$)/)
+  return { path: i >= 0 ? u.pathname.slice(i) : u.pathname, query: u.searchParams }
+}
+
+export function isApiUrl(url: string): boolean {
+  return /\/(api\/v1|v1\/(models|audio)|healthz|readyz|metrics)(\/|\?|$)/.test(
+    new URL(url, 'http://mock.local/').pathname,
+  )
+}
+
+function sseStream(server: MockServer, signal?: AbortSignal | null): Response {
+  const enc = new TextEncoder()
+  let unsub: (() => void) | undefined
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const send = (ev: unknown) => {
+        try {
+          controller.enqueue(enc.encode(`data: ${JSON.stringify(ev)}\n\n`))
+        } catch {
+          unsub?.()
+        }
+      }
+      send({ type: 'stats', ...server.stats() })
+      unsub = server.subscribe(send)
+      signal?.addEventListener('abort', () => {
+        unsub?.()
+        try {
+          controller.close()
+        } catch {
+          // already closed
+        }
+      })
+    },
+    cancel() {
+      unsub?.()
+    },
+  })
+  return new Response(body, { headers: { 'Content-Type': 'text/event-stream' } })
+}
+
+function speechResponse(server: MockServer, model: CatalogModel, input: string): Response {
+  const rate = model.sample_rate
+  const chunks = splitChunks(input)
+  const pcm = chunks.map((c, i) => babble(c, rate, i + 1))
+  const total = pcm.reduce((a, b) => a + b.length, 0)
+  const all = new Float32Array(total)
+  let o = 0
+  for (const p of pcm) {
+    all.set(p, o)
+    o += p.length
+  }
+  const wav = encodeWav(all, rate)
+  server.record(
+    server.makeTrace(model, Date.now(), { chars: input.length, text: input.slice(0, 48), transport: 'http' }),
+  )
+  let offset = 0
+  const body = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (offset >= wav.length) {
+        controller.close()
+        return
+      }
+      await sleep(offset === 0 ? 120 : 60)
+      const end = Math.min(wav.length, offset + 16384)
+      controller.enqueue(wav.slice(offset, end))
+      offset = end
+    },
+  })
+  return new Response(body, { headers: { 'Content-Type': 'audio/wav' } })
+}
+
+/** Answers API requests the way the real server would. Returns null for non-API URLs. */
+export async function handleRequest(
+  server: MockServer,
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+  const method = (init?.method ?? 'GET').toUpperCase()
+  const { path, query } = pathOf(url)
+  if (server.flags.offline) throw new TypeError('Failed to fetch')
+  await sleep(12 + Math.random() * 25) // loopback-ish latency
+  if (init?.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+
+  const open = path === '/healthz' || path === '/readyz' || path === '/api/v1/info'
+  if (server.flags.auth && !open) {
+    const headers = new Headers(init?.headers)
+    if (headers.get('Authorization') !== `Bearer ${MOCK_KEY}`)
+      return json({ detail: 'Invalid or missing API key' }, 401)
+  }
+
+  try {
+    if (path === '/healthz' || path === '/readyz') return json({ status: 'ok' })
+    if (path === '/api/v1/info') return json(server.info())
+    if (path === '/api/v1/events') return sseStream(server, init?.signal)
+    if (path === '/api/v1/stats') return json(server.stats())
+    if (path === '/api/v1/catalog') {
+      const task = query.get('task')
+      const q = query.get('q')?.toLowerCase()
+      const installed = query.get('installed')
+      const models = server.models.filter(
+        (m) =>
+          (!task || m.task === task) &&
+          (!q || `${m.id} ${m.family} ${m.description}`.toLowerCase().includes(q)) &&
+          (installed == null || String(m.installed) === installed),
+      )
+      return json({ models })
+    }
+    if (path === '/api/v1/requests') {
+      const limit = Number(query.get('limit') ?? 100)
+      const kind = query.get('kind')
+      const model = query.get('model')
+      const requests = server.traces
+        .filter((t) => (!kind || t.kind === kind) && (!model || t.model === model))
+        .slice(0, limit)
+      return json({ requests })
+    }
+    if (path === '/api/v1/components') return json({ components: server.components() })
+    const install = /^\/api\/v1\/components\/([\w-]+)\/install$/.exec(path)
+    if (install && method === 'POST') {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { accept_license?: boolean }
+      return json({ job_id: server.installComponent(install[1] as string, body.accept_license === true).id }, 202)
+    }
+    if (path === '/api/v1/samples') return json({ samples: SAMPLES })
+    const sample = /^\/api\/v1\/samples\/([\w-]+)\.wav$/.exec(path)
+    if (sample) {
+      const id = sample[1] as string
+      const file = SAMPLE_FILES[id]
+      if (!file) return json({ detail: 'Unknown sample' }, 404)
+      server.hint = { segments: SAMPLE_SEGMENTS[id] ?? [], expires: Date.now() + 60_000 }
+      return globalThis.fetch(file)
+    }
+    if (path === '/api/v1/models/pull' && method === 'POST') {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { id: string }
+      return json({ job_id: server.pull(body.id).id }, 202)
+    }
+    const job = /^\/api\/v1\/jobs\/([\w-]+)$/.exec(path)
+    if (job) {
+      const j = server.jobs.get(job[1] as string)
+      return j ? json(j) : json({ detail: 'Unknown job' }, 404)
+    }
+    const action = /^\/api\/v1\/models\/([^/]+)\/(load|unload)$/.exec(path)
+    if (action && method === 'POST') {
+      const id = decodeURIComponent(action[1] as string)
+      if (action[2] === 'load') await server.loadModel(id)
+      else server.unloadModel(id)
+      return json({ id, loaded: action[2] === 'load' })
+    }
+    const del = /^\/api\/v1\/models\/([^/]+)$/.exec(path)
+    if (del && method === 'DELETE') {
+      server.removeModel(decodeURIComponent(del[1] as string))
+      return new Response(null, { status: 204 })
+    }
+    if (path === '/api/v1/bench' && method === 'POST') {
+      return json({ job_id: server.bench(JSON.parse(String(init?.body ?? '{}')) as BenchRequest).id }, 202)
+    }
+    if (path === '/v1/models') {
+      return json({
+        object: 'list',
+        data: server.models.filter((m) => m.installed).map((m) => ({ id: m.id, object: 'model', owned_by: 'bolo' })),
+      })
+    }
+    if (path === '/v1/audio/speech' && method === 'POST') {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { model: string; input: string }
+      const model = server.model(body.model)
+      if (!model || model.task !== 'tts') return json({ detail: `Unknown TTS model: ${body.model}` }, 404)
+      if (model.available === false)
+        throw new HttpError(409, `${model.id} needs eSpeak NG, which is not installed.`, 'component_missing')
+      return speechResponse(server, model, body.input)
+    }
+    if (path === '/v1/audio/transcriptions' && method === 'POST') {
+      await sleep(400)
+      return json({ text: server.hint?.segments.map((s) => s.text).join(' ') ?? 'This is a mock transcription.' })
+    }
+    if (path === '/metrics') return new Response('# HELP bolo_requests_total Requests\nbolo_requests_total 18230\n')
+    return json({ detail: 'Not found' }, 404)
+  } catch (err) {
+    if (err instanceof HttpError) {
+      return json({ detail: err.message, error: { message: err.message, code: err.code } }, err.status)
+    }
+    throw err
+  }
+}

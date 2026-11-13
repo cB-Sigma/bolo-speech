@@ -1,0 +1,72 @@
+{
+  "kind": "tts",
+  "model": "piper-en-us-amy-low",
+  "mode": "batch",
+  "sample": "en-text-long",
+  "duration_s": 20.0,
+  "points": [
+    {
+      "concurrency": 1,
+      "ok": 49,
+      "errors": 0,
+      "first_partial_ms": null,
+      "final_ms": {
+        "p50": 416.0,
+        "p95": 481.9
+      },
+      "ttfa_ms": {
+        "p50": 138.0,
+        "p95": 166.2
+      },
+      "rtf": {
+        "p50": 0.0329,
+        "p95": 0.0385
+      },
+      "throughput_x_realtime": 30.23,
+      "elapsed_s": 20.46,
+      "mean_batch": 1.0
+    },
+    {
+      "concurrency": 2,
+      "ok": 43,
+      "errors": 0,
+      "first_partial_ms": null,
+      "final_ms": {
+        "p50": 941.6,
+        "p95": 1151.8
+      },
+      "ttfa_ms": {
+        "p50": 401.9,
+        "p95": 545.1
+      },
+      "rtf": {
+        "p50": 0.0746,
+        "p95": 0.0898
+      },
+      "throughput_x_realtime": 26.27,
+      "elapsed_s": 20.7,
+      "mean_batch": 1.0
+    },
+    {
+      "concurrency": 4,
+      "ok": 45,
+      "errors": 0,
+      "first_partial_ms": null,
+      "final_ms": {
+        "p50": 1886.4,
+        "p95": 2052.6
+      },
+      "ttfa_ms": {
+        "p50": 826.1,
+        "p95": 1155.1
+      },
+      "rtf": {
+        "p50": 0.1487,
+        "p95": 0.1631
+      },
+      "throughput_x_realtime": 26.94,
+      "elapsed_s": 21.12,
+      "mean_batch": 1.0
+    }
+  ]
+}

@@ -1,0 +1,919 @@
+# Whisper models in CTranslate2 format, run by the faster-whisper engine.
+
+- id: faster-whisper-tiny
+  aliases:
+  - Systran/faster-whisper-tiny
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages: &id001
+  - en
+  - zh
+  - de
+  - es
+  - ru
+  - ko
+  - fr
+  - ja
+  - pt
+  - tr
+  - pl
+  - ca
+  - nl
+  - ar
+  - sv
+  - it
+  - id
+  - hi
+  - fi
+  - vi
+  - he
+  - uk
+  - el
+  - ms
+  - cs
+  - ro
+  - da
+  - hu
+  - ta
+  - 'no'
+  - th
+  - ur
+  - hr
+  - bg
+  - lt
+  - la
+  - mi
+  - ml
+  - cy
+  - sk
+  - te
+  - fa
+  - lv
+  - bn
+  - sr
+  - az
+  - sl
+  - kn
+  - et
+  - mk
+  - br
+  - eu
+  - is
+  - hy
+  - ne
+  - mn
+  - bs
+  - kk
+  - sq
+  - sw
+  - gl
+  - mr
+  - pa
+  - si
+  - km
+  - sn
+  - yo
+  - so
+  - af
+  - oc
+  - ka
+  - be
+  - tg
+  - sd
+  - gu
+  - am
+  - yi
+  - lo
+  - uz
+  - fo
+  - ht
+  - ps
+  - tk
+  - nn
+  - mt
+  - sa
+  - lb
+  - my
+  - bo
+  - tl
+  - mg
+  - as
+  - tt
+  - haw
+  - ln
+  - ha
+  - ba
+  - jw
+  - su
+  - yue
+  tier: realtime
+  size_bytes: 78203619
+  params: 39000000
+  license: MIT
+  features:
+  - timestamps
+  - punctuation
+  - translate
+  - language-detect
+  description: Whisper tiny in CTranslate2 format for faster-whisper. Multilingual (99 languages, including the
+    major Indian languages). Quantised to int8 at load time on CPU.
+  source_url: https://github.com/SYSTRAN/faster-whisper
+  validated: cpu
+  measured:
+    rtf: 0.0912
+    wer: 0.0
+    audio_s: 6.3
+    load_s: 0.25
+    memory_mb: 45
+    threads: 4
+    engine: faster-whisper 1.2.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: synthesised by kokoro-v1.0-int8
+  source:
+    repo: Systran/faster-whisper-tiny
+    revision: d90ca5fe260221311c53c58e660288d3deb8d356
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: faster-whisper-tiny.en
+  aliases:
+  - Systran/faster-whisper-tiny.en
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages:
+  - en
+  tier: realtime
+  size_bytes: 78090594
+  params: 39000000
+  license: MIT
+  features:
+  - timestamps
+  - punctuation
+  description: Whisper tiny.en in CTranslate2 format for faster-whisper. English only. Quantised to int8 at load
+    time on CPU.
+  source_url: https://github.com/SYSTRAN/faster-whisper
+  validated: cpu
+  measured:
+    rtf: 0.0808
+    wer: 0.0
+    audio_s: 6.3
+    load_s: 0.9
+    memory_mb: 34
+    threads: 4
+    engine: faster-whisper 1.2.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: synthesised by kokoro-v1.0-int8
+  source:
+    repo: Systran/faster-whisper-tiny.en
+    revision: 0d3d19a32d3338f10357c0889762bd8d64bbdeba
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    english_only: true
+- id: faster-whisper-base
+  aliases:
+  - Systran/faster-whisper-base
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages: *id001
+  tier: balanced
+  size_bytes: 147882941
+  params: 74000000
+  license: MIT
+  features:
+  - timestamps
+  - punctuation
+  - translate
+  - language-detect
+  description: Whisper base in CTranslate2 format for faster-whisper. Multilingual (99 languages, including the
+    major Indian languages). Quantised to int8 at load time on CPU.
+  source_url: https://github.com/SYSTRAN/faster-whisper
+  validated: cpu
+  measured:
+    rtf: 0.1517
+    wer: 0.0
+    audio_s: 6.3
+    load_s: 0.37
+    memory_mb: 156
+    threads: 4
+    engine: faster-whisper 1.2.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: synthesised by kokoro-v1.0-int8
+  source:
+    repo: Systran/faster-whisper-base
+    revision: ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: faster-whisper-base.en
+  aliases:
+  - Systran/faster-whisper-base.en
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages:
+  - en
+  tier: balanced
+  size_bytes: 147769510
+  params: 74000000
+  license: MIT
+  features:
+  - timestamps
+  - punctuation
+  description: Whisper base.en in CTranslate2 format for faster-whisper. English only. Quantised to int8 at load
+    time on CPU.
+  source_url: https://github.com/SYSTRAN/faster-whisper
+  validated: untested
+  source:
+    repo: Systran/faster-whisper-base.en
+    revision: 3d3d5dee26484f91867d81cb899cfcf72b96be6c
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    english_only: true
+- id: faster-whisper-small
+  aliases:
+  - Systran/faster-whisper-small
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages: *id001
+  tier: balanced
+  size_bytes: 486212372
+  params: 244000000
+  license: MIT
+  features:
+  - timestamps
+  - punctuation
+  - translate
+  - language-detect
+  description: Whisper small in CTranslate2 format for faster-whisper. Multilingual (99 languages, including the
+    major Indian languages). Quantised to int8 at load time on CPU.
+  source_url: https://github.com/SYSTRAN/faster-whisper
+  validated: cpu
+  measured:
+    rtf: 0.4251
+    wer: 0.0
+    audio_s: 6.3
+    load_s: 0.96
+    memory_mb: 529
+    threads: 4
+    engine: faster-whisper 1.2.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: synthesised by kokoro-v1.0-int8
+  source:
+    repo: Systran/faster-whisper-small
+    revision: 536b0662742c02347bc0e980a01041f333bce120
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: faster-whisper-small.en
+  aliases:
+  - Systran/faster-whisper-small.en
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages:
+  - en
+  tier: balanced
+  size_bytes: 486098798
+  params: 244000000
+  license: MIT
+  features:
+  - timestamps
+  - punctuation
+  description: Whisper small.en in CTranslate2 format for faster-whisper. English only. Quantised to int8 at load
+    time on CPU.
+  source_url: https://github.com/SYSTRAN/faster-whisper
+  validated: untested
+  source:
+    repo: Systran/faster-whisper-small.en
+    revision: d1d751a5f8271d482d14ca55d9e2deeebbae577f
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    english_only: true
+- id: faster-whisper-medium
+  aliases:
+  - Systran/faster-whisper-medium
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages: *id001
+  tier: accuracy
+  size_bytes: 1530571735
+  params: 769000000
+  license: MIT
+  features:
+  - timestamps
+  - punctuation
+  - translate
+  - language-detect
+  description: Whisper medium in CTranslate2 format for faster-whisper. Multilingual (99 languages, including the
+    major Indian languages). Quantised to int8 at load time on CPU.
+  source_url: https://github.com/SYSTRAN/faster-whisper
+  validated: untested
+  source:
+    repo: Systran/faster-whisper-medium
+    revision: 08e178d48790749d25932bbc082711ddcfdfbc4f
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: faster-whisper-medium.en
+  aliases:
+  - Systran/faster-whisper-medium.en
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages:
+  - en
+  tier: accuracy
+  size_bytes: 1530457748
+  params: 769000000
+  license: MIT
+  features:
+  - timestamps
+  - punctuation
+  description: Whisper medium.en in CTranslate2 format for faster-whisper. English only. Quantised to int8 at load
+    time on CPU.
+  source_url: https://github.com/SYSTRAN/faster-whisper
+  validated: untested
+  source:
+    repo: Systran/faster-whisper-medium.en
+    revision: a29b04bd15381511a9af671baec01072039215e3
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    english_only: true
+- id: faster-whisper-large-v2
+  aliases:
+  - Systran/faster-whisper-large-v2
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages: *id001
+  tier: accuracy
+  size_bytes: 3089578858
+  params: 1550000000
+  license: MIT
+  features:
+  - timestamps
+  - punctuation
+  - translate
+  - language-detect
+  description: Whisper large-v2 in CTranslate2 format for faster-whisper. Multilingual (99 languages, including
+    the major Indian languages). Quantised to int8 at load time on CPU.
+  source_url: https://github.com/SYSTRAN/faster-whisper
+  validated: untested
+  source:
+    repo: Systran/faster-whisper-large-v2
+    revision: f0fe81560cb8b68660e564f55dd99207059c092e
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: faster-whisper-large-v3
+  aliases:
+  - Systran/faster-whisper-large-v3
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages: *id001
+  tier: accuracy
+  size_bytes: 3090835702
+  params: 1550000000
+  license: MIT
+  features:
+  - timestamps
+  - punctuation
+  - translate
+  - language-detect
+  description: Whisper large-v3 in CTranslate2 format for faster-whisper. Multilingual (99 languages, including
+    the major Indian languages). Quantised to int8 at load time on CPU.
+  source_url: https://github.com/SYSTRAN/faster-whisper
+  validated: untested
+  source:
+    repo: Systran/faster-whisper-large-v3
+    revision: edaa852ec7e145841d8ffdb056a99866b5f0a478
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: faster-whisper-large-v3-turbo
+  aliases:
+  - deepdml/faster-whisper-large-v3-turbo-ct2
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages: *id001
+  tier: accuracy
+  size_bytes: 1621665983
+  params: 809000000
+  license: MIT
+  features:
+  - timestamps
+  - punctuation
+  - translate
+  - language-detect
+  description: Whisper large-v3-turbo in CTranslate2 format for faster-whisper. Multilingual (99 languages, including
+    the major Indian languages). Quantised to int8 at load time on CPU.
+  source_url: https://github.com/SYSTRAN/faster-whisper
+  validated: untested
+  source:
+    repo: deepdml/faster-whisper-large-v3-turbo-ct2
+    revision: 4df90f75321148c3a29a9e2351b7ddf8f5b115a8
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: faster-whisper-distil-small.en
+  aliases:
+  - Systran/faster-distil-whisper-small.en
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages:
+  - en
+  tier: balanced
+  size_bytes: 335542354
+  params: 166000000
+  license: MIT
+  features:
+  - timestamps
+  - punctuation
+  description: Whisper distil-small.en in CTranslate2 format for faster-whisper. English only. Quantised to int8
+    at load time on CPU.
+  source_url: https://github.com/SYSTRAN/faster-whisper
+  validated: cpu
+  measured:
+    rtf: 0.2122
+    wer: 0.0
+    audio_s: 6.3
+    load_s: 0.74
+    memory_mb: 428
+    threads: 4
+    engine: faster-whisper 1.2.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: synthesised by kokoro-v1.0-int8
+  source:
+    repo: Systran/faster-distil-whisper-small.en
+    revision: ef77d90526ccd62cde3808ee70626a01e5cf83e4
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    english_only: true
+- id: faster-whisper-distil-medium.en
+  aliases:
+  - Systran/faster-distil-whisper-medium.en
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages:
+  - en
+  tier: balanced
+  size_bytes: 792060626
+  params: 394000000
+  license: MIT
+  features:
+  - timestamps
+  - punctuation
+  description: Whisper distil-medium.en in CTranslate2 format for faster-whisper. English only. Quantised to int8
+    at load time on CPU.
+  source_url: https://github.com/SYSTRAN/faster-whisper
+  validated: untested
+  source:
+    repo: Systran/faster-distil-whisper-medium.en
+    revision: 80ddfce281f77766d8943d63109199fc8145dfa5
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    english_only: true
+- id: faster-whisper-distil-large-v2
+  aliases:
+  - Systran/faster-distil-whisper-large-v2
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages:
+  - en
+  tier: accuracy
+  size_bytes: 1516108953
+  params: 756000000
+  license: MIT
+  features:
+  - timestamps
+  - punctuation
+  description: Whisper distil-large-v2 in CTranslate2 format for faster-whisper. English only. Quantised to int8
+    at load time on CPU.
+  source_url: https://github.com/SYSTRAN/faster-whisper
+  validated: untested
+  source:
+    repo: Systran/faster-distil-whisper-large-v2
+    revision: fe9b404fc56de3f7c38606ef9ba6fd83526d05e4
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    english_only: true
+- id: faster-whisper-distil-large-v3
+  aliases:
+  - Systran/faster-distil-whisper-large-v3
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages:
+  - en
+  tier: accuracy
+  size_bytes: 1516479628
+  params: 756000000
+  license: MIT
+  features:
+  - timestamps
+  - punctuation
+  description: Whisper distil-large-v3 in CTranslate2 format for faster-whisper. English only. Quantised to int8
+    at load time on CPU.
+  source_url: https://github.com/SYSTRAN/faster-whisper
+  validated: untested
+  source:
+    repo: Systran/faster-distil-whisper-large-v3
+    revision: c3058b475261292e64a0412df1d2681c06260fab
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    english_only: true
+- id: faster-whisper-tiny-hindi
+  aliases:
+  - collabora/faster-whisper-tiny-hindi
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages:
+  - hi
+  tier: realtime
+  size_bytes: 79088644
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  description: Whisper tiny fine-tuned for Hindi (Collabora), CTranslate2 format.
+  source_url: https://huggingface.co/collabora/faster-whisper-tiny-hindi
+  validated: cpu
+  measured:
+    rtf: 0.1535
+    wer: 0.0
+    audio_s: 3.4
+    load_s: 0.25
+    memory_mb: 34
+    threads: 4
+    engine: faster-whisper 1.2.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: synthesised by piper-hi-in-rohan-medium
+  source:
+    repo: collabora/faster-whisper-tiny-hindi
+    revision: 35a11d3d1231d4411ff9dc8cc439b8150708c95a
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    language: hi
+- id: faster-whisper-small-hindi
+  aliases:
+  - collabora/faster-whisper-small-hindi
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages:
+  - hi
+  tier: balanced
+  size_bytes: 487097397
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  description: Whisper small fine-tuned for Hindi (Collabora), CTranslate2 format.
+  source_url: https://huggingface.co/collabora/faster-whisper-small-hindi
+  validated: cpu
+  measured:
+    rtf: 1.1324
+    wer: 0.0
+    audio_s: 3.4
+    load_s: 1.2
+    memory_mb: 430
+    threads: 4
+    engine: faster-whisper 1.2.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: synthesised by piper-hi-in-rohan-medium
+  source:
+    repo: collabora/faster-whisper-small-hindi
+    revision: 92e09a8982af971cf2033ed592d4ef8b249baad2
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    language: hi
+- id: faster-whisper-medium-hindi
+  aliases:
+  - collabora/faster-whisper-medium-hindi
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages:
+  - hi
+  tier: balanced
+  size_bytes: 1531456760
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  description: Whisper medium fine-tuned for Hindi (Collabora), CTranslate2 format.
+  source_url: https://huggingface.co/collabora/faster-whisper-medium-hindi
+  validated: untested
+  source:
+    repo: collabora/faster-whisper-medium-hindi
+    revision: 049320ea7e87aa6632c970fd99651ec7692fc206
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    language: hi

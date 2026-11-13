@@ -1,0 +1,72 @@
+{
+  "kind": "tts",
+  "model": "kitten-nano-0.8-int8",
+  "mode": "batch",
+  "sample": "en-text-long",
+  "duration_s": 20.0,
+  "points": [
+    {
+      "concurrency": 1,
+      "ok": 6,
+      "errors": 0,
+      "first_partial_ms": null,
+      "final_ms": {
+        "p50": 3663.0,
+        "p95": 4064.9
+      },
+      "ttfa_ms": {
+        "p50": 1126.0,
+        "p95": 1321.4
+      },
+      "rtf": {
+        "p50": 0.2776,
+        "p95": 0.3084
+      },
+      "throughput_x_realtime": 3.74,
+      "elapsed_s": 21.19,
+      "mean_batch": 1.0
+    },
+    {
+      "concurrency": 2,
+      "ok": 7,
+      "errors": 0,
+      "first_partial_ms": null,
+      "final_ms": {
+        "p50": 7277.3,
+        "p95": 7488.3
+      },
+      "ttfa_ms": {
+        "p50": 2326.0,
+        "p95": 3695.9
+      },
+      "rtf": {
+        "p50": 0.5512,
+        "p95": 0.5674
+      },
+      "throughput_x_realtime": 3.71,
+      "elapsed_s": 24.89,
+      "mean_batch": 1.0
+    },
+    {
+      "concurrency": 4,
+      "ok": 8,
+      "errors": 0,
+      "first_partial_ms": null,
+      "final_ms": {
+        "p50": 13257.6,
+        "p95": 13825.5
+      },
+      "ttfa_ms": {
+        "p50": 4637.0,
+        "p95": 7146.5
+      },
+      "rtf": {
+        "p50": 1.0045,
+        "p95": 1.0487
+      },
+      "throughput_x_realtime": 3.83,
+      "elapsed_s": 27.55,
+      "mean_batch": 1.0
+    }
+  ]
+}

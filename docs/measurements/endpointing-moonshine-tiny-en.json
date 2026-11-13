@@ -1,0 +1,44 @@
+{
+ "en-short@250": {
+  "endpoint_ms": 250,
+  "sample": "en-short",
+  "finals_per_clip": 1,
+  "speech_end_to_final_ms": 355,
+  "final_decode_latency_ms": 137
+ },
+ "en-short@500": {
+  "endpoint_ms": 500,
+  "sample": "en-short",
+  "finals_per_clip": 1,
+  "speech_end_to_final_ms": 615,
+  "final_decode_latency_ms": 137
+ },
+ "en-short@900": {
+  "endpoint_ms": 900,
+  "sample": "en-short",
+  "finals_per_clip": 1,
+  "speech_end_to_final_ms": 1212,
+  "final_decode_latency_ms": 293
+ },
+ "en-long@250": {
+  "endpoint_ms": 250,
+  "sample": "en-long",
+  "finals_per_clip": 1,
+  "speech_end_to_final_ms": 586,
+  "final_decode_latency_ms": 331
+ },
+ "en-long@500": {
+  "endpoint_ms": 500,
+  "sample": "en-long",
+  "finals_per_clip": 1,
+  "speech_end_to_final_ms": 1074,
+  "final_decode_latency_ms": 445
+ },
+ "en-long@900": {
+  "endpoint_ms": 900,
+  "sample": "en-long",
+  "finals_per_clip": 1,
+  "speech_end_to_final_ms": 1586,
+  "final_decode_latency_ms": 440
+ }
+}

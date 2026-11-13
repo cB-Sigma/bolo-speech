@@ -1,0 +1,448 @@
+"""Model store: resumable, checksum-verified downloads into a content-addressed cache.
+
+Layout under the data directory::
+
+    blobs/sha256-<hex>             one file per unique content
+    blobs/partial/<key>.part       interrupted downloads (resumed with HTTP Range)
+    models/<id>/manifest.json      what the model consists of and where it came from
+    models/<id>/<relative path>    hard links (or symlinks/copies) to blobs
+
+Models are fetched from Hugging Face model repositories (the listing API
+supplies each file's size and, for LFS files, its SHA-256) or from plain
+URLs with an optional checksum in the catalog.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import fnmatch
+import hashlib
+import json
+import os
+import shutil
+import threading
+import time
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+from urllib.parse import quote
+
+import httpx
+
+from bolo.errors import DownloadError, GatedModel, ModelNotFound
+
+ProgressFn = Callable[[int, int], None]
+CHUNK = 1 << 20
+
+
+@dataclass
+class RemoteFile:
+    path: str
+    url: str
+    size: int | None = None
+    sha256: str | None = None
+    git_oid: str | None = None  # git blob SHA-1 for small non-LFS files
+
+
+@dataclass
+class Source:
+    """Where a model's files come from."""
+
+    repo: str | None = None
+    revision: str = "main"
+    include: list[str] = field(default_factory=list)
+    exclude: list[str] = field(default_factory=list)
+    subdir: str | None = None  # only this folder of the repo, stripped from local paths
+    urls: list[dict[str, Any]] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Source:
+        return cls(
+            repo=d.get("repo"),
+            revision=str(d.get("revision", "main")),
+            include=list(d.get("include", [])),
+            exclude=list(d.get("exclude", [])),
+            subdir=d.get("subdir"),
+            urls=list(d.get("urls", [])),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        out: dict[str, Any] = {}
+        if self.repo:
+            out["repo"] = self.repo
+            out["revision"] = self.revision
+        for key in ("include", "exclude", "subdir", "urls"):
+            if getattr(self, key):
+                out[key] = getattr(self, key)
+        return out
+
+
+def safe_id(model_id: str) -> str:
+    return model_id.replace("/", "--").replace(":", "--")
+
+
+def git_blob_sha1(path: Path) -> str:
+    h = hashlib.sha1(usedforsecurity=False)
+    h.update(f"blob {path.stat().st_size}\0".encode())
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(CHUNK), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(CHUNK), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def match_patterns(path: str, include: list[str], exclude: list[str]) -> bool:
+    if include and not any(fnmatch.fnmatch(path, pat) for pat in include):
+        return False
+    return not any(fnmatch.fnmatch(path, pat) for pat in exclude)
+
+
+class HubClient:
+    """Minimal Hugging Face Hub client (listing and file URLs only)."""
+
+    def __init__(
+        self, endpoint: str = "https://huggingface.co", token: str | None = None, timeout: float = 30.0
+    ) -> None:
+        self.endpoint = endpoint.rstrip("/")
+        self.token = token
+        self.timeout = timeout
+
+    def headers(self) -> dict[str, str]:
+        h = {"User-Agent": "bolo-speech"}
+        if self.token:
+            h["Authorization"] = f"Bearer {self.token}"
+        return h
+
+    def client(self) -> httpx.Client:
+        return httpx.Client(headers=self.headers(), timeout=self.timeout, follow_redirects=True)
+
+    def _check(self, resp: httpx.Response, repo: str) -> None:
+        if resp.status_code in (401, 403):
+            raise GatedModel(
+                f"Hugging Face denied access to '{repo}' (HTTP {resp.status_code}). The repository is gated or "
+                "private: accept its terms on huggingface.co and set BOLO_HF_TOKEN (or HF_TOKEN) to a token "
+                "with access."
+            )
+        if resp.status_code == 404:
+            raise ModelNotFound(f"Hugging Face repository or revision not found: '{repo}'")
+        if resp.status_code >= 400:
+            raise DownloadError(f"Hugging Face returned HTTP {resp.status_code} for '{repo}'")
+
+    def repo_info(self, repo: str) -> dict[str, Any]:
+        with self.client() as c:
+            resp = c.get(f"{self.endpoint}/api/models/{repo}")
+            self._check(resp, repo)
+            info: dict[str, Any] = resp.json()
+            return info
+
+    def list_files(self, repo: str, revision: str = "main") -> list[RemoteFile]:
+        files: list[RemoteFile] = []
+        url: str | None = f"{self.endpoint}/api/models/{repo}/tree/{quote(revision, safe='')}?recursive=true&limit=1000"
+        with self.client() as c:
+            while url:
+                try:
+                    resp = c.get(url)
+                except httpx.HTTPError as exc:
+                    raise DownloadError(f"could not reach Hugging Face to list '{repo}': {exc}") from exc
+                self._check(resp, repo)
+                for item in resp.json():
+                    if item.get("type") != "file":
+                        continue
+                    lfs = item.get("lfs") or {}
+                    files.append(
+                        RemoteFile(
+                            path=item["path"],
+                            url=f"{self.endpoint}/{repo}/resolve/{quote(revision, safe='')}/{quote(item['path'])}",
+                            size=int(lfs.get("size", item.get("size", 0))),
+                            sha256=lfs.get("oid"),
+                            git_oid=None if lfs else item.get("oid"),
+                        )
+                    )
+                url = resp.links.get("next", {}).get("url")
+        return files
+
+
+class ModelStore:
+    def __init__(self, data_dir: Path, hub: HubClient | None = None) -> None:
+        self.data_dir = Path(data_dir)
+        self.blobs = self.data_dir / "blobs"
+        self.partial = self.blobs / "partial"
+        self.models = self.data_dir / "models"
+        self.hub = hub or HubClient()
+        self._locks: dict[str, threading.Lock] = {}
+        self._guard = threading.Lock()
+
+    # -- queries ----------------------------------------------------------
+    def model_dir(self, model_id: str) -> Path:
+        return self.models / safe_id(model_id)
+
+    def manifest(self, model_id: str) -> dict[str, Any] | None:
+        path = self.model_dir(model_id) / "manifest.json"
+        if not path.is_file():
+            return None
+        try:
+            data: dict[str, Any] = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            return None
+        return data
+
+    def is_installed(self, model_id: str) -> bool:
+        m = self.manifest(model_id)
+        return bool(m and m.get("complete"))
+
+    def installed(self) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        if not self.models.is_dir():
+            return out
+        for d in sorted(self.models.iterdir()):
+            mf = d / "manifest.json"
+            if mf.is_file():
+                with contextlib.suppress(OSError, json.JSONDecodeError):
+                    data = json.loads(mf.read_text())
+                    if data.get("complete"):
+                        out.append(data)
+        return out
+
+    def size_on_disk(self, model_id: str) -> int:
+        m = self.manifest(model_id)
+        return sum(int(f.get("size", 0)) for f in m.get("files", [])) if m else 0
+
+    # -- planning ---------------------------------------------------------
+    def plan(self, source: Source) -> list[RemoteFile]:
+        """Resolve a source to the concrete list of files to fetch."""
+        files: list[RemoteFile] = []
+        if source.repo:
+            prefix = source.subdir.strip("/") + "/" if source.subdir else ""
+            for f in self.hub.list_files(source.repo, source.revision):
+                if prefix:
+                    if not f.path.startswith(prefix):
+                        continue
+                    rel = f.path[len(prefix) :]
+                else:
+                    rel = f.path
+                if rel.startswith(".git") or not match_patterns(rel, source.include, source.exclude):
+                    continue
+                files.append(RemoteFile(rel, f.url, f.size, f.sha256, f.git_oid))
+        for u in source.urls:
+            files.append(RemoteFile(u["path"], u["url"], u.get("size"), u.get("sha256")))
+        if not files:
+            raise DownloadError("the model source matched no files")
+        return files
+
+    # -- download ---------------------------------------------------------
+    def _lock(self, key: str) -> threading.Lock:
+        with self._guard:
+            return self._locks.setdefault(key, threading.Lock())
+
+    def _blob_path(self, sha256: str) -> Path:
+        return self.blobs / f"sha256-{sha256}"
+
+    def fetch_blob(
+        self,
+        remote: RemoteFile,
+        on_bytes: Callable[[int], None] | None = None,
+        cancelled: Callable[[], bool] | None = None,
+        retries: int = 4,
+    ) -> tuple[Path, str]:
+        """Download one file (resuming a partial one) and return ``(blob path, sha256)``."""
+        self.partial.mkdir(parents=True, exist_ok=True)
+        if remote.sha256:
+            blob = self._blob_path(remote.sha256)
+            if blob.is_file() and (remote.size is None or blob.stat().st_size == remote.size):
+                if on_bytes:
+                    on_bytes(blob.stat().st_size)
+                return blob, remote.sha256
+        key = hashlib.sha256(f"{remote.url}|{remote.sha256 or remote.git_oid or ''}".encode()).hexdigest()[:32]
+        part = self.partial / f"{key}.part"
+        with self._lock(key):
+            last_error: Exception | None = None
+            for attempt in range(retries):
+                try:
+                    self._download(remote, part, on_bytes, cancelled)
+                    break
+                except (httpx.HTTPError, OSError) as exc:
+                    last_error = exc
+                    time.sleep(min(2.0**attempt, 8.0))
+            else:
+                raise DownloadError(f"download of {remote.path} failed after {retries} attempts: {last_error}")
+            digest = sha256_file(part)
+            if remote.sha256 and digest != remote.sha256:
+                part.unlink(missing_ok=True)
+                raise DownloadError(
+                    f"checksum mismatch for {remote.path}: expected sha256 {remote.sha256}, got {digest}"
+                )
+            if remote.git_oid and not remote.sha256 and git_blob_sha1(part) != remote.git_oid:
+                part.unlink(missing_ok=True)
+                raise DownloadError(f"checksum mismatch for {remote.path}: git object id differs from the listing")
+            if remote.size is not None and part.stat().st_size != remote.size:
+                part.unlink(missing_ok=True)
+                raise DownloadError(f"size mismatch for {remote.path}")
+            blob = self._blob_path(digest)
+            if blob.exists():
+                part.unlink()
+            else:
+                part.replace(blob)
+            return blob, digest
+
+    def _download(
+        self,
+        remote: RemoteFile,
+        part: Path,
+        on_bytes: Callable[[int], None] | None,
+        cancelled: Callable[[], bool] | None,
+    ) -> None:
+        have = part.stat().st_size if part.exists() else 0
+        if remote.size is not None and have == remote.size and have > 0:
+            if on_bytes:
+                on_bytes(have)
+            return
+        if remote.size is not None and have > remote.size:
+            part.unlink()
+            have = 0
+        headers = self.hub.headers()
+        if have:
+            headers["Range"] = f"bytes={have}-"
+        with httpx.Client(timeout=httpx.Timeout(30.0, read=120.0), follow_redirects=True) as client:
+            with client.stream("GET", remote.url, headers=headers) as resp:
+                if resp.status_code in (401, 403):
+                    raise GatedModel(
+                        f"access denied (HTTP {resp.status_code}) while downloading {remote.path}; the repository "
+                        "is gated or private. Set BOLO_HF_TOKEN to a token with access."
+                    )
+                if resp.status_code == 416:  # range not satisfiable: start over
+                    part.unlink(missing_ok=True)
+                    raise httpx.TransportError("stale partial file; restarting")
+                if resp.status_code >= 400:
+                    raise DownloadError(f"HTTP {resp.status_code} while downloading {remote.url}")
+                resumed = resp.status_code == 206
+                if have and not resumed:
+                    have = 0
+                if on_bytes and have:
+                    on_bytes(have)
+                with part.open("ab" if resumed else "wb") as fh:
+                    for chunk in resp.iter_bytes(1 << 16):
+                        if cancelled and cancelled():
+                            raise DownloadError("download cancelled")
+                        fh.write(chunk)
+                        if on_bytes:
+                            on_bytes(len(chunk))
+
+    def _place(self, blob: Path, dest: Path) -> None:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if dest.exists() or dest.is_symlink():
+            dest.unlink()
+        try:
+            os.link(blob, dest)
+        except OSError:
+            try:
+                dest.symlink_to(blob)
+            except OSError:
+                shutil.copy2(blob, dest)
+
+    def pull(
+        self,
+        model_id: str,
+        source: Source,
+        progress: ProgressFn | None = None,
+        cancelled: Callable[[], bool] | None = None,
+        meta: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Fetch every file of a model and write its manifest. Safe to re-run."""
+        with self._lock("model:" + model_id):
+            files = self.plan(source)
+            total = sum(f.size or 0 for f in files)
+            done = 0
+            lock = threading.Lock()
+
+            def bump(n: int) -> None:
+                nonlocal done
+                with lock:
+                    done += n
+                    if progress:
+                        progress(done, total)
+
+            if progress:
+                progress(0, total)
+            mdir = self.model_dir(model_id)
+            mdir.mkdir(parents=True, exist_ok=True)
+            entries: list[dict[str, Any]] = []
+            for f in files:
+                blob, digest = self.fetch_blob(f, on_bytes=bump, cancelled=cancelled)
+                self._place(blob, mdir / f.path)
+                entries.append({"path": f.path, "size": blob.stat().st_size, "sha256": digest})
+            manifest: dict[str, Any] = {
+                "id": model_id,
+                "source": source.to_dict(),
+                "files": entries,
+                "size_bytes": sum(e["size"] for e in entries),
+                "installed_at": time.time(),
+                "complete": True,
+            }
+            if meta:
+                manifest["meta"] = meta
+            tmp = mdir / "manifest.json.tmp"
+            tmp.write_text(json.dumps(manifest, indent=2))
+            tmp.replace(mdir / "manifest.json")
+            return manifest
+
+    def register_local(self, model_id: str, path: Path, meta: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Register a model directory that already exists on disk (no download)."""
+        mdir = self.model_dir(model_id)
+        mdir.parent.mkdir(parents=True, exist_ok=True)
+        if mdir.resolve() != path.resolve():
+            if mdir.exists() or mdir.is_symlink():
+                raise DownloadError(f"model '{model_id}' already exists in the store")
+            mdir.symlink_to(path.resolve(), target_is_directory=True)
+        entries: list[dict[str, Any]] = [
+            {"path": str(p.relative_to(path)), "size": p.stat().st_size}
+            for p in sorted(path.rglob("*"))
+            if p.is_file() and p.name != "manifest.json"
+        ]
+        manifest: dict[str, Any] = {
+            "id": model_id,
+            "source": {"local": str(path)},
+            "files": entries,
+            "size_bytes": sum(e["size"] for e in entries),
+            "installed_at": time.time(),
+            "complete": True,
+            "meta": meta or {},
+        }
+        (path / "manifest.json").write_text(json.dumps(manifest, indent=2))
+        return manifest
+
+    # -- removal ----------------------------------------------------------
+    def remove(self, model_id: str) -> bool:
+        mdir = self.model_dir(model_id)
+        if not (mdir.exists() or mdir.is_symlink()):
+            return False
+        if mdir.is_symlink():
+            target = mdir.resolve()
+            mdir.unlink()
+            (target / "manifest.json").unlink(missing_ok=True)
+        else:
+            shutil.rmtree(mdir)
+        self.gc()
+        return True
+
+    def gc(self) -> int:
+        """Delete blobs no model links to any more. Returns bytes freed."""
+        if not self.blobs.is_dir():
+            return 0
+        referenced: set[str] = set()
+        for m in self.installed():
+            referenced.update(f["sha256"] for f in m.get("files", []) if "sha256" in f)
+        freed = 0
+        for blob in self.blobs.glob("sha256-*"):
+            digest = blob.name.removeprefix("sha256-")
+            if digest not in referenced:
+                freed += blob.stat().st_size
+                blob.unlink()
+        return freed

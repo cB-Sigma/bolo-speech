@@ -1,0 +1,93 @@
+{
+  "kind": "stt",
+  "model": "moonshine-tiny-en",
+  "mode": "realtime",
+  "sample": "en-short",
+  "duration_s": 24.0,
+  "points": [
+    {
+      "concurrency": 1,
+      "ok": 6,
+      "errors": 0,
+      "first_partial_ms": {
+        "p50": 55.5,
+        "p95": 64.7
+      },
+      "final_ms": {
+        "p50": 150.4,
+        "p95": 161.4
+      },
+      "ttfa_ms": null,
+      "rtf": {
+        "p50": 0.2681,
+        "p95": 0.278
+      },
+      "throughput_x_realtime": 0.73,
+      "elapsed_s": 24.83,
+      "mean_batch": 1.0
+    },
+    {
+      "concurrency": 2,
+      "ok": 12,
+      "errors": 0,
+      "first_partial_ms": {
+        "p50": 83.3,
+        "p95": 134.4
+      },
+      "final_ms": {
+        "p50": 223.7,
+        "p95": 337.6
+      },
+      "ttfa_ms": null,
+      "rtf": {
+        "p50": 0.2711,
+        "p95": 0.2995
+      },
+      "throughput_x_realtime": 1.45,
+      "elapsed_s": 24.93,
+      "mean_batch": 1.0
+    },
+    {
+      "concurrency": 4,
+      "ok": 24,
+      "errors": 0,
+      "first_partial_ms": {
+        "p50": 80.8,
+        "p95": 267.2
+      },
+      "final_ms": {
+        "p50": 684.2,
+        "p95": 794.9
+      },
+      "ttfa_ms": null,
+      "rtf": {
+        "p50": 0.258,
+        "p95": 0.3052
+      },
+      "throughput_x_realtime": 2.64,
+      "elapsed_s": 27.3,
+      "mean_batch": 1.0
+    },
+    {
+      "concurrency": 8,
+      "ok": 40,
+      "errors": 0,
+      "first_partial_ms": {
+        "p50": 455.5,
+        "p95": 924.1
+      },
+      "final_ms": {
+        "p50": 1719.1,
+        "p95": 2386.4
+      },
+      "ttfa_ms": null,
+      "rtf": {
+        "p50": 0.1807,
+        "p95": 0.2074
+      },
+      "throughput_x_realtime": 4.07,
+      "elapsed_s": 29.53,
+      "mean_batch": 1.0
+    }
+  ]
+}

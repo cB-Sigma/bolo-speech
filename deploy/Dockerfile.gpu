@@ -1,0 +1,52 @@
+# bolo, NVIDIA GPU image.
+#
+#   !!  UNTESTED  !!
+# Nothing in this file has been run by the maintainers: bolo 0.1.0 was developed
+# and measured on CPU only. It is a starting point for people with a GPU, and
+# reports (working or not) are very welcome.
+#
+# What should work in principle:
+#   * faster-whisper models (CTranslate2 has CUDA support in its Linux wheels and
+#     needs cuDNN 9 + CUDA 12 libraries, provided by the base image below);
+#     start with:  bolo serve --device cuda   (config key: device = "cuda")
+# What will NOT use the GPU with this image:
+#   * sherpa-onnx models: the `sherpa-onnx` wheel on PyPI is CPU-only. GPU builds
+#     are published by the sherpa-onnx project on its own wheel index; install the
+#     matching "+cuda" wheel instead and report back.
+#
+# Build from the repository root:
+#   docker build -f deploy/Dockerfile.gpu -t bolo:gpu .
+# Run:
+#   docker run --gpus all -p 8000:8000 -v bolo-data:/data bolo:gpu
+FROM python:3.12-slim AS build
+WORKDIR /src
+COPY server/ ./server/
+RUN pip install --no-cache-dir build && python -m build --wheel --outdir /dist server
+
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+ARG EXTRAS="sherpa,faster-whisper,av,wyoming"
+# eSpeak NG (GPL-3.0-or-later) is not included unless you build with --build-arg WITH_ESPEAK=1 (see Dockerfile).
+ARG WITH_ESPEAK=0
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends software-properties-common \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get install -y --no-install-recommends python3.12 python3.12-venv libgomp1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && python3.12 -m venv /opt/bolo
+COPY --from=build /dist/*.whl /tmp/
+RUN WHEEL="$(ls /tmp/*.whl)" \
+    && if [ "${WITH_ESPEAK}" = "1" ]; then EXTRAS="${EXTRAS},espeak"; fi \
+    && /opt/bolo/bin/pip install --no-cache-dir "${WHEEL}[${EXTRAS}]" \
+    && rm /tmp/*.whl \
+    && useradd --create-home --uid 10001 bolo \
+    && mkdir -p /data && chown bolo:bolo /data
+USER bolo
+ENV PATH=/opt/bolo/bin:$PATH \
+    BOLO_DATA_DIR=/data \
+    BOLO_HOST=0.0.0.0 \
+    BOLO_PORT=8000 \
+    BOLO_DEVICE=cuda
+VOLUME ["/data"]
+EXPOSE 8000 10300
+ENTRYPOINT ["bolo"]
+CMD ["serve"]

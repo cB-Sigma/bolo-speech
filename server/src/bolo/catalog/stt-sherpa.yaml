@@ -1,0 +1,2821 @@
+# Speech-to-text models run by the sherpa-onnx engine.
+# `validated: cpu` and `measured` are only set for models that were downloaded and run by the maintainers.
+
+- id: moonshine-tiny-en
+  aliases:
+  - moonshine-tiny
+  - UsefulSensors/moonshine-tiny
+  task: stt
+  engine: sherpa-onnx
+  kind: moonshine
+  family: Moonshine
+  languages:
+  - en
+  tier: realtime
+  size_bytes: 123968610
+  params: 27000000
+  license: MIT
+  features:
+  - punctuation
+  - telephony
+  description: Moonshine tiny (Useful Sensors), int8. Small English encoder-decoder whose cost scales with utterance
+    length; a good low-latency default on CPU.
+  source_url: https://github.com/moonshine-ai/moonshine
+  validated: cpu
+  measured:
+    rtf: 0.0332
+    wer: 0.021
+    audio_s: 23.3
+    load_s: 0.78
+    memory_mb: 0
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-moonshine-tiny-en-int8/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-moonshine-tiny-en-int8
+    revision: bf2b762c076d8ea61e2af0b3851c9564fb77552e
+    include:
+    - '*.onnx'
+    - tokens.txt
+    - LICENSE
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    max_chunk_s: 30.0
+- id: moonshine-base-en
+  aliases:
+  - moonshine-base
+  - UsefulSensors/moonshine-base
+  task: stt
+  engine: sherpa-onnx
+  kind: moonshine
+  family: Moonshine
+  languages:
+  - en
+  tier: realtime
+  size_bytes: 286930831
+  params: 61000000
+  license: MIT
+  features:
+  - punctuation
+  description: Moonshine base (Useful Sensors), int8. Small English encoder-decoder whose cost scales with utterance
+    length; a good low-latency default on CPU.
+  source_url: https://github.com/moonshine-ai/moonshine
+  validated: cpu
+  measured:
+    rtf: 0.1146
+    wer: 0.021
+    audio_s: 23.3
+    load_s: 1.11
+    memory_mb: 49
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-moonshine-base-en-int8/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-moonshine-base-en-int8
+    revision: 052b0798ad1bf046a140fdd4efcd9426530fa3f5
+    include:
+    - '*.onnx'
+    - tokens.txt
+    - LICENSE
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    max_chunk_s: 30.0
+- id: moonshine-v2-tiny-en
+  task: stt
+  engine: sherpa-onnx
+  kind: moonshine_v2
+  family: Moonshine
+  languages:
+  - en
+  tier: realtime
+  size_bytes: 44256550
+  license: MIT
+  features:
+  - punctuation
+  description: Moonshine v2 tiny for 'en', quantized (merged decoder, ONNX Runtime .ort format).
+  source_url: https://github.com/moonshine-ai/moonshine
+  validated: cpu
+  measured:
+    rtf: 0.0933
+    audio_s: 3.8
+    load_s: 0.51
+    memory_mb: 0
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj2/sherpa-onnx-moonshine-tiny-en-quantized-2026-02-27/test_wavs/0.wav
+  source:
+    repo: csukuangfj2/sherpa-onnx-moonshine-tiny-en-quantized-2026-02-27
+    revision: d1e6c30921780b8508d04b492dfb3ce8a51605d4
+    include:
+    - '*.ort'
+    - tokens.txt
+    - LICENSE
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    max_chunk_s: 30.0
+- id: moonshine-v2-base-en
+  task: stt
+  engine: sherpa-onnx
+  kind: moonshine_v2
+  family: Moonshine
+  languages:
+  - en
+  tier: realtime
+  size_bytes: 141313910
+  license: MIT
+  features:
+  - punctuation
+  description: Moonshine v2 base for 'en', quantized (merged decoder, ONNX Runtime .ort format).
+  source_url: https://github.com/moonshine-ai/moonshine
+  validated: cpu
+  measured:
+    rtf: 0.1603
+    audio_s: 3.8
+    load_s: 0.82
+    memory_mb: 11
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj2/sherpa-onnx-moonshine-base-en-quantized-2026-02-27/test_wavs/0.wav
+  source:
+    repo: csukuangfj2/sherpa-onnx-moonshine-base-en-quantized-2026-02-27
+    revision: 8f4d6c58c03d40bcea40043bb7120a878f2bbef6
+    include:
+    - '*.ort'
+    - tokens.txt
+    - LICENSE
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    max_chunk_s: 30.0
+- id: moonshine-v2-base-es
+  task: stt
+  engine: sherpa-onnx
+  kind: moonshine_v2
+  family: Moonshine
+  languages:
+  - es
+  tier: realtime
+  size_bytes: 65121954
+  license: Moonshine Community License (non-commercial)
+  commercial_use: false
+  features:
+  - punctuation
+  description: Moonshine v2 base for 'es', quantized (merged decoder, ONNX Runtime .ort format). Non-English Moonshine
+    models are released under a non-commercial licence.
+  source_url: https://github.com/moonshine-ai/moonshine
+  validated: untested
+  source:
+    repo: csukuangfj2/sherpa-onnx-moonshine-base-es-quantized-2026-02-27
+    revision: 59e235a505b7372eb7f896471a74c776f6f6e061
+    include:
+    - '*.ort'
+    - tokens.txt
+    - LICENSE
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    max_chunk_s: 30.0
+- id: moonshine-v2-tiny-ja
+  task: stt
+  engine: sherpa-onnx
+  kind: moonshine_v2
+  family: Moonshine
+  languages:
+  - ja
+  tier: realtime
+  size_bytes: 72128150
+  license: Moonshine Community License (non-commercial)
+  commercial_use: false
+  features:
+  - punctuation
+  description: Moonshine v2 tiny for 'ja', quantized (merged decoder, ONNX Runtime .ort format). Non-English Moonshine
+    models are released under a non-commercial licence.
+  source_url: https://github.com/moonshine-ai/moonshine
+  validated: untested
+  source:
+    repo: csukuangfj2/sherpa-onnx-moonshine-tiny-ja-quantized-2026-02-27
+    revision: 550e2eb0a8b33092f3b394f64649ee1b3d9eb506
+    include:
+    - '*.ort'
+    - tokens.txt
+    - LICENSE
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    max_chunk_s: 30.0
+- id: moonshine-v2-tiny-ko
+  task: stt
+  engine: sherpa-onnx
+  kind: moonshine_v2
+  family: Moonshine
+  languages:
+  - ko
+  tier: realtime
+  size_bytes: 72128206
+  license: Moonshine Community License (non-commercial)
+  commercial_use: false
+  features:
+  - punctuation
+  description: Moonshine v2 tiny for 'ko', quantized (merged decoder, ONNX Runtime .ort format). Non-English Moonshine
+    models are released under a non-commercial licence.
+  source_url: https://github.com/moonshine-ai/moonshine
+  validated: untested
+  source:
+    repo: csukuangfj2/sherpa-onnx-moonshine-tiny-ko-quantized-2026-02-27
+    revision: 3f2e79d6fe04ae0009fcb150a035586c12ac742f
+    include:
+    - '*.ort'
+    - tokens.txt
+    - LICENSE
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    max_chunk_s: 30.0
+- id: moonshine-v2-base-zh
+  task: stt
+  engine: sherpa-onnx
+  kind: moonshine_v2
+  family: Moonshine
+  languages:
+  - zh
+  tier: realtime
+  size_bytes: 141314030
+  license: Moonshine Community License (non-commercial)
+  commercial_use: false
+  features:
+  - punctuation
+  description: Moonshine v2 base for 'zh', quantized (merged decoder, ONNX Runtime .ort format). Non-English Moonshine
+    models are released under a non-commercial licence.
+  source_url: https://github.com/moonshine-ai/moonshine
+  validated: untested
+  source:
+    repo: csukuangfj2/sherpa-onnx-moonshine-base-zh-quantized-2026-02-27
+    revision: 19042e30b8680b101d0db3b0b8cabc84ae954b7f
+    include:
+    - '*.ort'
+    - tokens.txt
+    - LICENSE
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    max_chunk_s: 30.0
+- id: moonshine-v2-base-ar
+  task: stt
+  engine: sherpa-onnx
+  kind: moonshine_v2
+  family: Moonshine
+  languages:
+  - ar
+  tier: realtime
+  size_bytes: 141314070
+  license: Moonshine Community License (non-commercial)
+  commercial_use: false
+  features:
+  - punctuation
+  description: Moonshine v2 base for 'ar', quantized (merged decoder, ONNX Runtime .ort format). Non-English Moonshine
+    models are released under a non-commercial licence.
+  source_url: https://github.com/moonshine-ai/moonshine
+  validated: untested
+  source:
+    repo: csukuangfj2/sherpa-onnx-moonshine-base-ar-quantized-2026-02-27
+    revision: 00c1062f1b70e4da96658486f4fd79552d8bc22b
+    include:
+    - '*.ort'
+    - tokens.txt
+    - LICENSE
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    max_chunk_s: 30.0
+- id: moonshine-v2-base-uk
+  task: stt
+  engine: sherpa-onnx
+  kind: moonshine_v2
+  family: Moonshine
+  languages:
+  - uk
+  tier: realtime
+  size_bytes: 141313934
+  license: Moonshine Community License (non-commercial)
+  commercial_use: false
+  features:
+  - punctuation
+  description: Moonshine v2 base for 'uk', quantized (merged decoder, ONNX Runtime .ort format). Non-English Moonshine
+    models are released under a non-commercial licence.
+  source_url: https://github.com/moonshine-ai/moonshine
+  validated: untested
+  source:
+    repo: csukuangfj2/sherpa-onnx-moonshine-base-uk-quantized-2026-02-27
+    revision: 336649c4c1cd81d066c586163381fe8bb65d9145
+    include:
+    - '*.ort'
+    - tokens.txt
+    - LICENSE
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    max_chunk_s: 30.0
+- id: moonshine-v2-base-vi
+  task: stt
+  engine: sherpa-onnx
+  kind: moonshine_v2
+  family: Moonshine
+  languages:
+  - vi
+  tier: realtime
+  size_bytes: 141314030
+  license: Moonshine Community License (non-commercial)
+  commercial_use: false
+  features:
+  - punctuation
+  description: Moonshine v2 base for 'vi', quantized (merged decoder, ONNX Runtime .ort format). Non-English Moonshine
+    models are released under a non-commercial licence.
+  source_url: https://github.com/moonshine-ai/moonshine
+  validated: untested
+  source:
+    repo: csukuangfj2/sherpa-onnx-moonshine-base-vi-quantized-2026-02-27
+    revision: 2946c5272fcb2d92f5cd99edb6e828c66be94f2e
+    include:
+    - '*.ort'
+    - tokens.txt
+    - LICENSE
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    max_chunk_s: 30.0
+- id: whisper-tiny
+  aliases:
+  - openai/whisper-tiny
+  task: stt
+  engine: sherpa-onnx
+  kind: whisper
+  family: Whisper
+  languages: &id001
+  - en
+  - zh
+  - de
+  - es
+  - ru
+  - ko
+  - fr
+  - ja
+  - pt
+  - tr
+  - pl
+  - ca
+  - nl
+  - ar
+  - sv
+  - it
+  - id
+  - hi
+  - fi
+  - vi
+  - he
+  - uk
+  - el
+  - ms
+  - cs
+  - ro
+  - da
+  - hu
+  - ta
+  - 'no'
+  - th
+  - ur
+  - hr
+  - bg
+  - lt
+  - la
+  - mi
+  - ml
+  - cy
+  - sk
+  - te
+  - fa
+  - lv
+  - bn
+  - sr
+  - az
+  - sl
+  - kn
+  - et
+  - mk
+  - br
+  - eu
+  - is
+  - hy
+  - ne
+  - mn
+  - bs
+  - kk
+  - sq
+  - sw
+  - gl
+  - mr
+  - pa
+  - si
+  - km
+  - sn
+  - yo
+  - so
+  - af
+  - oc
+  - ka
+  - be
+  - tg
+  - sd
+  - gu
+  - am
+  - yi
+  - lo
+  - uz
+  - fo
+  - ht
+  - ps
+  - tk
+  - nn
+  - mt
+  - sa
+  - lb
+  - my
+  - bo
+  - tl
+  - mg
+  - as
+  - tt
+  - haw
+  - ln
+  - ha
+  - ba
+  - jw
+  - su
+  - yue
+  tier: realtime
+  size_bytes: 103609903
+  params: 39000000
+  license: MIT
+  features:
+  - punctuation
+  - translate
+  - language-detect
+  description: OpenAI Whisper tiny exported to ONNX (int8) for sherpa-onnx. Multilingual, including Hindi, Bengali,
+    Tamil, Telugu, Marathi, Urdu and other Indian languages; set `language` for best results.
+  source_url: https://github.com/openai/whisper
+  validated: cpu
+  measured:
+    rtf: 0.1395
+    wer: 0.042
+    audio_s: 23.3
+    load_s: 0.51
+    memory_mb: 80
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-whisper-tiny/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-whisper-tiny
+    revision: 65176e2deb88badc814a94058666cadccc29b61c
+    include:
+    - '*-encoder.int8.onnx'
+    - '*-decoder.int8.onnx'
+    - '*-tokens.txt'
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: whisper-tiny.en
+  aliases:
+  - openai/whisper-tiny.en
+  task: stt
+  engine: sherpa-onnx
+  kind: whisper
+  family: Whisper
+  languages:
+  - en
+  tier: realtime
+  size_bytes: 103627191
+  params: 39000000
+  license: MIT
+  features:
+  - punctuation
+  description: OpenAI Whisper tiny.en exported to ONNX (int8) for sherpa-onnx. English only.
+  source_url: https://github.com/openai/whisper
+  validated: cpu
+  measured:
+    rtf: 0.1806
+    wer: 0.031
+    audio_s: 23.3
+    load_s: 0.48
+    memory_mb: 80
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-whisper-tiny.en/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-whisper-tiny.en
+    revision: d026532c022fa99fd789d6b32446a1df7b6bfc43
+    include:
+    - '*-encoder.int8.onnx'
+    - '*-decoder.int8.onnx'
+    - '*-tokens.txt'
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    english_only: true
+- id: whisper-base
+  aliases:
+  - openai/whisper-base
+  task: stt
+  engine: sherpa-onnx
+  kind: whisper
+  family: Whisper
+  languages: *id001
+  tier: balanced
+  size_bytes: 160609290
+  params: 74000000
+  license: MIT
+  features:
+  - punctuation
+  - translate
+  - language-detect
+  description: OpenAI Whisper base exported to ONNX (int8) for sherpa-onnx. Multilingual, including Hindi, Bengali,
+    Tamil, Telugu, Marathi, Urdu and other Indian languages; set `language` for best results.
+  source_url: https://github.com/openai/whisper
+  validated: cpu
+  measured:
+    rtf: 0.1148
+    wer: 0.031
+    audio_s: 23.3
+    load_s: 0.94
+    memory_mb: 106
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-whisper-base/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-whisper-base
+    revision: bb53ee204431c90d314c1cc08d28d23e5b7927cc
+    include:
+    - '*-encoder.int8.onnx'
+    - '*-decoder.int8.onnx'
+    - '*-tokens.txt'
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: whisper-base.en
+  aliases:
+  - openai/whisper-base.en
+  task: stt
+  engine: sherpa-onnx
+  kind: whisper
+  family: Whisper
+  languages:
+  - en
+  tier: balanced
+  size_bytes: 160626066
+  params: 74000000
+  license: MIT
+  features:
+  - punctuation
+  description: OpenAI Whisper base.en exported to ONNX (int8) for sherpa-onnx. English only.
+  source_url: https://github.com/openai/whisper
+  validated: cpu
+  measured:
+    rtf: 0.1064
+    wer: 0.031
+    audio_s: 23.3
+    load_s: 0.75
+    memory_mb: 106
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-whisper-base.en/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-whisper-base.en
+    revision: 59eea950fc76df2453efb57e6c0fd334548e8ffe
+    include:
+    - '*-encoder.int8.onnx'
+    - '*-decoder.int8.onnx'
+    - '*-tokens.txt'
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    english_only: true
+- id: whisper-small
+  aliases:
+  - openai/whisper-small
+  task: stt
+  engine: sherpa-onnx
+  kind: whisper
+  family: Whisper
+  languages: *id001
+  tier: balanced
+  size_bytes: 375485327
+  params: 244000000
+  license: MIT
+  features:
+  - punctuation
+  - translate
+  - language-detect
+  description: OpenAI Whisper small exported to ONNX (int8) for sherpa-onnx. Multilingual, including Hindi, Bengali,
+    Tamil, Telugu, Marathi, Urdu and other Indian languages; set `language` for best results.
+  source_url: https://github.com/openai/whisper
+  validated: cpu
+  measured:
+    rtf: 0.3647
+    wer: 0.031
+    audio_s: 23.3
+    load_s: 2.15
+    memory_mb: 285
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-whisper-small/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-whisper-small
+    revision: 8f3c18b358db4d1f2fc1eae49d75cd20989e4309
+    include:
+    - '*-encoder.int8.onnx'
+    - '*-decoder.int8.onnx'
+    - '*-tokens.txt'
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: whisper-small.en
+  aliases:
+  - openai/whisper-small.en
+  task: stt
+  engine: sherpa-onnx
+  kind: whisper
+  family: Whisper
+  languages:
+  - en
+  tier: balanced
+  size_bytes: 375501079
+  params: 244000000
+  license: MIT
+  features:
+  - punctuation
+  description: OpenAI Whisper small.en exported to ONNX (int8) for sherpa-onnx. English only.
+  source_url: https://github.com/openai/whisper
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-whisper-small.en
+    revision: d9533f69affd85061aee349af7fea5cb2996dbbe
+    include:
+    - '*-encoder.int8.onnx'
+    - '*-decoder.int8.onnx'
+    - '*-tokens.txt'
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    english_only: true
+- id: whisper-medium
+  aliases:
+  - openai/whisper-medium
+  task: stt
+  engine: sherpa-onnx
+  kind: whisper
+  family: Whisper
+  languages: *id001
+  tier: accuracy
+  size_bytes: 946072270
+  params: 769000000
+  license: MIT
+  features:
+  - punctuation
+  - translate
+  - language-detect
+  description: OpenAI Whisper medium exported to ONNX (int8) for sherpa-onnx. Multilingual, including Hindi, Bengali,
+    Tamil, Telugu, Marathi, Urdu and other Indian languages; set `language` for best results.
+  source_url: https://github.com/openai/whisper
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-whisper-medium
+    revision: 8c31d28503847560985df21f90e14f0c736e075e
+    include:
+    - '*-encoder.int8.onnx'
+    - '*-decoder.int8.onnx'
+    - '*-tokens.txt'
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: whisper-medium.en
+  aliases:
+  - openai/whisper-medium.en
+  task: stt
+  engine: sherpa-onnx
+  kind: whisper
+  family: Whisper
+  languages:
+  - en
+  tier: accuracy
+  size_bytes: 946086998
+  params: 769000000
+  license: MIT
+  features:
+  - punctuation
+  description: OpenAI Whisper medium.en exported to ONNX (int8) for sherpa-onnx. English only.
+  source_url: https://github.com/openai/whisper
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-whisper-medium.en
+    revision: 251ab4521f354490e8f2c206fbd0b7f3f6b0a7ec
+    include:
+    - '*-encoder.int8.onnx'
+    - '*-decoder.int8.onnx'
+    - '*-tokens.txt'
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    english_only: true
+- id: whisper-large-v3
+  aliases:
+  - openai/whisper-large-v3
+  task: stt
+  engine: sherpa-onnx
+  kind: whisper
+  family: Whisper
+  languages: *id001
+  tier: accuracy
+  size_bytes: 1775753918
+  params: 1550000000
+  license: MIT
+  features:
+  - punctuation
+  - translate
+  - language-detect
+  description: OpenAI Whisper large-v3 exported to ONNX (int8) for sherpa-onnx. Multilingual, including Hindi, Bengali,
+    Tamil, Telugu, Marathi, Urdu and other Indian languages; set `language` for best results.
+  source_url: https://github.com/openai/whisper
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-whisper-large-v3
+    revision: 2a6507094dd6020d939d78e3f1834a1d06267fca
+    include:
+    - '*-encoder.int8.onnx'
+    - '*-decoder.int8.onnx'
+    - '*-tokens.txt'
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: whisper-large-v3-turbo
+  aliases:
+  - openai/whisper-large-v3-turbo
+  - whisper-turbo
+  task: stt
+  engine: sherpa-onnx
+  kind: whisper
+  family: Whisper
+  languages: *id001
+  tier: accuracy
+  size_bytes: 1036613791
+  params: 809000000
+  license: MIT
+  features:
+  - punctuation
+  - translate
+  - language-detect
+  description: OpenAI Whisper turbo exported to ONNX (int8) for sherpa-onnx. Multilingual, including Hindi, Bengali,
+    Tamil, Telugu, Marathi, Urdu and other Indian languages; set `language` for best results.
+  source_url: https://github.com/openai/whisper
+  validated: cpu
+  measured:
+    rtf: 0.3
+    wer: 0.031
+    audio_s: 23.3
+    load_s: 2.62
+    memory_mb: 1073
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-whisper-turbo/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-whisper-turbo
+    revision: 2ca6ff69fc878651b770880507669577ac41c2ff
+    include:
+    - '*-encoder.int8.onnx'
+    - '*-decoder.int8.onnx'
+    - '*-tokens.txt'
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: whisper-distil-small.en
+  aliases:
+  - distil-whisper/distil-small.en
+  task: stt
+  engine: sherpa-onnx
+  kind: whisper
+  family: Whisper
+  languages:
+  - en
+  tier: balanced
+  size_bytes: 298876082
+  params: 166000000
+  license: MIT
+  features:
+  - punctuation
+  description: OpenAI Whisper distil-small.en exported to ONNX (int8) for sherpa-onnx. English only.
+  source_url: https://github.com/openai/whisper
+  validated: cpu
+  measured:
+    rtf: 0.1312
+    wer: 0.031
+    audio_s: 23.3
+    load_s: 0.85
+    memory_mb: 197
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-whisper-distil-small.en/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-whisper-distil-small.en
+    revision: 0492324bca9e12a6fca0089bb846f2dd723b50d8
+    include:
+    - '*-encoder.int8.onnx'
+    - '*-decoder.int8.onnx'
+    - '*-tokens.txt'
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    english_only: true
+- id: whisper-distil-medium.en
+  aliases:
+  - distil-whisper/distil-medium.en
+  task: stt
+  engine: sherpa-onnx
+  kind: whisper
+  family: Whisper
+  languages:
+  - en
+  tier: balanced
+  size_bytes: 573494705
+  params: 394000000
+  license: MIT
+  features:
+  - punctuation
+  description: OpenAI Whisper distil-medium.en exported to ONNX (int8) for sherpa-onnx. English only.
+  source_url: https://github.com/openai/whisper
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-whisper-distil-medium.en
+    revision: 7cefcb28aa6bcb1f6946066b5fad5fea7098c99e
+    include:
+    - '*-encoder.int8.onnx'
+    - '*-decoder.int8.onnx'
+    - '*-tokens.txt'
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    english_only: true
+- id: whisper-distil-large-v2
+  aliases:
+  - distil-whisper/distil-large-v2
+  task: stt
+  engine: sherpa-onnx
+  kind: whisper
+  family: Whisper
+  languages:
+  - en
+  tier: accuracy
+  size_bytes: 983085645
+  params: 756000000
+  license: MIT
+  features:
+  - punctuation
+  description: OpenAI Whisper distil-large-v2 exported to ONNX (int8) for sherpa-onnx. English only.
+  source_url: https://github.com/openai/whisper
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-whisper-distil-large-v2
+    revision: bff5cc1de8d34fc5a8b3cbb2e1bfe03c35e3e1ea
+    include:
+    - '*-encoder.int8.onnx'
+    - '*-decoder.int8.onnx'
+    - '*-tokens.txt'
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    english_only: true
+- id: parakeet-tdt-0.6b-v2
+  aliases:
+  - nvidia/parakeet-tdt-0.6b-v2
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_transducer
+  family: Parakeet
+  languages:
+  - en
+  tier: accuracy
+  size_bytes: 661288526
+  params: 600000000
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  - punctuation
+  description: NVIDIA Parakeet TDT 0.6B v2 (English), int8 transducer. Very accurate for its speed; punctuation
+    and capitalisation.
+  source_url: https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2
+  validated: cpu
+  measured:
+    rtf: 0.0805
+    audio_s: 7.4
+    load_s: 2.51
+    memory_mb: 651
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8
+    revision: 84b478d541cdbf0c296a7ab5f1e20a6f8f998114
+    include:
+    - '*.int8.onnx'
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: parakeet-tdt-0.6b-v3
+  aliases:
+  - nvidia/parakeet-tdt-0.6b-v3
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_transducer
+  family: Parakeet
+  languages:
+  - bg
+  - hr
+  - cs
+  - da
+  - nl
+  - en
+  - et
+  - fi
+  - fr
+  - de
+  - el
+  - hu
+  - it
+  - lv
+  - lt
+  - mt
+  - pl
+  - pt
+  - ro
+  - sk
+  - sl
+  - es
+  - sv
+  - ru
+  - uk
+  tier: accuracy
+  size_bytes: 670576784
+  params: 600000000
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  - punctuation
+  - language-detect
+  description: 'NVIDIA Parakeet TDT 0.6B v3: 25 European languages with automatic language detection, int8 transducer.'
+  source_url: https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
+  validated: cpu
+  measured:
+    rtf: 0.0964
+    audio_s: 6.6
+    load_s: 2.28
+    memory_mb: 673
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/test_wavs/de.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8
+    revision: ed5d745623472f97cfc2e6c2916ee248798fc5a8
+    include:
+    - '*.int8.onnx'
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: parakeet-tdt-ctc-110m
+  aliases:
+  - nvidia/parakeet-tdt_ctc-110m
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: Parakeet
+  languages:
+  - en
+  tier: balanced
+  size_bytes: 458170974
+  params: 110000000
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  - punctuation
+  description: NVIDIA Parakeet TDT-CTC 110M (English), CTC head. A small, fast non-streaming model.
+  source_url: https://huggingface.co/nvidia/parakeet-tdt_ctc-110m
+  validated: cpu
+  measured:
+    rtf: 0.0304
+    audio_s: 8.4
+    load_s: 1.38
+    memory_mb: 366
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000
+    revision: 3af92f152d32c836acabf38f4c993bc96b80eb2d
+    include:
+    - model.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: parakeet-tdt-110m
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_transducer
+  family: Parakeet
+  languages:
+  - en
+  tier: balanced
+  size_bytes: 477410591
+  params: 110000000
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  - punctuation
+  description: NVIDIA Parakeet TDT-CTC 110M (English), TDT transducer head.
+  source_url: https://huggingface.co/nvidia/parakeet-tdt_ctc-110m
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-nemo-parakeet_tdt_transducer_110m-en-36000
+    revision: e9bea5a06247dc3f55319ff23d34b0328f2f5ddf
+    include:
+    - '*.onnx'
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: parakeet-unified-en-streaming-240ms
+  task: stt
+  engine: sherpa-onnx
+  kind: online_transducer
+  family: Parakeet
+  languages:
+  - en
+  tier: realtime
+  streaming: true
+  size_bytes: 663048739
+  params: 600000000
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  - punctuation
+  description: NVIDIA Parakeet unified 0.6B (English) exported for streaming with 240ms chunks, int8.
+  source_url: https://huggingface.co/nvidia
+  validated: untested
+  source:
+    repo: csukuangfj2/sherpa-onnx-nemo-parakeet-unified-en-0.6b-int8-streaming-240ms
+    revision: 188005017eb5516adf14e7355fbd919e6a36d704
+    include:
+    - '*.int8.onnx'
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: parakeet-unified-en-streaming-560ms
+  task: stt
+  engine: sherpa-onnx
+  kind: online_transducer
+  family: Parakeet
+  languages:
+  - en
+  tier: realtime
+  streaming: true
+  size_bytes: 663048978
+  params: 600000000
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  - punctuation
+  description: NVIDIA Parakeet unified 0.6B (English) exported for streaming with 560ms chunks, int8.
+  source_url: https://huggingface.co/nvidia
+  validated: cpu
+  measured:
+    rtf: 4.6941
+    audio_s: 7.4
+    load_s: 2.28
+    memory_mb: 271
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj2/sherpa-onnx-nemo-parakeet-unified-en-0.6b-int8-streaming-560ms/test_wavs/0.wav
+  source:
+    repo: csukuangfj2/sherpa-onnx-nemo-parakeet-unified-en-0.6b-int8-streaming-560ms
+    revision: 7551fd26fc810cc1e4e043e608db4d13b59be31e
+    include:
+    - '*.int8.onnx'
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: parakeet-unified-en-streaming-1120ms
+  task: stt
+  engine: sherpa-onnx
+  kind: online_transducer
+  family: Parakeet
+  languages:
+  - en
+  tier: balanced
+  streaming: true
+  size_bytes: 663048980
+  params: 600000000
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  - punctuation
+  description: NVIDIA Parakeet unified 0.6B (English) exported for streaming with 1120ms chunks, int8.
+  source_url: https://huggingface.co/nvidia
+  validated: untested
+  source:
+    repo: csukuangfj2/sherpa-onnx-nemo-parakeet-unified-en-0.6b-int8-streaming-1120ms
+    revision: 615bf8c5ad39692dc96cf1105afde73ec3eb2a59
+    include:
+    - '*.int8.onnx'
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: nemo-fastconformer-ctc-en-streaming-80ms
+  task: stt
+  engine: sherpa-onnx
+  kind: online_nemo_ctc
+  family: NeMo FastConformer
+  languages:
+  - en
+  tier: realtime
+  streaming: true
+  size_bytes: 132060302
+  params: 114000000
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  description: NVIDIA streaming FastConformer hybrid large (English), CTC head, 80ms look-ahead, int8.
+  source_url: https://huggingface.co/nvidia/stt_en_fastconformer_hybrid_large_streaming_multi
+  validated: cpu
+  measured:
+    rtf: 0.7565
+    wer: 0.0
+    audio_s: 23.3
+    load_s: 1.18
+    memory_mb: 145
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-nemo-streaming-fast-conformer-ctc-en-80ms-int8/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-nemo-streaming-fast-conformer-ctc-en-80ms-int8
+    revision: 2253b9ace8a22074f5e5f0fe9102c248185c34dd
+    include:
+    - '*.int8.onnx'
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: nemo-fastconformer-ctc-en-streaming-480ms
+  task: stt
+  engine: sherpa-onnx
+  kind: online_nemo_ctc
+  family: NeMo FastConformer
+  languages:
+  - en
+  tier: realtime
+  streaming: true
+  size_bytes: 132060326
+  params: 114000000
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  description: NVIDIA streaming FastConformer hybrid large (English), CTC head, 480ms look-ahead, int8.
+  source_url: https://huggingface.co/nvidia/stt_en_fastconformer_hybrid_large_streaming_multi
+  validated: cpu
+  measured:
+    rtf: 0.3341
+    wer: 0.038
+    audio_s: 23.3
+    load_s: 1.48
+    memory_mb: 66
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-nemo-streaming-fast-conformer-ctc-en-480ms-int8/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-nemo-streaming-fast-conformer-ctc-en-480ms-int8
+    revision: 66e9b61a9fe334eba579700599e391c6ee093633
+    include:
+    - '*.int8.onnx'
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: nemo-fastconformer-ctc-en-streaming-1040ms
+  task: stt
+  engine: sherpa-onnx
+  kind: online_nemo_ctc
+  family: NeMo FastConformer
+  languages:
+  - en
+  tier: realtime
+  streaming: true
+  size_bytes: 132060339
+  params: 114000000
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  description: NVIDIA streaming FastConformer hybrid large (English), CTC head, 1040ms look-ahead, int8.
+  source_url: https://huggingface.co/nvidia/stt_en_fastconformer_hybrid_large_streaming_multi
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-nemo-streaming-fast-conformer-ctc-en-1040ms-int8
+    revision: bc96dd3eda9e1001f5034f0f74f2b1d3200f4424
+    include:
+    - '*.int8.onnx'
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: nemo-fastconformer-transducer-en-streaming-80ms
+  task: stt
+  engine: sherpa-onnx
+  kind: online_transducer
+  family: NeMo FastConformer
+  languages:
+  - en
+  tier: realtime
+  streaming: true
+  size_bytes: 136883520
+  params: 114000000
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  description: NVIDIA streaming FastConformer hybrid large (English), transducer head, 80ms look-ahead, int8.
+  source_url: https://huggingface.co/nvidia/stt_en_fastconformer_hybrid_large_streaming_multi
+  validated: cpu
+  measured:
+    rtf: 0.6398
+    wer: 0.01
+    audio_s: 23.3
+    load_s: 1.46
+    memory_mb: 59
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-nemo-streaming-fast-conformer-transducer-en-80ms-int8/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-nemo-streaming-fast-conformer-transducer-en-80ms-int8
+    revision: 3fafd319033af1c552e7bc8394f7258afdce91b0
+    include:
+    - '*.int8.onnx'
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: nemo-fastconformer-transducer-en-streaming-480ms
+  task: stt
+  engine: sherpa-onnx
+  kind: online_transducer
+  family: NeMo FastConformer
+  languages:
+  - en
+  tier: realtime
+  streaming: true
+  size_bytes: 136883545
+  params: 114000000
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  description: NVIDIA streaming FastConformer hybrid large (English), transducer head, 480ms look-ahead, int8.
+  source_url: https://huggingface.co/nvidia/stt_en_fastconformer_hybrid_large_streaming_multi
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-nemo-streaming-fast-conformer-transducer-en-480ms-int8
+    revision: df8ed95e44a70924450381e610770f9d656d1e15
+    include:
+    - '*.int8.onnx'
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: nemo-fastconformer-ctc-en
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: NeMo FastConformer
+  languages:
+  - en
+  tier: balanced
+  size_bytes: 458172755
+  params: 115000000
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  - punctuation
+  description: NVIDIA FastConformer hybrid large, CTC head, English.
+  source_url: https://huggingface.co/nvidia
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-nemo-fast-conformer-ctc-en-24500
+    revision: 0c9921d70fbaab6b508023c624197f3924e2b49a
+    include:
+    - model.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: nemo-fastconformer-ctc-en-de-es-fr
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: NeMo FastConformer
+  languages:
+  - en
+  - de
+  - es
+  - fr
+  tier: balanced
+  size_bytes: 461337434
+  params: 115000000
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  - punctuation
+  description: NVIDIA FastConformer hybrid large, CTC head, English, German, Spanish and French.
+  source_url: https://huggingface.co/nvidia
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-nemo-fast-conformer-ctc-en-de-es-fr-14288
+    revision: a472770bdbc5861d7e671dcdc349edaedf144cd0
+    include:
+    - model.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: nemo-fastconformer-ctc-multi10
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: NeMo FastConformer
+  languages:
+  - be
+  - de
+  - en
+  - es
+  - fr
+  - hr
+  - it
+  - pl
+  - ru
+  - uk
+  tier: balanced
+  size_bytes: 461337333
+  params: 115000000
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  - punctuation
+  description: NVIDIA FastConformer hybrid large, CTC head, ten European languages.
+  source_url: https://huggingface.co/nvidia
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-nemo-fast-conformer-ctc-be-de-en-es-fr-hr-it-pl-ru-uk-20k
+    revision: 0ef311bd5a950818b5332b294aadb680f90a447f
+    include:
+    - model.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: canary-180m-flash
+  task: stt
+  engine: sherpa-onnx
+  kind: canary
+  family: Canary
+  languages:
+  - en
+  - es
+  - de
+  - fr
+  tier: balanced
+  size_bytes: 207170046
+  params: 182000000
+  license: CC-BY-4.0
+  features:
+  - punctuation
+  description: NVIDIA Canary 180M Flash (English, Spanish, German, French), int8 encoder-decoder.
+  source_url: https://huggingface.co/nvidia/canary-180m-flash
+  validated: cpu
+  measured:
+    rtf: 0.3585
+    audio_s: 6.6
+    load_s: 1.26
+    memory_mb: 156
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/test_wavs/de.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8
+    revision: 9077164e0d3dd1d5353743e89ceaa1d3a770838c
+    include:
+    - '*.int8.onnx'
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: zipformer-en-20m-streaming
+  aliases:
+  - zipformer-en-20m
+  task: stt
+  engine: sherpa-onnx
+  kind: online_transducer
+  family: Zipformer
+  languages:
+  - en
+  tier: realtime
+  streaming: true
+  size_bytes: 45202074
+  params: 20000000
+  license: Apache-2.0
+  features:
+  - timestamps
+  - telephony
+  description: 'Streaming Zipformer transducer, 20M parameters, English (LibriSpeech), int8. The smallest true-streaming
+    model here: ideal for many concurrent realtime streams on CPU. Output is lower-cased without punctuation.'
+  source_url: https://github.com/k2-fsa/icefall
+  validated: cpu
+  measured:
+    rtf: 0.1365
+    wer: 0.215
+    audio_s: 23.3
+    load_s: 0.58
+    memory_mb: 0
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17
+    revision: d42f2d9f7ca24806fb667456a18a9f1b60f70d16
+    include:
+    - encoder*.int8.onnx
+    - decoder*.onnx
+    - joiner*.int8.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - decoder*.int8.onnx
+- id: zipformer-en-streaming
+  task: stt
+  engine: sherpa-onnx
+  kind: online_transducer
+  family: Zipformer
+  languages:
+  - en
+  tier: realtime
+  streaming: true
+  size_bytes: 146874760
+  params: 66000000
+  license: Apache-2.0
+  features:
+  - timestamps
+  description: Streaming Zipformer transducer, English (LibriSpeech + GigaSpeech + Common Voice), int8.
+  source_url: https://github.com/k2-fsa/icefall
+  validated: cpu
+  measured:
+    rtf: 0.1859
+    wer: 0.0
+    audio_s: 23.3
+    load_s: 2.38
+    memory_mb: 0
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-streaming-zipformer-en-2023-06-26/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-streaming-zipformer-en-2023-06-26
+    revision: 672fbf1b30579d6585301139bb363f42a0ad4a24
+    include:
+    - encoder*.int8.onnx
+    - decoder*.onnx
+    - joiner*.int8.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - decoder*.int8.onnx
+- id: zipformer-zh-en-streaming
+  task: stt
+  engine: sherpa-onnx
+  kind: online_transducer
+  family: Zipformer
+  languages:
+  - zh
+  - en
+  tier: realtime
+  streaming: true
+  size_bytes: 199056205
+  params: 70000000
+  license: Apache-2.0
+  features:
+  - timestamps
+  description: Streaming Zipformer transducer for Mandarin and English code-switching, int8.
+  source_url: https://github.com/k2-fsa/icefall
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20
+    revision: 98590b7ed6443e77b714204da2757d75e1a642f4
+    include:
+    - encoder*.int8.onnx
+    - decoder*.onnx
+    - joiner*.int8.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - decoder*.int8.onnx
+- id: zipformer-ko-streaming
+  task: stt
+  engine: sherpa-onnx
+  kind: online_transducer
+  family: Zipformer
+  languages:
+  - ko
+  tier: realtime
+  streaming: true
+  size_bytes: 140919603
+  license: Apache-2.0
+  features:
+  - timestamps
+  description: Streaming Zipformer transducer, Korean (KsponSpeech), int8.
+  source_url: https://github.com/k2-fsa/icefall
+  validated: untested
+  source:
+    repo: k2-fsa/sherpa-onnx-streaming-zipformer-korean-2024-06-16
+    revision: ba6078bca4daf3f0dd37f79d0ab505af71df14a6
+    include:
+    - encoder*.int8.onnx
+    - decoder*.onnx
+    - joiner*.int8.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - decoder*.int8.onnx
+- id: zipformer-multi-zh-hans-streaming
+  task: stt
+  engine: sherpa-onnx
+  kind: online_transducer
+  family: Zipformer
+  languages:
+  - zh
+  tier: realtime
+  streaming: true
+  size_bytes: 76321340
+  license: Apache-2.0
+  features:
+  - timestamps
+  description: Streaming Zipformer transducer, Mandarin (multi-dataset), int8.
+  source_url: https://github.com/k2-fsa/icefall
+  validated: cpu
+  measured:
+    rtf: 0.2177
+    audio_s: 10.8
+    load_s: 3.25
+    memory_mb: 0
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-streaming-zipformer-multi-zh-hans-int8-2023-12-13/test_wavs/DEV_T0000000000.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-streaming-zipformer-multi-zh-hans-int8-2023-12-13
+    revision: 115a233a980d0a38536c8320e5c54f2fd2aa5416
+    include:
+    - encoder*.int8.onnx
+    - decoder*.onnx
+    - joiner*.int8.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - decoder*.int8.onnx
+- id: zipformer-ru-vosk-streaming
+  task: stt
+  engine: sherpa-onnx
+  kind: online_transducer
+  family: Zipformer
+  languages:
+  - ru
+  tier: realtime
+  streaming: true
+  size_bytes: 28572945
+  license: Apache-2.0
+  features:
+  - timestamps
+  description: Small streaming Zipformer transducer, Russian (Vosk), int8.
+  source_url: https://github.com/k2-fsa/icefall
+  validated: cpu
+  measured:
+    rtf: 0.0889
+    audio_s: 16.3
+    load_s: 1.92
+    memory_mb: 0
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-streaming-zipformer-small-ru-vosk-int8-2025-08-16/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-streaming-zipformer-small-ru-vosk-int8-2025-08-16
+    revision: 31fa603e4f31279c6e1f7600fed13dc4312663ab
+    include:
+    - encoder*.int8.onnx
+    - decoder*.onnx
+    - joiner*.int8.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - decoder*.int8.onnx
+- id: zipformer-bn-vosk-streaming
+  task: stt
+  engine: sherpa-onnx
+  kind: online_transducer
+  family: Zipformer
+  languages:
+  - bn
+  tier: realtime
+  streaming: true
+  size_bytes: 94119939
+  license: Apache-2.0
+  features:
+  - timestamps
+  description: Streaming Zipformer transducer, Bengali (Vosk).
+  source_url: https://github.com/k2-fsa/icefall
+  validated: cpu
+  measured:
+    rtf: 0.102
+    audio_s: 14.0
+    load_s: 1.68
+    memory_mb: 0
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj2/sherpa-onnx-streaming-zipformer-bn-vosk-2026-02-09/test_wavs/0.wav
+  source:
+    repo: csukuangfj2/sherpa-onnx-streaming-zipformer-bn-vosk-2026-02-09
+    revision: a7c3c1547450a7c546c876be9ca8a6ab54464423
+    include:
+    - encoder.onnx
+    - decoder.onnx
+    - joiner.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - decoder*.int8.onnx
+- id: zipformer-8lang-streaming
+  task: stt
+  engine: sherpa-onnx
+  kind: online_transducer
+  family: Zipformer
+  languages:
+  - ar
+  - en
+  - id
+  - ja
+  - ru
+  - th
+  - vi
+  - zh
+  tier: realtime
+  streaming: true
+  size_bytes: 338873347
+  license: Apache-2.0
+  features:
+  - timestamps
+  description: Streaming Zipformer transducer covering Arabic, English, Indonesian, Japanese, Russian, Thai, Vietnamese
+    and Mandarin.
+  source_url: https://github.com/k2-fsa/icefall
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-streaming-zipformer-ar_en_id_ja_ru_th_vi_zh-2025-02-10
+    revision: c6726c1147387ad2a11148b33973135d92a55e6c
+    include:
+    - encoder*.int8.onnx
+    - decoder*.onnx
+    - joiner*.int8.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - decoder*.int8.onnx
+- id: kroko-en-streaming
+  task: stt
+  engine: sherpa-onnx
+  kind: online_transducer
+  family: Zipformer
+  languages:
+  - en
+  tier: realtime
+  streaming: true
+  size_bytes: 71053214
+  license: CC-BY-SA-4.0
+  features:
+  - timestamps
+  - punctuation
+  description: Kroko community streaming Zipformer for 'en' (Banafo). Share-alike licence.
+  source_url: https://huggingface.co/Banafo/Kroko-ASR
+  validated: cpu
+  measured:
+    rtf: 0.0851
+    audio_s: 3.8
+    load_s: 3.01
+    memory_mb: 19
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06
+    revision: 572aaf4e2e0c603c3fc2a574d096e755a178faa1
+    include:
+    - '*.onnx'
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: kroko-es-streaming
+  task: stt
+  engine: sherpa-onnx
+  kind: online_transducer
+  family: Zipformer
+  languages:
+  - es
+  tier: realtime
+  streaming: true
+  size_bytes: 155838792
+  license: CC-BY-SA-4.0
+  features:
+  - timestamps
+  - punctuation
+  description: Kroko community streaming Zipformer for 'es' (Banafo). Share-alike licence.
+  source_url: https://huggingface.co/Banafo/Kroko-ASR
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-streaming-zipformer-es-kroko-2025-08-06
+    revision: 20cf7a4921613397841d31168796cade5b866585
+    include:
+    - '*.onnx'
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: kroko-fr-streaming
+  task: stt
+  engine: sherpa-onnx
+  kind: online_transducer
+  family: Zipformer
+  languages:
+  - fr
+  tier: realtime
+  streaming: true
+  size_bytes: 71052319
+  license: CC-BY-SA-4.0
+  features:
+  - timestamps
+  - punctuation
+  description: Kroko community streaming Zipformer for 'fr' (Banafo). Share-alike licence.
+  source_url: https://huggingface.co/Banafo/Kroko-ASR
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-streaming-zipformer-fr-kroko-2025-08-06
+    revision: 08b84b7b7cf519be9817e9c16919d96a7a8bad91
+    include:
+    - '*.onnx'
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: kroko-de-streaming
+  task: stt
+  engine: sherpa-onnx
+  kind: online_transducer
+  family: Zipformer
+  languages:
+  - de
+  tier: realtime
+  streaming: true
+  size_bytes: 71051469
+  license: CC-BY-SA-4.0
+  features:
+  - timestamps
+  - punctuation
+  description: Kroko community streaming Zipformer for 'de' (Banafo). Share-alike licence.
+  source_url: https://huggingface.co/Banafo/Kroko-ASR
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-streaming-zipformer-de-kroko-2025-08-06
+    revision: 887db3d083240198c2d2b99fb66cfcfe6948ced8
+    include:
+    - '*.onnx'
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: zipformer-en-gigaspeech
+  task: stt
+  engine: sherpa-onnx
+  kind: transducer
+  family: Zipformer
+  languages:
+  - en
+  tier: balanced
+  size_bytes: 75208255
+  license: Apache-2.0
+  features:
+  - timestamps
+  description: Zipformer transducer, English (GigaSpeech), int8.
+  source_url: https://github.com/k2-fsa/icefall
+  validated: cpu
+  measured:
+    rtf: 0.028
+    audio_s: 23.3
+    load_s: 1.26
+    memory_mb: 105
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: k2-fsa/sherpa-onnx-zipformer-gigaspeech-2023-12-12/test_wavs/1089-134686-0001.wav
+  source:
+    repo: k2-fsa/sherpa-onnx-zipformer-gigaspeech-2023-12-12
+    revision: 71b358123f9cbd7ccaf179b538d71a1a17354851
+    include:
+    - encoder*.int8.onnx
+    - decoder*.onnx
+    - joiner*.int8.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - decoder*.int8.onnx
+- id: zipformer-ru
+  task: stt
+  engine: sherpa-onnx
+  kind: transducer
+  family: Zipformer
+  languages:
+  - ru
+  tier: balanced
+  size_bytes: 73235523
+  license: Apache-2.0
+  features:
+  - timestamps
+  description: Zipformer transducer, Russian, int8.
+  source_url: https://github.com/k2-fsa/icefall
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-zipformer-ru-int8-2025-04-20
+    revision: 641de8d322c05b9087ad2927ccda4bda3cccc159
+    include:
+    - encoder*.int8.onnx
+    - decoder*.onnx
+    - joiner*.int8.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - decoder*.int8.onnx
+- id: zipformer-vi
+  task: stt
+  engine: sherpa-onnx
+  kind: transducer
+  family: Zipformer
+  languages:
+  - vi
+  tier: balanced
+  size_bytes: 77100477
+  license: Apache-2.0
+  features:
+  - timestamps
+  description: Zipformer transducer, Vietnamese, int8.
+  source_url: https://github.com/k2-fsa/icefall
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-zipformer-vi-int8-2025-04-20
+    revision: b2745a435379992ad3f299635468db0c34918e1e
+    include:
+    - encoder*.int8.onnx
+    - decoder*.onnx
+    - joiner*.int8.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - decoder*.int8.onnx
+- id: zipformer-ko
+  task: stt
+  engine: sherpa-onnx
+  kind: transducer
+  family: Zipformer
+  languages:
+  - ko
+  tier: balanced
+  size_bytes: 84735479
+  license: Apache-2.0
+  features:
+  - timestamps
+  description: Zipformer transducer, Korean, int8.
+  source_url: https://github.com/k2-fsa/icefall
+  validated: untested
+  source:
+    repo: k2-fsa/sherpa-onnx-zipformer-korean-2024-06-24
+    revision: 0fb4b2b5c8d3e5766121481ba911961e3649c664
+    include:
+    - encoder*.int8.onnx
+    - decoder*.onnx
+    - joiner*.int8.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+    - decoder*.int8.onnx
+- id: sense-voice-small
+  aliases:
+  - FunAudioLLM/SenseVoiceSmall
+  task: stt
+  engine: sherpa-onnx
+  kind: sense_voice
+  family: SenseVoice
+  languages:
+  - zh
+  - en
+  - ja
+  - ko
+  - yue
+  tier: balanced
+  size_bytes: 239549735
+  params: 234000000
+  license: FunASR Model License 1.1 (custom)
+  license_url: https://github.com/modelscope/FunASR/blob/main/MODEL_LICENSE
+  features:
+  - timestamps
+  - punctuation
+  - language-detect
+  description: 'SenseVoice Small (Alibaba FunAudioLLM): fast non-autoregressive recognition for Mandarin, Cantonese,
+    English, Japanese and Korean, int8. Read the model licence before commercial use.'
+  source_url: https://huggingface.co/FunAudioLLM/SenseVoiceSmall
+  validated: cpu
+  measured:
+    rtf: 0.0386
+    audio_s: 14.4
+    load_s: 1.26
+    memory_mb: 264
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/test_wavs/en.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17
+    revision: 2365baeacb507f821a0c8120fcee3d484dba7a07
+    include:
+    - model.int8.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: paraformer-zh
+  task: stt
+  engine: sherpa-onnx
+  kind: paraformer
+  family: Paraformer
+  languages:
+  - zh
+  - en
+  tier: balanced
+  size_bytes: 227405559
+  params: 220000000
+  license: FunASR Model License 1.1 (custom)
+  license_url: https://github.com/modelscope/FunASR/blob/main/MODEL_LICENSE
+  description: Paraformer large (Alibaba FunASR), Mandarin with some English, int8.
+  source_url: https://github.com/modelscope/FunASR
+  validated: cpu
+  measured:
+    rtf: 0.0914
+    audio_s: 10.8
+    load_s: 2.15
+    memory_mb: 163
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-paraformer-zh-2024-03-09/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-paraformer-zh-2024-03-09
+    revision: 906992d326ebf0c5171cde675aa0902be9e5bc6c
+    include:
+    - model.int8.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: paraformer-zh-en-streaming
+  task: stt
+  engine: sherpa-onnx
+  kind: online_paraformer
+  family: Paraformer
+  languages:
+  - zh
+  - en
+  tier: realtime
+  streaming: true
+  size_bytes: 237202501
+  license: FunASR Model License 1.1 (custom)
+  license_url: https://github.com/modelscope/FunASR/blob/main/MODEL_LICENSE
+  description: Streaming Paraformer (Alibaba FunASR), Mandarin and English, int8.
+  source_url: https://github.com/modelscope/FunASR
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-streaming-paraformer-bilingual-zh-en
+    revision: 8e40c43232a1c5c66c82111efc5820d3accca11b
+    include:
+    - encoder.int8.onnx
+    - decoder.int8.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: dolphin-base
+  task: stt
+  engine: sherpa-onnx
+  kind: dolphin_ctc
+  family: Dolphin
+  languages: &id002
+  - zh
+  - ja
+  - th
+  - ru
+  - ko
+  - id
+  - vi
+  - yue
+  - hi
+  - ur
+  - ms
+  - uz
+  - ar
+  - fa
+  - bn
+  - ta
+  - te
+  - ug
+  - gu
+  - my
+  - tl
+  - kk
+  - or
+  - ne
+  - mn
+  - km
+  - jv
+  - lo
+  - si
+  - ps
+  - pa
+  - ml
+  - kn
+  - mr
+  tier: balanced
+  size_bytes: 104234464
+  license: Apache-2.0
+  features:
+  - timestamps
+  - language-detect
+  description: 'Dolphin base (DataoceanAI), CTC, int8: 40 Eastern languages including Hindi, Urdu, Bengali, Tamil,
+    Telugu, Gujarati, Marathi, Kannada, Malayalam, Punjabi and Odia (see the model card for the full list).'
+  source_url: https://huggingface.co/DataoceanAI/dolphin-base
+  validated: cpu
+  measured:
+    rtf: 0.0214
+    audio_s: 5.6
+    load_s: 0.39
+    memory_mb: 66
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-dolphin-base-ctc-multi-lang-int8-2025-04-02/test_wavs/0.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-dolphin-base-ctc-multi-lang-int8-2025-04-02
+    revision: 1f3a53d0ecf658f8b0974e2cfde368eee40732fa
+    include:
+    - model.int8.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: dolphin-small
+  task: stt
+  engine: sherpa-onnx
+  kind: dolphin_ctc
+  family: Dolphin
+  languages: *id002
+  tier: balanced
+  size_bytes: 250163616
+  license: Apache-2.0
+  features:
+  - timestamps
+  - language-detect
+  description: 'Dolphin small (DataoceanAI), CTC, int8: 40 Eastern languages including Hindi, Urdu, Bengali, Tamil,
+    Telugu, Gujarati, Marathi, Kannada, Malayalam, Punjabi and Odia (see the model card for the full list).'
+  source_url: https://huggingface.co/DataoceanAI/dolphin-small
+  validated: untested
+  source:
+    repo: csukuangfj/sherpa-onnx-dolphin-small-ctc-multi-lang-int8-2025-04-02
+    revision: c8b6689509acfcd744c04e5e169164f9ac4cae32
+    include:
+    - model.int8.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: omnilingual-ctc-300m
+  aliases:
+  - facebook/omniASR-CTC-300M
+  task: stt
+  engine: sherpa-onnx
+  kind: omnilingual_ctc
+  family: Omnilingual ASR
+  languages:
+  - en
+  - hi
+  - bn
+  - ta
+  - te
+  - mr
+  - gu
+  - kn
+  - ml
+  - pa
+  - or
+  - as
+  - ur
+  - ne
+  - sa
+  - sd
+  - es
+  - fr
+  - de
+  - it
+  - pt
+  - ru
+  - ar
+  - zh
+  - ja
+  - ko
+  - id
+  - vi
+  - th
+  - tr
+  - sw
+  tier: balanced
+  size_bytes: 365438543
+  params: 300000000
+  license: Apache-2.0
+  features:
+  - 1600-languages
+  description: 'Meta Omnilingual ASR CTC 300M, int8: one model for 1,600+ languages, including the major Indian
+    languages (only a subset is listed here). Character-level output without punctuation.'
+  source_url: https://huggingface.co/facebook/omniASR-CTC-300M
+  validated: cpu
+  measured:
+    rtf: 0.1117
+    audio_s: 6.6
+    load_s: 0.83
+    memory_mb: 271
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: csukuangfj/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12/test_wavs/de.wav
+  source:
+    repo: csukuangfj/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12
+    revision: 6abf1ece20cd2308bdb7d13cd78ec1c44fa4c094
+    include:
+    - model.int8.onnx
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: indicconformer-multi-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - hi
+  - as
+  - bn
+  - brx
+  - gu
+  - kn
+  - ks
+  - mr
+  tier: balanced
+  size_bytes: 197053098
+  license: MIT
+  description: Community ONNX export (not by AI4Bharat) of an AI4Bharat IndicConformer large CTC model, int8. The
+    official AI4Bharat repositories are gated on Hugging Face; this ungated export is offered as is.
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_hi_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.1311
+    wer: 0.0
+    audio_s: 3.4
+    load_s: 1.09
+    memory_mb: 130
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: synthesised by piper-hi-in-rohan-medium
+  source:
+    repo: meetsync/indic-conformer-onnx-sherpa
+    revision: e19ba0d2f49c243fe4ce79ae3334526a03e753ae
+    include:
+    - model.int8.onnx
+    - tokens.txt
+    - LICENSE
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'

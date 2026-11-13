@@ -1,0 +1,310 @@
+"""A deterministic engine with programmable delays.
+
+It exists for two reasons: the test-suite uses it to check the scheduler,
+the lifecycle manager and (above all) the latency accounting against known
+timings; and ``bolo serve --fake-engine`` gives front-end developers a
+complete API to build against without downloading a model.
+
+Recognition is "decoded" from the audio length: a fixed vocabulary is
+emitted at ``words_per_second``. Synthesis produces a tone whose length is
+proportional to the text. Neither is meant to resemble speech.
+"""
+
+from __future__ import annotations
+
+import threading
+import time
+from collections.abc import Callable, Iterator
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+from bolo import __version__
+from bolo.engines.base import (
+    DiarizationModel,
+    Engine,
+    EngineStatus,
+    FloatArray,
+    LoadOptions,
+    Model,
+    Segment,
+    SpeakerTurn,
+    StreamResult,
+    STTModel,
+    STTRequest,
+    STTResult,
+    STTStream,
+    TTSModel,
+    VadDetector,
+    VADModel,
+    VadParams,
+    Voice,
+    Word,
+)
+
+VOCAB = [
+    "the",
+    "quick",
+    "brown",
+    "fox",
+    "jumps",
+    "over",
+    "the",
+    "lazy",
+    "dog",
+    "while",
+    "seven",
+    "bright",
+    "stars",
+    "drift",
+    "across",
+    "a",
+    "quiet",
+    "northern",
+    "sky",
+    "and",
+    "distant",
+    "bells",
+    "keep",
+    "time",
+    "for",
+    "travellers",
+    "on",
+    "the",
+    "old",
+    "road",
+]
+
+
+def fake_words(seconds: float, words_per_second: float = 2.5) -> list[Word]:
+    n = int(seconds * words_per_second + 1e-6)
+    step = 1.0 / words_per_second
+    return [Word(VOCAB[i % len(VOCAB)], i * step, (i + 1) * step) for i in range(n)]
+
+
+class FakeSTT(STTModel):
+    """Batch model. Decode time = ``base_delay_s`` + ``delay_per_audio_s`` x longest item."""
+
+    def __init__(self, opts: dict[str, Any]) -> None:
+        self.base_delay_s = float(opts.get("base_delay_s", 0.02))
+        self.delay_per_audio_s = float(opts.get("delay_per_audio_s", 0.01))
+        self.load_delay_s = float(opts.get("load_delay_s", 0.0))
+        self.max_batch = int(opts.get("max_batch", 8))
+        self.max_chunk_s = float(opts.get("max_chunk_s", 30.0))
+        self.words_per_second = float(opts.get("words_per_second", 2.5))
+        self.fail_on = opts.get("fail_on")
+        self.languages = ("en", "hi")
+        self.supports_word_timestamps = True
+        self.supports_translate = True
+        self.calls: list[int] = []  # batch size of every transcribe() call
+        self.concurrent = 0
+        self.max_concurrent = 0
+        self._lock = threading.Lock()
+        if self.load_delay_s:
+            time.sleep(self.load_delay_s)
+
+    def transcribe(self, requests: list[STTRequest]) -> list[STTResult]:
+        with self._lock:
+            self.calls.append(len(requests))
+            self.concurrent += 1
+            self.max_concurrent = max(self.max_concurrent, self.concurrent)
+        try:
+            longest = max((len(r.samples) for r in requests), default=0) / self.sample_rate
+            time.sleep(self.base_delay_s + self.delay_per_audio_s * longest)
+            out: list[STTResult] = []
+            for r in requests:
+                if self.fail_on is not None and r.prompt == self.fail_on:
+                    raise RuntimeError("fake engine failure requested")
+                seconds = len(r.samples) / self.sample_rate
+                words = fake_words(seconds, self.words_per_second)
+                text = " ".join(w.w for w in words)
+                seg = Segment(0.0, seconds, text, words if r.word_timestamps else [])
+                out.append(
+                    STTResult(text, r.language or "en", [seg] if text else [], words if r.word_timestamps else [])
+                )
+            return out
+        finally:
+            with self._lock:
+                self.concurrent -= 1
+
+
+class _FakeStream(STTStream):
+    """Counts voiced samples; "decodes" words in proportion to them."""
+
+    def __init__(self, model: FakeStreamingSTT) -> None:
+        self.model = model
+        self.voiced_received = 0
+        self.voiced_decoded = 0
+        self.base = 0
+        self.trailing_silence = 0
+        self.finished = False
+
+    def accept(self, samples: FloatArray) -> None:
+        quiet = np.abs(samples) < 1e-3
+        self.voiced_received += int((~quiet).sum())
+        if quiet.all():
+            self.trailing_silence += len(samples)
+        else:
+            self.trailing_silence = int(np.argmax(~quiet[::-1]))
+
+    def finish(self) -> None:
+        self.finished = True
+
+    def result(self) -> StreamResult:
+        seconds = (self.voiced_decoded - self.base) / self.model.sample_rate
+        words = fake_words(seconds, self.model.words_per_second)
+        return StreamResult(" ".join(w.w for w in words), words)
+
+    def is_endpoint(self) -> bool:
+        spoke = self.voiced_decoded > self.base
+        return spoke and self.trailing_silence >= self.model.endpoint_silence_s * self.model.sample_rate
+
+    def reset(self) -> None:
+        self.base = self.voiced_decoded
+        self.trailing_silence = 0
+
+
+class FakeStreamingSTT(FakeSTT):
+    """Streaming model: each ``decode_streams`` call costs ``step_delay_s`` regardless of batch size."""
+
+    streaming = True
+
+    def __init__(self, opts: dict[str, Any]) -> None:
+        super().__init__(opts)
+        self.step_delay_s = float(opts.get("step_delay_s", 0.01))
+        self.endpoint_silence_s = float(opts.get("endpoint_silence_s", 0.5))
+        self.stream_calls: list[int] = []
+
+    def create_stream(self, language: str | None = None) -> STTStream:
+        return _FakeStream(self)
+
+    def decode_streams(self, streams: list[STTStream]) -> None:
+        with self._lock:
+            self.stream_calls.append(len(streams))
+        time.sleep(self.step_delay_s)
+        for s in streams:
+            assert isinstance(s, _FakeStream)
+            s.voiced_decoded = s.voiced_received
+
+
+class FakeTTS(TTSModel):
+    """Synthesis time = ``first_delay_s`` + ``delay_per_char_s`` x characters, per chunk."""
+
+    sample_rate = 24000
+    voices = (
+        Voice("alpha", "Alpha", "en-US", "f", 0),
+        Voice("beta", "Beta", "en-GB", "m", 1),
+        Voice("gamma", "Gamma", "hi-IN", "f", 2),
+    )
+
+    def __init__(self, opts: dict[str, Any]) -> None:
+        self.first_delay_s = float(opts.get("first_delay_s", 0.02))
+        self.delay_per_char_s = float(opts.get("delay_per_char_s", 0.0005))
+        self.seconds_per_char = float(opts.get("seconds_per_char", 0.06))
+        self.pieces = int(opts.get("pieces", 2))
+        self.calls: list[str] = []
+
+    def synthesize(
+        self,
+        text: str,
+        voice: str | None = None,
+        speed: float = 1.0,
+        cancelled: Callable[[], bool] | None = None,
+    ) -> Iterator[FloatArray]:
+        self.calls.append(text)
+        v = self.find_voice(voice)
+        freq = 220.0 * (1 + (v.sid if v else 0) * 0.25)
+        total = max(1, int(len(text) * self.seconds_per_char / max(speed, 0.1) * self.sample_rate))
+        delay = self.first_delay_s + self.delay_per_char_s * len(text)
+        per_piece = total // self.pieces
+        for i in range(self.pieces):
+            if cancelled and cancelled():
+                return
+            time.sleep(delay / self.pieces)
+            n = per_piece if i < self.pieces - 1 else total - per_piece * (self.pieces - 1)
+            t = (np.arange(n) + i * per_piece) / self.sample_rate
+            yield (0.2 * np.sin(2 * np.pi * freq * t)).astype(np.float32)
+
+
+class FakeVAD(VADModel):
+    def __init__(self, opts: dict[str, Any]) -> None:
+        self.opts = opts
+
+    def create_detector(self, params: VadParams | None = None) -> VadDetector:
+        from bolo.streaming.vad import EnergyVad
+
+        return EnergyVad(params or VadParams())
+
+
+class FakeDiarization(DiarizationModel):
+    """Tells "speakers" apart by the dominant frequency of each burst of sound (tests only)."""
+
+    def __init__(self, opts: dict[str, Any]) -> None:
+        self.delay_s = float(opts.get("delay_s", 0.02))
+        self.calls: list[tuple[int | None, float | None]] = []
+
+    @staticmethod
+    def _pitch(samples: FloatArray) -> float:
+        if len(samples) < 256:
+            return 0.0
+        spectrum = np.abs(np.fft.rfft(samples * np.hanning(len(samples))))
+        return float(np.argmax(spectrum) * 16000 / len(samples))
+
+    def embed(self, samples: FloatArray) -> FloatArray:
+        pitch = self._pitch(samples)
+        angle = (np.pi / 2) * round(min(max((pitch - 100.0) / 400.0, 0.0), 1.0) * 4) / 4  # five well separated "voices"
+        return np.array([np.cos(angle), np.sin(angle)], dtype=np.float32)
+
+    def diarize(
+        self, samples: FloatArray, num_speakers: int | None = None, threshold: float | None = None
+    ) -> list[SpeakerTurn]:
+        from bolo.streaming.vad import EnergyVad, detect_segments
+
+        self.calls.append((num_speakers, threshold))
+        time.sleep(self.delay_s)
+        segments = detect_segments(EnergyVad(VadParams(min_silence_s=0.3, speech_pad_s=0.0)), samples)
+        pitches: list[float] = []
+        turns: list[SpeakerTurn] = []
+        for a, b in segments:
+            pitch = self._pitch(samples[a:b])
+            speaker = next((i for i, known in enumerate(pitches) if abs(known - pitch) < 40), -1)
+            if speaker < 0:
+                if num_speakers and len(pitches) >= num_speakers:
+                    speaker = min(range(len(pitches)), key=lambda i: abs(pitches[i] - pitch))
+                else:
+                    pitches.append(pitch)
+                    speaker = len(pitches) - 1
+            turns.append(SpeakerTurn(a / 16000, b / 16000, speaker))
+        return turns
+
+
+class FakeEngine(Engine):
+    id = "fake"
+    name = "Fake engine (testing)"
+    license = "Apache-2.0"
+    kinds = ("fake-stt", "fake-stt-streaming", "fake-tts", "fake-vad", "fake-diarization")
+
+    def __init__(self) -> None:
+        self.loaded: list[Model] = []
+
+    def status(self) -> EngineStatus:
+        return EngineStatus(self.id, True, __version__, None)
+
+    def load(self, kind: str, task: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Model:
+        merged = {**spec, **opts.options}
+        model: Model
+        if kind == "fake-stt":
+            model = FakeSTT(merged)
+        elif kind == "fake-stt-streaming":
+            model = FakeStreamingSTT(merged)
+        elif kind == "fake-tts":
+            model = FakeTTS(merged)
+        elif kind == "fake-vad":
+            model = FakeVAD(merged)
+        elif kind == "fake-diarization":
+            model = FakeDiarization(merged)
+        else:
+            raise ValueError(f"fake engine cannot load kind {kind!r}")
+        self.loaded.append(model)
+        return model
