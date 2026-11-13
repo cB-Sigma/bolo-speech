@@ -172,6 +172,13 @@ class TTSModel(Model):
     ) -> Iterator[FloatArray]:
         """Yield float32 audio at ``sample_rate`` for one chunk of text."""
 
+    def fit_text(self, text: str, language: str | None) -> str:
+        """Adapt normalised text to what this voice can read; raise ``UnsupportedCharacters`` if it cannot.
+
+        The default is to pass the text through. Voices with a closed character set override it.
+        """
+        return text
+
     def find_voice(self, voice: str | None) -> Voice | None:
         if not self.voices:
             return None
@@ -248,6 +255,16 @@ class DiarizationModel(Model):
     @abc.abstractmethod
     def embed(self, samples: FloatArray) -> FloatArray:
         """A unit-length speaker embedding for one stretch of speech."""
+
+
+class TurnModel(Model):
+    """End-of-turn detection: has the speaker finished, or only paused?"""
+
+    task = "turn"
+
+    @abc.abstractmethod
+    def probability(self, samples: FloatArray) -> float:
+        """Probability (0..1) that the 16 kHz utterance in ``samples`` is a finished turn."""
 
 
 class Engine(abc.ABC):

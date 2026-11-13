@@ -1,0 +1,208 @@
+{
+ "release": "voices-v1",
+ "license": {
+  "weights": "MIT",
+  "data": "CC-BY-4.0 (SYSPIN corpus)",
+  "credit": "SYSPIN project, SPIRE Lab, Indian Institute of Science (IISc), Bengaluru"
+ },
+ "voices": [
+  {
+   "id": "syspin-mai-female",
+   "repo": "SYSPIN/vits_Maithili_Female",
+   "revision": "d6b4393cf80d2af7c472a20ec5efe711f43d1f77",
+   "language": "mai",
+   "language_name": "Maithili",
+   "gender": "female",
+   "sample_text": "गामक चरवाहा जाड़ में बहुत धन प्राप्त कयलक।"
+  },
+  {
+   "id": "syspin-mai-male",
+   "repo": "SYSPIN/vits_Maithili_Male",
+   "revision": "9ce92c60a8301257874c444338d93d6c3477c295",
+   "language": "mai",
+   "language_name": "Maithili",
+   "gender": "male",
+   "sample_text": "गामक चरवाहा जाड़ में बहुत धन प्राप्त कयलक।"
+  },
+  {
+   "id": "syspin-bho-female",
+   "repo": "SYSPIN/vits_Bhojpuri_Female",
+   "revision": "515673623a546c4c43175a33fbecbb022ca127db",
+   "language": "bho",
+   "language_name": "Bhojpuri",
+   "gender": "female",
+   "sample_text": "पानी बिल हर महीना भरे के पड़ी।"
+  },
+  {
+   "id": "syspin-bho-male",
+   "repo": "SYSPIN/vits_Bhojpuri_Male",
+   "revision": "e5bb31ecf899f9a7e2559e0013a67933a6d78348",
+   "language": "bho",
+   "language_name": "Bhojpuri",
+   "gender": "male",
+   "sample_text": "पानी बिल हर महीना भरे के पड़ी।"
+  },
+  {
+   "id": "syspin-hi-female",
+   "repo": "SYSPIN/vits_Hindi_Female",
+   "revision": "642cf11cddef10061aaabd79685e16661bca9037",
+   "language": "hi",
+   "language_name": "Hindi",
+   "gender": "female",
+   "sample_text": "नमस्ते, आज मौसम बहुत अच्छा है।"
+  },
+  {
+   "id": "syspin-hi-male",
+   "repo": "SYSPIN/vits_Hindi_Male",
+   "revision": "7cc1ad298110c97adec25e520a83321c377df5a6",
+   "language": "hi",
+   "language_name": "Hindi",
+   "gender": "male",
+   "sample_text": "नमस्ते, आज मौसम बहुत अच्छा है।"
+  },
+  {
+   "id": "syspin-bn-female",
+   "repo": "SYSPIN/vits_Bengali_Female",
+   "revision": "fcda79fca653ae8965fcd108b322883d6cfec2ed",
+   "language": "bn",
+   "language_name": "Bengali",
+   "gender": "female",
+   "sample_text": "নমস্কার, আজ আবহাওয়া খুব ভালো।"
+  },
+  {
+   "id": "syspin-bn-male",
+   "repo": "SYSPIN/vits_Bengali_Male",
+   "revision": "3d84e48bfcc1649d9dd3c6e1e876b41905c99d6f",
+   "language": "bn",
+   "language_name": "Bengali",
+   "gender": "male",
+   "sample_text": "নমস্কার, আজ আবহাওয়া খুব ভালো।"
+  },
+  {
+   "id": "syspin-mr-female",
+   "repo": "SYSPIN/vits_Marathi_Female",
+   "revision": "a4c1f0b5dcdc0d9c614d183388f048f478b6ea82",
+   "language": "mr",
+   "language_name": "Marathi",
+   "gender": "female",
+   "sample_text": "नमस्कार, आज हवामान खूप छान आहे."
+  },
+  {
+   "id": "syspin-mr-male",
+   "repo": "SYSPIN/vits_Marathi_Male",
+   "revision": "b5cd73b8b9c180d3bdda6dac15301acad8d0c007",
+   "language": "mr",
+   "language_name": "Marathi",
+   "gender": "male",
+   "sample_text": "नमस्कार, आज हवामान खूप छान आहे."
+  },
+  {
+   "id": "syspin-te-female",
+   "repo": "SYSPIN/vits_Telugu_Female",
+   "revision": "dbbe1cbbfec4b2fb48f1ab3435142b932eca5766",
+   "language": "te",
+   "language_name": "Telugu",
+   "gender": "female",
+   "sample_text": "నమస్కారం, ఈ రోజు వాతావరణం చాలా బాగుంది."
+  },
+  {
+   "id": "syspin-te-male",
+   "repo": "SYSPIN/vits_Telugu_Male",
+   "revision": "cf04058b94123801f7742ebe1b604af160c4f677",
+   "language": "te",
+   "language_name": "Telugu",
+   "gender": "male",
+   "sample_text": "నమస్కారం, ఈ రోజు వాతావరణం చాలా బాగుంది."
+  },
+  {
+   "id": "syspin-kn-female",
+   "repo": "SYSPIN/vits_Kannada_Female",
+   "revision": "9929183c320cb35ddf3debf092b87a7f898e802d",
+   "language": "kn",
+   "language_name": "Kannada",
+   "gender": "female",
+   "sample_text": "ನಮಸ್ಕಾರ, ಇಂದು ಹವಾಮಾನ ತುಂಬಾ ಚೆನ್ನಾಗಿದೆ."
+  },
+  {
+   "id": "syspin-kn-male",
+   "repo": "SYSPIN/vits_Kannada_Male",
+   "revision": "3e047eb738dbf8968efedeee13561568672f5895",
+   "language": "kn",
+   "language_name": "Kannada",
+   "gender": "male",
+   "sample_text": "ನಮಸ್ಕಾರ, ಇಂದು ಹವಾಮಾನ ತುಂಬಾ ಚೆನ್ನಾಗಿದೆ."
+  },
+  {
+   "id": "syspin-gu-female",
+   "repo": "SYSPIN/vits_Gujarati_Female",
+   "revision": "3533cda87bf83e698464c911ea4237fb9efcf152",
+   "language": "gu",
+   "language_name": "Gujarati",
+   "gender": "female",
+   "sample_text": "નમસ્તે, આજે હવામાન ખૂબ સરસ છે."
+  },
+  {
+   "id": "syspin-gu-male",
+   "repo": "SYSPIN/vits_Gujarati_Male",
+   "revision": "683630c1a82fe433316812ab646728060a41a18c",
+   "language": "gu",
+   "language_name": "Gujarati",
+   "gender": "male",
+   "sample_text": "નમસ્તે, આજે હવામાન ખૂબ સરસ છે."
+  },
+  {
+   "id": "syspin-mag-female",
+   "repo": "SYSPIN/vits_Magahi_Female",
+   "revision": "0500d6cbcb0eae3eb30b1edb38c4b365944eb46e",
+   "language": "mag",
+   "language_name": "Magahi",
+   "gender": "female",
+   "sample_text": "नमस्ते, आज मौसम बहुत अच्छा है।"
+  },
+  {
+   "id": "syspin-mag-male",
+   "repo": "SYSPIN/vits_Magahi_Male",
+   "revision": "5a41e6164f74fff08918e5a1642ebbf50100c691",
+   "language": "mag",
+   "language_name": "Magahi",
+   "gender": "male",
+   "sample_text": "नमस्ते, आज मौसम बहुत अच्छा है।"
+  },
+  {
+   "id": "syspin-hne-female",
+   "repo": "SYSPIN/vits_Chhattisgarhi_Female",
+   "revision": "0c0fffe07b43a09bab5506485de9db1884bcc19e",
+   "language": "hne",
+   "language_name": "Chhattisgarhi",
+   "gender": "female",
+   "sample_text": "नमस्ते, आज मौसम बहुत अच्छा है।"
+  },
+  {
+   "id": "syspin-hne-male",
+   "repo": "SYSPIN/vits_Chhattisgarhi_Male",
+   "revision": "881673cd1f9a8367121ab3cf3f36ee582b0021d2",
+   "language": "hne",
+   "language_name": "Chhattisgarhi",
+   "gender": "male",
+   "sample_text": "नमस्ते, आज मौसम बहुत अच्छा है।"
+  },
+  {
+   "id": "syspin-en-female",
+   "repo": "SYSPIN/vits_English_Female",
+   "revision": "ce6219adea6faee308696de3851a7335f9af5dd3",
+   "language": "en",
+   "language_name": "English",
+   "gender": "female",
+   "sample_text": "good morning, the weather is very nice today."
+  },
+  {
+   "id": "syspin-en-male",
+   "repo": "SYSPIN/vits_English_Male",
+   "revision": "2e095770cf8ad748d974ccf0dd46f5a17e88d27b",
+   "language": "en",
+   "language_name": "English",
+   "gender": "male",
+   "sample_text": "good morning, the weather is very nice today."
+  }
+ ]
+}

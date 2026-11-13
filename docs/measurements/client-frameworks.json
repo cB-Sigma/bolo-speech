@@ -1,0 +1,90 @@
+{
+ "what": "bolo driven by the stock OpenAI integrations of two voice-agent frameworks, without a transport: a wav file is the caller (the built-in en-short sample, 3.0 s), a collector records the reply",
+ "bolo": {
+  "stt": "moonshine-tiny-en",
+  "tts": "piper-en-us-amy-low unless noted (the Realtime runs used the default kokoro-v1.0-int8)",
+  "threads": 2,
+  "llm": "qwen2.5:0.5b through Ollama 0.40.16 with num_thread 2"
+ },
+ "note": "functional runs on a 4-vCPU machine that was busy with other jobs; the *_after_speech_end_ms figures are from single runs and include that load, so read them as 'it works', not as latency results",
+ "pipecat": {
+  "version": "pipecat-ai 1.16.0",
+  "OpenAIRealtimeLLMService -> /v1/realtime": {
+   "user": [
+    "Good morning. could you tell me when my order will arise?"
+   ],
+   "bot_audio_s": 2.41,
+   "errors": [],
+   "interims": 6,
+   "first_interim_after_speech_end_ms": -1719,
+   "user_final_after_speech_end_ms": 668,
+   "first_audio_after_speech_end_ms": 4153,
+   "bot_words": 11
+  },
+  "OpenAIRealtimeSTTService -> /v1/realtime (transcription session)": {
+   "user": [
+    "Good morning. could you tell me when my order will arise?"
+   ],
+   "bot_audio_s": 0.0,
+   "errors": [],
+   "interims": 5,
+   "first_interim_after_speech_end_ms": -1776,
+   "user_final_after_speech_end_ms": 683,
+   "bot_words": 0
+  },
+  "OpenAISTTService + OpenAILLMService + OpenAITTSService (HTTP), Piper voice": {
+   "user": [],
+   "bot_audio_s": 3.71,
+   "errors": [],
+   "first_audio_after_speech_end_ms": 5406,
+   "bot_words": 18
+  },
+  "the same with the Kokoro voice": {
+   "user": [],
+   "bot_audio_s": 11.31,
+   "errors": [
+    "TTS context a68b6eb1-03bf-46b9-86c0-20de915c360d completed with no audio"
+   ],
+   "first_audio_after_speech_end_ms": 13076,
+   "bot_words": 38
+  },
+  "findings": [
+   "OpenAITTSService rejects voice names that are not OpenAI's (use alloy etc.; bolo maps them)",
+   "with Kokoro on this loaded machine the first audio of a sentence took more than 3 s, Pipecat logged 'TTS context ... completed with no audio' (non-fatal) and played the audio when it arrived"
+  ]
+ },
+ "livekit": {
+  "version": "livekit-agents 1.8.11, livekit-plugins-openai 1.8.11, livekit-plugins-silero 1.8.11",
+  "AgentSession(llm=openai.realtime.RealtimeModel) -> /v1/realtime": {
+   "user": [
+    "Good morning. could you tell me when my order will arise?"
+   ],
+   "errors": [],
+   "agent_audio_s": 6.5,
+   "first_audio_after_speech_end_ms": 19976,
+   "interim_transcripts": 6
+  },
+  "AgentSession(vad=silero, stt=openai.STT, llm=openai.LLM, tts=openai.TTS) over HTTP": {
+   "user": [
+    "Good morning, could you tell me when my order will arrive?"
+   ],
+   "errors": [],
+   "agent_audio_s": 7.03,
+   "first_audio_after_speech_end_ms": 4343,
+   "interim_transcripts": 0
+  },
+  "the same with openai.STT(use_realtime=True)": {
+   "user": [
+    "Good morning. could you tell me when my order will arise?"
+   ],
+   "errors": [],
+   "agent_audio_s": 9.95,
+   "first_audio_after_speech_end_ms": 4123,
+   "interim_transcripts": 4
+  },
+  "findings": [
+   "no change to bolo was needed",
+   "openai.TTS asks for stream_format=sse, which bolo serves"
+  ]
+ }
+}

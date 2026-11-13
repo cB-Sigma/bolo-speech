@@ -36,6 +36,7 @@ from bolo.engines.base import (
     STTResult,
     STTStream,
     TTSModel,
+    TurnModel,
     VadDetector,
     VADModel,
     VadParams,
@@ -279,11 +280,25 @@ class FakeDiarization(DiarizationModel):
         return turns
 
 
+class FakeTurn(TurnModel):
+    """Calls a turn finished once it holds ``min_complete_s`` of sound (tests only)."""
+
+    def __init__(self, opts: dict[str, Any]) -> None:
+        self.min_complete_s = float(opts.get("min_complete_s", 3.0))
+        self.calls: list[float] = []
+
+    def probability(self, samples: FloatArray) -> float:
+        frames = samples[: len(samples) // 320 * 320].reshape(-1, 320)
+        sound_s = float(np.sum(np.sqrt(np.mean(frames**2, axis=1)) > 0.01)) * 0.02 if len(frames) else 0.0
+        self.calls.append(sound_s)
+        return 0.95 if sound_s >= self.min_complete_s else 0.05
+
+
 class FakeEngine(Engine):
     id = "fake"
     name = "Fake engine (testing)"
     license = "Apache-2.0"
-    kinds = ("fake-stt", "fake-stt-streaming", "fake-tts", "fake-vad", "fake-diarization")
+    kinds = ("fake-stt", "fake-stt-streaming", "fake-tts", "fake-vad", "fake-diarization", "fake-turn")
 
     def __init__(self) -> None:
         self.loaded: list[Model] = []
@@ -304,6 +319,8 @@ class FakeEngine(Engine):
             model = FakeVAD(merged)
         elif kind == "fake-diarization":
             model = FakeDiarization(merged)
+        elif kind == "fake-turn":
+            model = FakeTurn(merged)
         else:
             raise ValueError(f"fake engine cannot load kind {kind!r}")
         self.loaded.append(model)

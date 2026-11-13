@@ -1,0 +1,23 @@
+# End-of-turn models: given the audio of an utterance so far, has the speaker finished or only paused?
+# Used by Realtime sessions with turn_detection.type = "semantic_vad".
+
+- id: smart-turn-v3
+  task: turn
+  engine: onnxruntime
+  kind: smart_turn
+  family: Smart Turn
+  languages: [ar, bn, da, de, en, es, fi, fr, hi, id, it, ja, ko, mr, nl, 'no', pl, pt, ru, tr, uk, vi, zh]
+  tier: realtime
+  size_bytes: 8679182
+  license: BSD-2-Clause
+  description: 'Smart Turn v3.2 (CPU build) by the Pipecat project: a Whisper-tiny encoder with a classification head that
+    listens to the last eight seconds of an utterance and says whether the speaker has finished. 23 languages, among them
+    Hindi, Bengali and Marathi.'
+  source_url: https://huggingface.co/pipecat-ai/smart-turn-v3
+  validated: untested
+  source:
+    urls:
+    - path: smart-turn-v3.2-cpu.onnx
+      url: https://huggingface.co/pipecat-ai/smart-turn-v3/resolve/f766f81d3cfdf7737ac64aad813d91bbfd56bf93/smart-turn-v3.2-cpu.onnx
+      size: 8679182
+      sha256: 2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f

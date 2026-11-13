@@ -134,6 +134,11 @@ def tokens_to_words(tokens: list[str], starts: list[float], end: float) -> list[
 _SENSE_VOICE_LANGS = {"<|zh|>": "zh", "<|en|>": "en", "<|ja|>": "ja", "<|ko|>": "ko", "<|yue|>": "yue"}
 
 
+def line_is_blank_only(symbols: set[str]) -> bool:
+    """True when a token table holds no usable characters (then it is not a character table)."""
+    return not any(s.strip() for s in symbols)
+
+
 class SherpaOfflineSTT(STTModel):
     def __init__(self, kind: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> None:
         import sherpa_onnx
@@ -148,7 +153,13 @@ class SherpaOfflineSTT(STTModel):
         self.max_chunk_s = float(spec.get("max_chunk_s", 30.0 if kind in ("whisper", "canary") else 60.0))
         self.supports_translate = kind == "whisper" and not spec.get("english_only", False)
         # The stock Whisper exports have no cross-attention outputs, so no token times.
-        self.supports_word_timestamps = kind not in ("whisper", "moonshine", "moonshine_v2", "canary", "paraformer")
+        # Whisper exports give token times only when they were exported with cross-attention outputs
+        # (sherpa-onnx scripts/whisper/export-onnx-with-attention.py); such a model says so with the catalog
+        # option `token_timestamps: true`. Moonshine has no token times in this runtime.
+        self.token_timestamps = kind == "whisper" and bool(spec.get("token_timestamps", False))
+        self.supports_word_timestamps = self.token_timestamps or kind not in (
+            "whisper", "moonshine", "moonshine_v2", "canary", "paraformer",
+        )  # fmt: skip
         self.default_language = str(spec.get("language", ""))
         self._lock = threading.Lock()
         self._recognizers: dict[tuple[str, str], Any] = {}
@@ -165,6 +176,7 @@ class SherpaOfflineSTT(STTModel):
                 tokens=find_file(p, "*tokens.txt"),
                 language=language,
                 task=task,
+                enable_token_timestamps=self.token_timestamps,
                 **common,
             )
         if k == "moonshine":
@@ -282,9 +294,14 @@ _PRIME_NOISE = (np.random.default_rng(0).standard_normal(int(PRIME_S * 16000)) *
 
 
 class _SherpaStream(STTStream):
-    def __init__(self, model: SherpaOnlineSTT) -> None:
+    def __init__(self, model: SherpaOnlineSTT, language: str | None = None) -> None:
         self.model = model
         self.stream = model.recognizer.create_stream()
+        if language:  # must be set before any audio is accepted
+            try:
+                self.stream.set_option("language", language)
+            except (AttributeError, RuntimeError):  # an older sherpa-onnx: the model then detects the language
+                pass
         # Streaming encoders need some left context: without it the first words of audio that
         # starts abruptly (a file, a push-to-talk clip) are often dropped. A second of very
         # faint noise works where digital silence does not (measured on the 20M Zipformer).
@@ -337,6 +354,8 @@ class SherpaOnlineSTT(STTModel):
         self.max_batch = int(spec.get("max_batch", 8))
         self.max_chunk_s = float(spec.get("max_chunk_s", 60.0))
         self.lowercase = bool(spec.get("lowercase", True))
+        #: prompt-conditioned models (Nemotron) take the language per stream; without it they detect it
+        self.stream_language = bool(spec.get("stream_language", False))
         endpoint: dict[str, Any] = {
             "enable_endpoint_detection": True,
             "rule1_min_trailing_silence": 2.4,
@@ -379,6 +398,8 @@ class SherpaOnlineSTT(STTModel):
             raise ValueError(f"sherpa-onnx engine cannot load kind {kind!r}")
 
     def create_stream(self, language: str | None = None) -> STTStream:
+        if self.stream_language and language and language != "auto":
+            return _SherpaStream(self, language.split("-")[0].lower())
         return _SherpaStream(self)
 
     def decode_streams(self, streams: list[STTStream]) -> None:
@@ -483,6 +504,18 @@ class SherpaTTS(TTSModel):
             or kind == "kitten"
             or (kind == "matcha" and not self.has_lexicon)
         )
+        # A VITS voice with neither lexicon nor phonemes reads characters from a closed set (Coqui-style):
+        # whatever is not in tokens.txt would be skipped silently, so the text is checked first (fit_text).
+        self.charset: frozenset[str] | None = None
+        if kind == "vits" and not self.has_lexicon and not self.needs_phonemes:
+            symbols: set[str] = set()
+            for line in Path(find_file(p, "tokens.txt")).read_text(encoding="utf-8").splitlines():
+                symbol = line.rsplit(" ", 1)[0] if " " in line else line
+                if len(symbol) == 1:
+                    symbols.add(symbol)
+            if not line_is_blank_only(symbols):
+                self.charset = frozenset(symbols)
+        self._numbers = str(spec["numbers"]) if spec.get("numbers") else None
         declared = [
             Voice(
                 str(v["id"]),
@@ -502,6 +535,13 @@ class SherpaTTS(TTSModel):
                 Voice(str(i), f"Speaker {i}", str(spec.get("language", "")), "", i)
                 for i in range(min(self.num_speakers, 64))
             )
+
+    def fit_text(self, text: str, language: str | None) -> str:
+        if self.charset is None:
+            return text
+        from bolo.text.normalize import fit_to_charset
+
+        return fit_to_charset(text, self.charset, language, self._numbers)
 
     def espeak_voice_for(self, voice: Voice | None) -> str | None:
         """The espeak-ng voice to phonemise with, or None when the text goes in as is."""

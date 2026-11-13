@@ -197,40 +197,76 @@ def mp3_frame_length(header: bytes) -> int | None:
     return (144 if version == 3 else 72) * bitrate // rate + padding
 
 
-class _AvAacSink:
-    def __init__(self, sample_rate: int) -> None:
+class _AvSink:
+    """Incremental encoding through PyAV (FFmpeg's libraries): ADTS AAC, or Ogg/Opus in small pages."""
+
+    def __init__(self, sample_rate: int, container: str, codec: str, options: dict[str, str] | None = None) -> None:
         import av
+        from av.audio.resampler import AudioResampler
 
         self._av = av
         self._buf = io.BytesIO()
-        self._container = av.open(self._buf, mode="w", format="adts")
-        self._stream = self._container.add_stream("aac", rate=sample_rate)
+        self._container = av.open(self._buf, mode="w", format=container, options=options or {})
+        self._stream = self._container.add_stream(codec, rate=sample_rate)
         self._stream.layout = "mono"
         self._rate = sample_rate
         self._sent = 0
         self._pts = 0
+        # Opus takes fixed 20 ms frames in a packed sample format: let FFmpeg's resampler cut them
+        self._framer: Any = None
+        if codec == "libopus":
+            self._stream.codec_context.open()
+            self._framer = AudioResampler(
+                format=self._stream.codec_context.format.name,
+                layout="mono",
+                rate=sample_rate,
+                frame_size=self._stream.codec_context.frame_size or sample_rate // 50,
+            )
 
     def _drain(self) -> bytes:
         data = self._buf.getbuffer()[self._sent :].tobytes()
         self._sent += len(data)
         return data
 
+    def _encode(self, frame: Any) -> None:
+        frames = [frame] if self._framer is None else self._framer.resample(frame)
+        for f in frames:
+            for packet in self._stream.encode(f):
+                self._container.mux(packet)
+
     def feed(self, samples: FloatArray) -> bytes:
         frame = self._av.AudioFrame.from_ndarray(samples.reshape(1, -1), format="fltp", layout="mono")
         frame.sample_rate = self._rate
         frame.pts = self._pts
         self._pts += len(samples)
-        for packet in self._stream.encode(frame):
-            self._container.mux(packet)
+        self._encode(frame)
         return self._drain()
 
     def finish(self) -> bytes:
+        if self._framer is not None:
+            for f in self._framer.resample(None):
+                for packet in self._stream.encode(f):
+                    self._container.mux(packet)
         for packet in self._stream.encode(None):
             self._container.mux(packet)
         self._container.close()
         data = self._buf.getvalue()[self._sent :]
         self._sent += len(data)
         return data
+
+
+#: Ogg page length for streamed Opus through PyAV, in microseconds (libsndfile writes about one page a second)
+OPUS_PAGE_US = 100_000
+
+
+def _opus_sink(sample_rate: int) -> _SndfileSink | _AvSink:
+    """Ogg/Opus: through PyAV when it is installed (a page every 100 ms, so audio starts early), else libsndfile."""
+    if have_av():
+        try:
+            return _AvSink(sample_rate, "ogg", "libopus", {"page_duration": str(OPUS_PAGE_US)})
+        except Exception:  # an FFmpeg build without libopus
+            pass
+    return _SndfileSink(sample_rate, "OGG", "OPUS")
 
 
 class StreamEncoder:
@@ -247,7 +283,7 @@ class StreamEncoder:
         self.media_type = media_type_for(self.format, self.sample_rate)
         self._resampler = StreamResampler(model_rate, self.sample_rate)
         self._header_sent = False
-        self._sink: _SndfileSink | _AvAacSink | None = None
+        self._sink: _SndfileSink | _AvSink | None = None
         self._ffmpeg_pcm: list[bytes] | None = None
         self.samples_out = 0
         if self.format == "flac":
@@ -255,10 +291,10 @@ class StreamEncoder:
         elif self.format == "mp3":
             self._sink = _SndfileSink(self.sample_rate, "MP3", "MPEG_LAYER_III")
         elif self.format == "opus":
-            self._sink = _SndfileSink(self.sample_rate, "OGG", "OPUS")
+            self._sink = _opus_sink(self.sample_rate)
         elif self.format == "aac":
             if have_av():
-                self._sink = _AvAacSink(self.sample_rate)
+                self._sink = _AvSink(self.sample_rate, "adts", "aac")
             elif shutil.which("ffmpeg"):
                 self._ffmpeg_pcm = []
             else:

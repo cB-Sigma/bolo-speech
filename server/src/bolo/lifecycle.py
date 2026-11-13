@@ -18,7 +18,7 @@ import psutil
 from bolo.catalog import Catalog, ModelSpec
 from bolo.config import Settings
 from bolo.engines import EngineRegistry
-from bolo.engines.base import DiarizationModel, LoadOptions, Model, STTModel, STTStream, TTSModel
+from bolo.engines.base import DiarizationModel, LoadOptions, Model, STTModel, STTStream, TTSModel, TurnModel
 from bolo.errors import EngineUnavailable, ModelNotFound, ModelNotInstalled, Overloaded
 from bolo.obs.events import EventBus
 from bolo.scheduler import Handler, ModelQueue
@@ -133,6 +133,10 @@ class ModelManager:
             handlers["embed"] = lambda items: [diarizer.embed(item) for item in items]
             max_batch["diarize"] = 1
             max_batch["embed"] = 8
+        elif isinstance(model, TurnModel):
+            turn = model
+            handlers["turn"] = lambda items: [turn.probability(item) for item in items]
+            max_batch["turn"] = 1
         return ModelQueue(
             spec.id,
             handlers,
@@ -172,8 +176,9 @@ class ModelManager:
         model = engine.load(spec.kind, spec.task, self.store.model_dir(spec.id), model_opts, opts)
         load_ms = (time.perf_counter() - t0) * 1000.0
         grown = max(0, proc.memory_info().rss - before)
-        # RSS growth is the best cheap estimate; fall back to the file size if it reads as zero.
-        memory = grown or int(self.store.size_on_disk(spec.id) * 1.1)
+        # An estimate. RSS growth during the load reads low, sometimes zero, when the allocator reuses memory
+        # that an unloaded model gave back, so it is never taken to be less than the model's files on disk.
+        memory = max(grown, self.store.size_on_disk(spec.id))
         return model, memory, load_ms
 
     def _probe(self, spec: ModelSpec) -> None:

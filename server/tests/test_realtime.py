@@ -56,18 +56,24 @@ async def test_transcription_session_with_the_sdk(live: LiveServer) -> None:
         assert updated.session.audio.input.turn_detection.silence_duration_ms == 300
         for chunk in b64_pcm24(2.0):
             await conn.input_audio_buffer.append(audio=chunk)
+            await asyncio.sleep(0.1)  # at the pace of a microphone, so that interim decodes happen
         events = await collect_until(conn, "conversation.item.input_audio_transcription.completed")
     types = [e.type for e in events]
-    assert types == [
+    delta_type = "conversation.item.input_audio_transcription.delta"
+    assert [t for t in types if t != delta_type] == [
         "input_audio_buffer.speech_started", "input_audio_buffer.speech_stopped", "input_audio_buffer.committed",
-        "conversation.item.added", "conversation.item.done",
-        "conversation.item.input_audio_transcription.delta", "conversation.item.input_audio_transcription.completed",
+        "conversation.item.added", "conversation.item.done", "conversation.item.input_audio_transcription.completed",
     ]  # fmt: skip
-    started, stopped, committed, added, _done, delta, completed = events
+    started, stopped, committed, added, _done, completed = [e for e in events if e.type != delta_type]
+    deltas = [e for e in events if e.type == delta_type]
     assert started.audio_start_ms < 300 and 1800 < stopped.audio_end_ms < 2600
     assert started.item_id == stopped.item_id == committed.item_id == added.item.id == completed.item_id
     assert added.item.role == "user" and added.item.content[0].type == "input_audio"
-    assert completed.transcript.startswith("the quick brown fox") and delta.delta == completed.transcript
+    assert completed.transcript.startswith("the quick brown fox")
+    # the transcript arrives in pieces while the user is still speaking, and the pieces add up to it
+    assert len(deltas) >= 2 and all(d.item_id == started.item_id for d in deltas)
+    assert "".join(d.delta for d in deltas) == completed.transcript
+    assert types.index(delta_type) < types.index("input_audio_buffer.speech_stopped")
     assert completed.usage.type == "duration" and completed.usage.seconds == pytest.approx(2.3, abs=0.5)
     trace = httpx.get(live.url + "/api/v1/requests", params={"limit": 5}).json()["requests"]
     turn = next(t for t in trace if t["transport"] == "realtime" and t["kind"] == "stt" and t.get("stt_model"))
@@ -125,9 +131,8 @@ async def test_conversation_turn_with_the_sdk(agent: LiveServer) -> None:
     assert [p["name"] for p in trace["phases"]] == ["decode", "llm_first_token", "synthesize_first", "synthesize_rest"]
     # end of speech -> transcript -> first LLM token -> first audio
     assert 0 < trace["final_ms"] < trace["first_token_ms"] < trace["ttfa_ms"] < trace["total_ms"]
-    assert trace["first_token_ms"] - trace["final_ms"] == pytest.approx(
-        50, abs=60
-    )  # the fake model's first-token delay
+    # the fake model's first-token delay (50 ms) plus opening the connection to it
+    assert 40 <= trace["first_token_ms"] - trace["final_ms"] <= 300
     assert trace["llm_model"] == "fake-llm" and trace["stt_model"] == "fake-stt" and trace["audio_seconds_out"] > 3
     stats = {m["id"]: m for m in httpx.get(agent.url + "/api/v1/stats").json()["models"]}
     assert stats["voice-agent"]["task"] == "agent" and stats["voice-agent"]["latency_ms"]["ttfa"][
@@ -397,3 +402,14 @@ async def test_realtime_auth(settings: Settings) -> None:
             assert (await conn.recv()).type == "session.created"
     finally:
         srv.stop()
+
+
+def test_remaining_delta_keeps_deltas_append_only() -> None:
+    from bolo.realtime import remaining_delta
+
+    assert remaining_delta("", "hello there") == "hello there"
+    assert remaining_delta("hello", "hello there.") == " there."
+    assert remaining_delta("hello there", "hello there") == ""
+    # the final decode revised a word that was already sent: only the words after it follow
+    assert remaining_delta("Hello there", "hello, there my friend") == " my friend"
+    assert remaining_delta("one two three", "one two") == ""

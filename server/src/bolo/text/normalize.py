@@ -247,6 +247,74 @@ def normalize_for_tts(text: str, language: str | None = None, *, expand_numbers:
     return text
 
 
+#: languages whose numbers can be spelled out (see :func:`_expand_numbers`)
+NUMBER_LANGUAGES = ("en", "hi")
+
+_PUNCT_FALLBACK = {
+    "।": ".", "॥": ".", "۔": ".", "؟": "?", "،": ",", "–": "-", "—": ",", "‘": "'", "’": "'", "“": '"', "”": '"',
+    "…": ".", ";": ",", ":": ",", "!": ".", "?": ".",
+}  # fmt: skip
+
+
+def fit_to_charset(text: str, charset: frozenset[str], language: str | None, numbers: str | None = None) -> str:
+    """Make ``text`` pronounceable by a voice that takes characters from a closed set (Coqui-style VITS).
+
+    Such a voice silently skips every character it has no symbol for, so "Room 42" would be read as
+    "Room". Here instead:
+
+    * letters are lower-cased when only the lower-case form is in the set;
+    * digits the voice has no symbol for are spelled out when a number normaliser exists for the
+      language (``numbers`` overrides the language used for that, e.g. Hindi number words for a
+      related language);
+    * punctuation the voice does not know is replaced by a mark it does know, or dropped;
+    * any letter or digit still outside the set raises :class:`~bolo.errors.UnsupportedCharacters`,
+      naming the characters.
+    """
+    from bolo.errors import UnsupportedCharacters
+
+    lang = (language or "").split("-")[0].split("_")[0].lower()
+
+    def missing(s: str) -> list[str]:
+        out: list[str] = []
+        for ch in s:
+            if ch in charset or ch.isspace() or ch in out:
+                continue
+            if unicodedata.category(ch)[0] in "LMN" and ch.lower() not in charset:
+                out.append(ch)
+        return out
+
+    number_lang = numbers or (lang if lang in NUMBER_LANGUAGES else None)
+    if any(ch.isdigit() for ch in missing(text)) and number_lang in NUMBER_LANGUAGES:
+        text = _expand_numbers(_to_ascii_digits(text), number_lang)
+    bad = missing(text)
+    if bad:
+        shown = ", ".join(f"'{ch}'" for ch in bad[:12]) + (" …" if len(bad) > 12 else "")
+        hint = ""
+        if any(ch.isdigit() for ch in bad):
+            hint = (
+                f" There is no number normaliser for language '{lang or 'unknown'}': write numbers out in words."
+                if number_lang is None
+                else " Write numbers out in words."
+            )
+        if any(ch.isalpha() for ch in bad):
+            hint += " Words in another script must be transliterated into the script of the voice."
+        raise UnsupportedCharacters(
+            f"this voice reads a fixed set of characters and has no symbol for: {shown}.{hint}", param="input"
+        )
+    out: list[str] = []
+    for ch in text:
+        if ch in charset:
+            out.append(ch)
+        elif ch.isspace():
+            out.append(" " if " " in charset else ch)
+        elif ch.lower() in charset:
+            out.append(ch.lower())
+        else:
+            mapped = _PUNCT_FALLBACK.get(ch, "")
+            out.append(mapped if mapped in charset else " ")
+    return _WS.sub(" ", "".join(out)).strip()
+
+
 def strip_punctuation(text: str, replacement: str = " ") -> str:
     """Remove punctuation and symbols but keep combining marks (Indic vowel signs are not ``\\w``)."""
     return "".join(replacement if unicodedata.category(ch)[0] in "PS" else ch for ch in text)

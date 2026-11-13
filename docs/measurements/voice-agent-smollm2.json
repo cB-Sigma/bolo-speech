@@ -6,7 +6,6 @@
    {
     "status": "completed",
     "user_heard": "Good morning. could you tell me when my order will arrive?",
-    "reply": "Good morning. Could you please confirm when your order is expected to arrive?",
     "reply_audio_s": 4.7,
     "reply_audio_wer_vs_text": 0.0,
     "stt_final_ms": 964.8,
@@ -18,12 +17,12 @@
      "llm_first_token": 250,
      "synthesize_first": 1356,
      "synthesize_rest": 193
-    }
+    },
+    "reply_words": 13
    },
    {
     "status": "completed",
     "user_heard": "Good morning. could you tell me when my order will arrive?",
-    "reply": "I'm sorry for any confusion, but as a text-based AI, I don't have real-time capabilities to provide the current status of your order. You would need to check your email or contact customer service directly for that information.",
     "reply_audio_s": 13.6,
     "reply_audio_wer_vs_text": 0.0,
     "stt_final_ms": 338.6,
@@ -35,12 +34,12 @@
      "llm_first_token": 155,
      "synthesize_first": 1758,
      "synthesize_rest": 1420
-    }
+    },
+    "reply_words": 38
    },
    {
     "status": "completed",
     "user_heard": "Good morning. could you tell me when my order will arrive?",
-    "reply": "I'm sorry for the confusion, but as a text-based AI, I don't have real-time access to your location or delivery status. You can check your order details online through your shopping platform.",
     "reply_audio_s": 11.9,
     "reply_audio_wer_vs_text": 0.0,
     "stt_final_ms": 198.2,
@@ -52,17 +51,17 @@
      "llm_first_token": 101,
      "synthesize_first": 2073,
      "synthesize_rest": 876
-    }
+    },
+    "reply_words": 32
    }
   ],
   "median_first_token_ms": 494.3,
   "median_first_audio_ms": 2372.7
  },
  "chat_completions_audio": {
-  "transcript": "The customer asks for the time on their phone.",
   "audio_s": 3.0,
   "wall_ms": 1012,
-  "llm_saw": null
+  "reply_words": 9
  },
  "realtime_kokoro": {
   "tts_model": "kokoro-v1.0-int8",
@@ -70,7 +69,6 @@
    {
     "status": "completed",
     "user_heard": "Good morning. could you tell me when my order will arrive?",
-    "reply": "I'm sorry for the inconvenience [… reply shortened in this record]",
     "reply_audio_s": 12.2,
     "reply_audio_wer_vs_text": 0.0,
     "stt_final_ms": 814.7,
@@ -82,12 +80,12 @@
      "llm_first_token": 228,
      "synthesize_first": 6947,
      "synthesize_rest": 12743
-    }
+    },
+    "reply_words": 11
    },
    {
     "status": "completed",
     "user_heard": "Good morning. could you tell me when my order will arrive?",
-    "reply": "Good morning, could you please confirm your order status?",
     "reply_audio_s": 2.7,
     "reply_audio_wer_vs_text": 0.0,
     "stt_final_ms": 252.8,
@@ -99,12 +97,12 @@
      "llm_first_token": 104,
      "synthesize_first": 3401,
      "synthesize_rest": 8
-    }
+    },
+    "reply_words": 9
    },
    {
     "status": "completed",
     "user_heard": "Good morning. could you tell me when my order will arrive?",
-    "reply": "My apologies for any confusion, but I'm currently unable to provide real-time updates on your order status. Please contact our customer service team if you have a specific time frame in mind.",
     "reply_audio_s": 10.7,
     "reply_audio_wer_vs_text": 0.03,
     "stt_final_ms": 140.5,
@@ -116,10 +114,12 @@
      "llm_first_token": 79,
      "synthesize_first": 3215,
      "synthesize_rest": 7873
-    }
+    },
+    "reply_words": 32
    }
   ],
   "median_first_token_ms": 360.9,
   "median_first_audio_ms": 3761.6
- }
+ },
+ "reply_text": "replies are whatever the small language model said; only their length is kept here"
 }

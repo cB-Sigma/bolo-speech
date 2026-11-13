@@ -2,7 +2,7 @@
 #   docker build -f deploy/Dockerfile -t bolo:cpu .
 #
 # NOTE: this Dockerfile has been written and reviewed but not built by the
-# maintainers for 0.1.0 (the release CI builds it). Report problems, please.
+# maintainers so far (the release CI builds it). Report problems, please.
 FROM python:3.12-slim AS build
 WORKDIR /src
 COPY server/ ./server/

@@ -18,7 +18,7 @@ import yaml
 
 from bolo.store import Source
 
-TASKS = ("stt", "tts", "vad", "diarization", "translation")
+TASKS = ("stt", "tts", "vad", "diarization", "turn", "translation")
 TIERS = ("realtime", "balanced", "accuracy")
 VALIDATED = ("cpu", "untested")
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
@@ -57,6 +57,8 @@ class ModelSpec:
     requires: list[str] = field(default_factory=list)  # optional components, e.g. ["espeak-ng"]
     custom: bool = False
     builtin: bool = False  # needs no files (fake engine)
+    #: "pending": described here, but its files are not published yet; hidden from listings, cannot be pulled
+    status: str | None = None
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> ModelSpec:
@@ -73,6 +75,15 @@ class ModelSpec:
         spec.validate()
         return spec
 
+    def require_published(self) -> None:
+        if self.status == "pending":
+            from bolo.errors import ModelNotPublished
+
+            raise ModelNotPublished(
+                f"model '{self.id}' is described in the catalog but its files are not published yet. "
+                "If you have the files, register the directory with `bolo pull ./dir`."
+            )
+
     def validate(self) -> None:
         if not _ID_RE.match(self.id):
             raise CatalogError(f"invalid model id {self.id!r} (lowercase letters, digits, '.', '_' and '-')")
@@ -86,10 +97,15 @@ class ModelSpec:
             raise CatalogError(f"{self.id}: languages must be a list of codes")
         if not self.license or self.license == "unknown":
             raise CatalogError(f"{self.id}: every catalog entry must state its licence")
-        if not self.builtin and not (self.source.repo or self.source.urls):
+        if not self.builtin and not (self.source.repo or self.source.urls or self.source.local):
             raise CatalogError(f"{self.id}: no download source")
         if self.validated == "cpu" and not self.builtin and not self.measured:
             raise CatalogError(f"{self.id}: validated entries must record their measurements")
+        if self.status not in (None, "pending"):
+            raise CatalogError(f"{self.id}: status must be 'pending' or absent")
+        for u in self.source.urls:
+            if u.get("extract") and not u.get("sha256") and self.status != "pending":
+                raise CatalogError(f"{self.id}: an archive to extract must be pinned with sha256")
         for v in self.voices:
             if "id" not in v:
                 raise CatalogError(f"{self.id}: voice without id")
@@ -100,7 +116,7 @@ class ModelSpec:
         for name in self.__dataclass_fields__:
             if name == "source":
                 out["source"] = self.source.to_dict()
-            elif name not in ("custom", "builtin"):
+            elif name not in ("custom", "builtin") and not (name == "status" and self.status is None):
                 out[name] = getattr(self, name)
         return out
 
@@ -152,6 +168,7 @@ class ModelSpec:
             "custom": self.custom,
             "requires": list(self.requires),
             "available": available,
+            "status": self.status,
         }
 
 
@@ -185,6 +202,11 @@ FAKE_MODELS: list[dict[str, Any]] = [
         "id": "fake-diarization", "task": "diarization", "engine": "fake", "kind": "fake-diarization", "family": "Fake",
         "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
         "description": "Test diarizer: separates bursts of sound by their dominant pitch. Not real speaker recognition.",
+    },
+    {
+        "id": "fake-turn", "task": "turn", "engine": "fake", "kind": "fake-turn", "family": "Fake", "languages": [],
+        "tier": "realtime", "license": "Apache-2.0", "builtin": True,
+        "description": "Test end-of-turn model: a turn is finished once it holds three seconds of sound.",
     },
     {
         "id": "fake-vad", "task": "vad", "engine": "fake", "kind": "fake-vad", "family": "Fake", "languages": [],
@@ -289,11 +311,13 @@ class Catalog:
     def __len__(self) -> int:
         return len(self._specs)
 
-    def search(self, task: str | None = None, q: str | None = None) -> list[ModelSpec]:
+    def search(self, task: str | None = None, q: str | None = None, include_pending: bool = False) -> list[ModelSpec]:
         out = []
         needle = (q or "").strip().lower()
         for spec in self._specs.values():
             if task and spec.task != task:
+                continue
+            if spec.status == "pending" and not include_pending:
                 continue
             if needle:
                 hay = " ".join(

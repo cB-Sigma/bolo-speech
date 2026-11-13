@@ -3403,3 +3403,568 @@
     language: sw-CD
   requires:
   - espeak-ng
+- id: piper-ne-np-chitwan-medium
+  aliases:
+  - piper-ne_NP-chitwan-medium
+  - rhasspy/piper-voices/ne_NP-chitwan-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - ne
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 62956503
+  license: 'Voice: CC0-1.0 (dataset, per the voice card)'
+  description: Piper voice 'chitwan' (Nepali, ne-NP, medium quality, one speaker), VITS in Piper format run by sherpa-onnx;
+    phonemes come from espeak-ng.
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.0704
+    round_trip_wer: 0.462
+    round_trip_cer: 0.093
+    round_trip_stt: indicconformer-ne-community
+    ttfa_ms: 402
+    audio_s: 5.7
+    load_s: 0.92
+    memory_mb: 78
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: one FLEURS sentence, synthesised and transcribed back
+  source:
+    repo: csukuangfj/vits-piper-ne_NP-chitwan-medium
+    revision: 2b6bad58d4f7df8f794f3514cca582c08e7223ff
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    language: ne-NP
+  requires:
+  - espeak-ng
+- id: piper-te-in-padmavathi-medium
+  aliases:
+  - piper-te_IN-padmavathi-medium
+  - rhasspy/piper-voices/te_IN-padmavathi-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - te
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63521302
+  license: 'Voice: CC-BY-4.0 (IndicVoices-R, per the voice card)'
+  description: 'Piper voice ''padmavathi'' (Telugu, te-IN, medium quality, one speaker), taken from the Piper project
+    as published and converted for sherpa-onnx by bolo after the download; phonemes come from espeak-ng. The licence
+    of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.1789
+    round_trip_wer: 0.154
+    round_trip_cer: 0.026
+    round_trip_stt: indicconformer-te-community
+    ttfa_ms: 1294
+    audio_s: 7.0
+    load_s: 2.08
+    memory_mb: 102
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: one FLEURS sentence, synthesised and transcribed back
+  source:
+    urls:
+    - path: te_IN-padmavathi-medium.onnx
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/te/te_IN/padmavathi/medium/te_IN-padmavathi-medium.onnx
+      size: 63516050
+      sha256: 414aa5960d91ceb6e45bbdf8c27fdc71af09f205130d7be4e99470f3c2cfa57d
+    - path: te_IN-padmavathi-medium.onnx.json
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/te/te_IN/padmavathi/medium/te_IN-padmavathi-medium.onnx.json
+      size: 4974
+    - path: MODEL_CARD
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/te/te_IN/padmavathi/medium/MODEL_CARD
+      size: 278
+    convert: piper
+  options:
+    language: te-IN
+  requires:
+  - espeak-ng
+- id: piper-te-in-venkatesh-medium
+  aliases:
+  - piper-te_IN-venkatesh-medium
+  - rhasspy/piper-voices/te_IN-venkatesh-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - te
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63521300
+  license: 'Voice: CC-BY-4.0 (IndicVoices-R, per the voice card)'
+  description: 'Piper voice ''venkatesh'' (Telugu, te-IN, medium quality, one speaker), taken from the Piper project
+    as published and converted for sherpa-onnx by bolo after the download; phonemes come from espeak-ng. The licence
+    of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.2106
+    round_trip_wer: 0.231
+    round_trip_cer: 0.038
+    round_trip_stt: indicconformer-te-community
+    ttfa_ms: 1240
+    audio_s: 6.0
+    load_s: 1.36
+    memory_mb: 99
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: one FLEURS sentence, synthesised and transcribed back
+  source:
+    urls:
+    - path: te_IN-venkatesh-medium.onnx
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/te/te_IN/venkatesh/medium/te_IN-venkatesh-medium.onnx
+      size: 63516050
+      sha256: dfaa5b7833cd48d946f3fe18c9c934aaa4e8590aac6922fddf34783a694c3c87
+    - path: te_IN-venkatesh-medium.onnx.json
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/te/te_IN/venkatesh/medium/te_IN-venkatesh-medium.onnx.json
+      size: 4973
+    - path: MODEL_CARD
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/te/te_IN/venkatesh/medium/MODEL_CARD
+      size: 277
+    convert: piper
+  options:
+    language: te-IN
+  requires:
+  - espeak-ng
+- id: piper-te-in-maya-medium
+  aliases:
+  - piper-te_IN-maya-medium
+  - rhasspy/piper-voices/te_IN-maya-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - te
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 62955402
+  license: 'See dataset licence: https://www.iitm.ac.in/donlab/indictts/downloads/license.pdf'
+  description: 'Piper voice ''maya'' (Telugu, te-IN, medium quality, one speaker), taken from the Piper project
+    as published and converted for sherpa-onnx by bolo after the download; phonemes come from espeak-ng. The licence
+    of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.0974
+    round_trip_wer: 0.077
+    round_trip_cer: 0.013
+    round_trip_stt: indicconformer-te-community
+    ttfa_ms: 596
+    audio_s: 6.1
+    load_s: 1.07
+    memory_mb: 75
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: one FLEURS sentence, synthesised and transcribed back
+  source:
+    urls:
+    - path: te_IN-maya-medium.onnx
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/te/te_IN/maya/medium/te_IN-maya-medium.onnx
+      size: 62950044
+      sha256: c3518ad4e3ca8ea6059c1e002f3772068f634960f58b237a96ff629db1c6200e
+    - path: te_IN-maya-medium.onnx.json
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/te/te_IN/maya/medium/te_IN-maya-medium.onnx.json
+      size: 5040
+    - path: MODEL_CARD
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/te/te_IN/maya/medium/MODEL_CARD
+      size: 318
+    convert: piper
+  options:
+    language: te-IN
+  requires:
+  - espeak-ng
+- id: piper-ml-in-arjun-medium
+  aliases:
+  - piper-ml_IN-arjun-medium
+  - rhasspy/piper-voices/ml_IN-arjun-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - ml
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 62955396
+  license: 'See dataset licence (IndicTTS Malayalam corpus; the voice card only links to it): check before commercial
+    use'
+  description: 'Piper voice ''arjun'' (Malayalam, ml-IN, medium quality, one speaker), taken from the Piper project
+    as published and converted for sherpa-onnx by bolo after the download; phonemes come from espeak-ng. The licence
+    of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.1907
+    round_trip_wer: 0.1
+    round_trip_cer: 0.022
+    round_trip_stt: indicconformer-ml-community
+    ttfa_ms: 1642
+    audio_s: 8.6
+    load_s: 1.47
+    memory_mb: 0
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: one FLEURS sentence, synthesised and transcribed back
+  source:
+    urls:
+    - path: ml_IN-arjun-medium.onnx
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/ml/ml_IN/arjun/medium/ml_IN-arjun-medium.onnx
+      size: 62950044
+      sha256: e881130516a874306972a07dcf262e6900140430c5658131121744a80ef3f11b
+    - path: ml_IN-arjun-medium.onnx.json
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/ml/ml_IN/arjun/medium/ml_IN-arjun-medium.onnx.json
+      size: 5044
+    - path: MODEL_CARD
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/ml/ml_IN/arjun/medium/MODEL_CARD
+      size: 308
+    convert: piper
+  options:
+    language: ml-IN
+  requires:
+  - espeak-ng
+- id: piper-ml-in-meera-medium
+  aliases:
+  - piper-ml_IN-meera-medium
+  - rhasspy/piper-voices/ml_IN-meera-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - ml
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 62955397
+  license: 'See dataset licence (IndicTTS Malayalam corpus; the voice card only links to it): check before commercial
+    use'
+  description: 'Piper voice ''meera'' (Malayalam, ml-IN, medium quality, one speaker), taken from the Piper project
+    as published and converted for sherpa-onnx by bolo after the download; phonemes come from espeak-ng. The licence
+    of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.1937
+    round_trip_wer: 0.1
+    round_trip_cer: 0.067
+    round_trip_stt: indicconformer-ml-community
+    ttfa_ms: 1221
+    audio_s: 6.4
+    load_s: 0.92
+    memory_mb: 10
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: one FLEURS sentence, synthesised and transcribed back
+  source:
+    urls:
+    - path: ml_IN-meera-medium.onnx
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/ml/ml_IN/meera/medium/ml_IN-meera-medium.onnx
+      size: 62950044
+      sha256: 0c3e730f8294286694cac5d33f4c94d050ed8ea74c5fd6d0d492d38cb57b5102
+    - path: ml_IN-meera-medium.onnx.json
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/ml/ml_IN/meera/medium/ml_IN-meera-medium.onnx.json
+      size: 5045
+    - path: MODEL_CARD
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/ml/ml_IN/meera/medium/MODEL_CARD
+      size: 308
+    convert: piper
+  options:
+    language: ml-IN
+  requires:
+  - espeak-ng
+- id: piper-mr-in-google-medium
+  aliases:
+  - piper-mr_IN-google-medium
+  - rhasspy/piper-voices/mr_IN-google-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - mr
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 76773918
+  license: 'Voice: CC-BY-SA-4.0 (OpenSLR 64)'
+  features:
+  - multi-voice
+  description: 'Piper voice ''google'' (Marathi, mr-IN, medium quality, 9 speakers), taken from the Piper project
+    as published and converted for sherpa-onnx by bolo after the download; phonemes come from espeak-ng. The licence
+    of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.1312
+    round_trip_wer: 0.333
+    round_trip_cer: 0.061
+    round_trip_stt: indicconformer-mr-community
+    ttfa_ms: 932
+    audio_s: 7.1
+    load_s: 0.92
+    memory_mb: 111
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: one FLEURS sentence, synthesised and transcribed back
+  source:
+    urls:
+    - path: mr_IN-google-medium.onnx
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/mr/mr_IN/google/medium/mr_IN-google-medium.onnx
+      size: 76768179
+      sha256: e1200d474a74ebd6d1737be2c7affe56f1f9efc18915d4595d7f5c2b15cf06f4
+    - path: mr_IN-google-medium.onnx.json
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/mr/mr_IN/google/medium/mr_IN-google-medium.onnx.json
+      size: 5467
+    - path: MODEL_CARD
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/mr/mr_IN/google/medium/MODEL_CARD
+      size: 272
+    convert: piper
+  options:
+    language: mr-IN
+  requires:
+  - espeak-ng
+- id: piper-bn-bd-google-medium
+  aliases:
+  - piper-bn_BD-google-medium
+  - rhasspy/piper-voices/bn_BD-google-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - bn
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 76790428
+  license: 'Voice: CC-BY-SA-4.0 (OpenSLR 37) and the CMU Indic licence'
+  features:
+  - multi-voice
+  description: 'Piper voice ''google'' (Bengali, bn-BD, medium quality, 16 speakers), taken from the Piper project
+    as published and converted for sherpa-onnx by bolo after the download; phonemes come from espeak-ng. The licence
+    of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.2153
+    round_trip_wer: 0.333
+    round_trip_cer: 0.06
+    round_trip_stt: indicconformer-bn-community
+    ttfa_ms: 1012
+    audio_s: 4.4
+    load_s: 1.24
+    memory_mb: 94
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: one FLEURS sentence, synthesised and transcribed back
+  source:
+    urls:
+    - path: bn_BD-google-medium.onnx
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/bn/bn_BD/google/medium/bn_BD-google-medium.onnx
+      size: 76782515
+      sha256: f2e7518ed5534a755024a48c71b80bf617efaf12570bbdf3ce255a9526a8afd3
+    - path: bn_BD-google-medium.onnx.json
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/bn/bn_BD/google/medium/bn_BD-google-medium.onnx.json
+      size: 5494
+    - path: MODEL_CARD
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/bn/bn_BD/google/medium/MODEL_CARD
+      size: 2419
+    convert: piper
+  options:
+    language: bn-BD
+  requires:
+  - espeak-ng
+- id: piper-ur-pk-aegis-female-medium
+  aliases:
+  - piper-ur_PK-aegis_female-medium
+  - rhasspy/piper-voices/ur_PK-aegis_female-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - ur
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63521436
+  license: 'Voice: MIT (per the voice card)'
+  description: 'Piper voice ''aegis_female'' (Urdu, ur-PK, medium quality, one speaker), taken from the Piper project
+    as published and converted for sherpa-onnx by bolo after the download; phonemes come from espeak-ng. The licence
+    of a Piper voice follows its training data: check it before commercial use.'
+  source_url: https://huggingface.co/rhasspy/piper-voices
+  validated: cpu
+  measured:
+    rtf: 0.1372
+    round_trip_wer: 0.278
+    round_trip_cer: 0.028
+    round_trip_stt: indicconformer-ur-community
+    ttfa_ms: 866
+    audio_s: 6.1
+    load_s: 1.36
+    memory_mb: 82
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: one FLEURS sentence, synthesised and transcribed back
+  source:
+    urls:
+    - path: ur_PK-aegis_female-medium.onnx
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/ur/ur_PK/aegis_female/medium/ur_PK-aegis_female-medium.onnx
+      size: 63515589
+      sha256: 3ec306035cfd0bbc22342fee5890450708a16dd231809522731678aa583c961f
+    - path: ur_PK-aegis_female-medium.onnx.json
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/ur/ur_PK/aegis_female/medium/ur_PK-aegis_female-medium.onnx.json
+      size: 5236
+    - path: MODEL_CARD
+      url: https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/ur/ur_PK/aegis_female/medium/MODEL_CARD
+      size: 611
+    convert: piper
+  options:
+    language: ur-PK
+  requires:
+  - espeak-ng
+- id: piper-ta-in-rasa-female-medium
+  aliases:
+  - piper-ta_IN-rasa_female-medium
+  - tinisoft/piper-ta_IN-rasa_female-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - ta
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63518128
+  license: 'Voice: CC-BY-4.0 (AI4Bharat Rasa data; third-party voice by tinisoft)'
+  description: Third-party Piper voice 'rasa_female' (Tamil, ta-IN, medium quality, one speaker), converted for
+    sherpa-onnx by bolo after the download; phonemes come from espeak-ng. Not part of the Piper project's own voice
+    collection.
+  source_url: https://huggingface.co/tinisoft/piper-ta_IN-rasa_female-medium
+  validated: cpu
+  measured:
+    rtf: 0.1095
+    round_trip_wer: 0.0
+    round_trip_cer: 0.0
+    round_trip_stt: indicconformer-ta-community
+    ttfa_ms: 487
+    audio_s: 4.5
+    load_s: 1.47
+    memory_mb: 0
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: one FLEURS sentence, synthesised and transcribed back
+  source:
+    repo: tinisoft/piper-ta_IN-rasa_female-medium
+    revision: 89e15edafc8b31e66ddf25f2adbe3bd3f20a9496
+    include:
+    - '*.onnx'
+    - '*.onnx.json'
+    convert: piper
+  options:
+    language: ta-IN
+  requires:
+  - espeak-ng
+- id: piper-ta-in-rasa-male-medium
+  aliases:
+  - piper-ta_IN-rasa_male-medium
+  - tinisoft/piper-ta_IN-rasa_male-medium
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: Piper
+  languages:
+  - ta
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 63518126
+  license: 'Voice: CC-BY-4.0 (AI4Bharat Rasa data; third-party voice by tinisoft)'
+  description: Third-party Piper voice 'rasa_male' (Tamil, ta-IN, medium quality, one speaker), converted for sherpa-onnx
+    by bolo after the download; phonemes come from espeak-ng. Not part of the Piper project's own voice collection.
+  source_url: https://huggingface.co/tinisoft/piper-ta_IN-rasa_male-medium
+  validated: cpu
+  measured:
+    rtf: 0.1473
+    round_trip_wer: 0.1
+    round_trip_cer: 0.031
+    round_trip_stt: indicconformer-ta-community
+    ttfa_ms: 563
+    audio_s: 4.0
+    load_s: 1.49
+    memory_mb: 0
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: one FLEURS sentence, synthesised and transcribed back
+  source:
+    repo: tinisoft/piper-ta_IN-rasa_male-medium
+    revision: 0b041f8e882b1e6f41f427169be25bcb0e94f352
+    include:
+    - '*.onnx'
+    - '*.onnx.json'
+    convert: piper
+  options:
+    language: ta-IN
+  requires:
+  - espeak-ng

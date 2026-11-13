@@ -2819,3 +2819,1023 @@
     - '*.mp4'
     - '*.mov'
     - '*.srt'
+- id: indicconformer-mai-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - mai
+  tier: balanced
+  size_bytes: 197652650
+  license: MIT
+  description: 'Maithili: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX
+    export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not).
+    Writes Devanagari.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_mai_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.0643
+    wer: 0.496
+    cer: 0.116
+    audio_s: 318.1
+    utterances: 60
+    load_s: 0.65
+    memory_mb: 281
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: RESPIN Maithili test (IISc, CC-BY-4.0), 60 utterances
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/mai/model.int8.onnx
+      size: 197585045
+      sha256: 27a6cee11bf20679821aa079e49694c5989ae16c9b7a58ea6f2052f80acff2bd
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-hi-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - hi
+  tier: balanced
+  size_bytes: 197663198
+  license: MIT
+  description: 'Hindi: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX
+    export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not).
+    Writes Devanagari. Also the practical fallback for Bhojpuri, which has no model of its own here (see docs/indic-telephony.md).'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_hi_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.0662
+    wer: 0.152
+    cer: 0.07
+    audio_s: 120.6
+    utterances: 10
+    load_s: 0.48
+    memory_mb: 126
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS hi_in dev (CC-BY-4.0), first 10 utterances
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/hi/model.int8.onnx
+      size: 197595593
+      sha256: 915c71e04dd7e5378a4057fdebb252b3a587188e4e99db6d7ce0909ad5ad05fa
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-as-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - as
+  tier: balanced
+  size_bytes: 197663114
+  license: MIT
+  description: 'Assamese: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX
+    export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not).
+    Writes Bengali-Assamese script.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_as_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.15
+    wer: 0.308
+    cer: 0.149
+    audio_s: 130.1
+    utterances: 10
+    load_s: 0.67
+    memory_mb: 257
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS as_in dev (CC-BY-4.0), first 10 utterances
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/as/model.int8.onnx
+      size: 197595509
+      sha256: b8c027e8ab6c9f64417a879b85c61254aefc3557b1875bf793fb5a33abb20426
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-bn-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - bn
+  tier: balanced
+  size_bytes: 197663183
+  license: MIT
+  description: 'Bengali: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX
+    export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not).
+    Writes Bengali script.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_bn_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.1062
+    wer: 0.108
+    cer: 0.025
+    audio_s: 124.9
+    utterances: 10
+    load_s: 0.51
+    memory_mb: 40
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS bn_in dev (CC-BY-4.0), first 10 utterances
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/bn/model.int8.onnx
+      size: 197595578
+      sha256: e9120a534f69df065314be468bf15579f1b92a4cd8c07ad119b80b69244718a8
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-brx-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - brx
+  tier: balanced
+  size_bytes: 197652565
+  license: MIT
+  description: 'Bodo: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX export
+    for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not). Writes
+    Devanagari.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_brx_hybrid_ctc_rnnt_large
+  validated: untested
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/brx/model.int8.onnx
+      size: 197584960
+      sha256: 05e4681819eccb06a39d0481828d52b90619171313ef6d7677db6842d205b177
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-doi-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - doi
+  tier: balanced
+  size_bytes: 197652485
+  license: MIT
+  description: 'Dogri: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX
+    export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not).
+    Writes Devanagari.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_doi_hybrid_ctc_rnnt_large
+  validated: untested
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/doi/model.int8.onnx
+      size: 197584880
+      sha256: cf2031118dcdd3eacb0738e7dd45a749770d276a6217f4e6f56e7175a44f2bbd
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-gu-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - gu
+  tier: balanced
+  size_bytes: 197663066
+  license: MIT
+  description: 'Gujarati: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX
+    export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not).
+    Writes Gujarati script.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_gu_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.1143
+    wer: 0.217
+    cer: 0.054
+    audio_s: 102.5
+    utterances: 10
+    load_s: 0.49
+    memory_mb: 42
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS gu_in dev (CC-BY-4.0), first 10 utterances
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/gu/model.int8.onnx
+      size: 197595461
+      sha256: 822ed7f0b809bbd479275bf91c913d05564b88c0d082bbcba2f37999b88cb598
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-kn-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - kn
+  tier: balanced
+  size_bytes: 197663333
+  license: MIT
+  description: 'Kannada: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX
+    export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not).
+    Writes Kannada script.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_kn_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.0703
+    wer: 0.151
+    cer: 0.048
+    audio_s: 129.8
+    utterances: 9
+    load_s: 0.42
+    memory_mb: 41
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS kn_in dev (CC-BY-4.0), first 9 utterances
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/kn/model.int8.onnx
+      size: 197595728
+      sha256: b226ce7e4ea35b0dd66991964bd00e011b6b14b0fcdf4f7d1cccd777781c94dc
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-kok-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - kok
+  tier: balanced
+  size_bytes: 197652635
+  license: MIT
+  description: 'Konkani: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX
+    export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not).
+    Writes Devanagari.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_kok_hybrid_ctc_rnnt_large
+  validated: untested
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/kok/model.int8.onnx
+      size: 197585030
+      sha256: 34c952a5817bef09bc118999598fa035b96c5c1900881a2bc438026bf480db07
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-ks-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - ks
+  tier: balanced
+  size_bytes: 197652573
+  license: MIT
+  description: 'Kashmiri: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX
+    export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not).
+    Writes Perso-Arabic script, right to left.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_ks_hybrid_ctc_rnnt_large
+  validated: untested
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/ks/model.int8.onnx
+      size: 197584968
+      sha256: d800d7bc4fd4adda9e1ec5ba3fcceb0539347cbe1b6fdf91deda90cc0bae2a6b
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-ml-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - ml
+  tier: balanced
+  size_bytes: 197663160
+  license: MIT
+  description: 'Malayalam: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX
+    export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not).
+    Writes Malayalam script.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_ml_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.1241
+    wer: 0.314
+    cer: 0.088
+    audio_s: 136.6
+    utterances: 9
+    load_s: 0.49
+    memory_mb: 43
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS ml_in dev (CC-BY-4.0), first 9 utterances
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/ml/model.int8.onnx
+      size: 197595555
+      sha256: dcbdfa9f773db910508b40b703cb76c5974e8d4c6f123ea81265b40853c3f0c2
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-mni-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - mni
+  tier: balanced
+  size_bytes: 197652647
+  license: MIT
+  description: 'Manipuri (Meitei): AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community
+    int8 ONNX export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export
+    is not). Writes Meetei Mayek script.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_mni_hybrid_ctc_rnnt_large
+  validated: untested
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/mni/model.int8.onnx
+      size: 197585042
+      sha256: 885adb2d6d48ce413e54e37fa88b41bd5eb86c78020f898fd55a554fc04df7ec
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-mr-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - mr
+  tier: balanced
+  size_bytes: 197663198
+  license: MIT
+  description: 'Marathi: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX
+    export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not).
+    Writes Devanagari.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_mr_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.2019
+    wer: 0.193
+    cer: 0.042
+    audio_s: 130.4
+    utterances: 10
+    load_s: 0.45
+    memory_mb: 41
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS mr_in dev (CC-BY-4.0), first 10 utterances
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/mr/model.int8.onnx
+      size: 197595593
+      sha256: 1ea81e55c4b9b12624c9d02a5b9c1b6f7c871c78a55ff52d333f81cb5136eaf2
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-ne-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - ne
+  tier: balanced
+  size_bytes: 197652740
+  license: MIT
+  description: 'Nepali: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX
+    export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not).
+    Writes Devanagari.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_ne_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.1354
+    wer: 0.307
+    cer: 0.127
+    audio_s: 90.6
+    utterances: 10
+    load_s: 0.48
+    memory_mb: 33
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS ne_np dev (CC-BY-4.0), first 10 utterances
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/ne/model.int8.onnx
+      size: 197585135
+      sha256: fbbc564e369046fd788d4150192a7e47c4e675346ec3f1b78002937fb3ccfb56
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-or-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - or
+  tier: balanced
+  size_bytes: 197652533
+  license: MIT
+  description: 'Odia: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX export
+    for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not). Writes
+    Odia script.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_or_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.1551
+    wer: 0.155
+    cer: 0.048
+    audio_s: 125.3
+    utterances: 10
+    load_s: 0.68
+    memory_mb: 41
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS or_in dev (CC-BY-4.0), first 10 utterances
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/or/model.int8.onnx
+      size: 197584928
+      sha256: 31730e06bd186bca5c3214003c2a0b5eeb3234d079b5b81aa72547adbe1c9be7
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-pa-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - pa
+  tier: balanced
+  size_bytes: 197663153
+  license: MIT
+  description: 'Punjabi: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX
+    export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not).
+    Writes Gurmukhi.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_pa_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.139
+    wer: 0.155
+    cer: 0.053
+    audio_s: 114.7
+    utterances: 10
+    load_s: 0.59
+    memory_mb: 41
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS pa_in dev (CC-BY-4.0), first 10 utterances
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/pa/model.int8.onnx
+      size: 197595548
+      sha256: ccd02e5ae7e71b6719de517c2819ce570247c1d9e79b3348e76cfd5eb3e5dbbc
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-sa-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - sa
+  tier: balanced
+  size_bytes: 197652635
+  license: MIT
+  description: 'Sanskrit: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX
+    export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not).
+    Writes Devanagari.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_sa_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.1267
+    wer: 0.442
+    cer: 0.061
+    audio_s: 123.7
+    utterances: 12
+    load_s: 0.47
+    memory_mb: 41
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: prathoshap/sushrota-sanskrit-asr-data train (CC-BY-4.0), first 12 utterances
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/sa/model.int8.onnx
+      size: 197585030
+      sha256: 08a878cdc31ef93c2a05545dbd0c44c5a95b3884d0754104beed984262a5b981
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-sat-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - sat
+  tier: balanced
+  size_bytes: 197652423
+  license: MIT
+  description: 'Santali: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX
+    export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not).
+    Writes Ol Chiki script.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_sat_hybrid_ctc_rnnt_large
+  validated: untested
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/sat/model.int8.onnx
+      size: 197584818
+      sha256: fc22b03c18bf911ce18ca1f7dafe8e5ccf2521f1a8c72596da22117cb8acf147
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-sd-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - sd
+  tier: balanced
+  size_bytes: 197652550
+  license: MIT
+  description: 'Sindhi: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX
+    export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not).
+    Writes Devanagari, not Perso-Arabic.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_sd_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.1094
+    audio_s: 106.5
+    utterances: 10
+    load_s: 0.59
+    memory_mb: 239
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: the model writes Sindhi in Devanagari and the test references are in Arabic script, so no error rate could
+      be computed; run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine
+      are lower
+    test_audio: FLEURS sd_in dev (CC-BY-4.0), first 10 utterances
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/sd/model.int8.onnx
+      size: 197584945
+      sha256: 6529b3ffac5a159696b3fd34dddb6e3bda4f3cb7521307f817e201cdc37d20b3
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-ta-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - ta
+  tier: balanced
+  size_bytes: 197663118
+  license: MIT
+  description: 'Tamil: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX
+    export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not).
+    Writes Tamil script.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_ta_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.06
+    wer: 0.255
+    cer: 0.102
+    audio_s: 105.6
+    utterances: 10
+    load_s: 0.63
+    memory_mb: 42
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS ta_in dev (CC-BY-4.0), first 10 utterances
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/ta/model.int8.onnx
+      size: 197595513
+      sha256: abb7b59d706b8d27ba3fb5e5e3db7671c9e1a09bf7bc6122de507c60030e65fb
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-te-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - te
+  tier: balanced
+  size_bytes: 197663298
+  license: MIT
+  description: 'Telugu: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX
+    export for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not).
+    Writes Telugu script.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_te_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.0744
+    wer: 0.211
+    cer: 0.104
+    audio_s: 98.1
+    utterances: 10
+    load_s: 0.47
+    memory_mb: 43
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS te_in dev (CC-BY-4.0), first 10 utterances
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/te/model.int8.onnx
+      size: 197595693
+      sha256: 710f176e33080f1be84b4f38bb5f33be3f522dcf4f191bf4d5cc89f7a85924f3
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-ur-community
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - ur
+  tier: balanced
+  size_bytes: 197652694
+  license: MIT
+  description: 'Urdu: AI4Bharat IndicConformer large (CTC branch, about 120 M parameters), community int8 ONNX export
+    for sherpa-onnx (not by AI4Bharat; the official repository is gated on Hugging Face, this export is not). Writes
+    Perso-Arabic script, right to left.'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_ur_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.143
+    wer: 0.185
+    cer: 0.075
+    audio_s: 98.2
+    utterances: 10
+    load_s: 0.66
+    memory_mb: 250
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS ur_pk dev (CC-BY-4.0), first 10 utterances
+  source:
+    urls:
+    - path: model.int8.onnx
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/ur/model.int8.onnx
+      size: 197585089
+      sha256: 0239f1c371a38f7623f29a8d7bae79f91f16f58aba45ea67103630dbb425cb07
+    - path: tokens.txt
+      url: https://huggingface.co/parismitaglobalsolutions/indicconformer-sherpa-onnx/resolve/9721eb71eea141fae0982cfcdb9dd2e3d4953c4a/tokens.txt
+      size: 67605
+      sha256: ee60967630213f31951817ac8b402b92ec18cce80718a24a49b388e56672dfb2
+- id: indicconformer-ta
+  aliases:
+  - csndhanasekar/sherpa-onnx-indicconformer-ta-int8
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - ta
+  tier: balanced
+  size_bytes: 137567224
+  license: MIT
+  description: 'Tamil: AI4Bharat IndicConformer large (CTC branch), community int8 ONNX export with a single-language
+    vocabulary (smaller than the indicconformer-ta-community export of the same model; not by AI4Bharat).'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_ta_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.2284
+    wer: 0.29
+    cer: 0.103
+    audio_s: 105.6
+    utterances: 10
+    load_s: 1.33
+    memory_mb: 123
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS ta_in dev (CC-BY-4.0), first 10 utterances
+  source:
+    repo: csndhanasekar/sherpa-onnx-indicconformer-ta-int8
+    revision: a41ba03ed8e489eda5e108cb49099b7c9cf83e8b
+    include:
+    - model.int8.onnx
+    - tokens.txt
+    - LICENSE
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: indicconformer-te
+  aliases:
+  - csndhanasekar/sherpa-onnx-indicconformer-te-int8
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - te
+  tier: balanced
+  size_bytes: 137566890
+  license: MIT
+  description: 'Telugu: AI4Bharat IndicConformer large (CTC branch), community int8 ONNX export with a single-language
+    vocabulary (smaller than the indicconformer-te-community export of the same model; not by AI4Bharat).'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_te_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.2623
+    wer: 0.217
+    cer: 0.105
+    audio_s: 98.1
+    utterances: 10
+    load_s: 1.22
+    memory_mb: 18
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS te_in dev (CC-BY-4.0), first 10 utterances
+  source:
+    repo: csndhanasekar/sherpa-onnx-indicconformer-te-int8
+    revision: 638940e6fe0302e50042e865a26d5e45579ebce5
+    include:
+    - model.int8.onnx
+    - tokens.txt
+    - LICENSE
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: indicconformer-ml
+  aliases:
+  - csndhanasekar/sherpa-onnx-indicconformer-ml-int8
+  task: stt
+  engine: sherpa-onnx
+  kind: nemo_ctc
+  family: IndicConformer
+  languages:
+  - ml
+  tier: balanced
+  size_bytes: 137567010
+  license: MIT
+  description: 'Malayalam: AI4Bharat IndicConformer large (CTC branch), community int8 ONNX export with a single-language
+    vocabulary (smaller than the indicconformer-ml-community export of the same model; not by AI4Bharat).'
+  source_url: https://huggingface.co/ai4bharat/indicconformer_stt_ml_hybrid_ctc_rnnt_large
+  validated: cpu
+  measured:
+    rtf: 0.1737
+    wer: 0.343
+    cer: 0.098
+    audio_s: 136.6
+    utterances: 9
+    load_s: 0.94
+    memory_mb: 151
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS ml_in dev (CC-BY-4.0), first 9 utterances
+  source:
+    repo: csndhanasekar/sherpa-onnx-indicconformer-ml-int8
+    revision: 394e2c20b57eb0db12839ecff00f904a55ea9f47
+    include:
+    - model.int8.onnx
+    - tokens.txt
+    - LICENSE
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+- id: nemotron-3.5-streaming-560ms
+  task: stt
+  engine: sherpa-onnx
+  kind: online_transducer
+  family: Nemotron
+  languages:
+  - ar
+  - bg
+  - cs
+  - da
+  - de
+  - el
+  - en
+  - es
+  - et
+  - fi
+  - fr
+  - he
+  - hi
+  - hr
+  - hu
+  - it
+  - ja
+  - ko
+  - lt
+  - lv
+  - nl
+  - 'no'
+  - pl
+  - pt
+  - ro
+  - ru
+  - sk
+  - sl
+  - sv
+  - th
+  - tr
+  - uk
+  - vi
+  - zh
+  tier: accuracy
+  streaming: true
+  size_bytes: 682215356
+  license: OpenMDW-1.1
+  description: 'NVIDIA Nemotron 3.5 ASR streaming (0.6 B parameters, cache-aware FastConformer transducer, 560 ms
+    chunks), int8 ONNX export by the sherpa-onnx project. Natively streaming with punctuation; Hindi is its only
+    Indian language. Pass language= to fix the language (otherwise the model detects it). Large (680 MB) for a CPU.'
+  source_url: https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b
+  validated: cpu
+  measured:
+    rtf: 0.3122
+    wer: 0.209
+    cer: 0.061
+    audio_s: 43.9
+    utterances: 3
+    load_s: 2.0
+    memory_mb: 7
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run as whole-utterance decoding (HTTP path) on 3 utterances with language=hi; streaming latency not measured;
+      run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are lower
+    test_audio: FLEURS hi_in dev (CC-BY-4.0), first 3 utterances
+  source:
+    repo: csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11
+    revision: ab43d895f5985b1bbab8b6eac8607fcdc05343f3
+    include:
+    - '*.int8.onnx'
+    - tokens.txt
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    stream_language: true
+    lowercase: false

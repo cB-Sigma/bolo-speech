@@ -7,7 +7,7 @@
    "name": "Apache-2.0",
    "url": "https://www.apache.org/licenses/LICENSE-2.0"
   },
-  "version": "0.1.0"
+  "version": "0.2.0"
  },
  "paths": {
   "/v1/models": {
@@ -1238,6 +1238,86 @@
      }
     }
    }
+  },
+  "/v1/realtime/client_secrets": {
+   "post": {
+    "tags": [
+     "openai"
+    ],
+    "summary": "Create an ephemeral key for Realtime sessions",
+    "description": "Body (all optional): ``{\"expires_after\": {\"anchor\": \"created_at\", \"seconds\": 600}, \"session\": {...}}``.\n\nNeeds the server API key. The returned ``value`` (``ek_...``) can be handed to a browser: it opens\nRealtime sessions (WebSocket or WebRTC) until it expires and is not accepted by any other route.",
+    "operationId": "client_secrets_v1_realtime_client_secrets_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/realtime/calls": {
+   "post": {
+    "tags": [
+     "openai"
+    ],
+    "summary": "Start a Realtime session over WebRTC (SDP offer/answer)",
+    "description": "Send the SDP offer as the body (``Content-Type: application/sdp``), or as the ``sdp`` field of a\nmultipart form together with an optional ``session`` field holding the session configuration as JSON.\nThe answer is ``201`` with the SDP answer as the body and the call in the ``Location`` header.\n\nAuthentication: the server API key or an ephemeral client secret. Query: ``model``,\n``intent=transcription``. Needs the ``webrtc`` extra (aiortc).",
+    "operationId": "create_call_v1_realtime_calls_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/realtime/calls/{call_id}/hangup": {
+   "post": {
+    "tags": [
+     "openai"
+    ],
+    "summary": "End a WebRTC Realtime call",
+    "operationId": "hangup_v1_realtime_calls__call_id__hangup_post",
+    "parameters": [
+     {
+      "name": "call_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Call Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
   }
  },
  "components": {
@@ -1333,7 +1413,7 @@
      "id": {
       "type": "string",
       "title": "Id",
-      "description": "Catalog id or alias, or `hf:<repo>` for any compatible Hugging Face model."
+      "description": "Catalog id or alias, `hf:<repo>` for any compatible Hugging Face model, or `piper:<voice>` (for example `piper:te_IN-venkatesh-medium`) for any voice of the Piper project."
      },
      "kind": {
       "anyOf": [

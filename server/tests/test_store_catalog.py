@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import http.server
 import json
+import re
 import threading
 from collections.abc import Iterator
 from pathlib import Path
@@ -208,16 +209,30 @@ def test_helpers() -> None:
 def test_every_packaged_entry_is_well_formed() -> None:
     entries = packaged_entries()
     assert len(entries) >= 150
-    specs = [ModelSpec.from_dict(e) for e in entries]
-    ids = [s.id for s in specs]
+    every = [ModelSpec.from_dict(e) for e in entries]
+    ids = [s.id for s in every]
     assert len(ids) == len(set(ids))
+    # entries whose files are not published yet: described, but without checksums and never offered
+    pending = [s for s in every if s.status == "pending"]
+    assert all(
+        s.validated == "untested"
+        and s.source.urls[0]["url"].startswith("https://github.com/cb-Sigma/bolo/releases/download/")
+        for s in pending
+    )
+    specs = [s for s in every if s.status != "pending"]
     for s in specs:
         assert s.license and s.license != "unknown", s.id
-        assert s.source.repo and len(s.source.revision) == 40, f"{s.id}: revisions are pinned to a commit"
+        if s.source.repo:
+            assert len(s.source.revision) == 40, f"{s.id}: revisions are pinned to a commit"
+            assert "espeak-ng-data/*" in s.source.exclude or s.engine != "sherpa-onnx" or s.source.include, s.id
+        else:  # plain URLs: the revision is part of the URL and the large files carry a checksum
+            assert s.source.urls, s.id
+            for u in s.source.urls:
+                assert re.search(r"/resolve/[0-9a-f]{40}/", u["url"]) or (u.get("extract") and u.get("sha256")), s.id
+                assert u.get("sha256") or (u.get("size") or 0) < 1_000_000, f"{s.id}: {u['path']} needs a sha256"
         assert s.size_bytes > 100_000, s.id
         assert s.description and s.source_url.startswith("https://"), s.id
-        assert s.engine in ("sherpa-onnx", "faster-whisper"), s.id
-        assert "espeak-ng-data/*" in s.source.exclude or s.engine != "sherpa-onnx", s.id
+        assert s.engine in ("sherpa-onnx", "faster-whisper", "onnxruntime"), s.id
         if s.task == "tts":
             assert s.sample_rate in (8000, 16000, 22050, 24000, 44100, 48000), s.id
         if s.validated == "cpu":
@@ -225,7 +240,7 @@ def test_every_packaged_entry_is_well_formed() -> None:
         if "non-commercial" in s.license.lower() or "-nc" in s.license.lower():
             assert s.commercial_use is False, s.id
     tasks = {s.task for s in specs}
-    assert tasks == {"stt", "tts", "vad", "diarization"}
+    assert tasks == {"stt", "tts", "vad", "diarization", "turn"}
     needs = [s for s in specs if "espeak-ng" in s.requires]
     assert len(needs) >= 80 and all(s.task == "tts" for s in needs)
     assert not [s.id for s in specs if s.family == "Kokoro" and s.requires]  # the default voice needs nothing extra
@@ -249,6 +264,35 @@ def test_every_packaged_entry_is_well_formed() -> None:
         "as",
     }
     assert len(indic) >= 12
+    # every scheduled language of India has a speech-to-text model of its own
+    scheduled = [
+        "as",
+        "bn",
+        "brx",
+        "doi",
+        "gu",
+        "hi",
+        "kn",
+        "kok",
+        "ks",
+        "mai",
+        "ml",
+        "mni",
+        "mr",
+        "ne",
+        "or",
+        "pa",
+        "sa",
+        "sat",
+        "sd",
+        "ta",
+        "te",
+        "ur",
+    ]
+    stt_langs = {lang for s in specs if s.task == "stt" and s.family == "IndicConformer" for lang in s.languages}
+    assert set(scheduled) <= stt_langs
+    converted = [s for s in specs if s.source.convert == "piper"]
+    assert len(converted) >= 10 and all(s.requires == ["espeak-ng"] and s.kind == "vits" for s in converted)
     assert not [s.id for s in specs if s.gated], (
         "gated models must never be in the default catalog without a marker test"
     )
@@ -365,6 +409,8 @@ def test_catalog_sources_resolve_on_the_hub() -> None:
     failures = []
     for entry in packaged_entries():
         spec = ModelSpec.from_dict(entry)
+        if spec.status == "pending":  # its files are not published yet
+            continue
         try:
             files = store.plan(spec.source)
             total = sum(f.size or 0 for f in files)

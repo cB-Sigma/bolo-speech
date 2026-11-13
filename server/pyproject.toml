@@ -51,6 +51,10 @@ kokoro-onnx = ["kokoro-onnx>=0.4"]
 espeak = ["espeakng-loader>=0.2.4"]
 av = ["av>=12"]
 wyoming = ["wyoming>=1.6"]
+# WebRTC transport of the Realtime API (aiortc is BSD-3-Clause; it brings PyAV for Opus)
+webrtc = ["aiortc>=1.9", "av>=12"]
+# end-of-turn detection for Realtime sessions (semantic_vad). faster-whisper already brings onnxruntime.
+turn = ["onnxruntime>=1.17"]
 text = ["whisper-normalizer>=0.1"]
 all = [
   "sherpa-onnx>=2.0,<3",
@@ -121,7 +125,7 @@ warn_unused_ignores = false
 module = [
   "sherpa_onnx.*", "faster_whisper.*", "ctranslate2.*", "soundfile.*", "soxr.*", "av.*",
   "moonshine_onnx.*", "kokoro_onnx.*", "pywhispercpp.*", "wyoming.*", "whisper_normalizer.*",
-  "onnxruntime.*", "tomli.*",
+  "onnxruntime.*", "tomli.*", "aiortc.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"

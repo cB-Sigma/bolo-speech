@@ -1,0 +1,213 @@
+{
+ "what": "number of speakers found by the default diarization pipeline (pyannote-3.0-eres2net) on recordings with a known number of speakers",
+ "conditions": "2 threads on a busy 4-vCPU machine; VoxConverse dev excerpts (CC-BY-4.0) cut to their first 300 s or less; the threshold 0.5 column is sherpa-onnx's default clustering threshold, measured earlier on the same machine",
+ "summary": {
+  "clips": 18,
+  "exact_clustering_only": 10,
+  "exact_with_consolidation": 14,
+  "mean_abs_error_clustering_only": 0.83,
+  "mean_abs_error_with_consolidation": 0.28,
+  "threshold_0_5_exact": 5,
+  "threshold_0_5_clips": 10
+ },
+ "clips": {
+  "1-two-speakers-en": {
+   "truth": 2,
+   "seconds": 16,
+   "clustering_only": 2,
+   "clustering_only_s": 3.1,
+   "with_consolidation": 2,
+   "with_consolidation_s": 2.6,
+   "consolidate_phase_ms": 536,
+   "source": "sherpa-onnx test clip 1-two-speakers-en",
+   "threshold_0_5_clusters": 2
+  },
+  "2-two-speakers-en": {
+   "truth": 2,
+   "seconds": 34,
+   "clustering_only": 2,
+   "clustering_only_s": 12.4,
+   "with_consolidation": 2,
+   "with_consolidation_s": 14.2,
+   "consolidate_phase_ms": 1584,
+   "source": "sherpa-onnx test clip 2-two-speakers-en",
+   "threshold_0_5_clusters": 4
+  },
+  "3-two-speakers-en": {
+   "truth": 2,
+   "seconds": 55,
+   "clustering_only": 2,
+   "clustering_only_s": 21.7,
+   "with_consolidation": 2,
+   "with_consolidation_s": 27.3,
+   "consolidate_phase_ms": 2667,
+   "source": "sherpa-onnx test clip 3-two-speakers-en",
+   "threshold_0_5_clusters": 4
+  },
+  "0-four-speakers-zh": {
+   "truth": 4,
+   "seconds": 57,
+   "clustering_only": 5,
+   "clustering_only_s": 13.7,
+   "with_consolidation": 4,
+   "with_consolidation_s": 16.5,
+   "consolidate_phase_ms": 1727,
+   "source": "sherpa-onnx test clip 0-four-speakers-zh",
+   "threshold_0_5_clusters": 7
+  },
+  "dev00": {
+   "truth": 8,
+   "seconds": 300,
+   "clustering_only": 8,
+   "clustering_only_s": 113.4,
+   "with_consolidation": 7,
+   "with_consolidation_s": 115.9,
+   "consolidate_phase_ms": 6013,
+   "source": "VoxConverse dev aisvi (first 300 s)",
+   "threshold_0_5_clusters": 13
+  },
+  "dev01": {
+   "truth": 1,
+   "seconds": 300,
+   "clustering_only": 1,
+   "clustering_only_s": 111.7,
+   "with_consolidation": 1,
+   "with_consolidation_s": 126.2,
+   "consolidate_phase_ms": null,
+   "source": "VoxConverse dev xypdm (first 300 s)",
+   "threshold_0_5_clusters": 3
+  },
+  "dev02": {
+   "truth": 4,
+   "seconds": 300,
+   "clustering_only": 5,
+   "clustering_only_s": 129.7,
+   "with_consolidation": 4,
+   "with_consolidation_s": 133.1,
+   "consolidate_phase_ms": 7583,
+   "source": "VoxConverse dev ldnro (first 300 s)",
+   "threshold_0_5_clusters": 4
+  },
+  "dev03": {
+   "truth": 1,
+   "seconds": 122,
+   "clustering_only": 1,
+   "clustering_only_s": 63.0,
+   "with_consolidation": 1,
+   "with_consolidation_s": 62.0,
+   "consolidate_phase_ms": null,
+   "source": "VoxConverse dev atgpi (first 122 s)",
+   "threshold_0_5_clusters": 1
+  },
+  "dev04": {
+   "truth": 8,
+   "seconds": 300,
+   "clustering_only": 8,
+   "clustering_only_s": 112.4,
+   "with_consolidation": 8,
+   "with_consolidation_s": 145.4,
+   "consolidate_phase_ms": 7055,
+   "source": "VoxConverse dev xxwgv (first 300 s)",
+   "threshold_0_5_clusters": 8
+  },
+  "dev05": {
+   "truth": 2,
+   "seconds": 154,
+   "clustering_only": 2,
+   "clustering_only_s": 77.5,
+   "with_consolidation": 2,
+   "with_consolidation_s": 56.3,
+   "consolidate_phase_ms": 4074,
+   "source": "VoxConverse dev qhesr (first 154 s)",
+   "threshold_0_5_clusters": 2
+  },
+  "dev06": {
+   "truth": 5,
+   "seconds": 300,
+   "clustering_only": 10,
+   "clustering_only_s": 89.6,
+   "with_consolidation": 6,
+   "with_consolidation_s": 84.3,
+   "consolidate_phase_ms": 6123,
+   "source": "VoxConverse dev ldkmv (first 300 s)",
+   "threshold_0_5_clusters": null
+  },
+  "dev07": {
+   "truth": 4,
+   "seconds": 260,
+   "clustering_only": 5,
+   "clustering_only_s": 109.4,
+   "with_consolidation": 4,
+   "with_consolidation_s": 98.3,
+   "consolidate_phase_ms": 5723,
+   "source": "VoxConverse dev ypwjd (first 260 s)",
+   "threshold_0_5_clusters": null
+  },
+  "dev08": {
+   "truth": 9,
+   "seconds": 300,
+   "clustering_only": 11,
+   "clustering_only_s": 90.3,
+   "with_consolidation": 7,
+   "with_consolidation_s": 125.2,
+   "consolidate_phase_ms": 7063,
+   "source": "VoxConverse dev pnook (first 300 s)",
+   "threshold_0_5_clusters": null
+  },
+  "dev09": {
+   "truth": 2,
+   "seconds": 106,
+   "clustering_only": 2,
+   "clustering_only_s": 32.7,
+   "with_consolidation": 2,
+   "with_consolidation_s": 33.2,
+   "consolidate_phase_ms": 3066,
+   "source": "VoxConverse dev kctgl (first 106 s)",
+   "threshold_0_5_clusters": null
+  },
+  "dev10": {
+   "truth": 4,
+   "seconds": 300,
+   "clustering_only": 5,
+   "clustering_only_s": 129.0,
+   "with_consolidation": 3,
+   "with_consolidation_s": 137.3,
+   "consolidate_phase_ms": 4999,
+   "source": "VoxConverse dev ktzmw (first 300 s)",
+   "threshold_0_5_clusters": null
+  },
+  "dev11": {
+   "truth": 1,
+   "seconds": 300,
+   "clustering_only": 2,
+   "clustering_only_s": 126.7,
+   "with_consolidation": 1,
+   "with_consolidation_s": 110.2,
+   "consolidate_phase_ms": 3417,
+   "source": "VoxConverse dev kkghn (first 300 s)",
+   "threshold_0_5_clusters": null
+  },
+  "dev12": {
+   "truth": 5,
+   "seconds": 116,
+   "clustering_only": 8,
+   "clustering_only_s": 33.7,
+   "with_consolidation": 5,
+   "with_consolidation_s": 38.1,
+   "consolidate_phase_ms": 3699,
+   "source": "VoxConverse dev exymw (first 116 s)",
+   "threshold_0_5_clusters": null
+  },
+  "dev13": {
+   "truth": 3,
+   "seconds": 140,
+   "clustering_only": 3,
+   "clustering_only_s": 54.0,
+   "with_consolidation": 3,
+   "with_consolidation_s": 57.5,
+   "consolidate_phase_ms": 4050,
+   "source": "VoxConverse dev sldwj (first 140 s)",
+   "threshold_0_5_clusters": null
+  }
+ }
+}

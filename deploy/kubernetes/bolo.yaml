@@ -1,5 +1,5 @@
 # A minimal single-replica deployment. Not applied to a cluster by the
-# maintainers for 0.1.0: treat it as an example to adapt.
+# maintainers so far: treat it as an example to adapt.
 #
 #   kubectl create secret generic bolo --from-literal=api-key="$(openssl rand -hex 24)"
 #   kubectl apply -f deploy/kubernetes/bolo.yaml

@@ -1,0 +1,284 @@
+{
+ "model": "smart-turn-v3 (smart-turn-v3.2-cpu.onnx)",
+ "bolo_threads": 2,
+ "load_average_at_start": 13.31787109375,
+ "load_s": 0.17,
+ "memory_mb": 27,
+ "probabilities": [
+  {
+   "clip": "English sample, whole sentence ('Good morning. Could you tell me when my order will arrive?')",
+   "seconds": 3.0,
+   "probability_complete": 0.988,
+   "inference_ms_best_of_5": 219.6
+  },
+  {
+   "clip": "English sample cut after 45 % (mid-sentence)",
+   "seconds": 1.35,
+   "probability_complete": 0.017,
+   "inference_ms_best_of_5": 163.7
+  },
+  {
+   "clip": "English sample cut after 60 % (mid-sentence)",
+   "seconds": 1.8,
+   "probability_complete": 0.069,
+   "inference_ms_best_of_5": 177.8
+  },
+  {
+   "clip": "English sample cut after 80 % (mid-sentence)",
+   "seconds": 2.4,
+   "probability_complete": 0.074,
+   "inference_ms_best_of_5": 179.9
+  },
+  {
+   "clip": "Hindi FLEURS 10003386135529782184.wav, whole sentence",
+   "seconds": 11.69,
+   "probability_complete": 0.942,
+   "inference_ms_best_of_5": 219.0
+  },
+  {
+   "clip": "Hindi FLEURS 10003386135529782184.wav, cut after 50 %",
+   "seconds": 5.84,
+   "probability_complete": 0.712,
+   "inference_ms_best_of_5": 210.3
+  },
+  {
+   "clip": "Hindi FLEURS 10028896103651079035.wav, whole sentence",
+   "seconds": 10.26,
+   "probability_complete": 0.625,
+   "inference_ms_best_of_5": 200.3
+  },
+  {
+   "clip": "Hindi FLEURS 10028896103651079035.wav, cut after 50 %",
+   "seconds": 5.13,
+   "probability_complete": 0.52,
+   "inference_ms_best_of_5": 181.5
+  },
+  {
+   "clip": "Hindi FLEURS 10096022508053277080.wav, whole sentence",
+   "seconds": 20.05,
+   "probability_complete": 0.914,
+   "inference_ms_best_of_5": 203.0
+  },
+  {
+   "clip": "Hindi FLEURS 10096022508053277080.wav, cut after 50 %",
+   "seconds": 10.02,
+   "probability_complete": 0.053,
+   "inference_ms_best_of_5": 185.6
+  },
+  {
+   "clip": "Hindi FLEURS 10211077472389368581.wav, whole sentence",
+   "seconds": 5.42,
+   "probability_complete": 0.432,
+   "inference_ms_best_of_5": 245.4
+  },
+  {
+   "clip": "Hindi FLEURS 10211077472389368581.wav, cut after 50 %",
+   "seconds": 2.71,
+   "probability_complete": 0.86,
+   "inference_ms_best_of_5": 264.0
+  }
+ ],
+ "realtime_sessions": {
+  "stt": "moonshine-tiny-en",
+  "server_vad_silence_ms": 500,
+  "semantic_vad_pause_ms": 300,
+  "note": "transcription sessions over WebSocket, audio paced in real time; times are from the true end of speech in the clip to the speech_stopped event at the client",
+  "results": {
+   "whole sentence | server_vad": {
+    "runs": [
+     {
+      "turns": 1,
+      "last_speech_stopped_after_end_of_speech_ms": 637,
+      "transcripts": [
+       "Good morning. could you tell me when my order will arise?"
+      ]
+     },
+     {
+      "turns": 1,
+      "last_speech_stopped_after_end_of_speech_ms": 613,
+      "transcripts": [
+       "Good morning. could you tell me when my order will arise?"
+      ]
+     },
+     {
+      "turns": 1,
+      "last_speech_stopped_after_end_of_speech_ms": 632,
+      "transcripts": [
+       "Good morning. could you tell me when my order will arise?"
+      ]
+     }
+    ],
+    "median_speech_stopped_after_end_of_speech_ms": 632,
+    "turns": [
+     1,
+     1,
+     1
+    ]
+   },
+   "whole sentence | semantic_vad": {
+    "runs": [
+     {
+      "turns": 1,
+      "last_speech_stopped_after_end_of_speech_ms": 738,
+      "transcripts": [
+       "Good morning. could you tell me when my order will arise?"
+      ]
+     },
+     {
+      "turns": 1,
+      "last_speech_stopped_after_end_of_speech_ms": 995,
+      "transcripts": [
+       "Good morning. could you tell me when my order will arise?"
+      ]
+     },
+     {
+      "turns": 1,
+      "last_speech_stopped_after_end_of_speech_ms": 678,
+      "transcripts": [
+       "Good morning. could you tell me when my order will arise?"
+      ]
+     }
+    ],
+    "median_speech_stopped_after_end_of_speech_ms": 738,
+    "turns": [
+     1,
+     1,
+     1
+    ]
+   },
+   "same sentence with a 0.9 s pause after 'could you tell me' (a point that can end a sentence) | server_vad": {
+    "runs": [
+     {
+      "turns": 2,
+      "last_speech_stopped_after_end_of_speech_ms": 621,
+      "transcripts": [
+       "Good morning. could you tell me?",
+       "When my order will arise,"
+      ]
+     },
+     {
+      "turns": 2,
+      "last_speech_stopped_after_end_of_speech_ms": 618,
+      "transcripts": [
+       "Good morning. could you tell me?",
+       "When my order will arise,"
+      ]
+     },
+     {
+      "turns": 2,
+      "last_speech_stopped_after_end_of_speech_ms": 628,
+      "transcripts": [
+       "Good morning. could you tell me?",
+       "When my order will arise,"
+      ]
+     }
+    ],
+    "median_speech_stopped_after_end_of_speech_ms": 621,
+    "turns": [
+     2,
+     2,
+     2
+    ]
+   },
+   "same sentence with a 0.9 s pause after 'could you tell me' (a point that can end a sentence) | semantic_vad": {
+    "runs": [
+     {
+      "turns": 2,
+      "last_speech_stopped_after_end_of_speech_ms": 941,
+      "transcripts": [
+       "Good morning. could you tell me?",
+       "When my order will arise,"
+      ]
+     },
+     {
+      "turns": 2,
+      "last_speech_stopped_after_end_of_speech_ms": 715,
+      "transcripts": [
+       "Good morning. could you tell me?",
+       "When my order will arise,"
+      ]
+     },
+     {
+      "turns": 2,
+      "last_speech_stopped_after_end_of_speech_ms": 691,
+      "transcripts": [
+       "Good morning. could you tell me?",
+       "When my order will arise,"
+      ]
+     }
+    ],
+    "median_speech_stopped_after_end_of_speech_ms": 715,
+    "turns": [
+     2,
+     2,
+     2
+    ]
+   },
+   "same sentence with a 0.9 s pause after 60 % ('... tell me when', clearly unfinished) | server_vad": {
+    "runs": [
+     {
+      "turns": 2,
+      "last_speech_stopped_after_end_of_speech_ms": 619,
+      "transcripts": [
+       "Good morning. Could you tell me when?",
+       "My order will arise."
+      ]
+     },
+     {
+      "turns": 2,
+      "last_speech_stopped_after_end_of_speech_ms": 626,
+      "transcripts": [
+       "Good morning. Could you tell me when?",
+       "My order will arise."
+      ]
+     },
+     {
+      "turns": 2,
+      "last_speech_stopped_after_end_of_speech_ms": 613,
+      "transcripts": [
+       "Good morning. Could you tell me when?",
+       "My order will arise."
+      ]
+     }
+    ],
+    "median_speech_stopped_after_end_of_speech_ms": 619,
+    "turns": [
+     2,
+     2,
+     2
+    ]
+   },
+   "same sentence with a 0.9 s pause after 60 % ('... tell me when', clearly unfinished) | semantic_vad": {
+    "runs": [
+     {
+      "turns": 1,
+      "last_speech_stopped_after_end_of_speech_ms": 1212,
+      "transcripts": [
+       "Good morning. could you tell me when my order will arise?"
+      ]
+     },
+     {
+      "turns": 1,
+      "last_speech_stopped_after_end_of_speech_ms": 664,
+      "transcripts": [
+       "Good morning. could you tell me when my order will arise?"
+      ]
+     },
+     {
+      "turns": 1,
+      "last_speech_stopped_after_end_of_speech_ms": 942,
+      "transcripts": [
+       "Good morning. could you tell me when my order will arise?"
+      ]
+     }
+    ],
+    "median_speech_stopped_after_end_of_speech_ms": 942,
+    "turns": [
+     1,
+     1,
+     1
+    ]
+   }
+  }
+ }
+}

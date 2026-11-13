@@ -1,0 +1,127 @@
+{
+ "llm": "qwen2.5:0.5b (Q4_K_M, 494 M parameters) through Ollama 0.40.16 (/v1/chat/completions), num_thread 2, same machine",
+ "bolo_threads": 2,
+ "note": "4 shared vCPUs; other jobs were running on the machine during the measurement (load average at start: 10.4)",
+ "realtime_piper": {
+  "tts_model": "piper-en-us-amy-low",
+  "turns": [
+   {
+    "status": "completed",
+    "user_heard": "Good morning. could you tell me when my order will arrive?",
+    "reply_audio_s": 11.7,
+    "reply_audio_wer_vs_text": 0.0,
+    "stt_final_ms": 387.5,
+    "first_token_ms": 711.1,
+    "first_audio_ms": 4395.6,
+    "total_ms": 7482.1,
+    "phases": {
+     "decode": 387,
+     "llm_first_token": 323,
+     "synthesize_first": 3684,
+     "synthesize_rest": 3086
+    },
+    "reply_words": 32
+   },
+   {
+    "status": "completed",
+    "user_heard": "Good morning. could you tell me when my order will arrive?",
+    "reply_audio_s": 10.0,
+    "reply_audio_wer_vs_text": 0.0,
+    "stt_final_ms": 166.8,
+    "first_token_ms": 408.0,
+    "first_audio_ms": 2680.1,
+    "total_ms": 3892.0,
+    "phases": {
+     "decode": 166,
+     "llm_first_token": 241,
+     "synthesize_first": 2272,
+     "synthesize_rest": 1210
+    },
+    "reply_words": 30
+   },
+   {
+    "status": "completed",
+    "user_heard": "Good morning. could you tell me when my order will arrive?",
+    "reply_audio_s": 11.7,
+    "reply_audio_wer_vs_text": 0.0,
+    "stt_final_ms": 140.6,
+    "first_token_ms": 233.5,
+    "first_audio_ms": 1426.4,
+    "total_ms": 2355.8,
+    "phases": {
+     "decode": 140,
+     "llm_first_token": 93,
+     "synthesize_first": 1193,
+     "synthesize_rest": 929
+    },
+    "reply_words": 32
+   }
+  ],
+  "median_first_token_ms": 408.0,
+  "median_first_audio_ms": 2680.1
+ },
+ "chat_completions_audio": {
+  "audio_s": 10.5,
+  "wall_ms": 2265,
+  "reply_words": 28
+ },
+ "realtime_kokoro": {
+  "tts_model": "kokoro-v1.0-int8",
+  "turns": [
+   {
+    "status": "completed",
+    "user_heard": "Good morning. could you tell me when my order will arrive?",
+    "reply_audio_s": 9.9,
+    "reply_audio_wer_vs_text": 0.0,
+    "stt_final_ms": 114.6,
+    "first_token_ms": 210.0,
+    "first_audio_ms": 6627.3,
+    "total_ms": 12876.2,
+    "phases": {
+     "decode": 114,
+     "llm_first_token": 95,
+     "synthesize_first": 6417,
+     "synthesize_rest": 6249
+    },
+    "reply_words": 33
+   },
+   {
+    "status": "completed",
+    "user_heard": "Good morning. could you tell me when my order will arrive?",
+    "reply_audio_s": 6.4,
+    "reply_audio_wer_vs_text": 0.0,
+    "stt_final_ms": 94.1,
+    "first_token_ms": 187.3,
+    "first_audio_ms": 4926.0,
+    "total_ms": 8784.6,
+    "phases": {
+     "decode": 94,
+     "llm_first_token": 93,
+     "synthesize_first": 4739,
+     "synthesize_rest": 3858
+    },
+    "reply_words": 26
+   },
+   {
+    "status": "completed",
+    "user_heard": "Good morning. could you tell me when my order will arrive?",
+    "reply_audio_s": 2.2,
+    "reply_audio_wer_vs_text": 0.125,
+    "stt_final_ms": 154.9,
+    "first_token_ms": 285.8,
+    "first_audio_ms": 4334.3,
+    "total_ms": 4336.5,
+    "phases": {
+     "decode": 155,
+     "llm_first_token": 131,
+     "synthesize_first": 4048,
+     "synthesize_rest": 2
+    },
+    "reply_words": 8
+   }
+  ],
+  "median_first_token_ms": 210.0,
+  "median_first_audio_ms": 4926.0
+ },
+ "reply_text": "replies are whatever the small language model said; only their length is kept here"
+}

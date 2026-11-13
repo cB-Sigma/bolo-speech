@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import importlib.util
 import logging
 import os
 import platform
@@ -26,7 +27,15 @@ from bolo.audio.resample import resample
 from bolo.catalog import Catalog, ModelSpec
 from bolo.components import ComponentManager
 from bolo.config import Settings
-from bolo.diarize import DiarizeOptions, merge_turns, renumber, speaker_label
+from bolo.diarize import (
+    DiarizeOptions,
+    consolidate_speakers,
+    label_speakers,
+    match_known,
+    merge_same_speaker,
+    merge_turns,
+    renumber,
+)
 from bolo.engines import EngineRegistry
 from bolo.engines.base import (
     FloatArray,
@@ -63,6 +72,9 @@ from bolo.text.phonemize import INSTALL_HINT
 from bolo.text.segment import chunk_text
 
 log = logging.getLogger("bolo")
+
+#: cosine similarity above which a diarized speaker is taken to be a known speaker
+IDENTIFY_THRESHOLD = 0.5
 
 OPENAI_STT_ALIASES = (
     "whisper-1", "gpt-4o-transcribe", "gpt-4o-mini-transcribe", "gpt-4o-transcribe-diarize", "gpt-transcribe",
@@ -108,6 +120,10 @@ class Bolo:
         self.manager = ModelManager(s, self.catalog, self.store, self.engines, self.events, self._auto_pull)
         self.components = ComponentManager(self)
         self.llm = LLMClient(s)
+        #: ephemeral Realtime keys: value -> (expiry as epoch seconds, session configuration)
+        self.client_secrets: dict[str, tuple[float, dict[str, Any]]] = {}
+        #: open WebRTC calls by id (objects from bolo.webrtc; closed in stop())
+        self.calls: dict[str, Any] = {}
         self.active_streams = 0
         self._tasks: list[asyncio.Task[Any]] = []
         self._pull_tasks: dict[str, asyncio.Task[Any]] = {}
@@ -143,6 +159,9 @@ class Bolo:
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await t
         self._tasks.clear()
+        for call in list(self.calls.values()):
+            with contextlib.suppress(Exception):
+                await call.close()
         await self.manager.close()
 
     def log(self, level: str, message: str) -> None:
@@ -191,6 +210,8 @@ class Bolo:
         diar = self.catalog.resolve(s.default_diarization)
         diar_ready = bool(diar and self.manager.is_installed(diar))
         llm = self.llm.describe()
+        webrtc = importlib.util.find_spec("aiortc") is not None
+        turn = self.catalog.resolve(s.default_turn)
         return {
             "diarization": {
                 "available": bool(diar) and (diar_ready or s.auto_pull),
@@ -198,6 +219,9 @@ class Bolo:
                 "default_model": diar.id if diar else None,
                 "http": {"endpoint": "/api/v1/diarize", "transcriptions": ["diarize", "diarized_json"]},
                 "websocket": "diarize=true (one speaker per utterance, labelled online)",
+                "word_timestamps": True,
+                "known_speakers": True,
+                "revised_labels_at_end_of_stream": True,
             },
             "realtime": {
                 "endpoint": "/v1/realtime",
@@ -205,6 +229,22 @@ class Bolo:
                 "conversation_sessions": llm["configured"],
                 "audio_formats": ["audio/pcm (24 kHz)", "audio/pcmu", "audio/pcma"],
                 "reference": "OpenAI Realtime API (GA event names), as typed in openai-python 3.50.0",
+                "transports": ["websocket", "webrtc"] if webrtc else ["websocket"],
+                "webrtc": {
+                    "endpoint": "/v1/realtime/calls",
+                    "available": webrtc,
+                    "install": None if webrtc else "pip install 'bolo-speech[webrtc]'",
+                    "ice_servers": list(s.webrtc_ice_servers),
+                },
+                "client_secrets": "/v1/realtime/client_secrets",
+                "transcript_deltas": True,
+                "turn_detection": ["server_vad", "semantic_vad"],
+                "semantic_vad": {
+                    "model": turn.id if turn else None,
+                    "available": self.turn_model() is not None,
+                    "installed": bool(turn and self.manager.is_installed(turn)),
+                },
+                "sip": False,
             },
             "chat_completions": {
                 "endpoint": "/v1/chat/completions",
@@ -307,6 +347,7 @@ class Bolo:
                 "tts": s.default_tts,
                 "vad": s.default_vad,
                 "diarization": s.default_diarization,
+                "turn": s.default_turn,
             }
             name = defaults[task]
         elif name == "realtime":
@@ -357,6 +398,8 @@ class Bolo:
     def start_pull(self, name: str) -> Job:
         """Start (or join) a background download of a catalog model."""
         spec = self.manager.resolve(name)
+        if not self.store.is_installed(spec.id):
+            spec.require_published()
         existing = self.jobs.active_pull(spec.id)
         if existing:
             return existing
@@ -384,6 +427,7 @@ class Bolo:
         return job
 
     async def _auto_pull(self, spec: ModelSpec) -> None:
+        spec.require_published()
         if not self.settings.auto_pull:
             raise ModelNotInstalled(
                 f"model '{spec.id}' is not installed and auto_pull is off; run `bolo pull {spec.id}` "
@@ -440,6 +484,28 @@ class Bolo:
             log.debug("neural VAD unavailable (%s); using the energy detector", exc.message)
         return EnergyVad(params), "energy"
 
+    def turn_model(self) -> ModelSpec | None:
+        """The end-of-turn model, if it can be used now (installed, or allowed to be pulled on first use)."""
+        spec = self.catalog.resolve(self.settings.default_turn)
+        if spec is None or spec.task != "turn" or not self.engines.status(spec.engine).available:
+            return None
+        if self.manager.is_installed(spec) or (self.settings.auto_pull and not spec.gated):
+            return spec
+        return None
+
+    async def end_of_turn(self, samples16: FloatArray) -> float | None:
+        """Probability that the utterance (16 kHz) is a finished turn, or None without an end-of-turn model."""
+        spec = self.turn_model()
+        if spec is None:
+            return None
+        try:
+            async with self.manager.use(spec.id) as entry:
+                probability, _ = await entry.queue.submit("turn", samples16)
+                return float(probability)
+        except BoloError as exc:
+            log.warning("end-of-turn model unavailable (%s); falling back to silence only", exc.message)
+            return None
+
     # ------------------------------------------------------------------
     # speech to text
     # ------------------------------------------------------------------
@@ -459,8 +525,12 @@ class Bolo:
         trace: Trace | None = None,
         on_segment: Callable[[Segment], Awaitable[None]] | None = None,
         diarize: DiarizeOptions | None = None,
+        record: bool = True,
     ) -> Transcript:
-        """Transcribe a complete recording. Long audio is split at pauses and decoded in batches."""
+        """Transcribe a complete recording. Long audio is split at pauses and decoded in batches.
+
+        ``record=False`` keeps the trace out of the request log (interim decodes of a live utterance).
+        """
         spec = self.resolve(model, "stt")
         trace = trace or Trace("stt", "internal", spec.id)
         trace.model = spec.id
@@ -490,7 +560,7 @@ class Bolo:
                     # piece of text is then known without needing word timestamps.
                     turns = merge_turns(await self._speaker_turns(samples, diarize, trace), max_len_s=stt.max_chunk_s)
                     chunks = [(int(t.start * sr), min(len(samples), int(t.end * sr))) for t in turns]
-                    speakers = [speaker_label(t.speaker) for t in turns]
+                    speakers = [diarize.label(t.speaker) for t in turns]
                 elif use_vad:
                     with trace.phase("vad"):
                         detector, _ = await self.vad_detector(
@@ -527,7 +597,8 @@ class Bolo:
             trace.finish("error", f"{type(exc).__name__}: {exc}")
             raise
         finally:
-            self.traces.record(trace)
+            if record:
+                self.traces.record(trace)
 
     async def _decode_chunks(
         self,
@@ -635,10 +706,79 @@ class Bolo:
                     forced = opts.min_speakers
             if forced:
                 turns, _ = await entry.queue.submit("diarize", (samples16, forced, opts.threshold))
-        trace.add_phase("diarize", start, trace.now())
+            turns = renumber(turns)
+            trace.add_phase("diarize", start, trace.now())
+            voices: dict[int, FloatArray] | None = None
+            s = self.settings
+            wanted = opts.consolidate if opts.consolidate is not None else True
+            repair = (
+                wanted
+                and not opts.num_speakers
+                and (s.diarization_min_speaker_s > 0 or s.diarization_merge_similarity > 0)
+            )
+            if repair and len({t.speaker for t in turns}) > max(1, opts.min_speakers or 1):
+                with trace.phase("consolidate"):
+                    voices = await self._voice_prints(entry, samples16, turns)
+                    mapping = consolidate_speakers(
+                        turns,
+                        voices,
+                        min_speech_s=s.diarization_min_speaker_s,
+                        merge_similarity=s.diarization_merge_similarity if s.diarization_merge_similarity > 0 else 2.0,
+                        min_speakers=opts.min_speakers or 1,
+                    )
+                    if any(a != b for a, b in mapping.items()):
+                        trace.extra["speakers_before_consolidation"] = len(mapping)
+                        turns = renumber(
+                            merge_same_speaker([SpeakerTurn(t.start, t.end, mapping[t.speaker]) for t in turns])
+                        )
+                        voices = None  # the clusters changed
+            named: dict[int, str] = {}
+            if opts.known and turns:
+                with trace.phase("identify"):
+                    named = await self._identify(entry, samples16, turns, opts, voices)
+        opts.names = label_speakers(sorted({t.speaker for t in turns}), named)
         trace.extra["diarization_model"] = spec.id
         trace.extra["speakers"] = len({t.speaker for t in turns})
-        return renumber(turns)
+        if opts.known:
+            trace.extra["known_speakers"] = {k.name: opts.similarities.get(k.name) for k in opts.known}
+        return turns
+
+    async def _voice_prints(
+        self, entry: LoadedModel, samples16: FloatArray, turns: list[SpeakerTurn]
+    ) -> dict[int, FloatArray]:
+        """One speaker embedding per diarized speaker, from that speaker's longest turns."""
+        sr = 16000
+        clusters: dict[int, FloatArray] = {}
+        for speaker in sorted({t.speaker for t in turns}):
+            parts: list[FloatArray] = []
+            total = 0.0
+            for t in sorted((t for t in turns if t.speaker == speaker), key=lambda t: t.start - t.end):
+                parts.append(samples16[int(t.start * sr) : int(t.end * sr)])
+                total += t.end - t.start
+                if total >= 30.0:  # the longest turns, up to half a minute, are plenty for a voice print
+                    break
+            audio = np.concatenate(parts) if parts else np.zeros(0, dtype=np.float32)
+            if len(audio) >= int(0.5 * sr):
+                clusters[speaker], _ = await entry.queue.submit("embed", audio)
+        return clusters
+
+    async def _identify(
+        self,
+        entry: LoadedModel,
+        samples16: FloatArray,
+        turns: list[SpeakerTurn],
+        opts: DiarizeOptions,
+        voices: dict[int, FloatArray] | None = None,
+    ) -> dict[int, str]:
+        """Compare each speaker's voice with the reference recordings of the known speakers."""
+        clusters = voices if voices is not None else await self._voice_prints(entry, samples16, turns)
+        references: list[tuple[str, FloatArray]] = []
+        for known in opts.known:
+            vector, _ = await entry.queue.submit("embed", known.samples)
+            references.append((known.name, vector))
+        threshold = opts.identify_threshold if opts.identify_threshold is not None else IDENTIFY_THRESHOLD
+        named, opts.similarities = match_known(clusters, references, threshold)
+        return named
 
     async def diarize(
         self,
@@ -738,6 +878,7 @@ class Bolo:
                 trace.language = lang
                 with trace.phase("normalize"):
                     clean = normalize_for_tts(text, lang) if normalize else text
+                    clean = tts.fit_text(clean, lang)  # closed character sets: spell digits out, or refuse
                     pieces = chunk_text(clean) or [clean]
                 loop = asyncio.get_running_loop()
                 stop = threading.Event()  # set when the consumer goes away; the engine polls it

@@ -70,7 +70,7 @@ to the speaker name (`amy`).
 | `GET /health` | yes | yes (also `/healthz`, `/readyz`) |
 | `POST /v1/chat/completions` (audio in/out, proxied to an LLM) | yes | yes; `CHAT_COMPLETION_BASE_URL` / `CHAT_COMPLETION_API_KEY` are read (see [voice-agents.md](voice-agents.md)) |
 | `WS /v1/realtime` (OpenAI Realtime API) | yes | yes, over WebSocket, with the GA event names |
-| `POST /v1/realtime` (WebRTC) | yes | **no** |
+| `POST /v1/realtime` (WebRTC) | yes | **different route**: OpenAI's current `POST /v1/realtime/calls` (SDP offer in, answer out; extra `webrtc`), plus `POST /v1/realtime/client_secrets`. Tested with a WebRTC library, not with browsers |
 | `POST /v1/audio/diarization` | yes (pyannote, needs PyTorch) | **different route**: `POST /api/v1/diarize`, or `diarize=true` / `diarized_json` on transcriptions (ONNX pipeline, no PyTorch) |
 | `POST /v1/audio/speech/embedding` | yes | **no** |
 | Gradio UI at `/` | yes | replaced by bolo's web console |

@@ -1,0 +1,49 @@
+{
+ "mode": "executable",
+ "phonemizer": "espeak-ng (executable)",
+ "source": "system-executable",
+ "version": "1.53.0",
+ "phonemes": {
+  "en-us": [
+   "ɡˈʊd mˈɔːɹnɪŋ kʊd juː tˈɛl mˌiː wɛn maɪ ˈɔːɹdɚ wɪl ɚɹˈaɪv",
+   "ðə tˈoʊɾəl ɪz fˈɔːɹɾi tˈuː dˈɑːlɚz ænd ɪt ʃˈɪps ˌɔn mˈʌndeɪ θˈæŋk juː"
+  ],
+  "hi": [
+   "nəmˈʌsteː ˌaːp kˈɛːseː hɛ̃ ˈaːɟ mˈɔːsəm bˈʌhʊt ˈʌcʰːaː hɛː"
+  ],
+  "de": [
+   "ɡˈuːtən mˈɔɾɡən viː ɡˈeːt ɛs ˌiːnən hˈɔøtə"
+  ]
+ },
+ "round_trip": {
+  "piper-en-us-amy-low": {
+   "audio_s": 5.26,
+   "synth_s": 2.8,
+   "wer": 0.0,
+   "heard": "\"'Good morning. Could you tell me when my order will arrive, \"'thank you very much for your help.'"
+  },
+  "kitten-nano-0.8-int8": {
+   "audio_s": 6.18,
+   "synth_s": 13.23,
+   "wer": 0.0,
+   "heard": "Good morning. could you tell me when my order will arrive? Thank you very much for your help."
+  },
+  "piper-hi-in-rohan-medium": {
+   "audio_s": 3.41,
+   "synth_s": 3.07,
+   "wer": 0.0,
+   "heard": "नमस्ते आप कैसे हैं आज मौसम बहुत अच्छा है।"
+  }
+ },
+ "compared_with_library": {
+  "library": "espeakng-loader wheel, espeak-ng 1.52.0",
+  "identical_phoneme_strings": 3,
+  "of": 4,
+  "difference": "Hindi: the executable (1.53.0) writes the geminate in one word with a length mark where the library (1.52.0) repeats the consonant",
+  "library_round_trip_wer": {
+   "piper-en-us-amy-low": 0.0,
+   "kitten-nano-0.8-int8": 0.0,
+   "piper-hi-in-rohan-medium": 0.0
+  }
+ }
+}

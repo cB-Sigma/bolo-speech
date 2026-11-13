@@ -3,7 +3,7 @@
 > **Not run by the maintainers.** bolo's Wyoming server is tested with the
 > `wyoming` Python client (see `wyoming_client.py` and the test-suite), which
 > is the library Home Assistant uses, but no Home Assistant instance was
-> available while 0.1.0 was developed. Please report how it goes.
+> available while bolo was developed. Please report how it goes.
 
 Home Assistant talks to local speech services through the
 [Wyoming protocol](https://www.home-assistant.io/integrations/wyoming/).

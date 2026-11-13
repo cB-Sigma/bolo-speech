@@ -1,0 +1,69 @@
+{
+ "llm": "qwen2.5:0.5b (Q4_K_M GGUF, 494 M parameters) served by llama.cpp llama-server (the binary shipped inside the Ollama 0.40.16 package, version 0.9.0-dev commit 6c01da627, started by hand with -t 2 -c 2048), same machine",
+ "bolo_threads": 2,
+ "note": "4 shared vCPUs; other jobs were running on the machine during the measurement (load average at start: 10.4)",
+ "realtime_piper": {
+  "tts_model": "piper-en-us-amy-low",
+  "turns": [
+   {
+    "status": "completed",
+    "user_heard": "Good morning. could you tell me when my order will arrive?",
+    "reply_audio_s": 17.1,
+    "reply_audio_wer_vs_text": 0.0,
+    "stt_final_ms": 359.7,
+    "first_token_ms": 2208.6,
+    "first_audio_ms": 18398.0,
+    "total_ms": 25634.5,
+    "phases": {
+     "decode": 359,
+     "llm_first_token": 1844,
+     "synthesize_first": 16189,
+     "synthesize_rest": 7236
+    },
+    "reply_words": 46
+   },
+   {
+    "status": "completed",
+    "user_heard": "Good morning. could you tell me when my order will arrive?",
+    "reply_audio_s": 8.5,
+    "reply_audio_wer_vs_text": 0.0,
+    "stt_final_ms": 466.7,
+    "first_token_ms": 893.4,
+    "first_audio_ms": 7456.3,
+    "total_ms": 9323.0,
+    "phases": {
+     "decode": 466,
+     "llm_first_token": 426,
+     "synthesize_first": 6563,
+     "synthesize_rest": 1866
+    },
+    "reply_words": 26
+   },
+   {
+    "status": "completed",
+    "user_heard": "Good morning. could you tell me when my order will arrive?",
+    "reply_audio_s": 14.0,
+    "reply_audio_wer_vs_text": 0.0,
+    "stt_final_ms": 310.5,
+    "first_token_ms": 630.4,
+    "first_audio_ms": 2838.5,
+    "total_ms": 5867.4,
+    "phases": {
+     "decode": 310,
+     "llm_first_token": 319,
+     "synthesize_first": 2208,
+     "synthesize_rest": 3029
+    },
+    "reply_words": 39
+   }
+  ],
+  "median_first_token_ms": 893.4,
+  "median_first_audio_ms": 7456.3
+ },
+ "chat_completions_audio": {
+  "audio_s": 6.6,
+  "wall_ms": 4841,
+  "reply_words": 19
+ },
+ "reply_text": "replies are whatever the small language model said; only their length is kept here"
+}

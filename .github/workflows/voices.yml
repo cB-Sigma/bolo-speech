@@ -1,0 +1,133 @@
+name: Voices
+
+# Converts the IISc SYSPIN VITS voices (PyTorch checkpoints on Hugging Face, pinned revisions in
+# tools/voices/syspin.json) to the ONNX layout bolo loads, and publishes one archive per voice,
+# SHA256SUMS and voices.json as assets of a release of this repository.
+# Afterwards: python tools/voices/update_catalog.py (see tools/voices/README.md).
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag that holds the voices
+        default: voices-v1
+        required: true
+      voices:
+        description: Comma-separated voice ids (empty = every voice in tools/voices/syspin.json)
+        default: ""
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: voices-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  list:
+    name: list voices
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: list
+        env:
+          ONLY: ${{ inputs.voices }}
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          ids = [v["id"] for v in json.load(open("tools/voices/syspin.json"))["voices"]]
+          only = [x.strip() for x in os.environ.get("ONLY", "").split(",") if x.strip()]
+          unknown = sorted(set(only) - set(ids))
+          if unknown:
+              raise SystemExit(f"unknown voice ids: {unknown}")
+          print("matrix=" + json.dumps({"voice": only or ids}))
+          PY
+
+  export:
+    name: export ${{ matrix.voice }}
+    needs: list
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJson(needs.list.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install the export tools (CPU PyTorch, Coqui TTS, ONNX, sherpa-onnx)
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+          pip install -r tools/voices/requirements.txt
+      - name: Convert, smoke-test and pack
+        run: python tools/voices/export_syspin.py --out dist --only "${{ matrix.voice }}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: voice-${{ matrix.voice }}
+          path: |
+            dist/*.tar.gz
+            dist/voices.json
+          retention-days: 3
+
+  release:
+    name: publish release assets
+    needs: export
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # creates or updates the release
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: voice-*
+          path: parts
+      - name: Merge the index and write SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          mkdir -p dist
+          # keep the entries of voices published by earlier runs
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern voices.json --dir previous 2>/dev/null || true
+          python3 - <<'PY'
+          import glob, hashlib, json, os, shutil
+          entries, meta = {}, {}
+          for path in ["previous/voices.json", *sorted(glob.glob("parts/*/voices.json"))]:
+              if os.path.isfile(path):
+                  doc = json.load(open(path, encoding="utf-8"))
+                  meta.update({k: v for k, v in doc.items() if k != "voices"})
+                  entries.update({v["id"]: v for v in doc.get("voices", [])})
+          for archive in glob.glob("parts/*/*.tar.gz"):
+              shutil.copy2(archive, "dist/")
+              name = os.path.basename(archive)
+              digest = hashlib.sha256(open(archive, "rb").read()).hexdigest()
+              entry = next(v for v in entries.values() if v["file"] == name)
+              assert entry["sha256"] == digest, f"{name}: checksum changed between jobs"
+          if not entries:
+              raise SystemExit("no voice was exported")
+          meta["release"] = os.environ["TAG"]
+          meta["voices"] = [entries[k] for k in sorted(entries)]
+          json.dump(meta, open("dist/voices.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+          with open("dist/SHA256SUMS", "w", encoding="utf-8") as sums:
+              for key in sorted(entries):
+                  sums.write(f"{entries[key]['sha256']}  {entries[key]['file']}\n")
+          PY
+          ls -l dist
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest=false \
+              --title "Voices ($TAG)" \
+              --notes "Voices converted for bolo by tools/voices (see tools/voices/README.md). IISc SYSPIN VITS voices: weights MIT, training data SYSPIN corpus CC-BY-4.0, by the SYSPIN project, SPIRE Lab, Indian Institute of Science. Each archive contains LICENSE and ATTRIBUTION. This is not a bolo software release."
+          fi

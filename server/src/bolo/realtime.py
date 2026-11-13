@@ -25,8 +25,12 @@ import asyncio
 import base64
 import binascii
 import contextlib
+import difflib
+import hmac
 import json
 import logging
+import secrets
+import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import TYPE_CHECKING, Any
@@ -39,6 +43,7 @@ from bolo.audio.resample import StreamResampler, resample
 from bolo.engines.base import FloatArray, VadDetector, VadParams
 from bolo.errors import BoloError
 from bolo.obs.trace import Trace, preview
+from bolo.streaming.agreement import LocalAgreement
 
 if TYPE_CHECKING:
     from bolo.core import Bolo
@@ -49,6 +54,9 @@ Send = Callable[[dict[str, Any]], Awaitable[None]]
 SR = 16000
 FORMATS = {"audio/pcm": ("pcm", 24000), "audio/pcmu": ("mulaw", 8000), "audio/pcma": ("alaw", 8000)}
 MAX_BUFFER_S = 120.0
+#: semantic_vad: the end-of-turn model is asked after this much silence, and believed above this probability
+SEMANTIC_PAUSE_S = 0.3
+SEMANTIC_THRESHOLD = 0.5
 
 
 def new_id(prefix: str) -> str:
@@ -82,10 +90,44 @@ def _format(spec: Any, param: str) -> tuple[str, int, dict[str, Any]]:
     return codec, rate, ({"type": kind, "rate": 24000} if codec == "pcm" else {"type": kind})
 
 
+def remaining_delta(sent: str, final: str) -> str:
+    """What still has to be sent so that the deltas add up to ``final``.
+
+    Deltas already sent cannot be taken back. When the final decode literally starts with them, the rest of
+    it is returned and the deltas concatenate to the transcript exactly. When it revised something that was
+    already sent (usually punctuation or capitalisation), the words that follow them in the final text are
+    returned; ``completed.transcript`` is then the authoritative text.
+    """
+    if not sent:
+        return final
+    if final.startswith(sent):
+        return final[len(sent) :]
+    words = final.split()
+    old = [w.strip(".,;:!?\"'").lower() for w in sent.split()]
+    new = [w.strip(".,;:!?\"'").lower() for w in words]
+    blocks = [b for b in difflib.SequenceMatcher(None, old, new, autojunk=False).get_matching_blocks() if b.size]
+    if blocks:  # continue after the place in the final text where the words already sent end
+        last = blocks[-1]
+        cut = last.b + last.size + (len(old) - (last.a + last.size))
+    else:
+        cut = len(old)
+    rest = words[cut:]
+    return (" " + " ".join(rest)) if rest else ""
+
+
 class RealtimeSession:
-    def __init__(self, core: Bolo, send: Send, *, model: str | None = None, transcription: bool = False) -> None:
+    def __init__(
+        self,
+        core: Bolo,
+        send: Send,
+        *,
+        model: str | None = None,
+        transcription: bool = False,
+        transport: str = "realtime",
+    ) -> None:
         self.core = core
         self._send_raw = send
+        self.transport = transport  # "realtime" (WebSocket) or "webrtc"; shown on traces
         self.id = new_id("sess")
         self.conversation_id = new_id("conv")
         self.kind = "transcription" if transcription else "realtime"
@@ -119,6 +161,13 @@ class RealtimeSession:
         self._speech_start: int | None = None
         self._pending_item: str | None = None
         self._commit_from = 0  # manual mode: start of the uncommitted audio
+        # semantic_vad: a pause the end-of-turn model called unfinished (end of speech so far, deadline)
+        self._held_end: int | None = None
+        self._hold_until = 0
+        self._turn_checks: list[dict[str, Any]] = []
+        # incremental user transcript: item id -> text already sent as deltas
+        self._partial_task: asyncio.Task[None] | None = None
+        self._partial_sent: dict[str, str] = {}
         # work
         self._turns: asyncio.Queue[Callable[[], Awaitable[None]] | None] = asyncio.Queue()
         self._worker: asyncio.Task[None] | None = None
@@ -187,7 +236,7 @@ class RealtimeSession:
             return
         self._closed = True
         self.core.active_streams -= 1
-        for task in (self._response, self._worker):
+        for task in (self._partial_task, self._response, self._worker):
             if task is not None and not task.done():
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError, Exception):
@@ -239,7 +288,11 @@ class RealtimeSession:
             await self.error(exc.message, code=exc.code, param=exc.param, type_=exc.type, event_id=event_id)
 
     async def _on_session_update(self, event: dict[str, Any]) -> None:
-        session = event.get("session")
+        self.configure(event.get("session"))
+        await self.send("session.updated", session=self.session_object())
+
+    def configure(self, session: Any) -> None:
+        """Apply a session configuration (the ``session`` object of ``session.update``)."""
         if not isinstance(session, dict):
             raise RealtimeError("session.update needs a 'session' object", param="session")
         kind = session.get("type", self.kind)
@@ -281,7 +334,8 @@ class RealtimeSession:
                 self.turn_detection = None
             elif isinstance(td, dict) and td.get("type") in ("server_vad", "semantic_vad"):
                 merged = {**(self.turn_detection or {}), **{k: v for k, v in td.items() if v is not None}}
-                # semantic_vad is accepted and handled as server_vad: bolo has no semantic end-of-turn model
+                # semantic_vad: the detector finds the pause, an end-of-turn model decides whether it ends
+                # the turn (see _on_pause). Without that model it behaves exactly like server_vad.
                 merged.setdefault("threshold", 0.5)
                 merged.setdefault("prefix_padding_ms", 300)
                 merged.setdefault("silence_duration_ms", int(self.core.settings.endpoint_silence_ms))
@@ -294,6 +348,7 @@ class RealtimeSession:
                     param="session.audio.input.turn_detection",
                 )
             self._detector = None
+            self._held_end = None
         if "voice" in audio_out:
             voice = audio_out["voice"]
             self.voice = voice.get("id") if isinstance(voice, dict) else voice
@@ -325,7 +380,6 @@ class RealtimeSession:
                 self.max_output_tokens = session["max_output_tokens"]
             if session.get("model"):
                 self.model = session["model"]
-        await self.send("session.updated", session=self.session_object())
 
     # -- audio input ----------------------------------------------------------
     def _decode(self, payload: bytes) -> FloatArray:
@@ -343,9 +397,10 @@ class RealtimeSession:
             return None
         if self._detector is None:
             td = self.turn_detection
+            silence_s = max(0.1, float(td.get("silence_duration_ms", 500)) / 1000.0)
             params = VadParams(
                 threshold=float(td.get("threshold", 0.5)),
-                min_silence_s=max(0.1, float(td.get("silence_duration_ms", 500)) / 1000.0),
+                min_silence_s=min(silence_s, SEMANTIC_PAUSE_S) if self._semantic else silence_s,
                 max_speech_s=self.core.settings.max_utterance_s * 3,
             )
             self._detector, self._vad_name = await self.core.vad_detector(params, fallback=True)
@@ -359,7 +414,10 @@ class RealtimeSession:
             payload = base64.b64decode(audio, validate=True)
         except (binascii.Error, ValueError) as exc:
             raise RealtimeError("'audio' is not valid base64", param="audio") from exc
-        samples = self._resampler.process(self._decode(payload))
+        await self.accept_audio(self._resampler.process(self._decode(payload)))
+
+    async def accept_audio(self, samples: FloatArray) -> None:
+        """Take input audio that is already 16 kHz mono (the WebRTC transport calls this directly)."""
         if not len(samples):
             return
         self._buf = np.concatenate([self._buf, samples]) if len(self._buf) else samples.copy()
@@ -374,6 +432,9 @@ class RealtimeSession:
         prefix = int(float((self.turn_detection or {}).get("prefix_padding_ms", 300)) * SR / 1000)
         for ev in detector.accept(samples):
             if ev.kind == "speech_start":
+                if self._held_end is not None and self._speech_start is not None:
+                    self._held_end = None  # the speaker went on after a pause: still the same turn
+                    continue
                 self._speech_start = max(self._buf_start, ev.sample - prefix)
                 self._pending_item = new_id("item")
                 await self.send(
@@ -383,17 +444,95 @@ class RealtimeSession:
                 )
                 if (self.turn_detection or {}).get("interrupt_response", True):
                     await self._cancel_response("turn_detected")
+                await self._stop_partials()
+                self._partial_task = asyncio.create_task(
+                    self._partials(self._pending_item, self._speech_start), name="bolo-realtime-partials"
+                )
             elif ev.kind == "speech_end" and self._speech_start is not None:
                 end = min(ev.sample + int(0.2 * SR), self._pos)
-                item_id = self._pending_item or new_id("item")
-                await self.send("input_audio_buffer.speech_stopped", audio_end_ms=self._ms(end), item_id=item_id)
-                await self._commit(
-                    self._slice(self._speech_start, end),
-                    item_id,
-                    Trace("agent", "realtime", "voice-agent"),
-                )
-                self._speech_start, self._pending_item = None, None
+                if self._semantic and not await self._turn_complete(end):
+                    self._held_end = end  # only a pause, says the model: keep the turn open for a while
+                    self._hold_until = ev.sample + int(self._max_pause_s() * SR)
+                    continue
+                await self._end_turn(end)
+        if self._held_end is not None and self._speech_start is not None and self._pos >= self._hold_until:
+            if not detector.in_speech:  # the pause lasted long enough to be the end after all
+                await self._end_turn(self._held_end)
+            else:
+                self._held_end = None
         self._trim()
+
+    @property
+    def _semantic(self) -> bool:
+        return (self.turn_detection or {}).get("type") == "semantic_vad" and self.core.turn_model() is not None
+
+    def _max_pause_s(self) -> float:
+        """How long a pause the end-of-turn model called unfinished may last before the turn ends anyway."""
+        eagerness = str((self.turn_detection or {}).get("eagerness", "auto"))
+        return {"low": 6.0, "medium": 3.0, "auto": 3.0, "high": 1.5}.get(eagerness, 3.0)
+
+    async def _turn_complete(self, end: int) -> bool:
+        started = time.perf_counter()
+        probability = await self.core.end_of_turn(self._slice(self._speech_start or 0, end))
+        self._turn_checks.append(
+            {"probability": None if probability is None else round(probability, 3),
+             "ms": round((time.perf_counter() - started) * 1000.0, 1)}
+        )  # fmt: skip
+        return probability is None or probability >= SEMANTIC_THRESHOLD
+
+    async def _end_turn(self, end: int) -> None:
+        item_id = self._pending_item or new_id("item")
+        await self._stop_partials()
+        await self.send("input_audio_buffer.speech_stopped", audio_end_ms=self._ms(end), item_id=item_id)
+        trace = Trace("agent", self.transport, "voice-agent")
+        if self._turn_checks:
+            trace.extra["turn_detection"] = {"type": "semantic_vad", "checks": self._turn_checks}
+            self._turn_checks = []
+        await self._commit(self._slice(self._speech_start or 0, end), item_id, trace)
+        self._speech_start, self._pending_item, self._held_end = None, None, None
+
+    async def _stop_partials(self) -> None:
+        task, self._partial_task = self._partial_task, None
+        if task is not None and not task.done():
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task
+
+    async def _partials(self, item_id: str, start: int) -> None:
+        """While the user is speaking, re-decode the utterance so far and send the words that have settled.
+
+        A word is sent once two consecutive decodes agree on it (LocalAgreement), so deltas only ever append.
+        """
+        s = self.core.settings
+        cfg = self.transcription
+        agreement = LocalAgreement(s.agreement)
+        sent_words = 0
+        decoded_to = 0
+        while not self._closed:
+            await asyncio.sleep(s.partial_interval_ms / 1000.0)
+            end = self._pos
+            if end - start < int(0.4 * SR) or end == decoded_to or end - start > s.max_utterance_s * SR:
+                continue
+            decoded_to = end
+            try:
+                result = await self.core.transcribe(
+                    self._slice(start, end), SR, model=cfg["model"], language=cfg.get("language"),
+                    prompt=cfg.get("prompt"), vad_filter=False, trace=Trace("stt", self.transport, ""), record=False,
+                )  # fmt: skip
+            except BoloError:
+                continue  # the final decode reports the error
+            agreement.update(result.text)
+            # hold the newest word back: its punctuation and casing often change once more audio follows
+            upto = min(len(agreement.committed), len(result.text.split()) - 1)
+            fresh = agreement.committed[sent_words:upto]
+            if not fresh:
+                continue
+            delta = " ".join(fresh) if sent_words == 0 else " " + " ".join(fresh)
+            sent_words = upto
+            self._partial_sent[item_id] = self._partial_sent.get(item_id, "") + delta
+            await self.send(
+                "conversation.item.input_audio_transcription.delta", item_id=item_id, content_index=0, delta=delta
+            )
 
     def _slice(self, start: int, end: int) -> FloatArray:
         a = max(0, start - self._buf_start)
@@ -417,11 +556,13 @@ class RealtimeSession:
             )
         self._buf, self._buf_start, self._commit_from = np.zeros(0, dtype=np.float32), self._pos, self._pos
         self._speech_start = None
-        await self._commit(audio, new_id("item"), Trace("agent", "realtime", "voice-agent"), auto_response=False)
+        await self._commit(audio, new_id("item"), Trace("agent", self.transport, "voice-agent"), auto_response=False)
 
     async def _on_clear(self, event: dict[str, Any]) -> None:
         self._buf, self._buf_start, self._commit_from = np.zeros(0, dtype=np.float32), self._pos, self._pos
         self._speech_start, self._pending_item = None, None
+        await self._stop_partials()
+        self._partial_sent.clear()
         await self.send("input_audio_buffer.cleared")
 
     async def _on_output_clear(self, event: dict[str, Any]) -> None:
@@ -460,7 +601,7 @@ class RealtimeSession:
 
     async def _transcribe(self, item: dict[str, Any], audio: FloatArray, trace: Trace) -> bool:
         cfg = self.transcription
-        sub = Trace("stt", "realtime", "")
+        sub = Trace("stt", self.transport, "")
         t0 = trace.now()
         try:
             result = await self.core.transcribe(
@@ -480,9 +621,12 @@ class RealtimeSession:
         trace.extra["user_text"] = preview(result.text)
         text = result.text
         item["content"][0]["transcript"] = text
-        if text:
+        sent = self._partial_sent.pop(item["id"], "")
+        trace.extra["transcript_deltas_before_final"] = bool(sent)
+        rest = remaining_delta(sent, text)
+        if rest:
             await self.send(
-                "conversation.item.input_audio_transcription.delta", item_id=item["id"], content_index=0, delta=text
+                "conversation.item.input_audio_transcription.delta", item_id=item["id"], content_index=0, delta=rest
             )
         await self.send(
             "conversation.item.input_audio_transcription.completed", item_id=item["id"], content_index=0, transcript=text,
@@ -571,7 +715,7 @@ class RealtimeSession:
         if self.kind != "realtime":
             raise RealtimeError("transcription sessions cannot create responses", code="unsupported")
         params = event.get("response") if isinstance(event.get("response"), dict) else {}
-        trace = Trace("agent", "realtime", "voice-agent")
+        trace = Trace("agent", self.transport, "voice-agent")
 
         async def turn() -> None:
             await self._start_response(params or {}, trace)
@@ -870,6 +1014,47 @@ class RealtimeSession:
         self._response_id = None
 
 
+# -- ephemeral client secrets -------------------------------------------------
+SECRET_PREFIX = "ek_"
+
+
+def mint_client_secret(core: Bolo, session: dict[str, Any] | None, seconds: int = 600) -> dict[str, Any]:
+    """Create a short-lived key that can only open Realtime sessions (``POST /v1/realtime/client_secrets``).
+
+    The session configuration given here is applied to every session opened with the secret, before
+    anything the client sends. Secrets live in memory: a restart invalidates them.
+    """
+    if not 10 <= seconds <= 7200:
+        raise RealtimeError("expires_after.seconds must be between 10 and 7200", param="expires_after.seconds")
+    config = dict(session or {})
+
+    async def nowhere(_event: dict[str, Any]) -> None:
+        return None
+
+    probe = RealtimeSession(core, nowhere, transcription=config.get("type") == "transcription")
+    probe.configure(config)  # validates; raises RealtimeError / BoloError on a bad configuration
+    now = time.time()
+    for value in [v for v, (expires, _) in core.client_secrets.items() if expires < now]:
+        del core.client_secrets[value]
+    value = SECRET_PREFIX + secrets.token_urlsafe(32)
+    expires_at = int(now) + int(seconds)
+    core.client_secrets[value] = (float(expires_at), config)
+    return {"value": value, "expires_at": expires_at, "session": probe.session_object()}
+
+
+def client_secret_session(core: Bolo, presented: str | None) -> dict[str, Any] | None:
+    """The session configuration behind a valid, unexpired client secret; None for anything else."""
+    if not presented or not presented.startswith(SECRET_PREFIX):
+        return None
+    for value, (expires, config) in list(core.client_secrets.items()):
+        if hmac.compare_digest(value.encode(), presented.encode()):
+            if expires < time.time():
+                del core.client_secrets[value]
+                return None
+            return config
+    return None
+
+
 async def serve(
     core: Bolo,
     receive: Callable[[], Awaitable[str | bytes | None]],
@@ -877,9 +1062,17 @@ async def serve(
     *,
     model: str | None,
     transcription: bool,
+    config: dict[str, Any] | None = None,
 ) -> None:
-    """Drive one Realtime connection until the client goes away (``receive`` returns None)."""
+    """Drive one Realtime connection until the client goes away (``receive`` returns None).
+
+    ``config`` is a session configuration to apply before ``session.created`` (from a client secret).
+    """
+    if config:
+        transcription = transcription or config.get("type") == "transcription"
     session = RealtimeSession(core, send, model=model, transcription=transcription)
+    if config:
+        session.configure(config)
     await session.start()
     try:
         while True:

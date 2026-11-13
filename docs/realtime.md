@@ -148,6 +148,34 @@ model's rule is used and the per-stream setting has no effect.
 | query `interim=false` | | finals only: no re-decoding at all, the cheapest mode |
 | query `vad=false` | | you decide where utterances end, with `{"type":"flush"}` |
 
+## The same thing through the OpenAI Realtime API
+
+`WS /v1/realtime` (see [voice-agents.md](voice-agents.md)) uses the same
+machinery, with OpenAI's event names: while the user speaks,
+`conversation.item.input_audio_transcription.delta` events carry the words
+that have settled (two consecutive decodes agree), and after the end of
+speech the remainder and a `completed` event with the whole transcript.
+Deltas only ever append. Measured with a 12-second sample
+(`docs/measurements/realtime-transcript-deltas.json`):
+
+| Model | Deltas | Of them before the end of speech | First delta after speech start |
+| --- | --- | --- | --- |
+| `moonshine-tiny-en` | 9 | 8 | 1.6 s |
+| `faster-whisper-tiny` | 12 | 11 | 2.1 s |
+| `zipformer-en-20m-streaming` | 10 | 9 | 2.4 s |
+
+The first delta is late by design: a word has to survive a second decode
+before it is sent. With the streaming Zipformer the deltas added up exactly
+to the final transcript; with Moonshine and Whisper the final decode revised
+a word or a punctuation mark that had already been sent, so treat
+`completed.transcript` as the text and the deltas as a preview. The native
+WebSocket (`/api/v1/stt/stream`) shows unstable text as well and is the
+better choice for a live caption display.
+
+`turn_detection: {"type": "semantic_vad"}` adds an optional end-of-turn model
+to silence detection in Realtime sessions (what it does and what we measured:
+[voice-agents.md](voice-agents.md)). The native WebSocket does not use it.
+
 ## Limits, stated plainly
 
 * LocalAgreement is the simple, robust policy from the Whisper-Streaming

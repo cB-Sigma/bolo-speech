@@ -1,0 +1,32 @@
+{
+ "moonshine-tiny-en": [
+  {
+   "deltas": 9,
+   "deltas_before_speech_stopped": 8,
+   "first_delta_after_speech_start_s": 1.57,
+   "concat_equals_transcript": false,
+   "concat": "Speech servers are judged by how quickly the first sound arrives. A good one starts speaking before it has finished reading. Keep a steady pace pace under load and tells you honestly how long each step took.",
+   "transcript": "1. Speech servers are judged by how quickly the first sound arrives. A good one starts speaking before it has finished reading. Keeps a steady pace under load and tells you honestly how long each step took."
+  }
+ ],
+ "faster-whisper-tiny": [
+  {
+   "deltas": 12,
+   "deltas_before_speech_stopped": 11,
+   "first_delta_after_speech_start_s": 2.07,
+   "concat_equals_transcript": false,
+   "concat": "Speed servers are judged by how quickly the first sound arrives. A good one starts speaking before it has finished reading. Keeps a steady pace under load and tells you honestly how long each step took.",
+   "transcript": "Speed servers are judged by how quickly the first sound arrives. A good one starts speaking before it has finished reading. Keeps a steady pace under load, and tells you honestly how long each step took."
+  }
+ ],
+ "zipformer-en-20m-streaming": [
+  {
+   "deltas": 10,
+   "deltas_before_speech_stopped": 9,
+   "first_delta_after_speech_start_s": 2.44,
+   "concat_equals_transcript": true,
+   "concat": "ers are judged by how quickly the first sound arrives a good one starts speaking before it has finished reading keeps a steady pace under load and tells you honestly how long each step took",
+   "transcript": "ers are judged by how quickly the first sound arrives a good one starts speaking before it has finished reading keeps a steady pace under load and tells you honestly how long each step took"
+  }
+ ]
+}

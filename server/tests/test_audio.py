@@ -250,3 +250,17 @@ def test_stereo_is_downmixed() -> None:
     y, rate = decode_audio(buf.getvalue())
     assert y.ndim == 1 and rate == 16000
     assert np.allclose(y, left / 2, atol=1e-3)
+
+
+def test_streamed_opus_arrives_in_small_pages_with_pyav() -> None:
+    pytest.importorskip("av")
+    t = np.arange(3 * 24000) / 24000
+    x = (0.3 * np.sin(2 * np.pi * 220 * t)).astype(np.float32)
+    enc = StreamEncoder("opus", 24000)
+    sizes = [len(enc.feed(x[i : i + 2400])) for i in range(0, len(x), 2400)]  # 100 ms at a time
+    data_tail = enc.finish()
+    assert sum(1 for s in sizes[2:] if s) >= len(sizes[2:]) - 2, "nearly every 100 ms of input yields an Ogg page"
+    enc = StreamEncoder("opus", 24000)
+    blob = b"".join(enc.feed(x[i : i + 2400]) for i in range(0, len(x), 2400)) + enc.finish()
+    y, rate = decode_audio(blob, filename="a.opus")
+    assert rate in (24000, 48000) and abs(len(y) / rate - 3.0) < 0.1 and data_tail is not None

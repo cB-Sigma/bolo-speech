@@ -7,62 +7,195 @@ was not.
 
 ## Indian languages
 
-### Speech to text
+### Speech to text: all 22 scheduled languages
 
-| Route | Models | Languages | Status |
-| --- | --- | --- | --- |
-| Hindi fine-tunes of Whisper | `faster-whisper-tiny-hindi`, `-small-hindi`, `-medium-hindi` (Collabora, CC-BY-4.0) | hi | `tiny` and `small` validated on CPU with synthesised Hindi (0% WER on one sentence); `small` ran slower than real time here (RTF 1.1), `tiny` at 0.15 |
-| Multilingual Whisper with `language=hi` (or bn, ta, te, mr, gu, kn, ml, pa, ur, ne, as, or, sa, sd) | `faster-whisper-small` and larger; `whisper-small` and larger | 99 languages | English path validated; Hindi through `faster-whisper-small` is in the opt-in test-suite. Whisper *tiny* was not usable for Hindi in our run (it answered with English-like text); use *small* or larger, or a Hindi fine-tune |
-| Meta Omnilingual ASR | `omnilingual-ctc-300m` | 1,600+ including all major Indian languages | runs on CPU (validated with the German test audio in its repository; RTF 0.11); Indian languages not individually checked. Character-level output, no punctuation |
-| Dolphin | `dolphin-base`, `dolphin-small` | 40 Eastern languages incl. hi, ur, bn, ta, te, gu, mr, kn, ml, pa, or | `dolphin-base` runs (validated with its own Mandarin test audio); Indian languages not individually checked |
-| Bengali streaming | `zipformer-bn-vosk-streaming` | bn | validated with the Bengali test audio in its repository; true streaming |
-| IndicConformer (AI4Bharat) | `indicconformer-multi-community` | hi, as, bn, brx, gu, kn, ks, mr | community export of a gated original; validated on CPU with synthesised Hindi (0% WER on one sentence, RTF 0.13). Other languages not checked |
+Every scheduled language of India has a model of its own: AI4Bharat's
+IndicConformer (Conformer-large, CTC branch, MIT), in an ungated community
+ONNX export for sherpa-onnx (`parismitaglobalsolutions/indicconformer-sherpa-onnx`,
+pinned to a commit; 198 MB per language, int8). The official AI4Bharat
+repositories are gated on Hugging Face; bolo never downloads gated models on
+its own.
 
-Tell the server the language. Multilingual models detect it otherwise, which
-costs time and, on short telephone utterances, accuracy:
+Each model below was pulled and run here on recordings with known
+transcripts. WER and CER are after removing punctuation; small samples (10
+utterances, about two minutes, unless stated), so read them as indications.
+The real-time factors were taken with 2 threads on a machine busy with other
+jobs and are pessimistic.
+
+| Language | Model | Test recordings | WER | CER | RTF |
+| --- | --- | --- | --- | --- | --- |
+| Assamese (`as`) | `indicconformer-as-community` | FLEURS as_in dev, first 10 utterances | 30.8 % | 14.9 % | 0.15 |
+| Bengali (`bn`) | `indicconformer-bn-community` | FLEURS bn_in dev, first 10 utterances | 10.8 % | 2.5 % | 0.11 |
+| Bodo (`brx`) | `indicconformer-brx-community` | **not run**: no public test recording found | - | - | - |
+| Dogri (`doi`) | `indicconformer-doi-community` | **not run**: no public test recording found | - | - | - |
+| Gujarati (`gu`) | `indicconformer-gu-community` | FLEURS gu_in dev, first 10 utterances | 21.7 % | 5.4 % | 0.11 |
+| Hindi (`hi`) | `indicconformer-hi-community` | FLEURS hi_in dev, first 10 utterances | 15.2 % | 7.0 % | 0.07 |
+| Kannada (`kn`) | `indicconformer-kn-community` | FLEURS kn_in dev, first 9 utterances | 15.1 % | 4.8 % | 0.07 |
+| Kashmiri (`ks`) | `indicconformer-ks-community` | **not run**: no public test recording found | - | - | - |
+| Konkani (`kok`) | `indicconformer-kok-community` | **not run**: no public test recording found | - | - | - |
+| Maithili (`mai`) | `indicconformer-mai-community` | RESPIN Maithili test, 60 utterances | 49.6 % | 11.6 % | 0.06 |
+| Malayalam (`ml`) | `indicconformer-ml-community` | FLEURS ml_in dev, first 9 utterances | 31.4 % | 8.8 % | 0.12 |
+| Manipuri (`mni`) | `indicconformer-mni-community` | **not run**: no public test recording found | - | - | - |
+| Marathi (`mr`) | `indicconformer-mr-community` | FLEURS mr_in dev, first 10 utterances | 19.3 % | 4.2 % | 0.20 |
+| Nepali (`ne`) | `indicconformer-ne-community` | FLEURS ne_np dev, first 10 utterances | 30.7 % | 12.7 % | 0.14 |
+| Odia (`or`) | `indicconformer-or-community` | FLEURS or_in dev, first 10 utterances | 15.5 % | 4.8 % | 0.16 |
+| Punjabi (`pa`) | `indicconformer-pa-community` | FLEURS pa_in dev, first 10 utterances | 15.5 % | 5.3 % | 0.14 |
+| Sanskrit (`sa`) | `indicconformer-sa-community` | prathoshap/sushrota-sanskrit-asr-data train, first 12 utterances | 44.2 % | 6.1 % | 0.13 |
+| Santali (`sat`) | `indicconformer-sat-community` | **not run**: no public test recording found | - | - | - |
+| Sindhi (`sd`) | `indicconformer-sd-community` | FLEURS sd_in dev, first 10 utterances: ran, but the model writes Devanagari and the references are in Arabic script | - | - | 0.11 |
+| Tamil (`ta`) | `indicconformer-ta-community` | FLEURS ta_in dev, first 10 utterances | 25.5 % | 10.2 % | 0.06 |
+| Telugu (`te`) | `indicconformer-te-community` | FLEURS te_in dev, first 10 utterances | 21.1 % | 10.4 % | 0.07 |
+| Urdu (`ur`) | `indicconformer-ur-community` | FLEURS ur_pk dev, first 10 utterances | 18.5 % | 7.5 % | 0.14 |
+
+Things to know:
+
+* **Say which language.** Each model knows one language; pick the model by
+  language (`model=indicconformer-mai-community`). Nothing here detects
+  Maithili, Bhojpuri or the other Hindi-belt languages reliably, and
+  Whisper's language detector does not know most of them.
+* Output is in the script the model was trained on: Kashmiri and Urdu in
+  Perso-Arabic (right to left), **Sindhi in Devanagari**, Manipuri in Meetei
+  Mayek, Santali in Ol Chiki. No punctuation, no capitalisation.
+* Bodo, Dogri, Kashmiri, Konkani, Manipuri and Santali are in the catalog as
+  **untested**: we found no openly downloadable recordings with transcripts
+  to run them on.
+* WER overstates the errors where spelling conventions differ. The Maithili
+  test set writes postpositions as separate words (`जाड़ में`), the model
+  attaches them (`जाड़मे`); the character error rate is the fairer number
+  there. Sanskrit was run on verse recitation.
+* Smaller exports of the same Tamil, Telugu and Malayalam models, with a
+  single-language vocabulary (138 MB): `indicconformer-ta`
+  (run on 10 FLEURS utterances: WER 29.0 %, CER 10.3 %, RTF 0.23), `indicconformer-te` (run on 10 FLEURS utterances: WER 21.7 %, CER 10.5 %, RTF 0.26),
+  `indicconformer-ml` (run on 9 FLEURS utterances: WER 34.3 %, CER 9.8 %, RTF 0.17).
+* All of these work on the realtime WebSocket and in Realtime sessions
+  through pseudo-streaming (see [realtime.md](realtime.md)).
 
 ```bash
-curl localhost:8000/v1/audio/transcriptions -F file=@call.wav -F model=faster-whisper-small -F language=hi
+bolo pull indicconformer-mai-community
+curl localhost:8000/v1/audio/transcriptions -F file=@call.wav -F model=indicconformer-mai-community
 ```
 
-```
-ws://localhost:8000/api/v1/stt/stream?model=faster-whisper-tiny-hindi&language=hi
-```
+### Maithili and Bhojpuri
 
-Every model above works on the realtime WebSocket. Only the Bengali
-Zipformer is natively streaming; the others use pseudo-streaming (VAD,
-periodic re-decoding, stabilised partials), whose latency is the model's
-decode time for the utterance so far. See [realtime.md](realtime.md).
+**Maithili** has a dedicated recogniser, `indicconformer-mai-community`:
+11.6 % CER and 49.6 % WER on 60 utterances of the RESPIN test set
+(IISc, CC-BY-4.0: read sentences about farming and banking by rural
+speakers). Example: reference `गामक चरवाहा जाड़ में बहुत धन प्राप्त कयलक`,
+recognised `गामके चरवाहा जाड़मे बहुत धन प्राप्त कयलक`.
 
-**Code-mixed speech** (Hinglish and friends). Nothing in bolo fights it: text
-is passed through as the model emits it, in whatever script. How well it is
-recognised depends on the model; Whisper fine-tunes on code-mixed data can be
-added with `bolo pull hf:<repo>` if they are in CTranslate2 format. We did not
-measure code-mixed accuracy.
+**Bhojpuri** has **no dedicated speech-to-text model that is permissively
+licensed, ungated and runs without PyTorch today.** The practical fallback is
+the Hindi model, `indicconformer-hi-community`, which we measured on 60
+RESPIN Bhojpuri utterances:
 
-**The official AI4Bharat models** are gated on Hugging Face and use an ONNX
-layout bolo cannot load yet. bolo never downloads gated models on its own; a
-loader that uses your token is on the roadmap. Details in
-[models.md](models.md#indian-languages).
+| Model | Audio | WER | CER |
+| --- | --- | --- | --- |
+| `indicconformer-hi-community` | Hindi (FLEURS, 10 utterances) | 15.2 % | 7.0 % |
+| `indicconformer-hi-community` | Hindi (RESPIN, 60 utterances) | 11.5 % | 2.8 % |
+| `indicconformer-hi-community` | **Bhojpuri** (RESPIN, 60 utterances) | **40.2 %** | **13.8 %** |
+| `indicconformer-hi-community` | Maithili (RESPIN, 60 utterances) | 51.1 % | 18.7 % |
+| `indicconformer-mai-community` | Maithili (RESPIN, 60 utterances) | 49.6 % | 11.6 % |
+
+So on Bhojpuri the Hindi model gets about six words in ten right, three to
+four times its error on Hindi, and it writes Bhojpuri with Hindi habits
+(reference `बायोगैस जीव जंतु के अपघटन से बनत बाटे`, recognised `बायोोगैस जीव जंतु के अपघटन से बनत बांटे`).
+That is usable as input for a language model that tolerates noisy text, and
+not good enough for transcripts. Better Bhojpuri models exist as PyTorch
+checkpoints (a Whisper-small fine-tune under CC-BY-4.0, and IISc's
+multilingual SraVaani, MIT but gated); they need a one-time conversion that
+has not been done, so they are not in the catalog. For Maithili do not use
+the Hindi model: it does worse than the Maithili one and rewrites Maithili
+grammar into Hindi.
+
+Voices for both languages exist (IISc SYSPIN, below) but are **not published
+yet**.
+
+### Other speech-to-text models for Indian languages
+
+| Model | Languages | What it is | Status |
+| --- | --- | --- | --- |
+| `faster-whisper-tiny-hindi`, `-small-hindi`, `-medium-hindi` | hi | Collabora's Hindi fine-tunes of Whisper (CC-BY-4.0) | `tiny` and `small` validated with synthesised Hindi (0 % WER on one sentence); `small` ran slower than real time here (RTF 1.1), `tiny` at 0.15 |
+| `faster-whisper-large-v2-hindi` | hi | Collabora, Whisper large-v2 (CC-BY-4.0, 3.1 GB) | **untested** |
+| `faster-whisper-base-hinglish` | Hindi-English | Oriserve's Hindi2Hinglish "Swift" (Whisper base, Apache-2.0, 81 MB): writes code-mixed speech in **Latin script** | ran on 10 Hindi FLEURS utterances (RTF 0.17) and produced romanised Hindi such as `Major kin khaana bhoomadhy saagar mein samaan kshetron ki ta`; **no accuracy number**: we had no Hinglish recordings with Latin-script references |
+| `faster-whisper-medium-tamil`, `-kannada` | ta, kn | vasista22's Whisper-medium fine-tunes, CTranslate2 builds by a third party (Apache-2.0, 780 MB) | Tamil: run on 3 FLEURS utterances: WER 6.9 %, CER 2.6 %, RTF 1.76. Kannada: run on 3 FLEURS utterances: WER 25.5 %, CER 24.5 %, RTF 1.84 |
+| `faster-whisper-medium-telugu`, `-bengali` | te, bn | Whisper-medium fine-tunes (Apache-2.0, 1.5 GB) | Telugu: run on 3 FLEURS utterances: WER 4.3 %, CER 7.0 %, RTF 1.52. Bengali: run on 3 FLEURS utterances: WER 13.2 %, CER 4.1 %, RTF 0.69 |
+| `faster-whisper-medium-punjabi` | pa | AI4Bharat IndicWhisper (MIT, 770 MB) | run on 3 FLEURS utterances: WER 48.4 %, CER 38.2 %, RTF 1.21 (3 utterances only; the first came out nearly exact, so most of the error is in the other two, which were not inspected) |
+| `nemotron-3.5-streaming-560ms` | hi and 34 non-Indian languages | NVIDIA Nemotron 3.5 ASR (0.6 B parameters, OpenMDW-1.1): the only **natively streaming** Hindi model here, with punctuation. `language=hi` fixes the language | run on 3 FLEURS utterances: WER 20.9 %, CER 6.1 %, RTF 0.31; whole-utterance decoding, streaming latency not measured |
+| multilingual Whisper with `language=` | hi, bn, ta, te, mr, gu, kn, ml, pa, ur, ne, as, or, sa, sd | `faster-whisper-small` and larger | English path validated; Whisper *tiny* was not usable for Hindi in our run. Prefer the per-language models above |
+| `zipformer-bn-vosk-streaming` | bn | natively streaming Zipformer | validated with the Bengali test audio in its repository |
+| `omnilingual-ctc-300m`, `dolphin-base` | many | broad multilingual models | run on CPU with non-Indian test audio only. The Omnilingual CTC model takes no language hint at all, so prefer a per-language model |
+
+The Whisper-medium models are accurate and slow: expect slower than real time
+on a few CPU cores. For live use on CPU the IndicConformer models are the
+ones to try first.
+
+**Code-mixed speech** (Hinglish and friends). IndicConformer writes English
+words in the native script; `faster-whisper-base-hinglish` writes everything
+in Latin script. We did not measure code-mixed accuracy for either.
 
 ### Text to speech
 
-| Language | Models | Needs espeak-ng | Status |
+| Language | Voices | Needs espeak-ng | Status |
 | --- | --- | --- | --- |
-| Hindi | `piper-hi-in-rohan-medium`, `-pratham-medium` ⚠, `-priyamvada-medium` ⚠ | yes | all three validated on CPU; `rohan` round-trips through Hindi speech recognition in the test-suite |
-| Hindi | `kokoro-v1.0-int8` / `kokoro-v1.0`, voices `hf_alpha`, `hf_beta`, `hm_omega`, `hm_psi` | yes | `hf_alpha` validated (the built-in Hindi sample was made with it and is recognised with 0% WER by `faster-whisper-tiny-hindi`) |
-| Nepali | `piper-ne-np-google-medium`, `-x-low`, `mimic3-ne-google` | yes | `medium` and mimic3 validated (audio produced; not transcribed back) |
-| Urdu | `piper-ur-pk-fasih-medium` | yes | validated (audio produced; not transcribed back) |
-| Bengali | `coqui-bn-female`, `coqui-bn-male` (character input), `mimic3-bn-multi` | coqui: no; mimic3: yes | `coqui-bn-female` and `mimic3-bn-multi` validated (audio produced) |
+| Hindi | `piper-hi-in-rohan-medium`, `-pratham-medium` ⚠, `-priyamvada-medium` ⚠; Kokoro voices `hf_alpha`, `hf_beta`, `hm_omega`, `hm_psi` | yes | validated on CPU; `rohan` round-trips through Hindi speech recognition in the test-suite |
+| Telugu | `piper-te-in-venkatesh-medium`, `piper-te-in-padmavathi-medium`, `piper-te-in-maya-medium` | yes | **new**, each synthesised a sentence that was transcribed back by the Telugu recogniser: round-trip CER 3.8 % (WER 23.1 %), RTF 0.21; round-trip CER 2.6 % (WER 15.4 %), RTF 0.18; round-trip CER 1.3 % (WER 7.7 %), RTF 0.10 |
+| Tamil | `piper-ta-in-rasa-female-medium`, `piper-ta-in-rasa-male-medium` (third-party voices, CC-BY-4.0) | yes | **new**: round-trip CER 0.0 % (WER 0.0 %), RTF 0.11; round-trip CER 3.1 % (WER 10.0 %), RTF 0.15 |
+| Malayalam | `piper-ml-in-arjun-medium`, `piper-ml-in-meera-medium` (data licence unclear: check before commercial use) | yes | **new**: round-trip CER 2.2 % (WER 10.0 %), RTF 0.19; round-trip CER 6.7 % (WER 10.0 %), RTF 0.19 |
+| Marathi | `piper-mr-in-google-medium` (9 speakers, CC-BY-SA-4.0) | yes | **new**: round-trip CER 6.1 % (WER 33.3 %), RTF 0.13 |
+| Bengali | `piper-bn-bd-google-medium` (16 speakers, **new**: round-trip CER 6.0 % (WER 33.3 %), RTF 0.22); `coqui-bn-female`, `coqui-bn-male` (character input); `mimic3-bn-multi` | piper, mimic3: yes; coqui: no | the others validated (audio produced; not transcribed back) |
+| Urdu | `piper-ur-pk-fasih-medium`; `piper-ur-pk-aegis-female-medium` (**new**: round-trip CER 2.8 % (WER 27.8 %), RTF 0.14) | yes | `fasih` validated (audio produced) |
+| Nepali | `piper-ne-np-chitwan-medium` (CC0 data; **new**: round-trip CER 9.3 % (WER 46.2 %), RTF 0.07); `piper-ne-np-google-medium`, `-x-low`; `mimic3-ne-google` | yes | the others validated (audio produced) |
 | Gujarati | `mimic3-gu-cmu-indic` | yes | validated (audio produced) |
-| Telugu, Malayalam | Piper voices exist upstream (`te_IN`, `ml_IN`) | yes | **not available yet**: no converted files; on the roadmap |
-| Tamil, Marathi, Kannada, Punjabi, Odia, Assamese | - | - | **no voice in the catalog.** Meta's MMS-TTS covers them but is non-commercial and has no ready-made export |
+| Maithili, Bhojpuri, Kannada, Magahi, Chhattisgarhi; more voices for hi, bn, mr, te, gu and Indian English | `syspin-<lang>-<female\|male>` (IISc SYSPIN, MIT weights, CC-BY-4.0 data; character input) | no | **not yet published.** The catalog describes them with `status: pending`; see "Voices converted by this project" in [models.md](models.md). Tested here from local files: below |
+| Punjabi, Odia, Assamese | - | - | **no voice.** The permissive models that exist for them need an engine bolo does not have |
+| Sanskrit, Sindhi, Kashmiri, Konkani, Dogri, Manipuri, Bodo, Santali | - | - | **no voice**; we know of nothing permissive, ungated and small enough for a CPU |
 
 ⚠ = the voice's training data is under a non-commercial licence.
 
-"Audio produced; not transcribed back" means exactly that: the voice loaded,
-synthesised a sentence of plausible length and loudness, and nobody on the
-team who speaks the language listened to it. Treat those as smoke-tested.
+The new Piper voices are the Piper project's own files (and two third-party
+Tamil voices in the same format), converted for sherpa-onnx by bolo right
+after the download; any other Piper voice works by name the same way
+(`bolo pull piper:<voice>`, see [models.md](models.md)). "Transcribed back"
+means: one FLEURS sentence was synthesised and recognised by that language's
+IndicConformer model, whose own error is part of the number. Nobody who
+speaks these languages listened. "Audio produced; not transcribed back"
+means the voice loaded and synthesised a sentence of plausible length and
+loudness: smoke-tested, no more.
+
+**SYSPIN voices for Maithili and Bhojpuri (not yet published).** IISc's
+SYSPIN project publishes studio-quality single-speaker VITS voices as PyTorch
+checkpoints. bolo's repository contains the conversion
+(`tools/voices/export_syspin.py`) and a workflow that publishes the converted
+files as release assets; until that has run, the catalog entries are
+`pending` and cannot be pulled. What we could test: archives packed from
+voices converted earlier with the same recipe were served from a local web
+server and went through the real pull path (download, checksum, unpacking,
+load, synthesis), and the result was transcribed back
+(`docs/measurements/syspin-voices-archive-pull.json`):
+
+| Voice | Transcribed back by | CER | WER |
+| --- | --- | --- | --- |
+| `syspin-mai-female` | `indicconformer-mai-community` | 11.9 % | 52.9 % |
+| `syspin-mai-male` | `indicconformer-mai-community` | 7.5 % | 41.2 % |
+| `syspin-bho-female` | `indicconformer-hi-community` (no Bhojpuri recogniser) | 5.7 % | 13.3 % |
+
+(two sentences each; the recognisers' own error rates are of the same size,
+so this says "intelligible", not how good). If you have the converted files,
+they work today from a directory:
+`bolo pull ./mai_f --kind vits --name syspin-mai-female --language mai`.
+
+These voices read **characters from a closed set**: the Bhojpuri female
+voice has no digits and no Latin letters at all, the Maithili female voice
+has only some digits. Anything outside the set would be skipped silently, so
+bolo refuses instead (`400 unsupported_characters`, naming the characters):
+write numbers out in words and transliterate English words into Devanagari.
+There is no number normaliser for Maithili or Bhojpuri; a voice entry can opt
+into Hindi number words with the option `numbers: hi`, which is an
+approximation.
+
+Without these voices, a Hindi voice will read Maithili or Bhojpuri text,
+since the script is the same, with Hindi pronunciation. We did not evaluate
+that and do not present it as support for either language.
 
 Text handling for Indic scripts:
 
@@ -71,10 +204,11 @@ Text handling for Indic scripts:
   first sentence in any of these scripts;
 * Hindi numbers are spelled out in the Indian system before synthesis:
   `250000` → `दो लाख पचास हज़ार`, Devanagari digits included. Other Indian
-  languages keep their digits (the voice's own front end reads them);
-* code-mixed input such as `मेरा order कल deliver होगा` is passed to the voice
-  unchanged. How a Hindi voice pronounces Latin-script words depends on the
-  voice; we have not evaluated it.
+  languages keep their digits: a phoneme-based voice (Piper format) reads
+  them through espeak-ng, a character-input voice refuses them (above);
+* code-mixed input such as `मेरा order कल deliver होगा` is passed to a
+  phoneme-based voice unchanged. How a Hindi voice pronounces Latin-script
+  words depends on the voice; we have not evaluated it.
 
 ## Telephony
 

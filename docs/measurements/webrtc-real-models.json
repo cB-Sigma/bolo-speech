@@ -1,0 +1,172 @@
+{
+ "what": "one voice-agent turn over WebRTC with real models: aiortc peer -> Opus -> bolo (silero-vad, moonshine-tiny-en, language model, piper-en-us-amy-low) -> Opus -> peer",
+ "llm": "qwen2.5:0.5b through Ollama 0.40.16, num_thread 2",
+ "bolo_threads": 2,
+ "aiortc": "1.16.0",
+ "load_average_at_start": 10.48388671875,
+ "turns": [
+  {
+   "user_transcript": "Good morning. could you tell me when my order will arise?",
+   "user_wer_vs_sample_text": 0.091,
+   "reply_words": 9,
+   "reply_heard_back_wer": 0.0,
+   "audible_reply_s": 2.0,
+   "track_sample_rate": 48000,
+   "client_side_ms": {
+    "speech_stopped_event_to_first_text_delta": 2246,
+    "speech_stopped_event_to_first_sound_on_track": 6960,
+    "speech_stopped_event_to_output_audio_buffer_started": 6828
+   },
+   "server_trace": {
+    "transport": "webrtc",
+    "status": "ok",
+    "stt_final_ms": 93.2,
+    "first_token_ms": 2245.7,
+    "first_audio_ms": 6825.2,
+    "total_ms": 6832.4,
+    "phases": {
+     "decode": 92,
+     "llm_first_token": 2152,
+     "synthesize_first": 4580,
+     "synthesize_rest": 7
+    }
+   },
+   "events_seen": [
+    "conversation.item.added",
+    "conversation.item.done",
+    "conversation.item.input_audio_transcription.completed",
+    "conversation.item.input_audio_transcription.delta",
+    "input_audio_buffer.committed",
+    "input_audio_buffer.speech_started",
+    "input_audio_buffer.speech_stopped",
+    "output_audio_buffer.started",
+    "output_audio_buffer.stopped",
+    "response.content_part.added",
+    "response.content_part.done",
+    "response.created",
+    "response.done",
+    "response.output_audio.done",
+    "response.output_audio_transcript.delta",
+    "response.output_audio_transcript.done",
+    "response.output_item.added",
+    "response.output_item.done",
+    "session.updated"
+   ],
+   "hangup_status": 200
+  },
+  {
+   "user_transcript": "Good morning. could you tell me when my order will arise?",
+   "user_wer_vs_sample_text": 0.091,
+   "reply_words": 20,
+   "reply_heard_back_wer": 0.182,
+   "audible_reply_s": 5.5,
+   "track_sample_rate": 48000,
+   "client_side_ms": {
+    "speech_stopped_event_to_first_text_delta": 1017,
+    "speech_stopped_event_to_first_sound_on_track": 1572,
+    "speech_stopped_event_to_output_audio_buffer_started": 1456
+   },
+   "server_trace": {
+    "transport": "webrtc",
+    "status": "ok",
+    "stt_final_ms": 597.3,
+    "first_token_ms": 1021.8,
+    "first_audio_ms": 1460.2,
+    "total_ms": 5218.9,
+    "phases": {
+     "decode": 592,
+     "llm_first_token": 424,
+     "synthesize_first": 438,
+     "synthesize_rest": 3755
+    }
+   },
+   "events_seen": [
+    "conversation.item.added",
+    "conversation.item.done",
+    "conversation.item.input_audio_transcription.completed",
+    "conversation.item.input_audio_transcription.delta",
+    "input_audio_buffer.committed",
+    "input_audio_buffer.speech_started",
+    "input_audio_buffer.speech_stopped",
+    "output_audio_buffer.started",
+    "output_audio_buffer.stopped",
+    "response.content_part.added",
+    "response.content_part.done",
+    "response.created",
+    "response.done",
+    "response.output_audio.done",
+    "response.output_audio_transcript.delta",
+    "response.output_audio_transcript.done",
+    "response.output_item.added",
+    "response.output_item.done",
+    "session.updated"
+   ],
+   "hangup_status": 200
+  },
+  {
+   "user_transcript": "Good morning. could you tell me when my order will arise?",
+   "user_wer_vs_sample_text": 0.091,
+   "reply_words": 26,
+   "reply_heard_back_wer": 0.0,
+   "audible_reply_s": 6.7,
+   "track_sample_rate": 48000,
+   "client_side_ms": {
+    "speech_stopped_event_to_first_text_delta": 560,
+    "speech_stopped_event_to_first_sound_on_track": 6098,
+    "speech_stopped_event_to_output_audio_buffer_started": 5968
+   },
+   "server_trace": {
+    "transport": "webrtc",
+    "status": "ok",
+    "stt_final_ms": 201.3,
+    "first_token_ms": 559.7,
+    "first_audio_ms": 5967.1,
+    "total_ms": 10852.6,
+    "phases": {
+     "decode": 200,
+     "llm_first_token": 357,
+     "synthesize_first": 5407,
+     "synthesize_rest": 4885
+    }
+   },
+   "events_seen": [
+    "conversation.item.added",
+    "conversation.item.done",
+    "conversation.item.input_audio_transcription.completed",
+    "conversation.item.input_audio_transcription.delta",
+    "input_audio_buffer.committed",
+    "input_audio_buffer.speech_started",
+    "input_audio_buffer.speech_stopped",
+    "output_audio_buffer.started",
+    "output_audio_buffer.stopped",
+    "response.content_part.added",
+    "response.content_part.done",
+    "response.created",
+    "response.done",
+    "response.output_audio.done",
+    "response.output_audio_transcript.delta",
+    "response.output_audio_transcript.done",
+    "response.output_item.added",
+    "response.output_item.done",
+    "session.updated"
+   ],
+   "hangup_status": 200
+  }
+ ],
+ "capabilities_realtime": {
+  "endpoint": "/v1/realtime",
+  "transcription_sessions": true,
+  "conversation_sessions": true,
+  "audio_formats": [
+   "audio/pcm (24 kHz)",
+   "audio/pcmu",
+   "audio/pcma"
+  ],
+  "reference": "OpenAI Realtime API (GA event names), as typed in openai-python 3.50.0"
+ },
+ "median_client_side_ms": {
+  "speech_stopped_event_to_first_text_delta": 1017,
+  "speech_stopped_event_to_first_sound_on_track": 6098,
+  "speech_stopped_event_to_output_audio_buffer_started": 5968
+ }
+}

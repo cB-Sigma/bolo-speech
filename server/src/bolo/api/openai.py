@@ -14,14 +14,16 @@ import time
 from collections.abc import AsyncGenerator, AsyncIterator, Coroutine
 from typing import Any, TypeVar
 
+import numpy as np
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from bolo.api.common import get_core, parse_bool, read_upload, sse
+from bolo.audio import decode_audio, resample
 from bolo.audio.encode import StreamEncoder, normalize_format
 from bolo.core import Bolo, SynthChunk, Transcript
-from bolo.diarize import DiarizeOptions
+from bolo.diarize import DiarizeOptions, KnownSpeaker
 from bolo.engines.base import Segment
 from bolo.errors import BoloError, InvalidRequest, ModelNotFound
 from bolo.obs.trace import Trace
@@ -221,28 +223,69 @@ def _int_field(form: Any, name: str) -> int | None:
         raise InvalidRequest(f"{name} must be an integer", param=name) from exc
 
 
-def _diarize_options(form: Any, fmt: str, model: str | None, task: str) -> DiarizeOptions | None:
+async def known_speakers(form: Any) -> list[KnownSpeaker]:
+    """``known_speaker_names[]`` and ``known_speaker_references[]`` (data URLs as in OpenAI's API, or file parts)."""
+    names = [str(n).strip() for key in ("known_speaker_names[]", "known_speaker_names") for n in form.getlist(key)]
+    refs = [r for key in ("known_speaker_references[]", "known_speaker_references") for r in form.getlist(key)]
+    if not names and not refs:
+        return []
+    if len(names) != len(refs):
+        raise InvalidRequest(
+            f"known_speaker_names[] ({len(names)}) and known_speaker_references[] ({len(refs)}) must have the same "
+            "number of entries",
+            param="known_speaker_references[]",
+        )
+    if len(names) > 8 or any(not n for n in names) or len(set(names)) != len(names):
+        raise InvalidRequest("give at most 8 known speakers, each with a distinct name", param="known_speaker_names[]")
+    out: list[KnownSpeaker] = []
+    for name, ref in zip(names, refs):
+        try:
+            if isinstance(ref, str):
+                if not ref.startswith("data:") or "," not in ref:
+                    raise ValueError("expected a data URL (data:audio/wav;base64,...) or a file part")
+                header, payload = ref.split(",", 1)
+                data = base64.b64decode(payload, validate=False)
+                content_type, filename = header[5:].split(";")[0] or None, None
+            else:
+                data, content_type, filename = await ref.read(), ref.content_type, ref.filename
+            samples, rate = await asyncio.to_thread(decode_audio, data, filename=filename, content_type=content_type)
+        except (ValueError, BoloError) as exc:
+            raise InvalidRequest(
+                f"the reference for known speaker '{name}' could not be read: {exc}", param="known_speaker_references[]"
+            ) from exc
+        seconds = len(samples) / rate if rate else 0.0
+        if not 1.0 <= seconds <= 60.0:
+            raise InvalidRequest(
+                f"the reference for known speaker '{name}' is {seconds:.1f} s long; use 2 to 10 s of that person "
+                "speaking (1 to 60 s are accepted)",
+                param="known_speaker_references[]",
+            )
+        out.append(KnownSpeaker(name, np.ascontiguousarray(resample(samples, rate, 16000), dtype=np.float32)))
+    return out
+
+
+async def _diarize_options(form: Any, fmt: str, model: str | None, task: str) -> DiarizeOptions | None:
     """Diarization is on with ``diarize=true``, ``response_format=diarized_json`` or the OpenAI diarize model name."""
     wanted = parse_bool(form.get("diarize")) or fmt == "diarized_json" or (model or "").endswith("-diarize")
     if not wanted:
         return None
     if task != "transcribe":
         raise InvalidRequest("diarization is only available for transcriptions", param="diarize")
-    if form.get("known_speaker_names[]") or form.get("known_speaker_references[]"):
-        raise InvalidRequest(
-            "known speaker references are not supported; speakers are labelled A, B, C, ... in order of appearance",
-            param="known_speaker_references[]",
-        )
     try:
         threshold = float(str(form.get("diarization_threshold"))) if form.get("diarization_threshold") else None
+        identify = float(str(form.get("identify_threshold"))) if form.get("identify_threshold") else None
     except ValueError as exc:
-        raise InvalidRequest("diarization_threshold must be a number", param="diarization_threshold") from exc
+        raise InvalidRequest(
+            "diarization_threshold and identify_threshold must be numbers", param="diarization_threshold"
+        ) from exc
     return DiarizeOptions(
         model=str(form.get("diarization_model") or "") or None,
         num_speakers=_int_field(form, "num_speakers"),
         min_speakers=_int_field(form, "min_speakers"),
         max_speakers=_int_field(form, "max_speakers"),
         threshold=threshold,
+        known=await known_speakers(form),
+        identify_threshold=identify,
     )
 
 
@@ -274,12 +317,7 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
         except ValueError as exc:
             raise InvalidRequest("temperature must be a number", param="temperature") from exc
         model = str(form.get("model") or "") or None
-        diarize = _diarize_options(form, fmt, model, task)
-        if diarize is not None and "word" in granularities:
-            raise InvalidRequest(
-                "word timestamps are not available together with diarization; speakers are given per segment",
-                param="timestamp_granularities[]",
-            )
+        diarize = await _diarize_options(form, fmt, model, task)
         spec = core.resolve(model, "stt")
         if diarize is not None:
             core.resolve(diarize.model, "diarization")  # unknown diarization model: fail before reading the upload

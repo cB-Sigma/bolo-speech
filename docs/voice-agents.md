@@ -6,7 +6,8 @@ puts speech recognition in front of it and speech synthesis behind it, over
 two interfaces that existing clients already use:
 
 * **`WS /v1/realtime`**: the OpenAI Realtime API. Audio in, audio out, turn
-  detection and interruption handled by the server.
+  detection and interruption handled by the server. The same sessions are
+  available over **WebRTC** (`POST /v1/realtime/calls`) for browsers.
 * **`POST /v1/chat/completions`**: ordinary chat completions that also accept
   `input_audio` parts and can answer with audio.
 
@@ -21,11 +22,11 @@ Read this first:
   receives text. It does not hear tone, laughter or hesitation, and it cannot
   choose how something is said.
 * **The quality of the conversation is the quality of the model you connect.**
-  bolo was developed with a 360M-parameter model on a CPU, which is enough to
-  prove that every part works and far too small to hold a useful
-  conversation. The latency figures below come from that setup and are **not
-  representative**: with a real model on its own hardware, time to first
-  token will be very different.
+  bolo was developed with models of 360M and 500M parameters on a shared
+  CPU, which is enough to prove that every part works and far too small to
+  hold a useful conversation. The latency figures below come from that setup
+  and are **not representative**: with a real model on its own hardware, time
+  to first token will be very different.
 * Implemented against the event set of the generally-available Realtime API
   as typed in the official `openai` Python SDK **3.50.0** (November 2026):
   GA names such as `response.output_audio.delta`, not the older beta names.
@@ -57,10 +58,17 @@ model = "llama3.2"
 `bolo doctor` tells you whether the endpoint is reachable and knows the model;
 `GET /api/v1/info` reports it under `capabilities.llm`.
 
-Only this combination was run by the maintainers: llama-cpp-python's
-OpenAI-compatible server with SmolLM2-360M-Instruct. **Ollama, llama.cpp's
-own server, vLLM and hosted APIs were not tried**; they speak the same
-protocol, and reports are welcome.
+Run by the maintainers, each with a real model: **Ollama** 0.40.16
+(`qwen2.5:0.5b`), **llama.cpp's `llama-server`** (the same GGUF file) and
+llama-cpp-python's server (SmolLM2-360M-Instruct). **vLLM and hosted APIs
+were not tried**; they speak the same protocol, and reports are welcome.
+
+On a machine whose cores are shared with other work, give the language model
+fewer threads than cores (Ollama: `PARAMETER num_thread 2` in a Modelfile;
+llama-server: `-t 2`) and bolo too (`--threads 2`). With the default of one
+thread per core on a busy four-core machine we saw Ollama fall below one
+token per second; with two threads the same model answered in about a
+second.
 
 Which models are used:
 
@@ -121,9 +129,9 @@ asyncio.run(main())
 ```
 
 Status of this script: the protocol exchange is what the test-suite and
-`examples/realtime_agent.py` (which uses a file instead of a microphone) run;
-the microphone and speaker parts were **not run** (no audio hardware), and
-**Ollama was not available** to the maintainers.
+`examples/realtime_agent.py` (which uses a file instead of a microphone) run,
+and that exchange was run against Ollama; the microphone and speaker parts
+were **not run** (no audio hardware).
 
 ## The Realtime API in bolo
 
@@ -136,7 +144,7 @@ WebSocket subprotocols `realtime` and `openai-insecure-api-key.<key>`.
 
 | Client event | Behaviour |
 | --- | --- |
-| `session.update` | `type` (`realtime` \| `transcription`), `instructions`, `output_modalities` (`["audio"]` or `["text"]`), `audio.input.format` / `audio.output.format` (`audio/pcm` at 24 kHz, `audio/pcmu`, `audio/pcma`), `audio.input.transcription` (`model`, `language`, `prompt`), `audio.input.turn_detection` (`server_vad` with `threshold`, `silence_duration_ms`, `prefix_padding_ms`, `create_response`, `interrupt_response`; or `null`), `audio.output.voice`, `audio.output.speed`, `tools` (functions), `tool_choice`, `max_output_tokens` |
+| `session.update` | `type` (`realtime` \| `transcription`), `instructions`, `output_modalities` (`["audio"]` or `["text"]`), `audio.input.format` / `audio.output.format` (`audio/pcm` at 24 kHz, `audio/pcmu`, `audio/pcma`), `audio.input.transcription` (`model`, `language`, `prompt`), `audio.input.turn_detection` (`server_vad` with `threshold`, `silence_duration_ms`, `prefix_padding_ms`, `create_response`, `interrupt_response`; `semantic_vad` with `eagerness`, see below; or `null`), `audio.output.voice`, `audio.output.speed`, `tools` (functions), `tool_choice`, `max_output_tokens` |
 | `input_audio_buffer.append` / `.commit` / `.clear` | base64 audio in the session's input format; manual commit when turn detection is off |
 | `conversation.item.create` | user/assistant/system messages (`input_text`, `input_audio` with base64 audio that is transcribed, `output_text`), `function_call`, `function_call_output` |
 | `conversation.item.delete` / `.retrieve` / `.truncate` | `truncate` cuts an assistant message's transcript to the sentences that had started playing before `audio_end_ms`, so the model does not "remember" words the user never heard |
@@ -148,7 +156,8 @@ WebSocket subprotocols `realtime` and `openai-insecure-api-key.<key>`.
 | `session.created`, `session.updated` | the full session object |
 | `input_audio_buffer.speech_started` / `.speech_stopped` / `.committed` / `.cleared` | `audio_start_ms` / `audio_end_ms` are positions in the input stream |
 | `conversation.item.added`, `conversation.item.done`, `.deleted`, `.retrieved`, `.truncated` | |
-| `conversation.item.input_audio_transcription.delta` / `.completed` / `.failed` | sent for every committed utterance. One delta with the whole text, then `completed` with `usage: {"type": "duration"}` |
+| `conversation.item.input_audio_transcription.delta` / `.completed` / `.failed` | sent for every utterance. Deltas arrive **while the user is still speaking** (the utterance so far is re-decoded every `partial_interval_ms` and a word is sent once two decodes agree on it), the rest right after the end of speech. A delta cannot be taken back, so when the final decode revises something already sent (usually punctuation or capitalisation, sometimes a word) the concatenated deltas differ slightly from the `transcript` of `completed`, which is the authoritative text and also has `usage: {"type": "duration"}` |
+| `output_audio_buffer.started` / `.stopped` / `.cleared` | WebRTC only: what the outgoing audio track is doing |
 | `response.created`, `response.output_item.added` / `.done`, `response.content_part.added` / `.done`, `response.done` | `response.done` carries `status` (`completed`, `cancelled` with `status_details.reason` `turn_detected` or `client_cancelled`, `incomplete`, `failed`) and token `usage` when the language model reports it |
 | `response.output_audio.delta` / `.done`, `response.output_audio_transcript.delta` / `.done` | audio in the session's output format; transcript deltas are the model's tokens as they arrive |
 | `response.output_text.delta` / `.done` | when `output_modalities` is `["text"]` |
@@ -166,6 +175,41 @@ Stop your playback when you see `input_audio_buffer.speech_started`, and send
 `conversation.item.truncate` with how much was actually played if you want
 the history to match what the user heard.
 
+**Semantic turn detection (optional).** `turn_detection: {"type":
+"semantic_vad"}` adds an end-of-turn model, [Smart Turn
+v3](https://huggingface.co/pipecat-ai/smart-turn-v3) (BSD-2-Clause, 8 MB,
+23 languages including Hindi, Bengali and Marathi; catalog id
+`smart-turn-v3`, pulled on first use like any model). The voice-activity
+detector then reports a pause after 300 ms of silence, the model listens to
+the last eight seconds of the utterance and says whether the speaker has
+finished. If so the turn ends at once; if not, the turn stays open until the
+speaker continues or the pause has lasted 1.5 s (`eagerness: "high"`), 3 s
+(`"medium"`, `"auto"`) or 6 s (`"low"`). Without the model (not installed
+and `auto_pull` off, or no `onnxruntime`), `semantic_vad` behaves exactly
+like `server_vad`; `GET /api/v1/info` says which under
+`capabilities.realtime.semantic_vad`. Each check is recorded on the turn's
+trace (`turn_detection.checks`: probability and milliseconds).
+
+What we measured with it (`docs/measurements/semantic-vad-smart-turn.json`;
+the built-in English sample through `moonshine-tiny-en`, three runs each, on
+a busy 4-vCPU machine):
+
+| Audio | `server_vad` (500 ms) | `semantic_vad` |
+| --- | --- | --- |
+| the whole sentence | 1 turn; end of turn reported 632 ms after the last word | 1 turn; 738 ms |
+| a 0.9 s pause after "... tell me when" (unfinished) | **2 turns**: "Good morning. Could you tell me when?" / "My order will arrive." | **1 turn**, whole sentence; 942 ms |
+| a 0.9 s pause after "Could you tell me" | 2 turns | 2 turns: the model takes "Could you tell me" for a finished sentence (probability 0.92) |
+
+One inference took 160 to 260 ms on two threads of that machine. On isolated
+clips the model gave 0.99 for the complete English sentence and 0.02 to 0.07
+for three mid-sentence cuts. On four Hindi sentences (FLEURS) it was much
+less decisive: 0.43 to 0.94 for the complete sentences and 0.05 to 0.86 for
+the same recordings cut in half. So: it keeps a hesitating speaker's turn
+together when the pause falls mid-phrase, it costs roughly a hundred
+milliseconds on finished sentences, and it is a judgement about *sound*, not
+grammar. It is off unless a client asks for it. No evaluation on real
+conversational recordings was done.
+
 **Speech starts before the answer is complete.** The model's tokens are cut
 into sentences as they arrive and each sentence is synthesised while the
 model keeps writing. Time to first audio is therefore the time to the end of
@@ -180,15 +224,79 @@ the function, send its result as a `function_call_output` item and then
 in streaming mode. It is tested with a scripted fake model only: **no real
 model's tool calling was exercised.**
 
+### Browsers: WebRTC and ephemeral keys
+
+`POST /v1/realtime/calls` is the WebRTC transport of the same sessions
+(`pip install 'bolo-speech[webrtc]'`, which brings
+[aiortc](https://github.com/aiortc/aiortc), BSD-3-Clause; without it the
+route answers `503 engine_unavailable` and everything else works). The body
+is the browser's SDP offer (`Content-Type: application/sdp`), or a multipart
+form with `sdp` and an optional `session` field holding the session
+configuration as JSON. The answer is `201` with the SDP answer and a
+`Location: /v1/realtime/calls/<call_id>` header;
+`POST /v1/realtime/calls/<call_id>/hangup` ends the call. Query parameters
+are those of the WebSocket (`model`, `intent=transcription`).
+
+* The caller's microphone is the audio track of the offer (Opus);
+  `input_audio_buffer.append` is not used.
+* The reply is played on the answer's audio track.
+  `response.output_audio.delta` events are **not** sent; instead
+  `output_audio_buffer.started` / `.stopped` / `.cleared` say what the track
+  is doing. On barge-in bolo also drops the audio it has generated but not
+  played yet, so the client has nothing to flush.
+* Every other event travels as JSON on the data channel the client creates
+  (`oai-events`), in both directions.
+
+```js
+// browser: an ephemeral key from your backend, then a call
+const pc = new RTCPeerConnection();
+pc.ontrack = (e) => { audioElement.srcObject = e.streams[0]; };
+pc.addTrack((await navigator.mediaDevices.getUserMedia({ audio: true })).getTracks()[0]);
+const events = pc.createDataChannel("oai-events");
+events.onmessage = (e) => console.log(JSON.parse(e.data).type);
+await pc.setLocalDescription(await pc.createOffer());
+const answer = await fetch("https://bolo.example/v1/realtime/calls?model=gpt-realtime", {
+  method: "POST", body: pc.localDescription.sdp,
+  headers: { "Content-Type": "application/sdp", Authorization: `Bearer ${EPHEMERAL_KEY}` },
+});
+await pc.setRemoteDescription({ type: "answer", sdp: await answer.text() });
+```
+
+**Ephemeral keys.** `POST /v1/realtime/client_secrets` (authenticated with
+the server's API key, so call it from your backend) returns
+`{"value": "ek_…", "expires_at": …, "session": {…}}`. Body, all optional:
+`{"expires_after": {"anchor": "created_at", "seconds": 600}, "session":
+{…session configuration…}}`. The key opens Realtime sessions only (WebSocket
+or WebRTC) until it expires, the session starts with the configuration it
+was minted with, and no other route accepts it. Keys live in the server's
+memory: they do not survive a restart and are not shared between replicas.
+
+**Network.** bolo contacts no STUN or TURN server unless
+`webrtc_ice_servers` is set (`BOLO_WEBRTC_ICE_SERVERS`, a list of
+`stun:` / `turn:` URLs), so out of the box a call connects only when browser
+and server can reach each other directly: the same machine, the same
+network, or a server with a public address. bolo does not include a TURN
+relay. `GET /api/v1/info` reports the transport under
+`capabilities.realtime.webrtc`.
+
+What was run: the test-suite drives calls with a real aiortc peer (Opus in
+both directions, data channel, barge-in, ephemeral keys). With real models
+(`moonshine-tiny-en`, a Piper voice, `qwen2.5:0.5b` behind Ollama) three
+turns completed over WebRTC and the reply, recorded from the incoming Opus
+track and transcribed again, matched the reply text with a word error rate of
+0, 0.18 and 0 (`docs/measurements/webrtc-real-models.json`). **No browser
+was used**: Chrome, Firefox and Safari are untested, as are NAT traversal,
+TURN and calls across the internet. **SIP is not implemented** and is out of
+scope for now; for telephony use the WebSocket transport with
+`audio/pcmu` (see [indic-telephony.md](indic-telephony.md)).
+
 ### What is different from OpenAI, or missing
 
 * A cascade: no speech-to-speech model, no emotional prosody control, no
-  `semantic_vad` (accepted, treated as `server_vad`), no noise reduction.
-* Input transcription events are always sent (bolo has to transcribe anyway),
-  and arrive as one delta rather than incrementally.
-* Not implemented: WebRTC and SIP (`POST /v1/realtime/calls`, the
-  `output_audio_buffer.*` server events), ephemeral client secrets
-  (`/v1/realtime/client_secrets`), MCP tools, image input, `prompt`
+  noise reduction. `semantic_vad` is an acoustic end-of-turn model added to
+  silence detection (above), not OpenAI's.
+* Input transcription events are always sent (bolo has to transcribe anyway).
+* Not implemented: SIP, MCP tools, image input, `prompt`
   templates, `reasoning`, `tracing`, `truncation` settings, log probabilities,
   DTMF, idle timeouts, rate-limit events, the realtime translation sessions.
   Unsupported settings in `session.update` are ignored unless they would
@@ -218,17 +326,24 @@ the end of speech is detected**:
 `voice-agent`. Add the endpointing silence (500 ms by default) for the delay
 a user perceives after they stop talking.
 
-Measured here (three turns each, one at a time, the language model sharing
-the same four CPU cores, see `docs/measurements/voice-agent-smollm2.json`):
+Measured here (three turns each, one at a time, medians, the language model
+on the same four CPU cores; files in `docs/measurements/`):
 
-| Voice | Transcript | First LLM token | First audio |
-| --- | --- | --- | --- |
-| `piper-en-us-amy-low` | 339 ms | 494 ms | 2,373 ms |
-| `kokoro-v1.0-int8` | 253 ms | 361 ms | 3,762 ms |
+| Language model | Voice | Transcript | First LLM token | First audio | File |
+| --- | --- | --- | --- | --- | --- |
+| SmolLM2-360M, llama-cpp-python server | `piper-en-us-amy-low` | 339 ms | 494 ms | 2,373 ms | `voice-agent-smollm2.json` |
+| SmolLM2-360M, llama-cpp-python server | `kokoro-v1.0-int8` | 253 ms | 361 ms | 3,762 ms | |
+| qwen2.5:0.5b, **Ollama** 0.40.16 | `piper-en-us-amy-low` | 167 ms | 408 ms | 2,680 ms (1,426 to 4,396) | `voice-agent-ollama.json` |
+| qwen2.5:0.5b, **Ollama** 0.40.16 | `kokoro-v1.0-int8` | 115 ms | 210 ms | 4,926 ms (4,334 to 6,627) | |
+| qwen2.5:0.5b, **llama.cpp `llama-server`** | `piper-en-us-amy-low` | 360 ms | 893 ms | 7,456 ms (2,839 to 18,398) | `voice-agent-llama-server.json` |
 
-(medians). **Do not plan with these numbers**: a 360M model on two CPU
-threads, competing with recognition and synthesis for the same cores, says
-little about your deployment. What they do show is the shape of a turn: the
+The Ollama and llama-server rows were taken with two threads each for bolo
+and for the model while the machine was busy with unrelated jobs (load
+average about 10 on 4 vCPUs); the spread in brackets is that load, and the
+llama-server row in particular says nothing about llama.cpp against Ollama.
+**Do not plan with these numbers**: a model of half a billion parameters on
+two CPU threads, competing with recognition and synthesis for the same cores,
+says little about your deployment. What they do show is the shape of a turn: the
 transcript and the first token are quick, and the time to first audio is
 dominated by how long the model needs to finish its first sentence.
 
@@ -283,37 +398,65 @@ proxied requests the model's own status and body are passed through),
 
 ## Using bolo from agent frameworks
 
-Both snippets below are **untested**: the frameworks were not installed while
-bolo was developed. They rely only on those frameworks' documented ability to
-point their OpenAI plugins at another base URL.
+Pipecat and LiveKit Agents were run against bolo with their stock OpenAI
+integrations: Pipecat 1.16.0 and LiveKit Agents 1.8.11 (with
+`livekit-plugins-openai` 1.8.11), bolo with `moonshine-tiny-en`, a Piper
+voice and `qwen2.5:0.5b` behind Ollama. Neither needed a change to bolo.
+The runs had no transport: a wav file played the caller and the reply was
+collected (`examples/pipecat_bot.py`, `examples/livekit_agent.py`, results in
+`docs/measurements/client-frameworks.json`). A Daily, LiveKit or telephony
+transport in front was **not** tried.
 
-**Pipecat**, with bolo's Realtime endpoint as the speech-to-speech service:
+| Framework | Integration | Result |
+| --- | --- | --- |
+| Pipecat | `OpenAIRealtimeLLMService(base_url="ws://…/v1/realtime")` | works: interim and final user transcripts, reply text and audio |
+| Pipecat | `OpenAIRealtimeSTTService` (Realtime transcription session) | works: interim and final transcripts |
+| Pipecat | `OpenAISTTService` + `OpenAILLMService` + `OpenAITTSService` (HTTP) | works, with two things to know (below) |
+| LiveKit | `AgentSession(llm=openai.realtime.RealtimeModel(base_url="http://…/v1"))` | works: transcripts, reply text and audio |
+| LiveKit | `openai.STT`, `openai.LLM`, `openai.TTS` with `base_url` (HTTP) | works |
+| LiveKit | `openai.STT(use_realtime=True)` | works: interim transcripts while the caller speaks |
+
+**Pipecat**
 
 ```python
-from pipecat.services.openai.realtime.llm import OpenAIRealtimeLLMService   # name as of Pipecat's docs; check your version
+from pipecat.services.openai.realtime.llm import OpenAIRealtimeLLMService
 
 s2s = OpenAIRealtimeLLMService(
     api_key="not-needed",
     base_url="ws://127.0.0.1:8000/v1/realtime",
-    model="gpt-realtime",
+    settings=OpenAIRealtimeLLMService.Settings(model="gpt-realtime", system_instruction="Answer briefly."),
 )
-# pipeline: transport.input() -> s2s -> transport.output()
+# pipeline: transport.input() -> context_aggregator.user() -> s2s -> transport.output() -> context_aggregator.assistant()
 ```
 
-or with bolo as separate STT and TTS services around Pipecat's own LLM step:
-see `examples/pipecat_bot.py`.
+Two things to know about Pipecat's HTTP text-to-speech service
+(`OpenAITTSService`): it accepts OpenAI's voice names only (`alloy`, `ash`, …;
+bolo maps them onto the voices of the configured model), and it gives up on a
+sentence when no audio has arrived after three seconds, logging "completed
+with no audio" before playing the audio anyway when it comes. With Kokoro on
+our busy four cores the first audio of a long sentence took longer than
+that; with a Piper voice it did not. For the language model step, point
+`OpenAILLMService` at bolo's `/v1` as well (requests without audio are
+proxied to your model unchanged) or straight at the model.
 
-**LiveKit Agents**:
+**LiveKit Agents**
 
 ```python
 from livekit.agents import AgentSession
-from livekit.plugins import openai
+from livekit.plugins import openai, silero
 
+# bolo does the whole turn
+session = AgentSession(llm=openai.realtime.RealtimeModel(
+    base_url="http://127.0.0.1:8000/v1", api_key="not-needed", model="gpt-realtime", voice="alloy"))
+
+# or LiveKit's turn handling with bolo for speech
 session = AgentSession(
-    llm=openai.realtime.RealtimeModel(base_url="http://127.0.0.1:8000/v1", api_key="not-needed", model="gpt-realtime", voice="af_heart"),
+    vad=silero.VAD.load(),
+    stt=openai.STT(base_url="http://127.0.0.1:8000/v1", api_key="not-needed", model="moonshine-tiny-en", language="en"),
+    llm=openai.LLM(base_url="http://127.0.0.1:8000/v1", api_key="not-needed", model="<your model>"),
+    tts=openai.TTS(base_url="http://127.0.0.1:8000/v1", api_key="not-needed", model="piper-en-us-amy-low", voice="alloy"),
 )
 ```
 
-or as separate `openai.STT(base_url=…)` / `openai.TTS(base_url=…)` plugins:
-see `examples/livekit_agent.py`. If a framework insists on features bolo does
-not have (WebRTC, semantic VAD, MCP), use the separate STT/TTS route.
+If a framework insists on features bolo does not have (MCP tools, image
+input), use the separate STT/TTS route.

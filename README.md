@@ -42,12 +42,12 @@
 - **Light.** No PyTorch anywhere. Inference runs on ONNX Runtime (through [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)) and CTranslate2 (through [faster-whisper](https://github.com/SYSTRAN/faster-whisper)). The base install has no engine at all; you add the ones you want.
 - **Realtime on CPU.** A low-latency tier, true streaming models, and stabilised partial results for models that were never designed to stream. Measured numbers below, from a 4-vCPU machine.
 - **A real server.** Per-model queues with micro-batching, backpressure, cancellation, lazy loading, idle unloading and a memory budget, with every request traced phase by phase.
-- **Indian languages and phone audio.** Hindi, Bengali, Urdu, Nepali and Gujarati voices; Hindi and multilingual recognition; 8 kHz G.711 μ-law/A-law in and out.
-- **Voice agents.** An OpenAI Realtime API endpoint (`/v1/realtime`) and audio in `/v1/chat/completions`: speech in, your own language model in the middle (Ollama, llama.cpp, vLLM, any OpenAI-compatible endpoint), streamed speech out, with barge-in and per-turn latency traces.
-- **Who said what.** Speaker diarization without PyTorch, as `diarized_json`, in subtitles, and as speaker labels on live transcripts.
-- **Honest.** 180 models in the catalog, each with its licence; the 71 that were actually run on CPU are marked, with what was measured. Everything else says *untested*.
+- **Indian languages and phone audio.** Speech recognition for all 22 scheduled languages of India, 16 of them run here on real recordings; voices for Hindi, Bengali, Telugu, Tamil, Malayalam, Marathi, Urdu, Nepali and Gujarati; 8 kHz G.711 μ-law/A-law in and out.
+- **Voice agents.** An OpenAI Realtime API endpoint (`/v1/realtime`) and audio in `/v1/chat/completions`: speech in, your own language model in the middle (Ollama, llama.cpp, vLLM, any OpenAI-compatible endpoint), streamed speech out, with barge-in and per-turn latency traces, over WebSocket or WebRTC. Run against Ollama and llama.cpp, and from Pipecat and LiveKit Agents.
+- **Who said what.** Speaker diarization without PyTorch, as `diarized_json`, in subtitles, on words, and as speaker labels on live transcripts; known speakers are named from reference recordings.
+- **Honest.** 225 models in the catalog, each with its licence; the 108 that were actually run on CPU are marked, with what was measured. Everything else says *untested*.
 
-> **Status: 0.1, alpha.** Developed and measured on Linux x86-64, CPU only. GPUs, Apple Silicon, arm64 and Windows are untested; see [What is not tested](#what-is-not-tested).
+> **Status: 0.2, alpha.** Developed and measured on Linux x86-64, CPU only. GPUs, Apple Silicon, arm64 and Windows are untested; see [What is not tested](#what-is-not-tested).
 
 ## The console
 
@@ -151,9 +151,9 @@ Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AA
 | --- | --- |
 | OpenAI HTTP | transcriptions (json, text, srt, vtt, verbose_json with word timestamps, SSE streaming), translations, speech (mp3, opus, aac, flac, wav, pcm, chunked as it is synthesised), models |
 | speaches routes | `/v1/registry`, `POST`/`DELETE /v1/models/{id}`, `/v1/audio/voices`, `/api/ps`, `/v1/audio/speech/timestamps` and its environment variables |
-| OpenAI Realtime API | `WS /v1/realtime`: transcription sessions, and conversation sessions (speech → your LLM → speech) with server VAD, barge-in, text turns and function calling. GA event names, tested with the official SDK's realtime client |
+| OpenAI Realtime API | `WS /v1/realtime`: transcription sessions, and conversation sessions (speech → your LLM → speech) with server VAD, an optional end-of-turn model (`semantic_vad`), barge-in, incremental user transcripts, text turns and function calling. GA event names, tested with the official SDK's realtime client, Pipecat and LiveKit Agents. The same sessions over **WebRTC** (`POST /v1/realtime/calls`, extra `webrtc`) with ephemeral keys for browsers (`POST /v1/realtime/client_secrets`) |
 | Chat completions with audio | `POST /v1/chat/completions`: `input_audio` parts are transcribed, the request goes to your LLM, the reply is spoken when `modalities` includes `audio` (streaming too). Everything else is proxied unchanged |
-| Speaker diarization | `diarize=true` or `response_format=diarized_json` on transcriptions, `POST /api/v1/diarize`, `diarize=true` on the realtime WebSocket |
+| Speaker diarization | `diarize=true` or `response_format=diarized_json` on transcriptions (with word timestamps and `known_speaker_names[]` / `known_speaker_references[]` if you like), `POST /api/v1/diarize`, `diarize=true` on the realtime WebSocket with revised labels at the end of the stream |
 | Realtime WebSockets | `WS /api/v1/stt/stream` (partials, finals with word times, VAD events, optional speaker labels) and `WS /api/v1/tts/stream` (text in pieces, audio out) |
 | Wyoming | speech-to-text and text-to-speech on one TCP port, including streaming synthesis |
 | Native JSON API | catalog, pulls with progress, load/unload, optional components, live statistics, request traces, Server-Sent Events, benchmark jobs |
@@ -174,7 +174,7 @@ Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AA
 | Task | Family | Models | Languages | Validated on CPU | Best measured RTF |
 | --- | --- | --- | --- | --- | --- |
 | DIARIZATION | pyannote + speaker embeddings | 3 | - | 1 | 0.106 (`pyannote-3.0-eres2net`) |
-| STT | Whisper | 31 | af, am, ar, as, az, ba, be, bg +92 | 14 | 0.081 (`faster-whisper-tiny.en`) |
+| STT | Whisper | 38 | af, am, ar, as, az, ba, be, bg +92 | 20 | 0.081 (`faster-whisper-tiny.en`) |
 | STT | Moonshine | 11 | ar, en, es, ja, ko, uk, vi, zh | 4 | 0.033 (`moonshine-tiny-en`) |
 | STT | Parakeet | 7 | bg, cs, da, de, el, en, es, et +17 | 4 | 0.030 (`parakeet-tdt-ctc-110m`) |
 | STT | NeMo FastConformer | 8 | be, de, en, es, fr, hr, it, pl +2 | 3 | 0.334 (`nemo-fastconformer-ctc-en-streaming-480ms`) |
@@ -184,17 +184,19 @@ Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AA
 | STT | Paraformer | 2 | en, zh | 1 | 0.091 (`paraformer-zh`) |
 | STT | Dolphin | 2 | ar, bn, fa, gu, hi, id, ja, jv +26 | 1 | 0.021 (`dolphin-base`) |
 | STT | Omnilingual ASR | 1 | ar, as, bn, de, en, es, fr, gu +23 | 1 | 0.112 (`omnilingual-ctc-300m`) |
-| STT | IndicConformer | 1 | as, bn, brx, gu, hi, kn, ks, mr | 1 | 0.131 (`indicconformer-multi-community`) |
-| TTS | Piper | 74 | ar, ca, cs, cy, da, de, el, en +30 | 17 | 0.040 (`piper-ne-np-google-medium`) |
+| STT | IndicConformer | 26 | as, bn, brx, doi, gu, hi, kn, kok +14 | 20 | 0.060 (`indicconformer-ta-community`) |
+| STT | Nemotron | 1 | ar, bg, cs, da, de, el, en, es +26 | 1 | 0.312 (`nemotron-3.5-streaming-560ms`) |
+| TTS | Piper | 85 | ar, bn, ca, cs, cy, da, de, el +35 | 28 | 0.040 (`piper-ne-np-google-medium`) |
 | TTS | Kokoro | 2 | en, es, fr, hi, it, ja, pt, zh | 2 | 0.759 (`kokoro-v1.0`) |
 | TTS | KittenTTS | 4 | en | 4 | 0.107 (`kitten-nano-0.8`) |
 | TTS | Matcha-TTS | 2 | en, zh | 1 | 0.205 (`matcha-en-ljspeech`) |
 | TTS | MeloTTS | 1 | en | 1 | 0.278 (`melo-tts-en`) |
 | TTS | MMS-TTS | 7 | de, en, es, fr, ru, th, uk | 1 | 0.196 (`mms-tts-eng`) |
 | TTS | VITS | 4 | bn, gu, ne | 4 | 0.046 (`mimic3-gu-cmu-indic`) |
+| TURN | Smart Turn | 1 | ar, bn, da, de, en, es, fi, fr +15 | 0 | - |
 | VAD | Silero VAD | 2 | - | 2 | 0.006 (`silero-vad-v5`) |
 
-**180 models in the catalog, 71 validated on CPU, 109 untested.** Full list: [docs/models.md](docs/models.md).
+**225 models in the catalog, 108 validated on CPU, 117 untested.** Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run on the machine described under [Performance](#performance) by `server/tools/validate_models.py`; the table in [docs/models.md](docs/models.md) has every model with its measured real-time factor and licence. Anything else that sherpa-onnx or faster-whisper can load can be added with `bolo pull hf:<owner>/<repo>`.
@@ -220,11 +222,21 @@ How it works, and how to tune it: [docs/realtime.md](docs/realtime.md).
 
 ## Indian languages and telephony
 
-**Recognition.** Hindi fine-tunes of Whisper (`faster-whisper-tiny-hindi`, 79 MB, and `-small-hindi`), multilingual Whisper with `language=hi` (or bn, ta, te, mr, gu, kn, ml, pa, ur, …), Meta's Omnilingual CTC model (1,600+ languages), Dolphin (40 Eastern languages), a streaming Bengali Zipformer, and a community export of AI4Bharat's IndicConformer. The official IndicConformer repositories are gated and not loadable yet; bolo never downloads gated models without your token.
+**Recognition: all 22 scheduled languages.** One IndicConformer model per language (AI4Bharat, MIT, ungated community ONNX exports pinned to a commit): Assamese, Bengali, Bodo, Dogri, Gujarati, Hindi, Kannada, Kashmiri, Konkani, Maithili, Malayalam, Manipuri, Marathi, Nepali, Odia, Punjabi, Sanskrit, Santali, Sindhi, Tamil, Telugu and Urdu. Sixteen were run here on real recordings (FLEURS, RESPIN, a Sanskrit corpus; 10 to 60 utterances each): character error rates from 2.5 % (Bengali) to 14.9 % (Assamese), for example Hindi 7.0 %, Tamil 10.2 %, Maithili 11.6 %. Bodo, Dogri, Kashmiri, Konkani, Manipuri and Santali are in the catalog untested, for lack of public test recordings. Also: Hinglish written in Latin script (`faster-whisper-base-hinglish`), Whisper fine-tunes for Hindi, Tamil, Kannada, Telugu, Bengali and Punjabi, a streaming Bengali Zipformer and NVIDIA's streaming Nemotron (Hindi).
 
-**Synthesis.** Hindi (three Piper-format voices and four Kokoro voices), Nepali, Urdu, Bengali and Gujarati voices. Sentences are split at the danda, Hindi numbers are spelled out in the Indian system (`250000` → दो लाख पचास हज़ार), and code-mixed text passes through untouched. No Tamil, Telugu, Marathi, Kannada, Malayalam or Punjabi voice yet.
+**Bhojpuri, honestly.** There is no permissive, ungated Bhojpuri recogniser that runs without PyTorch today. The fallback is the Hindi model: 40 % word error rate (14 % character error rate) on 60 Bhojpuri utterances in our run, against 12 to 15 % on Hindi.
 
-**Checked end to end:** Hindi text → `piper-hi-in-rohan-medium` → `faster-whisper-tiny-hindi` returns the sentence with 0% word error rate in the test-suite; the community IndicConformer export and `faster-whisper-small-hindi` also transcribed synthesised Hindi without errors. That is one sentence of clean synthetic speech, not an accuracy benchmark. Voices for Nepali, Urdu, Bengali and Gujarati produced audio that nobody who speaks those languages has reviewed.
+**Synthesis.** Hindi (three Piper-format voices and four Kokoro voices), Telugu (three voices), Tamil (two), Malayalam (two), Marathi, Bengali, Urdu, Nepali and Gujarati. The Telugu, Tamil, Malayalam, Marathi and newer Bengali and Urdu voices are the Piper project's own files, converted for sherpa-onnx by bolo right after the download (`bolo pull piper:<voice>` does that for any Piper voice); each was synthesised and transcribed back by the recogniser of its language (character error rate 0 to 7 %). Maithili, Bhojpuri, Kannada, Magahi and Chhattisgarhi voices (IISc SYSPIN, MIT) are converted by this project and **not yet published**: the catalog lists them as pending. **No voice** for Punjabi, Odia, Assamese, Sanskrit, Sindhi, Kashmiri, Konkani, Dogri, Manipuri, Bodo or Santali. Sentences are split at the danda, Hindi numbers are spelled out in the Indian system (`250000` → दो लाख पचास हज़ार), and code-mixed text passes through untouched.
+
+| | STT | TTS |
+| --- | --- | --- |
+| Hindi, Bengali, Telugu, Tamil, Malayalam, Marathi, Urdu, Nepali, Gujarati | yes (run here) | yes |
+| Kannada, Maithili | yes (run here) | prepared, not yet published |
+| Punjabi, Odia, Assamese, Sanskrit, Sindhi | yes (run here; Sindhi without an error rate) | no |
+| Bodo, Dogri, Kashmiri, Konkani, Manipuri, Santali | in the catalog, untested | no |
+| Bhojpuri (not a scheduled language) | Hindi model as a fallback (40 % WER) | prepared, not yet published |
+
+**Checked end to end:** besides the runs above, Hindi text → `piper-hi-in-rohan-medium` → `faster-whisper-tiny-hindi` returns the sentence with 0% word error rate in the test-suite. All of these are small samples that show the pipelines work; they are not accuracy benchmarks, and nobody who speaks the languages reviewed the synthesised audio.
 
 **Telephony.** 8 kHz G.711 is native in both directions: `encoding=mulaw|alaw` on the realtime WebSocket, raw `audio/basic` uploads, and `"response_format": "mulaw"` for speech, with helpers for 20 ms RTP-sized frames. The codecs match the reference implementation bit for bit. In the test-suite, text → Kokoro → 8 kHz μ-law → 160-byte frames at real-time pace → `moonshine-tiny-en` came back with 0% word error rate, and the same speech filtered to the 300 to 3,400 Hz telephone band with 17% (the first words were clipped).
 
@@ -235,12 +247,12 @@ Details, including what was *not* tested (no real phone network): [docs/indic-te
 **OpenAI.** The request and response shapes follow the OpenAI API reference as typed in the official `openai` Python SDK (3.50.0), and are exercised with that SDK in the test-suite:
 
 - *Audio*: plain and verbose transcription, word and segment timestamps, SSE transcription events, `diarized_json` (the `gpt-4o-transcribe-diarize` shape), translation, speech in every format, streamed speech, `stream_format: "sse"`, the error envelope. `whisper-1`, `gpt-4o-transcribe`, `tts-1` and friends map to your default models, and OpenAI voice names map onto the selected model's voices.
-- *Realtime* (`/v1/realtime`, GA event names such as `response.output_audio.delta`): `session.update`, `input_audio_buffer.*` with server VAD or manual commit, `conversation.item.*`, input transcription events, `response.create` / `response.cancel` with audio, transcript and text deltas, function-call events, truncation, errors; 24 kHz PCM16 and G.711 μ-law/A-law. Tested with the SDK's realtime client and a raw WebSocket.
+- *Realtime* (`/v1/realtime`, GA event names such as `response.output_audio.delta`): `session.update`, `input_audio_buffer.*` with server VAD, an optional end-of-turn model or manual commit, `conversation.item.*`, incremental input transcription events, `response.create` / `response.cancel` with audio, transcript and text deltas, function-call events, truncation, errors; 24 kHz PCM16 and G.711 μ-law/A-law. Tested with the SDK's realtime client and a raw WebSocket, and run from Pipecat 1.16 and LiveKit Agents 1.8 (their Realtime and their HTTP integrations). The WebRTC transport (`/v1/realtime/calls`) and ephemeral client secrets are implemented and tested with an aiortc peer, not with a browser.
 - *Chat completions with audio*: `input_audio` content parts and `modalities: ["text", "audio"]`, non-streaming and streaming.
 
-bolo is a cascade (speech-to-text → your language model → text-to-speech), not a speech-to-speech model. Not implemented: WebRTC and SIP transports, ephemeral client secrets, MCP tools, image input, semantic VAD (accepted, handled as server VAD), known-speaker references for diarization. See [docs/voice-agents.md](docs/voice-agents.md).
+bolo is a cascade (speech-to-text → your language model → text-to-speech), not a speech-to-speech model. Not implemented: SIP, MCP tools, image input. `semantic_vad` is an acoustic end-of-turn model (Smart Turn v3) on top of silence detection, optional and measured in the docs, not OpenAI's. See [docs/voice-agents.md](docs/voice-agents.md).
 
-**speaches.** Point existing speaches clients at bolo and keep their model ids (`Systran/faster-whisper-small`, `speaches-ai/Kokoro-82M-v1.0-ONNX`, …) and environment variables (including `CHAT_COMPLETION_BASE_URL`). What matches, what differs and what is missing (WebRTC realtime, speaker embeddings) is spelled out in [docs/migration-from-speaches.md](docs/migration-from-speaches.md).
+**speaches.** Point existing speaches clients at bolo and keep their model ids (`Systran/faster-whisper-small`, `speaches-ai/Kokoro-82M-v1.0-ONNX`, …) and environment variables (including `CHAT_COMPLETION_BASE_URL`). What matches, what differs and what is missing (speaker embeddings, its WebRTC route) is spelled out in [docs/migration-from-speaches.md](docs/migration-from-speaches.md).
 
 **Wyoming / Home Assistant.** `bolo serve --wyoming` exposes installed models on port 10300. Tested with the `wyoming` Python client; **not** tested against a Home Assistant instance. Setup notes: [examples/home_assistant.md](examples/home_assistant.md).
 
@@ -319,7 +331,7 @@ Kokoro is the default voice because it sounds best and needs no extra install, b
 
 **Speaker diarization** (`pyannote-3.0-eres2net`: pyannote segmentation-3.0 + ERes2Net embeddings, ONNX): on a 21-second clip of two synthetic voices (Kokoro `af_heart` and `am_michael`) taking six turns, the diarization error rate was **5.2%**, all of it speech missed at turn boundaries, with no speaker confusion (0% with a 250 ms collar), at RTF 0.11. Labelling live on the WebSocket (one embedding per utterance) got all six turns right and added about 90 ms per final. On four short public recordings the *number* of speakers was right for the three two-speaker clips and one too many (5 for 4) on the four-speaker one; with the default threshold of other embedding models it over-counts more. Pass `num_speakers` when you know it. That is a smoke test, not a benchmark: no overlapping speech, no noise.
 
-**A voice-agent turn** (Realtime API; `moonshine-tiny-en` → SmolLM2-360M-Instruct on llama-cpp-python, 2 threads, on the same 4 cores → `piper-en-us-amy-low`), measured from the moment the end of speech is detected, median of three turns: transcript after 339 ms, first LLM token after 494 ms, **first audio after 2.4 s**. With Kokoro as the voice the first audio came after 3.8 s. Most of the wait is the tiny model writing its first sentence while it shares the CPU with recognition and synthesis; a language model on its own hardware changes these numbers completely, so read them as "the pipeline works", not as what to expect. The answers of a 360M model are not worth quoting.
+**A voice-agent turn** (Realtime API; `moonshine-tiny-en` → SmolLM2-360M-Instruct on llama-cpp-python, 2 threads, on the same 4 cores → `piper-en-us-amy-low`), measured from the moment the end of speech is detected, median of three turns: transcript after 339 ms, first LLM token after 494 ms, **first audio after 2.4 s**. With Kokoro as the voice the first audio came after 3.8 s. Most of the wait is the tiny model writing its first sentence while it shares the CPU with recognition and synthesis; a language model on its own hardware changes these numbers completely, so read them as "the pipeline works", not as what to expect. The answers of a 360M model are not worth quoting. With `qwen2.5:0.5b` behind **Ollama** on the same busy machine (2 threads each): first token after 408 ms and first audio after 2.7 s with Piper (medians of three turns; `docs/measurements/voice-agent-ollama.json`). Over **WebRTC** with the same models a turn completed end to end and the reply heard on the Opus track transcribed back correctly (`webrtc-real-models.json`). None of these numbers describe a deployment with a real language model on its own hardware.
 
 **Text to speech under load** (`piper-en-us-amy-low`, a 200-character paragraph): first audio after 138 ms with one client, 402 ms with two, 826 ms with four; throughput stays near 27× real time. Synthesis is not batched; requests interleave sentence by sentence.
 
@@ -329,7 +341,7 @@ bolo is not the only way to serve speech, and often not the best one. Fairly:
 
 | | What it is | Choose it over bolo when | Choose bolo when |
 | --- | --- | --- | --- |
-| [speaches](https://github.com/speaches-ai/speaches) | OpenAI-compatible STT/TTS server (faster-whisper, Kokoro, Piper), MIT | you need its WebRTC realtime transport or speaker-embedding endpoint, or you prefer pyannote's PyTorch diarization pipeline | you want its API (including the Realtime API and chat-completions audio) with micro-batching, backpressure, more model families, telephony audio and latency tooling, without PyTorch. Its last commit was in April 2026 and the question "[Actively supported?](https://github.com/speaches-ai/speaches/issues/659)" has been open since July 2026 |
+| [speaches](https://github.com/speaches-ai/speaches) | OpenAI-compatible STT/TTS server (faster-whisper, Kokoro, Piper), MIT | you need its speaker-embedding endpoint, a WebRTC transport that has been used with browsers (bolo's has only been tested with a WebRTC library), or you prefer pyannote's PyTorch diarization pipeline | you want its API (including the Realtime API and chat-completions audio) with micro-batching, backpressure, more model families, telephony audio and latency tooling, without PyTorch. Its last commit was in April 2026 and the question "[Actively supported?](https://github.com/speaches-ai/speaches/issues/659)" has been open since July 2026 |
 | [LocalAI](https://github.com/mudler/LocalAI) | a large, very active platform for LLMs, images, audio and more, with backends pulled as separate images, MIT | you want one gateway that also *runs* the language models, images and embeddings, GPU acceleration, or its much bigger ecosystem | you want a single small Python process for the speech side, with realtime streaming and per-request latency traces, in front of whatever LLM you already run |
 | [vLLM-Omni](https://github.com/vllm-project/vllm-omni) | vLLM extended to omni-modal and speech models | you have GPUs and want true speech-to-speech models, expressive LLM-based TTS or full-duplex omni models at scale | you are on CPUs or small machines and want a cascade of classic ASR/TTS models around any text LLM, with low latency |
 | [WhisperLiveKit](https://github.com/QuentinFuxa/WhisperLiveKit) | realtime speech-to-text with state-of-the-art streaming policies (SimulStreaming/AlignAtt), streaming diarization and translation, Apache-2.0 | realtime transcription quality is the whole job: its streaming policies for Whisper are more advanced than bolo's LocalAgreement, and its live diarization handles overlapping speakers, which bolo's per-utterance labelling does not | you also need text-to-speech, batch transcription, an OpenAI-compatible API (including Realtime) and model management in the same server, without PyTorch |
@@ -346,12 +358,12 @@ Stated plainly, so you do not find out the hard way:
 - **Apple Silicon and macOS, Linux arm64, Windows.** Not run. The dependencies publish wheels for macOS and arm64, so it should work there; Windows is unknown.
 - **Python 3.10 and 3.11.** The package targets 3.10 to 3.13; the test-suite was run on 3.12 and 3.13 only.
 - **Real telephony.** The G.711 paths are tested end to end with synthesised speech, not on a phone network.
-- **Home Assistant, Pipecat, LiveKit, browsers on the Realtime endpoint.** The protocols they use are implemented and tested with protocol clients; the integrations themselves were not run. The example files say so.
+- **Home Assistant and browsers.** The Wyoming protocol is tested with a protocol client, not with Home Assistant. The WebRTC transport of the Realtime API is tested with the aiortc library (also with real models), not with Chrome, Firefox or Safari, and not across NAT or a TURN relay. Pipecat and LiveKit Agents were run against bolo, but without a transport in front (a wav file played the caller).
 - **The container images, the systemd unit and the Kubernetes manifest** were written but not built or deployed here (there was no container runtime).
-- **Most of the catalog.** 109 of 180 models are marked untested: their files were checked on the Hub and a sibling of the same architecture was run, but that model was not.
-- **The `espeak-ng` executable route** for phonemes (the measurements used the shared-library route from the `espeakng-loader` package).
-- **Voice agents with a capable language model.** The conversation path was run end to end with a 360M-parameter model on CPU only (see [Performance](#performance)); the answers of such a model are poor and the turn latency is not representative of a real deployment. Function calling was exercised with a scripted fake model, not a real one. Ollama, vLLM and hosted APIs were not tried.
-- **Diarization accuracy.** Measured on one clip made of two synthetic voices taking turns, plus speaker counts on four short public recordings. Overlapping speech, more than a handful of speakers and noisy rooms were not evaluated.
+- **Most of the catalog.** 117 of 225 models are marked untested: their files were checked on the Hub and a sibling of the same architecture was run, but that model was not.
+- **Voice agents with a capable language model.** The conversation path was run end to end with models of 360M and 500M parameters on a shared CPU, through llama-cpp-python's server, Ollama and llama.cpp's `llama-server` (see [Performance](#performance)); the answers of such models are poor and the turn latency is not representative of a real deployment. Function calling was exercised with a scripted fake model, not a real one. vLLM and hosted APIs were not tried.
+- **Diarization accuracy.** Measured on one clip made of two synthetic voices taking turns, plus speaker *counts* on 18 public recordings (see docs/api.md, "How many speakers"). No diarization error rate on real recordings; overlapping speech and noisy rooms were not evaluated. Known-speaker naming was tested with synthetic voices only.
+- **Converted voices and the release workflows.** The SYSPIN voice conversion script's export step and the "Voices" and "Release" workflows were written but not run here; the packing, publishing index and pull path were tested with voices converted earlier.
 - **Accuracy at scale.** Word error rates here come from a handful of clips. They show that the pipelines work, not how good the models are; for that, see the model publishers' evaluations.
 - **Long soak, memory growth over days, hostile input.** Not done.
 - Engines `moonshine` (useful-moonshine-onnx), `whisper.cpp` and `kokoro-onnx` have plugins that were written against their documentation and not run.
@@ -366,10 +378,12 @@ bolo itself is [Apache-2.0](LICENSE). It contains no third-party source code; [N
 
 ## Roadmap
 
-- Realtime API over WebRTC, ephemeral client secrets, MCP tools.
-- Overlap-aware online diarization and known-speaker enrolment.
-- The official (gated) AI4Bharat IndicConformer models with a user token; Telugu and Malayalam Piper voices; more Indian-language voices.
-- Loading raw Piper voices without a conversion step.
+- Publishing the converted SYSPIN voices (Maithili, Bhojpuri, Kannada, …) and switching their catalog entries on.
+- A Bhojpuri recogniser (conversion of a permissively licensed checkpoint), and voices for Punjabi, Odia and Assamese (needs a new small engine).
+- WebRTC tested with browsers and behind NAT; SIP; MCP tools.
+- Overlap-aware online diarization; a diarization error rate measured on real recordings.
+- Word timestamps for Whisper through sherpa-onnx (exports with attention outputs) and for Moonshine.
+- The official (gated) AI4Bharat models with a user token.
 - GPU validation, Apple Silicon validation, and published container images.
 - Models trained for 8 kHz telephone speech.
 - An attention-based streaming policy for Whisper as an alternative to LocalAgreement.

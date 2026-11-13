@@ -1,4 +1,4 @@
-"""Pulling models that are not in the curated catalog: ``bolo pull hf:<repo>``.
+"""Models that are not in the curated catalog: ``bolo pull hf:<repo>`` and ``bolo pull ./directory``.
 
 The repository listing is inspected and matched against the file layouts
 the engines understand. When the layout is ambiguous (a lone ``model.onnx``
@@ -9,6 +9,7 @@ the loader with ``--kind``.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from bolo.catalog import ModelSpec
@@ -166,6 +167,70 @@ def register_hf_model(core: Bolo, repo: str, kind: str | None = None, task: str 
         source_url=f"https://huggingface.co/{repo}",
         validated="untested",
         source=source,
+        custom=True,
+    )
+    spec.validate()
+    core.catalog.add_custom(spec)
+    return spec
+
+
+def register_local_model(
+    core: Bolo,
+    path: str,
+    kind: str | None = None,
+    task: str | None = None,
+    *,
+    name: str | None = None,
+    languages: list[str] | None = None,
+    options: dict[str, Any] | None = None,
+) -> ModelSpec:
+    """Create (or return) a custom catalog entry for a model directory on this machine.
+
+    The directory is used in place (the store keeps a link to it), so nothing is copied and the
+    files must stay where they are. The layout is the one the engines expect, for example
+    ``model.onnx`` + ``tokens.txt`` for a VITS voice.
+    """
+    directory = Path(path).expanduser().resolve()
+    if not directory.is_dir():
+        raise InvalidRequest(f"'{path}' is not a directory", param="id")
+    files = sorted(str(p.relative_to(directory)) for p in directory.rglob("*") if p.is_file())
+    if not files:
+        raise InvalidRequest(f"'{path}' is empty", param="id")
+    model_id = name or "local-" + re.sub(r"[^a-z0-9._-]+", "-", directory.name.lower()).strip("-")
+    existing = core.catalog.resolve(model_id)
+    if existing is not None:
+        if existing.source.local and Path(existing.source.local) == directory:
+            return existing
+        raise InvalidRequest(f"the name '{model_id}' is already taken; choose another with --name", param="name")
+    detected = kind or detect_kind(directory.name, files)
+    if detected is None:
+        raise InvalidRequest(
+            f"could not tell what kind of model '{directory.name}' is from its files. Pass --kind "
+            f"(one of: {', '.join(sorted(KINDS))}).",
+            param="kind",
+        )
+    if detected not in KINDS:
+        raise InvalidRequest(f"unknown kind '{detected}'. Known kinds: {', '.join(sorted(KINDS))}", param="kind")
+    engine, default_task, streaming = KINDS[detected]
+    opts = dict(options or {})
+    if languages and "language" not in opts and (task or default_task) == "tts":
+        opts["language"] = languages[0]
+    spec = ModelSpec(
+        id=model_id,
+        task=task or default_task,
+        engine=engine,
+        kind=detected,
+        family="Custom",
+        languages=list(languages or []),
+        tier="balanced",
+        streaming=streaming,
+        size_bytes=sum((directory / f).stat().st_size for f in files if f != "manifest.json"),
+        license="see the model's own terms (local directory)",
+        description=f"User-added model from the local directory {directory} (not validated by the bolo maintainers).",
+        source_url="",
+        validated="untested",
+        source=Source(local=str(directory)),
+        options=opts,
         custom=True,
     )
     spec.validate()

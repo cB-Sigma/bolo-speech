@@ -34,7 +34,7 @@ def test_catalog_shape_and_filters(live: LiveServer) -> None:
         assert contract_keys <= set(m), m["id"]
         assert m["tier"] in ("realtime", "balanced", "accuracy")
         assert m["validated"] in ("cpu", "untested")
-        assert m["task"] in ("stt", "tts", "vad", "diarization")
+        assert m["task"] in ("stt", "tts", "vad", "diarization", "turn")
         assert isinstance(m["requires"], list) and isinstance(m["available"], bool)
     tts = httpx.get(live.url + "/api/v1/catalog", params={"task": "tts"}).json()["models"]
     assert tts and all(m["task"] == "tts" for m in tts)
@@ -46,6 +46,7 @@ def test_catalog_shape_and_filters(live: LiveServer) -> None:
         "fake-stt-streaming",
         "fake-tts",
         "fake-vad",
+        "fake-turn",
         "fake-diarization",
     }
     not_installed = httpx.get(live.url + "/api/v1/catalog", params={"installed": "false", "task": "vad"}).json()[

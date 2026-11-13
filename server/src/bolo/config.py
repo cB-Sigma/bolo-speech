@@ -46,6 +46,9 @@ class Settings:
     max_upload_mb: int = 200
     # Install optional components (espeak-ng) from the API. Unset: allowed on a loopback bind or with an API key.
     allow_component_install: bool | None = None
+    #: STUN/TURN URLs offered to WebRTC peers (e.g. "stun:stun.example.org:3478"). Empty: none is contacted,
+    #: which is enough when the browser and the server can reach each other directly.
+    webrtc_ice_servers: list[str] = field(default_factory=list)
 
     # -- storage and downloads -------------------------------------------
     data_dir: Path = field(default_factory=default_data_dir)
@@ -59,6 +62,12 @@ class Settings:
     default_tts: str = "kokoro-v1.0-int8"
     default_vad: str = "silero-vad"
     default_diarization: str = "pyannote-3.0-eres2net"
+    #: after clustering, a "speaker" with less speech than this (seconds) is folded into the most similar one,
+    #: and two speakers whose voice prints are at least this similar are merged; 0 switches a repair off
+    diarization_min_speaker_s: float = 3.0
+    diarization_merge_similarity: float = 0.6
+    #: end-of-turn model used by Realtime sessions that ask for turn_detection.type = "semantic_vad"
+    default_turn: str = "smart-turn-v3"
     preload: list[str] = field(default_factory=list)
 
     # -- lifecycle --------------------------------------------------------

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import io
 import json
 
@@ -14,7 +15,10 @@ from bolo.core import Bolo
 from bolo.diarize import (
     DiarizeOptions,
     OnlineSpeakerLabeler,
+    cluster_embeddings,
     diarization_error_rate,
+    label_speakers,
+    match_known,
     merge_turns,
     renumber,
     speaker_label,
@@ -176,6 +180,86 @@ def test_diarized_streaming_emits_segment_events(live: LiveServer) -> None:
     assert not [e for e in events if e.type == "transcript.text.delta"]
 
 
+def tone(freq: float, seconds: float = 3.0) -> np.ndarray:
+    t = np.arange(int(seconds * 16000)) / 16000
+    return (0.3 * np.sin(2 * np.pi * freq * t)).astype(np.float32)
+
+
+def data_url(audio: np.ndarray) -> str:
+    return "data:audio/wav;base64," + base64.b64encode(encode_audio(audio, 16000, "wav")).decode()
+
+
+def test_words_carry_speakers_when_diarization_and_word_timestamps_are_combined(live: LiveServer) -> None:
+    r = httpx.post(
+        live.url + "/v1/audio/transcriptions",
+        files={"file": wav(two_speakers(4))},
+        data={"model": "fake-stt", "response_format": "verbose_json", "diarize": "true",
+              "timestamp_granularities[]": ["word", "segment"]},
+    )  # fmt: skip
+    assert r.status_code == 200, r.text
+    doc = r.json()
+    assert [s["speaker"] for s in doc["segments"]] == ["A", "B", "A", "B"]
+    assert len(doc["words"]) >= 8 and {w["speaker"] for w in doc["words"]} == {"A", "B"}
+    for word in doc["words"]:  # every word lies inside a segment of its own speaker
+        middle = (word["start"] + word["end"]) / 2
+        (segment,) = [s for s in doc["segments"] if s["start"] - 0.05 <= middle <= s["end"] + 0.05]
+        assert segment["speaker"] == word["speaker"]
+    assert " ".join(w["word"] for w in doc["words"]) == doc["text"]
+
+
+def test_known_speakers_are_recognised_by_voice(live: LiveServer) -> None:
+    client = openai.OpenAI(base_url=live.url + "/v1", api_key="x", max_retries=0)
+    # the fake diarizer's "voices" are pitches: the 420 Hz speaker is the agent, the 150 Hz one the caller
+    result = client.audio.transcriptions.create(
+        model="gpt-4o-transcribe-diarize", file=wav(two_speakers(4)), response_format="diarized_json",
+        chunking_strategy="auto", known_speaker_names=["agent", "caller"],
+        known_speaker_references=[data_url(tone(420)), data_url(tone(150))],
+    )  # fmt: skip
+    assert [s.speaker for s in result.segments] == ["caller", "agent", "caller", "agent"]
+    # only one of the two is known: the other keeps a letter
+    r = httpx.post(
+        live.url + "/api/v1/diarize", files={"file": wav(two_speakers(4))},
+        data={"known_speaker_names[]": "agent", "known_speaker_references[]": data_url(tone(420))},
+    )  # fmt: skip
+    doc = r.json()
+    assert r.status_code == 200 and doc["speakers"] == ["A", "agent"]
+    assert [s["speaker"] for s in doc["segments"]] == ["A", "agent", "A", "agent"]
+    assert doc["known_speakers"] == [{"name": "agent", "matched": True, "similarity": pytest.approx(1.0, abs=0.01)}]
+    trace = httpx.get(live.url + f"/api/v1/requests/{doc['request_id']}").json()
+    assert "identify" in [p["name"] for p in trace["phases"]] and trace["known_speakers"] == {"agent": 1.0}
+    # a reference that is not similar enough to anyone names nobody; a file part works like a data URL
+    r = httpx.post(
+        live.url + "/api/v1/diarize",
+        files={"file": wav(two_speakers(4)), "known_speaker_references[]": ("ref.wav", wav(tone(300)).getvalue())},
+        data={"known_speaker_names[]": "stranger", "identify_threshold": "0.95"},
+    )
+    doc = r.json()
+    assert r.status_code == 200, r.text
+    assert doc["speakers"] == ["A", "B"] and doc["known_speakers"][0]["matched"] is False
+    assert 0 < doc["known_speakers"][0]["similarity"] < 0.95
+
+
+def test_clustering_and_label_helpers() -> None:
+    def unit(degrees: float) -> np.ndarray:
+        return np.array([np.cos(np.radians(degrees)), np.sin(np.radians(degrees))], dtype=np.float32)
+
+    assert cluster_embeddings([], 0.5) == []
+    assert cluster_embeddings([unit(0), unit(80), unit(5), unit(85)], 0.5) == [0, 1, 0, 1]
+    assert cluster_embeddings([unit(0), unit(80), unit(5), unit(85)], 0.5, max_speakers=1) == [0, 0, 0, 0]
+    names, best = match_known({0: unit(0), 1: unit(80)}, [("ann", unit(78)), ("bob", unit(40))], 0.9)
+    assert names == {1: "ann"} and best == {"ann": pytest.approx(0.999, abs=0.01), "bob": pytest.approx(0.77, abs=0.01)}
+    # one name per cluster and one cluster per name, best pair first
+    names, _ = match_known({0: unit(0), 1: unit(10)}, [("ann", unit(2)), ("bob", unit(4))], 0.5)
+    assert names == {0: "ann", 1: "bob"}
+    assert label_speakers([0, 1, 2], {1: "ann"}) == {0: "A", 1: "ann", 2: "B"}
+    assert label_speakers([0, 1], {0: "A"}) == {0: "A", 1: "B"}  # a known speaker may be called "A"
+
+    # online, the second utterance opens a new speaker; with the whole stream known it joins the first
+    labeler = OnlineSpeakerLabeler(threshold=0.45)
+    assert [labeler.assign(unit(d)) for d in (0, 65, 32)] == [0, 1, 0]
+    assert labeler.revise() == [0, 0, 0]
+
+
 def test_diarization_request_errors(live: LiveServer) -> None:
     def post(**data: str) -> httpx.Response:
         return httpx.post(
@@ -186,10 +270,16 @@ def test_diarization_request_errors(live: LiveServer) -> None:
 
     assert post(diarize="true", num_speakers="many").json()["error"]["param"] == "num_speakers"
     assert post(diarize="true", num_speakers="99").status_code == 400
-    r = post(diarize="true", response_format="verbose_json", **{"timestamp_granularities[]": "word"})
-    assert r.status_code == 400 and "word timestamps" in r.json()["error"]["message"]
     assert post(diarize="true", diarization_model="nope").status_code == 404
-    assert post(diarize="true", **{"known_speaker_names[]": "agent"}).status_code == 400
+    # known speakers: names and references must pair up, and a reference must be audio
+    r = post(diarize="true", **{"known_speaker_names[]": "agent"})
+    assert r.status_code == 400 and "same number" in r.json()["error"]["message"]
+    r = post(diarize="true", **{"known_speaker_names[]": "agent", "known_speaker_references[]": "not audio"})
+    assert r.status_code == 400 and "could not be read" in r.json()["error"]["message"]
+    r = post(
+        diarize="true", **{"known_speaker_names[]": "agent", "known_speaker_references[]": data_url(tone(420, 0.3))}
+    )
+    assert r.status_code == 400 and "0.3 s long" in r.json()["error"]["message"]
     assert (
         httpx.post(
             live.url + "/v1/audio/translations",
@@ -246,9 +336,41 @@ async def test_websocket_finals_carry_speaker_labels(live: LiveServer, model: st
 
             await asyncio.sleep(0.01)
         await ws.send(json.dumps({"type": "stop"}))
-        finals = [m for m in [json.loads(x) async for x in ws] if m["type"] == "final"]
+        messages = [json.loads(x) async for x in ws]
+        finals = [m for m in messages if m["type"] == "final"]
     assert [f["speaker"] for f in finals] == ["A", "B", "A", "B"]
+    # before "done": the labels once more, after clustering the whole stream (nothing changes here)
+    assert [m["type"] for m in messages[-2:]] == ["speakers", "done"]
+    summary = messages[-2]
+    assert summary["revised"] == 0 and summary["speakers"] == ["A", "B"]
+    assert [u["speaker"] for u in summary["utterances"]] == ["A", "B", "A", "B"]
+    assert [u["utterance"] for u in summary["utterances"]] == [1, 2, 3, 4] and "was" not in summary["utterances"][0]
     trace = httpx.get(live.url + f"/api/v1/requests/{ready['request_id']}").json()
     assert "diarize" in [p["name"] for p in trace["phases"]]
     async with websockets.connect(live.ws_url + f"/api/v1/stt/stream?model={model}") as ws:
         assert json.loads(await ws.recv())["diarization"] is None
+
+
+def test_spurious_speakers_are_folded_into_real_ones() -> None:
+    from bolo.diarize import consolidate_speakers, merge_same_speaker
+
+    def unit(*v: float) -> np.ndarray:
+        a = np.array(v, dtype=np.float32)
+        return a / np.linalg.norm(a)
+
+    # speaker 0 and 1 talk for a minute each; 2 is a two-second blip that sounds like 1; 3 is 0 on another microphone
+    turns = [SpeakerTurn(0, 60, 0), SpeakerTurn(60, 120, 1), SpeakerTurn(120, 122, 2), SpeakerTurn(122, 150, 3)]
+    voices = {0: unit(1, 0, 0), 1: unit(0, 1, 0), 2: unit(0.2, 1, 0.3), 3: unit(1, 0.1, 0.6)}
+    assert consolidate_speakers(turns, voices) == {0: 0, 3: 0, 1: 1, 2: 1}
+    # each repair can be switched off, and min_speakers is a floor
+    assert consolidate_speakers(turns, voices, min_speech_s=0, merge_similarity=2.0) == {0: 0, 1: 1, 2: 2, 3: 3}
+    assert len(set(consolidate_speakers(turns, voices, min_speakers=3).values())) == 3
+    # without a voice print (too little audio) the blip joins the speaker next to it in time
+    assert consolidate_speakers(turns, {k: v for k, v in voices.items() if k != 2}, merge_similarity=2.0)[2] in (1, 3)
+    # on a short recording a short answer is still a speaker: the floor is a tenth of the speech
+    short = [SpeakerTurn(0, 8, 0), SpeakerTurn(8, 10, 1)]
+    assert consolidate_speakers(short, {0: unit(1, 0), 1: unit(0, 1)}) == {0: 0, 1: 1}
+    merged = merge_same_speaker(
+        [SpeakerTurn(0, 5, 0), SpeakerTurn(5, 7, 0), SpeakerTurn(7, 9, 1), SpeakerTurn(9.5, 10, 1)]
+    )
+    assert [(t.start, t.end, t.speaker) for t in merged] == [(0, 7, 0), (7, 9, 1), (9.5, 10, 1)]

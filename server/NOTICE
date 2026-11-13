@@ -66,6 +66,23 @@ Fonts
     (Copyright (c) 2014 Indian Type Foundry, SIL Open Font License 1.1);
     the font itself is not distributed.
 
+Voices converted by this project
+    The archives published as assets of the "voices-v1" release of this
+    repository are format conversions (PyTorch checkpoint to ONNX, made
+    with tools/voices/export_syspin.py) of the VITS voices published by
+    the SYSPIN project, SPIRE Lab, Indian Institute of Science (IISc),
+    Bengaluru (https://huggingface.co/SYSPIN). The model weights are under
+    the MIT licence; they were trained on the SYSPIN text-to-speech
+    corpus, licensed CC-BY-4.0. Each archive contains LICENSE and
+    ATTRIBUTION files naming the source repository and revision. The
+    archives are not part of the bolo package.
+
+    The optional end-of-turn model is Smart Turn v3 by the Pipecat project
+    (https://huggingface.co/pipecat-ai/smart-turn-v3, BSD-2-Clause),
+    downloaded on request like any other model. bolo's Whisper-style
+    feature computation (server/src/bolo/audio/features.py) is its own
+    implementation of the published algorithm.
+
 Built-in audio samples
     The files in server/src/bolo/samples/*.wav were synthesised with bolo
     using the models named in server/src/bolo/samples/index.json. The live

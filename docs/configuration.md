@@ -32,6 +32,10 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `default_tts` | `kokoro-v1.0-int8` | `--default-tts` | model behind `tts-1`, `tts-1-hd` |
 | `default_vad` | `silero-vad` | | detector for long-file segmentation and realtime endpointing |
 | `default_diarization` | `pyannote-3.0-eres2net` | | speaker-diarization pipeline |
+| `diarization_min_speaker_s` | `3` | | after clustering, a "speaker" with less speech than this in the whole recording (and never more than a tenth of the speech) is folded into the most similar speaker; `0` switches it off. See api.md, "How many speakers" |
+| `diarization_merge_similarity` | `0.6` | | speakers whose voice prints have at least this cosine similarity are merged; `0` switches it off |
+| `default_turn` | `smart-turn-v3` | | end-of-turn model for Realtime sessions that ask for `semantic_vad` (pulled on first use; without it `semantic_vad` is plain silence detection) |
+| `webrtc_ice_servers` | `[]` | | STUN/TURN URLs for the WebRTC transport of the Realtime API (`stun:host:port`, `turn:…`). Empty: no external server is contacted and calls connect on the same machine or network only |
 | `llm_base_url` | none | `--llm-base-url` | OpenAI-compatible chat-completions endpoint for voice agents (`/v1/realtime` conversations, `/v1/chat/completions`), e.g. `http://127.0.0.1:11434/v1` |
 | `llm_model` | none | `--llm-model` | model name sent to that endpoint; unset: the client's model name is passed on |
 | `llm_api_key` | none | `--llm-api-key` | bearer token for that endpoint |
@@ -42,10 +46,10 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `stt_ttl_s`, `tts_ttl_s` | `300` | | unload after this many idle seconds; `-1` never, `0` at once |
 | `vad_ttl_s` | `-1` | | same, for the VAD |
 | `diarization_ttl_s` | `300` | | same, for diarization pipelines |
-| `memory_budget_mb` | `0` (off) | `--memory-budget-mb` | evict idle models (LRU) to stay under this estimate |
+| `memory_budget_mb` | `0` (off) | `--memory-budget-mb` | evict idle models (LRU) to stay under this estimate. A model's memory is estimated as the growth of the process during its load, and never less than the size of its files |
 | `max_loaded_models` | `0` (off) | | cap on models in memory |
 | `probe_models` | `true` | | load a newly installed model once in a child process first |
-| `threads` | `0` = min(4, CPUs) / `workers` | `--threads` | inference threads per engine call |
+| `threads` | `0` = min(4, CPUs) / `workers` | `--threads` | inference threads per engine call. If the machine also runs other work (a language model, other services), set this below the number of cores: oversubscribed inference threads slow each other down badly |
 | `workers` | `1` | `--workers` | concurrent engine calls per model |
 | `max_batch` | `8` | `--max-batch` | largest micro-batch |
 | `batch_wait_ms` | `0` | `--batch-wait-ms` | linger for a fuller batch (adds latency; see architecture.md) |

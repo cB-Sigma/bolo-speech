@@ -42,6 +42,14 @@ class ModelNotInstalled(BoloError):
     type = "invalid_request_error"
 
 
+class ModelNotPublished(BoloError):
+    """A catalog entry whose files have not been published yet (``status: pending``)."""
+
+    status = 404
+    code = "model_not_published"
+    type = "invalid_request_error"
+
+
 class GatedModel(BoloError):
     status = 401
     code = "model_gated"
@@ -98,6 +106,12 @@ class AudioDecodeError(InvalidRequest):
 
 class UnsupportedFormat(InvalidRequest):
     code = "unsupported_format"
+
+
+class UnsupportedCharacters(InvalidRequest):
+    """The text contains letters or digits that a character-input voice has no symbol for."""
+
+    code = "unsupported_characters"
 
 
 class DownloadError(BoloError):

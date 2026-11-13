@@ -1,0 +1,106 @@
+{
+ "syspin-mai-female": {
+  "pull": {
+   "state": "done",
+   "progress_samples": [
+    0.0,
+    0.16,
+    1.0
+   ],
+   "files": [
+    "ATTRIBUTION",
+    "LICENSE",
+    "model.onnx",
+    "tokens.txt",
+    "voice.json"
+   ],
+   "archive": {
+    "url": "http://127.0.0.1:8123/syspin-mai-female.tar.gz",
+    "sha256": "6bae798860d3d51444e20a10bf8cd3254b627048de95ef6367f83671c8bf9646",
+    "size": 105730955
+   }
+  },
+  "archive_blob_kept": true,
+  "round_trip": {
+   "stt": "indicconformer-mai-community",
+   "audio_s": 5.8,
+   "text": "गामक चरवाहा जाड़ में बहुत धन प्राप्त कयलक। सामग्री आयात भेला पर किछ कर दिअ पड़ैत अछि।",
+   "heard": "गामक चरवाह हजारमे बहुत भनप्राप्त कयलक सामग्री आरात भेलाप किछु कर दिअ पड़ैत अछि",
+   "wer": 0.529,
+   "cer": 0.119
+  },
+  "digits": {
+   "status": 400,
+   "code": "unsupported_characters",
+   "message": "this voice reads a fixed set of characters and has no symbol for: '4'. There is no number normaliser for language 'mai': write numbers out in words."
+  }
+ },
+ "syspin-bho-female": {
+  "pull": {
+   "state": "done",
+   "progress_samples": [
+    0.0,
+    0.51,
+    1.0
+   ],
+   "files": [
+    "ATTRIBUTION",
+    "LICENSE",
+    "model.onnx",
+    "tokens.txt",
+    "voice.json"
+   ],
+   "archive": {
+    "url": "http://127.0.0.1:8123/syspin-bho-female.tar.gz",
+    "sha256": "99e5d208a5aaca0ae1946d4d963a632429d7692a125bf9ac2ceb199e6412335c",
+    "size": 105698548
+   }
+  },
+  "archive_blob_kept": true,
+  "round_trip": {
+   "stt": "indicconformer-hi-community",
+   "audio_s": 5.7,
+   "text": "बायोगैस जीव जंतु के अपघटन से बनत बाटे। पानी बिल हर महीना भरे के पड़ी।",
+   "heard": "बायोगैस जीव जंतु के आपभटन से बनत बाँटे पानी बिल हर महीना भरे के पड़ी",
+   "wer": 0.133,
+   "cer": 0.057
+  },
+  "digits": {
+   "status": 400,
+   "code": "unsupported_characters",
+   "message": "this voice reads a fixed set of characters and has no symbol for: '4', '2'. There is no number normaliser for language 'bho': write numbers out in words."
+  }
+ },
+ "syspin-mai-male": {
+  "pull": {
+   "state": "done",
+   "progress_samples": [
+    0.0,
+    0.42,
+    1.0
+   ],
+   "files": [
+    "ATTRIBUTION",
+    "LICENSE",
+    "model.onnx",
+    "tokens.txt",
+    "voice.json"
+   ],
+   "archive": {
+    "url": "http://127.0.0.1:8123/syspin-mai-male.tar.gz",
+    "sha256": "312833751a4c11fa391e06a400735b2dbbc86301a83309fd05f1d44206636e17",
+    "size": 105628329
+   }
+  },
+  "archive_blob_kept": true,
+  "round_trip": {
+   "stt": "indicconformer-mai-community",
+   "audio_s": 6.4,
+   "text": "गामक चरवाहा जाड़ में बहुत धन प्राप्त कयलक। सामग्री आयात भेला पर किछ कर दिअ पड़ैत अछि।",
+   "heard": "गामक चरवाहाजारमे बहुत धन प्राप्त कयला सामग्री आयात भेलापर किछु कर दिअ पड़ैत अछि",
+   "wer": 0.412,
+   "cer": 0.075
+  },
+  "digits": "synthesised"
+ }
+}

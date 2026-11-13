@@ -107,6 +107,7 @@ class STTSession:
         self._queue_ms: list[float] = []
         self._diarizer: LoadedModel | None = None
         self._labeler: OnlineSpeakerLabeler | None = None
+        self._embedded: list[int | None] = []  # per final: index of its embedding in the labeler, if it has one
 
     # -- public API -------------------------------------------------------
     async def start(self) -> None:
@@ -226,6 +227,7 @@ class STTSession:
                                 await proc.audio(tail, time.perf_counter())
                         await proc.finalize(time.perf_counter(), reason="stop" if stopping else "flush")
                 await self._send_metrics(pos)
+                await self._revise_speakers()
                 await self._send({"type": "done", "request_id": trace.id})
         except asyncio.CancelledError:
             status, error = "cancelled", "client disconnected"
@@ -284,11 +286,41 @@ class STTSession:
         trace = self.trace
         assert trace is not None
         if len(samples) < int(0.5 * SR):  # too little speech for a reliable embedding: keep the last speaker
+            self._embedded.append(None)
             return speaker_label(self._labeler.last) if self._labeler.last is not None else None
         start = trace.now()
         embedding, _info = await self._diarizer.queue.submit("embed", samples)
         trace.add_phase("diarize", start, trace.now())
+        self._embedded.append(len(self._labeler.embeddings))
         return speaker_label(self._labeler.assign(embedding))
+
+    async def _revise_speakers(self) -> None:
+        """At the end of the stream, cluster all utterances together and report the labels that change.
+
+        Sent as one ``speakers`` message before ``done``. Labels given earlier in ``final`` messages are
+        not re-sent; ``utterances`` lists every final (1-based ``utterance`` number, as in the SSE progress
+        events) with its revised ``speaker`` and, when it changed, the label it had before in ``was``.
+        """
+        labeler = self._labeler
+        if labeler is None or not self.finals or len(self._embedded) != len(self.finals):
+            return
+        revised = labeler.revise()
+        rows: list[dict[str, Any]] = []
+        changed = 0
+        previous: str | None = None
+        for number, (final, index) in enumerate(zip(self.finals, self._embedded), start=1):
+            label = speaker_label(revised[index]) if index is not None else previous
+            row: dict[str, Any] = {"utterance": number, "t0": final["t0"], "t1": final["t1"], "speaker": label}
+            if label != final.get("speaker"):
+                row["was"] = final.get("speaker")
+                changed += 1
+            rows.append(row)
+            previous = label
+        speakers = sorted({r["speaker"] for r in rows if r["speaker"]})
+        await self._send({"type": "speakers", "revised": changed, "speakers": speakers, "utterances": rows})
+        if self.trace is not None:
+            self.trace.extra["speakers"] = len(speakers)
+            self.trace.extra["speaker_labels_revised"] = changed
 
     # -- helpers used by processors ----------------------------------------
     def note_job(self, queue_ms: float, run_ms: float, batch: int, started: float, finished: float) -> None:

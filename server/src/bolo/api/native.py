@@ -37,7 +37,10 @@ async def catalog(
 
 class PullRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    id: str = Field(description="Catalog id or alias, or `hf:<repo>` for any compatible Hugging Face model.")
+    id: str = Field(
+        description="Catalog id or alias, `hf:<repo>` for any compatible Hugging Face model, or `piper:<voice>` "
+        "(for example `piper:te_IN-venkatesh-medium`) for any voice of the Piper project."
+    )
     kind: str | None = Field(default=None, description="Only for `hf:` pulls: loader kind when it cannot be detected.")
     task: str | None = None
 
@@ -51,6 +54,14 @@ async def pull(request: Request, body: PullRequest) -> JSONResponse:
 
         spec = await asyncio.to_thread(register_hf_model, core, name[3:], body.kind, body.task)
         name = spec.id
+    elif name.startswith("piper:"):
+        from bolo.piper import register_piper_voice
+
+        name = register_piper_voice(core, name[6:]).id
+    elif name.startswith("file:"):
+        raise InvalidRequest(
+            "local directories are registered from the command line (bolo pull ./dir), not over HTTP", param="id"
+        )
     job = core.start_pull(name)
     return JSONResponse({"job_id": job.id}, status_code=202)
 
@@ -107,8 +118,8 @@ async def diarize(request: Request) -> JSONResponse:
     """Multipart form: ``file`` and optional ``model``, ``num_speakers``, ``min_speakers``,
     ``max_speakers``, ``threshold`` (clustering distance; lower finds more speakers)."""
     from bolo.api.common import read_upload
-    from bolo.api.openai import _int_field
-    from bolo.diarize import DiarizeOptions, speaker_label
+    from bolo.api.openai import _int_field, known_speakers
+    from bolo.diarize import DiarizeOptions
     from bolo.obs.trace import Trace
 
     core = get_core(request)
@@ -118,14 +129,17 @@ async def diarize(request: Request) -> JSONResponse:
         raise InvalidRequest("a multipart 'file' field with the audio is required", param="file")
     try:
         threshold = float(str(form.get("threshold"))) if form.get("threshold") else None
+        identify = float(str(form.get("identify_threshold"))) if form.get("identify_threshold") else None
     except ValueError as exc:
-        raise InvalidRequest("threshold must be a number", param="threshold") from exc
+        raise InvalidRequest("threshold and identify_threshold must be numbers", param="threshold") from exc
     opts = DiarizeOptions(
         model=str(form.get("model") or "") or None,
         num_speakers=_int_field(form, "num_speakers"),
         min_speakers=_int_field(form, "min_speakers"),
         max_speakers=_int_field(form, "max_speakers"),
         threshold=threshold,
+        known=await known_speakers(form),
+        identify_threshold=identify,
     )
     spec = core.resolve(opts.model, "diarization")
     samples, rate = await read_upload(core, file)
@@ -136,10 +150,24 @@ async def diarize(request: Request) -> JSONResponse:
         {
             "model": spec.id,
             "duration": round(len(samples) / rate, 3),
-            "speakers": [speaker_label(s) for s in speakers],
+            "speakers": [opts.label(s) for s in speakers],
             "segments": [
-                {"start": round(t.start, 3), "end": round(t.end, 3), "speaker": speaker_label(t.speaker)} for t in turns
+                {"start": round(t.start, 3), "end": round(t.end, 3), "speaker": opts.label(t.speaker)} for t in turns
             ],
+            **(
+                {
+                    "known_speakers": [
+                        {
+                            "name": k.name,
+                            "matched": k.name in opts.names.values(),
+                            "similarity": opts.similarities.get(k.name),
+                        }
+                        for k in opts.known
+                    ]
+                }
+                if opts.known
+                else {}
+            ),
             "request_id": trace.id,
         },
         headers={"x-request-id": trace.id},

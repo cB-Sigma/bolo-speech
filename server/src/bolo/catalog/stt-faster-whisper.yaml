@@ -917,3 +917,375 @@
     - '*.srt'
   options:
     language: hi
+- id: faster-whisper-base-hinglish
+  aliases:
+  - MSpider3/whisper-hindi2hinglish-swift-ct2
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages:
+  - hi
+  - en
+  tier: realtime
+  size_bytes: 81398269
+  license: Apache-2.0
+  features:
+  - timestamps
+  description: 'Hinglish: Oriserve Whisper-Hindi2Hinglish-Swift (a Whisper base fine-tune) in CTranslate2 format,
+    converted by a third party. Writes code-mixed Hindi-English speech in Latin script ("mera order kab aayega"),
+    not Devanagari.'
+  source_url: https://huggingface.co/Oriserve/Whisper-Hindi2Hinglish-Swift
+  validated: cpu
+  measured:
+    rtf: 0.1737
+    audio_s: 120.6
+    utterances: 10
+    load_s: 0.42
+    memory_mb: 72
+    threads: 2
+    engine: faster-whisper 1.2.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: 'no accuracy number: run on Hindi speech, and the model writes romanised Hinglish, so there was no matching
+      reference; run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine
+      are lower'
+    test_audio: FLEURS hi_in dev (CC-BY-4.0), first 10 utterances
+  source:
+    repo: MSpider3/whisper-hindi2hinglish-swift-ct2
+    revision: 484362f23d657c07c2762ce1c52d7b4a7ab49d25
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    language: hi
+- id: faster-whisper-medium-tamil
+  aliases:
+  - mohankumars26/whisper-tamil-medium-ct2
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages:
+  - ta
+  tier: accuracy
+  size_bytes: 778193650
+  license: Apache-2.0
+  features:
+  - timestamps
+  description: 'Tamil: Whisper medium fine-tuned for Tamil (vasista22), CTranslate2 format, converted by a third
+    party. Large for a CPU: expect slower than real time on a few cores.'
+  source_url: https://huggingface.co/vasista22/whisper-tamil-medium
+  validated: cpu
+  measured:
+    rtf: 1.7612
+    wer: 0.069
+    cer: 0.026
+    audio_s: 37.0
+    utterances: 3
+    load_s: 2.29
+    memory_mb: 1363
+    threads: 2
+    engine: faster-whisper 1.2.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS ta_in dev (CC-BY-4.0), first 3 utterances
+  source:
+    repo: mohankumars26/whisper-tamil-medium-ct2
+    revision: d924de7965242165af8621e6e5bf8515aed7169a
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    language: ta
+- id: faster-whisper-medium-kannada
+  aliases:
+  - mohankumars26/whisper-kannada-medium-ct2
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages:
+  - kn
+  tier: accuracy
+  size_bytes: 778193650
+  license: Apache-2.0
+  features:
+  - timestamps
+  description: 'Kannada: Whisper medium fine-tuned for Kannada (vasista22), CTranslate2 format, converted by a third
+    party. Large for a CPU: expect slower than real time on a few cores.'
+  source_url: https://huggingface.co/vasista22/whisper-kannada-medium
+  validated: cpu
+  measured:
+    rtf: 1.8377
+    wer: 0.255
+    cer: 0.245
+    audio_s: 48.3
+    utterances: 3
+    load_s: 3.81
+    memory_mb: 1495
+    threads: 2
+    engine: faster-whisper 1.2.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS kn_in dev (CC-BY-4.0), first 3 utterances
+  source:
+    repo: mohankumars26/whisper-kannada-medium-ct2
+    revision: 9f22e66da7869fd9e7a967017ce0345452f08aec
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    language: kn
+- id: faster-whisper-medium-telugu
+  aliases:
+  - kavithajohn/whisper-telugu-medium-ct2
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages:
+  - te
+  tier: accuracy
+  size_bytes: 1531698800
+  license: Apache-2.0
+  features:
+  - timestamps
+  description: 'Telugu: Whisper medium fine-tuned for Telugu (vasista22), CTranslate2 format, converted by a third
+    party. Large for a CPU: expect slower than real time on a few cores.'
+  source_url: https://huggingface.co/vasista22/whisper-telugu-medium
+  validated: cpu
+  measured:
+    rtf: 1.5214
+    wer: 0.043
+    cer: 0.07
+    audio_s: 28.4
+    utterances: 3
+    load_s: 2.6
+    memory_mb: 1498
+    threads: 2
+    engine: faster-whisper 1.2.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS te_in dev (CC-BY-4.0), first 3 utterances
+  source:
+    repo: kavithajohn/whisper-telugu-medium-ct2
+    revision: cfc4011470fe98c2daa00621a14cc9cdec0bc413
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    language: te
+- id: faster-whisper-medium-bengali
+  aliases:
+  - bytx/tugstugi-medium-bn-ct2
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages:
+  - bn
+  tier: accuracy
+  size_bytes: 1531328883
+  license: Apache-2.0
+  features:
+  - timestamps
+  description: 'Bengali: Whisper medium fine-tuned for Bengali (bengaliAI), CTranslate2 format, converted by a third
+    party. Large for a CPU: expect slower than real time on a few cores.'
+  source_url: https://huggingface.co/bengaliAI/tugstugi_bengaliai-asr_whisper-medium
+  validated: cpu
+  measured:
+    rtf: 0.6852
+    wer: 0.132
+    cer: 0.041
+    audio_s: 38.6
+    utterances: 3
+    load_s: 3.06
+    memory_mb: 1509
+    threads: 2
+    engine: faster-whisper 1.2.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: run with 2 threads while the machine was busy with other jobs; real-time factors on an idle machine are
+      lower
+    test_audio: FLEURS bn_in dev (CC-BY-4.0), first 3 utterances
+  source:
+    repo: bytx/tugstugi-medium-bn-ct2
+    revision: e5fd069b6305a1309de9b03d3622906514acdc33
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    language: bn
+- id: faster-whisper-medium-punjabi
+  aliases:
+  - cutvideogaps/indicwhisper-punjabi-ct2
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages:
+  - pa
+  tier: accuracy
+  size_bytes: 772620951
+  license: MIT
+  features:
+  - timestamps
+  description: 'Punjabi: Whisper medium fine-tuned for Punjabi (AI4Bharat IndicWhisper), CTranslate2 format, converted
+    by a third party. Large for a CPU: expect slower than real time on a few cores.'
+  source_url: https://github.com/AI4Bharat/vistaar
+  validated: cpu
+  measured:
+    rtf: 1.2134
+    wer: 0.484
+    cer: 0.382
+    audio_s: 48.5
+    utterances: 3
+    load_s: 1.85
+    memory_mb: 1379
+    threads: 2
+    engine: faster-whisper 1.2.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: 3 utterances only; the first came out nearly exact, so most of the error is in the other two, which were
+      not inspected; run with 2 threads while the machine was busy with other jobs; real-time factors on an idle
+      machine are lower
+    test_audio: FLEURS pa_in dev (CC-BY-4.0), first 3 utterances
+  source:
+    repo: cutvideogaps/indicwhisper-punjabi-ct2
+    revision: 5de38a63e5353c70686aedb0d88da73e94c656a0
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    language: pa
+- id: faster-whisper-large-v2-hindi
+  aliases:
+  - collabora/faster-whisper-large-v2-hindi
+  task: stt
+  engine: faster-whisper
+  kind: ct2-whisper
+  family: Whisper
+  languages:
+  - hi
+  tier: accuracy
+  size_bytes: 3090463883
+  license: CC-BY-4.0
+  features:
+  - timestamps
+  description: 'Hindi: Whisper large-v2 fine-tuned for Hindi (Collabora), CTranslate2 format. Large for a CPU: expect
+    slower than real time on a few cores.'
+  source_url: https://huggingface.co/collabora/faster-whisper-large-v2-hindi
+  validated: untested
+  source:
+    repo: collabora/faster-whisper-large-v2-hindi
+    revision: 94b27e5e288871a964d20d53cb456891e93a8542
+    include:
+    - model.bin
+    - config.json
+    - tokenizer.json
+    - vocabulary.*
+    - preprocessor_config.json
+    exclude:
+    - espeak-ng-data/*
+    - test_wavs/*
+    - '*.md'
+    - '*.sh'
+    - '*.py'
+    - .gitattributes
+    - '*.wav'
+    - '*.mp4'
+    - '*.mov'
+    - '*.srt'
+  options:
+    language: hi

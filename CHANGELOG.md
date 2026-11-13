@@ -4,9 +4,91 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
-## [0.1.0] - unreleased
+## [0.2.0] - unreleased
 
-First public version.
+### Added
+
+- **Indian languages.** Speech-to-text entries for all 22 scheduled languages
+  of India (`indicconformer-<lang>-community`: AI4Bharat IndicConformer, MIT,
+  ungated community exports pinned to a commit), 16 of them run on real
+  recordings with the measured error rates in the catalog; among them
+  Maithili. Also `indicconformer-ta` / `-te` / `-ml` (smaller exports),
+  Hinglish in Latin script (`faster-whisper-base-hinglish`), Whisper
+  fine-tunes for Tamil, Kannada, Telugu, Bengali, Punjabi and Hindi
+  (large-v2), NVIDIA Nemotron 3.5 streaming, and the Nepali Piper voice
+  `chitwan`. Bhojpuri is documented honestly: no dedicated model, the Hindi
+  model as a fallback with its measured error.
+- **Any Piper voice by name**: `bolo pull piper:<voice>` fetches a voice from
+  the Piper project and converts it for sherpa-onnx after the download,
+  without any machine-learning library (`source.convert: piper` in catalog
+  entries). Ten Indian voices defined that way: Telugu (3), Tamil (2),
+  Malayalam (2), Marathi, Bengali, Urdu.
+- **Local model directories**: `bolo pull ./dir --kind … --name … --language …`.
+- **Archive sources**: catalog entries can point at a `.tar.gz` / `.zip`
+  (for example a GitHub release asset) that is verified by SHA-256 and
+  unpacked safely. The Hugging Face token is no longer sent to other hosts.
+- **Voices converted by this project**: `tools/voices/` and a "Voices"
+  workflow convert the IISc SYSPIN VITS voices (Maithili, Bhojpuri, Hindi,
+  Bengali, Marathi, Telugu, Kannada, Gujarati, Magahi, Chhattisgarhi, Indian
+  English) and publish them as release assets. The 22 catalog entries are
+  `status: pending` (hidden, not pullable) until that has happened.
+- **Closed character sets**: character-input voices no longer drop what they
+  cannot read. Digits are spelled out where a number normaliser exists;
+  otherwise the request fails with `unsupported_characters`, naming them.
+- **Realtime API**: incremental user-transcript deltas while the user is
+  speaking; a WebRTC transport (`POST /v1/realtime/calls` and `/hangup`,
+  extra `webrtc`, with `output_audio_buffer.*` events); ephemeral client
+  secrets (`POST /v1/realtime/client_secrets`); optional semantic turn
+  detection (`turn_detection.type = "semantic_vad"`) with the Smart Turn v3
+  end-of-turn model, a new `turn` model task and an `onnxruntime` engine.
+- **Diarization**: speaker labels on words (diarization and word timestamps
+  together); `known_speaker_names[]` / `known_speaker_references[]` to name
+  speakers from reference recordings (also on `/api/v1/diarize`); a
+  `speakers` message with revised labels at the end of a realtime stream;
+  consolidation of spurious speakers after clustering
+  (`diarization_min_speaker_s`, `diarization_merge_similarity`).
+- `capabilities` in `/api/v1/info` describe all of the above; catalog entries
+  have a `status` field.
+- Ogg/Opus is streamed in 100 ms pages when PyAV is installed.
+- Catalog option `token_timestamps` for Whisper exports with attention
+  outputs (sherpa-onnx); none of the current entries has them.
+- The release workflow can be started by hand, publishes to PyPI with an API
+  token and creates the tag and the GitHub release itself.
+
+### Changed
+
+- A loaded model's memory is never estimated below the size of its files
+  (the estimate could read far too low, or zero).
+- Examples for Pipecat and LiveKit Agents are now runnable scripts that were
+  run against bolo (Pipecat 1.16.0, LiveKit Agents 1.8.11).
+
+### Validated in this release (see the docs for numbers and conditions)
+
+- Voice-agent turns through Ollama and through llama.cpp's `llama-server`
+  with a real (small) model; a turn over WebRTC with real models.
+- Pipecat and LiveKit Agents, each through the Realtime endpoint, a Realtime
+  transcription session and the HTTP endpoints.
+- The eSpeak NG executable route with a real `espeak-ng` binary.
+
+### Known limitations
+
+- WebRTC was tested with a WebRTC library, not with browsers, NAT or TURN.
+  SIP is not implemented.
+- The semantic end-of-turn model judges sound, not grammar; in our small
+  test it helped with a pause in mid-phrase and was indecisive on Hindi.
+- The SYSPIN voices are not published yet, and the export step and the
+  workflows were not run by the maintainers.
+- Speaker counting was evaluated on 18 recordings; no diarization error
+  rate on real recordings was measured. Known-speaker naming was tested with
+  synthetic voices only.
+- Six scheduled languages (Bodo, Dogri, Kashmiri, Konkani, Manipuri,
+  Santali) have recognisers that were not run, and eleven have no voice.
+- Word timestamps are still unavailable for Whisper through sherpa-onnx and
+  for Moonshine.
+
+## [0.1.0]
+
+First public version (source only; never tagged or published to PyPI).
 
 ### Added
 
@@ -82,10 +164,12 @@ First public version.
   Windows are untested.
 - The Realtime API is WebSocket only (no WebRTC or SIP), has no ephemeral
   client secrets, MCP tools, image input or semantic turn detection, and
-  user transcripts arrive whole rather than as incremental deltas.
-- Diarization: no known-speaker references; the realtime labels assume one
-  speaker per utterance and do not handle overlapping speech.
+  user transcripts arrive whole rather than as incremental deltas
+  (addressed in 0.2.0, except SIP, MCP tools and image input).
+- Diarization: no known-speaker references (added in 0.2.0); the realtime
+  labels assume one speaker per utterance and do not handle overlapping
+  speech.
 - Voice-agent function calling was exercised with a scripted stand-in model
-  only; Ollama, vLLM and hosted models were not run.
+  only; Ollama, vLLM and hosted models were not run (Ollama was in 0.2.0).
 - Piper, KittenTTS, Matcha-TTS (English) and non-English Kokoro voices need
   the optional eSpeak NG component.

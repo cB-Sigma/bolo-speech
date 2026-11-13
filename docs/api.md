@@ -30,6 +30,9 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `POST` | `/v1/audio/translations` | Translate audio to English |
 | `POST` | `/v1/audio/speech` | Synthesise speech |
 | `POST` | `/v1/chat/completions` | Chat completions with audio in and out (speech front end to your LLM) |
+| `POST` | `/v1/realtime/client_secrets` | Create an ephemeral key for Realtime sessions |
+| `POST` | `/v1/realtime/calls` | Start a Realtime session over WebRTC (SDP offer/answer) |
+| `POST` | `/v1/realtime/calls/{call_id}/hangup` | End a WebRTC Realtime call |
 
 **speaches**
 
@@ -100,7 +103,7 @@ message:
 
 | Status | `code` | When |
 | --- | --- | --- |
-| 400 | `invalid_request`, `audio_decode_error`, `unsupported_format` | bad parameters, undecodable audio |
+| 400 | `invalid_request`, `audio_decode_error`, `unsupported_format`, `unsupported_characters` | bad parameters, undecodable audio; text with letters or digits that a character-input voice has no symbol for (the message names them) |
 | 401 | `invalid_api_key`, `model_gated` | missing/wrong key; gated model without a token |
 | 404 | `model_not_found`, `model_not_installed`, `not_found` | unknown model; not installed and `auto_pull` off |
 | 424 | `component_missing` | the voice needs an optional component (espeak-ng) that is not installed; the message says how to install it |
@@ -201,14 +204,25 @@ JSON body.
 
 The body is streamed (chunked transfer) while synthesis is still running:
 the first sentence is audible while the rest is being generated. `pcm`,
-`wav` and `mp3` are forwarded as soon as each piece exists; Ogg/Opus is
-emitted in pages of roughly one second, so prefer `pcm` or `mp3` when
-time-to-first-audio matters. A streamed `wav` has a header that declares an
+`wav` and `mp3` are forwarded as soon as each piece exists. Ogg/Opus is
+written in pages of 100 ms when PyAV is installed (`bolo-speech[av]` or
+`[webrtc]`; in our check every 100 ms of input produced output) and in pages
+of roughly one second through libsndfile otherwise, in which case prefer
+`pcm` or `mp3` when time-to-first-audio matters. A streamed `wav` has a header that declares an
 unknown length, as is usual for streams.
 
 Text normalisation (on by default): Unicode NFC, Markdown emphasis, links and
 emoji removed, numbers spelled out for English and Hindi. Code-mixed text is
 passed through as written.
+
+Voices that read characters from a closed set (the Coqui-format VITS voices:
+`coqui-*`, the SYSPIN voices) would silently skip anything they have no
+symbol for. bolo checks first: digits are spelled out when a number
+normaliser exists for the language (English, Hindi), punctuation the voice
+does not know is replaced or dropped, and any letter or digit that is left
+answers `400 unsupported_characters` naming the characters, for example
+`this voice reads a fixed set of characters and has no symbol for: '4', '2'.
+There is no number normaliser for language 'bn': write numbers out in words.`
 
 ### `GET /v1/models`, `GET /v1/models/{id}`
 
@@ -237,7 +251,7 @@ For clients written against speaches; details and differences are in
 ### `GET /api/v1/info`
 
 ```json
-{"name": "bolo", "version": "0.1.0",
+{"name": "bolo", "version": "0.2.0",
  "engines": [{"id": "sherpa-onnx", "version": "2.0.1", "available": true, "reason": null},
              {"id": "whisper.cpp", "version": null, "available": false, "reason": "ModuleNotFoundError: …"}],
  "device": "cpu", "cpu_count": 4, "platform": "linux-x86_64", "python": "3.12.3",
@@ -249,17 +263,25 @@ For clients written against speaches; details and differences are in
  "capabilities": {
    "diarization": {"available": true, "installed": false, "default_model": "pyannote-3.0-eres2net",
                    "http": {"endpoint": "/api/v1/diarize", "transcriptions": ["diarize", "diarized_json"]},
-                   "websocket": "diarize=true (one speaker per utterance, labelled online)"},
+                   "websocket": "diarize=true (one speaker per utterance, labelled online)",
+                   "word_timestamps": true, "known_speakers": true, "revised_labels_at_end_of_stream": true},
    "realtime": {"endpoint": "/v1/realtime", "transcription_sessions": true,
                 "conversation_sessions": false,          // true once a language model is configured
-                "audio_formats": ["audio/pcm (24 kHz)", "audio/pcmu", "audio/pcma"], "reference": "…"},
+                "audio_formats": ["audio/pcm (24 kHz)", "audio/pcmu", "audio/pcma"], "reference": "…",
+                "transports": ["websocket", "webrtc"],   // "webrtc" only when aiortc is installed
+                "webrtc": {"endpoint": "/v1/realtime/calls", "available": true, "install": null, "ice_servers": []},
+                "client_secrets": "/v1/realtime/client_secrets",
+                "transcript_deltas": true,               // user transcripts arrive incrementally
+                "turn_detection": ["server_vad", "semantic_vad"],
+                "semantic_vad": {"model": "smart-turn-v3", "available": true, "installed": false},
+                "sip": false},
    "chat_completions": {"endpoint": "/v1/chat/completions", "available": false, "audio": false},
    "llm": {"configured": false, "base_url": null, "model": null}}}
 ```
 
 ### `GET /api/v1/catalog?task=&q=&installed=`
 
-`task`: `stt`, `tts`, `vad`, `diarization`. `q`: space-separated words that must all appear
+`task`: `stt`, `tts`, `vad`, `diarization`, `turn` (end-of-turn models). `q`: space-separated words that must all appear
 in the id, aliases, family, engine, languages, licence or description.
 `installed`: `true` / `false`.
 
@@ -280,7 +302,8 @@ in the id, aliases, family, engine, languages, licence or description.
   "measured": {"rtf": 0.033, "wer": 0.021, "threads": 4, "hardware": "…", "date": "…", …},  // null when untested
   "custom": false,                    // true for models added with hf:
   "requires": [],                     // optional components, e.g. ["espeak-ng"]
-  "available": true                   // false while a required component is not installed
+  "available": true,                  // false while a required component is not installed
+  "status": null                      // "pending": described but its files are not published yet (see below)
 }]}
 ```
 
@@ -291,11 +314,16 @@ with this model).
 
 `GET /api/v1/models/{id}` returns one such entry.
 
+Entries with `"status": "pending"` describe models whose files the project
+has not published yet (voices awaiting conversion). They are left out of the
+catalog listing, `GET /api/v1/models/{id}` shows them, and pulling or using
+one answers `404 model_not_published`.
+
 ### Model management
 
 | Call | Result |
 | --- | --- |
-| `POST /api/v1/models/pull` `{"id": "…"}` | `202 {"job_id": "j_1"}`. `id` may be `hf:<owner>/<repo>[@rev]` with optional `"kind"`, `"task"` |
+| `POST /api/v1/models/pull` `{"id": "…"}` | `202 {"job_id": "j_1"}`. `id` may be `hf:<owner>/<repo>[@rev]` with optional `"kind"`, `"task"`, or `piper:<voice>` (for example `piper:te_IN-venkatesh-medium`) for any voice of the Piper project, which is converted for sherpa-onnx after the download. Local directories are registered from the command line only (`bolo pull ./dir`) |
 | `GET /api/v1/jobs/{job_id}` | `{"id","kind":"pull"\|"bench"\|"install","model","state":"queued"\|"running"\|"done"\|"error","progress":0..1,"bytes_done","bytes_total","error"}` (+ `result` for bench jobs) |
 | `GET /api/v1/jobs` | all recent jobs, newest first |
 | `POST /api/v1/models/{id}/load` | `200 {"id","loaded":true,"memory_bytes","load_ms"}` |
@@ -511,11 +539,30 @@ speaker, labelled `A`, `B`, `C`, … in order of first appearance:
 | `json` | not shown (text only) |
 | `stream=true` | one `transcript.text.segment` event per turn instead of `transcript.text.delta`, then `transcript.text.done` |
 
-Word timestamps cannot be combined with diarization (400). OpenAI's
-`known_speaker_names[]` / `known_speaker_references[]` are not supported (400).
+**Word timestamps** (`timestamp_granularities[]=word`) combine with
+diarization: every entry of `words` then carries `"speaker"` as well. The
+model must be able to produce word times (see "Word timestamps" under
+models.md).
+
+**Known speakers.** OpenAI's `known_speaker_names[]` and
+`known_speaker_references[]` are supported: up to 8 names, each with a
+reference recording of that person (a `data:audio/…;base64,…` URL as in
+OpenAI's API, or a file part; a few seconds of clean speech). After
+diarization each speaker's voice print is compared with the references
+(cosine similarity of speaker embeddings); a speaker that matches a reference
+with at least `identify_threshold` (default 0.5) is labelled with that name
+instead of a letter, each name being used at most once. Speakers that match
+nobody keep `A`, `B`, …. `/api/v1/diarize` accepts the same fields and
+reports what it found:
+`"known_speakers": [{"name": "Asha", "matched": true, "similarity": 0.71}]`.
+This is recognition by similarity against voices *you* supply, not
+verification: do not use it to authenticate anyone. Tested with synthetic
+voices only (two Kokoro voices told apart and named correctly); accuracy on
+real speakers, short references or telephone audio was not measured.
 
 **On its own**: `POST /api/v1/diarize`, multipart `file` plus optional `model`,
-`num_speakers`, `min_speakers`, `max_speakers`, `threshold`:
+`num_speakers`, `min_speakers`, `max_speakers`, `threshold`,
+`known_speaker_names[]` / `known_speaker_references[]`, `identify_threshold`:
 
 ```json
 {"model": "pyannote-3.0-eres2net", "duration": 21.5, "speakers": ["A", "B"],
@@ -528,17 +575,90 @@ every `final` gets a `"speaker"` field and `ready` reports
 `"diarization": "<model>"`. This is *online* labelling: when an utterance is
 finalised its audio is embedded and assigned to the closest speaker heard so
 far in this stream, or to a new one. It therefore assumes **one speaker per
-utterance** (a pause between speakers), cannot split overlapping speech, and
-never revises an earlier label. It adds one embedding computation to each
-final (about 90 ms in our runs; visible as the `diarize` phase and included
-in `latency_ms`). For an authoritative result on a finished recording use the
-HTTP routes, which cluster the whole file.
+utterance** (a pause between speakers) and cannot split overlapping speech.
+It adds one embedding computation to each final (about 90 ms in our runs;
+visible as the `diarize` phase and included in `latency_ms`).
+
+Labels sent with a `final` are never changed afterwards, but when the stream
+ends (`{"type":"stop"}`) all utterances are clustered once more, now that all
+of them are known, and one message before `done` gives the revised picture:
+
+```json
+{"type": "speakers", "revised": 1, "speakers": ["A", "B"],
+ "utterances": [{"utterance": 1, "t0": 0.4, "t1": 2.9, "speaker": "A"},
+                {"utterance": 2, "t0": 3.6, "t1": 5.1, "speaker": "A", "was": "C"}]}
+```
+
+`was` is present where the label differs from the one sent earlier (the
+typical repair: a speaker's first short utterance had opened a speaker of its
+own). For an authoritative result on a finished recording use the HTTP
+routes, which run the full pipeline on the whole file.
 
 Traces: kind `diarization` for `/api/v1/diarize`; a `diarize` phase and the
 extra fields `diarization_model` and `speakers` on transcription traces.
 
-The speaker *count* is the weak point of clustering: on real recordings it
-tends to find too many speakers. Pass `num_speakers` when you know it.
+### How many speakers
+
+The speaker *count* is the weak point of clustering: left alone it finds too
+many (a laugh, a cough or a change of loudness opens a new cluster). bolo
+does two things about it, and you can do a third:
+
+1. The default pipeline clusters with threshold 0.9 instead of
+   sherpa-onnx's 0.5 (`diarization_threshold` / `threshold` per request).
+2. After clustering, speakers are consolidated: two speakers whose voice
+   prints have a cosine similarity of at least 0.6 are merged, and a speaker
+   with less than 3 seconds of speech in the whole recording (never more than
+   a tenth of the speech) is folded into the most similar one
+   (`diarization_merge_similarity`, `diarization_min_speaker_s`; the
+   `consolidate` phase of the trace, and `speakers_before_consolidation`
+   when it changed something).
+3. Pass `num_speakers` when you know it, or `min_speakers` /
+   `max_speakers`. With `num_speakers` nothing is consolidated.
+
+What it does, measured on 18 recordings with a known number of speakers
+(`docs/measurements/diarization-speaker-counts.json`): the four test clips of
+sherpa-onnx's segmentation model and the first five minutes (or less) of
+14 VoxConverse dev recordings (broadcast and debate audio, CC-BY-4.0).
+
+| Recording | Speakers | Found at threshold 0.5 (sherpa-onnx default) | Threshold 0.9, clustering only | Threshold 0.9 + consolidation (default) |
+| --- | --- | --- | --- | --- |
+| sherpa-onnx test clip `1-two-speakers-en` | 2 | 2 | 2 | **2** |
+| sherpa-onnx test clip `2-two-speakers-en` | 2 | 4 | 2 | **2** |
+| sherpa-onnx test clip `3-two-speakers-en` | 2 | 4 | 2 | **2** |
+| sherpa-onnx test clip `0-four-speakers-zh` | 4 | 7 | 5 | **4** |
+| VoxConverse dev `aisvi` (first 300 s) | 8 | 13 | 8 | **7** |
+| VoxConverse dev `xypdm` (first 300 s) | 1 | 3 | 1 | **1** |
+| VoxConverse dev `ldnro` (first 300 s) | 4 | 4 | 5 | **4** |
+| VoxConverse dev `atgpi` (first 122 s) | 1 | 1 | 1 | **1** |
+| VoxConverse dev `xxwgv` (first 300 s) | 8 | 8 | 8 | **8** |
+| VoxConverse dev `qhesr` (first 154 s) | 2 | 2 | 2 | **2** |
+| VoxConverse dev `ldkmv` (first 300 s) | 5 | - | 10 | **6** |
+| VoxConverse dev `ypwjd` (first 260 s) | 4 | - | 5 | **4** |
+| VoxConverse dev `pnook` (first 300 s) | 9 | - | 11 | **7** |
+| VoxConverse dev `kctgl` (first 106 s) | 2 | - | 2 | **2** |
+| VoxConverse dev `ktzmw` (first 300 s) | 4 | - | 5 | **3** |
+| VoxConverse dev `kkghn` (first 300 s) | 1 | - | 2 | **1** |
+| VoxConverse dev `exymw` (first 116 s) | 5 | - | 8 | **5** |
+| VoxConverse dev `sldwj` (first 140 s) | 3 | - | 3 | **3** |
+
+The exact count was found in 14 of 18 recordings with
+consolidation, against 10 with clustering alone (mean
+error 0.28 against 0.83 speakers); with sherpa-onnx's
+default threshold it was right in 5 of the 10 recordings tried.
+The consolidation settings (3 s, 0.6) were chosen on the first eight rows
+(`aisvi` to `atgpi`); on the ten recordings that were not used for that
+choice it found the exact count in 7 of 10, against 4 of 10 with clustering
+alone. It errs towards too few speakers in busy recordings (8 → 7, 9 → 7,
+4 → 3): people who speak little are folded into others. Expect worse on
+recordings unlike these. Consolidation added 0.5 to 8 seconds to recordings of 16 s to 5 min
+(one speaker embedding per speaker, on 2 busy threads).
+
+Limits you should expect: somebody who says only a few words in a long
+recording disappears into another speaker; two similar voices on the same
+microphone can merge; overlapping speech is attributed to one speaker; the
+embedding model was trained on English (VoxCeleb), and other languages,
+telephone audio and children's voices were not evaluated. No diarization
+error rate on real recordings was measured, only speaker counts.
 
 ## Realtime API and chat completions
 
@@ -548,7 +668,9 @@ differences from OpenAI are in [voice-agents.md](voice-agents.md).
 
 | Endpoint | Summary |
 | --- | --- |
-| `WS /v1/realtime?model=…` | OpenAI Realtime API over WebSocket (GA event names, as typed in `openai` 3.50.0). `?intent=transcription` or `session.update` with `type: "transcription"` for transcription-only sessions. Audio: base64 `audio/pcm` (24 kHz PCM16), `audio/pcmu`, `audio/pcma`. Auth: `Authorization: Bearer`, or subprotocols `realtime` + `openai-insecure-api-key.<key>` |
+| `WS /v1/realtime?model=…` | OpenAI Realtime API over WebSocket (GA event names, as typed in `openai` 3.50.0). `?intent=transcription` or `session.update` with `type: "transcription"` for transcription-only sessions. Audio: base64 `audio/pcm` (24 kHz PCM16), `audio/pcmu`, `audio/pcma`. User transcripts arrive as incremental deltas. `turn_detection`: `server_vad`, `semantic_vad` (with the optional end-of-turn model) or `null`. Auth: `Authorization: Bearer`, or subprotocols `realtime` + `openai-insecure-api-key.<key>`; an ephemeral `ek_…` key is accepted in the same places |
+| `POST /v1/realtime/client_secrets` | mint an ephemeral key (`{"value": "ek_…", "expires_at", "session"}`) for browsers. Needs the server key. Body: `{"expires_after": {"anchor": "created_at", "seconds": 600}, "session": {…}}`, all optional |
+| `POST /v1/realtime/calls` | the same sessions over **WebRTC**: SDP offer in (`application/sdp`, or multipart `sdp` + `session`), `201` with the SDP answer and `Location: /v1/realtime/calls/{call_id}`. Needs `bolo-speech[webrtc]` (else `503 engine_unavailable`). `POST …/{call_id}/hangup` ends the call. Not implemented: SIP |
 | `POST /v1/chat/completions` | `input_audio` content parts are transcribed; `modalities: ["text","audio"]` + `audio: {voice, format}` adds a spoken reply (`message.audio`, or `delta.audio` when streaming); everything else is forwarded to the language model untouched; requests without audio are proxied as they are |
 
 Voice-agent turns are traces of kind `agent` (transport `realtime` or `chat`)

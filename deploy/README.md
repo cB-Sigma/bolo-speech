@@ -2,7 +2,7 @@
 
 | File | What it is | Status |
 | --- | --- | --- |
-| `Dockerfile` | CPU image (Python 3.12 slim, sherpa-onnx + faster-whisper + PyAV + Wyoming) | built by release CI; not built locally by the maintainers for 0.1.0 |
+| `Dockerfile` | CPU image (Python 3.12 slim, sherpa-onnx + faster-whisper + PyAV + Wyoming) | built by release CI; not built locally by the maintainers so far |
 | `Dockerfile.gpu` | NVIDIA CUDA 12 image | **untested** - no GPU was available during development |
 | `docker-compose.yml` | one service, a named volume for models | follows the CPU image |
 | `systemd/bolo.service` | hardened unit for a virtualenv install | reviewed, not run on a host by the maintainers |

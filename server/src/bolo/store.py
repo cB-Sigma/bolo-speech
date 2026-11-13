@@ -20,11 +20,13 @@ import hashlib
 import json
 import os
 import shutil
+import tarfile
 import threading
 import time
+import zipfile
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import quote
 
@@ -43,6 +45,7 @@ class RemoteFile:
     size: int | None = None
     sha256: str | None = None
     git_oid: str | None = None  # git blob SHA-1 for small non-LFS files
+    extract: bool = False  # a .tar.gz / .tgz / .tar / .zip archive to unpack into the model directory
 
 
 @dataclass
@@ -55,6 +58,8 @@ class Source:
     exclude: list[str] = field(default_factory=list)
     subdir: str | None = None  # only this folder of the repo, stripped from local paths
     urls: list[dict[str, Any]] = field(default_factory=list)
+    local: str | None = None  # a directory on this machine (``bolo pull ./dir``); nothing is downloaded
+    convert: str | None = None  # a step run once after the download ("piper": see bolo.piper)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Source:
@@ -65,6 +70,8 @@ class Source:
             exclude=list(d.get("exclude", [])),
             subdir=d.get("subdir"),
             urls=list(d.get("urls", [])),
+            local=d.get("local"),
+            convert=d.get("convert"),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -72,10 +79,81 @@ class Source:
         if self.repo:
             out["repo"] = self.repo
             out["revision"] = self.revision
-        for key in ("include", "exclude", "subdir", "urls"):
+        for key in ("include", "exclude", "subdir", "urls", "local", "convert"):
             if getattr(self, key):
                 out[key] = getattr(self, key)
         return out
+
+
+def _safe_member(name: str) -> str | None:
+    """A relative POSIX path that stays inside the destination, or None for anything else."""
+    path = PurePosixPath(name.replace("\\", "/"))
+    if path.is_absolute() or any(part in ("..", "") for part in path.parts) or not path.parts:
+        return None
+    if ":" in path.parts[0]:  # a Windows drive
+        return None
+    return str(path)
+
+
+def extract_archive(archive: Path, dest: Path, name: str) -> list[str]:
+    """Unpack a tar (optionally gzip-compressed) or zip archive into ``dest``; return the relative paths written.
+
+    Only regular files and directories are accepted: links, devices and any path that is absolute or
+    climbs out of ``dest`` make the whole archive invalid. A single top-level folder is stripped, so
+    ``voice/model.onnx`` and ``model.onnx`` both end up as ``dest/model.onnx``.
+    """
+    members: list[tuple[str, Any]] = []
+    lower = name.lower()
+    opened: Any
+    if lower.endswith(".zip"):
+        opened = zipfile.ZipFile(archive)
+        for info in opened.infolist():
+            if info.is_dir():
+                continue
+            if (info.external_attr >> 16) & 0o170000 == 0o120000:
+                raise DownloadError(f"{name}: archive member '{info.filename}' is a link; refusing to unpack")
+            members.append((info.filename, info))
+    elif lower.endswith((".tar.gz", ".tgz", ".tar")):
+        try:
+            opened = tarfile.open(archive, "r:*")  # noqa: SIM115 - closed below
+        except tarfile.TarError as exc:
+            raise DownloadError(f"{name} is not a readable tar archive: {exc}") from exc
+        for member in opened:
+            if member.isdir():
+                continue
+            if not member.isfile():
+                raise DownloadError(f"{name}: archive member '{member.name}' is not a regular file; refusing to unpack")
+            members.append((member.name, member))
+    else:
+        raise DownloadError(f"{name}: unsupported archive type (use .tar.gz, .tgz, .tar or .zip)")
+    try:
+        cleaned: list[tuple[str, Any]] = []
+        for raw, member in members:
+            rel = _safe_member(raw.removeprefix("./"))
+            if rel is None:
+                raise DownloadError(f"{name}: archive member '{raw}' would be written outside the model directory")
+            cleaned.append((rel, member))
+        if not cleaned:
+            raise DownloadError(f"{name}: the archive is empty")
+        tops = {rel.split("/", 1)[0] for rel, _ in cleaned}
+        strip = len(tops) == 1 and all("/" in rel for rel, _ in cleaned)
+        written: list[str] = []
+        root = dest.resolve()
+        for rel, member in cleaned:
+            rel = rel.split("/", 1)[1] if strip else rel
+            target = (dest / rel).resolve()
+            if root != target and root not in target.parents:
+                raise DownloadError(f"{name}: archive member '{rel}' would be written outside the model directory")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            source = opened.open(member) if isinstance(opened, zipfile.ZipFile) else opened.extractfile(member)
+            if source is None:
+                raise DownloadError(f"{name}: could not read archive member '{rel}'")
+            with source, target.open("wb") as out:
+                shutil.copyfileobj(source, out, 1 << 20)
+            written.append(rel)
+        return sorted(written)
+    finally:
+        opened.close()
 
 
 def safe_id(model_id: str) -> str:
@@ -232,7 +310,9 @@ class ModelStore:
                     continue
                 files.append(RemoteFile(rel, f.url, f.size, f.sha256, f.git_oid))
         for u in source.urls:
-            files.append(RemoteFile(u["path"], u["url"], u.get("size"), u.get("sha256")))
+            files.append(
+                RemoteFile(u["path"], u["url"], u.get("size"), u.get("sha256"), extract=bool(u.get("extract")))
+            )
         if not files:
             raise DownloadError("the model source matched no files")
         return files
@@ -308,6 +388,10 @@ class ModelStore:
             part.unlink()
             have = 0
         headers = self.hub.headers()
+        host = httpx.URL(remote.url).host
+        hub_host = httpx.URL(self.hub.endpoint).host
+        if host not in (hub_host, "huggingface.co") and not host.endswith((".huggingface.co", ".hf.co")):
+            headers.pop("Authorization", None)  # the Hugging Face token is for Hugging Face only
         if have:
             headers["Range"] = f"bytes={have}-"
         with httpx.Client(timeout=httpx.Timeout(30.0, read=120.0), follow_redirects=True) as client:
@@ -356,6 +440,17 @@ class ModelStore:
         meta: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Fetch every file of a model and write its manifest. Safe to re-run."""
+        if source.local:
+            path = Path(source.local)
+            if not path.is_dir():
+                raise DownloadError(f"the model directory {source.local} does not exist any more")
+            mdir = self.model_dir(model_id)
+            if mdir.is_symlink() and mdir.resolve() != path.resolve():
+                mdir.unlink()
+            registered = self.register_local(model_id, path, meta)
+            if progress:
+                progress(registered["size_bytes"], registered["size_bytes"])
+            return registered
         with self._lock("model:" + model_id):
             files = self.plan(source)
             total = sum(f.size or 0 for f in files)
@@ -376,8 +471,28 @@ class ModelStore:
             entries: list[dict[str, Any]] = []
             for f in files:
                 blob, digest = self.fetch_blob(f, on_bytes=bump, cancelled=cancelled)
+                if f.extract:
+                    # the unpacked files are what the model consists of; the archive itself is not kept
+                    for rel in extract_archive(blob, mdir, f.path):
+                        entries.append({"path": rel, "size": (mdir / rel).stat().st_size})
+                    meta = {**(meta or {}), "archive": {"url": f.url, "sha256": digest, "size": blob.stat().st_size}}
+                    blob.unlink(missing_ok=True)
+                    continue
                 self._place(blob, mdir / f.path)
                 entries.append({"path": f.path, "size": blob.stat().st_size, "sha256": digest})
+            if source.convert:
+                if source.convert != "piper":
+                    raise DownloadError(f"unknown conversion step '{source.convert}'")
+                from bolo.piper import convert_piper_dir
+
+                converted = convert_piper_dir(mdir)
+                meta = {**(meta or {}), "piper": converted}
+                kept = {e["path"]: e for e in entries}
+                entries = []
+                for p in sorted(mdir.rglob("*")):
+                    rel = str(p.relative_to(mdir))
+                    if p.is_file() and rel not in ("manifest.json", "manifest.json.tmp"):
+                        entries.append(kept.get(rel) or {"path": rel, "size": p.stat().st_size})
             manifest: dict[str, Any] = {
                 "id": model_id,
                 "source": source.to_dict(),

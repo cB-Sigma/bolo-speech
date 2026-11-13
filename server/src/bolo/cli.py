@@ -108,11 +108,49 @@ def cmd_pull(args: argparse.Namespace) -> int:
 
         spec = register_hf_model(core, name[3:], args.kind, args.task)
         print(f"registered {name} as '{spec.id}' ({spec.engine}, kind {spec.kind})")
+    elif name.startswith("piper:"):
+        from bolo.piper import register_piper_voice
+
+        try:
+            spec = register_piper_voice(core, name[6:])
+        except BoloError as exc:
+            print(f"error: {exc.message}", file=sys.stderr)
+            return 1
+        print(f"registered {name} as '{spec.id}' (converted for sherpa-onnx after the download)")
+    elif name.startswith("file:") or (Path(name).is_dir() and core.catalog.resolve(name) is None):
+        from bolo.custom import register_local_model
+
+        options: dict[str, Any] = {}
+        for item in args.option or []:
+            key, sep, value = item.partition("=")
+            if not sep or not key:
+                print(f"error: --option expects key=value, got {item!r}", file=sys.stderr)
+                return 1
+            options[key] = value
+        try:
+            spec = register_local_model(
+                core,
+                name.removeprefix("file:"),
+                args.kind,
+                args.task,
+                name=args.name,
+                languages=[x for x in (args.language or "").split(",") if x],
+                options=options,
+            )
+        except BoloError as exc:
+            print(f"error: {exc.message}", file=sys.stderr)
+            return 1
+        print(f"registered {name} as '{spec.id}' ({spec.engine}, kind {spec.kind})")
     else:
         spec = core.manager.resolve(name)
     if core.manager.is_installed(spec):
         print(f"{spec.id} is already installed")
         return 0
+    try:
+        spec.require_published()
+    except BoloError as exc:
+        print(f"error: {exc.message}", file=sys.stderr)
+        return 1
     if spec.gated and not core.store.hub.token:
         print(
             f"error: {spec.id} is a gated model. Accept its terms at {spec.source_url}, then pass --hf-token "
@@ -519,11 +557,18 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--llm-api-key", dest="llm_api_key", default=None)
     s.set_defaults(func=cmd_serve)
 
-    s = sub.add_parser("pull", help="download a model (catalog id, alias or hf:<repo>)")
+    s = sub.add_parser(
+        "pull", help="download a model (catalog id, alias or hf:<repo>), or register a local directory (./dir)"
+    )
     _common(s)
-    s.add_argument("model")
-    s.add_argument("--kind", help="loader kind for hf: models when it cannot be detected")
-    s.add_argument("--task", choices=["stt", "tts", "vad"], help="task for hf: models")
+    s.add_argument(
+        "model", help="catalog id or alias, hf:<owner>/<repo>[@revision], or a directory (./dir, file:/path)"
+    )
+    s.add_argument("--kind", help="loader kind for hf: and local models when it cannot be detected")
+    s.add_argument("--task", choices=["stt", "tts", "vad"], help="task for hf: and local models")
+    s.add_argument("--name", help="local models: the id to register the directory under (default: local-<dirname>)")
+    s.add_argument("--language", help="local models: language code(s), comma separated")
+    s.add_argument("--option", action="append", help="local models: loader option key=value (repeatable)")
     s.set_defaults(func=cmd_pull)
 
     s = sub.add_parser("rm", help="delete installed models")

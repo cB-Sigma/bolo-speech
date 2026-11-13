@@ -1,7 +1,14 @@
 name: Release
 
-# Push a tag like v0.1.0 to publish the Python package (PyPI trusted publishing,
-# no token stored in the repository) and the container image (GitHub Container Registry).
+# Publishes the Python package to PyPI, creates the GitHub release (and its tag) and
+# pushes the container image to the GitHub Container Registry.
+#
+# Two ways to run it:
+#   * Actions tab -> Release -> "Run workflow" on main. The version is read from
+#     server/src/bolo/__init__.py and the tag vX.Y.Z is created by this workflow.
+#   * Push a tag vX.Y.Z (it must match the package version).
+#
+# Needs the repository secret PYPI_API_TOKEN (a PyPI API token for bolo-speech).
 on:
   push:
     tags: ["v*"]
@@ -14,6 +21,8 @@ jobs:
   build:
     name: build distribution
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -29,11 +38,24 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+      - name: Read the package version
+        id: version
+        run: |
+          version="$(python -c "import re,pathlib; print(re.search(r'__version__ = \"(.+?)\"', pathlib.Path('server/src/bolo/__init__.py').read_text()).group(1))")"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "package version: ${version}"
       - name: Check that the tag matches the package version
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          version="$(python -c "import re,pathlib; print(re.search(r'__version__ = \"(.+?)\"', pathlib.Path('server/src/bolo/__init__.py').read_text()).group(1))")"
-          test "v${version}" = "${GITHUB_REF_NAME}" || { echo "tag ${GITHUB_REF_NAME} != package version ${version}"; exit 1; }
+          test "v${{ steps.version.outputs.version }}" = "${GITHUB_REF_NAME}" || { echo "tag ${GITHUB_REF_NAME} != package version ${{ steps.version.outputs.version }}"; exit 1; }
+      - name: Refuse to release a version that already has a release
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${{ steps.version.outputs.version }}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "release v${{ steps.version.outputs.version }} already exists; bump __version__ first"; exit 1
+          fi
       - name: Build sdist and wheel
         run: |
           python -m pip install --upgrade pip build twine
@@ -48,23 +70,41 @@ jobs:
   pypi:
     name: publish to PyPI
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/project/bolo-speech/
-    permissions:
-      id-token: write   # trusted publishing
     steps:
       - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+  release:
+    name: GitHub release and tag
+    needs: [build, pypi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # creates the tag and the release
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - name: Create the release (and the tag, when started by hand)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "v$VERSION" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "v$VERSION" --target "$GITHUB_SHA" --generate-notes dist/* --repo "$GITHUB_REPOSITORY"
+          fi
 
   image:
     name: container image
-    needs: build
+    needs: [build, pypi]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -91,17 +131,18 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository }}
+          # the version comes from the package, so a manual run tags the image the same way as a tag push
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{version}},value=v${{ needs.build.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ needs.build.outputs.version }}
+            type=raw,value=latest
             type=sha
       - uses: docker/build-push-action@v7
         with:
           context: .
           file: deploy/Dockerfile
           platforms: linux/amd64
-          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

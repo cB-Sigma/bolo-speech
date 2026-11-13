@@ -421,3 +421,33 @@ async def test_two_voices_are_told_apart(core: Bolo) -> None:
     print("speakers per segment:", speakers, "|", result.text)
     assert speakers[0] == "A" and set(speakers) == {"A", "B"}
     assert word_error_rate(" ".join(t for _, t in lines), result.text, "en") <= 0.25
+
+
+async def test_end_of_turn_model_tells_finished_from_unfinished(core: Bolo) -> None:
+    """Smart Turn v3 (8 MB): the whole English sample is a finished turn, its first half is not."""
+    from bolo import samples
+
+    audio, rate, _meta = samples.load_audio("en-short")
+    x = resample(audio, rate, 16000)
+    complete = await core.end_of_turn(x)
+    partial = await core.end_of_turn(x[: int(len(x) * 0.45)])
+    print(f"\nend of turn: whole {complete:.3f}, first 45 % {partial:.3f}")
+    assert complete is not None and partial is not None
+    assert complete > 0.5 > partial
+
+
+async def test_upstream_piper_voice_is_converted_and_speaks(core: Bolo) -> None:
+    """`piper:<voice>`: the Piper project's own files, converted after the download (needs espeak-ng to speak)."""
+    from bolo.piper import register_piper_voice
+
+    spec = register_piper_voice(core, "en_US-danny-low")  # not in the catalog
+    job = await core.pull_and_wait(spec.id)
+    assert job.state == "done", job.error
+    directory = core.store.model_dir(spec.id)
+    assert (directory / "tokens.txt").is_file() and (directory / "model.onnx").is_file()
+    if get_phonemizer() is None:
+        pytest.skip("speaking needs espeak-ng")
+    audio, rate = await core.synthesize_all("Good morning. Could you tell me when my order will arrive?", model=spec.id)
+    heard = await core.transcribe(audio, rate, model="moonshine-tiny-en", language="en")
+    print(f"\n{spec.id}: {heard.text}")
+    assert word_error_rate("Good morning. Could you tell me when my order will arrive?", heard.text, "en") <= 0.2

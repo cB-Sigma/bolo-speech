@@ -31,6 +31,7 @@ TASK_TITLES = {
     "tts": "Text to speech",
     "vad": "Voice-activity detection",
     "diarization": "Speaker diarization",
+    "turn": "End-of-turn detection",
 }
 
 
@@ -57,6 +58,8 @@ def langs(spec: ModelSpec, limit: int = 6) -> str:
 
 
 def measured(spec: ModelSpec) -> str:
+    if spec.status == "pending":
+        return "not yet published"
     if spec.validated != "cpu":
         return "untested"
     m = spec.measured
@@ -67,8 +70,12 @@ def measured(spec: ModelSpec) -> str:
         bits.append(f"DER {100 * m['der']:.1f}% on a two-voice test clip")
     if "wer" in m:
         bits.append(f"WER {100 * m['wer']:.1f}%")
+    if "cer" in m:
+        bits.append(f"CER {100 * m['cer']:.1f}%")
     if "round_trip_wer" in m:
         bits.append(f"round-trip WER {100 * m['round_trip_wer']:.1f}%")
+    if "round_trip_cer" in m:
+        bits.append(f"round-trip CER {100 * m['round_trip_cer']:.1f}%")
     return "**CPU** · " + " · ".join(bits)
 
 
@@ -84,10 +91,19 @@ def models_table(specs: list[ModelSpec]) -> str:
     by_task: dict[str, dict[str, list[ModelSpec]]] = defaultdict(lambda: defaultdict(list))
     for s in specs:
         by_task[s.task][s.family].append(s)
-    total = len(specs)
+    pending = sum(s.status == "pending" for s in specs)
+    total = len(specs) - pending
     valid = sum(s.validated == "cpu" for s in specs)
-    out.append(f"{total} models: {valid} validated on CPU by the maintainers, {total - valid} untested.\n")
-    for task in ("stt", "tts", "vad", "diarization"):
+    out.append(
+        f"{total} models: {valid} validated on CPU by the maintainers, {total - valid} untested."
+        + (
+            f' {pending} more are described but not yet published (see "Voices converted by this project").'
+            if pending
+            else ""
+        )
+        + "\n"
+    )
+    for task in ("stt", "tts", "vad", "diarization", "turn"):
         out.append(f"### {TASK_TITLES[task]}\n")
         for family, items in by_task[task].items():
             out.append(f"#### {family}\n")
@@ -104,6 +120,7 @@ def models_table(specs: list[ModelSpec]) -> str:
 
 
 def summary_table(specs: list[ModelSpec]) -> str:
+    specs = [s for s in specs if s.status != "pending"]
     rows: dict[tuple[str, str], list[ModelSpec]] = defaultdict(list)
     for s in specs:
         rows[(s.task, s.family)].append(s)

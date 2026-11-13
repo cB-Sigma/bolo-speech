@@ -1,7 +1,7 @@
 # bolo, NVIDIA GPU image.
 #
 #   !!  UNTESTED  !!
-# Nothing in this file has been run by the maintainers: bolo 0.1.0 was developed
+# Nothing in this file has been run by the maintainers: bolo was developed
 # and measured on CPU only. It is a starting point for people with a GPU, and
 # reports (working or not) are very welcome.
 #
