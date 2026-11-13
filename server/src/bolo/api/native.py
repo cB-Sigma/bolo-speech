@@ -79,6 +79,33 @@ async def jobs(request: Request) -> JSONResponse:
     return JSONResponse({"jobs": [j.to_dict() for j in reversed(get_core(request).jobs.all())]})
 
 
+class ModelSettingsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    phonemizer: str | None = Field(
+        default=None,
+        description="Pin the phonemiser of a voice: auto, uccharan, uccharan:improved or espeak-ng; null removes the pin.",
+    )
+
+
+@router.get("/models/{model_id:path}/settings", tags=["native"], summary="Settings pinned for one model")
+async def get_model_settings(request: Request, model_id: str) -> JSONResponse:
+    core = get_core(request)
+    spec = core.manager.resolve(model_id)
+    return JSONResponse({"model": spec.id, "settings": core.store.model_settings(spec.id)})
+
+
+@router.put("/models/{model_id:path}/settings", tags=["native"], summary="Pin settings for one model (phonemiser)")
+async def put_model_settings(request: Request, model_id: str, body: ModelSettingsRequest) -> JSONResponse:
+    core = get_core(request)
+    spec = core.manager.resolve(model_id)
+    values = body.model_dump(exclude_unset=True)
+    if values.get("phonemizer"):
+        core.components.validate_pin(spec, values["phonemizer"])
+    settings = core.store.set_model_settings(spec.id, values)
+    core.events.publish("model", {"id": spec.id, "event": "settings", "settings": settings})
+    return JSONResponse({"model": spec.id, "settings": settings})
+
+
 @router.post("/models/{model_id:path}/load", tags=["native"], summary="Load a model into memory")
 async def load(request: Request, model_id: str) -> JSONResponse:
     core = get_core(request)
@@ -119,7 +146,7 @@ async def diarize(request: Request) -> JSONResponse:
     ``max_speakers``, ``threshold`` (clustering distance; lower finds more speakers)."""
     from bolo.api.common import read_upload
     from bolo.api.openai import _int_field, known_speakers
-    from bolo.diarize import DiarizeOptions
+    from bolo.diarize import DiarizeOptions, find_overlaps
     from bolo.obs.trace import Trace
 
     core = get_core(request)
@@ -154,6 +181,8 @@ async def diarize(request: Request) -> JSONResponse:
             "segments": [
                 {"start": round(t.start, 3), "end": round(t.end, 3), "speaker": opts.label(t.speaker)} for t in turns
             ],
+            # bolo extension: stretches where two or more speakers talk at once (segments above may overlap)
+            "overlaps": [o.to_dict(opts.label) for o in find_overlaps(turns)],
             **(
                 {
                     "known_speakers": [
@@ -174,7 +203,7 @@ async def diarize(request: Request) -> JSONResponse:
     )
 
 
-@router.get("/components", tags=["native"], summary="Optional third-party components (espeak-ng)")
+@router.get("/components", tags=["native"], summary="Optional components (uccharan, espeak-ng, engine plugins)")
 async def components(request: Request) -> JSONResponse:
     return JSONResponse({"components": get_core(request).components.status()})
 

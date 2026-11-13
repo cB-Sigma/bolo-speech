@@ -54,7 +54,9 @@ class ModelSpec:
     measured: dict[str, Any] = field(default_factory=dict)
     source: Source = field(default_factory=Source)
     options: dict[str, Any] = field(default_factory=dict)
-    requires: list[str] = field(default_factory=list)  # optional components, e.g. ["espeak-ng"]
+    #: what the model needs besides its engine: "phonemizer" (a voice that reads phonemes; which component provides
+    #: them depends on the language, see bolo.text.phonemize), or a component id ("espeak-ng", "uccharan")
+    requires: list[str] = field(default_factory=list)
     custom: bool = False
     builtin: bool = False  # needs no files (fake engine)
     #: "pending": described here, but its files are not published yet; hidden from listings, cannot be pulled
@@ -74,6 +76,27 @@ class ModelSpec:
         spec = cls(source=Source.from_dict(src), **d)
         spec.validate()
         return spec
+
+    @property
+    def needs_phonemes(self) -> bool:
+        # "espeak-ng" is how entries written by bolo 0.1 (custom.yaml) say the same thing
+        return "phonemizer" in self.requires or "espeak-ng" in self.requires
+
+    def phoneme_target(self) -> tuple[str, str]:
+        """``(profile, language)`` of a voice that reads phonemes, for choosing the phonemiser."""
+        from bolo.text.phonemize import PROFILE_BY_KIND
+
+        language = str(self.options.get("espeak_voice") or self.options.get("language") or "")
+        if not language and self.voices:
+            language = str(self.voices[0].get("language", ""))
+        if not language and self.languages:
+            language = self.languages[0]
+        return PROFILE_BY_KIND.get(self.kind, "piper"), language
+
+    @property
+    def plugin(self) -> str | None:
+        """The plugin name of an ``engine: plugin:<name>`` entry."""
+        return self.engine[len("plugin:") :] if self.engine.startswith("plugin:") else None
 
     def require_published(self) -> None:
         if self.status == "pending":
@@ -128,6 +151,10 @@ class ModelSpec:
         pulling: dict[str, Any] | None = None,
         size_on_disk: int | None = None,
         available: bool = True,
+        requires: list[str] | None = None,
+        phonemizers: list[dict[str, Any]] | None = None,
+        voice_phonemizers: dict[str, list[dict[str, Any]]] | None = None,
+        settings: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         features = list(self.features)
         if self.task == "stt" and "partials" not in features:
@@ -154,6 +181,11 @@ class ModelSpec:
                     "name": v.get("name", v["id"]),
                     "language": v.get("language", ""),
                     "gender": v.get("gender", ""),
+                    **(
+                        {"phonemizers": voice_phonemizers[v["id"]]}
+                        if voice_phonemizers and v["id"] in voice_phonemizers
+                        else {}
+                    ),
                 }
                 for v in self.voices
             ],
@@ -166,7 +198,9 @@ class ModelSpec:
             "validated": self.validated,
             "measured": self.measured or None,
             "custom": self.custom,
-            "requires": list(self.requires),
+            "requires": list(self.requires) if requires is None else requires,
+            "phonemizers": phonemizers or [],
+            "settings": settings or {},
             "available": available,
             "status": self.status,
         }

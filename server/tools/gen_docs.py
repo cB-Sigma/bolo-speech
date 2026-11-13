@@ -83,7 +83,16 @@ def licence(spec: ModelSpec) -> str:
     text = spec.license.replace("|", "/")
     if len(text) > 60:
         text = text[:57] + "…"
-    return text + ("" if spec.commercial_use else " ⚠") + (" · needs espeak-ng" if "espeak-ng" in spec.requires else "")
+    extra = ""
+    if spec.needs_phonemes:
+        from bolo.text.phonemize import uccharan_language
+
+        extra = " · phonemes: uccharan" if uccharan_language(*spec.phoneme_target()) else " · needs espeak-ng"
+    if spec.plugin:
+        extra += f" · needs plugin {spec.plugin}"
+    if spec.gated:
+        extra += " · gated"
+    return text + ("" if spec.commercial_use else " ⚠") + extra
 
 
 def models_table(specs: list[ModelSpec]) -> str:

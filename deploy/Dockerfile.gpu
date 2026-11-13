@@ -24,7 +24,7 @@ COPY server/ ./server/
 RUN pip install --no-cache-dir build && python -m build --wheel --outdir /dist server
 
 FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
-ARG EXTRAS="sherpa,faster-whisper,av,wyoming"
+ARG EXTRAS="sherpa,faster-whisper,av,wyoming,uccharan"
 # eSpeak NG (GPL-3.0-or-later) is not included unless you build with --build-arg WITH_ESPEAK=1 (see Dockerfile).
 ARG WITH_ESPEAK=0
 RUN apt-get update \

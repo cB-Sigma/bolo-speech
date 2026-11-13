@@ -27,6 +27,12 @@ or optional extras and keep their own licences:
     kokoro-onnx (MIT; depends on phonemizer, GPL-3.0-or-later; not part of
       the "all" extra)
 
+  Phonemiser
+    uccharan (Apache-2.0; English data derived from CMUdict, BSD-2-Clause;
+      Kokoro English dictionaries from misaki, Apache-2.0)
+                                    https://github.com/cb-Sigma/uccharan
+      optional "uccharan" extra, part of "all"
+
   Optional protocol and codec libraries
     wyoming (MIT)                   https://github.com/OHF-Voice/wyoming
     PyAV (BSD-3-Clause; its wheels bundle FFmpeg libraries, LGPL-2.1-or-later)
@@ -78,6 +84,14 @@ Voices converted by this project
     corpus, licensed CC-BY-4.0. Each archive contains LICENSE and
     ATTRIBUTION files naming the source repository and revision. The
     archives are not part of the bolo package.
+
+    The same release (and, when published there, Hugging Face repositories
+    under codebucketsolutions/) may also carry format conversions of Meta's
+    MMS-TTS voices (https://huggingface.co/facebook/mms-tts, made with
+    tools/voices/export_mms.py and MMS's VITS inference code, MIT, Copyright
+    (c) 2021 Jaehyeon Kim). Those weights are licensed CC-BY-NC-4.0:
+    NON-COMMERCIAL use only. Each archive contains the licence text and the
+    attribution.
 
     The optional end-of-turn model is Smart Turn v3 by the Pipecat project
     (https://huggingface.co/pipecat-ai/smart-turn-v3, BSD-2-Clause),

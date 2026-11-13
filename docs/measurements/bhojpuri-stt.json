@@ -1,0 +1,45 @@
+{
+ "what": "speech-to-text on Bhojpuri: RESPIN test set (IISc, CC-BY-4.0, mirror rimrafadii/respin-iisc @ 9460f60f2541, split bh), 120 utterances = 12 at each of 10 evenly spaced offsets of the sorted file list; the *_60 columns are the 60 utterances at every other offset",
+ "normalisation": "NFC, punctuation and symbols removed (combining marks kept), lower case, whitespace collapsed",
+ "conditions": "2 threads, shared 4-vCPU x86_64, no GPU, other jobs running",
+ "date": "2026-11-13",
+ "rows": [
+  {
+   "label": "hindi-indicconformer",
+   "model": "indicconformer-hi-community",
+   "n": 120,
+   "wer": 0.4124,
+   "cer": 0.127,
+   "wer_60": 0.4288,
+   "cer_60": 0.1365,
+   "rtf": 0.061,
+   "audio_s": 601.8,
+   "threads": 2
+  },
+  {
+   "label": "whisper-small-bhojpuri",
+   "model": "Aditya109/whisper-small-bhojpuri-merged @ d39a21ba0f59, converted to CTranslate2 int8 here (tools/voices/convert_whisper.py), decoded with language hi",
+   "n": 120,
+   "wer": 0.4774,
+   "cer": 0.2224,
+   "wer_60": 0.5133,
+   "cer_60": 0.2428,
+   "rtf": 0.527,
+   "audio_s": 601.8,
+   "threads": 2
+  },
+  {
+   "label": "maithili-indicconformer",
+   "model": "indicconformer-mai-community",
+   "n": 120,
+   "wer": 0.6677,
+   "cer": 0.182,
+   "wer_60": 0.6964,
+   "cer_60": 0.1921,
+   "rtf": 0.075,
+   "audio_s": 601.8,
+   "threads": 2
+  }
+ ],
+ "note": "An earlier run of this evaluation used a normaliser that split Devanagari vowel signs off their letters; it was discarded. The research note's 40.2 % / 13.8 % for the Hindi model was on a different 60-utterance selection."
+}

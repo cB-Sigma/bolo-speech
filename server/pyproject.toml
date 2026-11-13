@@ -46,8 +46,10 @@ whispercpp = ["pywhispercpp>=1.3"]
 # kokoro-onnx itself is MIT but depends on `phonemizer` (GPL-3.0-or-later).
 # It is deliberately NOT part of `all`; Kokoro runs through sherpa-onnx by default.
 kokoro-onnx = ["kokoro-onnx>=0.4"]
+# uccharan (Apache-2.0): phonemes for Piper, Kitten, Matcha and Kokoro voices in English (US, GB) and Hindi.
+uccharan = ["uccharan>=0.1"]
 # eSpeak NG (GPL-3.0-or-later) as a prebuilt shared library with its data. Optional, never part of `all`:
-# Piper-format voices, KittenTTS and non-English Kokoro voices need it; everything else does not.
+# phoneme-based voices in languages uccharan does not cover need it; everything else does not.
 espeak = ["espeakng-loader>=0.2.4"]
 av = ["av>=12"]
 wyoming = ["wyoming>=1.6"]
@@ -58,6 +60,7 @@ turn = ["onnxruntime>=1.17"]
 text = ["whisper-normalizer>=0.1"]
 all = [
   "sherpa-onnx>=2.0,<3",
+  "uccharan>=0.1",
   "faster-whisper>=1.1",
   "av>=12",
   "wyoming>=1.6",
@@ -125,7 +128,7 @@ warn_unused_ignores = false
 module = [
   "sherpa_onnx.*", "faster_whisper.*", "ctranslate2.*", "soundfile.*", "soxr.*", "av.*",
   "moonshine_onnx.*", "kokoro_onnx.*", "pywhispercpp.*", "wyoming.*", "whisper_normalizer.*",
-  "onnxruntime.*", "tomli.*", "aiortc.*",
+  "onnxruntime.*", "tomli.*", "aiortc.*", "uccharan.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"

@@ -1,0 +1,66 @@
+{
+ "mms-tts-pan": {
+  "round-trip WER (5 sentences)": 0.194,
+  "round-trip CER": 0.103,
+  "recogniser": "indicconformer-pa-community",
+  "real-time factor (2 threads, shared 4 vCPU)": 0.324,
+  "time to first audio (ms)": 908,
+  "date": "2026-11-13"
+ },
+ "mms-tts-ory": {
+  "round-trip WER (5 sentences)": 0.185,
+  "round-trip CER": 0.057,
+  "recogniser": "indicconformer-or-community",
+  "real-time factor (2 threads, shared 4 vCPU)": 0.468,
+  "time to first audio (ms)": 915,
+  "date": "2026-11-13"
+ },
+ "mms-tts-asm": {
+  "round-trip WER (5 sentences)": 0.133,
+  "round-trip CER": 0.032,
+  "recogniser": "indicconformer-as-community",
+  "real-time factor (2 threads, shared 4 vCPU)": 0.341,
+  "time to first audio (ms)": 633,
+  "date": "2026-11-13"
+ },
+ "mms-tts-dgo": {
+  "round-trip WER (5 sentences)": 0.188,
+  "round-trip CER": 0.08,
+  "recogniser": "indicconformer-doi-community",
+  "real-time factor (2 threads, shared 4 vCPU)": 0.331,
+  "time to first audio (ms)": 722,
+  "date": "2026-11-13"
+ },
+ "mms-tts-mai": {
+  "round-trip WER (5 sentences)": 0.486,
+  "round-trip CER": 0.129,
+  "recogniser": "indicconformer-mai-community",
+  "real-time factor (2 threads, shared 4 vCPU)": 0.523,
+  "time to first audio (ms)": 1534,
+  "date": "2026-11-13"
+ },
+ "mms-tts-mag": {
+  "round-trip WER (5 sentences)": 0.529,
+  "round-trip CER": 0.305,
+  "recogniser": "indicconformer-hi-community",
+  "real-time factor (2 threads, shared 4 vCPU)": 0.388,
+  "time to first audio (ms)": 1134,
+  "date": "2026-11-13"
+ },
+ "mms-tts-hne": {
+  "round-trip WER (5 sentences)": 0.457,
+  "round-trip CER": 0.123,
+  "recogniser": "indicconformer-hi-community",
+  "real-time factor (2 threads, shared 4 vCPU)": 0.323,
+  "time to first audio (ms)": 896,
+  "date": "2026-11-13"
+ },
+ "mms-tts-urd": {
+  "round-trip WER (5 sentences)": 0.242,
+  "round-trip CER": 0.075,
+  "recogniser": "indicconformer-ur-community",
+  "real-time factor (2 threads, shared 4 vCPU)": 0.315,
+  "time to first audio (ms)": 807,
+  "date": "2026-11-13"
+ }
+}

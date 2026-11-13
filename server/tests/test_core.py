@@ -183,3 +183,17 @@ async def test_voice_that_returns_nothing_is_an_error_not_silence(core: Bolo) ->
     with pytest.raises(BoloError, match="produced no audio"):
         await core.synthesize_all("Hello there.")
     assert core.traces.recent(kind="tts")[0].status == "error"
+
+
+def test_realtime_and_quality_tts_defaults(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from bolo.config import Settings as S
+
+    core = Bolo(S(data_dir=tmp_path))
+    assert core.settings.default_realtime_tts == "piper-en-us-amy-low"
+    assert core.resolve("tts-1", "tts").id == "piper-en-us-amy-low"
+    assert core.resolve("tts-1-hd", "tts").id == core.resolve(None, "tts").id == "kokoro-v1.0-int8"
+    assert core.resolve("realtime", "tts").id == "piper-en-us-amy-low"
+    assert core.resolve("realtime", "stt").id == core.settings.default_realtime_stt
+    assert core.realtime_tts(None).id == "piper-en-us-amy-low"
+    assert core.realtime_tts("alloy").id == "piper-en-us-amy-low"
+    assert core.realtime_tts("af_heart").id == "kokoro-v1.0-int8"  # only the quality model has that voice

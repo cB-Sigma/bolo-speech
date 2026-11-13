@@ -18,7 +18,7 @@ Run it yourself (needs about 4 GB of disk per voice while it works; CPU is enoug
 
     python -m venv venv && . venv/bin/activate
     pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-    pip install -r tools/voices/requirements.txt
+    pip install -r tools/voices/requirements-syspin.txt
     python tools/voices/export_syspin.py --out dist                    # every voice in syspin.json
     python tools/voices/export_syspin.py --out dist --only syspin-mai-female,syspin-bho-female
 
@@ -229,6 +229,7 @@ def pack(voice: dict[str, Any], directory: Path, out: Path, licence: dict[str, s
         "speakers": 1,
         "sample_rate": result["sample_rate"] if result else 22050,
         "architecture": "VITS (Coqui), character input, no phonemiser",
+        "cleaner": "multilingual",  # Coqui multilingual_cleaners ran on the training text; bolo applies the same
         "source": {
             "repo": voice["repo"],
             "revision": voice["revision"],

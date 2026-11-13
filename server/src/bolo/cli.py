@@ -224,6 +224,25 @@ def cmd_show(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_models(args: argparse.Namespace) -> int:
+    """``bolo models config <id> [--phonemizer X | --clear]``: settings pinned for one model."""
+    from bolo.errors import BoloError
+
+    core = _core(args)
+    spec = core.manager.resolve(args.model)
+    try:
+        if args.clear:
+            core.store.set_model_settings(spec.id, {"phonemizer": None})
+        elif args.phonemizer:
+            core.components.validate_pin(spec, args.phonemizer)
+            core.store.set_model_settings(spec.id, {"phonemizer": args.phonemizer})
+    except BoloError as exc:
+        print(f"error: {exc.message}", file=sys.stderr)
+        return 1
+    print(json.dumps({"model": spec.id, "settings": core.store.model_settings(spec.id)}, indent=2))
+    return 0
+
+
 def cmd_ps(args: argparse.Namespace) -> int:
     import httpx
 
@@ -406,25 +425,26 @@ def cmd_components(args: argparse.Namespace) -> int:
         for c in manager.status():
             state = f"installed ({c['source']}, {c['version']})" if c["installed"] else "not installed"
             print(f"{c['id']:<12} {state:<40} {c['license']:<18} needed by {c['required_by_count']} catalog models")
-            if not c["installed"]:
-                print(
-                    f"             install: bolo components install {c['id']} --accept-license   (or: {c['manual_command']})"
-                )
+            if not c["installed"] and c.get("kind") == "phonemizer":
+                flag = " --accept-license" if c["id"] == "espeak-ng" else ""
+                print(f"             install: bolo components install {c['id']}{flag}   (or: {c['manual_command']})")
+            elif not c["installed"]:
+                print(f"             install: {c['manual_command']}")
         return 0
-    if args.component != "espeak-ng":
-        print(f"error: unknown component '{args.component}'", file=sys.stderr)
+    if args.component not in ("espeak-ng", "uccharan"):
+        print(f"error: unknown component '{args.component}' (installable: uccharan, espeak-ng)", file=sys.stderr)
         return 1
     if manager.is_installed(args.component):
         print(f"{args.component} is already installed")
         return 0
-    if not args.accept_license:
+    if args.component == "espeak-ng" and not args.accept_license:
         print(
             "error: eSpeak NG is licensed GPL-3.0-or-later and is not part of bolo. Re-run with --accept-license "
             "to install it into this Python environment.",
             file=sys.stderr,
         )
         return 1
-    error = manager.install_blocking()
+    error = manager.install_blocking(component=args.component)
     if error:
         print(f"error: {error}", file=sys.stderr)
         return 1
@@ -455,7 +475,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     from bolo.audio import decode, encode
     from bolo.audio.resample import HAVE_SOXR
     from bolo.engines import EngineRegistry
-    from bolo.text.phonemize import get_phonemizer
+    from bolo.text.phonemize import get_phonemizer, get_uccharan
 
     settings = _settings(args)
     print(
@@ -470,7 +490,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         print(f"  not writable: {exc}")
     print("engines:")
     ok = False
-    for st in EngineRegistry(include_fake=False).statuses():
+    for st in EngineRegistry(include_fake=False, settings=settings).statuses():
         mark = "ok " if st.available else "-- "
         ok = ok or st.available
         print(
@@ -489,13 +509,22 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         + ", ".join(f for f, v in fmts.items() if v)
         + ("" if fmts["aac"] else "  (aac needs bolo[av] or ffmpeg)")
     )
+    uc = get_uccharan()
+    if uc:
+        print(f"uccharan: found (version {uc.version() or 'unknown'}) - phonemiser for English and Hindi voices")
+    else:
+        print(
+            "uccharan: not installed (Piper, Kitten and Kokoro voices in English and Hindi need it or espeak-ng: "
+            "`pip install 'bolo[uccharan]'`)"
+        )
+    print(f"phonemizer setting: {settings.phonemizer}")
     ph = get_phonemizer()
     if ph:
         print(f"espeak-ng: found ({ph.source}, version {ph.version() or 'unknown'}) - optional, GPL-3.0-or-later")
     else:
         print(
-            "espeak-ng: not installed (optional, GPL-3.0-or-later; Piper-format, KittenTTS and non-English Kokoro "
-            "voices need it: `bolo components install espeak-ng --accept-license`)"
+            "espeak-ng: not installed (optional, GPL-3.0-or-later; phoneme-based voices in languages uccharan does "
+            "not cover need it: `bolo components install espeak-ng --accept-license`)"
         )
     _doctor_llm(settings)
     try:
@@ -590,6 +619,14 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--json", action="store_true")
     s.set_defaults(func=cmd_show)
 
+    s = sub.add_parser("models", help="per-model settings: models config <id> --phonemizer espeak-ng")
+    _common(s)
+    s.add_argument("action", choices=["config"])
+    s.add_argument("model")
+    s.add_argument("--phonemizer", help="auto | uccharan | uccharan:improved | espeak-ng")
+    s.add_argument("--clear", action="store_true", help="remove the pinned settings")
+    s.set_defaults(func=cmd_models)
+
     s = sub.add_parser("ps", help="show models loaded in a running server")
     s.add_argument("--url", default=os.environ.get("BOLO_URL", "http://127.0.0.1:8000"))
     s.add_argument("--api-key", dest="api_key", default=os.environ.get("BOLO_API_KEY"))
@@ -630,7 +667,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--json", action="store_true")
     s.set_defaults(func=cmd_bench)
 
-    s = sub.add_parser("components", help="optional third-party components (espeak-ng): list, install")
+    s = sub.add_parser("components", help="optional components (uccharan, espeak-ng, engine plugins): list, install")
     _common(s)
     s.add_argument("action", choices=["list", "install"])
     s.add_argument("component", nargs="?", default="espeak-ng")

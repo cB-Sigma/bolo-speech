@@ -149,7 +149,7 @@ def register_piper_voice(core: Bolo, voice: str) -> ModelSpec:
             convert="piper",
         ),
         options={"language": f"{lang}-{country}"},
-        requires=["espeak-ng"],
+        requires=["phonemizer"],
         custom=True,
     )
     spec.validate()

@@ -76,11 +76,13 @@ Which models are used:
 | --- | --- | --- |
 | speech to text | `default_realtime_stt` (`moonshine-tiny-en`) in Realtime sessions, `default_stt` in chat completions | `session.audio.input.transcription.model` / the `transcription_model` body field |
 | language model | `llm_model` (if unset, the `model` the client sent is passed on) | configuration |
-| text to speech | `default_tts` (`kokoro-v1.0-int8`) | `--default-tts`; the voice with `session.audio.output.voice` / `audio.voice` |
+| text to speech | `default_realtime_tts` (`piper-en-us-amy-low`) | `default_realtime_tts`; `speech_model` in chat completions; the voice with `session.audio.output.voice` / `audio.voice` (a Kokoro voice such as `af_heart` selects Kokoro); `session.audio.output.phonemizer` / `audio.phonemizer` |
 
-For low latency on CPU use a Piper-format voice as `default_tts` (it needs
-the optional eSpeak NG component): first audio after about 150 ms per
-sentence instead of 2 to 3 seconds for Kokoro on four cores.
+Agents speak with the low-latency voice by default: Piper `amy` starts in
+about 150 ms per sentence (its phonemes come from uccharan, so nothing
+optional is needed), against 2 to 3 seconds for Kokoro on this CPU (see
+models.md, "Default voices"). Name a Kokoro voice, or set
+`default_realtime_tts = "kokoro-v1.0-int8"`, for Kokoro's quality.
 
 ## A working example: bolo + Ollama, with the OpenAI SDK
 

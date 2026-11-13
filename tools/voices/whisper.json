@@ -1,0 +1,28 @@
+{
+ "release": "voices-v1",
+ "evaluated": [
+  {
+   "id": "faster-whisper-small-bhojpuri",
+   "repo": "Aditya109/whisper-small-bhojpuri-merged",
+   "revision": "d39a21ba0f590aaba280da8bf92ca84af894da80",
+   "author": "Aditya109 (Hugging Face)",
+   "base": "openai/whisper-small (MIT)",
+   "data": "ARTPARK-IISc Vaani, Bhojpuri (CC-BY-4.0)",
+   "license": "CC-BY-4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "language": "bho",
+   "language_name": "Bhojpuri",
+   "decode_language": "hi",
+   "files": [
+    "config.json",
+    "generation_config.json",
+    "model.safetensors",
+    "processor_config.json",
+    "tokenizer.json",
+    "tokenizer_config.json"
+   ]
+  }
+ ],
+ "voices": [],
+ "note": "'evaluated' was converted and measured but is not published: worse than the Hindi IndicConformer fallback on RESPIN Bhojpuri (see tools/voices/README.md). Move an entry to 'voices' to publish it."
+}

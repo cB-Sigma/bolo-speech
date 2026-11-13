@@ -256,6 +256,42 @@ _PUNCT_FALLBACK = {
 }  # fmt: skip
 
 
+_CLEAN_BRACKETS = re.compile(r'[<>()\[\]"]+')
+#: punctuation a character voice may not have, and the symbol to use instead when it has that one
+#: (the same list as the in-browser voices, ui/src/lib/browser-tts/text.ts)
+CLEANER_PUNCT_FALLBACK = (
+    ("।", "."), ("॥", "."), ("…", "."), ("’", "'"), ("‘", "'"), ("—", ","), ("–", ","), ("!", "."), ("?", "."),
+)  # fmt: skip
+TEXT_CLEANERS = ("multilingual", "lowercase")
+
+
+def multilingual_clean(text: str) -> str:
+    """Coqui's ``multilingual_cleaners``, which ran on the training text of Coqui VITS voices (IISc SYSPIN).
+
+    NFC (which also splits precomposed nukta letters such as U+0958, as the training text had them), lower
+    case, ``;`` and ``:`` to commas, hyphens to spaces, brackets and double quotes removed, whitespace collapsed.
+    """
+    t = unicodedata.normalize("NFC", text).lower().replace(";", ",").replace("-", " ").replace(":", ",")
+    return _WS.sub(" ", _CLEAN_BRACKETS.sub("", t)).strip()
+
+
+def clean_for_voice(text: str, cleaner: str | None, charset: frozenset[str] | None) -> str:
+    """Apply a character voice's training-time text cleaning (``text_cleaner`` option of the catalog entry).
+
+    ``multilingual``: :func:`multilingual_clean`, then punctuation the voice lacks is replaced by the nearest
+    symbol it has. ``lowercase`` (MMS-TTS): NFC and lower case. Anything else: unchanged.
+    """
+    if cleaner == "multilingual":
+        cleaned = multilingual_clean(text)
+        for src, dst in CLEANER_PUNCT_FALLBACK:
+            if charset is not None and src in cleaned and src not in charset and dst in charset:
+                cleaned = cleaned.replace(src, dst)
+        return cleaned
+    if cleaner == "lowercase":
+        return _WS.sub(" ", unicodedata.normalize("NFC", text).lower()).strip()
+    return text
+
+
 def fit_to_charset(text: str, charset: frozenset[str], language: str | None, numbers: str | None = None) -> str:
     """Make ``text`` pronounceable by a voice that takes characters from a closed set (Coqui-style VITS).
 

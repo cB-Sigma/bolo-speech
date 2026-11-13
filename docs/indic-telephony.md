@@ -83,10 +83,10 @@ curl localhost:8000/v1/audio/transcriptions -F file=@call.wav -F model=indicconf
 speakers). Example: reference `गामक चरवाहा जाड़ में बहुत धन प्राप्त कयलक`,
 recognised `गामके चरवाहा जाड़मे बहुत धन प्राप्त कयलक`.
 
-**Bhojpuri** has **no dedicated speech-to-text model that is permissively
-licensed, ungated and runs without PyTorch today.** The practical fallback is
-the Hindi model, `indicconformer-hi-community`, which we measured on 60
-RESPIN Bhojpuri utterances:
+**Bhojpuri** has **no dedicated speech-to-text model in the catalog that does
+better than the Hindi one.** The practical choice is the Hindi model,
+`indicconformer-hi-community`, which we measured on 60 RESPIN Bhojpuri
+utterances:
 
 | Model | Audio | WER | CER |
 | --- | --- | --- | --- |
@@ -100,15 +100,33 @@ So on Bhojpuri the Hindi model gets about six words in ten right, three to
 four times its error on Hindi, and it writes Bhojpuri with Hindi habits
 (reference `बायोगैस जीव जंतु के अपघटन से बनत बाटे`, recognised `बायोोगैस जीव जंतु के अपघटन से बनत बांटे`).
 That is usable as input for a language model that tolerates noisy text, and
-not good enough for transcripts. Better Bhojpuri models exist as PyTorch
-checkpoints (a Whisper-small fine-tune under CC-BY-4.0, and IISc's
-multilingual SraVaani, MIT but gated); they need a one-time conversion that
-has not been done, so they are not in the catalog. For Maithili do not use
+not good enough for transcripts.
+
+We converted the one permissively licensed Bhojpuri recogniser that runs
+without PyTorch after conversion, the Whisper-small fine-tune
+`Aditya109/whisper-small-bhojpuri-merged` (CC-BY-4.0, trained on IISc's Vaani
+data), to CTranslate2 int8 (`tools/voices/convert_whisper.py`) and compared it
+with the Hindi model on a second, larger sample: 120 RESPIN Bhojpuri test
+utterances (12 at each of 10 offsets; `docs/measurements/bhojpuri-stt.json`):
+
+| Model | WER | CER | RTF (2 threads) |
+| --- | --- | --- | --- |
+| `indicconformer-hi-community` (Hindi) | **41.2 %** | **12.7 %** | 0.06 |
+| Whisper-small Bhojpuri fine-tune (converted here) | 47.7 % | 22.2 % | 0.53 |
+| `indicconformer-mai-community` (Maithili) | 66.8 % | 18.2 % | 0.08 |
+
+The fine-tune is worse on this read speech (its card reports 36.4 % WER on
+Vaani's own test set, which is spontaneous speech) and nine times slower, so
+it is **not** added and the Hindi model stays the Bhojpuri default. IISc's
+SraVaani (MIT, gated, TorchScript) reports 20.8 % WER on RESPIN Bhojpuri; it
+is in the catalog for the future PyTorch engine plugin
+([plugins.md](plugins.md)), untested. No permissively licensed Maithili or
+Magahi Whisper fine-tune exists that we could find (the one Maithili
+fine-tune on Hugging Face states no licence). For Maithili do not use
 the Hindi model: it does worse than the Maithili one and rewrites Maithili
 grammar into Hindi.
 
-Voices for both languages exist (IISc SYSPIN, below) but are **not published
-yet**.
+Voices for both languages are published (IISc SYSPIN, below).
 
 ### Other speech-to-text models for Indian languages
 
@@ -137,7 +155,7 @@ in Latin script. We did not measure code-mixed accuracy for either.
 
 | Language | Voices | Needs espeak-ng | Status |
 | --- | --- | --- | --- |
-| Hindi | `piper-hi-in-rohan-medium`, `-pratham-medium` ⚠, `-priyamvada-medium` ⚠; Kokoro voices `hf_alpha`, `hf_beta`, `hm_omega`, `hm_psi` | yes | validated on CPU; `rohan` round-trips through Hindi speech recognition in the test-suite |
+| Hindi | `piper-hi-in-rohan-medium`, `-pratham-medium` ⚠, `-priyamvada-medium` ⚠; Kokoro voices `hf_alpha`, `hf_beta`, `hm_omega`, `hm_psi`; `syspin-hi-female`, `-male` | **no** (uccharan; espeak-ng optional) | validated on CPU. On 60 held-out sentences transcribed back by `indicconformer-hi-community`: `rohan` 7.7 % WER / 2.7 % CER with uccharan, 9.1 % / 2.7 % with espeak-ng; Kokoro `hf_alpha` 5.4 % / 1.8 % and 4.5 % / 1.4 % ([models.md](models.md#phonemisers)) |
 | Telugu | `piper-te-in-venkatesh-medium`, `piper-te-in-padmavathi-medium`, `piper-te-in-maya-medium` | yes | **new**, each synthesised a sentence that was transcribed back by the Telugu recogniser: round-trip CER 3.8 % (WER 23.1 %), RTF 0.21; round-trip CER 2.6 % (WER 15.4 %), RTF 0.18; round-trip CER 1.3 % (WER 7.7 %), RTF 0.10 |
 | Tamil | `piper-ta-in-rasa-female-medium`, `piper-ta-in-rasa-male-medium` (third-party voices, CC-BY-4.0) | yes | **new**: round-trip CER 0.0 % (WER 0.0 %), RTF 0.11; round-trip CER 3.1 % (WER 10.0 %), RTF 0.15 |
 | Malayalam | `piper-ml-in-arjun-medium`, `piper-ml-in-meera-medium` (data licence unclear: check before commercial use) | yes | **new**: round-trip CER 2.2 % (WER 10.0 %), RTF 0.19; round-trip CER 6.7 % (WER 10.0 %), RTF 0.19 |
@@ -146,9 +164,9 @@ in Latin script. We did not measure code-mixed accuracy for either.
 | Urdu | `piper-ur-pk-fasih-medium`; `piper-ur-pk-aegis-female-medium` (**new**: round-trip CER 2.8 % (WER 27.8 %), RTF 0.14) | yes | `fasih` validated (audio produced) |
 | Nepali | `piper-ne-np-chitwan-medium` (CC0 data; **new**: round-trip CER 9.3 % (WER 46.2 %), RTF 0.07); `piper-ne-np-google-medium`, `-x-low`; `mimic3-ne-google` | yes | the others validated (audio produced) |
 | Gujarati | `mimic3-gu-cmu-indic` | yes | validated (audio produced) |
-| Maithili, Bhojpuri, Kannada, Magahi, Chhattisgarhi; more voices for hi, bn, mr, te, gu and Indian English | `syspin-<lang>-<female\|male>` (IISc SYSPIN, MIT weights, CC-BY-4.0 data; character input) | no | **not yet published.** The catalog describes them with `status: pending`; see "Voices converted by this project" in [models.md](models.md). Tested here from local files: below |
-| Punjabi, Odia, Assamese | - | - | **no voice.** The permissive models that exist for them need an engine bolo does not have |
-| Sanskrit, Sindhi, Kashmiri, Konkani, Dogri, Manipuri, Bodo, Santali | - | - | **no voice**; we know of nothing permissive, ungated and small enough for a CPU |
+| Maithili, Bhojpuri, Kannada, Magahi, Chhattisgarhi; more voices for hi, bn, mr, te, gu and Indian English | `syspin-<lang>-<female\|male>` (IISc SYSPIN, MIT weights, CC-BY-4.0 data; character input) | no | **published** (release `voices-v1`); pull them like any other voice. Round trips: below |
+| Punjabi, Odia, Assamese, Dogri; more voices for Maithili, Magahi, Chhattisgarhi, Urdu, Awadhi, Haryanvi and the major languages | `mms-tts-<iso>` (Meta MMS-TTS, **CC-BY-NC-4.0: non-commercial only**; character input, 16 kHz) | no | **converted, not yet published** (`status: pending`). Run here from a local conversion, 5 sentences each, transcribed back by the language's IndicConformer: Punjabi 19.4 % WER / 10.3 % CER, Odia 18.5 / 5.7, Assamese 13.3 / 3.2, Dogri 18.8 / 8.0, Maithili 48.6 / 12.9, Urdu 24.2 / 7.5; Magahi 52.9 / 30.5 and Chhattisgarhi 45.7 / 12.3 through the *Hindi* recogniser (there is none of their own). Most Punjabi and Odia errors are a stray syllable added at the start or end (`docs/measurements/mms-tts-round-trip.json`) |
+| Sanskrit, Sindhi, Kashmiri, Konkani, Manipuri, Bodo, Santali | - | - | **no voice** that runs without PyTorch: MMS-TTS has none of them; Indic Parler-TTS (Apache-2.0, gated) and Svara (Apache-2.0) cover some and are listed for the future PyTorch engine plugin ([plugins.md](plugins.md)) |
 
 ⚠ = the voice's training data is under a non-commercial licence.
 
@@ -162,15 +180,12 @@ speaks these languages listened. "Audio produced; not transcribed back"
 means the voice loaded and synthesised a sentence of plausible length and
 loudness: smoke-tested, no more.
 
-**SYSPIN voices for Maithili and Bhojpuri (not yet published).** IISc's
-SYSPIN project publishes studio-quality single-speaker VITS voices as PyTorch
-checkpoints. bolo's repository contains the conversion
-(`tools/voices/export_syspin.py`) and a workflow that publishes the converted
-files as release assets; until that has run, the catalog entries are
-`pending` and cannot be pulled. What we could test: archives packed from
-voices converted earlier with the same recipe were served from a local web
-server and went through the real pull path (download, checksum, unpacking,
-load, synthesis), and the result was transcribed back
+**SYSPIN voices for Maithili and Bhojpuri.** IISc's SYSPIN project publishes
+studio-quality single-speaker VITS voices as PyTorch checkpoints. bolo's
+repository contains the conversion (`tools/voices/export_syspin.py`) and the
+workflow that published the converted files as release assets (`voices-v1`).
+Before publication, archives packed from voices converted earlier with the
+same recipe went through the real pull path and were transcribed back
 (`docs/measurements/syspin-voices-archive-pull.json`):
 
 | Voice | Transcribed back by | CER | WER |
@@ -180,9 +195,22 @@ load, synthesis), and the result was transcribed back
 | `syspin-bho-female` | `indicconformer-hi-community` (no Bhojpuri recogniser) | 5.7 % | 13.3 % |
 
 (two sentences each; the recognisers' own error rates are of the same size,
-so this says "intelligible", not how good). If you have the converted files,
-they work today from a directory:
-`bolo pull ./mai_f --kind vits --name syspin-mai-female --language mai`.
+so this says "intelligible", not how good).
+
+**Text cleaning.** The SYSPIN voices were trained on text cleaned by Coqui's
+`multilingual_cleaners` (NFC, lower case, `;` and `:` to commas, hyphens to
+spaces, brackets and quotes removed). sherpa-onnx does not do that, so text
+with capitals, those marks or a precomposed nukta letter (`ज़` as one
+character) reached the voices as symbols they never learnt. bolo now applies
+the same cleaning as the voices' training (and as the in-browser voices of the
+console, whose fixtures the tests share). On the published voices, 8 sentences
+each written with such text, transcribed back
+(`docs/measurements/syspin-text-cleaning.json`):
+
+| Voice | Without the cleaning | With it |
+| --- | --- | --- |
+| `syspin-hi-female` (Hindi recogniser) | 24.6 % WER / 8.2 % CER | 14.5 % / 4.2 % |
+| `syspin-en-female` (`whisper-base`) | 20.8 % / 12.6 % | 13.9 % / 9.2 % |
 
 These voices read **characters from a closed set**: the Bhojpuri female
 voice has no digits and no Latin letters at all, the Maithili female voice
@@ -205,7 +233,7 @@ Text handling for Indic scripts:
 * Hindi numbers are spelled out in the Indian system before synthesis:
   `250000` → `दो लाख पचास हज़ार`, Devanagari digits included. Other Indian
   languages keep their digits: a phoneme-based voice (Piper format) reads
-  them through espeak-ng, a character-input voice refuses them (above);
+  them through its phonemiser, a character-input voice refuses them (above);
 * code-mixed input such as `मेरा order कल deliver होगा` is passed to a
   phoneme-based voice unchanged. How a Hindi voice pronounces Latin-script
   words depends on the voice; we have not evaluated it.

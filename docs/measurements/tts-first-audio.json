@@ -1,0 +1,170 @@
+{
+ "what": "time to first audio through bolo (core.synthesize, as the HTTP and WebSocket endpoints use it): the first request after loading (cold) and the median / p90 of 19 more, each text two held-out English sentences (about 150 characters); WER: transcribed back with whisper-base",
+ "conditions": "shared 4-vCPU x86_64, no GPU, heavily loaded by other jobs during these runs (1-minute load average in each row): compare rows of one run, not with other pages",
+ "date": "2026-11-13",
+ "rows": [
+  {
+   "label": "baseline",
+   "model": "kokoro-v1.0-int8",
+   "threads": 4,
+   "first_chunk_chars": 120,
+   "warm_up": false,
+   "load_s": 2.01,
+   "cold_ttfa_ms": 2484,
+   "warm_ttfa_ms_median": 3312,
+   "warm_ttfa_ms_p90": 5704,
+   "n": 20,
+   "wer": 0.0135,
+   "loadavg_1m": 4.96240234375
+  },
+  {
+   "label": "warmup",
+   "model": "kokoro-v1.0-int8",
+   "threads": 4,
+   "first_chunk_chars": 120,
+   "warm_up": true,
+   "load_s": 4.57,
+   "cold_ttfa_ms": 3872,
+   "warm_ttfa_ms_median": 2755,
+   "warm_ttfa_ms_p90": 4642,
+   "n": 20,
+   "wer": null,
+   "loadavg_1m": 5.2529296875
+  },
+  {
+   "label": "warmup+first48",
+   "model": "kokoro-v1.0-int8",
+   "threads": 4,
+   "first_chunk_chars": 48,
+   "warm_up": true,
+   "load_s": 4.13,
+   "cold_ttfa_ms": 3055,
+   "warm_ttfa_ms_median": 2325,
+   "warm_ttfa_ms_p90": 3338,
+   "n": 20,
+   "wer": 0.0189,
+   "loadavg_1m": 5.5693359375
+  },
+  {
+   "label": "warmup+first48",
+   "model": "kokoro-v1.0-int8",
+   "threads": 2,
+   "first_chunk_chars": 48,
+   "warm_up": true,
+   "load_s": 3.11,
+   "cold_ttfa_ms": 1887,
+   "warm_ttfa_ms_median": 2327,
+   "warm_ttfa_ms_p90": 2842,
+   "n": 20,
+   "wer": null,
+   "loadavg_1m": 4.365234375
+  },
+  {
+   "label": "fp32+warmup+first48",
+   "model": "kokoro-v1.0",
+   "threads": 4,
+   "first_chunk_chars": 48,
+   "warm_up": true,
+   "load_s": 22.54,
+   "cold_ttfa_ms": 1233,
+   "warm_ttfa_ms_median": 1572,
+   "warm_ttfa_ms_p90": 2018,
+   "n": 20,
+   "wer": null,
+   "loadavg_1m": 6.2294921875
+  },
+  {
+   "label": "warmup",
+   "model": "piper-en-us-amy-low",
+   "threads": 4,
+   "first_chunk_chars": 120,
+   "warm_up": true,
+   "load_s": 1.49,
+   "cold_ttfa_ms": 308,
+   "warm_ttfa_ms_median": 402,
+   "warm_ttfa_ms_p90": 646,
+   "n": 20,
+   "wer": 0.0135,
+   "loadavg_1m": 7.2861328125
+  },
+  {
+   "label": "warmup",
+   "model": "piper-en-us-amy-low",
+   "threads": 2,
+   "first_chunk_chars": 120,
+   "warm_up": true,
+   "load_s": 1.5,
+   "cold_ttfa_ms": 113,
+   "warm_ttfa_ms_median": 148,
+   "warm_ttfa_ms_p90": 232,
+   "n": 20,
+   "wer": null,
+   "loadavg_1m": 6.70703125
+  }
+ ],
+ "probe_kokoro_int8_sherpa_direct": {
+  "what": "sherpa-onnx generate() alone, best of 3, load average about 6",
+  "rows": [
+   [
+    "threads",
+    "chars",
+    "ms",
+    "audio_s"
+   ],
+   [
+    4,
+    6,
+    2193,
+    0.63
+   ],
+   [
+    4,
+    41,
+    4186,
+    2.12
+   ],
+   [
+    4,
+    120,
+    8183,
+    6.07
+   ],
+   [
+    2,
+    6,
+    1381,
+    0.63
+   ],
+   [
+    2,
+    41,
+    3964,
+    2.12
+   ],
+   [
+    2,
+    120,
+    7829,
+    6.07
+   ],
+   [
+    1,
+    6,
+    1534,
+    0.63
+   ],
+   [
+    1,
+    41,
+    3081,
+    2.12
+   ],
+   [
+    1,
+    120,
+    8441,
+    6.07
+   ]
+  ]
+ }
+}

@@ -1,0 +1,6 @@
+# For tools/voices/export_mms.py. Install CPU PyTorch first:
+#   pip install "torch==2.8.*" --index-url https://download.pytorch.org/whl/cpu
+onnx>=1.16
+numpy
+scipy
+sherpa-onnx>=2.0,<3

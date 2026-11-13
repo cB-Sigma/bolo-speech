@@ -66,6 +66,7 @@ class Segment:
     avg_logprob: float | None = None
     no_speech_prob: float | None = None
     speaker: str | None = None  # set when the request asked for diarization
+    overlap: bool = False  # diarization found another speaker talking during this segment
 
 
 @dataclass
@@ -161,6 +162,8 @@ class Voice:
 class TTSModel(Model):
     task = "tts"
     voices: tuple[Voice, ...] = ()
+    #: True when ``synthesize`` takes a ``phonemizer`` keyword (voices that read phonemes)
+    accepts_phonemizer: bool = False
 
     @abc.abstractmethod
     def synthesize(
@@ -171,6 +174,9 @@ class TTSModel(Model):
         cancelled: Callable[[], bool] | None = None,
     ) -> Iterator[FloatArray]:
         """Yield float32 audio at ``sample_rate`` for one chunk of text."""
+
+    def warm_up(self) -> None:
+        """Run once after loading so that the first request does not pay for lazy initialisation."""
 
     def fit_text(self, text: str, language: str | None) -> str:
         """Adapt normalised text to what this voice can read; raise ``UnsupportedCharacters`` if it cannot.

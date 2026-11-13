@@ -1,0 +1,87 @@
+{
+ "what": "Meta MMS-TTS voices exported here with tools/voices/export_mms.py and run through bolo: 5 sentences each, synthesised and transcribed back",
+ "conditions": "2 threads, shared 4-vCPU x86_64, no GPU; sherpa-onnx 2.0.1; sentences written for this test (scratch), punctuation stripped, NFC; Magahi and Chhattisgarhi transcribed with the Hindi recogniser (no own recogniser)",
+ "date": "2026-11-13",
+ "rows": [
+  {
+   "voice": "mms-tts-pan",
+   "language": "pa",
+   "stt": "indicconformer-pa-community",
+   "n": 5,
+   "wer": 0.194,
+   "cer": 0.103,
+   "ttfa_ms_median": 908,
+   "rtf_median": 0.324
+  },
+  {
+   "voice": "mms-tts-ory",
+   "language": "or",
+   "stt": "indicconformer-or-community",
+   "n": 5,
+   "wer": 0.185,
+   "cer": 0.057,
+   "ttfa_ms_median": 915,
+   "rtf_median": 0.468
+  },
+  {
+   "voice": "mms-tts-asm",
+   "language": "as",
+   "stt": "indicconformer-as-community",
+   "n": 5,
+   "wer": 0.133,
+   "cer": 0.032,
+   "ttfa_ms_median": 633,
+   "rtf_median": 0.341
+  },
+  {
+   "voice": "mms-tts-dgo",
+   "language": "doi",
+   "stt": "indicconformer-doi-community",
+   "n": 5,
+   "wer": 0.188,
+   "cer": 0.08,
+   "ttfa_ms_median": 722,
+   "rtf_median": 0.331
+  },
+  {
+   "voice": "mms-tts-mag",
+   "language": "mag",
+   "stt": "indicconformer-hi-community",
+   "n": 5,
+   "wer": 0.529,
+   "cer": 0.305,
+   "ttfa_ms_median": 1134,
+   "rtf_median": 0.388
+  },
+  {
+   "voice": "mms-tts-hne",
+   "language": "hne",
+   "stt": "indicconformer-hi-community",
+   "n": 5,
+   "wer": 0.457,
+   "cer": 0.123,
+   "ttfa_ms_median": 896,
+   "rtf_median": 0.323
+  },
+  {
+   "voice": "mms-tts-urd",
+   "language": "ur",
+   "stt": "indicconformer-ur-community",
+   "n": 5,
+   "wer": 0.242,
+   "cer": 0.075,
+   "ttfa_ms_median": 807,
+   "rtf_median": 0.315
+  },
+  {
+   "voice": "mms-tts-mai",
+   "language": "mai",
+   "stt": "indicconformer-mai-community",
+   "n": 5,
+   "wer": 0.486,
+   "cer": 0.129,
+   "ttfa_ms_median": 1534,
+   "rtf_median": 0.523
+  }
+ ]
+}

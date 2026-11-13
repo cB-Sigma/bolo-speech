@@ -167,7 +167,8 @@ async def tts_stream(ws: WebSocket) -> None:
     """Streaming synthesis.
 
     Query: ``model``, ``voice``, ``format`` (pcm_s16le | pcm_f32le | mulaw |
-    alaw | wav | mp3 | opus | flac | aac), ``sample_rate``, ``speed``.
+    alaw | wav | mp3 | opus | flac | aac), ``sample_rate``, ``speed``,
+    ``phonemizer`` (auto | uccharan | uccharan:improved | espeak-ng; bolo extension).
     Client sends JSON ``{"type":"text","text":…}`` (incrementally),
     ``flush`` and ``stop``; the server answers with binary audio frames and
     JSON ``ready`` / ``chunk`` / ``metrics`` / ``done`` / ``error``.
@@ -188,6 +189,7 @@ async def tts_stream(ws: WebSocket) -> None:
         except ValueError as exc:
             raise InvalidRequest("sample_rate and speed must be numbers") from exc
         voice = params.get("voice") or None
+        phonemizer = params.get("phonemizer") or None
         language = params.get("language") or None
         async with core.manager.use(spec.id) as entry:
             model_rate = entry.model.sample_rate
@@ -219,7 +221,15 @@ async def tts_stream(ws: WebSocket) -> None:
                         text, received = item
                         trace = Trace("tts", "websocket", spec.id)
                         stream = SpeechStream(
-                            core, trace, encoder, text=text, model=spec.id, voice=voice, speed=speed, language=language
+                            core,
+                            trace,
+                            encoder,
+                            text=text,
+                            model=spec.id,
+                            voice=voice,
+                            speed=speed,
+                            language=language,
+                            phonemizer=phonemizer,
                         )
                         first = True
                         try:

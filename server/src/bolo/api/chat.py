@@ -137,11 +137,15 @@ async def chat_completions(request: Request) -> Response:
         voice = audio_cfg.get("voice")
         if isinstance(voice, dict):
             voice = voice.get("id")
+        phonemizer = audio_cfg.get("phonemizer")  # bolo extension
         if wants_audio and not audio_cfg:
             raise InvalidRequest(
                 "'audio' (voice and format) is required when modalities contains 'audio'", param="audio"
             )
-        tts_spec = core.resolve(body.get("speech_model"), "tts") if wants_audio else None
+        speech_model = body.get("speech_model")
+        tts_spec = (
+            (core.resolve(speech_model, "tts") if speech_model else core.realtime_tts(voice)) if wants_audio else None
+        )
         n_audio, seconds_in = await transcribe_parts(core, body, trace)
         trace.audio_seconds = seconds_in or None
         trace.mark_final()
@@ -164,7 +168,9 @@ async def chat_completions(request: Request) -> Response:
                     if not isinstance(text, str) or not text.strip():
                         continue
                     t_tts = trace.now()
-                    samples, rate = await core.synthesize_all(text, model=tts_spec.id, voice=voice)
+                    samples, rate = await core.synthesize_all(
+                        text, model=tts_spec.id, voice=voice, phonemizer=phonemizer
+                    )
                     data = await asyncio.to_thread(encode_audio, samples, rate, fmt)
                     trace.add_phase("synthesize", t_tts, trace.now())
                     trace.mark_ttfa()
@@ -250,7 +256,7 @@ async def chat_completions(request: Request) -> Response:
             if wants_audio and tts_spec is not None:
                 encoder = StreamEncoder(fmt, tts_spec.sample_rate)
                 async for kind, value in speak_stream(
-                    core, text_deltas(), model=tts_spec.id, voice=voice, transport="chat"
+                    core, text_deltas(), model=tts_spec.id, voice=voice, transport="chat", phonemizer=phonemizer
                 ):
                     if kind == "text":
                         said.append(value)

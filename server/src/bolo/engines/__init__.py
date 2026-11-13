@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from bolo.engines.base import Engine, EngineStatus
+
+if TYPE_CHECKING:
+    from bolo.config import Settings
 
 # id -> "module:Class"; nothing here is imported until the engine is asked for.
 BUILTIN_ENGINES: dict[str, str] = {
@@ -20,13 +24,44 @@ BUILTIN_ENGINES: dict[str, str] = {
 
 
 class EngineRegistry:
-    def __init__(self, include_fake: bool = False) -> None:
+    def __init__(self, include_fake: bool = False, settings: Settings | None = None) -> None:
         self._factories: dict[str, Callable[[], Engine]] = {}
         self._engines: dict[str, Engine] = {}
         for engine_id, target in BUILTIN_ENGINES.items():
             if engine_id == "fake" and not include_fake:
                 continue
             self._factories[engine_id] = self._lazy(target)
+        self._add_plugins(settings)
+
+    def _add_plugins(self, settings: Settings | None) -> None:
+        """Out-of-process plugins: installed packages (entry points), then the ``plugins`` setting (wins)."""
+        from bolo.plugin.host import PluginConfig, PluginEngine, discover_entry_points, parse_plugin_setting
+
+        found: dict[str, tuple[list[str], str]] = {}
+        if settings is None or settings.plugin_entry_points:
+            found.update({name: (cmd, "entry-point") for name, cmd in discover_entry_points().items()})
+        for item in settings.plugins if settings is not None else []:
+            name, cmd = parse_plugin_setting(item)
+            found[name] = (cmd, "settings")
+        for name, (cmd, source) in found.items():
+            config = PluginConfig(name, cmd, source)
+            if settings is not None:
+                config.idle_s = settings.plugin_idle_s
+                config.memory_limit_mb = settings.plugin_memory_limit_mb
+                config.nice = settings.plugin_nice
+            self.register(PluginEngine(config))
+
+    def plugins(self) -> list[Engine]:
+        from bolo.plugin.host import PREFIX
+
+        return [e for i, e in self._engines.items() if i.startswith(PREFIX)]
+
+    def shutdown(self) -> None:
+        """Stop plugin processes."""
+        for engine in self.plugins():
+            stop = getattr(engine, "shutdown", None)
+            if stop is not None:
+                stop()
 
     @staticmethod
     def _lazy(target: str) -> Callable[[], Engine]:
@@ -72,6 +107,8 @@ class EngineRegistry:
         except Exception as exc:
             return EngineStatus(engine_id, False, None, f"{type(exc).__name__}: {exc}")
         if engine is None:
+            if engine_id.startswith("plugin:"):
+                return EngineStatus(engine_id, False, None, f"the plugin '{engine_id[7:]}' is not installed")
             return EngineStatus(engine_id, False, None, "unknown engine")
         return engine.status()
 

@@ -55,7 +55,7 @@
   options:
     language: hi-IN
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-hi-in-priyamvada-medium
   aliases:
   - piper-hi_IN-priyamvada-medium
@@ -110,7 +110,7 @@
   options:
     language: hi-IN
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-hi-in-rohan-medium
   aliases:
   - piper-hi_IN-rohan-medium
@@ -163,7 +163,7 @@
   options:
     language: hi-IN
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-ne-np-google-medium
   aliases:
   - piper-ne_NP-google-medium
@@ -214,7 +214,7 @@
   options:
     language: ne-NP
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-ne-np-google-x-low
   aliases:
   - piper-ne_NP-google-x_low
@@ -254,7 +254,7 @@
   options:
     language: ne-NP
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-ur-pk-fasih-medium
   aliases:
   - piper-ur_PK-fasih-medium
@@ -307,7 +307,7 @@
   options:
     language: ur-PK
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-en-us-lessac-medium
   aliases:
   - piper-en_US-lessac-medium
@@ -364,7 +364,7 @@
   options:
     language: en-US
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-en-us-lessac-low
   aliases:
   - piper-en_US-lessac-low
@@ -407,7 +407,7 @@
   options:
     language: en-US
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-en-us-amy-low
   aliases:
   - piper-en_US-amy-low
@@ -461,7 +461,7 @@
   options:
     language: en-US
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-en-us-amy-medium
   aliases:
   - piper-en_US-amy-medium
@@ -504,7 +504,7 @@
   options:
     language: en-US
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-en-us-ryan-medium
   aliases:
   - piper-en_US-ryan-medium
@@ -561,7 +561,7 @@
   options:
     language: en-US
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-en-us-ryan-high
   aliases:
   - piper-en_US-ryan-high
@@ -605,7 +605,7 @@
   options:
     language: en-US
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-en-us-hfc-female-medium
   aliases:
   - piper-en_US-hfc_female-medium
@@ -650,7 +650,7 @@
   options:
     language: en-US
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-en-us-hfc-male-medium
   aliases:
   - piper-en_US-hfc_male-medium
@@ -695,7 +695,7 @@
   options:
     language: en-US
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-en-us-libritts-r-medium
   aliases:
   - piper-en_US-libritts_r-medium
@@ -748,7 +748,7 @@
   options:
     language: en-US
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-en-us-ljspeech-medium
   aliases:
   - piper-en_US-ljspeech-medium
@@ -792,7 +792,7 @@
   options:
     language: en-US
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-en-us-joe-medium
   aliases:
   - piper-en_US-joe-medium
@@ -835,7 +835,7 @@
   options:
     language: en-US
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-en-us-kristin-medium
   aliases:
   - piper-en_US-kristin-medium
@@ -879,7 +879,7 @@
   options:
     language: en-US
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-en-gb-alan-medium
   aliases:
   - piper-en_GB-alan-medium
@@ -923,7 +923,7 @@
   options:
     language: en-GB
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-en-gb-alba-medium
   aliases:
   - piper-en_GB-alba-medium
@@ -979,7 +979,7 @@
   options:
     language: en-GB
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-en-gb-cori-medium
   aliases:
   - piper-en_GB-cori-medium
@@ -1023,7 +1023,7 @@
   options:
     language: en-GB
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-en-gb-jenny-dioco-medium
   aliases:
   - piper-en_GB-jenny_dioco-medium
@@ -1067,7 +1067,7 @@
   options:
     language: en-GB
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-en-gb-northern-english-male-medium
   aliases:
   - piper-en_GB-northern_english_male-medium
@@ -1111,7 +1111,7 @@
   options:
     language: en-GB
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-en-gb-southern-english-female-medium
   aliases:
   - piper-en_GB-southern_english_female-medium
@@ -1155,7 +1155,7 @@
   options:
     language: en-GB
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-de-de-thorsten-medium
   aliases:
   - piper-de_DE-thorsten-medium
@@ -1209,7 +1209,7 @@
   options:
     language: de-DE
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-de-de-thorsten-high
   aliases:
   - piper-de_DE-thorsten-high
@@ -1253,7 +1253,7 @@
   options:
     language: de-DE
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-de-de-kerstin-low
   aliases:
   - piper-de_DE-kerstin-low
@@ -1295,7 +1295,7 @@
   options:
     language: de-DE
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-es-es-davefx-medium
   aliases:
   - piper-es_ES-davefx-medium
@@ -1349,7 +1349,7 @@
   options:
     language: es-ES
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-es-es-sharvard-medium
   aliases:
   - piper-es_ES-sharvard-medium
@@ -1390,7 +1390,7 @@
   options:
     language: es-ES
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-es-mx-ald-medium
   aliases:
   - piper-es_MX-ald-medium
@@ -1433,7 +1433,7 @@
   options:
     language: es-MX
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-es-ar-daniela-high
   aliases:
   - piper-es_AR-daniela-high
@@ -1477,7 +1477,7 @@
   options:
     language: es-AR
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-fr-fr-siwis-medium
   aliases:
   - piper-fr_FR-siwis-medium
@@ -1531,7 +1531,7 @@
   options:
     language: fr-FR
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-fr-fr-upmc-medium
   aliases:
   - piper-fr_FR-upmc-medium
@@ -1572,7 +1572,7 @@
   options:
     language: fr-FR
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-fr-fr-tom-medium
   aliases:
   - piper-fr_FR-tom-medium
@@ -1615,7 +1615,7 @@
   options:
     language: fr-FR
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-it-it-paola-medium
   aliases:
   - piper-it_IT-paola-medium
@@ -1669,7 +1669,7 @@
   options:
     language: it-IT
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-it-it-riccardo-x-low
   aliases:
   - piper-it_IT-riccardo-x_low
@@ -1712,7 +1712,7 @@
   options:
     language: it-IT
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-pt-br-faber-medium
   aliases:
   - piper-pt_BR-faber-medium
@@ -1766,7 +1766,7 @@
   options:
     language: pt-BR
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-pt-pt-tugao-medium
   aliases:
   - piper-pt_PT-tugao-medium
@@ -1810,7 +1810,7 @@
   options:
     language: pt-PT
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-nl-nl-mls-medium
   aliases:
   - piper-nl_NL-mls-medium
@@ -1851,7 +1851,7 @@
   options:
     language: nl-NL
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-nl-be-nathalie-medium
   aliases:
   - piper-nl_BE-nathalie-medium
@@ -1895,7 +1895,7 @@
   options:
     language: nl-BE
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-pl-pl-gosia-medium
   aliases:
   - piper-pl_PL-gosia-medium
@@ -1939,7 +1939,7 @@
   options:
     language: pl-PL
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-pl-pl-darkman-medium
   aliases:
   - piper-pl_PL-darkman-medium
@@ -1983,7 +1983,7 @@
   options:
     language: pl-PL
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-ru-ru-irina-medium
   aliases:
   - piper-ru_RU-irina-medium
@@ -2037,7 +2037,7 @@
   options:
     language: ru-RU
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-ru-ru-denis-medium
   aliases:
   - piper-ru_RU-denis-medium
@@ -2081,7 +2081,7 @@
   options:
     language: ru-RU
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-ru-ru-dmitri-medium
   aliases:
   - piper-ru_RU-dmitri-medium
@@ -2125,7 +2125,7 @@
   options:
     language: ru-RU
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-ru-ru-ruslan-medium
   aliases:
   - piper-ru_RU-ruslan-medium
@@ -2170,7 +2170,7 @@
   options:
     language: ru-RU
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-uk-ua-ukrainian-tts-medium
   aliases:
   - piper-uk_UA-ukrainian_tts-medium
@@ -2211,7 +2211,7 @@
   options:
     language: uk-UA
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-tr-tr-dfki-medium
   aliases:
   - piper-tr_TR-dfki-medium
@@ -2256,7 +2256,7 @@
   options:
     language: tr-TR
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-tr-tr-fahrettin-medium
   aliases:
   - piper-tr_TR-fahrettin-medium
@@ -2300,7 +2300,7 @@
   options:
     language: tr-TR
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-ar-jo-kareem-medium
   aliases:
   - piper-ar_JO-kareem-medium
@@ -2344,7 +2344,7 @@
   options:
     language: ar-JO
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-fa-ir-amir-medium
   aliases:
   - piper-fa_IR-amir-medium
@@ -2388,7 +2388,7 @@
   options:
     language: fa-IR
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-fa-ir-gyro-medium
   aliases:
   - piper-fa_IR-gyro-medium
@@ -2432,7 +2432,7 @@
   options:
     language: fa-IR
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-zh-cn-huayan-medium
   aliases:
   - piper-zh_CN-huayan-medium
@@ -2486,7 +2486,7 @@
   options:
     language: zh-CN
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-vi-vn-vais1000-medium
   aliases:
   - piper-vi_VN-vais1000-medium
@@ -2530,7 +2530,7 @@
   options:
     language: vi-VN
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-id-id-news-tts-medium
   aliases:
   - piper-id_ID-news_tts-medium
@@ -2574,7 +2574,7 @@
   options:
     language: id-ID
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-sv-se-nst-medium
   aliases:
   - piper-sv_SE-nst-medium
@@ -2617,7 +2617,7 @@
   options:
     language: sv-SE
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-da-dk-talesyntese-medium
   aliases:
   - piper-da_DK-talesyntese-medium
@@ -2661,7 +2661,7 @@
   options:
     language: da-DK
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-no-no-talesyntese-medium
   aliases:
   - piper-no_NO-talesyntese-medium
@@ -2705,7 +2705,7 @@
   options:
     language: no-NO
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-fi-fi-harri-medium
   aliases:
   - piper-fi_FI-harri-medium
@@ -2749,7 +2749,7 @@
   options:
     language: fi-FI
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-cs-cz-jirka-medium
   aliases:
   - piper-cs_CZ-jirka-medium
@@ -2792,7 +2792,7 @@
   options:
     language: cs-CZ
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-el-gr-rapunzelina-low
   aliases:
   - piper-el_GR-rapunzelina-low
@@ -2835,7 +2835,7 @@
   options:
     language: el-GR
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-hu-hu-anna-medium
   aliases:
   - piper-hu_HU-anna-medium
@@ -2879,7 +2879,7 @@
   options:
     language: hu-HU
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-ro-ro-mihai-medium
   aliases:
   - piper-ro_RO-mihai-medium
@@ -2923,7 +2923,7 @@
   options:
     language: ro-RO
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-sk-sk-lili-medium
   aliases:
   - piper-sk_SK-lili-medium
@@ -2966,7 +2966,7 @@
   options:
     language: sk-SK
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-sr-rs-serbski-institut-medium
   aliases:
   - piper-sr_RS-serbski_institut-medium
@@ -3008,7 +3008,7 @@
   options:
     language: sr-RS
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-sl-si-artur-medium
   aliases:
   - piper-sl_SI-artur-medium
@@ -3052,7 +3052,7 @@
   options:
     language: sl-SI
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-ca-es-upc-ona-medium
   aliases:
   - piper-ca_ES-upc_ona-medium
@@ -3096,7 +3096,7 @@
   options:
     language: ca-ES
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-cy-gb-gwryw-gogleddol-medium
   aliases:
   - piper-cy_GB-gwryw_gogleddol-medium
@@ -3140,7 +3140,7 @@
   options:
     language: cy-GB
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-is-is-bui-medium
   aliases:
   - piper-is_IS-bui-medium
@@ -3184,7 +3184,7 @@
   options:
     language: is-IS
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-ka-ge-natia-medium
   aliases:
   - piper-ka_GE-natia-medium
@@ -3228,7 +3228,7 @@
   options:
     language: ka-GE
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-kk-kz-issai-high
   aliases:
   - piper-kk_KZ-issai-high
@@ -3269,7 +3269,7 @@
   options:
     language: kk-KZ
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-lb-lu-marylux-medium
   aliases:
   - piper-lb_LU-marylux-medium
@@ -3314,7 +3314,7 @@
   options:
     language: lb-LU
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-lv-lv-aivars-medium
   aliases:
   - piper-lv_LV-aivars-medium
@@ -3358,7 +3358,7 @@
   options:
     language: lv-LV
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-sw-cd-lanfrica-medium
   aliases:
   - piper-sw_CD-lanfrica-medium
@@ -3402,7 +3402,7 @@
   options:
     language: sw-CD
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-ne-np-chitwan-medium
   aliases:
   - piper-ne_NP-chitwan-medium
@@ -3454,7 +3454,7 @@
   options:
     language: ne-NP
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-te-in-padmavathi-medium
   aliases:
   - piper-te_IN-padmavathi-medium
@@ -3506,7 +3506,7 @@
   options:
     language: te-IN
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-te-in-venkatesh-medium
   aliases:
   - piper-te_IN-venkatesh-medium
@@ -3558,7 +3558,7 @@
   options:
     language: te-IN
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-te-in-maya-medium
   aliases:
   - piper-te_IN-maya-medium
@@ -3610,7 +3610,7 @@
   options:
     language: te-IN
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-ml-in-arjun-medium
   aliases:
   - piper-ml_IN-arjun-medium
@@ -3663,7 +3663,7 @@
   options:
     language: ml-IN
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-ml-in-meera-medium
   aliases:
   - piper-ml_IN-meera-medium
@@ -3716,7 +3716,7 @@
   options:
     language: ml-IN
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-mr-in-google-medium
   aliases:
   - piper-mr_IN-google-medium
@@ -3770,7 +3770,7 @@
   options:
     language: mr-IN
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-bn-bd-google-medium
   aliases:
   - piper-bn_BD-google-medium
@@ -3824,7 +3824,7 @@
   options:
     language: bn-BD
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-ur-pk-aegis-female-medium
   aliases:
   - piper-ur_PK-aegis_female-medium
@@ -3876,7 +3876,7 @@
   options:
     language: ur-PK
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-ta-in-rasa-female-medium
   aliases:
   - piper-ta_IN-rasa_female-medium
@@ -3922,7 +3922,7 @@
   options:
     language: ta-IN
   requires:
-  - espeak-ng
+  - phonemizer
 - id: piper-ta-in-rasa-male-medium
   aliases:
   - piper-ta_IN-rasa_male-medium
@@ -3967,4 +3967,4 @@
   options:
     language: ta-IN
   requires:
-  - espeak-ng
+  - phonemizer

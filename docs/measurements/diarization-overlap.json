@@ -1,0 +1,169 @@
+{
+ "what": "three two-voice mixes (piper-en-us-amy-low then piper-en-gb-alba-medium, the second starting 2.5 s before the first ends), diarized transcription with whisper-base and num_speakers=2, the later turn clipped (keep_overlap false) or kept whole (true); WER of each speaker's text against what that voice said",
+ "conditions": "2 threads, shared 4-vCPU x86_64, no GPU; pyannote-3.0-eres2net via sherpa-onnx 2.0.1",
+ "date": "2026-11-13",
+ "rows": [
+  {
+   "keep_overlap": false,
+   "wer_first_speaker": 0.045,
+   "wer_second_speaker": 0.696,
+   "segments": [
+    [
+     0.03,
+     6.09,
+     "A",
+     true
+    ],
+    [
+     6.09,
+     8.43,
+     "B",
+     false
+    ]
+   ],
+   "overlaps": [
+    [
+     3.68,
+     6.09
+    ]
+   ]
+  },
+  {
+   "keep_overlap": true,
+   "wer_first_speaker": 0.045,
+   "wer_second_speaker": 0.913,
+   "segments": [
+    [
+     0.03,
+     6.09,
+     "A",
+     true
+    ],
+    [
+     3.68,
+     8.43,
+     "B",
+     true
+    ]
+   ],
+   "overlaps": [
+    [
+     3.68,
+     6.09
+    ]
+   ]
+  },
+  {
+   "keep_overlap": false,
+   "wer_first_speaker": 0.0,
+   "wer_second_speaker": 0.524,
+   "segments": [
+    [
+     0.03,
+     5.84,
+     "A",
+     true
+    ],
+    [
+     5.84,
+     8.45,
+     "B",
+     false
+    ]
+   ],
+   "overlaps": [
+    [
+     3.39,
+     5.84
+    ]
+   ]
+  },
+  {
+   "keep_overlap": true,
+   "wer_first_speaker": 0.0,
+   "wer_second_speaker": 0.905,
+   "segments": [
+    [
+     0.03,
+     5.84,
+     "A",
+     true
+    ],
+    [
+     3.39,
+     8.45,
+     "B",
+     true
+    ]
+   ],
+   "overlaps": [
+    [
+     3.39,
+     5.84
+    ]
+   ]
+  },
+  {
+   "keep_overlap": false,
+   "wer_first_speaker": 0.316,
+   "wer_second_speaker": 0.842,
+   "segments": [
+    [
+     0.03,
+     5.36,
+     "A",
+     true
+    ],
+    [
+     5.36,
+     6.46,
+     "B",
+     false
+    ],
+    [
+     6.56,
+     7.73,
+     "A",
+     false
+    ]
+   ],
+   "overlaps": [
+    [
+     3.03,
+     5.36
+    ]
+   ]
+  },
+  {
+   "keep_overlap": true,
+   "wer_first_speaker": 0.316,
+   "wer_second_speaker": 0.684,
+   "segments": [
+    [
+     0.03,
+     5.36,
+     "A",
+     true
+    ],
+    [
+     3.03,
+     6.46,
+     "B",
+     true
+    ],
+    [
+     6.56,
+     7.73,
+     "A",
+     false
+    ]
+   ],
+   "overlaps": [
+    [
+     3.03,
+     5.36
+    ]
+   ]
+  }
+ ]
+}

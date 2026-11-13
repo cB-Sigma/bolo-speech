@@ -1,9 +1,20 @@
-"""Grapheme-to-phoneme conversion through an *external* espeak-ng.
+"""Grapheme-to-phoneme conversion for voices that read phonemes.
 
-Piper-format VITS voices, KittenTTS, Matcha-TTS (English) and the
-non-English Kokoro voices are trained on IPA phonemes produced by espeak-ng.
-Since version 2.0 the sherpa-onnx runtime no longer contains espeak-ng and
-expects phonemes from the caller.
+Piper-format VITS voices, KittenTTS, Matcha-TTS (English) and Kokoro are
+trained on phonemes (espeak-ng IPA; misaki's tokens for Kokoro English).
+Since version 2.0 the sherpa-onnx runtime no longer contains a phonemiser and
+expects phonemes from the caller. Two phonemisers can provide them:
+
+* **uccharan** (Apache-2.0, ``pip install 'bolo[uccharan]'``, part of
+  ``bolo[all]``): the default where it covers the voice's language and
+  output profile, see :data:`UCCHARAN_SUPPORT` (English US and British, Hindi;
+  for Kokoro English it is a port of misaki, the front end Kokoro was trained
+  with). Runs in process, no GPL code or data.
+* **espeak-ng** (GPL-3.0-or-later), every other language.
+
+The ``phonemizer`` setting chooses: ``auto`` (uccharan where it covers the
+voice, otherwise espeak-ng), ``uccharan`` (never espeak-ng) or ``espeak-ng``
+(the behaviour of bolo 0.1).
 
 espeak-ng is licensed GPL-3.0-or-later. bolo (Apache-2.0) does not bundle
 it, link it at build time or depend on it. If you want voices that need it,
@@ -32,6 +43,7 @@ import subprocess
 import threading
 import unicodedata
 from functools import lru_cache
+from typing import Any
 
 from bolo.errors import ComponentMissing, EngineUnavailable
 
@@ -48,10 +60,47 @@ INSTALL_HINT = (
 )
 
 
+#: Output profile a voice family was trained on, by catalog ``kind``.
+PROFILE_BY_KIND = {"vits": "piper", "kokoro": "kokoro", "kitten": "kitten", "matcha": "matcha"}
+
+#: What uccharan covers: profile -> {language tag (lower case, as voices and the catalog write it) -> uccharan
+#: language}. Everything else needs espeak-ng. Extend this table when uccharan gains a language.
+UCCHARAN_SUPPORT: dict[str, dict[str, str]] = {
+    "piper": {"en-us": "en-us", "en-gb": "en-gb", "en-gb-x-rp": "en-gb", "en-gb-scotland": "en-gb", "hi": "hi"},
+    "kokoro": {"en-us": "en-us", "en-gb": "en-gb", "hi": "hi"},
+    "kitten": {"en-us": "en-us"},
+    "matcha": {"en-us": "en-us"},
+}
+UCCHARAN = "uccharan"
+ESPEAK = "espeak-ng"
+PREFERENCES = ("auto", UCCHARAN, ESPEAK)
+
+
+def normalise_language(tag: str) -> str:
+    """``en_US`` / ``en-US`` -> ``en-us``; ``hi-IN`` -> ``hi`` (Indian region tags carry no phonemiser difference)."""
+    t = tag.strip().lower().replace("_", "-")
+    base = t.split("-")[0]
+    return base if base in ("hi",) else t
+
+
+def uccharan_language(profile: str, language: str) -> str | None:
+    """The uccharan language for a voice, or None when uccharan does not cover it."""
+    return UCCHARAN_SUPPORT.get(profile, {}).get(normalise_language(language))
+
+
 class Phonemizer:
     name = "none"
+    #: the component that provides it ("uccharan" or "espeak-ng")
+    component = ESPEAK
     #: "system-executable" | "python-package" | "configured"
     source = "configured"
+
+    def supports(self, profile: str, language: str) -> bool:
+        return True
+
+    def voice_codepoints(self, text: str, language: str, profile: str, improved: bool = False) -> list[list[int]]:
+        """Codepoints per sentence for ``GenerationConfig.phoneme_codepoints``."""
+        return self.codepoints(text, language)
 
     def version(self) -> str | None:
         return None
@@ -183,6 +232,56 @@ class EspeakLibrary(Phonemizer):
         return result
 
 
+class UccharanPhonemizer(Phonemizer):
+    """uccharan (Apache-2.0), in process."""
+
+    name = "uccharan"
+    component = UCCHARAN
+    source = "python-package"
+
+    def __init__(self, module: Any) -> None:
+        self.module = module
+
+    def version(self) -> str | None:
+        return str(getattr(self.module, "__version__", "") or "") or None
+
+    def supports(self, profile: str, language: str) -> bool:
+        return uccharan_language(profile, language) is not None
+
+    def clause(self, text: str, voice: str) -> str:
+        lang = uccharan_language("piper", voice) or voice
+        return str(self.module.phonemize(text, lang, "espeak-ipa", punctuation=False))
+
+    def phonemize(self, text: str, voice: str) -> list[str]:
+        lang = uccharan_language("piper", voice) or voice
+        return list(self.module.phonemize(text, lang, "piper"))
+
+    def voice_codepoints(self, text: str, language: str, profile: str, improved: bool = False) -> list[list[int]]:
+        lang = uccharan_language(profile, language)
+        if lang is None:
+            raise EngineUnavailable(f"uccharan has no {profile!r} front end for language '{language}'")
+        if profile == "piper":
+            return [list(s) for s in self.module.phonemize(text, lang, "sherpa-onnx", improved=improved)]
+        out: list[list[int]] = []
+        for sentence in _sentences(text):
+            phones = str(self.module.phonemize(sentence, lang, profile, improved=improved)).strip()
+            if profile == "kitten":
+                # Kitten's own front end re-tokenises the phonemes (\w+|[^\w\s]) and joins them with spaces.
+                phones = " ".join(_KITTEN_TOKEN.findall(phones))
+            if phones:
+                out.append([ord(c) for c in phones])
+        return out
+
+
+_KITTEN_TOKEN = re.compile(r"\w+|[^\w\s]")
+
+
+def _sentences(text: str) -> list[str]:
+    from bolo.text.segment import split_sentences
+
+    return [s for s in split_sentences(text) if s.strip()] or [text]
+
+
 def _library_candidates() -> list[tuple[str, str | None, str]]:
     out: list[tuple[str, str | None, str]] = []
     try:
@@ -238,8 +337,133 @@ def require_phonemizer() -> Phonemizer:
     return ph
 
 
+_uccharan: Phonemizer | None = None
+_uccharan_resolved = False
+_preference = "auto"
+
+
+def get_uccharan() -> Phonemizer | None:
+    """uccharan when its Python package is installed (``BOLO_UCCHARAN=off`` hides it)."""
+    global _uccharan, _uccharan_resolved
+    with _lock:
+        if not _uccharan_resolved:
+            _uccharan_resolved = True
+            if os.environ.get("BOLO_UCCHARAN", "auto").lower() != "off":
+                try:
+                    import uccharan  # type: ignore[import-not-found,unused-ignore]
+
+                    _uccharan = UccharanPhonemizer(uccharan)
+                except Exception:
+                    _uccharan = None
+        return _uccharan
+
+
+def set_preference(preference: str) -> None:
+    """``auto`` | ``uccharan`` | ``espeak-ng`` (the ``phonemizer`` setting)."""
+    global _preference
+    if preference not in PREFERENCES:
+        raise ValueError(f"phonemizer must be one of {', '.join(PREFERENCES)}, not {preference!r}")
+    _preference = preference
+
+
+def candidates(profile: str, language: str) -> list[str]:
+    """Components that may phonemise for this voice under the current preference, best first."""
+    covered = uccharan_language(profile, language) is not None
+    if _preference == ESPEAK:
+        return [ESPEAK]
+    if _preference == UCCHARAN:
+        return [UCCHARAN] if covered else []
+    return [UCCHARAN, ESPEAK] if covered else [ESPEAK]
+
+
+def select(profile: str, language: str) -> Phonemizer | None:
+    """The phonemiser to use for a voice, or None when no suitable one is installed."""
+    for component in candidates(profile, language):
+        ph = get_uccharan() if component == UCCHARAN else get_phonemizer()
+        if ph is not None and ph.supports(profile, language):
+            return ph
+    return None
+
+
+UCCHARAN_MODES = ("compatible", "improved")
+CHOICES = ("auto", UCCHARAN, f"{UCCHARAN}:compatible", f"{UCCHARAN}:improved", ESPEAK)
+
+
+def parse_choice(value: str | None) -> tuple[str, bool]:
+    """A ``phonemizer`` request value -> ``(component or "auto", improved)``.
+
+    Values: ``auto``, ``uccharan`` (= ``uccharan:compatible``, what the voices were trained on),
+    ``uccharan:improved`` (uccharan's cleaner readings: homographs, numbers, Hindi schwa), ``espeak-ng``.
+    """
+    from bolo.errors import InvalidRequest
+
+    v = (value or "auto").strip().lower()
+    if v in ("", "auto"):
+        return "auto", False
+    component, _, mode = v.partition(":")
+    if component in ("espeak", "espeak-ng") and not mode:
+        return ESPEAK, False
+    if component == UCCHARAN and mode in ("", *UCCHARAN_MODES):
+        return UCCHARAN, mode == "improved"
+    raise InvalidRequest(f"phonemizer must be one of {', '.join(CHOICES)}, not {value!r}", param="phonemizer")
+
+
+def resolve(profile: str, language: str, choice: str | None = None) -> tuple[Phonemizer, bool]:
+    """The phonemiser (and uccharan's improved flag) for one request.
+
+    ``choice`` (a request's or a voice's pinned ``phonemizer``) overrides the server-wide preference.
+    Raises ``ComponentMissing`` (424) when the chosen phonemiser is not installed, and ``InvalidRequest``
+    (400) when uccharan is chosen for a language it does not cover.
+    """
+    from bolo.errors import InvalidRequest
+
+    component, improved = parse_choice(choice)
+    if component == "auto":
+        return require(profile, language), False
+    if component == UCCHARAN:
+        if uccharan_language(profile, language) is None:
+            covered = ", ".join(sorted(UCCHARAN_SUPPORT.get(profile, {}))) or "none"
+            raise InvalidRequest(
+                f"uccharan has no {profile} front end for language '{language}'. Supported for {profile}: "
+                f"{covered}. Use phonemizer 'espeak-ng' or 'auto' for this voice.",
+                param="phonemizer",
+            )
+        ph = get_uccharan()
+        if ph is None:
+            raise ComponentMissing(missing_hint(profile, language))
+        return ph, improved
+    ph = get_phonemizer()
+    if ph is None:
+        raise ComponentMissing(INSTALL_HINT)
+    return ph, False
+
+
+def missing_hint(profile: str, language: str) -> str:
+    wanted = candidates(profile, language)
+    if not wanted:
+        return (
+            f"no phonemiser for this voice: the phonemizer setting is 'uccharan', which does not cover "
+            f"language '{language}' ({profile}); set phonemizer = 'auto' to use eSpeak NG for it"
+        )
+    if wanted[0] == UCCHARAN:
+        return (
+            "this voice needs a phonemiser: install uccharan (Apache-2.0) with `pip install 'bolo[uccharan]'` or "
+            "`bolo components install uccharan`"
+            + ("" if len(wanted) == 1 else "; eSpeak NG (`bolo components install espeak-ng`) works too")
+        )
+    return INSTALL_HINT
+
+
+def require(profile: str, language: str) -> Phonemizer:
+    ph = select(profile, language)
+    if ph is None:
+        raise ComponentMissing(missing_hint(profile, language))
+    return ph
+
+
 def reset_phonemizer() -> None:
-    """Forget the cached choice (tests)."""
-    global _instance, _resolved
+    """Forget the cached choices (tests, and after installing a component)."""
+    global _instance, _resolved, _uccharan, _uccharan_resolved
     with _lock:
         _instance, _resolved = None, False
+        _uccharan, _uccharan_resolved = None, False

@@ -140,6 +140,8 @@ class RealtimeSession:
         self.max_output_tokens: Any = "inf"
         self.voice: str | None = None
         self.speed = 1.0
+        #: bolo extension, session.audio.output.phonemizer
+        self.phonemizer: str | None = None
         self.in_codec, self.in_rate, self.in_format = _format(None, "")
         self.out_codec, self.out_rate, self.out_format = _format(None, "")
         self.transcription: dict[str, Any] = {"model": s.default_realtime_stt, "language": None, "prompt": None}
@@ -218,7 +220,12 @@ class RealtimeSession:
             "output_modalities": self.output_modalities,
             "audio": {
                 "input": audio_in,
-                "output": {"format": self.out_format, "voice": self.voice, "speed": self.speed},
+                "output": {
+                    "format": self.out_format,
+                    "voice": self.voice,
+                    "speed": self.speed,
+                    "phonemizer": self.phonemizer,
+                },
             },
             "tools": self.tools,
             "tool_choice": self.tool_choice,
@@ -354,6 +361,15 @@ class RealtimeSession:
             self.voice = voice.get("id") if isinstance(voice, dict) else voice
         if audio_out.get("speed") is not None:
             self.speed = float(audio_out["speed"])
+        if "phonemizer" in audio_out:
+            from bolo.text.phonemize import parse_choice
+
+            value = audio_out["phonemizer"]
+            try:
+                parse_choice(value)
+            except Exception as exc:
+                raise RealtimeError(str(getattr(exc, "message", exc)), param="session.audio.output.phonemizer") from exc
+            self.phonemizer = value or None
         if self.kind == "realtime":
             if isinstance(session.get("instructions"), str):
                 self.instructions = session["instructions"]
@@ -887,9 +903,15 @@ class RealtimeSession:
         details: dict[str, Any] | None = None
         try:
             if audio_mode:
-                tts_spec = core.resolve(None, "tts")
+                tts_spec = core.realtime_tts(voice)
                 async for kind, value in speak_stream(
-                    core, text_deltas(), model=tts_spec.id, voice=voice, speed=self.speed, transport="realtime"
+                    core,
+                    text_deltas(),
+                    model=tts_spec.id,
+                    voice=voice,
+                    speed=self.speed,
+                    transport="realtime",
+                    phonemizer=self.phonemizer,
                 ):
                     msg = await open_message()
                     base = {"response_id": response_id, "item_id": msg["id"], "output_index": 0, "content_index": 0}

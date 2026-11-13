@@ -1,8 +1,12 @@
 name: Voices
 
-# Converts the IISc SYSPIN VITS voices (PyTorch checkpoints on Hugging Face, pinned revisions in
-# tools/voices/syspin.json) to the ONNX layout bolo loads, and publishes one archive per voice,
-# SHA256SUMS and voices.json as assets of a release of this repository.
+# Converts models that exist only as PyTorch checkpoints to formats bolo loads without PyTorch, and publishes
+# one archive per model, SHA256SUMS and voices.json as assets of a release of this repository:
+#   tools/voices/syspin.json   IISc SYSPIN VITS voices (MIT)            -> export_syspin.py
+#   tools/voices/mms.json      Meta MMS-TTS voices (CC-BY-NC-4.0)       -> export_mms.py
+#   tools/voices/whisper.json  Whisper fine-tunes -> CTranslate2 int8   -> convert_whisper.py
+# With the repository secret HF_TOKEN, each model is also uploaded to its own public Hugging Face repository
+# under codebucketsolutions/ (tools/voices/publish_hf.py); without it that step is skipped.
 # Afterwards: python tools/voices/update_catalog.py (see tools/voices/README.md).
 
 on:
@@ -13,7 +17,7 @@ on:
         default: voices-v1
         required: true
       voices:
-        description: Comma-separated voice ids (empty = every voice in tools/voices/syspin.json)
+        description: Comma-separated model ids (empty = every model in tools/voices/{syspin,mms,whisper}.json)
         default: ""
         required: false
 
@@ -38,12 +42,18 @@ jobs:
         run: |
           python3 - <<'PY' >> "$GITHUB_OUTPUT"
           import json, os
-          ids = [v["id"] for v in json.load(open("tools/voices/syspin.json"))["voices"]]
+          sets = {"syspin": "export_syspin.py", "mms": "export_mms.py", "whisper": "convert_whisper.py"}
+          items = {}
+          for name, script in sets.items():
+              path = f"tools/voices/{name}.json"
+              if os.path.isfile(path):
+                  for v in json.load(open(path, encoding="utf-8"))["voices"]:
+                      items[v["id"]] = {"voice": v["id"], "script": script, "requirements": f"requirements-{name}.txt"}
           only = [x.strip() for x in os.environ.get("ONLY", "").split(",") if x.strip()]
-          unknown = sorted(set(only) - set(ids))
+          unknown = sorted(set(only) - set(items))
           if unknown:
-              raise SystemExit(f"unknown voice ids: {unknown}")
-          print("matrix=" + json.dumps({"voice": only or ids}))
+              raise SystemExit(f"unknown model ids: {unknown}")
+          print("matrix=" + json.dumps({"include": [items[i] for i in (only or items)]}))
           PY
 
   export:
@@ -59,13 +69,15 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Install the export tools (CPU PyTorch, Coqui TTS, ONNX, sherpa-onnx)
+      - name: Install the export tools (CPU PyTorch and what the converter needs)
+        env:
+          REQS: ${{ matrix.requirements }}
         run: |
           python -m pip install --upgrade pip
           pip install "torch==2.8.*" "torchaudio==2.8.*" --index-url https://download.pytorch.org/whl/cpu
-          pip install -r tools/voices/requirements.txt
+          pip install -r "tools/voices/$REQS"
       - name: Convert, smoke-test and pack
-        run: python tools/voices/export_syspin.py --out dist --only "${{ matrix.voice }}"
+        run: python "tools/voices/${{ matrix.script }}" --out dist --only "${{ matrix.voice }}"
       - uses: actions/upload-artifact@v7
         with:
           name: voice-${{ matrix.voice }}
@@ -129,5 +141,19 @@ jobs:
           else
             gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest=false \
               --title "Voices ($TAG)" \
-              --notes "Voices converted for bolo by tools/voices (see tools/voices/README.md). IISc SYSPIN VITS voices: weights MIT, training data SYSPIN corpus CC-BY-4.0, by the SYSPIN project, SPIRE Lab, Indian Institute of Science. Each archive contains LICENSE and ATTRIBUTION. This is not a bolo software release."
+              --notes "Models converted for bolo by tools/voices (see tools/voices/README.md). IISc SYSPIN VITS voices: weights MIT, training data SYSPIN corpus CC-BY-4.0, by the SYSPIN project, SPIRE Lab, Indian Institute of Science. Meta MMS-TTS voices: CC-BY-NC-4.0, non-commercial use only. Each archive contains LICENSE and ATTRIBUTION; see voices.json for the licence of each. This is not a bolo software release."
           fi
+      - name: Upload to Hugging Face (only with the HF_TOKEN secret)
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "No HF_TOKEN secret: skipping the Hugging Face upload."
+            exit 0
+          fi
+          python -m pip install "huggingface_hub>=0.25"
+          python tools/voices/publish_hf.py --dist dist
+          # voices.json now records the Hub repository and commit of each model
+          gh release upload "$TAG" dist/voices.json --clobber --repo "$GITHUB_REPOSITORY"

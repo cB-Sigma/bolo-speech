@@ -37,7 +37,8 @@ catalog ids, and accepts the speaches ids of the same models as aliases:
 | `speaches-ai/Kokoro-82M-v1.0-ONNX-int8` | `kokoro-v1.0-int8` |
 | `speaches-ai/piper-en_US-amy-low` (any Piper voice in the catalog) | `piper-en-us-amy-low` |
 | `whisper-1` | the configured `default_stt` |
-| `tts-1`, `tts-1-hd` | the configured `default_tts` |
+| `tts-1` | `default_realtime_tts` (`piper-en-us-amy-low`) |
+| `tts-1-hd` | the configured `default_tts` (Kokoro) |
 
 speaches ships a `model_aliases.json` that maps `whisper-1` to
 `Systran/faster-whisper-large-v3`. bolo's default for `whisper-1` is
@@ -101,8 +102,9 @@ different ports.
   audio. Set `options: {beam_size: 5}` on a model to change it.
 * **Piper voices** run through sherpa-onnx, not the GPL `piper-tts` package
   that speaches depends on (see
-  [models.md](models.md#licences-and-the-espeak-ng-question)). Kokoro's
-  English and Mandarin voices work without espeak-ng.
+  [models.md](models.md#licences-and-the-espeak-ng-question)). English and
+  Hindi voices get their phonemes from uccharan; other languages need
+  espeak-ng.
 * **Concurrency.** Requests for the same model are queued and micro-batched
   instead of each taking a model handle; when the queue is full bolo answers
   `429` with `Retry-After`.
@@ -110,11 +112,13 @@ different ports.
   Diarization uses pyannote's segmentation model exported to ONNX with a
   separate speaker-embedding model, not the `pyannote.audio` pipeline, so
   results will differ from speaches'.
-* **Piper voices need a component speaches bundles.** speaches installs the
-  GPL `piper-tts` package, which contains espeak-ng. bolo does not ship
-  espeak-ng: install it once (console button, `bolo components install
-  espeak-ng --accept-license`, or `pip install 'bolo[espeak]'`) if you
-  use Piper voices. Until then they answer `424 component_missing`.
+* **Piper voices outside English and Hindi need a component speaches bundles.**
+  speaches installs the GPL `piper-tts` package, which contains espeak-ng.
+  bolo does not ship espeak-ng: install it once (console button, `bolo
+  components install espeak-ng --accept-license`, or `pip install
+  'bolo[espeak]'`) if you use such voices. Until then they answer `424
+  component_missing`. English and Hindi Piper voices use uccharan
+  (`bolo[all]`).
 
 ## Checking a migration
 

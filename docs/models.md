@@ -58,9 +58,47 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-247 models: 108 validated on CPU by the maintainers, 139 untested.
+253 models: 108 validated on CPU by the maintainers, 145 untested. 18 more are described but not yet published (see "Voices converted by this project").
 
 ### Speech to text
+
+#### SraVaani
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `sravaani-1.0` | as, bn, en, gu, hi, kn +8 | accuracy | pseudo | 909 MB | MIT · needs plugin torch · gated | untested |
+
+#### IndicConformer
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `indicconformer-600m-official` | as, bn, brx, doi, gu, hi +16 | accuracy | pseudo | 2.6 GB | MIT · needs plugin torch · gated | untested |
+| `indicconformer-multi-community` | hi, as, bn, brx, gu, kn +2 | balanced | pseudo | 197 MB | MIT | **CPU** · RTF 0.131 · WER 0.0% |
+| `indicconformer-mai-community` | mai | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.064 · WER 49.6% · CER 11.6% |
+| `indicconformer-hi-community` | hi | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.066 · WER 15.2% · CER 7.0% |
+| `indicconformer-as-community` | as | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.150 · WER 30.8% · CER 14.9% |
+| `indicconformer-bn-community` | bn | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.106 · WER 10.8% · CER 2.5% |
+| `indicconformer-brx-community` | brx | balanced | pseudo | 198 MB | MIT | untested |
+| `indicconformer-doi-community` | doi | balanced | pseudo | 198 MB | MIT | untested |
+| `indicconformer-gu-community` | gu | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.114 · WER 21.7% · CER 5.4% |
+| `indicconformer-kn-community` | kn | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.070 · WER 15.1% · CER 4.8% |
+| `indicconformer-kok-community` | kok | balanced | pseudo | 198 MB | MIT | untested |
+| `indicconformer-ks-community` | ks | balanced | pseudo | 198 MB | MIT | untested |
+| `indicconformer-ml-community` | ml | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.124 · WER 31.4% · CER 8.8% |
+| `indicconformer-mni-community` | mni | balanced | pseudo | 198 MB | MIT | untested |
+| `indicconformer-mr-community` | mr | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.202 · WER 19.3% · CER 4.2% |
+| `indicconformer-ne-community` | ne | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.135 · WER 30.7% · CER 12.7% |
+| `indicconformer-or-community` | or | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.155 · WER 15.5% · CER 4.8% |
+| `indicconformer-pa-community` | pa | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.139 · WER 15.5% · CER 5.3% |
+| `indicconformer-sa-community` | sa | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.127 · WER 44.2% · CER 6.1% |
+| `indicconformer-sat-community` | sat | balanced | pseudo | 198 MB | MIT | untested |
+| `indicconformer-sd-community` | sd | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.109 |
+| `indicconformer-ta-community` | ta | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.060 · WER 25.5% · CER 10.2% |
+| `indicconformer-te-community` | te | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.074 · WER 21.1% · CER 10.4% |
+| `indicconformer-ur-community` | ur | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.143 · WER 18.5% · CER 7.5% |
+| `indicconformer-ta` | ta | balanced | pseudo | 138 MB | MIT | **CPU** · RTF 0.228 · WER 29.0% · CER 10.3% |
+| `indicconformer-te` | te | balanced | pseudo | 138 MB | MIT | **CPU** · RTF 0.262 · WER 21.7% · CER 10.5% |
+| `indicconformer-ml` | ml | balanced | pseudo | 138 MB | MIT | **CPU** · RTF 0.174 · WER 34.3% · CER 9.8% |
 
 #### Whisper
 
@@ -199,37 +237,6 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `omnilingual-ctc-300m` | en, hi, bn, ta, te, mr +25 | balanced | pseudo | 365 MB | Apache-2.0 | **CPU** · RTF 0.112 |
 
-#### IndicConformer
-
-| id | languages | tier | streaming | download | licence | validated |
-| --- | --- | --- | --- | --- | --- | --- |
-| `indicconformer-multi-community` | hi, as, bn, brx, gu, kn +2 | balanced | pseudo | 197 MB | MIT | **CPU** · RTF 0.131 · WER 0.0% |
-| `indicconformer-mai-community` | mai | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.064 · WER 49.6% · CER 11.6% |
-| `indicconformer-hi-community` | hi | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.066 · WER 15.2% · CER 7.0% |
-| `indicconformer-as-community` | as | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.150 · WER 30.8% · CER 14.9% |
-| `indicconformer-bn-community` | bn | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.106 · WER 10.8% · CER 2.5% |
-| `indicconformer-brx-community` | brx | balanced | pseudo | 198 MB | MIT | untested |
-| `indicconformer-doi-community` | doi | balanced | pseudo | 198 MB | MIT | untested |
-| `indicconformer-gu-community` | gu | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.114 · WER 21.7% · CER 5.4% |
-| `indicconformer-kn-community` | kn | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.070 · WER 15.1% · CER 4.8% |
-| `indicconformer-kok-community` | kok | balanced | pseudo | 198 MB | MIT | untested |
-| `indicconformer-ks-community` | ks | balanced | pseudo | 198 MB | MIT | untested |
-| `indicconformer-ml-community` | ml | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.124 · WER 31.4% · CER 8.8% |
-| `indicconformer-mni-community` | mni | balanced | pseudo | 198 MB | MIT | untested |
-| `indicconformer-mr-community` | mr | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.202 · WER 19.3% · CER 4.2% |
-| `indicconformer-ne-community` | ne | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.135 · WER 30.7% · CER 12.7% |
-| `indicconformer-or-community` | or | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.155 · WER 15.5% · CER 4.8% |
-| `indicconformer-pa-community` | pa | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.139 · WER 15.5% · CER 5.3% |
-| `indicconformer-sa-community` | sa | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.127 · WER 44.2% · CER 6.1% |
-| `indicconformer-sat-community` | sat | balanced | pseudo | 198 MB | MIT | untested |
-| `indicconformer-sd-community` | sd | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.109 |
-| `indicconformer-ta-community` | ta | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.060 · WER 25.5% · CER 10.2% |
-| `indicconformer-te-community` | te | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.074 · WER 21.1% · CER 10.4% |
-| `indicconformer-ur-community` | ur | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.143 · WER 18.5% · CER 7.5% |
-| `indicconformer-ta` | ta | balanced | pseudo | 138 MB | MIT | **CPU** · RTF 0.228 · WER 29.0% · CER 10.3% |
-| `indicconformer-te` | te | balanced | pseudo | 138 MB | MIT | **CPU** · RTF 0.262 · WER 21.7% · CER 10.5% |
-| `indicconformer-ml` | ml | balanced | pseudo | 138 MB | MIT | **CPU** · RTF 0.174 · WER 34.3% · CER 9.8% |
-
 #### Nemotron
 
 | id | languages | tier | streaming | download | licence | validated |
@@ -238,34 +245,88 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 ### Text to speech
 
+#### Parler-TTS
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `indic-parler-tts` | as, bn, en, gu, hi, kn +11 | accuracy | - | 3.8 GB | Apache-2.0 · needs plugin torch · gated | untested |
+
+#### F5-TTS
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `indic-f5` | as, bn, gu, hi, kn, ml +5 | accuracy | - | 1.4 GB | MIT · needs plugin torch · gated | untested |
+
+#### Veena
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `veena` | en, hi | accuracy | - | 7.6 GB | Apache-2.0 · needs plugin torch | untested |
+
+#### Svara
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `svara-tts-v1` | as, bho, bn, brx, doi, en +13 | accuracy | - | 13.2 GB | Apache-2.0 · needs plugin torch | untested |
+
+#### MMS-TTS
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `mms-tts-pan` | pa | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | not yet published |
+| `mms-tts-ory` | or | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | not yet published |
+| `mms-tts-asm` | as | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | not yet published |
+| `mms-tts-dgo` | doi | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | not yet published |
+| `mms-tts-mai` | mai | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | not yet published |
+| `mms-tts-mag` | mag | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | not yet published |
+| `mms-tts-hne` | hne | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | not yet published |
+| `mms-tts-awa` | awa | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | not yet published |
+| `mms-tts-bgc` | bgc | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | not yet published |
+| `mms-tts-urd` | ur | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | not yet published |
+| `mms-tts-hin` | hi | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | not yet published |
+| `mms-tts-ben` | bn | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | not yet published |
+| `mms-tts-guj` | gu | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | not yet published |
+| `mms-tts-kan` | kn | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | not yet published |
+| `mms-tts-mal` | ml | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | not yet published |
+| `mms-tts-mar` | mr | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | not yet published |
+| `mms-tts-tam` | ta | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | not yet published |
+| `mms-tts-tel` | te | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | not yet published |
+| `mms-tts-eng` | en | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | **CPU** · RTF 0.196 · first audio 590 ms · round-trip WER 5.0% |
+| `mms-tts-deu` | de | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
+| `mms-tts-fra` | fr | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
+| `mms-tts-spa` | es | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
+| `mms-tts-rus` | ru | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
+| `mms-tts-ukr` | uk | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
+| `mms-tts-tha` | th | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
+
 #### Piper
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `piper-hi-in-pratham-medium` | hi | realtime | - | 63 MB | See dataset licence: http://creativecommons.org/licenses/… ⚠ · needs espeak-ng | **CPU** · RTF 0.152 · first audio 238 ms |
-| `piper-hi-in-priyamvada-medium` | hi | realtime | - | 63 MB | See dataset licence: http://creativecommons.org/licenses/… ⚠ · needs espeak-ng | **CPU** · RTF 0.056 · first audio 96 ms |
-| `piper-hi-in-rohan-medium` | hi | realtime | - | 63 MB | See dataset licence: https://www.iitm.ac.in/donlab/indict… · needs espeak-ng | **CPU** · RTF 0.092 · first audio 164 ms |
+| `piper-hi-in-pratham-medium` | hi | realtime | - | 63 MB | See dataset licence: http://creativecommons.org/licenses/… ⚠ · phonemes: uccharan | **CPU** · RTF 0.152 · first audio 238 ms |
+| `piper-hi-in-priyamvada-medium` | hi | realtime | - | 63 MB | See dataset licence: http://creativecommons.org/licenses/… ⚠ · phonemes: uccharan | **CPU** · RTF 0.056 · first audio 96 ms |
+| `piper-hi-in-rohan-medium` | hi | realtime | - | 63 MB | See dataset licence: https://www.iitm.ac.in/donlab/indict… · phonemes: uccharan | **CPU** · RTF 0.092 · first audio 164 ms |
 | `piper-ne-np-google-medium` | ne | realtime | - | 77 MB | Voice: CC-BY-SA-4.0 International · needs espeak-ng | **CPU** · RTF 0.040 · first audio 88 ms |
 | `piper-ne-np-google-x-low` | ne | realtime | - | 28 MB | Voice: CC-BY-SA-4.0 International · needs espeak-ng | untested |
 | `piper-ur-pk-fasih-medium` | ur | realtime | - | 64 MB | See voice card · needs espeak-ng | **CPU** · RTF 0.090 · first audio 191 ms |
-| `piper-en-us-lessac-medium` | en | realtime | - | 63 MB | See dataset licence: https://www.cstr.ed.ac.uk/projects/b… ⚠ · needs espeak-ng | **CPU** · RTF 0.126 · first audio 325 ms · round-trip WER 5.0% |
-| `piper-en-us-lessac-low` | en | realtime | - | 63 MB | See dataset licence: https://www.cstr.ed.ac.uk/projects/b… ⚠ · needs espeak-ng | untested |
-| `piper-en-us-amy-low` | en | realtime | - | 63 MB | See dataset licence: https://github.com/MycroftAI/mimic3-… · needs espeak-ng | **CPU** · RTF 0.049 · first audio 189 ms · round-trip WER 0.0% |
-| `piper-en-us-amy-medium` | en | realtime | - | 63 MB | See dataset licence: https://github.com/MycroftAI/mimic3-… · needs espeak-ng | untested |
-| `piper-en-us-ryan-medium` | en | realtime | - | 63 MB | Voice: CC BY-NC-SA 4.0 ⚠ · needs espeak-ng | **CPU** · RTF 0.118 · first audio 259 ms · round-trip WER 0.0% |
-| `piper-en-us-ryan-high` | en | realtime | - | 121 MB | Voice: CC BY-NC-SA 4.0 ⚠ · needs espeak-ng | untested |
-| `piper-en-us-hfc-female-medium` | en | realtime | - | 63 MB | See dataset licence: https://creativecommons.org/licenses… ⚠ · needs espeak-ng | untested |
-| `piper-en-us-hfc-male-medium` | en | realtime | - | 63 MB | See dataset licence: https://creativecommons.org/licenses… ⚠ · needs espeak-ng | untested |
-| `piper-en-us-libritts-r-medium` | en | realtime | - | 79 MB | Voice: CC BY 4.0 · needs espeak-ng | **CPU** · RTF 0.137 · first audio 309 ms · round-trip WER 0.0% |
-| `piper-en-us-ljspeech-medium` | en | realtime | - | 64 MB | Voice: public domain · needs espeak-ng | untested |
-| `piper-en-us-joe-medium` | en | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
-| `piper-en-us-kristin-medium` | en | realtime | - | 64 MB | Voice: public domain · needs espeak-ng | untested |
-| `piper-en-gb-alan-medium` | en | realtime | - | 63 MB | See dataset licence: https://github.com/MycroftAI/mimic3-… · needs espeak-ng | untested |
-| `piper-en-gb-alba-medium` | en | realtime | - | 63 MB | See dataset licence: https://creativecommons.org/licenses… · needs espeak-ng | **CPU** · RTF 0.147 · first audio 380 ms · round-trip WER 15.0% |
-| `piper-en-gb-cori-medium` | en | realtime | - | 64 MB | Voice: public domain · needs espeak-ng | untested |
-| `piper-en-gb-jenny-dioco-medium` | en | realtime | - | 63 MB | See dataset licence: https://github.com/dioco-group/jenny… · needs espeak-ng | untested |
-| `piper-en-gb-northern-english-male-medium` | en | realtime | - | 63 MB | Voice: CC-BY-SA 4.0 International · needs espeak-ng | untested |
-| `piper-en-gb-southern-english-female-medium` | en | realtime | - | 77 MB | See voice card · needs espeak-ng | untested |
+| `piper-en-us-lessac-medium` | en | realtime | - | 63 MB | See dataset licence: https://www.cstr.ed.ac.uk/projects/b… ⚠ · phonemes: uccharan | **CPU** · RTF 0.126 · first audio 325 ms · round-trip WER 5.0% |
+| `piper-en-us-lessac-low` | en | realtime | - | 63 MB | See dataset licence: https://www.cstr.ed.ac.uk/projects/b… ⚠ · phonemes: uccharan | untested |
+| `piper-en-us-amy-low` | en | realtime | - | 63 MB | See dataset licence: https://github.com/MycroftAI/mimic3-… · phonemes: uccharan | **CPU** · RTF 0.049 · first audio 189 ms · round-trip WER 0.0% |
+| `piper-en-us-amy-medium` | en | realtime | - | 63 MB | See dataset licence: https://github.com/MycroftAI/mimic3-… · phonemes: uccharan | untested |
+| `piper-en-us-ryan-medium` | en | realtime | - | 63 MB | Voice: CC BY-NC-SA 4.0 ⚠ · phonemes: uccharan | **CPU** · RTF 0.118 · first audio 259 ms · round-trip WER 0.0% |
+| `piper-en-us-ryan-high` | en | realtime | - | 121 MB | Voice: CC BY-NC-SA 4.0 ⚠ · phonemes: uccharan | untested |
+| `piper-en-us-hfc-female-medium` | en | realtime | - | 63 MB | See dataset licence: https://creativecommons.org/licenses… ⚠ · phonemes: uccharan | untested |
+| `piper-en-us-hfc-male-medium` | en | realtime | - | 63 MB | See dataset licence: https://creativecommons.org/licenses… ⚠ · phonemes: uccharan | untested |
+| `piper-en-us-libritts-r-medium` | en | realtime | - | 79 MB | Voice: CC BY 4.0 · phonemes: uccharan | **CPU** · RTF 0.137 · first audio 309 ms · round-trip WER 0.0% |
+| `piper-en-us-ljspeech-medium` | en | realtime | - | 64 MB | Voice: public domain · phonemes: uccharan | untested |
+| `piper-en-us-joe-medium` | en | realtime | - | 63 MB | Voice: CC0-1.0 · phonemes: uccharan | untested |
+| `piper-en-us-kristin-medium` | en | realtime | - | 64 MB | Voice: public domain · phonemes: uccharan | untested |
+| `piper-en-gb-alan-medium` | en | realtime | - | 63 MB | See dataset licence: https://github.com/MycroftAI/mimic3-… · phonemes: uccharan | untested |
+| `piper-en-gb-alba-medium` | en | realtime | - | 63 MB | See dataset licence: https://creativecommons.org/licenses… · phonemes: uccharan | **CPU** · RTF 0.147 · first audio 380 ms · round-trip WER 15.0% |
+| `piper-en-gb-cori-medium` | en | realtime | - | 64 MB | Voice: public domain · phonemes: uccharan | untested |
+| `piper-en-gb-jenny-dioco-medium` | en | realtime | - | 63 MB | See dataset licence: https://github.com/dioco-group/jenny… · phonemes: uccharan | untested |
+| `piper-en-gb-northern-english-male-medium` | en | realtime | - | 63 MB | Voice: CC-BY-SA 4.0 International · phonemes: uccharan | untested |
+| `piper-en-gb-southern-english-female-medium` | en | realtime | - | 77 MB | See voice card · phonemes: uccharan | untested |
 | `piper-de-de-thorsten-medium` | de | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | **CPU** · RTF 0.251 · first audio 187 ms |
 | `piper-de-de-thorsten-high` | de | realtime | - | 114 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
 | `piper-de-de-kerstin-low` | de | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
@@ -339,16 +400,16 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `kitten-nano-0.8-int8` | en | realtime | - | 28 MB | Apache-2.0 · needs espeak-ng | **CPU** · RTF 0.266 · first audio 977 ms · round-trip WER 0.0% |
-| `kitten-nano-0.8` | en | realtime | - | 60 MB | Apache-2.0 · needs espeak-ng | **CPU** · RTF 0.107 · first audio 396 ms · round-trip WER 0.0% |
-| `kitten-micro-0.8` | en | realtime | - | 45 MB | Apache-2.0 · needs espeak-ng | **CPU** · RTF 0.319 · first audio 1329 ms · round-trip WER 0.0% |
-| `kitten-mini-0.8` | en | realtime | - | 82 MB | Apache-2.0 · needs espeak-ng | **CPU** · RTF 1.112 · first audio 3312 ms · round-trip WER 0.0% |
+| `kitten-nano-0.8-int8` | en | realtime | - | 28 MB | Apache-2.0 · phonemes: uccharan | **CPU** · RTF 0.266 · first audio 977 ms · round-trip WER 0.0% |
+| `kitten-nano-0.8` | en | realtime | - | 60 MB | Apache-2.0 · phonemes: uccharan | **CPU** · RTF 0.107 · first audio 396 ms · round-trip WER 0.0% |
+| `kitten-micro-0.8` | en | realtime | - | 45 MB | Apache-2.0 · phonemes: uccharan | **CPU** · RTF 0.319 · first audio 1329 ms · round-trip WER 0.0% |
+| `kitten-mini-0.8` | en | realtime | - | 82 MB | Apache-2.0 · phonemes: uccharan | **CPU** · RTF 1.112 · first audio 3312 ms · round-trip WER 0.0% |
 
 #### Matcha-TTS
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `matcha-en-ljspeech` | en | balanced | - | 78 MB | Apache-2.0 · needs espeak-ng | **CPU** · RTF 0.205 · first audio 761 ms · round-trip WER 0.0% |
+| `matcha-en-ljspeech` | en | balanced | - | 78 MB | Apache-2.0 · phonemes: uccharan | **CPU** · RTF 0.205 · first audio 761 ms · round-trip WER 0.0% |
 | `matcha-zh-baker` | zh | balanced | - | 96 MB | Research only (Baker dataset: non-commercial) ⚠ | untested |
 
 #### MeloTTS
@@ -356,18 +417,6 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `melo-tts-en` | en | balanced | - | 175 MB | MIT | **CPU** · RTF 0.278 · first audio 768 ms · round-trip WER 30.0% |
-
-#### MMS-TTS
-
-| id | languages | tier | streaming | download | licence | validated |
-| --- | --- | --- | --- | --- | --- | --- |
-| `mms-tts-eng` | en | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | **CPU** · RTF 0.196 · first audio 590 ms · round-trip WER 5.0% |
-| `mms-tts-deu` | de | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
-| `mms-tts-fra` | fr | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
-| `mms-tts-spa` | es | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
-| `mms-tts-rus` | ru | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
-| `mms-tts-ukr` | uk | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
-| `mms-tts-tha` | th | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
 
 #### VITS
 
@@ -501,24 +550,19 @@ switch: with `auto_pull` off nothing is downloaded unless you ask.
 
 ## Voices converted by this project
 
-Some good, permissively licensed voices exist only as PyTorch checkpoints.
-bolo has no PyTorch, so the project converts them once, in the open
-(`tools/voices/` and the "Voices" workflow), and publishes the results as
-assets of a GitHub release of this repository
-(`https://github.com/cb-Sigma/bolo/releases/tag/voices-v1`). Each archive
+Some good voices exist only as PyTorch checkpoints. bolo has no PyTorch, so
+the project converts them once, in the open (`tools/voices/` and the "Voices"
+workflow), and publishes the results as assets of a GitHub release of this
+repository (`https://github.com/cb-Sigma/bolo/releases/tag/voices-v1`) and,
+once the workflow has a Hugging Face token, as one public repository per voice
+under `codebucketsolutions/` (the catalog then pulls from the Hub, pinned to
+the uploaded commit, with the release archive as fallback). Each archive
 holds `model.onnx`, `tokens.txt`, `voice.json` (source repository and pinned
 revision, licence, language, sample rate, character set), `LICENSE` and
 `ATTRIBUTION`.
 
-**Status: not yet published.** The 22 catalog entries below carry
-`status: pending`: they are listed here, hidden from `bolo list` and the
-console, and answer `model_not_published` when pulled. Once the workflow has
-run, `tools/voices/update_catalog.py` writes the checksums into the catalog.
-What was run so far: packing, the sherpa-onnx smoke synthesis, the index and
-the catalog update on three voices converted earlier with the same recipe
-(Maithili female and male, Bhojpuri female), then the complete pull path
-against a local web server and a transcription of the result. The export
-step of the script itself (PyTorch) and the workflow were **not** run.
+**SYSPIN: published** (release `voices-v1`, 22 voices; the catalog has
+their sizes and checksums).
 
 | Voices | Source (all by the SYSPIN project, SPIRE Lab, Indian Institute of Science) | Licence |
 | --- | --- | --- |
@@ -531,6 +575,21 @@ The pinned revisions are in `tools/voices/syspin.json`. The conversion
 changes the file format only (Coqui VITS checkpoint to ONNX); the weights are
 not retrained. All are single-speaker VITS voices at 22.05 kHz, about 114 MB
 each, with character input and no espeak-ng.
+
+**Meta MMS-TTS (non-commercial): converted, not yet published.** 18 voices
+for Indian languages (`mms-tts-<iso>`: Punjabi, Odia, Assamese, Dogri,
+Maithili, Magahi, Chhattisgarhi, Awadhi, Haryanvi, Urdu, Hindi, Bengali,
+Gujarati, Kannada, Malayalam, Marathi, Tamil, Telugu), from
+`facebook/mms-tts` pinned to a commit, converted with MMS's own VITS
+inference code (`tools/voices/export_mms.py`, the recipe sherpa-onnx used for
+its English MMS voices). **CC-BY-NC-4.0: non-commercial use only**; each
+archive carries the licence text and the attribution, and the entries say
+`commercial_use: false`. They are `status: pending` until the workflow
+publishes them. The conversion was run here for eight languages and each
+voice was loaded by bolo and transcribed back (numbers in
+[indic-telephony.md](indic-telephony.md) and
+`docs/measurements/mms-tts-round-trip.json`); MMS-TTS has no voice for
+Sanskrit, Sindhi, Kashmiri, Konkani, Manipuri, Bodo, Santali or Bhojpuri.
 
 ## Character-input voices
 
@@ -552,7 +611,19 @@ against the table first:
 
 Checked on the real `coqui-bn-female` voice (83 symbols, Bengali digits but
 no ASCII digits and no Latin letters) and on the SYSPIN Maithili and
-Bhojpuri voices. Phoneme-based voices (Piper format, Kokoro, KittenTTS) are
+Bhojpuri voices.
+
+Before that check, the text gets the **cleaning the voice's training text
+had** (catalog option `text_cleaner`, or `cleaner` in the voice's
+`voice.json`): `multilingual` for the SYSPIN voices (Coqui's
+`multilingual_cleaners`: NFC, which also splits precomposed nukta letters,
+lower case, `;` and `:` to commas, hyphens to spaces, brackets and double
+quotes removed, then `।` to `.` for voices without a danda), `lowercase` for
+MMS-TTS. sherpa-onnx does none of this itself. The same front end runs in the
+console's in-browser voices and the tests share their fixtures. On the
+published Hindi and English SYSPIN voices it lowered the round-trip error on
+mixed-case, punctuated text from 24.6 % to 14.5 % and from 20.8 % to 13.9 %
+WER (8 sentences each, `docs/measurements/syspin-text-cleaning.json`). Phoneme-based voices (Piper format, Kokoro, KittenTTS) are
 not affected: espeak-ng reads digits and foreign words for them.
 
 ## Word timestamps
@@ -563,6 +634,13 @@ not affected: espeak-ng reads digits and foreign words for them.
 | transducer and CTC models through sherpa-onnx (Zipformer, Parakeet, NeMo, IndicConformer, SenseVoice, …) | yes, from the token times the decoder reports |
 | Whisper through sherpa-onnx (`whisper-*`) | **no** with the exports in the catalog: token times need a model exported with cross-attention outputs. sherpa-onnx 2.0.1 supports such exports, and a catalog entry for one can switch them on with the option `token_timestamps: true`; we checked that the stock `whisper-tiny` export reports none |
 | Moonshine | **no**: the runtime exposes no token times, and we did not add a forced aligner |
+
+A cheap forced aligner (CTC alignment of the transcript against a small CTC
+model) was considered for both and not built: sherpa-onnx's offline
+recogniser does not expose the per-frame posteriors such an alignment needs,
+so it would mean running a CTC model's ONNX graph and NeMo-compatible feature
+extraction ourselves, and we had no reference word timings here to check the
+result against.
 
 With `diarize=true`, words also carry their speaker. For word times with
 Whisper, use the `faster-whisper-*` entries.
@@ -579,20 +657,137 @@ was measured for each language. In short:
   Kannada, Telugu, Bengali and Punjabi; a streaming Bengali Zipformer and
   NVIDIA's streaming Nemotron for Hindi.
 * **Text to speech** for Hindi, Bengali, Telugu, Tamil, Malayalam, Marathi,
-  Urdu, Nepali and Gujarati. Maithili, Bhojpuri, Kannada and more are
-  prepared but not yet published (previous section). **No voice** for
-  Punjabi, Odia, Assamese, Sanskrit, Sindhi, Kashmiri, Konkani, Dogri,
-  Manipuri, Bodo and Santali.
+  Urdu, Nepali, Gujarati, Kannada, Maithili, Bhojpuri, Magahi and
+  Chhattisgarhi (the SYSPIN voices are published). Non-commercial MMS-TTS
+  voices for Punjabi, Odia, Assamese, Dogri and more are converted and wait
+  for publication. **No voice** that runs without PyTorch for Sanskrit,
+  Sindhi, Kashmiri, Konkani, Manipuri, Bodo and Santali.
 * **Bhojpuri** has no speech-to-text model of its own here; the Hindi model
-  is the fallback, at about 40 % word error rate in our run.
+  is the best we measured (41 % word error rate on 120 utterances), better than
+  the Whisper-small Bhojpuri fine-tune we converted (48 %).
 
 **AI4Bharat's own repositories** (`ai4bharat/indicconformer_stt_*`,
 `ai4bharat/indic-conformer-600m-multilingual`) are **gated** on Hugging Face
 (MIT licence, but you must accept terms and use a token). bolo never
-downloads a gated model without a token you supply, so the catalog uses
-ungated community exports of the same models, pinned to a commit and named
-`-community`. They are third-party conversions: we verified the licence of
+downloads a gated model without a token you supply, so the default
+recognisers are ungated community exports of the same models, pinned to a
+commit and named `-community`. The official multilingual release is listed
+too (`indicconformer-600m-official`, gated, for the PyTorch engine plugin). They are third-party conversions: we verified the licence of
 the originals and ran the files, not how they were made.
+
+## Phonemisers
+
+Piper-format voices, KittenTTS, Matcha-TTS and Kokoro were trained on phonemes, not letters, and
+sherpa-onnx 2.x expects the caller to supply them. bolo has two phonemisers:
+
+| Phonemiser | Licence | Covers | How it gets there |
+| --- | --- | --- | --- |
+| **uccharan** (default) | Apache-2.0 | Piper and Kokoro voices in English (US, British) and Hindi; Kitten and Matcha (US English). For Kokoro English it is a port of misaki, the front end Kokoro was trained with, with misaki's dictionaries built in | `bolo[uccharan]`, part of `bolo[all]` and the Docker image; `bolo components install uccharan` |
+| **espeak-ng** | GPL-3.0-or-later | every language espeak-ng has | optional component, never installed by default (next section) |
+
+With the default setting (`phonemizer = "auto"`) a voice uses uccharan when uccharan covers its
+language, and espeak-ng otherwise. That makes **26 catalog voices work out of the box** (15 US
+English and 6 British English Piper voices, 3 Hindi Piper voices, the 4 KittenTTS models, Matcha
+English) plus Kokoro's English and Hindi voices; the other 67 phoneme-based voices (Piper voices
+in other languages, Mimic 3 voices) still need espeak-ng. The coverage table is data
+(`UCCHARAN_SUPPORT` in `server/src/bolo/text/phonemize.py`); it grows when uccharan gains a language.
+
+You can choose, at three levels (a request beats a pin, a pin beats the server setting):
+
+* per request: `phonemizer` in the body of `/v1/audio/speech` (ignored by OpenAI clients, which do not
+  send it), `?phonemizer=` on the TTS WebSocket, `session.audio.output.phonemizer` in a Realtime
+  session, `audio.phonemizer` in `/v1/chat/completions`;
+* per voice, persistently: `bolo models config piper-en-us-amy-low --phonemizer espeak-ng`, or
+  `PUT /api/v1/models/{id}/settings` with `{"phonemizer": "espeak-ng"}` (`null` removes the pin);
+* server-wide: the `phonemizer` setting (`auto`, `uccharan`, `espeak-ng`).
+
+Values: `uccharan` (= `uccharan:compatible`, reproduces what the voices were trained on),
+`uccharan:improved` (uccharan's cleaner readings of homographs, numbers and Hindi schwa deletion;
+not what the voices were trained on), `espeak-ng`, `auto`. Asking for espeak-ng when it is not
+installed answers `424 component_missing`; asking for uccharan in a language it does not cover
+answers `400` with the list of languages it does cover. Each catalog entry lists the choices for
+its voice in `phonemizers` (`[{id, available, default, note}]`; for Kokoro per voice).
+
+### Measured: uccharan against espeak-ng, voice by voice
+
+60 held-out sentences per language (the last 60 lines of uccharan's held-out evaluation sets,
+which were never used to write its rules), synthesised through bolo with each phonemiser and
+transcribed back: English by `whisper-base` (sherpa-onnx int8, Whisper's English normaliser),
+Hindi by `indicconformer-hi-community` (punctuation stripped, NFC). Time to first audio is the
+median per sentence through bolo, 2 threads on the shared 4-vCPU machine (busy: other jobs ran at
+the same time, so compare rows with each other rather than with other pages). espeak-ng 1.52.0
+from the `espeakng-loader` library; uccharan 0.1.0; 2026-11-13.
+
+| Voice | Phonemiser | WER | CER | First audio (median / p90) |
+| --- | --- | ---: | ---: | --- |
+| `piper-en-us-amy-low` | uccharan | 2.99 % | 1.26 % | 135 / 279 ms |
+| | uccharan:improved | 2.99 % | 1.26 % | 130 / 229 ms |
+| | espeak-ng | 2.61 % | 1.15 % | 148 / 263 ms |
+| `piper-en-us-lessac-medium` | uccharan | 3.36 % | 1.52 % | 145 / 248 ms |
+| | espeak-ng | 2.43 % | 1.00 % | 252 / 395 ms |
+| `piper-en-gb-alba-medium` | uccharan | 5.04 % | 2.89 % | 152 / 245 ms |
+| | espeak-ng | 4.48 % | 2.67 % | 182 / 324 ms |
+| `piper-hi-in-rohan-medium` | uccharan | 7.65 % | 2.68 % | 146 / 204 ms |
+| | uccharan:improved | 8.22 % | 3.01 % | 153 / 265 ms |
+| | espeak-ng | 9.07 % | 2.68 % | 170 / 238 ms |
+| `kitten-nano-0.8-int8` | uccharan | 1.68 % | 0.82 % | 890 / 1512 ms |
+| | espeak-ng | 1.87 % | 0.78 % | 1198 / 1928 ms |
+| `kokoro-v1.0-int8`, `af_heart` | uccharan (misaki port) | 2.99 % | 1.22 % | 2373 / 4102 ms |
+| | espeak-ng | 2.99 % | 1.82 % | 2518 / 4636 ms |
+| | neither (bundled lexicon only) | 6.72 % | 6.93 % | 2361 / 3968 ms |
+| `kokoro-v1.0-int8`, `hf_alpha` | uccharan | 5.38 % | 1.77 % | 2856 / 4042 ms |
+| | espeak-ng | 4.53 % | 1.44 % | 3018 / 4469 ms |
+
+Reading it: with 60 sentences (about 600 words) one word is 0.17 points, so differences under about
+one point are within noise: uccharan and espeak-ng are equivalent on these voices, as uccharan's own
+500-sentence evaluation found. The clear result is Kokoro English: without a phonemiser (the
+bundled lexicon skips words it does not know) the error is more than twice as high. Time to first
+audio is the same or lower with uccharan (it runs in process). `uccharan:improved` changed 12 of the
+60 English sentences (for example "OK" read as "okay") without changing the error rate here.
+Raw rows: `docs/measurements/phonemizer-ab.json`.
+
+## Default voices
+
+Two defaults, measured on the same machine (4 threads unless noted; details in
+`docs/measurements/tts-first-audio.json`):
+
+* `default_tts` = `kokoro-v1.0-int8`: the quality voice (54 voices, 8 languages). Requests that name
+  no model, `tts-1-hd` and `gpt-4o-mini-tts` use it.
+* `default_realtime_tts` = `piper-en-us-amy-low`: the low-latency voice, for voice agents (Realtime
+  API, chat completions with audio), Wyoming, `tts-1` and `model: "realtime"`. With uccharan it needs
+  no optional component; its licence allows commercial use (`lessac` does not), and it is 16 kHz,
+  which suits telephony. A voice that only Kokoro has (`af_heart`) still selects Kokoro.
+
+Time to first audio through bolo for replies of two sentences (about 150 characters), first request
+after loading and the median / p90 of 19 more. The machine was heavily loaded by other jobs during
+these runs (load average 4.4 to 7.3 on 4 vCPUs), so the absolute numbers are pessimistic; compare rows.
+
+| Voice | Threads | First chunk | Warm-up on load | Cold | Median / p90 | Round-trip WER |
+| --- | --- | --- | --- | --- | --- | --- |
+| `kokoro-v1.0-int8` (before) | 4 | 120 chars | no | 2484 ms | 3312 / 5704 ms | 1.35 % |
+| `kokoro-v1.0-int8` | 4 | 120 chars | yes | 3872 ms | 2755 / 4642 ms | |
+| `kokoro-v1.0-int8` (now) | 4 | 48 chars | yes | 3055 ms | 2325 / 3338 ms | 1.89 % |
+| `kokoro-v1.0-int8` | 2 | 48 chars | yes | 1887 ms | 2327 / 2842 ms | |
+| `kokoro-v1.0` (float32) | 4 | 48 chars | yes | 1233 ms | 1572 / 2018 ms | |
+| `piper-en-us-amy-low` | 4 | 120 chars | yes | 308 ms | 402 / 646 ms | 1.35 % |
+| `piper-en-us-amy-low` | 2 | 120 chars | yes | 113 ms | 148 / 232 ms | |
+
+What this says:
+
+* **Kokoro is slow to start on this CPU whatever we do.** sherpa-onnx alone needs 1.4 to 2.2 s to
+  say "Hello." with the int8 model (best of three, under the same load), so a large part is fixed
+  cost per call, not length. A shorter first chunk (the catalog now sets `first_chunk_chars: 48`
+  for Kokoro, so the first piece ends at a clause or about 48 characters) cut the median by about
+  15 % and the p90 by about 30 % without a measurable change in the round-trip error.
+* **The int8 export is not the fast one**: the float32 `kokoro-v1.0` started speaking about a third
+  sooner in the same conditions (it is 383 MB instead of 172 MB, and uses more memory). If first
+  audio matters more than download size, set `default_tts = "kokoro-v1.0"`.
+* **Threads**: on a loaded machine 2 threads were as fast as 4 for Kokoro and much faster for Piper;
+  on an idle machine 4 is the default. Leave `threads` at its default unless you measured otherwise.
+* **Warm-up on load** (`warm_up: true` in a catalog entry's options: one short synthesis right
+  after loading) did not show a reliable gain in these noisy runs and is off by default.
+* **Piper `amy` starts speaking in about 0.15 s** with the same round-trip error, which is why it is
+  the realtime default; Kokoro is the voice to choose for quality and for its 54 voices.
 
 ## Licences and the espeak-ng question
 
@@ -632,16 +827,19 @@ to turn text into those phonemes at run time. What we found:
   pass phonemes in (`GenerationConfig.phoneme_codepoints`) or use a lexicon.
   We verified on the 2.0.1 wheel that the `data_dir` options are ignored.
   bolo requires sherpa-onnx ≥ 2.0 for this reason.
-* So bolo has a small phonemiser front end (`bolo/text/phonemize.py`) that
-  hands text to espeak-ng and gets phonemes back.
+* So bolo has a phonemiser front end (`bolo/text/phonemize.py`): uccharan
+  (Apache-2.0) where it covers the language, espeak-ng otherwise (section
+  "Phonemisers" above).
 
 **bolo does not ship espeak-ng.** It is not in the wheel, not in
 `bolo[all]`, and not in the Docker images unless you build them with
 `--build-arg WITH_ESPEAK=1`. It is an *optional component*, installed only
-when you ask for it. Models that need it have `requires: ["espeak-ng"]` in the
-catalog (marked "needs espeak-ng" in the tables above, 93 entries) and show as
-unavailable until it is there; using one answers `424 component_missing` with
-the install instructions instead of producing silence.
+when you ask for it. Voices that read phonemes have `requires: ["phonemizer"]`
+in the catalog files; in the API their `requires` names the phonemiser they
+would use here (`["uccharan"]` for English and Hindi, `["espeak-ng"]` for the
+67 others, marked "needs espeak-ng" in the tables above), and they show as
+unavailable until it is installed; using one answers `424 component_missing`
+with the install instructions instead of producing silence.
 
 Ways to install it, any one of:
 
@@ -694,11 +892,10 @@ Things to know:
   decision. If it matters to you, use the system executable, or stay with
   voices that need no espeak-ng at all.
 
-Voices that never need espeak-ng: **Kokoro's English and Mandarin voices**
-(the default text-to-speech model; they use the bundled lexicons, and words
-missing from the lexicon are skipped, so quality is better with espeak-ng
-installed), **MeloTTS**, **MMS-TTS** (non-commercial licence), the
-**Coqui VITS** Bengali voices and the SYSPIN voices.
+Voices that never need espeak-ng: every English and Hindi voice that reads
+phonemes (through uccharan), **Kokoro's Mandarin voices** (lexicon),
+**MeloTTS**, **MMS-TTS** (non-commercial licence), the **Coqui VITS**
+Bengali voices and the SYSPIN voices.
 
 ### Models
 
@@ -713,7 +910,9 @@ copied when the entry was written. Things to watch:
   check before you ship.
 * **Moonshine**: English models are MIT; the non-English models are under the
   Moonshine Community License, which is non-commercial.
-* **MMS-TTS** is CC-BY-NC-4.0.
+* **MMS-TTS** is CC-BY-NC-4.0: non-commercial use only (`commercial_use: false`). bolo lists
+  non-commercial and gated models because the choice is yours; the licence, `commercial_use` and
+  `gated` are on every catalog entry and can be filtered on.
 * **SenseVoice / Paraformer** use Alibaba's FunASR model licence (custom).
 * **Kroko** community models are CC-BY-SA.
 * **Parakeet, Canary, NeMo FastConformer** are CC-BY-4.0.
@@ -721,4 +920,7 @@ copied when the entry was written. Things to watch:
   to Apache-2.0, and the ONNX file in its repository does not load in
   sherpa-onnx without added metadata. The loader kind (`ten_vad`) exists for
   people who have a compatible file.
-* Nothing in the default catalog is gated.
+* **Gated** entries (`gated: true`: Indic Parler-TTS, IndicF5, SraVaani, AI4Bharat's official
+  IndicConformer) are never downloaded without a Hugging Face token; using one without a token
+  answers `401 model_gated` with the model page to accept the terms on. All four also need the
+  PyTorch engine plugin ([plugins.md](plugins.md)), which is not written yet.

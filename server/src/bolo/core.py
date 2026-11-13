@@ -30,6 +30,7 @@ from bolo.config import Settings
 from bolo.diarize import (
     DiarizeOptions,
     consolidate_speakers,
+    find_overlaps,
     label_speakers,
     match_known,
     merge_same_speaker,
@@ -67,8 +68,8 @@ from bolo.obs.events import EventBus
 from bolo.obs.trace import Trace, TraceStore, preview
 from bolo.store import HubClient, ModelStore
 from bolo.streaming.vad import EnergyVad, FallbackVad, detect_segments, merge_segments
+from bolo.text import phonemize
 from bolo.text.normalize import normalize_for_tts
-from bolo.text.phonemize import INSTALL_HINT
 from bolo.text.segment import chunk_text
 
 log = logging.getLogger("bolo")
@@ -113,12 +114,13 @@ class Bolo:
         self.events = EventBus()
         self.traces = TraceStore(s.trace_buffer)
         self.jobs = JobStore()
-        self.engines = engines or EngineRegistry(include_fake=s.fake_engine)
+        self.engines = engines or EngineRegistry(include_fake=s.fake_engine, settings=s)
         self.catalog = Catalog.load(s.data_dir, include_fake=s.fake_engine)
         token = s.hf_token or os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
         self.store = ModelStore(s.data_dir, HubClient(s.hf_endpoint, token))
         self.manager = ModelManager(s, self.catalog, self.store, self.engines, self.events, self._auto_pull)
         self.components = ComponentManager(self)
+        phonemize.set_preference(s.phonemizer)
         self.llm = LLMClient(s)
         #: ephemeral Realtime keys: value -> (expiry as epoch seconds, session configuration)
         self.client_secrets: dict[str, tuple[float, dict[str, Any]]] = {}
@@ -163,6 +165,7 @@ class Bolo:
             with contextlib.suppress(Exception):
                 await call.close()
         await self.manager.close()
+        await asyncio.get_running_loop().run_in_executor(None, self.engines.shutdown)
 
     def log(self, level: str, message: str) -> None:
         getattr(log, level if level in ("debug", "info", "warning", "error") else "info")(message)
@@ -194,7 +197,10 @@ class Bolo:
             "python": platform.python_version(),
             "auth_required": bool(s.api_key),
             "data_dir": str(s.data_dir),
-            "defaults": {"stt": s.default_stt, "realtime_stt": s.default_realtime_stt, "tts": s.default_tts, "vad": s.default_vad},
+            "defaults": {
+                "stt": s.default_stt, "realtime_stt": s.default_realtime_stt, "tts": s.default_tts,
+                "realtime_tts": s.default_realtime_tts, "vad": s.default_vad,
+            },
             "wyoming": {"enabled": s.wyoming, "host": s.wyoming_host, "port": s.wyoming_port},
             "components": self.components.status(),
             "capabilities": self.capabilities(),
@@ -255,6 +261,7 @@ class Bolo:
         }
 
     def model_api(self, spec: ModelSpec) -> dict[str, Any]:
+        requires, phonemizers, available = self.components.requirements(spec)
         job = self.jobs.active_pull(spec.id)
         pulling = {"job_id": job.id, "progress": round(job.progress, 4)} if job else None
         installed = self.manager.is_installed(spec)
@@ -264,7 +271,11 @@ class Bolo:
             loaded=spec.id in self.manager.loaded,
             pulling=pulling,
             size_on_disk=size,
-            available=all(self.components.is_installed(c) for c in spec.requires),
+            available=available,
+            requires=requires,
+            phonemizers=phonemizers,
+            voice_phonemizers=self.components.voice_phonemizers(spec),
+            settings=self.store.model_settings(spec.id),
         )
 
     def catalog_api(
@@ -351,18 +362,33 @@ class Bolo:
             }
             name = defaults[task]
         elif name == "realtime":
-            name = s.default_realtime_stt
+            name = s.default_realtime_stt if task == "stt" else s.default_realtime_tts
         if self.catalog.resolve(name) is None:
             if task == "stt" and name in OPENAI_STT_ALIASES:
                 name = s.default_stt
             elif task == "tts" and name in OPENAI_TTS_ALIASES:
-                name = s.default_tts
+                # OpenAI's tts-1 is the low-latency model, tts-1-hd and gpt-4o-mini-tts the quality ones
+                name = s.default_realtime_tts if name == "tts-1" else s.default_tts
         spec = self.manager.resolve(name)
         if spec.task != task:
             raise InvalidRequest(
                 f"model '{spec.id}' is a {spec.task} model and cannot be used for {task}", param="model"
             )
         return spec
+
+    def realtime_tts(self, voice: str | None = None) -> ModelSpec:
+        """The voice for latency-sensitive speech (``default_realtime_tts``), unless ``voice`` names a voice that
+        only the quality model (``default_tts``) has: then that model, so a chosen voice is never refused."""
+        fast = self.resolve("realtime", "tts")
+        if not voice or voice.lower() in OPENAI_VOICES:
+            return fast
+        known = {str(v["id"]).lower() for v in fast.voices}
+        if voice.lower() in known:
+            return fast
+        quality = self.resolve(None, "tts")
+        if voice.lower() in {str(v["id"]).lower() for v in quality.voices}:
+            return quality
+        return fast
 
     def _pull_blocking(self, spec: ModelSpec, job: Job) -> None:
         def progress(done: int, total: int) -> None:
@@ -428,15 +454,15 @@ class Bolo:
 
     async def _auto_pull(self, spec: ModelSpec) -> None:
         spec.require_published()
-        if not self.settings.auto_pull:
-            raise ModelNotInstalled(
-                f"model '{spec.id}' is not installed and auto_pull is off; run `bolo pull {spec.id}` "
-                f"or POST /api/v1/models/pull"
-            )
         if spec.gated and not self.store.hub.token:
             raise GatedModel(
                 f"model '{spec.id}' is gated and is never downloaded automatically. Accept its terms at "
                 f"{spec.source_url}, set BOLO_HF_TOKEN and run `bolo pull {spec.id}`."
+            )
+        if not self.settings.auto_pull:
+            raise ModelNotInstalled(
+                f"model '{spec.id}' is not installed and auto_pull is off; run `bolo pull {spec.id}` "
+                f"or POST /api/v1/models/pull"
             )
         self.log("info", f"model '{spec.id}' is not installed; pulling it now")
         job = await self.pull_and_wait(spec.id)
@@ -555,12 +581,20 @@ class Bolo:
                 use_vad = vad_filter if vad_filter is not None else duration > stt.max_chunk_s
                 chunks: list[tuple[int, int]]
                 speakers: list[str] | None = None
+                overlapped: list[bool] | None = None
                 if diarize is not None:
                     # Cut at the speaker turns and transcribe each turn: the speaker of every
-                    # piece of text is then known without needing word timestamps.
-                    turns = merge_turns(await self._speaker_turns(samples, diarize, trace), max_len_s=stt.max_chunk_s)
+                    # piece of text is then known without needing word timestamps. Stretches where two
+                    # people talk at once are marked on the segments (keep_overlap: see DiarizeOptions).
+                    raw = await self._speaker_turns(samples, diarize, trace)
+                    overlaps = find_overlaps(raw)
+                    diarize.overlaps = overlaps
+                    turns = merge_turns(raw, max_len_s=stt.max_chunk_s, keep_overlap=diarize.keep_overlap)
                     chunks = [(int(t.start * sr), min(len(samples), int(t.end * sr))) for t in turns]
                     speakers = [diarize.label(t.speaker) for t in turns]
+                    overlapped = [any(o.start < t.end and o.end > t.start for o in overlaps) for t in turns]
+                    if overlaps:
+                        trace.extra["overlapped_speech_s"] = round(sum(o.end - o.start for o in overlaps), 2)
                 elif use_vad:
                     with trace.phase("vad"):
                         detector, _ = await self.vad_detector(
@@ -576,6 +610,7 @@ class Bolo:
                     entry, stt, samples, chunks, trace,
                     language=language, task=task, prompt=prompt, word_timestamps=word_timestamps,
                     temperature=temperature, hotwords=hotwords, on_segment=on_segment, speakers=speakers,
+                    overlapped=overlapped,
                 )  # fmt: skip
                 transcript.duration = duration
                 transcript.model = spec.id
@@ -616,6 +651,7 @@ class Bolo:
         hotwords: str | None,
         on_segment: Callable[[Segment], Awaitable[None]] | None,
         speakers: list[str] | None = None,
+        overlapped: list[bool] | None = None,
     ) -> Transcript:
         sr = stt.sample_rate
         submitted = trace.now()
@@ -655,6 +691,7 @@ class Bolo:
                         seg.avg_logprob,
                         seg.no_speech_prob,
                         speakers[index] if speakers else None,
+                        bool(overlapped and overlapped[index]),
                     )
                     if not shifted.text:
                         continue
@@ -828,11 +865,11 @@ class Bolo:
         names = ", ".join(v.id for v in tts.voices[:12]) + (", …" if len(tts.voices) > 12 else "")
         raise InvalidRequest(f"voice '{voice}' is not available for model '{spec.id}'. Voices: {names}", param="voice")
 
-    def require_components(self, spec: ModelSpec) -> None:
+    def require_components(self, spec: ModelSpec, phonemizer: str | None = None) -> None:
         """Fail fast when a model needs an optional component that is not installed."""
-        for component in spec.requires:
-            if not self.components.is_installed(component):
-                raise ComponentMissing(f"model '{spec.id}' cannot be used yet: " + INSTALL_HINT)
+        reason = self.components.missing_reason(spec, phonemizer)
+        if reason:
+            raise ComponentMissing(f"model '{spec.id}' cannot be used yet: " + reason)
 
     async def synthesize(
         self,
@@ -844,6 +881,7 @@ class Bolo:
         language: str | None = None,
         normalize: bool = True,
         trace: Trace | None = None,
+        phonemizer: str | None = None,
     ) -> AsyncGenerator[SynthChunk, None]:
         """Synthesise ``text`` sentence by sentence, yielding audio as soon as it exists.
 
@@ -866,12 +904,13 @@ class Bolo:
                 raise InvalidRequest("the input text is empty", param="input")
             if not 0.25 <= speed <= 4.0:
                 raise InvalidRequest("speed must be between 0.25 and 4.0", param="speed")
-            self.require_components(spec)
+            self.require_components(spec, phonemizer)
             async with self.manager.use(spec.id) as entry:
                 tts = entry.model
                 assert isinstance(tts, TTSModel)
                 sample_rate = tts.sample_rate
                 chosen = self.pick_voice(tts, voice, spec)
+                phonemizer = self.components.check_phonemizer(spec, chosen.id if chosen else voice, phonemizer)
                 lang = language or (
                     chosen.language if chosen and chosen.language else (spec.languages[0] if spec.languages else "en")
                 )
@@ -879,7 +918,9 @@ class Bolo:
                 with trace.phase("normalize"):
                     clean = normalize_for_tts(text, lang) if normalize else text
                     clean = tts.fit_text(clean, lang)  # closed character sets: spell digits out, or refuse
-                    pieces = chunk_text(clean) or [clean]
+                    # a slow voice gets a shorter first chunk (catalog option first_chunk_chars), so audio starts early
+                    first = int(spec.options.get("first_chunk_chars", 120))
+                    pieces = chunk_text(clean, first_max_chars=first) or [clean]
                 loop = asyncio.get_running_loop()
                 stop = threading.Event()  # set when the consumer goes away; the engine polls it
                 seq = 0
@@ -893,7 +934,9 @@ class Bolo:
 
                     submitted = trace.now()
                     job = asyncio.ensure_future(
-                        entry.queue.submit("tts", (piece, chosen.id if chosen else voice, speed, emit, stop.is_set))
+                        entry.queue.submit(
+                            "tts", (piece, chosen.id if chosen else voice, speed, emit, stop.is_set, phonemizer)
+                        )
                     )
                     job.add_done_callback(lambda _f, _out=out: _out.put_nowait(None))  # type: ignore[misc]
                     first_of_text = True

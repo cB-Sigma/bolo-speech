@@ -44,7 +44,10 @@ class Settings:
     ui: bool = True
     cross_origin_isolation: bool = True  # COOP/COEP on the console so in-browser WebAssembly can use threads
     max_upload_mb: int = 200
-    # Install optional components (espeak-ng) from the API. Unset: allowed on a loopback bind or with an API key.
+    #: who turns text into phonemes for Piper, Kitten, Matcha and Kokoro voices: "auto" (uccharan where it covers
+    #: the voice's language, else espeak-ng), "uccharan" (never espeak-ng) or "espeak-ng" (as in bolo 0.1)
+    phonemizer: str = "auto"
+    # Install optional components (uccharan, espeak-ng) from the API. Unset: allowed on a loopback bind or with an API key.
     allow_component_install: bool | None = None
     #: STUN/TURN URLs offered to WebRTC peers (e.g. "stun:stun.example.org:3478"). Empty: none is contacted,
     #: which is enough when the browser and the server can reach each other directly.
@@ -60,6 +63,10 @@ class Settings:
     default_stt: str = "whisper-base"
     default_realtime_stt: str = "moonshine-tiny-en"
     default_tts: str = "kokoro-v1.0-int8"
+    #: voice for latency-sensitive speech: voice agents (Realtime API, chat with audio), Wyoming, the "realtime"
+    #: and "tts-1" model names. Piper "amy" starts speaking in about 0.15 s on CPU; Kokoro stays the default
+    #: for /v1/audio/speech without a model and for "tts-1-hd".
+    default_realtime_tts: str = "piper-en-us-amy-low"
     default_vad: str = "silero-vad"
     default_diarization: str = "pyannote-3.0-eres2net"
     #: after clustering, a "speaker" with less speech than this (seconds) is folded into the most similar one,
@@ -104,6 +111,14 @@ class Settings:
     wyoming: bool = False
     wyoming_host: str = "127.0.0.1"
     wyoming_port: int = 10300
+
+    # -- engine plugins (out of process; docs/plugins.md) -----------------
+    #: "name=command args" per plugin, e.g. "torch=bolo-torch-plugin"; installed plugin packages are found too
+    plugins: list[str] = field(default_factory=list)
+    plugin_entry_points: bool = True  # discover plugins installed as packages (entry-point group bolo.engines)
+    plugin_idle_s: float = 300.0  # stop a plugin process when none of its models has been loaded for this long
+    plugin_memory_limit_mb: int = 0  # address-space limit of a plugin process (POSIX); 0: none
+    plugin_nice: int = 0  # scheduling niceness added to plugin processes
 
     # -- misc ---------------------------------------------------------------
     device: str = "cpu"

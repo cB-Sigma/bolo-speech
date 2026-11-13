@@ -1,0 +1,140 @@
+{
+ "release": "voices-v1",
+ "repo": "facebook/mms-tts",
+ "revision": "44cc7fb408064ef9ea6e7c59130d88cac1274671",
+ "code_repo": "mms-meta/MMS",
+ "code_revision": "65d863f41196654aa8b8f3dc586474a4c8f30934",
+ "license": {
+  "weights": "CC-BY-NC-4.0",
+  "commercial_use": false,
+  "credit": "Meta AI, Massively Multilingual Speech (MMS)"
+ },
+ "voices": [
+  {
+   "id": "mms-tts-pan",
+   "code": "pan",
+   "language": "pa",
+   "language_name": "Punjabi",
+   "sample_text": "ਸਤ ਸ੍ਰੀ ਅਕਾਲ, ਅੱਜ ਮੌਸਮ ਬਹੁਤ ਵਧੀਆ ਹੈ।"
+  },
+  {
+   "id": "mms-tts-ory",
+   "code": "ory",
+   "language": "or",
+   "language_name": "Odia",
+   "sample_text": "ନମସ୍କାର, ଆଜି ପାଣିପାଗ ବହୁତ ଭଲ ଅଛି।"
+  },
+  {
+   "id": "mms-tts-asm",
+   "code": "asm",
+   "language": "as",
+   "language_name": "Assamese",
+   "sample_text": "নমস্কাৰ, আজি বতৰ বৰ ভাল।"
+  },
+  {
+   "id": "mms-tts-dgo",
+   "code": "dgo",
+   "language": "doi",
+   "language_name": "Dogri",
+   "sample_text": "नमस्ते, अज्ज मौसम बड़ा खरा ऐ।"
+  },
+  {
+   "id": "mms-tts-mai",
+   "code": "mai",
+   "language": "mai",
+   "language_name": "Maithili",
+   "sample_text": "गामक चरवाहा जाड़ में बहुत धन प्राप्त कयलक।"
+  },
+  {
+   "id": "mms-tts-mag",
+   "code": "mag",
+   "language": "mag",
+   "language_name": "Magahi",
+   "sample_text": "नमस्ते, आज मौसम बहुत अच्छा हइ।"
+  },
+  {
+   "id": "mms-tts-hne",
+   "code": "hne",
+   "language": "hne",
+   "language_name": "Chhattisgarhi",
+   "sample_text": "नमस्ते, आज मौसम बहुत बढ़िया हे।"
+  },
+  {
+   "id": "mms-tts-awa",
+   "code": "awa",
+   "language": "awa",
+   "language_name": "Awadhi",
+   "sample_text": "नमस्ते, आज मौसम बहुत नीक बा।"
+  },
+  {
+   "id": "mms-tts-bgc",
+   "code": "bgc",
+   "language": "bgc",
+   "language_name": "Haryanvi",
+   "sample_text": "राम राम, आज मौसम घणा बढ़िया सै।"
+  },
+  {
+   "id": "mms-tts-urd",
+   "code": "urd-script_arabic",
+   "language": "ur",
+   "language_name": "Urdu",
+   "sample_text": "آج موسم بہت اچھا ہے۔"
+  },
+  {
+   "id": "mms-tts-hin",
+   "code": "hin",
+   "language": "hi",
+   "language_name": "Hindi",
+   "sample_text": "नमस्ते, आज मौसम बहुत अच्छा है।"
+  },
+  {
+   "id": "mms-tts-ben",
+   "code": "ben",
+   "language": "bn",
+   "language_name": "Bengali",
+   "sample_text": "নমস্কার, আজ আবহাওয়া খুব ভালো।"
+  },
+  {
+   "id": "mms-tts-guj",
+   "code": "guj",
+   "language": "gu",
+   "language_name": "Gujarati",
+   "sample_text": "નમસ્તે, આજે હવામાન ખૂબ સરસ છે."
+  },
+  {
+   "id": "mms-tts-kan",
+   "code": "kan",
+   "language": "kn",
+   "language_name": "Kannada",
+   "sample_text": "ನಮಸ್ಕಾರ, ಇಂದು ಹವಾಮಾನ ತುಂಬಾ ಚೆನ್ನಾಗಿದೆ."
+  },
+  {
+   "id": "mms-tts-mal",
+   "code": "mal",
+   "language": "ml",
+   "language_name": "Malayalam",
+   "sample_text": "നമസ്കാരം, ഇന്ന് കാലാവസ്ഥ വളരെ നല്ലതാണ്."
+  },
+  {
+   "id": "mms-tts-mar",
+   "code": "mar",
+   "language": "mr",
+   "language_name": "Marathi",
+   "sample_text": "नमस्कार, आज हवामान खूप छान आहे."
+  },
+  {
+   "id": "mms-tts-tam",
+   "code": "tam",
+   "language": "ta",
+   "language_name": "Tamil",
+   "sample_text": "வணக்கம், இன்று வானிலை மிகவும் நன்றாக உள்ளது."
+  },
+  {
+   "id": "mms-tts-tel",
+   "code": "tel",
+   "language": "te",
+   "language_name": "Telugu",
+   "sample_text": "నమస్కారం, ఈ రోజు వాతావరణం చాలా బాగుంది."
+  }
+ ]
+}

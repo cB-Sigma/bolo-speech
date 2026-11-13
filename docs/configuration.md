@@ -29,12 +29,19 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `hf_endpoint` | `https://huggingface.co` | | Hub endpoint (for a mirror) |
 | `default_stt` | `whisper-base` | `--default-stt` | model behind `whisper-1` and requests that name no model |
 | `default_realtime_stt` | `moonshine-tiny-en` | `--default-realtime-stt` | model for the STT WebSocket when none is named (`model=realtime`) |
-| `default_tts` | `kokoro-v1.0-int8` | `--default-tts` | model behind `tts-1`, `tts-1-hd` |
+| `default_tts` | `kokoro-v1.0-int8` | `--default-tts` | the quality voice: requests that name no model, `tts-1-hd`, `gpt-4o-mini-tts` |
+| `default_realtime_tts` | `piper-en-us-amy-low` | | the low-latency voice: `tts-1`, `model=realtime`, voice agents (Realtime API conversations, `/v1/chat/completions` audio without `speech_model`) and Wyoming synthesis without a voice. A voice that only `default_tts` has (e.g. `af_heart`) still selects `default_tts`. See models.md, "Default voices" |
+| `phonemizer` | `auto` | | who turns text into phonemes for Piper, Kitten, Matcha and Kokoro voices: `auto` (uccharan where it covers the voice's language: English US/GB and Hindi; espeak-ng otherwise), `uccharan` (never espeak-ng), `espeak-ng` (as in bolo 0.1). Requests (`phonemizer` field) and per-model pins (`bolo models config <id> --phonemizer …`, `PUT /api/v1/models/{id}/settings`, stored in `<data_dir>/model-settings.json`) override it. See models.md, "Phonemisers" |
 | `default_vad` | `silero-vad` | | detector for long-file segmentation and realtime endpointing |
 | `default_diarization` | `pyannote-3.0-eres2net` | | speaker-diarization pipeline |
 | `diarization_min_speaker_s` | `3` | | after clustering, a "speaker" with less speech than this in the whole recording (and never more than a tenth of the speech) is folded into the most similar speaker; `0` switches it off. See api.md, "How many speakers" |
 | `diarization_merge_similarity` | `0.6` | | speakers whose voice prints have at least this cosine similarity are merged; `0` switches it off |
 | `default_turn` | `smart-turn-v3` | | end-of-turn model for Realtime sessions that ask for `semantic_vad` (pulled on first use; without it `semantic_vad` is plain silence detection) |
+| `plugins` | `[]` | | out-of-process engine plugins, `name=command args` each (docs/plugins.md) |
+| `plugin_entry_points` | `true` | | also use plugins installed as packages (entry-point group `bolo.engines`) |
+| `plugin_idle_s` | `300` | | stop a plugin process when none of its models has been loaded for this long |
+| `plugin_memory_limit_mb` | `0` | | address-space limit for plugin processes (POSIX); `0`: none |
+| `plugin_nice` | `0` | | niceness added to plugin processes |
 | `webrtc_ice_servers` | `[]` | | STUN/TURN URLs for the WebRTC transport of the Realtime API (`stun:host:port`, `turn:…`). Empty: no external server is contacted and calls connect on the same machine or network only |
 | `llm_base_url` | none | `--llm-base-url` | OpenAI-compatible chat-completions endpoint for voice agents (`/v1/realtime` conversations, `/v1/chat/completions`), e.g. `http://127.0.0.1:11434/v1` |
 | `llm_model` | none | `--llm-model` | model name sent to that endpoint; unset: the client's model name is passed on |
@@ -66,7 +73,8 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `trace_buffer` | `1000` | | request traces kept in memory |
 | `fake_engine` | `false` | `--fake-engine` | add deterministic test models (development) |
 
-Three more environment variables are read outside the settings object, for
+Four more environment variables are read outside the settings object. `BOLO_UCCHARAN=off` hides an installed
+uccharan (to test the espeak-ng route). For
 the optional eSpeak NG component: `BOLO_ESPEAK_LIBRARY` (with
 `BOLO_ESPEAK_DATA`) points at a specific libespeak-ng and takes precedence;
 otherwise an `espeak-ng` executable on `PATH` is used, then the

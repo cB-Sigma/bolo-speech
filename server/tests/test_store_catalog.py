@@ -232,7 +232,7 @@ def test_every_packaged_entry_is_well_formed() -> None:
                 assert u.get("sha256") or (u.get("size") or 0) < 1_000_000, f"{s.id}: {u['path']} needs a sha256"
         assert s.size_bytes > 100_000, s.id
         assert s.description and s.source_url.startswith("https://"), s.id
-        assert s.engine in ("sherpa-onnx", "faster-whisper", "onnxruntime"), s.id
+        assert s.engine in ("sherpa-onnx", "faster-whisper", "onnxruntime", "plugin:torch"), s.id
         if s.task == "tts":
             assert s.sample_rate in (8000, 16000, 22050, 24000, 44100, 48000), s.id
         if s.validated == "cpu":
@@ -241,7 +241,7 @@ def test_every_packaged_entry_is_well_formed() -> None:
             assert s.commercial_use is False, s.id
     tasks = {s.task for s in specs}
     assert tasks == {"stt", "tts", "vad", "diarization", "turn"}
-    needs = [s for s in specs if "espeak-ng" in s.requires]
+    needs = [s for s in specs if s.needs_phonemes]
     assert len(needs) >= 80 and all(s.task == "tts" for s in needs)
     assert not [s.id for s in specs if s.family == "Kokoro" and s.requires]  # the default voice needs nothing extra
     assert sum(s.tier == "realtime" and s.task == "stt" for s in specs) >= 10
@@ -292,10 +292,11 @@ def test_every_packaged_entry_is_well_formed() -> None:
     stt_langs = {lang for s in specs if s.task == "stt" and s.family == "IndicConformer" for lang in s.languages}
     assert set(scheduled) <= stt_langs
     converted = [s for s in specs if s.source.convert == "piper"]
-    assert len(converted) >= 10 and all(s.requires == ["espeak-ng"] and s.kind == "vits" for s in converted)
-    assert not [s.id for s in specs if s.gated], (
-        "gated models must never be in the default catalog without a marker test"
-    )
+    assert len(converted) >= 10 and all(s.requires == ["phonemizer"] and s.kind == "vits" for s in converted)
+    gated = [s for s in specs if s.gated]
+    assert gated and all(s.source_url and s.source.repo and s.validated == "untested" for s in gated)
+    plugin = [s for s in specs if s.plugin]
+    assert plugin and all(s.plugin == "torch" and s.options.get("plugin_install") for s in plugin)
 
 
 def test_catalog_aliases_defaults_and_search() -> None:

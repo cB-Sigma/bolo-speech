@@ -57,12 +57,14 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `POST` | `/api/v1/models/pull` | Start downloading a model |
 | `GET` | `/api/v1/jobs/{job_id}` | Poll a background job |
 | `GET` | `/api/v1/jobs` | List background jobs |
+| `GET` | `/api/v1/models/{model_id}/settings` | Settings pinned for one model |
+| `PUT` | `/api/v1/models/{model_id}/settings` | Pin settings for one model (phonemiser) |
 | `POST` | `/api/v1/models/{model_id}/load` | Load a model into memory |
 | `POST` | `/api/v1/models/{model_id}/unload` | Unload a model from memory |
 | `DELETE` | `/api/v1/models/{model_id}` | Delete an installed model |
 | `GET` | `/api/v1/models/{model_id}` | One catalog entry |
 | `POST` | `/api/v1/diarize` | Speaker diarization: who spoke when |
-| `GET` | `/api/v1/components` | Optional third-party components (espeak-ng) |
+| `GET` | `/api/v1/components` | Optional components (uccharan, espeak-ng, engine plugins) |
 | `POST` | `/api/v1/components/{component_id}/install` | Install an optional component |
 | `GET` | `/api/v1/stats` | Live server statistics |
 | `GET` | `/api/v1/requests` | Recent request traces, newest first |
@@ -201,6 +203,7 @@ JSON body.
 | `sample_rate` | model's | extension: resample the output (8000 to 48000) |
 | `language` | voice's | extension: language for text normalisation |
 | `normalize` | `true` | extension: `false` sends the text to the voice untouched |
+| `phonemizer` | voice's pin, else the server's `phonemizer` setting | extension, for voices that read phonemes: `auto`, `uccharan` (= `uccharan:compatible`), `uccharan:improved`, `espeak-ng`. `424 component_missing` when the chosen one is not installed, `400` (`param: "phonemizer"`) when uccharan does not cover the voice's language. Ignored for voices that read characters or a lexicon. See models.md, "Phonemisers" |
 
 The body is streamed (chunked transfer) while synthesis is still running:
 the first sentence is audible while the rest is being generated. `pcm`,
@@ -329,6 +332,8 @@ one answers `404 model_not_published`.
 | `POST /api/v1/models/{id}/load` | `200 {"id","loaded":true,"memory_bytes","load_ms"}` |
 | `POST /api/v1/models/{id}/unload` | `200 {"id","loaded":false}` |
 | `DELETE /api/v1/models/{id}` | `204`; unloads first |
+| `GET /api/v1/models/{id}/settings` | `{"model","settings":{…}}`: what the user pinned for that model (`{}` by default) |
+| `PUT /api/v1/models/{id}/settings` `{"phonemizer": "espeak-ng"}` | pins the phonemiser of a voice (`null` removes the pin); stored in `<data_dir>/model-settings.json`, shown as `settings` in catalog entries, announced as a `model` event with `"event":"settings"`. `400` for a model that reads characters, or uccharan on a language it does not cover. CLI: `bolo models config <id> --phonemizer X` / `--clear` |
 
 Pulling an installed model yields a job that is already `done`. Pulling a
 gated model without a token yields a job in state `error` that says what to do.
@@ -567,8 +572,24 @@ real speakers, short references or telephone audio was not measured.
 ```json
 {"model": "pyannote-3.0-eres2net", "duration": 21.5, "speakers": ["A", "B"],
  "segments": [{"start": 0.03, "end": 2.98, "speaker": "A"}, {"start": 3.7, "end": 6.4, "speaker": "B"}],
+ "overlaps": [],
  "request_id": "r_000012"}
 ```
+
+**Overlapping speech.** The segmentation model (pyannote segmentation-3.0) can
+assign two speakers to the same moment, and the pipeline then returns turns
+of different speakers that overlap in time; `overlaps` lists those stretches
+(`[{"start","end","speakers":["A","B"]}]`, 0.25 s or longer). In a diarized
+transcription, segments that overlap another speaker carry `"overlap": true`
+in `verbose_json` and `diarized_json`. The overlapping audio is still
+transcribed once, as part of the turn that started first, so the second
+speaker's first words are usually missing or attributed to the first speaker.
+We tried transcribing both turns whole (`DiarizeOptions.keep_overlap`, off by
+default): on three synthetic two-voice mixes with 2.5 s of overlap the second
+speaker's word error rate got worse in two of three (the recogniser wrote the
+louder speaker's words into both texts; `docs/measurements/diarization-overlap.json`),
+so it is not the default and not exposed in the API. Separating overlapping
+voices would need a source-separation model.
 
 **Live** (`WS /api/v1/stt/stream?diarize=true`, optional `max_speakers`):
 every `final` gets a `"speaker"` field and `ready` reports
@@ -679,9 +700,13 @@ with `first_token_ms` and `ttfa_ms`; see
 
 ## Optional components
 
-Third-party pieces bolo can use but does not ship. Today there is one,
-eSpeak NG (GPL-3.0-or-later), needed by the catalog models whose `requires`
-list contains `"espeak-ng"`.
+Pieces bolo can use but does not require: two phonemisers, **uccharan**
+(Apache-2.0, part of `bolo[all]`; English US/GB and Hindi) and **eSpeak NG**
+(GPL-3.0-or-later, never installed by default; every other language), and
+engine plugins (`plugin:<name>`, [plugins.md](plugins.md)), which are listed so
+that a client can say what a model needs but are installed as packages.
+Find items by `id`; `kind` is `phonemizer` or `engine-plugin`.
+`POST /api/v1/components/uccharan/install` needs no licence acceptance.
 
 `GET /api/v1/components`
 
@@ -710,8 +735,11 @@ when the environment is read-only, has neither pip nor uv, the operator set
 address without an API key (never allowed). A failed download shows up as a
 job in state `error`.
 
-Catalog entries carry `requires` (for example `["espeak-ng"]`, else `[]`) and
-`available` (false while a requirement is missing). Synthesis with such a
+Catalog entries carry `requires` (for a voice that reads phonemes, the
+phonemiser it would use here: `["uccharan"]` or `["espeak-ng"]`; `["plugin:torch"]`
+for a model on an engine plugin; else `[]`), `available` (false while that is
+missing) and `phonemizers` (the choices for the voice, `[{id, available,
+default, note}]`; for Kokoro on each voice instead). Synthesis with such a
 voice fails fast with `424 component_missing` and a message that names the
 component and the ways to install it; over WebSockets it is an `error`
 message with that code. `/api/v1/info` includes the same `components` list.
@@ -749,13 +777,18 @@ buffers) comes on top.
 | Client sends | bolo answers |
 | --- | --- |
 | `describe` | `info` with one ASR program (installed speech-to-text models) and one TTS program (installed voices; multi-voice models appear once per language as `<model>:<language>` with their voices as speakers) |
-| `transcribe` (`name`, `language`), `audio-start`, `audio-chunk`…, `audio-stop` | `transcript` (`text`, `language`) |
+| `transcribe` (`name`, `language`), `audio-start`, `audio-chunk`…, `audio-stop` | `transcript-start`, `transcript-chunk` (the text so far, once per decoded piece), `transcript` (`text`, `language`), `transcript-stop`; `info` advertises `supports_transcript_streaming` |
 | `synthesize` (`text`, `voice.name`, `voice.speaker`) | `audio-start`, `audio-chunk`… (16-bit PCM at the voice's rate), `audio-stop` |
 | `synthesize-start`, `synthesize-chunk`…, `synthesize-stop` | audio as sentences complete, then `audio-stop`, `synthesize-stopped` |
 
 Errors are sent as Wyoming `error` events and the connection stays usable.
-The protocol has no authentication. Tested with the `wyoming` Python client;
-not tested against a Home Assistant instance.
+The protocol has no authentication. Synthesis without a voice uses
+`default_realtime_tts`. The flows Home Assistant uses (describe, transcribe with
+transcript streaming, synthesize, streaming synthesis with the compatible
+`synthesize` event in between) were run with the official `wyoming` 1.11 client
+against a real server with real models
+(`docs/measurements/wyoming-flows.json`); Home Assistant itself was not run
+(too heavy for the build machine).
 
 ## Operations
 

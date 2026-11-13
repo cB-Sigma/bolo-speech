@@ -42,10 +42,11 @@
 - **Light.** No PyTorch anywhere. Inference runs on ONNX Runtime (through [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)) and CTranslate2 (through [faster-whisper](https://github.com/SYSTRAN/faster-whisper)). The base install has no engine at all; you add the ones you want.
 - **Realtime on CPU.** A low-latency tier, true streaming models, and stabilised partial results for models that were never designed to stream. Measured numbers below, from a 4-vCPU machine.
 - **A real server.** Per-model queues with micro-batching, backpressure, cancellation, lazy loading, idle unloading and a memory budget, with every request traced phase by phase.
-- **Indian languages and phone audio.** Speech recognition for all 22 scheduled languages of India, 16 of them run here on real recordings; voices for Hindi, Bengali, Telugu, Tamil, Malayalam, Marathi, Urdu, Nepali and Gujarati; 8 kHz G.711 μ-law/A-law in and out.
+- **Indian languages and phone audio.** Speech recognition for all 22 scheduled languages of India, 16 of them run here on real recordings; voices for Hindi, Bengali, Telugu, Tamil, Malayalam, Marathi, Urdu, Nepali, Gujarati, Kannada, Maithili, Bhojpuri, Magahi and Chhattisgarhi, with non-commercial MMS voices for Punjabi, Odia, Assamese and Dogri on the way; 8 kHz G.711 μ-law/A-law in and out.
+- **No GPL needed for English and Hindi voices.** Phonemes come from [uccharan](https://github.com/cb-Sigma/uccharan) (Apache-2.0), which matches eSpeak NG on our round-trip tests; eSpeak NG stays an optional choice, per server, per voice or per request.
 - **Voice agents.** An OpenAI Realtime API endpoint (`/v1/realtime`) and audio in `/v1/chat/completions`: speech in, your own language model in the middle (Ollama, llama.cpp, vLLM, any OpenAI-compatible endpoint), streamed speech out, with barge-in and per-turn latency traces, over WebSocket or WebRTC. Run against Ollama and llama.cpp, and from Pipecat and LiveKit Agents.
 - **Who said what.** Speaker diarization without PyTorch, as `diarized_json`, in subtitles, on words, and as speaker labels on live transcripts; known speakers are named from reference recordings.
-- **Honest.** 225 models in the catalog, each with its licence; the 108 that were actually run on CPU are marked, with what was measured. Everything else says *untested*.
+- **Honest.** 253 models in the catalog, each with its licence; the 108 that were actually run on CPU are marked, with what was measured. Everything else says *untested*.
 
 > **Status: 0.2, alpha.** Developed and measured on Linux x86-64, CPU only. GPUs, Apple Silicon, arm64 and Windows are untested; see [What is not tested](#what-is-not-tested).
 
@@ -139,9 +140,9 @@ text = client.audio.transcriptions.create(model="whisper-1", file=open("recordin
 client.audio.speech.create(model="tts-1", voice="alloy", input=text).write_to_file("echo.mp3")
 ```
 
-Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AAC through bundled FFmpeg), `wyoming`, `all` (those four), and `espeak` (see below; never part of `all`).
+Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AAC through bundled FFmpeg), `wyoming`, `uccharan` (phonemes for English and Hindi voices), `all` (those five), and `espeak` (see below; never part of `all`).
 
-**eSpeak NG is optional and not shipped with bolo.** Voices in Piper format, KittenTTS and the non-English Kokoro voices need the eSpeak NG phonemiser, which is GPL-3.0-or-later. The default voice (Kokoro English) does not. If you want those voices, install it when you choose to: one click in the console (Models → Components), `bolo components install espeak-ng --accept-license`, `pip install 'bolo[espeak]'`, or your system's package (`apt install espeak-ng`). It takes effect without a restart. Until then those voices answer with a clear `component_missing` error. Details: [Licences](#licences).
+**Phonemes without the GPL.** Piper-format voices, KittenTTS, Matcha and Kokoro read phonemes. For English (US, British) and Hindi they come from uccharan (Apache-2.0, in `bolo[all]`), so those voices work as installed. Voices in other languages need the eSpeak NG phonemiser, which is GPL-3.0-or-later and not shipped: install it when you choose to, with one click in the console (Models → Components), `bolo components install espeak-ng --accept-license`, `pip install 'bolo[espeak]'`, or your system's package (`apt install espeak-ng`). It takes effect without a restart; until then those voices answer with a clear `component_missing` error. You can also prefer eSpeak NG for any voice ([docs/models.md](docs/models.md#phonemisers)). Details: [Licences](#licences).
 
 ## What it does
 
@@ -174,6 +175,12 @@ Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AA
 | Task | Family | Models | Languages | Validated on CPU | Best measured RTF |
 | --- | --- | --- | --- | --- | --- |
 | DIARIZATION | pyannote + speaker embeddings | 3 | - | 1 | 0.106 (`pyannote-3.0-eres2net`) |
+| TTS | Parler-TTS | 1 | as, bn, en, gu, hi, kn, ks, ml +9 | 0 | - |
+| TTS | F5-TTS | 1 | as, bn, gu, hi, kn, ml, mr, or +3 | 0 | - |
+| TTS | Veena | 1 | en, hi | 0 | - |
+| TTS | Svara | 1 | as, bho, bn, brx, doi, en, gu, hi +11 | 0 | - |
+| STT | SraVaani | 1 | as, bn, en, gu, hi, kn, ml, mr +6 | 0 | - |
+| STT | IndicConformer | 27 | as, bn, brx, doi, gu, hi, kn, kok +14 | 20 | 0.060 (`indicconformer-ta-community`) |
 | STT | Whisper | 38 | af, am, ar, as, az, ba, be, bg +92 | 20 | 0.081 (`faster-whisper-tiny.en`) |
 | STT | Moonshine | 11 | ar, en, es, ja, ko, uk, vi, zh | 4 | 0.033 (`moonshine-tiny-en`) |
 | STT | Parakeet | 7 | bg, cs, da, de, el, en, es, et +17 | 4 | 0.030 (`parakeet-tdt-ctc-110m`) |
@@ -184,7 +191,6 @@ Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AA
 | STT | Paraformer | 2 | en, zh | 1 | 0.091 (`paraformer-zh`) |
 | STT | Dolphin | 2 | ar, bn, fa, gu, hi, id, ja, jv +26 | 1 | 0.021 (`dolphin-base`) |
 | STT | Omnilingual ASR | 1 | ar, as, bn, de, en, es, fr, gu +23 | 1 | 0.112 (`omnilingual-ctc-300m`) |
-| STT | IndicConformer | 26 | as, bn, brx, doi, gu, hi, kn, kok +14 | 20 | 0.060 (`indicconformer-ta-community`) |
 | STT | Nemotron | 1 | ar, bg, cs, da, de, el, en, es +26 | 1 | 0.312 (`nemotron-3.5-streaming-560ms`) |
 | TTS | Piper | 85 | ar, bn, ca, cs, cy, da, de, el +35 | 28 | 0.040 (`piper-ne-np-google-medium`) |
 | TTS | Kokoro | 2 | en, es, fr, hi, it, ja, pt, zh | 2 | 0.759 (`kokoro-v1.0`) |
@@ -196,12 +202,14 @@ Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AA
 | TURN | Smart Turn | 1 | ar, bn, da, de, en, es, fi, fr +15 | 0 | - |
 | VAD | Silero VAD | 2 | - | 2 | 0.006 (`silero-vad-v5`) |
 
-**247 models in the catalog, 108 validated on CPU, 139 untested.** Full list: [docs/models.md](docs/models.md).
+**253 models in the catalog, 108 validated on CPU, 145 untested.** Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run on the machine described under [Performance](#performance) by `server/tools/validate_models.py`; the table in [docs/models.md](docs/models.md) has every model with its measured real-time factor and licence. Anything else that sherpa-onnx or faster-whisper can load can be added with `bolo pull hf:<owner>/<repo>`.
 
-Not supported: models that need PyTorch at run time (XTTS, F5-TTS, Chatterbox, Orpheus and other LLM-based voices), and voice cloning. bolo runs no language models itself: voice agents use the one you connect.
+Models that need PyTorch at run time (Indic Parler-TTS, IndicF5, Veena, Svara, SraVaani, XTTS, Chatterbox and other LLM-based voices) do not run inside bolo. bolo can drive them through an **out-of-process engine plugin** ([docs/plugins.md](docs/plugins.md)); the PyTorch plugin itself is not written yet, so those catalog entries show "needs plugin torch". bolo runs no language models itself: voice agents use the one you connect.
+
+**Licences are labelled, not filtered.** The catalog includes non-commercial models (MMS-TTS, some Piper voices, non-English Moonshine) and gated ones (Indic Parler-TTS, SraVaani, the official IndicConformer): every entry states `license`, `commercial_use` and `gated`, the console shows them, and you decide what to download. Gated models are fetched only with your Hugging Face token.
 
 ## The realtime tier
 
@@ -224,17 +232,23 @@ How it works, and how to tune it: [docs/realtime.md](docs/realtime.md).
 
 **Recognition: all 22 scheduled languages.** One IndicConformer model per language (AI4Bharat, MIT, ungated community ONNX exports pinned to a commit): Assamese, Bengali, Bodo, Dogri, Gujarati, Hindi, Kannada, Kashmiri, Konkani, Maithili, Malayalam, Manipuri, Marathi, Nepali, Odia, Punjabi, Sanskrit, Santali, Sindhi, Tamil, Telugu and Urdu. Sixteen were run here on real recordings (FLEURS, RESPIN, a Sanskrit corpus; 10 to 60 utterances each): character error rates from 2.5 % (Bengali) to 14.9 % (Assamese), for example Hindi 7.0 %, Tamil 10.2 %, Maithili 11.6 %. Bodo, Dogri, Kashmiri, Konkani, Manipuri and Santali are in the catalog untested, for lack of public test recordings. Also: Hinglish written in Latin script (`faster-whisper-base-hinglish`), Whisper fine-tunes for Hindi, Tamil, Kannada, Telugu, Bengali and Punjabi, a streaming Bengali Zipformer and NVIDIA's streaming Nemotron (Hindi).
 
-**Bhojpuri, honestly.** There is no permissive, ungated Bhojpuri recogniser that runs without PyTorch today. The fallback is the Hindi model: 40 % word error rate (14 % character error rate) on 60 Bhojpuri utterances in our run, against 12 to 15 % on Hindi.
+**Bhojpuri, honestly.** The Hindi model is the best Bhojpuri recogniser we can run: 41 % word error rate (13 % character error rate) on 120 Bhojpuri utterances, against 12 to 15 % on Hindi. The permissively licensed Whisper-small Bhojpuri fine-tune, converted here, did worse on the same audio (48 % / 22 %), so it is not in the catalog.
 
-**Synthesis.** Hindi (three Piper-format voices and four Kokoro voices), Telugu (three voices), Tamil (two), Malayalam (two), Marathi, Bengali, Urdu, Nepali and Gujarati. The Telugu, Tamil, Malayalam, Marathi and newer Bengali and Urdu voices are the Piper project's own files, converted for sherpa-onnx by bolo right after the download (`bolo pull piper:<voice>` does that for any Piper voice); each was synthesised and transcribed back by the recogniser of its language (character error rate 0 to 7 %). Maithili, Bhojpuri, Kannada, Magahi and Chhattisgarhi voices (IISc SYSPIN, MIT) are converted by this project and **not yet published**: the catalog lists them as pending. **No voice** for Punjabi, Odia, Assamese, Sanskrit, Sindhi, Kashmiri, Konkani, Dogri, Manipuri, Bodo or Santali. Sentences are split at the danda, Hindi numbers are spelled out in the Indian system (`250000` → दो लाख पचास हज़ार), and code-mixed text passes through untouched.
+**Synthesis.** Hindi (three Piper-format voices, four Kokoro voices, two SYSPIN voices; all without eSpeak NG), Telugu (three voices), Tamil (two), Malayalam (two), Marathi, Bengali, Urdu, Nepali and Gujarati. The Telugu, Tamil, Malayalam, Marathi and newer Bengali and Urdu voices are the Piper project's own files, converted for sherpa-onnx by bolo right after the download (`bolo pull piper:<voice>` does that for any Piper voice); each was synthesised and transcribed back by the recogniser of its language (character error rate 0 to 7 %). Maithili, Bhojpuri, Kannada, Magahi and Chhattisgarhi voices (IISc SYSPIN, MIT) are converted by this project and published. Meta's MMS-TTS voices (non-commercial) for Punjabi, Odia, Assamese, Dogri and ten more are converted and run here, **not yet published**. **No voice** that runs without PyTorch for Sanskrit, Sindhi, Kashmiri, Konkani, Manipuri, Bodo or Santali. Sentences are split at the danda, Hindi numbers are spelled out in the Indian system (`250000` → दो लाख पचास हज़ार), and code-mixed text passes through untouched.
 
-| | STT | TTS |
+Licence classes: **P** permissive (MIT, Apache-2.0, CC-BY, CC0), **NC** non-commercial, **G** gated, **T** needs the PyTorch plugin (not written yet).
+
+| Language | STT | TTS |
 | --- | --- | --- |
-| Hindi, Bengali, Telugu, Tamil, Malayalam, Marathi, Urdu, Nepali, Gujarati | yes (run here) | yes |
-| Kannada, Maithili | yes (run here) | prepared, not yet published |
-| Punjabi, Odia, Assamese, Sanskrit, Sindhi | yes (run here; Sindhi without an error rate) | no |
-| Bodo, Dogri, Kashmiri, Konkani, Manipuri, Santali | in the catalog, untested | no |
-| Bhojpuri (not a scheduled language) | Hindi model as a fallback (40 % WER) | prepared, not yet published |
+| Hindi | P, run here (also G/T: SraVaani, official IndicConformer) | P (Piper, Kokoro, SYSPIN; some Piper voices NC); NC MMS pending; G/T Indic Parler-TTS, IndicF5 |
+| Bengali, Telugu, Tamil, Malayalam, Marathi, Urdu, Nepali, Gujarati | P, run here | P (some Piper voices NC); NC MMS pending for most |
+| Kannada, Maithili | P, run here | P (SYSPIN); NC MMS pending |
+| Magahi, Chhattisgarhi | Hindi model only | P (SYSPIN); NC MMS (run here, pending) |
+| Bhojpuri (not a scheduled language) | Hindi model (41 % WER) | P (SYSPIN) |
+| Punjabi, Odia, Assamese | P, run here | NC MMS (run here, pending); G/T Indic Parler-TTS |
+| Dogri | P, untested | NC MMS (run here, pending) |
+| Sanskrit, Sindhi | P, run here (Sindhi without an error rate) | G/T only (Indic Parler-TTS) |
+| Bodo, Kashmiri, Konkani, Manipuri, Santali | P, untested | none (Bodo, Kashmiri: G/T or T only) |
 
 **Checked end to end:** besides the runs above, Hindi text → `piper-hi-in-rohan-medium` → `faster-whisper-tiny-hindi` returns the sentence with 0% word error rate in the test-suite. All of these are small samples that show the pipelines work; they are not accuracy benchmarks, and nobody who speaks the languages reviewed the synthesised audio.
 
@@ -300,7 +314,7 @@ All numbers were measured with bolo's own load generator (`bolo bench`, in proce
 | `kitten-nano-0.8-int8` (TTS) | 0.27, first audio after about 1.0 s | 3.7× |
 | `kokoro-v1.0-int8` (TTS) | 0.88, first audio after 2.4 to 3.4 s | barely faster than real time |
 
-Kokoro is the default voice because it sounds best and needs no extra install, but on four shared cores it is only just real-time; the float32 export (`kokoro-v1.0`) measured slightly faster (RTF 0.76). For low latency on CPU use a Piper-format voice. Two streaming models were slower than real time here and are not usable live on this hardware: `parakeet-unified-en-streaming-560ms` (RTF 4.7) and, nearly, `nemo-fastconformer-ctc-en-streaming-80ms` (0.76).
+Kokoro is the default voice for quality, but on four shared cores it is only just real-time; the float32 export (`kokoro-v1.0`) measured faster than the int8 one, also for first audio. Voice agents, Wyoming and `tts-1` therefore use `piper-en-us-amy-low` by default (`default_realtime_tts`), which starts speaking in about 150 ms and needs no optional component (phonemes from uccharan); see [docs/models.md](docs/models.md#default-voices). Two streaming models were slower than real time here and are not usable live on this hardware: `parakeet-unified-en-streaming-560ms` (RTF 4.7) and, nearly, `nemo-fastconformer-ctc-en-streaming-80ms` (0.76).
 
 **Concurrent realtime streams** (each client streams at 1×; p50 / p95 in ms):
 
@@ -321,6 +335,8 @@ Kokoro is the default voice because it sounds best and needs no extra install, b
 | 2 | 15.3 / 12.1 | 28.1 / 28.5 | 14.0 / 13.6 |
 | 4 | 21.5 / 12.2 | 28.5 / 27.4 | 12.2 / 14.0 |
 | 8 | 25.7 / 11.3 | 28.3 / 27.5 | 13.4 / 13.8 |
+
+**Thirty minutes of mixed load** (moonshine and whisper-base transcription, Piper and Kitten synthesis; 1 to 8 clients; the machine was also running another project's jobs, load average 6 to 13): 1,494 requests, one refused with `429` by design, none failed. Memory reached 1.69 GB once the four models were loaded and ended at 1.80 GB, most of the rise when the client count went to 8; no unbounded growth. Under 8 clients the p95 was 1.3 s for moonshine and 3.3 s for Piper (whole responses). [docs/measurements/soak-30min.json](docs/measurements/soak-30min.json).
 
 **What batching buys on CPU, honestly:**
 
@@ -358,14 +374,14 @@ Stated plainly, so you do not find out the hard way:
 - **Apple Silicon and macOS, Linux arm64, Windows.** Not run. The dependencies publish wheels for macOS and arm64, so it should work there; Windows is unknown.
 - **Python 3.10 and 3.11.** The package targets 3.10 to 3.13; the test-suite was run on 3.12 and 3.13 only.
 - **Real telephony.** The G.711 paths are tested end to end with synthesised speech, not on a phone network.
-- **Home Assistant and browsers.** The Wyoming protocol is tested with a protocol client, not with Home Assistant. The WebRTC transport of the Realtime API is tested with the aiortc library (also with real models), not with Chrome, Firefox or Safari, and not across NAT or a TURN relay. Pipecat and LiveKit Agents were run against bolo, but without a transport in front (a wav file played the caller).
-- **The container images, the systemd unit and the Kubernetes manifest** were written but not built or deployed here (there was no container runtime).
+- **Home Assistant and browsers.** The Wyoming flows Home Assistant uses were run with the official `wyoming` client against a real server with real models, not with Home Assistant itself. The WebRTC transport of the Realtime API is tested with the aiortc library (also with real models), not with Chrome, Firefox or Safari, and not across NAT or a TURN relay. Pipecat and LiveKit Agents were run against bolo, but without a transport in front (a wav file played the caller).
+- **The GPU image, the systemd unit and the Kubernetes manifest.** The CPU image was built and run here (health check, synthesis, transcription) and CI builds and smoke-tests it on every push; the compose file was run. The systemd unit passes `systemd-analyze verify` but was not run under systemd, the Kubernetes manifest was not applied to a cluster, and the GPU image was not built.
 - **Most of the catalog.** 117 of 225 models are marked untested: their files were checked on the Hub and a sibling of the same architecture was run, but that model was not.
 - **Voice agents with a capable language model.** The conversation path was run end to end with models of 360M and 500M parameters on a shared CPU, through llama-cpp-python's server, Ollama and llama.cpp's `llama-server` (see [Performance](#performance)); the answers of such models are poor and the turn latency is not representative of a real deployment. Function calling was exercised with a scripted fake model, not a real one. vLLM and hosted APIs were not tried.
-- **Diarization accuracy.** Measured on one clip made of two synthetic voices taking turns, plus speaker *counts* on 18 public recordings (see docs/api.md, "How many speakers"). No diarization error rate on real recordings; overlapping speech and noisy rooms were not evaluated. Known-speaker naming was tested with synthetic voices only.
-- **Converted voices and the release workflows.** The SYSPIN voice conversion script's export step and the "Voices" and "Release" workflows were written but not run here; the packing, publishing index and pull path were tested with voices converted earlier.
+- **Diarization accuracy.** Measured on one clip made of two synthetic voices taking turns, plus speaker *counts* on 18 public recordings (see docs/api.md, "How many speakers"), plus overlap handling on three synthetic two-voice mixes. No diarization error rate on real recordings; overlap and noisy rooms were not evaluated on real recordings. Known-speaker naming was tested with synthetic voices only.
+- **Converted voices and the release workflow.** The "Voices" workflow published the 22 SYSPIN voices; the MMS-TTS conversion was run here for eight languages but the voices are not published yet, and the Hugging Face upload was tested only against a stand-in for the Hub API. The "Release" workflow has not been run.
 - **Accuracy at scale.** Word error rates here come from a handful of clips. They show that the pipelines work, not how good the models are; for that, see the model publishers' evaluations.
-- **Long soak, memory growth over days, hostile input.** Not done.
+- **Memory growth over days, hostile input.** Not done; a 30-minute mixed-load soak was (see [Performance](#performance)).
 - Engines `moonshine` (useful-moonshine-onnx), `whisper.cpp` and `kokoro-onnx` have plugins that were written against their documentation and not run.
 
 ## Licences
@@ -373,17 +389,18 @@ Stated plainly, so you do not find out the hard way:
 bolo itself is [Apache-2.0](LICENSE). It contains no third-party source code; [NOTICE](NOTICE) lists what it works with.
 
 - **Engines**: sherpa-onnx (Apache-2.0), ONNX Runtime (MIT), faster-whisper and CTranslate2 (MIT). The optional `kokoro-onnx` plugin is MIT but pulls in the GPL `phonemizer` package, so it is not part of `[all]`.
-- **eSpeak NG (GPL-3.0-or-later) is a separate, optional component.** It turns text into phonemes for Piper-format voices, KittenTTS, Matcha-TTS (English) and the non-English Kokoro voices. bolo's wheel does not contain it, the `all` extra does not install it, and the container image does not include it unless you build with `--build-arg WITH_ESPEAK=1`. It arrives only when you ask: the console's install button (which asks you to accept the licence), `bolo components install espeak-ng --accept-license`, `pip install 'bolo[espeak]'` (the `espeakng-loader` package: a prebuilt library plus data), or a system package. bolo's own code stays Apache-2.0 either way: Apache-2.0 code may be combined with GPLv3 code, and bolo only calls the component's public interface. But **if you redistribute a bundle that contains eSpeak NG** (an image built with `WITH_ESPEAK=1`, an appliance, an installer) **you must comply with the GPL for that component**. Without it you still have Kokoro English and Mandarin, MeloTTS, MMS-TTS (non-commercial) and the Coqui Bengali voices. sherpa-onnx removed espeak-ng from its own binaries in version 2.0, and the GPL `piper-tts` runtime is not used at all. More in [docs/models.md](docs/models.md#licences-and-the-espeak-ng-question).
-- **Models** are downloaded from their publishers under their own licences, which the catalog records per model and the console shows. Most are MIT, Apache-2.0 or CC-BY-4.0. Some are **non-commercial** (MMS-TTS, non-English Moonshine, several Piper voices, flagged ⚠) or have custom terms (SenseVoice, Paraformer). Nothing in the default catalog is gated, and bolo never downloads a gated model without your own token.
+- **uccharan (Apache-2.0)** turns text into phonemes for English and Hindi voices; it is a dependency of `bolo[all]`, not part of bolo's code.
+- **eSpeak NG (GPL-3.0-or-later) is a separate, optional component.** It turns text into phonemes for Piper-format voices, KittenTTS and Kokoro in the languages uccharan does not cover. bolo's wheel does not contain it, the `all` extra does not install it, and the container image does not include it unless you build with `--build-arg WITH_ESPEAK=1`. It arrives only when you ask: the console's install button (which asks you to accept the licence), `bolo components install espeak-ng --accept-license`, `pip install 'bolo[espeak]'` (the `espeakng-loader` package: a prebuilt library plus data), or a system package. bolo's own code stays Apache-2.0 either way: Apache-2.0 code may be combined with GPLv3 code, and bolo only calls the component's public interface. But **if you redistribute a bundle that contains eSpeak NG** (an image built with `WITH_ESPEAK=1`, an appliance, an installer) **you must comply with the GPL for that component**. Without it you still have every English and Hindi voice (through uccharan), Kokoro Mandarin, MeloTTS, MMS-TTS (non-commercial), the SYSPIN voices and the Coqui Bengali voices. sherpa-onnx removed espeak-ng from its own binaries in version 2.0, and the GPL `piper-tts` runtime is not used at all. More in [docs/models.md](docs/models.md#licences-and-the-espeak-ng-question).
+- **Models** are downloaded from their publishers under their own licences, which the catalog records per model and the console shows. Most are MIT, Apache-2.0 or CC-BY-4.0. Some are **non-commercial** (MMS-TTS, non-English Moonshine, several Piper voices, flagged ⚠) or have custom terms (SenseVoice, Paraformer). A few are **gated** (marked `gated`); bolo never downloads a gated model without your own token.
 
 ## Roadmap
 
-- Publishing the converted SYSPIN voices (Maithili, Bhojpuri, Kannada, …) and switching their catalog entries on.
-- A Bhojpuri recogniser (conversion of a permissively licensed checkpoint), and voices for Punjabi, Odia and Assamese (needs a new small engine).
+- Publishing the MMS-TTS voices (Punjabi, Odia, Assamese, Dogri, …) and the Hugging Face mirror of all converted models.
+- A Bhojpuri recogniser better than the Hindi fallback (the Whisper fine-tune we converted was not).
+- The PyTorch engine plugin (Indic Parler-TTS, IndicF5, Svara, SraVaani).
 - WebRTC tested with browsers and behind NAT; SIP; MCP tools.
-- Overlap-aware online diarization; a diarization error rate measured on real recordings.
+- Overlap-aware online (live) diarization; a diarization error rate measured on real recordings.
 - Word timestamps for Whisper through sherpa-onnx (exports with attention outputs) and for Moonshine.
-- The official (gated) AI4Bharat models with a user token.
 - GPU validation, Apple Silicon validation, and published container images.
 - Models trained for 8 kHz telephone speech.
 - An attention-based streaming policy for Whisper as an alternative to LocalAgreement.

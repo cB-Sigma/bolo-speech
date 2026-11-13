@@ -11,11 +11,20 @@ On a live stream there is no whole recording to cluster. There the
 to the nearest speaker seen so far, or to a new one. It assumes one speaker
 per utterance, which is what a voice-activity detector gives you when people
 take turns; overlapping speech is attributed to whoever dominates.
+
+Overlap (offline): the segmentation model (pyannote segmentation-3.0, a
+powerset model) can give two speakers at once, and sherpa-onnx then returns
+turns of different speakers that overlap in time. :func:`find_overlaps` lists
+those stretches, which are marked on transcript segments. :func:`merge_turns`
+can keep an overlapping turn whole (``keep_overlap``) instead of clipping it at
+the end of the previous one; that is off by default because the recogniser,
+hearing the mixture, then wrote the louder voice's words into both texts.
 """
 
 from __future__ import annotations
 
 import itertools
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -53,6 +62,11 @@ class DiarizeOptions:
     names: dict[int, str] = field(default_factory=dict)
     #: filled in by the pipeline: known speaker name -> best cosine similarity found
     similarities: dict[str, float] = field(default_factory=dict)
+    #: transcribe both speakers' turns in full where they overlap (otherwise the later turn is clipped). Off by
+    #: default: in our test the recogniser then wrote the louder speaker's words into the other's text as well
+    keep_overlap: bool = False
+    #: filled in by the pipeline: stretches where two or more speakers talk at once
+    overlaps: list[Overlap] = field(default_factory=list)
 
     def label(self, speaker: int) -> str:
         return self.names.get(speaker) or speaker_label(speaker)
@@ -213,10 +227,46 @@ def renumber(turns: list[SpeakerTurn]) -> list[SpeakerTurn]:
     ]
 
 
+@dataclass
+class Overlap:
+    start: float
+    end: float
+    speakers: list[int]
+
+    def to_dict(self, label: Callable[[int], str]) -> dict[str, object]:
+        return {"start": round(self.start, 3), "end": round(self.end, 3), "speakers": [label(s) for s in self.speakers]}
+
+
+def find_overlaps(turns: list[SpeakerTurn], min_s: float = 0.25) -> list[Overlap]:
+    """Stretches where two or more speakers talk at once (at least ``min_s`` long), in time order."""
+    edges = sorted({t.start for t in turns} | {t.end for t in turns})
+    out: list[Overlap] = []
+    for a, b in itertools.pairwise(edges):
+        active = sorted({t.speaker for t in turns if t.start < b and t.end > a})
+        if len(active) < 2:
+            continue
+        if out and abs(out[-1].end - a) < 1e-6 and out[-1].speakers == active:
+            out[-1].end = b
+        else:
+            out.append(Overlap(a, b, active))
+    return [o for o in out if o.end - o.start >= min_s]
+
+
 def merge_turns(
-    turns: list[SpeakerTurn], *, max_gap_s: float = 1.0, max_len_s: float = 30.0, min_len_s: float = 0.2
+    turns: list[SpeakerTurn],
+    *,
+    max_gap_s: float = 1.0,
+    max_len_s: float = 30.0,
+    min_len_s: float = 0.2,
+    keep_overlap: bool = False,
+    min_overlap_s: float = 0.25,
 ) -> list[SpeakerTurn]:
-    """Join consecutive turns of the same speaker into chunks worth transcribing."""
+    """Join consecutive turns of the same speaker into chunks worth transcribing.
+
+    A turn that starts before the previous one (of another speaker) ends is clipped to start where the
+    previous one ends, unless ``keep_overlap`` is set and the overlap lasts ``min_overlap_s`` or more: then
+    both turns keep their full extent and the overlapping audio is transcribed twice, once for each speaker.
+    """
     out: list[SpeakerTurn] = []
     for t in sorted(turns, key=lambda t: t.start):
         if t.end - t.start < min_len_s and not (out and out[-1].speaker == t.speaker):
@@ -224,11 +274,13 @@ def merge_turns(
         last = out[-1] if out else None
         if last and last.speaker == t.speaker and t.start - last.end <= max_gap_s and t.end - last.start <= max_len_s:
             last.end = max(last.end, t.end)
+            continue
+        prev = out[-1] if out else None
+        if prev and t.start < prev.end and not (keep_overlap and min(prev.end, t.end) - t.start >= min_overlap_s):
+            out.append(SpeakerTurn(prev.end, t.end, t.speaker))
         else:
-            out.append(
-                SpeakerTurn(max(t.start, last.end) if last and t.start < last.end else t.start, t.end, t.speaker)
-            )
-    return [t for t in out if t.end - t.start >= min_len_s]
+            out.append(SpeakerTurn(t.start, t.end, t.speaker))
+    return sorted((t for t in out if t.end - t.start >= min_len_s), key=lambda t: t.start)
 
 
 class OnlineSpeakerLabeler:

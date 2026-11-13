@@ -92,6 +92,9 @@ def build_info(core: Bolo) -> Any:
                             speakers=[TtsVoiceSpeaker(name=i) for i in ids],
                         )
                     )
+    asr_extra: dict[str, Any] = {}
+    if "supports_transcript_streaming" in getattr(AsrProgram, "__dataclass_fields__", {}):
+        asr_extra["supports_transcript_streaming"] = True  # wyoming >= 1.7: transcript-start/-chunk/-stop
     asr = [
         AsrProgram(
             name="bolo",
@@ -100,6 +103,7 @@ def build_info(core: Bolo) -> Any:
             description="bolo speech-to-text",
             version=__version__,
             models=asr_models,
+            **asr_extra,
         )
     ]
     tts = [
@@ -139,6 +143,13 @@ def make_handler(core: Bolo) -> Any:
     from wyoming.info import Describe
     from wyoming.server import AsyncEventHandler
     from wyoming.tts import Synthesize, SynthesizeChunk, SynthesizeStart, SynthesizeStop, SynthesizeStopped
+
+    try:  # wyoming >= 1.7
+        from wyoming.asr import TranscriptChunk, TranscriptStart, TranscriptStop
+
+        _TRANSCRIPT_STREAMING: tuple[Any, Any, Any] | None = (TranscriptStart, TranscriptChunk, TranscriptStop)
+    except ImportError:  # pragma: no cover - older wyoming
+        _TRANSCRIPT_STREAMING = None
 
     class Handler(AsyncEventHandler):  # type: ignore[misc]
         def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -187,8 +198,24 @@ def make_handler(core: Bolo) -> Any:
                 self.audio = []
                 trace = Trace("stt", "wyoming", "")
                 language = (self.language or "").split("-")[0].split("_")[0] or None
-                result = await core.transcribe(samples_f, self.rate, model=self.model, language=language, trace=trace)
+                streaming = _TRANSCRIPT_STREAMING is not None
+                done_text: list[str] = []
+                if streaming:
+                    start, chunk_cls, _stop = _TRANSCRIPT_STREAMING  # type: ignore[misc]
+                    await self.write_event(start(language=self.language).event())
+
+                    async def on_segment(segment: Any) -> None:
+                        # each chunk carries the transcript so far (it replaces the previous one)
+                        done_text.append(segment.text.strip())
+                        await self.write_event(chunk_cls(text=" ".join(t for t in done_text if t)).event())
+
+                result = await core.transcribe(
+                    samples_f, self.rate, model=self.model, language=language, trace=trace,
+                    on_segment=on_segment if streaming else None,
+                )  # fmt: skip
                 await self.write_event(Transcript(text=result.text, language=result.language or self.language).event())
+                if streaming:
+                    await self.write_event(_TRANSCRIPT_STREAMING[2]().event())  # type: ignore[index]
             elif Synthesize.is_type(event.type):
                 if self.streaming_tts:
                     return True  # compatibility event sent alongside the streaming ones: ignore
@@ -217,6 +244,8 @@ def make_handler(core: Bolo) -> Any:
 
         async def _speak(self, text: str, voice: Any, *, first: bool, last: bool) -> None:
             model, voice_id = parse_voice(core, voice)
+            if model is None:
+                model = core.realtime_tts(voice_id).id  # a voice assistant wants the first sound quickly
             trace = Trace("tts", "wyoming", "")
             sent_start = not first
             try:

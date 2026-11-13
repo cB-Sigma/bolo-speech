@@ -65,6 +65,36 @@ jobs:
           curl -fsS http://127.0.0.1:8765/api/v1/catalog | python -c "import json,sys; assert len(json.load(sys.stdin)['models']) > 100"
           kill %1
 
+  image:
+    name: container image (build and smoke test, not pushed)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Image extras (uccharan only once it is on PyPI)
+        id: extras
+        run: |
+          if python3 -m pip download --no-deps --quiet --dest /tmp/probe uccharan >/dev/null 2>&1; then
+            echo "extras=sherpa,faster-whisper,moonshine,av,wyoming,uccharan" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::uccharan is not on PyPI yet: building the image without it"
+            echo "extras=sherpa,faster-whisper,moonshine,av,wyoming" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: docker/setup-buildx-action@v4
+      - name: Build the CPU image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/Dockerfile
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: bolo:ci
+          build-args: EXTRAS=${{ steps.extras.outputs.extras }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke test (health, synthesis, transcription of the synthesised audio)
+        run: deploy/smoke_test.sh bolo:ci
+
   ui:
     name: web console
     runs-on: ubuntu-latest

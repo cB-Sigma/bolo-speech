@@ -1,0 +1,128 @@
+# Models that need PyTorch. bolo itself never imports PyTorch: these run on an out-of-process engine plugin
+# (engine: plugin:torch, docs/plugins.md) that is installed separately. Until it is installed they are listed with
+# requires: [plugin:torch] and available: false. None of them was run by the bolo maintainers.
+- id: indic-parler-tts
+  task: tts
+  engine: plugin:torch
+  kind: parler-tts
+  family: Parler-TTS
+  languages: [as, bn, en, gu, hi, kn, ks, ml, mr, ne, or, pa, sa, sd, ta, te, ur]
+  tier: accuracy
+  sample_rate: 44100
+  size_bytes: 3763425337
+  params: 900000000
+  license: Apache-2.0
+  gated: true
+  description: 'AI4Bharat Indic Parler-TTS: text-to-speech for 20+ Indian languages with the voice described in words
+    ("a calm female voice, close to the microphone"). Gated: accept the terms on the model page and set HF_TOKEN.
+    Needs PyTorch, so it runs on the torch engine plugin.'
+  source_url: https://huggingface.co/ai4bharat/indic-parler-tts
+  validated: untested
+  source:
+    repo: ai4bharat/indic-parler-tts
+    revision: 660bc53c64ae83150613264111708a0465211237
+  options:
+    plugin_install: the bolo PyTorch engine plugin (plugins/bolo-torch in the bolo repository; not published yet)
+- id: indic-f5
+  task: tts
+  engine: plugin:torch
+  kind: f5-tts
+  family: F5-TTS
+  languages: [as, bn, gu, hi, kn, ml, mr, or, pa, ta, te]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 1406119998
+  params: 336000000
+  license: MIT
+  gated: true
+  description: 'AI4Bharat IndicF5: voice-cloning text-to-speech (a short reference recording sets the voice) for 11
+    Indian languages. Gated: accept the terms on the model page and set HF_TOKEN. Needs PyTorch (torch engine plugin).'
+  source_url: https://huggingface.co/ai4bharat/IndicF5
+  validated: untested
+  source:
+    repo: ai4bharat/IndicF5
+    revision: fb652a96e508091045890dae5bb99fe511facbcf
+  options:
+    plugin_install: the bolo PyTorch engine plugin (plugins/bolo-torch in the bolo repository; not published yet)
+- id: veena
+  task: tts
+  engine: plugin:torch
+  kind: orpheus-snac
+  family: Veena
+  languages: [en, hi]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 7594435993
+  params: 3000000000
+  license: Apache-2.0
+  description: 'Maya Research Veena: a 3B-parameter Llama-based text-to-speech model for Hindi, English and code-mixed
+    text, decoded with the SNAC audio codec. Needs PyTorch (torch engine plugin) and, in practice, a GPU.'
+  source_url: https://huggingface.co/maya-research/Veena
+  validated: untested
+  source:
+    repo: maya-research/Veena
+    revision: 8b770f9e69e6b35ef320d4cd70a99a4ab6dd022f
+  options:
+    plugin_install: the bolo PyTorch engine plugin (plugins/bolo-torch in the bolo repository; not published yet)
+- id: svara-tts-v1
+  task: tts
+  engine: plugin:torch
+  kind: orpheus-snac
+  family: Svara
+  languages: [as, bho, bn, brx, doi, en, gu, hi, hne, kn, mag, mai, ml, mr, ne, pa, sa, ta, te]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 13234128955
+  license: Apache-2.0
+  description: 'Kenpath Svara TTS v1: a Llama-based expressive text-to-speech model for 19 Indian languages (including
+    Bhojpuri, Magahi, Maithili, Chhattisgarhi, Bodo and Dogri), decoded with the SNAC codec. Needs PyTorch (torch
+    engine plugin) and, in practice, a GPU.'
+  source_url: https://huggingface.co/kenpath/svara-tts-v1
+  validated: untested
+  source:
+    repo: kenpath/svara-tts-v1
+    revision: db8a02fc1e4eab827ff6dda5bed3b56d4d2dd51e
+    exclude: ['examples/*']
+  options:
+    plugin_install: the bolo PyTorch engine plugin (plugins/bolo-torch in the bolo repository; not published yet)
+- id: sravaani-1.0
+  task: stt
+  engine: plugin:torch
+  kind: sravaani
+  family: SraVaani
+  languages: [as, bn, en, gu, hi, kn, ml, mr, ne, or, pa, sa, ta, te]
+  tier: accuracy
+  size_bytes: 909339943
+  license: MIT
+  gated: true
+  description: 'ARTPARK-IISc SraVaani 1.0: multilingual speech recognition for 13 Indian languages and English, shipped
+    as a TorchScript model. Gated: accept the terms on the model page and set HF_TOKEN. Needs PyTorch (torch engine
+    plugin).'
+  source_url: https://huggingface.co/ARTPARK-IISc/SraVaani-1.0
+  validated: untested
+  source:
+    repo: ARTPARK-IISc/SraVaani-1.0
+    revision: a7254684e699e464fb70d10ad301e28fa0330cad
+  options:
+    plugin_install: the bolo PyTorch engine plugin (plugins/bolo-torch in the bolo repository; not published yet)
+- id: indicconformer-600m-official
+  task: stt
+  engine: plugin:torch
+  kind: indicconformer-official
+  family: IndicConformer
+  languages: [as, bn, brx, doi, gu, hi, kn, kok, ks, mai, ml, mni, mr, ne, or, pa, sa, sat, sd, ta, te, ur]
+  tier: accuracy
+  size_bytes: 2556502929
+  params: 600000000
+  license: MIT
+  gated: true
+  description: 'AI4Bharat IndicConformer 600M, the official multilingual release for the 22 scheduled languages
+    (ONNX graphs driven by PyTorch pre- and post-processing code). Gated: accept the terms on the model page and set
+    HF_TOKEN. The ungated community exports of the same model (indicconformer-<lang>-community) run without the plugin.'
+  source_url: https://huggingface.co/ai4bharat/indic-conformer-600m-multilingual
+  validated: untested
+  source:
+    repo: ai4bharat/indic-conformer-600m-multilingual
+    revision: 2a77d305038dfc502fd9464e7d028b90381976cb
+  options:
+    plugin_install: the bolo PyTorch engine plugin (plugins/bolo-torch in the bolo repository; not published yet)

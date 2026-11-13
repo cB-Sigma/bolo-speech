@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
+
+import pytest
 
 from bolo.streaming.agreement import LocalAgreement, PrefixStability
 from bolo.text.formats import to_srt, to_vtt
@@ -187,3 +190,46 @@ def test_espeak_executable_route(tmp_path, monkeypatch) -> None:  # type: ignore
             phonemize.require_phonemizer()
     finally:
         phonemize.reset_phonemizer()
+
+
+# -- training-time cleaning of character voices (the same front end as the in-browser voices) ---------------
+_UI_FIXTURES = (
+    Path(__file__).resolve().parents[2] / "ui" / "src" / "lib" / "browser-tts" / "fixtures" / "sherpa-tokens.json"
+)
+
+
+def test_multilingual_clean_matches_the_browser_front_end() -> None:
+    from bolo.text.normalize import clean_for_voice, multilingual_clean
+
+    # the cases of ui/src/lib/browser-tts/browser-tts.test.ts
+    assert multilingual_clean('  Hello;  "World" (again) - yes: NO  ') == "hello, world again yes, no"
+    assert multilingual_clean("[a] <b>") == "a b"
+    assert multilingual_clean("क़") == "क़"  # precomposed nukta letter -> letter + nukta (NFC)
+    assert multilingual_clean("क़") == "क़"
+    assert multilingual_clean("é") == "é"
+    no_danda = frozenset("abc .,")
+    assert clean_for_voice("Abc। ABC!", "multilingual", no_danda) == "abc. abc."
+    with_danda = frozenset("abc .,।!")
+    assert clean_for_voice("Abc। ABC!", "multilingual", with_danda) == "abc। abc!"
+    assert clean_for_voice("ÀB;C", "lowercase", None) == "àb;c"
+    assert clean_for_voice("As Is;", None, None) == "As Is;"
+
+
+@pytest.mark.skipif(not _UI_FIXTURES.is_file(), reason="needs the repository checkout (ui fixtures)")
+def test_cleaned_text_gives_the_verified_token_ids() -> None:
+    """The fixtures hold ids checked sample for sample against sherpa-onnx; the server's cleaning must give them."""
+    import json
+
+    from bolo.text.normalize import clean_for_voice
+
+    cases = json.loads(_UI_FIXTURES.read_text(encoding="utf-8"))["cases"]
+    assert cases
+    for case in cases:
+        symbols: dict[str, int] = case["symbols"]
+        cleaned = clean_for_voice(case["text"], "multilingual", frozenset(symbols))
+        ids = [symbols[ch] for ch in cleaned if ch in symbols]
+        blank = case["blank_id"]
+        with_blanks = [blank]
+        for i in ids:
+            with_blanks += [i, blank]
+        assert with_blanks == case["ids"], case["text"]

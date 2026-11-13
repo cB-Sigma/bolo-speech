@@ -285,7 +285,7 @@ def test_piper_voice_is_converted_without_touching_the_download(tmp_path: Path) 
 
 async def test_piper_names_become_catalog_entries(core: Bolo) -> None:
     spec = register_piper_voice(core, "xx_XX-nobody-high")
-    assert spec.id == "piper-xx-xx-nobody-high" and spec.requires == ["espeak-ng"] and spec.source.convert == "piper"
+    assert spec.id == "piper-xx-xx-nobody-high" and spec.requires == ["phonemizer"] and spec.source.convert == "piper"
     assert spec.source.urls[0]["url"].endswith("/xx/xx_XX/nobody/high/xx_XX-nobody-high.onnx")
     assert register_piper_voice(core, "xx_XX-nobody-high") is spec
     # voices that are already in the catalog are found by their upstream name

@@ -40,9 +40,14 @@ class FasterWhisperSTT(STTModel):
         )
         if spec.get("english_only"):
             self.fixed_language = "en"
+        #: Whisper language token a fine-tune for a language Whisper has no token for was trained with
+        #: (Bhojpuri fine-tunes decode as "hi"); requests for the model's own language use it
+        self.decode_language: str | None = spec.get("decode_language")
         self.supports_translate = bool(self.model.model.is_multilingual)
 
     def _language(self, req: STTRequest) -> str | None:
+        if self.decode_language:
+            return str(self.decode_language)
         lang = req.language or self.fixed_language
         return lang.split("-")[0].lower() if lang else None
 

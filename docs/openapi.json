@@ -651,6 +651,94 @@
     }
    }
   },
+  "/api/v1/models/{model_id}/settings": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Settings pinned for one model",
+    "operationId": "get_model_settings_api_v1_models__model_id__settings_get",
+    "parameters": [
+     {
+      "name": "model_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Model Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Pin settings for one model (phonemiser)",
+    "operationId": "put_model_settings_api_v1_models__model_id__settings_put",
+    "parameters": [
+     {
+      "name": "model_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Model Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ModelSettingsRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/models/{model_id}/load": {
    "post": {
     "tags": [
@@ -829,7 +917,7 @@
     "tags": [
      "native"
     ],
-    "summary": "Optional third-party components (espeak-ng)",
+    "summary": "Optional components (uccharan, espeak-ng, engine plugins)",
     "operationId": "components_api_v1_components_get",
     "responses": {
      "200": {
@@ -1408,6 +1496,25 @@
     "type": "object",
     "title": "InstallRequest"
    },
+   "ModelSettingsRequest": {
+    "properties": {
+     "phonemizer": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phonemizer",
+      "description": "Pin the phonemiser of a voice: auto, uccharan, uccharan:improved or espeak-ng; null removes the pin."
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "ModelSettingsRequest"
+   },
    "PullRequest": {
     "properties": {
      "id": {
@@ -1535,6 +1642,18 @@
       "title": "Normalize",
       "description": "Extension: set false to skip text normalisation.",
       "default": true
+     },
+     "phonemizer": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phonemizer",
+      "description": "Extension: who turns text into phonemes for voices that read phonemes: auto, uccharan (= uccharan:compatible), uccharan:improved or espeak-ng. Default: the voice's pinned choice, else the server's `phonemizer` setting."
      }
     },
     "type": "object",

@@ -1,0 +1,587 @@
+# Meta MMS-TTS voices for Indian languages (CC-BY-NC-4.0: non-commercial use only), converted to ONNX by
+# tools/voices/export_mms.py and published by the Voices workflow (GitHub release, and Hugging Face under
+# codebucketsolutions/ when HF_TOKEN is set). status: pending until then; tools/voices/update_catalog.py switches
+# them on. Not covered by MMS-TTS: Sanskrit, Sindhi, Kashmiri, Konkani, Manipuri, Bodo, Santali, Bhojpuri.
+
+- id: mms-tts-pan
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - pa
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 114057689
+  params: 36000000
+  license: CC-BY-NC-4.0
+  license_url: https://creativecommons.org/licenses/by-nc/4.0/
+  commercial_use: false
+  description: Meta MMS-TTS Punjabi voice (VITS, reads characters, no phonemiser), converted to ONNX by the bolo
+    project (tools/voices/export_mms.py) from facebook/mms-tts models/pan. Non-commercial use only (CC-BY-NC-4.0).
+    Write numbers out in words.
+  source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/pan
+  validated: untested
+  measured:
+    rtf: 0.324
+    round_trip_wer: 0.194
+    round_trip_cer: 0.103
+    round_trip_stt: indicconformer-pa-community
+    round_trip_sentences: 5
+    ttfa_ms: 908
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: measured on an export made here with tools/voices/export_mms.py (the recipe the Voices workflow runs)
+  source:
+    urls:
+    - path: mms-tts-pan.tar.gz
+      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-pan.tar.gz
+      extract: true
+  options:
+    text_cleaner: lowercase
+  status: pending
+- id: mms-tts-ory
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - or
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 114070863
+  params: 36000000
+  license: CC-BY-NC-4.0
+  license_url: https://creativecommons.org/licenses/by-nc/4.0/
+  commercial_use: false
+  description: Meta MMS-TTS Odia voice (VITS, reads characters, no phonemiser), converted to ONNX by the bolo project
+    (tools/voices/export_mms.py) from facebook/mms-tts models/ory. Non-commercial use only (CC-BY-NC-4.0). Write
+    numbers out in words.
+  source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/ory
+  validated: untested
+  measured:
+    rtf: 0.468
+    round_trip_wer: 0.185
+    round_trip_cer: 0.057
+    round_trip_stt: indicconformer-or-community
+    round_trip_sentences: 5
+    ttfa_ms: 915
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: measured on an export made here with tools/voices/export_mms.py (the recipe the Voices workflow runs)
+  source:
+    urls:
+    - path: mms-tts-ory.tar.gz
+      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-ory.tar.gz
+      extract: true
+  options:
+    text_cleaner: lowercase
+  status: pending
+- id: mms-tts-asm
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - as
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 114063101
+  params: 36000000
+  license: CC-BY-NC-4.0
+  license_url: https://creativecommons.org/licenses/by-nc/4.0/
+  commercial_use: false
+  description: Meta MMS-TTS Assamese voice (VITS, reads characters, no phonemiser), converted to ONNX by the bolo
+    project (tools/voices/export_mms.py) from facebook/mms-tts models/asm. Non-commercial use only (CC-BY-NC-4.0).
+    Write numbers out in words.
+  source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/asm
+  validated: untested
+  measured:
+    rtf: 0.341
+    round_trip_wer: 0.133
+    round_trip_cer: 0.032
+    round_trip_stt: indicconformer-as-community
+    round_trip_sentences: 5
+    ttfa_ms: 633
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: measured on an export made here with tools/voices/export_mms.py (the recipe the Voices workflow runs)
+  source:
+    urls:
+    - path: mms-tts-asm.tar.gz
+      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-asm.tar.gz
+      extract: true
+  options:
+    text_cleaner: lowercase
+  status: pending
+- id: mms-tts-dgo
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - doi
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 114061554
+  params: 36000000
+  license: CC-BY-NC-4.0
+  license_url: https://creativecommons.org/licenses/by-nc/4.0/
+  commercial_use: false
+  description: Meta MMS-TTS Dogri voice (VITS, reads characters, no phonemiser), converted to ONNX by the bolo project
+    (tools/voices/export_mms.py) from facebook/mms-tts models/dgo. Non-commercial use only (CC-BY-NC-4.0). Write
+    numbers out in words.
+  source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/dgo
+  validated: untested
+  measured:
+    rtf: 0.331
+    round_trip_wer: 0.188
+    round_trip_cer: 0.08
+    round_trip_stt: indicconformer-doi-community
+    round_trip_sentences: 5
+    ttfa_ms: 722
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: measured on an export made here with tools/voices/export_mms.py (the recipe the Voices workflow runs)
+  source:
+    urls:
+    - path: mms-tts-dgo.tar.gz
+      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-dgo.tar.gz
+      extract: true
+  options:
+    text_cleaner: lowercase
+  status: pending
+- id: mms-tts-mai
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - mai
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 114063161
+  params: 36000000
+  license: CC-BY-NC-4.0
+  license_url: https://creativecommons.org/licenses/by-nc/4.0/
+  commercial_use: false
+  description: Meta MMS-TTS Maithili voice (VITS, reads characters, no phonemiser), converted to ONNX by the bolo
+    project (tools/voices/export_mms.py) from facebook/mms-tts models/mai. Non-commercial use only (CC-BY-NC-4.0).
+    Write numbers out in words.
+  source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/mai
+  validated: untested
+  measured:
+    rtf: 0.523
+    round_trip_wer: 0.486
+    round_trip_cer: 0.129
+    round_trip_stt: indicconformer-mai-community
+    round_trip_sentences: 5
+    ttfa_ms: 1534
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: measured on an export made here with tools/voices/export_mms.py (the recipe the Voices workflow runs)
+  source:
+    urls:
+    - path: mms-tts-mai.tar.gz
+      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-mai.tar.gz
+      extract: true
+  options:
+    text_cleaner: lowercase
+  status: pending
+- id: mms-tts-mag
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - mag
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 114065457
+  params: 36000000
+  license: CC-BY-NC-4.0
+  license_url: https://creativecommons.org/licenses/by-nc/4.0/
+  commercial_use: false
+  description: Meta MMS-TTS Magahi voice (VITS, reads characters, no phonemiser), converted to ONNX by the bolo
+    project (tools/voices/export_mms.py) from facebook/mms-tts models/mag. Non-commercial use only (CC-BY-NC-4.0).
+    Write numbers out in words.
+  source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/mag
+  validated: untested
+  measured:
+    rtf: 0.388
+    round_trip_wer: 0.529
+    round_trip_cer: 0.305
+    round_trip_stt: indicconformer-hi-community
+    round_trip_sentences: 5
+    ttfa_ms: 1134
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: measured on an export made here with tools/voices/export_mms.py (the recipe the Voices workflow runs)
+  source:
+    urls:
+    - path: mms-tts-mag.tar.gz
+      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-mag.tar.gz
+      extract: true
+  options:
+    text_cleaner: lowercase
+  status: pending
+- id: mms-tts-hne
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - hne
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 114059234
+  params: 36000000
+  license: CC-BY-NC-4.0
+  license_url: https://creativecommons.org/licenses/by-nc/4.0/
+  commercial_use: false
+  description: Meta MMS-TTS Chhattisgarhi voice (VITS, reads characters, no phonemiser), converted to ONNX by the
+    bolo project (tools/voices/export_mms.py) from facebook/mms-tts models/hne. Non-commercial use only (CC-BY-NC-4.0).
+    Write numbers out in words.
+  source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/hne
+  validated: untested
+  measured:
+    rtf: 0.323
+    round_trip_wer: 0.457
+    round_trip_cer: 0.123
+    round_trip_stt: indicconformer-hi-community
+    round_trip_sentences: 5
+    ttfa_ms: 896
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: measured on an export made here with tools/voices/export_mms.py (the recipe the Voices workflow runs)
+  source:
+    urls:
+    - path: mms-tts-hne.tar.gz
+      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-hne.tar.gz
+      extract: true
+  options:
+    text_cleaner: lowercase
+  status: pending
+- id: mms-tts-awa
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - awa
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 114060000
+  params: 36000000
+  license: CC-BY-NC-4.0
+  license_url: https://creativecommons.org/licenses/by-nc/4.0/
+  commercial_use: false
+  description: Meta MMS-TTS Awadhi voice (VITS, reads characters, no phonemiser), converted to ONNX by the bolo
+    project (tools/voices/export_mms.py) from facebook/mms-tts models/awa. Non-commercial use only (CC-BY-NC-4.0).
+    Write numbers out in words.
+  source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/awa
+  validated: untested
+  source:
+    urls:
+    - path: mms-tts-awa.tar.gz
+      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-awa.tar.gz
+      extract: true
+  options:
+    text_cleaner: lowercase
+  status: pending
+- id: mms-tts-bgc
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - bgc
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 114060000
+  params: 36000000
+  license: CC-BY-NC-4.0
+  license_url: https://creativecommons.org/licenses/by-nc/4.0/
+  commercial_use: false
+  description: Meta MMS-TTS Haryanvi voice (VITS, reads characters, no phonemiser), converted to ONNX by the bolo
+    project (tools/voices/export_mms.py) from facebook/mms-tts models/bgc. Non-commercial use only (CC-BY-NC-4.0).
+    Write numbers out in words.
+  source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/bgc
+  validated: untested
+  source:
+    urls:
+    - path: mms-tts-bgc.tar.gz
+      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-bgc.tar.gz
+      extract: true
+  options:
+    text_cleaner: lowercase
+  status: pending
+- id: mms-tts-urd
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - ur
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 114056751
+  params: 36000000
+  license: CC-BY-NC-4.0
+  license_url: https://creativecommons.org/licenses/by-nc/4.0/
+  commercial_use: false
+  description: Meta MMS-TTS Urdu voice (VITS, reads characters, no phonemiser), converted to ONNX by the bolo project
+    (tools/voices/export_mms.py) from facebook/mms-tts models/urd-script_arabic. Non-commercial use only (CC-BY-NC-4.0).
+    Write numbers out in words.
+  source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/urd-script_arabic
+  validated: untested
+  measured:
+    rtf: 0.315
+    round_trip_wer: 0.242
+    round_trip_cer: 0.075
+    round_trip_stt: indicconformer-ur-community
+    round_trip_sentences: 5
+    ttfa_ms: 807
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: measured on an export made here with tools/voices/export_mms.py (the recipe the Voices workflow runs)
+  source:
+    urls:
+    - path: mms-tts-urd.tar.gz
+      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-urd.tar.gz
+      extract: true
+  options:
+    text_cleaner: lowercase
+  status: pending
+- id: mms-tts-hin
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - hi
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 114060000
+  params: 36000000
+  license: CC-BY-NC-4.0
+  license_url: https://creativecommons.org/licenses/by-nc/4.0/
+  commercial_use: false
+  description: Meta MMS-TTS Hindi voice (VITS, reads characters, no phonemiser), converted to ONNX by the bolo project
+    (tools/voices/export_mms.py) from facebook/mms-tts models/hin. Non-commercial use only (CC-BY-NC-4.0). Write
+    numbers out in words.
+  source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/hin
+  validated: untested
+  source:
+    urls:
+    - path: mms-tts-hin.tar.gz
+      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-hin.tar.gz
+      extract: true
+  options:
+    text_cleaner: lowercase
+  status: pending
+- id: mms-tts-ben
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - bn
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 114060000
+  params: 36000000
+  license: CC-BY-NC-4.0
+  license_url: https://creativecommons.org/licenses/by-nc/4.0/
+  commercial_use: false
+  description: Meta MMS-TTS Bengali voice (VITS, reads characters, no phonemiser), converted to ONNX by the bolo
+    project (tools/voices/export_mms.py) from facebook/mms-tts models/ben. Non-commercial use only (CC-BY-NC-4.0).
+    Write numbers out in words.
+  source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/ben
+  validated: untested
+  source:
+    urls:
+    - path: mms-tts-ben.tar.gz
+      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-ben.tar.gz
+      extract: true
+  options:
+    text_cleaner: lowercase
+  status: pending
+- id: mms-tts-guj
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - gu
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 114060000
+  params: 36000000
+  license: CC-BY-NC-4.0
+  license_url: https://creativecommons.org/licenses/by-nc/4.0/
+  commercial_use: false
+  description: Meta MMS-TTS Gujarati voice (VITS, reads characters, no phonemiser), converted to ONNX by the bolo
+    project (tools/voices/export_mms.py) from facebook/mms-tts models/guj. Non-commercial use only (CC-BY-NC-4.0).
+    Write numbers out in words.
+  source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/guj
+  validated: untested
+  source:
+    urls:
+    - path: mms-tts-guj.tar.gz
+      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-guj.tar.gz
+      extract: true
+  options:
+    text_cleaner: lowercase
+  status: pending
+- id: mms-tts-kan
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - kn
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 114060000
+  params: 36000000
+  license: CC-BY-NC-4.0
+  license_url: https://creativecommons.org/licenses/by-nc/4.0/
+  commercial_use: false
+  description: Meta MMS-TTS Kannada voice (VITS, reads characters, no phonemiser), converted to ONNX by the bolo
+    project (tools/voices/export_mms.py) from facebook/mms-tts models/kan. Non-commercial use only (CC-BY-NC-4.0).
+    Write numbers out in words.
+  source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/kan
+  validated: untested
+  source:
+    urls:
+    - path: mms-tts-kan.tar.gz
+      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-kan.tar.gz
+      extract: true
+  options:
+    text_cleaner: lowercase
+  status: pending
+- id: mms-tts-mal
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - ml
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 114060000
+  params: 36000000
+  license: CC-BY-NC-4.0
+  license_url: https://creativecommons.org/licenses/by-nc/4.0/
+  commercial_use: false
+  description: Meta MMS-TTS Malayalam voice (VITS, reads characters, no phonemiser), converted to ONNX by the bolo
+    project (tools/voices/export_mms.py) from facebook/mms-tts models/mal. Non-commercial use only (CC-BY-NC-4.0).
+    Write numbers out in words.
+  source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/mal
+  validated: untested
+  source:
+    urls:
+    - path: mms-tts-mal.tar.gz
+      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-mal.tar.gz
+      extract: true
+  options:
+    text_cleaner: lowercase
+  status: pending
+- id: mms-tts-mar
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - mr
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 114060000
+  params: 36000000
+  license: CC-BY-NC-4.0
+  license_url: https://creativecommons.org/licenses/by-nc/4.0/
+  commercial_use: false
+  description: Meta MMS-TTS Marathi voice (VITS, reads characters, no phonemiser), converted to ONNX by the bolo
+    project (tools/voices/export_mms.py) from facebook/mms-tts models/mar. Non-commercial use only (CC-BY-NC-4.0).
+    Write numbers out in words.
+  source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/mar
+  validated: untested
+  source:
+    urls:
+    - path: mms-tts-mar.tar.gz
+      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-mar.tar.gz
+      extract: true
+  options:
+    text_cleaner: lowercase
+  status: pending
+- id: mms-tts-tam
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - ta
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 114060000
+  params: 36000000
+  license: CC-BY-NC-4.0
+  license_url: https://creativecommons.org/licenses/by-nc/4.0/
+  commercial_use: false
+  description: Meta MMS-TTS Tamil voice (VITS, reads characters, no phonemiser), converted to ONNX by the bolo project
+    (tools/voices/export_mms.py) from facebook/mms-tts models/tam. Non-commercial use only (CC-BY-NC-4.0). Write
+    numbers out in words.
+  source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/tam
+  validated: untested
+  source:
+    urls:
+    - path: mms-tts-tam.tar.gz
+      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-tam.tar.gz
+      extract: true
+  options:
+    text_cleaner: lowercase
+  status: pending
+- id: mms-tts-tel
+  task: tts
+  engine: sherpa-onnx
+  kind: vits
+  family: MMS-TTS
+  languages:
+  - te
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 114060000
+  params: 36000000
+  license: CC-BY-NC-4.0
+  license_url: https://creativecommons.org/licenses/by-nc/4.0/
+  commercial_use: false
+  description: Meta MMS-TTS Telugu voice (VITS, reads characters, no phonemiser), converted to ONNX by the bolo
+    project (tools/voices/export_mms.py) from facebook/mms-tts models/tel. Non-commercial use only (CC-BY-NC-4.0).
+    Write numbers out in words.
+  source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/tel
+  validated: untested
+  source:
+    urls:
+    - path: mms-tts-tel.tar.gz
+      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-tel.tar.gz
+      extract: true
+  options:
+    text_cleaner: lowercase
+  status: pending

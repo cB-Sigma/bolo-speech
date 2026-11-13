@@ -2,11 +2,18 @@
 
 | File | What it is | Status |
 | --- | --- | --- |
-| `Dockerfile` | CPU image (Python 3.12 slim, sherpa-onnx + faster-whisper + PyAV + Wyoming) | built by release CI; not built locally by the maintainers so far |
+| `Dockerfile` | CPU image (Python 3.12 slim, sherpa-onnx + faster-whisper + Moonshine + PyAV + Wyoming + uccharan; 994 MB) | **built and run** by the maintainers (2026-11-13, Docker 29.9): `/healthz`, the container health check, synthesis with `piper-en-us-amy-low` (uccharan phonemes) and transcription of that audio back with `faster-whisper-tiny`; built and smoke-tested by CI on every push (`deploy/smoke_test.sh`), and before the release workflow pushes it |
+| `smoke_test.sh` | starts an image, waits for `/healthz`, synthesises a sentence and transcribes it back | used by CI and the release workflow; run here |
 | `Dockerfile.gpu` | NVIDIA CUDA 12 image | **untested** - no GPU was available during development |
-| `docker-compose.yml` | one service, a named volume for models | follows the CPU image |
-| `systemd/bolo.service` | hardened unit for a virtualenv install | reviewed, not run on a host by the maintainers |
-| `kubernetes/bolo.yaml` | PVC + Deployment + Service with probes | example; not applied to a cluster |
+| `docker-compose.yml` | one service, a named volume for models | **run** with the image above: started, reported `healthy`, answered `/healthz` |
+| `systemd/bolo.service` | hardened unit for a virtualenv install | `systemd-analyze verify` passes (apart from the missing virtualenv); not run under systemd (no systemd in the build machine) |
+| `kubernetes/bolo.yaml` | PVC + Deployment + Service with probes | example; not applied to a cluster (none available) |
+
+Building behind a proxy or with a registry mirror: `--build-arg PYTHON_IMAGE=mirror.gcr.io/library/python:3.12-slim`
+replaces the base image. Wheels placed in `deploy/wheels/` are installed in preference to the package index (for a
+package that is not published yet, or an offline build). Until uccharan is on PyPI, put its wheel there
+(`maturin build --release` in uccharan's `bindings/python`), or build with
+`--build-arg EXTRAS=sherpa,faster-whisper,moonshine,av,wyoming` (English and Hindi Piper voices then need eSpeak NG).
 
 All of them keep models in a volume (`BOLO_DATA_DIR`) and bind the HTTP port.
 Set `BOLO_API_KEY` before exposing the port to anything but localhost, and
@@ -24,7 +31,8 @@ location / {
 }
 ```
 
-eSpeak NG (GPL-3.0-or-later) is not in the images by default. Build with
+uccharan (Apache-2.0) is in the CPU image: English and Hindi Piper, Kitten and Kokoro voices work as they are.
+eSpeak NG (GPL-3.0-or-later) is not in the images by default; voices in other languages need it. Build with
 `--build-arg WITH_ESPEAK=1` to include it (you then have to meet the GPL's
 terms for that component if you pass the image on), or install it into a
 running container from the console or with

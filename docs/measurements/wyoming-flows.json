@@ -1,0 +1,49 @@
+{
+ "what": "the Wyoming flows Home Assistant uses (describe; transcribe with transcript streaming; synthesize; streaming synthesis as HA sends it: synthesize-start, word chunks, the compatible synthesize, synthesize-stop), run with the official wyoming 1.11.0 client against bolo serve --wyoming with real models; Home Assistant itself was not run",
+ "conditions": "bolo serve with 2 threads, shared 4-vCPU x86_64, no GPU, other jobs running; STT whisper-base (default); TTS piper-en-us-amy-low (uccharan phonemes); audio sent in 20 ms chunks; the first transcription and the first synthesis include loading the model",
+ "date": "2026-11-13",
+ "results": {
+  "describe": {
+   "asr_models": 7,
+   "tts_voices": 14,
+   "transcript_streaming": true,
+   "synthesize_streaming": true
+  },
+  "transcribe_en-short": {
+   "order": [
+    "transcript-start",
+    "transcript-chunk",
+    "transcript",
+    "transcript-stop"
+   ],
+   "text": "Good morning. Could you tell me when my order will arrive?",
+   "language": "en",
+   "ms_after_audio_stop": 2410
+  },
+  "transcribe_hi-short": {
+   "order": [
+    "transcript-start",
+    "transcript-chunk",
+    "transcript",
+    "transcript-stop"
+   ],
+   "text": "نمستے آپ کیسے ہیں, آج موسم بhoot aachha hai",
+   "language": "hi",
+   "ms_after_audio_stop": 1586
+  },
+  "synthesize": {
+   "voice": "piper-en-us-amy-low",
+   "rate": 16000,
+   "seconds": 4.94,
+   "first_audio_ms": 1258,
+   "transcribed_back": "Turning on the kitchen lights, the temperature outside is 21 degrees."
+  },
+  "synthesize_streaming": {
+   "voice": "piper-en-us-amy-low",
+   "rate": 16000,
+   "seconds": 4.77,
+   "first_audio_ms": 81,
+   "transcribed_back": "Turning on the kitchen lights, the temperature outside is 21 degrees."
+  }
+ }
+}

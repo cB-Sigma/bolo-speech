@@ -50,9 +50,11 @@ class LoadedModel:
 def _tts_handler(model: TTSModel) -> Handler:
     def run(payloads: list[Any]) -> list[Any]:
         out: list[Any] = []
-        for text, voice, speed, emit, cancelled in payloads:
+        for text, voice, speed, emit, cancelled, *extra in payloads:
             n = 0
-            for chunk in model.synthesize(text, voice, speed, cancelled):
+            phonemizer = extra[0] if extra else None
+            kwargs = {"phonemizer": phonemizer} if phonemizer and model.accepts_phonemizer else {}
+            for chunk in model.synthesize(text, voice, speed, cancelled, **kwargs):
                 emit(chunk)
                 n += len(chunk)
                 if cancelled():
@@ -173,7 +175,11 @@ class ModelManager:
             model_opts.setdefault("voices", spec.voices)
         if len(spec.languages) == 1:
             model_opts.setdefault("language", spec.languages[0])
+        if spec.engine.startswith("plugin:"):
+            model_opts.setdefault("model_id", spec.id)
         model = engine.load(spec.kind, spec.task, self.store.model_dir(spec.id), model_opts, opts)
+        if isinstance(model, TTSModel):
+            model.warm_up()
         load_ms = (time.perf_counter() - t0) * 1000.0
         grown = max(0, proc.memory_info().rss - before)
         # An estimate. RSS growth during the load reads low, sometimes zero, when the allocator reuses memory
@@ -183,8 +189,8 @@ class ModelManager:
 
     def _probe(self, spec: ModelSpec) -> None:
         """First load of an installed model happens in a child process (see ``bolo._probe``)."""
-        if spec.builtin or not self.settings.probe_models:
-            return
+        if spec.builtin or not self.settings.probe_models or spec.engine.startswith("plugin:"):
+            return  # plugins run in their own process already
         manifest = self.store.manifest(spec.id)
         engine_version = self.engines.status(spec.engine).version
         if manifest is None or manifest.get("probed") == engine_version:

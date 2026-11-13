@@ -1,0 +1,39 @@
+{
+ "what": "published SYSPIN voices (release voices-v1) with and without their training-time text cleaning, on 8 sentences per voice written with capitals, ';', ':', hyphens, brackets, quotes and precomposed nukta letters; synthesised through bolo and transcribed back",
+ "conditions": "2 threads, shared 4-vCPU x86_64, no GPU; Hindi: indicconformer-hi-community; English: whisper-base with Whisper's English normaliser",
+ "date": "2026-11-13",
+ "rows": [
+  {
+   "model": "syspin-hi-female",
+   "cleaner": "none",
+   "stt": "indicconformer-hi-community",
+   "n": 8,
+   "wer": 0.2464,
+   "cer": 0.0818
+  },
+  {
+   "model": "syspin-en-female",
+   "cleaner": "none",
+   "stt": "whisper-base",
+   "n": 8,
+   "wer": 0.2083,
+   "cer": 0.1257
+  },
+  {
+   "model": "syspin-hi-female",
+   "cleaner": "multilingual",
+   "stt": "indicconformer-hi-community",
+   "n": 8,
+   "wer": 0.1449,
+   "cer": 0.0424
+  },
+  {
+   "model": "syspin-en-female",
+   "cleaner": "multilingual",
+   "stt": "whisper-base",
+   "n": 8,
+   "wer": 0.1389,
+   "cer": 0.0916
+  }
+ ]
+}

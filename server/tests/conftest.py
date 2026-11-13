@@ -56,6 +56,7 @@ def settings(tmp_path: Path) -> Settings:
         default_stt="fake-stt",
         default_realtime_stt="fake-stt-streaming",
         default_tts="fake-tts",
+        default_realtime_tts="fake-tts",
         default_vad="fake-vad",
         default_diarization="fake-diarization",
         # the fake diarizer's "voices" are two-dimensional and its clips short: no folding of small speakers

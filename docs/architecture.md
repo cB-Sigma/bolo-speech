@@ -179,9 +179,18 @@ latency definitions.
   as it is complete. Speech detected while a response is playing cancels the
   language-model stream and the queued synthesis (barge-in). Every turn is
   one trace of kind `agent`.
-* **Components** (`bolo/components.py`) tracks optional third-party pieces
-  that are not shipped (eSpeak NG), reports whether they are installed, and
-  can install them into the running environment on request.
+* **Components** (`bolo/components.py`) tracks optional pieces: the two
+  phonemisers (uccharan, eSpeak NG), reports which one each voice would use
+  and whether it is installed, and can install them into the running
+  environment on request. It also lists the engine plugins catalog models
+  need.
+* **Phonemisers** (`bolo/text/phonemize.py`) turn text into phonemes for
+  voices that read phonemes: uccharan in process where it covers the
+  language (a data table), eSpeak NG otherwise; a request, a per-model pin
+  (`model-settings.json` in the data directory) or the server setting chooses.
+* **Engine plugins** (`bolo/plugin/`) run engines in separate processes over a
+  JSON-lines protocol on stdio; their models look like any other model to
+  the scheduler (docs/plugins.md).
 
 ## Observability
 

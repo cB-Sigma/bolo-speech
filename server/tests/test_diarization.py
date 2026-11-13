@@ -374,3 +374,22 @@ def test_spurious_speakers_are_folded_into_real_ones() -> None:
         [SpeakerTurn(0, 5, 0), SpeakerTurn(5, 7, 0), SpeakerTurn(7, 9, 1), SpeakerTurn(9.5, 10, 1)]
     )
     assert [(t.start, t.end, t.speaker) for t in merged] == [(0, 7, 0), (7, 9, 1), (9.5, 10, 1)]
+
+
+def test_overlaps_are_found_and_kept_for_transcription() -> None:
+    from bolo.diarize import find_overlaps, merge_turns
+    from bolo.engines.base import SpeakerTurn
+
+    # what sherpa-onnx returns for two people talking at once (measured on a real two-voice mix: 0.03-6.33 and 4.00-8.76)
+    raw = [SpeakerTurn(0.03, 6.33, 0), SpeakerTurn(4.0, 8.76, 1), SpeakerTurn(9.5, 12.0, 0)]
+    (o,) = find_overlaps(raw)
+    assert (round(o.start, 2), round(o.end, 2), o.speakers) == (4.0, 6.33, [0, 1])
+    assert o.to_dict(lambda s: "AB"[s]) == {"start": 4.0, "end": 6.33, "speakers": ["A", "B"]}
+    clipped = merge_turns(raw)
+    assert [(t.start, t.end, t.speaker) for t in clipped] == [(0.03, 6.33, 0), (6.33, 8.76, 1), (9.5, 12.0, 0)]
+    kept = merge_turns(raw, keep_overlap=True)
+    assert [(t.start, t.end, t.speaker) for t in kept] == [(0.03, 6.33, 0), (4.0, 8.76, 1), (9.5, 12.0, 0)]
+    # a graze shorter than min_overlap_s is still clipped
+    graze = merge_turns([SpeakerTurn(0, 3.0, 0), SpeakerTurn(2.9, 5.0, 1)], keep_overlap=True)
+    assert [(t.start, t.speaker) for t in graze] == [(0, 0), (3.0, 1)]
+    assert find_overlaps([SpeakerTurn(0, 3.0, 0), SpeakerTurn(2.9, 5.0, 1)]) == []

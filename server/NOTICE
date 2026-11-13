@@ -3,9 +3,7 @@ Copyright 2026 The bolo Authors
 
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 
-bolo's own source code contains no third-party source code, except the copy
-of uccharan in ui/src/vendor/uccharan (see "Web console: speech synthesis in
-the browser" below). It talks to the
+bolo's own source code contains no third-party source code. It talks to the
 following components, which are installed separately as Python dependencies
 or optional extras and keep their own licences:
 
@@ -26,6 +24,12 @@ or optional extras and keep their own licences:
     useful-moonshine-onnx (MIT), pywhispercpp / whisper.cpp (MIT)
     kokoro-onnx (MIT; depends on phonemizer, GPL-3.0-or-later; not part of
       the "all" extra)
+
+  Phonemiser
+    uccharan (Apache-2.0; English data derived from CMUdict, BSD-2-Clause;
+      Kokoro English dictionaries from misaki, Apache-2.0)
+                                    https://github.com/cb-Sigma/uccharan
+      optional "uccharan" extra, part of "all"
 
   Optional protocol and codec libraries
     wyoming (MIT)                   https://github.com/OHF-Voice/wyoming
@@ -79,37 +83,19 @@ Voices converted by this project
     ATTRIBUTION files naming the source repository and revision. The
     archives are not part of the bolo package.
 
+    The same release (and, when published there, Hugging Face repositories
+    under codebucketsolutions/) may also carry format conversions of Meta's
+    MMS-TTS voices (https://huggingface.co/facebook/mms-tts, made with
+    tools/voices/export_mms.py and MMS's VITS inference code, MIT, Copyright
+    (c) 2021 Jaehyeon Kim). Those weights are licensed CC-BY-NC-4.0:
+    NON-COMMERCIAL use only. Each archive contains the licence text and the
+    attribution.
+
     The optional end-of-turn model is Smart Turn v3 by the Pipecat project
     (https://huggingface.co/pipecat-ai/smart-turn-v3, BSD-2-Clause),
     downloaded on request like any other model. bolo's Whisper-style
     feature computation (server/src/bolo/audio/features.py) is its own
     implementation of the published algorithm.
-
-Web console: speech synthesis in the browser
-    The console (and the live demo) can run text-to-speech voices in the
-    page with ONNX Runtime Web (MIT, https://github.com/microsoft/onnxruntime),
-    loaded from jsDelivr at run time, not bundled.
-
-    ui/src/vendor/uccharan is a copy of the WebAssembly build of uccharan
-    0.1.0, a text-to-phoneme library (Apache-2.0, Copyright 2026 Abhinav
-    Gautam and the uccharan contributors, https://github.com/cb-Sigma/uccharan),
-    with its LICENSE, NOTICE and DATA_LICENSES.md. Its English data file
-    (en-us.ucd) is derived from the CMU Pronouncing Dictionary, Copyright (C)
-    1993-2015 Carnegie Mellon University, BSD-2-Clause-style licence; the full
-    text is in ui/src/vendor/uccharan/NOTICE. uccharan contains no eSpeak NG
-    code or data; no GPL component is used for speech synthesis in the browser.
-
-    The live demo serves, next to the page (under voices/), copies of these
-    voices with their weights stored at reduced precision (8-bit and 16-bit;
-    not retrained), made by ui/scripts/voices/build.py:
-      - SYSPIN VITS voices (Hindi, Maithili, Bhojpuri, Marathi, Kannada and
-        Indian English) by the SYSPIN project, SPIRE Lab, Indian Institute of
-        Science, Bengaluru: weights MIT, training data the SYSPIN corpus,
-        CC-BY-4.0 (see "Voices converted by this project" above);
-      - the Piper voice en_US "amy" (low) from rhasspy/piper-voices (MIT),
-        trained on the Amy dataset of Mycroft's mimic3-voices.
-    Each voice directory carries its licence and attribution files. The
-    voices are not part of the bolo package or of the git repository.
 
 Built-in audio samples
     The files in server/src/bolo/samples/*.wav were synthesised with bolo

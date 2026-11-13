@@ -10,7 +10,7 @@ from conftest import speechlike
 
 wyoming = pytest.importorskip("wyoming")
 
-from wyoming.asr import Transcribe, Transcript  # noqa: E402
+from wyoming.asr import Transcribe, Transcript, TranscriptChunk, TranscriptStop  # noqa: E402
 from wyoming.audio import AudioChunk, AudioStart, AudioStop  # noqa: E402
 from wyoming.client import AsyncTcpClient  # noqa: E402
 from wyoming.error import Error  # noqa: E402
@@ -56,6 +56,7 @@ async def test_describe_lists_models_and_voices(wyoming_port: int) -> None:
     hindi = next(v for v in voices if v.name == "fake-tts:hi-IN")
     assert hindi.languages == ["hi-IN"] and [s.name for s in hindi.speakers] == ["gamma"]
     assert info.tts[0].supports_synthesize_streaming is True
+    assert info.asr[0].supports_transcript_streaming is True
 
 
 async def test_transcribe_round_trip(wyoming_port: int, core: Bolo) -> None:
@@ -66,7 +67,13 @@ async def test_transcribe_round_trip(wyoming_port: int, core: Bolo) -> None:
         for off in range(0, len(pcm), 4096):
             await client.write_event(AudioChunk(audio=pcm[off : off + 4096], rate=16000, width=2, channels=1).event())
         await client.write_event(AudioStop().event())
-        transcript = Transcript.from_event((await read_until(client, Transcript))[-1])
+        events = await read_until(client, TranscriptStop)
+    types = [e.type for e in events]
+    # Home Assistant's order for transcript streaming: start, chunk(s), the compatible transcript, stop
+    assert types[0] == "transcript-start" and types[-2:] == ["transcript", "transcript-stop"]
+    chunks = [TranscriptChunk.from_event(e).text for e in events if TranscriptChunk.is_type(e.type)]
+    transcript = Transcript.from_event(events[-2])
+    assert chunks and chunks[-1] == transcript.text
     assert transcript.text == "the quick brown fox jumps" and transcript.language == "en"
     trace = core.traces.recent()[0]
     assert trace.transport == "wyoming" and trace.kind == "stt" and trace.audio_seconds == 2.0

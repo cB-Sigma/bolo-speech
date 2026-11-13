@@ -140,4 +140,9 @@ Apache License 2.0.
    `main`). It builds the console and the distributions, publishes them to
    PyPI with the `PYPI_API_TOKEN` repository secret, creates the tag
    `vX.Y.Z` and the GitHub release with generated notes, and pushes the
-   container image. Pushing a tag `vX.Y.Z` by hand starts the same workflow.
+   container image (after a smoke test of it). Pushing a tag `vX.Y.Z` by hand
+   starts the same workflow.
+
+Before the first release that lists `uccharan` in `[all]`, make sure uccharan
+is on PyPI: otherwise `pip install 'bolo[all]'` cannot be resolved (the
+image jobs detect this and build without it, with a warning).

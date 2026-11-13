@@ -53,8 +53,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - **Voices converted by this project**: `tools/voices/` and a "Voices"
   workflow convert the IISc SYSPIN VITS voices (Maithili, Bhojpuri, Hindi,
   Bengali, Marathi, Telugu, Kannada, Gujarati, Magahi, Chhattisgarhi, Indian
-  English) and publish them as release assets. The 22 catalog entries are
-  `status: pending` (hidden, not pullable) until that has happened.
+  English) and publish them as release assets (release `voices-v1`, 22
+  voices).
 - **Closed character sets**: character-input voices no longer drop what they
   cannot read. Digits are spelled out where a number normaliser exists;
   otherwise the request fails with `unsupported_characters`, naming them.
@@ -77,8 +77,59 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   outputs (sherpa-onnx); none of the current entries has them.
 - The release workflow can be started by hand, publishes to PyPI with an API
   token and creates the tag and the GitHub release itself.
+- **uccharan as the phonemiser.** Piper-format, KittenTTS, Matcha-TTS and
+  Kokoro voices get their phonemes from uccharan (Apache-2.0; new extra
+  `uccharan`, part of `all` and of the Docker image) wherever it covers the
+  voice's language: English (US, British) and Hindi. 26 catalog voices plus
+  Kokoro's English and Hindi voices therefore work without eSpeak NG; the 67
+  phoneme-based voices in other languages still need it. For Kokoro English
+  uccharan is a port of misaki, the front end Kokoro was trained with: in our
+  run it halved the error of the lexicon-only path. Measured voice by voice
+  against eSpeak NG (docs/models.md, "Phonemisers").
+- **Choosing the phonemiser**: setting `phonemizer` (`auto`, `uccharan`,
+  `espeak-ng`), a `phonemizer` field per request (speech endpoint, TTS
+  WebSocket, Realtime sessions, chat completions), a per-voice pin
+  (`bolo models config <id> --phonemizer …`, `PUT /api/v1/models/{id}/settings`)
+  and uccharan's `improved` mode (`uccharan:improved`). Catalog entries list the
+  choices for each voice.
+- **Low-latency default voice**: `default_realtime_tts` (`piper-en-us-amy-low`)
+  for voice agents, Wyoming, `tts-1` and `model: "realtime"`; Kokoro stays the
+  quality default.
+- **Engine plugins**: out-of-process engines discovered from installed
+  packages (entry points `bolo.engines`) or a configured command, with a
+  versioned JSON-lines protocol, restart with back-off after a crash, idle
+  shutdown and resource limits; their models use bolo's queues, traces and
+  metrics. A reference plugin is used in the tests. Catalog entries for models
+  that need PyTorch (Indic Parler-TTS, IndicF5, Veena, Svara, SraVaani, the
+  official IndicConformer) point at the future `torch` plugin
+  (docs/plugins.md).
+- **Meta MMS-TTS voices for Indian languages** (CC-BY-NC-4.0, non-commercial):
+  conversion in `tools/voices/export_mms.py` and the Voices workflow; 18
+  catalog entries (`status: pending` until published), the first voices for
+  Punjabi, Odia, Assamese and Dogri among them.
+- **Gated models** in the catalog, labelled `gated`; the error now says where
+  to accept the terms before anything else is tried.
+- **Hugging Face hosting** of converted models (one public repository per
+  model under `codebucketsolutions/`, with a model card) when the workflow has
+  an `HF_TOKEN`; catalog entries can name a fallback source.
+- **Diarization**: overlapping speech is reported (`overlaps` from
+  `/api/v1/diarize`, `overlap: true` on transcript segments). Transcribing both
+  overlapping turns whole was tried and made the second speaker's text worse,
+  so overlapping audio is still transcribed once.
+- **Wyoming**: transcript streaming (`transcript-start`, `-chunk`, `-stop`).
+- Kokoro: a shorter first chunk (`first_chunk_chars`) and a warm-up on load
+  for earlier first audio.
+- A CI job builds the container image and smoke-tests it on every push.
 
 ### Changed
+
+- Character-input voices (IISc SYSPIN, MMS-TTS) now get the text cleaning their
+  training text had (SYSPIN: Coqui's `multilingual_cleaners`, the same front end
+  as the in-browser voices; MMS: lower case), so capitals, `;`, `:`, hyphens,
+  brackets and precomposed nukta letters map to the symbols the voices learnt.
+- The 22 SYSPIN voices are published (release `voices-v1`) and pullable.
+- The container image includes Moonshine (the default realtime recogniser was
+  missing from it) and uccharan; `PYTHON_IMAGE` selects the base image.
 
 - A loaded model's memory is never estimated below the size of its files
   (the estimate could read far too low, or zero).
@@ -99,8 +150,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   SIP is not implemented.
 - The semantic end-of-turn model judges sound, not grammar; in our small
   test it helped with a pause in mid-phrase and was indecisive on Hindi.
-- The SYSPIN voices are not published yet, and the export step and the
-  workflows were not run by the maintainers.
+- The MMS-TTS voices are not published yet (the conversion was run here for
+  eight of them); the Hugging Face upload was tested against a stand-in for
+  the Hub API only.
 - Speaker counting was evaluated on 18 recordings; no diarization error
   rate on real recordings was measured. Known-speaker naming was tested with
   synthetic voices only.
@@ -108,6 +160,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   Santali) have recognisers that were not run, and eleven have no voice.
 - Word timestamps are still unavailable for Whisper through sherpa-onnx and
   for Moonshine.
+- uccharan is not on PyPI yet at the time of writing; until it is, install its
+  wheel yourself (the `uccharan` extra cannot be resolved), and CI builds the
+  image without it.
+- The PyTorch engine plugin is not written yet: the models that need it are
+  listed and unusable.
+- Online (realtime) speaker labels still assume one speaker per utterance;
+  overlap is handled for whole recordings only.
 
 ## [0.1.0]
 

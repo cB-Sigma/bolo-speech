@@ -168,6 +168,7 @@ def _verbose(t: Transcript, task: str, word_level: bool, segment_level: bool) ->
                 "compression_ratio": 0.0,
                 "no_speech_prob": s.no_speech_prob if s.no_speech_prob is not None else 0.0,
                 **({"speaker": s.speaker} if s.speaker else {}),
+                **({"overlap": True} if s.overlap else {}),
             }
             for i, s in enumerate(t.segments)
         ]
@@ -183,6 +184,7 @@ def _diarized_segment(index: int, s: Segment) -> dict[str, Any]:
         "end": round(s.end, 3),
         "text": s.text,
         "speaker": s.speaker or "A",
+        **({"overlap": True} if s.overlap else {}),
     }
 
 
@@ -439,6 +441,12 @@ class SpeechRequest(BaseModel):
     sample_rate: int | None = Field(default=None, ge=8000, le=48000, description="Extension: resample the output.")
     language: str | None = Field(default=None, description="Extension: language hint for text normalisation.")
     normalize: bool = Field(default=True, description="Extension: set false to skip text normalisation.")
+    phonemizer: str | None = Field(
+        default=None,
+        description="Extension: who turns text into phonemes for voices that read phonemes: auto, uccharan "
+        "(= uccharan:compatible), uccharan:improved or espeak-ng. Default: the voice's pinned choice, else the "
+        "server's `phonemizer` setting.",
+    )
 
 
 class SpeechStream:
@@ -523,6 +531,7 @@ async def create_speech(request: Request, body: SpeechRequest) -> Response:
     stream = SpeechStream(
         core, trace, encoder,
         text=body.input, model=spec.id, voice=voice, speed=body.speed, language=body.language, normalize=body.normalize,
+        phonemizer=body.phonemizer,
     )  # fmt: skip
     chunks = stream.chunks()
     try:

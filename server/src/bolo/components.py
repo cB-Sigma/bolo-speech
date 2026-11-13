@@ -1,11 +1,13 @@
-"""Optional third-party components that bolo can use but does not ship.
+"""Optional third-party components that bolo can use but does not require.
 
-There is one today: **eSpeak NG**, the phonemiser that Piper-format voices,
-KittenTTS, Matcha-TTS (English) and the non-English Kokoro voices were
-trained with. It is GPL-3.0-or-later. bolo's wheel and its default extras do
-not contain it; it is installed only when the operator asks for it, through
-the console, ``bolo components install espeak-ng``, the ``espeak`` extra, or
-the system package manager.
+* **uccharan** (Apache-2.0): the phonemiser for Piper, Kitten, Matcha and Kokoro voices in the
+  languages it covers (English US and British, Hindi). Part of ``bolo[all]``; installable here.
+* **eSpeak NG** (GPL-3.0-or-later): the phonemiser for every other language. Never shipped or
+  installed by default: only when the operator asks for it (console, ``bolo components install
+  espeak-ng``, the ``espeak`` extra, or the system package manager).
+* **Engine plugins** (``plugin:<name>``): out-of-process engines such as a PyTorch engine
+  (docs/plugins.md). Listed so that the console can say which plugin a model needs; they are
+  installed as packages by the operator, not from here.
 """
 
 from __future__ import annotations
@@ -26,16 +28,30 @@ from bolo.jobs import Job
 from bolo.text import phonemize
 
 if TYPE_CHECKING:
+    from bolo.catalog import ModelSpec
     from bolo.core import Bolo
 
-ESPEAK = "espeak-ng"
+ESPEAK = phonemize.ESPEAK
+UCCHARAN = phonemize.UCCHARAN
 ESPEAK_PACKAGE = "espeakng-loader>=0.2.4"
+UCCHARAN_PACKAGE = "uccharan>=0.1"
+PACKAGES = {ESPEAK: ESPEAK_PACKAGE, UCCHARAN: UCCHARAN_PACKAGE}
 LOOPBACK = ("127.0.0.1", "localhost", "::1")
+PLUGIN_PREFIX = "plugin:"
+#: Kokoro voice-name prefix -> phonemiser language (Mandarin "z" reads from its lexicon)
+KOKORO_LANGUAGES = {"a": "en-us", "b": "en-gb", "e": "es", "f": "fr-fr", "h": "hi", "i": "it", "p": "pt-br", "j": "ja"}
 
 
 def espeak_status() -> tuple[bool, str | None, str | None]:
     """``(installed, source, version)`` of the espeak-ng the phonemiser would use."""
     ph = phonemize.get_phonemizer()
+    if ph is None:
+        return False, None, None
+    return True, ph.source, ph.version()
+
+
+def uccharan_status() -> tuple[bool, str | None, str | None]:
+    ph = phonemize.get_uccharan()
     if ph is None:
         return False, None, None
     return True, ph.source, ph.version()
@@ -54,16 +70,19 @@ def installer_command() -> list[str] | None:
     return None
 
 
-def manual_command() -> str:
+def manual_command(component: str = ESPEAK) -> str:
     """How a person would install the component for the way bolo itself was installed."""
+    extra, package = ("espeak", "espeakng-loader") if component == ESPEAK else ("uccharan", "uccharan")
     prefix = sys.prefix.replace("\\", "/")
     if Path("/.dockerenv").exists():
-        return "rebuild the image with: docker build --build-arg WITH_ESPEAK=1 ..."
+        if component == ESPEAK:
+            return "rebuild the image with: docker build --build-arg WITH_ESPEAK=1 ..."
+        return "rebuild the image (uccharan is part of bolo[all])"
     if "/pipx/venvs/" in prefix:
-        return "pipx inject bolo espeakng-loader"
+        return f"pipx inject bolo {package}"
     if "/uv/tools/" in prefix:
-        return "uv tool install --with espeakng-loader bolo"
-    return "pip install 'bolo[espeak]'"
+        return f"uv tool install --with {package} bolo"
+    return f"pip install 'bolo[{extra}]'"
 
 
 class ComponentManager:
@@ -76,6 +95,166 @@ class ComponentManager:
     def _run(cmd: list[str]) -> tuple[int, str]:
         proc = subprocess.run(cmd, capture_output=True, timeout=600, check=False)
         return proc.returncode, (proc.stdout + proc.stderr).decode(errors="replace")
+
+    # -- what a model needs -------------------------------------------------
+    def pinned_phonemizer(self, spec: ModelSpec) -> str | None:
+        value = self.core.store.model_settings(spec.id).get("phonemizer")
+        return str(value) if value else None
+
+    @staticmethod
+    def phoneme_target(spec: ModelSpec, voice_id: str | None = None) -> tuple[str, str] | None:
+        """``(profile, language)`` of a voice that reads phonemes, or None (characters or lexicon only)."""
+        if spec.needs_phonemes:
+            return spec.phoneme_target()
+        if spec.kind == "kokoro" and spec.engine == "sherpa-onnx":
+            prefix = (voice_id or "a")[:1] if spec.options.get("multi_lang") else "a"
+            language = KOKORO_LANGUAGES.get(prefix)
+            return ("kokoro", language) if language else None
+        return None
+
+    def phonemizer_options(self, profile: str, language: str, pinned: str | None = None) -> list[dict[str, Any]]:
+        """The phonemisers a voice can use: ``[{id, available, default, note}]`` (for a selector in the console)."""
+        covered = phonemize.uccharan_language(profile, language) is not None
+        uc, es = self.is_installed(UCCHARAN), self.is_installed(ESPEAK)
+        supported = ", ".join(sorted(phonemize.UCCHARAN_SUPPORT.get(profile, {})))
+        options: list[dict[str, Any]] = []
+        if covered:
+            options.append(
+                {
+                    "id": UCCHARAN,
+                    "available": uc,
+                    "default": False,
+                    "note": "uccharan, compatible mode: the phonemes the voice was trained on (Apache-2.0)"
+                    + ("" if uc else "; not installed"),
+                }
+            )
+            options.append(
+                {
+                    "id": f"{UCCHARAN}:improved",
+                    "available": uc,
+                    "default": False,
+                    "note": "uccharan, improved mode: better homographs, numbers and Hindi schwa deletion, "
+                    "but not what the voice was trained on" + ("" if uc else "; not installed"),
+                }
+            )
+        else:
+            options.append(
+                {
+                    "id": UCCHARAN,
+                    "available": False,
+                    "default": False,
+                    "note": f"uccharan does not cover '{language}' for {profile} voices (it covers {supported})",
+                }
+            )
+        options.append(
+            {
+                "id": ESPEAK,
+                "available": es,
+                "default": False,
+                "note": "eSpeak NG, optional component (GPL-3.0-or-later)" + ("" if es else "; not installed"),
+            }
+        )
+        chosen: str | None = None
+        if pinned:
+            component, improved = phonemize.parse_choice(pinned)
+            chosen = f"{UCCHARAN}:improved" if improved else component
+        if chosen is None or chosen == "auto":
+            wanted = phonemize.candidates(profile, language)
+            installed = [c for c in wanted if self.is_installed(c)]
+            chosen = installed[0] if installed else (wanted[0] if wanted else None)
+        for option in options:
+            option["default"] = option["id"] == chosen and (
+                option["available"] or not any(o["available"] for o in options)
+            )
+        return options
+
+    def requirements(self, spec: ModelSpec) -> tuple[list[str], list[dict[str, Any]], bool]:
+        """``(requires, phonemizers, available)`` of a catalog entry, for this installation.
+
+        ``requires`` names the components the model needs here and now: for a voice that reads
+        phonemes, the phonemiser it would use (``uccharan`` or ``espeak-ng``); ``phonemizers`` lists
+        the choices (see :meth:`phonemizer_options`); ``available`` is true when what is needed is installed.
+        """
+        requires: list[str] = []
+        options: list[dict[str, Any]] = []
+        available = True
+        if spec.needs_phonemes:
+            profile, language = spec.phoneme_target()
+            options = self.phonemizer_options(profile, language, self.pinned_phonemizer(spec))
+            default = next((o for o in options if o["default"]), None)
+            component = (default["id"] if default else ESPEAK).split(":")[0]
+            requires.append(component)
+            available = bool(default and default["available"])
+        for item in spec.requires:
+            if item not in ("phonemizer", ESPEAK):
+                requires.append(item)
+                available = available and self.is_installed(item)
+        if spec.plugin:
+            plugin = PLUGIN_PREFIX + spec.plugin
+            requires.append(plugin)
+            available = available and self.is_installed(plugin)
+        return requires, options, available
+
+    def voice_phonemizers(self, spec: ModelSpec) -> dict[str, list[dict[str, Any]]]:
+        """Per-voice choices for a model whose voices differ in language (Kokoro)."""
+        if spec.needs_phonemes or spec.kind != "kokoro":
+            return {}
+        pinned = self.pinned_phonemizer(spec)
+        out: dict[str, list[dict[str, Any]]] = {}
+        for v in spec.voices:
+            target = self.phoneme_target(spec, str(v["id"]))
+            if target:
+                out[str(v["id"])] = self.phonemizer_options(*target, pinned=pinned)
+        return out
+
+    def check_phonemizer(self, spec: ModelSpec, voice_id: str | None, choice: str | None) -> str | None:
+        """Validate a requested (or pinned) phonemiser for a voice; returns the choice to pass to the engine."""
+        effective = choice or self.pinned_phonemizer(spec)
+        if not effective:
+            return None
+        component, _ = phonemize.parse_choice(effective)  # 400 on a value that is not a phonemiser
+        target = self.phoneme_target(spec, voice_id)
+        if target is None or component == "auto":
+            return None  # the voice reads characters or a lexicon: nothing to choose
+        phonemize.resolve(*target, effective)  # 424 when not installed, 400 when uccharan lacks the language
+        return effective
+
+    def validate_pin(self, spec: ModelSpec, value: str) -> None:
+        """A phonemiser can be pinned on a model whose voices read phonemes; uccharan only where it covers them."""
+        from bolo.errors import InvalidRequest
+
+        component, _ = phonemize.parse_choice(value)
+        candidates = [self.phoneme_target(spec)] if spec.needs_phonemes else [
+            self.phoneme_target(spec, str(v["id"])) for v in spec.voices
+        ]  # fmt: skip
+        targets = [t for t in candidates if t is not None]
+        if not targets:
+            raise InvalidRequest(f"model '{spec.id}' does not use a phonemiser", param="phonemizer")
+        if component == UCCHARAN and not any(phonemize.uccharan_language(*t) for t in targets):
+            raise InvalidRequest(
+                f"uccharan does not cover the language of '{spec.id}' ({targets[0][1]})", param="phonemizer"
+            )
+
+    def missing_reason(self, spec: ModelSpec, choice: str | None = None) -> str | None:
+        """Why a model cannot be used for lack of a component, or None.
+
+        With a phonemiser chosen (by the request, else pinned on the model), that choice is checked instead,
+        raising ``InvalidRequest`` / ``ComponentMissing`` itself.
+        """
+        if spec.plugin and not self.is_installed(PLUGIN_PREFIX + spec.plugin):
+            hint = spec.options.get("plugin_install") or "see docs/plugins.md"
+            return f"it runs on the engine plugin '{spec.plugin}', which is not installed ({hint})"
+        if spec.needs_phonemes:
+            profile, language = spec.phoneme_target()
+            effective = choice or self.pinned_phonemizer(spec)
+            if effective and phonemize.parse_choice(effective)[0] != "auto":
+                phonemize.resolve(profile, language, effective)
+            elif phonemize.select(profile, language) is None:
+                return phonemize.missing_hint(profile, language)
+        for item in spec.requires:
+            if item not in ("phonemizer", ESPEAK) and not self.is_installed(item):
+                return f"it needs the component '{item}', which is not installed"
+        return None
 
     # -- policy -----------------------------------------------------------
     def install_blocked_reason(self) -> str | None:
@@ -94,18 +273,64 @@ class ComponentManager:
 
     # -- status -----------------------------------------------------------
     def required_by(self, component: str) -> int:
-        return sum(1 for spec in self.core.catalog.all() if component in spec.requires)
+        count = 0
+        for spec in self.core.catalog.all():
+            if spec.status == "pending":
+                continue
+            if component.startswith(PLUGIN_PREFIX):
+                count += spec.engine == component
+            elif spec.needs_phonemes:
+                count += component in phonemize.candidates(*spec.phoneme_target())
+            else:
+                count += component in spec.requires
+        return count
 
     def is_installed(self, component: str) -> bool:
-        return component == ESPEAK and espeak_status()[0]
+        if component == ESPEAK:
+            return espeak_status()[0]
+        if component == UCCHARAN:
+            return uccharan_status()[0]
+        if component.startswith(PLUGIN_PREFIX):
+            return self.core.engines.status(component).available
+        return False
+
+    def plugin_ids(self) -> list[str]:
+        ids = {e.id for e in self.core.engines.plugins()}
+        ids |= {spec.engine for spec in self.core.catalog.all() if spec.plugin and spec.status != "pending"}
+        return sorted(ids)
 
     def status(self) -> list[dict[str, Any]]:
-        installed, source, version = espeak_status()
         blocked = self.install_blocked_reason()
-        return [
+        out: list[dict[str, Any]] = []
+        installed, source, version = uccharan_status()
+        out.append(
+            {
+                "id": UCCHARAN,
+                "name": "uccharan",
+                "kind": "phonemizer",
+                "installed": installed,
+                "source": source,
+                "version": version,
+                "license": "Apache-2.0",
+                "license_url": "https://github.com/cb-Sigma/uccharan/blob/main/LICENSE",
+                "required_by_count": self.required_by(UCCHARAN),
+                "installable": blocked is None and not installed,
+                "install_blocked_reason": None if installed else blocked,
+                "manual_command": manual_command(UCCHARAN),
+                "languages": sorted({lang for table in phonemize.UCCHARAN_SUPPORT.values() for lang in table.values()}),
+                "description": (
+                    "Text-to-phoneme front end (Apache-2.0) for Piper-format, KittenTTS, Matcha-TTS and Kokoro "
+                    "voices in English (US, British) and Hindi; for Kokoro English a port of misaki, the front end "
+                    "Kokoro was trained with. Part of bolo[all]. Voices in other languages need eSpeak NG."
+                ),
+            }
+        )
+        installed, source, version = espeak_status()
+        out.append(
             {
                 "id": ESPEAK,
                 "name": "eSpeak NG",
+                "kind": "phonemizer",
                 "installed": installed,
                 "source": source,
                 "version": version,
@@ -114,28 +339,60 @@ class ComponentManager:
                 "required_by_count": self.required_by(ESPEAK),
                 "installable": blocked is None and not installed,
                 "install_blocked_reason": None if installed else blocked,
-                "manual_command": manual_command(),
+                "manual_command": manual_command(ESPEAK),
                 "description": (
-                    "Text-to-phoneme front end used by Piper-format voices, KittenTTS, Matcha-TTS (English) and "
-                    "the non-English Kokoro voices. Optional and not shipped with bolo: it is licensed "
-                    "GPL-3.0-or-later and is installed only on request. Kokoro English and Mandarin, MeloTTS, "
-                    "MMS-TTS and the Coqui voices work without it."
+                    "Text-to-phoneme front end used by Piper-format voices, KittenTTS, Matcha-TTS and Kokoro in the "
+                    "languages uccharan does not cover. Optional and not shipped with bolo: it is licensed "
+                    "GPL-3.0-or-later and is installed only on request. Character- and lexicon-based voices "
+                    "(MMS-TTS, SYSPIN, Kokoro Mandarin, MeloTTS) work without it."
                 ),
             }
-        ]
+        )
+        for plugin in self.plugin_ids():
+            st = self.core.engines.status(plugin)
+            hint = next(
+                (str(s.options["plugin_install"]) for s in self.core.catalog.all()
+                 if s.engine == plugin and s.options.get("plugin_install")),
+                "see docs/plugins.md",
+            )  # fmt: skip
+            out.append(
+                {
+                    "id": plugin,
+                    "name": f"engine plugin '{plugin[len(PLUGIN_PREFIX) :]}'",
+                    "kind": "engine-plugin",
+                    "installed": st.available,
+                    "source": "plugin",
+                    "version": st.version,
+                    "license": "see the plugin package",
+                    "license_url": None,
+                    "required_by_count": self.required_by(plugin),
+                    "installable": False,
+                    "install_blocked_reason": None
+                    if st.available
+                    else "engine plugins are installed as packages by the operator",
+                    "manual_command": hint,
+                    "description": (
+                        "An engine that runs in its own process (for example models that need PyTorch, which bolo "
+                        "itself never loads). " + ("" if st.available else (st.reason or ""))
+                    ).strip(),
+                }
+            )
+        return out
 
     # -- install ----------------------------------------------------------
     def start_install(self, component: str, accept_license: bool) -> Job:
-        if component != ESPEAK:
+        if component not in PACKAGES:
+            if component.startswith(PLUGIN_PREFIX):
+                raise InvalidRequest(f"engine plugins are installed as packages, not from the API ({component})")
             raise ModelNotFound(f"unknown component '{component}'")
-        if accept_license is not True:
+        if component == ESPEAK and accept_license is not True:
             raise InvalidRequest(
                 'eSpeak NG is licensed GPL-3.0-or-later; send {"accept_license": true} to install it',
                 param="accept_license",
             )
         blocked = self.install_blocked_reason()
         if blocked:
-            raise InvalidRequest(f"cannot install {component}: {blocked}. Manual route: {manual_command()}")
+            raise InvalidRequest(f"cannot install {component}: {blocked}. Manual route: {manual_command(component)}")
         job = self.core.jobs.create("install", component)
         if self.is_installed(component):
             job.state, job.progress = "done", 1.0
@@ -145,33 +402,31 @@ class ComponentManager:
         task.add_done_callback(lambda t: self.core._tasks.remove(t) if t in self.core._tasks else None)
         return job
 
-    def install_blocking(self, job: Job | None = None) -> str | None:
-        """Install the loader package and activate it. Returns an error message, or None on success."""
+    def install_blocking(self, job: Job | None = None, component: str = ESPEAK) -> str | None:
+        """Install the component's package and activate it. Returns an error message, or None on success."""
         cmd = installer_command()
         if cmd is None:
             return "neither pip nor uv is available in this environment"
-        code, output = self.run_installer([*cmd, ESPEAK_PACKAGE])
+        code, output = self.run_installer([*cmd, PACKAGES[component]])
         if code != 0:
             tail = " | ".join(output.strip().splitlines()[-4:])
             return f"the installer exited with {code}: {tail}"
         importlib.invalidate_caches()
         phonemize.reset_phonemizer()
-        if phonemize.get_phonemizer() is None:
-            return "the package was installed but the espeak-ng library could not be loaded"
+        if not self.is_installed(component):
+            return f"the package was installed but {component} could not be loaded"
         return None
 
     async def _install(self, job: Job) -> None:
         core = self.core
         job.state, job.progress = "running", 0.1
         core.events.publish("job", {"job": job.to_dict()})
-        error = await asyncio.get_running_loop().run_in_executor(None, self.install_blocking, job)
+        error = await asyncio.get_running_loop().run_in_executor(None, self.install_blocking, job, job.model)
         if error:
             job.state, job.error = "error", error
             core.log("error", f"installing {job.model} failed: {error}")
         else:
             job.state, job.progress = "done", 1.0
             core.events.publish("component", {"id": job.model, "event": "installed"})
-            core.log(
-                "info", f"installed component {job.model} (GPL-3.0-or-later); voices that need it are now available"
-            )
+            core.log("info", f"installed component {job.model}; voices that need it are now available")
         core.events.publish("job", {"job": job.to_dict()})

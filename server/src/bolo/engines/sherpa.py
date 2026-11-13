@@ -7,14 +7,16 @@ the ``sherpa-onnx`` wheel (no PyTorch).
 Model directories are matched by file-name patterns rather than exact names,
 so the same loader handles the float and int8 exports of a model.
 
-Licensing note: the sherpa-onnx *source* is Apache-2.0, but its binary wheels
-link the espeak-ng phonemiser (GPL-3.0-or-later), which Piper-format VITS,
-Kokoro (for non-lexicon languages), Matcha-en and KittenTTS voices call at
-run time. See docs/models.md, "Licences".
+sherpa-onnx 2.x contains no phonemiser. Piper-format VITS, Kokoro, Matcha-en
+and KittenTTS voices get their phonemes from :mod:`bolo.text.phonemize`
+(uccharan, Apache-2.0, where it covers the language; otherwise an espeak-ng
+the user installs). See docs/models.md, "Licences".
 """
 
 from __future__ import annotations
 
+import contextlib
+import json
 import threading
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -432,7 +434,7 @@ class SherpaOnlineSTT(STTModel):
         return out
 
 
-# Kokoro voice-name prefix -> espeak-ng voice. Mandarin ("z") always uses the bundled lexicon.
+# Kokoro voice-name prefix -> phonemiser language. Mandarin ("z") always uses the bundled lexicon.
 _KOKORO_ESPEAK = {"a": "en-us", "b": "en-gb", "e": "es", "f": "fr-fr", "h": "hi", "i": "it", "p": "pt-br", "j": "ja"}
 _KOKORO_LEXICON_OK = ("a", "b", "z")
 
@@ -440,9 +442,9 @@ _KOKORO_LEXICON_OK = ("a", "b", "z")
 class SherpaTTS(TTSModel):
     """Text-to-speech through ``sherpa_onnx.OfflineTts``.
 
-    sherpa-onnx 2.x has no built-in phonemiser. Voices trained on espeak-ng
-    phonemes get them from :mod:`bolo.text.phonemize` (an external espeak-ng
-    the user installs); lexicon- and character-based voices need nothing.
+    sherpa-onnx 2.x has no built-in phonemiser. Voices trained on phonemes get
+    them from :mod:`bolo.text.phonemize` (uccharan or espeak-ng); lexicon- and
+    character-based voices need nothing.
     """
 
     def __init__(self, kind: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> None:
@@ -495,6 +497,7 @@ class SherpaTTS(TTSModel):
         if not config.validate():
             raise ValueError(f"sherpa-onnx rejected the TTS configuration for {p.name}")
         self._tts = so.OfflineTts(config)
+        self.accepts_phonemizer = True
         self.sample_rate = int(self._tts.sample_rate)
         self.num_speakers = int(self._tts.num_speakers)
         self.model_lang = str(getattr(self._tts, "lang", "") or spec.get("espeak_voice", ""))
@@ -516,6 +519,12 @@ class SherpaTTS(TTSModel):
             if not line_is_blank_only(symbols):
                 self.charset = frozenset(symbols)
         self._numbers = str(spec["numbers"]) if spec.get("numbers") else None
+        # Training-time text cleaning of a character voice: catalog option, else the voice.json bolo's exporters write.
+        self.text_cleaner: str | None = spec.get("text_cleaner")
+        voice_json = p / "voice.json"
+        if self.text_cleaner is None and voice_json.is_file():
+            with contextlib.suppress(ValueError, OSError):
+                self.text_cleaner = json.loads(voice_json.read_text(encoding="utf-8")).get("cleaner")
         declared = [
             Voice(
                 str(v["id"]),
@@ -537,29 +546,52 @@ class SherpaTTS(TTSModel):
             )
 
     def fit_text(self, text: str, language: str | None) -> str:
+        from bolo.text.normalize import clean_for_voice, fit_to_charset
+
+        if self.text_cleaner:
+            text = clean_for_voice(text, self.text_cleaner, self.charset)
         if self.charset is None:
             return text
-        from bolo.text.normalize import fit_to_charset
-
         return fit_to_charset(text, self.charset, language, self._numbers)
 
-    def espeak_voice_for(self, voice: Voice | None) -> str | None:
-        """The espeak-ng voice to phonemise with, or None when the text goes in as is."""
-        if self.kind == "kokoro":
-            from bolo.text.phonemize import get_phonemizer
+    def warm_up(self) -> None:
+        if not self.spec.get("warm_up", False):
+            return
+        try:
+            for _ in self.synthesize(str(self.spec.get("warm_up_text", "Hello.")), None, 1.0, None):
+                pass
+        except Exception:  # a voice that cannot say the warm-up text is still usable
+            pass
 
+    def phoneme_target(self, voice: Voice | None, choice: str | None = None) -> tuple[str, str] | None:
+        """``(profile, language)`` to phonemise with, or None when the text goes in as is (lexicon or characters)."""
+        from bolo.text import phonemize
+
+        if self.kind == "kokoro":
             prefix = voice.id[:1] if voice is not None and self.spec.get("multi_lang", False) else "a"
-            espeak_voice = _KOKORO_ESPEAK.get(prefix)
-            if espeak_voice is None:
+            language = _KOKORO_ESPEAK.get(prefix)
+            if language is None:
                 return None
-            # English works from the bundled lexicon, but words missing from it are skipped,
-            # so espeak-ng phonemes are preferred whenever a phonemiser is installed.
-            if prefix in _KOKORO_LEXICON_OK and self.has_lexicon and get_phonemizer() is None:
+            # English also works from the bundled lexicon, but words missing from it are skipped, so a
+            # phonemiser is preferred whenever one is installed (uccharan's front end is a port of misaki,
+            # the one Kokoro English was trained with).
+            explicit = phonemize.parse_choice(choice)[0] != "auto"
+            if (
+                prefix in _KOKORO_LEXICON_OK
+                and self.has_lexicon
+                and not explicit
+                and phonemize.select("kokoro", language) is None
+            ):
                 return None
-            return espeak_voice
+            return "kokoro", language
         if self.needs_phonemes:
-            return self.model_lang or "en-us"
+            return phonemize.PROFILE_BY_KIND.get(self.kind, "piper"), self.model_lang or "en-us"
         return None
+
+    def espeak_voice_for(self, voice: Voice | None) -> str | None:
+        """The phonemiser language for a voice (kept for callers of bolo 0.1)."""
+        target = self.phoneme_target(voice)
+        return target[1] if target else None
 
     def synthesize(
         self,
@@ -567,21 +599,22 @@ class SherpaTTS(TTSModel):
         voice: str | None = None,
         speed: float = 1.0,
         cancelled: Callable[[], bool] | None = None,
+        phonemizer: str | None = None,
     ) -> Iterator[FloatArray]:
         original = text
         v = self.find_voice(voice)
         config = self._so.GenerationConfig()
         config.sid = v.sid if v else (int(voice) if voice and voice.isdigit() else 0)
         config.speed = speed
-        espeak_voice = self.espeak_voice_for(v)
-        if espeak_voice:
-            from bolo.text.phonemize import require_phonemizer
+        target = self.phoneme_target(v, phonemizer)
+        if target:
+            from bolo.text import phonemize
 
-            codepoints = require_phonemizer().codepoints(text, espeak_voice)
+            profile, language = target
+            ph, improved = phonemize.resolve(profile, language, phonemizer)
+            codepoints = ph.voice_codepoints(text, language, profile, improved)
             if not codepoints:
-                raise RuntimeError(
-                    f"the phonemiser produced nothing for {text[:60]!r} (espeak-ng voice '{espeak_voice}')"
-                )
+                raise RuntimeError(f"the phonemiser ({ph.name}) produced nothing for {text[:60]!r} ({language})")
             config.phoneme_codepoints = codepoints
             text = ""
 

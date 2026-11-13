@@ -5,7 +5,8 @@ These download models (about 600 MB for everything not named ``large``) into
 rate thresholds that leave room for model noise, and print the latency they
 measured so a run doubles as a sanity check of the numbers in the README.
 
-Voices that need espeak-ng phonemes are skipped when no espeak-ng is installed.
+Voices that read phonemes are skipped when no phonemiser for their language is installed (uccharan covers English
+and Hindi; espeak-ng the rest).
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from bolo.config import Settings
 from bolo.core import Bolo
 from bolo.obs.trace import Trace
 from bolo.text.normalize import word_error_rate
-from bolo.text.phonemize import get_phonemizer
+from bolo.text.phonemize import get_phonemizer, get_uccharan, select
 from conftest import LiveServer
 
 pytestmark = [pytest.mark.real, pytest.mark.timeout(900)]
@@ -39,6 +40,10 @@ LIBRISPEECH_REF = (
 )
 
 needs_espeak = pytest.mark.skipif(get_phonemizer() is None, reason="needs an espeak-ng installation (not bundled: GPL)")
+needs_phonemes_en_hi = pytest.mark.skipif(
+    select("piper", "en-us") is None, reason="needs a phonemiser: uccharan (bolo[uccharan]) or espeak-ng"
+)
+needs_uccharan = pytest.mark.skipif(get_uccharan() is None, reason="needs uccharan (bolo[uccharan])")
 
 
 def real_settings() -> Settings:
@@ -196,7 +201,7 @@ async def test_kokoro_round_trip(core: Bolo) -> None:
     assert wer <= 0.2
 
 
-@needs_espeak
+@needs_phonemes_en_hi
 async def test_piper_voice_round_trip(core: Bolo) -> None:
     audio, rate = await core.synthesize_all(EN_TEXT, model="piper-en-us-amy-low")
     heard = await core.transcribe(audio, rate, model="moonshine-tiny-en")
@@ -205,7 +210,7 @@ async def test_piper_voice_round_trip(core: Bolo) -> None:
     assert rate == 16000 and wer <= 0.2
 
 
-@needs_espeak
+@needs_phonemes_en_hi
 async def test_hindi_end_to_end(core: Bolo) -> None:
     """Hindi text -> Hindi voice (Piper format) -> Hindi speech recognition (Whisper fine-tune)."""
     audio, rate = await core.synthesize_all(HI_TEXT, model="piper-hi-in-rohan-medium")
@@ -335,10 +340,10 @@ async def test_every_voice_returns_audio_or_a_clear_error(live: LiveServer, mode
     r = httpx.post(
         live.url + "/v1/audio/speech", json={"model": model, "input": text, "response_format": "pcm"}, timeout=600
     )
-    if get_phonemizer() is None and model != "kokoro-v1.0-int8":
-        # no espeak-ng on this machine: the only acceptable outcome is an explicit error that says so
-        assert errors and "espeak-ng" in errors[0]["message"]
-        assert r.status_code >= 400 and "espeak-ng" in r.json()["error"]["message"]
+    if select("piper", "en-us") is None and model != "kokoro-v1.0-int8":
+        # no phonemiser on this machine: the only acceptable outcome is an explicit error that says so
+        assert errors and "uccharan" in errors[0]["message"]
+        assert r.status_code >= 400 and "uccharan" in r.json()["error"]["message"]
         return
     assert not errors, errors
     seconds = len(audio) / 2 / ready["sample_rate"]
@@ -445,9 +450,42 @@ async def test_upstream_piper_voice_is_converted_and_speaks(core: Bolo) -> None:
     assert job.state == "done", job.error
     directory = core.store.model_dir(spec.id)
     assert (directory / "tokens.txt").is_file() and (directory / "model.onnx").is_file()
-    if get_phonemizer() is None:
-        pytest.skip("speaking needs espeak-ng")
+    if select("piper", "en-us") is None:
+        pytest.skip("speaking needs a phonemiser (uccharan or espeak-ng)")
     audio, rate = await core.synthesize_all("Good morning. Could you tell me when my order will arrive?", model=spec.id)
     heard = await core.transcribe(audio, rate, model="moonshine-tiny-en", language="en")
     print(f"\n{spec.id}: {heard.text}")
     assert word_error_rate("Good morning. Could you tell me when my order will arrive?", heard.text, "en") <= 0.2
+
+
+@needs_uccharan
+@pytest.mark.parametrize("choice", ["uccharan", "uccharan:improved", "espeak-ng"])
+async def test_phonemizer_choice_per_request(core: Bolo, choice: str) -> None:
+    """The same Piper voice with each phonemiser, chosen per request: all intelligible."""
+    if choice == "espeak-ng" and get_phonemizer() is None:
+        pytest.skip("espeak-ng is not installed")
+    audio, rate = await core.synthesize_all(EN_TEXT, model="piper-en-us-amy-low", phonemizer=choice)
+    heard = await core.transcribe(audio, rate, model="moonshine-tiny-en")
+    wer = word_error_rate(EN_TEXT, heard.text, "en")
+    print(f"\namy with {choice}: round-trip WER {wer:.3f} | {heard.text}")
+    assert wer <= 0.2
+
+
+@needs_uccharan
+async def test_kokoro_english_and_hindi_through_uccharan(core: Bolo) -> None:
+    for voice, text, stt, lang in (
+        ("af_heart", EN_TEXT, "moonshine-tiny-en", "en"),
+        ("hf_alpha", HI_TEXT, "faster-whisper-tiny-hindi", "hi"),
+    ):
+        audio, rate = await core.synthesize_all(text, model="kokoro-v1.0-int8", voice=voice, phonemizer="uccharan")
+        heard = await core.transcribe(audio, rate, model=stt, language=lang)
+        wer = word_error_rate(text, heard.text, lang)
+        print(f"\nkokoro {voice} via uccharan: WER {wer:.3f} | {heard.text}")
+        assert wer <= (0.2 if lang == "en" else 0.4)
+
+
+@needs_uccharan
+async def test_kitten_through_uccharan(core: Bolo) -> None:
+    audio, rate = await core.synthesize_all(EN_TEXT, model="kitten-nano-0.8-int8", phonemizer="uccharan")
+    heard = await core.transcribe(audio, rate, model="moonshine-tiny-en")
+    assert word_error_rate(EN_TEXT, heard.text, "en") <= 0.2

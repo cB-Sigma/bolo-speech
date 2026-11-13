@@ -18,6 +18,7 @@ import contextlib
 import fnmatch
 import hashlib
 import json
+import logging
 import os
 import shutil
 import tarfile
@@ -25,7 +26,7 @@ import threading
 import time
 import zipfile
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import quote
@@ -34,6 +35,7 @@ import httpx
 
 from bolo.errors import DownloadError, GatedModel, ModelNotFound
 
+log = logging.getLogger("bolo.store")
 ProgressFn = Callable[[int, int], None]
 CHUNK = 1 << 20
 
@@ -60,6 +62,8 @@ class Source:
     urls: list[dict[str, Any]] = field(default_factory=list)
     local: str | None = None  # a directory on this machine (``bolo pull ./dir``); nothing is downloaded
     convert: str | None = None  # a step run once after the download ("piper": see bolo.piper)
+    #: plain-URL files (for example a release archive) used when the repository cannot be reached
+    fallback: list[dict[str, Any]] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Source:
@@ -72,6 +76,7 @@ class Source:
             urls=list(d.get("urls", [])),
             local=d.get("local"),
             convert=d.get("convert"),
+            fallback=list(d.get("fallback", [])),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -79,7 +84,7 @@ class Source:
         if self.repo:
             out["repo"] = self.repo
             out["revision"] = self.revision
-        for key in ("include", "exclude", "subdir", "urls", "local", "convert"):
+        for key in ("include", "exclude", "subdir", "urls", "local", "convert", "fallback"):
             if getattr(self, key):
                 out[key] = getattr(self, key)
         return out
@@ -257,6 +262,53 @@ class ModelStore:
         self.hub = hub or HubClient()
         self._locks: dict[str, threading.Lock] = {}
         self._guard = threading.Lock()
+
+    # -- per-model settings chosen by the user (model-settings.json) ------
+    MODEL_SETTINGS = ("phonemizer",)
+
+    def model_settings(self, model_id: str | None = None) -> dict[str, Any]:
+        """Settings pinned for one model (or, without an id, for all of them)."""
+        path = self.data_dir / "model-settings.json"
+        try:
+            stamp = path.stat().st_mtime_ns
+        except OSError:
+            stamp = None
+        cached = getattr(self, "_settings_cache", None)
+        if cached is not None and cached[0] == stamp:
+            data: dict[str, Any] = cached[1]
+        else:
+            try:
+                data = json.loads(path.read_text(encoding="utf-8")) if stamp is not None else {}
+            except (OSError, json.JSONDecodeError):
+                data = {}
+            self._settings_cache = (stamp, data)
+            data = dict(data)
+        if model_id is None:
+            return dict(data)
+        entry = data.get(model_id)
+        return dict(entry) if isinstance(entry, dict) else {}
+
+    def set_model_settings(self, model_id: str, values: dict[str, Any]) -> dict[str, Any]:
+        """Merge ``values`` into a model's pinned settings (``None`` removes a key); returns the result."""
+        with self._guard:
+            data = self.model_settings()
+            entry = dict(data.get(model_id) or {})
+            for key, value in values.items():
+                if key not in self.MODEL_SETTINGS:
+                    raise KeyError(key)
+                if value is None:
+                    entry.pop(key, None)
+                else:
+                    entry[key] = value
+            if entry:
+                data[model_id] = entry
+            else:
+                data.pop(model_id, None)
+            self.data_dir.mkdir(parents=True, exist_ok=True)
+            tmp = self.data_dir / "model-settings.json.tmp"
+            tmp.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
+            tmp.replace(self.data_dir / "model-settings.json")
+            return entry
 
     # -- queries ----------------------------------------------------------
     def model_dir(self, model_id: str) -> Path:
@@ -451,6 +503,14 @@ class ModelStore:
             if progress:
                 progress(registered["size_bytes"], registered["size_bytes"])
             return registered
+        if source.repo and source.fallback:
+            try:
+                return self.pull(model_id, replace(source, fallback=[]), progress, cancelled, meta)
+            except GatedModel:
+                raise
+            except (DownloadError, httpx.HTTPError) as exc:
+                log.warning("%s: %s; using the fallback source", model_id, exc)
+                return self.pull(model_id, Source(urls=source.fallback), progress, cancelled, meta)
         with self._lock("model:" + model_id):
             files = self.plan(source)
             total = sum(f.size or 0 for f in files)
