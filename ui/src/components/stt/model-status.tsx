@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { useStore } from '@/hooks/use-store'
 import { describeLoad, sharedEngine, type EngineState } from '@/lib/browser-stt/engine'
+import { isOutOfMemory } from '@/lib/browser-runtime'
 import type { Store } from '@/lib/store'
 import type { LoadStage } from '@/lib/browser-stt/models'
 import { fmtBytes } from '@/lib/format'
@@ -258,8 +259,18 @@ export function LoadTrouble({
                 ? 'Nothing has been reported since the download finished. Slow devices can take this long; if it never ends, a single-threaded retry usually works.'
                 : 'No data has arrived for a while. The network may be slow or blocked.'}
           </p>
+          {failed && isOutOfMemory(s.error) && (
+            <p className="mt-1.5 text-foreground" data-testid="load-oom">
+              The browser would not give this page enough memory. Close other tabs (or the other in-browser model on
+              this page), then retry. Phones and tablets limit the memory of each tab, and every open tab takes some.
+            </p>
+          )}
           {s.safeMode && failed && (
-            <p className="mt-0.5 text-muted-foreground">That was the single-threaded attempt.</p>
+            <p className="mt-0.5 text-muted-foreground">
+              {isOutOfMemory(s.error)
+                ? 'It already retried on one thread with everything else released.'
+                : 'That was the single-threaded attempt.'}
+            </p>
           )}
           <div className="mt-2 flex flex-wrap gap-2">
             <Button

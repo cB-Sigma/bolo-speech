@@ -296,6 +296,37 @@ mode for speech synthesis). Nothing in it needs the server.
   for the Hindi voice, Moonshine Tiny for the two English voices. There is none for Maithili,
   Bhojpuri, Marathi or Kannada; the button says so.
 
+### Memory on iPhone and iPad
+
+ONNX Runtime Web 1.19 and later ships only builds whose loader creates a *shared*
+`WebAssembly.Memory` with a 4 GiB maximum, even on one thread (checked in 1.31: the plain,
+asyncify, jsep and jspi builds all do; there is no non-threaded artefact any more, so "load the
+non-threaded file" is not an option). Engines reserve address space for the whole maximum of a
+shared memory up front. WebKit on iOS has little of it: one such memory (the recogniser's) fits,
+a second one in the same page fails with `RangeError: Out of memory`, which ONNX Runtime reports as
+`no available backend found. ERR: [wasm] RangeError: Out of memory`, on any number of threads. That
+is what an iPhone (Edge, i.e. WebKit) showed for the Piper voice after the demo had loaded the
+recogniser. The cause is inferred, not reproduced on WebKit (Playwright's WebKit is not installed
+on the build machine; V8 shows the same pattern: a 4 GiB shared memory needs about 10 GB of address
+space). What the console does now:
+
+- The synthesiser loads the runtime's JavaScript with the maximum lowered to 1 GiB (the
+  WebAssembly module accepts any maximum up to its own; a 13-second sentence of a 114 MB voice
+  needs about 0.3 GiB; amy uses 144 MiB after loading). If the loader does not look as expected
+  the cap is skipped and the diagnostics say so.
+- On WebKit (every browser on iPhone and iPad, and Safari) only one model runtime is kept alive:
+  loading the voice releases the recogniser's worker and the other way round; each loads again by
+  itself when next needed (from the browser cache).
+- Any out-of-memory error while loading (recogniser or synthesiser) releases the other runtime,
+  switches to one-at-a-time for the rest of the visit and retries once on one thread before
+  showing anything. If that fails too, the panel says to close other tabs.
+- `?debug=1` shows the runtime's memory cap and size after loading and as it grows, the page's
+  memory where the browser reports it, the device memory class, and whether runtimes are kept one
+  at a time.
+
+The e2e suite simulates the WebKit limit by refusing large shared memories in the synthesiser's
+worker, and runs the one-at-a-time mode with an iPhone user agent.
+
 ### Where the voices come from
 
 GitHub release assets are served without CORS headers, so a page cannot fetch them. The voices are

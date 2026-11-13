@@ -471,10 +471,12 @@ test.describe('text to speech in the page', () => {
   test.describe('with the voices published', () => {
     test.skip(!VOICES || !MIRROR, 'set BOLO_E2E_VOICE_DIR (voices) and BOLO_E2E_MODEL_DIR (runtime mirror) to run')
 
-    test('speaks Hindi sentence by sentence and measures it', async ({ page }) => {
+    test('speaks Maithili sentence by sentence and measures it', async ({ page }) => {
       await open(page, 'tts')
       await expect(page.getByTestId('voices-missing')).toHaveCount(0)
-      await page.getByTestId('tts-text').fill('नमस्ते! कल सुबह 10 बजे बैठक है।')
+      await page.getByTestId('voice-picker').click()
+      await page.getByTestId('voice-syspin-mai-female').click()
+      await page.getByTestId('tts-text').fill('प्रणाम! काल्हि 10 बजे बैसक अछि।')
       await page.getByTestId('speak').click()
       await expect(page.getByTestId('model-chip')).toHaveAttribute('data-status', 'ready', { timeout: 120_000 })
       await expect(page.getByTestId('ttfa')).toHaveText(/^\d+$/, { timeout: 60_000 })
@@ -482,16 +484,63 @@ test.describe('text to speech in the page', () => {
       await expect(page.getByTestId('spoken-text')).toContainText('दस बजे')
       await expect(page.getByTestId('chunk-timeline')).toBeVisible()
       await expect(page.getByTestId('speak')).toBeVisible({ timeout: 60_000 })
-      await expect(page.getByTestId('chunk-timeline').locator('text=नमस्ते!')).toBeVisible()
+      await expect(page.getByTestId('chunk-timeline').locator('text=प्रणाम!')).toBeVisible()
       await expect(page.getByTestId('save-wav')).toBeEnabled()
       const download = page.waitForEvent('download')
       await page.getByTestId('save-wav').click()
-      expect((await download).suggestedFilename()).toBe('bolo-syspin-hi-female.wav')
+      expect((await download).suggestedFilename()).toBe('bolo-syspin-mai-female.wav')
       const readouts = await page.getByTestId('readout').allInnerTexts()
       console.log(
-        `[tts] hi ttfa ${await page.getByTestId('ttfa').innerText()} ms · ${readouts.join(' · ').replace(/\n/g, ' ')}`,
+        `[tts] mai ttfa ${await page.getByTestId('ttfa').innerText()} ms · ${readouts.join(' · ').replace(/\n/g, ' ')}`,
       )
       await axe(page)
+    })
+
+    test('out of memory (as on an iPhone): one lean retry, then plain advice', async ({ page }) => {
+      // Stand-in for WebKit's limit: no shared WebAssembly memory above 512 MiB in the synthesiser's worker.
+      page.on('worker', (w) => {
+        void w
+          .evaluate(() => {
+            if (!location.pathname.includes('/assets/worker-')) return
+            const Real = WebAssembly.Memory
+            const Limited = function (d: WebAssembly.MemoryDescriptor & { shared?: boolean }) {
+              if (d.shared && (d.maximum ?? 0) > 8192) throw new RangeError('Out of memory')
+              return new Real(d)
+            } as unknown as typeof WebAssembly.Memory
+            Limited.prototype = Real.prototype
+            WebAssembly.Memory = Limited
+          })
+          .catch(() => undefined)
+      })
+      await open(page, 'tts')
+      await page.getByTestId('voice-picker').click()
+      await page.getByTestId('voice-piper-en-us-amy-low').click()
+      await page.getByTestId('speak').click()
+      await expect(page.getByTestId('load-oom')).toContainText('Close other tabs', { timeout: 120_000 })
+      await expect(page.getByTestId('load-trouble')).toContainText('already retried on one thread')
+      await axe(page)
+    })
+
+    test('on an iPhone only one model runtime is kept: the voice gives way to the recogniser and back', async ({
+      browser,
+    }) => {
+      const context = await browser.newContext({
+        userAgent:
+          'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 EdgiOS/141.0 Mobile/15E148 Safari/605.1.15',
+        viewport: { width: 390, height: 844 },
+      })
+      const page = await context.newPage()
+      await open(page, 'tts')
+      await page.getByTestId('voice-picker').click()
+      await page.getByTestId('voice-piper-en-us-amy-low').click()
+      await page.getByTestId('tts-text').fill('Good morning.')
+      await page.getByTestId('round-trip').click()
+      await expect(page.getByTestId('wer')).toBeVisible({ timeout: 180_000 })
+      // The recogniser needed the memory: the voice was released and says it loads again when needed.
+      await expect(page.getByTestId('model-chip')).toHaveAttribute('data-status', 'idle')
+      await page.getByTestId('speak').click()
+      await expect(page.getByTestId('model-chip')).toHaveAttribute('data-status', 'ready', { timeout: 120_000 })
+      await context.close()
     })
 
     test('speaks US English through uccharan and transcribes it back in the page', async ({ page }) => {

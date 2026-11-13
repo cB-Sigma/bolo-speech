@@ -1,4 +1,11 @@
 import { Store } from '@/lib/store'
+import {
+  claimRuntime,
+  isOutOfMemory,
+  releaseOtherRuntimes,
+  releaseRuntime,
+  requireOneRuntime,
+} from '@/lib/browser-runtime'
 import { diag } from '@/lib/diagnostics'
 import { recordBrowserTrace } from './traces'
 import { detectSupport, probeWebGpu } from '@/lib/support'
@@ -145,23 +152,43 @@ export class BrowserSttEngine {
   load(opts: LoadOptions = {}): Promise<void> {
     if (this.loading) return this.loading
     const generation = ++this.generation
-    const loading = this.doLoad(opts, generation).catch((err: unknown) => {
-      if (generation !== this.generation) throw err
-      this.loading = null
-      this.stopWatchdog()
-      this.worker?.terminate()
-      this.worker = null
-      const message = err instanceof Error ? err.message : String(err)
-      const s = this.store.get()
-      diag.error('model', `${s.stage ? `${STAGE_TEXT[s.stage]}: ` : ''}${message}`)
-      if (opts.background) {
-        // Nobody asked for this load yet: stay quiet, and let an explicit start report the problem.
-        this.store.patch({ status: 'idle', stage: null, runtime: null, stalled: null, progress: 0, files: [] })
-      } else {
-        this.store.patch({ status: 'error', error: message, stalled: null })
-      }
-      throw err
-    })
+    const loading = this.doLoad(opts, generation)
+      .catch(async (err: unknown) => {
+        if (generation !== this.generation) throw err
+        const message = err instanceof Error ? err.message : String(err)
+        if (!isOutOfMemory(message) || opts.safe) throw err
+        // Out of memory: release the synthesiser's runtime if it is loaded, keep one at a time from now on,
+        // and try once more on one thread before reporting the error.
+        this.worker?.terminate()
+        this.worker = null
+        requireOneRuntime()
+        const freed = releaseOtherRuntimes('stt')
+        diag.error(
+          'model',
+          `out of memory while loading (${message}); retrying on one thread${freed.length ? ` after releasing ${freed.join(', ')}` : ''}`,
+        )
+        await new Promise((r) => setTimeout(r, 250))
+        if (generation !== this.generation) throw err
+        return this.doLoad({ ...opts, safe: true }, generation)
+      })
+      .catch((err: unknown) => {
+        if (generation !== this.generation) throw err
+        releaseRuntime('stt')
+        this.loading = null
+        this.stopWatchdog()
+        this.worker?.terminate()
+        this.worker = null
+        const message = err instanceof Error ? err.message : String(err)
+        const s = this.store.get()
+        diag.error('model', `${s.stage ? `${STAGE_TEXT[s.stage]}: ` : ''}${message}`)
+        if (opts.background) {
+          // Nobody asked for this load yet: stay quiet, and let an explicit start report the problem.
+          this.store.patch({ status: 'idle', stage: null, runtime: null, stalled: null, progress: 0, files: [] })
+        } else {
+          this.store.patch({ status: 'error', error: message, stalled: null })
+        }
+        throw err
+      })
     this.loading = loading
     return loading
   }
@@ -226,6 +253,8 @@ export class BrowserSttEngine {
       `loading ${model.id} on ${device}, ${threads} thread${threads === 1 ? '' : 's'}${safe ? ' (single-threaded retry)' : ''}`,
     )
 
+    // On WebKit only one model runtime fits in the page: this releases the synthesiser's, if it is loaded.
+    claimRuntime('stt', () => this.dispose())
     const worker: SpeechWorker = workerFactory
       ? await workerFactory()
       : (new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }) as unknown as SpeechWorker)
@@ -324,6 +353,7 @@ export class BrowserSttEngine {
 
   dispose(): void {
     this.generation += 1
+    releaseRuntime('stt')
     this.stopWatchdog()
     this.worker?.terminate()
     this.worker = null

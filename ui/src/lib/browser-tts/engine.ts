@@ -1,3 +1,12 @@
+import {
+  claimRuntime,
+  isOutOfMemory,
+  releaseOtherRuntimes,
+  releaseRuntime,
+  reportPageMemory,
+  requireOneRuntime,
+  TTS_MEMORY_PAGES,
+} from '@/lib/browser-runtime'
 import { diag } from '@/lib/diagnostics'
 import { readBrowserSttConfig, type BrowserDevice, type FileProgress, type LoadStage } from '@/lib/browser-stt/models'
 import { Store } from '@/lib/store'
@@ -109,6 +118,7 @@ export class BrowserTtsEngine {
   private lastMovement = 0
   private generation = 0
   private indexRead: Promise<VoiceIndex | null> | null = null
+  private peakMemory: number | null = null
 
   constructor(voice: BrowserVoice = DEFAULT_BROWSER_VOICE) {
     this.store = new Store<TtsEngineState>({
@@ -180,18 +190,39 @@ export class BrowserTtsEngine {
   load(opts: { safe?: boolean } = {}): Promise<void> {
     if (this.loading) return this.loading
     const generation = ++this.generation
-    const loading = this.doLoad(Boolean(opts.safe), generation).catch((err: unknown) => {
-      if (generation !== this.generation) throw err
-      this.loading = null
-      this.stopWatchdog()
-      this.worker?.terminate()
-      this.worker = null
-      const message = err instanceof Error ? err.message : String(err)
-      const s = this.store.get()
-      diag.error('voice', `${s.stage ? `${STAGE_TEXT[s.stage]}: ` : ''}${message}`)
-      this.store.patch({ status: 'error', error: message, stalled: null })
-      throw err
-    })
+    const loading = this.doLoad(Boolean(opts.safe), generation)
+      .catch(async (err: unknown) => {
+        if (generation !== this.generation) throw err
+        const message = err instanceof Error ? err.message : String(err)
+        if (!isOutOfMemory(message) || opts.safe) throw err
+        // Out of memory: free everything else the page runs in WebAssembly, keep one runtime at a time from
+        // now on, and try once more the leanest way (one thread). Only then is the error shown.
+        this.worker?.terminate()
+        this.worker = null
+        requireOneRuntime()
+        const freed = releaseOtherRuntimes('tts')
+        diag.error(
+          'voice',
+          `out of memory while loading (${message}); retrying on one thread${freed.length ? ` after releasing ${freed.join(', ')}` : ''}`,
+        )
+        this.store.patch({ safeMode: true })
+        await new Promise((r) => setTimeout(r, 250))
+        if (generation !== this.generation) throw err
+        return this.doLoad(true, generation)
+      })
+      .catch((err: unknown) => {
+        if (generation !== this.generation) throw err
+        this.loading = null
+        this.stopWatchdog()
+        this.worker?.terminate()
+        this.worker = null
+        releaseRuntime('tts')
+        const message = err instanceof Error ? err.message : String(err)
+        const s = this.store.get()
+        diag.error('voice', `${s.stage ? `${STAGE_TEXT[s.stage]}: ` : ''}${message}`)
+        this.store.patch({ status: 'error', error: message, stalled: null })
+        throw err
+      })
     this.loading = loading
     return loading
   }
@@ -256,6 +287,8 @@ export class BrowserTtsEngine {
       'voice',
       `loading ${voice.id}, ${threads} thread${threads === 1 ? '' : 's'}${safe ? ' (single-threaded retry)' : ''}`,
     )
+    // On WebKit only one model runtime fits in the page: this releases the recogniser's, if it is loaded.
+    claimRuntime('tts', () => this.dispose())
     const worker: TtsWorker = workerFactory
       ? await workerFactory()
       : (new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }) as unknown as TtsWorker)
@@ -286,9 +319,15 @@ export class BrowserTtsEngine {
           diag.fetch(msg.record)
           if (msg.record.error || msg.record.status >= 400 || msg.record.status === 0)
             diag.error('fetch', `${msg.record.url}: ${msg.record.error ?? `HTTP ${msg.record.status}`}`)
+        } else if (msg.type === 'note') {
+          diag.event('voice', msg.text)
         } else if (msg.type === 'ready') {
           this.stopWatchdog()
-          diag.event('voice', `ready after ${Math.round(msg.loadMs)} ms`)
+          diag.event(
+            'voice',
+            `ready after ${Math.round(msg.loadMs)} ms${msg.memoryBytes != null ? ` · runtime memory ${(msg.memoryBytes / 2 ** 20).toFixed(0)} MiB` : ''}`,
+          )
+          void reportPageMemory('after loading the voice')
           this.store.patch({
             status: 'ready',
             loadMs: msg.loadMs,
@@ -311,6 +350,10 @@ export class BrowserTtsEngine {
             missing: msg.missing,
           })
           this.pending.delete(msg.id)
+          if (msg.memoryBytes != null && msg.memoryBytes > (this.peakMemory ?? 0)) {
+            this.peakMemory = msg.memoryBytes
+            diag.event('voice', `runtime memory grew to ${(msg.memoryBytes / 2 ** 20).toFixed(0)} MiB`)
+          }
         } else if (msg.type === 'error') {
           if (msg.id != null) {
             this.pending.get(msg.id)?.reject(new Error(msg.message))
@@ -330,6 +373,7 @@ export class BrowserTtsEngine {
         threads,
         ortWasmBase: readBrowserSttConfig().ortWasmBase,
         plainRuntimeLoad: safe,
+        memoryPages: TTS_MEMORY_PAGES,
       }
       worker.postMessage(req)
     })
@@ -357,6 +401,8 @@ export class BrowserTtsEngine {
 
   dispose(): void {
     this.generation += 1
+    releaseRuntime('tts')
+    this.peakMemory = null
     this.stopWatchdog()
     this.worker?.terminate()
     this.worker = null

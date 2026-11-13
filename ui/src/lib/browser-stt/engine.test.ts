@@ -102,12 +102,29 @@ describe('BrowserSttEngine with a scripted worker', () => {
   })
 
   it('reports the worker’s own error message when a requested load fails', async () => {
-    setSpeechWorkerFactory(() => new FakeSpeechWorker({ loadMs: 500, fail: 'RangeError: Out of memory' }))
+    setSpeechWorkerFactory(
+      () => new FakeSpeechWorker({ loadMs: 500, fail: 'CompileError: WebAssembly.instantiate(): bad magic' }),
+    )
     const engine = new BrowserSttEngine()
     const result = engine.load().catch((e: Error) => e.message)
     await vi.advanceTimersByTimeAsync(600)
-    expect(await result).toBe('RangeError: Out of memory')
-    expect(engine.store.get()).toMatchObject({ status: 'error', error: 'RangeError: Out of memory' })
+    expect(await result).toBe('CompileError: WebAssembly.instantiate(): bad magic')
+    expect(engine.store.get()).toMatchObject({
+      status: 'error',
+      error: 'CompileError: WebAssembly.instantiate(): bad magic',
+    })
+  })
+
+  it('after an out-of-memory error it retries once on one thread before reporting anything', async () => {
+    setSpeechWorkerFactory(() => new FakeSpeechWorker({ loadMs: 500, fail: 'RangeError: Out of memory' }))
+    const engine = new BrowserSttEngine()
+    const result = engine.load().then(
+      () => 'loaded',
+      (e: Error) => e.message,
+    )
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(await result).toBe('loaded')
+    expect(engine.store.get()).toMatchObject({ status: 'ready', safeMode: true, threads: 1, error: null })
   })
 
   it('keeps quiet when a speculative preload fails, but records it', async () => {

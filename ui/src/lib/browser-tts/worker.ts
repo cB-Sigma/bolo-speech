@@ -1,6 +1,12 @@
 /// <reference lib="webworker" />
 import * as ort from 'onnxruntime-web/wasm'
-import { cachedDownload, ortCdnBase, RUNTIME_CACHE } from '@/lib/browser-runtime'
+import {
+  cachedDownload,
+  lowerMemoryMaximum,
+  ortCdnBase,
+  RUNTIME_CACHE,
+  runtimeMemoryBytes,
+} from '@/lib/browser-runtime'
 import type { FetchRecord, FileProgress, LoadStage } from '@/lib/browser-stt/models'
 import { VOICE_CACHE, type TtsWorkerRequest, type TtsWorkerResponse } from './protocol'
 import type * as UccharanModule from '@/vendor/uccharan/index.js'
@@ -30,8 +36,32 @@ async function loadRuntime(req: Extract<TtsWorkerRequest, { type: 'load' }>): Pr
   wasm.proxy = false
   const base = req.ortWasmBase?.replace(/\/?$/, '/') ?? ortCdnBase(ort.env.versions.web ?? '')
   const paths = { mjs: `${base}ort-wasm-simd-threaded.mjs`, wasm: `${base}ort-wasm-simd-threaded.wasm` }
-  wasm.wasmPaths = paths
+  wasm.wasmPaths = { ...paths }
   stage('runtime')
+  // The loader asks for a shared memory of up to 4 GiB; a voice needs far less, and on iPhones a second
+  // memory that size does not fit next to the recogniser's. Load it with a lower maximum.
+  try {
+    const glue = await cachedDownload(
+      new URL(paths.mjs, scope.location.href).href,
+      RUNTIME_CACHE,
+      { record },
+      {
+        contentType: 'text/javascript',
+      },
+    )
+    const lowered = lowerMemoryMaximum(new TextDecoder().decode(glue.data), req.memoryPages)
+    if (lowered) {
+      wasm.wasmPaths = { ...paths, mjs: URL.createObjectURL(new Blob([lowered], { type: 'text/javascript' })) }
+      post({
+        type: 'note',
+        text: `runtime memory capped at ${req.memoryPages / 16} MiB (shared, ${req.threads} thread${req.threads === 1 ? '' : 's'})`,
+      })
+    } else {
+      post({ type: 'note', text: 'runtime loader not recognised: memory cap not applied (4 GiB maximum)' })
+    }
+  } catch (err) {
+    post({ type: 'note', text: `memory cap not applied: ${err instanceof Error ? err.message : String(err)}` })
+  }
   if (req.plainRuntimeLoad) return
   try {
     // The same file and cache entry the recogniser uses: whichever runs first downloads it for both.
@@ -99,6 +129,7 @@ async function load(req: Extract<TtsWorkerRequest, { type: 'load' }>): Promise<v
   post({
     type: 'ready',
     loadMs: performance.now() - started,
+    memoryBytes: runtimeMemoryBytes(),
     config,
     threads: req.threads,
     cached: modelFile.fromCache,
@@ -160,6 +191,7 @@ async function synth(req: Extract<TtsWorkerRequest, { type: 'synth' }>): Promise
       tokens: ids.reduce((a, s) => a + s.length, 0),
       phonemes,
       missing: [...new Set(missing)],
+      memoryBytes: runtimeMemoryBytes(),
     },
     [audio.buffer],
   )

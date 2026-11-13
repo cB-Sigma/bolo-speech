@@ -279,20 +279,30 @@ test.describe('in-browser model: loading', () => {
 
   test('a failed load shows the real error with ways forward', async ({ page }) => {
     await open(page, '/stt', {
-      storage: fakeModel({ loadMs: 800, fail: 'no available backend found. ERR: [wasm] RangeError: Out of memory' }),
+      storage: fakeModel({ loadMs: 800, fail: 'no available backend found. ERR: [wasm] CompileError: bad magic' }),
     })
     await page.getByTestId('mode-browser').click()
     await page.getByTestId('sample-en-fellow-americans').click()
     const trouble = page.getByTestId('load-trouble').first()
     await expect(trouble).toContainText('The model could not be loaded')
     await expect(trouble.getByTestId('load-error')).toHaveText(
-      'no available backend found. ERR: [wasm] RangeError: Out of memory',
+      'no available backend found. ERR: [wasm] CompileError: bad magic',
     )
     await expect(page.getByTestId('model-chip')).toContainText('Could not load')
     await trouble.getByTestId('retry-safe').click()
     await expect(page.getByTestId('model-chip')).toContainText('Ready', { timeout: 15_000 })
     // And a sample then runs.
     await page.getByTestId('sample-en-fellow-americans').click()
+    await expect(page.getByTestId('final-text').first()).toContainText('pretend transcript', { timeout: 20_000 })
+  })
+
+  test('an out-of-memory load is retried once on one thread by itself', async ({ page }) => {
+    await open(page, '/stt', {
+      storage: fakeModel({ loadMs: 800, fail: 'no available backend found. ERR: [wasm] RangeError: Out of memory' }),
+    })
+    await page.getByTestId('mode-browser').click()
+    await page.getByTestId('sample-en-fellow-americans').click()
+    await expect(page.getByTestId('model-chip')).toContainText('Ready · WebAssembly · 1 thread', { timeout: 15_000 })
     await expect(page.getByTestId('final-text').first()).toContainText('pretend transcript', { timeout: 20_000 })
   })
 

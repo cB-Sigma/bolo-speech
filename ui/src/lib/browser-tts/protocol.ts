@@ -15,6 +15,8 @@ export type TtsWorkerRequest =
       ortWasmBase?: string
       /** Leave fetching the runtime binary to ONNX Runtime (no progress, no shared cache). */
       plainRuntimeLoad: boolean
+      /** Maximum of the runtime's WebAssembly memory, in 64 KiB pages. */
+      memoryPages: number
     }
   | {
       type: 'synth'
@@ -28,7 +30,15 @@ export type TtsWorkerResponse =
   | { type: 'progress'; files: FileProgress[] }
   | { type: 'stage'; stage: LoadStage; loaded?: number; total?: number }
   | { type: 'fetch'; record: FetchRecord }
-  | { type: 'ready'; loadMs: number; config: VoiceConfig; threads: number; cached: boolean }
+  | {
+      type: 'ready'
+      loadMs: number
+      config: VoiceConfig
+      threads: number
+      cached: boolean
+      /** Size of the runtime's WebAssembly memory after loading, when known. */
+      memoryBytes: number | null
+    }
   | {
       type: 'audio'
       id: number
@@ -41,7 +51,9 @@ export type TtsWorkerResponse =
       phonemes?: string
       /** Phonemes the voice has no id for (skipped). */
       missing: string[]
+      memoryBytes: number | null
     }
+  | { type: 'note'; text: string }
   | { type: 'error'; id?: number; message: string }
 
 /** Cache Storage bucket for voice files (models, settings, phonemiser data). */

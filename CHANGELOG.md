@@ -26,7 +26,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   Pages site by the "Live demo" workflow (`ui/scripts/voices/build.py`); they
   are not in git. The console served by `bolo serve` gets the same screen as
   an "In browser" mode next to "Server", fetching the voices from the public
-  demo.
+  demo. On iPhone and iPad (WebKit) only one in-browser model runtime is kept
+  at a time and the synthesiser's runtime memory is capped at 1 GiB, because a
+  second 4 GiB WebAssembly memory does not fit there ("RangeError: Out of
+  memory"); any out-of-memory load is retried once on one thread with
+  everything else released, then explained ("close other tabs").
 - **Indian languages.** Speech-to-text entries for all 22 scheduled languages
   of India (`indicconformer-<lang>-community`: AI4Bharat IndicConformer, MIT,
   ungated community exports pinned to a commit), 16 of them run on real
