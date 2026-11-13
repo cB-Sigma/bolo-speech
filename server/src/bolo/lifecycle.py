@@ -147,8 +147,10 @@ class ModelManager:
         elif isinstance(model, DiarizationModel):
             diarizer = model
             handlers["diarize"] = lambda items: [diarizer.diarize(*item) for item in items]
+            handlers["diarize_detailed"] = lambda items: [diarizer.diarize_detailed(*item) for item in items]
             handlers["embed"] = lambda items: [diarizer.embed(item) for item in items]
             max_batch["diarize"] = 1
+            max_batch["diarize_detailed"] = 1
             max_batch["embed"] = 8
         elif isinstance(model, SeparationModel):
             separator = model

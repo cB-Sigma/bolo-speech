@@ -68,7 +68,8 @@ def measured(spec: ModelSpec) -> str:
     if "ttfa_ms" in m:
         bits.append(f"first audio {m['ttfa_ms']} ms")
     if "der" in m:
-        bits.append(f"DER {100 * m['der']:.1f}% on a two-voice test clip")
+        where = "AMI meeting excerpts" if "AMI" in str(m.get("test_audio", "")) else "a two-voice test clip"
+        bits.append(f"DER {100 * m['der']:.1f}% on {where}")
     if "wer" in m:
         bits.append(f"WER {100 * m['wer']:.1f}%")
     if "cer" in m:

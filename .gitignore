@@ -56,3 +56,6 @@ docs/_*
 
 # vendored WebAssembly build of uccharan (needed to build the console)
 !ui/src/vendor/uccharan/dist/
+
+# wheels for local Docker builds (deploy/wheels/README.md)
+deploy/wheels/*.whl

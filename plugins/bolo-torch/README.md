@@ -188,7 +188,10 @@ whole request (diarization included) took 36.0 s with `sepformer-whamr16k`, 21.0
 33.8 s with `pixit-ami` (load 10.7 s). In each run bolo kept only speaker A's track (speaker B, who talks only
 during the overlap, had 0.5 s of clean speech, less than the 1 s bolo needs for a voice print). With
 `sepformer-whamr16k` that track scored −10.7 dB against the male reference, worse than the −0.9 dB of the
-plugin's own track for the same window (`pixit-ami`: −9.9 dB): worth checking in bolo's track assignment.
+plugin's own track for the same window (`pixit-ami`: −9.9 dB). That was bolo's track assignment as of the
+afternoon of 2026-11-13; it was reworked afterwards (it now also weighs each track's share of the speakers' solo
+speech) and checked with perfect tracks, so this single observation may no longer apply. The word-error
+evaluation of both separators through the current bolo is in docs/models.md, "Overlapping speech".
 
 ## Not tested
 

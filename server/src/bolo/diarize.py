@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from bolo.engines.base import FloatArray, SpeakerTurn
+from bolo.engines.base import FloatArray, SpeakerActivity, SpeakerTurn
 
 
 def speaker_label(index: int) -> str:
@@ -67,6 +67,10 @@ class DiarizeOptions:
     keep_overlap: bool = False
     #: filled in by the pipeline: stretches where two or more speakers talk at once
     overlaps: list[Overlap] = field(default_factory=list)
+    #: filled in by the pipeline when the model gives them (Nemotron-3-Diarization): per-frame speaker
+    #: probabilities, one column per speaker index of the turns (``label(k)`` names column ``k``). Not part
+    #: of any API response; for components that condition recognition on the diarization.
+    activity: SpeakerActivity | None = None
 
     def label(self, speaker: int) -> str:
         return self.names.get(speaker) or speaker_label(speaker)
@@ -281,6 +285,105 @@ def merge_turns(
         else:
             out.append(SpeakerTurn(t.start, t.end, t.speaker))
     return sorted((t for t in out if t.end - t.start >= min_len_s), key=lambda t: t.start)
+
+
+def _runs(active: np.ndarray) -> list[tuple[int, int]]:
+    """``(start, end)`` frame ranges where ``active`` is true."""
+    edges = np.flatnonzero(np.diff(np.concatenate([[0], active.astype(np.int8), [0]])))
+    return list(zip(edges[0::2].tolist(), edges[1::2].tolist()))
+
+
+def activity_to_turns(
+    activity: SpeakerActivity,
+    *,
+    threshold: float = 0.5,
+    offset: float | None = None,
+    pad_onset: float = 0.0,
+    pad_offset: float = 0.0,
+    min_duration_on: float = 0.0,
+    min_duration_off: float = 0.0,
+    min_speaker_s: float = 0.0,
+) -> tuple[list[SpeakerTurn], SpeakerActivity]:
+    """Speaker turns from per-frame speaker probabilities (the binarisation NeMo applies to Sortformer output).
+
+    A speaker starts talking where their probability rises above ``threshold`` and stops where it falls
+    below ``offset`` (hysteresis; default: ``threshold``). Each turn is widened by ``pad_onset`` /
+    ``pad_offset`` seconds, gaps shorter than ``min_duration_off`` within one speaker are closed, turns
+    shorter than ``min_duration_on`` are dropped, and so is a speaker with less than ``min_speaker_s`` of
+    speech in all. Turns of different speakers may overlap: that is overlapped speech.
+
+    Returns the turns (speakers renumbered in order of first appearance, sorted by start) and the
+    probabilities of the speakers kept, columns in the same order.
+    """
+    probs = np.asarray(activity.probs, dtype=np.float32)
+    step = activity.frame_s
+    duration = len(probs) * step
+    low = threshold if offset is None else min(offset, threshold)
+    per_speaker: dict[int, list[tuple[float, float]]] = {}
+    for k in range(probs.shape[1] if probs.ndim == 2 else 0):
+        p = probs[:, k]
+        event = np.where(p > threshold, 1, np.where(p < low, -1, 0)).astype(np.int8)
+        index = np.where(event != 0, np.arange(len(p)), 0)
+        np.maximum.accumulate(index, out=index)
+        state = event[index]
+        state[(index == 0) & (event[0] == 0)] = -1
+        spans: list[tuple[float, float]] = []
+        for a, b in _runs(state == 1):
+            start, end = max(0.0, a * step - pad_onset), min(duration, b * step + pad_offset)
+            if spans and start - spans[-1][1] <= min_duration_off:
+                spans[-1] = (spans[-1][0], max(spans[-1][1], end))
+            else:
+                spans.append((start, end))
+        spans = [(a, b) for a, b in spans if b - a >= max(min_duration_on, step / 2)]
+        if spans and sum(b - a for a, b in spans) >= min_speaker_s:
+            per_speaker[k] = spans
+    order = sorted(per_speaker, key=lambda k: per_speaker[k][0][0])
+    turns = sorted(
+        (SpeakerTurn(a, b, new) for new, k in enumerate(order) for a, b in per_speaker[k]), key=lambda t: t.start
+    )
+    kept = probs[:, order] if order else np.zeros((len(probs), 0), np.float32)
+    return turns, SpeakerActivity(np.ascontiguousarray(kept), step)
+
+
+def remap_activity(activity: SpeakerActivity, mapping: dict[int, int]) -> SpeakerActivity:
+    """Columns merged as speakers were merged: ``mapping`` old speaker -> new speaker; a merged column is the
+    frame-wise maximum of its parts. Speakers missing from ``mapping`` are dropped."""
+    n = max(mapping.values(), default=-1) + 1
+    out = np.zeros((len(activity.probs), n), np.float32)
+    for old, new in mapping.items():
+        if 0 <= old < activity.num_speakers:
+            out[:, new] = np.maximum(out[:, new], activity.probs[:, old])
+    return SpeakerActivity(out, activity.frame_s)
+
+
+def limit_speakers(
+    turns: list[SpeakerTurn], activity: SpeakerActivity, max_speakers: int
+) -> tuple[list[SpeakerTurn], SpeakerActivity]:
+    """Fold the speakers who talk least into the others until ``max_speakers`` are left.
+
+    Each folded speaker joins the remaining speaker the model found most likely during the folded
+    speaker's turns (its second guess for those frames).
+    """
+    spoken: dict[int, float] = {}
+    for t in turns:
+        spoken[t.speaker] = spoken.get(t.speaker, 0.0) + t.end - t.start
+    keep = sorted(spoken, key=lambda s: -spoken[s])[: max(1, max_speakers)]
+    target: dict[int, int] = {s: s for s in keep}
+    for s in spoken:
+        if s in target:
+            continue
+        frames = np.zeros(len(activity.probs), bool)
+        for t in turns:
+            if t.speaker == s:
+                frames[activity.frame(t.start) : activity.frame(t.end)] = True
+        scores = {k: float(activity.probs[frames, k].sum()) if k < activity.num_speakers else 0.0 for k in keep}
+        target[s] = max(keep, key=lambda k: scores[k])
+    merged = merge_same_speaker([SpeakerTurn(t.start, t.end, target[t.speaker]) for t in turns])
+    first: dict[int, int] = {}
+    for t in sorted(merged, key=lambda t: t.start):
+        first.setdefault(t.speaker, len(first))
+    mapping = {s: first[target[s]] for s in spoken}
+    return renumber(merged), remap_activity(activity, mapping)
 
 
 class OnlineSpeakerLabeler:

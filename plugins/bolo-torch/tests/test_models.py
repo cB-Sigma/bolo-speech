@@ -203,11 +203,12 @@ class _Sources:
 
 
 def test_pixit_tracks_and_turns() -> None:
-    def pipeline(file: dict[str, Any]) -> tuple[_Diarization, _Sources]:
+    def pipeline(file: dict[str, Any], **kwargs: Any) -> tuple[_Diarization, _Sources]:
         assert file["sample_rate"] == 16000 and file["waveform"].shape[0] == 1
+        assert kwargs == {"num_speakers": 2}
         return _Diarization(), _Sources(file["waveform"].shape[-1])
 
-    model = PixIT(pipeline)
+    model = PixIT(pipeline, {"num_speakers": 2})
     mix = tone(1.0)
     tracks = model.separate(mix)
     assert len(tracks) == 2  # one per diarized speaker, the extra source column is ignored

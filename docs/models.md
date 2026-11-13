@@ -58,7 +58,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-276 models: 115 validated on CPU by the maintainers, 161 untested.
+277 models: 116 validated on CPU by the maintainers, 161 untested.
 
 ### Speech to text
 
@@ -469,6 +469,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `pyannote-3.0-titanet-small` | - | balanced | - | 46 MB | MIT (segmentation) + CC-BY-4.0 (embedding) | untested |
 | `pyannote-3.0-wespeaker-resnet34` | - | balanced | - | 33 MB | MIT (segmentation) + CC-BY-4.0 (embedding) | untested |
 
+#### Nemotron diarization
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `nemotron-3-diarization` | - | balanced | - | 147 MB | OpenMDW-1.1 | **CPU** · RTF 0.039 · DER 24.1% on AMI meeting excerpts |
+
 ### End-of-turn detection
 
 #### Smart Turn
@@ -647,6 +653,216 @@ mixed-case, punctuated text from 24.6 % to 14.5 % and from 20.8 % to 13.9 %
 WER (8 sentences each, `docs/measurements/syspin-text-cleaning.json`). Phoneme-based voices (Piper format, Kokoro, KittenTTS) are
 not affected: espeak-ng reads digits and foreign words for them.
 
+## Speaker diarization
+
+Two kinds of diarizer are in the catalog, both without PyTorch:
+
+* **`pyannote-3.0-eres2net`** (the default) and its siblings: pyannote's
+  segmentation-3.0 model finds up to three local speakers per 10 s window,
+  speaker embeddings (ERes2Net) are clustered across windows, and bolo folds
+  spurious clusters into real ones (api.md, "How many speakers"). Run by
+  sherpa-onnx.
+* **`nemotron-3-diarization`** (opt-in): NVIDIA's Nemotron-3-Diarization
+  (September 2026, OpenMDW-1.1, 100M parameters), an end-to-end model. A
+  31-layer Transformer reads the log-mel spectrogram and gives, every 10 ms,
+  the probability that each of up to 8 speakers is talking; speakers are
+  numbered in order of arrival, so there is no clustering step, and two
+  speakers can be active at once (overlap). Run by ONNX Runtime
+  (`bolo/engines/nemotron.py`), 147 MB download (the int8 graph plus the
+  ERes2Net embeddings used for named speakers and live streams).
+
+Choose per request with `diarization_model=nemotron-3-diarization`
+(`/v1/audio/transcriptions`) or `model=nemotron-3-diarization`
+(`/api/v1/diarize`), or for the whole server with `default_diarization`
+(configuration.md). It needs the `onnxruntime` Python package (part of
+`bolo[all]` through faster-whisper; otherwise `pip install onnxruntime`).
+
+**When to use Nemotron.** Meetings and conversations where people talk over
+each other, telephone audio, and voices that sound alike: there it gets the
+number of speakers right far more often and almost never mixes two people up
+(measurements below), at a fifth of the cost. It is **not the default**
+yet: on clean, turn-taking two-voice dialogues it was no better than
+clustering and merged some clearly different voices (below).
+
+### How it runs in bolo
+
+* **Front-end.** NeMo's log-mel features in NumPy (`bolo/audio/features.py`,
+  `NemoLogMel`): pre-emphasis 0.97, 25 ms symmetric Hann window inside a
+  512-point FFT every 10 ms, zero-padded centred frames, 128 Slaney mel bands,
+  natural log with a 2^-24 guard, no normalisation. It works on a whole
+  recording or on audio arriving in pieces and gives the same frames either
+  way.
+* **Chunks and speaker cache.** The ONNX graph is one encoder step: a
+  chunk's log-mel frames plus the cached frame embeddings in, speaker logits
+  for every frame and the chunk's embeddings out. bolo runs the loop around
+  it in NumPy, following transformers' reference implementation: a whole
+  recording is cut into 27.2 s chunks with 3.2 s look-ahead; every chunk
+  also sees a FIFO queue of recent frames and the Arrival-Order Speaker Cache
+  (264 frames chosen per speaker by how clearly they belong to that speaker),
+  which keeps a speaker on the same channel across chunks. Recordings of any
+  length work, with flat memory. The same loop runs live
+  (`NemotronDiarization.stream()`: 1.04 / 0.64 / 0.32 s latency modes), but
+  that is not yet connected to bolo's live APIs: a WebSocket session with
+  `diarize=true` still labels each utterance with speaker embeddings, also
+  when Nemotron is the default model.
+* **Turns.** A speaker talks where their probability is above `threshold`
+  (0.5); a pause of the same speaker shorter than `min_duration_off` (1 s)
+  is closed. Turns of different speakers may overlap and are reported as
+  overlaps exactly as with the pyannote pipelines. Further settings
+  (catalog `options`): `offset` (hysteresis), `pad_onset`, `pad_offset`,
+  `min_duration_on`, `min_speaker_s`. The per-request `threshold` /
+  `diarization_threshold` sets the speech threshold.
+* **Frame probabilities.** The pipeline keeps the per-frame probabilities,
+  one column per final speaker (`DiarizeOptions.activity`, not part of any
+  API response), for components that condition recognition on the
+  diarization.
+* **Speaker counts.** `num_speakers` / `max_speakers` fold the speakers who
+  talk least into the speaker the model found next most likely for their
+  frames. The model cannot be made to hear more speakers than it does, so
+  `min_speakers` has no effect; at most 8 speakers. bolo's clustering
+  clean-up (`diarization_min_speaker_s`, `diarization_merge_similarity`) is
+  not applied.
+
+**Validation against the reference** (2026-11-13; transformers 5.23 with
+PyTorch fp32 as the reference, 24 AMI excerpts of 45 s and two 4.5-minute
+recordings made by joining six excerpts of one meeting):
+
+| what | compared with | result |
+| --- | --- | --- |
+| log-mel front-end | transformers' `NemotronAsrStreamingFeatureExtractor` | max abs. difference 1.6e-4, mean 3.2e-7 (log units); same frame count (the reference adds one masked padding frame); fixed values in `tests/test_nemotron.py` |
+| offline probabilities, catalog int8 graph (onnx-community) | PyTorch fp32, same chunking | mean abs. difference 0.0009; 99.95 % of frame-and-speaker decisions at 0.5 identical |
+| offline probabilities, our own fp32 export (`server/tools/export_nemotron_onnx.py`) | PyTorch fp32 | 0.00002; 99.998 % |
+| offline probabilities, our own int8 export (same tool) | PyTorch fp32 | 0.0014; 99.9 % |
+| live loop, 1.04 s mode, audio fed in 0.1 s pieces (2 recordings) | transformers' streaming loop | 0.0008; 99.95 % |
+
+(The research note `docs/_research-overlap-v2.md` measured 0.014 and 98.7 %
+for the int8 graph: that was each excerpt in one ONNX pass, without the chunk
+loop, against the chunked reference; repeated here, 0.015 and 98.8 %. With
+the same chunking the two agree to 0.0009.)
+
+### Measured: Nemotron against clustering
+
+2026-11-13, `docs/measurements/diarization-nemotron.json`. 4 vCPU Xeon @
+2.1 GHz, 2 threads, shared with other jobs. Data: the 24 AMI excerpts of
+"Overlapping speech" (45 s, single distant microphone, test meetings
+ES2004a, IS1009a, TS3003a, EN2002a, 12-65 % overlap) and the synthetic
+two-voice mixes of the same section (11 pairs: 4 cross-gender English, 3
+same-gender female, 3 same-gender male, 1 Hindi; 2.5 s and 5 s overlap at
+0 dB; each also as 8 kHz G.711 μ-law): 44 mixes. DER with pyannote.metrics
+4.0, collar 0, overlapped speech scored, pooled over files; for AMI against
+the word times (gaps under 0.3 s joined) and against the manual segments.
+`pyannote-3.0-eres2net` with its defaults (clustering 0.9 and clean-up);
+Nemotron untuned (threshold 0.5, nothing else) and as shipped.
+
+| audio | diarizer | DER | false alarm | missed | confusion | speaker count right | RTF |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| AMI, word-time reference | pyannote-3.0-eres2net | 38.6 % | 4.5 % | 19.9 % | 14.2 % | 7 / 24 | 0.20 |
+| | Nemotron, untuned | 34.7 % | 1.6 % | 31.2 % | 1.8 % | 18 / 24 | 0.04 |
+| | **Nemotron, as shipped** | **24.1 %** | 3.1 % | **19.0 %** | **2.0 %** | **18 / 24** | **0.04** |
+| AMI, manual-segment reference | pyannote-3.0-eres2net | 43.2 % | 1.5 % | 31.2 % | 10.6 % | 6 / 24 | |
+| | Nemotron, untuned | 43.0 % | 0.3 % | 41.8 % | 0.8 % | 15 / 24 | |
+| | **Nemotron, as shipped** | **33.1 %** | 1.0 % | 31.0 % | 1.1 % | 15 / 24 | |
+| synthetic 16 kHz (22 mixes) | pyannote-3.0-eres2net | 3.8 / 27.8 / 17.3 / 1.4 % (cross / same-f / same-m / Hindi) | | | up to 17.3 % | 18 / 22 | 0.19 |
+| | Nemotron, as shipped | 0.7 / 0.7 / 0.9 / 1.1 % | | | 0 % | 22 / 22 | 0.04 |
+| synthetic 8 kHz μ-law (22 mixes) | pyannote-3.0-eres2net | 30.7 / 46.6 / 41.4 / 25.8 % | | | up to 33.7 % | 5 / 22 | 0.19 |
+| | Nemotron, as shipped | 0.9 / 1.0 / 1.4 / 1.3 % | | | ≤ 0.01 % | 22 / 22 | 0.04 |
+
+Where Nemotron got the AMI speaker count wrong it always found too few:
+five times it missed a speaker with less than 2.5 s of speech in the
+excerpt, once one with about 8.5 s. On two 4.5-minute recordings (six excerpts of one
+meeting joined, 4 speakers) it found 4 and 3 speakers (clustering: 7 and 4)
+at RTF 0.04 against 0.21-0.23 for clustering.
+
+**Tuning** (the missed speech). Changing the threshold alone moves misses
+against false alarms without helping (AMI, word reference: threshold 0.4
+DER 33.7 %, 0.5 34.7 %, 0.6 37.1 %). What the model misses is mostly the
+short pauses inside a speaker's turn, so the shipped setting closes a
+speaker's pauses shorter than 1 s: missed speech 31.2 → 19.0 % (now below
+clustering's 19.9 %), false alarm 1.6 → 3.1 %, confusion 1.8 → 2.0 %. Chosen
+from a grid over threshold (0.35-0.6), hysteresis, padding (0-0.5 s) and gap
+closing (0-2 s) on these 24 excerpts, then by the transcripts below
+between three candidates (untuned; pauses under 1 s closed; the same plus
+0.2 s added to the end of every turn). The DER-best setting on the grid
+(threshold 0.5, 0.2 s end padding, 1 s gap closing: DER 23.4 %; the same
+setting was picked when each meeting in turn was left out of the choice)
+cost words in the transcripts (cpWER 64.3 % instead of 61.2 %), so padding
+is not used. Closing pauses up to 1.5 s gives a slightly lower DER (23.4 %,
+false alarm 6.7 %) and was not tried on transcripts. These settings were
+chosen on the same excerpts they are reported on.
+
+**Transcripts** (`whisper-base`, `faster-whisper-tiny-hindi` for Hindi; each
+diarized turn transcribed on its own, as bolo does; cpWER with MeetEval
+0.4.3, Whisper's English normaliser; 95 % intervals by paired bootstrap over
+files):
+
+| audio | files | pyannote-3.0-eres2net | Nemotron, as shipped | relative (95 % CI) | files better / worse | worst file |
+| --- | --- | --- | --- | --- | --- | --- |
+| AMI excerpts | 24 | 69.4 % | **61.2 %** | **-12 % (-16 to -8 %)** | 20 / 3 | +1.3 pt |
+| synthetic, all | 44 | 55.5 % | **25.1 %** | **-55 % (-62 to -46 %)** | 33 / 7 | +21.5 pt |
+| · 16 kHz cross-gender | 8 | 19.7 % | 23.3 % | +18 % (-0.5 to +45 %) | 1 / 5 | +21.5 pt |
+| · 16 kHz same-gender female | 6 | 52.0 % | 20.7 % | -60 % | 5 / 0 | 0.0 pt |
+| · 16 kHz same-gender male | 6 | 44.5 % | 19.7 % | -56 % | 6 / 0 | -1.0 pt |
+| · 8 kHz cross-gender | 8 | 59.0 % | 29.4 % | -50 % | 8 / 0 | -2.9 pt |
+| · 8 kHz same-gender female | 6 | 90.5 % | 22.9 % | -75 % | 6 / 0 | -51.5 pt |
+| · 8 kHz same-gender male | 6 | 87.0 % | 29.2 % | -66 % | 6 / 0 | -38.8 pt |
+| · Hindi, 16 / 8 kHz (one pair) | 2 + 2 | 23.9 / 56.2 % | 24.4 / 40.3 % | | | |
+
+The 16 kHz cross-gender mixes, which clustering already handled, got worse:
+where Nemotron keeps the first speaker active through part of the overlap,
+bolo transcribes the overlap with the first speaker's turn and the second
+speaker's turn starts late (the worst mix lost most of a sentence). This is
+the known limit of cutting the recording at turns; diarization-conditioned
+recognition (research note, section 7) is the way past it.
+
+**Clean two-voice dialogues** (no overlap). 32 dialogues of four lines (about
+16 s, 0.6 s pauses) read by pairs of Kokoro voices, 15 cross-gender and 17
+same-gender: Nemotron told the two voices apart in 14, clustering in 15. Each
+failed on different pairs: Nemotron got five cross-gender pairs wrong that
+clustering separated (merged af_heart with am_adam, af_sarah with bm_lewis,
+bf_isabella with am_eric; mixed up af_heart with am_michael and bf_alice
+with am_onyx; with eight lines instead of four it merged all five), and
+separated four same-gender pairs that clustering merged.
+PyTorch gives the same probabilities on these files, so this is the model,
+not the port: on clean synthetic turn-taking it can hear two voices as one.
+
+**Speed.** RTF at 2 threads: 0.04 offline (recordings of 45 s to
+4.5 min), against 0.17-0.23 for `pyannote-3.0-eres2net` on the same audio.
+The live loop costs much more, because each small chunk attends to the whole
+cache: RTF 0.64 (1.04 s latency), 0.93 (0.64 s) and 1.83 (0.32 s, slower
+than real time) per stream at 2 threads.
+
+**Default: not changed.** Nemotron is clearly better on the meeting
+excerpts (DER 38.6 → 24.1 %, confusion 14.2 → 2.0 %, cpWER -12 %) and on
+overlapped, same-gender and telephone audio, but it is not better everywhere:
+on clean two-voice dialogues it merged five cross-gender pairs that the
+current default separates (the default-settings test
+`test_two_voices_are_told_apart` would fail with it), and on 16 kHz
+cross-gender overlap mixes the transcripts got worse. The evaluation is
+45-second excerpts and synthetic audio, not whole meetings, and the model
+files are a third-party conversion (below). It stays opt-in until full
+meetings (AMI, NOTSOFAR) and real two-party calls have been measured.
+
+**Licence and provenance.** The weights are NVIDIA's, under the OpenMDW
+License Agreement 1.1 (permissive, commercial use allowed). Redistributing the
+model files (for example in a container image) requires a copy of the
+agreement and the notices that came with the model; a party that sues
+claiming the model infringes a patent or copyright loses the licence; the
+training data (among it licensed conversational data) is NVIDIA's
+representation. The catalog downloads the int8 ONNX conversion from
+`onnx-community/Nemotron-3-Diarization-ONNX` (Hugging Face's ONNX community
+organisation, not NVIDIA), pinned to commit `353b6f8a` (`model_quantized.onnx`
+sha256 `fff7d18c…`, `model_quantized.onnx_data` `002d7483…`). We intend to
+publish our own conversion before relying on it: `server/tools/export_nemotron_onnx.py`
+makes the same graph from NVIDIA's `model.safetensors` with transformers and
+PyTorch on CPU in a few minutes (fp32 397 MB; int8 118 MB with 8-bit
+block-wise weights), validated above; it is not hosted yet. Exporting with
+NeMo itself was not tried: NeMo and its dependencies need several GB, more
+than this machine had free, and the transformers port reproduced the
+reference to 0.00002. A directory made by the tool can be registered with
+`bolo pull ./dir --kind nemotron_diarization` (the kind is guessed when the
+directory name contains "nemotron" and "diar"); it gets the same
+post-processing defaults as the catalog entry.
+
 ## Overlapping speech
 
 When two people talk at once, diarization marks the stretch (`overlap: true`)
@@ -761,12 +977,32 @@ share of the speakers' solo speech in the window. Measured here through bolo:
 | --- | --- | --- | --- | --- | --- | --- |
 | `voxlock-int8` (sherpa-onnx) | 36 | 32.8 % → 26.2 % | -20 % (-11 to -34 %) | 38.0 % → 27.9 % | +0.9 pt | 0.26 |
 | `sepformer-whamr16k` (bolo-torch, CPU PyTorch) | 36 | 32.8 % → 26.2 % | -20 % (-11 to -34 %) | 38.0 % → 28.0 % | **+8.7 pt** | 0.82 |
-| `pixit-ami` (bolo-torch, gated) | measured via bolo-torch: PIXIT_RESULTS | | | | | |
+| `pixit-ami` (bolo-torch, gated), pipeline defaults ¹ | 36 | 30.4 % → 26.7 % | -12 % (-4 to -23 %) | 34.1 % → 28.1 % | +6.8 pt | 1.44 |
+| `pixit-ami`, leakage removal off, 2 speakers ¹ | 36 | 30.4 % → 25.8 % | -15 % (-6 to -26 %) | 34.1 % → 26.7 % | +5.8 pt | 1.85 |
 
 SepFormer matched VoxLock's quality on these mixes but cost three times as
 much and failed one mix badly; its weights come from WHAMR! (WSJ0-derived,
-an LDC licence: a provenance risk for commercial use). PixIT was not run here
-(2.6 GB download); see plugins/bolo-torch for the plugin's own numbers. A
+an LDC licence: a provenance risk for commercial use).
+
+¹ PixIT rows (2026-11-13, later run): the TTS cache had been cleared, so the
+mixes were synthesised again (same design, 12 English pairs × 0 dB × 1 / 2.5 /
+5 s overlap, but some sentences and lengths differ), and the baseline is that
+run's own; the rows are comparable with each other, not exactly with the rows
+above. pyannote.audio 4.0.7 in the plugin; the two PixIT runs shared the
+machine for part of the time (load average up to 8.7), so its extra RTF is
+pessimistic. PixIT helped (cpWER -12 % with defaults,
+-15 % with leakage removal off; overlap WER
+34.1 % → 26.7 %), most for
+cross-gender pairs (-25 %) and same-gender male
+pairs (-26 %), not for same-gender female pairs
+(-0 %); Hindi pair (3 mixes) -29 % /
+-24 %. It fails the decision rule on cost (extra RTF
+1.4-1.8, against 0.15) and on the worst mix (+6.8 / +5.8
+pt), and its gain is smaller than VoxLock's at several times the cost. Not
+measured for PixIT: the 8 kHz telephone copies and the AMI excerpts (runs
+stopped unfinished), and VoxLock on the regenerated mixes. Its pipeline
+defaults zero a speaker's track wherever that speaker is judged silent;
+`leakage_removal: false` (a bolo-torch option) did better here. A
 check with perfect tracks handed over in the wrong order confirmed that
 bolo gives each diarized speaker their own track, aligned to the sample.
 
@@ -1082,6 +1318,10 @@ copied when the entry was written. Things to watch:
 * **SenseVoice / Paraformer** use Alibaba's FunASR model licence (custom).
 * **Kroko** community models are CC-BY-SA.
 * **Parakeet, Canary, NeMo FastConformer** are CC-BY-4.0.
+* **Nemotron-3-Diarization** (`nemotron-3-diarization`) is under the OpenMDW License Agreement 1.1:
+  commercial use allowed; whoever redistributes the model files must include the agreement and the
+  model's notices; suing over patents or copyright in the model ends the licence. The catalog uses a
+  third-party ONNX conversion (onnx-community); see "Speaker diarization" above.
 * **TEN VAD** is not in the catalog: its licence adds field-of-use conditions
   to Apache-2.0, and the ONNX file in its repository does not load in
   sherpa-onnx without added metadata. The loader kind (`ten_vad`) exists for

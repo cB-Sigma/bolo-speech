@@ -42,6 +42,25 @@ or optional extras and keep their own licences:
   both run by sherpa-onnx. Model files are downloaded by the user, not
   distributed with bolo.
 
+  The optional diarization model "nemotron-3-diarization" is NVIDIA
+  Nemotron-3-Diarization (https://huggingface.co/nvidia/Nemotron-3-Diarization),
+  licensed under the OpenMDW License Agreement, version 1.1
+  (https://openmdw.ai/license/1-1/), in the int8 ONNX conversion published
+  by the onnx-community organisation on Hugging Face
+  (https://huggingface.co/onnx-community/Nemotron-3-Diarization-ONNX). It is
+  downloaded by the user on request, run by ONNX Runtime (MIT), and not
+  distributed with bolo. Whoever redistributes the model files (for example
+  inside a container image) must, under OpenMDW-1.1, include a copy of that
+  agreement and keep the copyright and origin notices that come with the
+  model. OpenMDW-1.1 also ends the licence of anyone who sues claiming that
+  the model infringes a patent or copyright. bolo's NumPy implementation of
+  the model's chunked inference (server/src/bolo/engines/nemotron.py: the
+  speaker cache and chunk loop) follows the reference implementation in
+  Hugging Face transformers (models/nemotron3_diarization, Apache-2.0,
+  Copyright 2026 The HuggingFace Inc. team); its log-mel front-end
+  (server/src/bolo/audio/features.py) is bolo's own implementation of NeMo's
+  published preprocessing.
+
   eSpeak NG (GPL-3.0-or-later, https://github.com/espeak-ng/espeak-ng) is an
   OPTIONAL component. It is NOT bundled with bolo, not linked into it, not a
   dependency of the "all" extra and not in the default container images. It

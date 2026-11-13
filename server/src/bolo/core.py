@@ -35,6 +35,7 @@ from bolo.diarize import (
     match_known,
     merge_same_speaker,
     merge_turns,
+    remap_activity,
     renumber,
 )
 from bolo.engines import EngineRegistry
@@ -840,21 +841,30 @@ class Bolo:
             return []
         start = trace.now()
         async with self.manager.use(spec.id) as entry:
-            turns, _ = await entry.queue.submit("diarize", (samples16, opts.num_speakers, opts.threshold))
+            result, _ = await entry.queue.submit("diarize_detailed", (samples16, opts.num_speakers, opts.threshold))
+            turns, activity = result.turns, result.activity
             found = len({t.speaker for t in turns})
             forced = None
             if not opts.num_speakers:
                 if opts.max_speakers and found > opts.max_speakers:
                     forced = opts.max_speakers
-                elif opts.min_speakers and found < opts.min_speakers:
+                elif opts.min_speakers and found < opts.min_speakers and activity is None:
+                    # an end-to-end model (activity given) cannot be asked for more speakers than it hears
                     forced = opts.min_speakers
             if forced:
-                turns, _ = await entry.queue.submit("diarize", (samples16, forced, opts.threshold))
+                result, _ = await entry.queue.submit("diarize_detailed", (samples16, forced, opts.threshold))
+                turns, activity = result.turns, result.activity
+            order: dict[int, int] = {}
+            for t in sorted(turns, key=lambda t: t.start):
+                order.setdefault(t.speaker, len(order))
+            if activity is not None and any(a != b for a, b in order.items()):
+                activity = remap_activity(activity, order)
             turns = renumber(turns)
             trace.add_phase("diarize", start, trace.now())
             voices: dict[int, FloatArray] | None = None
             s = self.settings
-            wanted = opts.consolidate if opts.consolidate is not None else True
+            model_default = bool(getattr(entry.model, "consolidate_default", True))
+            wanted = opts.consolidate if opts.consolidate is not None else model_default
             repair = (
                 wanted
                 and not opts.num_speakers
@@ -872,15 +882,20 @@ class Bolo:
                     )
                     if any(a != b for a, b in mapping.items()):
                         trace.extra["speakers_before_consolidation"] = len(mapping)
-                        turns = renumber(
-                            merge_same_speaker([SpeakerTurn(t.start, t.end, mapping[t.speaker]) for t in turns])
-                        )
+                        merged = merge_same_speaker([SpeakerTurn(t.start, t.end, mapping[t.speaker]) for t in turns])
+                        if activity is not None:
+                            first: dict[int, int] = {}
+                            for t in merged:
+                                first.setdefault(t.speaker, len(first))
+                            activity = remap_activity(activity, {a: first[b] for a, b in mapping.items()})
+                        turns = renumber(merged)
                         voices = None  # the clusters changed
             named: dict[int, str] = {}
             if opts.known and turns:
                 with trace.phase("identify"):
                     named = await self._identify(entry, samples16, turns, opts, voices)
         opts.names = label_speakers(sorted({t.speaker for t in turns}), named)
+        opts.activity = activity
         trace.extra["diarization_model"] = spec.id
         trace.extra["speakers"] = len({t.speaker for t in turns})
         if opts.known:

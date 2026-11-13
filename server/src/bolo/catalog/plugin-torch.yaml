@@ -411,7 +411,8 @@
     note: 'Synthetic 0 dB two-voice mix (bolo samples en-long + hi-short). With the pipeline defaults it found three
       speakers and returned the whole mixture on one track (leakage removal zeroed the others); with
       leakage_removal false and two speakers, overlap SI-SDR female 0.5 -> 1.9 dB, male -0.5 -> -1.0 dB. Trained
-      on AMI meetings; not tried on meeting audio here.'
+      on AMI meetings. Through separate_overlaps on 36 synthetic English mixes: cpWER 30.4 -> 26.7 % (defaults) and
+      25.8 % (leakage_removal false, num_speakers 2), extra RTF 1.4-1.8; see docs/models.md, "Overlapping speech".'
   source:
     repo: pyannote/speech-separation-ami-1.0
     revision: 9486b106945ae0cc0784041a08bfcdba5edadfb9

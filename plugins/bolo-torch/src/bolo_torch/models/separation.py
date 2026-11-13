@@ -79,8 +79,10 @@ class PixIT(SeparationModel):
     mode = "blind"
     sample_rate = SR
 
-    def __init__(self, pipeline: Callable[..., Any]) -> None:
+    def __init__(self, pipeline: Callable[..., Any], speakers: dict[str, int] | None = None) -> None:
         self.pipeline = pipeline
+        #: ``num_speakers`` / ``min_speakers`` / ``max_speakers`` for every call (catalog options)
+        self.speakers = dict(speakers or {})
         self._lock = threading.Lock()
         #: who spoke when in the last call: (start s, end s, track index)
         self.last_turns: list[tuple[float, float, int]] = []
@@ -90,7 +92,7 @@ class PixIT(SeparationModel):
 
         audio = np.ascontiguousarray(mixture, dtype=np.float32)
         with self._lock, torch.inference_mode():
-            out = self.pipeline({"waveform": torch.from_numpy(audio).unsqueeze(0), "sample_rate": SR})
+            out = self.pipeline({"waveform": torch.from_numpy(audio).unsqueeze(0), "sample_rate": SR}, **self.speakers)
         if isinstance(out, tuple) and len(out) == 2:
             diarization, sources = out
         else:
@@ -171,4 +173,5 @@ def load_pixit(ctx: LoadContext) -> PixIT:
         params.setdefault("separation", {})["leakage_removal"] = bool(leakage)
         pipeline.instantiate(params)
     pipeline.to(torch.device(ctx.device))
-    return PixIT(pipeline)
+    speakers = {k: int(ctx.option(k)) for k in ("num_speakers", "min_speakers", "max_speakers") if ctx.option(k)}
+    return PixIT(pipeline, speakers)

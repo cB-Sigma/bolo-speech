@@ -46,6 +46,7 @@ KINDS: dict[str, tuple[str, str, bool]] = {
     "kokoro-onnx": ("kokoro-onnx", "tts", False),
     "silero_vad": ("sherpa-onnx", "vad", False),
     "ten_vad": ("sherpa-onnx", "vad", False),
+    "nemotron_diarization": ("onnxruntime", "diarization", False),
 }
 
 
@@ -59,6 +60,8 @@ def detect_kind(repo: str, paths: list[str]) -> str | None:
 
     if "model.bin" in names and "config.json" in names and (has(r"^tokenizer\.json$") or has(r"^vocabulary\.")):
         return "ct2-whisper"
+    if "nemotron" in name and "diar" in name and has(r"\.onnx$"):
+        return "nemotron_diarization"
     if has(r"silero_vad.*\.onnx$"):
         return "silero_vad"
     if has(r"ten-vad.*\.onnx$"):
@@ -101,6 +104,8 @@ def choose_files(kind: str, files: list[RemoteFile], precision: str = "int8") ->
     exclude: list[str] = ["test_wavs/*", "*.md", "*.sh", "*.py", "*.wav", "*.mp4", "*.mov", "*.srt", ".gitattributes"]
     if kind == "ct2-whisper":
         return exclude
+    if kind == "nemotron_diarization":  # one int8 graph (onnx/model_quantized.onnx + its data file), no other precision
+        return [*exclude, "*.nemo", "*.gguf", "*.safetensors", "onnx/model.onnx*", "onnx/model_fp16*", "onnx/model_q4*"]
     paths = {f.path for f in files}
     for path in sorted(paths):
         if not path.endswith(".onnx") or path.endswith(".int8.onnx"):

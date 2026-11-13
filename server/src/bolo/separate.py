@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import io
 import itertools
 import logging
@@ -41,7 +42,7 @@ import numpy as np
 
 from bolo.diarize import Overlap
 from bolo.engines.base import FloatArray, SeparationModel, SpeakerTurn
-from bolo.errors import BoloError, InvalidRequest
+from bolo.errors import BoloError, EngineUnavailable, InvalidRequest
 
 if TYPE_CHECKING:
     from bolo.core import Bolo
@@ -377,7 +378,15 @@ async def separate(
         involved = sorted({sp for w in result.windows for sp in w.speakers})
         clean = clean_speech(raw)
         deadline = time.monotonic() + max(1.0, s.separation_timeout_s)
-        async with core.manager.use(spec.id) as entry:
+        async with contextlib.AsyncExitStack() as stack:
+            try:
+                entry = await stack.enter_async_context(core.manager.use(spec.id))
+            except EngineUnavailable as exc:  # the separator crashed or cannot start: keep the mixture
+                log.warning("overlap separation unavailable: %s", exc.message)
+                result.status = "skipped"
+                result.reason = "engine_unavailable"
+                result.detail = exc.message
+                return result
             model = entry.model
             assert isinstance(model, SeparationModel)
             blind = model.mode == "blind"

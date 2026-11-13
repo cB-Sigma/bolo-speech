@@ -8,6 +8,22 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Nemotron-3-Diarization as a second diarizer** (`nemotron-3-diarization`,
+  opt-in). NVIDIA's end-to-end diarization model (OpenMDW-1.1, up to 8
+  speakers, overlap-aware) runs in ONNX Runtime without PyTorch: NeMo's
+  log-mel front-end in NumPy and the chunked speaker-cache loop for long
+  recordings and live audio, both checked against the transformers reference
+  (probabilities within 0.001). Choose it with `diarization_model` /
+  `model` per request or `default_diarization`. On 24 AMI far-field excerpts
+  DER fell from 38.6 to 24.1 % (speaker confusion 14.2 to 2.0 %, speaker
+  count right in 18 instead of 7) and cpWER with whisper-base from 69 to
+  61 %; on same-gender and telephone mixes it removed the speaker confusion
+  of clustering; it runs five times faster (RTF 0.04). It stays opt-in: on
+  clean turn-taking dialogues of synthetic voices it merged some clearly
+  different voices that clustering separates (docs/models.md, "Speaker
+  diarization"). The per-frame speaker probabilities are kept for later
+  diarization-conditioned recognition. `server/tools/export_nemotron_onnx.py`
+  re-exports the model from NVIDIA's weights.
 - **Speech synthesis in the browser.** The live demo's text-to-speech screen
   now speaks: nine voices run in the page with ONNX Runtime Web
   (WebAssembly, up to 4 threads), downloaded once and kept by the browser.

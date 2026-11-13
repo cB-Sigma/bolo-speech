@@ -19,7 +19,7 @@ from bolo.core import Bolo
 from bolo.diarize import DiarizeOptions, Overlap
 from bolo.engines.base import LoadOptions, SpeakerTurn
 from bolo.engines.fake import FakeSeparation
-from bolo.errors import InvalidRequest
+from bolo.errors import EngineUnavailable, InvalidRequest
 from bolo.obs.trace import Trace
 from bolo.plugin.host import PluginConfig, PluginEngine, PluginSeparation
 from bolo.separate import (
@@ -255,6 +255,21 @@ async def test_separation_failure_timeout_and_cancellation(sep_core: Bolo) -> No
     slow = sep_core.manager.loaded["fake-separation-slow"].model
     assert isinstance(slow, FakeSeparation) and slow.voices == {}
     assert trace.status == "cancelled"
+
+
+async def test_separator_that_cannot_start_keeps_the_mixture(sep_core: Bolo, monkeypatch: pytest.MonkeyPatch) -> None:
+    real_use = sep_core.manager.use
+
+    def use(name: str):  # type: ignore[no-untyped-def]
+        if name == "fake-separation":
+            raise EngineUnavailable("separator process crashed; restarting")
+        return real_use(name)
+
+    monkeypatch.setattr(sep_core.manager, "use", use)
+    t = await sep_core.transcribe(meeting(), SR, diarize=DiarizeOptions(), separate=SeparateOptions())
+    assert t.separation is not None
+    assert (t.separation["status"], t.separation["reason"]) == ("skipped", "engine_unavailable")
+    assert t.segments and not any(s.separated for s in t.segments)
 
 
 async def test_requests_that_are_refused(sep_core: Bolo) -> None:

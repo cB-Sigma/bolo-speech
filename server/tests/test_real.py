@@ -428,6 +428,45 @@ async def test_two_voices_are_told_apart(core: Bolo) -> None:
     assert word_error_rate(" ".join(t for _, t in lines), result.text, "en") <= 0.25
 
 
+@pytest.mark.parametrize("rate", [16000, 8000])
+async def test_nemotron_tells_two_similar_voices_apart(core: Bolo, rate: int) -> None:
+    """Two female Kokoro voices that clustering merges into one speaker, wideband and as G.711 mu-law audio.
+
+    Not every pair works: on clean four-line TTS dialogues without overlap Nemotron merged some pairs that
+    clustering separates, among them af_heart / am_adam of the test above (docs/models.md)."""
+    from bolo.audio import mulaw_encode
+    from bolo.diarize import DiarizeOptions, diarization_error_rate
+    from bolo.engines.base import SpeakerTurn
+
+    lines = [
+        ("af_sky", "Good morning. I would like to ask about my order from last week."),
+        ("af_bella", "Of course. Could you give me the order number, please?"),
+        ("af_sky", "Yes, it is four seven one nine. It was supposed to arrive on Monday."),
+        ("af_bella", "Thank you. I can see that it left the warehouse yesterday evening."),
+    ]
+    parts: list[np.ndarray] = []
+    reference: list[SpeakerTurn] = []
+    position = 0
+    for voice, text in lines:
+        audio, native = await core.synthesize_all(text, model="kokoro-v1.0-int8", voice=voice)
+        speech = resample(audio, native, 16000)
+        reference.append(SpeakerTurn(position / 16000, (position + len(speech)) / 16000, int(voice == "af_bella")))
+        parts += [speech, np.zeros(int(0.6 * 16000), dtype=np.float32)]
+        position += len(speech) + int(0.6 * 16000)
+    dialogue = np.concatenate(parts)
+    if rate == 8000:
+        dialogue = mulaw_decode(mulaw_encode(resample(dialogue, 16000, 8000)))
+
+    opts = DiarizeOptions(model="nemotron-3-diarization")
+    turns = await core.diarize(dialogue, rate, opts)
+    score = diarization_error_rate(reference, turns)
+    print(f"\nnemotron at {rate} Hz: {len({t.speaker for t in turns})} speakers, DER {score['der']:.3f} ({score})")
+    assert len({t.speaker for t in turns}) == 2
+    assert score["confusion"] <= 0.05 and score["der"] <= 0.15
+    assert opts.activity is not None and opts.activity.num_speakers == 2
+    assert abs(len(opts.activity.probs) - len(dialogue) / rate * 100) <= 2
+
+
 async def test_overlap_separation_recovers_the_second_voice(core: Bolo) -> None:
     """Two Kokoro voices, the second talking over the first for about 2.5 s: with separate_overlaps the second
     speaker's overlapped words are transcribed from their own track, and the whole transcript gets better."""

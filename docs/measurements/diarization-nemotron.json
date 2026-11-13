@@ -1,0 +1,819 @@
+{
+ "what": "nemotron-3-diarization (NVIDIA Nemotron-3-Diarization, onnx-community int8 ONNX, run by bolo's NumPy front-end and chunk loop in ONNX Runtime) against pyannote-3.0-eres2net (sherpa-onnx clustering, bolo's defaults): front-end and probability checks against transformers' PyTorch reference, DER components, speaker counts, cpWER of diarized whisper-base transcripts, speed",
+ "date": "2026-11-13",
+ "conditions": "4 vCPU Xeon @ 2.1 GHz (AVX-512), no GPU, 2 threads, shared with other evaluation jobs; onnxruntime 1.31.1, sherpa-onnx 2.0.1; reference: transformers 5.23.0 with PyTorch 2.15 CPU, fp32",
+ "model": {
+  "catalog_id": "nemotron-3-diarization",
+  "source": "onnx-community/Nemotron-3-Diarization-ONNX@353b6f8ad2cac3580e982d7fbdf0a010786b0406",
+  "files": {
+   "onnx/model_quantized.onnx": "fff7d18c7439c9fdc1c6c4dfec924cb42d3344264ca879780dfaf7ee886e6c1e",
+   "onnx/model_quantized.onnx_data": "002d7483e1c865c35c82220fdb378f185ff213c6d35922b38ae421c8ec72c338"
+  },
+  "reference_weights": "nvidia/Nemotron-3-Diarization@52a432672732425e4c19765b9fec9b5810e6f4ba model.safetensors",
+  "licence": "OpenMDW-1.1"
+ },
+ "data": {
+  "ami": "24 excerpts of 45 s, AMI SDM (Array1-01) test meetings ES2004a, IS1009a, TS3003a, EN2002a, chosen for overlap (12-65 %), CC BY 4.0; references: word times with gaps under 0.3 s joined ('words'), and the manual segments ('segments')",
+  "synthetic": "bolo's two-voice mixes (Kokoro / Piper TTS): pairs 0-3 cross-gender English, 6-8 same-gender female, 9-11 same-gender male, 12 Hindi; overlap 2.5 s and 5 s at 0 dB; each also 300-3400 Hz, 8 kHz G.711 mu-law: 44 mixes; reference = utterance boundaries",
+  "long": "two 270 s recordings, the six excerpts of ES2004a and of TS3003a joined",
+  "dialogues": "32 four-line two-voice dialogues of Kokoro voices (about 16 s, 0.6 s pauses, no overlap); DER with bolo's frame scorer"
+ },
+ "scoring": "DER: pyannote.metrics 4.0, collar 0, overlap scored, pooled over files (percent). cpWER: MeetEval 0.4.3 cp_word_error_rate, Whisper EnglishTextNormalizer after html.unescape (Hindi: NFC, punctuation removed), pooled; relative change and 95 % interval by paired bootstrap over files (2000 resamples)",
+ "frontend_and_loop_validation": {
+  "catalog_int8_offline_vs_pytorch": {
+   "recordings": 26,
+   "prob_mean_abs_diff": 0.000881,
+   "decisions_identical_at_0_5": 0.99949,
+   "feature_max_abs_diff": 0.000158,
+   "feature_mean_abs_diff": 3.22e-07
+  },
+  "own_int8_export_offline_vs_pytorch": {
+   "recordings": 26,
+   "prob_mean_abs_diff": 0.001432,
+   "decisions_identical_at_0_5": 0.99886,
+   "feature_max_abs_diff": 0.000158,
+   "feature_mean_abs_diff": 3.22e-07
+  },
+  "own_fp32_export_offline_vs_pytorch": {
+   "recordings": 26,
+   "prob_mean_abs_diff": 2.13e-05,
+   "decisions_identical_at_0_5": 0.99998
+  },
+  "catalog_int8_streaming_low_latency_vs_pytorch_streaming": {
+   "recordings": 2,
+   "prob_mean_abs_diff": 0.00076,
+   "decisions_identical_at_0_5": 0.9995
+  },
+  "catalog_int8_one_unchunked_pass_vs_chunked_pytorch": {
+   "recordings": 24,
+   "prob_mean_abs_diff": 0.0149,
+   "decisions_identical_at_0_5": 0.9882,
+   "note": "what the research note measured (0.014 / 98.7 %): the whole excerpt in one ONNX pass, without the chunk loop"
+  }
+ },
+ "postprocessing": {
+  "as_shipped": {
+   "threshold": 0.5,
+   "offset": 0.5,
+   "pad_onset": 0.0,
+   "pad_offset": 0.0,
+   "min_duration_on": 0.0,
+   "min_duration_off": 1.0
+  },
+  "untuned": {
+   "threshold": 0.5
+  },
+  "der_best_grid": {
+   "threshold": 0.5,
+   "offset": 0.5,
+   "pad_onset": 0.0,
+   "pad_offset": 0.2,
+   "min_duration_off": 1.0,
+   "ami_words": {
+    "der": 23.4,
+    "false_alarm": 7.19,
+    "missed": 13.63,
+    "confusion": 2.59
+   },
+   "leave_one_meeting_out_der": 23.4
+  },
+  "threshold_only_ami_words_der": {
+   "0.3": 33.81,
+   "0.4": 33.66,
+   "0.5": 34.67,
+   "0.6": 37.08
+  },
+  "chosen_on": "the same 24 AMI excerpts (DER grid, then cpWER among three candidates)"
+ },
+ "der": {
+  "pyannote-3.0-eres2net": {
+   "ami (ref: segments)": {
+    "der": 43.2,
+    "false_alarm": 1.46,
+    "missed": 31.15,
+    "confusion": 10.59,
+    "speaker_count_right": 6,
+    "n": 24,
+    "rtf": 0.201
+   },
+   "ami (ref: words)": {
+    "der": 38.57,
+    "false_alarm": 4.51,
+    "missed": 19.87,
+    "confusion": 14.19,
+    "speaker_count_right": 7,
+    "n": 24,
+    "rtf": 0.201
+   },
+   "synthetic 16 kHz Hindi": {
+    "der": 1.4,
+    "false_alarm": 0.09,
+    "missed": 1.31,
+    "confusion": 0.0,
+    "speaker_count_right": 2,
+    "n": 2,
+    "rtf": 0.188
+   },
+   "synthetic 16 kHz cross-gender": {
+    "der": 3.78,
+    "false_alarm": 0.05,
+    "missed": 3.65,
+    "confusion": 0.07,
+    "speaker_count_right": 8,
+    "n": 8,
+    "rtf": 0.194
+   },
+   "synthetic 16 kHz same-gender female": {
+    "der": 27.78,
+    "false_alarm": 0.11,
+    "missed": 10.35,
+    "confusion": 17.33,
+    "speaker_count_right": 3,
+    "n": 6,
+    "rtf": 0.184
+   },
+   "synthetic 16 kHz same-gender male": {
+    "der": 17.27,
+    "false_alarm": 0.34,
+    "missed": 5.52,
+    "confusion": 11.41,
+    "speaker_count_right": 5,
+    "n": 6,
+    "rtf": 0.196
+   },
+   "synthetic 8 kHz Hindi": {
+    "der": 25.75,
+    "false_alarm": 1.9,
+    "missed": 5.68,
+    "confusion": 18.16,
+    "speaker_count_right": 1,
+    "n": 2,
+    "rtf": 0.2
+   },
+   "synthetic 8 kHz cross-gender": {
+    "der": 30.73,
+    "false_alarm": 1.28,
+    "missed": 10.04,
+    "confusion": 19.41,
+    "speaker_count_right": 4,
+    "n": 8,
+    "rtf": 0.189
+   },
+   "synthetic 8 kHz same-gender female": {
+    "der": 46.6,
+    "false_alarm": 0.06,
+    "missed": 12.82,
+    "confusion": 33.72,
+    "speaker_count_right": 0,
+    "n": 6,
+    "rtf": 0.187
+   },
+   "synthetic 8 kHz same-gender male": {
+    "der": 41.39,
+    "false_alarm": 0.12,
+    "missed": 12.59,
+    "confusion": 28.68,
+    "speaker_count_right": 0,
+    "n": 6,
+    "rtf": 0.196
+   }
+  },
+  "nemotron_untuned": {
+   "ami (ref: segments)": {
+    "der": 42.99,
+    "false_alarm": 0.36,
+    "missed": 41.84,
+    "confusion": 0.79,
+    "speaker_count_right": 15,
+    "n": 24,
+    "rtf": 0.034
+   },
+   "ami (ref: words)": {
+    "der": 34.68,
+    "false_alarm": 1.65,
+    "missed": 31.21,
+    "confusion": 1.82,
+    "speaker_count_right": 18,
+    "n": 24,
+    "rtf": 0.034
+   },
+   "synthetic 16 kHz Hindi": {
+    "der": 1.1,
+    "false_alarm": 0.0,
+    "missed": 1.1,
+    "confusion": 0.0,
+    "speaker_count_right": 2,
+    "n": 2,
+    "rtf": 0.04
+   },
+   "synthetic 16 kHz cross-gender": {
+    "der": 0.84,
+    "false_alarm": 0.05,
+    "missed": 0.79,
+    "confusion": 0.0,
+    "speaker_count_right": 8,
+    "n": 8,
+    "rtf": 0.041
+   },
+   "synthetic 16 kHz same-gender female": {
+    "der": 0.66,
+    "false_alarm": 0.06,
+    "missed": 0.61,
+    "confusion": 0.0,
+    "speaker_count_right": 6,
+    "n": 6,
+    "rtf": 0.041
+   },
+   "synthetic 16 kHz same-gender male": {
+    "der": 1.06,
+    "false_alarm": 0.01,
+    "missed": 1.05,
+    "confusion": 0.0,
+    "speaker_count_right": 6,
+    "n": 6,
+    "rtf": 0.042
+   },
+   "synthetic 8 kHz Hindi": {
+    "der": 1.21,
+    "false_alarm": 0.15,
+    "missed": 1.05,
+    "confusion": 0.0,
+    "speaker_count_right": 2,
+    "n": 2,
+    "rtf": 0.04
+   },
+   "synthetic 8 kHz cross-gender": {
+    "der": 1.72,
+    "false_alarm": 0.01,
+    "missed": 1.71,
+    "confusion": 0.0,
+    "speaker_count_right": 8,
+    "n": 8,
+    "rtf": 0.041
+   },
+   "synthetic 8 kHz same-gender female": {
+    "der": 2.5,
+    "false_alarm": 0.02,
+    "missed": 2.48,
+    "confusion": 0.0,
+    "speaker_count_right": 6,
+    "n": 6,
+    "rtf": 0.04
+   },
+   "synthetic 8 kHz same-gender male": {
+    "der": 2.57,
+    "false_alarm": 0.01,
+    "missed": 2.31,
+    "confusion": 0.25,
+    "speaker_count_right": 6,
+    "n": 6,
+    "rtf": 0.041
+   }
+  },
+  "nemotron_as_shipped": {
+   "ami (ref: segments)": {
+    "der": 33.07,
+    "false_alarm": 0.96,
+    "missed": 31.02,
+    "confusion": 1.09,
+    "speaker_count_right": 15,
+    "n": 24,
+    "rtf": 0.039
+   },
+   "ami (ref: words)": {
+    "der": 24.06,
+    "false_alarm": 3.12,
+    "missed": 18.95,
+    "confusion": 1.98,
+    "speaker_count_right": 18,
+    "n": 24,
+    "rtf": 0.039
+   },
+   "synthetic 16 kHz Hindi": {
+    "der": 1.05,
+    "false_alarm": 0.0,
+    "missed": 1.05,
+    "confusion": 0.0,
+    "speaker_count_right": 2,
+    "n": 2,
+    "rtf": 0.04
+   },
+   "synthetic 16 kHz cross-gender": {
+    "der": 0.71,
+    "false_alarm": 0.05,
+    "missed": 0.65,
+    "confusion": 0.0,
+    "speaker_count_right": 8,
+    "n": 8,
+    "rtf": 0.043
+   },
+   "synthetic 16 kHz same-gender female": {
+    "der": 0.66,
+    "false_alarm": 0.06,
+    "missed": 0.61,
+    "confusion": 0.0,
+    "speaker_count_right": 6,
+    "n": 6,
+    "rtf": 0.041
+   },
+   "synthetic 16 kHz same-gender male": {
+    "der": 0.9,
+    "false_alarm": 0.01,
+    "missed": 0.88,
+    "confusion": 0.0,
+    "speaker_count_right": 6,
+    "n": 6,
+    "rtf": 0.044
+   },
+   "synthetic 8 kHz Hindi": {
+    "der": 1.31,
+    "false_alarm": 0.44,
+    "missed": 0.87,
+    "confusion": 0.0,
+    "speaker_count_right": 2,
+    "n": 2,
+    "rtf": 0.041
+   },
+   "synthetic 8 kHz cross-gender": {
+    "der": 0.89,
+    "false_alarm": 0.01,
+    "missed": 0.88,
+    "confusion": 0.0,
+    "speaker_count_right": 8,
+    "n": 8,
+    "rtf": 0.044
+   },
+   "synthetic 8 kHz same-gender female": {
+    "der": 0.98,
+    "false_alarm": 0.02,
+    "missed": 0.97,
+    "confusion": 0.0,
+    "speaker_count_right": 6,
+    "n": 6,
+    "rtf": 0.041
+   },
+   "synthetic 8 kHz same-gender male": {
+    "der": 1.37,
+    "false_alarm": 0.26,
+    "missed": 1.1,
+    "confusion": 0.01,
+    "speaker_count_right": 6,
+    "n": 6,
+    "rtf": 0.042
+   }
+  }
+ },
+ "cpwer_whisper_base": {
+  "AMI excerpts": {
+   "files": 24,
+   "pyannote-3.0-eres2net": 69.43,
+   "nemotron untuned": {
+    "cpwer": 62.08,
+    "relative_pct": -10.6,
+    "ci95_pct": [
+     -15.1,
+     -5.9
+    ],
+    "files_better": 20,
+    "files_worse": 2,
+    "worst_file_change_pt": 13.1
+   },
+   "nemotron as shipped": {
+    "cpwer": 61.22,
+    "relative_pct": -11.8,
+    "ci95_pct": [
+     -16.0,
+     -8.0
+    ],
+    "files_better": 20,
+    "files_worse": 3,
+    "worst_file_change_pt": 1.3
+   },
+   "nemotron DER-best (0.2 s end padding)": {
+    "cpwer": 64.3,
+    "relative_pct": -7.4,
+    "ci95_pct": [
+     -12.5,
+     -2.1
+    ],
+    "files_better": 16,
+    "files_worse": 7,
+    "worst_file_change_pt": 15.0
+   }
+  },
+  "synthetic 16 kHz Hindi": {
+   "files": 2,
+   "pyannote-3.0-eres2net": 23.86,
+   "nemotron untuned": {
+    "cpwer": 24.43,
+    "relative_pct": 2.4,
+    "ci95_pct": [
+     0.0,
+     3.7
+    ],
+    "files_better": 0,
+    "files_worse": 1,
+    "worst_file_change_pt": 1.1
+   },
+   "nemotron as shipped": {
+    "cpwer": 24.43,
+    "relative_pct": 2.4,
+    "ci95_pct": [
+     0.0,
+     3.7
+    ],
+    "files_better": 0,
+    "files_worse": 1,
+    "worst_file_change_pt": 1.1
+   },
+   "nemotron DER-best (0.2 s end padding)": {
+    "cpwer": 27.84,
+    "relative_pct": 16.7,
+    "ci95_pct": [
+     13.3,
+     18.5
+    ],
+    "files_better": 0,
+    "files_worse": 2,
+    "worst_file_change_pt": 5.7
+   }
+  },
+  "synthetic 16 kHz cross-gender": {
+   "files": 8,
+   "pyannote-3.0-eres2net": 19.71,
+   "nemotron untuned": {
+    "cpwer": 25.0,
+    "relative_pct": 26.8,
+    "ci95_pct": [
+     -1.9,
+     65.1
+    ],
+    "files_better": 2,
+    "files_worse": 4,
+    "worst_file_change_pt": 21.6
+   },
+   "nemotron as shipped": {
+    "cpwer": 23.32,
+    "relative_pct": 18.3,
+    "ci95_pct": [
+     -0.5,
+     45.2
+    ],
+    "files_better": 1,
+    "files_worse": 5,
+    "worst_file_change_pt": 21.5
+   },
+   "nemotron DER-best (0.2 s end padding)": {
+    "cpwer": 22.96,
+    "relative_pct": 16.5,
+    "ci95_pct": [
+     5.9,
+     30.6
+    ],
+    "files_better": 0,
+    "files_worse": 8,
+    "worst_file_change_pt": 10.3
+   }
+  },
+  "synthetic 16 kHz same-gender female": {
+   "files": 6,
+   "pyannote-3.0-eres2net": 52.01,
+   "nemotron untuned": {
+    "cpwer": 20.71,
+    "relative_pct": -60.2,
+    "ci95_pct": [
+     -72.4,
+     -38.2
+    ],
+    "files_better": 5,
+    "files_worse": 0,
+    "worst_file_change_pt": 0.0
+   },
+   "nemotron as shipped": {
+    "cpwer": 20.71,
+    "relative_pct": -60.2,
+    "ci95_pct": [
+     -72.8,
+     -38.2
+    ],
+    "files_better": 5,
+    "files_worse": 0,
+    "worst_file_change_pt": 0.0
+   },
+   "nemotron DER-best (0.2 s end padding)": {
+    "cpwer": 20.55,
+    "relative_pct": -60.5,
+    "ci95_pct": [
+     -73.2,
+     -36.1
+    ],
+    "files_better": 5,
+    "files_worse": 1,
+    "worst_file_change_pt": 1.9
+   }
+  },
+  "synthetic 16 kHz same-gender male": {
+   "files": 6,
+   "pyannote-3.0-eres2net": 44.46,
+   "nemotron untuned": {
+    "cpwer": 19.74,
+    "relative_pct": -55.6,
+    "ci95_pct": [
+     -71.2,
+     -34.4
+    ],
+    "files_better": 6,
+    "files_worse": 0,
+    "worst_file_change_pt": -1.0
+   },
+   "nemotron as shipped": {
+    "cpwer": 19.74,
+    "relative_pct": -55.6,
+    "ci95_pct": [
+     -71.3,
+     -35.1
+    ],
+    "files_better": 6,
+    "files_worse": 0,
+    "worst_file_change_pt": -1.0
+   },
+   "nemotron DER-best (0.2 s end padding)": {
+    "cpwer": 20.39,
+    "relative_pct": -54.2,
+    "ci95_pct": [
+     -70.6,
+     -29.5
+    ],
+    "files_better": 5,
+    "files_worse": 0,
+    "worst_file_change_pt": 0.0
+   }
+  },
+  "synthetic 8 kHz Hindi": {
+   "files": 2,
+   "pyannote-3.0-eres2net": 56.25,
+   "nemotron untuned": {
+    "cpwer": 53.98,
+    "relative_pct": -4.0,
+    "ci95_pct": [
+     -18.2,
+     24.2
+    ],
+    "files_better": 1,
+    "files_worse": 1,
+    "worst_file_change_pt": 9.1
+   },
+   "nemotron as shipped": {
+    "cpwer": 40.34,
+    "relative_pct": -28.3,
+    "ci95_pct": [
+     -54.5,
+     24.2
+    ],
+    "files_better": 1,
+    "files_worse": 1,
+    "worst_file_change_pt": 9.1
+   },
+   "nemotron DER-best (0.2 s end padding)": {
+    "cpwer": 38.07,
+    "relative_pct": -32.3,
+    "ci95_pct": [
+     -59.1,
+     21.2
+    ],
+    "files_better": 1,
+    "files_worse": 1,
+    "worst_file_change_pt": 8.0
+   }
+  },
+  "synthetic 8 kHz cross-gender": {
+   "files": 8,
+   "pyannote-3.0-eres2net": 59.01,
+   "nemotron untuned": {
+    "cpwer": 28.0,
+    "relative_pct": -52.5,
+    "ci95_pct": [
+     -67.6,
+     -38.0
+    ],
+    "files_better": 8,
+    "files_worse": 0,
+    "worst_file_change_pt": -2.9
+   },
+   "nemotron as shipped": {
+    "cpwer": 29.45,
+    "relative_pct": -50.1,
+    "ci95_pct": [
+     -63.6,
+     -35.9
+    ],
+    "files_better": 8,
+    "files_worse": 0,
+    "worst_file_change_pt": -2.9
+   },
+   "nemotron DER-best (0.2 s end padding)": {
+    "cpwer": 30.05,
+    "relative_pct": -49.1,
+    "ci95_pct": [
+     -63.4,
+     -29.4
+    ],
+    "files_better": 7,
+    "files_worse": 0,
+    "worst_file_change_pt": 0.0
+   }
+  },
+  "synthetic 8 kHz same-gender female": {
+   "files": 6,
+   "pyannote-3.0-eres2net": 90.53,
+   "nemotron untuned": {
+    "cpwer": 25.68,
+    "relative_pct": -71.6,
+    "ci95_pct": [
+     -77.5,
+     -65.2
+    ],
+    "files_better": 6,
+    "files_worse": 0,
+    "worst_file_change_pt": -44.7
+   },
+   "nemotron as shipped": {
+    "cpwer": 22.95,
+    "relative_pct": -74.6,
+    "ci95_pct": [
+     -78.9,
+     -70.1
+    ],
+    "files_better": 6,
+    "files_worse": 0,
+    "worst_file_change_pt": -51.5
+   },
+   "nemotron DER-best (0.2 s end padding)": {
+    "cpwer": 25.68,
+    "relative_pct": -71.6,
+    "ci95_pct": [
+     -77.8,
+     -63.9
+    ],
+    "files_better": 6,
+    "files_worse": 0,
+    "worst_file_change_pt": -42.7
+   }
+  },
+  "synthetic 8 kHz same-gender male": {
+   "files": 6,
+   "pyannote-3.0-eres2net": 87.0,
+   "nemotron untuned": {
+    "cpwer": 27.29,
+    "relative_pct": -68.6,
+    "ci95_pct": [
+     -75.1,
+     -60.9
+    ],
+    "files_better": 6,
+    "files_worse": 0,
+    "worst_file_change_pt": -46.6
+   },
+   "nemotron as shipped": {
+    "cpwer": 29.21,
+    "relative_pct": -66.4,
+    "ci95_pct": [
+     -75.1,
+     -56.2
+    ],
+    "files_better": 6,
+    "files_worse": 0,
+    "worst_file_change_pt": -38.8
+   },
+   "nemotron DER-best (0.2 s end padding)": {
+    "cpwer": 28.89,
+    "relative_pct": -66.8,
+    "ci95_pct": [
+     -76.5,
+     -56.3
+    ],
+    "files_better": 6,
+    "files_worse": 0,
+    "worst_file_change_pt": -41.7
+   }
+  },
+  "synthetic (all)": {
+   "files": 44,
+   "pyannote-3.0-eres2net": 55.52,
+   "nemotron untuned": {
+    "cpwer": 25.75,
+    "relative_pct": -53.6,
+    "ci95_pct": [
+     -61.6,
+     -44.4
+    ],
+    "files_better": 34,
+    "files_worse": 6,
+    "worst_file_change_pt": 21.6
+   },
+   "nemotron as shipped": {
+    "cpwer": 25.07,
+    "relative_pct": -54.9,
+    "ci95_pct": [
+     -61.8,
+     -45.8
+    ],
+    "files_better": 33,
+    "files_worse": 7,
+    "worst_file_change_pt": 21.5
+   },
+   "nemotron DER-best (0.2 s end padding)": {
+    "cpwer": 25.55,
+    "relative_pct": -54.0,
+    "ci95_pct": [
+     -61.1,
+     -44.9
+    ],
+    "files_better": 30,
+    "files_worse": 12,
+    "worst_file_change_pt": 10.3
+   }
+  }
+ },
+ "speed": {
+  "ES2004a_concat:pyannote-3.0-eres2net": {
+   "audio_s": 270.0,
+   "wall_s": 55.35,
+   "rtf": 0.205,
+   "speakers": 7
+  },
+  "ES2004a_concat:nemotron-3-diarization": {
+   "audio_s": 270.0,
+   "wall_s": 10.7,
+   "rtf": 0.04,
+   "speakers": 4
+  },
+  "TS3003a_concat:pyannote-3.0-eres2net": {
+   "audio_s": 270.0,
+   "wall_s": 60.94,
+   "rtf": 0.226,
+   "speakers": 4
+  },
+  "TS3003a_concat:nemotron-3-diarization": {
+   "audio_s": 270.0,
+   "wall_s": 10.65,
+   "rtf": 0.039,
+   "speakers": 3
+  },
+  "stream:low_latency": {
+   "latency_s": 1.04,
+   "rtf": 0.637
+  },
+  "stream:very_low_latency": {
+   "latency_s": 0.64,
+   "rtf": 0.928
+  },
+  "stream:ultra_low_latency": {
+   "latency_s": 0.32,
+   "rtf": 1.826
+  },
+  "peak_rss_mb": 1248
+ },
+ "dialogues_four_lines": {
+  "speakers_told_apart": {
+   "pyannote-3.0-eres2net": 15,
+   "nemotron": 14,
+   "of": 32
+  },
+  "rows": [
+   "af_heart/af_bella | pyannote: 1 spk DER 0.49 conf 0.45 | nemotron: 1 spk DER 0.61 conf 0.47",
+   "af_heart/am_adam | pyannote: 2 spk DER 0.05 conf 0.00 | nemotron: 1 spk DER 0.61 conf 0.47",
+   "af_heart/af_sarah | pyannote: 1 spk DER 0.50 conf 0.45 | nemotron: 1 spk DER 0.61 conf 0.47",
+   "af_bella/af_nicole | pyannote: 2 spk DER 0.05 conf 0.00 | nemotron: 2 spk DER 0.05 conf 0.00",
+   "af_sky/af_bella | pyannote: 1 spk DER 0.47 conf 0.43 | nemotron: 2 spk DER 0.03 conf 0.00",
+   "am_adam/am_michael | pyannote: 2 spk DER 0.05 conf 0.00 | nemotron: 2 spk DER 0.03 conf 0.00",
+   "bf_emma/bf_isabella | pyannote: 1 spk DER 0.49 conf 0.44 | nemotron: 1 spk DER 0.59 conf 0.46",
+   "am_puck/am_eric | pyannote: 1 spk DER 0.52 conf 0.47 | nemotron: 2 spk DER 0.03 conf 0.00",
+   "af_heart/am_michael | pyannote: 2 spk DER 0.03 conf 0.00 | nemotron: 2 spk DER 0.33 conf 0.26",
+   "af_heart/bm_george | pyannote: 2 spk DER 0.03 conf 0.00 | nemotron: 2 spk DER 0.03 conf 0.00",
+   "af_bella/am_adam | pyannote: 2 spk DER 0.05 conf 0.00 | nemotron: 2 spk DER 0.04 conf 0.00",
+   "af_nicole/am_eric | pyannote: 2 spk DER 0.06 conf 0.00 | nemotron: 2 spk DER 0.02 conf 0.00",
+   "af_sarah/bm_lewis | pyannote: 2 spk DER 0.05 conf 0.00 | nemotron: 1 spk DER 0.61 conf 0.48",
+   "af_sky/am_liam | pyannote: 2 spk DER 0.05 conf 0.00 | nemotron: 2 spk DER 0.03 conf 0.00",
+   "bf_emma/bm_george | pyannote: 2 spk DER 0.04 conf 0.00 | nemotron: 2 spk DER 0.02 conf 0.00",
+   "bf_alice/am_onyx | pyannote: 2 spk DER 0.03 conf 0.00 | nemotron: 2 spk DER 0.53 conf 0.29",
+   "af_kore/am_fenrir | pyannote: 1 spk DER 0.49 conf 0.45 | nemotron: 1 spk DER 0.60 conf 0.46",
+   "af_nova/am_echo | pyannote: 1 spk DER 0.49 conf 0.46 | nemotron: 1 spk DER 0.59 conf 0.47",
+   "af_jessica/bm_daniel | pyannote: 2 spk DER 0.03 conf 0.00 | nemotron: 2 spk DER 0.02 conf 0.00",
+   "af_river/am_puck | pyannote: 2 spk DER 0.04 conf 0.00 | nemotron: 2 spk DER 0.03 conf 0.00",
+   "af_alloy/af_aoede | pyannote: 1 spk DER 0.45 conf 0.40 | nemotron: 1 spk DER 0.54 conf 0.41",
+   "af_kore/af_nova | pyannote: 1 spk DER 0.51 conf 0.48 | nemotron: 1 spk DER 0.63 conf 0.50",
+   "af_jessica/af_river | pyannote: 1 spk DER 0.47 conf 0.44 | nemotron: 2 spk DER 0.07 conf 0.01",
+   "bf_lily/bf_alice | pyannote: 1 spk DER 0.46 conf 0.43 | nemotron: 1 spk DER 0.56 conf 0.44",
+   "am_echo/am_fenrir | pyannote: 1 spk DER 0.44 conf 0.41 | nemotron: 1 spk DER 0.55 conf 0.42",
+   "am_liam/am_onyx | pyannote: 1 spk DER 0.49 conf 0.45 | nemotron: 1 spk DER 0.60 conf 0.46",
+   "bm_lewis/bm_daniel | pyannote: 1 spk DER 0.48 conf 0.44 | nemotron: 2 spk DER 0.54 conf 0.21",
+   "bm_fable/am_michael | pyannote: 1 spk DER 0.58 conf 0.40 | nemotron: 2 spk DER 0.09 conf 0.00",
+   "am_eric/bm_george | pyannote: 1 spk DER 0.51 conf 0.47 | nemotron: 1 spk DER 0.62 conf 0.49",
+   "af_aoede/am_adam | pyannote: 2 spk DER 0.05 conf 0.00 | nemotron: 2 spk DER 0.04 conf 0.00",
+   "af_nicole/af_sarah | pyannote: 1 spk DER 0.47 conf 0.39 | nemotron: 1 spk DER 0.54 conf 0.41",
+   "bf_isabella/am_eric | pyannote: 2 spk DER 0.04 conf 0.00 | nemotron: 1 spk DER 0.57 conf 0.43"
+  ]
+ },
+ "default_decision": "opt-in (pyannote-3.0-eres2net stays the default): clearly better on AMI excerpts and on overlapped same-gender and telephone mixes, but not everywhere: on clean two-voice dialogues it got five cross-gender pairs wrong that clustering separates (including the pair of the default-settings test test_two_voices_are_told_apart), and 16 kHz cross-gender overlap mixes transcribed worse; no full-meeting evaluation yet; third-party ONNX conversion"
+}

@@ -128,3 +128,61 @@
   options:
     segmentation: model.onnx
     threshold: 0.5
+
+# End-to-end neural diarization, run by ONNX Runtime directly (bolo.engines.nemotron).
+- id: nemotron-3-diarization
+  aliases: [nemotron-diarization]
+  task: diarization
+  engine: onnxruntime
+  kind: nemotron_diarization
+  family: Nemotron diarization
+  languages: []
+  tier: balanced
+  size_bytes: 147332174
+  params: 100000000
+  license: OpenMDW-1.1
+  license_url: https://openmdw.ai/license/1-1/
+  commercial_use: true
+  features: [overlap]
+  description: 'NVIDIA Nemotron-3-Diarization (September 2026): a 31-layer Transformer that predicts, every 10 ms, which of up
+    to eight speakers is talking, with an arrival-order speaker cache for long recordings and live audio. No clustering
+    step, so similar voices and telephone audio are told apart far better than by embedding clustering, and overlapped
+    speech comes out directly. Trained on Fisher, CALLHOME, AMI, NOTSOFAR and DISPLACE (Hindi, Kannada, Telugu, Bengali,
+    Indian English) conversations. int8 ONNX conversion by the onnx-community organisation on Hugging Face (a third-party
+    conversion of the official weights; see docs/models.md); ERes2Net embeddings (Apache-2.0) are included for
+    recognising named speakers.'
+  source_url: https://huggingface.co/nvidia/Nemotron-3-Diarization
+  validated: cpu
+  measured:
+    rtf: 0.039
+    der: 0.2406
+    audio_s: 1080.0
+    threads: 2
+    engine: onnxruntime 1.31.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    test_audio: 24 AMI far-field meeting excerpts of 45 s, DER against word times, collar 0, overlap scored
+      (docs/measurements/diarization-nemotron.json)
+  source:
+    repo: onnx-community/Nemotron-3-Diarization-ONNX
+    revision: 353b6f8ad2cac3580e982d7fbdf0a010786b0406
+    include:
+    - onnx/model_quantized.onnx
+    - onnx/model_quantized.onnx_data
+    - config.json
+    - preprocessor_config.json
+    urls:
+    - path: embedding/3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx
+      url: https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/0743f301363dec56491a490f6d6cbc9d67f9a3bf/3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx
+      size: 26485263
+      sha256: c59158379255ad66e161679cca6af8d52d51e389e3224ab7d7a7baae295c2db5
+  options:
+    model: onnx/model_quantized.onnx
+    # post-processing of the speaker probabilities, chosen on 24 AMI far-field excerpts (docs/models.md):
+    # a speaker's pauses shorter than 1 s are closed; padding the turns lowered DER further but cost words
+    threshold: 0.5
+    offset: 0.5
+    pad_onset: 0.0
+    pad_offset: 0.0
+    min_duration_on: 0.0
+    min_duration_off: 1.0

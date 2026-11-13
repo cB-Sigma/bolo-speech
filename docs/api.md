@@ -529,9 +529,20 @@ sent. Each sentence is one trace (`request_id` in `metrics`).
 
 ## Speaker diarization
 
-Who spoke when, without PyTorch: pyannote's segmentation-3.0 model and a
-speaker-embedding model (both ONNX, run by sherpa-onnx) with clustering. The
-default pipeline is `pyannote-3.0-eres2net` (about 32 MB; pulled on first use).
+Who spoke when, without PyTorch. Two kinds of diarizer are in the catalog:
+
+| model | how | download | choose it with |
+| --- | --- | --- | --- |
+| `pyannote-3.0-eres2net` (default) | pyannote's segmentation-3.0 model and a speaker-embedding model (both ONNX, run by sherpa-onnx), then clustering | 32 MB | nothing (default), or `diarization_model` / `model` |
+| `nemotron-3-diarization` | NVIDIA's Nemotron-3-Diarization, an end-to-end model that gives every 10 ms the probability that each of up to 8 speakers is talking (ONNX Runtime) | 147 MB | `diarization_model=nemotron-3-diarization` on `/v1/audio/transcriptions`, `model=nemotron-3-diarization` on `/api/v1/diarize`, or `default_diarization` in the configuration |
+
+Both are pulled on first use. Which one to use, with measurements, is in
+models.md, "Speaker diarization"; in short, Nemotron tells similar voices and
+telephone voices apart far better and finds the number of speakers more
+often, at a fifth of the cost. `nemotron-3-diarization` needs the
+`onnxruntime` Python package (installed with `bolo[all]`, which brings it with
+faster-whisper; otherwise `pip install onnxruntime`) and, for named speakers
+and live streams, sherpa-onnx for its speaker embeddings.
 
 **With a transcription** (`POST /v1/audio/transcriptions`): add `diarize=true`,
 optionally `num_speakers` or `min_speakers` / `max_speakers`,
@@ -574,6 +585,16 @@ real speakers, short references or telephone audio was not measured.
 `num_speakers`, `min_speakers`, `max_speakers`, `threshold`,
 `known_speaker_names[]` / `known_speaker_references[]`, `identify_threshold`:
 
+`threshold` (`diarization_threshold` on transcriptions) means different things
+to the two kinds of model: for the pyannote pipelines it is the clustering
+threshold (higher: fewer speakers); for `nemotron-3-diarization` it is the
+speech probability above which a speaker counts as talking (default 0.5;
+lower: more speech, more false alarms). With Nemotron, `num_speakers` and
+`max_speakers` fold the speakers who talk least into the others, but the
+model cannot be made to hear more speakers than it does, so `min_speakers`
+(and a `num_speakers` above what it found) has no effect; it handles at most
+8 speakers.
+
 ```json
 {"model": "pyannote-3.0-eres2net", "duration": 21.5, "speakers": ["A", "B"],
  "segments": [{"start": 0.03, "end": 2.98, "speaker": "A"}, {"start": 3.7, "end": 6.4, "speaker": "B"}],
@@ -582,7 +603,8 @@ real speakers, short references or telephone audio was not measured.
 ```
 
 **Overlapping speech.** The segmentation model (pyannote segmentation-3.0) can
-assign two speakers to the same moment, and the pipeline then returns turns
+assign two speakers to the same moment, and so can Nemotron (its speakers'
+probabilities are independent), and the pipeline then returns turns
 of different speakers that overlap in time; `overlaps` lists those stretches
 (`[{"start","end","speakers":["A","B"]}]`, 0.25 s or longer). In a diarized
 transcription, segments that overlap another speaker carry `"overlap": true`
@@ -695,7 +717,9 @@ and `bolo_separation_audio_seconds_total`.
 
 The speaker *count* is the weak point of clustering: left alone it finds too
 many (a laugh, a cough or a change of loudness opens a new cluster). bolo
-does two things about it, and you can do a third:
+does two things about it, and you can do a third (all of this is about the
+pyannote pipelines; `nemotron-3-diarization` counts speakers itself and got
+the count right far more often in our tests, see models.md):
 
 1. The default pipeline clusters with threshold 0.9 instead of
    sherpa-onnx's 0.5 (`diarization_threshold` / `threshold` per request).

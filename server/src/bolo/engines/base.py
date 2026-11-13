@@ -248,10 +248,44 @@ class SpeakerTurn:
     speaker: int  # 0-based cluster index, in order of first appearance
 
 
+@dataclass
+class SpeakerActivity:
+    """Per-frame speaker probabilities of a recording: ``probs[frame, speaker]`` in 0..1.
+
+    Column ``k`` belongs to speaker ``k`` of the turns it came with (0-based, in order of first appearance).
+    Only end-to-end neural diarizers (Nemotron-3-Diarization) produce it; it is what diarization-conditioned
+    recognisers take as input.
+    """
+
+    probs: FloatArray
+    frame_s: float = 0.01
+
+    @property
+    def num_speakers(self) -> int:
+        return int(self.probs.shape[1]) if self.probs.ndim == 2 else 0
+
+    def frame(self, t: float) -> int:
+        return max(0, min(len(self.probs), round(t / self.frame_s)))
+
+
+@dataclass
+class DiarizationResult:
+    turns: list[SpeakerTurn]
+    activity: SpeakerActivity | None = None
+
+
 class DiarizationModel(Model):
-    """Who spoke when: speaker segmentation + speaker embeddings + clustering."""
+    """Who spoke when: speaker segmentation + speaker embeddings + clustering, or an end-to-end model."""
 
     task = "diarization"
+    #: whether bolo's speaker clean-up (:func:`bolo.diarize.consolidate_speakers`) runs unless the request says
+    consolidate_default: bool = True
+
+    def diarize_detailed(
+        self, samples: FloatArray, num_speakers: int | None = None, threshold: float | None = None
+    ) -> DiarizationResult:
+        """Like :meth:`diarize`, plus the per-frame speaker probabilities when the model has them."""
+        return DiarizationResult(self.diarize(samples, num_speakers, threshold))
 
     @abc.abstractmethod
     def diarize(

@@ -8,6 +8,7 @@ bolo's SDK reports an exception by its class name; this server sends the ``code`
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from typing import IO, Any
 
@@ -54,4 +55,10 @@ def serve(engine: Engine, stdin: IO[bytes] | None = None, stdout: IO[bytes] | No
     out = stdout or sys.stdout.buffer
     if stdout is None:
         sys.stdout = sys.stderr  # stray prints of model libraries must not corrupt the protocol stream
-    return TorchServer(engine, stdin or sys.stdin.buffer, out).run()
+    code = TorchServer(engine, stdin or sys.stdin.buffer, out).run()
+    if stdin is None:
+        # bolo closed the pipe or asked for shutdown: leave now. Waiting for the worker pool would keep a
+        # half-finished synthesis or separation running (and holding memory) after bolo has gone.
+        sys.stderr.flush()
+        os._exit(code)
+    return code
