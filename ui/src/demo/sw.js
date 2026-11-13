@@ -10,7 +10,8 @@
  * 2. Offline. Same-origin files and the pinned ONNX Runtime files from
  *    jsDelivr are cached as they are fetched, so a second visit works
  *    without a network. Model weights are cached separately by the
- *    recogniser itself (Cache Storage, "transformers-cache").
+ *    recogniser itself (Cache Storage, "transformers-cache"), voices by the
+ *    synthesiser ("bolo-voices").
  */
 const CACHE = 'bolo-demo-v1'
 // `credentialless` needs no cooperation from other origins but is Chromium-only;
@@ -81,7 +82,10 @@ self.addEventListener('fetch', (event) => {
   const sameOrigin = url.origin === self.location.origin
   const cacheable = request.method === 'GET' && !request.headers.has('range')
   let work
-  if (sameOrigin && cacheable) {
+  if (sameOrigin && /\/voices\//.test(url.pathname)) {
+    // Voices are large and the synthesiser keeps its own copy (Cache Storage, "bolo-voices"): pass through.
+    work = fetch(request)
+  } else if (sameOrigin && cacheable) {
     // Hashed build assets never change; everything else (the page itself) prefers the network.
     work = /\/assets\//.test(url.pathname) ? cacheFirst(request) : networkFirst(request)
   } else if (url.hostname === 'cdn.jsdelivr.net' && cacheable) {

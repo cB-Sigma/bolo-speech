@@ -8,6 +8,25 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Speech synthesis in the browser.** The live demo's text-to-speech screen
+  now speaks: nine voices run in the page with ONNX Runtime Web
+  (WebAssembly, up to 4 threads), downloaded once and kept by the browser.
+  IISc SYSPIN voices for Hindi, Maithili (female, male), Bhojpuri (female,
+  male), Marathi, Kannada and Indian English read characters directly (no
+  phonemiser); the US English Piper voice "amy" gets its phonemes from a
+  vendored copy of uccharan (Apache-2.0), so no eSpeak NG is involved. The
+  front end matches sherpa-onnx (cleaning, token ids, pause shortening; checked
+  sample for sample), spells numbers out in Hindi, Marathi, Kannada and
+  English, and lists the characters a voice cannot say. Sentence-by-sentence
+  streaming playback, time to first audio, real-time factor, the chunk
+  timeline, WAV download and a round trip through the in-browser recogniser
+  (Hindi, English). Voices are shrunk for the browser (8-bit convolution
+  weights outside the text encoder, 16-bit elsewhere: 114 MB to 36.5 MB, no
+  measurable change in round-trip error) and published same-origin with the
+  Pages site by the "Live demo" workflow (`ui/scripts/voices/build.py`); they
+  are not in git. The console served by `bolo serve` gets the same screen as
+  an "In browser" mode next to "Server", fetching the voices from the public
+  demo.
 - **Indian languages.** Speech-to-text entries for all 22 scheduled languages
   of India (`indicconformer-<lang>-community`: AI4Bharat IndicConformer, MIT,
   ungated community exports pinned to a commit), 16 of them run on real

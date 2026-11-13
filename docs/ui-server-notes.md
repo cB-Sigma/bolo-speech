@@ -256,9 +256,135 @@ small service worker that adds COOP/COEP to every response it relays (the approa
 coi-serviceworker, MIT; this is an independent implementation) and caches the bundle for offline
 use. It asks for `credentialless` on Chromium and `require-corp` elsewhere.
 
-In-browser text to speech was considered for the demo and left out. Checked on 2026-11-13:
-Kokoro (`onnx-community/Kokoro-82M-v1.0-ONNX`, Apache-2.0, 86–92 MB quantised) and the Piper/Kitten
-voices need a phonemiser, and the web builds available (`kokoro-js` → `phonemizer`) bundle eSpeak
-NG, which is GPL-3.0; SpeechT5 (`Xenova/speecht5_tts` plus vocoder, MIT) needs about 177 MB at 8-bit
-quantisation; Supertonic is under an OpenRAIL licence and about 260 MB. None is both permissively
-licensed end to end and small enough to download into a visitor's tab.
+## Speech synthesis in the browser
+
+The text-to-speech screen of the live demo runs voices in the page; the console served by
+`bolo serve` has the same screen as an "In browser" mode next to "Server" (there is no "Compare"
+mode for speech synthesis). Nothing in it needs the server.
+
+### How it works
+
+- A worker (`ui/src/lib/browser-tts/worker.ts`) runs the voice's VITS graph directly with ONNX
+  Runtime Web (`onnxruntime-web/wasm`, the version `@huggingface/transformers` uses, so the
+  WebAssembly binary in Cache Storage is shared with the recogniser and fetched once), on up to 4
+  threads when the page is cross-origin isolated.
+- **Character voices** (IISc SYSPIN, Coqui VITS) need no phonemiser. The front end
+  (`ui/src/lib/browser-tts/text.ts`) does what their original Coqui front end did: NFC, lower case,
+  Coqui's `multilingual_cleaners`, one id per character from the voice's table, unknown characters
+  skipped, a blank id between every pair and at both ends. After each model call the audio goes
+  through the same pause shortening sherpa-onnx applies (`ScaleSilence`, scale 0.2). Checked
+  against sherpa-onnx 2.0.1 with the noise switched off: for 7 test sentences across Hindi,
+  Maithili, Bhojpuri, Marathi, Kannada and English the waveforms are identical (same length,
+  largest difference below 1e-3); the ids are kept as unit-test fixtures
+  (`fixtures/sherpa-tokens.json`, made by `ui/scripts/voices/fixtures.py`). sherpa-onnx does not
+  apply Coqui's cleaners, so for text with capitals, `;`, `:`, `-`, brackets or double quotes the
+  browser follows the training text and the server does not; and sherpa-onnx does not NFC its
+  input, so a precomposed nukta letter (क़, U+0958) maps to a different id there.
+- Numbers are spelt out before synthesis (`numbers.ts`: English, Hindi, Marathi and Kannada names,
+  Indian grouping, decimals, per cent; Maithili and Bhojpuri use the Hindi names). Characters a
+  voice has no symbol for are listed under the text box instead of vanishing silently; a missing
+  danda (the Bhojpuri voices have none) becomes a full stop.
+- **Piper voice** (US English "amy", low): phonemes come from uccharan (Apache-2.0, vendored in
+  `ui/src/vendor/uccharan`, WebAssembly module 254 KiB plus 2.0 MiB of English data), `piper`
+  profile, ids `^ _ p _ … $`. No eSpeak NG build is used anywhere.
+- Text is split into sentences (a long first sentence at its first comma); each one is
+  synthesised and scheduled on the Web Audio clock as soon as it is ready, so the first plays while
+  the rest are made. Time to first audio is measured from the moment the voice is ready; the
+  one-time download and compile are shown separately. The real-time factor is model time per second
+  of audio.
+- The round trip feeds each synthesised sentence to the in-browser recogniser: Whisper Tiny Hindi
+  for the Hindi voice, Moonshine Tiny for the two English voices. There is none for Maithili,
+  Bhojpuri, Marathi or Kannada; the button says so.
+
+### Where the voices come from
+
+GitHub release assets are served without CORS headers, so a page cannot fetch them. The voices are
+therefore published **with the Pages site, same origin, under `voices/`** and are not in git.
+`.github/workflows/pages.yml` runs `ui/scripts/voices/build.py`, which
+
+1. downloads the SYSPIN archives that the "Voices" workflow (`tools/voices/`) published as assets of
+   the `voices-v1` release, and the Piper voice from `rhasspy/piper-voices` at a pinned revision
+   (SHA-256 checked);
+2. shrinks each graph (`shrink.py`): convolution weights outside the text encoder, duration
+   predictor and (for Piper) decoder become 8-bit integers with one scale per output channel,
+   everything else 16-bit floats; ONNX Runtime expands them to fp32 constants when the session is
+   created (`session.disable_quant_qdq=1`, without which the DequantizeLinear nodes ran on every
+   call and made synthesis about 10 % slower), so computation stays fp32;
+3. checks each shrunk voice against the original with the noise off (same length, mean log-mel
+   difference on the loudest frames below 0.08; measured 0.017 to 0.023) and writes
+   `voices/index.json` with sizes and SHA-256 of every file.
+
+It needs only `numpy`, `onnx` and `onnxruntime` and takes a few minutes; the output is cached by
+the workflow (key: the release's `voices.json` and the build scripts). Voices whose archive is not
+published yet are left out (`--skip-missing`) and the demo says "not published with this build".
+**Order of operations for the owner:** run the "Voices" workflow once (it creates `voices-v1`),
+then the "Live demo" workflow (it also runs by itself when "Voices" completes). The Pages artifact
+grows by about 320 MB; the largest single file is 36.5 MB.
+
+The console served by `bolo serve` fetches the voices from the public demo
+(`https://cb-sigma.github.io/bolo/voices/`; GitHub Pages sends `Access-Control-Allow-Origin: *`).
+To use a copy of your own: `localStorage.setItem('bolo.browserTts', JSON.stringify({ voicesBase:
+'https://static.internal.example/voices/' }))`. A natural follow-up is for the server to offer
+the voices it has installed under its own origin. With a Content-Security-Policy, add the voices
+host to `connect-src`.
+
+| Voice | Language | Download | Weights / data licence | Made by |
+| --- | --- | --- | --- | --- |
+| `syspin-hi-female` | हिन्दी Hindi | 36.5 MB | MIT / CC-BY-4.0 | SYSPIN, SPIRE Lab, IISc |
+| `syspin-mai-female`, `syspin-mai-male` | मैथिली Maithili | 36.5 MB each | MIT / CC-BY-4.0 | SYSPIN, SPIRE Lab, IISc |
+| `syspin-bho-female`, `syspin-bho-male` | भोजपुरी Bhojpuri | 36.5 MB each | MIT / CC-BY-4.0 | SYSPIN, SPIRE Lab, IISc |
+| `syspin-mr-female` | मराठी Marathi | 36.5 MB | MIT / CC-BY-4.0 | SYSPIN, SPIRE Lab, IISc |
+| `syspin-kn-female` | ಕನ್ನಡ Kannada | 36.5 MB | MIT / CC-BY-4.0 | SYSPIN, SPIRE Lab, IISc |
+| `syspin-en-female` | English (India) | 36.5 MB | MIT / CC-BY-4.0 | SYSPIN, SPIRE Lab, IISc |
+| `piper-en-us-amy-low` | English (US) | 27.1 MB (25.0 MB voice + 2.1 MB uccharan data) | MIT (piper-voices) / Amy dataset, mimic3-voices (licence not stated per voice) | Rhasspy / Piper |
+
+Original fp32 sizes: 114 MB per SYSPIN voice, 63 MB for amy. Plus, once, the ONNX Runtime binary
+from jsDelivr (about 12 MB, shared with the recogniser).
+
+### Quality of the shrunk voices
+
+Round trip, original vs shrunk, three sentences per voice with the normal sampling noise,
+transcribed by sherpa-onnx (IndicConformer per language; Hindi model for Bhojpuri; Whisper Base for
+English); character error rate:
+
+| Voice | fp32 | shrunk |
+| --- | --- | --- |
+| Hindi female | 9.2 % | 6.2 % |
+| Maithili female / male | 6.2 % / 3.7 % | 6.2 % / 1.2 % |
+| Bhojpuri female / male | 15.1 % / 6.8 % | 12.3 % / 13.7 % |
+| Marathi female | 0.0 % | 2.6 % |
+| Kannada female | 0.0 % | 0.0 % |
+| Indian English female | 3.7 % | 5.6 % |
+
+The differences go both ways and are within the run-to-run variation the sampling noise causes.
+An 8-bit text encoder, by contrast, changed the output clearly (log-mel difference 0.64), which is
+why it stays 16-bit. Nobody who speaks these languages has listened to the output.
+
+### Measured in headless Chromium
+
+Measured on 2026-11-13 in headless Chromium on the build machine (4 cores of an Intel Xeon @ 2.10 GHz,
+no GPU, shared with other jobs: load average 4 to 7), voices served same-origin as on Pages, 4
+WebAssembly threads. Full record: `docs/measurements/browser-tts.json`. "First use" is a fresh
+profile (download from a local server, so network time is close to zero; add your download time),
+"from cache" is after a reload. Text: the voice's sample plus one more sentence (4 to 8 s of audio).
+
+| Voice | Download | Ready, first use | Ready, from cache | Time to first audio | Real-time factor |
+| --- | --- | --- | --- | --- | --- |
+| `syspin-hi-female` | 36.5 MB | 3.8 s | 1.7 s | 1843–3630 ms | 1.93–3.02 |
+| `syspin-mai-female` | 36.5 MB | 4.2 s | 2.2 s | 915–1827 ms | 1.83–2.89 |
+| `syspin-mai-male` | 36.5 MB | 3.6 s | 1.8 s | 1375–2624 ms | 1.85–2.13 |
+| `syspin-bho-female` | 36.5 MB | 6.1 s | 1.6 s | 1102–2765 ms | 1.63–2.73 |
+| `syspin-bho-male` | 36.5 MB | 3.6 s | 2.0 s | 961–1314 ms | 1.59–1.77 |
+| `syspin-mr-female` | 36.5 MB | 3.7 s | 1.9 s | 1583–2017 ms | 1.67–1.78 |
+| `syspin-kn-female` | 36.5 MB | 4.4 s | 1.7 s | 2031–2822 ms | 1.54–2.47 |
+| `syspin-en-female` | 36.5 MB | 4.4 s | 2.2 s | 1909–2670 ms | 1.59–1.73 |
+| `piper-en-us-amy-low` | 27.1 MB | 4.0 s | 2.1 s | 230–292 ms | 0.32–0.38 |
+
+So on this machine the SYSPIN voices run **slower than real time** (real-time factor 1.5 to 3):
+the first sentence arrives after 1 to 3 s and later sentences make playback wait (the underruns
+the screen shows are real). The Piper voice (16 kHz, smaller decoder) runs at 0.2 to 0.4 with first
+audio in about 0.2 to 0.3 s. In Node, single-threaded, ONNX Runtime Web ran the Hindi voice at a
+real-time factor of 2.3 where native ONNX Runtime took 0.65 on the same busy machine: WebAssembly
+costs about 3.5× here. With isolation switched off (1 thread) the numbers were about the same as
+with 4 threads, so on this loaded machine extra threads did not help; on an idle machine they
+should. A recent laptop or phone will do better than this shared server; it was not measured.

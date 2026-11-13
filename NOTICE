@@ -3,7 +3,9 @@ Copyright 2026 The bolo Authors
 
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 
-bolo's own source code contains no third-party source code. It talks to the
+bolo's own source code contains no third-party source code, except the copy
+of uccharan in ui/src/vendor/uccharan (see "Web console: speech synthesis in
+the browser" below). It talks to the
 following components, which are installed separately as Python dependencies
 or optional extras and keep their own licences:
 
@@ -82,6 +84,32 @@ Voices converted by this project
     downloaded on request like any other model. bolo's Whisper-style
     feature computation (server/src/bolo/audio/features.py) is its own
     implementation of the published algorithm.
+
+Web console: speech synthesis in the browser
+    The console (and the live demo) can run text-to-speech voices in the
+    page with ONNX Runtime Web (MIT, https://github.com/microsoft/onnxruntime),
+    loaded from jsDelivr at run time, not bundled.
+
+    ui/src/vendor/uccharan is a copy of the WebAssembly build of uccharan
+    0.1.0, a text-to-phoneme library (Apache-2.0, Copyright 2026 Abhinav
+    Gautam and the uccharan contributors, https://github.com/cb-Sigma/uccharan),
+    with its LICENSE, NOTICE and DATA_LICENSES.md. Its English data file
+    (en-us.ucd) is derived from the CMU Pronouncing Dictionary, Copyright (C)
+    1993-2015 Carnegie Mellon University, BSD-2-Clause-style licence; the full
+    text is in ui/src/vendor/uccharan/NOTICE. uccharan contains no eSpeak NG
+    code or data; no GPL component is used for speech synthesis in the browser.
+
+    The live demo serves, next to the page (under voices/), copies of these
+    voices with their weights stored at reduced precision (8-bit and 16-bit;
+    not retrained), made by ui/scripts/voices/build.py:
+      - SYSPIN VITS voices (Hindi, Maithili, Bhojpuri, Marathi, Kannada and
+        Indian English) by the SYSPIN project, SPIRE Lab, Indian Institute of
+        Science, Bengaluru: weights MIT, training data the SYSPIN corpus,
+        CC-BY-4.0 (see "Voices converted by this project" above);
+      - the Piper voice en_US "amy" (low) from rhasspy/piper-voices (MIT),
+        trained on the Amy dataset of Mycroft's mimic3-voices.
+    Each voice directory carries its licence and attribution files. The
+    voices are not part of the bolo package or of the git repository.
 
 Built-in audio samples
     The files in server/src/bolo/samples/*.wav were synthesised with bolo

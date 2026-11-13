@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { useStore } from '@/hooks/use-store'
 import { describeLoad, sharedEngine, type EngineState } from '@/lib/browser-stt/engine'
+import type { Store } from '@/lib/store'
 import type { LoadStage } from '@/lib/browser-stt/models'
 import { fmtBytes } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -15,8 +16,31 @@ const STAGES: { id: LoadStage; label: string }[] = [
   { id: 'warmup', label: 'Warm up' },
 ]
 
+/** The load-related state both in-browser engines (recogniser and synthesiser) share. */
+export type LoadState = Pick<
+  EngineState,
+  | 'status'
+  | 'device'
+  | 'threads'
+  | 'files'
+  | 'progress'
+  | 'stage'
+  | 'runtime'
+  | 'stalled'
+  | 'safeMode'
+  | 'cached'
+  | 'error'
+> & { model: { label: string; approxBytes: number } }
+
+/** An engine these components can show and drive: the recogniser by default, or the in-browser synthesiser. */
+export interface LoadEngine {
+  readonly store: Pick<Store<LoadState>, 'get' | 'subscribe'>
+  load(): Promise<void>
+  retrySafe(): Promise<void>
+}
+
 /** 0..100 across the whole load: downloads take most of the bar, the rest is split between compile and warm-up. */
-export function overallPercent(s: EngineState): number {
+export function overallPercent(s: LoadState): number {
   if (s.status === 'ready') return 100
   if (s.status !== 'loading') return 0
   const runtime = s.runtime && s.runtime.total > 0 ? Math.min(1, s.runtime.loaded / s.runtime.total) : 0
@@ -34,17 +58,17 @@ export function overallPercent(s: EngineState): number {
   }
 }
 
-function runsOn(s: EngineState): string {
+function runsOn(s: LoadState): string {
   return s.device === 'webgpu' ? 'WebGPU' : `WebAssembly · ${s.threads} thread${s.threads === 1 ? '' : 's'}`
 }
 
 /** One short line saying where the in-browser model is. */
-export function modelStatusText(s: EngineState): string {
+export function modelStatusText(s: LoadState, noun = 'model'): string {
   switch (s.status) {
     case 'ready':
       return `Ready · ${runsOn(s)}`
     case 'loading':
-      return describeLoad(s, fmtBytes)
+      return describeLoad(s, fmtBytes, noun)
     case 'error':
       return 'Could not load'
     default:
@@ -56,8 +80,15 @@ export function modelStatusText(s: EngineState): string {
  * Always-visible status of the in-browser model. When nothing is loaded it
  * doubles as the button that fetches it.
  */
-export function ModelStatusChip({ className }: { className?: string }) {
-  const engine = sharedEngine()
+export function ModelStatusChip({
+  className,
+  engine = sharedEngine(),
+  noun = 'model',
+}: {
+  className?: string
+  engine?: LoadEngine
+  noun?: string
+}) {
   const s = useStore(engine.store)
   const idle = s.status === 'idle' || s.status === 'error'
   const body = (
@@ -81,7 +112,7 @@ export function ModelStatusChip({ className }: { className?: string }) {
       )}
       <span className="min-w-0 truncate">
         <span className="font-medium text-foreground">{s.model.label}</span>
-        <span className="text-muted-foreground"> · {modelStatusText(s)}</span>
+        <span className="text-muted-foreground"> · {modelStatusText(s, noun)}</span>
       </span>
       {idle && <Download className="size-3 shrink-0 text-muted-foreground" aria-hidden />}
     </>
@@ -97,7 +128,7 @@ export function ModelStatusChip({ className }: { className?: string }) {
       onClick={() => void engine.load().catch(() => undefined)}
       data-testid="model-chip"
       data-status={s.status}
-      aria-label={`${s.model.label}: ${modelStatusText(s)}. ${s.cached ? 'Load it now' : 'Download it now'}`}
+      aria-label={`${s.model.label}: ${modelStatusText(s, noun)}. ${s.cached ? 'Load it now' : 'Download it now'}`}
     >
       {body}
     </button>
@@ -109,8 +140,16 @@ export function ModelStatusChip({ className }: { className?: string }) {
 }
 
 /** Stage-by-stage progress of a load in flight. Renders nothing otherwise. */
-export function LoadProgress({ className }: { className?: string }) {
-  const s = useStore(sharedEngine().store)
+export function LoadProgress({
+  className,
+  engine = sharedEngine(),
+  noun = 'model',
+}: {
+  className?: string
+  engine?: LoadEngine
+  noun?: string
+}) {
+  const s = useStore(engine.store)
   const [elapsed, setElapsed] = useState(0)
   const loading = s.status === 'loading'
   useEffect(() => {
@@ -128,11 +167,15 @@ export function LoadProgress({ className }: { className?: string }) {
     <div className={cn('min-w-0', className)} data-testid="load-progress" data-stage={s.stage ?? ''}>
       <div className="flex items-baseline justify-between gap-3 text-xs">
         <span className="min-w-0 truncate font-medium" role="status" data-testid="load-stage">
-          {describeLoad(s, fmtBytes)}
+          {describeLoad(s, fmtBytes, noun)}
         </span>
         <span className="shrink-0 num text-muted-foreground">{elapsed.toFixed(0)} s</span>
       </div>
-      <Progress value={overallPercent(s)} aria-label="Model load progress" className="mt-1.5 h-1.5" />
+      <Progress
+        value={overallPercent(s)}
+        aria-label={`${noun[0]?.toUpperCase()}${noun.slice(1)} load progress`}
+        className="mt-1.5 h-1.5"
+      />
       <ol className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground" aria-label="Load steps">
         {STAGES.map((st, i) => (
           <li
@@ -151,7 +194,7 @@ export function LoadProgress({ className }: { className?: string }) {
                 i < at ? 'bg-good' : i === at ? 'bg-chart-1' : 'border border-chart-axis',
               )}
             />
-            {st.label}
+            {st.id === 'model' ? `${noun[0]?.toUpperCase()}${noun.slice(1)}` : st.label}
             <span className="sr-only">{i < at ? ' (done)' : i === at ? ' (in progress)' : ' (waiting)'}</span>
           </li>
         ))}
@@ -170,8 +213,18 @@ export function LoadProgress({ className }: { className?: string }) {
  * Shown when a load failed, or when nothing has moved for a while: the real
  * reason, and ways forward.
  */
-export function LoadTrouble({ onSample, className }: { onSample?: () => void; className?: string }) {
-  const engine = sharedEngine()
+export function LoadTrouble({
+  onSample,
+  className,
+  engine = sharedEngine(),
+  noun = 'model',
+}: {
+  onSample?: () => void
+  className?: string
+  engine?: LoadEngine
+  /** What is being loaded, for the messages ("model", "voice"). */
+  noun?: string
+}) {
   const s = useStore(engine.store)
   const failed = s.status === 'error'
   const stalled = s.status === 'loading' && s.stalled != null
@@ -180,9 +233,9 @@ export function LoadTrouble({ onSample, className }: { onSample?: () => void; cl
     s.stalled?.stage === 'runtime'
       ? 'downloading the runtime'
       : s.stalled?.stage === 'model'
-        ? 'downloading the model'
+        ? `downloading the ${noun}`
         : s.stalled?.stage === 'compiling'
-          ? 'compiling the model'
+          ? `compiling the ${noun}`
           : s.stalled?.stage === 'warmup'
             ? 'warming up'
             : 'starting'
@@ -196,7 +249,7 @@ export function LoadTrouble({ onSample, className }: { onSample?: () => void; cl
         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning-text" aria-hidden />
         <div className="min-w-0 flex-1">
           <p className="font-medium">
-            {failed ? 'The model could not be loaded' : `Still ${what} after ${s.stalled?.seconds} s`}
+            {failed ? `The ${noun} could not be loaded` : `Still ${what} after ${s.stalled?.seconds} s`}
           </p>
           <p className="mt-0.5 break-words text-muted-foreground" data-testid="load-error">
             {failed

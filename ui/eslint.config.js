@@ -4,7 +4,17 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist-mock', 'dist-demo', 'node_modules', 'test-results', 'playwright-report', 'src/components/ui/**'] },
+  {
+    ignores: [
+      'dist-mock',
+      'dist-demo',
+      'node_modules',
+      'test-results',
+      'playwright-report',
+      'src/components/ui/**',
+      'src/vendor/**',
+    ],
+  },
   {
     files: ['**/*.{ts,tsx}'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],

@@ -90,8 +90,14 @@ storage key at run time, to point the console at a different origin.
 - The Models screen lists the browser models (download and cache state, size, licence) and a
   read-only snapshot of a server's catalog, `src/demo/catalog-snapshot.json`, labelled "available
   when you run the server". Refresh it with `node scripts/export-catalog.mjs --base <server>`.
-- Everything that needs a server (text to speech, pull/load/unload, the phone-line simulation,
-  compare mode, Wyoming) is disabled with a one-line reason and the install command.
+- Text to speech runs in the page too: nine voices (Hindi, Maithili, Bhojpuri, Marathi, Kannada,
+  Indian and US English) with ONNX Runtime Web, sentence-by-sentence playback, time to first audio,
+  real-time factor and a round trip through the in-browser recogniser. The voices are published
+  with the Pages site (`scripts/voices/build.py`, run by the Pages workflow; not in git); for
+  local runs serve them with `node scripts/serve-pages.mjs --voices <dir>`. See
+  `docs/ui-server-notes.md`, "Speech synthesis in the browser".
+- Everything that needs a server (pull/load/unload, the phone-line simulation, compare mode,
+  Wyoming) is disabled with a one-line reason and the install command.
 - "Share this result" puts the session's latency summary in the URL hash. There is no backend; a
   shared link just shows those numbers, labelled as someone else's measurement.
 
@@ -139,6 +145,9 @@ src/
   lib/stt/          transcript and latency tracking, server and in-browser transcribers, energy VAD
   lib/tts/          streaming synthesis session with per-chunk timing and underrun detection
   lib/browser-stt/  web worker running Moonshine with ONNX Runtime Web (WebGPU or WebAssembly)
+  lib/browser-tts/  in-browser voices: text front end, numbers, worker running VITS with ONNX Runtime Web
+  vendor/uccharan/  vendored text-to-phoneme library (Apache-2.0) for the Piper voice
+scripts/voices/     prepares the voices the live demo publishes (shrink, check, index)
   components/ui/    shadcn/ui components (generated; see components.json)
   components/       charts, panels, layout, screen-specific pieces
   routes/           one file per screen, each its own chunk

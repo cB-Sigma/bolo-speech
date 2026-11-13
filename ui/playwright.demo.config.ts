@@ -3,6 +3,7 @@ import { defineConfig } from '@playwright/test'
 
 const PORT = 4174
 const mirror = process.env.BOLO_E2E_MODEL_DIR
+const voices = process.env.BOLO_E2E_VOICE_DIR
 const micAudio = path.resolve(import.meta.dirname, 'src/mock/assets/en-ask-not.wav')
 
 /**
@@ -13,6 +14,10 @@ const micAudio = path.resolve(import.meta.dirname, 'src/mock/assets/en-ask-not.w
  * a local mirror in Hugging Face layout; it is then served from a second origin
  * with the same CORS header the real CDNs send, so cross-origin loading under
  * the service worker's isolation is exercised for real. Without it they skip.
+ *
+ * The speech-synthesis tests need the voices the Pages workflow publishes:
+ * point BOLO_E2E_VOICE_DIR at the output of scripts/voices/build.py. It is
+ * served same-origin under /bolo/voices/, as on GitHub Pages.
  */
 export default defineConfig({
   testDir: './e2e-demo',
@@ -37,7 +42,7 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
   webServer: {
-    command: `npm run build:demo && node scripts/serve-pages.mjs --port ${PORT}${mirror ? ` --mirror "${mirror}"` : ''}`,
+    command: `npm run build:demo && node scripts/serve-pages.mjs --port ${PORT}${mirror ? ` --mirror "${mirror}"` : ''}${voices ? ` --voices "${voices}"` : ''}`,
     url: `http://127.0.0.1:${PORT}/bolo/`,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,

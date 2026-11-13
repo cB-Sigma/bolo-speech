@@ -1,5 +1,5 @@
 import { CircleCheck, Download, Info, Languages, Play, Repeat2, Square, TriangleAlert, Volume2 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { BudgetBar } from '@/components/charts/budget-bar'
 import { Page } from '@/components/layout/app-shell'
@@ -21,15 +21,17 @@ import { STT_RATE } from '@/lib/audio/capture'
 import { resample } from '@/lib/audio/resample'
 import { encodeWav } from '@/lib/audio/wav'
 import { download } from '@/lib/bench'
-import { fmtMs, fmtPercent, fmtRtf, fmtSeconds, fmtSpeed, languageName } from '@/lib/format'
-import { wordErrorRate, type WerResult } from '@/lib/latency/wer'
+import { fmtMs, fmtRtf, fmtSeconds, fmtSpeed, languageName } from '@/lib/format'
+import { wordErrorRate } from '@/lib/latency/wer'
 import { prefs, setPref } from '@/lib/prefs'
 import { Store } from '@/lib/store'
 import { ServerTranscriber } from '@/lib/stt/server'
 import { transcriptText } from '@/lib/stt/transcriber'
 import { emptyTts, TtsSession, type TtsState, type TtsTransport } from '@/lib/tts/session'
-import { NeedsServer } from '@/components/demo'
+import { RoundTripPanel, type RoundTrip } from '@/components/tts/round-trip'
 import { isDemo } from '@/lib/api/config'
+import { detectSupport } from '@/lib/support'
+import { BrowserTts } from './tts-browser'
 import { cn } from '@/lib/utils'
 
 const FALLBACK_TEXTS: Sample[] = [
@@ -45,81 +47,31 @@ const FALLBACK_TEXTS: Sample[] = [
 
 const idle = new Store<TtsState>(emptyTts())
 
-interface RoundTrip {
-  status: 'running' | 'done' | 'error'
-  model: string
-  hypothesis: string
-  result: WerResult | null
-  error?: string
-}
-
-function WerDiff({ r }: { r: WerResult }) {
-  return (
-    <p className="text-[15px] leading-8" data-testid="wer-diff">
-      {r.alignment.map((s, i) => {
-        if (s.op === 'equal') return <span key={i}>{s.hyp} </span>
-        if (s.op === 'insert')
-          return (
-            <span
-              key={i}
-              className="rounded-sm bg-chart-1/15 px-0.5 underline decoration-chart-1 decoration-2 underline-offset-4"
-              title="Inserted: not in the text"
-            >
-              {s.hyp}
-              <span className="sr-only"> (inserted)</span>{' '}
-            </span>
-          )
-        if (s.op === 'delete')
-          return (
-            <span
-              key={i}
-              className="rounded-sm bg-critical/10 px-0.5 text-muted-foreground line-through decoration-critical"
-              title="Missing from the transcript"
-            >
-              {s.ref}
-              <span className="sr-only"> (missing)</span>{' '}
-            </span>
-          )
-        return (
-          <span key={i} title={`Expected “${s.ref}”`}>
-            <span className="rounded-sm bg-critical/10 px-0.5 text-muted-foreground line-through decoration-critical">
-              {s.ref}
-            </span>
-            <span className="rounded-sm bg-chart-1/15 px-0.5 underline decoration-chart-1 decoration-2 underline-offset-4">
-              {s.hyp}
-            </span>
-            <span className="sr-only"> (substituted)</span>{' '}
-          </span>
-        )
-      })}
-    </p>
-  )
-}
-
-function DemoTts() {
-  return (
-    <Page title="Text to speech">
-      <NeedsServer title="Text to speech needs the server">
-        <p>
-          Speech synthesis is not part of the browser demo. The small open voices either depend on a GPL-licensed
-          phonemiser when compiled for the web, or need a download of well over 150 MB to run in a tab, and neither is
-          something to spring on a visitor.
-        </p>
-        <p className="mt-2">
-          With bolo installed this screen streams audio over a WebSocket, shows time to first audio, the real-time
-          factor and a per-chunk timeline, flags playback underruns, and can feed the result back into speech
-          recognition to report a word error rate.
-        </p>
-      </NeedsServer>
-    </Page>
-  )
-}
-
 export default function TtsPage() {
-  return isDemo ? <DemoTts /> : <ServerTts />
+  const [mode, setMode] = useState<'server' | 'browser'>(isDemo ? 'browser' : 'server')
+  const support = detectSupport()
+  const toggle = isDemo ? null : (
+    <ToggleGroup
+      type="single"
+      variant="outline"
+      size="sm"
+      value={mode}
+      onValueChange={(v) => v && setMode(v as 'server' | 'browser')}
+      aria-label="Where synthesis runs"
+      data-testid="tts-mode"
+    >
+      <ToggleGroupItem value="server" className="px-3 text-xs" data-testid="tts-mode-server">
+        Server
+      </ToggleGroupItem>
+      <ToggleGroupItem value="browser" className="px-3 text-xs" disabled={!support.wasm} data-testid="tts-mode-browser">
+        In browser
+      </ToggleGroupItem>
+    </ToggleGroup>
+  )
+  return mode === 'browser' ? <BrowserTts modeToggle={toggle} /> : <ServerTts modeToggle={toggle} />
 }
 
-function ServerTts() {
+function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
   const { models, model, select, isLoading, error: modelsError } = useSelectedModel('tts')
   const stt = useSelectedModel('stt')
   const samples = useSamples()
@@ -272,6 +224,7 @@ function ServerTts() {
           <TooltipContent>Preview this voice</TooltipContent>
         </Tooltip>
       </div>
+      {modeToggle && <div className="ml-auto">{modeToggle}</div>}
       <ToggleGroup
         type="single"
         variant="outline"
@@ -280,7 +233,7 @@ function ServerTts() {
         onValueChange={(v) => v && setTransport(v as TtsTransport)}
         aria-label="Transport"
         disabled={busy}
-        className="ml-auto"
+        className={modeToggle ? undefined : 'ml-auto'}
       >
         <ToggleGroupItem value="websocket" className="px-3 text-xs">
           WebSocket
@@ -439,56 +392,7 @@ function ServerTts() {
             )}
           </Panel>
 
-          {trip && (
-            <Panel
-              title="Round trip"
-              description={
-                <span>
-                  Synthesised audio transcribed by <span className="num">{trip.model}</span>
-                </span>
-              }
-              data-testid="round-trip-panel"
-            >
-              {trip.status === 'running' ? (
-                <p className="text-sm text-muted-foreground" role="status">
-                  Synthesising, then transcribing…
-                </p>
-              ) : trip.status === 'error' ? (
-                <p role="alert" className="text-sm text-critical-text">
-                  {trip.error}
-                </p>
-              ) : trip.result ? (
-                <div className="grid gap-4 sm:grid-cols-[9rem_minmax(0,1fr)]">
-                  <div>
-                    <div className="text-xs text-muted-foreground">Word error rate</div>
-                    <div className="mt-0.5 text-3xl leading-9 font-semibold tracking-tight" data-testid="wer">
-                      {fmtPercent(trip.result.wer, trip.result.wer > 0 && trip.result.wer < 0.1 ? 1 : 0)}
-                    </div>
-                    <div className="mt-1 num text-[11px] leading-4 text-muted-foreground">
-                      {trip.result.substitutions} sub · {trip.result.deletions} del · {trip.result.insertions} ins
-                      <br />
-                      of {trip.result.refWords} words
-                    </div>
-                  </div>
-                  <div className="min-w-0">
-                    <WerDiff r={trip.result} />
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="rounded-sm bg-critical/10 px-1 line-through decoration-critical">word</span>{' '}
-                        expected, not heard
-                      </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="rounded-sm bg-chart-1/15 px-1 underline decoration-chart-1 decoration-2 underline-offset-2">
-                          word
-                        </span>{' '}
-                        heard instead
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </Panel>
-          )}
+          {trip && <RoundTripPanel trip={trip} />}
         </div>
 
         <div className="flex min-w-0 flex-col gap-4">

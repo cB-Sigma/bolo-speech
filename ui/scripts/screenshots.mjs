@@ -5,8 +5,10 @@
 // --base     where the console is served (a real `bolo serve`, or `npm run preview:mock`)
 // --speech   a speech recording to transcribe in the playground (WAV)
 // --only     comma-separated subset: playground,latency,models,tts,benchmark,light,timeline,phone,hindi,compare,
-//            animation,demo,components
-// --demo     where the live demo build is served (for `demo`), e.g. http://127.0.0.1:4174/bolo
+//            animation,demo,demo-tts,components
+// --demo     where the live demo build is served (for `demo`, `demo-tts`), e.g. http://127.0.0.1:4174/bolo
+//            (`demo-tts` needs the voices: serve-pages.mjs --voices <dir>)
+// --demo-voice  voice for `demo-tts` (default syspin-mai-female)
 // --browser-stt  JSON for the in-browser recogniser's local mirror (for `compare` and `demo`)
 // --stt/--tts  model ids to select (default: whatever the console picks)
 // --hindi-model  an installed model that supports Hindi (for `hindi`), e.g. faster-whisper-tiny-hindi
@@ -34,6 +36,7 @@ const { values: args } = parseArgs({
     'playground-target': { type: 'string' },
     'bench-seconds': { type: 'string', default: '5' },
     demo: { type: 'string' },
+    'demo-voice': { type: 'string', default: 'syspin-mai-female' },
     'browser-stt': { type: 'string' },
     sample: { type: 'string', default: 'en-long' },
     'hindi-model': { type: 'string' },
@@ -70,12 +73,13 @@ async function shot(
         }
       : {}
   await page.addInitScript(
-    ([t, p, b]) => {
+    ([t, p, b, v]) => {
       localStorage.setItem('bolo.theme', t)
       localStorage.setItem('bolo.prefs', JSON.stringify(p))
       if (b) localStorage.setItem('bolo.browserStt', b)
+      if (v) localStorage.setItem('bolo.browserTtsVoice', v)
     },
-    [theme, stored, args['browser-stt'] ?? null],
+    [theme, stored, args['browser-stt'] ?? null, base === args.base ? null : args['demo-voice']],
   )
   await page.goto(`${base}/#${route}`)
   await page.locator('[data-testid=connection][data-state=online]').waitFor({ timeout: 20_000 })
@@ -226,6 +230,18 @@ if (args.demo) {
       await page.locator('[data-testid=engine-status][data-status=ready]').waitFor({ timeout: 180_000 })
       await page.getByTestId('mic').waitFor({ timeout: 120_000 })
       await page.waitForTimeout(500)
+    },
+  })
+  // Speech synthesis in the page: the voice downloads, then each sentence plays as it is made.
+  await shot('console-demo-tts', {
+    base: args.demo,
+    route: '/tts',
+    height: 1240,
+    act: async (page) => {
+      await page.getByTestId('speak').click()
+      await page.locator('[data-testid=model-chip][data-status=ready]').waitFor({ timeout: 180_000 })
+      await page.getByTestId('speak').waitFor({ timeout: 180_000 })
+      await page.waitForTimeout(800)
     },
   })
 }

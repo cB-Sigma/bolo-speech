@@ -1,0 +1,207 @@
+{
+ "date": "2026-11-13",
+ "what": "In-browser speech synthesis in the live demo build, headless Chromium (Playwright), served like GitHub Pages with the voices same-origin and the ONNX Runtime binary from a local mirror. Each voice: first use on a fresh profile (cold: download + compile), a second request on the same page (warm), and after a reload (cached: voice from Cache Storage, compile again). ttfa_ms = first sentence ready, measured from the voice being ready; rtf = model time per second of audio; ready_s = wait for download/cache + compile + warm-up before synthesis.",
+ "machine": "4 cores of Intel(R) Xeon(R) Processor @ 2.10GHz, Linux x86_64, no GPU, shared with other jobs (load average 4-7 during the run)",
+ "threads": 4,
+ "voices": [
+  {
+   "id": "syspin-hi-female",
+   "download_bytes": 36519386,
+   "cold": {
+    "ttfa": 2099,
+    "rtf": 3.02,
+    "audio": 5.01,
+    "ready": 3.8
+   },
+   "warm": {
+    "ttfa": 3630,
+    "rtf": 2.81,
+    "audio": 5.54,
+    "ready": 0
+   },
+   "cached": {
+    "ttfa": 1843,
+    "rtf": 1.93,
+    "audio": 5.21,
+    "ready": 1.7
+   }
+  },
+  {
+   "id": "syspin-mai-female",
+   "download_bytes": 36526540,
+   "cold": {
+    "ttfa": 1827,
+    "rtf": 2.71,
+    "audio": 4.76,
+    "ready": 4.2
+   },
+   "warm": {
+    "ttfa": 1701,
+    "rtf": 2.89,
+    "audio": 4.54,
+    "ready": 0
+   },
+   "cached": {
+    "ttfa": 915,
+    "rtf": 1.83,
+    "audio": 4.74,
+    "ready": 2.2
+   }
+  },
+  {
+   "id": "syspin-mai-male",
+   "download_bytes": 36533304,
+   "cold": {
+    "ttfa": 2102,
+    "rtf": 1.85,
+    "audio": 5.89,
+    "ready": 3.6
+   },
+   "warm": {
+    "ttfa": 2624,
+    "rtf": 2.13,
+    "audio": 7.09,
+    "ready": 0
+   },
+   "cached": {
+    "ttfa": 1375,
+    "rtf": 1.89,
+    "audio": 6.2,
+    "ready": 1.8
+   }
+  },
+  {
+   "id": "syspin-bho-female",
+   "download_bytes": 36507118,
+   "cold": {
+    "ttfa": 2765,
+    "rtf": 2.69,
+    "audio": 5.44,
+    "ready": 6.1
+   },
+   "warm": {
+    "ttfa": 1811,
+    "rtf": 2.73,
+    "audio": 5.41,
+    "ready": 0
+   },
+   "cached": {
+    "ttfa": 1102,
+    "rtf": 1.63,
+    "audio": 5.58,
+    "ready": 1.6
+   }
+  },
+  {
+   "id": "syspin-bho-male",
+   "download_bytes": 36505518,
+   "cold": {
+    "ttfa": 1314,
+    "rtf": 1.68,
+    "audio": 5.42,
+    "ready": 3.6
+   },
+   "warm": {
+    "ttfa": 1076,
+    "rtf": 1.77,
+    "audio": 5.39,
+    "ready": 0
+   },
+   "cached": {
+    "ttfa": 961,
+    "rtf": 1.59,
+    "audio": 5.6,
+    "ready": 2
+   }
+  },
+  {
+   "id": "syspin-mr-female",
+   "download_bytes": 36529032,
+   "cold": {
+    "ttfa": 2017,
+    "rtf": 1.67,
+    "audio": 6.55,
+    "ready": 3.7
+   },
+   "warm": {
+    "ttfa": 1583,
+    "rtf": 1.78,
+    "audio": 6.62,
+    "ready": 0
+   },
+   "cached": {
+    "ttfa": 1702,
+    "rtf": 1.73,
+    "audio": 6.46,
+    "ready": 1.9
+   }
+  },
+  {
+   "id": "syspin-kn-female",
+   "download_bytes": 36503513,
+   "cold": {
+    "ttfa": 2771,
+    "rtf": 2.47,
+    "audio": 7.4,
+    "ready": 4.4
+   },
+   "warm": {
+    "ttfa": 2822,
+    "rtf": 2.45,
+    "audio": 7.57,
+    "ready": 0
+   },
+   "cached": {
+    "ttfa": 2031,
+    "rtf": 1.54,
+    "audio": 7.08,
+    "ready": 1.7
+   }
+  },
+  {
+   "id": "syspin-en-female",
+   "download_bytes": 36510601,
+   "cold": {
+    "ttfa": 2670,
+    "rtf": 1.73,
+    "audio": 7.76,
+    "ready": 4.4
+   },
+   "warm": {
+    "ttfa": 2439,
+    "rtf": 1.69,
+    "audio": 7.52,
+    "ready": 0
+   },
+   "cached": {
+    "ttfa": 1909,
+    "rtf": 1.59,
+    "audio": 8.08,
+    "ready": 2.2
+   }
+  },
+  {
+   "id": "piper-en-us-amy-low",
+   "download_bytes": 27081166,
+   "cold": {
+    "ttfa": 292,
+    "rtf": 0.38,
+    "audio": 5.84,
+    "ready": 4
+   },
+   "warm": {
+    "ttfa": 230,
+    "rtf": 0.33,
+    "audio": 5.57,
+    "ready": 0
+   },
+   "cached": {
+    "ttfa": 275,
+    "rtf": 0.32,
+    "audio": 5.72,
+    "ready": 2.1
+   }
+  }
+ ],
+ "single_thread_check": "With isolation off (1 thread): Hindi female rtf 2.44 / 2.84 / 2.75, amy 0.26 / 0.22 / 0.24. On this busy machine 4 threads did not help measurably."
+}

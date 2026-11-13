@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { useTheme } from '@/hooks/use-theme'
-import type { TtsSession } from '@/lib/tts/session'
+import type { GaplessPlayer } from '@/lib/audio/player'
+import type { Store } from '@/lib/store'
+import type { TtsState } from '@/lib/tts/session'
 import { cn } from '@/lib/utils'
 
 function cssVar(name: string): string {
@@ -11,7 +13,14 @@ function cssVar(name: string): string {
  * Overview of the synthesised audio that fills in as chunks arrive, with the
  * played part in the accent colour and thin rules at chunk boundaries.
  */
-export function PlaybackWave({ session, className }: { session: TtsSession | null; className?: string }) {
+/** What the waveform needs from a synthesis, on the server or in the browser. */
+export interface PlayableSession {
+  readonly store: Store<TtsState>
+  readonly player: GaplessPlayer | null
+  audio(): Float32Array
+}
+
+export function PlaybackWave({ session, className }: { session: PlayableSession | null; className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const { resolved } = useTheme()
 

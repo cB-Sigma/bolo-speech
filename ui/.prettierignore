@@ -6,3 +6,4 @@ playwright-report
 src/components/ui
 dist-demo
 src/demo/catalog-snapshot.json
+src/vendor

@@ -53,3 +53,6 @@ SERVER_STATUS.md
 
 # internal working notes
 docs/_*
+
+# vendored WebAssembly build of uccharan (needed to build the console)
+!ui/src/vendor/uccharan/dist/

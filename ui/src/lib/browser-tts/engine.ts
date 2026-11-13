@@ -1,0 +1,374 @@
+import { diag } from '@/lib/diagnostics'
+import { readBrowserSttConfig, type BrowserDevice, type FileProgress, type LoadStage } from '@/lib/browser-stt/models'
+import { Store } from '@/lib/store'
+import { detectSupport } from '@/lib/support'
+import { VOICE_CACHE, type TtsWorkerRequest, type TtsWorkerResponse } from './protocol'
+import type { VoiceConfig } from './text'
+import {
+  browserVoice,
+  BROWSER_VOICES,
+  DEFAULT_BROWSER_VOICE,
+  voicesBase,
+  type BrowserVoice,
+  type VoiceIndex,
+} from './voices'
+
+export type TtsEngineStatus = 'idle' | 'loading' | 'ready' | 'error'
+
+/**
+ * State of the in-browser synthesiser. The load-related fields have the same
+ * shape as the recogniser's, so the same status chip, progress and trouble
+ * components show both.
+ */
+export interface TtsEngineState {
+  status: TtsEngineStatus
+  voice: BrowserVoice
+  /** `model` is what the shared load components read: label and size. */
+  model: { id: string; label: string; approxBytes: number }
+  device: BrowserDevice | null
+  threads: number
+  files: FileProgress[]
+  progress: number
+  stage: LoadStage | null
+  runtime: { loaded: number; total: number } | null
+  stalled: { stage: LoadStage | null; seconds: number } | null
+  safeMode: boolean
+  loadMs: number | null
+  cached: boolean | null
+  cachedIds: string[]
+  error: string | null
+  config: VoiceConfig | null
+  /** What the deployment publishes (sizes, which voices exist); null until read or when absent. */
+  index: VoiceIndex | null
+  /** Why the index could not be read, if it could not. */
+  indexError: string | null
+}
+
+export interface SynthResult {
+  audio: Float32Array
+  sampleRate: number
+  ms: number
+  tokens: number
+  phonemes?: string
+  missing: string[]
+}
+
+export interface TtsWorker {
+  onmessage: ((e: MessageEvent<TtsWorkerResponse>) => void) | null
+  onerror: ((e: ErrorEvent) => void) | null
+  postMessage(message: TtsWorkerRequest, transfer?: Transferable[]): void
+  terminate(): void
+}
+
+let workerFactory: (() => TtsWorker | Promise<TtsWorker>) | null = null
+
+/** Replace the worker (unit tests). */
+export function setTtsWorkerFactory(factory: (() => TtsWorker | Promise<TtsWorker>) | null): void {
+  workerFactory = factory
+}
+
+const STAGE_TEXT: Record<LoadStage, string> = {
+  runtime: 'downloading the runtime',
+  model: 'downloading the voice',
+  compiling: 'compiling the voice',
+  warmup: 'warming up',
+}
+
+function modelOf(voice: BrowserVoice, index: VoiceIndex | null) {
+  const published = index?.voices.find((v) => v.id === voice.id)
+  return { id: voice.id, label: voice.label, approxBytes: published?.bytes ?? voice.approxBytes }
+}
+
+/** Whether a voice's files are in the browser cache. */
+export async function isVoiceCached(id: string): Promise<boolean> {
+  try {
+    if (typeof caches === 'undefined') return false
+    const keys = await (await caches.open(VOICE_CACHE)).keys()
+    return keys.some((k) => k.url.includes(`/${id}/model.onnx`))
+  } catch {
+    return false
+  }
+}
+
+/** Remove every downloaded voice from the browser. */
+export async function clearVoiceCache(): Promise<void> {
+  if (typeof caches !== 'undefined') await caches.delete(VOICE_CACHE)
+}
+
+/**
+ * Owns the worker that runs one voice at a time in the page. Nothing is
+ * downloaded until `load()` (or the first synthesis) asks for it.
+ */
+export class BrowserTtsEngine {
+  readonly store: Store<TtsEngineState>
+  private worker: TtsWorker | null = null
+  private loading: Promise<void> | null = null
+  private nextId = 1
+  private pending = new Map<number, { resolve: (r: SynthResult) => void; reject: (e: Error) => void }>()
+  private watchdog: ReturnType<typeof setInterval> | null = null
+  private lastMovement = 0
+  private generation = 0
+  private indexRead: Promise<VoiceIndex | null> | null = null
+
+  constructor(voice: BrowserVoice = DEFAULT_BROWSER_VOICE) {
+    this.store = new Store<TtsEngineState>({
+      status: 'idle',
+      voice,
+      model: modelOf(voice, null),
+      device: null,
+      threads: 1,
+      files: [],
+      progress: 0,
+      stage: null,
+      runtime: null,
+      stalled: null,
+      safeMode: false,
+      loadMs: null,
+      cached: null,
+      cachedIds: [],
+      error: null,
+      config: null,
+      index: null,
+      indexError: null,
+    })
+    void this.refreshCached()
+  }
+
+  /** Read the published index (sizes, which voices this deployment has). Cached for the page's lifetime. */
+  readIndex(): Promise<VoiceIndex | null> {
+    this.indexRead ??= (async () => {
+      const url = `${voicesBase()}index.json`
+      try {
+        const res = await fetch(url, { cache: 'no-cache' })
+        if (!res.ok) throw new Error(res.status === 404 ? 'not published with this build' : `HTTP ${res.status}`)
+        const index = (await res.json()) as VoiceIndex
+        const s = this.store.get()
+        this.store.patch({ index, indexError: null, model: modelOf(s.voice, index) })
+        return index
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        diag.error('voices', `${url}: ${message}`)
+        this.store.patch({ indexError: message })
+        return null
+      }
+    })()
+    return this.indexRead
+  }
+
+  async refreshCached(): Promise<void> {
+    const flags = await Promise.all(BROWSER_VOICES.map((v) => isVoiceCached(v.id)))
+    const cachedIds = BROWSER_VOICES.filter((_, i) => flags[i]).map((v) => v.id)
+    this.store.patch({ cachedIds, cached: cachedIds.includes(this.store.get().voice.id) })
+  }
+
+  /** Switch voice. The current one is unloaded; nothing is downloaded until `load()`. */
+  setVoice(id: string): void {
+    const voice = browserVoice(id)
+    if (voice.id === this.store.get().voice.id) return
+    this.dispose()
+    const s = this.store.get()
+    this.store.patch({
+      voice,
+      model: modelOf(voice, s.index),
+      cached: s.cachedIds.includes(voice.id),
+      loadMs: null,
+      error: null,
+      config: null,
+    })
+  }
+
+  load(opts: { safe?: boolean } = {}): Promise<void> {
+    if (this.loading) return this.loading
+    const generation = ++this.generation
+    const loading = this.doLoad(Boolean(opts.safe), generation).catch((err: unknown) => {
+      if (generation !== this.generation) throw err
+      this.loading = null
+      this.stopWatchdog()
+      this.worker?.terminate()
+      this.worker = null
+      const message = err instanceof Error ? err.message : String(err)
+      const s = this.store.get()
+      diag.error('voice', `${s.stage ? `${STAGE_TEXT[s.stage]}: ` : ''}${message}`)
+      this.store.patch({ status: 'error', error: message, stalled: null })
+      throw err
+    })
+    this.loading = loading
+    return loading
+  }
+
+  retrySafe(): Promise<void> {
+    this.dispose()
+    return this.load({ safe: true })
+  }
+
+  private moved(): void {
+    this.lastMovement = performance.now()
+    if (this.store.get().stalled) this.store.patch({ stalled: null })
+  }
+
+  private startWatchdog(): void {
+    this.stopWatchdog()
+    const limit = (readBrowserSttConfig().stallSeconds ?? 40) * 1000
+    this.lastMovement = performance.now()
+    this.watchdog = setInterval(() => {
+      const s = this.store.get()
+      if (s.status !== 'loading') return
+      const quiet = performance.now() - this.lastMovement
+      if (quiet >= limit) {
+        const seconds = Math.round(quiet / 1000)
+        if (!s.stalled)
+          diag.error('voice', `no progress for ${seconds} s while ${s.stage ? STAGE_TEXT[s.stage] : 'starting'}`)
+        this.store.patch({ stalled: { stage: s.stage, seconds } })
+      }
+    }, 1000)
+  }
+
+  private stopWatchdog(): void {
+    if (this.watchdog) clearInterval(this.watchdog)
+    this.watchdog = null
+  }
+
+  private async doLoad(safe: boolean, generation: number): Promise<void> {
+    const support = detectSupport()
+    if (!support.wasm) throw new Error('This browser does not support WebAssembly.')
+    const { voice } = this.store.get()
+    this.store.patch({
+      status: 'loading',
+      error: null,
+      files: [],
+      progress: 0,
+      stage: 'runtime',
+      runtime: null,
+      stalled: null,
+      safeMode: safe,
+    })
+    this.startWatchdog()
+    const index = await this.readIndex()
+    const published = index?.voices.find((v) => v.id === voice.id)
+    if (index && !published) throw new Error(`${voice.label} is not published with this build of the demo.`)
+    if (!index || !published)
+      throw new Error(`The voices could not be found (${this.store.get().indexError ?? 'no index'}).`)
+    const files = published.files
+    const threads = !safe && support.wasmThreads ? Math.max(1, Math.min(4, support.hardwareConcurrency)) : 1
+    if (generation !== this.generation) throw new Error('Load cancelled')
+    this.store.patch({ device: 'wasm', threads })
+    diag.event(
+      'voice',
+      `loading ${voice.id}, ${threads} thread${threads === 1 ? '' : 's'}${safe ? ' (single-threaded retry)' : ''}`,
+    )
+    const worker: TtsWorker = workerFactory
+      ? await workerFactory()
+      : (new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }) as unknown as TtsWorker)
+    if (generation !== this.generation) {
+      worker.terminate()
+      throw new Error('Load cancelled')
+    }
+    this.worker = worker
+    await new Promise<void>((resolve, reject) => {
+      worker.onerror = (e) => reject(new Error(e.message || 'The speech worker failed to start'))
+      worker.onmessage = (e: MessageEvent<TtsWorkerResponse>) => {
+        const msg = e.data
+        if (msg.type === 'progress') {
+          const total = msg.files.reduce((a, f) => a + f.total, 0)
+          const loaded = msg.files.reduce((a, f) => a + f.loaded, 0)
+          this.moved()
+          this.store.patch({ files: msg.files, progress: total > 0 ? loaded / total : 0 })
+        } else if (msg.type === 'stage') {
+          const s = this.store.get()
+          if (s.stage !== msg.stage) diag.event('voice', STAGE_TEXT[msg.stage])
+          if (s.stage !== msg.stage || msg.loaded !== s.runtime?.loaded) this.moved()
+          this.store.patch({
+            stage: msg.stage,
+            runtime:
+              msg.stage === 'runtime' && msg.loaded != null ? { loaded: msg.loaded, total: msg.total ?? 0 } : s.runtime,
+          })
+        } else if (msg.type === 'fetch') {
+          diag.fetch(msg.record)
+          if (msg.record.error || msg.record.status >= 400 || msg.record.status === 0)
+            diag.error('fetch', `${msg.record.url}: ${msg.record.error ?? `HTTP ${msg.record.status}`}`)
+        } else if (msg.type === 'ready') {
+          this.stopWatchdog()
+          diag.event('voice', `ready after ${Math.round(msg.loadMs)} ms`)
+          this.store.patch({
+            status: 'ready',
+            loadMs: msg.loadMs,
+            progress: 1,
+            cached: true,
+            cachedIds: [...new Set([...this.store.get().cachedIds, voice.id])],
+            stage: null,
+            stalled: null,
+            config: msg.config,
+          })
+          resolve()
+        } else if (msg.type === 'audio') {
+          const rate = this.store.get().config?.sample_rate ?? 22050
+          this.pending.get(msg.id)?.resolve({
+            audio: msg.audio,
+            sampleRate: rate,
+            ms: msg.ms,
+            tokens: msg.tokens,
+            phonemes: msg.phonemes,
+            missing: msg.missing,
+          })
+          this.pending.delete(msg.id)
+        } else if (msg.type === 'error') {
+          if (msg.id != null) {
+            this.pending.get(msg.id)?.reject(new Error(msg.message))
+            this.pending.delete(msg.id)
+          } else {
+            reject(new Error(msg.message))
+          }
+        }
+      }
+      const version = (files['model.onnx']?.sha256 ?? '').slice(0, 12) + (files['voice.json']?.sha256 ?? '').slice(0, 6)
+      const req: TtsWorkerRequest = {
+        type: 'load',
+        base: voicesBase(),
+        voice: voice.id,
+        version,
+        phonemizer: voice.phonemizer,
+        threads,
+        ortWasmBase: readBrowserSttConfig().ortWasmBase,
+        plainRuntimeLoad: safe,
+      }
+      worker.postMessage(req)
+    })
+  }
+
+  /** Synthesise one prepared chunk. Requests run one at a time in the worker. */
+  async synthesize(text: string): Promise<SynthResult> {
+    await this.load()
+    const worker = this.worker
+    const cfg = this.store.get().config
+    if (!worker || !cfg) throw new Error('The voice is not loaded')
+    const id = this.nextId++
+    const { noise_scale, length_scale, noise_scale_w } = cfg.inference
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, { resolve, reject })
+      worker.postMessage({ type: 'synth', id, text, scales: [noise_scale, length_scale, noise_scale_w] })
+    })
+  }
+
+  /** Stop answering outstanding requests (the worker finishes the one it is on). */
+  cancelPending(): void {
+    for (const p of this.pending.values()) p.reject(new Error('Stopped'))
+    this.pending.clear()
+  }
+
+  dispose(): void {
+    this.generation += 1
+    this.stopWatchdog()
+    this.worker?.terminate()
+    this.worker = null
+    this.loading = null
+    this.cancelPending()
+    this.store.patch({ status: 'idle', progress: 0, files: [], stage: null, runtime: null, stalled: null, error: null })
+  }
+}
+
+let shared: BrowserTtsEngine | null = null
+
+export function sharedTtsEngine(): BrowserTtsEngine {
+  shared ??= new BrowserTtsEngine()
+  return shared
+}

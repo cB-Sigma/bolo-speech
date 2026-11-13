@@ -2,6 +2,13 @@ name: Live demo
 
 # Builds the browser-only demo of the web console and publishes it to GitHub Pages
 # (https://cb-sigma.github.io/bolo/). Requires Settings → Pages → Source: "GitHub Actions".
+#
+# The demo also speaks, in the browser. Its voices are served from the Pages site itself (same
+# origin: release assets carry no CORS headers, so a page cannot fetch them). They are not in git:
+# this workflow takes the SYSPIN voices that the "Voices" workflow published as assets of the
+# voices-v1 release, plus one Piper voice from Hugging Face at a pinned revision, shrinks them for
+# the browser (ui/scripts/voices/build.py; numpy + onnx + onnxruntime, no PyTorch, a few minutes)
+# and caches the result. Voices not published yet are left out and the demo says so.
 
 on:
   push:
@@ -10,6 +17,10 @@ on:
       - "ui/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
+  # Rebuild when new voices have been published.
+  workflow_run:
+    workflows: [Voices]
+    types: [completed]
 
 permissions:
   contents: read
@@ -39,6 +50,31 @@ jobs:
       - name: Build the demo
         working-directory: ui
         run: npm run build:demo
+      - name: Look up the published voices
+        id: voices
+        run: |
+          # The release index changes whenever voices are (re)published; it is part of the cache key.
+          curl -fsSL -o voices-release.json https://github.com/cb-Sigma/bolo/releases/download/voices-v1/voices.json \
+            || echo '{}' > voices-release.json
+          echo "release=$(sha256sum voices-release.json | cut -c1-16)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        id: voice-cache
+        with:
+          path: .voices
+          key: browser-voices-${{ steps.voices.outputs.release }}-${{ hashFiles('ui/scripts/voices/**', 'ui/src/vendor/uccharan/data/**') }}
+      - uses: actions/setup-python@v7
+        if: steps.voice-cache.outputs.cache-hit != 'true'
+        with:
+          python-version: "3.12"
+      - name: Prepare the voices for the browser
+        if: steps.voice-cache.outputs.cache-hit != 'true'
+        run: |
+          python -m pip install --quiet onnx onnxruntime numpy
+          python ui/scripts/voices/build.py --out .voices --skip-missing
+      - name: Add the voices to the site
+        run: |
+          cp -r .voices ui/dist-demo/voices
+          du -sh ui/dist-demo ui/dist-demo/voices
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:

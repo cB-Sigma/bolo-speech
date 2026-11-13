@@ -32,6 +32,7 @@ running in the page (Moonshine Tiny unless stated, ONNX Runtime Web, WebAssembly
 | `console-tts.png` | 1440 px, 2× | dark | real server, `kokoro-v1.0-int8` | Text-to-speech playground after "Speak, then transcribe": streamed synthesis, time to first audio, the chunk timeline and the round trip through `moonshine-tiny-en`. Kokoro runs slower than real time on this CPU, so the playback underrun shown is genuine. |
 | `console-benchmark.png` | 1440 px, 2× | dark | real server, `moonshine-tiny-en` | A concurrency sweep (1, 2, 4, 8; 5 s per level) run through `POST /api/v1/bench`. |
 | `console-demo.png` | 1440 px, 2× | dark | in-browser demo | The live demo as a first-time visitor gets it (default 800 ms target, Moonshine Tiny), after pressing "Play a sample": recognition ran in the page on 4 WebAssembly threads (cross-origin isolation supplied by the demo's service worker). No server was involved. |
+| `console-demo-tts.png` | 1440 px, 2× | dark | in-browser demo | Text to speech in the live demo with the SYSPIN Maithili female voice, after pressing Speak on a fresh profile: the voice was downloaded (36.5 MB, from the local voices directory standing in for the Pages site) and compiled, then the sample text was synthesised sentence by sentence on 4 WebAssembly threads and played as each sentence was ready. This CPU synthesises slower than real time, so the underruns shown are genuine. No server was involved. |
 | `console-components.png` | 1440 px, 2× | dark | real server, `piper-en-us-amy-low` | Text-to-speech playground with a voice that needs eSpeak NG while it is not installed: the inline notice and install button. Taken against the real server started with `BOLO_ESPEAK=off`, which makes it report the component as not installed (the build machine's environment has it). |
 | `console-components-dialog.png` | 1440 px, 2× | dark | real server | The confirmation shown before installing: licence, link, and what will happen. For this picture the dialog was not confirmed. (The install itself was exercised earlier in a clean environment: about a second from a warm package cache, and the voice then spoke without a reload.) |
 
@@ -59,6 +60,7 @@ Brand images are rendered from SVG/HTML with headless Chromium; they are drawing
 ```bash
 cd ui
 # --demo needs: npm run build:demo && npm run serve:demo
+#   (for demo-tts also --voices <dir>, the output of scripts/voices/build.py)
 # --components needs a second server started with BOLO_ESPEAK=off
 node scripts/screenshots.mjs --base http://127.0.0.1:8000 --out ../docs/assets \
   --speech path/to/speech.wav --stt moonshine-tiny-en --tts kokoro-v1.0-int8 --playground-target 800 \

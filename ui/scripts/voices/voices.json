@@ -1,0 +1,70 @@
+{
+  "about": "Voices published with the live demo for in-browser speech synthesis. Read by build.py; the console's own list is ui/src/lib/browser-tts/voices.ts (keep the ids in step).",
+  "syspin_release": "https://github.com/cb-Sigma/bolo/releases/download/voices-v1/",
+  "voices": [
+    { "id": "syspin-hi-female", "kind": "coqui", "source": "syspin", "sample": "नमस्ते! आप कैसे हैं? आज मौसम बहुत अच्छा है।" },
+    {
+      "id": "syspin-mai-female",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "प्रणाम! अहाँ केहन छी? आइ मौसम बड्ड नीक अछि।"
+    },
+    {
+      "id": "syspin-mai-male",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "प्रणाम! अहाँ केहन छी? आइ मौसम बड्ड नीक अछि।"
+    },
+    {
+      "id": "syspin-bho-female",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "प्रणाम! रउआ कइसन बानी? आज मौसम बहुत बढ़िया बा।"
+    },
+    {
+      "id": "syspin-bho-male",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "प्रणाम! रउआ कइसन बानी? आज मौसम बहुत बढ़िया बा।"
+    },
+    {
+      "id": "syspin-mr-female",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "नमस्कार! तुम्ही कसे आहात? आज हवामान खूप छान आहे."
+    },
+    {
+      "id": "syspin-kn-female",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "ನಮಸ್ಕಾರ! ನೀವು ಹೇಗಿದ್ದೀರಿ? ಇಂದು ಹವಾಮಾನ ತುಂಬಾ ಚೆನ್ನಾಗಿದೆ."
+    },
+    {
+      "id": "syspin-en-female",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "Hello! How are you today? The weather is lovely this morning."
+    },
+    {
+      "id": "piper-en-us-amy-low",
+      "kind": "piper",
+      "source": "url",
+      "base": "https://huggingface.co/rhasspy/piper-voices/resolve/2f358b6a560e3a913ebf509b2f3344f20b367f94/en/en_US/amy/low/",
+      "files": {
+        "model.onnx": {
+          "from": "en_US-amy-low.onnx",
+          "sha256": "a5a91abb7de0f104358a25aded480ddacf1ff0762886325886ec406a2e86aab3"
+        },
+        "config.json": {
+          "from": "en_US-amy-low.onnx.json",
+          "sha256": "2250a9a605b8dc35a116717fadc5056695dd809e34a15d02f72a0f52d53d3ebb"
+        },
+        "MODEL_CARD": {
+          "from": "MODEL_CARD",
+          "sha256": "71b07ded301a96346096a71d8f0d64cbb5f49d5d51004dce28bbb7504e3f65f0"
+        }
+      },
+      "sample_ipa": "həlˈoʊ, wˈɜːld."
+    }
+  ]
+}

@@ -50,3 +50,18 @@ test('voice picker lists the model voices and previews one', async ({ page }) =>
   await page.getByRole('button', { name: 'Preview this voice' }).click()
   await expect(page.getByRole('combobox', { name: 'Voice' })).toContainText('Alpha')
 })
+
+test('an "In browser" mode runs the same screen with voices that run in the page', async ({ page }) => {
+  // The voices normally come from the public demo; point at a host that answers 404 so nothing is fetched.
+  await page.addInitScript(() =>
+    localStorage.setItem('bolo.browserTts', JSON.stringify({ voicesBase: '/no-voices-here/' })),
+  )
+  await open(page, '/tts')
+  await expect(page.getByTestId('tts-mode-server')).toHaveAttribute('data-state', 'on')
+  await page.getByTestId('tts-mode-browser').click()
+  await expect(page.getByTestId('voice-picker')).toBeVisible()
+  await expect(page.getByTestId('voice-about')).toContainText('SYSPIN')
+  await expect(page.getByTestId('voices-missing')).toContainText('Server mode is unaffected')
+  await page.getByTestId('tts-mode-server').click()
+  await expect(page.getByLabel('Transport')).toBeVisible()
+})

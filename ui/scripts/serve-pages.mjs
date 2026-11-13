@@ -8,6 +8,10 @@
 // in-browser recogniser can be tested without the internet:
 //   <dir>/onnx-community/moonshine-tiny-ONNX/resolve/main/...   model files (Hub layout)
 //   /ort/...                                                    ONNX Runtime files from node_modules
+//
+// With --voices <dir> the voices for in-browser speech synthesis (the output of
+// scripts/voices/build.py) are served same-origin under <base>voices/, as the
+// Pages workflow publishes them.
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
@@ -19,6 +23,7 @@ const { values } = parseArgs({
     dir: { type: 'string', default: 'dist-demo' },
     base: { type: 'string', default: '/bolo/' },
     mirror: { type: 'string' },
+    voices: { type: 'string' },
   },
 })
 const TYPES = {
@@ -58,6 +63,12 @@ http
       return
     }
     let rel = decodeURIComponent(url.pathname.slice(values.base.length)) || 'index.html'
+    if (values.voices && rel.startsWith('voices/')) {
+      const dir = path.resolve(values.voices)
+      const file = path.join(dir, rel.slice('voices/'.length))
+      if (!file.startsWith(dir)) return void res.writeHead(403).end()
+      return void send(res, file)
+    }
     if (rel.endsWith('/')) rel += 'index.html'
     const file = path.join(root, rel)
     if (!file.startsWith(root)) return void res.writeHead(403).end()

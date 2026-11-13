@@ -2,6 +2,7 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 
 const MIRROR = Boolean(process.env.BOLO_E2E_MODEL_DIR)
+const VOICES = Boolean(process.env.BOLO_E2E_VOICE_DIR)
 const CDN = 'http://127.0.0.1:4175'
 const ROUTES = ['stt', 'tts', 'models', 'latency', 'benchmark', 'connect']
 
@@ -108,10 +109,6 @@ test('server-only features are disabled with an explanation and the install comm
   await expect(page.getByRole('radio', { name: 'Compare' })).toBeDisabled()
   await expect(page.getByRole('radio', { name: 'In browser' })).toBeChecked()
   await expect(page.getByRole('switch', { name: /Phone line/ })).toBeDisabled()
-
-  await page.goto('./#/tts')
-  await expect(page.getByTestId('needs-server')).toContainText('Text to speech needs the server')
-  await expect(page.getByLabel('Install command')).toContainText('pipx install')
 
   await page.goto('./#/models')
   await expect(page.getByRole('heading', { name: /Runs in your browser/ })).toBeVisible()
@@ -437,5 +434,77 @@ test.describe('with the models available: first use and Hindi', () => {
       `[demo-hindi] ready ${readyMs} ms · ${p50.replace(/\s+/g, ' ')} · ${rtf.replace(/\s+/g, ' ')} · ${transcript.trim()}`,
     )
     await axe(page)
+  })
+})
+
+test.describe('text to speech in the page', () => {
+  test('the voice picker lists every language by its own name, with size and licence', async ({ page }) => {
+    await open(page, 'tts')
+    await expect(page.getByTestId('needs-server')).toHaveCount(0)
+    await expect(page.getByTestId('tts-text')).toHaveValue('नमस्ते! आप कैसे हैं? आज मौसम बहुत अच्छा है।')
+    await page.getByTestId('voice-picker').click()
+    for (const name of [
+      'हिन्दी · Hindi',
+      'मैथिली · Maithili',
+      'भोजपुरी · Bhojpuri',
+      'मराठी · Marathi',
+      'ಕನ್ನಡ · Kannada',
+      'English (India)',
+      'English (US)',
+    ]) {
+      await expect(page.getByRole('group').filter({ hasText: name }).first()).toBeVisible()
+    }
+    await expect(page.getByTestId('voice-syspin-mai-female')).toContainText('MB')
+    await page.getByTestId('voice-syspin-mai-female').click()
+    // A sample sentence is swapped for the new language's own.
+    await expect(page.getByTestId('tts-text')).toHaveValue('प्रणाम! अहाँ केहन छी? आइ मौसम बड्ड नीक अछि।')
+    const about = page.getByTestId('voice-about')
+    await expect(about).toContainText('SYSPIN project, SPIRE Lab, Indian Institute of Science')
+    await expect(about).toContainText('MIT')
+    await expect(about).toContainText('CC-BY-4.0')
+    await expect(about).toContainText('Nobody who speaks this language has reviewed')
+    // No in-browser recogniser for Maithili: the round trip says so instead of failing.
+    await expect(page.getByTestId('round-trip')).toBeDisabled()
+    if (!VOICES) await expect(page.getByTestId('voices-missing')).toBeVisible()
+  })
+
+  test.describe('with the voices published', () => {
+    test.skip(!VOICES || !MIRROR, 'set BOLO_E2E_VOICE_DIR (voices) and BOLO_E2E_MODEL_DIR (runtime mirror) to run')
+
+    test('speaks Hindi sentence by sentence and measures it', async ({ page }) => {
+      await open(page, 'tts')
+      await expect(page.getByTestId('voices-missing')).toHaveCount(0)
+      await page.getByTestId('tts-text').fill('नमस्ते! कल सुबह 10 बजे बैठक है।')
+      await page.getByTestId('speak').click()
+      await expect(page.getByTestId('model-chip')).toHaveAttribute('data-status', 'ready', { timeout: 120_000 })
+      await expect(page.getByTestId('ttfa')).toHaveText(/^\d+$/, { timeout: 60_000 })
+      // Numbers are spelt out, and the page says what it read.
+      await expect(page.getByTestId('spoken-text')).toContainText('दस बजे')
+      await expect(page.getByTestId('chunk-timeline')).toBeVisible()
+      await expect(page.getByTestId('speak')).toBeVisible({ timeout: 60_000 })
+      await expect(page.getByTestId('chunk-timeline').locator('text=नमस्ते!')).toBeVisible()
+      await expect(page.getByTestId('save-wav')).toBeEnabled()
+      const download = page.waitForEvent('download')
+      await page.getByTestId('save-wav').click()
+      expect((await download).suggestedFilename()).toBe('bolo-syspin-hi-female.wav')
+      const readouts = await page.getByTestId('readout').allInnerTexts()
+      console.log(
+        `[tts] hi ttfa ${await page.getByTestId('ttfa').innerText()} ms · ${readouts.join(' · ').replace(/\n/g, ' ')}`,
+      )
+      await axe(page)
+    })
+
+    test('speaks US English through uccharan and transcribes it back in the page', async ({ page }) => {
+      await open(page, 'tts')
+      await page.getByTestId('voice-picker').click()
+      await page.getByTestId('voice-piper-en-us-amy-low').click()
+      await page.getByTestId('tts-text').fill('Hello there. This voice runs entirely in your browser.')
+      await page.getByTestId('round-trip').click()
+      await expect(page.getByTestId('wer')).toBeVisible({ timeout: 180_000 })
+      await expect(page.getByTestId('phonemes')).toContainText('həlˈoʊ')
+      const wer = await page.getByTestId('wer').innerText()
+      console.log(`[tts] amy round trip WER ${wer}: ${await page.getByTestId('wer-diff').innerText()}`)
+      expect(Number.parseFloat(wer)).toBeLessThanOrEqual(30)
+    })
   })
 })
