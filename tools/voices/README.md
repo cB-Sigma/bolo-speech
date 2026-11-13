@@ -27,7 +27,7 @@ SPIRE Lab, Indian Institute of Science. Every archive carries `LICENSE` and `ATT
 
 ```bash
 python -m venv venv && . venv/bin/activate
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+pip install "torch==2.8.*" "torchaudio==2.8.*" --index-url https://download.pytorch.org/whl/cpu
 pip install -r tools/voices/requirements.txt
 python tools/voices/export_syspin.py --out dist --only syspin-mai-female
 ```
