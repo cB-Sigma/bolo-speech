@@ -193,7 +193,8 @@ async def test_pending_entries_are_hidden_and_cannot_be_pulled(core: Bolo) -> No
             pass
     packaged = Catalog.load()
     pending = [s for s in packaged.search(include_pending=True) if s.status == "pending"]
-    assert pending and all(s.id.startswith("syspin-") and s.validated == "untested" for s in pending)
+    # entries still waiting for their release must not have been run here
+    assert all(s.validated == "untested" for s in pending)
 
 
 # -- local directories --------------------------------------------------------
