@@ -13,7 +13,9 @@ chmod 777 "$DATA"
 cleanup() {
   docker logs "$NAME" > "$DATA/container.log" 2>&1 || true
   docker rm -f "$NAME" > /dev/null 2>&1 || true
-  rm -rf "$DATA"
+  # the container writes the data directory as its own user: remove it from inside one
+  docker run --rm --entrypoint sh -v "$DATA:/data" "$IMAGE" -c 'rm -rf /data/* /data/.[!.]*' > /dev/null 2>&1 || true
+  rm -rf "$DATA" 2> /dev/null || true
 }
 trap cleanup EXIT
 
