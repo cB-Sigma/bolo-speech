@@ -147,6 +147,7 @@ Multipart form.
 | `stream` | `false` | `true`: Server-Sent Events (below) |
 | `diarize` | `false` | extension. `true` labels segments with speakers (see [Speaker diarization](#speaker-diarization)); also switched on by `response_format=diarized_json` or the model name `gpt-4o-transcribe-diarize` |
 | `num_speakers`, `min_speakers`, `max_speakers` | - | extension, with diarization: fix or bound the number of speakers |
+| `separate_overlaps` | `false` | extension, with diarization: transcribe overlapped speech from one separated track per speaker (see [Separating overlapping speech](#speaker-diarization)); `separation_model`, `separation_context_s`, `separation_min_overlap_s`, `separation_allow_narrowband` |
 | `vad_filter` | auto | extension. `true` forces silence removal before decoding; by default VAD is used only to split audio longer than the model's window |
 | `hotwords` | - | extension, passed to engines that support it |
 
@@ -268,6 +269,10 @@ For clients written against speaches; details and differences are in
                    "http": {"endpoint": "/api/v1/diarize", "transcriptions": ["diarize", "diarized_json"]},
                    "websocket": "diarize=true (one speaker per utterance, labelled online)",
                    "word_timestamps": true, "known_speakers": true, "revised_labels_at_end_of_stream": true},
+   "separation": {"available": true, "installed": false, "default_model": "voxlock-int8",
+                  "http": {"transcriptions": "separate_overlaps=true (with diarization)", "diarize": "separate_overlaps=true"},
+                  "default_on": false, "languages": ["en"], "min_sample_rate": 16000,
+                  "context_s": 2.0, "min_overlap_s": 0.5},
    "realtime": {"endpoint": "/v1/realtime", "transcription_sessions": true,
                 "conversation_sessions": false,          // true once a language model is configured
                 "audio_formats": ["audio/pcm (24 kHz)", "audio/pcmu", "audio/pcma"], "reference": "…",
@@ -284,7 +289,7 @@ For clients written against speaches; details and differences are in
 
 ### `GET /api/v1/catalog?task=&q=&installed=`
 
-`task`: `stt`, `tts`, `vad`, `diarization`, `turn` (end-of-turn models). `q`: space-separated words that must all appear
+`task`: `stt`, `tts`, `vad`, `diarization`, `turn` (end-of-turn models), `separation` (overlapped-speech separation). `q`: space-separated words that must all appear
 in the id, aliases, family, engine, languages, licence or description.
 `installed`: `true` / `false`.
 
@@ -588,8 +593,71 @@ We tried transcribing both turns whole (`DiarizeOptions.keep_overlap`, off by
 default): on three synthetic two-voice mixes with 2.5 s of overlap the second
 speaker's word error rate got worse in two of three (the recogniser wrote the
 louder speaker's words into both texts; `docs/measurements/diarization-overlap.json`),
-so it is not the default and not exposed in the API. Separating overlapping
-voices would need a source-separation model.
+so it is not the default and not exposed in the API. To get both voices,
+use `separate_overlaps` (next section).
+
+**Separating overlapping speech** (opt-in, bolo extension). Add
+`separate_overlaps=true` to a diarized transcription (`diarize=true` or
+`response_format=diarized_json`) or to `POST /api/v1/diarize`. After
+diarization:
+
+1. each speaker's *voice sample* is taken from their own speech away from any
+   overlap (the longest clean stretches, up to `separation_sample_max_s` = 10 s;
+   VoxLock needs at least 3 s and uses the loudest 3 s of it);
+2. every overlap of at least `separation_min_overlap_s` (0.5 s) is widened by
+   `separation_context_s` (2 s) on each side, its edges moved to the quietest
+   moment nearby, and touching windows joined;
+3. the separation model (`separation_model`, default `voxlock-int8`) extracts
+   each involved speaker's voice from the window, once per speaker;
+4. inside the window each separated speaker is transcribed from their own
+   track (over the span of their own turns); everything else is transcribed
+   from the recording as before.
+
+Segments transcribed from a track carry `"separated": true` (and
+`"overlap": true`). A speaker may then have two consecutive segments (before
+the window, inside it), and different speakers' segments overlap in time.
+
+Optional fields: `separation_model`, `separation_context_s` (0-10),
+`separation_min_overlap_s` (0-10), `separation_allow_narrowband` (see below);
+on `/api/v1/diarize`, `separation_audio=true` adds each window's tracks as
+WAV data URLs (`windows[].tracks`).
+
+Every JSON response (`json`, `verbose_json`, `diarized_json`, the final
+`transcript.text.done` event of a stream, `/api/v1/diarize`) then has a
+`separation` object, and every response the header `x-bolo-separation`
+(`applied`, or `<status>; reason=<reason>`):
+
+```json
+"separation": {
+  "model": "voxlock-int8", "status": "applied", "reason": null, "detail": null, "context_s": 2.0,
+  "speakers": [{"speaker": "A", "sample_s": 10.0}, {"speaker": "B", "sample_s": 10.0}],
+  "windows": [{"start": 14.57, "end": 20.81,
+               "overlaps": [{"start": 16.37, "end": 18.75, "speakers": ["A", "B"]}],
+               "speakers": ["A", "B"], "separated": ["A", "B"], "skipped": []}],
+  "separated_audio_s": 12.48, "time_ms": 9150.7, "rtf": 0.293
+}
+```
+
+| `status` | `reason` | meaning |
+| --- | --- | --- |
+| `applied` | `null` | every speaker in every window got a track |
+| `partial` | `no_voice_sample`, `timeout`, `error` | some did; the rest is transcribed from the mixture |
+| `skipped` | `no_overlap` | no overlap long enough |
+| `skipped` | `no_voice_sample` | no speaker in an overlap has 3 s of speech without overlap (`speakers[].skipped` says how much they had) |
+| `skipped` | `timeout`, `error` | separation did not finish (`separation_timeout_s`, default 300 s) or the model failed (`detail`); the request still succeeds |
+
+Refused with 400 (`param: "separate_overlaps"`) before any work:
+`separate_overlaps` without diarization, and audio recorded below 16 kHz
+(telephony) unless `separation_allow_narrowband=true`: the model is trained on
+wideband speech and did not help on 8 kHz μ-law copies in our evaluation
+(models.md, "Overlapping speech"). With the override the audio is resampled
+and separated anyway, and the report says `"narrowband": true` (also set when
+16 kHz audio has nothing above 4 kHz, i.e. an upsampled phone call).
+
+When to use it, and what it costs, is in models.md, "Overlapping speech":
+measured results by type of audio. It is off by default. A blind separator in
+an engine plugin can be named in `separation_model` as well (its tracks are
+given to the diarized speakers by voice similarity).
 
 **Live** (`WS /api/v1/stt/stream?diarize=true`, optional `max_speakers`):
 every `final` gets a `"speaker"` field and `ready` reports
@@ -617,6 +685,11 @@ routes, which run the full pipeline on the whole file.
 
 Traces: kind `diarization` for `/api/v1/diarize`; a `diarize` phase and the
 extra fields `diarization_model` and `speakers` on transcription traces.
+With `separate_overlaps`, both kinds add a `separate` phase and the fields
+`separation` (as in the header), `separation_model`, `separation_windows` and
+`separation_ms`; `/api/v1/stats` counts requests by outcome
+(`separation.requests`) and `/metrics` has `bolo_separation_requests_total{status}`
+and `bolo_separation_audio_seconds_total`.
 
 ### How many speakers
 

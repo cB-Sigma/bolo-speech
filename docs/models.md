@@ -58,7 +58,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-271 models: 108 validated on CPU by the maintainers, 163 untested.
+276 models: 115 validated on CPU by the maintainers, 161 untested.
 
 ### Speech to text
 
@@ -249,13 +249,14 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `indic-parler-tts` | as, bn, en, gu, hi, kn +11 | accuracy | - | 3.8 GB | Apache-2.0 · needs plugin torch · gated | untested |
+| `indic-parler-tts` | as, bn, brx, doi, en, gu +15 | accuracy | - | 3.8 GB | Apache-2.0 · needs plugin torch · gated | **CPU** · RTF 22.500 · first audio 39400 ms |
+| `parler-tts-tiny-v1` | en | balanced | - | 1.3 GB | Apache-2.0 · needs plugin torch | **CPU** · RTF 4.540 · first audio 11520 ms |
 
 #### F5-TTS
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `indic-f5` | as, bn, gu, hi, kn, ml +5 | accuracy | - | 1.4 GB | MIT · needs plugin torch · gated | untested |
+| `indic-f5` | as, bn, gu, hi, kn, ml +5 | accuracy | - | 1.4 GB | MIT · needs plugin torch · gated | **CPU** · RTF 119.700 · first audio 211280 ms |
 
 #### Veena
 
@@ -476,6 +477,27 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `smart-turn-v3` | ar, bn, da, de, en, es +17 | realtime | - | 9 MB | BSD-2-Clause | untested |
 
+### Overlapped-speech separation
+
+#### SepFormer
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `sepformer-whamr16k` | en | accuracy | - | 113 MB | Apache-2.0 · needs plugin torch | **CPU** · RTF 3.690 |
+| `sepformer-whamr` | en | balanced | - | 113 MB | Apache-2.0 · needs plugin torch | **CPU** · RTF 1.440 |
+
+#### PixIT
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `pixit-ami` | en | accuracy | - | 2.6 GB | MIT · needs plugin torch · gated | **CPU** · RTF 5.690 |
+
+#### VoxLock
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `voxlock-int8` | en | balanced | - | 81 MB | Apache-2.0 | **CPU** · RTF 0.460 |
+
 ⚠ = the licence restricts commercial use. RTF = processing time / audio duration (lower is faster).
 <!-- END GENERATED: models -->
 
@@ -553,10 +575,10 @@ switch: with `auto_pull` off nothing is downloaded unless you ask.
 Some good voices exist only as PyTorch checkpoints. bolo has no PyTorch, so
 the project converts them once, in the open (`tools/voices/` and the "Voices"
 workflow), and publishes the results as assets of a GitHub release of this
-repository (`https://github.com/cb-Sigma/bolo/releases/tag/voices-v1`) and,
-once the workflow has a Hugging Face token, as one public repository per voice
-under `codebucketsolutions/` (the catalog then pulls from the Hub, pinned to
-the uploaded commit, with the release archive as fallback). Each archive
+repository (`https://github.com/cb-Sigma/bolo/releases/tag/voices-v1`) and as one
+public repository per voice under `codebucketsolutions/` on Hugging Face (the
+catalog pulls from the Hub, pinned to the uploaded commit, with the release
+archive as fallback). Each archive
 holds `model.onnx`, `tokens.txt`, `voice.json` (source repository and pinned
 revision, licence, language, sample rate, character set), `LICENSE` and
 `ATTRIBUTION`.
@@ -576,7 +598,7 @@ changes the file format only (Coqui VITS checkpoint to ONNX); the weights are
 not retrained. All are single-speaker VITS voices at 22.05 kHz, about 114 MB
 each, with character input and no espeak-ng.
 
-**Meta MMS-TTS (non-commercial): converted, not yet published.** 18 voices
+**Meta MMS-TTS (non-commercial): published** (release `voices-v1` and Hugging Face). 18 voices
 for Indian languages (`mms-tts-<iso>`: Punjabi, Odia, Assamese, Dogri,
 Maithili, Magahi, Chhattisgarhi, Awadhi, Haryanvi, Urdu, Hindi, Bengali,
 Gujarati, Kannada, Malayalam, Marathi, Tamil, Telugu), from
@@ -584,8 +606,7 @@ Gujarati, Kannada, Malayalam, Marathi, Tamil, Telugu), from
 inference code (`tools/voices/export_mms.py`, the recipe sherpa-onnx used for
 its English MMS voices). **CC-BY-NC-4.0: non-commercial use only**; each
 archive carries the licence text and the attribution, and the entries say
-`commercial_use: false`. They are `status: pending` until the workflow
-publishes them. The conversion was run here for eight languages and each
+`commercial_use: false`. The conversion was run here for eight languages and each
 voice was loaded by bolo and transcribed back (numbers in
 [indic-telephony.md](indic-telephony.md) and
 `docs/measurements/mms-tts-round-trip.json`); MMS-TTS has no voice for
@@ -625,6 +646,129 @@ published Hindi and English SYSPIN voices it lowered the round-trip error on
 mixed-case, punctuated text from 24.6 % to 14.5 % and from 20.8 % to 13.9 %
 WER (8 sentences each, `docs/measurements/syspin-text-cleaning.json`). Phoneme-based voices (Piper format, Kokoro, KittenTTS) are
 not affected: espeak-ng reads digits and foreign words for them.
+
+## Overlapping speech
+
+When two people talk at once, diarization marks the stretch (`overlap: true`)
+but the recogniser hears one mixture and usually writes only the louder
+voice. `separate_overlaps=true` (api.md, "Separating overlapping speech")
+gives each speaker in an overlap a track of their own first. **It is off by
+default and stays opt-in**: in our evaluation it improved the transcript of
+16 kHz English two-speaker audio with clearly different voices, but it never
+met the cost limit we set for turning it on by default, and it did not help
+on telephone audio or on AMI far-field meeting recordings.
+
+**How.** The default separator is `voxlock-int8` (VoxLock, Apache-2.0,
+77 MB installed, run by sherpa-onnx 2.0.1, no PyTorch). It is a
+*target-speaker* model: given about 3 s of one voice it keeps that voice and
+removes the rest. bolo takes each speaker's sample from their own speech
+outside overlaps, separates each overlap plus 2 s on each side once per
+speaker, and transcribes each speaker's part of that window from their own
+track. VoxLock was trained on English (LibriSpeech and AMI), is causal
+(streaming-capable, so it leaves some offline quality unused), and is a 2026
+model from a single author: the numbers below are ours, not its card's. The
+Python binding of sherpa-onnx only takes the voice sample as a file, so each
+speaker costs an extractor build (about 1.9 s here) per request.
+
+**Evaluation** (2026-11-13, `docs/measurements/overlap-separation.json`;
+4 vCPU Xeon @ 2.1 GHz shared with other jobs, load average 4-7, 2 threads,
+so times are pessimistic). Synthetic two-voice mixes made with bolo's own
+voices (12 English pairs: 6 cross-gender incl. Piper amy, 3 female and 3
+male same-gender pairs; 1 Hindi pair): A alone, B alone, A's long sentence
+with B starting before A finishes (1, 2.5 or 5 s of overlap), A alone; B at
+0 dB for every overlap length and at -5 / +5 dB for 2.5 s (5 mixes per
+pair, about 32 s each, 8 % overlap on average). A telephone copy of every
+mix (300-3400 Hz, 8 kHz, G.711 μ-law). AMI: 24 excerpts of 45 s from the
+official test meetings ES2004a, IS1009a, TS3003a and EN2002a (single
+distant microphone, CC BY 4.0), chosen for the most overlap (12-65 %).
+Recognisers: `whisper-base` for English, `faster-whisper-tiny-hindi` for
+Hindi; diarization `pyannote-3.0-eres2net`, everything at default settings.
+cpWER = concatenated minimum-permutation WER (same definition as MeetEval;
+implemented in the scratch scorer, MeetEval itself was not installed);
+"overlap WER" = the two sentences involved in the overlap (AMI: reference
+words within 0.5 s of an annotated overlap); "solo" = the rest. 95 %
+intervals: paired bootstrap over mixes.
+
+| audio | mixes | cpWER without → with | relative (95 % CI) | overlap WER | solo WER change | worst mix | extra RTF |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 16 kHz English, all | 60 | 29.1 % → 23.2 % | -20 % (-13 to -31 %) | 34.7 % → 25.4 % (-27 %) | -0.2 pt | +3.0 pt | 0.23 |
+| · cross-gender pairs | 30 | 14.7 % → 6.1 % | -59 % (-48 to -67 %) | 21.1 % → 7.4 % (-65 %) | 0.0 pt | 0.0 pt | 0.31 |
+| · same-gender, male | 15 | 37.8 % → 32.1 % | -15 % (-5 to -30 %) | 39.4 % → 29.7 % (-25 %) | +1.1 pt | +3.0 pt | 0.20 |
+| · same-gender, female | 15 | 49.3 % → 48.5 % | -2 % (+0.3 to -5 %) | 57.4 % → 57.0 % | -1.9 pt | +1.0 pt | 0.12 |
+| · 1 s overlaps | 12 | 23.4 % → 21.9 % | -6 % (-1 to -25 %) | 25.0 % → 22.6 % (-10 %) | 0.0 pt | +0.9 pt | 0.23 |
+| · 5 s overlaps | 12 | 39.6 % → 26.4 % | -33 % (-16 to -59 %) | 48.6 % → 28.4 % (-41 %) | -2.1 pt | 0.0 pt | 0.38 |
+| · second voice 5 dB quieter | 12 | 23.5 % → 21.3 % | -9 % (-0.5 to -27 %) | 31.0 % → 26.7 % (-14 %) | +1.8 pt | +3.0 pt | 0.17 |
+| 16 kHz Hindi (one pair) | 5 | 19.1 % → 7.5 % | -61 % (-50 to -66 %) | 24.9 % → 6.8 % (-73 %) | 0.0 pt | -3.4 pt | 0.61 |
+| 8 kHz μ-law English | 60 | 64.0 % → 64.9 % | +1 % (+4 to -1 %) | 71.3 % → 72.5 % | +0.7 pt | **+26.3 pt** | 0.09 |
+| 8 kHz μ-law Hindi | 5 | 54.7 % → 59.5 % | +9 % (+32 to -3 %) | 63.4 % → 64.8 % | +5.1 pt | +14.8 pt | 0.31 |
+| AMI far-field meetings | 24 | 72.3 % → 72.5 % | +0.4 % (+4 to -3 %) | 84.0 % → 83.6 % | -0.8 pt | **+14.5 pt** | 0.35 |
+
+Notes. In 13 of the 60 English mixes nothing was separated because
+diarization found no overlap (6 of them same-gender female pairs, which it
+also tended to merge into one speaker: separation cannot fix that). On telephone
+audio diarization found the overlap in fewer than half the mixes, and where
+VoxLock ran it often damaged speech (one mix lost 26 points). On AMI the
+excerpts are hard for `whisper-base` to begin with (72 % cpWER), in 13 of 24
+excerpts at least one speaker had less than 3 s of clean speech for a voice
+sample (`partial`),
+and separation made no measurable difference overall while one excerpt got
+14.5 points worse. The Hindi result is one voice pair (5 mixes) of an
+English-trained model: promising, too small to rely on. RTF here is the
+extra time of the whole request (separation plus the second decoding)
+divided by the audio length (the Hindi recogniser is slower, hence its
+0.61); the separation step costs about 1.9 s per
+enrolled speaker plus 0.46 s per second of window and speaker, so a
+1-minute two-person recording with three overlaps costs roughly 20 s extra
+at 2 threads on this machine.
+
+**Decision rule** (set before the evaluation; all must hold to turn it on by
+default for a class of audio): (1) cpWER at least 10 % better with the 95 %
+interval excluding zero, on AMI and on the synthetic set; (2) overlap WER at
+least 20 % better; (3) solo WER no more than 0.5 pt worse; (4) extra RTF at
+most 0.15 at 2 threads; (5) no mix more than 5 pt worse.
+
+| audio | (1) | (2) | (3) | (4) | (5) | default |
+| --- | --- | --- | --- | --- | --- | --- |
+| 16 kHz English, all synthetic | pass | pass | pass | **fail** (0.23) | pass | off |
+| 16 kHz English, cross-gender | pass | pass | pass | **fail** (0.31) | pass | off |
+| 16 kHz English, same-gender | **fail** (female) | **fail** (female) | **fail** (male +1.1) | **fail** | pass | off |
+| 16 kHz Hindi (one pair) | pass | pass | pass | **fail** | pass | off |
+| 8 kHz telephone (μ-law) | **fail** | **fail** | **fail** | pass | **fail** | off; refused unless `separation_allow_narrowband=true` |
+| AMI far-field meetings | **fail** | **fail** | pass | **fail** | **fail** | off |
+
+Read strictly, rule (1) asks for the gain on AMI as well, and AMI failed, so
+no class of audio qualifies for on-by-default; the table shows where the
+quality rules alone were met.
+
+So: worth turning on for **16 kHz recordings of two (or a few) clearly
+different voices that talk over each other for a second or more**
+(interviews, podcasts, two-person calls recorded wideband), if 0.2-0.3 extra
+RTF is acceptable. Not for telephone audio, not for distant-microphone
+meetings, and of little use when the voices are similar.
+
+**Context and voice-sample length** (12 English pairs, 2.5 s overlap, 0 dB,
+other sentences): context 0 / 1 / 2 / 4 s gave cpWER 20.5 / 20.2 / 20.8 /
+22.0 % (without separation 28.2 %), so 2 s is kept; a 3 s instead of 10 s
+voice sample gave 20.4 % (VoxLock uses the loudest 3 s of the sample
+anyway).
+
+**Blind separators through the PyTorch plugin.** `separation_model` may name
+a blind separator served by `plugins/bolo-torch`; bolo gives its tracks to
+the diarized speakers by voice similarity in the overlap plus each track's
+share of the speakers' solo speech in the window. Measured here through bolo:
+
+| separator | mixes (16 kHz English, 0 dB) | cpWER without → with | relative (95 % CI) | overlap WER | worst mix | extra RTF |
+| --- | --- | --- | --- | --- | --- | --- |
+| `voxlock-int8` (sherpa-onnx) | 36 | 32.8 % → 26.2 % | -20 % (-11 to -34 %) | 38.0 % → 27.9 % | +0.9 pt | 0.26 |
+| `sepformer-whamr16k` (bolo-torch, CPU PyTorch) | 36 | 32.8 % → 26.2 % | -20 % (-11 to -34 %) | 38.0 % → 28.0 % | **+8.7 pt** | 0.82 |
+| `pixit-ami` (bolo-torch, gated) | measured via bolo-torch: PIXIT_RESULTS | | | | | |
+
+SepFormer matched VoxLock's quality on these mixes but cost three times as
+much and failed one mix badly; its weights come from WHAMR! (WSJ0-derived,
+an LDC licence: a provenance risk for commercial use). PixIT was not run here
+(2.6 GB download); see plugins/bolo-torch for the plugin's own numbers. A
+check with perfect tracks handed over in the wrong order confirmed that
+bolo gives each diarized speaker their own track, aligned to the sample.
 
 ## Word timestamps
 
@@ -710,13 +854,37 @@ its voice in `phonemizers` (`[{id, available, default, note}]`; for Kokoro per v
 
 ### Measured: uccharan against espeak-ng, voice by voice
 
-60 held-out sentences per language (the last 60 lines of uccharan's held-out evaluation sets,
-which were never used to write its rules), synthesised through bolo with each phonemiser and
-transcribed back: English by `whisper-base` (sherpa-onnx int8, Whisper's English normaliser),
-Hindi by `indicconformer-hi-community` (punctuation stripped, NFC). Time to first audio is the
-median per sentence through bolo, 2 threads on the shared 4-vCPU machine (busy: other jobs ran at
-the same time, so compare rows with each other rather than with other pages). espeak-ng 1.52.0
-from the `espeakng-loader` library; uccharan 0.1.0; 2026-11-13.
+**Run 2, 500 sentences per voice (paired).** The 500 held-out sentences per language that
+uccharan's own end-to-end evaluation uses (selected the same way from its held-out sets, which were
+never used to write its rules), each synthesised through bolo twice, once per phonemiser, and both
+results transcribed back: English by `whisper-base` (sherpa-onnx int8, Whisper's English
+normaliser), Hindi by `indicconformer-hi-community`. The interval is the 95 % paired bootstrap
+interval of WER(uccharan) − WER(espeak-ng) over sentences. 2 threads per process, two voices at a
+time on the shared 4-vCPU machine (load average 0.8 to 5.3 for amy and rohan, 3.2 to 7.0 for lessac
+and alba, from other jobs). espeak-ng 1.52.0, uccharan 0.1.0, 2026-11-13.
+
+| Voice | WER uccharan | WER espeak-ng | Difference (95 % CI), points | Sentences better / worse with uccharan | First audio (median) uccharan / espeak-ng |
+| --- | ---: | ---: | --- | --- | --- |
+| `piper-en-us-amy-low` | 2.89 % | 2.65 % | +0.24 (−0.25 … +0.81) | 20 / 25 | 166 / 167 ms |
+| `piper-en-us-lessac-medium` | 3.67 % | 3.94 % | −0.27 (−1.05 … +0.44) | 48 / 51 | 371 / 370 ms |
+| `piper-en-gb-alba-medium` | 6.52 % | 6.65 % | −0.13 (−1.16 … +0.87) | 71 / 70 | 398 / 397 ms |
+| `piper-hi-in-rohan-medium` | 8.83 % | 9.45 % | −0.62 (−1.46 … +0.25) | 56 / 52 | 221 / 211 ms |
+
+**Every interval contains zero: no voice is measurably better or worse with either phonemiser.**
+A check of how much of the difference is noise: the two phonemisers give identical phonemes for
+377 of the 500 English sentences (347 for alba) and 494 of 500 Hindi ones, and even on those
+sentences the error counts differ (amy 82 against 75 errors, rohan 274 against 294), because VITS
+samples its output and the recogniser reacts to small differences. Differences of this size
+between the phonemisers are therefore within what the synthesis itself varies. Where the
+phonemes do differ, the sentences that came out worse with uccharan involve names (Gabor,
+Tatoeba, Walid, Janos), a few vowel choices (`beyond`, `realize`), and contractions that espeak-ng
+joins with the next word (`wouldn't have`); the list is in the measurement file, for uccharan's
+maintainers.
+
+**Run 1, 60 sentences** (the last 60 lines of the same held-out sets, not paired: one run per
+phonemiser, 2 threads, busier machine). It is superseded by run 2 and kept because the first
+version of this page quoted it; its differences were within noise too (60 sentences are about
+600 words, one word is 0.17 points).
 
 | Voice | Phonemiser | WER | CER | First audio (median / p90) |
 | --- | --- | ---: | ---: | --- |
@@ -738,13 +906,11 @@ from the `espeakng-loader` library; uccharan 0.1.0; 2026-11-13.
 | `kokoro-v1.0-int8`, `hf_alpha` | uccharan | 5.38 % | 1.77 % | 2856 / 4042 ms |
 | | espeak-ng | 4.53 % | 1.44 % | 3018 / 4469 ms |
 
-Reading it: with 60 sentences (about 600 words) one word is 0.17 points, so differences under about
-one point are within noise: uccharan and espeak-ng are equivalent on these voices, as uccharan's own
-500-sentence evaluation found. The clear result is Kokoro English: without a phonemiser (the
-bundled lexicon skips words it does not know) the error is more than twice as high. Time to first
-audio is the same or lower with uccharan (it runs in process). `uccharan:improved` changed 12 of the
-60 English sentences (for example "OK" read as "okay") without changing the error rate here.
-Raw rows: `docs/measurements/phonemizer-ab.json`.
+The one clear result of run 1 stands: Kokoro English without a phonemiser (the bundled lexicon
+skips words it does not know) has more than twice the error. Kitten and Kokoro were not part of
+run 2. `uccharan:improved` changed 12 of the 60 English sentences (for example "OK" read as
+"okay") without changing the error rate. Raw rows of both runs:
+`docs/measurements/phonemizer-ab.json`.
 
 ## Default voices
 
@@ -923,4 +1089,6 @@ copied when the entry was written. Things to watch:
 * **Gated** entries (`gated: true`: Indic Parler-TTS, IndicF5, SraVaani, AI4Bharat's official
   IndicConformer) are never downloaded without a Hugging Face token; using one without a token
   answers `401 model_gated` with the model page to accept the terms on. All four also need the
-  PyTorch engine plugin ([plugins.md](plugins.md)), which is not written yet.
+  PyTorch engine plugin bolo-torch ([plugins.md](plugins.md)); SraVaani and the official
+  IndicConformer are not implemented in bolo-torch 0.1.0. PixIT (`pixit-ami`) is gated too, on two
+  repositories.

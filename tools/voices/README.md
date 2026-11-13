@@ -47,8 +47,10 @@ Status (2026-11-13): the workflow published the 22 SYSPIN voices as release `voi
 catalog entries were switched on with `update_catalog.py`. `export_mms.py` was run by the
 maintainers for Punjabi, Odia, Assamese, Dogri, Maithili, Magahi, Chhattisgarhi and Urdu (each
 loaded by bolo and transcribed back, `docs/measurements/mms-tts-round-trip.json`); the MMS voices
-are not published yet. `publish_hf.py` and the Hub source were tested with a stand-in for the Hub
-API (`server/tests/test_voice_tools.py`), not against the Hub.
+were then published by the workflow, which also uploaded all 40 voices to Hugging Face
+(`codebucketsolutions/`); `update_catalog.py` points the catalog at those repositories.
+`publish_hf.py` and the Hub source are also covered by `server/tests/test_voice_tools.py` with a
+stand-in for the Hub API.
 
 `convert_whisper.py` converted `Aditya109/whisper-small-bhojpuri-merged` (CC-BY-4.0) here. On 120
 RESPIN Bhojpuri test utterances it did worse than the Hindi IndicConformer model that bolo already

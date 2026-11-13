@@ -1,246 +1,1573 @@
 {
- "what": "text-to-speech round trip per voice and phonemiser through bolo: 60 held-out sentences synthesised, transcribed back",
- "conditions": "2 threads, shared 4-vCPU x86_64 (Intel Xeon 2.10GHz), no GPU, other jobs running; sherpa-onnx 2.0.1; uccharan 0.1.0 (wheel built from its repository); espeak-ng 1.52.0 (espeakng-loader); English STT whisper-base (sherpa-onnx int8) with Whisper's English normaliser; Hindi STT indicconformer-hi-community, punctuation stripped, NFC",
- "sentences": "last 60 lines of uccharan tools/eval/data/en_heldout.tsv and hi_heldout.tsv",
- "date": "2026-11-13",
- "rows": [
-  {
-   "model": "piper-en-us-amy-low",
-   "voice": "-",
-   "lang": "en",
-   "stt": "whisper-base",
-   "n": 60,
-   "wer": 0.0299,
-   "cer": 0.0126,
-   "ttfa_ms_median": 135,
-   "ttfa_ms_p90": 279,
-   "rtf_median": 0.053,
-   "threads": 2,
-   "phonemizer": "uccharan"
+ "what": "text-to-speech round trip per voice with uccharan and with espeak-ng through bolo, two runs",
+ "run_1_60_sentences": {
+  "conditions": "2 threads, shared 4-vCPU x86_64 (Intel Xeon 2.10GHz), no GPU, other jobs running; sherpa-onnx 2.0.1; uccharan 0.1.0 (wheel built from its repository); espeak-ng 1.52.0 (espeakng-loader); English STT whisper-base (sherpa-onnx int8) with Whisper's English normaliser; Hindi STT indicconformer-hi-community, punctuation stripped, NFC",
+  "sentences": "last 60 lines of uccharan tools/eval/data/en_heldout.tsv and hi_heldout.tsv",
+  "date": "2026-11-13",
+  "rows": [
+   {
+    "model": "piper-en-us-amy-low",
+    "voice": "-",
+    "lang": "en",
+    "stt": "whisper-base",
+    "n": 60,
+    "wer": 0.0299,
+    "cer": 0.0126,
+    "ttfa_ms_median": 135,
+    "ttfa_ms_p90": 279,
+    "rtf_median": 0.053,
+    "threads": 2,
+    "phonemizer": "uccharan"
+   },
+   {
+    "model": "piper-en-us-lessac-medium",
+    "voice": "-",
+    "lang": "en",
+    "stt": "whisper-base",
+    "n": 60,
+    "wer": 0.0336,
+    "cer": 0.0152,
+    "ttfa_ms_median": 145,
+    "ttfa_ms_p90": 248,
+    "rtf_median": 0.071,
+    "threads": 2,
+    "phonemizer": "uccharan"
+   },
+   {
+    "model": "piper-en-gb-alba-medium",
+    "voice": "-",
+    "lang": "en",
+    "stt": "whisper-base",
+    "n": 60,
+    "wer": 0.0504,
+    "cer": 0.0289,
+    "ttfa_ms_median": 152,
+    "ttfa_ms_p90": 245,
+    "rtf_median": 0.073,
+    "threads": 2,
+    "phonemizer": "uccharan"
+   },
+   {
+    "model": "kitten-nano-0.8-int8",
+    "voice": "-",
+    "lang": "en",
+    "stt": "whisper-base",
+    "n": 60,
+    "wer": 0.0168,
+    "cer": 0.0082,
+    "ttfa_ms_median": 890,
+    "ttfa_ms_p90": 1512,
+    "rtf_median": 0.33,
+    "threads": 2,
+    "phonemizer": "uccharan"
+   },
+   {
+    "model": "kokoro-v1.0-int8",
+    "voice": "af_heart",
+    "lang": "en",
+    "stt": "whisper-base",
+    "n": 60,
+    "wer": 0.0299,
+    "cer": 0.0122,
+    "ttfa_ms_median": 2373,
+    "ttfa_ms_p90": 4102,
+    "rtf_median": 1.214,
+    "threads": 2,
+    "phonemizer": "uccharan"
+   },
+   {
+    "model": "piper-en-us-amy-low",
+    "voice": "-",
+    "lang": "en",
+    "stt": "whisper-base",
+    "n": 60,
+    "wer": 0.0261,
+    "cer": 0.0115,
+    "ttfa_ms_median": 148,
+    "ttfa_ms_p90": 263,
+    "rtf_median": 0.06,
+    "threads": 2,
+    "phonemizer": "espeak-ng"
+   },
+   {
+    "model": "piper-en-us-lessac-medium",
+    "voice": "-",
+    "lang": "en",
+    "stt": "whisper-base",
+    "n": 60,
+    "wer": 0.0243,
+    "cer": 0.01,
+    "ttfa_ms_median": 252,
+    "ttfa_ms_p90": 395,
+    "rtf_median": 0.114,
+    "threads": 2,
+    "phonemizer": "espeak-ng"
+   },
+   {
+    "model": "piper-en-gb-alba-medium",
+    "voice": "-",
+    "lang": "en",
+    "stt": "whisper-base",
+    "n": 60,
+    "wer": 0.0448,
+    "cer": 0.0267,
+    "ttfa_ms_median": 182,
+    "ttfa_ms_p90": 324,
+    "rtf_median": 0.079,
+    "threads": 2,
+    "phonemizer": "espeak-ng"
+   },
+   {
+    "model": "kitten-nano-0.8-int8",
+    "voice": "-",
+    "lang": "en",
+    "stt": "whisper-base",
+    "n": 60,
+    "wer": 0.0187,
+    "cer": 0.0078,
+    "ttfa_ms_median": 1198,
+    "ttfa_ms_p90": 1928,
+    "rtf_median": 0.413,
+    "threads": 2,
+    "phonemizer": "espeak-ng"
+   },
+   {
+    "model": "kokoro-v1.0-int8",
+    "voice": "af_heart",
+    "lang": "en",
+    "stt": "whisper-base",
+    "n": 60,
+    "wer": 0.0299,
+    "cer": 0.0182,
+    "ttfa_ms_median": 2518,
+    "ttfa_ms_p90": 4636,
+    "rtf_median": 1.291,
+    "threads": 2,
+    "phonemizer": "espeak-ng"
+   },
+   {
+    "model": "kokoro-v1.0-int8",
+    "voice": "af_heart",
+    "lang": "en",
+    "stt": "whisper-base",
+    "n": 60,
+    "wer": 0.0672,
+    "cer": 0.0693,
+    "ttfa_ms_median": 2361,
+    "ttfa_ms_p90": 3968,
+    "rtf_median": 1.238,
+    "threads": 2,
+    "phonemizer": "lexicon"
+   },
+   {
+    "model": "piper-hi-in-rohan-medium",
+    "voice": "-",
+    "lang": "hi",
+    "stt": "indicconformer-hi-community",
+    "n": 60,
+    "wer": 0.0765,
+    "cer": 0.0268,
+    "ttfa_ms_median": 146,
+    "ttfa_ms_p90": 204,
+    "rtf_median": 0.078,
+    "threads": 2,
+    "phonemizer": "uccharan"
+   },
+   {
+    "model": "kokoro-v1.0-int8",
+    "voice": "hf_alpha",
+    "lang": "hi",
+    "stt": "indicconformer-hi-community",
+    "n": 60,
+    "wer": 0.0538,
+    "cer": 0.0177,
+    "ttfa_ms_median": 2856,
+    "ttfa_ms_p90": 4042,
+    "rtf_median": 1.302,
+    "threads": 2,
+    "phonemizer": "uccharan"
+   },
+   {
+    "model": "piper-hi-in-rohan-medium",
+    "voice": "-",
+    "lang": "hi",
+    "stt": "indicconformer-hi-community",
+    "n": 60,
+    "wer": 0.0907,
+    "cer": 0.0268,
+    "ttfa_ms_median": 170,
+    "ttfa_ms_p90": 238,
+    "rtf_median": 0.098,
+    "threads": 2,
+    "phonemizer": "espeak-ng"
+   },
+   {
+    "model": "kokoro-v1.0-int8",
+    "voice": "hf_alpha",
+    "lang": "hi",
+    "stt": "indicconformer-hi-community",
+    "n": 60,
+    "wer": 0.0453,
+    "cer": 0.0144,
+    "ttfa_ms_median": 3018,
+    "ttfa_ms_p90": 4469,
+    "rtf_median": 1.385,
+    "threads": 2,
+    "phonemizer": "espeak-ng"
+   },
+   {
+    "model": "piper-hi-in-rohan-medium",
+    "voice": "-",
+    "lang": "hi",
+    "stt": "indicconformer-hi-community",
+    "n": 60,
+    "wer": 0.0822,
+    "cer": 0.0301,
+    "ttfa_ms_median": 153,
+    "ttfa_ms_p90": 265,
+    "rtf_median": 0.084,
+    "threads": 2,
+    "phonemizer": "uccharan:improved"
+   },
+   {
+    "model": "piper-en-us-amy-low",
+    "voice": "-",
+    "lang": "en",
+    "stt": "whisper-base",
+    "n": 60,
+    "wer": 0.0299,
+    "cer": 0.0126,
+    "ttfa_ms_median": 130,
+    "ttfa_ms_p90": 229,
+    "rtf_median": 0.052,
+    "threads": 2,
+    "phonemizer": "uccharan:improved"
+   }
+  ]
+ },
+ "run_2_500_sentences": {
+  "what": "paired: each sentence synthesised with both phonemisers (per-request phonemizer, alternating order), both transcribed back; 95 % interval of WER(uccharan) - WER(espeak-ng) by paired bootstrap over sentences (2000 resamples, seed 11, the method of uccharan's tools/eval/e2e_tts_asr.py)",
+  "sentences": "500 per language picked as uccharan's e2e_tts_asr.py picks them from its held-out sets (en: 30-120 characters, ASCII, no digits; hi: 15-120 characters, no Latin letters or digits; shuffled with seed 7), passed through bolo's normal text normalisation",
+  "conditions": "bolo 0.2.0, 2 threads per process, two voices measured at a time on the shared 4-vCPU x86_64 (no GPU); 1-minute load average 0.8-5.3 during amy and rohan, 3.2-7.0 during lessac and alba (other jobs); sherpa-onnx 2.0.1, uccharan 0.1.0, espeak-ng 1.52.0 (espeakng-loader); STT whisper-base (en, Whisper English normaliser) and indicconformer-hi-community (hi, punctuation stripped, NFC)",
+  "date": "2026-11-13",
+  "results": {
+   "amy": {
+    "model": "piper-en-us-amy-low",
+    "sentences": 500,
+    "words": 4494,
+    "wer_uccharan": 0.0289,
+    "wer_espeak": 0.0265,
+    "diff_points": 0.24,
+    "ci95_points": [
+     -0.25,
+     0.81
+    ],
+    "sentences_better_u": 20,
+    "sentences_better_e": 25,
+    "ttfa_median_u": 166.0,
+    "ttfa_median_e": 167.0,
+    "load1_min_max": [
+     0.79,
+     5.32
+    ]
+   },
+   "lessac": {
+    "model": "piper-en-us-lessac-medium",
+    "sentences": 500,
+    "words": 4494,
+    "wer_uccharan": 0.0367,
+    "wer_espeak": 0.0394,
+    "diff_points": -0.27,
+    "ci95_points": [
+     -1.05,
+     0.44
+    ],
+    "sentences_better_u": 48,
+    "sentences_better_e": 51,
+    "ttfa_median_u": 370.5,
+    "ttfa_median_e": 370.0,
+    "load1_min_max": [
+     3.16,
+     7.01
+    ]
+   },
+   "alba": {
+    "model": "piper-en-gb-alba-medium",
+    "sentences": 500,
+    "words": 4494,
+    "wer_uccharan": 0.0652,
+    "wer_espeak": 0.0665,
+    "diff_points": -0.13,
+    "ci95_points": [
+     -1.16,
+     0.87
+    ],
+    "sentences_better_u": 71,
+    "sentences_better_e": 70,
+    "ttfa_median_u": 398.0,
+    "ttfa_median_e": 397.0,
+    "load1_min_max": [
+     3.16,
+     7.01
+    ]
+   },
+   "rohan": {
+    "model": "piper-hi-in-rohan-medium",
+    "sentences": 500,
+    "words": 3218,
+    "wer_uccharan": 0.0883,
+    "wer_espeak": 0.0945,
+    "diff_points": -0.62,
+    "ci95_points": [
+     -1.46,
+     0.25
+    ],
+    "sentences_better_u": 56,
+    "sentences_better_e": 52,
+    "ttfa_median_u": 221.0,
+    "ttfa_median_e": 211.0,
+    "load1_min_max": [
+     0.79,
+     5.32
+    ]
+   }
   },
-  {
-   "model": "piper-en-us-lessac-medium",
-   "voice": "-",
-   "lang": "en",
-   "stt": "whisper-base",
-   "n": 60,
-   "wer": 0.0336,
-   "cer": 0.0152,
-   "ttfa_ms_median": 145,
-   "ttfa_ms_p90": 248,
-   "rtf_median": 0.071,
-   "threads": 2,
-   "phonemizer": "uccharan"
+  "identical_phonemes": {
+   "amy": {
+    "sentences_identical": 377,
+    "sentences_different": 123,
+    "errors_uccharan_espeak_words_where_identical": [
+     82,
+     75,
+     3373
+    ],
+    "errors_uccharan_espeak_words_where_different": [
+     48,
+     44,
+     1121
+    ]
+   },
+   "lessac": {
+    "sentences_identical": 377,
+    "sentences_different": 123,
+    "errors_uccharan_espeak_words_where_identical": [
+     114,
+     117,
+     3373
+    ],
+    "errors_uccharan_espeak_words_where_different": [
+     51,
+     60,
+     1121
+    ]
+   },
+   "alba": {
+    "sentences_identical": 347,
+    "sentences_different": 153,
+    "errors_uccharan_espeak_words_where_identical": [
+     174,
+     178,
+     3097
+    ],
+    "errors_uccharan_espeak_words_where_different": [
+     119,
+     121,
+     1397
+    ]
+   },
+   "rohan": {
+    "sentences_identical": 494,
+    "sentences_different": 6,
+    "errors_uccharan_espeak_words_where_identical": [
+     274,
+     294,
+     3165
+    ],
+    "errors_uccharan_espeak_words_where_different": [
+     10,
+     10,
+     53
+    ]
+   }
   },
-  {
-   "model": "piper-en-gb-alba-medium",
-   "voice": "-",
-   "lang": "en",
-   "stt": "whisper-base",
-   "n": 60,
-   "wer": 0.0504,
-   "cer": 0.0289,
-   "ttfa_ms_median": 152,
-   "ttfa_ms_p90": 245,
-   "rtf_median": 0.073,
-   "threads": 2,
-   "phonemizer": "uccharan"
+  "sentences_worse_with_uccharan_where_phonemes_differ": {
+   "amy": [
+    {
+     "text": "Alberto was walking in Isabella's direction.",
+     "uccharan": "ælbˈɜːɾoʊ wʌz wˈɔːkɪŋ ɪn ˌɪzəbˈɛləz dɚɹˈɛkʃən.",
+     "espeak": "ælbˈɜːɾoʊ wʌz wˈɔːkɪŋ ɪn ˌɪseɪbˈɛləz dᵻɹˈɛkʃən.",
+     "heard_uccharan": "a birdo was walking in isabellas direction",
+     "heard_espeak": "alberta was walking in isabellas direction"
+    },
+    {
+     "text": "I didn't realize you lived in this neighborhood.",
+     "uccharan": "aɪ dˈɪdnt ɹˈiəlˌaɪz juː lˈɪvd ɪn ðɪs nˈeɪbɚhˌʊd.",
+     "espeak": "aɪ dˈɪdnt ɹˈiːəlaɪz juː lˈɪvd ɪn ðɪs nˈeɪbɚhˌʊd.",
+     "heard_uccharan": "i did not realize you lived in the snaper hode",
+     "heard_espeak": "i did not realize you lived in the neighborhood"
+    },
+    {
+     "text": "Tom was Mary's first dance partner.",
+     "uccharan": "tˈɑːm wʌz mˈɛɹɪz fˈɜːst dˈæns pˈɑːɹtnɚ.",
+     "espeak": "tˈɑːm wʌz mˈɛɹiz fˈɜːst dˈæns pˈɑːɹtnɚ.",
+     "heard_uccharan": "tom wasmaris 1st dance partner",
+     "heard_espeak": "tom was marys 1st dance partner"
+    },
+    {
+     "text": "Yanni and Skura were both guilty.",
+     "uccharan": "jˈæni ænd skˈʊɹɹə wɜː bˈoʊθ ɡˈɪlti.",
+     "espeak": "jˈæni ænd skjˈʊɹɹə wɜː bˈoʊθ ɡˈɪlti.",
+     "heard_uccharan": "yanny and skurra were both guilty",
+     "heard_espeak": "yanny and skura were both guilty"
+    },
+    {
+     "text": "As it is already night, retire to your homes.",
+     "uccharan": "æz ɪɾ ɪz ɔːlɹˌɛdi nˈaɪt, ɹᵻtˈaɪɚ tə jʊɹ hˈoʊmz.",
+     "espeak": "ˌæzɪtˌɪz ɔːlɹˌɛdi nˈaɪt, ɹᵻtˈaɪɚ tə jʊɹ hˈoʊmz.",
+     "heard_uccharan": "acid is already night retired to your homes",
+     "heard_espeak": "as it is already night retired to your homes"
+    },
+    {
+     "text": "Gabor found the chest and found a letter.",
+     "uccharan": "ɡəbˈɔːɹ fˈaʊnd ðə tʃˈɛst ænd fˈaʊnd ɐ lˈɛɾɚ.",
+     "espeak": "ɡˈæbɚ fˈaʊnd ðə tʃˈɛst ænd fˈaʊnd ɐ lˈɛɾɚ.",
+     "heard_uccharan": "the bore found the chest and found a letter",
+     "heard_espeak": "gaber found the chest and found a letter"
+    },
+    {
+     "text": "I'm not a sentence. I should be deleted from Tatoeba.",
+     "uccharan": "aɪm nˌɑːɾə sˈɛntəns. aɪ ʃˌʊd biː dᵻlˈiːɾᵻd fɹʌm teɪɾˈoʊiːbə.",
+     "espeak": "aɪm nˌɑːɾə sˈɛntəns. aɪ ʃˌʊd biː dᵻlˈiːɾᵻd fɹʌm tætˈoʊbə.",
+     "heard_uccharan": "i am not a sentence i should be deleted from te doiba",
+     "heard_espeak": "i am not a sentence i should be deleted from tatoba"
+    },
+    {
+     "text": "Antonio's self-esteem has taken a severe hit due to the constant bullying he endures on the website.",
+     "uccharan": "æntˈoʊnɪˌoʊz sˈɛlfᵻstˈiːm hɐz tˈeɪkən ɐ sᵻvˈɪɹ hˈɪt dˈuː tə ðə kˈɑːnstənt bˈʊliɪŋ hiː ɛndjˈʊɹz ɔnðə wˈɛbsaɪt.",
+     "espeak": "æntˈoʊnɪˌoʊz sˈɛlfɛstˈiːm hɐz tˈeɪkən ɐ sᵻvˈɪɹ hˈɪt dˈuː tə ðə kˈɑːnstənt bˈʊlɪɪŋ hiː ɛndˈʊɹz ɔnðə wˈɛbsaɪt.",
+     "heard_uccharan": "antonios self esteem has taken a severe hit due to the constant bullying he had years on the website",
+     "heard_espeak": "antonios self esteem has taken a severe hit due to the constant bullying he hinders on the website"
+    },
+    {
+     "text": "Zaragoza in Aragon, Spain is a sister city of Zamboanga City.",
+     "uccharan": "zɑːɹɑːɡˈoʊzə ɪn ˈæɹəɡˌɑːn, spˈeɪn ɪz ɐ sˈɪstɚ sˈɪɾi ʌv zæmbˈoʊŋɡə sˈɪɾi.",
+     "espeak": "zˌæɹɐɡˈoʊzə ɪn ˈæɹæɡən, spˈeɪn ɪz ɐ sˈɪstɚ sˈɪɾi ʌv zˈæmboʊŋɡə sˈɪɾi.",
+     "heard_uccharan": "sauragos is an arrogant spain is a sister city of zimbong city",
+     "heard_espeak": "zaragoza in erigan spain is a sister city of zamboonga city"
+    }
+   ],
+   "lessac": [
+    {
+     "text": "Tom wouldn't have done that unless it was really necessary.",
+     "uccharan": "tˈɑːm wˈʊdənt hæv dˈʌn ðæt ʌnlˈɛs ɪt wʌz ɹˈiəli nˈɛsəsˌɛɹi.",
+     "espeak": "tˈɑːm wˌʊdəntəv dˈʌn ðæt ʌnlˈɛs ɪt wʌz ɹˈiəli nˈɛsᵻsɚɹi.",
+     "heard_uccharan": "tom wutant have done that unless it was really necessary",
+     "heard_espeak": "tom would not have done that unless it was really necessary"
+    },
+    {
+     "text": "Janos looked under the shelves and found his money there.",
+     "uccharan": "dʒˈænoʊs lˈʊkt ˌʌndɚ ðə ʃˈɛlvz ænd fˈaʊnd hɪz mˈʌni ðˈɛɹ.",
+     "espeak": "dʒˈɑːnoʊz lˈʊkt ˌʌndɚ ðə ʃˈɛlvz ænd fˈaʊnd hɪz mˈʌni ðˈɛɹ.",
+     "heard_uccharan": "genose looked under the shelves and found his money there",
+     "heard_espeak": "janos looked under the shelves and found his money there"
+    },
+    {
+     "text": "Fear creates barriers to effective communication.",
+     "uccharan": "fˈɪɹ kɹiːˈeɪts bˈæɹɪɚz tʊ ɪfˈɛktɪv kəmjˌuːnɪkˈeɪʃən.",
+     "espeak": "fˈɪɹ kɹiːˈeɪts bˈæɹɪɹz tʊ ɪfˈɛktɪv kəmjˌuːnɪkˈeɪʃən.",
+     "heard_uccharan": "there creates barriers to effective communication",
+     "heard_espeak": "fear creates barriers to effective communication"
+    },
+    {
+     "text": "It's estimated that, over our lifetime, we spend up to six months standing in queues.",
+     "uccharan": "ɪts ˈɛstɪmˌeɪɾᵻd ðˈæt, ˌoʊvɚɹ ˌaʊɚ lˈaɪftaɪm, wiː spˈɛnd ˌʌp tə sˈɪks mˈʌnθs stˈændɪŋ ɪn kjˈuːz.",
+     "espeak": "ɪts ˈɛstᵻmˌeɪɾᵻd ðˈæt, ˌoʊvɚɹ ˌaʊɚ lˈaɪftaɪm, wiː spˈɛnd ˌʌp tə sˈɪks mˈʌnθs stˈændɪŋ ɪn kjˈuːz.",
+     "heard_uccharan": "it is estimated that over our lifetime we spend up to 6 months standing in cues",
+     "heard_espeak": "it is estimated that over our lifetime we spend up to 6 months standing in queues"
+    },
+    {
+     "text": "I didn't realize you lived in this neighborhood.",
+     "uccharan": "aɪ dˈɪdnt ɹˈiəlˌaɪz juː lˈɪvd ɪn ðɪs nˈeɪbɚhˌʊd.",
+     "espeak": "aɪ dˈɪdnt ɹˈiːəlaɪz juː lˈɪvd ɪn ðɪs nˈeɪbɚhˌʊd.",
+     "heard_uccharan": "i did not realize you lived in the neighborhood",
+     "heard_espeak": "i did not realize you lived in this neighborhood"
+    },
+    {
+     "text": "If you want it, you can have it.",
+     "uccharan": "ɪf juː wˈɔnt ɪt, juː kæn hæv ɪt.",
+     "espeak": "ɪf juː wˈɔnt ɪt, juː kæn hˈæv ɪt.",
+     "heard_uccharan": "if you want it you can have",
+     "heard_espeak": "if you want it you can have it"
+    },
+    {
+     "text": "The situation was beyond description.",
+     "uccharan": "ðə sˌɪtʃuːˈeɪʃən wʌz bᵻˈɑːnd dᵻskɹˈɪpʃən.",
+     "espeak": "ðə sˌɪtʃuːˈeɪʃən wʌz bᵻjˌɔnd dᵻskɹˈɪpʃən.",
+     "heard_uccharan": "the situation was barned description",
+     "heard_espeak": "the situation was beyond description"
+    },
+    {
+     "text": "Tom's strength isn't what it once was.",
+     "uccharan": "tˈɑːmz stɹˈɛŋkθ ˌɪzənt wʌt ɪt wˈʌns wʌz.",
+     "espeak": "tˈɑːmz stɹˈɛŋθ ˌɪzənt wʌt ɪt wˈʌns wʌz.",
+     "heard_uccharan": "term strength is not what it once was",
+     "heard_espeak": "toms strength is not what it once was"
+    },
+    {
+     "text": "Yanni saw Skura lying on the floor.",
+     "uccharan": "jˈæni sˈɔː skˈʊɹɹə lˈaɪɪŋ ɔnðə flˈɔːɹ.",
+     "espeak": "jˈæni sˈɔː skjˈʊɹɹə lˈaɪɪŋ ɔnðə flˈɔːɹ.",
+     "heard_uccharan": "yenny saw score relying on the floor",
+     "heard_espeak": "yenny saw secure lying on the floor"
+    },
+    {
+     "text": "Can you name any plants peculiar to Japan?",
+     "uccharan": "kæn juː nˈeɪm ˌɛni plˈænts pᵻkjˈuːljɚ tə dʒəpˈæn?",
+     "espeak": "kæn juː nˈeɪm ˌɛni plˈænts pɪkjˈuːlɪɹ tə dʒəpˈæn?",
+     "heard_uccharan": "can you name any plans peculiar to japan",
+     "heard_espeak": "can you name any plants peculiar to japan"
+    },
+    {
+     "text": "As it is already night, retire to your homes.",
+     "uccharan": "æz ɪɾ ɪz ɔːlɹˌɛdi nˈaɪt, ɹᵻtˈaɪɚ tə jʊɹ hˈoʊmz.",
+     "espeak": "ˌæzɪtˌɪz ɔːlɹˌɛdi nˈaɪt, ɹᵻtˈaɪɚ tə jʊɹ hˈoʊmz.",
+     "heard_uccharan": "as it is already night retired to your homes",
+     "heard_espeak": "as it is already night retire to your homes"
+    },
+    {
+     "text": "Yanni is looking at Algeria as a huge growth factor for his company.",
+     "uccharan": "jˈæni ɪz lˈʊkɪŋ æɾ ældʒˈiəɹiə æz ɐ hjˈuːdʒ ɡɹˈoʊθ fˈæktɚ fɔːɹ hɪz kˈʌmpəni.",
+     "espeak": "jˈæni ɪz lˈʊkɪŋ æɾ ældʒˈɪɹiə æz ɐ hjˈuːdʒ ɡɹˈoʊθ fˈæktɚ fɔːɹ hɪz kˈʌmpəni.",
+     "heard_uccharan": "yannis looking at algeria as a huge growth factor for his company",
+     "heard_espeak": "yani is looking at algeria as a huge growth factor for his company"
+    },
+    {
+     "text": "Yanni was talking about his relationship with Skura.",
+     "uccharan": "jˈæni wʌz tˈɔːkɪŋ ɐbˌaʊt hɪz ɹᵻlˈeɪʃənʃˌɪp wɪð skˈʊɹɹə.",
+     "espeak": "jˈæni wʌz tˈɔːkɪŋ ɐbˌaʊt hɪz ɹᵻlˈeɪʃənʃˌɪp wɪð skjˈʊɹɹə.",
+     "heard_uccharan": "yeni was talking about his relationship with scora",
+     "heard_espeak": "yeni was talking about his relationship with skura"
+    },
+    {
+     "text": "You shall answer for this, Ibragim!",
+     "uccharan": "juː ʃˌæl ˈænsɚ fɔːɹ ðˈɪs, ɪbɹˈædʒɪm!",
+     "espeak": "juː ʃˌæl ˈænsɚ fɔːɹ ðˈɪs, ˈɪbɹædʒɪm!",
+     "heard_uccharan": "you shall answer for this a bregeon",
+     "heard_espeak": "you shall answer for this ibregyn"
+    },
+    {
+     "text": "It's a perfect day for a picnic.",
+     "uccharan": "ɪts ɐ pˈɜːfɪkt dˈeɪ fɚɹə pˈɪknɪk.",
+     "espeak": "ɪts ɐ pˈɜːfɛkt dˈeɪ fɚɹə pˈɪknɪk.",
+     "heard_uccharan": "it is a perfect day for picnic",
+     "heard_espeak": "it is a perfect day for a picnic"
+    },
+    {
+     "text": "Blizzards always make me feel so nostalgic.",
+     "uccharan": "blˈɪzɚdz ˈɔːlweɪz mˌeɪk mˌiː fˈiːl sˌoʊ nɔstˈældʒɪk.",
+     "espeak": "blˈɪzɚdz ˈɔːlweɪz mˌeɪk mˌiː fˈiːl sˌoʊ nəstˈældʒɪk.",
+     "heard_uccharan": "lizards always make me feel so nostalgic",
+     "heard_espeak": "blizzards always make me feel so nostalgic"
+    }
+   ],
+   "alba": [
+    {
+     "text": "Tom wouldn't have done that unless it was really necessary.",
+     "uccharan": "tˈɒm wˈʊdənt hæv dˈʌn ðæt ʌnlˈɛs ɪt wɒz ɹˈiəlɪ nˈɛsəsəɹɪ.",
+     "espeak": "tˈɒm wˌʊdəntəv dˈʌn ðæt ʌnlˈɛs ɪt wɒz ɹˈiəlɪ nˈɛsɪsəɹɪ.",
+     "heard_uccharan": "but tom would not have done that unless it was really necessary",
+     "heard_espeak": "tom would not have done that unless it was really necessary"
+    },
+    {
+     "text": "Martino asked Walid to help him write a text in Berber.",
+     "uccharan": "mɑːtˈiːnəʊ ˈɑːskt wɔːlˈiːd tə hˈɛlp hˌɪm ɹˈaɪt ɐ tˈɛkst ɪn bˈɜːbɐ.",
+     "espeak": "mɑːtˈiːnəʊ ˈɑːskt wˈælɪd tə hˈɛlp hˌɪm ɹˈaɪt ɐ tˈɛkst ɪn bˈɜːbɐ.",
+     "heard_uccharan": "marty no asked will lead to help him write a text in burber",
+     "heard_espeak": "martino asked wallet to help him write a text in burber"
+    },
+    {
+     "text": "I know you aren't very happy about it.",
+     "uccharan": "aɪ nˈəʊ juː ˌɑːnt vˈɛɹɪ hˈæpɪ ɐbˌaʊt ɪt.",
+     "espeak": "aɪ nˈəʊ juː ˌɑːnt vˈɛɹɪ hˈæpɪ ɐbˈaʊt ɪt.",
+     "heard_uccharan": "i know you were not very happy about it",
+     "heard_espeak": "i know you are not very happy about it"
+    },
+    {
+     "text": "Tom didn't like Mary from the start.",
+     "uccharan": "tˈɒm dˈɪdnt lˈaɪk mˈeəɹɪ fɹɒmðə stˈɑːt.",
+     "espeak": "tˈɒm dˈɪdnt lˈaɪk mˈeəɹɪ fɹʌmðə stˈɑːt.",
+     "heard_uccharan": "tum do not like mary from the start",
+     "heard_espeak": "tom did not like mary from the start"
+    },
+    {
+     "text": "Fear creates barriers to effective communication.",
+     "uccharan": "fˈiə kɹiːˈeɪts bˈæɹɪəz tʊ ɪfˈɛktɪv kəmjˌuːnɪkˈeɪʃən.",
+     "espeak": "fˈiə kɹiːˈeɪts bˈæɹiəz tʊ ɪfˈɛktɪv kəmjˌuːnɪkˈeɪʃən.",
+     "heard_uccharan": "help your creats barriers to effective communication",
+     "heard_espeak": "fear creates barriers to effective communication"
+    },
+    {
+     "text": "Food and clothes are necessities of life.",
+     "uccharan": "fˈuːd ænd klˈəʊðz ɑː nɪsˈɛsɪtɪz ɒv lˈaɪf.",
+     "espeak": "fˈuːd ænd klˈəʊðz ɑː nəsˈɛsɪtɪz ɒv lˈaɪf.",
+     "heard_uccharan": "fruit and cloths are necessities of life",
+     "heard_espeak": "fruit and clothes are necessities of life"
+    },
+    {
+     "text": "\"Seriously?\" \"I shit you not.\"",
+     "uccharan": "sˈiəɹiəslɪ? aɪ ʃˈɪt juː nˈɒt.",
+     "espeak": "sˈiəɹɪəslɪ? aɪ ʃˈɪt juː nˈɒt.",
+     "heard_uccharan": "seriously i should do not",
+     "heard_espeak": "seriously i shit you not"
+    },
+    {
+     "text": "Tom wouldn't have just let Mary win.",
+     "uccharan": "tˈɒm wˈʊdənt hæv dʒˈʌst lˈɛt mˈeəɹɪ wˈɪn.",
+     "espeak": "tˈɒm wˌʊdəntəv dʒˈʌst lˈɛt mˈeəɹɪ wˈɪn.",
+     "heard_uccharan": "but tom would not have just let mary win",
+     "heard_espeak": "tom would not have just let mary win"
+    },
+    {
+     "text": "Tom seemed to really enjoy being here.",
+     "uccharan": "tˈɒm sˈiːmd tə ɹˈiəlɪ ɛndʒˈɔɪ bˌiːɪŋ hˈiə.",
+     "espeak": "tˈɒm sˈiːmd tə ɹˈiəlɪ ɪndʒˈɔɪ bˌiːɪŋ hˈiə.",
+     "heard_uccharan": "but tom seemed to really enjoy being here",
+     "heard_espeak": "tom seemed to really enjoy being here"
+    },
+    {
+     "text": "Did you see yesterday's match against Australia?",
+     "uccharan": "dˈɪd juː sˈiː jˈɛstədˌeɪz mˈætʃ ɐɡˈɛnst ɔːstɹˈeɪliɐ?",
+     "espeak": "dˈɪd juː sˈiː jˈɛstədˌeɪz mˈætʃ ɐɡˈɛnst ɒstɹˈeɪliə?",
+     "heard_uccharan": "the dc yesterday is much against australia",
+     "heard_espeak": "the dc yesterdays much against australia"
+    },
+    {
+     "text": "Boris wants to live a perfect life.",
+     "uccharan": "bˈɔːɹɪs wˈɒnts tə lˈɪv ɐ pˈɜːfɪkt lˈaɪf.",
+     "espeak": "bˈɒɹɪs wˈɒnts tə lˈɪv ɐ pˈɜːfɛkt lˈaɪf.",
+     "heard_uccharan": "boris wanted to live a perfect life",
+     "heard_espeak": "boris wants to live a perfect life"
+    },
+    {
+     "text": "Mennad is going to shit his pants.",
+     "uccharan": "mˈɛnæd ɪz ɡˌəʊɪŋ tə ʃˈɪt hɪz pˈænts.",
+     "espeak": "mˈɛnæd ɪz ɡˌəʊɪŋ tə ʃˈɪt hɪz pˈɑːnts.",
+     "heard_uccharan": "men out is going to shut his pants",
+     "heard_espeak": "menad is going to shit his pants"
+    },
+    {
+     "text": "Greater demand for high-quality coffee has helped drive coffee prices higher.",
+     "uccharan": "ɡɹˈeɪtɐ dɪmˈɑːnd fɔː hˈaɪkwˈɑːlɪtɪ kˈɒfɪ hɐz hˈɛlpt dɹˈaɪv kˈɒfɪ pɹˈaɪsɪz hˈaɪə.",
+     "espeak": "ɡɹˈeɪtɐ dɪmˈɑːnd fɔː hˈaɪkwˈɒlɪtɪ kˈɒfɪ hɐz hˈɛlpt dɹˈaɪv kˈɒfɪ pɹˈaɪsɪz hˈaɪɐ.",
+     "heard_uccharan": "great to demand for high quality coffee has helped drive coffee prices higher",
+     "heard_espeak": "greater demand for high quality coffee has helped drive coffee prices higher"
+    },
+    {
+     "text": "Jonas easily fended off the thugs.",
+     "uccharan": "dʒˈəʊnəs ˈiːzɪlɪ fˈɛndɪd ˈɒf ðə θˈʌɡz.",
+     "espeak": "dʒˈəʊnəz ˈiːzɪlɪ fˈɛndɪd ˈɒf ðə θˈʌɡz.",
+     "heard_uccharan": "jonas easily fended off the fugs",
+     "heard_espeak": "jonas easily fended off the thugs"
+    },
+    {
+     "text": "Since graduation fifteen years ago I have never run into my former classmates.",
+     "uccharan": "sˈɪns ɡɹˌædʒuːˈeɪʃən fɪftˈiːn jˈiəz ɐɡˈəʊ aɪ hæv nˈɛvɐ ɹˈʌn ˌɪntʊ maɪ fˈɔːmɐ klˈɑːsmeɪts.",
+     "espeak": "sˈɪns ɡɹˌædjuːˈeɪʃən fˈɪftiːn jˈiəz ɐɡˈəʊ aɪ hæv nˈɛvɐ ɹˈʌn ˌɪntʊ maɪ fˈɔːmɐ klˈɑːsmeɪts.",
+     "heard_uccharan": "since graduation 15 years ago i had never run into my former classmates",
+     "heard_espeak": "since graduation 15 years ago i have never run into my former classmates"
+    },
+    {
+     "text": "Tom dunked his croissant into his coffee.",
+     "uccharan": "tˈɒm dˈʌŋkt hɪz kwɒsˈɑːnt ˌɪntʊ hɪz kˈɒfɪ.",
+     "espeak": "tˈɒm dˈʌŋkt hɪz kwˈɑːsɑ̃ ˌɪntʊ hɪz kˈɒfɪ.",
+     "heard_uccharan": "tom dunked his co scent into his coffee",
+     "heard_espeak": "tom dunked his quassar into his coffee"
+    },
+    {
+     "text": "As it is already night, retire to your homes.",
+     "uccharan": "æz ɪt ɪz ɔːlɹˌɛdɪ nˈaɪt, ɹɪtˈaɪə tə jɔː hˈəʊmz.",
+     "espeak": "ˌæzɪtˌɪz ɔːlɹˌɛdɪ nˈaɪt, ɹɪtˈaɪə tə jɔː hˈəʊmz.",
+     "heard_uccharan": "as it is already night retired to your homes",
+     "heard_espeak": "as it is already night retire to your homes"
+    },
+    {
+     "text": "Yanni was talking about his relationship with Skura.",
+     "uccharan": "jˈænɪ wɒz tˈɔːkɪŋ ɐbˌaʊt hɪz ɹɪlˈeɪʃənʃˌɪp wɪð skˈɔːɹɐ.",
+     "espeak": "jˈænɪ wɒz tˈɔːkɪŋ ɐbˌaʊt hɪz ɹɪlˈeɪʃənʃˌɪp wɪð skjˈɔːɹɐ.",
+     "heard_uccharan": "yanny was talking about his relationship with skurra",
+     "heard_espeak": "yanny was talking about his relationship with skura"
+    },
+    {
+     "text": "Antonio's self-esteem has taken a severe hit due to the constant bullying he endures on the website.",
+     "uccharan": "æntˈəʊnɪˌəʊz sˈɛlfɪstˈiːm hɐz tˈeɪkən ɐ sɪvˈiə hˈɪt djˈuː tə ðə kˈɒnstənt bˈʊliɪŋ hiː ɛndjˈɔːz ɒnðə wˈɛbsaɪt.",
+     "espeak": "æntˈəʊnɪˌəʊz sˈɛlfɛstˈiːm hɐz tˈeɪkən ɐ sɪvˈiə hˈɪt djˈuː tə ðə kˈɒnstənt bˈʊlɪɪŋ hiː ɛndjˈɔːz ɒnðə wˈɛbsaɪt.",
+     "heard_uccharan": "antonios self esteem has taken a severe hit due to constant bullying he and jaws on the website",
+     "heard_espeak": "antonios self esteem has taken a severe hit due to the constant bullying he enjoys on the website"
+    },
+    {
+     "text": "A rich guy from Australia just bought the house next to mine.",
+     "uccharan": "ɐ ɹˈɪtʃ ɡˈaɪ fɹɒm ɔːstɹˈeɪliɐ dʒˈʌst bˈɔːt ðə hˈaʊs nˈɛkst tə mˈaɪn.",
+     "espeak": "ɐ ɹˈɪtʃ ɡˈaɪ fɹɒm ɒstɹˈeɪliə dʒˈʌst bˈɔːt ðə hˈaʊs nˈɛkst tə mˈaɪn.",
+     "heard_uccharan": "a rich guy from australia",
+     "heard_espeak": "a rich guy from australia just bought the house next to mine"
+    },
+    {
+     "text": "Jews, Christians and Muslims agree that Jerusalem is a holy city.",
+     "uccharan": "dʒˈuːz, kɹˈɪstʃənz ænd mˈʌzlɪmz ɐɡɹˈiː ðæt dʒəɹˈuːsələm ɪz ɐ hˈəʊlɪ sˈɪtɪ.",
+     "espeak": "dʒˈuːz, kɹˈɪstʃənz ænd mˈʊzlɪmz ɐɡɹˈiː ðæt dʒəɹˈuːsələm ɪz ɐ hˈəʊlɪ sˈɪtɪ.",
+     "heard_uccharan": "jews christians and muslims agreed that jerusalem is a holy city",
+     "heard_espeak": "jews christians and muslims agree that jerusalem is a holy city"
+    },
+    {
+     "text": "Will you be at home at midday today?",
+     "uccharan": "wɪl juː biː æt hˈəʊm æt mˈɪddeɪ tədˈeɪ?",
+     "espeak": "wɪl juː biː æt hˈəʊm æt mˌɪddˈeɪ tədˈeɪ?",
+     "heard_uccharan": "will you be at home at midsy to d",
+     "heard_espeak": "will you be at home at meditadhi"
+    }
+   ],
+   "rohan": [
+    {
+     "text": "टॉम ने अ‍ॅप डिलीट कर दिया।",
+     "uccharan": "ʈˈɔm nˈeː ˈʌɛp ɖɪlˈiːʈ kˈʌɾ dˈɪjaː.",
+     "espeak": "ʈˈɔm nˈeː ˈʌʰχɛp ɖɪlˈiːʈ kˈʌɾ dˈɪjaː.",
+     "heard_uccharan": "टॉन ने ऐप डिलीट कर दिया",
+     "heard_espeak": "टॉम ने अब डिलीट कर दिया"
+    },
+    {
+     "text": "उसकी जान-पहचान में तो बहुत लोग थे पर दोस्त कोई भी नहीं थे।",
+     "uccharan": "ˌʊskˌi ɟˈaːnpˌəhəcˈaːn mẽː tˈoː bˈʌhʊt lˈoːɡ tʰeː pˈʌɾ dˈoːst kˈoːi bʰˈi nˈʌhĩ tʰeː.",
+     "espeak": "ˌʊskˌi ɟˈaːnəpˌəhəcˈaːn mẽː tˈoː bˈʌhʊt lˈoːɡ tʰeː pˈʌɾ dˈoːst kˈoːi bʰˈi nˈʌhĩ tʰeː.",
+     "heard_uccharan": "उसकी जान पहचान में तो बहुत लोग थे आरोप दोस्त कोई भी नहीं थे",
+     "heard_espeak": "उसकी जान पहचान में तो बहुत लोग थे पर दोस्त कोई भी नहीं थे"
+    }
+   ]
   },
-  {
-   "model": "kitten-nano-0.8-int8",
-   "voice": "-",
-   "lang": "en",
-   "stt": "whisper-base",
-   "n": 60,
-   "wer": 0.0168,
-   "cer": 0.0082,
-   "ttfa_ms_median": 890,
-   "ttfa_ms_p90": 1512,
-   "rtf_median": 0.33,
-   "threads": 2,
-   "phonemizer": "uccharan"
-  },
-  {
-   "model": "kokoro-v1.0-int8",
-   "voice": "af_heart",
-   "lang": "en",
-   "stt": "whisper-base",
-   "n": 60,
-   "wer": 0.0299,
-   "cer": 0.0122,
-   "ttfa_ms_median": 2373,
-   "ttfa_ms_p90": 4102,
-   "rtf_median": 1.214,
-   "threads": 2,
-   "phonemizer": "uccharan"
-  },
-  {
-   "model": "piper-en-us-amy-low",
-   "voice": "-",
-   "lang": "en",
-   "stt": "whisper-base",
-   "n": 60,
-   "wer": 0.0261,
-   "cer": 0.0115,
-   "ttfa_ms_median": 148,
-   "ttfa_ms_p90": 263,
-   "rtf_median": 0.06,
-   "threads": 2,
-   "phonemizer": "espeak-ng"
-  },
-  {
-   "model": "piper-en-us-lessac-medium",
-   "voice": "-",
-   "lang": "en",
-   "stt": "whisper-base",
-   "n": 60,
-   "wer": 0.0243,
-   "cer": 0.01,
-   "ttfa_ms_median": 252,
-   "ttfa_ms_p90": 395,
-   "rtf_median": 0.114,
-   "threads": 2,
-   "phonemizer": "espeak-ng"
-  },
-  {
-   "model": "piper-en-gb-alba-medium",
-   "voice": "-",
-   "lang": "en",
-   "stt": "whisper-base",
-   "n": 60,
-   "wer": 0.0448,
-   "cer": 0.0267,
-   "ttfa_ms_median": 182,
-   "ttfa_ms_p90": 324,
-   "rtf_median": 0.079,
-   "threads": 2,
-   "phonemizer": "espeak-ng"
-  },
-  {
-   "model": "kitten-nano-0.8-int8",
-   "voice": "-",
-   "lang": "en",
-   "stt": "whisper-base",
-   "n": 60,
-   "wer": 0.0187,
-   "cer": 0.0078,
-   "ttfa_ms_median": 1198,
-   "ttfa_ms_p90": 1928,
-   "rtf_median": 0.413,
-   "threads": 2,
-   "phonemizer": "espeak-ng"
-  },
-  {
-   "model": "kokoro-v1.0-int8",
-   "voice": "af_heart",
-   "lang": "en",
-   "stt": "whisper-base",
-   "n": 60,
-   "wer": 0.0299,
-   "cer": 0.0182,
-   "ttfa_ms_median": 2518,
-   "ttfa_ms_p90": 4636,
-   "rtf_median": 1.291,
-   "threads": 2,
-   "phonemizer": "espeak-ng"
-  },
-  {
-   "model": "kokoro-v1.0-int8",
-   "voice": "af_heart",
-   "lang": "en",
-   "stt": "whisper-base",
-   "n": 60,
-   "wer": 0.0672,
-   "cer": 0.0693,
-   "ttfa_ms_median": 2361,
-   "ttfa_ms_p90": 3968,
-   "rtf_median": 1.238,
-   "threads": 2,
-   "phonemizer": "lexicon"
-  },
-  {
-   "model": "piper-hi-in-rohan-medium",
-   "voice": "-",
-   "lang": "hi",
-   "stt": "indicconformer-hi-community",
-   "n": 60,
-   "wer": 0.0765,
-   "cer": 0.0268,
-   "ttfa_ms_median": 146,
-   "ttfa_ms_p90": 204,
-   "rtf_median": 0.078,
-   "threads": 2,
-   "phonemizer": "uccharan"
-  },
-  {
-   "model": "kokoro-v1.0-int8",
-   "voice": "hf_alpha",
-   "lang": "hi",
-   "stt": "indicconformer-hi-community",
-   "n": 60,
-   "wer": 0.0538,
-   "cer": 0.0177,
-   "ttfa_ms_median": 2856,
-   "ttfa_ms_p90": 4042,
-   "rtf_median": 1.302,
-   "threads": 2,
-   "phonemizer": "uccharan"
-  },
-  {
-   "model": "piper-hi-in-rohan-medium",
-   "voice": "-",
-   "lang": "hi",
-   "stt": "indicconformer-hi-community",
-   "n": 60,
-   "wer": 0.0907,
-   "cer": 0.0268,
-   "ttfa_ms_median": 170,
-   "ttfa_ms_p90": 238,
-   "rtf_median": 0.098,
-   "threads": 2,
-   "phonemizer": "espeak-ng"
-  },
-  {
-   "model": "kokoro-v1.0-int8",
-   "voice": "hf_alpha",
-   "lang": "hi",
-   "stt": "indicconformer-hi-community",
-   "n": 60,
-   "wer": 0.0453,
-   "cer": 0.0144,
-   "ttfa_ms_median": 3018,
-   "ttfa_ms_p90": 4469,
-   "rtf_median": 1.385,
-   "threads": 2,
-   "phonemizer": "espeak-ng"
-  },
-  {
-   "model": "piper-hi-in-rohan-medium",
-   "voice": "-",
-   "lang": "hi",
-   "stt": "indicconformer-hi-community",
-   "n": 60,
-   "wer": 0.0822,
-   "cer": 0.0301,
-   "ttfa_ms_median": 153,
-   "ttfa_ms_p90": 265,
-   "rtf_median": 0.084,
-   "threads": 2,
-   "phonemizer": "uccharan:improved"
-  },
-  {
-   "model": "piper-en-us-amy-low",
-   "voice": "-",
-   "lang": "en",
-   "stt": "whisper-base",
-   "n": 60,
-   "wer": 0.0299,
-   "cer": 0.0126,
-   "ttfa_ms_median": 130,
-   "ttfa_ms_p90": 229,
-   "rtf_median": 0.052,
-   "threads": 2,
-   "phonemizer": "uccharan:improved"
+  "words_wrong_only_with_one": {
+   "amy": {
+    "uccharan": [
+     [
+      "sami",
+      2
+     ],
+     [
+      "tom",
+      2
+     ],
+     [
+      "i",
+      2
+     ],
+     [
+      "says",
+      1
+     ],
+     [
+      "side",
+      1
+     ],
+     [
+      "neighborhood",
+      1
+     ],
+     [
+      "seemed",
+      1
+     ],
+     [
+      "to",
+      1
+     ],
+     [
+      "enjoy",
+      1
+     ],
+     [
+      "here",
+      1
+     ],
+     [
+      "really",
+      1
+     ],
+     [
+      "being",
+      1
+     ],
+     [
+      "for",
+      1
+     ],
+     [
+      "bag",
+      1
+     ],
+     [
+      "marys",
+      1
+     ],
+     [
+      "was",
+      1
+     ],
+     [
+      "saw",
+      1
+     ],
+     [
+      "skura",
+      1
+     ],
+     [
+      "as",
+      1
+     ],
+     [
+      "it",
+      1
+     ],
+     [
+      "licked",
+      1
+     ],
+     [
+      "because",
+      1
+     ],
+     [
+      "talking",
+      1
+     ],
+     [
+      "motorcycle",
+      1
+     ],
+     [
+      "zaragoza",
+      1
+     ]
+    ],
+    "espeak": [
+     [
+      "this",
+      2
+     ],
+     [
+      "poses",
+      1
+     ],
+     [
+      "janos",
+      1
+     ],
+     [
+      "dictionary",
+      1
+     ],
+     [
+      "shit",
+      1
+     ],
+     [
+      "queues",
+      1
+     ],
+     [
+      "threw",
+      1
+     ],
+     [
+      "does",
+      1
+     ],
+     [
+      "copied",
+      1
+     ],
+     [
+      "layla",
+      1
+     ],
+     [
+      "me",
+      1
+     ],
+     [
+      "policy",
+      1
+     ],
+     [
+      "making",
+      1
+     ],
+     [
+      "tom",
+      1
+     ],
+     [
+      "all",
+      1
+     ],
+     [
+      "croissant",
+      1
+     ],
+     [
+      "handcuffs",
+      1
+     ],
+     [
+      "a",
+      1
+     ],
+     [
+      "compromise",
+      1
+     ],
+     [
+      "applies",
+      1
+     ],
+     [
+      "threatening",
+      1
+     ],
+     [
+      "midday",
+      1
+     ],
+     [
+      "can",
+      1
+     ],
+     [
+      "hot",
+      1
+     ],
+     [
+      "full",
+      1
+     ]
+    ]
+   },
+   "lessac": {
+    "uccharan": [
+     [
+      "tom",
+      11
+     ],
+     [
+      "is",
+      5
+     ],
+     [
+      "in",
+      3
+     ],
+     [
+      "this",
+      3
+     ],
+     [
+      "not",
+      2
+     ],
+     [
+      "and",
+      2
+     ],
+     [
+      "it",
+      2
+     ],
+     [
+      "glory",
+      2
+     ],
+     [
+      "typhoon",
+      1
+     ],
+     [
+      "you",
+      1
+     ],
+     [
+      "people",
+      1
+     ],
+     [
+      "pleasers",
+      1
+     ],
+     [
+      "thorn",
+      1
+     ],
+     [
+      "would",
+      1
+     ],
+     [
+      "was",
+      1
+     ],
+     [
+      "many",
+      1
+     ],
+     [
+      "janos",
+      1
+     ],
+     [
+      "talk",
+      1
+     ],
+     [
+      "fear",
+      1
+     ],
+     [
+      "queues",
+      1
+     ],
+     [
+      "its",
+      1
+     ],
+     [
+      "on",
+      1
+     ],
+     [
+      "way",
+      1
+     ],
+     [
+      "cleanup",
+      1
+     ],
+     [
+      "team",
+      1
+     ]
+    ],
+    "espeak": [
+     [
+      "tom",
+      7
+     ],
+     [
+      "ziri",
+      4
+     ],
+     [
+      "why",
+      2
+     ],
+     [
+      "it",
+      2
+     ],
+     [
+      "have",
+      2
+     ],
+     [
+      "and",
+      2
+     ],
+     [
+      "he",
+      2
+     ],
+     [
+      "would",
+      2
+     ],
+     [
+      "not",
+      2
+     ],
+     [
+      "sami",
+      2
+     ],
+     [
+      "cocks",
+      1
+     ],
+     [
+      "aunt",
+      1
+     ],
+     [
+      "my",
+      1
+     ],
+     [
+      "his",
+      1
+     ],
+     [
+      "safety",
+      1
+     ],
+     [
+      "own",
+      1
+     ],
+     [
+      "for",
+      1
+     ],
+     [
+      "did",
+      1
+     ],
+     [
+      "you",
+      1
+     ],
+     [
+      "isabellas",
+      1
+     ],
+     [
+      "toms",
+      1
+     ],
+     [
+      "mira",
+      1
+     ],
+     [
+      "says",
+      1
+     ],
+     [
+      "a",
+      1
+     ],
+     [
+      "by",
+      1
+     ]
+    ]
+   },
+   "alba": {
+    "uccharan": [
+     [
+      "you",
+      5
+     ],
+     [
+      "the",
+      4
+     ],
+     [
+      "sami",
+      4
+     ],
+     [
+      "tom",
+      3
+     ],
+     [
+      "are",
+      2
+     ],
+     [
+      "long",
+      2
+     ],
+     [
+      "he",
+      2
+     ],
+     [
+      "shit",
+      2
+     ],
+     [
+      "day",
+      2
+     ],
+     [
+      "angrily",
+      1
+     ],
+     [
+      "please",
+      1
+     ],
+     [
+      "martino",
+      1
+     ],
+     [
+      "here",
+      1
+     ],
+     [
+      "how",
+      1
+     ],
+     [
+      "did",
+      1
+     ],
+     [
+      "shelves",
+      1
+     ],
+     [
+      "fear",
+      1
+     ],
+     [
+      "creates",
+      1
+     ],
+     [
+      "clothes",
+      1
+     ],
+     [
+      "says",
+      1
+     ],
+     [
+      "froze",
+      1
+     ],
+     [
+      "queues",
+      1
+     ],
+     [
+      "dance",
+      1
+     ],
+     [
+      "typhoon",
+      1
+     ],
+     [
+      "yesterdays",
+      1
+     ]
+    ],
+    "espeak": [
+     [
+      "tom",
+      5
+     ],
+     [
+      "found",
+      4
+     ],
+     [
+      "he",
+      4
+     ],
+     [
+      "was",
+      3
+     ],
+     [
+      "they",
+      3
+     ],
+     [
+      "i",
+      3
+     ],
+     [
+      "mary",
+      2
+     ],
+     [
+      "not",
+      2
+     ],
+     [
+      "will",
+      2
+     ],
+     [
+      "how",
+      2
+     ],
+     [
+      "sami",
+      2
+     ],
+     [
+      "is",
+      2
+     ],
+     [
+      "are",
+      2
+     ],
+     [
+      "than",
+      2
+     ],
+     [
+      "have",
+      2
+     ],
+     [
+      "the",
+      2
+     ],
+     [
+      "nylon",
+      2
+     ],
+     [
+      "says",
+      1
+     ],
+     [
+      "side",
+      1
+     ],
+     [
+      "did",
+      1
+     ],
+     [
+      "snakes",
+      1
+     ],
+     [
+      "mira",
+      1
+     ],
+     [
+      "talk",
+      1
+     ],
+     [
+      "need",
+      1
+     ],
+     [
+      "rima",
+      1
+     ]
+    ]
+   },
+   "rohan": {
+    "uccharan": [
+     [
+      "टॉम",
+      11
+     ],
+     [
+      "से",
+      3
+     ],
+     [
+      "ज़्यादा",
+      3
+     ],
+     [
+      "है",
+      2
+     ],
+     [
+      "हूँ",
+      2
+     ],
+     [
+      "मैं",
+      1
+     ],
+     [
+      "या",
+      1
+     ],
+     [
+      "पाना",
+      1
+     ],
+     [
+      "प्रगति",
+      1
+     ],
+     [
+      "तैरने",
+      1
+     ],
+     [
+      "ज़रूरत",
+      1
+     ],
+     [
+      "होठ",
+      1
+     ],
+     [
+      "वफ़ादार",
+      1
+     ],
+     [
+      "वह",
+      1
+     ],
+     [
+      "सुपरमार्केट",
+      1
+     ],
+     [
+      "चोद",
+      1
+     ],
+     [
+      "सामी",
+      1
+     ],
+     [
+      "ब्रैड",
+      1
+     ],
+     [
+      "पिट",
+      1
+     ],
+     [
+      "उसे",
+      1
+     ],
+     [
+      "फ़ोन",
+      1
+     ],
+     [
+      "कृप्या",
+      1
+     ],
+     [
+      "लैला",
+      1
+     ],
+     [
+      "थीं",
+      1
+     ],
+     [
+      "कॉफ़ी",
+      1
+     ]
+    ],
+    "espeak": [
+     [
+      "टॉम",
+      12
+     ],
+     [
+      "ज़्यादा",
+      3
+     ],
+     [
+      "ज़रूरत",
+      2
+     ],
+     [
+      "की",
+      2
+     ],
+     [
+      "एक",
+      2
+     ],
+     [
+      "आप",
+      2
+     ],
+     [
+      "से",
+      2
+     ],
+     [
+      "तरफ",
+      2
+     ],
+     [
+      "इसे",
+      1
+     ],
+     [
+      "वहाँ",
+      1
+     ],
+     [
+      "है",
+      1
+     ],
+     [
+      "कोई",
+      1
+     ],
+     [
+      "क्या",
+      1
+     ],
+     [
+      "पतंग",
+      1
+     ],
+     [
+      "खिसक",
+      1
+     ],
+     [
+      "बस",
+      1
+     ],
+     [
+      "पढ़",
+      1
+     ],
+     [
+      "उसमें",
+      1
+     ],
+     [
+      "क्योंकि",
+      1
+     ],
+     [
+      "चल",
+      1
+     ],
+     [
+      "लड़",
+      1
+     ],
+     [
+      "पाठशाला",
+      1
+     ],
+     [
+      "फ़्रांस",
+      1
+     ],
+     [
+      "पा",
+      1
+     ],
+     [
+      "कि",
+      1
+     ]
+    ]
+   }
   }
- ]
+ }
 }

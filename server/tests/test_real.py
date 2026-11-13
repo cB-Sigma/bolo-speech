@@ -428,6 +428,65 @@ async def test_two_voices_are_told_apart(core: Bolo) -> None:
     assert word_error_rate(" ".join(t for _, t in lines), result.text, "en") <= 0.25
 
 
+async def test_overlap_separation_recovers_the_second_voice(core: Bolo) -> None:
+    """Two Kokoro voices, the second talking over the first for about 2.5 s: with separate_overlaps the second
+    speaker's overlapped words are transcribed from their own track, and the whole transcript gets better."""
+    from bolo.diarize import DiarizeOptions
+    from bolo.separate import SeparateOptions
+
+    rate = 16000
+    a1 = "The library opens at nine and closes late on Thursdays for the reading group."
+    b1 = "Please send the updated schedule to everyone before the meeting starts tomorrow."
+    a2 = (
+        "When the committee finally met in the spring, they agreed to repair the roof first, then repaint the hall, "
+        "and leave the garden until the autumn when there would be more volunteers around."
+    )
+    b2 = (
+        "The engineers spent most of the week testing the new pumps, and although two of them failed early, the "
+        "rest kept running smoothly through the night without any trouble at all."
+    )
+
+    async def say(voice: str, text: str) -> np.ndarray:
+        audio, native = await core.synthesize_all(text, model="kokoro-v1.0-int8", voice=voice)
+        return resample(audio, native, rate)
+
+    parts = [await say("af_heart", a1), await say("am_michael", b1), await say("af_heart", a2)]
+    b_over = await say("am_michael", b2)
+    gap = np.zeros(int(0.6 * rate), dtype=np.float32)
+    head = np.concatenate([parts[0], gap, parts[1], gap, parts[2]])
+    start_b2 = len(head) - int(2.5 * rate)
+    mix = np.zeros(start_b2 + len(b_over) + rate // 2, dtype=np.float32)
+    mix[: len(head)] += head
+    mix[start_b2 : start_b2 + len(b_over)] += b_over
+
+    reference = " ".join([a1, b1, a2, b2])
+    plain = await core.transcribe(mix, rate, model="whisper-base", language="en", diarize=DiarizeOptions())
+    trace = Trace("stt", "internal", "")
+    opts = SeparateOptions()
+    separated = await core.transcribe(
+        mix, rate, model="whisper-base", language="en", diarize=DiarizeOptions(), separate=opts, trace=trace
+    )
+    report = separated.separation
+    assert report is not None, separated
+    print("\nseparation:", report["status"], report["windows"], f"{report['time_ms']:.0f} ms")
+    print("plain:", plain.text)
+    print("separated:", separated.text)
+    assert report["status"] == "applied" and report["windows"][0]["separated"] == ["A", "B"]
+    assert any(s.separated and s.speaker == "B" for s in separated.segments)
+    b_text = " ".join(s.text for s in separated.segments if s.speaker == "B")
+    b_plain = " ".join(s.text for s in plain.segments if s.speaker == "B")
+    assert word_error_rate(b1 + " " + b2, b_text, "en") < word_error_rate(b1 + " " + b2, b_plain, "en")
+    assert word_error_rate(reference, separated.text, "en") <= 0.2
+    assert "separate" in [p.name for p in trace.phases]
+    # telephone audio is refused unless asked for
+    from bolo.errors import InvalidRequest
+
+    with pytest.raises(InvalidRequest, match="16 kHz"):
+        await core.transcribe(
+            resample(mix, rate, 8000), 8000, model="whisper-base", diarize=DiarizeOptions(), separate=SeparateOptions()
+        )
+
+
 async def test_end_of_turn_model_tells_finished_from_unfinished(core: Bolo) -> None:
     """Smart Turn v3 (8 MB): the whole English sample is a finished turn, its first half is not."""
     from bolo import samples

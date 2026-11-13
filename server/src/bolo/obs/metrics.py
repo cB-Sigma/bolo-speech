@@ -66,6 +66,20 @@ def render_metrics(core: Bolo) -> str:
         stats["totals"]["audio_seconds_out"],
         direction="out",
     )
+    for status, count in stats["separation"]["requests"].items():
+        w.add(
+            "bolo_separation_requests_total",
+            "counter",
+            "Requests that asked for separate_overlaps, by outcome (applied, partial, skipped).",
+            count,
+            status=status,
+        )
+    w.add(
+        "bolo_separation_audio_seconds_total",
+        "counter",
+        "Seconds of audio sent through the separation model (window length x speakers).",
+        stats["separation"]["audio_seconds"],
+    )
     for m in stats["models"]:
         labels = {"model": m["id"], "task": m["task"]}
         w.add("bolo_model_loaded", "gauge", "1 when the model is in memory.", int(m["loaded"]), **labels)

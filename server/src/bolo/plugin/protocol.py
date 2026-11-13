@@ -27,13 +27,20 @@ transcribe ``handle``, ``requests``: list of ``{n, language, task,      ``result
            audio of all requests follows, concatenated (``n``           words}``
            samples each)
 synthesize ``handle``, ``text``, ``voice``, ``speed``                   ``sample_rate`` (chunks before)
+separate   ``handle``; the mixture follows (16 kHz)                     ``tracks`` (count); the tracks
+                                                                        follow, concatenated, equal length
+enrol      ``handle``, ``key``; the voice sample follows (16 kHz)       -
+extract    ``handle``, ``key``; the mixture follows (16 kHz)            the enrolled voice's track follows
+release    ``handle``, ``key``                                          -
 cancel     ``target`` (the id of a running request)                     -
 shutdown   -                                                            - (then the process exits)
 ========== ============================================================ ==============================
 
 ``info`` of a loaded model may hold ``voices`` (list of ``{id, name, language, gender}``),
 ``languages``, ``max_batch`` (default 1: no batching), ``supports_translate`` and
-``supports_word_timestamps``. Segments are ``{start, end, text, words}``, words ``{w, t0, t1}``.
+``supports_word_timestamps``; a separation model (task ``separation``) gives ``mode``
+(``"blind"``: answers ``separate``; ``"target"``: answers ``enrol``/``extract``/``release``) and
+``min_sample_s`` (seconds of voice a target model needs). Segments are ``{start, end, text, words}``, words ``{w, t0, t1}``.
 
 Versioning: bolo sends the highest version it speaks in ``hello``; the plugin answers with the
 version it will use (at most bolo's). A plugin that cannot speak any version bolo knows answers

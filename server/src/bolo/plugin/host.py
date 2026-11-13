@@ -41,6 +41,7 @@ from bolo.engines.base import (
     LoadOptions,
     Model,
     Segment,
+    SeparationModel,
     STTModel,
     STTRequest,
     STTResult,
@@ -48,7 +49,7 @@ from bolo.engines.base import (
     Voice,
     Word,
 )
-from bolo.errors import EngineUnavailable
+from bolo.errors import EngineUnavailable, GatedModel, InvalidRequest
 from bolo.plugin.protocol import PROTOCOL_VERSION, audio_bytes, audio_from_bytes, read_message, write_message
 
 log = logging.getLogger("bolo.plugin")
@@ -262,7 +263,13 @@ class PluginProcess:
     def _check(message: dict[str, Any]) -> dict[str, Any]:
         if message.get("ok") is False:
             err = message.get("error") or {}
-            raise EngineUnavailable(f"plugin error ({err.get('code', 'error')}): {err.get('message', '')}")
+            code, text = str(err.get("code", "error")), str(err.get("message", ""))
+            # errors with a meaning to the client keep their status (a gated download is 401, not 503)
+            if code == GatedModel.code:
+                raise GatedModel(text)
+            if code == InvalidRequest.code:
+                raise InvalidRequest(text)
+            raise EngineUnavailable(f"plugin error ({code}): {text}")
         return message
 
     def request(
@@ -272,6 +279,17 @@ class PluginProcess:
         try:
             reply, _ = self._next(call, timeout)
             return self._check(reply)
+        finally:
+            self._calls.pop(rid, None)
+
+    def request_with_payload(
+        self, message: dict[str, Any], payload: bytes | None = None, timeout: float | None = None
+    ) -> tuple[dict[str, Any], bytes]:
+        """Like :meth:`request`, for requests whose final reply carries audio (``separate``, ``extract``)."""
+        rid, call = self._send(message, payload)
+        try:
+            reply, data = self._next(call, timeout)
+            return self._check(reply), data
         finally:
             self._calls.pop(rid, None)
 
@@ -423,6 +441,46 @@ class PluginTTS(_PluginModelMixin, TTSModel):
                 yield audio_from_bytes(payload)
 
 
+class PluginSeparation(_PluginModelMixin, SeparationModel):
+    """A separation model in a plugin: ``info.mode`` "blind" (op ``separate``) or "target" (``enrol``,
+    ``extract``, ``release``)."""
+
+    def __init__(self, process: PluginProcess, load_message: dict[str, Any]) -> None:
+        self.process, self._load_message, self._handle, self._generation = process, load_message, None, 0
+        self._ensure_loaded()
+
+    def _apply_load_reply(self, reply: dict[str, Any]) -> None:
+        info = reply.get("info") or {}
+        self.sample_rate = int(reply.get("sample_rate") or 16000)
+        self.mode = str(info.get("mode") or "blind")
+        self.min_sample_s = float(info.get("min_sample_s") or 3.0)
+
+    def separate(self, mixture: FloatArray) -> list[FloatArray]:
+        handle = self._ensure_loaded()
+        reply, payload = self.process.request_with_payload({"op": "separate", "handle": handle}, audio_bytes(mixture))
+        audio = audio_from_bytes(payload)
+        count = int(reply.get("tracks", 0))
+        n = len(audio) // count if count else 0
+        return [audio[i * n : (i + 1) * n] for i in range(count)]
+
+    def enrol(self, key: str, sample: FloatArray) -> None:
+        handle = self._ensure_loaded()
+        self.process.request({"op": "enrol", "handle": handle, "key": key}, audio_bytes(sample))
+
+    def extract(self, key: str, mixture: FloatArray) -> FloatArray:
+        handle = self._ensure_loaded()
+        _, payload = self.process.request_with_payload(
+            {"op": "extract", "handle": handle, "key": key}, audio_bytes(mixture)
+        )
+        return audio_from_bytes(payload)
+
+    def release(self, key: str) -> None:
+        if self._handle is None or self._generation != self.process.generation or not self.process.running:
+            return
+        with contextlib.suppress(EngineUnavailable):
+            self.process.request({"op": "release", "handle": self._handle, "key": key}, timeout=30)
+
+
 class PluginEngine(Engine):
     """The registry's face of one plugin (``plugin:<name>``)."""
 
@@ -452,7 +510,9 @@ class PluginEngine(Engine):
             return PluginSTT(self.process, message)
         if task == "tts":
             return PluginTTS(self.process, message)
-        raise EngineUnavailable(f"plugins can serve stt and tts models, not {task!r}")
+        if task == "separation":
+            return PluginSeparation(self.process, message)
+        raise EngineUnavailable(f"plugins can serve stt, tts and separation models, not {task!r}")
 
     def shutdown(self) -> None:
         self.process.stop()

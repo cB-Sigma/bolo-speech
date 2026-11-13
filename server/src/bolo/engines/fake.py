@@ -29,6 +29,7 @@ from bolo.engines.base import (
     LoadOptions,
     Model,
     Segment,
+    SeparationModel,
     SpeakerTurn,
     StreamResult,
     STTModel,
@@ -243,7 +244,46 @@ class FakeDiarization(DiarizationModel):
 
     def __init__(self, opts: dict[str, Any]) -> None:
         self.delay_s = float(opts.get("delay_s", 0.02))
+        #: find several tones at once (overlapping "speakers") in 0.25 s frames
+        self.multi_pitch = bool(opts.get("multi_pitch", False))
         self.calls: list[tuple[int | None, float | None]] = []
+
+    def _multi_pitch_turns(self, samples: FloatArray) -> list[SpeakerTurn]:
+        """Every tone above a fifth of the loudest frame's peak is a speaker; its frames make its turns."""
+        frame = 4000
+        pitches: list[float] = []
+        active: list[set[int]] = []
+        floor = 0.0
+        spectra = []
+        for i in range(0, len(samples) - frame + 1, frame):
+            spectrum = np.abs(np.fft.rfft(samples[i : i + frame] * np.hanning(frame)))
+            spectra.append(spectrum)
+            floor = max(floor, float(spectrum.max()))
+        for spectrum in spectra:
+            found: set[int] = set()
+            if floor > 0 and spectrum.max() > 0.2 * floor:
+                peaks = [
+                    k for k in range(1, len(spectrum) - 1)
+                    if spectrum[k] > 0.2 * floor and spectrum[k] >= spectrum[k - 1] and spectrum[k] >= spectrum[k + 1]
+                ]  # fmt: skip
+                for k in peaks:
+                    pitch = k * 16000 / frame
+                    speaker = next((j for j, known in enumerate(pitches) if abs(known - pitch) < 40), -1)
+                    if speaker < 0:
+                        pitches.append(pitch)
+                        speaker = len(pitches) - 1
+                    found.add(speaker)
+            active.append(found)
+        turns: list[SpeakerTurn] = []
+        for speaker in range(len(pitches)):
+            start: int | None = None
+            for index, found in enumerate([*active, set()]):
+                if speaker in found and start is None:
+                    start = index
+                elif speaker not in found and start is not None:
+                    turns.append(SpeakerTurn(start * frame / 16000, index * frame / 16000, speaker))
+                    start = None
+        return sorted(turns, key=lambda t: t.start)
 
     @staticmethod
     def _pitch(samples: FloatArray) -> float:
@@ -264,6 +304,8 @@ class FakeDiarization(DiarizationModel):
 
         self.calls.append((num_speakers, threshold))
         time.sleep(self.delay_s)
+        if self.multi_pitch:
+            return self._multi_pitch_turns(samples)
         segments = detect_segments(EnergyVad(VadParams(min_silence_s=0.3, speech_pad_s=0.0)), samples)
         pitches: list[float] = []
         turns: list[SpeakerTurn] = []
@@ -278,6 +320,63 @@ class FakeDiarization(DiarizationModel):
                     speaker = len(pitches) - 1
             turns.append(SpeakerTurn(a / 16000, b / 16000, speaker))
         return turns
+
+
+class FakeSeparation(SeparationModel):
+    """Keeps the enrolled voice's dominant tone and removes everything else (tests only)."""
+
+    def __init__(self, opts: dict[str, Any]) -> None:
+        self.delay_s = float(opts.get("delay_s", 0.0))
+        self.delay_per_audio_s = float(opts.get("delay_per_audio_s", 0.0))
+        self.fail = bool(opts.get("fail", False))
+        self.mode = str(opts.get("mode", "target"))
+        self.voices: dict[str, float] = {}
+        self.extracted: list[tuple[str, float]] = []  # (key, seconds) per call
+        self._lock = threading.Lock()
+
+    def enrol(self, key: str, sample: FloatArray) -> None:
+        if len(sample) < int(self.min_sample_s * 16000) - 1:
+            raise ValueError("voice sample too short")
+        with self._lock:
+            self.voices[key] = FakeDiarization._pitch(sample)
+
+    def extract(self, key: str, mixture: FloatArray) -> FloatArray:
+        if self.fail:
+            raise RuntimeError("fake separation failure requested")
+        time.sleep(self.delay_s + self.delay_per_audio_s * len(mixture) / 16000)
+        with self._lock:
+            pitch = self.voices[key]
+            self.extracted.append((key, len(mixture) / 16000))
+        spectrum = np.fft.rfft(mixture)
+        freqs = np.fft.rfftfreq(len(mixture), 1 / 16000)
+        spectrum[np.abs(freqs - pitch) > 40] = 0
+        return np.fft.irfft(spectrum, len(mixture)).astype(np.float32)
+
+    def release(self, key: str) -> None:
+        with self._lock:
+            self.voices.pop(key, None)
+
+    def separate(self, mixture: FloatArray) -> list[FloatArray]:
+        """Blind mode: one track per strong tone, loudest first."""
+        if self.fail:
+            raise RuntimeError("fake separation failure requested")
+        with self._lock:
+            self.extracted.append(("blind", len(mixture) / 16000))
+        spectrum = np.fft.rfft(mixture)
+        freqs = np.fft.rfftfreq(len(mixture), 1 / 16000)
+        power = np.abs(spectrum)
+        tracks: list[FloatArray] = []
+        taken: list[float] = []
+        for k in np.argsort(power)[::-1]:
+            if power[k] < 0.2 * power.max() or len(tracks) >= 3:
+                break
+            if any(abs(freqs[k] - f) < 80 for f in taken):
+                continue
+            taken.append(float(freqs[k]))
+            kept = spectrum.copy()
+            kept[np.abs(freqs - freqs[k]) > 40] = 0
+            tracks.append(np.fft.irfft(kept, len(mixture)).astype(np.float32))
+        return tracks
 
 
 class FakeTurn(TurnModel):
@@ -298,7 +397,9 @@ class FakeEngine(Engine):
     id = "fake"
     name = "Fake engine (testing)"
     license = "Apache-2.0"
-    kinds = ("fake-stt", "fake-stt-streaming", "fake-tts", "fake-vad", "fake-diarization", "fake-turn")
+    kinds = (
+        "fake-stt", "fake-stt-streaming", "fake-tts", "fake-vad", "fake-diarization", "fake-turn", "fake-separation",
+    )  # fmt: skip
 
     def __init__(self) -> None:
         self.loaded: list[Model] = []
@@ -321,6 +422,8 @@ class FakeEngine(Engine):
             model = FakeDiarization(merged)
         elif kind == "fake-turn":
             model = FakeTurn(merged)
+        elif kind == "fake-separation":
+            model = FakeSeparation(merged)
         else:
             raise ValueError(f"fake engine cannot load kind {kind!r}")
         self.loaded.append(model)

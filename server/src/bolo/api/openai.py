@@ -27,6 +27,7 @@ from bolo.diarize import DiarizeOptions, KnownSpeaker
 from bolo.engines.base import Segment
 from bolo.errors import BoloError, InvalidRequest, ModelNotFound
 from bolo.obs.trace import Trace
+from bolo.separate import SeparateOptions
 from bolo.text.formats import to_srt, to_vtt
 
 router = APIRouter()
@@ -169,10 +170,13 @@ def _verbose(t: Transcript, task: str, word_level: bool, segment_level: bool) ->
                 "no_speech_prob": s.no_speech_prob if s.no_speech_prob is not None else 0.0,
                 **({"speaker": s.speaker} if s.speaker else {}),
                 **({"overlap": True} if s.overlap else {}),
+                **({"separated": True} if s.separated else {}),
             }
             for i, s in enumerate(t.segments)
         ]
     out["usage"] = _usage(t.duration)
+    if t.separation is not None:
+        out["separation"] = t.separation
     return out
 
 
@@ -185,6 +189,7 @@ def _diarized_segment(index: int, s: Segment) -> dict[str, Any]:
         "text": s.text,
         "speaker": s.speaker or "A",
         **({"overlap": True} if s.overlap else {}),
+        **({"separated": True} if s.separated else {}),
     }
 
 
@@ -196,10 +201,14 @@ def _diarized(t: Transcript) -> dict[str, Any]:
         "text": t.text,
         "segments": [_diarized_segment(i, s) for i, s in enumerate(t.segments)],
         "usage": _usage(t.duration),
+        **({"separation": t.separation} if t.separation is not None else {}),
     }
 
 
 def _render(t: Transcript, fmt: str, task: str, granularities: list[str], headers: dict[str, str]) -> Response:
+    if t.separation is not None:
+        status, reason = t.separation["status"], t.separation.get("reason")
+        headers = {**headers, "x-bolo-separation": f"{status}; reason={reason}" if reason else status}
     if fmt == "diarized_json":
         return JSONResponse(_diarized(t), headers=headers)
     if fmt == "text":
@@ -212,7 +221,10 @@ def _render(t: Transcript, fmt: str, task: str, granularities: list[str], header
         return PlainTextResponse(to_vtt(t.segments), headers=headers)
     if fmt == "verbose_json":
         return JSONResponse(_verbose(t, task, "word" in granularities, "segment" in granularities), headers=headers)
-    return JSONResponse({"text": t.text, "usage": _usage(t.duration)}, headers=headers)
+    body: dict[str, Any] = {"text": t.text, "usage": _usage(t.duration)}
+    if t.separation is not None:
+        body["separation"] = t.separation
+    return JSONResponse(body, headers=headers)
 
 
 def _int_field(form: Any, name: str) -> int | None:
@@ -264,6 +276,29 @@ async def known_speakers(form: Any) -> list[KnownSpeaker]:
             )
         out.append(KnownSpeaker(name, np.ascontiguousarray(resample(samples, rate, 16000), dtype=np.float32)))
     return out
+
+
+def _float_field(form: Any, name: str) -> float | None:
+    raw = form.get(name)
+    if raw in (None, ""):
+        return None
+    try:
+        return float(str(raw))
+    except ValueError as exc:
+        raise InvalidRequest(f"{name} must be a number", param=name) from exc
+
+
+def separate_options(form: Any) -> SeparateOptions | None:
+    """``separate_overlaps=true`` and its ``separation_*`` fields (bolo extension)."""
+    if not parse_bool(form.get("separate_overlaps")):
+        return None
+    return SeparateOptions(
+        model=str(form.get("separation_model") or "") or None,
+        context_s=_float_field(form, "separation_context_s"),
+        min_overlap_s=_float_field(form, "separation_min_overlap_s"),
+        allow_narrowband=parse_bool(form.get("separation_allow_narrowband")),
+        return_audio=parse_bool(form.get("separation_audio")),
+    )
 
 
 async def _diarize_options(form: Any, fmt: str, model: str | None, task: str) -> DiarizeOptions | None:
@@ -320,9 +355,17 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
             raise InvalidRequest("temperature must be a number", param="temperature") from exc
         model = str(form.get("model") or "") or None
         diarize = await _diarize_options(form, fmt, model, task)
+        separate = separate_options(form)
         spec = core.resolve(model, "stt")
         if diarize is not None:
             core.resolve(diarize.model, "diarization")  # unknown diarization model: fail before reading the upload
+        if separate is not None:
+            if diarize is None:
+                raise InvalidRequest(
+                    "separate_overlaps needs diarization: add diarize=true or response_format=diarized_json",
+                    param="separate_overlaps",
+                )
+            core.resolve(separate.model, "separation")
         trace.model = spec.id
         samples, rate = await read_upload(core, file)
         trace.restart()
@@ -338,6 +381,7 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
             "vad_filter": parse_bool(vad_raw) if vad_raw not in (None, "") else None,
             "trace": trace,
             "diarize": diarize,
+            "separate": separate,
         }
     except BoloError as exc:
         trace.finish("error", exc.message)
@@ -370,7 +414,10 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
     async def run() -> None:
         try:
             t = await core.transcribe(samples, rate, on_segment=on_segment, **kwargs)
-            await queue.put(sse({"type": "transcript.text.done", "text": t.text, "usage": _usage(t.duration)}))
+            done: dict[str, Any] = {"type": "transcript.text.done", "text": t.text, "usage": _usage(t.duration)}
+            if t.separation is not None:
+                done["separation"] = t.separation
+            await queue.put(sse(done))
         except BoloError as exc:
             await queue.put(
                 sse(
@@ -417,7 +464,8 @@ async def create_transcription(request: Request) -> Response:
     ``response_format`` (json, text, srt, vtt, verbose_json), ``temperature``,
     ``timestamp_granularities[]`` (word, segment) and ``stream``.
 
-    Extensions: ``vad_filter`` (force or disable silence removal) and ``hotwords``.
+    Extensions: ``vad_filter`` (force or disable silence removal) and ``hotwords``; with diarization,
+    ``separate_overlaps=true`` transcribes overlapped speech from one separated track per speaker.
     """
     return await _transcribe_endpoint(request, "transcribe")
 

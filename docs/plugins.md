@@ -9,9 +9,9 @@ needs.
 
 Status: the server side, the protocol, the plugin-side helper and a reference plugin are part of
 bolo 0.2.0 and are covered by tests (`server/tests/test_plugins.py`, which runs the reference
-plugin as a real subprocess). The PyTorch plugin itself (`plugins/bolo-torch`, package name not
-decided yet) is a separate package and is not written yet; the catalog already lists the models
-that will need it, as "needs plugin `torch` (not installed)".
+plugin as a real subprocess). The PyTorch plugin is the separate package **bolo-torch**
+([plugins/bolo-torch](../plugins/bolo-torch/README.md)); until it is installed the catalog lists the
+models that need it as "needs plugin `torch` (not installed)" with its install command.
 
 ## Using a plugin
 
@@ -25,8 +25,11 @@ A plugin is found in two ways:
   ```toml
   # pyproject.toml of the plugin package
   [project.entry-points."bolo.engines"]
-  torch = "bolo_torch.plugin"
+  torch = "bolo_torch:plugin"   # a function returning [sys.executable, "-m", "bolo_torch"]
   ```
+
+  The entry point is loaded in bolo's own process, so the module it names must not import heavy
+  libraries (bolo-torch's `__init__` imports nothing but `sys`).
 
 * **configured command** (wins over an entry point of the same name), for a plugin in another
   virtual environment, a container, or any executable:
@@ -106,26 +109,45 @@ messages before its final reply. Replies to different requests may interleave.
 | `unload` | `handle` | - |
 | `transcribe` | `handle`, `requests: [{n, language, task, prompt, word_timestamps, temperature, hotwords}]` + the audio of all requests, concatenated | `results: [{text, language, segments: [{start, end, text, words}], words: [{w, t0, t1}]}]` |
 | `synthesize` | `handle`, `text`, `voice`, `speed` | chunks, then `sample_rate`, `chunks`, `cancelled` |
+| `separate` | `handle` + the mixture (16 kHz) | `tracks` (count) + the tracks, concatenated, equal length |
+| `enrol` | `handle`, `key` + a voice sample (16 kHz) | - |
+| `extract` | `handle`, `key` + the mixture (16 kHz) | the enrolled voice's track |
+| `release` | `handle`, `key` | - |
 | `cancel` | `target` (id of a running request) | - |
 | `shutdown` | - | - (the process exits) |
+
+A separation model's `load` reply carries `info.mode` (`"blind"`: answers `separate`; `"target"`:
+answers `enrol` / `extract` / `release`) and `info.min_sample_s`.
+
+Errors: `error.code` `model_gated` becomes bolo's `401 model_gated` and `invalid_request` its
+`400 invalid_request` (so a gated download inside the plugin reaches the client as such); any other
+code is a `503 engine_unavailable` naming the code. bolo's SDK reports an exception by its class
+name; bolo-torch sends the code of its own errors instead.
 
 Compatibility: new optional members can appear within version 1; an incompatible change gets
 version 2, and bolo will keep speaking version 1 to plugins that answer `hello` with 1. The exact
 definitions are in `server/src/bolo/plugin/protocol.py`.
 
-## Models waiting for the PyTorch plugin
+## The PyTorch plugin: bolo-torch
 
-These are in the catalog (`server/src/bolo/catalog/plugin-torch.yaml`) with `engine: plugin:torch`,
-pinned revisions and their licences. None was run by the maintainers.
+[`plugins/bolo-torch`](../plugins/bolo-torch/README.md) serves these catalog entries
+(`server/src/bolo/catalog/plugin-torch.yaml`, `engine: plugin:torch`, pinned revisions):
 
-| Model | Task | Languages | Licence | Gated |
-| --- | --- | --- | --- | --- |
-| `indic-parler-tts` (AI4Bharat) | TTS, voice described in words | 17 incl. 11 Indian | Apache-2.0 | yes |
-| `indic-f5` (AI4Bharat IndicF5) | TTS, voice cloning | 11 Indian | MIT | yes |
-| `veena` (Maya Research) | TTS, 3B Llama + SNAC | Hindi, English | Apache-2.0 | no |
-| `svara-tts-v1` (Kenpath) | TTS, Llama + SNAC | 19 incl. Bhojpuri, Magahi, Maithili, Chhattisgarhi, Bodo, Dogri | Apache-2.0 | no |
-| `sravaani-1.0` (ARTPARK-IISc) | STT (TorchScript) | 13 Indian + English | MIT | yes |
-| `indicconformer-600m-official` (AI4Bharat) | STT, 22 scheduled languages | 22 | MIT | yes (the ungated community exports run without a plugin) |
+| Model | Task | Extra | Licence | Gated | Run here (CPU, 2 threads, shared machine) |
+| --- | --- | --- | --- | --- | --- |
+| `indic-parler-tts` (AI4Bharat) | TTS, voice described in words, 69 named voices | `parler` | Apache-2.0 | yes | RTF 21-23, first audio 21-64 s |
+| `parler-tts-tiny-v1` | TTS, English | `parler` | Apache-2.0 | no | RTF 4.5-4.8, first audio 4.6-11.5 s |
+| `indic-f5` (AI4Bharat IndicF5) | TTS, voice cloning, 11 Indian languages | `f5` | MIT | yes | RTF 120-154 |
+| `veena` (Maya Research) | TTS, 3B Llama + SNAC, Hindi and English | `orpheus` | Apache-2.0 | no | not run (only the SNAC decoder) |
+| `svara-tts-v1` (Kenpath) | TTS, 3B Llama + SNAC, 19 languages | `orpheus` | Apache-2.0 | no | not run (only the SNAC decoder) |
+| `sepformer-whamr16k` | separation (blind, 2 speakers, 16 kHz) | `sepformer` | Apache-2.0, WSJ0-derived data | no | RTF 3.7 |
+| `sepformer-whamr` | separation (blind, 2 speakers, 8 kHz) | `sepformer` | Apache-2.0, WSJ0-derived data | no | RTF 1.4 |
+| `pixit-ami` (pyannote PixIT) | separation with diarization | `pyannote` | MIT | yes (two repositories) | RTF 5.7; little gain on a synthetic mix |
+| `sravaani-1.0`, `indicconformer-600m-official` | STT | - | MIT | yes | not implemented in bolo-torch 0.1.0 |
 
-The 3B-class models (Veena, Svara) need a GPU in practice; GPU use was not tested by the
-maintainers.
+Install (CPU): `pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu`, then
+`pip install "bolo-torch[parler,sepformer]"` with the extras you need. `parler` and `pyannote` need
+different `transformers` versions; run PixIT from a second environment with
+`BOLO_PLUGINS="torch=/path/to/env/bin/python -m bolo_torch"`. GPUs: set `BOLO_TORCH_DEVICE=auto`
+(bolo's own `device` setting defaults to `cpu`); no GPU was used in testing. Details, measurements
+and licences: [plugins/bolo-torch/README.md](../plugins/bolo-torch/README.md).

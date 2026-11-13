@@ -1,12 +1,14 @@
-# Models that need PyTorch. bolo itself never imports PyTorch: these run on an out-of-process engine plugin
-# (engine: plugin:torch, docs/plugins.md) that is installed separately. Until it is installed they are listed with
-# requires: [plugin:torch] and available: false. None of them was run by the bolo maintainers.
+# Models that need PyTorch. bolo itself never imports PyTorch: these run on the out-of-process engine plugin
+# bolo-torch (engine: plugin:torch, plugins/bolo-torch, docs/plugins.md), which is installed separately, per model
+# family: pip install "bolo-torch[parler]" / "[f5]" / "[orpheus]" / "[sepformer]" / "[pyannote]". Until it is installed these
+# entries are listed with requires: [plugin:torch] and available: false, and using one answers 424 with the
+# install hint in options.plugin_install.
 - id: indic-parler-tts
   task: tts
   engine: plugin:torch
   kind: parler-tts
   family: Parler-TTS
-  languages: [as, bn, en, gu, hi, kn, ks, ml, mr, ne, or, pa, sa, sd, ta, te, ur]
+  languages: [as, bn, brx, doi, en, gu, hi, hne, kn, ks, ml, mni, mr, ne, or, pa, sa, sd, ta, te, ur]
   tier: accuracy
   sample_rate: 44100
   size_bytes: 3763425337
@@ -17,12 +19,95 @@
     ("a calm female voice, close to the microphone"). Gated: accept the terms on the model page and set HF_TOKEN.
     Needs PyTorch, so it runs on the torch engine plugin.'
   source_url: https://huggingface.co/ai4bharat/indic-parler-tts
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 22.5
+    ttfa_ms: 39400
+    audio_s: 4.26
+    load_s: 16.1
+    threads: 2
+    engine: bolo-torch 0.1.0, torch 2.11.0+cpu, parler-tts 0.2.3
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: 'Through bolo''s HTTP API, voice divya, two Hindi sentences (47 characters). Far slower than real time on
+      CPU (RTF 21-23 in three runs); the machine was shared (load average 5-8). Round trip with
+      faster-whisper-tiny-hindi: "आज मौसम बहुत अच्छा है हम शाम को ताज़ा जाएंगी।"'
   source:
     repo: ai4bharat/indic-parler-tts
     revision: 660bc53c64ae83150613264111708a0465211237
   options:
-    plugin_install: the bolo PyTorch engine plugin (plugins/bolo-torch in the bolo repository; not published yet)
+    plugin_install: pip install "bolo-torch[parler]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    first_chunk_chars: 60
+  voices:
+    - {id: divya, name: Divya, language: hi-IN}
+    - {id: rohit, name: Rohit, language: hi-IN}
+    - {id: aman, name: Aman, language: hi-IN}
+    - {id: rani, name: Rani, language: hi-IN}
+    - {id: thoma, name: Thoma, language: en-IN}
+    - {id: mary, name: Mary, language: en-IN}
+    - {id: swapna, name: Swapna, language: en-IN}
+    - {id: dinesh, name: Dinesh, language: en-IN}
+    - {id: meera, name: Meera, language: en-IN}
+    - {id: jatin, name: Jatin, language: en-IN}
+    - {id: aakash, name: Aakash, language: en-IN}
+    - {id: sneha, name: Sneha, language: en-IN}
+    - {id: kabir, name: Kabir, language: en-IN}
+    - {id: tisha, name: Tisha, language: en-IN}
+    - {id: chingkhei, name: Chingkhei, language: en-IN}
+    - {id: thoiba, name: Thoiba, language: en-IN}
+    - {id: priya, name: Priya, language: en-IN}
+    - {id: tarun, name: Tarun, language: en-IN}
+    - {id: gauri, name: Gauri, language: en-IN}
+    - {id: nisha, name: Nisha, language: en-IN}
+    - {id: raghav, name: Raghav, language: en-IN}
+    - {id: kavya, name: Kavya, language: en-IN}
+    - {id: ravi, name: Ravi, language: en-IN}
+    - {id: vikas, name: Vikas, language: en-IN}
+    - {id: riya, name: Riya, language: en-IN}
+    - {id: amit, name: Amit, language: as-IN}
+    - {id: sita, name: Sita, language: as-IN}
+    - {id: poonam, name: Poonam, language: as-IN}
+    - {id: rakesh, name: Rakesh, language: as-IN}
+    - {id: arjun, name: Arjun, language: bn-IN}
+    - {id: aditi, name: Aditi, language: bn-IN}
+    - {id: tapan, name: Tapan, language: bn-IN}
+    - {id: rashmi, name: Rashmi, language: bn-IN}
+    - {id: arnav, name: Arnav, language: bn-IN}
+    - {id: riya-bn, name: Riya, language: bn-IN}
+    - {id: bikram, name: Bikram, language: brx-IN}
+    - {id: maya, name: Maya, language: brx-IN}
+    - {id: kalpana, name: Kalpana, language: brx-IN}
+    - {id: bhanu, name: Bhanu, language: hne-IN}
+    - {id: champa, name: Champa, language: hne-IN}
+    - {id: karan, name: Karan, language: doi-IN}
+    - {id: yash, name: Yash, language: gu-IN}
+    - {id: neha, name: Neha, language: gu-IN}
+    - {id: suresh, name: Suresh, language: kn-IN}
+    - {id: anu, name: Anu, language: kn-IN}
+    - {id: chetan, name: Chetan, language: kn-IN}
+    - {id: vidya, name: Vidya, language: kn-IN}
+    - {id: anjali, name: Anjali, language: ml-IN}
+    - {id: harish, name: Harish, language: ml-IN}
+    - {id: anju, name: Anju, language: ml-IN}
+    - {id: laishram, name: Laishram, language: mni-IN}
+    - {id: ranjit, name: Ranjit, language: mni-IN}
+    - {id: sanjay, name: Sanjay, language: mr-IN}
+    - {id: sunita, name: Sunita, language: mr-IN}
+    - {id: nikhil, name: Nikhil, language: mr-IN}
+    - {id: radha, name: Radha, language: mr-IN}
+    - {id: varun, name: Varun, language: mr-IN}
+    - {id: isha, name: Isha, language: mr-IN}
+    - {id: amrita, name: Amrita, language: ne-IN}
+    - {id: manas, name: Manas, language: or-IN}
+    - {id: debjani, name: Debjani, language: or-IN}
+    - {id: divjot, name: Divjot, language: pa-IN}
+    - {id: gurpreet, name: Gurpreet, language: pa-IN}
+    - {id: aryan, name: Aryan, language: sa-IN}
+    - {id: jaya, name: Jaya, language: ta-IN}
+    - {id: kavitha, name: Kavitha, language: ta-IN}
+    - {id: prakash, name: Prakash, language: te-IN}
+    - {id: lalitha, name: Lalitha, language: te-IN}
+    - {id: kiran, name: Kiran, language: te-IN}
 - id: indic-f5
   task: tts
   engine: plugin:torch
@@ -38,12 +123,28 @@
   description: 'AI4Bharat IndicF5: voice-cloning text-to-speech (a short reference recording sets the voice) for 11
     Indian languages. Gated: accept the terms on the model page and set HF_TOKEN. Needs PyTorch (torch engine plugin).'
   source_url: https://huggingface.co/ai4bharat/IndicF5
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 119.7
+    ttfa_ms: 211280
+    audio_s: 3.72
+    load_s: 11.9
+    threads: 2
+    engine: bolo-torch 0.1.0, torch 2.11.0+cpu, bundled f5_tts, 32 flow steps
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: 'Through bolo''s HTTP API, voice pan_f_happy, two Hindi sentences (47 characters). Not usable on CPU
+      (RTF 120-154); a GPU model. The machine was shared (load average 6-7). Round trip with
+      faster-whisper-tiny-hindi: "आज मौसम बहुत अच्छा है हम शाम को बाजार जायेंगे"'
   source:
     repo: ai4bharat/IndicF5
     revision: fb652a96e508091045890dae5bb99fe511facbcf
   options:
-    plugin_install: the bolo PyTorch engine plugin (plugins/bolo-torch in the bolo repository; not published yet)
+    plugin_install: pip install "bolo-torch[f5]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    first_chunk_chars: 80
+  voices:
+    - {id: pan_f_happy, name: Punjabi female (reference clip), language: pa-IN, gender: f, ref_audio: prompts/PAN_F_HAPPY_00001.wav,
+       ref_text: "ਭਹੰਪੀ ਵਿੱਚ ਸਮਾਰਕਾਂ ਦੇ ਭਵਨ ਨਿਰਮਾਣ ਕਲਾ ਦੇ ਵੇਰਵੇ ਗੁੰਝਲਦਾਰ ਅਤੇ ਹੈਰਾਨ ਕਰਨ ਵਾਲੇ ਹਨ, ਜੋ ਮੈਨੂੰ ਖੁਸ਼ ਕਰਦੇ  ਹਨ।"}
 - id: veena
   task: tts
   engine: plugin:torch
@@ -59,11 +160,18 @@
     text, decoded with the SNAC audio codec. Needs PyTorch (torch engine plugin) and, in practice, a GPU.'
   source_url: https://huggingface.co/maya-research/Veena
   validated: untested
+  voices:
+    - {id: kavya, name: Kavya, language: hi-IN}
+    - {id: agastya, name: Agastya, language: hi-IN}
+    - {id: maitri, name: Maitri, language: hi-IN}
+    - {id: vinaya, name: Vinaya, language: hi-IN}
   source:
     repo: maya-research/Veena
     revision: 8b770f9e69e6b35ef320d4cd70a99a4ab6dd022f
   options:
-    plugin_install: the bolo PyTorch engine plugin (plugins/bolo-torch in the bolo repository; not published yet)
+    plugin_install: pip install "bolo-torch[orpheus]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    prompt_format: veena
+    first_chunk_chars: 80
 - id: svara-tts-v1
   task: tts
   engine: plugin:torch
@@ -79,12 +187,53 @@
     engine plugin) and, in practice, a GPU.'
   source_url: https://huggingface.co/kenpath/svara-tts-v1
   validated: untested
+  voices:
+    - {id: hi_male, name: 'Hindi (Male)', language: hi-IN, gender: m}
+    - {id: hi_female, name: 'Hindi (Female)', language: hi-IN, gender: f}
+    - {id: bn_male, name: 'Bengali (Male)', language: bn-IN, gender: m}
+    - {id: bn_female, name: 'Bengali (Female)', language: bn-IN, gender: f}
+    - {id: mr_male, name: 'Marathi (Male)', language: mr-IN, gender: m}
+    - {id: mr_female, name: 'Marathi (Female)', language: mr-IN, gender: f}
+    - {id: te_male, name: 'Telugu (Male)', language: te-IN, gender: m}
+    - {id: te_female, name: 'Telugu (Female)', language: te-IN, gender: f}
+    - {id: kn_male, name: 'Kannada (Male)', language: kn-IN, gender: m}
+    - {id: kn_female, name: 'Kannada (Female)', language: kn-IN, gender: f}
+    - {id: bh_male, name: 'Bhojpuri (Male)', language: bho-IN, gender: m}
+    - {id: bh_female, name: 'Bhojpuri (Female)', language: bho-IN, gender: f}
+    - {id: mag_male, name: 'Magahi (Male)', language: mag-IN, gender: m}
+    - {id: mag_female, name: 'Magahi (Female)', language: mag-IN, gender: f}
+    - {id: hne_male, name: 'Chhattisgarhi (Male)', language: hne-IN, gender: m}
+    - {id: hne_female, name: 'Chhattisgarhi (Female)', language: hne-IN, gender: f}
+    - {id: mai_male, name: 'Maithili (Male)', language: mai-IN, gender: m}
+    - {id: mai_female, name: 'Maithili (Female)', language: mai-IN, gender: f}
+    - {id: as_male, name: 'Assamese (Male)', language: as-IN, gender: m}
+    - {id: as_female, name: 'Assamese (Female)', language: as-IN, gender: f}
+    - {id: brx_male, name: 'Bodo (Male)', language: brx-IN, gender: m}
+    - {id: brx_female, name: 'Bodo (Female)', language: brx-IN, gender: f}
+    - {id: doi_male, name: 'Dogri (Male)', language: doi-IN, gender: m}
+    - {id: doi_female, name: 'Dogri (Female)', language: doi-IN, gender: f}
+    - {id: gu_male, name: 'Gujarati (Male)', language: gu-IN, gender: m}
+    - {id: gu_female, name: 'Gujarati (Female)', language: gu-IN, gender: f}
+    - {id: ml_male, name: 'Malayalam (Male)', language: ml-IN, gender: m}
+    - {id: ml_female, name: 'Malayalam (Female)', language: ml-IN, gender: f}
+    - {id: pa_male, name: 'Punjabi (Male)', language: pa-IN, gender: m}
+    - {id: pa_female, name: 'Punjabi (Female)', language: pa-IN, gender: f}
+    - {id: ta_male, name: 'Tamil (Male)', language: ta-IN, gender: m}
+    - {id: ta_female, name: 'Tamil (Female)', language: ta-IN, gender: f}
+    - {id: en_male, name: 'English (Indian) (Male)', language: en-IN, gender: m}
+    - {id: en_female, name: 'English (Indian) (Female)', language: en-IN, gender: f}
+    - {id: ne_male, name: 'Nepali (Male)', language: ne-IN, gender: m}
+    - {id: ne_female, name: 'Nepali (Female)', language: ne-IN, gender: f}
+    - {id: sa_male, name: 'Sanskrit (Male)', language: sa-IN, gender: m}
+    - {id: sa_female, name: 'Sanskrit (Female)', language: sa-IN, gender: f}
   source:
     repo: kenpath/svara-tts-v1
     revision: db8a02fc1e4eab827ff6dda5bed3b56d4d2dd51e
     exclude: ['examples/*']
   options:
-    plugin_install: the bolo PyTorch engine plugin (plugins/bolo-torch in the bolo repository; not published yet)
+    plugin_install: pip install "bolo-torch[orpheus]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    prompt_format: svara
+    first_chunk_chars: 80
 - id: sravaani-1.0
   task: stt
   engine: plugin:torch
@@ -104,7 +253,7 @@
     repo: ARTPARK-IISc/SraVaani-1.0
     revision: a7254684e699e464fb70d10ad301e28fa0330cad
   options:
-    plugin_install: the bolo PyTorch engine plugin (plugins/bolo-torch in the bolo repository; not published yet)
+    plugin_install: not supported by bolo-torch 0.1.0 yet (loading it answers that the kind is not implemented)
 - id: indicconformer-600m-official
   task: stt
   engine: plugin:torch
@@ -125,4 +274,146 @@
     repo: ai4bharat/indic-conformer-600m-multilingual
     revision: 2a77d305038dfc502fd9464e7d028b90381976cb
   options:
-    plugin_install: the bolo PyTorch engine plugin (plugins/bolo-torch in the bolo repository; not published yet)
+    plugin_install: not supported by bolo-torch 0.1.0 yet (loading it answers that the kind is not implemented)
+- id: parler-tts-tiny-v1
+  task: tts
+  engine: plugin:torch
+  kind: parler-tts
+  family: Parler-TTS
+  languages: [en]
+  tier: balanced
+  sample_rate: 44100
+  size_bytes: 1269555579
+  license: Apache-2.0
+  description: 'Parler-TTS Tiny v1 (Hugging Face): the smallest Parler-TTS checkpoint, English only, with the voice
+    described in words or picked by name. Not gated. Needs PyTorch (torch engine plugin); on CPU it is slower than real
+    time.'
+  source_url: https://huggingface.co/parler-tts/parler-tts-tiny-v1
+  validated: cpu
+  measured:
+    rtf: 4.54
+    ttfa_ms: 11520
+    audio_s: 5.48
+    load_s: 7.42
+    threads: 2
+    engine: bolo-torch 0.1.0, torch 2.11.0+cpu, parler-tts 0.2.3
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: 'Through bolo''s HTTP API, voice jon, two sentences (101 characters); load includes starting the plugin.
+      A 42-character text: first audio 4.6 s, RTF 4.8. The machine was shared (load average 2-3). Round trip with
+      faster-whisper-tiny: "the quick brown fox dumps over the lazy dog. It was a sunny morning and the market was
+      already busy."'
+  voices:
+    - {id: jon, name: Jon, language: en-US}
+    - {id: lea, name: Lea, language: en-US}
+    - {id: gary, name: Gary, language: en-US}
+    - {id: jenna, name: Jenna, language: en-US}
+    - {id: mike, name: Mike, language: en-US}
+    - {id: laura, name: Laura, language: en-US}
+  source:
+    repo: parler-tts/parler-tts-tiny-v1
+    revision: fe1bd939bb05464d39a76e20cf8a35d4e6885571
+  options:
+    plugin_install: pip install "bolo-torch[parler]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    first_chunk_chars: 60
+    description_tokenizer: same
+- id: sepformer-whamr16k
+  task: separation
+  engine: plugin:torch
+  kind: sepformer
+  family: SepFormer
+  languages: [en]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 113149680
+  license: Apache-2.0
+  description: 'SpeechBrain SepFormer trained on WHAMR! at 16 kHz: blind separation of two overlapping voices (noisy,
+    reverberant training data), used by separate_overlaps. Not gated. The weights are Apache-2.0 but WHAMR! is built
+    from WSJ0 (LDC licence), a provenance risk for commercial use. Needs PyTorch (torch engine plugin); on CPU it is
+    slower than real time.'
+  source_url: https://huggingface.co/speechbrain/sepformer-whamr16k
+  validated: cpu
+  measured:
+    rtf: 3.69
+    load_s: 2.6
+    audio_s: 11.8
+    threads: 2
+    engine: bolo-torch 0.1.0, torch 2.11.0+cpu, speechbrain 1.1.2
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: 'Synthetic 0 dB two-voice mix (bolo samples en-long + hi-short, docs/models.md). Overlap SI-SDR: female
+      0.5 -> 5.5 dB, male -0.5 -> -0.3 dB (no gain for the second voice). Through separate_overlaps on
+      /api/v1/diarize the 7.7 s window took 36 s with diarization. Machine shared (load average 2-3).'
+  source:
+    repo: speechbrain/sepformer-whamr16k
+    revision: 21a5b500c6f52fddc387c5d9e5fb13ffd6f039c5
+    include: [hyperparams.yaml, masknet.ckpt, encoder.ckpt, decoder.ckpt]
+  options:
+    plugin_install: pip install "bolo-torch[sepformer]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+- id: sepformer-whamr
+  task: separation
+  engine: plugin:torch
+  kind: sepformer
+  family: SepFormer
+  languages: [en]
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 113149658
+  license: Apache-2.0
+  description: 'SpeechBrain SepFormer trained on WHAMR! at 8 kHz (the telephone band): blind separation of two
+    overlapping voices. bolo hands it 16 kHz audio, which the plugin resamples to 8 kHz and back. Not gated. Weights
+    Apache-2.0, training data derived from WSJ0 (LDC licence). Needs PyTorch (torch engine plugin).'
+  source_url: https://huggingface.co/speechbrain/sepformer-whamr
+  validated: cpu
+  measured:
+    rtf: 1.44
+    load_s: 2.34
+    audio_s: 11.8
+    threads: 2
+    engine: bolo-torch 0.1.0, torch 2.11.0+cpu, speechbrain 1.1.2
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: 'Same synthetic 16 kHz mix, resampled to 8 kHz and back. Overlap SI-SDR against the full-band
+      references: female 0.5 -> 5.8 dB, male -0.5 -> -1.8 dB. No telephone recording was tested.'
+  source:
+    repo: speechbrain/sepformer-whamr
+    revision: 9950fd8055b38679d2af5bef2366b5dba600ec66
+    include: [hyperparams.yaml, masknet.ckpt, encoder.ckpt, decoder.ckpt]
+  options:
+    plugin_install: pip install "bolo-torch[sepformer]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+- id: pixit-ami
+  task: separation
+  engine: plugin:torch
+  kind: pixit
+  family: PixIT
+  languages: [en]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 2628500000
+  license: MIT
+  gated: true
+  description: 'pyannote PixIT (speech-separation-ami-1.0): joint speaker diarization and speech separation trained
+    on AMI meeting recordings, one track per speaker it finds. Gated: accept the conditions of both
+    pyannote/speech-separation-ami-1.0 and pyannote/separation-ami-1.0 and set HF_TOKEN (the plugin downloads the
+    second one when it loads, with microsoft/wavlm-large and speechbrain/spkrec-ecapa-voxceleb: 2.6 GB in all).
+    Needs PyTorch and pyannote.audio (torch engine plugin, pyannote extra, in its own environment). Slower than
+    real time on CPU.'
+  source_url: https://huggingface.co/pyannote/speech-separation-ami-1.0
+  validated: cpu
+  measured:
+    rtf: 5.69
+    load_s: 10.8
+    audio_s: 11.8
+    threads: 2
+    engine: bolo-torch 0.1.0, torch 2.11.0+cpu, pyannote.audio 4.0.7, speechbrain 1.1.2
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-13'
+    note: 'Synthetic 0 dB two-voice mix (bolo samples en-long + hi-short). With the pipeline defaults it found three
+      speakers and returned the whole mixture on one track (leakage removal zeroed the others); with
+      leakage_removal false and two speakers, overlap SI-SDR female 0.5 -> 1.9 dB, male -0.5 -> -1.0 dB. Trained
+      on AMI meetings; not tried on meeting audio here.'
+  source:
+    repo: pyannote/speech-separation-ami-1.0
+    revision: 9486b106945ae0cc0784041a08bfcdba5edadfb9
+  options:
+    plugin_install: pip install "bolo-torch[pyannote]" (the bolo PyTorch engine plugin, plugins/bolo-torch)

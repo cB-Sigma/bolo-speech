@@ -1,0 +1,111 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bolo-torch"
+dynamic = ["version"]
+description = "PyTorch engine plugin for the bolo speech server: Indic Parler-TTS, IndicF5, Veena, Svara, SepFormer and pyannote PixIT, run out of process."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "The bolo Authors" }]
+keywords = ["speech", "tts", "separation", "diarization", "pytorch", "indic", "bolo", "plugin"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: MacOS",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Multimedia :: Sound/Audio :: Speech",
+  "Typing :: Typed",
+]
+# torch comes from PyPI by default (the CUDA build on Linux). For the much smaller CPU-only build install torch
+# first from https://download.pytorch.org/whl/cpu (see README.md).
+dependencies = [
+  "bolo>=0.2,<0.3",
+  "torch>=2.4",
+  "numpy>=1.26",
+  "huggingface-hub>=0.23",
+]
+
+[project.optional-dependencies]
+# Indic Parler-TTS and other Parler-TTS checkpoints. parler-tts 0.2.3 pins transformers 4.46.1; its audio
+# library pins protobuf<5, which sentencepiece 0.2.1+ cannot import with (Indic Parler-TTS's tokenizer needs it).
+parler = ["parler-tts>=0.2.3", "sentencepiece>=0.1.99,<0.2.1"]
+# IndicF5. The model repository ships its own copy of the f5_tts package; these are the libraries it imports.
+f5 = [
+  "transformers>=4.46", "vocos>=0.1", "x-transformers>=1.31.14", "torchdiffeq", "ema-pytorch>=0.5.2",
+  "accelerate>=0.33", "cached-path", "pydub", "librosa", "matplotlib", "pypinyin", "jieba", "datasets", "wandb",
+  "torchaudio>=2.1", "soundfile>=0.12.1",
+]
+# Veena and Svara (Llama-style language model + SNAC codec)
+orpheus = ["transformers>=4.46", "snac>=1.2", "accelerate>=0.33"]
+# SpeechBrain SepFormer speech separation (not gated)
+sepformer = ["speechbrain>=1.0", "torchaudio>=2.1"]
+# pyannote PixIT joint diarization and separation (gated). Needs transformers>=4.48.3, so it cannot share an
+# environment with the `parler` extra.
+pyannote = ["pyannote.audio[separation]>=3.3.2"]
+dev = ["pytest>=8", "pytest-timeout>=2.3", "ruff>=0.8", "mypy>=1.13", "build", "twine"]
+
+[project.scripts]
+bolo-torch = "bolo_torch.cli:main"
+
+[project.entry-points."bolo.engines"]
+torch = "bolo_torch:plugin"
+
+[project.urls]
+Homepage = "https://github.com/cb-Sigma/bolo/tree/main/plugins/bolo-torch"
+Documentation = "https://github.com/cb-Sigma/bolo/blob/main/plugins/bolo-torch/README.md"
+Issues = "https://github.com/cb-Sigma/bolo/issues"
+Changelog = "https://github.com/cb-Sigma/bolo/blob/main/plugins/bolo-torch/CHANGELOG.md"
+
+[tool.hatch.version]
+path = "src/bolo_torch/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bolo_torch"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "CHANGELOG.md", "LICENSE", "pyproject.toml"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF", "PL", "PTH", "T20"]
+ignore = [
+  "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR2004", "PLW0603", "PLC0415",
+  "RUF001", "RUF002", "RUF003", "E501", "PLR0917", "B024", "SIM105", "UP045", "UP007", "PLW2901", "RUF005",
+  "RUF012", "B905",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/bolo_torch/cli.py" = ["T20"]
+"tests/**" = ["T20", "B011"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = ["src/bolo_torch"]
+warn_unused_ignores = false
+
+[[tool.mypy.overrides]]
+module = [
+  "parler_tts.*", "speechbrain.*", "pyannote.*", "snac.*", "transformers.*", "soxr.*", "soundfile.*",
+  "huggingface_hub.*", "torchaudio.*",
+]
+ignore_missing_imports = true
+follow_imports = "skip"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["real: downloads and runs real models (opt in with BOLO_TORCH_TEST_REAL=1)"]
+timeout = 600

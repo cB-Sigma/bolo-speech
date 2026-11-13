@@ -115,7 +115,7 @@ async def test_stats_shape(core: Bolo) -> None:
     await core.transcribe(speechlike(1.0), 16000)
     await core.synthesize_all("Hello.")
     stats = core.stats()
-    assert set(stats) == {"uptime_s", "active_streams", "queue_depth", "system", "totals", "models"}
+    assert set(stats) == {"uptime_s", "active_streams", "queue_depth", "system", "totals", "models", "separation"}
     assert set(stats["system"]) == {"cpu_percent", "rss_bytes", "threads"}
     assert stats["totals"]["requests"] == 2 and stats["totals"]["audio_seconds_in"] == 1.0
     by_id = {m["id"]: m for m in stats["models"]}

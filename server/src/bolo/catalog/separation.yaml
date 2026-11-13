@@ -1,0 +1,42 @@
+# Overlapped-speech separation (task: separation), used by `separate_overlaps` on diarized transcription.
+
+- id: voxlock-int8
+  aliases: [voxlock]
+  task: separation
+  engine: sherpa-onnx
+  kind: voxlock
+  family: VoxLock
+  languages: [en]
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 80934980
+  params: 27000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/arbazsiddiqui/voxlock/blob/main/LICENSE
+  description: 'Target-speaker extraction (VoxLock, a causal band-split RNN): keeps one voice of a mixture given
+    3 s of that voice, which bolo takes from the speaker''s own speech outside overlaps. Runs in sherpa-onnx 2.0.1+
+    (int8 chunk model plus enrolment model). Trained on English (LibriSpeech and AMI); a 2026 model from a single
+    author, so judge it by the measurements in docs/models.md ("Overlapping speech") rather than its model card.
+    Internally 16 kHz; it did not help on telephone (8 kHz) audio in our tests.'
+  source_url: https://huggingface.co/arbazsiddiqui/voxlock
+  validated: cpu
+  measured:
+    rtf: 0.46
+    rtf_note: seconds of CPU per second of window audio and speaker, plus about 1.9 s per enrolled speaker
+    cpwer_rel_gain: 0.204
+    audio_s: 2015.3
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 4-7)
+    date: '2026-11-13'
+    test_audio: 60 synthetic two-voice English mixes at 16 kHz (docs/measurements/overlap-separation.json)
+  source:
+    urls:
+    - path: sherpa-onnx-voxlock-int8.tar.bz2
+      url: https://github.com/k2-fsa/sherpa-onnx/releases/download/speech-enhancement-models/sherpa-onnx-voxlock-int8.tar.bz2
+      size: 72508647
+      sha256: bcb947f9e8676d3e963f6048b0088505c84f0843bfdc88cb26dde3264d81570b
+      extract: true
+  options:
+    enroll_model: enroll.onnx
+    chunk_model: chunk_int8.onnx

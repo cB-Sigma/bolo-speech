@@ -179,7 +179,7 @@
      "openai"
     ],
     "summary": "Transcribe audio",
-    "description": "Multipart form: ``file``, ``model``, optional ``language``, ``prompt``,\n``response_format`` (json, text, srt, vtt, verbose_json), ``temperature``,\n``timestamp_granularities[]`` (word, segment) and ``stream``.\n\nExtensions: ``vad_filter`` (force or disable silence removal) and ``hotwords``.",
+    "description": "Multipart form: ``file``, ``model``, optional ``language``, ``prompt``,\n``response_format`` (json, text, srt, vtt, verbose_json), ``temperature``,\n``timestamp_granularities[]`` (word, segment) and ``stream``.\n\nExtensions: ``vad_filter`` (force or disable silence removal) and ``hotwords``; with diarization,\n``separate_overlaps=true`` transcribes overlapped speech from one separated track per speaker.",
     "operationId": "create_transcription_v1_audio_transcriptions_post",
     "responses": {
      "200": {
@@ -898,7 +898,7 @@
      "native"
     ],
     "summary": "Speaker diarization: who spoke when",
-    "description": "Multipart form: ``file`` and optional ``model``, ``num_speakers``, ``min_speakers``,\n``max_speakers``, ``threshold`` (clustering distance; lower finds more speakers).",
+    "description": "Multipart form: ``file`` and optional ``model``, ``num_speakers``, ``min_speakers``,\n``max_speakers``, ``threshold`` (clustering distance; lower finds more speakers).\n\n``separate_overlaps=true`` also separates overlapped stretches into one track per speaker\n(``separation_model``, ``separation_context_s``, ``separation_min_overlap_s``,\n``separation_allow_narrowband``; ``separation_audio=true`` returns the tracks as WAV data URLs).",
     "operationId": "diarize_api_v1_diarize_post",
     "responses": {
      "200": {

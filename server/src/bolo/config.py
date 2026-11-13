@@ -73,6 +73,16 @@ class Settings:
     #: and two speakers whose voice prints are at least this similar are merged; 0 switches a repair off
     diarization_min_speaker_s: float = 3.0
     diarization_merge_similarity: float = 0.6
+    #: target-speaker extraction model used by ``separate_overlaps`` (opt-in per request)
+    default_separation: str = "voxlock-int8"
+    #: seconds of audio around each overlap that are separated and transcribed again
+    separation_context_s: float = 2.0
+    #: overlaps shorter than this (seconds) are left as they are
+    separation_min_overlap_s: float = 0.5
+    #: at most this much of a speaker's clean (non-overlapped) speech is used as the voice sample
+    separation_sample_max_s: float = 10.0
+    #: give up separating after this many seconds per request; what was not separated is transcribed as before
+    separation_timeout_s: float = 300.0
     #: end-of-turn model used by Realtime sessions that ask for turn_detection.type = "semantic_vad"
     default_turn: str = "smart-turn-v3"
     preload: list[str] = field(default_factory=list)

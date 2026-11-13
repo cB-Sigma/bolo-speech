@@ -32,6 +32,7 @@ TASK_TITLES = {
     "vad": "Voice-activity detection",
     "diarization": "Speaker diarization",
     "turn": "End-of-turn detection",
+    "separation": "Overlapped-speech separation",
 }
 
 
@@ -112,7 +113,7 @@ def models_table(specs: list[ModelSpec]) -> str:
         )
         + "\n"
     )
-    for task in ("stt", "tts", "vad", "diarization", "turn"):
+    for task in ("stt", "tts", "vad", "diarization", "turn", "separation"):
         out.append(f"### {TASK_TITLES[task]}\n")
         for family, items in by_task[task].items():
             out.append(f"#### {family}\n")

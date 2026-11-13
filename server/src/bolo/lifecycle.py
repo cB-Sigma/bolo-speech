@@ -18,7 +18,16 @@ import psutil
 from bolo.catalog import Catalog, ModelSpec
 from bolo.config import Settings
 from bolo.engines import EngineRegistry
-from bolo.engines.base import DiarizationModel, LoadOptions, Model, STTModel, STTStream, TTSModel, TurnModel
+from bolo.engines.base import (
+    DiarizationModel,
+    LoadOptions,
+    Model,
+    SeparationModel,
+    STTModel,
+    STTStream,
+    TTSModel,
+    TurnModel,
+)
 from bolo.errors import EngineUnavailable, ModelNotFound, ModelNotInstalled, Overloaded
 from bolo.obs.events import EventBus
 from bolo.scheduler import Handler, ModelQueue
@@ -109,7 +118,13 @@ class ModelManager:
 
     def ttl_for(self, spec: ModelSpec) -> float:
         s = self.settings
-        ttls = {"stt": s.stt_ttl_s, "tts": s.tts_ttl_s, "vad": s.vad_ttl_s, "diarization": s.diarization_ttl_s}
+        ttls = {
+            "stt": s.stt_ttl_s,
+            "tts": s.tts_ttl_s,
+            "vad": s.vad_ttl_s,
+            "diarization": s.diarization_ttl_s,
+            "separation": s.diarization_ttl_s,
+        }
         return ttls.get(spec.task, s.stt_ttl_s)
 
     def memory_in_use(self) -> int:
@@ -135,6 +150,14 @@ class ModelManager:
             handlers["embed"] = lambda items: [diarizer.embed(item) for item in items]
             max_batch["diarize"] = 1
             max_batch["embed"] = 8
+        elif isinstance(model, SeparationModel):
+            separator = model
+            handlers["enrol"] = lambda items: [_enrol(separator, item) for item in items]
+            handlers["extract"] = lambda items: [separator.extract(*item) for item in items]
+            handlers["separate"] = lambda items: [separator.separate(item) for item in items]
+            max_batch["enrol"] = 1
+            max_batch["extract"] = 1
+            max_batch["separate"] = 1
         elif isinstance(model, TurnModel):
             turn = model
             handlers["turn"] = lambda items: [turn.probability(item) for item in items]
@@ -325,3 +348,8 @@ class ModelManager:
                 await self._reaper
         for model_id in list(self.loaded):
             await self.unload(model_id, reason="shutdown")
+
+
+def _enrol(separator: SeparationModel, item: tuple[str, Any]) -> bool:
+    separator.enrol(*item)
+    return True

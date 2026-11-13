@@ -36,6 +36,11 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `default_diarization` | `pyannote-3.0-eres2net` | | speaker-diarization pipeline |
 | `diarization_min_speaker_s` | `3` | | after clustering, a "speaker" with less speech than this in the whole recording (and never more than a tenth of the speech) is folded into the most similar speaker; `0` switches it off. See api.md, "How many speakers" |
 | `diarization_merge_similarity` | `0.6` | | speakers whose voice prints have at least this cosine similarity are merged; `0` switches it off |
+| `default_separation` | `voxlock-int8` | | model used by `separate_overlaps` (opt-in per request; pulled on first use). See api.md, "Separating overlapping speech" |
+| `separation_context_s` | `2` | | seconds of audio on each side of an overlap that are separated and transcribed again |
+| `separation_min_overlap_s` | `0.5` | | overlaps shorter than this are left alone |
+| `separation_sample_max_s` | `10` | | at most this much of a speaker's speech without overlap is used as their voice sample (VoxLock needs 3 s and uses the loudest 3 s of it) |
+| `separation_timeout_s` | `300` | | stop separating after this long per request; what was not separated is transcribed from the mixture and the response says `reason: "timeout"` |
 | `default_turn` | `smart-turn-v3` | | end-of-turn model for Realtime sessions that ask for `semantic_vad` (pulled on first use; without it `semantic_vad` is plain silence detection) |
 | `plugins` | `[]` | | out-of-process engine plugins, `name=command args` each (docs/plugins.md) |
 | `plugin_entry_points` | `true` | | also use plugins installed as packages (entry-point group `bolo.engines`) |
@@ -52,7 +57,7 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `preload` | `[]` | `--preload` (repeatable) | models to load at startup; `/readyz` waits for them |
 | `stt_ttl_s`, `tts_ttl_s` | `300` | | unload after this many idle seconds; `-1` never, `0` at once |
 | `vad_ttl_s` | `-1` | | same, for the VAD |
-| `diarization_ttl_s` | `300` | | same, for diarization pipelines |
+| `diarization_ttl_s` | `300` | | same, for diarization pipelines and separation models |
 | `memory_budget_mb` | `0` (off) | `--memory-budget-mb` | evict idle models (LRU) to stay under this estimate. A model's memory is estimated as the growth of the process during its load, and never less than the size of its files |
 | `max_loaded_models` | `0` (off) | | cap on models in memory |
 | `probe_models` | `true` | | load a newly installed model once in a child process first |

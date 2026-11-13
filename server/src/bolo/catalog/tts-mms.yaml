@@ -1,6 +1,6 @@
 # Meta MMS-TTS voices for Indian languages (CC-BY-NC-4.0: non-commercial use only), converted to ONNX by
 # tools/voices/export_mms.py and published by the Voices workflow (GitHub release, and Hugging Face under
-# codebucketsolutions/ when HF_TOKEN is set). status: pending until then; tools/voices/update_catalog.py switches
+# codebucketsolutions/ when HF_TOKEN is set). tools/voices/update_catalog.py switches
 # them on. Not covered by MMS-TTS: Sanskrit, Sindhi, Kashmiri, Konkani, Manipuri, Bodo, Santali, Bhojpuri.
 
 - id: mms-tts-pan

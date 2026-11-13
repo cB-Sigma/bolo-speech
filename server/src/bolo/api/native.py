@@ -143,9 +143,13 @@ async def show(request: Request, model_id: str) -> JSONResponse:
 @router.post("/diarize", tags=["native"], summary="Speaker diarization: who spoke when")
 async def diarize(request: Request) -> JSONResponse:
     """Multipart form: ``file`` and optional ``model``, ``num_speakers``, ``min_speakers``,
-    ``max_speakers``, ``threshold`` (clustering distance; lower finds more speakers)."""
+    ``max_speakers``, ``threshold`` (clustering distance; lower finds more speakers).
+
+    ``separate_overlaps=true`` also separates overlapped stretches into one track per speaker
+    (``separation_model``, ``separation_context_s``, ``separation_min_overlap_s``,
+    ``separation_allow_narrowband``; ``separation_audio=true`` returns the tracks as WAV data URLs)."""
     from bolo.api.common import read_upload
-    from bolo.api.openai import _int_field, known_speakers
+    from bolo.api.openai import _int_field, known_speakers, separate_options
     from bolo.diarize import DiarizeOptions, find_overlaps
     from bolo.obs.trace import Trace
 
@@ -168,15 +172,24 @@ async def diarize(request: Request) -> JSONResponse:
         known=await known_speakers(form),
         identify_threshold=identify,
     )
+    separate = separate_options(form)
     spec = core.resolve(opts.model, "diarization")
+    if separate is not None:
+        core.resolve(separate.model, "separation")
     samples, rate = await read_upload(core, file)
     trace = Trace("diarization", "http", spec.id)
-    turns = await core.diarize(samples, rate, opts, trace)
+    turns = await core.diarize(samples, rate, opts, trace, separate=separate)
+    duration = len(samples) / rate
+    headers = {"x-request-id": trace.id}
+    extra: dict[str, Any] = {}
+    if separate is not None and separate.result is not None:
+        extra["separation"] = separate.result.to_dict(opts.label, duration, audio=separate.return_audio)
+        headers["x-bolo-separation"] = separate.result.header()
     speakers = sorted({t.speaker for t in turns})
     return JSONResponse(
         {
             "model": spec.id,
-            "duration": round(len(samples) / rate, 3),
+            "duration": round(duration, 3),
             "speakers": [opts.label(s) for s in speakers],
             "segments": [
                 {"start": round(t.start, 3), "end": round(t.end, 3), "speaker": opts.label(t.speaker)} for t in turns
@@ -197,9 +210,10 @@ async def diarize(request: Request) -> JSONResponse:
                 if opts.known
                 else {}
             ),
+            **extra,
             "request_id": trace.id,
         },
-        headers={"x-request-id": trace.id},
+        headers=headers,
     )
 
 

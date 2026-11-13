@@ -47,7 +47,7 @@ class RemoteFile:
     size: int | None = None
     sha256: str | None = None
     git_oid: str | None = None  # git blob SHA-1 for small non-LFS files
-    extract: bool = False  # a .tar.gz / .tgz / .tar / .zip archive to unpack into the model directory
+    extract: bool = False  # a .tar.gz / .tgz / .tar.bz2 / .tar / .zip archive to unpack into the model directory
 
 
 @dataclass
@@ -101,7 +101,7 @@ def _safe_member(name: str) -> str | None:
 
 
 def extract_archive(archive: Path, dest: Path, name: str) -> list[str]:
-    """Unpack a tar (optionally gzip-compressed) or zip archive into ``dest``; return the relative paths written.
+    """Unpack a tar (optionally gzip- or bzip2-compressed) or zip archive into ``dest``; return the relative paths written.
 
     Only regular files and directories are accepted: links, devices and any path that is absolute or
     climbs out of ``dest`` make the whole archive invalid. A single top-level folder is stripped, so
@@ -118,7 +118,7 @@ def extract_archive(archive: Path, dest: Path, name: str) -> list[str]:
             if (info.external_attr >> 16) & 0o170000 == 0o120000:
                 raise DownloadError(f"{name}: archive member '{info.filename}' is a link; refusing to unpack")
             members.append((info.filename, info))
-    elif lower.endswith((".tar.gz", ".tgz", ".tar")):
+    elif lower.endswith((".tar.gz", ".tgz", ".tar", ".tar.bz2", ".tbz2")):
         try:
             opened = tarfile.open(archive, "r:*")  # noqa: SIM115 - closed below
         except tarfile.TarError as exc:
@@ -130,7 +130,7 @@ def extract_archive(archive: Path, dest: Path, name: str) -> list[str]:
                 raise DownloadError(f"{name}: archive member '{member.name}' is not a regular file; refusing to unpack")
             members.append((member.name, member))
     else:
-        raise DownloadError(f"{name}: unsupported archive type (use .tar.gz, .tgz, .tar or .zip)")
+        raise DownloadError(f"{name}: unsupported archive type (use .tar.gz, .tgz, .tar.bz2, .tar or .zip)")
     try:
         cleaned: list[tuple[str, Any]] = []
         for raw, member in members:

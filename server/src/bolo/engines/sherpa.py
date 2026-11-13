@@ -32,6 +32,7 @@ from bolo.engines.base import (
     LoadOptions,
     Model,
     Segment,
+    SeparationModel,
     SpeakerTurn,
     StreamResult,
     STTModel,
@@ -73,6 +74,7 @@ ONLINE_KINDS = (
 TTS_KINDS = ("vits", "kokoro", "matcha", "kitten")
 VAD_KINDS = ("silero_vad", "ten_vad")
 DIARIZATION_KINDS = ("pyannote_diarization",)
+SEPARATION_KINDS = ("voxlock",)
 
 
 def find_file(path: Path, *patterns: str, required: bool = True, prefer_int8: bool = True) -> str:
@@ -779,12 +781,80 @@ class SherpaDiarization(DiarizationModel):
         return (vector / norm).astype(np.float32) if norm > 0 else vector
 
 
+class SherpaVoxLock(SeparationModel):
+    """VoxLock target-speaker extraction (sherpa-onnx 2.0.1+): one extractor per enrolled voice.
+
+    sherpa-onnx's Python binding takes the voice sample only as a file path when the extractor is
+    built (the C++ ``SetVoiceSample`` is not exposed), so every enrolment writes a temporary WAV and
+    builds an extractor of its own. Building one loads both graphs (about 2 s on a 4-vCPU machine),
+    which is why extractors are kept until released.
+    """
+
+    def __init__(self, path: Path, spec: dict[str, Any], opts: LoadOptions) -> None:
+        import sherpa_onnx
+
+        if not hasattr(sherpa_onnx, "OfflineSpeechDenoiserVoxLockModelConfig"):
+            raise RuntimeError("VoxLock needs sherpa-onnx 2.0.1 or newer: pip install -U 'sherpa-onnx>=2.0.1'")
+        self._so = sherpa_onnx
+        self.enroll_model = find_file(path, str(spec.get("enroll_model", "enroll.onnx")), "enroll*.onnx")
+        self.chunk_model = find_file(path, str(spec.get("chunk_model", "chunk_int8.onnx")), "chunk*.onnx")
+        self.threads = opts.threads
+        self.provider = "cuda" if opts.device.startswith("cuda") else "cpu"
+        self.max_cached = int(spec.get("max_cached", 16))
+        self._extractors: dict[str, Any] = {}
+        self._lock = threading.Lock()
+
+    def enrol(self, key: str, sample: FloatArray) -> None:
+        import tempfile
+
+        import soundfile as sf
+
+        so = self._so
+        with tempfile.TemporaryDirectory(prefix="bolo-voice-") as tmp:
+            voice = str(Path(tmp) / "voice.wav")
+            sf.write(voice, np.clip(sample, -1.0, 1.0), 16000, subtype="PCM_16")
+            config = so.OfflineSpeechDenoiserConfig(
+                model=so.OfflineSpeechDenoiserModelConfig(
+                    voxlock=so.OfflineSpeechDenoiserVoxLockModelConfig(
+                        enroll_model=self.enroll_model, chunk_model=self.chunk_model, voice_sample=voice
+                    ),
+                    num_threads=self.threads,
+                    provider=self.provider,
+                )
+            )
+            extractor = so.OfflineSpeechDenoiser(config)  # reads the voice sample now
+        with self._lock:
+            self._extractors.pop(key, None)
+            self._extractors[key] = extractor
+            while len(self._extractors) > self.max_cached:  # callers release their keys; this is a backstop
+                self._extractors.pop(next(iter(self._extractors)))
+
+    def extract(self, key: str, mixture: FloatArray) -> FloatArray:
+        with self._lock:
+            extractor = self._extractors.get(key)
+        if extractor is None:
+            raise KeyError(f"no voice enrolled under {key!r}")
+        out = extractor(np.ascontiguousarray(mixture, dtype=np.float32), 16000)
+        audio = np.asarray(out.samples, dtype=np.float32)
+        if int(out.sample_rate) != 16000:
+            from bolo.audio.resample import resample
+
+            audio = resample(audio, int(out.sample_rate), 16000)
+        if len(audio) < len(mixture):
+            audio = np.pad(audio, (0, len(mixture) - len(audio)))
+        return np.ascontiguousarray(audio[: len(mixture)], dtype=np.float32)
+
+    def release(self, key: str) -> None:
+        with self._lock:
+            self._extractors.pop(key, None)
+
+
 class SherpaOnnxEngine(Engine):
     id = "sherpa-onnx"
     name = "sherpa-onnx"
     license = "Apache-2.0"
     url = "https://github.com/k2-fsa/sherpa-onnx"
-    kinds = OFFLINE_KINDS + ONLINE_KINDS + TTS_KINDS + VAD_KINDS + DIARIZATION_KINDS
+    kinds = OFFLINE_KINDS + ONLINE_KINDS + TTS_KINDS + VAD_KINDS + DIARIZATION_KINDS + SEPARATION_KINDS
 
     def status(self) -> EngineStatus:
         try:
@@ -807,4 +877,6 @@ class SherpaOnnxEngine(Engine):
             return SherpaVAD(kind, path, spec, opts)
         if kind in DIARIZATION_KINDS:
             return SherpaDiarization(kind, path, spec, opts)
+        if kind in SEPARATION_KINDS:
+            return SherpaVoxLock(path, spec, opts)
         raise ValueError(f"sherpa-onnx engine cannot load kind {kind!r}")

@@ -148,3 +148,37 @@ jobs:
           key: bolo-models-${{ hashFiles('server/src/bolo/catalog/*.yaml') }}
       - name: Run the small real-model tests
         run: pytest -q -m real -k "not large" --timeout 900
+
+  plugin-torch:
+    name: bolo-torch plugin (CPU torch, fast tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugins/bolo-torch
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            server/pyproject.toml
+            plugins/bolo-torch/pyproject.toml
+      - name: Install CPU torch, bolo and the plugin (no model libraries, no downloads)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e ../../server
+          python -m pip install -e ".[dev]"
+      - name: Lint
+        run: |
+          ruff check src tests
+          ruff format --check src tests
+      - name: Type-check
+        run: mypy
+      - name: Test (fake model backends; the plugin runs as a real subprocess behind bolo's plugin host)
+        run: pytest -q
+      - name: Build and check the distribution
+        run: |
+          python -m build
+          twine check dist/*

@@ -20,7 +20,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import IO, Any
 
-from bolo.engines.base import Engine, LoadOptions, Model, STTModel, STTRequest, TTSModel
+import numpy as np
+
+from bolo.engines.base import Engine, LoadOptions, Model, SeparationModel, STTModel, STTRequest, TTSModel
 from bolo.plugin.protocol import PROTOCOL_VERSION, audio_bytes, audio_from_bytes, read_message, write_message
 
 
@@ -83,6 +85,8 @@ class _Server:
                 self.transcribe(rid, message, payload)
             elif op == "synthesize":
                 self.synthesize(rid, message)
+            elif op in ("separate", "enrol", "extract", "release"):
+                self.separation(rid, op, message, payload)
             else:
                 self.fail(rid, "unknown_op", f"unknown op {op!r}")
         except Exception as exc:
@@ -101,6 +105,8 @@ class _Server:
         info: dict[str, Any] = {}
         if isinstance(model, TTSModel):
             info["voices"] = [v.to_dict() for v in model.voices]
+        if isinstance(model, SeparationModel):
+            info.update(mode=model.mode, min_sample_s=model.min_sample_s)
         if isinstance(model, STTModel):
             info.update(
                 languages=list(model.languages), max_batch=model.max_batch,
@@ -144,6 +150,26 @@ class _Server:
             for res in results
         ]
         self.reply(rid, results=out)
+
+    def separation(self, rid: str, op: str, m: dict[str, Any], payload: bytes) -> None:
+        model = self.model(m)
+        if not isinstance(model, SeparationModel):
+            raise TypeError("this model does not separate speech")
+        key = str(m.get("key", ""))
+        if op == "separate":
+            tracks = model.separate(audio_from_bytes(payload))
+            n = max((len(t) for t in tracks), default=0)
+            joined = [np.pad(t, (0, n - len(t))) for t in tracks]
+            data = audio_bytes(np.concatenate(joined).astype(np.float32) if joined else np.zeros(0, np.float32))
+            self.send({"id": rid, "ok": True, "tracks": len(tracks)}, data)
+        elif op == "enrol":
+            model.enrol(key, audio_from_bytes(payload))
+            self.reply(rid)
+        elif op == "extract":
+            self.send({"id": rid, "ok": True}, audio_bytes(model.extract(key, audio_from_bytes(payload))))
+        else:
+            model.release(key)
+            self.reply(rid)
 
     def synthesize(self, rid: str, m: dict[str, Any]) -> None:
         model = self.model(m)

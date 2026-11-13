@@ -9,10 +9,24 @@ name: Release
 #   * Push a tag vX.Y.Z (it must match the package version).
 #
 # Needs the repository secret PYPI_API_TOKEN (a PyPI API token for bolo).
+#
+# The PyTorch engine plugin (plugins/bolo-torch) is released separately: "Run workflow" with
+# package = bolo-torch. It builds the plugin, publishes it to PyPI with the same PYPI_API_TOKEN and
+# creates the GitHub release bolo-torch-vX.Y.Z; nothing of bolo itself runs. Publish bolo first: the
+# plugin depends on bolo>=0.2. The first upload of a new PyPI project needs a token that is not
+# scoped to an existing project (an account-wide token, or add a project-scoped one afterwards), and
+# PyPI limits how many new projects an account may create per day (4 at the time of writing), so
+# a first release of bolo and bolo-torch on the same day counts two.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      package:
+        description: "What to release"
+        type: choice
+        options: [bolo, bolo-torch]
+        default: bolo
 
 permissions:
   contents: read
@@ -20,6 +34,7 @@ permissions:
 jobs:
   build:
     name: build distribution
+    if: github.event_name == 'push' || inputs.package == 'bolo'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -172,3 +187,77 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  plugin-torch-build:
+    name: build bolo-torch
+    if: github.event_name == 'workflow_dispatch' && inputs.package == 'bolo-torch'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    defaults:
+      run:
+        working-directory: plugins/bolo-torch
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Read the plugin version
+        id: version
+        run: |
+          version="$(python -c "import re,pathlib; print(re.search(r'__version__ = \"(.+?)\"', pathlib.Path('src/bolo_torch/__init__.py').read_text()).group(1))")"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "plugin version: ${version}"
+      - name: Refuse to release a version that already has a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "bolo-torch-v${{ steps.version.outputs.version }}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "release bolo-torch-v${{ steps.version.outputs.version }} already exists; bump __version__ first"; exit 1
+          fi
+      - name: Test against CPU torch before publishing
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e ../../server -e ".[dev]"
+          pytest -q
+      - name: Build sdist and wheel
+        run: |
+          python -m build
+          twine check dist/*
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-bolo-torch
+          path: plugins/bolo-torch/dist/
+
+  plugin-torch-pypi:
+    name: publish bolo-torch to PyPI
+    needs: plugin-torch-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist-bolo-torch
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+  plugin-torch-release:
+    name: bolo-torch GitHub release and tag
+    needs: [plugin-torch-build, plugin-torch-pypi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist-bolo-torch
+          path: dist/
+      - name: Create the release (and the tag bolo-torch-vX.Y.Z)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.plugin-torch-build.outputs.version }}
+        run: |
+          gh release create "bolo-torch-v$VERSION" --target "$GITHUB_SHA" --title "bolo-torch $VERSION" \
+            --notes "The PyTorch engine plugin of bolo. See plugins/bolo-torch/CHANGELOG.md." dist/* --repo "$GITHUB_REPOSITORY"

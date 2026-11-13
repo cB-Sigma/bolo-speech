@@ -105,8 +105,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   (docs/plugins.md).
 - **Meta MMS-TTS voices for Indian languages** (CC-BY-NC-4.0, non-commercial):
   conversion in `tools/voices/export_mms.py` and the Voices workflow; 18
-  catalog entries (`status: pending` until published), the first voices for
-  Punjabi, Odia, Assamese and Dogri among them.
+  catalog entries, published as release assets and on Hugging Face; the first
+  voices for Punjabi, Odia, Assamese and Dogri among them.
 - **Gated models** in the catalog, labelled `gated`; the error now says where
   to accept the terms before anything else is tried.
 - **Hugging Face hosting** of converted models (one public repository per
@@ -120,6 +120,30 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - Kokoro: a shorter first chunk (`first_chunk_chars`) and a warm-up on load
   for earlier first audio.
 - A CI job builds the container image and smoke-tests it on every push.
+- **Separating overlapping speech (opt-in).** `separate_overlaps=true` on a
+  diarized transcription or on `/api/v1/diarize` gives each speaker in an
+  overlap a track of their own before transcription: VoxLock target-speaker
+  extraction (`voxlock-int8`, Apache-2.0, run by sherpa-onnx 2.0.1, no
+  PyTorch), enrolled from each speaker's own speech outside overlaps.
+  Segments transcribed from a track are marked `separated: true`; the response
+  carries a `separation` report (what was separated, what was skipped and why)
+  and an `x-bolo-separation` header; a `separate` phase in traces, new
+  metrics. Audio below 16 kHz is refused unless
+  `separation_allow_narrowband=true`. Off by default; docs/models.md,
+  "Overlapping speech", says for which audio it passed our evaluation. New
+  catalog task `separation`; engine plugins can serve separation models
+  (blind or target-speaker) through new protocol operations.
+- **The PyTorch engine plugin, bolo-torch 0.1.0** (`plugins/bolo-torch`, its
+  own package and changelog). Runs Indic Parler-TTS, Parler-TTS Tiny, IndicF5,
+  Veena and Svara (text to speech) and SpeechBrain SepFormer (WHAMR! 8 kHz and
+  16 kHz) and pyannote PixIT (separation) out of process, with extras per
+  model family. New catalog entries `parler-tts-tiny-v1`,
+  `sepformer-whamr16k`, `sepformer-whamr` and `pixit-ami`; Indic Parler-TTS,
+  IndicF5, Veena and Svara list their voices. All run on CPU here except Veena
+  and Svara (3B models); every one is slower than real time on CPU
+  (plugins/bolo-torch/README.md has the numbers).
+- Plugin errors coded `model_gated` or `invalid_request` now reach the client
+  as `401 model_gated` / `400 invalid_request` instead of `503`.
 
 ### Changed
 
@@ -150,9 +174,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   SIP is not implemented.
 - The semantic end-of-turn model judges sound, not grammar; in our small
   test it helped with a pause in mid-phrase and was indecisive on Hindi.
-- The MMS-TTS voices are not published yet (the conversion was run here for
-  eight of them); the Hugging Face upload was tested against a stand-in for
-  the Hub API only.
+- Of the published MMS-TTS voices, eight were run by the maintainers (from
+  local conversions with the same script); the other ten are untested.
 - Speaker counting was evaluated on 18 recordings; no diarization error
   rate on real recordings was measured. Known-speaker naming was tested with
   synthetic voices only.
@@ -167,6 +190,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   listed and unusable.
 - Online (realtime) speaker labels still assume one speaker per utterance;
   overlap is handled for whole recordings only.
+- Overlap separation was evaluated on synthetic two-voice mixes made with
+  bolo's own voices and on 24 AMI meeting excerpts; not on real telephone
+  calls, and not with more than one recogniser per language.
 
 ## [0.1.0]
 

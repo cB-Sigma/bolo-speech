@@ -74,7 +74,11 @@ async def test_plugin_models_through_the_scheduler(plugin_settings: Settings) ->
         assert result.text.strip()
         engine = core.engines.get("plugin:ref")
         proc = engine.process  # type: ignore[union-attr]
-        assert proc.running and proc.hello["protocol"] == 1 and proc.hello["kinds"] == ["fake-stt", "fake-tts"]
+        assert (
+            proc.running
+            and proc.hello["protocol"] == 1
+            and proc.hello["kinds"] == ["fake-stt", "fake-tts", "fake-separation"]
+        )
         assert len(proc.handles) == 2
         assert core.engines.status("plugin:ref").available
     finally:

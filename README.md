@@ -42,7 +42,7 @@
 - **Light.** No PyTorch anywhere. Inference runs on ONNX Runtime (through [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)) and CTranslate2 (through [faster-whisper](https://github.com/SYSTRAN/faster-whisper)). The base install has no engine at all; you add the ones you want.
 - **Realtime on CPU.** A low-latency tier, true streaming models, and stabilised partial results for models that were never designed to stream. Measured numbers below, from a 4-vCPU machine.
 - **A real server.** Per-model queues with micro-batching, backpressure, cancellation, lazy loading, idle unloading and a memory budget, with every request traced phase by phase.
-- **Indian languages and phone audio.** Speech recognition for all 22 scheduled languages of India, 16 of them run here on real recordings; voices for Hindi, Bengali, Telugu, Tamil, Malayalam, Marathi, Urdu, Nepali, Gujarati, Kannada, Maithili, Bhojpuri, Magahi and Chhattisgarhi, with non-commercial MMS voices for Punjabi, Odia, Assamese and Dogri on the way; 8 kHz G.711 μ-law/A-law in and out.
+- **Indian languages and phone audio.** Speech recognition for all 22 scheduled languages of India, 16 of them run here on real recordings; voices for Hindi, Bengali, Telugu, Tamil, Malayalam, Marathi, Urdu, Nepali, Gujarati, Kannada, Maithili, Bhojpuri, Magahi and Chhattisgarhi, plus non-commercial MMS voices for Punjabi, Odia, Assamese and Dogri; 8 kHz G.711 μ-law/A-law in and out.
 - **No GPL needed for English and Hindi voices.** Phonemes come from [uccharan](https://github.com/cb-Sigma/uccharan) (Apache-2.0), which matches eSpeak NG on our round-trip tests; eSpeak NG stays an optional choice, per server, per voice or per request.
 - **Voice agents.** An OpenAI Realtime API endpoint (`/v1/realtime`) and audio in `/v1/chat/completions`: speech in, your own language model in the middle (Ollama, llama.cpp, vLLM, any OpenAI-compatible endpoint), streamed speech out, with barge-in and per-turn latency traces, over WebSocket or WebRTC. Run against Ollama and llama.cpp, and from Pipecat and LiveKit Agents.
 - **Who said what.** Speaker diarization without PyTorch, as `diarized_json`, in subtitles, on words, and as speaker labels on live transcripts; known speakers are named from reference recordings.
@@ -175,12 +175,15 @@ Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AA
 | Task | Family | Models | Languages | Validated on CPU | Best measured RTF |
 | --- | --- | --- | --- | --- | --- |
 | DIARIZATION | pyannote + speaker embeddings | 3 | - | 1 | 0.106 (`pyannote-3.0-eres2net`) |
-| TTS | Parler-TTS | 1 | as, bn, en, gu, hi, kn, ks, ml +9 | 0 | - |
-| TTS | F5-TTS | 1 | as, bn, gu, hi, kn, ml, mr, or +3 | 0 | - |
+| TTS | Parler-TTS | 2 | as, bn, brx, doi, en, gu, hi, hne +13 | 2 | 4.540 (`parler-tts-tiny-v1`) |
+| TTS | F5-TTS | 1 | as, bn, gu, hi, kn, ml, mr, or +3 | 1 | 119.700 (`indic-f5`) |
 | TTS | Veena | 1 | en, hi | 0 | - |
 | TTS | Svara | 1 | as, bho, bn, brx, doi, en, gu, hi +11 | 0 | - |
 | STT | SraVaani | 1 | as, bn, en, gu, hi, kn, ml, mr +6 | 0 | - |
 | STT | IndicConformer | 27 | as, bn, brx, doi, gu, hi, kn, kok +14 | 20 | 0.060 (`indicconformer-ta-community`) |
+| SEPARATION | SepFormer | 2 | en | 2 | 1.440 (`sepformer-whamr`) |
+| SEPARATION | PixIT | 1 | en | 1 | 5.690 (`pixit-ami`) |
+| SEPARATION | VoxLock | 1 | en | 1 | 0.460 (`voxlock-int8`) |
 | STT | Whisper | 38 | af, am, ar, as, az, ba, be, bg +92 | 20 | 0.081 (`faster-whisper-tiny.en`) |
 | STT | Moonshine | 11 | ar, en, es, ja, ko, uk, vi, zh | 4 | 0.033 (`moonshine-tiny-en`) |
 | STT | Parakeet | 7 | bg, cs, da, de, el, en, es, et +17 | 4 | 0.030 (`parakeet-tdt-ctc-110m`) |
@@ -202,12 +205,12 @@ Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AA
 | TURN | Smart Turn | 1 | ar, bn, da, de, en, es, fi, fr +15 | 0 | - |
 | VAD | Silero VAD | 2 | - | 2 | 0.006 (`silero-vad-v5`) |
 
-**271 models in the catalog, 108 validated on CPU, 163 untested.** Full list: [docs/models.md](docs/models.md).
+**276 models in the catalog, 115 validated on CPU, 161 untested.** Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run on the machine described under [Performance](#performance) by `server/tools/validate_models.py`; the table in [docs/models.md](docs/models.md) has every model with its measured real-time factor and licence. Anything else that sherpa-onnx or faster-whisper can load can be added with `bolo pull hf:<owner>/<repo>`.
 
-Models that need PyTorch at run time (Indic Parler-TTS, IndicF5, Veena, Svara, SraVaani, XTTS, Chatterbox and other LLM-based voices) do not run inside bolo. bolo can drive them through an **out-of-process engine plugin** ([docs/plugins.md](docs/plugins.md)); the PyTorch plugin itself is not written yet, so those catalog entries show "needs plugin torch". bolo runs no language models itself: voice agents use the one you connect.
+Models that need PyTorch at run time (Indic Parler-TTS, IndicF5, Veena, Svara, SraVaani, XTTS, Chatterbox and other LLM-based voices) do not run inside bolo. bolo drives them through an **out-of-process engine plugin** ([docs/plugins.md](docs/plugins.md)): the PyTorch plugin is the separate package [bolo-torch](plugins/bolo-torch/README.md) (Indic Parler-TTS, IndicF5, Veena, Svara, SepFormer and PixIT separation; slower than real time on CPU), and until it is installed those catalog entries show "needs plugin torch" with its install command. bolo runs no language models itself: voice agents use the one you connect.
 
 **Licences are labelled, not filtered.** The catalog includes non-commercial models (MMS-TTS, some Piper voices, non-English Moonshine) and gated ones (Indic Parler-TTS, SraVaani, the official IndicConformer): every entry states `license`, `commercial_use` and `gated`, the console shows them, and you decide what to download. Gated models are fetched only with your Hugging Face token.
 
@@ -234,19 +237,19 @@ How it works, and how to tune it: [docs/realtime.md](docs/realtime.md).
 
 **Bhojpuri, honestly.** The Hindi model is the best Bhojpuri recogniser we can run: 41 % word error rate (13 % character error rate) on 120 Bhojpuri utterances, against 12 to 15 % on Hindi. The permissively licensed Whisper-small Bhojpuri fine-tune, converted here, did worse on the same audio (48 % / 22 %), so it is not in the catalog.
 
-**Synthesis.** Hindi (three Piper-format voices, four Kokoro voices, two SYSPIN voices; all without eSpeak NG), Telugu (three voices), Tamil (two), Malayalam (two), Marathi, Bengali, Urdu, Nepali and Gujarati. The Telugu, Tamil, Malayalam, Marathi and newer Bengali and Urdu voices are the Piper project's own files, converted for sherpa-onnx by bolo right after the download (`bolo pull piper:<voice>` does that for any Piper voice); each was synthesised and transcribed back by the recogniser of its language (character error rate 0 to 7 %). Maithili, Bhojpuri, Kannada, Magahi and Chhattisgarhi voices (IISc SYSPIN, MIT) are converted by this project and published. Meta's MMS-TTS voices (non-commercial) for Punjabi, Odia, Assamese, Dogri and ten more are converted and run here, **not yet published**. **No voice** that runs without PyTorch for Sanskrit, Sindhi, Kashmiri, Konkani, Manipuri, Bodo or Santali. Sentences are split at the danda, Hindi numbers are spelled out in the Indian system (`250000` → दो लाख पचास हज़ार), and code-mixed text passes through untouched.
+**Synthesis.** Hindi (three Piper-format voices, four Kokoro voices, two SYSPIN voices; all without eSpeak NG), Telugu (three voices), Tamil (two), Malayalam (two), Marathi, Bengali, Urdu, Nepali and Gujarati. The Telugu, Tamil, Malayalam, Marathi and newer Bengali and Urdu voices are the Piper project's own files, converted for sherpa-onnx by bolo right after the download (`bolo pull piper:<voice>` does that for any Piper voice); each was synthesised and transcribed back by the recogniser of its language (character error rate 0 to 7 %). Maithili, Bhojpuri, Kannada, Magahi and Chhattisgarhi voices (IISc SYSPIN, MIT) are converted by this project and published. Meta's MMS-TTS voices (non-commercial) for Punjabi, Odia, Assamese, Dogri and fourteen more are converted by this project and published too (also on Hugging Face under `codebucketsolutions/`). **No voice** that runs without PyTorch for Sanskrit, Sindhi, Kashmiri, Konkani, Manipuri, Bodo or Santali. Sentences are split at the danda, Hindi numbers are spelled out in the Indian system (`250000` → दो लाख पचास हज़ार), and code-mixed text passes through untouched.
 
-Licence classes: **P** permissive (MIT, Apache-2.0, CC-BY, CC0), **NC** non-commercial, **G** gated, **T** needs the PyTorch plugin (not written yet).
+Licence classes: **P** permissive (MIT, Apache-2.0, CC-BY, CC0), **NC** non-commercial, **G** gated, **T** needs the PyTorch plugin ([bolo-torch](plugins/bolo-torch/README.md)).
 
 | Language | STT | TTS |
 | --- | --- | --- |
-| Hindi | P, run here (also G/T: SraVaani, official IndicConformer) | P (Piper, Kokoro, SYSPIN; some Piper voices NC); NC MMS pending; G/T Indic Parler-TTS, IndicF5 |
-| Bengali, Telugu, Tamil, Malayalam, Marathi, Urdu, Nepali, Gujarati | P, run here | P (some Piper voices NC); NC MMS pending for most |
-| Kannada, Maithili | P, run here | P (SYSPIN); NC MMS pending |
-| Magahi, Chhattisgarhi | Hindi model only | P (SYSPIN); NC MMS (run here, pending) |
+| Hindi | P, run here (also G/T: SraVaani, official IndicConformer) | P (Piper, Kokoro, SYSPIN; some Piper voices NC); NC MMS; G/T Indic Parler-TTS, IndicF5 |
+| Bengali, Telugu, Tamil, Malayalam, Marathi, Urdu, Nepali, Gujarati | P, run here | P (some Piper voices NC); NC MMS for most |
+| Kannada, Maithili | P, run here | P (SYSPIN); NC MMS |
+| Magahi, Chhattisgarhi | Hindi model only | P (SYSPIN); NC MMS (run here) |
 | Bhojpuri (not a scheduled language) | Hindi model (41 % WER) | P (SYSPIN) |
-| Punjabi, Odia, Assamese | P, run here | NC MMS (run here, pending); G/T Indic Parler-TTS |
-| Dogri | P, untested | NC MMS (run here, pending) |
+| Punjabi, Odia, Assamese | P, run here | NC MMS (run here); G/T Indic Parler-TTS |
+| Dogri | P, untested | NC MMS (run here) |
 | Sanskrit, Sindhi | P, run here (Sindhi without an error rate) | G/T only (Indic Parler-TTS) |
 | Bodo, Kashmiri, Konkani, Manipuri, Santali | P, untested | none (Bodo, Kashmiri: G/T or T only) |
 
@@ -379,7 +382,7 @@ Stated plainly, so you do not find out the hard way:
 - **Most of the catalog.** 117 of 225 models are marked untested: their files were checked on the Hub and a sibling of the same architecture was run, but that model was not.
 - **Voice agents with a capable language model.** The conversation path was run end to end with models of 360M and 500M parameters on a shared CPU, through llama-cpp-python's server, Ollama and llama.cpp's `llama-server` (see [Performance](#performance)); the answers of such models are poor and the turn latency is not representative of a real deployment. Function calling was exercised with a scripted fake model, not a real one. vLLM and hosted APIs were not tried.
 - **Diarization accuracy.** Measured on one clip made of two synthetic voices taking turns, plus speaker *counts* on 18 public recordings (see docs/api.md, "How many speakers"), plus overlap handling on three synthetic two-voice mixes. No diarization error rate on real recordings; overlap and noisy rooms were not evaluated on real recordings. Known-speaker naming was tested with synthetic voices only.
-- **Converted voices and the release workflow.** The "Voices" workflow published the 22 SYSPIN voices; the MMS-TTS conversion was run here for eight languages but the voices are not published yet, and the Hugging Face upload was tested only against a stand-in for the Hub API. The "Release" workflow has not been run.
+- **Converted voices and the release workflow.** The "Voices" workflow published the 22 SYSPIN and 18 MMS-TTS voices (release assets and Hugging Face); eight MMS voices were run here from local conversions, the published MMS files were not re-run. The "Release" workflow has not been run.
 - **Accuracy at scale.** Word error rates here come from a handful of clips. They show that the pipelines work, not how good the models are; for that, see the model publishers' evaluations.
 - **Memory growth over days, hostile input.** Not done; a 30-minute mixed-load soak was (see [Performance](#performance)).
 - Engines `moonshine` (useful-moonshine-onnx), `whisper.cpp` and `kokoro-onnx` have plugins that were written against their documentation and not run.
@@ -395,7 +398,6 @@ bolo itself is [Apache-2.0](LICENSE). It contains no third-party source code; [N
 
 ## Roadmap
 
-- Publishing the MMS-TTS voices (Punjabi, Odia, Assamese, Dogri, …) and the Hugging Face mirror of all converted models.
 - A Bhojpuri recogniser better than the Hindi fallback (the Whisper fine-tune we converted was not).
 - The PyTorch engine plugin (Indic Parler-TTS, IndicF5, Svara, SraVaani).
 - WebRTC tested with browsers and behind NAT; SIP; MCP tools.

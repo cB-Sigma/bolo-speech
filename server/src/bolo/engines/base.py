@@ -67,6 +67,7 @@ class Segment:
     no_speech_prob: float | None = None
     speaker: str | None = None  # set when the request asked for diarization
     overlap: bool = False  # diarization found another speaker talking during this segment
+    separated: bool = False  # decoded from this speaker's separated track, not from the mixture
 
 
 @dataclass
@@ -261,6 +262,37 @@ class DiarizationModel(Model):
     @abc.abstractmethod
     def embed(self, samples: FloatArray) -> FloatArray:
         """A unit-length speaker embedding for one stretch of speech."""
+
+
+class SeparationModel(Model):
+    """Target-speaker extraction: keep one voice of a mixture, given a short sample of that voice.
+
+    Callers enrol a speaker under a key of their choosing, extract as often as they like, then release
+    the key. Audio in and out is 16 kHz mono.
+    """
+
+    task = "separation"
+    #: "target": extracts one enrolled voice per call (enrol/extract/release);
+    #: "blind": splits a mixture into tracks without knowing the voices (separate), which bolo then
+    #: assigns to the diarized speakers by voice similarity
+    mode: str = "target"
+    #: seconds of the speaker's voice the model needs to enrol them ("target" models)
+    min_sample_s: float = 3.0
+
+    def enrol(self, key: str, sample: FloatArray) -> None:
+        """Prepare an extractor for the voice in ``sample`` (16 kHz, at least ``min_sample_s`` long)."""
+        raise NotImplementedError(f"{type(self).__name__} is a {self.mode} separator")
+
+    def extract(self, key: str, mixture: FloatArray) -> FloatArray:
+        """The enrolled voice from ``mixture`` (16 kHz); as long as the input."""
+        raise NotImplementedError(f"{type(self).__name__} is a {self.mode} separator")
+
+    def release(self, key: str) -> None:
+        """Forget an enrolled voice (a no-op for unknown keys)."""
+
+    def separate(self, mixture: FloatArray) -> list[FloatArray]:
+        """Blind separation: one track per source found in ``mixture`` (16 kHz), each as long as the input."""
+        raise NotImplementedError(f"{type(self).__name__} is a {self.mode} separator")
 
 
 class TurnModel(Model):

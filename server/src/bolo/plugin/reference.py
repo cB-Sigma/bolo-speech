@@ -36,7 +36,7 @@ class ReferenceEngine(Engine):
     id = "reference"
     name = "reference"
     license = "Apache-2.0"
-    kinds = ("fake-stt", "fake-tts")
+    kinds = ("fake-stt", "fake-tts", "fake-separation")
 
     def __init__(self) -> None:
         self.fake = FakeEngine()

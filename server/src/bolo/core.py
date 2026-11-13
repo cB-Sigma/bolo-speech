@@ -66,6 +66,8 @@ from bolo.lifecycle import LoadedModel, ModelManager
 from bolo.llm import LLMClient
 from bolo.obs.events import EventBus
 from bolo.obs.trace import Trace, TraceStore, preview
+from bolo.separate import SeparateOptions, SeparationResult, check_request, is_narrowband, plan_chunks, split_long
+from bolo.separate import separate as run_separation
 from bolo.store import HubClient, ModelStore
 from bolo.streaming.vad import EnergyVad, FallbackVad, detect_segments, merge_segments
 from bolo.text import phonemize
@@ -95,6 +97,8 @@ class Transcript:
     segments: list[Segment] = field(default_factory=list)
     words: list[Word] = field(default_factory=list)
     model: str = ""
+    #: what ``separate_overlaps`` did (the response's ``separation`` object), when it was asked for
+    separation: dict[str, Any] | None = None
 
 
 @dataclass
@@ -127,6 +131,9 @@ class Bolo:
         #: open WebRTC calls by id (objects from bolo.webrtc; closed in stop())
         self.calls: dict[str, Any] = {}
         self.active_streams = 0
+        #: requests that asked for separate_overlaps, by outcome, and seconds of audio separated
+        self.separation_counts: dict[str, int] = {"applied": 0, "partial": 0, "skipped": 0}
+        self.separation_audio_s = 0.0
         self._tasks: list[asyncio.Task[Any]] = []
         self._pull_tasks: dict[str, asyncio.Task[Any]] = {}
         self._proc = psutil.Process()
@@ -229,6 +236,7 @@ class Bolo:
                 "known_speakers": True,
                 "revised_labels_at_end_of_stream": True,
             },
+            "separation": self._separation_capability(),
             "realtime": {
                 "endpoint": "/v1/realtime",
                 "transcription_sessions": True,
@@ -259,6 +267,30 @@ class Bolo:
             },
             "llm": {"configured": llm["configured"], "base_url": llm["base_url"], "model": llm["model"]},
         }
+
+    def _separation_capability(self) -> dict[str, Any]:
+        s = self.settings
+        spec = self.catalog.resolve(s.default_separation)
+        installed = bool(spec and self.manager.is_installed(spec))
+        engine_ok = bool(spec and self.engines.status(spec.engine).available)
+        return {
+            "available": bool(spec) and engine_ok and (installed or s.auto_pull),
+            "installed": installed,
+            "default_model": spec.id if spec else None,
+            "http": {
+                "transcriptions": "separate_overlaps=true (with diarization)",
+                "diarize": "separate_overlaps=true",
+            },
+            "default_on": False,
+            "languages": list(spec.languages) if spec else [],
+            "min_sample_rate": 16000,
+            "context_s": s.separation_context_s,
+            "min_overlap_s": s.separation_min_overlap_s,
+        }
+
+    def note_separation(self, result: SeparationResult) -> None:
+        self.separation_counts[result.status] = self.separation_counts.get(result.status, 0) + 1
+        self.separation_audio_s += result.separated_audio_s
 
     def model_api(self, spec: ModelSpec) -> dict[str, Any]:
         requires, phonemizers, available = self.components.requirements(spec)
@@ -345,6 +377,10 @@ class Bolo:
                 "audio_seconds_out": round(self.traces.audio_seconds_out, 2),
             },
             "models": models,
+            "separation": {
+                "requests": dict(self.separation_counts),
+                "audio_seconds": round(self.separation_audio_s, 2),
+            },
         }
 
     # ------------------------------------------------------------------
@@ -359,6 +395,7 @@ class Bolo:
                 "vad": s.default_vad,
                 "diarization": s.default_diarization,
                 "turn": s.default_turn,
+                "separation": s.default_separation,
             }
             name = defaults[task]
         elif name == "realtime":
@@ -551,6 +588,7 @@ class Bolo:
         trace: Trace | None = None,
         on_segment: Callable[[Segment], Awaitable[None]] | None = None,
         diarize: DiarizeOptions | None = None,
+        separate: SeparateOptions | None = None,
         record: bool = True,
     ) -> Transcript:
         """Transcribe a complete recording. Long audio is split at pauses and decoded in batches.
@@ -562,7 +600,15 @@ class Bolo:
         trace.model = spec.id
         trace.audio_seconds = len(samples) / sample_rate if sample_rate else 0.0
         duration = trace.audio_seconds
+        separation: SeparationResult | None = None
         try:
+            if separate is not None:
+                if diarize is None:
+                    raise InvalidRequest(
+                        "separate_overlaps needs diarization (diarize=true)", param="separate_overlaps"
+                    )
+                check_request(sample_rate, separate)
+                self.resolve(separate.model, "separation")
             async with self.manager.use(spec.id) as entry:
                 stt = entry.model
                 assert isinstance(stt, STTModel)
@@ -582,6 +628,7 @@ class Bolo:
                 chunks: list[tuple[int, int]]
                 speakers: list[str] | None = None
                 overlapped: list[bool] | None = None
+                sources: list[FloatArray | None] | None = None
                 if diarize is not None:
                     # Cut at the speaker turns and transcribe each turn: the speaker of every
                     # piece of text is then known without needing word timestamps. Stretches where two
@@ -595,6 +642,17 @@ class Bolo:
                     overlapped = [any(o.start < t.end and o.end > t.start for o in overlaps) for t in turns]
                     if overlaps:
                         trace.extra["overlapped_speech_s"] = round(sum(o.end - o.start for o in overlaps), 2)
+                    if separate is not None:
+                        separation, plan = await self._separated_plan(
+                            samples, sr, raw, overlaps, turns, separate, trace,
+                            narrowband=sample_rate < 16000, max_chunk_s=stt.max_chunk_s,
+                            diarization_model=diarize.model,
+                        )  # fmt: skip
+                        if plan is not None:
+                            chunks = [(int(c.start * sr), min(len(samples), int(c.end * sr))) for c in plan]
+                            speakers = [diarize.label(c.speaker) for c in plan]
+                            overlapped = [c.overlap for c in plan]
+                            sources = [self._track_audio(separation, c, sr) for c in plan]
                 elif use_vad:
                     with trace.phase("vad"):
                         detector, _ = await self.vad_detector(
@@ -610,10 +668,12 @@ class Bolo:
                     entry, stt, samples, chunks, trace,
                     language=language, task=task, prompt=prompt, word_timestamps=word_timestamps,
                     temperature=temperature, hotwords=hotwords, on_segment=on_segment, speakers=speakers,
-                    overlapped=overlapped,
+                    overlapped=overlapped, sources=sources,
                 )  # fmt: skip
                 transcript.duration = duration
                 transcript.model = spec.id
+                if separation is not None and diarize is not None:
+                    transcript.separation = separation.to_dict(diarize.label, duration)
                 trace.mark_final()
                 trace.language = transcript.language
                 trace.text_preview = preview(transcript.text)
@@ -652,17 +712,25 @@ class Bolo:
         on_segment: Callable[[Segment], Awaitable[None]] | None,
         speakers: list[str] | None = None,
         overlapped: list[bool] | None = None,
+        sources: list[FloatArray | None] | None = None,
     ) -> Transcript:
+        """Decode ``chunks`` (sample ranges of ``samples``). ``sources[i]``, when given, is the audio to decode
+        for chunk ``i`` instead of the mixture (a separated track); it is placed at the chunk's start."""
         sr = stt.sample_rate
+
+        def audio(index: int, a: int, b: int) -> FloatArray:
+            source = sources[index] if sources else None
+            return source if source is not None else samples[a:b]
+
         submitted = trace.now()
         pending = [
             asyncio.ensure_future(
                 entry.queue.submit(
                     "batch",
-                    STTRequest(samples[a:b], language, task, prompt, word_timestamps, temperature, hotwords),
+                    STTRequest(audio(i, a, b), language, task, prompt, word_timestamps, temperature, hotwords),
                 )
             )
-            for a, b in chunks
+            for i, (a, b) in enumerate(chunks)
         ]
         segments: list[Segment] = []
         words: list[Word] = []
@@ -692,6 +760,7 @@ class Bolo:
                         seg.no_speech_prob,
                         speakers[index] if speakers else None,
                         bool(overlapped and overlapped[index]),
+                        bool(sources and sources[index] is not None),
                     )
                     if not shifted.text:
                         continue
@@ -716,6 +785,44 @@ class Bolo:
         with trace.phase("finalize"):
             text = " ".join(s.text for s in segments).strip()
         return Transcript(text, detected, 0.0, segments, words)
+
+    async def _separated_plan(
+        self,
+        samples: FloatArray,
+        sr: int,
+        raw: list[SpeakerTurn],
+        overlaps: list[Any],
+        turns: list[SpeakerTurn],
+        opts: SeparateOptions,
+        trace: Trace,
+        *,
+        narrowband: bool,
+        max_chunk_s: float,
+        diarization_model: str | None = None,
+    ) -> tuple[SeparationResult, list[Any] | None]:
+        """Run overlap separation; return its result and the chunks to decode (None: decode as without it)."""
+        samples16 = samples if sr == 16000 else resample(samples, sr, 16000)
+        narrowband = narrowband or is_narrowband(samples16)
+        result = await run_separation(
+            self, samples16, raw, overlaps, opts, trace, narrowband=narrowband, diarization_model=diarization_model
+        )
+        opts.result = result
+        if not result.tracks:
+            return result, None
+        plan = split_long(plan_chunks(turns, raw, result.windows, overlaps), max_chunk_s)
+        return result, plan
+
+    @staticmethod
+    def _track_audio(result: SeparationResult, chunk: Any, sr: int) -> FloatArray | None:
+        """The part of a separated track that ``chunk`` covers, at the recogniser's rate (None: the mixture)."""
+        if chunk.track is None:
+            return None
+        window = result.windows[chunk.track[0]]
+        track = result.tracks[chunk.track]
+        a = max(0, round((chunk.start - window.start) * 16000))
+        b = min(len(track), round((chunk.end - window.start) * 16000))
+        piece = np.ascontiguousarray(track[a:b], dtype=np.float32)
+        return piece if sr == 16000 else resample(piece, 16000, sr)
 
     # ------------------------------------------------------------------
     # speaker diarization
@@ -823,17 +930,32 @@ class Bolo:
         sample_rate: int,
         opts: DiarizeOptions | None = None,
         trace: Trace | None = None,
+        separate: SeparateOptions | None = None,
     ) -> list[SpeakerTurn]:
-        """Who spoke when. Returns speaker turns sorted by time, speakers numbered by first appearance."""
+        """Who spoke when. Returns speaker turns sorted by time, speakers numbered by first appearance.
+
+        With ``separate``, overlapped stretches are also separated into one track per speaker
+        (``separate.result``)."""
         opts = opts or DiarizeOptions()
         spec = self.resolve(opts.model, "diarization")
         trace = trace or Trace("diarization", "internal", spec.id)
         trace.model = spec.id
         trace.audio_seconds = len(samples) / sample_rate if sample_rate else 0.0
         try:
+            if separate is not None:
+                check_request(sample_rate, separate)
+                self.resolve(separate.model, "separation")
             with trace.phase("resample"):
                 samples16 = await asyncio.to_thread(resample, samples, sample_rate, 16000)
-            turns = await self._speaker_turns(np.ascontiguousarray(samples16, dtype=np.float32), opts, trace)
+            samples16 = np.ascontiguousarray(samples16, dtype=np.float32)
+            turns = await self._speaker_turns(samples16, opts, trace)
+            if separate is not None:
+                overlaps = find_overlaps(turns)
+                narrowband = sample_rate < 16000 or is_narrowband(samples16)
+                separate.result = await run_separation(
+                    self, samples16, turns, overlaps, separate, trace, narrowband=narrowband,
+                    diarization_model=opts.model,
+                )  # fmt: skip
             trace.mark_final()
             trace.finish("ok")
             if trace.audio_seconds and trace.total_ms is not None:

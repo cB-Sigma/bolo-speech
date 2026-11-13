@@ -18,7 +18,7 @@ import yaml
 
 from bolo.store import Source
 
-TASKS = ("stt", "tts", "vad", "diarization", "turn", "translation")
+TASKS = ("stt", "tts", "vad", "diarization", "turn", "translation", "separation")
 TIERS = ("realtime", "balanced", "accuracy")
 VALIDATED = ("cpu", "untested")
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
@@ -236,6 +236,23 @@ FAKE_MODELS: list[dict[str, Any]] = [
         "id": "fake-diarization", "task": "diarization", "engine": "fake", "kind": "fake-diarization", "family": "Fake",
         "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
         "description": "Test diarizer: separates bursts of sound by their dominant pitch. Not real speaker recognition.",
+    },
+    {
+        "id": "fake-diarization-overlap", "task": "diarization", "engine": "fake", "kind": "fake-diarization",
+        "family": "Fake", "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
+        "options": {"multi_pitch": True},
+        "description": "Test diarizer that hears several tones at once, so its speaker turns can overlap.",
+    },
+    {
+        "id": "fake-separation", "task": "separation", "engine": "fake", "kind": "fake-separation", "family": "Fake",
+        "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
+        "description": "Test separator: keeps the enrolled voice's dominant tone. Not real speech separation.",
+    },
+    {
+        "id": "fake-separation-blind", "task": "separation", "engine": "fake", "kind": "fake-separation",
+        "family": "Fake", "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
+        "options": {"mode": "blind"},
+        "description": "Test blind separator: one track per strong tone. Not real speech separation.",
     },
     {
         "id": "fake-turn", "task": "turn", "engine": "fake", "kind": "fake-turn", "family": "Fake", "languages": [],

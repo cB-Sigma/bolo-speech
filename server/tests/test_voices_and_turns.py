@@ -326,7 +326,15 @@ async def turns(url: str, mode: dict[str, Any], audio: np.ndarray) -> list[dict[
                 json.dumps({"type": "input_audio_buffer.append", "audio": base64.b64encode(pcm[i : i + 4800]).decode()})
             )
             await asyncio.sleep(0.05)
-        await asyncio.sleep(0.8)
+        # wait until the server has gone quiet (a fixed pause was too short on a busy machine), at most 10 s
+        loop = asyncio.get_running_loop()
+        deadline, seen, quiet_since = loop.time() + 10.0, -1, loop.time()
+        while loop.time() < deadline:
+            if len(events) != seen:
+                seen, quiet_since = len(events), loop.time()
+            elif loop.time() - quiet_since >= 1.0:
+                break
+            await asyncio.sleep(0.05)
         reader.cancel()
     return events
 

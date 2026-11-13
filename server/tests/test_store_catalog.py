@@ -240,7 +240,7 @@ def test_every_packaged_entry_is_well_formed() -> None:
         if "non-commercial" in s.license.lower() or "-nc" in s.license.lower():
             assert s.commercial_use is False, s.id
     tasks = {s.task for s in specs}
-    assert tasks == {"stt", "tts", "vad", "diarization", "turn"}
+    assert tasks == {"stt", "tts", "vad", "diarization", "turn", "separation"}
     needs = [s for s in specs if s.needs_phonemes]
     assert len(needs) >= 80 and all(s.task == "tts" for s in needs)
     assert not [s.id for s in specs if s.family == "Kokoro" and s.requires]  # the default voice needs nothing extra
@@ -294,7 +294,9 @@ def test_every_packaged_entry_is_well_formed() -> None:
     converted = [s for s in specs if s.source.convert == "piper"]
     assert len(converted) >= 10 and all(s.requires == ["phonemizer"] and s.kind == "vits" for s in converted)
     gated = [s for s in specs if s.gated]
-    assert gated and all(s.source_url and s.source.repo and s.validated == "untested" for s in gated)
+    # a gated model may only be marked validated when it was really run, which leaves measurements
+    assert gated and all(s.source_url and s.source.repo for s in gated)
+    assert all(s.validated == "untested" or s.measured for s in gated)
     plugin = [s for s in specs if s.plugin]
     assert plugin and all(s.plugin == "torch" and s.options.get("plugin_install") for s in plugin)
 
