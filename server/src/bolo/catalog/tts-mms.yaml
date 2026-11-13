@@ -12,7 +12,7 @@
   - pa
   tier: balanced
   sample_rate: 16000
-  size_bytes: 114057689
+  size_bytes: 114057714
   params: 36000000
   license: CC-BY-NC-4.0
   license_url: https://creativecommons.org/licenses/by-nc/4.0/
@@ -35,13 +35,22 @@
     date: '2026-11-13'
     note: measured on an export made here with tools/voices/export_mms.py (the recipe the Voices workflow runs)
   source:
-    urls:
+    repo: codebucketsolutions/bolo-mms-tts-punjabi
+    revision: ac69f610855787299209a1747c58d74a73dccd03
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: mms-tts-pan.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-pan.tar.gz
+      size: 105245211
+      sha256: 5c1cc0988f863e76d67ea1b3ff26960720a1e46ad95edf5a7044f559427b71cf
       extract: true
   options:
     text_cleaner: lowercase
-  status: pending
 - id: mms-tts-ory
   task: tts
   engine: sherpa-onnx
@@ -51,7 +60,7 @@
   - or
   tier: balanced
   sample_rate: 16000
-  size_bytes: 114070863
+  size_bytes: 114070887
   params: 36000000
   license: CC-BY-NC-4.0
   license_url: https://creativecommons.org/licenses/by-nc/4.0/
@@ -74,13 +83,22 @@
     date: '2026-11-13'
     note: measured on an export made here with tools/voices/export_mms.py (the recipe the Voices workflow runs)
   source:
-    urls:
+    repo: codebucketsolutions/bolo-mms-tts-odia
+    revision: 4cecfc437672578eb662979fe9aa0d3644193bf2
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: mms-tts-ory.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-ory.tar.gz
+      size: 105226828
+      sha256: 6d9e3b3e59f107d320cef0f77cdc486738e6441a20e714093c16988c96cddb48
       extract: true
   options:
     text_cleaner: lowercase
-  status: pending
 - id: mms-tts-asm
   task: tts
   engine: sherpa-onnx
@@ -90,7 +108,7 @@
   - as
   tier: balanced
   sample_rate: 16000
-  size_bytes: 114063101
+  size_bytes: 114063126
   params: 36000000
   license: CC-BY-NC-4.0
   license_url: https://creativecommons.org/licenses/by-nc/4.0/
@@ -113,13 +131,22 @@
     date: '2026-11-13'
     note: measured on an export made here with tools/voices/export_mms.py (the recipe the Voices workflow runs)
   source:
-    urls:
+    repo: codebucketsolutions/bolo-mms-tts-assamese
+    revision: 444b6cc65db818e5443dccd735a5f16d030ef3e6
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: mms-tts-asm.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-asm.tar.gz
+      size: 105232657
+      sha256: d919c1008974a55a35a5f5a064a8c096c904a70a7faef4b91bb94ddca8b35921
       extract: true
   options:
     text_cleaner: lowercase
-  status: pending
 - id: mms-tts-dgo
   task: tts
   engine: sherpa-onnx
@@ -129,7 +156,7 @@
   - doi
   tier: balanced
   sample_rate: 16000
-  size_bytes: 114061554
+  size_bytes: 114061578
   params: 36000000
   license: CC-BY-NC-4.0
   license_url: https://creativecommons.org/licenses/by-nc/4.0/
@@ -152,13 +179,22 @@
     date: '2026-11-13'
     note: measured on an export made here with tools/voices/export_mms.py (the recipe the Voices workflow runs)
   source:
-    urls:
+    repo: codebucketsolutions/bolo-mms-tts-dogri
+    revision: 02f2099af53b9e359827b31966e1c256412321a8
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: mms-tts-dgo.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-dgo.tar.gz
+      size: 105228936
+      sha256: 093465749c33c127cc26332a6b3c9a8acba8eddd4e58be21fc3a5e7e62d101b2
       extract: true
   options:
     text_cleaner: lowercase
-  status: pending
 - id: mms-tts-mai
   task: tts
   engine: sherpa-onnx
@@ -168,7 +204,7 @@
   - mai
   tier: balanced
   sample_rate: 16000
-  size_bytes: 114063161
+  size_bytes: 114063186
   params: 36000000
   license: CC-BY-NC-4.0
   license_url: https://creativecommons.org/licenses/by-nc/4.0/
@@ -191,13 +227,22 @@
     date: '2026-11-13'
     note: measured on an export made here with tools/voices/export_mms.py (the recipe the Voices workflow runs)
   source:
-    urls:
+    repo: codebucketsolutions/bolo-mms-tts-maithili
+    revision: cc55c9a2b982655fbc4c21f0482375bb449ddbe1
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: mms-tts-mai.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-mai.tar.gz
+      size: 105198186
+      sha256: 38956b4de93a101d1fb55cb1fb49bb17e2428860110370af3061d5173d8008f8
       extract: true
   options:
     text_cleaner: lowercase
-  status: pending
 - id: mms-tts-mag
   task: tts
   engine: sherpa-onnx
@@ -207,7 +252,7 @@
   - mag
   tier: balanced
   sample_rate: 16000
-  size_bytes: 114065457
+  size_bytes: 114065480
   params: 36000000
   license: CC-BY-NC-4.0
   license_url: https://creativecommons.org/licenses/by-nc/4.0/
@@ -230,13 +275,22 @@
     date: '2026-11-13'
     note: measured on an export made here with tools/voices/export_mms.py (the recipe the Voices workflow runs)
   source:
-    urls:
+    repo: codebucketsolutions/bolo-mms-tts-magahi
+    revision: bfbdc967e54d57de0045c87188c95eed0ae740ae
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: mms-tts-mag.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-mag.tar.gz
+      size: 105245014
+      sha256: 7edd771a24bb10ac9d3cd0a5db07f67668fe49791c2e3561fff7d797cea5cccf
       extract: true
   options:
     text_cleaner: lowercase
-  status: pending
 - id: mms-tts-hne
   task: tts
   engine: sherpa-onnx
@@ -246,7 +300,7 @@
   - hne
   tier: balanced
   sample_rate: 16000
-  size_bytes: 114059234
+  size_bytes: 114059259
   params: 36000000
   license: CC-BY-NC-4.0
   license_url: https://creativecommons.org/licenses/by-nc/4.0/
@@ -269,13 +323,22 @@
     date: '2026-11-13'
     note: measured on an export made here with tools/voices/export_mms.py (the recipe the Voices workflow runs)
   source:
-    urls:
+    repo: codebucketsolutions/bolo-mms-tts-chhattisgarhi
+    revision: f92930692265756614e475729ee4209eaf149c25
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: mms-tts-hne.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-hne.tar.gz
+      size: 105225754
+      sha256: a325a6c7a763e61719b237d6d66267b9b8f717e0e4bb60254b46756234432a1f
       extract: true
   options:
     text_cleaner: lowercase
-  status: pending
 - id: mms-tts-awa
   task: tts
   engine: sherpa-onnx
@@ -285,7 +348,7 @@
   - awa
   tier: balanced
   sample_rate: 16000
-  size_bytes: 114060000
+  size_bytes: 114072439
   params: 36000000
   license: CC-BY-NC-4.0
   license_url: https://creativecommons.org/licenses/by-nc/4.0/
@@ -296,13 +359,22 @@
   source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/awa
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-mms-tts-awadhi
+    revision: c90f9a4ac67ec52a1c98122bdbf4e13312712993
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: mms-tts-awa.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-awa.tar.gz
+      size: 105221279
+      sha256: 7aadd7bc32cd7a8f7fee475d0e525bce06f2d56d1d743bf7d783babc98b0b1cd
       extract: true
   options:
     text_cleaner: lowercase
-  status: pending
 - id: mms-tts-bgc
   task: tts
   engine: sherpa-onnx
@@ -312,7 +384,7 @@
   - bgc
   tier: balanced
   sample_rate: 16000
-  size_bytes: 114060000
+  size_bytes: 114060817
   params: 36000000
   license: CC-BY-NC-4.0
   license_url: https://creativecommons.org/licenses/by-nc/4.0/
@@ -323,13 +395,22 @@
   source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/bgc
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-mms-tts-haryanvi
+    revision: 4759150353d15da2e1f1f8b1342f4b191e8a7132
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: mms-tts-bgc.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-bgc.tar.gz
+      size: 105236345
+      sha256: 5ef8f9ebc761133a4d02ec3a430c0c7e2496901c72750879c5162e1e36720ee4
       extract: true
   options:
     text_cleaner: lowercase
-  status: pending
 - id: mms-tts-urd
   task: tts
   engine: sherpa-onnx
@@ -339,7 +420,7 @@
   - ur
   tier: balanced
   sample_rate: 16000
-  size_bytes: 114056751
+  size_bytes: 114056777
   params: 36000000
   license: CC-BY-NC-4.0
   license_url: https://creativecommons.org/licenses/by-nc/4.0/
@@ -362,13 +443,22 @@
     date: '2026-11-13'
     note: measured on an export made here with tools/voices/export_mms.py (the recipe the Voices workflow runs)
   source:
-    urls:
+    repo: codebucketsolutions/bolo-mms-tts-urdu
+    revision: 713eced25f3a006cc8a74f9260ce3a771f998fce
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: mms-tts-urd.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-urd.tar.gz
+      size: 105222621
+      sha256: 65a903e3e5124f96c013602fa1b5e4d9f846b0ce115f9bdc1508439c76de1e53
       extract: true
   options:
     text_cleaner: lowercase
-  status: pending
 - id: mms-tts-hin
   task: tts
   engine: sherpa-onnx
@@ -378,7 +468,7 @@
   - hi
   tier: balanced
   sample_rate: 16000
-  size_bytes: 114060000
+  size_bytes: 114067780
   params: 36000000
   license: CC-BY-NC-4.0
   license_url: https://creativecommons.org/licenses/by-nc/4.0/
@@ -389,13 +479,22 @@
   source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/hin
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-mms-tts-hindi
+    revision: 8536fc13eef39672bc72afb46bbc2a3f0f3df410
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: mms-tts-hin.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-hin.tar.gz
+      size: 105241778
+      sha256: 95d1f3f3cbcf5c4ed82dabffe2cfd9c347748c914273c6df040657bb2c59f2b6
       extract: true
   options:
     text_cleaner: lowercase
-  status: pending
 - id: mms-tts-ben
   task: tts
   engine: sherpa-onnx
@@ -405,7 +504,7 @@
   - bn
   tier: balanced
   sample_rate: 16000
-  size_bytes: 114060000
+  size_bytes: 114069332
   params: 36000000
   license: CC-BY-NC-4.0
   license_url: https://creativecommons.org/licenses/by-nc/4.0/
@@ -416,13 +515,22 @@
   source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/ben
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-mms-tts-bengali
+    revision: 1628278294f5b1c98783b6b98ed11c54de457ef2
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: mms-tts-ben.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-ben.tar.gz
+      size: 105225872
+      sha256: a1d1ab331cdf8c1897f8084e5a2743bdf0057a1fb7c8b5409b98f4aa59f37ab6
       extract: true
   options:
     text_cleaner: lowercase
-  status: pending
 - id: mms-tts-guj
   task: tts
   engine: sherpa-onnx
@@ -432,7 +540,7 @@
   - gu
   tier: balanced
   sample_rate: 16000
-  size_bytes: 114060000
+  size_bytes: 114058482
   params: 36000000
   license: CC-BY-NC-4.0
   license_url: https://creativecommons.org/licenses/by-nc/4.0/
@@ -443,13 +551,22 @@
   source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/guj
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-mms-tts-gujarati
+    revision: 296b9bf71ce1366e736dc1d944187a425cc5def7
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: mms-tts-guj.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-guj.tar.gz
+      size: 105238597
+      sha256: 001dd43d98bd6ddf7c22d278b5e09b72877c4b4745ac69244ed17d22dcefeae7
       extract: true
   options:
     text_cleaner: lowercase
-  status: pending
 - id: mms-tts-kan
   task: tts
   engine: sherpa-onnx
@@ -459,7 +576,7 @@
   - kn
   tier: balanced
   sample_rate: 16000
-  size_bytes: 114060000
+  size_bytes: 114070134
   params: 36000000
   license: CC-BY-NC-4.0
   license_url: https://creativecommons.org/licenses/by-nc/4.0/
@@ -470,13 +587,22 @@
   source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/kan
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-mms-tts-kannada
+    revision: a736c7e70a8ce06af50e518f71f650be71702b8f
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: mms-tts-kan.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-kan.tar.gz
+      size: 105232501
+      sha256: 59ddbf5aad2ede24b554ca4aca9904adf9b306c329a5c1ea0031a23405128bed
       extract: true
   options:
     text_cleaner: lowercase
-  status: pending
 - id: mms-tts-mal
   task: tts
   engine: sherpa-onnx
@@ -486,7 +612,7 @@
   - ml
   tier: balanced
   sample_rate: 16000
-  size_bytes: 114060000
+  size_bytes: 114077162
   params: 36000000
   license: CC-BY-NC-4.0
   license_url: https://creativecommons.org/licenses/by-nc/4.0/
@@ -497,13 +623,22 @@
   source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/mal
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-mms-tts-malayalam
+    revision: 35da5595ac139c3d1e4d8329695547c5b642a0a6
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: mms-tts-mal.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-mal.tar.gz
+      size: 105245136
+      sha256: 689248e56685e06d7736206d081709e1692a05a5050262867d17000888f76b2a
       extract: true
   options:
     text_cleaner: lowercase
-  status: pending
 - id: mms-tts-mar
   task: tts
   engine: sherpa-onnx
@@ -513,7 +648,7 @@
   - mr
   tier: balanced
   sample_rate: 16000
-  size_bytes: 114060000
+  size_bytes: 114068575
   params: 36000000
   license: CC-BY-NC-4.0
   license_url: https://creativecommons.org/licenses/by-nc/4.0/
@@ -524,13 +659,22 @@
   source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/mar
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-mms-tts-marathi
+    revision: f220c3b7de694830afd573d6dbd8d4c22ef73042
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: mms-tts-mar.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-mar.tar.gz
+      size: 105227837
+      sha256: 5763fef9c1062cc64ddc4a073cdb01aff23e24092a490ba759853d4b82621335
       extract: true
   options:
     text_cleaner: lowercase
-  status: pending
 - id: mms-tts-tam
   task: tts
   engine: sherpa-onnx
@@ -540,7 +684,7 @@
   - ta
   tier: balanced
   sample_rate: 16000
-  size_bytes: 114060000
+  size_bytes: 114056926
   params: 36000000
   license: CC-BY-NC-4.0
   license_url: https://creativecommons.org/licenses/by-nc/4.0/
@@ -551,13 +695,22 @@
   source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/tam
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-mms-tts-tamil
+    revision: a579e358f4eadc5c778026aa74e8a7fe206bfb57
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: mms-tts-tam.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-tam.tar.gz
+      size: 105211530
+      sha256: b8b0cd23352238cee76109a92925a12afe468ecce427b9d47cd77c86e546b0f0
       extract: true
   options:
     text_cleaner: lowercase
-  status: pending
 - id: mms-tts-tel
   task: tts
   engine: sherpa-onnx
@@ -567,7 +720,7 @@
   - te
   tier: balanced
   sample_rate: 16000
-  size_bytes: 114060000
+  size_bytes: 114062387
   params: 36000000
   license: CC-BY-NC-4.0
   license_url: https://creativecommons.org/licenses/by-nc/4.0/
@@ -578,10 +731,19 @@
   source_url: https://huggingface.co/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/tel
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-mms-tts-telugu
+    revision: 70ec5585a899547aa7ee3e5f06c8dbe8caeff9f6
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: mms-tts-tel.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-tel.tar.gz
+      size: 105231672
+      sha256: 18c162e2db5730fa18910366a3db677ed2752b552e4f0b023f92aa6ad323159c
       extract: true
   options:
     text_cleaner: lowercase
-  status: pending

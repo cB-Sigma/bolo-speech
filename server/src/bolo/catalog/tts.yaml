@@ -1203,18 +1203,26 @@
   - mai
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114233513
+  size_bytes: 114233541
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Maithili female voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision d6b4393cf80d). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Maithili_Female
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-maithili-female
+    revision: fb0fc6ae735ec754a77634e93f8792b28367d8ea
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-mai-female.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-mai-female.tar.gz
-      size: 105730974
-      sha256: 8aa586fe57b5e7910cdce08baf1efceb2a1fe9e1227b4f15f4ac1ab30caf24dd
+      size: 105730991
+      sha256: 4bde66189dcfd06a1a41acefa4891f694c1535b6ea8cbc73eda6a7ee611be605
       extract: true
   options:
     text_cleaner: multilingual
@@ -1227,18 +1235,26 @@
   - mai
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114246764
+  size_bytes: 114246793
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Maithili male voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision 9ce92c60a830). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Maithili_Male
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-maithili-male
+    revision: fd04c59ef17c3236119f45f60582abaec5d4cdfe
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-mai-male.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-mai-male.tar.gz
-      size: 105628327
-      sha256: f48de2910b8ba6e304ee6148951daf8a038b430b004bab004420638198bbd7fc
+      size: 105628342
+      sha256: 1711011e4388e2319922e6184ba764a3957ecffed13448aee66daf9e3806ee33
       extract: true
   options:
     text_cleaner: multilingual
@@ -1251,18 +1267,26 @@
   - bho
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114195290
+  size_bytes: 114195319
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Bhojpuri female voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision 515673623a54). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Bhojpuri_Female
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-bhojpuri-female
+    revision: 773cf5f69d1cce9fff75dc4500540f424a2950e8
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-bho-female.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-bho-female.tar.gz
-      size: 105698565
-      sha256: 8d99d630a5adc1034a64d1648f0aca31f5f512a11ad34247196e0897c176410e
+      size: 105698578
+      sha256: 5b3e5d3b6088ea6a8655ef3ed9b8d444a845f4559e6d3aedd6dd71f5260f6c22
       extract: true
   options:
     text_cleaner: multilingual
@@ -1275,18 +1299,26 @@
   - bho
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114192163
+  size_bytes: 114192193
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Bhojpuri male voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision e5bb31ecf899). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Bhojpuri_Male
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-bhojpuri-male
+    revision: bb7608eed52bdbf1f51a719317d37083bd93e4eb
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-bho-male.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-bho-male.tar.gz
-      size: 105679723
-      sha256: 9f9bf84fb1bc5f8ec2cade84e27040cb97b7aa7f915c60143849f7b91e8ce71e
+      size: 105679741
+      sha256: 420592f0567a8dcd75e55332698ac48e239cb6e103774b9f45db140a7c5c6b78
       extract: true
   options:
     text_cleaner: multilingual
@@ -1299,18 +1331,26 @@
   - hi
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114219508
+  size_bytes: 114219536
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Hindi female voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision 642cf11cddef). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Hindi_Female
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-hindi-female
+    revision: c48b729dfae118ebce7086d9695918edd02f8fa0
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-hi-female.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-hi-female.tar.gz
-      size: 105444548
-      sha256: acd29a5ab13fac40900280821ae3ada8d691977452a15640372c516d1fb97ddd
+      size: 105444567
+      sha256: 0c8c579060f39082cd6aca58b16654f8bde6b867c76981054f893291975d2f6f
       extract: true
   options:
     text_cleaner: multilingual
@@ -1323,18 +1363,26 @@
   - hi
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114217944
+  size_bytes: 114217972
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Hindi male voice: Coqui VITS converted to ONNX by the bolo project (tools/voices, upstream
     revision 7cc1ad298110). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Hindi_Male
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-hindi-male
+    revision: 776013ac9d2a3adb5c330aa3adbc9af7fda5ad20
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-hi-male.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-hi-male.tar.gz
-      size: 105467576
-      sha256: a37d02a2076d5a8ad8913d12be52a2826a90ff9de55e34ed28c8d5271b6352e8
+      size: 105467591
+      sha256: 8a5e584b8b08f006d22b245764415fd0aad05b34479966dacc8d9341073e5d8c
       extract: true
   options:
     text_cleaner: multilingual
@@ -1347,18 +1395,26 @@
   - bn
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114190616
+  size_bytes: 114190644
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Bengali female voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision fcda79fca653). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Bengali_Female
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-bengali-female
+    revision: c344ee1197e62d6be373cb9e14634a94931bdf12
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-bn-female.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-bn-female.tar.gz
-      size: 105501767
-      sha256: b8c90b4651bc3cf31966a1151499fa671a594841a20916d5916a49a997ac7c1c
+      size: 105501785
+      sha256: e21bc57f52e89cbaed443b833e7a5bfd8e42097a107919389e36524ecdf673f6
       extract: true
   options:
     text_cleaner: multilingual
@@ -1371,18 +1427,26 @@
   - bn
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114190602
+  size_bytes: 114190630
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Bengali male voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision 3d84e48bfcc1). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Bengali_Male
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-bengali-male
+    revision: 8e898d53ded194dfa90d357de0b8c8e3c47d4905
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-bn-male.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-bn-male.tar.gz
-      size: 105624171
-      sha256: bc62d47d2df13d28333175af2ea24061ee950b55841f13e4e67ce47b275086c5
+      size: 105624187
+      sha256: 3cb7ffcbe178bfd635dcdee5711be06eae0a06682cfe307795ed554b93be3c4a
       extract: true
   options:
     text_cleaner: multilingual
@@ -1395,18 +1459,26 @@
   - mr
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114238182
+  size_bytes: 114238210
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Marathi female voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision a4c1f0b5dcdc). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Marathi_Female
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-marathi-female
+    revision: 78c765d9d729b20a1297e53ed8f9f658062f0925
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-mr-female.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-mr-female.tar.gz
-      size: 105705723
-      sha256: e80624bd860bff79cedf2b8e3dd4b310b2a81b1fdb057cf01d651974b0369332
+      size: 105705739
+      sha256: 9c5163b2b58dd22a271c4a27be8853a8ae3e765bf8f4f64490f72b18ad69f013
       extract: true
   options:
     text_cleaner: multilingual
@@ -1419,18 +1491,26 @@
   - mr
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114232709
+  size_bytes: 114232739
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Marathi male voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision b5cd73b8b9c1). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Marathi_Male
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-marathi-male
+    revision: daee212b8f9d7bdf9bf8c39f348dacad36e2faaa
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-mr-male.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-mr-male.tar.gz
-      size: 105566707
-      sha256: 46d62d9ca501bbb2d824a5b062450d47634979e882a2508dc782b8a6922d15c1
+      size: 105566723
+      sha256: 873cbfeee42cf129b05c9f5ca5f3f9ca4b057e2887805c9dd4ae49f280d7af8b
       extract: true
   options:
     text_cleaner: multilingual
@@ -1443,18 +1523,26 @@
   - te
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114224870
+  size_bytes: 114224898
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Telugu female voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision dbbe1cbbfec4). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Telugu_Female
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-telugu-female
+    revision: 24682cdcc245b8930f177cc57108baca7103e0fb
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-te-female.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-te-female.tar.gz
-      size: 105762285
-      sha256: 63543539bac71b7fc98f1598f8eb5718eb8623e5bd52f0e560d9bcf78dee1fff
+      size: 105762303
+      sha256: c6b672304e517c4f232082af2d409d679c8f402f3962eac4e813678e068f206a
       extract: true
   options:
     text_cleaner: multilingual
@@ -1467,18 +1555,26 @@
   - te
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114210009
+  size_bytes: 114210038
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Telugu male voice: Coqui VITS converted to ONNX by the bolo project (tools/voices, upstream
     revision cf04058b9412). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Telugu_Male
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-telugu-male
+    revision: 6650e4cb5e553e80af13e5b079ffaf86c30ac19b
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-te-male.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-te-male.tar.gz
-      size: 105761670
-      sha256: 941ff180f4314c7b875f981cf8538be3514a179c3a2bd16f52a4e910fc7241bf
+      size: 105761689
+      sha256: 7eefebd79bf2aa7515f0ef3fa33abb3f0c43b606c91592282f69a3dfc70bc92f
       extract: true
   options:
     text_cleaner: multilingual
@@ -1491,18 +1587,26 @@
   - kn
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114188286
+  size_bytes: 114188314
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Kannada female voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision 9929183c320c). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Kannada_Female
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-kannada-female
+    revision: a35d24ac60139a2051745b4899a5335aabab6fab
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-kn-female.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-kn-female.tar.gz
-      size: 105428206
-      sha256: 517aef3b1d9f7f3d4781afd20a6437bc29abe6b1c95d58599bbaafccf5922915
+      size: 105428221
+      sha256: 425d846f77ffa6b912e1583d583ce920a1191d72f866d46fbe1d687f5f01ad68
       extract: true
   options:
     text_cleaner: multilingual
@@ -1515,18 +1619,26 @@
   - kn
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114190621
+  size_bytes: 114190649
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Kannada male voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision 3e047eb738db). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Kannada_Male
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-kannada-male
+    revision: f5e28d5e8340d7cf7bd05264dd34b33ca0bdb9f6
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-kn-male.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-kn-male.tar.gz
-      size: 105536067
-      sha256: 4002e4d722212a05c887a1b18f3849d936779dcad09a1345dd4dcf666b69c2eb
+      size: 105536086
+      sha256: 56e6cf26ef0bb6fa32c92363699fefa45a5f5e8f1ec66dcbd302b6f86568e383
       extract: true
   options:
     text_cleaner: multilingual
@@ -1539,18 +1651,26 @@
   - gu
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114214849
+  size_bytes: 114214878
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Gujarati female voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision 3533cda87bf8). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Gujarati_Female
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-gujarati-female
+    revision: 4d12dcb2dcf397ec033dfc1f94ce246ac57833dd
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-gu-female.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-gu-female.tar.gz
-      size: 105556085
-      sha256: 4bb65bc650d078d615d0459abc6a1f54fb68a2b9e51a5a80a2583841153cce07
+      size: 105556104
+      sha256: 624e43890910024bf6b3e9f864772a7ad894de7cdd2f33f4582298aa4c12a5ae
       extract: true
   options:
     text_cleaner: multilingual
@@ -1563,18 +1683,26 @@
   - gu
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114216394
+  size_bytes: 114216421
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Gujarati male voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision 683630c1a82f). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Gujarati_Male
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-gujarati-male
+    revision: 8b07836d2b27b01d45457a15205c11cc51e49cd2
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-gu-male.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-gu-male.tar.gz
-      size: 105447920
-      sha256: 8945e2347811a241ca145e62243b2062c239c33f99055fc14e3e728a3b496ccf
+      size: 105447942
+      sha256: 278231a89eb33a220bfe254a810898b90dad991c74f8e2e203101a3995dbddb7
       extract: true
   options:
     text_cleaner: multilingual
@@ -1587,18 +1715,26 @@
   - mag
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114219500
+  size_bytes: 114219528
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Magahi female voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision 0500d6cbcb0e). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Magahi_Female
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-magahi-female
+    revision: 89a217a0090dad01c584488b8650d0660b126443
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-mag-female.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-mag-female.tar.gz
-      size: 105639212
-      sha256: 89440b362315fe20f11b2002c2f06cb3106e8d5e6c465652dc4233d4d3710783
+      size: 105639227
+      sha256: 5da8ddb42a2f7ec7c975155c9e5434d7ad69b84d296e09ef7634f40caee12ea2
       extract: true
   options:
     text_cleaner: multilingual
@@ -1611,18 +1747,26 @@
   - mag
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114215608
+  size_bytes: 114215636
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Magahi male voice: Coqui VITS converted to ONNX by the bolo project (tools/voices, upstream
     revision 5a41e6164f74). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Magahi_Male
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-magahi-male
+    revision: 50eeb4a7637d20a0681ac2ac84d06e9cfbf51e2e
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-mag-male.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-mag-male.tar.gz
-      size: 105451643
-      sha256: c9495dbb0b31662dc7f115ea25a8b0c64862a4615e6f359c41510712a97b8221
+      size: 105451658
+      sha256: d497ad7d1bec21cf1d82d476a9cbecace6154ae82c27fc16274263017c9d356e
       extract: true
   options:
     text_cleaner: multilingual
@@ -1635,18 +1779,26 @@
   - hne
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114213187
+  size_bytes: 114213216
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Chhattisgarhi female voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision 0c0fffe07b43). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Chhattisgarhi_Female
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-chhattisgarhi-female
+    revision: 7465910e8ac2a2edcd6a227fd1ac1f3a5e123ec6
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-hne-female.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-hne-female.tar.gz
-      size: 105696809
-      sha256: dc38cdb427c8754f46c1783433395f24a2c391dec280fe1badbdbcd3488a6d4f
+      size: 105696828
+      sha256: aa77865fa95aacf8a33ff5b7319fe1899829f74f52c6c5fb381b297d34bce086
       extract: true
   options:
     text_cleaner: multilingual
@@ -1659,18 +1811,26 @@
   - hne
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114206937
+  size_bytes: 114206964
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN Chhattisgarhi male voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision 881673cd1f9a). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_Chhattisgarhi_Male
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-chhattisgarhi-male
+    revision: db5ab9743979328d262f724b966a68ec40d8fa2e
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-hne-male.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-hne-male.tar.gz
-      size: 105511959
-      sha256: daa73b6fecfcecb37ebfdd8c2ab7c010d32330a4fccd09d3b257bb12e67138ce
+      size: 105511970
+      sha256: 8393b61376f3c1e3c79bd83b139f0f0e7f3f7d8499887fdc3914a2f5ba4641a8
       extract: true
   options:
     text_cleaner: multilingual
@@ -1683,18 +1843,26 @@
   - en
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114202045
+  size_bytes: 114202073
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN English female voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision ce6219adea6f). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_English_Female
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-english-female
+    revision: 6718ed2eb53b763b0a30d76a6895f15770c36928
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-en-female.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-en-female.tar.gz
-      size: 105518204
-      sha256: 9e44d50d3a2922e37ac611bf11b8d9eddd92397642c4aa0af9a6e5f5e0b56f3d
+      size: 105518220
+      sha256: 561e59a0c22f36d472e4cbb59b18ee8c20fe46f2e08957cd6c816b9d1e5ec366
       extract: true
   options:
     text_cleaner: multilingual
@@ -1707,18 +1875,26 @@
   - en
   tier: balanced
   sample_rate: 22050
-  size_bytes: 114203602
+  size_bytes: 114203630
   license: MIT (weights, IISc SYSPIN); training data SYSPIN corpus, CC-BY-4.0
   description: 'IISc SYSPIN English male voice: Coqui VITS converted to ONNX by the bolo project (tools/voices,
     upstream revision 2e095770cf8a). Reads characters from a closed set, no espeak-ng: write numbers out in words.'
   source_url: https://huggingface.co/SYSPIN/vits_English_Male
   validated: untested
   source:
-    urls:
+    repo: codebucketsolutions/bolo-syspin-english-male
+    revision: 5a3593d507688effe6f8d70f5d118dd20fc18082
+    include:
+    - ATTRIBUTION
+    - LICENSE
+    - model.onnx
+    - tokens.txt
+    - voice.json
+    fallback:
     - path: syspin-en-male.tar.gz
       url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-en-male.tar.gz
-      size: 105643441
-      sha256: 5ee90da28d385b3e31b81cbe427bf9d2022a001d4c1d8504a3fbe03d7af94fa8
+      size: 105643456
+      sha256: d6e65497c38665ea85e52508fa0912d228eef09b4a2a4a9087b33a518c66e438
       extract: true
   options:
     text_cleaner: multilingual
