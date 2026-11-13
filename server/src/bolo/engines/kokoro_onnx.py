@@ -2,8 +2,8 @@
 
 Optional and off by default. ``kokoro-onnx`` is MIT, but it depends on
 ``phonemizer`` (GPL-3.0-or-later) and loads espeak-ng (GPL-3.0-or-later)
-in process. It is therefore not part of ``bolo-speech[all]``; install it
-yourself with ``pip install 'bolo-speech[kokoro-onnx]'`` if those terms suit
+in process. It is therefore not part of ``bolo[all]``; install it
+yourself with ``pip install 'bolo[kokoro-onnx]'`` if those terms suit
 you. The catalog's Kokoro entries use sherpa-onnx instead.
 
 Expects a directory with ``kokoro-v1.0*.onnx`` and ``voices-v1.0.bin``

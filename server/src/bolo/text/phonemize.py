@@ -43,7 +43,7 @@ _LANG_FLAG = re.compile(r"\([a-z-]+\)")
 INSTALL_HINT = (
     "this voice needs the optional component 'espeak-ng' (eSpeak NG, GPL-3.0-or-later), which is not shipped "
     "with bolo. Install it from the console (Models, Components), with `bolo components install espeak-ng`, "
-    "with `pip install 'bolo-speech[espeak]'`, or with your system package manager (`apt install espeak-ng`); "
+    "with `pip install 'bolo[espeak]'`, or with your system package manager (`apt install espeak-ng`); "
     "or choose a voice that does not need it, such as Kokoro English."
 )
 

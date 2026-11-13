@@ -8,7 +8,7 @@ name: Release
 #     server/src/bolo/__init__.py and the tag vX.Y.Z is created by this workflow.
 #   * Push a tag vX.Y.Z (it must match the package version).
 #
-# Needs the repository secret PYPI_API_TOKEN (a PyPI API token for bolo-speech).
+# Needs the repository secret PYPI_API_TOKEN (a PyPI API token for bolo).
 on:
   push:
     tags: ["v*"]

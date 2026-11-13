@@ -233,7 +233,7 @@ class Bolo:
                 "webrtc": {
                     "endpoint": "/v1/realtime/calls",
                     "available": webrtc,
-                    "install": None if webrtc else "pip install 'bolo-speech[webrtc]'",
+                    "install": None if webrtc else "pip install 'bolo[webrtc]'",
                     "ice_servers": list(s.webrtc_ice_servers),
                 },
                 "client_secrets": "/v1/realtime/client_secrets",

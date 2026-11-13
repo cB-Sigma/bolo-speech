@@ -38,7 +38,7 @@ def _require() -> Any:
         import wyoming
     except ImportError as exc:
         raise RuntimeError(
-            "the Wyoming protocol needs the 'wyoming' package: pip install 'bolo-speech[wyoming]'"
+            "the Wyoming protocol needs the 'wyoming' package: pip install 'bolo[wyoming]'"
         ) from exc
     return wyoming
 

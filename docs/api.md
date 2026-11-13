@@ -135,7 +135,7 @@ Multipart form.
 
 | Field | | |
 | --- | --- | --- |
-| `file` | required | audio. WAV, FLAC, OGG/Vorbis, OGG/Opus, MP3, AIFF decode with no extra install; M4A/AAC, WebM, MP4 and others need `bolo-speech[av]` or `ffmpeg` on `PATH`. Raw headerless audio is accepted when the part's content type says so: `audio/basic` or `audio/x-mulaw` (8 kHz μ-law), `audio/x-alaw`, `audio/pcm;rate=16000` (16-bit little-endian) |
+| `file` | required | audio. WAV, FLAC, OGG/Vorbis, OGG/Opus, MP3, AIFF decode with no extra install; M4A/AAC, WebM, MP4 and others need `bolo[av]` or `ffmpeg` on `PATH`. Raw headerless audio is accepted when the part's content type says so: `audio/basic` or `audio/x-mulaw` (8 kHz μ-law), `audio/x-alaw`, `audio/pcm;rate=16000` (16-bit little-endian) |
 | `model` | optional | see model names |
 | `language` | optional | ISO-639-1 code. Improves accuracy and latency for multilingual models |
 | `prompt` | optional | initial prompt (Whisper models) |
@@ -194,7 +194,7 @@ JSON body.
 | `input` | required | text. Split into sentences and synthesised one at a time |
 | `model` | optional | see model names |
 | `voice` | optional | a voice id of the model (`GET /api/v1/models/{id}`), or `{"id": …}`. OpenAI voice names (`alloy`, `echo`, `nova`, …) are mapped onto the model's voices so stock clients work |
-| `response_format` | `mp3` | `mp3`, `opus` (Ogg), `aac` (ADTS; needs `bolo-speech[av]` or ffmpeg), `flac`, `wav`, `pcm` (16-bit little-endian mono at the model's rate), and the telephony extensions `mulaw` / `alaw` (raw 8 kHz G.711) |
+| `response_format` | `mp3` | `mp3`, `opus` (Ogg), `aac` (ADTS; needs `bolo[av]` or ffmpeg), `flac`, `wav`, `pcm` (16-bit little-endian mono at the model's rate), and the telephony extensions `mulaw` / `alaw` (raw 8 kHz G.711) |
 | `speed` | `1.0` | 0.25 to 4.0 |
 | `stream_format` | `audio` | `sse` wraps the audio in `speech.audio.delta` events (base64) followed by `speech.audio.done` |
 | `instructions` | - | accepted and ignored |
@@ -205,7 +205,7 @@ JSON body.
 The body is streamed (chunked transfer) while synthesis is still running:
 the first sentence is audible while the rest is being generated. `pcm`,
 `wav` and `mp3` are forwarded as soon as each piece exists. Ogg/Opus is
-written in pages of 100 ms when PyAV is installed (`bolo-speech[av]` or
+written in pages of 100 ms when PyAV is installed (`bolo[av]` or
 `[webrtc]`; in our check every 100 ms of input produced output) and in pages
 of roughly one second through libsndfile otherwise, in which case prefer
 `pcm` or `mp3` when time-to-first-audio matters. A streamed `wav` has a header that declares an
@@ -670,7 +670,7 @@ differences from OpenAI are in [voice-agents.md](voice-agents.md).
 | --- | --- |
 | `WS /v1/realtime?model=…` | OpenAI Realtime API over WebSocket (GA event names, as typed in `openai` 3.50.0). `?intent=transcription` or `session.update` with `type: "transcription"` for transcription-only sessions. Audio: base64 `audio/pcm` (24 kHz PCM16), `audio/pcmu`, `audio/pcma`. User transcripts arrive as incremental deltas. `turn_detection`: `server_vad`, `semantic_vad` (with the optional end-of-turn model) or `null`. Auth: `Authorization: Bearer`, or subprotocols `realtime` + `openai-insecure-api-key.<key>`; an ephemeral `ek_…` key is accepted in the same places |
 | `POST /v1/realtime/client_secrets` | mint an ephemeral key (`{"value": "ek_…", "expires_at", "session"}`) for browsers. Needs the server key. Body: `{"expires_after": {"anchor": "created_at", "seconds": 600}, "session": {…}}`, all optional |
-| `POST /v1/realtime/calls` | the same sessions over **WebRTC**: SDP offer in (`application/sdp`, or multipart `sdp` + `session`), `201` with the SDP answer and `Location: /v1/realtime/calls/{call_id}`. Needs `bolo-speech[webrtc]` (else `503 engine_unavailable`). `POST …/{call_id}/hangup` ends the call. Not implemented: SIP |
+| `POST /v1/realtime/calls` | the same sessions over **WebRTC**: SDP offer in (`application/sdp`, or multipart `sdp` + `session`), `201` with the SDP answer and `Location: /v1/realtime/calls/{call_id}`. Needs `bolo[webrtc]` (else `503 engine_unavailable`). `POST …/{call_id}/hangup` ends the call. Not implemented: SIP |
 | `POST /v1/chat/completions` | `input_audio` content parts are transcribed; `modalities: ["text","audio"]` + `audio: {voice, format}` adds a spoken reply (`message.audio`, or `delta.audio` when streaming); everything else is forwarded to the language model untouched; requests without audio are proxied as they are |
 
 Voice-agent turns are traces of kind `agent` (transport `realtime` or `chat`)
@@ -693,7 +693,7 @@ list contains `"espeak-ng"`.
   "license_url": "https://github.com/espeak-ng/espeak-ng/blob/master/COPYING",
   "required_by_count": 82,              // catalog models that need it
   "installable": true, "install_blocked_reason": null,
-  "manual_command": "pip install 'bolo-speech[espeak]'",
+  "manual_command": "pip install 'bolo[espeak]'",
   "description": "…"}]}
 ```
 

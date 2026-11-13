@@ -8,7 +8,7 @@ format      route
 ``flac``    libsndfile via ``soundfile``
 ``mp3``     libsndfile >= 1.1 via ``soundfile`` (bundled in its wheels)
 ``opus``    Ogg/Opus, libsndfile >= 1.1 via ``soundfile``
-``aac``     ADTS AAC through PyAV (``bolo-speech[av]``) or ``ffmpeg``
+``aac``     ADTS AAC through PyAV (``bolo[av]``) or ``ffmpeg``
 ``mulaw``   raw 8 kHz G.711 μ-law, built in (telephony extension)
 ``alaw``    raw 8 kHz G.711 A-law, built in (telephony extension)
 ==========  ==========================================================
@@ -299,7 +299,7 @@ class StreamEncoder:
                 self._ffmpeg_pcm = []
             else:
                 raise UnsupportedFormat(
-                    "response_format 'aac' needs FFmpeg: install \"bolo-speech[av]\" or put ffmpeg on PATH"
+                    "response_format 'aac' needs FFmpeg: install \"bolo[av]\" or put ffmpeg on PATH"
                 )
 
     def feed(self, samples: npt.NDArray[np.floating], last: bool = False) -> bytes:

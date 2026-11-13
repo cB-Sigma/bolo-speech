@@ -73,7 +73,7 @@ def test_component_listing_shape(live: LiveServer, no_espeak) -> None:  # type: 
     assert c["id"] == "espeak-ng" and c["name"] == "eSpeak NG" and c["license"] == "GPL-3.0-or-later"
     assert c["installed"] is False and c["source"] is None and c["version"] is None
     assert c["required_by_count"] >= 80 and c["installable"] is True and c["install_blocked_reason"] is None
-    assert c["manual_command"] == "pip install 'bolo-speech[espeak]'" and c["license_url"].startswith("https://")
+    assert c["manual_command"] == "pip install 'bolo[espeak]'" and c["license_url"].startswith("https://")
     assert httpx.get(live.url + "/api/v1/info").json()["components"] == doc["components"]
     piper = httpx.get(live.url + "/api/v1/models/piper-en-us-amy-low").json()
     assert piper["requires"] == ["espeak-ng"] and piper["available"] is False

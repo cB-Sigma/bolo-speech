@@ -4,7 +4,7 @@ Route, in order:
 
 1. libsndfile through the ``soundfile`` wheel: WAV, FLAC, OGG/Vorbis,
    OGG/Opus, MP3, AIFF, AU and friends. No system packages needed.
-2. PyAV (``pip install 'bolo-speech[av]'``; the wheel bundles FFmpeg's
+2. PyAV (``pip install 'bolo[av]'``; the wheel bundles FFmpeg's
    libraries): M4A/AAC, WebM, MP4, AMR, WMA and anything else FFmpeg reads.
 3. An ``ffmpeg`` executable on ``PATH`` as a last resort.
 
@@ -171,5 +171,5 @@ def decode_audio(
     ext = filename.rsplit(".", 1)[-1].lower() if filename and "." in filename else ""
     hint = ""
     if not have_av() and (ext in _NEEDS_AV or not ext):
-        hint = " This container needs FFmpeg: install the bundled decoder with \"pip install 'bolo-speech[av]'\" or put ffmpeg on PATH."
+        hint = " This container needs FFmpeg: install the bundled decoder with \"pip install 'bolo[av]'\" or put ffmpeg on PATH."
     raise AudioDecodeError(f"could not decode the audio file ({'; '.join(errors)}).{hint}")

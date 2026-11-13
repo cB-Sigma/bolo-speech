@@ -2,7 +2,7 @@
 #
 #   sudo useradd --system --home /var/lib/bolo --create-home bolo
 #   sudo -u bolo python3 -m venv /var/lib/bolo/venv
-#   sudo -u bolo /var/lib/bolo/venv/bin/pip install 'bolo-speech[all]'
+#   sudo -u bolo /var/lib/bolo/venv/bin/pip install 'bolo[all]'
 #   sudo install -m 600 -o bolo /dev/null /etc/bolo.env     # put BOLO_API_KEY=... in it
 #   sudo systemctl daemon-reload && sudo systemctl enable --now bolo
 [Unit]

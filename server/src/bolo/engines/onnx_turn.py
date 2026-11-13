@@ -65,7 +65,7 @@ class OnnxRuntimeEngine(Engine):
         except Exception as exc:
             return EngineStatus(
                 self.id, False, None,
-                f"{type(exc).__name__}: {exc}. Optional (end-of-turn detection): pip install 'bolo-speech[turn]'",
+                f"{type(exc).__name__}: {exc}. Optional (end-of-turn detection): pip install 'bolo[turn]'",
             )  # fmt: skip
 
     def load(self, kind: str, task: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Model:

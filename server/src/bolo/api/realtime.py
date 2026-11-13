@@ -156,7 +156,7 @@ async def create_call(request: Request) -> Response:
         from bolo import webrtc
     except ImportError as exc:
         raise EngineUnavailable(
-            "the WebRTC transport needs aiortc, which is not installed: pip install 'bolo-speech[webrtc]'. "
+            "the WebRTC transport needs aiortc, which is not installed: pip install 'bolo[webrtc]'. "
             "The WebSocket transport (WS /v1/realtime) works without it."
         ) from exc
     params = request.query_params

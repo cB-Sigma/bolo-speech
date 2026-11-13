@@ -60,10 +60,10 @@ def manual_command() -> str:
     if Path("/.dockerenv").exists():
         return "rebuild the image with: docker build --build-arg WITH_ESPEAK=1 ..."
     if "/pipx/venvs/" in prefix:
-        return "pipx inject bolo-speech espeakng-loader"
+        return "pipx inject bolo espeakng-loader"
     if "/uv/tools/" in prefix:
-        return "uv tool install --with espeakng-loader bolo-speech"
-    return "pip install 'bolo-speech[espeak]'"
+        return "uv tool install --with espeakng-loader bolo"
+    return "pip install 'bolo[espeak]'"
 
 
 class ComponentManager:

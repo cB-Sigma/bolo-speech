@@ -194,7 +194,7 @@ class HubClient:
         self.timeout = timeout
 
     def headers(self) -> dict[str, str]:
-        h = {"User-Agent": "bolo-speech"}
+        h = {"User-Agent": "bolo"}
         if self.token:
             h["Authorization"] = f"Bearer {self.token}"
         return h

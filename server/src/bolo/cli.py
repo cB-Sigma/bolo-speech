@@ -477,17 +477,17 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             f"  {mark}{st.id:<15} {st.version or ''} {'' if st.available else '(' + (st.reason or 'unavailable') + ')'}"
         )
     if not ok:
-        print("  no inference engine is installed. Try: pip install 'bolo-speech[sherpa]'")
+        print("  no inference engine is installed. Try: pip install 'bolo[sherpa]'")
     print("audio:")
     print(f"  resampler: {'libsoxr' if HAVE_SOXR else 'built-in (install soxr for better quality)'}")
     print(
-        f"  decode wav/flac/ogg/opus/mp3: libsndfile;  m4a/aac/webm: {'PyAV' if decode.have_av() else ('ffmpeg' if decode.have_ffmpeg() else 'unavailable (pip install bolo-speech[av])')}"
+        f"  decode wav/flac/ogg/opus/mp3: libsndfile;  m4a/aac/webm: {'PyAV' if decode.have_av() else ('ffmpeg' if decode.have_ffmpeg() else 'unavailable (pip install bolo[av])')}"
     )
     fmts = encode.available_formats()
     print(
         "  encode: "
         + ", ".join(f for f, v in fmts.items() if v)
-        + ("" if fmts["aac"] else "  (aac needs bolo-speech[av] or ffmpeg)")
+        + ("" if fmts["aac"] else "  (aac needs bolo[av] or ffmpeg)")
     )
     ph = get_phonemizer()
     if ph:
@@ -503,7 +503,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
         print(f"wyoming: ok {getattr(wyoming, '__version__', '')}")
     except Exception:
-        print("wyoming: not installed (pip install 'bolo-speech[wyoming]')")
+        print("wyoming: not installed (pip install 'bolo[wyoming]')")
     if args.network:
         import httpx
 

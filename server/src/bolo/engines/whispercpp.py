@@ -58,7 +58,7 @@ class WhisperCppEngine(Engine):
             return EngineStatus(self.id, True, version("pywhispercpp"), None)
         except Exception as exc:
             return EngineStatus(
-                self.id, False, None, f"{type(exc).__name__}: {exc}. Optional: pip install 'bolo-speech[whispercpp]'"
+                self.id, False, None, f"{type(exc).__name__}: {exc}. Optional: pip install 'bolo[whispercpp]'"
             )
 
     def load(self, kind: str, task: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Model:

@@ -3,7 +3,7 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [project]
-name = "bolo-speech"
+name = "bolo"
 dynamic = ["version"]
 description = "A lightweight, torch-free speech server: speech-to-text, text-to-speech and VAD behind OpenAI-compatible, WebSocket and Wyoming APIs."
 readme = "README.md"

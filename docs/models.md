@@ -607,9 +607,9 @@ it, and what you download, carry their own terms.
 | faster-whisper / CTranslate2 | MIT / MIT | |
 | useful-moonshine-onnx | MIT | optional |
 | onnxruntime | MIT | runs the optional end-of-turn model (Smart Turn v3, BSD-2-Clause); installed with faster-whisper anyway |
-| aiortc | BSD-3-Clause | optional (`bolo-speech[webrtc]`): the WebRTC transport of the Realtime API; brings PyAV |
+| aiortc | BSD-3-Clause | optional (`bolo[webrtc]`): the WebRTC transport of the Realtime API; brings PyAV |
 | pywhispercpp / whisper.cpp | MIT / MIT | optional |
-| kokoro-onnx | MIT, **but depends on `phonemizer` (GPL-3.0-or-later)** and loads espeak-ng in process | optional, deliberately not in `bolo-speech[all]` |
+| kokoro-onnx | MIT, **but depends on `phonemizer` (GPL-3.0-or-later)** and loads espeak-ng in process | optional, deliberately not in `bolo[all]` |
 | piper-tts (`piper1-gpl`) | GPL-3.0 | **not used and not supported**: Piper-format voices run through sherpa-onnx instead |
 
 Codec libraries: `soundfile` bundles libsndfile (LGPL-2.1+) with mpg123 and
@@ -636,7 +636,7 @@ to turn text into those phonemes at run time. What we found:
   hands text to espeak-ng and gets phonemes back.
 
 **bolo does not ship espeak-ng.** It is not in the wheel, not in
-`bolo-speech[all]`, and not in the Docker images unless you build them with
+`bolo[all]`, and not in the Docker images unless you build them with
 `--build-arg WITH_ESPEAK=1`. It is an *optional component*, installed only
 when you ask for it. Models that need it have `requires: ["espeak-ng"]` in the
 catalog (marked "needs espeak-ng" in the tables above, 93 entries) and show as
@@ -649,7 +649,7 @@ Ways to install it, any one of:
 | --- | --- |
 | the console (Models → Optional components, or the notice next to a voice) | asks you to accept the licence, then the same as the next row |
 | `bolo components install espeak-ng --accept-license`, or `POST /api/v1/components/espeak-ng/install` with `{"accept_license": true}` | `pip install espeakng-loader` (or `uv pip install`) into the server's own Python environment; a running server starts using it without a restart |
-| `pip install 'bolo-speech[espeak]'` | the same package, installed by you |
+| `pip install 'bolo[espeak]'` | the same package, installed by you |
 | `apt install espeak-ng` / `brew install espeak-ng` | the system executable |
 
 `bolo components list`, `bolo doctor` and `GET /api/v1/components` show
