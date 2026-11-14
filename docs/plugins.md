@@ -105,7 +105,7 @@ messages before its final reply. Replies to different requests may interleave.
 | --- | --- | --- |
 | `hello` | `protocol` (highest version bolo speaks) | `protocol` (version used), `name`, `version`, `kinds` |
 | `health` | - | `rss_mb` |
-| `load` | `model`, `kind`, `task`, `path`, `options`, `threads`, `device` | `handle`, `sample_rate`, `info` (`voices`, `languages`, `max_batch`, `supports_translate`, `supports_word_timestamps`, `speaker_conditioned`) |
+| `load` | `model`, `kind`, `task`, `path`, `options`, `threads`, `device`, `placement` (optional) | `handle`, `sample_rate`, `info` (`voices`, `languages`, `max_batch`, `supports_translate`, `supports_word_timestamps`, `speaker_conditioned`, `placement`) |
 | `unload` | `handle` | - |
 | `transcribe` | `handle`, `requests: [{n, language, task, prompt, word_timestamps, temperature, hotwords}]` + the audio of all requests, concatenated | `results: [{text, language, segments: [{start, end, text, words}], words: [{w, t0, t1}]}]` |
 | `speakers` | `handle`, `n`, `language`, `task`, `prompt`, `word_timestamps`, `temperature`, `frame_s`, `frames`, `speakers` + `n` audio samples, then the speaker activity (`frames` x `speakers` float32, frame by frame) | `results`: one per speaker, as for `transcribe`, times from the start of the audio |
@@ -128,6 +128,16 @@ together with per-frame speaker activity (column `k` is speaker `k` of the diari
 only to models that announce it, so older plugins are unaffected; the protocol version stays 1. In a
 plugin built on bolo's SDK, an `STTModel` with `speaker_conditioned = True` implements
 `transcribe_speakers(SpeakerRequest) -> list[STTResult]`.
+
+**GPU/CPU placement.** `device` in `load` is where bolo's scheduler placed the model (`cpu`, `cuda:0`, ...;
+configuration.md, "GPU and CPU placement"). When the free accelerator memory is smaller than the model's estimate,
+bolo also sends `placement: {"device_map": "auto", "max_memory": {"0": <bytes>, "cpu": <bytes>}}`: a plugin that
+can split a model across the GPU and the CPU (accelerate's `device_map="auto"` with that `max_memory`) does so, and
+answers with `info.placement: {"gpu_bytes", "cpu_bytes", "device_map"}`, which `bolo ps` shows as
+`"x%/y% CPU/GPU"`. A plugin that cannot split ignores `placement` and loads the model whole on `device`. In a
+plugin built on bolo's SDK, `LoadOptions.max_memory` carries it, and a model attribute `placement_report` (a dict)
+is sent back. Both members are optional (bolo 0.5); the protocol version stays 1. bolo-torch splits the
+transformers language model of Orpheus SNAC voices this way; its other loaders load whole.
 
 Errors: `error.code` `model_gated` becomes bolo's `401 model_gated` and `invalid_request` its
 `400 invalid_request` (so a gated download inside the plugin reaches the client as such); any other

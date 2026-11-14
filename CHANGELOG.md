@@ -6,6 +6,42 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Added
+
+- **Ollama-style model scheduling: GPU/CPU placement, keep-alive, `bolo ps`.** Untested on a GPU: everything
+  GPU-side is tested with fake NVML readings and made-up memory figures.
+  - **Placement per model** (docs/configuration.md, "GPU and CPU placement"). With an accelerator, each model goes
+    on the GPU when its estimated memory fits in the free accelerator memory minus `gpu_reserve_mb` (default 512),
+    after unloading idle GPU-resident models when that makes it fit; otherwise on the CPU, with a notice. Nothing is
+    refused. llama.cpp models (tts-server, Orpheus-family voices, the speech-to-speech server) get `-ngl N` computed
+    from the free memory and the GGUF's layer count and size, unless `-ngl` is set in their arguments. ONNX Runtime
+    models made of several graphs (DiCoW ONNX, LFM3-Audio) are placed graph by graph. bolo-torch plugin models get
+    accelerate's `device_map="auto"` with a `max_memory` and report their split back (plugin protocol: optional
+    `placement` in `load`, `info.placement` in the reply). sherpa-onnx and faster-whisper models move whole. A model
+    can pin its device (`PUT /api/v1/models/{id}/settings {"device": "cpu"}`, or `options.device` in the catalog).
+  - **Accelerator memory**: NVML (new optional extra `bolo-speech[nvidia]`, `nvidia-ml-py`) or `nvidia-smi`, with
+    the memory held by bolo and the servers and plugins it started; Apple Silicon reported as unified memory; the
+    growth of RAM and VRAM during each load is attributed to the model. New `gpu_memory_budget_mb`: LRU eviction
+    among GPU-resident models, then the CPU.
+  - **Keep-alive** (docs/api.md, "Keep-alive"): a `keep_alive` field on transcriptions, translations and speech, and
+    `?keep_alive=` on the STT, TTS and Realtime WebSockets (applied when the session ends); seconds or durations
+    (`"5m"`), `0` unloads after the request, `-1` keeps the model. New setting `keep_alive` (default `5m`);
+    `stt_ttl_s`, `tts_ttl_s` and `diarization_ttl_s` now default to unset and override it when set (`vad_ttl_s`
+    stays `-1`). Models can pin their own `keep_alive`.
+  - **`GET /api/v1/ps`**, Ollama's `/api/ps` shape (`size`, `size_vram`, `processor`, `expires_at`, ...) with the
+    machine's CPU, RAM and GPUs. bolo's `/api/ps` stays speaches' route. `/api/v1/stats` carries the same fields.
+  - **`bolo ps`** shows MODEL, TASK, SIZE, PROCESSOR ("100% GPU", "35%/65% CPU/GPU"), DEVICE and UNTIL ("4 minutes
+    from now", "Forever", "Stopping...") under a line with CPU, RSS, RAM and each GPU's used/total memory; `-v` adds
+    the request and latency columns. New **`bolo load <model> --keep-alive 10m`** (also `bolo run`) and
+    **`bolo stop <model>`**. `POST /api/v1/models/{id}/load` takes `keep_alive` and says where the model went.
+  - **Console**: a "Loaded models" panel on the Models page: each loaded model with its size, CPU/GPU split, VRAM
+    share, a countdown to unloading, and Unload / Keep loaded buttons, plus CPU, RAM and GPU totals.
+
+### Changed
+
+- The `model` event of `/api/v1/events` for a load carries `processor` (and `notice` when the model is not all on
+  the accelerator); the unload answer carries `unloaded` (false when the model was not loaded).
+
 ### Fixed
 
 - **The `device` setting now reaches every ONNX Runtime engine.** Nemotron diarization, DiCoW ONNX,

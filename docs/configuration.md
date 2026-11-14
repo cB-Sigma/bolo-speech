@@ -61,14 +61,17 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `s2s_server_url` | unset | | `speech-to-speech`: a llama-server you run (`http://host:port`); bolo opens its WebSocket `/v1/realtime`, one upstream session per Realtime session. Nothing is downloaded or started then |
 | `s2s_server_api_key` | unset | | sent as `Authorization: Bearer …` to `s2s_server_url` |
 | `s2s_parallel` | `2` | | sessions the managed server holds at once (`llama-server --parallel`; one slot per session) |
-| `s2s_server_args` | `[]` | | extra command-line arguments for the managed server (bolo adds `-ngl 99` when `device` is not `cpu`) |
+| `s2s_server_args` | `[]` | | extra command-line arguments for the managed server (bolo adds `-ngl N`, the layers that fit in free accelerator memory, when `device` is not `cpu` and the arguments have no `-ngl`) |
 | `allow_component_install` | unset | | whether optional components (eSpeak NG) may be installed through the API. Unset: allowed on a loopback bind or when an API key is set. Never allowed on a non-loopback bind without a key |
 | `preload` | `[]` | `--preload` (repeatable) | models to load at startup; `/readyz` waits for them |
-| `stt_ttl_s`, `tts_ttl_s` | `300` | | unload after this many idle seconds; `-1` never, `0` at once |
-| `vad_ttl_s` | `-1` | | same, for the VAD |
-| `diarization_ttl_s` | `300` | | same, for diarization pipelines and separation models |
+| `keep_alive` | `5m` | | how long a model stays loaded once idle, as in Ollama: seconds (`300`) or a duration (`"30s"`, `"5m"`, `"1h30m"`); `0` unloads a model as soon as the request using it ends; a negative value (`-1`) keeps models loaded until they are unloaded on purpose or evicted. A request's own `keep_alive` (api.md, "Keep-alive") and the per-task values below override it. Environment: `BOLO_KEEP_ALIVE`. Ollama's `OLLAMA_KEEP_ALIVE` is deliberately not read: bolo often runs next to an Ollama whose setting is meant for Ollama |
+| `stt_ttl_s`, `tts_ttl_s` | unset (`keep_alive`) | | per-task override of `keep_alive`, in seconds; `-1` never, `0` at once |
+| `vad_ttl_s` | `-1` | | same, for the VAD (kept loaded by default) |
+| `diarization_ttl_s` | unset (`keep_alive`) | | same, for diarization pipelines and separation models |
 | `memory_budget_mb` | `0` (off) | `--memory-budget-mb` | evict idle models (LRU) to stay under this estimate. A model's memory is estimated as the growth of the process during its load, and never less than the size of its files |
 | `max_loaded_models` | `0` (off) | | cap on models in memory |
+| `gpu_reserve_mb` | `512` | | with an accelerator: accelerator memory left free when placing a model (the display, other programs, allocation spikes). A model goes on the GPU only when its estimated memory fits in the free memory minus this; see "GPU and CPU placement" below |
+| `gpu_memory_budget_mb` | `0` (off) | | accelerator memory bolo's models may take in all. Loading a model that would go over it first unloads idle GPU-resident models, least recently used first; when every one is in use, the new model is placed on the CPU (with a notice) instead. Nothing is refused |
 | `probe_models` | `true` | | load a newly installed model once in a child process first |
 | `threads` | `0` = min(4, CPUs) / `workers` | `--threads` | inference threads per engine call. If the machine also runs other work (a language model, other services), set this below the number of cores: oversubscribed inference threads slow each other down badly |
 | `workers` | `1` | `--workers` | concurrent engine calls per model |
@@ -82,14 +85,14 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `agreement` | `2` | | hypotheses that must agree before a word is shown as stable |
 | `wyoming` | `false` | `--wyoming` | serve the Wyoming protocol |
 | `wyoming_host`, `wyoming_port` | `127.0.0.1`, `10300` | `--wyoming-host`, `--wyoming-port` | Wyoming bind address |
-| `device` | `cpu` | | where models run: `cpu`, `cuda` (or `cuda:1`), `coreml` (also `mps`, `metal`), `rocm`, `dml`, `openvino`, or `auto` (the first accelerator found). sherpa-onnx models use `cuda` or `coreml`; faster-whisper uses `cuda`; the ONNX Runtime engines (Nemotron diarization, DiCoW ONNX, the Orpheus-family decoder, the end-of-turn model, in-process speech-to-speech) use the matching execution provider when the installed `onnxruntime` has it (for `cuda`, install `onnxruntime-gpu`), and otherwise run on the CPU with one warning; llama-server and audio.cpp get `-ngl 99` for any value other than `cpu`. **Untested on a GPU** |
+| `device` | `cpu` | | where models run (per model, as placed by the scheduler: see "GPU and CPU placement" below; a model can pin its own with `PUT /api/v1/models/{id}/settings` `{"device": "cpu"}` or a catalog `options.device`): `cpu`, `cuda` (or `cuda:1`), `coreml` (also `mps`, `metal`), `rocm`, `dml`, `openvino`, or `auto` (the first accelerator found). sherpa-onnx models use `cuda` or `coreml`; faster-whisper uses `cuda`; the ONNX Runtime engines (Nemotron diarization, DiCoW ONNX, the Orpheus-family decoder, the end-of-turn model, in-process speech-to-speech) use the matching execution provider when the installed `onnxruntime` has it (for `cuda`, install `onnxruntime-gpu`), and otherwise run on the CPU with one warning; llama-server gets `-ngl N`, the layers that fit in the free accelerator memory (all of them when everything fits; none when nothing does), unless you set `-ngl` yourself in `tts_server_args`, `s2s_server_args` or the entry's `server_args`; audio.cpp gets the device as its backend. **Untested on a GPU** |
 | `log_level` | `info` | `--log-level` | `debug`, `info`, `warning`, `error` |
 | `trace_buffer` | `1000` | | request traces kept in memory |
 | `fake_engine` | `false` | `--fake-engine` | add deterministic test models (development) |
 | `tts_servers` | `[]` | | external TTS servers the operator runs, as `"<model id or runtime>=<url>"`, e.g. `"llama-server=http://127.0.0.1:8080"` (every llama-server model goes there) or `"voxcpm2-audiocpp=http://gpu-box:8080"` (one model). A model id or alias wins over a runtime name. Such a model needs no download and no binary; for audio.cpp the server's config must declare the model under the id in the entry's `options.server_model` (the catalog id). See models.md, "External TTS servers" |
 | `tts_server_api_key` | unset | | sent as `Authorization: Bearer …` to the servers in `tts_servers` (llama-server `--api-key`) |
 | `llama_server_bin`, `audiocpp_server_bin` | unset | | the binary bolo starts for a model whose runtime has no URL in `tts_servers`. Unset: the one `bolo components install llama-server` / `audio.cpp` put in `<data_dir>/components/`, then `llama-server` / `audiocpp_server` on `PATH`. Point it at a CUDA/Vulkan/Metal build to use a GPU |
-| `tts_server_args` | `[]` | | extra command-line arguments for every server bolo starts (e.g. `["-ngl", "99"]` for llama-server; bolo adds `-ngl 99` itself when `device` is not `cpu`) |
+| `tts_server_args` | `[]` | | extra command-line arguments for every server bolo starts (e.g. `["-ngl", "20"]` for llama-server, which bolo then leaves alone; without one bolo adds `-ngl N` itself when `device` is not `cpu`, N being the layers that fit in free accelerator memory) |
 | `tts_server_start_timeout_s` | `300` | | how long a started server may take to answer `GET /health` (loading its model) |
 | `tts_server_timeout_s` | `300` | | longest wait for the next bytes of a synthesis answer |
 | `providers` | `{}` | | cloud providers for `engine: remote` models: one `[providers.<name>]` table each with `kind` (`openai-compatible`, `sarvam`, `elevenlabs`, `deepgram`; implied for those four names, `openai` meaning `openai-compatible`), `base_url` (default: the vendor's), `api_key`, `options` and `prices`. In the environment: `BOLO_PROVIDERS` (the table as JSON) or `BOLO_PROVIDER_<NAME>_API_KEY` / `_BASE_URL` / `_KIND` (these add to the file's table). Keys are never logged or returned by any API. Paid cloud APIs; audio leaves this server. See [providers.md](providers.md) |
@@ -129,8 +132,15 @@ default_tts = "kokoro-v1.0-int8"
 preload = ["silero-vad", "zipformer-en-20m-streaming"]
 
 [lifecycle]
+keep_alive = "10m"                    # every model, unless a task or a request says otherwise
 stt_ttl_s = 900
 memory_budget_mb = 3000
+
+# with an accelerator (device = "cuda"): models that do not fit in free VRAM go on the CPU
+device = "cuda"
+[gpu]
+reserve_mb = 1024                     # gpu_reserve_mb
+memory_budget_mb = 8000               # gpu_memory_budget_mb
 
 [scheduler]
 threads = 4
@@ -198,6 +208,42 @@ To make switching painless, these `speaches` names are read as fallbacks
 Note that speaches binds `0.0.0.0` by default and bolo binds `127.0.0.1`: set
 `UVICORN_HOST=0.0.0.0` (or `BOLO_HOST`) in a container.
 
+## GPU and CPU placement
+
+With an accelerator (`device` = `cuda`, `cuda:1`, `coreml`, `auto`, ...), bolo decides per model, at load time, where
+it goes, the way Ollama does:
+
+1. Estimate the model's memory: its files on disk × 1.2, or the catalog's `options.hardware.vram_gb` when larger.
+2. Read the free accelerator memory (NVIDIA: NVML through the optional `nvidia-ml-py` package, else `nvidia-smi`;
+   Apple Silicon: the machine's available memory, since it is shared), subtract `gpu_reserve_mb`, and cap it by
+   what is left of `gpu_memory_budget_mb`.
+3. If the model fits, it goes on the accelerator. If it would fit after unloading idle GPU-resident models, those
+   are unloaded first (least recently used first). Otherwise it is split where its runtime allows, or placed on
+   the CPU, with a notice in the log, in the load answer and in `bolo ps`. Nothing is refused.
+
+How a model can be split depends on its runtime:
+
+| Runtime | Placement |
+| --- | --- |
+| llama.cpp (`tts-server` models on llama-server, Orpheus-family voices, the speech-to-speech server) | by layers: `-ngl N` from the free memory, the GGUF's layer count (read from its header) and its size, the projector (`-mm`) first, plus 10% of the model for the KV cache and buffers. An `-ngl` you set yourself wins |
+| ONNX Runtime models made of several graphs (DiCoW ONNX: encoder and decoder; LFM3-Audio: four graphs) | by graph: the largest graphs go on the accelerator while they fit, the rest run on the CPU |
+| bolo-torch plugin models (PyTorch) | the plugin gets accelerate's `device_map="auto"` with a `max_memory` from the free memory and reports back how it split the weights (docs/plugins.md); models whose loader supports it (Orpheus SNAC so far) are split by layers, others load whole |
+| sherpa-onnx | whole model on one device: sherpa-onnx builds its sessions itself, with one provider per model |
+| faster-whisper (CTranslate2) | whole model on one device (CTranslate2 cannot split a model); CUDA only, so `coreml` runs it on the CPU |
+| single-graph ONNX Runtime models (Nemotron, end-of-turn, the SNAC decoder) | whole model on one device. Cutting one graph in two at a layer boundary is possible with `onnx.utils.Extractor` but is not done yet |
+| kokoro-onnx, Moonshine, whisper.cpp, cloud and operator-run servers | the CPU (or wherever the operator's server runs) |
+
+`device = "auto"` means the accelerator bolo can read: the first NVIDIA GPU (NVML or nvidia-smi) or Apple Silicon's
+GPU, else the CPU; for ROCm, DirectML or OpenVINO name the device. When the free memory cannot be read (those, or a
+GPU without driver tools), a model goes on the device as before, and `bolo ps` shows the plan rather than a measurement. After each load bolo measures what the
+load took: the growth of its own resident memory and that of the processes it started (llama-server, audio.cpp,
+plugins), and the growth of their accelerator memory (NVML's per-process figures, else the whole device's). On Apple
+Silicon the accelerator's share cannot be told apart from ordinary memory; it is reported as planned.
+
+`memory_budget_mb` counts the RAM side of each model, `gpu_memory_budget_mb` the accelerator side.
+
+None of this has run on a real GPU in bolo's tests: it is tested with fake NVML readings and made-up memory figures.
+
 ## Per-model options
 
 A catalog entry (or a custom entry in `<data_dir>/custom.yaml`) may carry
@@ -226,6 +272,13 @@ model) and `romanised` (`off`, `auto` or `on` for this model's voices; default: 
 server's `romanised` setting). `text_normalizer`, `wordlists` and `romanised` can
 also be pinned at run time with `PUT /api/v1/models/{id}/settings`, which wins
 over the catalog.
+
+Placement and keep-alive: `device` (where this model runs, overriding the `device`
+setting; it still goes on the CPU when it does not fit) and `keep_alive` (how long
+it stays loaded once idle, overriding `keep_alive` and the per-task TTLs). Both can
+be pinned with `PUT /api/v1/models/{id}/settings` as well, which wins. For
+llama.cpp models, `block_count` gives the layer count when the GGUF header cannot
+be read.
 
 Pronunciation word lists are files in `<data_dir>/wordlists/<name>.tsv`
 (uccharan's TSV format; manage them with `/api/v1/wordlists`); the list named

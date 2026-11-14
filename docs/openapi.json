@@ -1222,7 +1222,65 @@
      "native"
     ],
     "summary": "Load a model into memory",
+    "description": "Optional JSON body ``{\"keep_alive\": \"10m\"}`` (or ``?keep_alive=``). The answer says where the model went:\n``processor`` (\"100% GPU\", \"35%/65% CPU/GPU\", ...), ``placement`` and, when it is not all on the accelerator\nthat was asked for, a ``notice``.",
     "operationId": "load_api_v1_models__model_id__load_post",
+    "parameters": [
+     {
+      "name": "model_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Model Id"
+      }
+     },
+     {
+      "name": "keep_alive",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Keep Alive"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/models/{model_id}/unload": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Unload a model from memory",
+    "description": "Unloads now (``bolo stop``). A request still using the model finishes first.",
+    "operationId": "unload_api_v1_models__model_id__unload_post",
     "parameters": [
      {
       "name": "model_id",
@@ -1256,40 +1314,20 @@
     }
    }
   },
-  "/api/v1/models/{model_id}/unload": {
-   "post": {
+  "/api/v1/ps": {
+   "get": {
     "tags": [
      "native"
     ],
-    "summary": "Unload a model from memory",
-    "operationId": "unload_api_v1_models__model_id__unload_post",
-    "parameters": [
-     {
-      "name": "model_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "string",
-       "title": "Model Id"
-      }
-     }
-    ],
+    "summary": "Loaded models: size, GPU/CPU split, keep-alive (Ollama style)",
+    "description": "Like Ollama's ``/api/ps``: per model ``size``, ``size_vram`` (bytes), ``processor`` (\"100% GPU\", \"100% CPU\",\n\"35%/65% CPU/GPU\"), ``device``, ``expires_at`` (null: kept loaded), ``until``; plus the machine (CPU, RAM, each\nGPU's used and total memory) and the budgets.",
+    "operationId": "ps_api_v1_ps_get",
     "responses": {
      "200": {
       "description": "Successful Response",
       "content": {
        "application/json": {
         "schema": {}
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
        }
       }
      }
@@ -2793,6 +2831,33 @@
       ],
       "title": "Fallback",
       "description": "Models (of the same task, local or cloud) that answer instead when this one is unavailable, overloaded or its provider fails, in order; null removes the pin, [] switches a configured fallback off."
+     },
+     "device": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Device",
+      "description": "Pin where the model runs: cpu, cuda, cuda:1, coreml, auto, ... (overrides the `device` setting for this model; it still goes on the CPU when it does not fit on the accelerator); null removes the pin."
+     },
+     "keep_alive": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Keep Alive",
+      "description": "Pin how long the model stays loaded when idle: seconds or a duration ('10m'); -1 keeps it loaded; 0 unloads it after each request; null removes the pin."
      }
     },
     "additionalProperties": false,
@@ -3082,6 +3147,21 @@
       ],
       "title": "Language",
       "description": "Extension: language hint for text normalisation."
+     },
+     "keep_alive": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Keep Alive",
+      "description": "Extension (Ollama's keep_alive): how long the voice stays loaded after this request: seconds or a duration ('10m'); 0 unloads it when the request ends; -1 keeps it loaded."
      },
      "normalize": {
       "anyOf": [

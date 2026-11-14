@@ -71,6 +71,7 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `POST` | `/api/v1/providers/{name}/test` | Check that a provider answers and accepts the key |
 | `POST` | `/api/v1/models/{model_id}/load` | Load a model into memory |
 | `POST` | `/api/v1/models/{model_id}/unload` | Unload a model from memory |
+| `GET` | `/api/v1/ps` | Loaded models: size, GPU/CPU split, keep-alive (Ollama style) |
 | `DELETE` | `/api/v1/models/{model_id}` | Delete an installed model |
 | `GET` | `/api/v1/models/{model_id}` | One catalog entry |
 | `POST` | `/api/v1/diarize` | Speaker diarization: who spoke when |
@@ -571,11 +572,13 @@ was used by name and is not a curated entry.
 | `POST /api/v1/models/pull` `{"id": "…"}` | `202 {"job_id": "j_1"}`. `id` may be `hf:<owner>/<repo>[@rev]` with optional `"kind"`, `"task"`, or `piper:<voice>` (for example `piper:te_IN-venkatesh-medium`) for any voice of the Piper project, which is converted for sherpa-onnx after the download. Local directories are registered from the command line only (`bolo pull ./dir`) |
 | `GET /api/v1/jobs/{job_id}` | `{"id","kind":"pull"\|"bench"\|"install","model","state":"queued"\|"running"\|"done"\|"error","progress":0..1,"bytes_done","bytes_total","error"}` (+ `result` for bench jobs) |
 | `GET /api/v1/jobs` | all recent jobs, newest first |
-| `POST /api/v1/models/{id}/load` | `200 {"id","loaded":true,"memory_bytes","load_ms"}` |
-| `POST /api/v1/models/{id}/unload` | `200 {"id","loaded":false}` |
+| `POST /api/v1/models/{id}/load` | `200 {"id","loaded":true,"memory_bytes","load_ms","size_vram_bytes","processor","device","placement","keep_alive_s"}` (+ `notice` when the model is not all on the accelerator that was asked for). Optional body `{"keep_alive": "10m"}` or `?keep_alive=`: how long it stays loaded once idle (`-1`: until unloaded; `0`: load and unload at once, answering `"loaded": false`, Ollama's way to unload). CLI: `bolo load <id> --keep-alive 10m` (also `bolo run`) |
+| `POST /api/v1/models/{id}/unload` | `200 {"id","loaded":false,"unloaded":true\|false}` (`false`: it was not loaded). A request still using the model finishes first. CLI: `bolo stop <id>…` |
+| `GET /api/v1/ps` | loaded models, Ollama style: see "Loaded models" below. CLI: `bolo ps` |
 | `DELETE /api/v1/models/{id}` | `204`; unloads first |
 | `GET /api/v1/models/{id}/settings` | `{"model","settings":{…}}`: what the user pinned for that model (`{}` by default) |
 | `PUT /api/v1/models/{id}/settings` `{"fallback": ["openai-whisper-1"]}` | pins the model's [fallback list](providers.md#fallback) (same task, local or cloud; `[]` switches a configured fallback off, `null` removes the pin) |
+| `PUT /api/v1/models/{id}/settings` `{"device": "cpu", "keep_alive": "30m"}` | pins where the model runs (overrides the `device` setting for it; it still goes on the CPU when it does not fit on the accelerator) and how long it stays loaded once idle (overrides `keep_alive` and the per-task TTLs; `-1` keeps it loaded). `null` removes a pin. Takes effect at the next load |
 | `PUT /api/v1/models/{id}/settings` `{"phonemizer": "espeak-ng"}` | pins the phonemiser of a voice (`null` removes the pin); stored in `<data_dir>/model-settings.json`, shown as `settings` in catalog entries, announced as a `model` event with `"event":"settings"`. `400` for a model that reads characters, or uccharan on a language it does not cover. CLI: `bolo models config <id> --phonemizer X` / `--clear` |
 
 Pulling an installed model yields a job that is already `done`. Pulling a
@@ -598,6 +601,81 @@ The status code does not change and nothing is refused: the pull has
 started, the model is loaded. The key is absent when there is nothing to
 say, and always absent with `hardware_warnings = false`. Requests served by
 such a model have the same `warnings` on their trace.
+
+### Keep-alive
+
+As in Ollama, every request that uses a model can say how long the model stays loaded afterwards with
+`keep_alive`: a number of seconds or a duration (`"30s"`, `"5m"`, `"1h30m"`), `0` to unload the model when the
+request ends, any negative value (`-1`) to keep it loaded until it is unloaded on purpose or evicted to make room.
+It is an extra field that OpenAI clients never send, so they are unaffected:
+
+| Where | How |
+| --- | --- |
+| `POST /v1/audio/transcriptions`, `/v1/audio/translations` | form field `keep_alive`; applies to the speech-to-text model and to the diarization and separation models the request uses (not to the VAD it uses on the side) |
+| `POST /v1/audio/speech` | JSON field `keep_alive`; applies to the voice's model |
+| `WS /api/v1/stt/stream`, `WS /api/v1/tts/stream`, `WS /v1/realtime` | query parameter `?keep_alive=`; applied when the session ends (so `0` unloads the models then, not between utterances); the Realtime API's applies to its speech-to-text and text-to-speech models |
+| `POST /api/v1/models/{id}/load` | JSON body `{"keep_alive": …}` or `?keep_alive=` |
+
+Without one, the model's pinned `keep_alive`, its catalog `options.keep_alive`, the per-task TTL (`stt_ttl_s`, …) or
+the `keep_alive` setting (`5m`) decide, in that order. Unlike Ollama, a later request without `keep_alive` does not
+reset a value an earlier request or load gave the model: send `keep_alive` again to change it. A malformed value is
+`400` with `param: "keep_alive"`.
+
+### Loaded models: `GET /api/v1/ps`
+
+Like Ollama's `/api/ps` (bolo's `/api/ps` is speaches' route, which lists model ids, so the Ollama shape lives here):
+
+```jsonc
+{"models": [{
+   "name": "whisper-large-v3-turbo", "model": "whisper-large-v3-turbo", "task": "stt",
+   "size": 1717986918,                    // bytes: RAM and accelerator memory the load took (never less than the files)
+   "size_vram": 1610612736,               // of which on the accelerator
+   "size_ram": 107374182,
+   "processor": "100% GPU",               // "100% CPU", or "35%/65% CPU/GPU" for a split model (by bytes)
+   "device": "cuda:0",                    // cpu | cuda:N | coreml | ... | remote (an operator-run server) | cloud
+   "split": "whole",                      // whole | layers (llama.cpp) | graphs (ONNX Runtime) | device_map (PyTorch)
+   "expires_at": "2026-11-14T21:04:05Z",  // when it is unloaded if it stays idle; null: kept loaded
+   "expires_in_s": 241.3, "until": "4 minutes from now",   // "Forever", "Stopping..."
+   "keep_alive": "5m", "keep_alive_s": 300.0,
+   "active": 0, "requests": 12, "idle_s": 58.7, "load_ms": 2110.4,
+   "vram_measured": true,                 // false: the accelerator share is the plan, not a measurement
+   "latency_ms": {…}, "rtf": {…},         // as in /api/v1/stats
+   "placement": {"device": "cuda:0", "requested": "cuda", "split": "whole", "gpu_bytes": 1610612736,
+                 "cpu_bytes": 0, "processor": "100% GPU", "notice": null, "free_memory_known": true},
+                 // llama.cpp: + "gpu_layers": 19, "total_layers": 29, "operator_layers": false
+                 // ONNX Runtime graphs: + "graphs": {"encoder": "cuda:0", "decoder": "cpu"}
+   "details": {"engine": "sherpa-onnx", "kind": "whisper", "family": "Whisper"}
+ }],
+ "system": {"cpu_percent": 12.5, "rss_bytes": 2147483648, "device": "cuda",
+            "ram_total_bytes": 34359738368, "ram_available_bytes": 21474836480,
+            "gpus": [{"index": 0, "vendor": "nvidia", "name": "NVIDIA GeForce RTX 3060", "backend": "cuda",
+                      "total_bytes": 12884901888, "free_bytes": 9556148224, "used_bytes": 3328753664,
+                      "unified": false, "utilization": 41.0,
+                      "process_bytes": 2147483648,   // held by bolo and the servers and plugins it started
+                      "source": "nvml"}],             // nvml | nvidia-smi | unified (Apple Silicon) ; [] when unknown
+            "accelerator_source": "nvml", "models_vram_bytes": 1610612736, "models_ram_bytes": 107374182},
+ "budgets": {"memory_budget_bytes": null, "gpu_memory_budget_bytes": null, "gpu_reserve_bytes": 536870912,
+             "max_loaded_models": null, "keep_alive": "5m"},
+ "speech_to_speech": {"model": "lfm3-audio-2b-llamacpp", "placement": {…}}   // once its llama-server started
+}
+```
+
+`processor` says where the weights are: a model placed whole on the accelerator reads `100% GPU` even though its
+runtime holds some host memory too (that is in `size`). On Apple Silicon the GPU shares the machine's memory:
+`unified` is true, `process_bytes` is null and `size_vram` is the plan. How models are placed: configuration.md,
+"GPU and CPU placement".
+
+`bolo ps` prints the same as a table:
+
+```
+cpu 12.5%  rss 2.0 GB  ram 12.0/32.0 GB  gpu0 NVIDIA GeForce RTX 3060 vram 3.1/12.0 GB (bolo 2.0 GB) 41% busy
+MODEL                   TASK  SIZE    PROCESSOR        DEVICE  UNTIL
+whisper-large-v3-turbo  stt   1.6 GB  100% GPU         cuda:0  4 minutes from now
+orpheus-3b-llamacpp     tts   3.0 GB  35%/65% CPU/GPU  cuda:0  Forever
+silero-vad              vad   2.0 MB  100% CPU         cpu     Forever
+```
+
+`bolo ps -v` adds ACTIVE, REQUESTS, P50 MS, RTF P50 and IDLE, and the placement notices; `--json` prints the document.
 
 ### Hardware and recommendations
 
@@ -770,7 +848,10 @@ is `word` (whole words, any case; the default), `case`, `exact` (any substring) 
 ```jsonc
 {"uptime_s": 123.4, "active_streams": 2, "queue_depth": 0,
  "system": {"cpu_percent": 41.0,          // this process, as a share of all cores
-            "rss_bytes": 734003200, "threads": 12},
+            "rss_bytes": 734003200, "threads": 12,
+            // the machine's memory and accelerators, as in GET /api/v1/ps
+            "ram_total_bytes": 17179869184, "ram_available_bytes": 11811160064, "gpus": [],
+            "accelerator_source": null, "models_vram_bytes": 0, "models_ram_bytes": 210000000},
  "totals": {"requests": 120, "errors": 1, "audio_seconds_in": 812.5, "audio_seconds_out": 96.2},
  "models": [{
    "id": "moonshine-tiny-en", "task": "stt", "loaded": true,
@@ -780,6 +861,10 @@ is `word` (whole words, any case; the default), `case`, `exact` (any substring) 
                   "final":         {"p50": 260, "p95": 480, "p99": 600},
                   "ttfa": null},
    "rtf": {"p50": 0.08, "p95": 0.15},
+   // loaded models: placement and keep-alive, the fields of GET /api/v1/ps
+   "size_vram_bytes": 0, "ram_bytes": 210000000, "vram_measured": false, "processor": "100% CPU", "device": "cpu",
+   "placement": {…}, "keep_alive_s": 300.0, "expires_in_s": 296.8, "expires_at": "2026-11-14T21:04:05Z",
+   "stopping": false,
    "queue": {"depth": 0, "inflight": 1, "workers": 1, "batches": 61, "mean_batch": 1.31, "max_batch": 4,
              "rejected": 0, "queue_ms": {"p50": 0.1, "p95": 38.0, "p99": 71.2}}
  }],

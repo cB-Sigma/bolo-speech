@@ -19,8 +19,8 @@ the engines:
                      |              |
                 +----+--------------+-----------------------------------------------------+
                 |                lifecycle manager (bolo.lifecycle)                       |
-                |  lazy load · first load in a probe process · TTL unload · memory budget |
-                |  · LRU eviction · preload                                               |
+                |  lazy load · first load in a probe process · keep-alive unload · RAM    |
+                |  and VRAM budgets · LRU eviction · GPU/CPU placement · preload          |
                 +----+--------------------------------------------------------------------+
                      |  one queue per loaded model
                 +----+--------------------------------------------------------------------+
@@ -45,6 +45,7 @@ The source tree mirrors the picture:
 | `streaming/` | realtime sessions, VAD helpers, partial-result stabilisation |
 | `scheduler.py` | per-model queue with micro-batching |
 | `lifecycle.py`, `_probe.py` | model loading, unloading, eviction, crash isolation |
+| `placement.py`, `accel.py`, `keepalive.py` | GPU/CPU placement (llama.cpp layers, ONNX Runtime graphs), accelerator memory (NVML, nvidia-smi, unified memory), keep-alive parsing |
 | `hardware.py`, `recommend.py` | what this machine is (CPU, memory, GPUs, runtimes, container limits), the micro-benchmark, a fit per catalog model and the rankings; advice and notices only, never a restriction ([recommendations.md](recommendations.md)) |
 | `engines/` | the plugin interface (`base.py`) and one module per engine |
 | `catalog/` | YAML model catalog and its validation |
@@ -125,8 +126,14 @@ workers with fewer threads each can help text-to-speech throughput.
   (`python -m bolo._probe`). Native runtimes sometimes abort the process when
   a model file is not what they expect; the probe turns that into an error
   message for one model instead of an outage.
-* **TTL.** Idle models are unloaded after `stt_ttl_s` / `tts_ttl_s` (300 s);
-  the VAD stays (`vad_ttl_s = -1`). A model in use is never unloaded.
+* **Keep-alive.** Idle models are unloaded after their keep-alive, as in
+  Ollama: the `keep_alive` of the last request or load that gave one, else the
+  model's pin, the per-task TTL (`stt_ttl_s`, ...; the VAD stays,
+  `vad_ttl_s = -1`) or the `keep_alive` setting (`5m`). `0` unloads a model
+  when the request using it ends (a session's: when the session ends); `-1`
+  keeps it. A model in use is never unloaded. A request's value travels in a
+  context variable (`bolo.keepalive.REQUEST_KEEP_ALIVE`) set by the route, so
+  the core's call paths did not change.
 * **Budget.** With `memory_budget_mb` or `max_loaded_models` set, loading a
   model first evicts idle ones, least recently used first. If everything
   loaded is busy the request gets `429` rather than the machine swapping.
@@ -134,6 +141,55 @@ workers with fewer threads each can help text-to-speech throughput.
   load, which is approximate.
 * **Auto-pull.** If a requested model is in the catalog but not on disk it is
   downloaded first (unless `auto_pull` is off, or the model is gated).
+
+## Placement: GPU, CPU or both
+
+Before a model is loaded the lifecycle manager places it (`bolo/placement.py`,
+`ModelManager.place`), the way Ollama's scheduler does:
+
+```
+ requested device (pin > catalog options.device > `device`; auto -> the GPU found)
+        |
+ free accelerator memory (bolo/accel.py: NVML, nvidia-smi, unified memory on Apple)
+   - gpu_reserve_mb, capped by what is left of gpu_memory_budget_mb
+        |
+ fits whole? ---- yes ----------------------------------------------> on the GPU
+        | no
+ would fit after unloading idle GPU-resident models? -- yes -> unload them (LRU), place again
+        | no
+ the runtime can split?  llama.cpp: -ngl N layers | ONNX Runtime: graph by graph |
+                         PyTorch plugin: device_map + max_memory
+        | no
+ on the CPU, with a notice (nothing is refused)
+```
+
+The decision reaches the engine in `LoadOptions`: `device` (the device for
+the whole model, or for the graphs not listed), `gpu_layers` (llama-server's
+`-ngl`), `graph_devices` (role -> device, read with `opts.device_for(role)`)
+and `max_memory` (sent to plugins). Engines that cannot use the device family
+(faster-whisper on Metal, kokoro-onnx, Moonshine) are placed on the CPU up
+front rather than failing later.
+
+After the load the manager measures what it took: the growth of the resident
+memory of this process and every process it started (llama-server, audio.cpp,
+plugins), and the growth of their accelerator memory (NVML's per-process
+figures, else the device's used memory). A plugin's own report of its split
+wins. On Apple Silicon the accelerator share is the plan, since unified memory
+cannot be told apart. `memory_budget_mb` counts each model's RAM side,
+`gpu_memory_budget_mb` its accelerator side.
+
+`GET /api/v1/ps`, `bolo ps` and the console's "Loaded models" panel show the
+result: size, `size_vram`, `PROCESSOR` ("100% GPU", "100% CPU",
+"35%/65% CPU/GPU"), device and time until unload.
+
+What is not done: splitting a single large ONNX graph in two at a layer
+boundary (`onnx.utils.Extractor` could cut it; the front half would run on
+the GPU, the back on the CPU) is left for later; CTranslate2 cannot split a
+model; sherpa-onnx builds its own sessions, so its models move whole.
+
+**Untested on hardware.** CI has no GPU. The placement arithmetic, the NVML
+and nvidia-smi readings, the GPU budget and eviction, `-ngl` and the per-graph
+providers are tested with fake NVML modules and made-up memory figures only.
 
 ## The model store
 

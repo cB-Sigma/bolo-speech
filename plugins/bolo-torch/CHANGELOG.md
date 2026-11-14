@@ -4,6 +4,14 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Added
+
+- **GPU/CPU splits.** When bolo 0.5's scheduler finds less free GPU memory than a model needs, it sends a
+  `placement` with the load (`device_map="auto"` and a `max_memory`); the Orpheus SNAC loader then lets accelerate
+  put as many layers on the GPU as fit and the rest on the CPU, and reports the split back
+  (`info.placement`: GPU and CPU bytes, the device map), which `bolo ps` shows as "x%/y% CPU/GPU". Other loaders
+  load whole as before. With an older bolo nothing changes. Tested with fakes only; no GPU was used.
+
 ## [0.1.2] - 2026-11-14
 
 ### Changed

@@ -85,7 +85,7 @@ bolo list --all -q english        # browse the catalog
 bolo pull moonshine-tiny-en       # 124 MB, the fastest English recogniser here
 bolo transcribe recording.wav -m moonshine-tiny-en
 bolo speak "Hello there." -o hello.wav -m kokoro-v1.0-int8 --voice af_heart
-bolo ps                           # what a running server has in memory
+bolo ps                           # what a running server has in memory: size, CPU/GPU, time until unload
 bolo doctor                       # engines, codecs, components, this machine
 ```
 
@@ -114,6 +114,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | **A web console** | playgrounds, the catalog, latency dashboards, benchmarks, conversations, calls, served by the same process | [below](#the-console) |
 | **Engine plugins** | models that need another runtime run out of process behind the same API: [bolo-torch](plugins/bolo-torch/README.md) for PyTorch models | [plugins.md](docs/plugins.md) |
 | **Wyoming** | speech-to-text and text-to-speech for Home Assistant on one TCP port | [api.md](docs/api.md#wyoming-protocol), [examples/home_assistant.md](examples/home_assistant.md) |
+| **Ollama-style model scheduling** | each model goes on the GPU when it fits in free VRAM and on the CPU when it does not (llama.cpp models split by layers, multi-graph ONNX models by graph); `keep_alive` per request, `bolo ps` with size, CPU/GPU split and time until unload, `bolo load` / `bolo stop`, a "Loaded models" panel in the console. GPU side tested with fakes only | [configuration.md](docs/configuration.md#gpu-and-cpu-placement), [api.md](docs/api.md#keep-alive) |
 | **Server behaviour** | per-model queues with micro-batching, backpressure (`429`, not a growing delay), cancellation, lazy loading, idle unloading, a memory budget, resumable verified downloads, Prometheus metrics, and a phase-by-phase trace of every request | [architecture.md](docs/architecture.md), [configuration.md](docs/configuration.md) |
 
 ## Models and licences
