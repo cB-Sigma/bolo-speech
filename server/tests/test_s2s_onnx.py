@@ -544,7 +544,7 @@ def onnx_server(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> Iterator
     settings.s2s_model = "lfm3-audio-2b-onnx"
     models: list[m.Lfm3Model] = []
 
-    def shared(path: Path, options: dict[str, Any], threads: int) -> m.Lfm3Model:
+    def shared(path: Path, options: dict[str, Any], threads: int, device: str = "cpu") -> m.Lfm3Model:
         assert path.name == "lfm3-audio-2b-onnx" and options["precision"] == "q4" and threads >= 1
         models.append(fake_model())
         return models[-1]
@@ -626,7 +626,7 @@ async def test_backend_needs_packages_and_files(settings: Settings, monkeypatch:
     monkeypatch.setattr(core.store, "is_installed", lambda model_id: True)
     assert core.s2s.describe()["available"]
 
-    def no_files(path: Path, options: dict[str, Any], threads: int) -> m.Lfm3Model:
+    def no_files(path: Path, options: dict[str, Any], threads: int, device: str = "cpu") -> m.Lfm3Model:
         raise EngineUnavailable(f"{path / 'tokenizer.json'} is missing; pull the model again")
 
     monkeypatch.setattr(m, "shared_model", no_files)
@@ -651,7 +651,7 @@ def test_catalog_entry_and_engine(settings: Settings, monkeypatch: pytest.Monkey
     # the engine hands the directory to this module: one model for speech-to-speech and text-to-speech
     seen: list[tuple[Path, int]] = []
 
-    def shared(path: Path, options: dict[str, Any], threads: int) -> m.Lfm3Model:
+    def shared(path: Path, options: dict[str, Any], threads: int, device: str = "cpu") -> m.Lfm3Model:
         seen.append((path, threads))
         return fake_model()
 

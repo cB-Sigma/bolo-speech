@@ -6,6 +6,16 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The `device` setting now reaches every ONNX Runtime engine.** Nemotron diarization, DiCoW ONNX,
+  the SNAC decoder of the Orpheus-family voices, the end-of-turn model and in-process
+  speech-to-speech always ran on the CPU, whatever `device` said. They now use the matching
+  execution provider (CUDA, CoreML, ROCm, DirectML, OpenVINO) when the installed `onnxruntime`
+  has it, and fall back to the CPU with one warning when it does not. sherpa-onnx models also
+  accept `coreml` (`mps` and `metal` mean the same). New value `auto`: the first accelerator found.
+  Still untested on a GPU.
+
 ## [0.4.0] - 2026-11-14
 
 ### Added

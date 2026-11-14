@@ -19,6 +19,7 @@ from typing import Any
 import numpy as np
 
 from bolo.engines.base import Engine, EngineStatus, FloatArray, LoadOptions, Model, TurnModel
+from bolo.ort_providers import providers_for
 
 WINDOW_S = 8
 
@@ -33,7 +34,7 @@ class SmartTurn(TurnModel):
         options = ort.SessionOptions()
         options.intra_op_num_threads = max(1, min(2, opts.threads))
         options.inter_op_num_threads = 1
-        self._session = ort.InferenceSession(str(files[0]), sess_options=options, providers=["CPUExecutionProvider"])
+        self._session = ort.InferenceSession(str(files[0]), sess_options=options, providers=providers_for(opts.device))
         self._input = self._session.get_inputs()[0].name
         self._lock = threading.Lock()
 

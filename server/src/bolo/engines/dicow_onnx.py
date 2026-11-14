@@ -53,6 +53,7 @@ from bolo.engines.base import (
     STTRequest,
     STTResult,
 )
+from bolo.ort_providers import providers_for
 
 SR = 16000
 #: STNO mask frames per second (Whisper's 100 mel frames per second after the encoder's stride-2 convolution)
@@ -245,7 +246,7 @@ class Network(Protocol):
 
 
 class OnnxNetwork:
-    def __init__(self, encoder: Path, decoder: Path, threads: int) -> None:
+    def __init__(self, encoder: Path, decoder: Path, threads: int, device: str = "cpu") -> None:
         import onnxruntime as ort
 
         def session(path: Path) -> Any:
@@ -253,7 +254,7 @@ class OnnxNetwork:
             options.intra_op_num_threads = max(1, threads)
             options.inter_op_num_threads = 1
             options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-            return ort.InferenceSession(str(path), sess_options=options, providers=["CPUExecutionProvider"])
+            return ort.InferenceSession(str(path), sess_options=options, providers=providers_for(device))
 
         self.encoder = session(encoder)
         self.decoder = session(decoder)
@@ -546,7 +547,7 @@ class DiCoWOnnx(STTModel):
         encoder = _find(path, spec.get("encoder"), ("encoder.int8.onnx", "encoder.onnx"))
         decoder = _find(path, spec.get("decoder"), ("decoder.int8.onnx", "decoder.onnx"))
         gen = GenerationSettings.from_dir(path)
-        network = OnnxNetwork(encoder, decoder, opts.threads)
+        network = OnnxNetwork(encoder, decoder, opts.threads, opts.device)
         return cls(
             network,
             gen,

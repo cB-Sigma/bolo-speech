@@ -57,6 +57,7 @@ import numpy as np
 
 from bolo.engines.base import FloatArray, LoadOptions, SynthesisExtras, TTSModel, Voice
 from bolo.errors import ComponentMissing, EngineUnavailable, InvalidRequest
+from bolo.ort_providers import providers_for
 
 if TYPE_CHECKING:
     from bolo.engines.tts_server import ServerProcess, TTSServerEngine
@@ -158,7 +159,7 @@ class SnacDecoder:
         return np.asarray(out, dtype=np.float32).reshape(-1)
 
 
-def open_session(path: Path, threads: int) -> OrtSession:
+def open_session(path: Path, threads: int, device: str = "cpu") -> OrtSession:
     try:
         import onnxruntime as ort
     except ImportError as exc:
@@ -170,7 +171,7 @@ def open_session(path: Path, threads: int) -> OrtSession:
     opts.intra_op_num_threads = max(1, threads)
     opts.inter_op_num_threads = 1
     opts.log_severity_level = 3
-    session: OrtSession = ort.InferenceSession(str(path), opts, providers=["CPUExecutionProvider"])
+    session: OrtSession = ort.InferenceSession(str(path), opts, providers=providers_for(device))
     return session
 
 
@@ -514,7 +515,7 @@ def load_model(engine: TTSServerEngine, path: Path, spec: dict[str, Any], opts: 
     url = engine.remote(spec)
     decoder_path = find_decoder(path, spec, Path(s.data_dir), download=url is not None)
     threads = int(spec.get("decoder_threads") or max(1, min(2, opts.threads)))
-    decoder = SnacDecoder(open_session(decoder_path, threads))
+    decoder = SnacDecoder(open_session(decoder_path, threads, opts.device))
     if url:
         model = OrpheusLlamaCpp(
             name, spec, decoder, base_url=url, api_key=s.tts_server_api_key, timeout_s=s.tts_server_timeout_s

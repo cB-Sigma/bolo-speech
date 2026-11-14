@@ -47,6 +47,7 @@ from bolo.engines.base import (
     Voice,
     Word,
 )
+from bolo.ort_providers import sherpa_provider
 
 OFFLINE_KINDS = (
     "whisper",
@@ -152,7 +153,7 @@ class SherpaOfflineSTT(STTModel):
         self.path = path
         self.spec = spec
         self.threads = opts.threads
-        self.provider = "cuda" if opts.device.startswith("cuda") else "cpu"
+        self.provider = sherpa_provider(opts.device)
         self.max_batch = int(spec.get("max_batch", 8))
         self.max_chunk_s = float(spec.get("max_chunk_s", 30.0 if kind in ("whisper", "canary") else 60.0))
         self.supports_translate = kind == "whisper" and not spec.get("english_only", False)
@@ -370,7 +371,7 @@ class SherpaOnlineSTT(STTModel):
         }
         common: dict[str, Any] = {
             "num_threads": opts.threads,
-            "provider": "cuda" if opts.device.startswith("cuda") else "cpu",
+            "provider": sherpa_provider(opts.device),
             **endpoint,
         }
         tokens = find_file(p, "tokens.txt")
@@ -493,7 +494,7 @@ class SherpaTTS(TTSModel):
         else:
             raise ValueError(f"sherpa-onnx engine cannot load TTS kind {kind!r}")
         rule_fsts = ",".join(str(f) for f in sorted(p.glob("*.fst")))
-        provider = "cuda" if opts.device.startswith("cuda") else "cpu"
+        provider = sherpa_provider(opts.device)
         model_cfg = so.OfflineTtsModelConfig(num_threads=opts.threads, provider=provider, **cfg)
         config = so.OfflineTtsConfig(model=model_cfg, rule_fsts=rule_fsts, max_num_sentences=1)
         if not config.validate():
@@ -721,7 +722,7 @@ class SherpaDiarization(DiarizationModel):
         import sherpa_onnx
 
         self._so = sherpa_onnx
-        provider = "cuda" if opts.device.startswith("cuda") else "cpu"
+        provider = sherpa_provider(opts.device)
         segmentation = find_file(path, str(spec.get("segmentation", "model*.onnx")), "model*.onnx")
         embedding = find_file(
             path, str(spec.get("embedding", "embedding/*.onnx")), "embedding/*.onnx", prefer_int8=False
@@ -799,7 +800,7 @@ class SherpaVoxLock(SeparationModel):
         self.enroll_model = find_file(path, str(spec.get("enroll_model", "enroll.onnx")), "enroll*.onnx")
         self.chunk_model = find_file(path, str(spec.get("chunk_model", "chunk_int8.onnx")), "chunk*.onnx")
         self.threads = opts.threads
-        self.provider = "cuda" if opts.device.startswith("cuda") else "cpu"
+        self.provider = sherpa_provider(opts.device)
         self.max_cached = int(spec.get("max_cached", 16))
         self._extractors: dict[str, Any] = {}
         self._lock = threading.Lock()

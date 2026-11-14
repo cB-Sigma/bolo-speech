@@ -296,7 +296,7 @@ async def test_diarized_request_through_the_core(
 
     created: list[ScriptedNetwork] = []
 
-    def fake_network(encoder: Path, decoder: Path, threads: int) -> ScriptedNetwork:
+    def fake_network(encoder: Path, decoder: Path, threads: int, device: str = "cpu") -> ScriptedNetwork:
         assert encoder.name == "encoder.int8.onnx" and decoder.name == "decoder.int8.onnx"
         # the fake diarizer finds two speakers; each says its own word in its own time
         net = ScriptedNetwork({(0, 0): [ts(0.5), 10, ts(3.0)], (0, 1): [ts(5.0), 11, ts(8.0)]})
@@ -331,7 +331,9 @@ def test_load_options_reach_the_model(tmp_path: Path, monkeypatch: pytest.Monkey
     path = write_model_dir(tmp_path / "m")
     (path / "encoder.onnx").write_bytes(b"x")
     seen: list[tuple[str, str, int]] = []
-    monkeypatch.setattr(d, "OnnxNetwork", lambda e, dec, t: seen.append((e.name, dec.name, t)) or ScriptedNetwork({}))
+    monkeypatch.setattr(
+        d, "OnnxNetwork", lambda e, dec, t, device="cpu": seen.append((e.name, dec.name, t)) or ScriptedNetwork({})
+    )
     model = d.DiCoWOnnx.from_dir(path, {"encoder": "encoder.onnx", "batch": 2}, LoadOptions(threads=3))
     assert seen == [("encoder.onnx", "decoder.int8.onnx", 3)] and model.batch == 2
     with pytest.raises(FileNotFoundError):

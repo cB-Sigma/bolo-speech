@@ -76,6 +76,7 @@ import numpy.typing as npt
 
 from bolo.engines.base import FloatArray, LoadOptions, SynthesisExtras, TTSModel, Voice
 from bolo.errors import ComponentMissing, EngineUnavailable
+from bolo.ort_providers import providers_for
 from bolo.s2s import (
     AudioDelta,
     ResponseEnd,
@@ -767,7 +768,9 @@ class Lfm3Model:
         self.lock = threading.Lock()
 
     @classmethod
-    def from_dir(cls, path: Path, *, precision: str = "q4", threads: int = 4, **options: Any) -> Lfm3Model:
+    def from_dir(
+        cls, path: Path, *, precision: str = "q4", threads: int = 4, device: str = "cpu", **options: Any
+    ) -> Lfm3Model:
         try:
             from tokenizers import Tokenizer
         except ImportError as exc:
@@ -782,7 +785,7 @@ class Lfm3Model:
             if hasattr(generation, key) and options[key] is not None:
                 setattr(generation, key, type(getattr(generation, key))(options.pop(key)))
         return cls(
-            OnnxGraphs(path, precision=precision, threads=threads),
+            OnnxGraphs(path, precision=precision, threads=threads, providers=providers_for(device)),
             lambda text: list(tokenizer.encode(text, add_special_tokens=False).ids),
             lambda ids: str(tokenizer.decode(ids, skip_special_tokens=True)),
             Tokens.from_lookup(tokenizer.token_to_id),
@@ -810,20 +813,22 @@ SESSION_OPTIONS = (
     "reasoning",
 )  # fmt: skip
 
-_models: dict[tuple[str, str, int, str], Lfm3Model] = {}
+_models: dict[tuple[str, str, int, str, str], Lfm3Model] = {}
 _models_lock = threading.Lock()
 
 
-def shared_model(path: Path, options: dict[str, Any], threads: int) -> Lfm3Model:
+def shared_model(path: Path, options: dict[str, Any], threads: int, device: str = "cpu") -> Lfm3Model:
     """The model of a directory, loaded once: speech-to-speech sessions and text-to-speech use the same graphs
     (about 3 GB of memory for the q4 files)."""
     precision = str(options.get("precision") or "q4")
     overrides = {k: options[k] for k in GENERATION_OPTIONS if options.get(k) is not None}
-    key = (str(Path(path).resolve()), precision, threads, json.dumps(overrides, sort_keys=True))
+    key = (str(Path(path).resolve()), precision, threads, json.dumps(overrides, sort_keys=True), device)
     with _models_lock:
         model = _models.get(key)
         if model is None:
-            model = _models[key] = Lfm3Model.from_dir(Path(path), precision=precision, threads=threads, **overrides)
+            model = _models[key] = Lfm3Model.from_dir(
+                Path(path), precision=precision, threads=threads, device=device, **overrides
+            )
         return model
 
 
@@ -1294,7 +1299,7 @@ class Lfm3Tts(TTSModel):
 
     @classmethod
     def from_dir(cls, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Lfm3Tts:
-        return cls(shared_model(path, spec, opts.threads), spec)
+        return cls(shared_model(path, spec, opts.threads, opts.device), spec)
 
     def synthesize(
         self,
@@ -1448,10 +1453,12 @@ class OnnxS2SBackend(S2SBackend):
         threads: int = 4,
         model_id: str | None = None,
         model: Lfm3Model | None = None,
+        device: str = "cpu",
     ) -> None:
         self.model_dir = Path(model_dir)
         self.options = dict(options or {})
         self.threads = threads
+        self.device = device
         self.model_id = model_id
         self._model = model
         self._load_lock = threading.Lock()
@@ -1460,7 +1467,7 @@ class OnnxS2SBackend(S2SBackend):
     def model(self) -> Lfm3Model:
         with self._load_lock:
             if self._model is None:
-                self._model = shared_model(self.model_dir, self.options, self.threads)
+                self._model = shared_model(self.model_dir, self.options, self.threads, self.device)
             return self._model
 
     def session_options(self) -> dict[str, Any]:

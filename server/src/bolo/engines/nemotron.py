@@ -32,6 +32,7 @@ import numpy as np
 
 from bolo.audio.features import NEMO_MELS, NemoLogMel
 from bolo.engines.base import DiarizationModel, DiarizationResult, FloatArray, LoadOptions, SpeakerActivity, SpeakerTurn
+from bolo.ort_providers import providers_for
 
 FRAME_S = 0.01  # one output frame per 10 ms mel frame
 SUBSAMPLING = 8  # mel frames per encoder frame
@@ -173,14 +174,14 @@ class SpeakerCache:
 class _OnnxStep:
     """One encoder step of the ONNX graph."""
 
-    def __init__(self, model_file: str, threads: int) -> None:
+    def __init__(self, model_file: str, threads: int, device: str = "cpu") -> None:
         import onnxruntime as ort
 
         options = ort.SessionOptions()
         options.intra_op_num_threads = max(1, threads)
         options.inter_op_num_threads = 1
         options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        self.session = ort.InferenceSession(model_file, sess_options=options, providers=["CPUExecutionProvider"])
+        self.session = ort.InferenceSession(model_file, sess_options=options, providers=providers_for(device))
         names = {i.name for i in self.session.get_inputs()}
         expected = {"input_features", "cached_embeds", "attention_mask"}
         if not expected <= names:
@@ -283,7 +284,7 @@ class NemotronDiarization(DiarizationModel):
 
     def __init__(self, path: Path, spec: dict[str, Any], opts: LoadOptions) -> None:
         model_file = _find(path, str(spec.get("model", "onnx/model_quantized.onnx")), "onnx/*.onnx")
-        self._run = _OnnxStep(str(model_file), opts.threads)
+        self._run = _OnnxStep(str(model_file), opts.threads, opts.device)
         self._lock = threading.Lock()  # one ONNX session; a stream and a recording take turns
         self.post = {name: float(spec.get(name, value)) for name, value in DEFAULT_POSTPROCESSING.items()}
         self.min_speaker_s = float(spec.get("min_speaker_s", 0.0))

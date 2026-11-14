@@ -632,7 +632,11 @@ class S2SManager:
             await self.core._auto_pull(spec)
         s = self.core.settings
         backend = OnnxS2SBackend(
-            self.core.store.model_dir(spec.id), options=spec.options, threads=s.resolved_threads(), model_id=spec.id
+            self.core.store.model_dir(spec.id),
+            options=spec.options,
+            threads=s.resolved_threads(),
+            model_id=spec.id,
+            device=s.device,
         )
         # load now: missing files answer here (503) and not in the middle of the first turn
         await asyncio.to_thread(backend.model)

@@ -311,7 +311,7 @@ def entry(model_id: str, decoder: Path) -> dict[str, Any]:
 def fake_onnx(monkeypatch: pytest.MonkeyPatch) -> list[FakeSnac]:
     sessions: list[FakeSnac] = []
 
-    def open_session(path: Path, threads: int) -> FakeSnac:
+    def open_session(path: Path, threads: int, device: str = "cpu") -> FakeSnac:
         assert path.is_file() and threads >= 1
         sessions.append(FakeSnac())
         return sessions[-1]

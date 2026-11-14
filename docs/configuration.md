@@ -82,7 +82,7 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `agreement` | `2` | | hypotheses that must agree before a word is shown as stable |
 | `wyoming` | `false` | `--wyoming` | serve the Wyoming protocol |
 | `wyoming_host`, `wyoming_port` | `127.0.0.1`, `10300` | `--wyoming-host`, `--wyoming-port` | Wyoming bind address |
-| `device` | `cpu` | | `cuda` is passed to engines that support it - **untested** |
+| `device` | `cpu` | | where models run: `cpu`, `cuda` (or `cuda:1`), `coreml` (also `mps`, `metal`), `rocm`, `dml`, `openvino`, or `auto` (the first accelerator found). sherpa-onnx models use `cuda` or `coreml`; faster-whisper uses `cuda`; the ONNX Runtime engines (Nemotron diarization, DiCoW ONNX, the Orpheus-family decoder, the end-of-turn model, in-process speech-to-speech) use the matching execution provider when the installed `onnxruntime` has it (for `cuda`, install `onnxruntime-gpu`), and otherwise run on the CPU with one warning; llama-server and audio.cpp get `-ngl 99` for any value other than `cpu`. **Untested on a GPU** |
 | `log_level` | `info` | `--log-level` | `debug`, `info`, `warning`, `error` |
 | `trace_buffer` | `1000` | | request traces kept in memory |
 | `fake_engine` | `false` | `--fake-engine` | add deterministic test models (development) |
