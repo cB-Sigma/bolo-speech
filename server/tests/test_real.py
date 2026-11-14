@@ -16,6 +16,7 @@ import json
 import os
 from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import Any
 
 import httpx
 import numpy as np
@@ -428,12 +429,93 @@ async def test_two_voices_are_told_apart(core: Bolo) -> None:
     assert word_error_rate(" ".join(t for _, t in lines), result.text, "en") <= 0.25
 
 
+def _dominant_speakers(reference: list[Any], turns: list[Any]) -> list[int | None]:
+    """For every reference turn, the speaker the diarizer gave most of its time to (None: nothing heard)."""
+    dominant: list[int | None] = []
+    for ref in reference:
+        heard: dict[int, float] = {}
+        for t in turns:
+            overlap = min(ref.end, t.end) - max(ref.start, t.start)
+            if overlap > 0:
+                heard[t.speaker] = heard.get(t.speaker, 0.0) + overlap
+        dominant.append(max(heard, key=lambda k: heard[k]) if heard else None)
+    return dominant
+
+
 @pytest.mark.parametrize("rate", [16000, 8000])
 async def test_nemotron_tells_two_similar_voices_apart(core: Bolo, rate: int) -> None:
-    """Two female Kokoro voices that clustering merges into one speaker, wideband and as G.711 mu-law audio.
+    """Two female Kokoro voices that clustering merges into one speaker, in a conversation where the second
+    talks over the first for 2.5 s, wideband and as G.711 mu-law audio.
 
-    Not every pair works: on clean four-line TTS dialogues without overlap Nemotron merged some pairs that
-    clustering separates, among them af_heart / am_adam of the test above (docs/models.md)."""
+    This is the kind of recording the measurements in docs/models.md are about (A, B, A's long sentence with B
+    starting before it ends, A). Kokoro's output differs a little from one synthesis to the next, so the test
+    needs a recording whose result does not depend on that: over 12 syntheses this one gave two speakers, every
+    line with its own speaker and a DER of at most 2 % at both rates. A clean four-line dialogue does not
+    (the next test)."""
+    from bolo.audio import mulaw_encode
+    from bolo.diarize import DiarizeOptions, diarization_error_rate
+    from bolo.engines.base import SpeakerTurn
+
+    async def say(voice: str, text: str) -> np.ndarray:
+        audio, native = await core.synthesize_all(text, model="kokoro-v1.0-int8", voice=voice)
+        return resample(audio, native, 16000)
+
+    a1 = await say("af_sky", "Good morning. I would like to ask about my order from last week.")
+    b1 = await say("af_bella", "Of course. Could you give me the order number, please?")
+    a2 = await say(
+        "af_sky",
+        "Good morning. I would like to ask about my order from last week. It was supposed to arrive on Monday, "
+        "but nothing has come yet, and I have not had any message about it.",
+    )
+    b2 = await say(
+        "af_bella",
+        "Of course, I am sorry about the delay. Could you give me the order number, please? I will look it up "
+        "straight away and see where the parcel is at the moment.",
+    )
+    a3 = await say("af_sky", "Yes, it is four seven one nine. It was supposed to arrive on Monday.")
+    gap = int(0.6 * 16000)
+    start_b2 = len(a1) + gap + len(b1) + gap + len(a2) - int(2.5 * 16000)  # b2 starts 2.5 s before a2 ends
+    start_a3 = start_b2 + len(b2) + gap
+    placed = [
+        (0, a1, 0),
+        (len(a1) + gap, b1, 1),
+        (len(a1) + gap + len(b1) + gap, a2, 0),
+        (start_b2, b2, 1),
+        (start_a3, a3, 0),
+    ]
+    dialogue = np.zeros(start_a3 + len(a3) + gap, dtype=np.float32)
+    reference: list[SpeakerTurn] = []
+    for start, speech, speaker in placed:
+        dialogue[start : start + len(speech)] += speech
+        reference.append(SpeakerTurn(start / 16000, (start + len(speech)) / 16000, speaker))
+    if rate == 8000:
+        dialogue = mulaw_decode(mulaw_encode(resample(dialogue, 16000, 8000)))
+
+    opts = DiarizeOptions(model="nemotron-3-diarization")
+    turns = await core.diarize(dialogue, rate, opts)
+    score = diarization_error_rate(reference, turns)
+    print(f"\nnemotron at {rate} Hz: {len({t.speaker for t in turns})} speakers, DER {score['der']:.3f} ({score})")
+    # What the test shows: the two voices come out as two speakers, and every line is given to its own speaker.
+    assert len({t.speaker for t in turns}) == 2
+    dominant = _dominant_speakers(reference, turns)
+    assert None not in dominant, dominant
+    by_voice = {voice: {d for d, r in zip(dominant, reference, strict=True) if r.speaker == voice} for voice in (0, 1)}
+    assert all(len(v) == 1 for v in by_voice.values()) and by_voice[0] != by_voice[1], (dominant, by_voice)
+    # Measured 1.4-1.9 % DER over 12 syntheses at each rate; the bounds leave room for another CPU.
+    assert score["confusion"] <= 0.05 and score["der"] <= 0.15
+    assert opts.activity is not None and opts.activity.num_speakers == 2
+    assert abs(len(opts.activity.probs) - len(dialogue) / rate * 100) <= 2
+
+
+async def test_nemotron_on_a_clean_dialogue_as_telephone_audio(core: Bolo) -> None:
+    """The limit of the test above: four short lines without overlap by the same two voices, as 8 kHz mu-law.
+
+    Here Nemotron's answer depends on small differences between one synthesis of the same text and the next
+    (docs/models.md, "Clean two-voice dialogues"): of 40 dialogues put together from five syntheses of each line
+    it found two speakers in 38 and gave every line its own speaker in 31, and it missed up to 44 % of the speech
+    (median 23 %; false alarm at most 9 %). On GitHub's CPUs the same dialogue came out as one speaker once and
+    with 25 % and 41 % missed speech. So this test asserts only what held every time: speech is found, there are never more than
+    two speakers, and little is reported outside the lines. It does not assert that the voices are told apart."""
     from bolo.audio import mulaw_encode
     from bolo.diarize import DiarizeOptions, diarization_error_rate
     from bolo.engines.base import SpeakerTurn
@@ -453,37 +535,15 @@ async def test_nemotron_tells_two_similar_voices_apart(core: Bolo, rate: int) ->
         reference.append(SpeakerTurn(position / 16000, (position + len(speech)) / 16000, int(voice == "af_bella")))
         parts += [speech, np.zeros(int(0.6 * 16000), dtype=np.float32)]
         position += len(speech) + int(0.6 * 16000)
-    dialogue = np.concatenate(parts)
-    if rate == 8000:
-        dialogue = mulaw_decode(mulaw_encode(resample(dialogue, 16000, 8000)))
+    dialogue = mulaw_decode(mulaw_encode(resample(np.concatenate(parts), 16000, 8000)))
 
     opts = DiarizeOptions(model="nemotron-3-diarization")
-    turns = await core.diarize(dialogue, rate, opts)
+    turns = await core.diarize(dialogue, 8000, opts)
     score = diarization_error_rate(reference, turns)
-    print(f"\nnemotron at {rate} Hz: {len({t.speaker for t in turns})} speakers, DER {score['der']:.3f} ({score})")
-    # What the test shows: the two voices come out as two speakers, and every line is given to its own speaker.
-    assert len({t.speaker for t in turns}) == 2
-    dominant = []
-    for ref in reference:
-        heard: dict[int, float] = {}
-        for t in turns:
-            overlap = min(ref.end, t.end) - max(ref.start, t.start)
-            if overlap > 0:
-                heard[t.speaker] = heard.get(t.speaker, 0.0) + overlap
-        assert heard, f"no speech found in the line at {ref.start:.1f} s"
-        dominant.append(max(heard, key=lambda k: heard[k]))
-    by_voice = {voice: {d for d, r in zip(dominant, reference, strict=True) if r.speaker == voice} for voice in (0, 1)}
-    assert all(len(v) == 1 for v in by_voice.values()) and by_voice[0] != by_voice[1], (dominant, by_voice)
-    assert score["confusion"] <= 0.05
-    # Missed speech is what Nemotron gets wrong most (docs/models.md: 19-31 % on AMI as shipped, up to 42 %
-    # untuned). Wideband audio stays within 15 % DER; on 8 kHz mu-law audio GitHub's CPUs missed 25-41 % of
-    # these lines where the development machine missed far less, so the bound there is on missed speech only.
-    if rate == 16000:
-        assert score["der"] <= 0.15
-    else:
-        assert score["missed"] <= 0.5 and score["false_alarm"] <= 0.15
-    assert opts.activity is not None and opts.activity.num_speakers == 2
-    assert abs(len(opts.activity.probs) - len(dialogue) / rate * 100) <= 2
+    print(f"\nnemotron, clean dialogue at 8000 Hz: {len({t.speaker for t in turns})} speakers ({score})")
+    assert 1 <= len({t.speaker for t in turns}) <= 2
+    assert score["false_alarm"] <= 0.15 and score["missed"] <= 0.6
+    assert opts.activity is not None and abs(len(opts.activity.probs) - len(dialogue) / 8000 * 100) <= 2
 
 
 async def test_overlap_separation_recovers_the_second_voice(core: Bolo) -> None:

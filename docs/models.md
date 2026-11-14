@@ -811,7 +811,9 @@ each other, telephone audio, and voices that sound alike: there it gets the
 number of speakers right far more often and almost never mixes two people up
 (measurements below), at a fifth of the cost. It is **not the default**
 yet: on clean, turn-taking two-voice dialogues it was no better than
-clustering and merged some clearly different voices (below).
+clustering, merged some clearly different voices, and as telephone audio
+its result changed from one synthesis of the same dialogue to the next
+(below).
 
 ### How it runs in bolo
 
@@ -953,6 +955,26 @@ with am_onyx; with eight lines instead of four it merged all five), and
 separated four same-gender pairs that clustering merged.
 PyTorch gives the same probabilities on these files, so this is the model,
 not the port: on clean synthetic turn-taking it can hear two voices as one.
+
+These results are for one synthesis of each dialogue, and they are not
+stable: Kokoro's output differs slightly every time it reads the same text,
+and that is enough to change Nemotron's answer (2026-11-14, af_sky with
+af_bella, a same-gender pair that clustering merges; 40 dialogues put
+together from five syntheses of each of the four lines, espeak-ng phonemes).
+At 16 kHz it found two speakers and gave every line its own speaker in all
+40 (DER 3-4 %; one more synthesis outside this set gave 36 %, nearly all
+missed speech). As 8 kHz G.711 μ-law it found two speakers in 38 and gave
+every line its own speaker in only 31; it missed up to 44 % of the speech
+(median 23 %). With longer turns (four lines of about 8 s, 10 dialogues from
+two syntheses of each line) it merged or mixed up the two voices at both
+rates in all 10. The same two
+voices in a conversation with one 2.5 s overlap (the kind of mix measured
+above: A, B, A's long sentence with B starting before it ends, A) came out
+right in 12 of 12 at both rates, DER 1.4-1.9 %. So what the tables above show
+for 8 kHz and same-gender voices holds for conversations with overlap, not
+for short clean turn-taking dialogues, where telephone audio makes the result
+a matter of chance. `tests/test_real.py` asserts the first and, for the
+clean 8 kHz dialogue, only that no third speaker appears.
 
 **Speed.** RTF at 2 threads: 0.04 offline (recordings of 45 s to
 4.5 min), against 0.17-0.23 for `pyannote-3.0-eres2net` on the same audio.
