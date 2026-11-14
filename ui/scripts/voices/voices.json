@@ -2,15 +2,20 @@
   "about": "Voices published with the live demo for in-browser speech synthesis. Read by build.py; the console's own list is ui/src/lib/browser-tts/voices.ts (keep the ids in step).",
   "syspin_release": "https://github.com/cb-Sigma/bolo/releases/download/voices-v1/",
   "voices": [
-    { "id": "syspin-hi-female", "kind": "coqui", "source": "syspin", "sample": "नमस्ते! आप कैसे हैं? आज मौसम बहुत अच्छा है।" },
     {
-      "id": "syspin-mai-female",
+      "id": "syspin-hi-female",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "नमस्ते! आप कैसे हैं? आज मौसम बहुत अच्छा है।"
+    },
+    {
+      "id": "syspin-mai-male",
       "kind": "coqui",
       "source": "syspin",
       "sample": "प्रणाम! अहाँ केहन छी? आइ मौसम बड्ड नीक अछि।"
     },
     {
-      "id": "syspin-mai-male",
+      "id": "syspin-mai-female",
       "kind": "coqui",
       "source": "syspin",
       "sample": "प्रणाम! अहाँ केहन छी? आइ मौसम बड्ड नीक अछि।"

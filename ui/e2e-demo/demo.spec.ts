@@ -278,6 +278,27 @@ test.describe('first visit: microphone and model status', () => {
     await expect(page.locator('meta[name="viewport"]')).toHaveAttribute('content', /viewport-fit=cover/)
   })
 
+  test('Moonshine is the recogniser until the visitor picks another one themselves', async ({ page }) => {
+    // An earlier version stored the Hindi model after a speech-synthesis round trip; nobody chose it.
+    await page.addInitScript(() => {
+      if (!localStorage.getItem('bolo.prefs'))
+        localStorage.setItem('bolo.prefs', JSON.stringify({ browserModel: 'whisper-tiny-hindi' }))
+    })
+    await open(page, 'stt')
+    await expect(page.getByTestId('demo-hero').getByTestId('model-chip')).toContainText('Moonshine Tiny')
+    // Choosing Hindi still offers the Hindi model, and a choice made here is kept.
+    await page.getByTestId('demo-hero').getByTestId('hero-hindi').click()
+    await page.getByTestId('switch-model-dialog').getByTestId('switch-to-whisper-tiny-hindi').click()
+    await expect
+      .poll(() =>
+        page.evaluate(() => JSON.parse(localStorage.getItem('bolo.prefs') ?? '{}') as Record<string, unknown>),
+      )
+      .toMatchObject({ browserModel: 'whisper-tiny-hindi', browserModelPicked: true })
+    await page.reload()
+    await expect(page.getByTestId('demo-banner')).toBeVisible()
+    await expect(page.getByTestId('browser-model-picker')).toContainText('Whisper Tiny Hindi')
+  })
+
   test('a blocked microphone is flagged before the tap and explained after it, at phone width', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.addInitScript(() => {
@@ -414,7 +435,10 @@ test.describe('with the models available: first use and Hindi', () => {
   test('Hindi: the fine-tuned model transcribes the bundled Hindi sample in Devanagari', async ({ page }) => {
     await page.addInitScript(() => {
       if (!localStorage.getItem('bolo.prefs'))
-        localStorage.setItem('bolo.prefs', JSON.stringify({ browserModel: 'whisper-tiny-hindi' }))
+        localStorage.setItem(
+          'bolo.prefs',
+          JSON.stringify({ browserModel: 'whisper-tiny-hindi', browserModelPicked: true }),
+        )
     })
     await open(page, 'stt')
     await expect(page.getByTestId('browser-model-picker')).toContainText('Whisper Tiny Hindi')
@@ -484,7 +508,8 @@ test.describe('text to speech in the page', () => {
       await expect(page.getByTestId('spoken-text')).toContainText('दस बजे')
       await expect(page.getByTestId('chunk-timeline')).toBeVisible()
       await expect(page.getByTestId('speak')).toBeVisible({ timeout: 60_000 })
-      await expect(page.getByTestId('chunk-timeline').locator('text=प्रणाम!')).toBeVisible()
+      // The one-word greeting is not synthesised by itself (the voice garbles it): it goes with the next sentence.
+      await expect(page.getByTestId('chunk-timeline')).toContainText('प्रणाम! काल्हि दस बजे बैसक अछि।')
       await expect(page.getByTestId('save-wav')).toBeEnabled()
       const download = page.waitForEvent('download')
       await page.getByTestId('save-wav').click()
