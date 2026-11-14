@@ -7,6 +7,10 @@ import type {
   ModelStats,
   Percentiles,
   Phase,
+  Provider,
+  ProviderList,
+  ProviderTest,
+  ProviderUpdate,
   RequestTrace,
   ServerEvent,
   ServerInfo,
@@ -56,6 +60,21 @@ export function profileOf(m: Pick<CatalogModel, 'task' | 'tier' | 'id'>): Profil
 
 type Listener = (ev: ServerEvent) => void
 
+const PROVIDER_KINDS = [
+  {
+    kind: 'openai-compatible',
+    default_base_url: 'https://api.openai.com/v1',
+    terms_url: 'https://openai.com/policies/services-agreement/',
+  },
+  { kind: 'sarvam', default_base_url: 'https://api.sarvam.ai', terms_url: 'https://www.sarvam.ai/terms-of-service' },
+  {
+    kind: 'elevenlabs',
+    default_base_url: 'https://api.elevenlabs.io',
+    terms_url: 'https://elevenlabs.io/terms-of-use',
+  },
+  { kind: 'deepgram', default_base_url: 'https://api.deepgram.com', terms_url: 'https://deepgram.com/terms' },
+]
+
 export interface MockFlags {
   /** Start with eSpeak NG already installed. */
   espeak?: boolean
@@ -88,6 +107,21 @@ export class MockServer {
   private pendingTimeouts = new Set<ReturnType<typeof setTimeout>>()
   liveStreams = 0
   private espeak = false
+  /** Cloud providers: `openai` came with the configuration, others are added through the API. */
+  providerList: Provider[] = [
+    {
+      name: 'openai',
+      kind: 'openai-compatible',
+      base_url: 'https://api.openai.com/v1',
+      configured: true,
+      api_key_set: true,
+      options: {},
+      prices: { 'gpt-4o-transcribe': { per_minute: 0.006 } },
+      source: 'settings',
+      editable: false,
+      terms_url: 'https://openai.com/policies/services-agreement/',
+    },
+  ]
 
   constructor(flags: MockFlags = {}) {
     this.flags = flags
@@ -147,6 +181,127 @@ export class MockServer {
       platform: 'linux-x86_64',
       auth_required: Boolean(this.flags.auth),
       data_dir: '/home/bolo/.cache/bolo',
+      auto_pull: true,
+      providers: this.providerList.map((p) => ({ name: p.name, kind: p.kind, configured: p.configured })),
+      capabilities: {
+        providers: {
+          endpoint: '/api/v1/providers',
+          kinds: PROVIDER_KINDS.map((k) => k.kind),
+          editable: true,
+          edit_blocked_reason: null,
+          configured: this.providerList.filter((p) => p.configured).map((p) => p.name),
+          cost_estimates: true,
+        },
+      },
+    }
+  }
+
+  // --- cloud providers ---------------------------------------------------------------------------------------
+
+  providers(): ProviderList {
+    return {
+      providers: this.providerList.map((p) => ({ ...p, stats: {} })),
+      kinds: PROVIDER_KINDS,
+      editable: true,
+      edit_blocked_reason: null,
+      notice: 'paid cloud API; audio leaves this server',
+    }
+  }
+
+  /** Cloud models follow their provider: installed once it is configured. */
+  private syncCloudModels(): void {
+    for (const m of this.models) {
+      if (!m.cloud || !m.provider) continue
+      const p = this.providerList.find((x) => x.name === m.provider?.name)
+      m.provider = { ...m.provider, configured: Boolean(p?.configured), price: p?.prices[m.provider.model] ?? null }
+      m.installed = Boolean(p?.configured)
+      if (!m.installed) m.loaded = false
+    }
+  }
+
+  putProvider(name: string, body: ProviderUpdate): Provider {
+    const existing = this.providerList.find((p) => p.name === name)
+    if (existing && !existing.editable)
+      throw new HttpError(400, `provider '${name}' comes from the configuration; change it there`, 'invalid_request')
+    const kind = body.kind ?? existing?.kind ?? (PROVIDER_KINDS.find((k) => k.kind === name)?.kind || '')
+    const known = PROVIDER_KINDS.find((k) => k.kind === kind)
+    if (!known) throw new HttpError(400, `provider '${name}': kind must be one of the known kinds`, 'invalid_request')
+    // The key itself is not kept anywhere a response could read it from: only whether one was given.
+    const keySet = body.api_key ? true : body.clear_api_key ? false : (existing?.api_key_set ?? false)
+    const base_url = body.base_url ?? (existing?.kind === kind ? existing.base_url : known.default_base_url)
+    const next: Provider = {
+      name,
+      kind,
+      base_url,
+      configured: keySet || (kind === 'openai-compatible' && base_url !== known.default_base_url),
+      api_key_set: keySet,
+      options: body.options ?? existing?.options ?? {},
+      prices: body.prices ?? existing?.prices ?? {},
+      source: 'stored',
+      editable: true,
+      terms_url: base_url === known.default_base_url ? known.terms_url : null,
+    }
+    this.providerList = existing
+      ? this.providerList.map((p) => (p.name === name ? next : p))
+      : [...this.providerList, next]
+    this.syncCloudModels()
+    this.emit({ type: 'provider', name, event: 'saved' })
+    return next
+  }
+
+  deleteProvider(name: string): void {
+    const existing = this.providerList.find((p) => p.name === name)
+    if (!existing) throw new HttpError(404, `unknown provider '${name}'`, 'model_not_found')
+    if (!existing.editable)
+      throw new HttpError(400, `provider '${name}' comes from the configuration; remove it there`, 'invalid_request')
+    this.providerList = this.providerList.filter((p) => p.name !== name)
+    this.syncCloudModels()
+    this.emit({ type: 'provider', name, event: 'removed' })
+  }
+
+  testProvider(name: string): ProviderTest {
+    const p = this.providerList.find((x) => x.name === name)
+    if (!p) throw new HttpError(404, `unknown provider '${name}'`, 'model_not_found')
+    if (!p.configured)
+      return {
+        name,
+        ok: false,
+        message: `provider '${name}' has no API key yet`,
+        code: 'provider_not_configured',
+        checked: null,
+        latency_ms: 0.4,
+      }
+    return {
+      name,
+      ok: true,
+      message: p.kind === 'sarvam' ? 'the address answers and did not refuse the key' : 'the key was accepted',
+      code: null,
+      checked: p.kind === 'sarvam' ? 'reachability' : 'credentials',
+      latency_ms: 180 + Math.round(this.rand() * 120),
+    }
+  }
+
+  /** What a request to a cloud model adds to its trace. */
+  cloudTrace(m: CatalogModel, trace: RequestTrace): RequestTrace {
+    if (!m.cloud || !m.provider) return trace
+    const price = m.provider.price
+    const minutes = (trace.audio_seconds ?? 0) / 60
+    const amount = (price?.per_minute ?? 0) * minutes + ((price?.per_1k_chars ?? 0) * (trace.chars ?? 0)) / 1000
+    return {
+      ...trace,
+      provider: {
+        name: m.provider.name,
+        kind: m.provider.kind,
+        model: m.provider.model,
+        requests: 1,
+        latency_ms: Math.round(trace.total_ms * 0.85),
+        first_byte_ms: Math.round(trace.total_ms * 0.4),
+        bytes_sent: Math.round((trace.audio_seconds ?? 0) * 32000) + (trace.chars ?? 0),
+        bytes_received: m.task === 'tts' ? Math.round((trace.audio_seconds ?? 0) * 48000) : 240,
+      },
+      ...(price
+        ? { cost: { amount: Math.round(amount * 1e6) / 1e6, currency: price.currency ?? 'USD', estimated: true } }
+        : {}),
     }
   }
 

@@ -115,7 +115,10 @@ async def test_stats_shape(core: Bolo) -> None:
     await core.transcribe(speechlike(1.0), 16000)
     await core.synthesize_all("Hello.")
     stats = core.stats()
-    assert set(stats) == {"uptime_s", "active_streams", "queue_depth", "system", "totals", "models", "separation"}
+    assert set(stats) == {
+        "uptime_s", "active_streams", "queue_depth", "system", "totals", "models", "separation", "providers",
+        "fallbacks",
+    }  # fmt: skip
     assert set(stats["system"]) == {"cpu_percent", "rss_bytes", "threads"}
     assert stats["totals"]["requests"] == 2 and stats["totals"]["audio_seconds_in"] == 1.0
     by_id = {m["id"]: m for m in stats["models"]}
@@ -125,8 +128,10 @@ async def test_stats_shape(core: Bolo) -> None:
     assert set(stt["latency_ms"]["final"]) == {"p50", "p95", "p99"}
     assert set(stt["rtf"]) == {"p50", "p95"}
     assert by_id["fake-tts"]["latency_ms"]["final"] is None
+    assert stats["providers"] == [] and stats["fallbacks"] == []
     info = core.info()
     assert info["name"] == "bolo" and info["device"] == "cpu" and info["auth_required"] is False
+    assert info["auto_pull"] is False and info["providers"] == []
     assert {"id": "fake", "version": info["version"], "available": True, "reason": None} in info["engines"]
 
 

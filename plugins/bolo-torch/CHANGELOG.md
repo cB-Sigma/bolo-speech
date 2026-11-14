@@ -2,6 +2,12 @@
 
 The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.1] - 2026-11-14
+
+### Changed
+
+- Installs with bolo 0.3 as well as 0.2 (`bolo-speech>=0.2,<0.4`). No change to the plugin's code.
+
 ## [0.1.0] - 2026-11-14
 
 First release, for bolo 0.2.

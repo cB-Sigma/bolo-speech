@@ -893,7 +893,7 @@
   "note": "same four 45 s AMI excerpts as the torch timing (3-4 speakers), after one warm-up file; diarization included. The machine was shared (load average 2-5), so these are upper bounds: a decode-only rerun of ES2004a_00355 at 4 threads took 34.3 s (RTF 0.76), IS1009a_00275 15.9 s (0.35). Torch plugin on an idle machine: 0.453 (2 threads) / 0.26 (4 threads) in bfloat16 with AMX, 1.41 in float32. onnx_int8_all_matmuls decoded ES2004a_00355 in 19.5 s at 4 threads; onnx_fp32 in 54 s.",
   "memory": "about 4.7 GB resident for the evaluation process with nemotron + int8 DiCoW at 4 speakers (fp32 graphs: about 5.7 GB)"
  },
- "decision": "onnx_int8 matches the torch plugin on AMI (26.03 % vs 26.03 %, 7 files better, 7 worse) and is within 0.6 pt on the 40 English synthetic mixes (6.04 vs 5.46 %; onnx_fp32 5.25 %), 1.2 pt over all 44 (7.79 vs 6.63 %; one 8 kHz Hindi mix, 37.5 pt worse, carries most of it). Meets the ~1 pt bar on AMI and English; Hindi worse on one file. Catalog entry stays validated: untested while status: pending (the hosted files have not been run).",
+ "decision": "onnx_int8 matches the torch plugin on AMI (26.03 % vs 26.03 %, 7 files better, 7 worse) and is within 0.6 pt on the 40 English synthetic mixes (6.04 vs 5.46 %; onnx_fp32 5.25 %), 1.2 pt over all 44 (7.79 vs 6.63 %; one 8 kHz Hindi mix, 37.5 pt worse, carries most of it). Meets the ~1 pt bar on AMI and English; Hindi worse on one file. The export is published at codebucketsolutions/dicow-v3.3-onnx (revision dd5db868e037d00e587a7f4ee56865f6c1817c3c) with the SHA-256 sums listed under export_files; the catalog entry is validated: cpu on these measurements.",
  "not_measured": [
   "fp32 on all 24 AMI excerpts (2 files only, stopped for time)",
   "an idle-machine timing",

@@ -12,7 +12,7 @@ import type { CatalogModel } from '@/lib/api/types'
 import { fmtBytes, languageName } from '@/lib/format'
 import { supportsLanguage } from '@/lib/languages'
 import { cn } from '@/lib/utils'
-import { hardwareLabel, runtimeLabel } from '@/lib/capabilities'
+import { hardwareLabel, isCloud, runtimeLabel } from '@/lib/capabilities'
 import { languageSummary, TIER_LABEL, TIERS } from './model-bits'
 
 const GROUP_ORDER = [
@@ -21,6 +21,7 @@ const GROUP_ORDER = [
   'llama.cpp voices',
   'audio.cpp voices',
   'Engine plugin voices',
+  'Cloud voices (paid APIs)',
 ]
 
 function groups(models: CatalogModel[], groupBy?: (m: CatalogModel) => string) {
@@ -106,7 +107,8 @@ export function ModelPicker({
                     />
                     <span className="truncate num text-[13px]">{m.id}</span>
                     <span className="ml-auto shrink-0 pl-3 text-xs text-muted-foreground [[data-slot=select-trigger]_&]:hidden">
-                      {languageSummary(m.languages, 2)} · {fmtBytes(m.size_bytes)}
+                      {languageSummary(m.languages, 2)}
+                      {isCloud(m) ? '' : ` · ${fmtBytes(m.size_bytes)}`}
                       {runtimeLabel(m) ? ` · ${runtimeLabel(m)}` : ''}
                       {m.hardware && m.hardware.gpu !== 'optional' ? ` · ${hardwareLabel(m.hardware)}` : ''}
                       {m.available === false

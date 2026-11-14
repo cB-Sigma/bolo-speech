@@ -131,6 +131,7 @@ async def chat_completions(request: Request) -> Response:
         )
 
     trace = Trace("agent", "chat", "voice-agent")
+    trace.extra["pipeline"] = "cascade"
     audio_cfg: dict[str, Any] = body["audio"] if isinstance(body.get("audio"), dict) else {}
     try:
         fmt = _audio_format(str(audio_cfg.get("format") or "wav")) if wants_audio else "wav"

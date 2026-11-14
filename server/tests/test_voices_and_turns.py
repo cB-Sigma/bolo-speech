@@ -175,7 +175,7 @@ def entry(**kw: Any) -> dict[str, Any]:
     return {**base, **kw}
 
 
-async def test_pending_entries_are_hidden_and_cannot_be_pulled(core: Bolo) -> None:
+async def test_pending_entries_are_marked_and_cannot_be_pulled(core: Bolo) -> None:
     with pytest.raises(CatalogError, match="pinned with sha256"):
         ModelSpec.from_dict(entry())
     with pytest.raises(CatalogError, match="status"):
@@ -184,7 +184,10 @@ async def test_pending_entries_are_hidden_and_cannot_be_pulled(core: Bolo) -> No
     core.catalog.add(spec)
     assert "v1" not in [s.id for s in core.catalog.search("tts")]
     assert "v1" in [s.id for s in core.catalog.search("tts", include_pending=True)]
-    assert "v1" not in [m["id"] for m in core.catalog_api()]
+    # the API's catalog lists them, marked: a console can show "not published yet" instead of nothing
+    listed = {m["id"]: m for m in core.catalog_api()}
+    assert listed["v1"]["status"] == "pending" and listed["v1"]["installed"] is False
+    assert "v1" not in [m["id"] for m in core.catalog_api(installed=True)]
     assert core.model_api(spec)["status"] == "pending"
     with pytest.raises(ModelNotPublished, match="not published yet"):
         core.start_pull("v1")

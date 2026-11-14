@@ -587,11 +587,17 @@ class RealtimeSession:
         )  # fmt: skip
         return probability is None or probability >= SEMANTIC_THRESHOLD
 
+    def _agent_trace(self) -> Trace:
+        """A voice-agent trace that says which pipeline answers (or would answer) the turn."""
+        trace = Trace("agent", self.transport, "voice-agent")
+        trace.extra["pipeline"] = self.pipeline if self.kind == "realtime" else "transcription"
+        return trace
+
     async def _end_turn(self, end: int) -> None:
         item_id = self._pending_item or new_id("item")
         await self._stop_partials()
         await self.send("input_audio_buffer.speech_stopped", audio_end_ms=self._ms(end), item_id=item_id)
-        trace = Trace("agent", self.transport, "voice-agent")
+        trace = self._agent_trace()
         if self._turn_checks:
             trace.extra["turn_detection"] = {"type": "semantic_vad", "checks": self._turn_checks}
             self._turn_checks = []
@@ -612,6 +618,11 @@ class RealtimeSession:
         """
         s = self.core.settings
         cfg = self.transcription
+        try:
+            if not self.core.interim_decodes(self.core.resolve(cfg["model"], "stt")):
+                return  # a cloud recogniser: every interim decode would be a billed request
+        except BoloError:
+            return  # the final decode reports the error
         agreement = LocalAgreement(s.agreement)
         sent_words = 0
         decoded_to = 0
@@ -663,7 +674,7 @@ class RealtimeSession:
             )
         self._buf, self._buf_start, self._commit_from = np.zeros(0, dtype=np.float32), self._pos, self._pos
         self._speech_start = None
-        await self._commit(audio, new_id("item"), Trace("agent", self.transport, "voice-agent"), auto_response=False)
+        await self._commit(audio, new_id("item"), self._agent_trace(), auto_response=False)
 
     async def _on_clear(self, event: dict[str, Any]) -> None:
         self._buf, self._buf_start, self._commit_from = np.zeros(0, dtype=np.float32), self._pos, self._pos
@@ -865,7 +876,7 @@ class RealtimeSession:
         if self.kind != "realtime":
             raise RealtimeError("transcription sessions cannot create responses", code="unsupported")
         params = event.get("response") if isinstance(event.get("response"), dict) else {}
-        trace = Trace("agent", self.transport, "voice-agent")
+        trace = self._agent_trace()
 
         async def turn() -> None:
             await self._start_response(params or {}, trace)

@@ -87,6 +87,8 @@ class STTResult:
     language: str | None = None
     segments: list[Segment] = field(default_factory=list)
     words: list[Word] = field(default_factory=list)
+    #: what the request cost at a cloud provider (:class:`bolo.providers.Usage`; remote engine only)
+    usage: Any = None
 
 
 @dataclass
@@ -178,6 +180,8 @@ class SynthesisExtras:
     reference_audio: bytes | None = None
     #: what is said in ``reference_audio``, for models that want the transcript of the reference
     reference_text: str | None = None
+    #: filled by cloud voices with what the request cost there (:class:`bolo.providers.Usage`)
+    usage: Any = None
 
 
 class TTSModel(Model):

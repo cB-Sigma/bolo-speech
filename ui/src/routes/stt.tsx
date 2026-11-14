@@ -1,4 +1,5 @@
 import {
+  Cloud,
   Copy,
   FileAudio,
   Info,
@@ -42,6 +43,7 @@ import { useStore } from '@/hooks/use-store'
 import { useSttSession, type EngineMode, type SessionInput } from '@/hooks/use-stt-session'
 import { useSupport } from '@/hooks/use-support'
 import { api } from '@/lib/api/client'
+import { cloudNotice, isCloud, notInstalledHint } from '@/lib/capabilities'
 import type { Sample } from '@/lib/api/types'
 import { isDemo } from '@/lib/api/config'
 import { STT_RATE } from '@/lib/audio/capture'
@@ -602,13 +604,26 @@ export default function SttPage() {
           <AlertDescription>{describeError(modelsError)} In-browser mode still works.</AlertDescription>
         </Alert>
       )}
+      {needsModel && model && isCloud(model) && model.installed && (
+        <Alert className="mb-4" data-testid="cloud-model-notice">
+          <Cloud />
+          <AlertTitle>{cloudNotice(model)}</AlertTitle>
+          <AlertDescription>
+            <span>
+              <span className="num">{model.id}</span> is served by the provider{' '}
+              <span className="num">{model.provider?.name ?? 'unknown'}</span>: what you say here is sent there and
+              billed by it.
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
       {needsModel && model && !model.installed && (
         <Alert className="mb-4">
           <Info />
           <AlertTitle>
             <span className="num">{model.id}</span> is not installed
           </AlertTitle>
-          <AlertDescription>Pull it from the Models screen, or pick an installed model.</AlertDescription>
+          <AlertDescription>{notInstalledHint(info.data, model)}</AlertDescription>
         </Alert>
       )}
 

@@ -28,7 +28,7 @@ bolo serves speech-to-text, text-to-speech and voice-activity detection.
 
 * **openai** - drop-in `/v1/audio/*` and `/v1/models`
 * **speaches** - model-management routes compatible with speaches
-* **native** - `/api/v1/*`: catalog, pulls, stats, request traces, events, benchmark
+* **native** - `/api/v1/*`: catalog, pulls, cloud providers, stats, request traces, events, benchmark
 * WebSockets (not shown by OpenAPI): `/api/v1/stt/stream`, `/api/v1/tts/stream` - see docs/api.md
 """
 
@@ -76,7 +76,15 @@ def create_app(settings: Settings | None = None, core: Bolo | None = None) -> Fa
             allow_origins=settings.cors_origins,
             allow_methods=["*"],
             allow_headers=["*"],
-            expose_headers=["x-request-id", "x-sample-rate", "openai-processing-ms"],
+            expose_headers=[
+                "x-request-id",
+                "x-sample-rate",
+                "openai-processing-ms",
+                "x-bolo-model",
+                "x-bolo-fallback",
+                "x-bolo-estimated-cost",
+                "x-bolo-separation",
+            ],
         )
 
     @app.exception_handler(BoloError)

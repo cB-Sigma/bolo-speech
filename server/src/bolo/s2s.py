@@ -18,8 +18,21 @@ That is :class:`S2SConversation`, opened per Realtime session by an :class:`S2SB
   for TTS servers). Each Realtime session holds one upstream session, which holds one llama-server slot: the
   managed server is started with ``--parallel s2s_parallel``.
 
-An in-process backend (onnxruntime / onnxruntime-genai exports of a model and its audio codec) implements the
-same two classes; nothing in the session logic depends on llama-server.
+* :class:`OpenAIRealtimeBackend`: OpenAI's Realtime API over WebSocket (``wss://api.openai.com/v1/realtime``),
+  or any service that copies it, chosen with ``s2s_model = "<provider>:<model>"`` (a provider of kind
+  ``openai-compatible``; for example ``openai:gpt-realtime-2.1``). The same event set as above with three
+  differences, taken from the API reference as typed in openai-python 3.51.0 (2026-11-14): PCM audio is 24 kHz
+  both ways (bolo resamples), a response is either audio (with its transcript in
+  ``response.output_audio_transcript.delta``) or text but never both, and the server's own turn detection is
+  on by default, so bolo switches it off (``audio.input.turn_detection: null``) and commits turns itself.
+  Paid cloud API: the conversation's audio leaves this server.
+
+* :class:`bolo.s2s_onnx.OnnxS2SBackend`: LFM3-Audio in this process, from the model's ONNX graphs in ONNX
+  Runtime (``s2s_model = "lfm3-audio-2b-onnx"``; ``pip install 'bolo-speech[s2s]'``). No llama-server, no second
+  process: the audio of a turn is evaluated while the user speaks, and text and 24 kHz audio come out as they are
+  generated. One model in memory serves all sessions, which take turns step by step.
+
+Nothing in the session logic depends on which of these answers.
 """
 
 from __future__ import annotations
@@ -42,6 +55,7 @@ from bolo.engines.base import FloatArray
 from bolo.errors import ComponentMissing, EngineUnavailable, InvalidRequest
 
 if TYPE_CHECKING:
+    from bolo.catalog import ModelSpec
     from bolo.core import Bolo
     from bolo.engines.tts_server import ServerProcess
 
@@ -50,6 +64,8 @@ log = logging.getLogger("bolo.s2s")
 #: OpenAI voice names that stock clients send; a backend with its own voices never sees them
 OPENAI_VOICES = {"alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse", "marin", "cedar"}  # fmt: skip
 INPUT_RATE = 16000
+#: catalog ``kind`` of the models :mod:`bolo.s2s_onnx` runs in this process
+ONNX_KIND = "lfm3_audio_onnx"
 
 
 # -- what a response is made of ----------------------------------------------------------------------------------
@@ -170,10 +186,21 @@ def _b64_pcm16(samples: FloatArray) -> str:
 class LlamaRealtimeConversation(S2SConversation):
     """An upstream ``/v1/realtime`` session of llama-server (realtime conversation mode)."""
 
-    def __init__(self, ws: Any, output_rate: int, where: str) -> None:
+    def __init__(
+        self, ws: Any, output_rate: int, where: str, *, input_rate: int = INPUT_RATE, audio_or_text: bool = False
+    ) -> None:
         self.ws = ws
         self.output_rate = output_rate
         self.where = where
+        #: the rate the server wants the user's audio at (bolo hears at 16 kHz and resamples)
+        self.input_rate = input_rate
+        #: a response is audio (whose transcript is the text) or text, never both (OpenAI's Realtime API)
+        self.audio_or_text = audio_or_text
+        self._text_events = (
+            ("response.output_text.delta", "response.output_audio_transcript.delta")
+            if audio_or_text
+            else ("response.output_text.delta",)
+        )
         self._events: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
         #: responses that were cancelled and whose response.done has not come back yet: their events are dropped
         self._stale = 0
@@ -215,6 +242,10 @@ class LlamaRealtimeConversation(S2SConversation):
 
     async def append_audio(self, samples16: FloatArray) -> None:
         if len(samples16):
+            if self.input_rate != INPUT_RATE:
+                from bolo.audio.resample import resample
+
+                samples16 = resample(samples16, INPUT_RATE, self.input_rate)
             await self._send({"type": "input_audio_buffer.append", "audio": _b64_pcm16(samples16)})
 
     async def commit(self) -> None:
@@ -231,7 +262,8 @@ class LlamaRealtimeConversation(S2SConversation):
     async def respond(
         self, *, modalities: list[str], max_output_tokens: Any = None, tool_choice: Any = None
     ) -> AsyncGenerator[S2SEvent, None]:
-        params: dict[str, Any] = {"output_modalities": ["text", "audio"] if "audio" in modalities else ["text"]}
+        both = ["audio"] if self.audio_or_text else ["text", "audio"]
+        params: dict[str, Any] = {"output_modalities": both if "audio" in modalities else ["text"]}
         if max_output_tokens is not None:
             params["max_output_tokens"] = max_output_tokens
         if tool_choice in ("auto", "none", "required"):
@@ -256,7 +288,7 @@ class LlamaRealtimeConversation(S2SConversation):
                     return
                 if kind == "response.created":
                     started = True
-                elif kind == "response.output_text.delta" and event.get("delta"):
+                elif kind in self._text_events and event.get("delta"):
                     yield TextDelta(str(event["delta"]))
                 elif kind == "response.output_audio.delta" and event.get("delta"):
                     yield AudioDelta(_pcm16(base64.b64decode(str(event["delta"]))), self.output_rate)
@@ -357,6 +389,25 @@ class LlamaRealtimeBackend(S2SBackend):
         session = created.get("session") or {}
         out_fmt = ((session.get("audio") or {}).get("output") or {}).get("format") or {}
         output_rate = int(out_fmt.get("rate") or 24000)
+        update = self._session_update(config)
+        try:
+            await ws.send(json.dumps({"type": "session.update", "session": update}))
+            reply = await asyncio.wait_for(self._next(ws, ("session.updated", "error")), self.connect_timeout_s)
+        except Exception as exc:
+            with contextlib.suppress(Exception):
+                await ws.close()
+            raise EngineUnavailable(f"the speech-to-speech server at {url} did not take the session: {exc}") from exc
+        if reply.get("type") == "error":
+            with contextlib.suppress(Exception):
+                await ws.close()
+            message = str((reply.get("error") or {}).get("message") or "error")
+            raise InvalidRequest(f"the speech-to-speech model refused the session configuration: {message}")
+        return self._conversation(ws, output_rate, url)
+
+    def _conversation(self, ws: Any, output_rate: int, url: str) -> S2SConversation:
+        return LlamaRealtimeConversation(ws, output_rate, url)
+
+    def _session_update(self, config: S2SConfig) -> dict[str, Any]:
         update: dict[str, Any] = {
             "type": "realtime",
             "audio": {"input": {"format": {"type": "audio/pcm", "rate": INPUT_RATE}}},
@@ -378,19 +429,7 @@ class LlamaRealtimeBackend(S2SBackend):
             update["max_output_tokens"] = config.max_output_tokens
         if config.voice and config.voice.lower() not in OPENAI_VOICES:
             update["audio"]["output"] = {"voice": config.voice}
-        try:
-            await ws.send(json.dumps({"type": "session.update", "session": update}))
-            reply = await asyncio.wait_for(self._next(ws, ("session.updated", "error")), self.connect_timeout_s)
-        except Exception as exc:
-            with contextlib.suppress(Exception):
-                await ws.close()
-            raise EngineUnavailable(f"the speech-to-speech server at {url} did not take the session: {exc}") from exc
-        if reply.get("type") == "error":
-            with contextlib.suppress(Exception):
-                await ws.close()
-            message = str((reply.get("error") or {}).get("message") or "error")
-            raise InvalidRequest(f"the speech-to-speech model refused the session configuration: {message}")
-        return LlamaRealtimeConversation(ws, output_rate, url)
+        return update
 
     @staticmethod
     async def _next(ws: Any, kinds: tuple[str, ...]) -> dict[str, Any]:
@@ -407,6 +446,73 @@ class LlamaRealtimeBackend(S2SBackend):
     async def close(self) -> None:
         if self.process is not None:
             await asyncio.to_thread(self.process.stop)
+
+
+# -- OpenAI Realtime API ------------------------------------------------------------------------------------------
+OPENAI_RATE = 24000
+
+
+class OpenAIRealtimeBackend(LlamaRealtimeBackend):
+    """OpenAI's Realtime API (WebSocket), or a service that copies it. See the module docstring for what differs
+    from llama-server's ``/v1/realtime``."""
+
+    name = "openai-realtime"
+
+    def __init__(
+        self,
+        base_url: str,
+        *,
+        api_key: str | None,
+        model: str,
+        provider: str = "openai",
+        connect_timeout_s: float = 30.0,
+    ) -> None:
+        super().__init__(base_url, api_key=api_key, model=model, connect_timeout_s=connect_timeout_s)
+        self.provider = provider
+
+    @property
+    def ws_url(self) -> str:
+        from urllib.parse import quote
+
+        return f"{realtime_url(str(self.url))}?model={quote(str(self.model), safe='')}"
+
+    def describe(self) -> dict[str, Any]:
+        return {
+            "backend": self.name, "url": realtime_url(str(self.url)), "model": self.model, "managed": False,
+            "provider": self.provider, "cloud": True,
+        }  # fmt: skip
+
+    def _conversation(self, ws: Any, output_rate: int, url: str) -> S2SConversation:
+        where = realtime_url(str(self.url))  # without the query string
+        return LlamaRealtimeConversation(ws, output_rate, where, input_rate=OPENAI_RATE, audio_or_text=True)
+
+    def _session_update(self, config: S2SConfig) -> dict[str, Any]:
+        pcm = {"type": "audio/pcm", "rate": OPENAI_RATE}
+        output: dict[str, Any] = {"format": pcm}
+        if config.voice:
+            output["voice"] = config.voice
+        update: dict[str, Any] = {
+            "type": "realtime",
+            "output_modalities": ["audio"],
+            # bolo detects turns and barge-in itself and commits the audio of each turn
+            "audio": {"input": {"format": pcm, "turn_detection": None}, "output": output},
+            "tools": [
+                {
+                    "type": "function",
+                    "name": t.get("name"),
+                    "description": t.get("description") or "",
+                    "parameters": t.get("parameters") or {"type": "object", "properties": {}},
+                }
+                for t in config.tools
+            ],
+        }
+        if config.instructions:
+            update["instructions"] = config.instructions
+        if config.tool_choice in ("auto", "none", "required"):
+            update["tool_choice"] = config.tool_choice
+        if isinstance(config.max_output_tokens, int):
+            update["max_output_tokens"] = config.max_output_tokens
+        return update
 
 
 # -- which backend a server uses ----------------------------------------------------------------------------------
@@ -427,25 +533,83 @@ class S2SManager:
     def describe(self) -> dict[str, Any]:
         s = self.core.settings
         out: dict[str, Any] = {"model": s.s2s_model, "url": s.s2s_server_url}
+        configured, available, reason = self._readiness()
+        # `configured`: the settings name something that can answer; `available`: a session can use it now
+        out.update(configured=configured, available=available, reason=reason)
         if self._backend is not None:
             out.update(self._backend.describe())
         return out
+
+    def _cloud(self) -> tuple[Any, str] | None:
+        """``s2s_model = "<provider>:<model>"`` -> (provider, model), when the prefix names a provider."""
+        prefix, sep, model = (self.core.settings.s2s_model or "").partition(":")
+        provider = self.core.providers.get(prefix) if sep and model else None
+        return (provider, model) if provider is not None else None
+
+    def _readiness(self) -> tuple[bool, bool, str | None]:
+        from bolo.tts_runtimes import LLAMA, find_binary
+
+        s = self.core.settings
+        if s.s2s_server_url:
+            return True, True, None
+        cloud = self._cloud()
+        if cloud is not None:
+            provider, _model = cloud
+            if provider.kind != "openai-compatible":
+                return False, False, f"provider '{provider.name}' is not of kind openai-compatible"
+            ok = bool(provider.configured)
+            return ok, ok, None if ok else f"provider '{provider.name}' has no API key"
+        spec = self.core.catalog.resolve(s.s2s_model) if s.s2s_model else None
+        if spec is None:
+            return False, False, "s2s_model does not name a catalog model or a <provider>:<model>"
+        if spec.kind == ONNX_KIND:
+            from bolo.s2s_onnx import INSTALL_HINT, missing_packages
+
+            missing = missing_packages()
+            if missing:
+                return True, False, f"{' and '.join(missing)} not installed ({INSTALL_HINT})"
+            if not (self.core.store.is_installed(spec.id) or (s.auto_pull and not spec.gated)):
+                return True, False, f"model '{spec.id}' is not installed"
+            return True, True, None
+        if spec.engine != "tts-server":
+            return False, False, f"model '{spec.id}' is not a speech-to-speech model"
+        if find_binary(s, LLAMA)[0] is None:
+            return True, False, "llama-server is not installed (bolo components install llama-server)"
+        if not (self.core.store.is_installed(spec.id) or (s.auto_pull and not spec.gated)):
+            return True, False, f"model '{spec.id}' is not installed"
+        return True, True, None
 
     async def _build(self) -> S2SBackend:
         s = self.core.settings
         if s.s2s_server_url:
             return LlamaRealtimeBackend(s.s2s_server_url, api_key=s.s2s_server_api_key, model=s.s2s_model or None)
+        cloud = self._cloud()
+        if cloud is not None:
+            provider, model = cloud
+            if provider.kind != "openai-compatible":
+                raise InvalidRequest(
+                    f"provider '{provider.name}' is of kind {provider.kind}; the cloud speech-to-speech backend speaks "
+                    "OpenAI's Realtime API and needs a provider of kind openai-compatible",
+                    param="s2s_model",
+                )
+            self.core.providers.require(provider.name, model=s.s2s_model)
+            return OpenAIRealtimeBackend(
+                provider.base_url, api_key=provider.api_key, model=model, provider=provider.name
+            )
         if not s.s2s_model:
             raise EngineUnavailable(
-                "the speech-to-speech pipeline needs a model: set s2s_model (a llama-server model of the catalog, "
-                "e.g. lfm3-audio-2b-llamacpp) or s2s_server_url (a llama-server you run)"
+                "the speech-to-speech pipeline needs a model: set s2s_model (lfm3-audio-2b-onnx, which runs in this "
+                "process, or a llama-server model of the catalog such as lfm3-audio-2b-llamacpp) or s2s_server_url "
+                "(a llama-server you run)"
             )
         spec = self.core.manager.resolve(s.s2s_model)
         options = spec.options
+        if spec.kind == ONNX_KIND:
+            return await self._build_onnx(spec)
         if spec.engine != "tts-server" or str(options.get("runtime") or "llama-server") != "llama-server":
             raise InvalidRequest(
-                f"model '{spec.id}' does not run on llama-server; s2s_model must name a llama-server model such as "
-                "lfm3-audio-2b-llamacpp",
+                f"model '{spec.id}' is not a speech-to-speech model; s2s_model must name a llama-server model such as "
+                "lfm3-audio-2b-llamacpp, or lfm3-audio-2b-onnx (in this process)",
                 param="s2s_model",
             )
         if not self.core.store.is_installed(spec.id):
@@ -453,6 +617,26 @@ class S2SManager:
         return LlamaRealtimeBackend(
             process=self._process(spec.id, self.core.store.model_dir(spec.id), options), model=spec.id
         )
+
+    async def _build_onnx(self, spec: ModelSpec) -> S2SBackend:
+        """LFM3-Audio's ONNX graphs in this process (:mod:`bolo.s2s_onnx`)."""
+        from bolo.s2s_onnx import INSTALL_HINT, OnnxS2SBackend, missing_packages
+
+        missing = missing_packages()
+        if missing:
+            raise ComponentMissing(
+                f"the speech-to-speech model '{spec.id}' runs in this process and needs {' and '.join(missing)}: "
+                f"{INSTALL_HINT}"
+            )
+        if not self.core.store.is_installed(spec.id):
+            await self.core._auto_pull(spec)
+        s = self.core.settings
+        backend = OnnxS2SBackend(
+            self.core.store.model_dir(spec.id), options=spec.options, threads=s.resolved_threads(), model_id=spec.id
+        )
+        # load now: missing files answer here (503) and not in the middle of the first turn
+        await asyncio.to_thread(backend.model)
+        return backend
 
     def _process(self, name: str, path: Path, options: dict[str, Any]) -> ServerProcess:
         import os

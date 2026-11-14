@@ -98,8 +98,16 @@ not implement them; loading one answers `400 invalid_request` saying so.
 
 ## Install
 
-bolo-torch is not on PyPI yet (neither is bolo 0.2.0; both are published by the release workflow). From a
-checkout of the bolo repository:
+bolo-torch is on PyPI and installs bolo (the `bolo-speech` distribution) with it:
+
+```bash
+# 1. PyTorch. The CPU-only build is much smaller than the default (CUDA) build on Linux:
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+# 2. the plugin, with the model families you want:
+pip install "bolo-torch[parler,sepformer]"
+```
+
+From a checkout of the bolo repository:
 
 ```bash
 # 1. PyTorch. The CPU-only build is much smaller than the default (CUDA) build on Linux:
@@ -108,11 +116,6 @@ pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 pip install ./server "./plugins/bolo-torch[parler,sepformer]"
 ```
 
-Once published, step 2 becomes:
-
-```bash
-pip install "bolo-torch[parler,sepformer]"     # also installs bolo
-```
 
 Extras: `parler` (Parler-TTS), `f5` (IndicF5), `f5-original` (the original F5-TTS checkpoints, on the `f5-tts`
 package, which pins its own libraries: give it its own environment), `indic-speak` (transformers 5 and SNAC),

@@ -4,6 +4,84 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
+## [0.3.0] - 2026-11-14
+
+### Added
+
+- **Speech-to-speech in bolo's own process: `lfm3-audio-2b-onnx`** ([docs/voice-agents.md](docs/voice-agents.md)).
+  `s2s_model = "lfm3-audio-2b-onnx"` runs Liquid AI's LFM3-Audio 2B from its ONNX graphs with ONNX
+  Runtime and NumPy (`bolo/s2s_onnx.py`; `pip install 'bolo-speech[s2s]'`: onnxruntime and tokenizers), with
+  no llama-server: log-mel front end, the audio encoder (the turn is evaluated while the user
+  speaks), the language model with its caches, the depth decoder (three MaskGIT passes per 80 ms
+  speech frame), the codec decoder and inverse STFT (24 kHz audio in chunks as it is generated),
+  interleaved text and speech, tool calls, barge-in between steps. The catalog entry pins every
+  file by SHA-256 (2.7 GB), states the LFM Open License (commercial use only below USD 10M yearly
+  revenue) and is also a text-to-speech voice (engine `onnxruntime`, kind `lfm3_audio_onnx`; two
+  voices, 18 languages). Without the packages a session answers 424, with missing files 503, and
+  `GET /api/v1/info` reports the pipeline as configured but not available. On 4 shared CPU cores it
+  generates speech at 0.4 to 0.5 times real time (first audio after about 1 s): it needs a faster
+  CPU or a GPU to hold a conversation. Opt-in real test: `BOLO_TEST_REAL=1 BOLO_TEST_S2S_ONNX=1`.
+- **Cloud providers: the `remote` engine** ([docs/providers.md](docs/providers.md)). bolo can hand
+  speech-to-text and text-to-speech to a cloud API and treat the answer like a local model's. One
+  engine, four adapters: `openai-compatible` (OpenAI and every server that copies its audio API,
+  including another bolo: transcriptions with `json` / `verbose_json` / streamed answers,
+  translations, streamed speech), `sarvam` (Saaras v3/v4 recognition and translation, Bulbul
+  v2/v3/v4-flash voices, the streaming recognition socket), `elevenlabs` (streamed speech, Scribe)
+  and `deepgram` (Nova pre-recorded and live). **These are paid cloud APIs and audio leaves the
+  server**; nothing is sent unless a cloud model is named. Request fields (language, voice, speed,
+  prompt, hotwords, timestamps, translation) are mapped per provider; options a provider lacks
+  answer a clear 400 (or are dropped with `ignore_unsupported`).
+- **`providers` setting** (`[providers.<name>]` tables: `kind`, `base_url`, `api_key`, `options`,
+  `prices`; `BOLO_PROVIDERS`, `BOLO_PROVIDER_<NAME>_API_KEY` / `_BASE_URL` / `_KIND`), and
+  `GET/PUT/DELETE /api/v1/providers[/{name}]`, `POST /api/v1/providers/{name}/test` for providers
+  added at run time (`<data_dir>/providers.json`, mode 0600; `allow_provider_edit`). Keys are
+  write-only: never logged, never returned, removed from provider error messages. CLI:
+  `bolo providers list`, `bolo providers test <name>`, and a providers line in `bolo doctor`.
+- **Cloud catalog entries** (20: `openai-*`, `sarvam-*`, `elevenlabs-*`, `deepgram-*`) with
+  `engine: remote`, `cloud: true`, the notice "paid cloud API; audio leaves this server", the
+  provider's terms in the licence field, languages and voices. They count as installed when their
+  provider is configured. Any other model works as `<provider>:<model>`.
+- **bolo's features on cloud models**: diarization and long-recording segmentation (bolo cuts,
+  the provider transcribes each piece), word lists and text normalisation before the text leaves
+  (per-model `text_normalizer`), every output format including 8 kHz G.711, the STT WebSocket
+  (Deepgram's and Sarvam's live sockets), Realtime cascades, traces (`provider`: requests, time,
+  bytes; `cost`: an estimate from the operator's price table), `stats.providers`, and
+  `bolo_provider_*` metrics.
+- **Fallback**: a per-model `fallback` list (setting `fallbacks`, a pin through
+  `PUT /api/v1/models/{id}/settings`, or `options.fallback` in the catalog), local to cloud or
+  cloud to local, used on `engine_unavailable`, `overloaded` and provider failures (5xx, timeout,
+  rate limit, refused key). The trace records it (`fallback`), responses carry `x-bolo-model` and
+  `x-bolo-fallback`, and `bolo_fallbacks_total` counts it.
+- **Cloud speech-to-speech**: `s2s_model = "<provider>:<model>"` (for example
+  `openai:gpt-realtime-2.1`) backs the Realtime `speech-to-speech` pipeline with OpenAI's
+  Realtime API over WebSocket. bolo keeps turn detection, barge-in, codecs and transcripts.
+  Gemini Live is not done.
+- **For clients (found by the console)**: `capabilities.realtime.pipelines.*` have `configured`
+  and `available`; catalog entries have `runnable` / `not_runnable_reason` (`spark-tts-0.5b`,
+  `maskgct`, `diarizen-wavlm-large-s80-md-v2`); voice-agent traces have `pipeline`; `info` has
+  `auto_pull` and `providers`; `info.capabilities` has `wordlists` and `providers`.
+- **Console**: a Providers page (add, edit, test; the key field is write-only), a "cloud" mark and
+  filter on the Models page, and a Compare page that sends the same audio or text to two or more
+  models and shows output, latency and estimated cost side by side.
+
+### Changed
+
+- `GET /api/v1/catalog` now lists entries whose files are not published yet (`status:
+  "pending"`, `installed: false`) instead of leaving them out. `GET /v1/models` is unchanged
+  (installed models only).
+- `GET /api/v1/stats` has two more keys, `providers` and `fallbacks` (empty lists without cloud
+  requests).
+- **Published model files**: `dicow-v3.3-onnx` (bolo's ONNX export of DiCoW v3.3,
+  `codebucketsolutions/dicow-v3.3-onnx`) and the SNAC 24 kHz decoder of the Orpheus-family
+  llama.cpp voices (`codebucketsolutions/snac-24khz-onnx`) are on Hugging Face, rebuilt by the
+  "Publish a converted model" workflow and compared with the recorded SHA-256 sums before upload.
+  The catalog pins their revisions and the entries are no longer `pending`: `dicow-v3.3-onnx`
+  (validated on CPU), `svara-tts-v1-llamacpp`, `svara-tts-v1-q8-llamacpp`, `veena-llamacpp`,
+  `veena-q8-llamacpp`, `orpheus-3b-0.1-ft-llamacpp` and `snortts-indic-v0-llamacpp` (untested from
+  the published files).
+- Install instructions lead with `uv` (`uv tool install 'bolo-speech[all]'`,
+  `uvx --from 'bolo-speech[all]' bolo serve`).
+
 ## [0.2.0] - 2026-11-14
 
 ### Added

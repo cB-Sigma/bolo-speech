@@ -131,7 +131,8 @@ class Settings:
     #: conversation history), in parallel with the response
     realtime_transcribe_user: bool = True
     #: speech-to-speech: the catalog model bolo serves with a llama-server it starts (needs llama-server), unless
-    #: s2s_server_url names a llama-server you run (its WebSocket /v1/realtime)
+    #: s2s_server_url names a llama-server you run (its WebSocket /v1/realtime). "lfm3-audio-2b-onnx" runs the same
+    #: model in this process with ONNX Runtime (bolo-speech[s2s]; no llama-server); "<provider>:<model>" is a cloud model
     s2s_model: str = "lfm3-audio-2b-llamacpp"
     s2s_server_url: str | None = None
     s2s_server_api_key: str | None = None  # sent as "Authorization: Bearer ..." to s2s_server_url
@@ -162,6 +163,19 @@ class Settings:
     tts_server_start_timeout_s: float = 300.0  # how long a managed server may take to load its model
     tts_server_timeout_s: float = 300.0  # longest wait for the next bytes of a synthesis response
 
+    # -- cloud providers (engine remote; docs/providers.md) --------------------------------------
+    #: name -> {kind, base_url, api_key, options, prices}. kind: openai-compatible, sarvam, elevenlabs or deepgram.
+    #: In a file: a [providers.<name>] table per provider. In the environment: BOLO_PROVIDERS (JSON), or
+    #: BOLO_PROVIDER_<NAME>_KIND / _BASE_URL / _API_KEY. Keys are never logged or returned by any API.
+    providers: dict[str, Any] = field(default_factory=dict)
+    #: "<model>=<fallback>[,<fallback>...]" per model: what answers instead when the model's engine is
+    #: unavailable, overloaded, or its provider fails (5xx, timeout). Local and cloud models can be mixed.
+    fallbacks: list[str] = field(default_factory=list)
+    #: add, change and remove providers through the API (stored in <data_dir>/providers.json).
+    #: Unset: allowed on a loopback bind or with an API key.
+    allow_provider_edit: bool | None = None
+    provider_timeout_s: float = 60.0  # longest wait for a provider's answer (or its next bytes while streaming)
+
     # -- misc ---------------------------------------------------------------
     device: str = "cpu"
     log_level: str = "info"
@@ -187,6 +201,10 @@ class Settings:
                 "s2s_server_api_key",
             }:
                 v = "***" if v else None
+            elif f.name == "providers":
+                from bolo.providers import redact_provider
+
+                v = {str(name): redact_provider(entry) for name, entry in dict(v).items()}
             elif isinstance(v, Path):
                 v = str(v)
             out[f.name] = v
@@ -234,6 +252,18 @@ def _coerce(name: str, raw: Any, target: Any) -> Any:
         return float(raw)
     if target is Path:
         return Path(str(raw)).expanduser()
+    if origin is dict:
+        if isinstance(raw, dict):
+            return dict(raw)
+        import json
+
+        try:
+            doc = json.loads(str(raw))
+        except ValueError as exc:
+            raise ValueError(f"{name}: expected a JSON object") from exc
+        if not isinstance(doc, dict):
+            raise ValueError(f"{name}: expected a JSON object")
+        return doc
     if origin is list:
         if isinstance(raw, (list, tuple)):
             return [str(x) for x in raw]
@@ -248,12 +278,52 @@ def _coerce(name: str, raw: Any, target: Any) -> Any:
     return str(raw)
 
 
+def _check_cloud(settings: Settings) -> None:
+    """Fail at start-up, with the setting's name, for a provider or fallback entry that cannot be read."""
+    from bolo.errors import BoloError
+    from bolo.providers import ProviderConfig
+
+    for name, entry in settings.providers.items():
+        try:
+            ProviderConfig.from_dict(str(name), entry)
+        except BoloError as exc:
+            raise ValueError(f"providers: {exc.message}") from exc
+    for item in settings.fallbacks:
+        model, sep, rest = str(item).partition("=")
+        if not sep or not model.strip() or not rest.strip():
+            raise ValueError(f"fallbacks: expected '<model>=<fallback>[,<fallback>...]', got {item!r}")
+
+
+_PROVIDER_ENV_FIELDS = ("API_KEY", "BASE_URL", "KIND")
+
+
+def _provider_env(values: dict[str, Any], environ: dict[str, str]) -> None:
+    """``BOLO_PROVIDER_<NAME>_API_KEY`` / ``_BASE_URL`` / ``_KIND`` add to (or override) the ``providers`` table."""
+    prefix = "BOLO_PROVIDER_"
+    found: dict[str, dict[str, str]] = {}
+    for envname, raw in environ.items():
+        if not envname.startswith(prefix) or raw == "":
+            continue
+        rest = envname[len(prefix) :]
+        for suffix in _PROVIDER_ENV_FIELDS:
+            if rest.endswith("_" + suffix) and len(rest) > len(suffix) + 1:
+                name = rest[: -len(suffix) - 1].lower().replace("_", "-")
+                found.setdefault(name, {})[suffix.lower()] = raw
+                break
+    if not found:
+        return
+    providers = {str(k): dict(v) for k, v in dict(values.get("providers") or {}).items()}
+    for name, entry in found.items():
+        providers[name] = {**providers.get(name, {}), **entry}
+    values["providers"] = providers
+
+
 def _field_types() -> dict[str, Any]:
     hints = get_type_hints(Settings)
     out: dict[str, Any] = {}
     for name, hint in hints.items():
         args = getattr(hint, "__args__", ())
-        if args and type(None) in args and getattr(hint, "__origin__", None) is not list:
+        if args and type(None) in args and getattr(hint, "__origin__", None) not in (list, dict):
             hint = next(a for a in args if a is not type(None))
         out[name] = hint
     return out
@@ -282,7 +352,9 @@ def load_settings(
             doc = tomllib.load(fh)
         flat: dict[str, Any] = {}
         for key, val in doc.items():
-            if isinstance(val, dict):  # allow [server] / [models] style sections
+            if key == "providers" and isinstance(val, dict):  # this table stays nested
+                flat[key] = val
+            elif isinstance(val, dict):  # allow [server] / [models] style sections
                 for sub_key, sub_val in val.items():
                     # `[llm] base_url = …` is the same as `llm_base_url = …`
                     prefixed = f"{key}_{sub_key}".replace("-", "_")
@@ -305,6 +377,8 @@ def load_settings(
         if envname in environ:
             values[name] = _coerce(name, environ[envname], types[name])
 
+    _provider_env(values, environ)
+
     # 3. explicit overrides (CLI flags)
     for name, val in (overrides or {}).items():
         if val is None:
@@ -314,6 +388,7 @@ def load_settings(
         values[name] = _coerce(name, val, types[name])
 
     settings = Settings(**values)
+    _check_cloud(settings)
     if settings.workers < 1:
         raise ValueError("workers must be >= 1")
     if settings.max_batch < 1:

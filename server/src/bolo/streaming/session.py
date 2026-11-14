@@ -174,6 +174,10 @@ class STTSession:
                 proc: _Processor
                 if stt.streaming:
                     proc = _NativeProcessor(self, entry, stt, detector)
+                    # a stream that holds a connection (a cloud provider's live socket) is closed with the session
+                    release = getattr(proc.stream, "close", None)
+                    if release is not None:
+                        stack.callback(release)
                 else:
                     proc = _PseudoProcessor(self, entry, stt, detector)
                 resampler = StreamResampler(self.cfg.sample_rate, SR)
@@ -537,6 +541,8 @@ class _PseudoProcessor(_Processor):
         self.buf_start = 0  # absolute sample index of buf[0]
         self.utt_start: int | None = None if detector is not None else 0
         self.agreement = LocalAgreement(settings.agreement)
+        #: repeated decodes of the growing utterance (a cloud model gets the final decode only: each is billed)
+        self.interim_ok = session.core.interim_decodes(entry.spec)
         self.interval = settings.partial_interval_ms / 1000.0
         self.max_utt = int(min(settings.max_utterance_s, stt.max_chunk_s) * SR)
         self.last_partial_at = 0.0
@@ -585,7 +591,7 @@ class _PseudoProcessor(_Processor):
             if length >= self.max_utt:
                 await self._final(self.pos, recv_t)
                 self.utt_start = self.pos if self.detector is None or self.detector.in_speech else None
-            elif self.s.cfg.interim:
+            elif self.s.cfg.interim and self.interim_ok:
                 await self._maybe_partial(recv_t)
         self._trim()
 

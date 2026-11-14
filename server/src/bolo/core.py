@@ -66,6 +66,7 @@ from bolo.errors import (
     GatedModel,
     InvalidRequest,
     ModelNotInstalled,
+    Overloaded,
     SynthesisFailed,
 )
 from bolo.jobs import Job, JobStore
@@ -73,6 +74,8 @@ from bolo.lifecycle import LoadedModel, ModelManager
 from bolo.llm import AudioLLMClient, LLMClient
 from bolo.obs.events import EventBus
 from bolo.obs.trace import Trace, TraceStore, preview
+from bolo.providers import KINDS as PROVIDER_KINDS
+from bolo.providers import TERMS, ProviderRegistry, Usage
 from bolo.s2s import S2SManager
 from bolo.separate import SeparateOptions, SeparationResult, check_request, is_narrowband, plan_chunks, split_long
 from bolo.separate import separate as run_separation
@@ -82,6 +85,7 @@ from bolo.text import phonemize
 from bolo.text.phonemize import strip_overrides
 from bolo.text.prepare import prepare as prepare_text
 from bolo.text.segment import chunk_text
+from bolo.text.wordlists import MAX_LISTS_PER_REQUEST
 
 log = logging.getLogger("bolo")
 
@@ -132,6 +136,14 @@ class Bolo:
         token = s.hf_token or os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
         self.store = ModelStore(s.data_dir, HubClient(s.hf_endpoint, token))
         self.manager = ModelManager(s, self.catalog, self.store, self.engines, self.events, self._auto_pull)
+        #: cloud providers (settings and <data_dir>/providers.json), their counters and price tables
+        self.providers = ProviderRegistry(s)
+        self.manager.providers = self.providers
+        remote = self.engines.get("remote")
+        if remote is not None and hasattr(remote, "attach"):
+            remote.attach(self.providers)
+        self._fallbacks = parse_fallbacks(s.fallbacks)
+        self._fallback_warned: set[tuple[str, str]] = set()
         self.components = ComponentManager(self)
         phonemize.set_preference(s.phonemizer)
         self.llm = LLMClient(s)
@@ -218,6 +230,11 @@ class Bolo:
             "python": platform.python_version(),
             "auth_required": bool(s.api_key),
             "data_dir": str(s.data_dir),
+            # models that are not installed are downloaded on first use
+            "auto_pull": s.auto_pull,
+            "providers": [
+                {"name": p.name, "kind": p.kind, "configured": p.configured} for p in self.providers.all()
+            ],
             "defaults": {
                 "stt": s.default_stt, "realtime_stt": s.default_realtime_stt, "tts": s.default_tts,
                 "realtime_tts": s.default_realtime_tts, "vad": s.default_vad,
@@ -239,7 +256,32 @@ class Bolo:
         llm = self.llm.describe()
         webrtc = importlib.util.find_spec("aiortc") is not None
         turn = self.catalog.resolve(s.default_turn)
+        audio_llm = self.audio_llm.describe()
+        s2s = self.s2s.describe()
+        uccharan = wordlist_support()
         return {
+            # pronunciation word lists (docs/api.md, "Pronunciation word lists"); they need uccharan
+            "wordlists": {
+                "available": uccharan,
+                "endpoint": "/api/v1/wordlists",
+                "install": None if uccharan else "pip install 'bolo-speech[uccharan]'",
+                "request_fields": ["wordlists", "pronunciations"],
+                "formats": ["tsv", "pls", "json"],
+                "pin_per_model": True,
+                "preview": "/api/v1/wordlists/{name}/preview",
+                "max_lists_per_request": MAX_LISTS_PER_REQUEST,
+            },
+            # cloud providers and models (docs/providers.md)
+            "providers": {
+                "endpoint": "/api/v1/providers",
+                "kinds": list(PROVIDER_KINDS),
+                "editable": self.providers.edit_blocked_reason() is None,
+                "edit_blocked_reason": self.providers.edit_blocked_reason(),
+                "configured": [p.name for p in self.providers.all() if p.configured],
+                "adhoc_models": "<provider>:<model>",
+                "fallback": True,
+                "cost_estimates": any(p.prices for p in self.providers.all()),
+            },
             "diarization": {
                 "available": bool(diar) and (diar_ready or s.auto_pull),
                 "installed": diar_ready,
@@ -279,10 +321,11 @@ class Bolo:
                 },
                 "sip": False,
                 "pipeline": s.realtime_pipeline,
+                # per pipeline: `configured` (its settings are in place) and `available` (a session can use it now)
                 "pipelines": {
-                    "cascade": {"available": llm["configured"]},
-                    "audio-llm": self.audio_llm.describe(),
-                    "speech-to-speech": self.s2s.describe(),
+                    "cascade": {"configured": llm["configured"], "available": llm["configured"]},
+                    "audio-llm": {**audio_llm, "available": bool(audio_llm["configured"])},
+                    "speech-to-speech": s2s,
                 },
             },
             "chat_completions": {
@@ -323,7 +366,9 @@ class Bolo:
         pulling = {"job_id": job.id, "progress": round(job.progress, 4)} if job else None
         installed = self.manager.is_installed(spec)
         size = self.store.size_on_disk(spec.id) if installed and not spec.builtin else None
-        return spec.to_api(
+        if spec.cloud:
+            size, pulling = None, None
+        entry = spec.to_api(
             installed=installed,
             loaded=spec.id in self.manager.loaded,
             pulling=pulling,
@@ -334,12 +379,35 @@ class Bolo:
             voice_phonemizers=self.components.voice_phonemizers(spec),
             settings=self.store.model_settings(spec.id),
         )
+        entry["fallback"] = self.fallback_ids(spec)
+        if spec.cloud:
+            provider = self.providers.find(
+                str(spec.options.get("provider") or "") or None, str(spec.options.get("provider_kind") or "") or None
+            )
+            name = provider.name if provider else str(spec.options.get("provider") or "")
+            remote_model = str(spec.options.get("model") or "")
+            entry["provider"] = {
+                "name": name,
+                "kind": provider.kind if provider else str(spec.options.get("provider_kind") or ""),
+                "model": remote_model,
+                "configured": bool(provider and provider.configured),
+                "price": provider.price_for(remote_model) if provider else None,
+            }
+            entry["adhoc"] = spec.adhoc
+            # voices read from the provider's account when the model was loaded (ElevenLabs) are listed from then on
+            live = self.manager.loaded.get(spec.id)
+            if live is not None and isinstance(live.model, TTSModel) and len(live.model.voices) > len(spec.voices):
+                entry["voices"] = [v.to_dict() for v in live.model.voices]
+        else:
+            entry["provider"] = None
+        return entry
 
     def catalog_api(
         self, task: str | None = None, q: str | None = None, installed: bool | None = None
     ) -> list[dict[str, Any]]:
         out = []
-        for spec in self.catalog.search(task or None, q):
+        # entries whose files are not published yet are listed too: `status` is "pending" for them
+        for spec in self.catalog.search(task or None, q, include_pending=True):
             entry = self.model_api(spec)
             if installed is not None and entry["installed"] != installed:
                 continue
@@ -406,6 +474,11 @@ class Bolo:
                 "requests": dict(self.separation_counts),
                 "audio_seconds": round(self.separation_audio_s, 2),
             },
+            # cloud providers: requests, errors, time, bytes and estimated cost per provider and model
+            "providers": self.providers.stats(),
+            "fallbacks": [
+                {"requested": a, "answered": b, "count": n} for (a, b), n in self.providers.fallbacks.items()
+            ],
         }
 
     # ------------------------------------------------------------------
@@ -431,12 +504,103 @@ class Bolo:
             elif task == "tts" and name in OPENAI_TTS_ALIASES:
                 # OpenAI's tts-1 is the low-latency model, tts-1-hd and gpt-4o-mini-tts the quality ones
                 name = s.default_realtime_tts if name == "tts-1" else s.default_tts
+        if self.catalog.resolve(name) is None:
+            self._adhoc(name, task)
         spec = self.manager.resolve(name)
         if spec.task != task:
             raise InvalidRequest(
                 f"model '{spec.id}' is a {spec.task} model and cannot be used for {task}", param="model"
             )
         return spec
+
+    @staticmethod
+    def interim_decodes(spec: ModelSpec) -> bool:
+        """Whether a live utterance may be decoded again and again while it grows (pseudo-streaming partials).
+
+        Each such decode of a cloud model is a billed request, so cloud models only get the final decode unless
+        the model option ``interim_decodes`` asks for more. (A provider's live socket is not affected.)"""
+        return not spec.cloud or bool(spec.options.get("interim_decodes"))
+
+    def _adhoc(self, name: str, task: str) -> ModelSpec | None:
+        """``<provider>:<model>``: any model of a configured provider, without a catalog entry."""
+        prefix, sep, model = name.partition(":")
+        provider = self.providers.get(prefix) if sep and model else None
+        if provider is None or task not in ("stt", "tts"):
+            return None
+        options: dict[str, Any] = {"provider": provider.name, "model": model, "workers": 4}
+        per_model = provider.options.get("models")
+        if isinstance(per_model, dict) and isinstance(per_model.get(model), dict):
+            options.update(per_model[model])
+        terms = TERMS[provider.kind] if provider.is_default_host else provider.base_url
+        spec = ModelSpec(
+            id=f"{provider.name}:{model}",
+            task=task,
+            engine="remote",
+            kind=f"remote-{task}",
+            family=f"{provider.name} (cloud)",
+            languages=[],
+            sample_rate=int(options.get("sample_rate") or (16000 if task == "stt" else 24000)),
+            license=f"terms of {provider.name} (cloud API)",
+            license_url=terms,
+            cloud=True,
+            adhoc=True,
+            features=["telephony"],
+            description=f"'{model}' at the provider '{provider.name}' ({provider.kind}), asked for by name. "
+            "Cloud API: audio or text leaves this server.",
+            source_url=provider.base_url,
+            options=options,
+        )
+        return self.catalog.add_adhoc(spec)
+
+    # ------------------------------------------------------------------
+    # fallback
+    # ------------------------------------------------------------------
+    def fallback_ids(self, spec: ModelSpec) -> list[str]:
+        """The model's ``fallback`` list: pinned through the API, else the ``fallbacks`` setting, else the catalog."""
+        pinned = self.store.model_settings(spec.id).get("fallback")
+        chosen = pinned if pinned is not None else self._fallbacks.get(spec.id)
+        if chosen is None:
+            for alias in spec.aliases:
+                if alias in self._fallbacks:
+                    chosen = self._fallbacks[alias]
+                    break
+        if chosen is None:
+            chosen = spec.options.get("fallback") or []
+        return [str(x) for x in ([chosen] if isinstance(chosen, str) else chosen)]
+
+    def fallback_chain(self, spec: ModelSpec, task: str) -> list[ModelSpec]:
+        """The models that answer instead of ``spec`` when it is unavailable, in order (misconfigured names are
+        skipped with a warning, never an error for the request)."""
+        out: list[ModelSpec] = []
+        for name in self.fallback_ids(spec):
+            try:
+                candidate = self.resolve(name, task)
+            except BoloError as exc:
+                if (spec.id, name) not in self._fallback_warned:  # once, not on every request
+                    self._fallback_warned.add((spec.id, name))
+                    log.warning("fallback '%s' of '%s' is not usable: %s", name, spec.id, exc.message)
+                continue
+            if candidate.id != spec.id and all(candidate.id != c.id for c in out):
+                out.append(candidate)
+        return out
+
+    def _note_fallback(
+        self, trace: Trace, requested: ModelSpec, failed: ModelSpec, nxt: ModelSpec, exc: BoloError
+    ) -> None:
+        record = trace.extra.setdefault("fallback", {"requested": requested.id, "answered": nxt.id, "attempts": []})
+        record["answered"] = nxt.id
+        record["attempts"].append({"model": failed.id, "code": exc.code, "message": exc.message[:300]})
+        self.providers.note_fallback(requested.id, nxt.id)
+        self.log("warning", f"model '{failed.id}' failed ({exc.code}: {exc.message}); falling back to '{nxt.id}'")
+
+    @staticmethod
+    def _note_usage(trace: Trace, usage: Usage) -> None:
+        """Put what a request cost at a cloud provider on its trace."""
+        if not usage.requests:
+            return
+        trace.extra["provider"] = usage.to_dict()
+        if usage.cost is not None:
+            trace.extra["cost"] = usage.cost
 
     def realtime_tts(self, voice: str | None = None) -> ModelSpec:
         """The voice for latency-sensitive speech (``default_realtime_tts``), unless ``voice`` names a voice that
@@ -486,7 +650,7 @@ class Bolo:
     def start_pull(self, name: str) -> Job:
         """Start (or join) a background download of a catalog model."""
         spec = self.manager.resolve(name)
-        if not self.store.is_installed(spec.id):
+        if not self.store.is_installed(spec.id) and not spec.cloud:
             spec.require_published()
         existing = self.jobs.active_pull(spec.id)
         if existing:
@@ -494,6 +658,13 @@ class Bolo:
         job = self.jobs.create("pull", spec.id)
         if spec.builtin or self.store.is_installed(spec.id):
             job.state, job.progress = "done", 1.0
+            return job
+        if spec.cloud:  # nothing to download: the provider has to be configured
+            try:
+                self._require_provider(spec)
+                job.state, job.progress = "done", 1.0
+            except BoloError as exc:
+                job.state, job.error = "error", exc.message
             return job
         if spec.gated and not self.store.hub.token:
             job.state = "error"
@@ -514,7 +685,17 @@ class Bolo:
             await asyncio.shield(task)
         return job
 
+    def _require_provider(self, spec: ModelSpec) -> None:
+        self.providers.require(
+            str(spec.options.get("provider") or "") or None,
+            str(spec.options.get("provider_kind") or "") or None,
+            model=spec.id,
+        )
+
     async def _auto_pull(self, spec: ModelSpec) -> None:
+        if spec.cloud:
+            self._require_provider(spec)
+            return
         spec.require_published()
         if spec.gated and not self.store.hub.token:
             raise GatedModel(
@@ -619,9 +800,49 @@ class Bolo:
         """Transcribe a complete recording. Long audio is split at pauses and decoded in batches.
 
         ``record=False`` keeps the trace out of the request log (interim decodes of a live utterance).
+        When the model has a ``fallback`` list and is unavailable (its engine, an overloaded queue, a cloud
+        provider's 5xx or timeout), the next model of the list answers; the trace's ``fallback`` says so.
         """
         spec = self.resolve(model, "stt")
         trace = trace or Trace("stt", "internal", spec.id)
+        chain = [spec, *self.fallback_chain(spec, "stt")]
+        for i, candidate in enumerate(chain):
+            more = i + 1 < len(chain)
+            try:
+                return await self._transcribe_once(
+                    samples, sample_rate, candidate, trace, more,
+                    language=language, task=task, prompt=prompt, word_timestamps=word_timestamps,
+                    temperature=temperature, hotwords=hotwords, vad_filter=vad_filter, on_segment=on_segment,
+                    diarize=diarize, separate=separate, record=record,
+                )  # fmt: skip
+            except BoloError as exc:
+                if not (more and fallback_worthy(exc)) or trace.status != "running":
+                    raise
+                self._note_fallback(trace, spec, candidate, chain[i + 1], exc)
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    async def _transcribe_once(
+        self,
+        samples: FloatArray,
+        sample_rate: int,
+        spec: ModelSpec,
+        trace: Trace,
+        more: bool,
+        *,
+        language: str | None,
+        task: str,
+        prompt: str | None,
+        word_timestamps: bool,
+        temperature: float,
+        hotwords: str | None,
+        vad_filter: bool | None,
+        on_segment: Callable[[Segment], Awaitable[None]] | None,
+        diarize: DiarizeOptions | None,
+        separate: SeparateOptions | None,
+        record: bool,
+    ) -> Transcript:
+        """One model's attempt. With ``more`` (a fallback is left), an availability error leaves the trace open."""
+        handed_on = False
         trace.model = spec.id
         trace.audio_seconds = len(samples) / sample_rate if sample_rate else 0.0
         duration = trace.audio_seconds
@@ -729,13 +950,16 @@ class Bolo:
             trace.finish("cancelled", "client disconnected")
             raise
         except BoloError as exc:
+            if more and fallback_worthy(exc):
+                handed_on = True  # the next model of the fallback list takes the request (and the trace)
+                raise
             trace.finish("error", exc.message)
             raise
         except Exception as exc:
             trace.finish("error", f"{type(exc).__name__}: {exc}")
             raise
         finally:
-            if record:
+            if record and not handed_on:
                 self.traces.record(trace)
 
     async def _decode_chunks(
@@ -780,10 +1004,13 @@ class Bolo:
         detected: str | None = language
         first_start: float | None = None
         last_finish = submitted
+        usage = Usage()
         try:
             for index, ((a, _b), fut) in enumerate(zip(chunks, pending)):
                 result, info = await fut
                 assert isinstance(result, STTResult)
+                if isinstance(result.usage, Usage):
+                    usage.add(result.usage)
                 trace.note_batch(info.batch_size)
                 if first_start is None or info.started < first_start:
                     first_start = info.started
@@ -825,6 +1052,7 @@ class Bolo:
             trace.add_phase("queue", submitted, start)
             trace.add_phase("decode", start, last_finish)
             self.traces.observe_latency(entry.id, "stt", queue_ms=(start - submitted) * 1000.0)
+        self._note_usage(trace, usage)
         with trace.phase("finalize"):
             text = " ".join(s.text for s in segments).strip()
         return Transcript(text, detected, 0.0, segments, words)
@@ -1143,6 +1371,56 @@ class Bolo:
         if trace is None:
             trace = Trace("tts", "internal", model or self.settings.default_tts)
         spec = self.resolve(model, "tts")
+        chain = [spec, *self.fallback_chain(spec, "tts")]
+        try:
+            for i, candidate in enumerate(chain):
+                more = i + 1 < len(chain)
+                started = False
+                attempt = self._synthesize_once(
+                    text, candidate, trace, more, own_voice=i == 0,
+                    voice=voice, speed=speed, language=language, normalize=normalize, phonemizer=phonemizer,
+                    reference_audio=reference_audio, reference_text=reference_text, wordlists=wordlists,
+                    pronunciations=pronunciations, input_format=input_format,
+                )  # fmt: skip
+                try:
+                    async for chunk in attempt:
+                        started = True
+                        yield chunk
+                    return
+                except BoloError as exc:
+                    # once audio was delivered the answer cannot change voice: no fallback after the first chunk
+                    if started or not more or not fallback_worthy(exc) or trace.status != "running":
+                        raise
+                    self._note_fallback(trace, spec, candidate, chain[i + 1], exc)
+                finally:
+                    # a consumer that stopped listening closes this generator: the attempt has to hear of it
+                    # now (it stops the engine and marks the trace), not when it is garbage-collected
+                    await attempt.aclose()
+        finally:
+            if own_trace:
+                self.complete_tts(trace)
+
+    async def _synthesize_once(
+        self,
+        text: str,
+        spec: ModelSpec,
+        trace: Trace,
+        more: bool,
+        *,
+        own_voice: bool,
+        voice: str | None,
+        speed: float,
+        language: str | None,
+        normalize: bool | str,
+        phonemizer: str | None,
+        reference_audio: bytes | None,
+        reference_text: str | None,
+        wordlists: list[str] | None,
+        pronunciations: list[dict[str, Any]] | None,
+        input_format: str,
+    ) -> AsyncGenerator[SynthChunk, None]:
+        """One model's attempt at :meth:`synthesize`. ``own_voice`` is false for a fallback model: a voice it
+        does not have is replaced by its default instead of refused."""
         trace.model = spec.id
         trace.chars = len(text)
         trace.text_preview = preview(text)
@@ -1158,7 +1436,13 @@ class Bolo:
                 tts = entry.model
                 assert isinstance(tts, TTSModel)
                 sample_rate = tts.sample_rate
-                chosen = self.pick_voice(tts, voice, spec)
+                try:
+                    chosen = self.pick_voice(tts, voice, spec)
+                except InvalidRequest:
+                    if own_voice:
+                        raise
+                    voice, chosen = None, tts.find_voice(None)
+                    phonemizer = None  # the pin was for the requested model's voice
                 phonemizer = self.components.check_phonemizer(spec, chosen.id if chosen else voice, phonemizer)
                 lang = language or (
                     chosen.language if chosen and chosen.language else (spec.languages[0] if spec.languages else "en")
@@ -1174,6 +1458,7 @@ class Bolo:
                         language=language or (chosen.language if chosen and chosen.language else None),
                         reference_audio=reference_wav(reference_audio) if reference_audio is not None else None,
                         reference_text=reference_text,
+                        usage=Usage() if spec.cloud else None,
                     )
                 with trace.phase("normalize"):
                     # normaliser, word lists, SSML and pronunciation overrides for this voice (bolo.text.prepare)
@@ -1234,6 +1519,8 @@ class Bolo:
                     split = first_audio_at if first_audio_at is not None else end
                     trace.add_phase("synthesize_first", synth_started, split)
                     trace.add_phase("synthesize_rest", split, end)
+                if extras is not None and isinstance(extras.usage, Usage):
+                    self._note_usage(trace, extras.usage)
             trace.audio_seconds = total_samples / sample_rate if sample_rate else 0.0
             if total_samples == 0:
                 raise EngineUnavailable(f"model '{spec.id}' produced no audio for this text")
@@ -1242,14 +1529,13 @@ class Bolo:
             trace.finish("cancelled", "client disconnected")
             raise
         except BoloError as exc:
+            if more and total_samples == 0 and fallback_worthy(exc):
+                raise  # the next model of the fallback list takes the request (and the trace)
             trace.finish("error", exc.message)
             raise
         except Exception as exc:
             trace.finish("error", f"{type(exc).__name__}: {exc}")
             raise SynthesisFailed(f"synthesis failed in model '{spec.id}': {exc}") from exc
-        finally:
-            if own_trace:
-                self.complete_tts(trace)
 
     def complete_tts(self, trace: Trace) -> None:
         """Finish and store a synthesis trace (callers that passed their own trace call this)."""
@@ -1270,6 +1556,44 @@ class Bolo:
 
 
 REFERENCE_MAX_S = 30.0
+
+
+def fallback_worthy(exc: BoloError) -> bool:
+    """Errors that mean "this model cannot answer right now" (not "the request is wrong"): an unavailable
+    engine, a full queue, a cloud provider's 5xx, timeout, rate limit or refused key."""
+    return isinstance(exc, (EngineUnavailable, Overloaded))
+
+
+def parse_fallbacks(items: list[str]) -> dict[str, list[str]]:
+    """The ``fallbacks`` setting: ``"<model>=<fallback>[,<fallback>...]"`` per entry."""
+    out: dict[str, list[str]] = {}
+    for item in items:
+        model, sep, rest = str(item).partition("=")
+        names = [n.strip() for n in rest.replace("|", ",").split(",") if n.strip()]
+        if not sep or not model.strip() or not names:
+            raise ValueError(f"fallbacks: expected '<model>=<fallback>[,<fallback>...]', got {item!r}")
+        out[model.strip()] = names
+    return out
+
+
+def wordlist_support() -> bool:
+    from bolo.text.wordlists import uccharan_module
+
+    return uccharan_module() is not None
+
+
+def fallback_headers(trace: Trace) -> dict[str, str]:
+    """Response headers that say which model answered: ``x-bolo-model`` always, ``x-bolo-fallback`` when it was
+    not the one asked for, ``x-bolo-estimated-cost`` when the provider's price table knows the model."""
+    headers = {"x-bolo-model": trace.model}
+    record = trace.extra.get("fallback")
+    if isinstance(record, dict) and record.get("attempts"):
+        first = record["attempts"][0]
+        headers["x-bolo-fallback"] = f"{record['requested']} -> {trace.model}; reason={first.get('code')}"
+    cost = trace.extra.get("cost")
+    if isinstance(cost, dict):
+        headers["x-bolo-estimated-cost"] = f"{cost.get('amount')} {cost.get('currency')}"
+    return headers
 
 
 def reference_wav(data: bytes) -> bytes:

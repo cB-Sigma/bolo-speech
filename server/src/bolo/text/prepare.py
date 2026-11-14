@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 NORMALIZERS = ("uccharan", "light", "model", "none")
 INPUT_FORMATS = ("text", "ssml", "markdown")
 #: engines whose voices read text themselves
-TEXT_ENGINES = ("tts-server",)
+TEXT_ENGINES = ("tts-server", "remote")
 
 
 @dataclass(frozen=True)

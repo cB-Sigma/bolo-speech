@@ -95,6 +95,8 @@ def licence(spec: ModelSpec) -> str:
     if spec.engine == "tts-server":
         gpu = (spec.options.get("hardware") or {}).get("gpu")
         extra += f" · runs on {spec.options.get('runtime')}" + (f" · GPU {gpu}" if gpu and gpu != "optional" else "")
+    if spec.cloud:
+        extra += f" · [terms]({spec.license_url}) · needs provider `{spec.options.get('provider')}`"
     if spec.gated:
         extra += " · gated"
     return text + ("" if spec.commercial_use else " ⚠") + extra
@@ -115,10 +117,13 @@ def models_table(specs: list[ModelSpec]) -> str:
     for s in specs:
         by_task[s.task][group(s)].append(s)
     pending = sum(s.status == "pending" for s in specs)
-    total = len(specs) - pending
+    cloud = sum(s.cloud for s in specs)
+    total = len(specs) - pending - cloud
     valid = sum(s.validated == "cpu" for s in specs)
     out.append(
         f"{total} models: {valid} validated on CPU by the maintainers, {total - valid} untested."
+        f" {cloud} more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run"
+        " against a real account, see [providers.md](providers.md))."
         + (
             f" {pending} more {'is' if pending == 1 else 'are'} described but not yet published"
             f" ({', '.join(sorted(s.id for s in specs if s.status == 'pending'))})."
@@ -137,7 +142,7 @@ def models_table(specs: list[ModelSpec]) -> str:
                 name = f"`{s.id}`" + (f" ({s.family})" if s.engine == "tts-server" else "")
                 out.append(
                     f"| {name} | {langs(s)} | {s.tier} | {'native' if s.streaming else ('-' if task != 'stt' else 'pseudo')} "
-                    f"| {size(s.size_bytes)} | {licence(s)} | {measured(s)} |"
+                    f"| {'none (cloud API)' if s.cloud else size(s.size_bytes)} | {licence(s)} | {measured(s)} |"
                 )
             out.append("")
     out.append("⚠ = the licence restricts commercial use. RTF = processing time / audio duration (lower is faster).")
@@ -166,9 +171,12 @@ def summary_table(specs: list[ModelSpec]) -> str:
             + (f"{best:.3f} (`{best_id}`)" if best is not None else "-")
             + " |"
         )
-    total, valid_n = len(specs), sum(s.validated == "cpu" for s in specs)
+    cloud = sum(s.cloud for s in specs)
+    total, valid_n = len(specs) - cloud, sum(s.validated == "cpu" for s in specs)
     out.append(
-        f"\n**{total} models in the catalog, {valid_n} validated on CPU, {total - valid_n} untested.** Full list: [docs/models.md](docs/models.md)."
+        f"\n**{total} models in the catalog, {valid_n} validated on CPU, {total - valid_n} untested**, plus {cloud} "
+        "cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). "
+        "Full list: [docs/models.md](docs/models.md)."
     )
     return "\n".join(out)
 

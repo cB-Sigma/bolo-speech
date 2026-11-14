@@ -1,0 +1,1 @@
+import{Ft as e,Rt as t}from"./use-api-DvGM0rWl.js";import{n,r,t as i}from"./support-Bs5mvCB-.js";var a=t(e(),1);function o(){let[e,t]=(0,a.useState)(()=>({...i(),webgpuAdapter:null,micPermission:`unknown`}));return(0,a.useEffect)(()=>{let e=!0;return Promise.all([r(),n()]).then(([n,r])=>{e&&t(e=>({...e,webgpuAdapter:n,micPermission:r}))}),()=>{e=!1}},[]),e}export{o as t};

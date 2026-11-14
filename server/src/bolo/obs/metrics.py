@@ -66,6 +66,55 @@ def render_metrics(core: Bolo) -> str:
         stats["totals"]["audio_seconds_out"],
         direction="out",
     )
+    for item in stats.get("providers", []):
+        labels = {"provider": str(item["provider"]), "model": str(item["model"])}
+        w.add(
+            "bolo_provider_requests_total", "counter", "Requests sent to cloud providers.", item["requests"], **labels
+        )
+        w.add("bolo_provider_errors_total", "counter", "Requests a cloud provider failed.", item["errors"], **labels)
+        w.add(
+            "bolo_provider_latency_seconds_total",
+            "counter",
+            "Time spent waiting for cloud providers.",
+            round(item["latency_ms_total"] / 1000.0, 3),
+            **labels,
+        )
+        w.add(
+            "bolo_provider_bytes_sent_total", "counter", "Bytes sent to cloud providers.", item["bytes_sent"], **labels
+        )
+        w.add(
+            "bolo_provider_bytes_received_total",
+            "counter",
+            "Bytes received from cloud providers.",
+            item["bytes_received"],
+            **labels,
+        )
+        w.add(
+            "bolo_provider_audio_seconds_total",
+            "counter",
+            "Seconds of audio sent to (speech-to-text) or received from (text-to-speech) cloud providers.",
+            item["audio_seconds"],
+            **labels,
+        )
+        w.add("bolo_provider_characters_total", "counter", "Characters sent to cloud voices.", item["chars"], **labels)
+        for currency, amount in item["estimated_cost"].items():
+            w.add(
+                "bolo_provider_estimated_cost_total",
+                "counter",
+                "Estimated spend at cloud providers, from the operator's price table (not a bill).",
+                amount,
+                currency=str(currency),
+                **labels,
+            )
+    for item in stats.get("fallbacks", []):
+        w.add(
+            "bolo_fallbacks_total",
+            "counter",
+            "Requests answered by a fallback model.",
+            item["count"],
+            requested=str(item["requested"]),
+            answered=str(item["answered"]),
+        )
     for status, count in stats["separation"]["requests"].items():
         w.add(
             "bolo_separation_requests_total",

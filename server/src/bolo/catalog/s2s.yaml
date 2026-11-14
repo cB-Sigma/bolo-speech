@@ -1,0 +1,88 @@
+# Models that run in this process as a speech-to-speech backend (bolo.s2s_onnx); they also speak text.
+- id: lfm3-audio-2b-onnx
+  task: tts
+  engine: onnxruntime
+  kind: lfm3_audio_onnx
+  family: LFM3-Audio 2B
+  languages: [en, ar, da, de, el, es, fi, fr, he, it, ja, ko, nl, pl, pt, sv, tr, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 2730432057
+  params: 2200000000
+  license: LFM Open License v1.0
+  license_url: https://huggingface.co/LiquidAI/LFM3-Audio-2B-ONNX/blob/main/LICENSE
+  commercial_use: false
+  gated: false
+  features: [speech-to-speech, tool-calls]
+  description: 'Liquid AI LFM3-Audio 2B from its ONNX graphs (4-bit language model), in this process with ONNX Runtime:
+    no llama-server. As s2s_model it is the speech-to-speech model of Realtime sessions (English conversation with
+    interleaved text and speech, tool calls); as a voice it speaks text in 18 languages with two voices, no cloning.
+    Commercial use is conditional: licensed only to organisations under USD 10M yearly revenue. About 3.3 GB of
+    memory; on 4 shared CPU cores speech is generated at about half the speed it is spoken, so it wants a faster
+    CPU (8 or more cores) to keep up. Needs onnxruntime and tokenizers (pip install bolo-speech[s2s]).'
+  source_url: https://huggingface.co/LiquidAI/LFM3-Audio-2B-ONNX
+  validated: untested
+  source:
+    urls:
+    - path: LICENSE
+      url: https://huggingface.co/LiquidAI/LFM3-Audio-2B-ONNX/resolve/ac6eed2a1d6b16c785bfc1edc06b623164a22477/LICENSE
+      size: 10574
+      sha256: 4d28ca14dedc0b3d0fcc2b3339f0e79931faa33874f3d24f522183a8fc70068c
+    - path: config.json
+      url: https://huggingface.co/LiquidAI/LFM3-Audio-2B-ONNX/resolve/ac6eed2a1d6b16c785bfc1edc06b623164a22477/config.json
+      size: 6243
+      sha256: 1eb2a8349a1ec9eda2ed8e8bb1a8788007ae2ae9baa38a7d959743c5379d30d8
+    - path: generation_config.json
+      url: https://huggingface.co/LiquidAI/LFM3-Audio-2B-ONNX/resolve/ac6eed2a1d6b16c785bfc1edc06b623164a22477/generation_config.json
+      size: 382
+      sha256: fa4a9e00378a7c93d199787e6a219bdf48d4bbe85f563b6450c461de5f394853
+    - path: preprocessor_config.json
+      url: https://huggingface.co/LiquidAI/LFM3-Audio-2B-ONNX/resolve/ac6eed2a1d6b16c785bfc1edc06b623164a22477/preprocessor_config.json
+      size: 466
+      sha256: 6c991f650c2ec718ffe752c78ac2af66b2085b05b25bff3b8fef57310cc100ee
+    - path: audio_tokenizer/config.json
+      url: https://huggingface.co/LiquidAI/LFM3-Audio-2B-ONNX/resolve/ac6eed2a1d6b16c785bfc1edc06b623164a22477/audio_tokenizer/config.json
+      size: 801
+      sha256: 13ac10473c6cf45618a3e9603f529c889683c9e28fa77e0d4f0ca6e686d0cbf4
+    - path: tokenizer.json
+      url: https://huggingface.co/LiquidAI/LFM3-Audio-2B-ONNX/resolve/ac6eed2a1d6b16c785bfc1edc06b623164a22477/tokenizer.json
+      size: 17908634
+      sha256: 41927bd314d17d7d7fadb44e10cd0919f7b71528d7741596d8cbd15c6945ec44
+    - path: onnx/audio_encoder.onnx
+      url: https://huggingface.co/LiquidAI/LFM3-Audio-2B-ONNX/resolve/ac6eed2a1d6b16c785bfc1edc06b623164a22477/onnx/audio_encoder.onnx
+      size: 162507
+      sha256: c68ddaf64339aa2bc6c841b0ec0da3be89027849991cbd7e546d3d3156094921
+    - path: onnx/audio_encoder.onnx_data
+      url: https://huggingface.co/LiquidAI/LFM3-Audio-2B-ONNX/resolve/ac6eed2a1d6b16c785bfc1edc06b623164a22477/onnx/audio_encoder.onnx_data
+      size: 510351360
+      sha256: d5fed72d461d7c052f2e65c79421f955fe02c55b220caeba69b40201cffb0358
+    - path: onnx/codec_decoder.onnx
+      url: https://huggingface.co/LiquidAI/LFM3-Audio-2B-ONNX/resolve/ac6eed2a1d6b16c785bfc1edc06b623164a22477/onnx/codec_decoder.onnx
+      size: 94000
+      sha256: 5e1d03189d2169ca0e961d1b468b1625bdc57e082bdae7c332178c8aad719878
+    - path: onnx/codec_decoder.onnx_data
+      url: https://huggingface.co/LiquidAI/LFM3-Audio-2B-ONNX/resolve/ac6eed2a1d6b16c785bfc1edc06b623164a22477/onnx/codec_decoder.onnx_data
+      size: 179046408
+      sha256: d0eda417de1c477cc627b730608daa92d43838f3b2865869e74662af7334acfe
+    - path: onnx/decoder_q4.onnx
+      url: https://huggingface.co/LiquidAI/LFM3-Audio-2B-ONNX/resolve/ac6eed2a1d6b16c785bfc1edc06b623164a22477/onnx/decoder_q4.onnx
+      size: 358840
+      sha256: 448efb66fb4181f23242d7d54b8e9ddbd7c3b6e247f018f871c3d17cf58a58a8
+    - path: onnx/decoder_q4.onnx_data
+      url: https://huggingface.co/LiquidAI/LFM3-Audio-2B-ONNX/resolve/ac6eed2a1d6b16c785bfc1edc06b623164a22477/onnx/decoder_q4.onnx_data
+      size: 1686859776
+      sha256: b069b656f2610fd6c4d1a297596adcb26a53a9dbcef0baa16432b72a4077b773
+    - path: onnx/depth_decoder.onnx
+      url: https://huggingface.co/LiquidAI/LFM3-Audio-2B-ONNX/resolve/ac6eed2a1d6b16c785bfc1edc06b623164a22477/onnx/depth_decoder.onnx
+      size: 34498
+      sha256: cbe5945206042a1b34f74bbb2979135374f594d7e4502405c86d76f2f5f3965a
+    - path: onnx/depth_decoder.onnx_data
+      url: https://huggingface.co/LiquidAI/LFM3-Audio-2B-ONNX/resolve/ac6eed2a1d6b16c785bfc1edc06b623164a22477/onnx/depth_decoder.onnx_data
+      size: 335597568
+      sha256: 022a87e4eb269c194f723e5d124d9389a9f9d7a993dfcd09dea283699df40c45
+  options:
+    precision: q4
+    hardware: {gpu: optional, ram_gb: 3.5, note: 'CPU: the q4 files; about 7 steps per second on 4 shared cores, real time needs about 19'}
+  voices:
+  - {id: female, name: Female, gender: f}
+  - {id: male, name: Male, gender: m}

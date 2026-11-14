@@ -1,8 +1,8 @@
 # Recognisers run by ONNX Runtime directly (bolo.engines.dicow_onnx), without PyTorch.
 #
-# dicow-v3.3-onnx is bolo's own ONNX export of BUT-FIT/DiCoW_v3_3 (server/tools/export_dicow_onnx.py). It stays
-# `status: pending` until the export is hosted (docs/models.md, "DiCoW without PyTorch"); until then a local export
-# is registered with `bolo pull ./dir`, which gives it the same features and options as this entry.
+# dicow-v3.3-onnx is bolo's own ONNX export of BUT-FIT/DiCoW_v3_3 (server/tools/export_dicow_onnx.py), published at
+# codebucketsolutions/dicow-v3.3-onnx (docs/models.md, "DiCoW without PyTorch"). A local export registered with
+# `bolo pull ./dir` gets the same features and options as this entry.
 - id: dicow-v3.3-onnx
   aliases: [dicow-onnx]
   task: stt
@@ -24,10 +24,23 @@
     for each speaker. Same decoding as dicow-v3.3 on the torch plugin. Trained on English meetings and mixtures (AMI,
     NOTSOFAR-1, LibriMix). CC-BY-4.0: credit BUT Speech@FIT and cite the DiCoW papers (see the model card).'
   source_url: https://huggingface.co/BUT-FIT/DiCoW_v3_3
-  validated: untested
-  status: pending
+  validated: cpu
+  measured:
+    rtf: 0.725
+    audio_s: 180.0
+    memory_mb: 4700
+    threads: 4
+    engine: onnxruntime 1.31.1, numpy, int8 graphs
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz, AMX), no GPU
+    date: '2026-11-14'
+    note: 'Diarized transcription with nemotron-3-diarization, RTF including diarization, four 45 s AMI excerpts
+      with 3-4 speakers on a shared machine (1.01 at 2 threads; memory is the whole process with the diarizer).
+      cpWER on 24 AMI far-field excerpts 26.0 %, the same as dicow-v3.3 on the torch plugin (7 files better, 7
+      worse); on 44 synthetic two-voice mixes 7.8 % against 6.6 %. Measured on a local export; the published
+      files have the same SHA-256 sums. docs/measurements/dicow-onnx.json.'
   source:
     repo: codebucketsolutions/dicow-v3.3-onnx
+    revision: dd5db868e037d00e587a7f4ee56865f6c1817c3c
     include: [encoder.int8.onnx, encoder.int8.onnx.data, decoder.int8.onnx, decoder.int8.onnx.data, '*.json', README.md]
   options:
     diarization_model: nemotron-3-diarization

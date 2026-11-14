@@ -58,9 +58,40 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-334 models: 119 validated on CPU by the maintainers, 215 untested. 10 more are described but not yet published (dicow-v3.3-onnx, fish-drama-3-llamacpp, mira-tts-audiocpp, orpheus-3b-0.1-ft-llamacpp, snortts-indic-v0-llamacpp, soprano-1.1-80m-llamacpp, svara-tts-v1-llamacpp, svara-tts-v1-q8-llamacpp, veena-llamacpp, veena-q8-llamacpp).
+342 models: 120 validated on CPU by the maintainers, 222 untested. 20 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
 
 ### Speech to text
+
+#### OpenAI (cloud)
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `openai-whisper-1` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` | untested |
+| `openai-gpt-4o-transcribe` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` | untested |
+| `openai-gpt-4o-mini-transcribe` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` | untested |
+| `openai-gpt-transcribe` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` | untested |
+
+#### Sarvam (cloud)
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `sarvam-saaras-v4` | hi, bn, kn, ml, mr, or +17 | accuracy | pseudo | none (cloud API) | Sarvam AI Terms of Service (paid cloud API) · [terms](https://www.sarvam.ai/terms-of-service) · needs provider `sarvam` | untested |
+| `sarvam-saaras-v3` | hi, bn, kn, ml, mr, or +17 | accuracy | pseudo | none (cloud API) | Sarvam AI Terms of Service (paid cloud API) · [terms](https://www.sarvam.ai/terms-of-service) · needs provider `sarvam` | untested |
+| `sarvam-saaras-v4-streaming` | hi, bn, kn, ml, mr, or +17 | realtime | native | none (cloud API) | Sarvam AI Terms of Service (paid cloud API) · [terms](https://www.sarvam.ai/terms-of-service) · needs provider `sarvam` | untested |
+
+#### ElevenLabs (cloud)
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `elevenlabs-scribe-v3` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` | untested |
+| `elevenlabs-scribe-v2` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` | untested |
+
+#### Deepgram (cloud)
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `deepgram-nova-3` | af, ar, hy, as, eu, be +55 | realtime | native | none (cloud API) | Deepgram Terms of Service (paid cloud API) · [terms](https://deepgram.com/terms) · needs provider `deepgram` | untested |
+| `deepgram-nova-2` | bg, ca, zh, cs, da, nl +27 | realtime | native | none (cloud API) | Deepgram Terms of Service (paid cloud API) · [terms](https://deepgram.com/terms) · needs provider `deepgram` | untested |
 
 #### SraVaani
 
@@ -106,7 +137,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `dicow-v3.3` | en | accuracy | pseudo | 3.6 GB | CC-BY-4.0 · needs plugin torch | **CPU** · RTF 0.453 |
 | `se-dicow` | en | accuracy | pseudo | 4.4 GB | Apache-2.0 · needs plugin torch | **CPU** · RTF 0.589 |
-| `dicow-v3.3-onnx` | en | accuracy | pseudo | 1.5 GB | CC-BY-4.0 | not yet published |
+| `dicow-v3.3-onnx` | en | accuracy | pseudo | 1.5 GB | CC-BY-4.0 | **CPU** · RTF 0.725 |
 
 #### Whisper
 
@@ -253,6 +284,30 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 ### Text to speech
 
+#### OpenAI (cloud)
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `openai-tts-1` | af, am, ar, as, az, ba +94 | realtime | - | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` | untested |
+| `openai-tts-1-hd` | af, am, ar, as, az, ba +94 | balanced | - | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` | untested |
+| `openai-gpt-4o-mini-tts` | af, am, ar, as, az, ba +94 | balanced | - | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` | untested |
+
+#### Sarvam (cloud)
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `sarvam-bulbul-v3` | hi, bn, en, gu, kn, ml +5 | balanced | - | none (cloud API) | Sarvam AI Terms of Service (paid cloud API) · [terms](https://www.sarvam.ai/terms-of-service) · needs provider `sarvam` | untested |
+| `sarvam-bulbul-v2` | hi, bn, en, gu, kn, ml +5 | balanced | - | none (cloud API) | Sarvam AI Terms of Service (paid cloud API) · [terms](https://www.sarvam.ai/terms-of-service) · needs provider `sarvam` | untested |
+| `sarvam-bulbul-v4-flash` | hi, bn, en, gu, kn, ml +5 | realtime | - | none (cloud API) | Sarvam AI Terms of Service (paid cloud API) · [terms](https://www.sarvam.ai/terms-of-service) · needs provider `sarvam` | untested |
+
+#### ElevenLabs (cloud)
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `elevenlabs-flash-v2.5` | en, ja, zh, de, hi, fr +26 | realtime | - | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` | untested |
+| `elevenlabs-multilingual-v2` | en, ja, zh, de, hi, fr +23 | balanced | - | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` | untested |
+| `elevenlabs-v3` | en, ja, zh, de, hi, fr +26 | balanced | - | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` | untested |
+
 #### Parler-TTS
 
 | id | languages | tier | streaming | download | licence | validated |
@@ -297,6 +352,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `maskgct` | en, zh, ja, ko, fr, de | accuracy | - | 6.6 GB | CC-BY-NC-4.0 ⚠ · needs plugin torch | untested |
 
+#### LFM3-Audio 2B
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `lfm3-audio-2b-onnx` | en, ar, da, de, el, es +12 | accuracy | - | 2.7 GB | LFM Open License v1.0 ⚠ | untested |
+
 #### MMS-TTS
 
 | id | languages | tier | streaming | download | licence | validated |
@@ -331,12 +392,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `svara-tts-v1-llamacpp` (Svara) | hi, bn, mr, te, kn, ta +13 | accuracy | - | 2.1 GB | Apache-2.0 · runs on llama-server · GPU recommended | not yet published |
-| `svara-tts-v1-q8-llamacpp` (Svara) | hi, bn, mr, te, kn, ta +13 | accuracy | - | 3.6 GB | Apache-2.0 · runs on llama-server · GPU recommended | not yet published |
-| `veena-llamacpp` (Veena) | hi, en | accuracy | - | 2.5 GB | Apache-2.0 · runs on llama-server · GPU recommended | not yet published |
-| `veena-q8-llamacpp` (Veena) | hi, en | accuracy | - | 4.1 GB | Apache-2.0 · runs on llama-server · GPU recommended | not yet published |
-| `orpheus-3b-0.1-ft-llamacpp` (Orpheus) | en | accuracy | - | 2.1 GB | Apache-2.0 (Llama 3.2 Community License for the base model) · runs on llama-server · GPU recommended | not yet published |
-| `snortts-indic-v0-llamacpp` (snorTTS Indic) | hi, bn, gu, kn, ml, mr +3 | accuracy | - | 2.4 GB | Apache-2.0 (Llama 3.2 Community License for the base model) · runs on llama-server · GPU recommended | not yet published |
+| `svara-tts-v1-llamacpp` (Svara) | hi, bn, mr, te, kn, ta +13 | accuracy | - | 2.1 GB | Apache-2.0 · runs on llama-server · GPU recommended | untested |
+| `svara-tts-v1-q8-llamacpp` (Svara) | hi, bn, mr, te, kn, ta +13 | accuracy | - | 3.6 GB | Apache-2.0 · runs on llama-server · GPU recommended | untested |
+| `veena-llamacpp` (Veena) | hi, en | accuracy | - | 2.5 GB | Apache-2.0 · runs on llama-server · GPU recommended | untested |
+| `veena-q8-llamacpp` (Veena) | hi, en | accuracy | - | 4.1 GB | Apache-2.0 · runs on llama-server · GPU recommended | untested |
+| `orpheus-3b-0.1-ft-llamacpp` (Orpheus) | en | accuracy | - | 2.1 GB | Apache-2.0 (Llama 3.2 Community License for the base model) · runs on llama-server · GPU recommended | untested |
+| `snortts-indic-v0-llamacpp` (snorTTS Indic) | hi, bn, gu, kn, ml, mr +3 | accuracy | - | 2.4 GB | Apache-2.0 (Llama 3.2 Community License for the base model) · runs on llama-server · GPU recommended | untested |
 
 #### Piper
 
@@ -635,6 +696,10 @@ models below were checked against their model cards and licence files on 2026-11
 Speech-to-speech: `s2s_model` (default `lfm3-audio-2b-llamacpp`, LFM Open License v1.0: commercial use only
 below USD 10M yearly revenue) is used only by the opt-in `speech-to-speech` Realtime pipeline
 ([voice-agents.md](voice-agents.md#pipelines-cascade-audio-in-language-model-speech-to-speech)).
+`lfm3-audio-2b-onnx` is the same model from Liquid's ONNX export, run in bolo's own process with ONNX
+Runtime (`pip install 'bolo-speech[s2s]'`, no llama-server; the same licence): name it as `s2s_model`, or use it
+as a text-to-speech voice. Its files (2.7 GB) are pinned by SHA-256. On 4 shared CPU cores it generates
+speech at 0.4 to 0.5 times real time, so it wants a faster CPU or a GPU.
 
 ## Models outside the catalog
 
@@ -1096,9 +1161,10 @@ Reading:
   (`pyannote-3.0-eres2net`'s turns) reached 47.6 % (-31 %, 23 of 24 better,
   none worse), Nemotron's turns 26.0 %. On the synthetic mixes it removes
   the cases neither diarizer fixed: 8 kHz μ-law and same-gender voices end
-  at 3.5-7.9 %. The control for the bigger recogniser alone (the same
-  weights run turn by turn without conditioning) gave -15 %, not
-  significant, on four of these excerpts.
+  at 3.5-7.9 %. A separate run
+  was the control for the bigger recogniser alone (the same weights run
+  turn by turn without conditioning): -15 %, not significant, on four of
+  these excerpts.
 * **Hindi:** one synthetic pair (2 files per rate), 14.8 / 26.1 % against
   23.9 / 59.1 % (`language=hi`); the model was not trained on Hindi
   multi-talker speech. Too small to rely on.
@@ -1220,27 +1286,19 @@ and `dicow_onnx.json` (sha256 of every file). It needs PyTorch, transformers
 graphs, else the fp32 ones), `batch` (speakers decoded together, 4),
 `skip_silent_s` (0.2).
 
-**Not hosted yet.** No public ONNX conversion of DiCoW existed on Hugging Face
-(searched 2026-11-14), so the catalog entry `dicow-v3.3-onnx` is `status:
-pending` (hidden from listings, cannot be pulled) until the export is
-published as `codebucketsolutions/dicow-v3.3-onnx`. Until then register a local
-export: `bolo pull ./dicow-onnx` detects the kind from `dicow_onnx.json` and
-gives the model the entry's features and options (speaker-conditioned,
-`diarization_model: nemotron-3-diarization`). To publish (needs a write token
-for the organisation):
-
-```
-python server/tools/export_dicow_onnx.py ./DiCoW_v3_3 ./dicow-onnx --drop-fp32   # or reuse an export
-huggingface-cli upload codebucketsolutions/dicow-v3.3-onnx ./dicow-onnx . --repo-type model \
-    --exclude "manifest.json" --commit-message "DiCoW v3.3 ONNX export (int8)"
-```
-
-then, in `server/src/bolo/catalog/stt-onnxruntime.yaml`, pin
-`source.revision` to the upload's commit, set `size_bytes` to the uploaded
-files' total, remove `status: pending` and, once someone has run the
-published files, set `validated: cpu` with the `measured` block of
-`docs/measurements/dicow-onnx.json` (`server/tests/test_real.py::test_dicow_onnx_transcribes_both_voices_of_an_overlap`
-runs it with `BOLO_DICOW_ONNX_DIR` set). The README the script writes keeps the
+**Hosting.** No public ONNX conversion of DiCoW existed on Hugging Face
+(searched 2026-11-14), so bolo publishes its own export as
+`codebucketsolutions/dicow-v3.3-onnx`. The repository's "Publish a converted
+model" workflow rebuilds the export from the pinned upstream revision and
+uploads it only when every file's SHA-256 equals the one recorded in
+`docs/measurements/dicow-onnx.json`, so the published files are byte for byte
+the ones the measurements above were made with; the catalog entry pins the
+upload's revision and is `validated: cpu` on that basis. A local export can
+still be registered: `bolo pull ./dicow-onnx` detects the kind from
+`dicow_onnx.json` and gives the model the entry's features and options
+(speaker-conditioned, `diarization_model: nemotron-3-diarization`;
+`server/tests/test_real.py::test_dicow_onnx_transcribes_both_voices_of_an_overlap`
+runs one with `BOLO_DICOW_ONNX_DIR` set). The README the script writes keeps the
 CC-BY-4.0 attribution and asks users to cite the two DiCoW papers.
 
 ## Overlapping speech
@@ -1406,6 +1464,37 @@ result against.
 
 With `diarize=true`, words also carry their speaker. For word times with
 Whisper, use the `faster-whisper-*` entries.
+
+## Cloud providers
+
+The catalog also lists models bolo does not run: the well-known speech models
+of **OpenAI**, **Sarvam**, **ElevenLabs** and **Deepgram**, served through the
+`remote` engine (`server/src/bolo/catalog/cloud.yaml`; they are in the tables
+above under "OpenAI (cloud)", "Sarvam (cloud)" and so on). They differ from
+every other entry in four ways:
+
+- **Paid cloud API; audio leaves this server.** Every entry says so in its
+  description, the API marks it (`cloud: true`, `notice`), and the console
+  labels it and can filter on it. Nothing goes to a provider unless a request,
+  a default (`default_stt` …) or a model's `fallback` list names a cloud model.
+- **Nothing is downloaded.** An entry is installed once its provider is
+  configured (`[providers.<name>]` with an `api_key`, or
+  `BOLO_PROVIDER_<NAME>_API_KEY`). `bolo pull` on one only checks that.
+- **The licence field carries the provider's terms**, with the link in
+  `license_url`. As with licences elsewhere in the catalog, terms are
+  labelled, never a reason to leave a model out.
+- **None is validated.** No entry was run against a real account; languages,
+  voices and limits are what each provider's documentation said on 2026-11-14.
+
+Any other model of a configured provider (and any model of an
+`openai-compatible` server, such as another bolo) can be used as
+`<provider>:<model>` without an entry.
+
+Diarization, long-recording segmentation, word lists and text normalisation,
+telephony formats, Realtime sessions, traces and fallback work on top of
+cloud models as they do for local ones. Request-field mapping per provider,
+errors, cost estimates, key handling and what was and was not verified are in
+[providers.md](providers.md).
 
 ## External TTS servers (llama-server, audio.cpp)
 
@@ -1622,9 +1711,10 @@ packages: torch 2.15.0+cpu, snac 1.2.1, onnx 1.23.2, onnxconverter-common
 | `snac_24khz_decoder.onnx` (fp32, used by the catalog) | 52,581,828 | `33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911` |
 | `snac_24khz_decoder_fp16.onnx` | 26,368,793 | `0d9f92693bf05e453365f87aad6052d8939b2575eba64eacad5b60d53a317a41` |
 
-They are to be published at `codebucketsolutions/snac-24khz-onnx`; until then
-the catalog entries are `pending` (no download), and `options.snac_path` can
-point at a local copy. With an operator-run server nothing is pulled, so the
+They are published at `codebucketsolutions/snac-24khz-onnx` (rebuilt by the
+"Publish a converted model" workflow and uploaded after their SHA-256 sums
+matched the ones above); the catalog entries pin that revision, and
+`options.snac_path` can point at a local copy instead. With an operator-run server nothing is pulled, so the
 decoder is fetched once into `<data_dir>/components/snac/` and checked against
 its SHA-256.
 

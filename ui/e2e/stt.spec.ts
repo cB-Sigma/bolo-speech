@@ -41,7 +41,7 @@ test('file upload and the phone-line simulation', async ({ page }) => {
   await open(page, '/stt')
   await page.getByRole('switch', { name: /Phone line/ }).click()
   await page
-    .locator('input[type=file]')
+    .getByLabel('Audio file', { exact: true })
     .setInputFiles(path.resolve(import.meta.dirname, '../src/mock/assets/en-fellow-americans.wav'))
   await expect(page.getByTestId('final-text').first()).toBeVisible({ timeout: 15_000 })
   await expect(page.getByTestId('mic')).toBeVisible({ timeout: 10_000 })

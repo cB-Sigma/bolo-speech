@@ -3,6 +3,8 @@ import {
   AudioLines,
   BookA,
   Boxes,
+  Cloud,
+  Columns3,
   Gauge,
   MessagesSquare,
   Mic,
@@ -14,6 +16,8 @@ import {
 /** Server features some screens depend on. */
 export interface NavFeatures {
   wordLists: boolean
+  /** Cloud providers behind `engine: remote` models. */
+  providers?: boolean
 }
 
 export interface NavItem {
@@ -101,6 +105,23 @@ export const NAV: NavItem[] = [
     icon: BookA,
     group: 'Playground',
     when: (f) => f.wordLists,
+  },
+  {
+    to: '/compare',
+    label: 'Compare',
+    short: 'Compare',
+    description: 'Send the same audio or text to several models, local and cloud',
+    icon: Columns3,
+    group: 'Playground',
+  },
+  {
+    to: '/providers',
+    label: 'Providers',
+    short: 'Providers',
+    description: 'Cloud speech APIs: accounts, keys and cost',
+    icon: Cloud,
+    group: 'Server',
+    when: (f) => Boolean(f.providers),
   },
 ]
 

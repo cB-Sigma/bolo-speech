@@ -23,7 +23,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from bolo.api.common import get_core, parse_bool, read_upload, sse
 from bolo.audio import decode_audio, resample
 from bolo.audio.encode import StreamEncoder, normalize_format
-from bolo.core import Bolo, SynthChunk, Transcript
+from bolo.core import Bolo, SynthChunk, Transcript, fallback_headers
 from bolo.diarize import DiarizeOptions, KnownSpeaker
 from bolo.engines.base import Segment
 from bolo.errors import BoloError, InvalidRequest, ModelNotFound
@@ -395,6 +395,7 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
         if transcript is None:
             return Response(status_code=499)  # the client went away; nobody reads this
         headers["openai-processing-ms"] = str(round(trace.total_ms or 0))
+        headers.update(fallback_headers(trace))
         return _render(transcript, fmt, task, granularities, headers)
 
     queue: asyncio.Queue[bytes | None] = asyncio.Queue()
@@ -664,6 +665,8 @@ async def create_speech(request: Request, body: SpeechRequest) -> Response:
         "x-request-id": trace.id,
         "x-sample-rate": str(encoder.sample_rate),
         "Cache-Control": "no-cache",
+        # which model answered (a fallback is decided before the first audio, so it is known here)
+        **{k: v for k, v in fallback_headers(trace).items() if k != "x-bolo-estimated-cost"},
     }
     media = "text/event-stream" if as_sse else encoder.media_type
     return StreamingResponse(gen(), media_type=media, headers=headers)

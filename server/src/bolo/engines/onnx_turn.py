@@ -55,7 +55,7 @@ class OnnxRuntimeEngine(Engine):
     name = "ONNX Runtime"
     license = "MIT"
     url = "https://onnxruntime.ai"
-    kinds = ("smart_turn", "nemotron_diarization", "dicow_onnx")
+    kinds = ("smart_turn", "nemotron_diarization", "dicow_onnx", "lfm3_audio_onnx")
 
     def status(self) -> EngineStatus:
         try:
@@ -65,7 +65,7 @@ class OnnxRuntimeEngine(Engine):
         except Exception as exc:
             return EngineStatus(
                 self.id, False, None,
-                f"{type(exc).__name__}: {exc}. Optional (end-of-turn detection, Nemotron diarization, DiCoW): "
+                f"{type(exc).__name__}: {exc}. Optional (end-of-turn detection, Nemotron diarization, DiCoW, LFM3-Audio): "
                 "pip install onnxruntime",
             )  # fmt: skip
 
@@ -78,6 +78,10 @@ class OnnxRuntimeEngine(Engine):
             from bolo.engines.dicow_onnx import DiCoWOnnx
 
             return DiCoWOnnx.from_dir(path, spec, opts)
+        if kind == "lfm3_audio_onnx":
+            from bolo.s2s_onnx import Lfm3Tts
+
+            return Lfm3Tts.from_dir(path, spec, opts)
         if kind != "smart_turn":
             raise ValueError(f"the onnxruntime engine cannot load kind {kind!r}")
         return SmartTurn(path, spec, opts)

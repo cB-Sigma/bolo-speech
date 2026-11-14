@@ -1,5 +1,6 @@
 import {
   Boxes,
+  Cloud,
   Download,
   ExternalLink,
   LayoutGrid,
@@ -13,10 +14,11 @@ import {
   X,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Page } from '@/components/layout/app-shell'
 import {
   AvailabilityMark,
+  CloudMark,
   GatedMark,
   HardwareMark,
   languageSummary,
@@ -59,7 +61,16 @@ import {
   NeedsComponentMark,
 } from '@/components/component-install'
 import { ModelSettingsSection } from '@/components/model-settings'
-import { isCpuFriendly, isNotImplemented, isPending, PHONEMIZER_LABEL, runtimeLabel } from '@/lib/capabilities'
+import {
+  cloudNotice,
+  isCloud,
+  isCpuFriendly,
+  isNotImplemented,
+  isPending,
+  PHONEMIZER_LABEL,
+  runtimeLabel,
+} from '@/lib/capabilities'
+import { describePrice } from '@/lib/cost'
 import { describeError, missingComponent, useCatalog, useComponents, useLive, useModelActions } from '@/hooks/use-api'
 import { useStore } from '@/hooks/use-store'
 import type { CatalogModel, ModelStats, Task } from '@/lib/api/types'
@@ -150,6 +161,16 @@ function ModelActions({
       </span>
     )
   }
+  if (isCloud(m) && !m.installed) {
+    // Nothing to download: the model is usable once its provider has a key.
+    return (
+      <Button size="sm" variant="outline" asChild data-testid={`setup-${m.id}`}>
+        <Link to="/providers">
+          <Cloud /> Set up {m.provider?.name ?? 'provider'}
+        </Link>
+      </Button>
+    )
+  }
   if (m.pulling) {
     return (
       <div className={cn('flex items-center gap-2', compact ? 'w-32' : 'w-full')}>
@@ -204,10 +225,14 @@ function ModelActions({
               <ExternalLink /> Open source page
             </a>
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" onSelect={() => onDelete(m)}>
-            <Trash2 /> Delete from disk
-          </DropdownMenuItem>
+          {!isCloud(m) && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onSelect={() => onDelete(m)}>
+                <Trash2 /> Delete from disk
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -273,8 +298,14 @@ function ModelCard({
           <dd className="truncate text-right">{languageSummary(m.languages)}</dd>
           <dt className="text-muted-foreground">Size</dt>
           <dd className="text-right num">
-            {fmtBytes(m.size_bytes)}
-            <span className="text-muted-foreground"> · {fmtParams(m.params)} params</span>
+            {isCloud(m) ? (
+              <span className="text-muted-foreground">no download</span>
+            ) : (
+              <>
+                {fmtBytes(m.size_bytes)}
+                <span className="text-muted-foreground"> · {fmtParams(m.params)} params</span>
+              </>
+            )}
           </dd>
           <dt className="text-muted-foreground">Licence</dt>
           <dd className="truncate text-right">
@@ -283,6 +314,7 @@ function ModelCard({
           </dd>
         </dl>
         <div className="mt-3 flex w-full flex-wrap items-center gap-x-3 gap-y-1">
+          <CloudMark model={m} />
           <AvailabilityMark model={m} />
           <ValidatedMark validated={m.validated} />
           {m.gated && <GatedMark />}
@@ -325,6 +357,7 @@ function Details({ m, stats, onClose }: { m: CatalogModel | null; stats?: ModelS
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <TierBadge tier={m.tier} />
                 <StateDot model={m} />
+                <CloudMark model={m} />
                 <AvailabilityMark model={m} />
                 <ValidatedMark validated={m.validated} />
                 <UnmetMark m={m} />
@@ -334,6 +367,44 @@ function Details({ m, stats, onClose }: { m: CatalogModel | null; stats?: ModelS
             </SheetHeader>
             <div className="grid gap-5 p-4 text-sm">
               <p className="leading-6 text-muted-foreground">{m.description}</p>
+              {isCloud(m) && (
+                <div
+                  className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-[13px] leading-5"
+                  data-testid="cloud-details"
+                >
+                  <p className="flex items-center gap-1.5 font-medium text-warning-text">
+                    <Cloud className="size-3.5" aria-hidden /> {cloudNotice(m)}
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    Served by the provider <span className="num text-foreground">{m.provider?.name ?? 'unknown'}</span>
+                    {m.provider?.model ? (
+                      <>
+                        {' '}
+                        as <span className="num text-foreground">{m.provider.model}</span>
+                      </>
+                    ) : null}
+                    . {m.provider?.configured ? 'The provider is configured.' : 'The provider is not configured yet.'}{' '}
+                    {describePrice(m.provider?.price)
+                      ? `Your price table: ${describePrice(m.provider?.price)}.`
+                      : 'No price is set for it, so no cost estimate is shown.'}{' '}
+                    <Link to="/providers" className="underline underline-offset-2">
+                      Providers
+                    </Link>
+                  </p>
+                  {(m.fallback?.length ?? 0) > 0 && (
+                    <p className="mt-1 text-muted-foreground">
+                      Falls back to <span className="num text-foreground">{m.fallback?.join(', ')}</span> when the
+                      provider cannot answer.
+                    </p>
+                  )}
+                </div>
+              )}
+              {!isCloud(m) && (m.fallback?.length ?? 0) > 0 && (
+                <p className="text-[13px] leading-5 text-muted-foreground" data-testid="fallback-details">
+                  Falls back to <span className="num text-foreground">{m.fallback?.join(', ')}</span> when this model is
+                  unavailable or overloaded.
+                </p>
+              )}
               <UnmetNotice m={m} />
 
               <section>
@@ -382,7 +453,9 @@ function Details({ m, stats, onClose }: { m: CatalogModel | null; stats?: ModelS
                   <p className="rounded-lg border border-dashed border-border p-3 text-[13px] leading-5 text-muted-foreground">
                     {m.installed
                       ? 'Load the model and send it some audio; its real-time factor and latency percentiles will appear here.'
-                      : 'Not installed. Pull the model to measure it on this machine.'}
+                      : isCloud(m)
+                        ? 'Its provider is not configured yet. Add it on the Providers screen to use this model.'
+                        : 'Not installed. Pull the model to measure it on this machine.'}
                   </p>
                 )}
               </section>
@@ -596,6 +669,7 @@ export default function ModelsPage() {
   const [noExtras, setNoExtras] = useState(false)
   const [commercialOnly, setCommercialOnly] = useState(false)
   const [cpuOnly, setCpuOnly] = useState(false)
+  const [where, setWhere] = useState(ANY)
   const [openId, setOpenId] = useState<string | null>(null)
   const [toDelete, setToDelete] = useState<CatalogModel | null>(null)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
@@ -639,11 +713,12 @@ export default function ModelsPage() {
           (!noExtras || !(m.requires?.length ?? 0)) &&
           (!commercialOnly || m.commercial_use !== false) &&
           (!cpuOnly || isCpuFriendly(m)) &&
+          (where === ANY || (where === 'cloud') === isCloud(m)) &&
           (!needle ||
             `${m.id} ${m.aliases.join(' ')} ${m.family} ${m.description} ${m.engine}`.toLowerCase().includes(needle)),
       )
       .sort((a, b) => rank(a) - rank(b) || a.family.localeCompare(b.family) || a.id.localeCompare(b.id))
-  }, [all, q, task, tier, lang, license, family, installedOnly, noExtras, commercialOnly, cpuOnly])
+  }, [all, q, task, tier, lang, license, family, installedOnly, noExtras, commercialOnly, cpuOnly, where])
 
   const filtersActive =
     q !== '' ||
@@ -655,8 +730,10 @@ export default function ModelsPage() {
     installedOnly ||
     noExtras ||
     commercialOnly ||
-    cpuOnly
+    cpuOnly ||
+    where !== ANY
   const reset = () => {
+    setWhere(ANY)
     setQ('')
     setTask('all')
     setTier(ANY)
@@ -775,6 +852,17 @@ export default function ModelsPage() {
         options.licenses.map((l) => ({ value: l, label: l })),
         'w-36',
       )}
+      {all.some((m) => isCloud(m)) &&
+        filterSelect(
+          'Runs',
+          where,
+          setWhere,
+          [
+            { value: 'local', label: 'On this server' },
+            { value: 'cloud', label: 'Cloud' },
+          ],
+          'w-36',
+        )}
       <label className="flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-input px-2.5 text-xs dark:bg-input/30">
         Installed
         <Switch checked={installedOnly} onCheckedChange={setInstalledOnly} size="sm" />
@@ -967,7 +1055,9 @@ export default function ModelsPage() {
                       <TierBadge tier={m.tier} />
                     </TableCell>
                     <TableCell className="max-w-44 truncate text-xs">{languageSummary(m.languages, 2)}</TableCell>
-                    <TableCell className="text-right num text-xs">{fmtBytes(m.size_bytes)}</TableCell>
+                    <TableCell className="text-right num text-xs">
+                      {isCloud(m) ? <span className="text-muted-foreground">cloud</span> : fmtBytes(m.size_bytes)}
+                    </TableCell>
                     <TableCell className="text-xs">
                       <span className="flex items-center gap-2">
                         {m.license}
@@ -976,7 +1066,8 @@ export default function ModelsPage() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <span className="flex flex-col gap-0.5">
+                      <span className="flex flex-col items-start gap-0.5">
+                        <CloudMark model={m} />
                         <AvailabilityMark model={m} />
                         <ValidatedMark validated={m.validated} />
                         <HardwareMark hardware={m.hardware} />

@@ -61,6 +61,9 @@ webrtc = ["aiortc>=1.9", "av>=12"]
 turn = ["onnxruntime>=1.17"]
 # Orpheus-family voices (Svara, Veena, Orpheus, snorTTS) on llama.cpp: the SNAC audio decoder runs in onnxruntime
 orpheus = ["onnxruntime>=1.17"]
+# LFM3-Audio in this process (speech-to-speech and text-to-speech without llama-server): the model's ONNX graphs
+# use MatMulNBits, GatherBlockQuantized and GroupQueryAttention, which need a recent onnxruntime
+s2s = ["onnxruntime>=1.20", "tokenizers>=0.20"]
 text = ["whisper-normalizer>=0.1"]
 all = [
   "sherpa-onnx>=2.0,<3",
@@ -132,7 +135,7 @@ warn_unused_ignores = false
 module = [
   "sherpa_onnx.*", "faster_whisper.*", "ctranslate2.*", "soundfile.*", "soxr.*", "av.*",
   "moonshine_onnx.*", "kokoro_onnx.*", "pywhispercpp.*", "wyoming.*", "whisper_normalizer.*",
-  "onnxruntime.*", "tomli.*", "aiortc.*", "uccharan.*",
+  "onnxruntime.*", "tomli.*", "aiortc.*", "uccharan.*", "tokenizers.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"

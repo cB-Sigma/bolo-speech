@@ -102,11 +102,11 @@
 ## Quick start
 
 ```bash
-pipx install 'bolo-speech[all] @ git+https://github.com/cb-Sigma/bolo#subdirectory=server'
+uv tool install 'bolo-speech[all]'
 bolo serve
 ```
 
-(`pip install` into a virtual environment works the same way. Once the package is on PyPI this becomes `pipx install 'bolo-speech[all]'`, or `pipx run --spec 'bolo-speech[all]' bolo serve`.)
+Or run it once without installing: `uvx --from 'bolo-speech[all]' bolo serve`. Without [uv](https://docs.astral.sh/uv/): `pipx install 'bolo-speech[all]'`, or `pip install 'bolo-speech[all]'` into a virtual environment. As a container (CPU image): `docker run -p 8000:8000 -v bolo-data:/data ghcr.io/cb-sigma/bolo:latest`. The PyPI distribution is `bolo-speech`; the command and the Python package are `bolo`.
 
 Open <http://127.0.0.1:8000> for the console, or use the API. The first request for a model downloads it:
 
@@ -157,6 +157,7 @@ Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AA
 | Speaker diarization | `diarize=true` or `response_format=diarized_json` on transcriptions (with word timestamps and `known_speaker_names[]` / `known_speaker_references[]` if you like), `POST /api/v1/diarize`, `diarize=true` on the realtime WebSocket with revised labels at the end of the stream |
 | Realtime WebSockets | `WS /api/v1/stt/stream` (partials, finals with word times, VAD events, optional speaker labels) and `WS /api/v1/tts/stream` (text in pieces, audio out) |
 | Wyoming | speech-to-text and text-to-speech on one TCP port, including streaming synthesis |
+| Cloud providers (optional) | models of OpenAI, Sarvam, ElevenLabs, Deepgram or any OpenAI-compatible server behind the same routes (`engine: remote`), with bolo's diarization, word lists, telephony formats, traces and cost estimates on top, and per-model fallback between local and cloud. Paid cloud APIs; audio leaves the server only when you name such a model. [docs/providers.md](docs/providers.md) |
 | Native JSON API | catalog, pulls with progress, load/unload, optional components, live statistics, request traces, Server-Sent Events, benchmark jobs |
 | Operations | Prometheus `/metrics`, `/healthz`, `/readyz`, optional bearer key, CORS |
 
@@ -174,6 +175,13 @@ Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AA
 <!-- BEGIN GENERATED: models-summary -->
 | Task | Family | Models | Languages | Validated on CPU | Best measured RTF |
 | --- | --- | --- | --- | --- | --- |
+| STT | OpenAI (cloud) | 4 | af, am, ar, as, az, ba, be, bg +92 | 0 | - |
+| TTS | OpenAI (cloud) | 3 | af, am, ar, as, az, ba, be, bg +92 | 0 | - |
+| STT | Sarvam (cloud) | 3 | as, bn, brx, doi, en, gu, hi, kn +15 | 0 | - |
+| TTS | Sarvam (cloud) | 3 | bn, en, gu, hi, kn, ml, mr, or +3 | 0 | - |
+| TTS | ElevenLabs (cloud) | 3 | ar, bg, cs, da, de, el, en, es +24 | 0 | - |
+| STT | ElevenLabs (cloud) | 2 | af, am, ar, as, az, ba, be, bg +92 | 0 | - |
+| STT | Deepgram (cloud) | 2 | af, ar, as, be, bg, bn, bs, ca +53 | 0 | - |
 | DIARIZATION | pyannote + speaker embeddings | 3 | - | 1 | 0.106 (`pyannote-3.0-eres2net`) |
 | DIARIZATION | Nemotron diarization | 1 | - | 1 | 0.039 (`nemotron-3-diarization`) |
 | TTS | Parler-TTS | 2 | as, bn, brx, doi, en, gu, hi, hne +13 | 2 | 4.540 (`parler-tts-tiny-v1`) |
@@ -184,11 +192,12 @@ Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AA
 | STT | IndicConformer | 27 | as, bn, brx, doi, gu, hi, kn, kok +14 | 20 | 0.060 (`indicconformer-ta-community`) |
 | SEPARATION | SepFormer | 2 | en | 2 | 1.440 (`sepformer-whamr`) |
 | SEPARATION | PixIT | 1 | en | 1 | 5.690 (`pixit-ami`) |
-| STT | DiCoW | 2 | en | 2 | 0.453 (`dicow-v3.3`) |
+| STT | DiCoW | 3 | en | 3 | 0.453 (`dicow-v3.3`) |
 | TTS | Indic-Speak | 1 | as, bn, brx, doi, en, gu, hi, kn +15 | 0 | - |
 | TTS | Spark-TTS | 1 | en, zh | 0 | - |
 | TTS | MaskGCT | 1 | de, en, fr, ja, ko, zh | 0 | - |
 | DIARIZATION | DiariZen | 1 | - | 0 | - |
+| TTS | LFM3-Audio 2B | 1 | ar, da, de, el, en, es, fi, fr +10 | 0 | - |
 | SEPARATION | VoxLock | 1 | en | 1 | 0.460 (`voxlock-int8`) |
 | STT | Whisper | 38 | af, am, ar, as, az, ba, be, bg +92 | 20 | 0.081 (`faster-whisper-tiny.en`) |
 | STT | Moonshine | 11 | ar, en, es, ja, ko, uk, vi, zh | 4 | 0.033 (`moonshine-tiny-en`) |
@@ -202,6 +211,7 @@ Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AA
 | STT | Omnilingual ASR | 1 | ar, as, bn, de, en, es, fr, gu +23 | 1 | 0.112 (`omnilingual-ctc-300m`) |
 | STT | Nemotron | 1 | ar, bg, cs, da, de, el, en, es +26 | 1 | 0.312 (`nemotron-3.5-streaming-560ms`) |
 | TTS | MMS-TTS | 25 | as, awa, bgc, bn, de, doi, en, es +17 | 1 | 0.196 (`mms-tts-eng`) |
+| TTS | Orpheus family on llama.cpp (SNAC in onnxruntime) | 6 | as, bho, bn, brx, doi, en, gu, hi +11 | 0 | - |
 | TTS | Piper | 85 | ar, bn, ca, cs, cy, da, de, el +35 | 28 | 0.040 (`piper-ne-np-google-medium`) |
 | TTS | External TTS server: llama-server | 10 | ar, da, de, el, en, es, fi, fr +15 | 1 | 0.716 (`pocket-tts-en-llamacpp`) |
 | TTS | External TTS server: audio.cpp | 40 | ar, be, bg, bn, cs, da, de, el +41 | 0 | - |
@@ -213,7 +223,7 @@ Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AA
 | TURN | Smart Turn | 1 | ar, bn, da, de, en, es, fi, fr +15 | 0 | - |
 | VAD | Silero VAD | 2 | - | 2 | 0.006 (`silero-vad-v5`) |
 
-**334 models in the catalog, 119 validated on CPU, 215 untested.** Full list: [docs/models.md](docs/models.md).
+**342 models in the catalog, 120 validated on CPU, 222 untested**, plus 20 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run on the machine described under [Performance](#performance) by `server/tools/validate_models.py`; the table in [docs/models.md](docs/models.md) has every model with its measured real-time factor and licence. Anything else that sherpa-onnx or faster-whisper can load can be added with `bolo pull hf:<owner>/<repo>`.
@@ -411,7 +421,7 @@ bolo itself is [Apache-2.0](LICENSE). It contains no third-party source code; [N
 - WebRTC tested with browsers and behind NAT; SIP; MCP tools.
 - Overlap-aware online (live) diarization; a diarization error rate measured on real recordings.
 - Word timestamps for Whisper through sherpa-onnx (exports with attention outputs) and for Moonshine.
-- GPU validation, Apple Silicon validation, and published container images.
+- GPU validation and Apple Silicon validation.
 - Models trained for 8 kHz telephone speech.
 - An attention-based streaming policy for Whisper as an alternative to LocalAgreement.
 - Authentication beyond a single shared key.

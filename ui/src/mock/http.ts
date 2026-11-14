@@ -1,4 +1,4 @@
-import type { BenchRequest, CatalogModel } from '@/lib/api/types'
+import type { BenchRequest, CatalogModel, ProviderUpdate } from '@/lib/api/types'
 import { encodeWav } from '@/lib/audio/wav'
 import { SAMPLE_SEGMENTS, SAMPLES } from './catalog'
 import { HttpError, MOCK_KEY, sleep, type MockServer } from './engine'
@@ -65,9 +65,11 @@ function speechResponse(server: MockServer, model: CatalogModel, input: string):
     o += p.length
   }
   const wav = encodeWav(all, rate)
-  server.record(
+  const trace = server.cloudTrace(
+    model,
     server.makeTrace(model, Date.now(), { chars: input.length, text: input.slice(0, 48), transport: 'http' }),
   )
+  server.record(trace)
   let offset = 0
   const body = new ReadableStream<Uint8Array>({
     async pull(controller) {
@@ -81,7 +83,9 @@ function speechResponse(server: MockServer, model: CatalogModel, input: string):
       offset = end
     },
   })
-  return new Response(body, { headers: { 'Content-Type': 'audio/wav' } })
+  return new Response(body, {
+    headers: { 'Content-Type': 'audio/wav', 'x-request-id': trace.id, 'x-bolo-model': model.id },
+  })
 }
 
 /** Answers API requests the way the real server would. Returns null for non-API URLs. */
@@ -120,6 +124,29 @@ export async function handleRequest(
           (installed == null || String(m.installed) === installed),
       )
       return json({ models })
+    }
+    const oneTrace = /^\/api\/v1\/requests\/([\w-]+)$/.exec(path)
+    if (oneTrace) {
+      const t = server.traces.find((x) => x.id === oneTrace[1])
+      return t ? json(t) : json({ detail: 'Unknown request' }, 404)
+    }
+    if (path === '/api/v1/providers') return json(server.providers())
+    const providerTest = /^\/api\/v1\/providers\/([\w-]+)\/test$/.exec(path)
+    if (providerTest && method === 'POST') {
+      await sleep(150)
+      return json(server.testProvider(providerTest[1] as string))
+    }
+    const provider = /^\/api\/v1\/providers\/([\w-]+)$/.exec(path)
+    if (provider && method === 'PUT') {
+      return json(server.putProvider(provider[1] as string, JSON.parse(String(init?.body ?? '{}')) as ProviderUpdate))
+    }
+    if (provider && method === 'DELETE') {
+      server.deleteProvider(provider[1] as string)
+      return new Response(null, { status: 204 })
+    }
+    if (provider) {
+      const p = server.providers().providers.find((x) => x.name === provider[1])
+      return p ? json(p) : json({ detail: 'Unknown provider' }, 404)
     }
     if (path === '/api/v1/requests') {
       const limit = Number(query.get('limit') ?? 100)
@@ -181,11 +208,40 @@ export async function handleRequest(
       if (!model || model.task !== 'tts') return json({ detail: `Unknown TTS model: ${body.model}` }, 404)
       if (model.available === false)
         throw new HttpError(409, `${model.id} needs eSpeak NG, which is not installed.`, 'component_missing')
+      if (model.cloud && !model.installed)
+        throw new HttpError(
+          503,
+          `model '${model.id}' needs the cloud provider '${model.provider?.name}', which is not configured`,
+          'provider_not_configured',
+        )
       return speechResponse(server, model, body.input)
     }
     if (path === '/v1/audio/transcriptions' && method === 'POST') {
-      await sleep(400)
-      return json({ text: server.hint?.segments.map((s) => s.text).join(' ') ?? 'This is a mock transcription.' })
+      const form = init?.body instanceof FormData ? init.body : null
+      const model = server.model(String(form?.get('model') ?? '')) ?? server.models.find((m) => m.task === 'stt')
+      if (model && !model.installed)
+        throw new HttpError(
+          model.cloud ? 503 : 404,
+          model.cloud
+            ? `model '${model.id}' needs the cloud provider '${model.provider?.name}', which is not configured`
+            : `model '${model.id}' is not installed`,
+          model.cloud ? 'provider_not_configured' : 'model_not_installed',
+        )
+      await sleep(model?.cloud ? 700 : 400)
+      const text = server.hint?.segments.map((s) => s.text).join(' ') ?? 'This is a mock transcription.'
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (model) {
+        const audioSeconds = server.hint?.segments.at(-1)?.t1 ?? 4
+        const trace = server.cloudTrace(
+          model,
+          server.makeTrace(model, Date.now(), { audioSeconds, text: text.slice(0, 48), transport: 'http' }),
+        )
+        server.record(trace)
+        headers['x-request-id'] = trace.id
+        headers['x-bolo-model'] = model.id
+        if (trace.cost) headers['x-bolo-estimated-cost'] = `${trace.cost.amount} ${trace.cost.currency}`
+      }
+      return new Response(JSON.stringify({ text }), { headers })
     }
     if (path === '/metrics') return new Response('# HELP bolo_requests_total Requests\nbolo_requests_total 18230\n')
     return json({ detail: 'Not found' }, 404)

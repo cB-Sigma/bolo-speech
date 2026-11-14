@@ -241,7 +241,7 @@ items, user transcripts from its own STT, and traces.
 | --- | --- | --- | --- | --- |
 | `cascade` (default) | bolo's STT | the `llm_*` chat-completions model | bolo's TTS | `llm_base_url` |
 | `audio-llm` | the model itself (the turn's audio as `input_audio`, WAV) | an audio-understanding model, `audio_llm_*` (falls back to `llm_*`) | bolo's TTS | a chat-completions server that takes `input_audio` |
-| `speech-to-speech` | the model itself (16 kHz PCM, streamed while the user speaks) | a speech-to-speech model | the same model | `s2s_server_url`, or `s2s_model` + llama-server |
+| `speech-to-speech` | the model itself (16 kHz PCM, streamed while the user speaks) | a speech-to-speech model | the same model | `s2s_server_url`, or `s2s_model` + llama-server, or `s2s_model = "lfm3-audio-2b-onnx"` + `bolo-speech[s2s]` |
 
 **`audio-llm`.** The latest user turn is sent to the model as audio, earlier
 turns as their transcripts (or as audio while a transcript is missing; the
@@ -284,6 +284,57 @@ TTS catalog entry, pulled on first use) is served by a llama-server on a
 loopback port with a random API key and `--parallel s2s_parallel`, restarted
 after a crash with a back-off as TTS servers are. Each Realtime session holds
 one upstream session (one llama-server slot).
+
+or run the model **in bolo's own process**, without llama-server:
+
+```sh
+pip install 'bolo-speech[s2s]'          # onnxruntime and tokenizers
+bolo pull lfm3-audio-2b-onnx     # 2.7 GB, every file pinned by SHA-256
+bolo serve                       # with s2s_model = "lfm3-audio-2b-onnx" and realtime_pipeline = "speech-to-speech"
+```
+
+`lfm3-audio-2b-onnx` is the same LFM3-Audio 2B from Liquid's ONNX export
+(`LiquidAI/LFM3-Audio-2B-ONNX`, the 4-bit language model with the float32
+audio encoder, depth decoder and codec decoder; the same licence). bolo runs
+the four graphs with ONNX Runtime and NumPy (`bolo/s2s_onnx.py`) and follows
+the model's own generation procedure: the turn's audio is encoded and
+evaluated while the user is still speaking, the answer is interleaved text
+and speech (six text tokens, then twelve 80 ms speech frames, each frame from
+three passes of the depth decoder), the codec turns the frames into 24 kHz
+audio in chunks of about half a second, and tool calls are parsed out of the
+text. The session's instructions follow the sentence the model was trained
+with (`Respond with interleaved text and audio.`), the tools go into the
+system prompt, a barge-in stops the model before its next step, and the
+conversation stays in the model's context from turn to turn (it starts over
+after 8192 positions, about seven minutes of speech). One copy of the model
+(about 3.4 GB of memory) serves every session; sessions take turns step by
+step, so two conversations at once each run at half speed. `voice` is not
+used: in a conversation the model has one voice. The same catalog entry is
+also a text-to-speech voice (`female`, `male`; 18 languages).
+
+Measured on 4 shared CPU cores (Xeon 2.1 GHz, other jobs running, load 2 to
+4): first audio 0.8 to 1.2 s after the end of the user's turn, then about 7.5
+steps per second where real time needs about 19, so speech comes out at
+0.4 to 0.5 times the speed it is spoken (RTF 2.2 to 2.5) and playback
+pauses. On that machine it shows that the pipeline works, not that it is
+usable; real time needs a CPU about two and a half times as fast (8 or more
+modern cores) or a GPU (precision `q4f16`, not tested). What was checked
+against llama.cpp: the same tokenisation of the prompts, the same number of
+audio tokens for the same recording, and the same answer text to a spoken
+question; the two 4-bit quantisations differ, so longer texts drift apart
+after some tens of tokens. Without `bolo-speech[s2s]` a speech-to-speech session
+answers 424 (`component_missing`) with the command to run, and
+`GET /api/v1/info` shows the pipeline as configured but not available.
+
+A cloud model can stand in the same place: `s2s_model = "openai:gpt-realtime-2.1"`
+(`<provider>:<model>`, a provider of kind `openai-compatible` from the
+`providers` setting) makes **OpenAI's Realtime API** the backend, over
+WebSocket. It is a paid cloud API and the conversation's audio leaves this
+server. bolo resamples each turn to the 24 kHz that API takes, switches its
+server-side turn detection off (bolo detects turns and barge-in itself), and
+asks for audio responses whose transcript is the text (that API answers with
+audio or text, never both). See [providers.md](providers.md#cloud-speech-to-speech-openai-realtime).
+Gemini Live is not supported.
 
 How a turn maps onto the upstream protocol: when bolo's turn detection hears
 speech start, the audio from `prefix_padding_ms` before it is sent upstream

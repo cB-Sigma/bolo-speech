@@ -62,6 +62,28 @@ class EngineUnavailable(BoloError):
     type = "server_error"
 
 
+class ProviderNotConfigured(EngineUnavailable):
+    """A cloud model whose provider has no entry (or no key) in the ``providers`` setting."""
+
+    code = "provider_not_configured"
+
+
+class ProviderError(EngineUnavailable):
+    """A cloud provider failed (5xx, a broken connection) or refused bolo's credentials."""
+
+    status = 502
+    code = "provider_error"
+
+
+class ProviderAuthError(ProviderError):
+    code = "provider_auth"
+
+
+class ProviderTimeout(ProviderError):
+    status = 504
+    code = "provider_timeout"
+
+
 class ComponentMissing(BoloError):
     """An optional third-party component (espeak-ng) that the request needs is not installed."""
 

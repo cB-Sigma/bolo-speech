@@ -146,8 +146,8 @@
   features: [overlap]
   description: 'NVIDIA Nemotron-3-Diarization (September 2026): a 31-layer Transformer that predicts, every 10 ms, which of up
     to eight speakers is talking, with an arrival-order speaker cache for long recordings and live audio. No clustering
-    step, so similar voices and telephone audio are told apart far better than by embedding clustering, and overlapped
-    speech comes out directly. Trained on Fisher, CALLHOME, AMI, NOTSOFAR and DISPLACE (Hindi, Kannada, Telugu, Bengali,
+    step: better than embedding clustering with overlapping speech and with similar voices, and overlapped speech comes
+    out directly. On short, clean turn-taking dialogues at telephone quality it can merge two speakers into one. Trained on Fisher, CALLHOME, AMI, NOTSOFAR and DISPLACE (Hindi, Kannada, Telugu, Bengali,
     Indian English) conversations. int8 ONNX conversion by the onnx-community organisation on Hugging Face (a third-party
     conversion of the official weights; see docs/models.md); ERes2Net embeddings (Apache-2.0) are included for
     recognising named speakers.'

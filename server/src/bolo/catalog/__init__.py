@@ -24,6 +24,9 @@ VALIDATED = ("cpu", "untested")
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 
 
+CLOUD_NOTICE = "paid cloud API; audio leaves this server"
+
+
 class CatalogError(ValueError):
     pass
 
@@ -59,8 +62,15 @@ class ModelSpec:
     requires: list[str] = field(default_factory=list)
     custom: bool = False
     builtin: bool = False  # needs no files (fake engine)
-    #: "pending": described here, but its files are not published yet; hidden from listings, cannot be pulled
+    #: "pending": described here, but its files are not published yet; cannot be pulled
     status: str | None = None
+    #: a model behind a paid cloud API (engine remote): nothing to download, audio or text leaves the server
+    cloud: bool = False
+    #: False for entries no runtime bolo has can run yet (kept so the catalog says why); see not_runnable_reason
+    runnable: bool = True
+    not_runnable_reason: str | None = None
+    #: a ``provider:model`` id that was asked for by name and is not a curated entry
+    adhoc: bool = False
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> ModelSpec:
@@ -120,7 +130,11 @@ class ModelSpec:
             raise CatalogError(f"{self.id}: languages must be a list of codes")
         if not self.license or self.license == "unknown":
             raise CatalogError(f"{self.id}: every catalog entry must state its licence")
-        if not self.builtin and not (self.source.repo or self.source.urls or self.source.local):
+        if self.cloud and not self.license_url:
+            raise CatalogError(f"{self.id}: a cloud entry must link the provider's terms in license_url")
+        if not self.runnable and not self.not_runnable_reason:
+            raise CatalogError(f"{self.id}: an entry that is not runnable must say why (not_runnable_reason)")
+        if not self.builtin and not self.cloud and not (self.source.repo or self.source.urls or self.source.local):
             raise CatalogError(f"{self.id}: no download source")
         if self.validated == "cpu" and not self.builtin and not self.measured:
             raise CatalogError(f"{self.id}: validated entries must record their measurements")
@@ -139,6 +153,10 @@ class ModelSpec:
         for name in self.__dataclass_fields__:
             if name == "source":
                 out["source"] = self.source.to_dict()
+            elif name in ("cloud", "adhoc", "not_runnable_reason") and not getattr(self, name):
+                continue  # defaults stay out of custom.yaml
+            elif name == "runnable" and self.runnable:
+                continue  # (so does this one)
             elif name not in ("custom", "builtin") and not (name == "status" and self.status is None):
                 out[name] = getattr(self, name)
         return out
@@ -203,6 +221,12 @@ class ModelSpec:
             "settings": settings or {},
             "available": available,
             "status": self.status,
+            # machine-readable "no runtime can run this yet" (the description says the same in prose)
+            "runnable": self.runnable,
+            "not_runnable_reason": self.not_runnable_reason,
+            # a paid cloud API: nothing is downloaded, and audio or text leaves this server
+            "cloud": self.cloud,
+            "notice": CLOUD_NOTICE if self.cloud else None,
             # what the model needs to run well, when the catalog says (options.hardware), e.g.
             # {"gpu": "recommended", "vram_gb": 3.5, "note": "..."}; null for entries that run fine on a CPU
             "hardware": self.options.get("hardware"),
@@ -344,6 +368,15 @@ class Catalog:
         entries = [s.to_dict() for s in self._specs.values() if s.custom]
         self._custom_path.parent.mkdir(parents=True, exist_ok=True)
         self._custom_path.write_text(yaml.safe_dump(entries, sort_keys=False, allow_unicode=True), encoding="utf-8")
+
+    def add_adhoc(self, spec: ModelSpec) -> ModelSpec:
+        """Register a ``provider:model`` id that was asked for by name (kept in memory only)."""
+        with self._lock:
+            existing = self._specs.get(spec.id)
+            if existing is not None:
+                return existing
+            self._specs[spec.id] = spec
+            return spec
 
     def set_alias(self, alias: str, model_id: str) -> None:
         """Point a public alias (``whisper-1``, ``tts-1``) at a model at runtime."""

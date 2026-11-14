@@ -20,6 +20,10 @@ export interface ServerInfo {
   platform: string
   auth_required: boolean
   data_dir: string
+  /** Whether a model that is not installed is downloaded on first use. Absent on older servers. */
+  auto_pull?: boolean
+  /** Cloud providers the server knows (never a key). */
+  providers?: { name: string; kind: string; configured: boolean }[]
   /** Newer servers only. */
   defaults?: Partial<Record<'stt' | 'realtime_stt' | 'tts' | 'realtime_tts' | 'vad', string>>
   components?: Component[]
@@ -54,12 +58,31 @@ export interface Capabilities {
     [k: string]: unknown
   }
   llm?: { configured?: boolean; base_url?: string | null; model?: string | null }
+  /** Pronunciation word lists: announced by newer servers (older ones are probed with a request). */
+  wordlists?: { available?: boolean; endpoint?: string; install?: string | null; [k: string]: unknown }
+  /** Cloud providers behind `engine: remote` models. */
+  providers?: {
+    endpoint?: string
+    kinds?: string[]
+    editable?: boolean
+    edit_blocked_reason?: string | null
+    configured?: string[]
+    cost_estimates?: boolean
+    [k: string]: unknown
+  }
   [k: string]: unknown
 }
 
 export interface RealtimePipelineInfo {
+  /** A session can use this pipeline now. Newer servers report it for every pipeline. */
   available?: boolean
+  /** Its settings are in place (it may still lack something, see `reason`). */
   configured?: boolean
+  /** Why it is not available, in the server's words. */
+  reason?: string | null
+  /** A cloud speech-to-speech backend: the conversation's audio leaves the server. */
+  cloud?: boolean
+  provider?: string
   base_url?: string | null
   model?: string | null
   url?: string | null
@@ -135,8 +158,108 @@ export interface CatalogModel {
   /** `pending`: described but its files are not published yet. */
   status?: 'pending' | string | null
   hardware?: Hardware | null
+  /** False when no runtime the server has can run the model yet; `not_runnable_reason` says why. */
+  runnable?: boolean
+  not_runnable_reason?: string | null
+  /** A paid cloud API (engine `remote`): nothing is downloaded, and audio or text leaves the server. */
+  cloud?: boolean
+  notice?: string | null
+  provider?: ModelProvider | null
+  /** Models that answer instead when this one cannot. */
+  fallback?: string[]
+  /** A `<provider>:<model>` id that was used by name, not a curated entry. */
+  adhoc?: boolean
   /** Live demo only: where this entry can run. */
   runtime?: 'browser' | 'server'
+}
+
+/** The cloud provider behind a catalog entry. */
+export interface ModelProvider {
+  name: string
+  kind: string
+  model: string
+  configured: boolean
+  price?: Price | null
+}
+
+/** One row of a provider's price table: what the operator pays, for cost estimates. */
+export interface Price {
+  per_minute?: number
+  per_hour?: number
+  per_1k_chars?: number
+  per_1m_chars?: number
+  per_request?: number
+  currency?: string
+}
+
+export interface ProviderStats {
+  requests: number
+  errors: number
+  latency_ms_mean: number | null
+  latency_ms_total?: number
+  bytes_sent: number
+  bytes_received: number
+  audio_seconds: number
+  chars: number
+  estimated_cost: Record<string, number>
+  last_error: string | null
+}
+
+/** A cloud provider as the server shows it. The API key is never part of it. */
+export interface Provider {
+  name: string
+  kind: string
+  base_url: string
+  configured: boolean
+  api_key_set: boolean
+  options: Record<string, unknown>
+  prices: Record<string, Price>
+  /** `settings`: from the configuration (read-only here); `stored`: added through the API. */
+  source: 'settings' | 'stored' | string
+  editable: boolean
+  terms_url: string | null
+  stats?: Record<string, ProviderStats>
+}
+
+export interface ProviderKind {
+  kind: string
+  default_base_url: string
+  terms_url: string
+}
+
+export interface ProviderList {
+  providers: Provider[]
+  kinds: ProviderKind[]
+  editable: boolean
+  edit_blocked_reason: string | null
+  notice: string
+}
+
+/** Body of `PUT /api/v1/providers/{name}`. `api_key` is write-only: leave it out to keep the stored key. */
+export interface ProviderUpdate {
+  kind?: string
+  base_url?: string
+  api_key?: string
+  clear_api_key?: boolean
+  options?: Record<string, unknown>
+  prices?: Record<string, Price>
+}
+
+export interface ProviderTest {
+  name: string
+  ok: boolean
+  message: string
+  code: string | null
+  /** `credentials`: the key was accepted; `reachability`: only that the address answers. */
+  checked: 'credentials' | 'reachability' | string | null
+  latency_ms: number
+}
+
+/** An estimated cost from the operator's price table (never a bill). */
+export interface Cost {
+  amount: number
+  currency: string
+  estimated?: boolean
 }
 
 export interface Catalog {
@@ -206,6 +329,20 @@ export interface RequestTrace {
   separation_windows?: number
   separation_ms?: number
   pipeline?: string
+  /** A request served by a cloud model: what it took at the provider, and the estimated cost. */
+  provider?: {
+    name: string
+    kind?: string
+    model: string
+    requests: number
+    latency_ms: number
+    first_byte_ms?: number | null
+    bytes_sent: number
+    bytes_received: number
+  }
+  cost?: Cost
+  /** Another model answered instead of the one asked for. */
+  fallback?: { requested: string; answered: string; attempts: { model: string; code: string; message: string }[] }
   first_token_ms?: number
   overlapped_speech_s?: number
   /** TTS: which normaliser ran, the text the voice received (first 500 characters), and word-list matches. */
@@ -300,6 +437,7 @@ export type ServerEvent =
   | { type: 'component'; id: string; event: 'installed' | 'removed' | string }
   | { type: 'log'; level: string; message: string }
   | { type: 'wordlist'; name: string; event: 'updated' | 'deleted' | string }
+  | { type: 'provider'; name: string; event: 'saved' | 'removed' | string }
 
 /** Messages on the STT websocket (server → client). */
 export interface SttWord {

@@ -11,7 +11,7 @@ import {
   CommandList,
   CommandShortcut,
 } from '@/components/ui/command'
-import { useCatalog, useWordLists } from '@/hooks/use-api'
+import { useCatalog, useNavFeatures } from '@/hooks/use-api'
 import { useStore } from '@/hooks/use-store'
 import { useTheme } from '@/hooks/use-theme'
 import { visibleNav } from '@/lib/nav'
@@ -25,7 +25,7 @@ export default function CommandPalette() {
   const { setChoice } = useTheme()
   const catalog = useCatalog()
   const p = useStore(prefs)
-  const nav = visibleNav({ wordLists: useWordLists().offered })
+  const nav = visibleNav(useNavFeatures())
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

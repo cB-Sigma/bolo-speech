@@ -65,15 +65,22 @@ export function pipelineOptions(info: ServerInfo | undefined, components: Compon
       detail = llm?.model ? `language model ${llm.model}` : null
       if (!available) reason = 'No language model is configured (setting llm_base_url).'
     } else if (id === 'audio-llm') {
-      available = Boolean(entry?.configured ?? entry?.available)
+      available = Boolean(entry?.available ?? entry?.configured)
       detail = entry?.model ? `audio model ${entry.model}` : null
       if (!available)
         reason = 'No audio-understanding model is configured (settings audio_llm_base_url, audio_llm_model).'
     } else {
-      // The server reports what it would use, not whether it can: a running server it was pointed at, or a
-      // llama-server model it starts itself, which needs llama-server installed.
       detail = entry?.model ? `model ${entry.model}` : null
-      if (entry?.url) {
+      if (typeof entry?.available === 'boolean') {
+        // Newer servers say whether a session can use it now, and why not.
+        available = entry.available
+        if (entry.url) detail = `${detail ? `${detail} at ` : ''}${entry.url}`
+        if (!available)
+          reason =
+            sentence(entry.reason) ?? 'No speech-to-speech model is configured (settings s2s_model or s2s_server_url).'
+      } else if (entry?.url) {
+        // Older servers report what they would use, not whether they can: a running server they were pointed
+        // at, or a llama-server model they start themselves, which needs llama-server installed.
         available = true
         detail = `${detail ? `${detail} at ` : ''}${entry.url}`
       } else if (entry?.model) {
@@ -97,9 +104,22 @@ export function pipelineOptions(info: ServerInfo | undefined, components: Compon
       available,
       reason: available ? null : reason,
       detail,
-      note: id === 'speech-to-speech' ? S2S_LICENCE_NOTE : null,
+      note: id === 'speech-to-speech' ? (isCloudS2s(entry) ? S2S_CLOUD_NOTE : S2S_LICENCE_NOTE) : null,
     }
   })
+}
+
+/** A speech-to-speech backend at a cloud provider (`s2s_model = "<provider>:<model>"`). */
+function isCloudS2s(entry: { cloud?: boolean; model?: string | null } | undefined): boolean {
+  return Boolean(entry?.cloud) || /^[a-z0-9_-]+:.+/.test(entry?.model ?? '')
+}
+
+export const S2S_CLOUD_NOTE = "Paid cloud API: the conversation's audio leaves this server"
+
+function sentence(text: string | null | undefined): string | null {
+  if (!text) return null
+  const t = text.trim()
+  return `${t.charAt(0).toUpperCase()}${t.slice(1)}${/[.!?]$/.test(t) ? '' : '.'}`
 }
 
 /** The pipeline to preselect: the server default when usable, else the first usable one, else the default. */
@@ -122,7 +142,8 @@ export interface DiarizerOption {
 }
 
 const DIARIZER_NOTES: Record<string, string> = {
-  'nemotron-3-diarization': 'Better with overlapping or phone audio, misses more quiet speech',
+  'nemotron-3-diarization':
+    'Better with overlapping speech and similar voices; can merge speakers on clean phone-quality turn-taking',
   'pyannote-3.0-eres2net': 'Default: segmentation and clustering, small and fast',
 }
 
@@ -168,11 +189,65 @@ export function isPending(m: Pick<CatalogModel, 'status'>): boolean {
 }
 
 /**
- * Entries the catalog describes but no runtime can run yet. The server says so only in the description ("Not
- * runnable yet: …"), or in a future `status`.
+ * Entries the catalog describes but no runtime can run yet. Servers say so with `runnable: false`; older ones
+ * only in the description ("Not runnable yet: …").
  */
-export function isNotImplemented(m: Pick<CatalogModel, 'status' | 'description'>): boolean {
+export function isNotImplemented(m: Pick<CatalogModel, 'status' | 'description' | 'runnable'>): boolean {
+  if (typeof m.runnable === 'boolean') return !m.runnable
   return m.status === 'not_implemented' || m.status === 'not-implemented' || /not runnable yet/i.test(m.description)
+}
+
+/** Why an entry cannot run, in the server's words (newer servers), else null. */
+export function notRunnableReason(m: Pick<CatalogModel, 'not_runnable_reason'>): string | null {
+  return sentence(m.not_runnable_reason)
+}
+
+// --- Cloud models ---------------------------------------------------------------------------------------------------
+
+export const CLOUD_NOTICE = 'Paid cloud API; audio leaves this server'
+
+/** A model behind a paid cloud API (engine `remote`). */
+export function isCloud(m: Pick<CatalogModel, 'cloud' | 'engine'> | null | undefined): boolean {
+  return Boolean(m && (m.cloud ?? m.engine === 'remote'))
+}
+
+/** The notice to show with a cloud model: the server's wording when it sends one. */
+export function cloudNotice(m: Pick<CatalogModel, 'notice'> | null | undefined): string {
+  const n = m?.notice?.trim()
+  return n ? `${n.charAt(0).toUpperCase()}${n.slice(1)}` : CLOUD_NOTICE
+}
+
+// --- Server behaviour ---------------------------------------------------------------------------------------------
+
+/** Whether the server downloads a model on first use. Null when it does not say (older servers). */
+export function autoPull(info: ServerInfo | undefined): boolean | null {
+  return typeof info?.auto_pull === 'boolean' ? info.auto_pull : null
+}
+
+/** What to tell someone who picked a model that is not installed. */
+export function notInstalledHint(info: ServerInfo | undefined, m: Pick<CatalogModel, 'cloud' | 'engine'>): string {
+  if (isCloud(m)) return 'Its cloud provider is not configured yet. Add the provider on the Providers screen.'
+  const auto = autoPull(info)
+  if (auto === true) return 'The server downloads it on first use, so the first request takes longer.'
+  if (auto === false)
+    return 'This server does not download models on demand (auto_pull is off). Pull it from the Models screen.'
+  return 'Pull it from the Models screen, or pick an installed model.'
+}
+
+/**
+ * Whether the server has word lists: true or false when it announces them (`capabilities.wordlists`), null
+ * when it does not say, in which case the caller probes the route.
+ */
+export function wordListsAnnounced(info: ServerInfo | undefined): boolean | null {
+  const w = info?.capabilities?.wordlists
+  if (w) return true
+  // A server new enough to announce cloud providers announces word lists too: absent means it has none.
+  return info?.capabilities && 'providers' in info.capabilities ? false : null
+}
+
+/** Whether the server has cloud providers (the Providers screen and cost estimates). */
+export function providersOffered(info: ServerInfo | undefined): boolean {
+  return Boolean(info?.capabilities?.providers)
 }
 
 /** True when a model is fine without a GPU. */
@@ -200,6 +275,7 @@ function formatGb(gb: number): string {
 /** Short name of the runtime behind a model, for voice families that do not run in bolo itself. */
 export function runtimeLabel(m: Pick<CatalogModel, 'engine' | 'requires' | 'id'>): string | null {
   if (m.engine.startsWith('plugin:')) return `plugin ${m.engine.slice(7)}`
+  if (m.engine === 'remote') return 'cloud API'
   if (m.engine === 'tts-server') {
     if (m.requires?.includes('audio.cpp') || m.id.endsWith('-audiocpp')) return 'audio.cpp'
     return 'llama.cpp'
@@ -214,6 +290,7 @@ export function voiceFamily(m: Pick<CatalogModel, 'engine' | 'id' | 'family'>): 
   if (m.engine === 'tts-server' && ORPHEUS.test(m.id)) return 'Orpheus family (llama.cpp)'
   if (m.engine === 'tts-server') return m.id.endsWith('-audiocpp') ? 'audio.cpp voices' : 'llama.cpp voices'
   if (m.engine.startsWith('plugin:')) return 'Engine plugin voices'
+  if (m.engine === 'remote') return 'Cloud voices (paid APIs)'
   return 'Built-in voices'
 }
 

@@ -2,12 +2,12 @@
  "openapi": "3.1.0",
  "info": {
   "title": "bolo",
-  "description": "\nbolo serves speech-to-text, text-to-speech and voice-activity detection.\n\n* **openai** - drop-in `/v1/audio/*` and `/v1/models`\n* **speaches** - model-management routes compatible with speaches\n* **native** - `/api/v1/*`: catalog, pulls, stats, request traces, events, benchmark\n* WebSockets (not shown by OpenAPI): `/api/v1/stt/stream`, `/api/v1/tts/stream` - see docs/api.md\n",
+  "description": "\nbolo serves speech-to-text, text-to-speech and voice-activity detection.\n\n* **openai** - drop-in `/v1/audio/*` and `/v1/models`\n* **speaches** - model-management routes compatible with speaches\n* **native** - `/api/v1/*`: catalog, pulls, cloud providers, stats, request traces, events, benchmark\n* WebSockets (not shown by OpenAPI): `/api/v1/stt/stream`, `/api/v1/tts/stream` - see docs/api.md\n",
   "license": {
    "name": "Apache-2.0",
    "url": "https://www.apache.org/licenses/LICENSE-2.0"
   },
-  "version": "0.2.0"
+  "version": "0.3.0"
  },
  "paths": {
   "/v1/models": {
@@ -717,6 +717,188 @@
       }
      }
     },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/providers": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Cloud providers (keys are never returned)",
+    "operationId": "list_providers_api_v1_providers_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/providers/{name}": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "One cloud provider",
+    "operationId": "get_provider_api_v1_providers__name__get",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Name"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Add or change a cloud provider",
+    "description": "Stored in ``<data_dir>/providers.json`` (mode 0600). Providers from the configuration file or the\nenvironment cannot be changed here. Refused on a non-loopback bind without an API key.",
+    "operationId": "put_provider_api_v1_providers__name__put",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Name"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProviderRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Remove a stored cloud provider",
+    "operationId": "delete_provider_api_v1_providers__name__delete",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Name"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/providers/{name}/test": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Check that a provider answers and accepts the key",
+    "description": "One cheap request to the provider (a model, voice or project listing; nothing billed). The answer says\nwhether the key itself was checked (``checked: credentials``) or only the address (``reachability``).",
+    "operationId": "test_provider_api_v1_providers__name__test_post",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Name"
+      }
+     }
+    ],
     "responses": {
      "200": {
       "description": "Successful Response",
@@ -1816,6 +1998,21 @@
       ],
       "title": "Wordlists",
       "description": "Pin pronunciation word lists to the model, highest priority first; null removes the pin."
+     },
+     "fallback": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fallback",
+      "description": "Models (of the same task, local or cloud) that answer instead when this one is unavailable, overloaded or its provider fails, in order; null removes the pin, [] switches a configured fallback off."
      }
     },
     "additionalProperties": false,
@@ -1889,6 +2086,80 @@
      "models"
     ],
     "title": "PreviewRequest"
+   },
+   "ProviderRequest": {
+    "properties": {
+     "kind": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Kind",
+      "description": "openai-compatible, sarvam, elevenlabs or deepgram."
+     },
+     "base_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Base Url",
+      "description": "Default: the provider's own address."
+     },
+     "api_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Api Key",
+      "description": "Write-only. Absent or empty keeps the stored key; it is never returned by any route."
+     },
+     "clear_api_key": {
+      "type": "boolean",
+      "title": "Clear Api Key",
+      "description": "Remove the stored key.",
+      "default": false
+     },
+     "options": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Options"
+     },
+     "prices": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Prices",
+      "description": "Price table for cost estimates: {<provider model or *>: {per_minute, per_hour, per_1k_chars, per_1m_chars, per_request, currency}}."
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "ProviderRequest"
    },
    "PullRequest": {
     "properties": {

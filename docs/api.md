@@ -59,6 +59,11 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `GET` | `/api/v1/jobs` | List background jobs |
 | `GET` | `/api/v1/models/{model_id}/settings` | Settings pinned for one model |
 | `PUT` | `/api/v1/models/{model_id}/settings` | Pin settings for one model (phonemiser, text normaliser, word lists) |
+| `GET` | `/api/v1/providers` | Cloud providers (keys are never returned) |
+| `GET` | `/api/v1/providers/{name}` | One cloud provider |
+| `PUT` | `/api/v1/providers/{name}` | Add or change a cloud provider |
+| `DELETE` | `/api/v1/providers/{name}` | Remove a stored cloud provider |
+| `POST` | `/api/v1/providers/{name}/test` | Check that a provider answers and accepts the key |
 | `POST` | `/api/v1/models/{model_id}/load` | Load a model into memory |
 | `POST` | `/api/v1/models/{model_id}/unload` | Unload a model from memory |
 | `DELETE` | `/api/v1/models/{model_id}` | Delete an installed model |
@@ -118,8 +123,15 @@ message:
 | 429 | `overloaded` (`type: rate_limit_error`) | the model's queue is full, or the memory budget is exhausted. `Retry-After` is set |
 | 500 | `synthesis_failed`, `internal_error` | the engine failed, or a voice produced no audio for the text (never an empty 200) |
 | 502 | `download_failed`, `llm_error` | a model download failed; the configured language model could not be reached or answered with an error |
+| 502 | `provider_error`, `provider_auth` | a cloud provider failed (5xx, a broken connection, an unknown model) or refused bolo's key. See [providers.md](providers.md#errors) |
 | 503 | `llm_not_configured` | `/v1/chat/completions` or a Realtime conversation without `llm_base_url` |
 | 503 | `engine_unavailable` | the engine for this model is not installed, or the model failed its load probe |
+| 503 | `provider_not_configured` | a cloud model whose provider has no entry or no key in `providers` |
+| 504 | `provider_timeout` | a cloud provider did not answer within `provider_timeout_s` |
+
+A provider's 400 is passed on as `400 invalid_request` with its message, and its 429 as
+`429 overloaded` with its `Retry-After`. `engine_unavailable`, `overloaded` and the `provider_*`
+errors are what a model's [fallback list](providers.md#fallback) reacts to.
 
 **Model names.** Anywhere a model is expected you may send a catalog id
 (`moonshine-tiny-en`), one of its aliases (often the upstream repository id,
@@ -128,10 +140,21 @@ for example `Systran/faster-whisper-small`), or an OpenAI name: `whisper-1`,
 `tts-1-hd`, `gpt-4o-mini-tts` map to `default_tts`. Omitting the model uses
 the default. A model that is in the catalog but not installed is downloaded
 on first use unless `auto_pull` is off (the request waits for the download).
+Cloud models (catalog entries with `cloud: true`, for example
+`openai-whisper-1` or `sarvam-bulbul-v3`) are used the same way once their
+provider is configured, and any other model of a configured provider can be
+named as `<provider>:<model>` (`openai:gpt-transcribe`,
+`sarvam:saarika:v2.5`). They are paid cloud APIs and the audio leaves this
+server: see [providers.md](providers.md).
 
 **Response headers.** `x-request-id` is the trace id (look it up at
 `/api/v1/requests/{id}`); `openai-processing-ms` on transcriptions;
-`x-sample-rate` on speech.
+`x-sample-rate` on speech. `x-bolo-model` on transcriptions and speech is the
+model that answered; `x-bolo-fallback: <requested> -> <answered>;
+reason=<code>` is added when a [fallback](providers.md#fallback) answered
+instead of the model that was asked for, and `x-bolo-estimated-cost:
+<amount> <currency>` on transcriptions served by a cloud model that has a
+price in the provider's price table.
 
 ## OpenAI-compatible endpoints
 
@@ -335,11 +358,20 @@ For clients written against speaches; details and differences are in
              {"id": "whisper.cpp", "version": null, "available": false, "reason": "ModuleNotFoundError: …"}],
  "device": "cpu", "cpu_count": 4, "platform": "linux-x86_64", "python": "3.12.3",
  "auth_required": false, "data_dir": "/home/u/.cache/bolo",
+ "auto_pull": true,                       // models that are not installed are downloaded on first use
+ "providers": [{"name": "openai", "kind": "openai-compatible", "configured": true}],   // cloud providers; never a key
  "defaults": {"stt": "whisper-base", "realtime_stt": "moonshine-tiny-en", "tts": "kokoro-v1.0-int8", "vad": "silero-vad"},
  "wyoming": {"enabled": false, "host": "127.0.0.1", "port": 10300},
  "scheduler": {"workers": 1, "threads": 4, "max_batch": 8, "batch_wait_ms": 0.0, "max_queue": 64},
  "components": [ … the list from GET /api/v1/components … ],
  "capabilities": {
+   "wordlists": {"available": true,          // false without uccharan; "install" then says how to add it
+                 "endpoint": "/api/v1/wordlists", "install": null, "request_fields": ["wordlists", "pronunciations"],
+                 "formats": ["tsv", "pls", "json"], "pin_per_model": true,
+                 "preview": "/api/v1/wordlists/{name}/preview", "max_lists_per_request": 8},
+   "providers": {"endpoint": "/api/v1/providers", "kinds": ["openai-compatible", "sarvam", "elevenlabs", "deepgram"],
+                 "editable": true, "edit_blocked_reason": null, "configured": ["openai"],
+                 "adhoc_models": "<provider>:<model>", "fallback": true, "cost_estimates": false},
    "diarization": {"available": true, "installed": false, "default_model": "pyannote-3.0-eres2net",
                    "http": {"endpoint": "/api/v1/diarize", "transcriptions": ["diarize", "diarized_json"]},
                    "websocket": "diarize=true (one speaker per utterance, labelled online)",
@@ -358,7 +390,15 @@ For clients written against speaches; details and differences are in
                 "transcript_deltas": true,               // user transcripts arrive incrementally
                 "turn_detection": ["server_vad", "semantic_vad"],
                 "semantic_vad": {"model": "smart-turn-v3", "available": true, "installed": false},
-                "sip": false},
+                "sip": false,
+                "pipeline": "cascade",                   // the server's default (setting realtime_pipeline)
+                // per pipeline: "configured" (its settings are in place) and "available" (a session can use it now)
+                "pipelines": {
+                  "cascade": {"configured": false, "available": false},          // needs llm_base_url
+                  "audio-llm": {"configured": false, "available": false, "base_url": null, "model": null},
+                  "speech-to-speech": {"configured": true, "available": false,
+                                       "reason": "llama-server is not installed (bolo components install llama-server)",
+                                       "model": "lfm3-audio-2b-llamacpp", "url": null}}},
    "chat_completions": {"endpoint": "/v1/chat/completions", "available": false, "audio": false},
    "llm": {"configured": false, "base_url": null, "model": null}}}
 ```
@@ -388,6 +428,12 @@ in the id, aliases, family, engine, languages, licence or description.
   "requires": [],                     // optional components, e.g. ["espeak-ng"]
   "available": true,                  // false while a required component is not installed
   "status": null,                     // "pending": described but its files are not published yet (see below)
+  "runnable": true,                   // false: no runtime bolo has can run this model yet …
+  "not_runnable_reason": null,        // … and why (spark-tts-0.5b, maskgct, diarizen-wavlm-large-s80-md-v2)
+  "cloud": false,                     // true: a paid cloud API (engine "remote"); nothing is downloaded
+  "notice": null,                     // cloud models: "paid cloud API; audio leaves this server"
+  "provider": null,                   // cloud models: {"name","kind","model","configured","price"}
+  "fallback": [],                     // models that answer instead when this one cannot (providers.md, "Fallback")
   "hardware": null                    // or {"gpu": "optional"|"recommended"|"required", "vram_gb": 2.0, "note": "…"}
 }]}
 ```
@@ -400,9 +446,19 @@ with this model).
 `GET /api/v1/models/{id}` returns one such entry.
 
 Entries with `"status": "pending"` describe models whose files the project
-has not published yet (voices awaiting conversion). They are left out of the
-catalog listing, `GET /api/v1/models/{id}` shows them, and pulling or using
-one answers `404 model_not_published`.
+has not published yet (voices awaiting conversion). The catalog listing
+includes them (`installed` is `false`; they are not in `GET /v1/models`), and
+pulling or using one answers `404 model_not_published`.
+
+Entries with `"runnable": false` are models that no runtime bolo has can run
+yet; `not_runnable_reason` says why. They are listed so the catalog can say
+so, and so their licence and source are on record.
+
+Cloud entries (`"cloud": true`, `engine: "remote"`) have no files:
+`installed` is `true` when their provider is configured (`provider.configured`),
+`size_bytes` is 0, `license_url` links the provider's terms, and "pulling" one
+only checks the provider. `"adhoc": true` marks a `<provider>:<model>` id that
+was used by name and is not a curated entry.
 
 ### Model management
 
@@ -415,10 +471,36 @@ one answers `404 model_not_published`.
 | `POST /api/v1/models/{id}/unload` | `200 {"id","loaded":false}` |
 | `DELETE /api/v1/models/{id}` | `204`; unloads first |
 | `GET /api/v1/models/{id}/settings` | `{"model","settings":{…}}`: what the user pinned for that model (`{}` by default) |
+| `PUT /api/v1/models/{id}/settings` `{"fallback": ["openai-whisper-1"]}` | pins the model's [fallback list](providers.md#fallback) (same task, local or cloud; `[]` switches a configured fallback off, `null` removes the pin) |
 | `PUT /api/v1/models/{id}/settings` `{"phonemizer": "espeak-ng"}` | pins the phonemiser of a voice (`null` removes the pin); stored in `<data_dir>/model-settings.json`, shown as `settings` in catalog entries, announced as a `model` event with `"event":"settings"`. `400` for a model that reads characters, or uccharan on a language it does not cover. CLI: `bolo models config <id> --phonemizer X` / `--clear` |
 
 Pulling an installed model yields a job that is already `done`. Pulling a
 gated model without a token yields a job in state `error` that says what to do.
+
+### Cloud providers
+
+`GET /api/v1/providers`, `GET/PUT/DELETE /api/v1/providers/{name}` and
+`POST /api/v1/providers/{name}/test` list, add, change, remove and check the
+cloud providers behind `engine: remote` models. Keys are write-only: no route
+returns one. The routes, the stored file and who may change providers are
+described in [providers.md](providers.md#the-providers-api).
+
+```jsonc
+// GET /api/v1/providers
+{"providers": [{"name": "openai", "kind": "openai-compatible", "base_url": "https://api.openai.com/v1",
+                "configured": true, "api_key_set": true, "options": {}, "prices": {"whisper-1": {"per_minute": 0.006}},
+                "source": "settings",        // settings (file or environment; read-only) | stored (added through the API)
+                "editable": false, "terms_url": "https://openai.com/policies/services-agreement/",
+                "stats": {"whisper-1": {"requests": 12, "errors": 0, "latency_ms_mean": 640.2, "bytes_sent": 3841024,
+                                        "bytes_received": 2210, "audio_seconds": 120.0, "chars": 0,
+                                        "estimated_cost": {"USD": 0.012}, "last_error": null}}}],
+ "kinds": [{"kind": "openai-compatible", "default_base_url": "https://api.openai.com/v1", "terms_url": "…"}, …],
+ "editable": true, "edit_blocked_reason": null, "notice": "paid cloud API; audio leaves this server"}
+
+// PUT /api/v1/providers/sarvam   {"api_key": "…"}            -> the provider, without the key
+// POST /api/v1/providers/sarvam/test
+{"name": "sarvam", "ok": true, "message": "…", "code": null, "checked": "reachability", "latency_ms": 212.4}
+```
 
 ### Pronunciation word lists
 
@@ -467,7 +549,13 @@ is `word` (whole words, any case; the default), `case`, `exact` (any substring) 
    "rtf": {"p50": 0.08, "p95": 0.15},
    "queue": {"depth": 0, "inflight": 1, "workers": 1, "batches": 61, "mean_batch": 1.31, "max_batch": 4,
              "rejected": 0, "queue_ms": {"p50": 0.1, "p95": 38.0, "p99": 71.2}}
- }]}
+ }],
+ "separation": {"requests": {"applied": 0, "partial": 0, "skipped": 0}, "audio_seconds": 0.0},
+ // cloud providers, per provider and provider model (empty without cloud requests)
+ "providers": [{"provider": "openai", "model": "whisper-1", "requests": 12, "errors": 0, "latency_ms_mean": 640.2,
+                "latency_ms_total": 7682.4, "bytes_sent": 3841024, "bytes_received": 2210, "audio_seconds": 120.0,
+                "chars": 0, "estimated_cost": {"USD": 0.012}, "last_error": null}],
+ "fallbacks": [{"requested": "whisper-base", "answered": "openai-whisper-1", "count": 2}]}
 ```
 
 Quantiles are over a rolling window (the most recent 2,048 observations, at
@@ -492,6 +580,16 @@ The most recent request traces, newest first (kept in memory, 1,000 by default).
   "first_partial_ms": null, "final_ms": 141.2, "ttfa_ms": null, "total_ms": 141.2,
   "rtf": 0.0336, "batch_size": 1, "text_preview": "After early nightfall, the yellow lamps…"}]}
 ```
+
+Traces carry extra fields where they apply: `provider` and `cost` (a request
+served by a cloud model: requests, time and bytes at the provider, and the
+estimated cost when the provider's price table knows the model),
+`fallback` (`{requested, answered, attempts: [{model, code, message}]}` when
+another model answered; `model` is then the one that answered), and on
+voice-agent traces (`kind: "agent"`) `pipeline`: which pipeline answered the
+turn (`cascade`, `audio-llm`, `speech-to-speech`; `transcription` for a
+transcription-only session; `cascade` for `/v1/chat/completions`). See
+[providers.md](providers.md#traces-metrics-and-cost-estimates).
 
 Phase names: speech-to-text `queue`, `resample`, `vad`, `decode`, `finalize`;
 text-to-speech `queue`, `normalize`, `synthesize_first`, `synthesize_rest`,
@@ -647,9 +745,10 @@ Who spoke when, without PyTorch. Two kinds of diarizer are in the catalog:
 | `nemotron-3-diarization` | NVIDIA's Nemotron-3-Diarization, an end-to-end model that gives every 10 ms the probability that each of up to 8 speakers is talking (ONNX Runtime) | 147 MB | `diarization_model=nemotron-3-diarization` on `/v1/audio/transcriptions`, `model=nemotron-3-diarization` on `/api/v1/diarize`, or `default_diarization` in the configuration |
 
 Both are pulled on first use. Which one to use, with measurements, is in
-models.md, "Speaker diarization"; in short, Nemotron tells similar voices and
-telephone voices apart far better and finds the number of speakers more
-often, at a fifth of the cost. `nemotron-3-diarization` needs the
+models.md, "Speaker diarization"; in short, Nemotron does better with
+overlapping speech and similar voices and finds the number of speakers more
+often, at a fifth of the cost; on short, clean turn-taking dialogues at
+telephone quality it can merge two speakers into one. `nemotron-3-diarization` needs the
 `onnxruntime` Python package (installed with `bolo-speech[all]`, which brings it with
 faster-whisper; otherwise `pip install onnxruntime`) and, for named speakers
 and live streams, sherpa-onnx for its speaker embeddings.
@@ -732,8 +831,7 @@ paragraphs).
 **Diarization-conditioned recognition.** With a speaker-conditioned model
 (`model=dicow-v3.3`; needs the bolo-torch plugin, `pip install
 "bolo-torch[dicow]"`; or the same model without PyTorch in bolo's core,
-`dicow-v3.3-onnx`, which until its files are hosted is registered from a local
-export with `bolo pull ./dir`) a diarized transcription is not cut at speaker turns.
+`dicow-v3.3-onnx`) a diarized transcription is not cut at speaker turns.
 bolo diarizes the recording, then the model transcribes the whole recording
 once per speaker, told every 20 ms whether that speaker, someone else, both or
 nobody is talking, so overlapping speech is transcribed for each speaker. The

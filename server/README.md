@@ -101,11 +101,11 @@
 ## Quick start
 
 ```bash
-pipx install 'bolo-speech[all] @ git+https://github.com/cb-Sigma/bolo#subdirectory=server'
+uv tool install 'bolo-speech[all]'
 bolo serve
 ```
 
-(`pip install` into a virtual environment works the same way. Once the package is on PyPI this becomes `pipx install 'bolo-speech[all]'`, or `pipx run --spec 'bolo-speech[all]' bolo serve`.)
+Or run it once without installing: `uvx --from 'bolo-speech[all]' bolo serve`. Without [uv](https://docs.astral.sh/uv/): `pipx install 'bolo-speech[all]'`, or `pip install 'bolo-speech[all]'` into a virtual environment. As a container (CPU image): `docker run -p 8000:8000 -v bolo-data:/data ghcr.io/cb-sigma/bolo:latest`. The PyPI distribution is `bolo-speech`; the command and the Python package are `bolo`.
 
 Open <http://127.0.0.1:8000> for the console, or use the API. The first request for a model downloads it:
 

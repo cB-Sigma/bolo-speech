@@ -30,6 +30,7 @@ from bolo.engines.base import (
 )
 from bolo.errors import EngineUnavailable, ModelNotFound, ModelNotInstalled, Overloaded
 from bolo.obs.events import EventBus
+from bolo.providers import ProviderRegistry
 from bolo.scheduler import Handler, ModelQueue
 from bolo.store import ModelStore
 
@@ -106,6 +107,8 @@ class ModelManager:
         self._reaper: asyncio.Task[None] | None = None
         self._ensure_installed = ensure_installed
         self.evictions = 0
+        #: set by the core: who the cloud providers are (a cloud model is installed when its provider is configured)
+        self.providers: ProviderRegistry | None = None
 
     # -- helpers ----------------------------------------------------------
     def resolve(self, name: str) -> ModelSpec:
@@ -120,6 +123,16 @@ class ModelManager:
         """Files on disk, or nothing to download: built in, or served by an operator-run TTS server."""
         from bolo.tts_runtimes import remote_url
 
+        if spec.cloud:
+            provider = (
+                self.providers.find(
+                    str(spec.options.get("provider") or "") or None,
+                    str(spec.options.get("provider_kind") or "") or None,
+                )
+                if self.providers is not None
+                else None
+            )
+            return provider is not None and provider.configured
         return spec.builtin or self.store.is_installed(spec.id) or remote_url(self.settings, spec) is not None
 
     def ttl_for(self, spec: ModelSpec) -> float:
@@ -177,7 +190,7 @@ class ModelManager:
         return ModelQueue(
             spec.id,
             handlers,
-            workers=int(spec.options.get("workers", s.workers)),
+            workers=max(1, int(spec.options.get("workers", s.workers))),
             max_batch=max_batch,
             max_wait_ms=s.batch_wait_ms,
             max_queue=s.max_queue,
@@ -210,8 +223,10 @@ class ModelManager:
             model_opts.setdefault("voices", spec.voices)
         if len(spec.languages) == 1:
             model_opts.setdefault("language", spec.languages[0])
-        if spec.engine.startswith("plugin:") or spec.engine == "tts-server":
+        if spec.engine.startswith("plugin:") or spec.engine in ("tts-server", "remote"):
             model_opts.setdefault("model_id", spec.id)
+        if spec.engine == "remote":
+            model_opts.setdefault("sample_rate", spec.sample_rate)
         if spec.engine == "tts-server":
             model_opts.setdefault("model_aliases", list(spec.aliases))
             model_opts.setdefault("sample_rate", spec.sample_rate)
@@ -229,8 +244,8 @@ class ModelManager:
         """First load of an installed model happens in a child process (see ``bolo._probe``)."""
         if spec.builtin or not self.settings.probe_models or spec.engine.startswith("plugin:"):
             return  # plugins run in their own process already
-        if spec.engine == "tts-server":
-            return  # the model runs in a server process; loading it there is the check
+        if spec.engine in ("tts-server", "remote"):
+            return  # the model runs in a server process (or at a provider); loading it there is the check
         manifest = self.store.manifest(spec.id)
         engine_version = self.engines.status(spec.engine).version
         if manifest is None or manifest.get("probed") == engine_version:

@@ -84,9 +84,9 @@ def manual_command(component: str = ESPEAK) -> str:
             return "rebuild the image with: docker build --build-arg WITH_ESPEAK=1 ..."
         return "rebuild the image (uccharan is part of bolo-speech[all])"
     if "/pipx/venvs/" in prefix:
-        return f"pipx inject bolo {package}"
+        return f"pipx inject bolo-speech {package}"
     if "/uv/tools/" in prefix:
-        return f"uv tool install --with {package} bolo"
+        return f"uv tool install --with {package} bolo-speech"
     return f"pip install 'bolo-speech[{extra}]'"
 
 

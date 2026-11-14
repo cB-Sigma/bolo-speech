@@ -458,6 +458,46 @@ def cmd_components(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_providers(args: argparse.Namespace) -> int:
+    """Cloud providers from the configuration and <data_dir>/providers.json. Keys are never printed."""
+    registry = _core(args).providers
+    if args.action == "list":
+        providers = registry.all()
+        if not providers:
+            print("no cloud providers are configured (docs/providers.md); nothing leaves this server")
+            return 0
+        for p in providers:
+            state = "configured" if p.configured else "no API key"
+            print(f"{p.name:<16} {p.kind:<18} {state:<12} {p.source:<9} {p.base_url}")
+        return 0
+    if not args.provider:
+        print("error: name the provider to test", file=sys.stderr)
+        return 1
+    if registry.get(args.provider) is None:
+        print(f"error: unknown provider '{args.provider}'", file=sys.stderr)
+        return 1
+    result = registry.test(args.provider)
+    what = {"credentials": "key accepted", "reachability": "address reachable (the key was not proven)"}
+    if result["ok"]:
+        print(f"{result['name']}: {what.get(str(result['checked']), 'ok')} in {result['latency_ms']:.0f} ms")
+        print(f"  {result['message']}")
+        return 0
+    print(f"{result['name']}: failed ({result['code']}): {result['message']}", file=sys.stderr)
+    return 1
+
+
+def _doctor_providers(settings: Settings) -> None:
+    from bolo.providers import ProviderRegistry
+
+    providers = ProviderRegistry(settings).all()
+    if not providers:
+        print("cloud providers: none configured (nothing leaves this server)")
+        return
+    print("cloud providers (paid cloud APIs; `bolo providers test <name>` checks one):")
+    for p in providers:
+        print(f"  {p.name}: {p.kind} at {p.base_url}, {'configured' if p.configured else 'no API key'}")
+
+
 def _doctor_llm(settings: Settings) -> None:
     from bolo.llm import LLMClient
 
@@ -533,6 +573,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             "not cover need it: `bolo components install espeak-ng --accept-license`)"
         )
     _doctor_llm(settings)
+    _doctor_providers(settings)
     try:
         import wyoming
 
@@ -687,6 +728,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="accept the component's licence (GPL-3.0-or-later)",
     )
     s.set_defaults(func=cmd_components)
+
+    s = sub.add_parser("providers", help="cloud providers (paid cloud APIs; docs/providers.md): list, test")
+    _common(s)
+    s.add_argument("action", choices=["list", "test"])
+    s.add_argument("provider", nargs="?")
+    s.set_defaults(func=cmd_providers)
 
     s = sub.add_parser("doctor", help="check engines, codecs, components, the language model and the data directory")
     _common(s)

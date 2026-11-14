@@ -614,6 +614,8 @@
     - {id: zaid, name: Zaid, language: ur-IN}
     - {id: saba, name: Saba, language: ur-IN}
 - id: spark-tts-0.5b
+  runnable: false
+  not_runnable_reason: no runtime bolo can use runs this model yet
   task: tts
   engine: plugin:torch
   kind: spark-tts
@@ -642,6 +644,8 @@
   options:
     plugin_install: not supported by bolo-torch yet (no packaged inference code)
 - id: maskgct
+  runnable: false
+  not_runnable_reason: no ggml or ONNX runtime has this model, and its inference code is not packaged
   task: tts
   engine: plugin:torch
   kind: maskgct
@@ -669,6 +673,8 @@
   options:
     plugin_install: not supported by bolo-torch yet (no packaged inference code)
 - id: diarizen-wavlm-large-s80-md-v2
+  runnable: false
+  not_runnable_reason: bolo's engine plugins cannot serve diarization models yet
   task: diarization
   engine: plugin:torch
   kind: diarizen

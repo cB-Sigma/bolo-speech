@@ -39,7 +39,13 @@ def tone_b64(seconds: float = 0.1) -> str:
 
 
 class FakeRealtimeServer:
-    def __init__(self, api_key: str | None = None, port: int = 0, word_delay_s: float = 0.0) -> None:
+    def __init__(
+        self, api_key: str | None = None, port: int = 0, word_delay_s: float = 0.0, openai: bool = False
+    ) -> None:
+        #: behave like OpenAI's Realtime API where it differs from llama-server: 24 kHz PCM input, and a
+        #: response that is audio (text in ``response.output_audio_transcript.delta``) or text, never both
+        self.openai = openai
+        self.paths: list[str] = []
         self.api_key = api_key
         self.port = port
         self.word_delay_s = word_delay_s
@@ -73,6 +79,7 @@ class FakeRealtimeServer:
             return connection.respond(HTTPStatus.UNAUTHORIZED, "Invalid API Key\n")
         if not request.path.startswith("/v1/realtime"):
             return connection.respond(HTTPStatus.NOT_FOUND, "not found\n")
+        self.paths.append(request.path)
         return None
 
     async def _main(self) -> None:
@@ -88,7 +95,7 @@ class FakeRealtimeServer:
         self.events.append(log)
         state: dict[str, Any] = {"tools": [], "audio_s": 0.0, "turn": False, "text": None, "tool_output": None}
         self.sessions.append(state)
-        rate = 16000
+        rate = 24000 if self.openai else 16000
         task: asyncio.Task[None] | None = None
         cancel = asyncio.Event()
 
@@ -136,9 +143,15 @@ class FakeRealtimeServer:
                     status = "cancelled"
                     break
                 base = {"response_id": response_id, "item_id": "item_msg", "output_index": 0}
-                await send({"type": "response.output_text.delta", **base, "content_index": 0,
-                            "delta": word if i == 0 else " " + word})  # fmt: skip
-                await send({"type": "response.output_audio.delta", **base, "content_index": 1, "delta": tone_b64()})
+                delta = word if i == 0 else " " + word
+                audio = "audio" in state.get("modalities", ["audio"])
+                if self.openai and audio:
+                    await send({"type": "response.output_audio_transcript.delta", **base, "content_index": 0,
+                                "delta": delta})  # fmt: skip
+                else:
+                    await send({"type": "response.output_text.delta", **base, "content_index": 0, "delta": delta})
+                if audio or not self.openai:
+                    await send({"type": "response.output_audio.delta", **base, "content_index": 1, "delta": tone_b64()})
                 await asyncio.sleep(self.word_delay_s)
             output.append({**item, "status": status})
             await send({"type": "response.output_item.done", "response_id": response_id, "output_index": 0,
@@ -182,6 +195,7 @@ class FakeRealtimeServer:
                                 "message": "response.create: commit audio or create a message first", "param": None}})  # fmt: skip
                     continue
                 cancel.clear()
+                state["modalities"] = (event.get("response") or {}).get("output_modalities") or ["audio"]
                 task = asyncio.create_task(respond(f"resp_{len(log)}"))
             elif kind == "response.cancel":
                 self.cancelled += 1

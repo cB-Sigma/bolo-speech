@@ -1,4 +1,15 @@
-import { CircleCheck, Download, Info, Languages, Play, Repeat2, Square, TriangleAlert, Volume2 } from 'lucide-react'
+import {
+  CircleCheck,
+  Cloud,
+  Download,
+  Info,
+  Languages,
+  Play,
+  Repeat2,
+  Square,
+  TriangleAlert,
+  Volume2,
+} from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { BudgetBar } from '@/components/charts/budget-bar'
@@ -18,6 +29,7 @@ import {
   describeError,
   missingComponent,
   useComponents,
+  useInfo,
   useSamples,
   useSelectedModel,
   useWordLists,
@@ -42,7 +54,15 @@ import { isDemo } from '@/lib/api/config'
 import { detectSupport } from '@/lib/support'
 import { BrowserTts } from './tts-browser'
 import { VoiceClonePanel, type CloneReference } from '@/components/tts/voice-clone'
-import { canClone, PHONEMIZER_LABEL, phonemizerChoices, voiceFamily } from '@/lib/capabilities'
+import {
+  canClone,
+  cloudNotice,
+  isCloud,
+  notInstalledHint,
+  PHONEMIZER_LABEL,
+  phonemizerChoices,
+  voiceFamily,
+} from '@/lib/capabilities'
 import { cn } from '@/lib/utils'
 
 const FALLBACK_TEXTS: Sample[] = [
@@ -83,6 +103,7 @@ export default function TtsPage() {
 }
 
 function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
+  const info = useInfo()
   const { models, model, select, isLoading, error: modelsError } = useSelectedModel('tts')
   const stt = useSelectedModel('stt')
   const samples = useSamples()
@@ -348,13 +369,26 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
         </Alert>
       )}
       {missing && model && <ComponentNotice component={missing} subject={model.id} className="mb-4" />}
+      {model && isCloud(model) && model.installed && (
+        <Alert className="mb-4" data-testid="cloud-model-notice">
+          <Cloud />
+          <AlertTitle>{cloudNotice(model)}</AlertTitle>
+          <AlertDescription>
+            <span>
+              <span className="num">{model.id}</span> is served by the provider{' '}
+              <span className="num">{model.provider?.name ?? 'unknown'}</span>: what you type here is sent there and
+              billed by it.
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
       {model && !model.installed && (
         <Alert className="mb-4">
           <Info />
           <AlertTitle>
             <span className="num">{model.id}</span> is not installed
           </AlertTitle>
-          <AlertDescription>Pull it from the Models screen, or pick an installed model.</AlertDescription>
+          <AlertDescription>{notInstalledHint(info.data, model)}</AlertDescription>
         </Alert>
       )}
 

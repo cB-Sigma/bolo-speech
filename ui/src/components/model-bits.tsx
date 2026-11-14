@@ -1,7 +1,7 @@
-import { Ban, CircleCheck, CircleDashed, Clock, Cpu, Lock, Scale, Target, Zap } from 'lucide-react'
+import { Ban, CircleCheck, CircleDashed, Clock, Cloud, Cpu, Lock, Scale, Target, Zap } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { CatalogModel, Tier } from '@/lib/api/types'
-import { hardwareLabel, isNotImplemented, isPending } from '@/lib/capabilities'
+import { cloudNotice, hardwareLabel, isCloud, isNotImplemented, isPending, notRunnableReason } from '@/lib/capabilities'
 import { languageName } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -152,16 +152,54 @@ export function HardwareMark({ hardware, className }: { hardware: CatalogModel['
   )
 }
 
+/** "Cloud" for models behind a paid cloud API, with the notice that audio leaves the server. */
+export function CloudMark({
+  model,
+  className,
+}: {
+  model: Pick<CatalogModel, 'cloud' | 'engine' | 'notice' | 'provider'>
+  className?: string
+}) {
+  if (!isCloud(model)) return null
+  const provider = model.provider?.name
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          className={cn(
+            'inline-flex h-5 items-center gap-1 rounded-md border border-warning/40 bg-warning/10 px-1.5 text-[11px] font-medium text-warning-text',
+            className,
+          )}
+          data-testid="cloud-mark"
+        >
+          <Cloud className="size-3" aria-hidden />
+          Cloud
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-64">
+        {cloudNotice(model)}.{' '}
+        {provider
+          ? model.provider?.configured
+            ? `Served by the provider ${provider}.`
+            : `Needs the provider ${provider}, which is not configured yet.`
+          : ''}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 /** "Not published yet" for pending entries, "Not runnable yet" for entries no runtime can run. */
 export function AvailabilityMark({
   model,
   className,
 }: {
-  model: Pick<CatalogModel, 'status' | 'description'>
+  model: Pick<CatalogModel, 'status' | 'description' | 'runnable' | 'not_runnable_reason'>
   className?: string
 }) {
   const pending = isPending(model)
   const notImpl = !pending && isNotImplemented(model)
+  const why = notRunnableReason(model)
   if (!pending && !notImpl) return null
   return (
     <Tooltip>
@@ -178,7 +216,7 @@ export function AvailabilityMark({
       <TooltipContent className="max-w-64">
         {pending
           ? 'Described in the catalog, but its files are not published yet. It cannot be pulled or used.'
-          : 'Listed for reference: no runtime bolo can use runs it yet, so loading it fails. The description says why.'}
+          : `Listed for reference: nothing this server has can run it yet, so loading it fails. ${why ?? 'The description says why.'}`}
       </TooltipContent>
     </Tooltip>
   )

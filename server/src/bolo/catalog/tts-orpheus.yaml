@@ -10,9 +10,9 @@
 # Sources, read 2026-11-14: the Hugging Face API for every repository (revision, files, sizes, SHA-256, gating,
 # licence tags), the model cards, Kenpath's svara-tts-inference (prompt), canopyai/Orpheus-TTS (prompt, sampling),
 # llama.cpp tools/server/README.md (build b12375).
-# status: pending until the SNAC decoder is published at codebucketsolutions/snac-24khz-onnx (then pin the
-# revision in the decoder URL and drop the status). validated: untested (the files bolo would download are not
-# published yet); Svara and Veena Q4_K_M were run on a 4-vCPU machine, see docs/models.md.
+# The SNAC decoder is published at codebucketsolutions/snac-24khz-onnx (the decoder URLs pin its revision).
+# validated: untested (no entry was run from the published files); Svara and Veena Q4_K_M were run on a 4-vCPU
+# machine with a local export of the decoder, see docs/models.md.
 - id: svara-tts-v1-llamacpp
   task: tts
   engine: tts-server
@@ -27,7 +27,6 @@
   license_url: https://huggingface.co/kenpath/svara-tts-v1
   commercial_use: true
   gated: false
-  status: pending
   description: 'Kenpath Svara TTS v1 (3.3 B Llama, Orpheus Hindi base) for 19 Indian languages including Bhojpuri, Magahi,
     Maithili, Chhattisgarhi, Bodo and Dogri, two voices per language, without PyTorch: Q4_K_M GGUF by mradermacher on
     llama.cpp, SNAC decoded by bolo in onnxruntime. Needs a GPU for live use. Licence: Apache-2.0 as labelled by
@@ -42,7 +41,7 @@
     include: [svara-tts-v1.Q4_K_M.gguf]
     urls:
     - path: snac/snac_24khz_decoder.onnx
-      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/258647ba4e314f23642264764b46fa241a1f2b73/snac_24khz_decoder.onnx
       size: 52581828
       sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
   options:
@@ -60,7 +59,7 @@
     hardware: {gpu: recommended, vram_gb: 3.2, note: 'approximate: weights x 1.3 + 0.5 GB, plus about 0.45 GB of KV cache; 11-16 times slower than real time on a 4-core CPU (measured at Q4_K_M)'}
     snac:
       file: snac/snac_24khz_decoder.onnx
-      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/258647ba4e314f23642264764b46fa241a1f2b73/snac_24khz_decoder.onnx
       sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
       size: 52581828
   voices:
@@ -116,7 +115,6 @@
   license_url: https://huggingface.co/kenpath/svara-tts-v1
   commercial_use: true
   gated: false
-  status: pending
   description: 'Kenpath Svara TTS v1 (3.3 B Llama, Orpheus Hindi base) for 19 Indian languages including Bhojpuri, Magahi,
     Maithili, Chhattisgarhi, Bodo and Dogri, two voices per language, without PyTorch: Q8_0 (closest to the original
     weights) GGUF by mradermacher on llama.cpp, SNAC decoded by bolo in onnxruntime. Needs a GPU for live use. Licence:
@@ -131,7 +129,7 @@
     include: [svara-tts-v1.Q8_0.gguf]
     urls:
     - path: snac/snac_24khz_decoder.onnx
-      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/258647ba4e314f23642264764b46fa241a1f2b73/snac_24khz_decoder.onnx
       size: 52581828
       sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
   options:
@@ -149,7 +147,7 @@
     hardware: {gpu: recommended, vram_gb: 5.1, note: 'approximate: weights x 1.3 + 0.5 GB, plus about 0.45 GB of KV cache; 11-16 times slower than real time on a 4-core CPU (measured at Q4_K_M)'}
     snac:
       file: snac/snac_24khz_decoder.onnx
-      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/258647ba4e314f23642264764b46fa241a1f2b73/snac_24khz_decoder.onnx
       sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
       size: 52581828
   voices:
@@ -205,7 +203,6 @@
   license_url: https://huggingface.co/maya-research/Veena
   commercial_use: true
   gated: false
-  status: pending
   description: 'Maya Research Veena (3 B Llama) for Hindi, English and code-mixed text, four voices, without PyTorch: Q4_K_M GGUF
     by Mungert on llama.cpp, SNAC decoded by bolo in onnxruntime. Needs a GPU for live use. Apache-2.0; training data
     not disclosed.'
@@ -218,7 +215,7 @@
     include: [Veena-q4_k_m.gguf]
     urls:
     - path: snac/snac_24khz_decoder.onnx
-      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/258647ba4e314f23642264764b46fa241a1f2b73/snac_24khz_decoder.onnx
       size: 52581828
       sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
   options:
@@ -230,7 +227,7 @@
     hardware: {gpu: recommended, vram_gb: 3.7, note: 'approximate: weights x 1.3 + 0.5 GB, plus about 0.45 GB of KV cache; 11-16 times slower than real time on a 4-core CPU (measured at Q4_K_M)'}
     snac:
       file: snac/snac_24khz_decoder.onnx
-      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/258647ba4e314f23642264764b46fa241a1f2b73/snac_24khz_decoder.onnx
       sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
       size: 52581828
   voices:
@@ -252,7 +249,6 @@
   license_url: https://huggingface.co/maya-research/Veena
   commercial_use: true
   gated: false
-  status: pending
   description: 'Maya Research Veena (3 B Llama) for Hindi, English and code-mixed text, four voices, without PyTorch: Q8_0 GGUF by
     Mungert on llama.cpp, SNAC decoded by bolo in onnxruntime. Needs a GPU for live use. Apache-2.0; training data not
     disclosed.'
@@ -265,7 +261,7 @@
     include: [Veena-q8_0.gguf]
     urls:
     - path: snac/snac_24khz_decoder.onnx
-      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/258647ba4e314f23642264764b46fa241a1f2b73/snac_24khz_decoder.onnx
       size: 52581828
       sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
   options:
@@ -277,7 +273,7 @@
     hardware: {gpu: recommended, vram_gb: 5.7, note: 'approximate: weights x 1.3 + 0.5 GB, plus about 0.45 GB of KV cache; 11-16 times slower than real time on a 4-core CPU (measured at Q4_K_M)'}
     snac:
       file: snac/snac_24khz_decoder.onnx
-      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/258647ba4e314f23642264764b46fa241a1f2b73/snac_24khz_decoder.onnx
       sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
       size: 52581828
   voices:
@@ -300,7 +296,6 @@
   license_url: https://huggingface.co/canopylabs/orpheus-3b-0.1-ft
   commercial_use: true
   gated: false
-  status: pending
   description: 'Canopy Labs Orpheus 3B 0.1 (English), eight voices and emotive tags such as <laugh> and <sigh>, without PyTorch:
     Q4_K_M GGUF by Unsloth on llama.cpp, SNAC decoded by bolo in onnxruntime. Needs a GPU for live use. The weights are
     labelled Apache-2.0 and are a fine-tune of Llama 3.2 3B Instruct, so Meta''s Llama 3.2 Community License terms
@@ -315,7 +310,7 @@
     include: [orpheus-3b-0.1-ft-Q4_K_M.gguf]
     urls:
     - path: snac/snac_24khz_decoder.onnx
-      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/258647ba4e314f23642264764b46fa241a1f2b73/snac_24khz_decoder.onnx
       size: 52581828
       sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
   options:
@@ -327,7 +322,7 @@
     hardware: {gpu: recommended, vram_gb: 3.2, note: 'approximate: weights x 1.3 + 0.5 GB, plus about 0.45 GB of KV cache; 11-16 times slower than real time on a 4-core CPU (measured at Q4_K_M)'}
     snac:
       file: snac/snac_24khz_decoder.onnx
-      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/258647ba4e314f23642264764b46fa241a1f2b73/snac_24khz_decoder.onnx
       sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
       size: 52581828
   voices:
@@ -353,7 +348,6 @@
   license_url: https://huggingface.co/snorbyte/snorTTS-Indic-v0
   commercial_use: true
   gated: false
-  status: pending
   description: 'snorbyte snorTTS-Indic-v0 (3 B Llama, Orpheus Hindi pretrain base) for nine Indian languages and code-switched
     text, 24 speakers, without PyTorch: Q4_K_M GGUF by mradermacher on llama.cpp, SNAC decoded by bolo in onnxruntime.
     Needs a GPU for live use. Labelled Apache-2.0; its base canopylabs/3b-hi-pretrain-research_release is under the
@@ -368,7 +362,7 @@
     include: [snorTTS-Indic-v0.Q4_K_M.gguf]
     urls:
     - path: snac/snac_24khz_decoder.onnx
-      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/258647ba4e314f23642264764b46fa241a1f2b73/snac_24khz_decoder.onnx
       size: 52581828
       sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
   options:
@@ -380,7 +374,7 @@
     hardware: {gpu: recommended, vram_gb: 3.6, note: 'approximate: weights x 1.3 + 0.5 GB, plus about 0.45 GB of KV cache; 11-16 times slower than real time on a 4-core CPU (measured at Q4_K_M)'}
     snac:
       file: snac/snac_24khz_decoder.onnx
-      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/258647ba4e314f23642264764b46fa241a1f2b73/snac_24khz_decoder.onnx
       sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
       size: 52581828
     temperature: 0.4

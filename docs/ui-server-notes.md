@@ -162,6 +162,32 @@ transport in the TTS playground, `response_format=wav`), and `GET /healthz` (rou
 - **TTS stream.** The console sends `text`, then `flush`, then `stop`, and treats `done` as the end
   of audio. Chunks with empty `text` are folded into the preceding sentence in the timeline.
 
+## Server flags that replaced console heuristics (2026-11-14)
+
+Six things the console used to work out for itself are now reported by the server. The console
+reads the flag when it is there and keeps the old reasoning only for older servers.
+
+| What | Before (in the console) | Now (from the server) |
+| --- | --- | --- |
+| Can a Realtime pipeline be used? | `speech-to-speech`: a URL is set, or a model is named and the llama-server component is installed | `capabilities.realtime.pipelines.<id>.available` and `.configured`, with `.reason` for speech-to-speech |
+| Can a catalog model run at all? | the description contains "Not runnable yet" | `runnable: false` and `not_runnable_reason` on the entry |
+| Models whose files are not published | absent from `GET /api/v1/catalog`, so the console only met them by id | listed, with `status: "pending"` |
+| Which pipeline answered a voice-agent turn | not on the trace | `pipeline` on `kind: "agent"` traces (shown in the request drawer) |
+| Is a model that is not installed downloaded on first use? | unknown: the console always said "pull it first" | `info.auto_pull` (the playgrounds word their hint from it) |
+| Does the server have word lists? | probe `GET /api/v1/wordlists` and read a 404 as "no" | `info.capabilities.wordlists` (the probe is skipped when the server announces capabilities without it) |
+
+Cloud providers added three screens' worth of API use: `GET/PUT/DELETE /api/v1/providers[/{name}]`
+and `POST …/test` (Providers), `cloud` / `notice` / `provider` / `fallback` on catalog entries
+(Models: the "Cloud" mark and the "Runs" filter), and for Compare the response headers
+`x-request-id`, `x-bolo-model`, `x-bolo-fallback` and `x-bolo-estimated-cost` plus
+`GET /api/v1/requests/{id}` for the server's own timings and the estimated cost. With CORS (a
+console on another origin) those headers are readable because the server lists them in
+`Access-Control-Expose-Headers`.
+
+The key field of the Providers screen is write-only by construction: the form state starts with an
+empty key every time, the server never sends one, and saving without typing sends no `api_key`
+(the server keeps the stored key).
+
 ## Found while integrating against `bolo serve --fake-engine`
 
 Checked with the sherpa-onnx engine and the models installed on the build machine (4 CPU cores, no GPU). None of these

@@ -35,7 +35,112 @@ const kokoroVoices: Voice[] = [
 
 const INDIC = ['hi', 'bn', 'ta', 'te', 'mr', 'gu', 'kn', 'ml', 'pa', 'or', 'as', 'ur']
 
+const CLOUD_LICENSE = {
+  openai: {
+    license: 'OpenAI Services Agreement (paid cloud API)',
+    license_url: 'https://openai.com/policies/services-agreement/',
+  },
+  sarvam: {
+    license: 'Sarvam AI Terms of Service (paid cloud API)',
+    license_url: 'https://www.sarvam.ai/terms-of-service',
+  },
+}
+
+/** A cloud model as the server lists it: nothing to download, installed when its provider is configured. */
+const cloud = (
+  m: Pick<CatalogModel, 'id' | 'task' | 'tier' | 'description'> & Partial<CatalogModel>,
+  provider: 'openai' | 'sarvam',
+  remote: string,
+): CatalogModel =>
+  base({
+    family: provider === 'openai' ? 'OpenAI (cloud)' : 'Sarvam (cloud)',
+    engine: 'remote',
+    size_bytes: 0,
+    cloud: true,
+    notice: 'paid cloud API; audio leaves this server',
+    provider: {
+      name: provider,
+      kind: provider === 'openai' ? 'openai-compatible' : 'sarvam',
+      model: remote,
+      configured: provider === 'openai',
+      price: remote === 'gpt-4o-transcribe' ? { per_minute: 0.006 } : null,
+    },
+    installed: provider === 'openai',
+    runnable: true,
+    fallback: [],
+    source_url: provider === 'openai' ? 'https://developers.openai.com/api/docs' : 'https://docs.sarvam.ai',
+    features: ['telephony'],
+    sample_rate: m.task === 'tts' ? 24000 : 16000,
+    ...CLOUD_LICENSE[provider],
+    ...m,
+  })
+
+/** The cloud entries of the mock catalog (the provider `openai` is configured, `sarvam` is not). */
+export function cloudCatalog(): CatalogModel[] {
+  return [
+    cloud(
+      {
+        id: 'openai-gpt-4o-transcribe',
+        task: 'stt',
+        tier: 'accuracy',
+        languages: ['en', 'hi', 'es', 'fr', 'de', 'ta'],
+        description:
+          "OpenAI's gpt-4o-transcribe: text only, streamed from OpenAI. Paid cloud API: the audio leaves this server.",
+      },
+      'openai',
+      'gpt-4o-transcribe',
+    ),
+    cloud(
+      {
+        id: 'openai-gpt-4o-mini-tts',
+        task: 'tts',
+        tier: 'balanced',
+        languages: ['en', 'hi', 'es', 'fr', 'de'],
+        voices: [
+          { id: 'alloy', name: 'Alloy', language: '' },
+          { id: 'coral', name: 'Coral', language: '' },
+        ],
+        description: "OpenAI's steerable voice model. Paid cloud API: the text leaves this server.",
+      },
+      'openai',
+      'gpt-4o-mini-tts',
+    ),
+    cloud(
+      {
+        id: 'sarvam-saaras-v4',
+        task: 'stt',
+        tier: 'accuracy',
+        languages: INDIC,
+        description:
+          "Sarvam's recogniser for 22 Indian languages and Indian English. Paid cloud API: the audio leaves this server.",
+      },
+      'sarvam',
+      'saaras:v4',
+    ),
+    cloud(
+      {
+        id: 'sarvam-bulbul-v3',
+        task: 'tts',
+        tier: 'balanced',
+        languages: ['hi', 'bn', 'en', 'gu', 'kn', 'ml', 'mr', 'or', 'pa', 'ta', 'te'],
+        voices: [{ id: 'shubh', name: 'Shubh', language: '' }],
+        description: "Sarvam's Bulbul v3: 11 Indian languages. Paid cloud API: the text leaves this server.",
+      },
+      'sarvam',
+      'bulbul:v3',
+    ),
+  ]
+}
+
 export function seedCatalog(): CatalogModel[] {
+  return [
+    ...localCatalog(),
+    // Cloud entries go last: local models stay the ones a fresh console picks.
+    ...cloudCatalog(),
+  ]
+}
+
+function localCatalog(): CatalogModel[] {
   return [
     base({
       id: 'moonshine-tiny-en',

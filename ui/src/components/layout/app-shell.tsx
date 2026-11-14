@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useInfo, useLive, useWordLists } from '@/hooks/use-api'
+import { useInfo, useLive, useNavFeatures } from '@/hooks/use-api'
 import { useTheme, type ThemeChoice } from '@/hooks/use-theme'
 import { DemoBanner } from '@/components/demo'
 import { isDemo, isMock } from '@/lib/api/config'
@@ -32,7 +32,7 @@ export const DOCS_URL = 'https://github.com/cb-Sigma/bolo/tree/main/docs'
 
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const groups = ['Playground', 'Server'] as const
-  const items = visibleNav({ wordLists: useWordLists().offered })
+  const items = visibleNav(useNavFeatures())
   return (
     <nav aria-label="Main" className="flex flex-col gap-5">
       {groups.map((g) => (

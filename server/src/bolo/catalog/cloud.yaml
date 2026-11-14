@@ -1,0 +1,1716 @@
+# Cloud models (engine: remote): the well-known models of the providers bolo has adapters for.
+# Nothing here is downloaded. An entry is "installed" once its provider is configured (docs/providers.md), and
+# every use is billed by the provider: paid cloud API; audio leaves this server.
+# license / license_url carry the provider's terms. Lists (languages, voices, limits) were read from each
+# provider's documentation on 2026-11-14; nothing here was run against a real account (validated: untested).
+# Any other model of a configured provider can be used without an entry, as `<provider>:<model>`.
+- id: openai-whisper-1
+  task: stt
+  engine: remote
+  kind: remote-stt
+  family: OpenAI (cloud)
+  languages: &id001
+  - af
+  - am
+  - ar
+  - as
+  - az
+  - ba
+  - be
+  - bg
+  - bn
+  - bo
+  - br
+  - bs
+  - ca
+  - cs
+  - cy
+  - da
+  - de
+  - el
+  - en
+  - es
+  - et
+  - eu
+  - fa
+  - fi
+  - fo
+  - fr
+  - gl
+  - gu
+  - ha
+  - haw
+  - he
+  - hi
+  - hr
+  - ht
+  - hu
+  - hy
+  - id
+  - is
+  - it
+  - ja
+  - jw
+  - ka
+  - kk
+  - km
+  - kn
+  - ko
+  - la
+  - lb
+  - ln
+  - lo
+  - lt
+  - lv
+  - mg
+  - mi
+  - mk
+  - ml
+  - mn
+  - mr
+  - ms
+  - mt
+  - my
+  - ne
+  - nl
+  - nn
+  - 'no'
+  - oc
+  - pa
+  - pl
+  - ps
+  - pt
+  - ro
+  - ru
+  - sa
+  - sd
+  - si
+  - sk
+  - sl
+  - sn
+  - so
+  - sq
+  - sr
+  - su
+  - sv
+  - sw
+  - ta
+  - te
+  - tg
+  - th
+  - tk
+  - tl
+  - tr
+  - tt
+  - uk
+  - ur
+  - uz
+  - vi
+  - yi
+  - yo
+  - zh
+  - yue
+  tier: accuracy
+  streaming: false
+  sample_rate: 16000
+  license: OpenAI Services Agreement (paid cloud API)
+  license_url: https://openai.com/policies/services-agreement/
+  cloud: true
+  features:
+  - timestamps
+  - translate
+  - telephony
+  description: 'OpenAI''s hosted Whisper (large-v2). Segment and word timestamps, translation to English. Does not
+    stream. OpenAI has announced its shutdown for 2027-02-26. Paid cloud API: the audio leaves this server.'
+  source_url: https://developers.openai.com/api/docs/guides/speech-to-text
+  validated: untested
+  options:
+    provider: openai
+    provider_kind: openai-compatible
+    model: whisper-1
+    workers: 4
+    response_format: verbose_json
+    word_timestamps: true
+    translate: true
+- id: openai-gpt-4o-transcribe
+  task: stt
+  engine: remote
+  kind: remote-stt
+  family: OpenAI (cloud)
+  languages: *id001
+  tier: accuracy
+  streaming: false
+  sample_rate: 16000
+  license: OpenAI Services Agreement (paid cloud API)
+  license_url: https://openai.com/policies/services-agreement/
+  cloud: true
+  features:
+  - telephony
+  description: 'OpenAI''s gpt-4o-transcribe: text only (no timestamps from the provider; bolo''s own segment times
+    stay), streamed from OpenAI as it is recognised. OpenAI has announced its shutdown for 2027-02-26. Paid cloud
+    API: the audio leaves this server.'
+  source_url: https://developers.openai.com/api/docs/guides/speech-to-text
+  validated: untested
+  options:
+    provider: openai
+    provider_kind: openai-compatible
+    model: gpt-4o-transcribe
+    workers: 4
+    stream: true
+- id: openai-gpt-4o-mini-transcribe
+  task: stt
+  engine: remote
+  kind: remote-stt
+  family: OpenAI (cloud)
+  languages: *id001
+  tier: accuracy
+  streaming: false
+  sample_rate: 16000
+  license: OpenAI Services Agreement (paid cloud API)
+  license_url: https://openai.com/policies/services-agreement/
+  cloud: true
+  features:
+  - telephony
+  description: 'OpenAI''s gpt-4o-mini-transcribe: text only (no timestamps from the provider; bolo''s own segment
+    times stay), streamed from OpenAI as it is recognised. OpenAI has announced its shutdown for 2027-02-26. Paid
+    cloud API: the audio leaves this server.'
+  source_url: https://developers.openai.com/api/docs/guides/speech-to-text
+  validated: untested
+  options:
+    provider: openai
+    provider_kind: openai-compatible
+    model: gpt-4o-mini-transcribe
+    workers: 4
+    stream: true
+- id: openai-gpt-transcribe
+  task: stt
+  engine: remote
+  kind: remote-stt
+  family: OpenAI (cloud)
+  languages: *id001
+  tier: accuracy
+  streaming: false
+  sample_rate: 16000
+  license: OpenAI Services Agreement (paid cloud API)
+  license_url: https://openai.com/policies/services-agreement/
+  cloud: true
+  features:
+  - telephony
+  description: 'OpenAI''s gpt-transcribe: text only (no timestamps from the provider; bolo''s own segment times
+    stay), streamed from OpenAI as it is recognised. Takes hotwords as `keywords`. Paid cloud API: the audio leaves
+    this server.'
+  source_url: https://developers.openai.com/api/docs/guides/speech-to-text
+  validated: untested
+  options:
+    provider: openai
+    provider_kind: openai-compatible
+    model: gpt-transcribe
+    workers: 4
+    stream: true
+    hotwords_field: keywords
+- id: openai-tts-1
+  task: tts
+  engine: remote
+  kind: remote-tts
+  family: OpenAI (cloud)
+  languages: *id001
+  tier: realtime
+  streaming: false
+  sample_rate: 24000
+  license: OpenAI Services Agreement (paid cloud API)
+  license_url: https://openai.com/policies/services-agreement/
+  cloud: true
+  features:
+  - telephony
+  description: 'OpenAI''s low-latency voice model. Audio is streamed from OpenAI as 24 kHz PCM while it is synthesised;
+    at most 4096 characters per request (bolo sends a sentence at a time). OpenAI has announced its shutdown for
+    2027-01-06. Paid cloud API: the text leaves this server.'
+  source_url: https://developers.openai.com/api/docs/guides/text-to-speech
+  validated: untested
+  options:
+    provider: openai
+    provider_kind: openai-compatible
+    model: tts-1
+    workers: 4
+    text_normalizer: model
+  voices:
+  - id: alloy
+    name: Alloy
+    language: ''
+  - id: ash
+    name: Ash
+    language: ''
+  - id: coral
+    name: Coral
+    language: ''
+  - id: echo
+    name: Echo
+    language: ''
+  - id: fable
+    name: Fable
+    language: ''
+  - id: onyx
+    name: Onyx
+    language: ''
+  - id: nova
+    name: Nova
+    language: ''
+  - id: sage
+    name: Sage
+    language: ''
+  - id: shimmer
+    name: Shimmer
+    language: ''
+- id: openai-tts-1-hd
+  task: tts
+  engine: remote
+  kind: remote-tts
+  family: OpenAI (cloud)
+  languages: *id001
+  tier: balanced
+  streaming: false
+  sample_rate: 24000
+  license: OpenAI Services Agreement (paid cloud API)
+  license_url: https://openai.com/policies/services-agreement/
+  cloud: true
+  features:
+  - telephony
+  description: 'OpenAI''s higher-quality voice model. Audio is streamed from OpenAI as 24 kHz PCM while it is synthesised;
+    at most 4096 characters per request (bolo sends a sentence at a time). OpenAI has announced its shutdown for
+    2027-01-06. Paid cloud API: the text leaves this server.'
+  source_url: https://developers.openai.com/api/docs/guides/text-to-speech
+  validated: untested
+  options:
+    provider: openai
+    provider_kind: openai-compatible
+    model: tts-1-hd
+    workers: 4
+    text_normalizer: model
+  voices:
+  - id: alloy
+    name: Alloy
+    language: ''
+  - id: ash
+    name: Ash
+    language: ''
+  - id: coral
+    name: Coral
+    language: ''
+  - id: echo
+    name: Echo
+    language: ''
+  - id: fable
+    name: Fable
+    language: ''
+  - id: onyx
+    name: Onyx
+    language: ''
+  - id: nova
+    name: Nova
+    language: ''
+  - id: sage
+    name: Sage
+    language: ''
+  - id: shimmer
+    name: Shimmer
+    language: ''
+- id: openai-gpt-4o-mini-tts
+  task: tts
+  engine: remote
+  kind: remote-tts
+  family: OpenAI (cloud)
+  languages: *id001
+  tier: balanced
+  streaming: false
+  sample_rate: 24000
+  license: OpenAI Services Agreement (paid cloud API)
+  license_url: https://openai.com/policies/services-agreement/
+  cloud: true
+  features:
+  - telephony
+  description: 'OpenAI''s steerable voice model (the model option `instructions` directs the delivery). Audio is
+    streamed from OpenAI as 24 kHz PCM while it is synthesised; at most 4096 characters per request (bolo sends
+    a sentence at a time). OpenAI has announced its shutdown for 2027-01-06. Paid cloud API: the text leaves this
+    server.'
+  source_url: https://developers.openai.com/api/docs/guides/text-to-speech
+  validated: untested
+  options:
+    provider: openai
+    provider_kind: openai-compatible
+    model: gpt-4o-mini-tts
+    workers: 4
+    text_normalizer: model
+  voices:
+  - id: alloy
+    name: Alloy
+    language: ''
+  - id: ash
+    name: Ash
+    language: ''
+  - id: ballad
+    name: Ballad
+    language: ''
+  - id: coral
+    name: Coral
+    language: ''
+  - id: echo
+    name: Echo
+    language: ''
+  - id: fable
+    name: Fable
+    language: ''
+  - id: onyx
+    name: Onyx
+    language: ''
+  - id: nova
+    name: Nova
+    language: ''
+  - id: sage
+    name: Sage
+    language: ''
+  - id: shimmer
+    name: Shimmer
+    language: ''
+  - id: verse
+    name: Verse
+    language: ''
+  - id: marin
+    name: Marin
+    language: ''
+  - id: cedar
+    name: Cedar
+    language: ''
+- id: sarvam-saaras-v4
+  task: stt
+  engine: remote
+  kind: remote-stt
+  family: Sarvam (cloud)
+  languages: &id002
+  - hi
+  - bn
+  - kn
+  - ml
+  - mr
+  - or
+  - pa
+  - ta
+  - te
+  - en
+  - gu
+  - as
+  - ur
+  - ne
+  - kok
+  - ks
+  - sd
+  - sa
+  - sat
+  - mni
+  - brx
+  - mai
+  - doi
+  tier: accuracy
+  streaming: false
+  sample_rate: 16000
+  license: Sarvam AI Terms of Service (paid cloud API)
+  license_url: https://www.sarvam.ai/terms-of-service
+  cloud: true
+  features:
+  - timestamps
+  - translate
+  - telephony
+  - hotwords
+  description: 'Sarvam''s current recogniser for 22 Indian languages and Indian English, with code-mixed speech,
+    automatic language detection, hotwords (keyterms) and translation to English. Phrase-level timestamps only.
+    The API takes up to 30 s per request: bolo cuts longer recordings at pauses. Paid cloud API: the audio leaves
+    this server.'
+  source_url: https://docs.sarvam.ai/api-reference-docs/speech-to-text/transcribe
+  validated: untested
+  options:
+    provider: sarvam
+    provider_kind: sarvam
+    model: saaras:v4
+    workers: 4
+    keyterms: true
+    translate: true
+- id: sarvam-saaras-v3
+  task: stt
+  engine: remote
+  kind: remote-stt
+  family: Sarvam (cloud)
+  languages: *id002
+  tier: accuracy
+  streaming: false
+  sample_rate: 16000
+  license: Sarvam AI Terms of Service (paid cloud API)
+  license_url: https://www.sarvam.ai/terms-of-service
+  cloud: true
+  features:
+  - timestamps
+  - translate
+  - telephony
+  description: 'Sarvam''s previous recogniser (transcribe, translate, verbatim, translit and codemix modes; set
+    the model option `mode`). No hotwords. Up to 30 s per request: bolo cuts longer recordings at pauses. Paid cloud
+    API: the audio leaves this server.'
+  source_url: https://docs.sarvam.ai/api-reference-docs/speech-to-text/transcribe
+  validated: untested
+  options:
+    provider: sarvam
+    provider_kind: sarvam
+    model: saaras:v3
+    workers: 4
+    translate: true
+- id: sarvam-saaras-v4-streaming
+  task: stt
+  engine: remote
+  kind: remote-stt
+  family: Sarvam (cloud)
+  languages: *id002
+  tier: realtime
+  streaming: true
+  sample_rate: 16000
+  license: Sarvam AI Terms of Service (paid cloud API)
+  license_url: https://www.sarvam.ai/terms-of-service
+  cloud: true
+  features:
+  - telephony
+  description: 'Saaras v4 over Sarvam''s streaming WebSocket: one transcript per utterance, no interim text. bolo''s
+    use of this socket has only been run against a stand-in for the service. Paid cloud API: the audio leaves this
+    server.'
+  source_url: https://docs.sarvam.ai/api-reference-docs/speech-to-text/transcribe/ws
+  validated: untested
+  options:
+    provider: sarvam
+    provider_kind: sarvam
+    model: saaras:v4
+    workers: 4
+    live: true
+    translate: true
+    keyterms: true
+- id: sarvam-bulbul-v3
+  task: tts
+  engine: remote
+  kind: remote-tts
+  family: Sarvam (cloud)
+  languages: &id003
+  - hi
+  - bn
+  - en
+  - gu
+  - kn
+  - ml
+  - mr
+  - or
+  - pa
+  - ta
+  - te
+  tier: balanced
+  streaming: false
+  sample_rate: 24000
+  license: Sarvam AI Terms of Service (paid cloud API)
+  license_url: https://www.sarvam.ai/terms-of-service
+  cloud: true
+  features:
+  - telephony
+  description: 'Sarvam''s Bulbul v3: 11 Indian languages, code-mixed text, 37 speakers that each speak every language.
+    Speed 0.5 to 2.0, at most 2500 characters per request. Not streamed by the REST API (bolo sends a sentence at
+    a time). Paid cloud API: the text leaves this server.'
+  source_url: https://docs.sarvam.ai/api-reference-docs/text-to-speech/convert
+  validated: untested
+  options:
+    provider: sarvam
+    provider_kind: sarvam
+    model: bulbul:v3
+    workers: 4
+    default_voice: shubh
+  voices:
+  - id: shubh
+    name: Shubh
+    language: ''
+  - id: aditya
+    name: Aditya
+    language: ''
+  - id: ritu
+    name: Ritu
+    language: ''
+  - id: priya
+    name: Priya
+    language: ''
+  - id: neha
+    name: Neha
+    language: ''
+  - id: rahul
+    name: Rahul
+    language: ''
+  - id: pooja
+    name: Pooja
+    language: ''
+  - id: rohan
+    name: Rohan
+    language: ''
+  - id: simran
+    name: Simran
+    language: ''
+  - id: kavya
+    name: Kavya
+    language: ''
+  - id: amit
+    name: Amit
+    language: ''
+  - id: dev
+    name: Dev
+    language: ''
+  - id: ishita
+    name: Ishita
+    language: ''
+  - id: shreya
+    name: Shreya
+    language: ''
+  - id: ratan
+    name: Ratan
+    language: ''
+  - id: varun
+    name: Varun
+    language: ''
+  - id: manan
+    name: Manan
+    language: ''
+  - id: sumit
+    name: Sumit
+    language: ''
+  - id: roopa
+    name: Roopa
+    language: ''
+  - id: kabir
+    name: Kabir
+    language: ''
+  - id: aayan
+    name: Aayan
+    language: ''
+  - id: ashutosh
+    name: Ashutosh
+    language: ''
+  - id: advait
+    name: Advait
+    language: ''
+  - id: anand
+    name: Anand
+    language: ''
+  - id: tanya
+    name: Tanya
+    language: ''
+  - id: tarun
+    name: Tarun
+    language: ''
+  - id: sunny
+    name: Sunny
+    language: ''
+  - id: mani
+    name: Mani
+    language: ''
+  - id: gokul
+    name: Gokul
+    language: ''
+  - id: vijay
+    name: Vijay
+    language: ''
+  - id: shruti
+    name: Shruti
+    language: ''
+  - id: suhani
+    name: Suhani
+    language: ''
+  - id: mohit
+    name: Mohit
+    language: ''
+  - id: kavitha
+    name: Kavitha
+    language: ''
+  - id: rehan
+    name: Rehan
+    language: ''
+  - id: soham
+    name: Soham
+    language: ''
+  - id: rupali
+    name: Rupali
+    language: ''
+- id: sarvam-bulbul-v2
+  task: tts
+  engine: remote
+  kind: remote-tts
+  family: Sarvam (cloud)
+  languages: *id003
+  tier: balanced
+  streaming: false
+  sample_rate: 22050
+  license: Sarvam AI Terms of Service (paid cloud API)
+  license_url: https://www.sarvam.ai/terms-of-service
+  cloud: true
+  features:
+  - telephony
+  description: 'Sarvam''s Bulbul v2: 11 Indian languages, 7 speakers, speed 0.3 to 3.0, at most 1500 characters
+    per request. Paid cloud API: the text leaves this server.'
+  source_url: https://docs.sarvam.ai/api-reference-docs/text-to-speech/convert
+  validated: untested
+  options:
+    provider: sarvam
+    provider_kind: sarvam
+    model: bulbul:v2
+    workers: 4
+    default_voice: anushka
+  voices:
+  - id: anushka
+    name: Anushka
+    language: ''
+    gender: f
+  - id: manisha
+    name: Manisha
+    language: ''
+    gender: f
+  - id: vidya
+    name: Vidya
+    language: ''
+    gender: f
+  - id: arya
+    name: Arya
+    language: ''
+    gender: f
+  - id: abhilash
+    name: Abhilash
+    language: ''
+    gender: m
+  - id: karun
+    name: Karun
+    language: ''
+    gender: m
+  - id: hitesh
+    name: Hitesh
+    language: ''
+    gender: m
+- id: sarvam-bulbul-v4-flash
+  task: tts
+  engine: remote
+  kind: remote-tts
+  family: Sarvam (cloud)
+  languages: *id003
+  tier: realtime
+  streaming: false
+  sample_rate: 24000
+  license: Sarvam AI Terms of Service (paid cloud API)
+  license_url: https://www.sarvam.ai/terms-of-service
+  cloud: true
+  features:
+  - telephony
+  description: 'Sarvam''s Bulbul v4 Flash, the model Sarvam recommends for new work: 222 persona voices named <name>_<language>_<style>,
+    speed 0.5 to 2.0, at most 2500 characters per request. Paid cloud API: the text leaves this server.'
+  source_url: https://docs.sarvam.ai/api-reference-docs/text-to-speech/convert
+  validated: untested
+  options:
+    provider: sarvam
+    provider_kind: sarvam
+    model: bulbul:v4-flash
+    workers: 4
+    default_voice: shubh_enhi_ads
+  voices:
+  - id: arnab_bn_conversation
+    name: Arnab (conversation)
+    language: bn-IN
+  - id: roopa_bn_conversational
+    name: Roopa (conversational)
+    language: bn-IN
+  - id: bimal_bn_suspense
+    name: Bimal (suspense)
+    language: bn-IN
+  - id: aditi_en_stories
+    name: Aditi (stories)
+    language: en-IN
+  - id: aparna_en_companion
+    name: Aparna (companion)
+    language: en-IN
+  - id: aparna_en_edtech
+    name: Aparna (edtech)
+    language: en-IN
+  - id: ashwin_en_sports
+    name: Ashwin (sports)
+    language: en-IN
+  - id: ashwin_en_sports_energetic
+    name: Ashwin (sports energetic)
+    language: en-IN
+  - id: chandrika_en_stories
+    name: Chandrika (stories)
+    language: en-IN
+  - id: dev_en_recovery
+    name: Dev (recovery)
+    language: en-IN
+  - id: dev_en_conversational
+    name: Dev (conversational)
+    language: en-IN
+  - id: deven_en_conversation
+    name: Deven (conversation)
+    language: en-IN
+  - id: ishita_en_customer
+    name: Ishita (customer)
+    language: en-IN
+  - id: ishita_en_medical
+    name: Ishita (medical)
+    language: en-IN
+  - id: ishita_en_numbers
+    name: Ishita (numbers)
+    language: en-IN
+  - id: ishita_en_social
+    name: Ishita (social)
+    language: en-IN
+  - id: ishita_en_stories
+    name: Ishita (stories)
+    language: en-IN
+  - id: kalpit_en_edtech
+    name: Kalpit (edtech)
+    language: en-IN
+  - id: nachiket_en_ads
+    name: Nachiket (ads)
+    language: en-IN
+  - id: neha_en_customer
+    name: Neha (customer)
+    language: en-IN
+  - id: neha_en_latenight
+    name: Neha (latenight)
+    language: en-IN
+  - id: nupur_en_kids
+    name: Nupur (kids)
+    language: en-IN
+  - id: ojas_en_social
+    name: Ojas (social)
+    language: en-IN
+  - id: ritu_en_edtech
+    name: Ritu (edtech)
+    language: en-IN
+  - id: ritu_en_latenight
+    name: Ritu (latenight)
+    language: en-IN
+  - id: ritu_en_medical
+    name: Ritu (medical)
+    language: en-IN
+  - id: ritu_en_reels
+    name: Ritu (reels)
+    language: en-IN
+  - id: rohan_en_recovery
+    name: Rohan (recovery)
+    language: en-IN
+  - id: roopa_en_conversational
+    name: Roopa (conversational)
+    language: en-IN
+  - id: rustom_en_suspense
+    name: Rustom (suspense)
+    language: en-IN
+  - id: sanchita_en_companion
+    name: Sanchita (companion)
+    language: en-IN
+  - id: sanchita_en_insurance
+    name: Sanchita (insurance)
+    language: en-IN
+  - id: sanchita_en_recovery
+    name: Sanchita (recovery)
+    language: en-IN
+  - id: sanchita_en_market
+    name: Sanchita (market)
+    language: en-IN
+  - id: sanchita_en_social
+    name: Sanchita (social)
+    language: en-IN
+  - id: shabana_en_edtech
+    name: Shabana (edtech)
+    language: en-IN
+  - id: shalini_en_companion
+    name: Shalini (companion)
+    language: en-IN
+  - id: shalini_en_customer
+    name: Shalini (customer)
+    language: en-IN
+  - id: shubh_en_narration
+    name: Shubh (narration)
+    language: en-IN
+  - id: shubh_en_numbers
+    name: Shubh (numbers)
+    language: en-IN
+  - id: shubh_en_ads
+    name: Shubh (ads)
+    language: en-IN
+  - id: shubh_en_recovery
+    name: Shubh (recovery)
+    language: en-IN
+  - id: shubh_en_audiobook
+    name: Shubh (audiobook)
+    language: en-IN
+  - id: shubh_en_narration_gentle
+    name: Shubh (narration gentle)
+    language: en-IN
+  - id: shubh_en_sports
+    name: Shubh (sports)
+    language: en-IN
+  - id: simran_en_narration
+    name: Simran (narration)
+    language: en-IN
+  - id: simran_en_automobile
+    name: Simran (automobile)
+    language: en-IN
+  - id: simran_en_conversation
+    name: Simran (conversation)
+    language: en-IN
+  - id: simran_en_customer
+    name: Simran (customer)
+    language: en-IN
+  - id: simran_en_edtech
+    name: Simran (edtech)
+    language: en-IN
+  - id: simran_en_edtech_bot
+    name: Simran (edtech bot)
+    language: en-IN
+  - id: simran_en_sales
+    name: Simran (sales)
+    language: en-IN
+  - id: simran_en_recovery
+    name: Simran (recovery)
+    language: en-IN
+  - id: simran_en_ads
+    name: Simran (ads)
+    language: en-IN
+  - id: simran_en_therapist
+    name: Simran (therapist)
+    language: en-IN
+  - id: sunny_en_social
+    name: Sunny (social)
+    language: en-IN
+  - id: varun_en_ads
+    name: Varun (ads)
+    language: en-IN
+  - id: varun_en_suspense
+    name: Varun (suspense)
+    language: en-IN
+  - id: zarina_en_conversation
+    name: Zarina (conversation)
+    language: en-IN
+  - id: amelia_en_conversational
+    name: Amelia (conversational)
+    language: en-IN
+  - id: sophia_en_conversational
+    name: Sophia (conversational)
+    language: en-IN
+  - id: girish_en_documentary
+    name: Girish (documentary)
+    language: en-IN
+  - id: girish_en_devotional
+    name: Girish (devotional)
+    language: en-IN
+  - id: payal_en_edtech
+    name: Payal (edtech)
+    language: en-IN
+  - id: sarang_en_narration
+    name: Sarang (narration)
+    language: en-IN
+  - id: ishita_enhi_companion
+    name: Ishita (companion, English and Hindi)
+    language: hi-IN
+  - id: ishita_enhi_customer
+    name: Ishita (customer, English and Hindi)
+    language: hi-IN
+  - id: ishita_enhi_customer_expressive
+    name: Ishita (customer expressive, English and Hindi)
+    language: hi-IN
+  - id: sanchita_enhi_companion
+    name: Sanchita (companion, English and Hindi)
+    language: hi-IN
+  - id: shalini_enhi_companion
+    name: Shalini (companion, English and Hindi)
+    language: hi-IN
+  - id: shalini_enhi_customer
+    name: Shalini (customer, English and Hindi)
+    language: hi-IN
+  - id: shubh_enhi_companion
+    name: Shubh (companion, English and Hindi)
+    language: hi-IN
+  - id: shubh_enhi_ads
+    name: Shubh (ads, English and Hindi)
+    language: hi-IN
+  - id: shubh_enhi_banking
+    name: Shubh (banking, English and Hindi)
+    language: hi-IN
+  - id: simran_enhi_companion
+    name: Simran (companion, English and Hindi)
+    language: hi-IN
+  - id: simran_enhi_customer
+    name: Simran (customer, English and Hindi)
+    language: hi-IN
+  - id: simran_enhi_banking_expressive
+    name: Simran (banking expressive, English and Hindi)
+    language: hi-IN
+  - id: sunny_enhi_customer
+    name: Sunny (customer, English and Hindi)
+    language: hi-IN
+  - id: bhavik_gu_conversation
+    name: Bhavik (conversation)
+    language: gu-IN
+  - id: pooja_gu_conversational
+    name: Pooja (conversational)
+    language: gu-IN
+  - id: pooja_gu_customer
+    name: Pooja (customer)
+    language: gu-IN
+  - id: aayan_hi_conversational
+    name: Aayan (conversational)
+    language: hi-IN
+  - id: amit_hi_conversational
+    name: Amit (conversational)
+    language: hi-IN
+  - id: ashutosh_hi_conversational
+    name: Ashutosh (conversational)
+    language: hi-IN
+  - id: kabir_hi_conversational
+    name: Kabir (conversational)
+    language: hi-IN
+  - id: kavya_hi_conversational
+    name: Kavya (conversational)
+    language: hi-IN
+  - id: manan_hi_conversational
+    name: Manan (conversational)
+    language: hi-IN
+  - id: rahul_hi_conversational
+    name: Rahul (conversational)
+    language: hi-IN
+  - id: sumit_hi_conversational
+    name: Sumit (conversational)
+    language: hi-IN
+  - id: aditya_hi_conversational
+    name: Aditya (conversational)
+    language: hi-IN
+  - id: aditya_hi_sales
+    name: Aditya (sales)
+    language: hi-IN
+  - id: anand_hi_documentary
+    name: Anand (documentary)
+    language: hi-IN
+  - id: anand_hi_news
+    name: Anand (news)
+    language: hi-IN
+  - id: aparna_hi_customer
+    name: Aparna (customer)
+    language: hi-IN
+  - id: aparna_hi_kyc
+    name: Aparna (kyc)
+    language: hi-IN
+  - id: ashok_hi_character
+    name: Ashok (character)
+    language: hi-IN
+  - id: ashok_hi_news
+    name: Ashok (news)
+    language: hi-IN
+  - id: chhavi_hi_kids
+    name: Chhavi (kids)
+    language: hi-IN
+  - id: ishita_hi_ads
+    name: Ishita (ads)
+    language: hi-IN
+  - id: ishita_hi_edtech
+    name: Ishita (edtech)
+    language: hi-IN
+  - id: ishita_hi_banking
+    name: Ishita (banking)
+    language: hi-IN
+  - id: ishita_hi_ads_informal
+    name: Ishita (ads informal)
+    language: hi-IN
+  - id: ishita_hi_devotional
+    name: Ishita (devotional)
+    language: hi-IN
+  - id: ishita_hi_numbers
+    name: Ishita (numbers)
+    language: hi-IN
+  - id: ishita_hi_social
+    name: Ishita (social)
+    language: hi-IN
+  - id: kunal_hi_kids
+    name: Kunal (kids)
+    language: hi-IN
+  - id: mahesh_hi_documentary
+    name: Mahesh (documentary)
+    language: hi-IN
+  - id: mani_hi_devotional
+    name: Mani (devotional)
+    language: hi-IN
+  - id: mani_hi_conversational
+    name: Mani (conversational)
+    language: hi-IN
+  - id: mohit_hi_conversational
+    name: Mohit (conversational)
+    language: hi-IN
+  - id: nachiket_hi_devotional
+    name: Nachiket (devotional)
+    language: hi-IN
+  - id: priya_hi_recovery
+    name: Priya (recovery)
+    language: hi-IN
+  - id: ratan_hi_latenight
+    name: Ratan (latenight)
+    language: hi-IN
+  - id: ratan_hi_customer_expressive
+    name: Ratan (customer expressive)
+    language: hi-IN
+  - id: ratan_hi_documentary
+    name: Ratan (documentary)
+    language: hi-IN
+  - id: ratan_hi_devotional
+    name: Ratan (devotional)
+    language: hi-IN
+  - id: ratan_hi_recovery
+    name: Ratan (recovery)
+    language: hi-IN
+  - id: ratan_hi_social
+    name: Ratan (social)
+    language: hi-IN
+  - id: ratan_hi_sports
+    name: Ratan (sports)
+    language: hi-IN
+  - id: ratan_hi_latenight_warm
+    name: Ratan (latenight warm)
+    language: hi-IN
+  - id: rehan_hi_social
+    name: Rehan (social)
+    language: hi-IN
+  - id: ritu_hi_customer_utility
+    name: Ritu (customer utility)
+    language: hi-IN
+  - id: ritu_hi_kids
+    name: Ritu (kids)
+    language: hi-IN
+  - id: ritu_hi_conversation
+    name: Ritu (conversation)
+    language: hi-IN
+  - id: ritu_hi_customer
+    name: Ritu (customer)
+    language: hi-IN
+  - id: ritu_hi_edtech
+    name: Ritu (edtech)
+    language: hi-IN
+  - id: ritu_hi_ads_formal
+    name: Ritu (ads formal)
+    language: hi-IN
+  - id: ritu_hi_banking
+    name: Ritu (banking)
+    language: hi-IN
+  - id: ritu_hi_ads_informal
+    name: Ritu (ads informal)
+    language: hi-IN
+  - id: ritu_hi_insurance
+    name: Ritu (insurance)
+    language: hi-IN
+  - id: ritu_hi_edtech_bot
+    name: Ritu (edtech bot)
+    language: hi-IN
+  - id: ritu_hi_medical
+    name: Ritu (medical)
+    language: hi-IN
+  - id: ritu_hi_sales
+    name: Ritu (sales)
+    language: hi-IN
+  - id: ritu_hi_reels
+    name: Ritu (reels)
+    language: hi-IN
+  - id: ritu_hi_social
+    name: Ritu (social)
+    language: hi-IN
+  - id: ritu_hi_customer_warm
+    name: Ritu (customer warm)
+    language: hi-IN
+  - id: ritu_hi_social_lively
+    name: Ritu (social lively)
+    language: hi-IN
+  - id: roopa_hi_companion
+    name: Roopa (companion)
+    language: hi-IN
+  - id: roopa_hi_narration
+    name: Roopa (narration)
+    language: hi-IN
+  - id: roopa_hi_recovery
+    name: Roopa (recovery)
+    language: hi-IN
+  - id: roopa_hi_market
+    name: Roopa (market)
+    language: hi-IN
+  - id: roopa_hi_conversational
+    name: Roopa (conversational)
+    language: hi-IN
+  - id: sanchita_hi_assistant
+    name: Sanchita (assistant)
+    language: hi-IN
+  - id: sanchita_hi_edtech
+    name: Sanchita (edtech)
+    language: hi-IN
+  - id: sanchita_hi_banking
+    name: Sanchita (banking)
+    language: hi-IN
+  - id: sanchita_hi_feedback
+    name: Sanchita (feedback)
+    language: hi-IN
+  - id: sanchita_hi_ads_formal
+    name: Sanchita (ads formal)
+    language: hi-IN
+  - id: sanchita_hi_ads_informal
+    name: Sanchita (ads informal)
+    language: hi-IN
+  - id: sanchita_hi_interview
+    name: Sanchita (interview)
+    language: hi-IN
+  - id: sanchita_hi_romantic
+    name: Sanchita (romantic)
+    language: hi-IN
+  - id: sanchita_hi_market
+    name: Sanchita (market)
+    language: hi-IN
+  - id: sanchita_hi_social
+    name: Sanchita (social)
+    language: hi-IN
+  - id: sanchita_hi_kyc
+    name: Sanchita (kyc)
+    language: hi-IN
+  - id: sarika_hi_conversation
+    name: Sarika (conversation)
+    language: hi-IN
+  - id: shalini_hi_companion
+    name: Shalini (companion)
+    language: hi-IN
+  - id: shalini_hi_social
+    name: Shalini (social)
+    language: hi-IN
+  - id: shreya_hi_conversational
+    name: Shreya (conversational)
+    language: hi-IN
+  - id: shreya_hi_news
+    name: Shreya (news)
+    language: hi-IN
+  - id: shruti_hi_edtech
+    name: Shruti (edtech)
+    language: hi-IN
+  - id: shubh_hi_customer
+    name: Shubh (customer)
+    language: hi-IN
+  - id: shubh_hi_ecomm
+    name: Shubh (ecomm)
+    language: hi-IN
+  - id: shubh_hi_stories_mixed
+    name: Shubh (stories mixed)
+    language: hi-IN
+  - id: shubh_hi_devotional
+    name: Shubh (devotional)
+    language: hi-IN
+  - id: shubh_hi_ads
+    name: Shubh (ads)
+    language: hi-IN
+  - id: shubh_hi_recovery
+    name: Shubh (recovery)
+    language: hi-IN
+  - id: shubh_hi_stories_dramatic
+    name: Shubh (stories dramatic)
+    language: hi-IN
+  - id: simran_hi_assistant
+    name: Simran (assistant)
+    language: hi-IN
+  - id: simran_hi_narration
+    name: Simran (narration)
+    language: hi-IN
+  - id: simran_hi_automobile
+    name: Simran (automobile)
+    language: hi-IN
+  - id: simran_hi_conversation
+    name: Simran (conversation)
+    language: hi-IN
+  - id: simran_hi_news_breaking
+    name: Simran (news breaking)
+    language: hi-IN
+  - id: simran_hi_social_energetic
+    name: Simran (social energetic)
+    language: hi-IN
+  - id: simran_hi_social_excited
+    name: Simran (social excited)
+    language: hi-IN
+  - id: simran_hi_latenight
+    name: Simran (latenight)
+    language: hi-IN
+  - id: simran_hi_news
+    name: Simran (news)
+    language: hi-IN
+  - id: simran_hi_recovery
+    name: Simran (recovery)
+    language: hi-IN
+  - id: simran_hi_sales
+    name: Simran (sales)
+    language: hi-IN
+  - id: suchitra_hi_ecomm
+    name: Suchitra (ecomm)
+    language: hi-IN
+  - id: suhani_hi_social
+    name: Suhani (social)
+    language: hi-IN
+  - id: sunny_hi_ads
+    name: Sunny (ads)
+    language: hi-IN
+  - id: sunny_hi_reels
+    name: Sunny (reels)
+    language: hi-IN
+  - id: tarun_hi_conversational
+    name: Tarun (conversational)
+    language: hi-IN
+  - id: tarun_hi_sales
+    name: Tarun (sales)
+    language: hi-IN
+  - id: chaitra_hi_customer
+    name: Chaitra (customer)
+    language: hi-IN
+  - id: shilpa_hi_narration
+    name: Shilpa (narration)
+    language: hi-IN
+  - id: tanya_hi_narration
+    name: Tanya (narration)
+    language: hi-IN
+  - id: aarti_hi_customer
+    name: Aarti (customer)
+    language: hi-IN
+  - id: advait_hi_character
+    name: Advait (character)
+    language: hi-IN
+  - id: aryaman_hi_ads
+    name: Aryaman (ads)
+    language: hi-IN
+  - id: chirag_hi_social
+    name: Chirag (social)
+    language: hi-IN
+  - id: girish_hi_devotional
+    name: Girish (devotional)
+    language: hi-IN
+  - id: mukul_hi_ads
+    name: Mukul (ads)
+    language: hi-IN
+  - id: mukul_hi_suspense
+    name: Mukul (suspense)
+    language: hi-IN
+  - id: suman_hi_companion
+    name: Suman (companion)
+    language: hi-IN
+  - id: vaibhav_hi_social
+    name: Vaibhav (social)
+    language: hi-IN
+  - id: vandana_hi_ecomm
+    name: Vandana (ecomm)
+    language: hi-IN
+  - id: vipul_hi_social
+    name: Vipul (social)
+    language: hi-IN
+  - id: chaitra_kn_conversation
+    name: Chaitra (conversation)
+    language: kn-IN
+  - id: chaitra_kn_narration
+    name: Chaitra (narration)
+    language: kn-IN
+  - id: chetan_kn_conversation
+    name: Chetan (conversation)
+    language: kn-IN
+  - id: suchitra_kn_narration
+    name: Suchitra (narration)
+    language: kn-IN
+  - id: ishita_mr_conversational
+    name: Ishita (conversational)
+    language: mr-IN
+  - id: mrunal_mr_narration
+    name: Mrunal (narration)
+    language: mr-IN
+  - id: neha_mr_narration
+    name: Neha (narration)
+    language: mr-IN
+  - id: nilesh_mr_conversation
+    name: Nilesh (conversation)
+    language: mr-IN
+  - id: ritu_mr_insurance
+    name: Ritu (insurance)
+    language: mr-IN
+  - id: ritu_mr_narration
+    name: Ritu (narration)
+    language: mr-IN
+  - id: rupali_mr_stories
+    name: Rupali (stories)
+    language: mr-IN
+  - id: soham_mr_narration
+    name: Soham (narration)
+    language: mr-IN
+  - id: mukul_mr_stories
+    name: Mukul (stories)
+    language: mr-IN
+  - id: anand_pa_conversation
+    name: Anand (conversation)
+    language: pa-IN
+  - id: anand_pa_customer
+    name: Anand (customer)
+    language: pa-IN
+  - id: harpreet_pa_narration
+    name: Harpreet (narration)
+    language: pa-IN
+  - id: jaspal_pa_banking
+    name: Jaspal (banking)
+    language: pa-IN
+  - id: gokul_ta_narration
+    name: Gokul (narration)
+    language: ta-IN
+  - id: aravind_ta_ads
+    name: Aravind (ads)
+    language: ta-IN
+  - id: aravind_ta_suspense
+    name: Aravind (suspense)
+    language: ta-IN
+  - id: vijay_ta_narration
+    name: Vijay (narration)
+    language: ta-IN
+  - id: kavitha_te_conversation
+    name: Kavitha (conversation)
+    language: te-IN
+  - id: kavitha_te_narration
+    name: Kavitha (narration)
+    language: te-IN
+  - id: pooja_te_conversation
+    name: Pooja (conversation)
+    language: te-IN
+  - id: tarun_te_narration
+    name: Tarun (narration)
+    language: te-IN
+- id: elevenlabs-flash-v2.5
+  task: tts
+  engine: remote
+  kind: remote-tts
+  family: ElevenLabs (cloud)
+  languages: &id004
+  - en
+  - ja
+  - zh
+  - de
+  - hi
+  - fr
+  - ko
+  - pt
+  - it
+  - es
+  - id
+  - nl
+  - tr
+  - fil
+  - pl
+  - sv
+  - bg
+  - ro
+  - ar
+  - cs
+  - el
+  - fi
+  - hr
+  - ms
+  - sk
+  - da
+  - ta
+  - uk
+  - ru
+  - hu
+  - 'no'
+  - vi
+  tier: realtime
+  streaming: false
+  sample_rate: 24000
+  license: ElevenLabs Terms of Use (paid cloud API)
+  license_url: https://elevenlabs.io/terms-of-use
+  cloud: true
+  features:
+  - telephony
+  description: 'ElevenLabs Flash v2.5: the low-latency model, 32 languages, up to 40,000 characters per request.
+    Voices are the voices of your ElevenLabs account, read when the model is loaded: name one by id or by name.
+    Audio is streamed as 24 kHz PCM. Paid cloud API: the text leaves this server.'
+  source_url: https://elevenlabs.io/docs/overview/models
+  validated: untested
+  options:
+    provider: elevenlabs
+    provider_kind: elevenlabs
+    model: eleven_flash_v2_5
+    workers: 4
+    list_voices: true
+    send_language: true
+- id: elevenlabs-multilingual-v2
+  task: tts
+  engine: remote
+  kind: remote-tts
+  family: ElevenLabs (cloud)
+  languages:
+  - en
+  - ja
+  - zh
+  - de
+  - hi
+  - fr
+  - ko
+  - pt
+  - it
+  - es
+  - id
+  - nl
+  - tr
+  - fil
+  - pl
+  - sv
+  - bg
+  - ro
+  - ar
+  - cs
+  - el
+  - fi
+  - hr
+  - ms
+  - sk
+  - da
+  - ta
+  - uk
+  - ru
+  tier: balanced
+  streaming: false
+  sample_rate: 24000
+  license: ElevenLabs Terms of Use (paid cloud API)
+  license_url: https://elevenlabs.io/terms-of-use
+  cloud: true
+  features:
+  - telephony
+  description: 'ElevenLabs Multilingual v2: 29 languages, up to 10,000 characters per request. Voices are the voices
+    of your ElevenLabs account, read when the model is loaded: name one by id or by name. The language is taken
+    from the text. Paid cloud API: the text leaves this server.'
+  source_url: https://elevenlabs.io/docs/overview/models
+  validated: untested
+  options:
+    provider: elevenlabs
+    provider_kind: elevenlabs
+    model: eleven_multilingual_v2
+    workers: 4
+    list_voices: true
+    text_normalizer: model
+- id: elevenlabs-v3
+  task: tts
+  engine: remote
+  kind: remote-tts
+  family: ElevenLabs (cloud)
+  languages: *id004
+  tier: balanced
+  streaming: false
+  sample_rate: 24000
+  license: ElevenLabs Terms of Use (paid cloud API)
+  license_url: https://elevenlabs.io/terms-of-use
+  cloud: true
+  features:
+  - telephony
+  description: 'ElevenLabs v3: the expressive model (70+ languages, of which the catalog lists the 32 that Flash
+    v2.5 documents by code), up to 5,000 characters per request. Voices are the voices of your ElevenLabs account,
+    read when the model is loaded: name one by id or by name. Paid cloud API: the text leaves this server.'
+  source_url: https://elevenlabs.io/docs/overview/models
+  validated: untested
+  options:
+    provider: elevenlabs
+    provider_kind: elevenlabs
+    model: eleven_v3
+    workers: 4
+    list_voices: true
+    send_language: true
+    text_normalizer: model
+- id: elevenlabs-scribe-v3
+  task: stt
+  engine: remote
+  kind: remote-stt
+  family: ElevenLabs (cloud)
+  languages: *id001
+  tier: accuracy
+  streaming: false
+  sample_rate: 16000
+  license: ElevenLabs Terms of Use (paid cloud API)
+  license_url: https://elevenlabs.io/terms-of-use
+  cloud: true
+  features:
+  - timestamps
+  - telephony
+  - hotwords
+  description: 'ElevenLabs Scribe (scribe_v3): 90+ languages (the catalog lists Whisper''s codes), word timestamps,
+    hotwords (keyterms, which ElevenLabs bills at a surcharge). Paid cloud API: the audio leaves this server.'
+  source_url: https://elevenlabs.io/docs/api-reference/speech-to-text/convert
+  validated: untested
+  options:
+    provider: elevenlabs
+    provider_kind: elevenlabs
+    model: scribe_v3
+    workers: 4
+- id: elevenlabs-scribe-v2
+  task: stt
+  engine: remote
+  kind: remote-stt
+  family: ElevenLabs (cloud)
+  languages: *id001
+  tier: accuracy
+  streaming: false
+  sample_rate: 16000
+  license: ElevenLabs Terms of Use (paid cloud API)
+  license_url: https://elevenlabs.io/terms-of-use
+  cloud: true
+  features:
+  - timestamps
+  - telephony
+  - hotwords
+  description: 'ElevenLabs Scribe (scribe_v2): 90+ languages (the catalog lists Whisper''s codes), word timestamps,
+    hotwords (keyterms, which ElevenLabs bills at a surcharge). Paid cloud API: the audio leaves this server.'
+  source_url: https://elevenlabs.io/docs/api-reference/speech-to-text/convert
+  validated: untested
+  options:
+    provider: elevenlabs
+    provider_kind: elevenlabs
+    model: scribe_v2
+    workers: 4
+- id: deepgram-nova-3
+  task: stt
+  engine: remote
+  kind: remote-stt
+  family: Deepgram (cloud)
+  languages:
+  - af
+  - ar
+  - hy
+  - as
+  - eu
+  - be
+  - bn
+  - bs
+  - bg
+  - ca
+  - zh
+  - hr
+  - cs
+  - da
+  - nl
+  - en
+  - et
+  - fi
+  - fr
+  - gl
+  - ka
+  - de
+  - el
+  - gu
+  - he
+  - hi
+  - hu
+  - id
+  - it
+  - ja
+  - kn
+  - kk
+  - ko
+  - lv
+  - lt
+  - mk
+  - ms
+  - mr
+  - mn
+  - ne
+  - 'no'
+  - ps
+  - fa
+  - pl
+  - pt
+  - pa
+  - ro
+  - ru
+  - sr
+  - sk
+  - sl
+  - es
+  - sv
+  - tl
+  - ta
+  - te
+  - th
+  - tr
+  - uk
+  - ur
+  - vi
+  tier: realtime
+  streaming: true
+  sample_rate: 16000
+  license: Deepgram Terms of Service (paid cloud API)
+  license_url: https://deepgram.com/terms
+  cloud: true
+  features:
+  - timestamps
+  - telephony
+  - hotwords
+  description: 'Deepgram Nova-3: batch and live recognition (a live session uses Deepgram''s streaming socket, with
+    interim text), word timestamps, hotwords (keyterm). Regional language tags such as en-IN are passed on. Paid
+    cloud API: the audio leaves this server.'
+  source_url: https://developers.deepgram.com/docs/models-languages-overview
+  validated: untested
+  options:
+    provider: deepgram
+    provider_kind: deepgram
+    model: nova-3
+    workers: 4
+- id: deepgram-nova-2
+  task: stt
+  engine: remote
+  kind: remote-stt
+  family: Deepgram (cloud)
+  languages:
+  - bg
+  - ca
+  - zh
+  - cs
+  - da
+  - nl
+  - en
+  - et
+  - fi
+  - fr
+  - de
+  - el
+  - hi
+  - hu
+  - id
+  - it
+  - ja
+  - ko
+  - lv
+  - lt
+  - ms
+  - 'no'
+  - pl
+  - pt
+  - ro
+  - ru
+  - sk
+  - es
+  - sv
+  - th
+  - tr
+  - uk
+  - vi
+  tier: realtime
+  streaming: true
+  sample_rate: 16000
+  license: Deepgram Terms of Service (paid cloud API)
+  license_url: https://deepgram.com/terms
+  cloud: true
+  features:
+  - timestamps
+  - telephony
+  - hotwords
+  description: 'Deepgram Nova-2: batch and live recognition, word timestamps, hotwords (keywords). Paid cloud API:
+    the audio leaves this server.'
+  source_url: https://developers.deepgram.com/docs/models-languages-overview
+  validated: untested
+  options:
+    provider: deepgram
+    provider_kind: deepgram
+    model: nova-2
+    workers: 4

@@ -1,4 +1,6 @@
 import type { RequestTrace } from './api/types'
+import { fmtCost } from './cost'
+import { fmtBytes } from './format'
 
 export const STT_PHASES = ['queue', 'resample', 'vad', 'decode', 'finalize'] as const
 export const TTS_PHASES = ['queue', 'normalize', 'synthesize_first', 'synthesize_rest', 'encode'] as const
@@ -57,6 +59,18 @@ export function traceExtras(t: RequestTrace): [string, string][] {
     out.push([label, typeof v === 'number' ? `${Math.round(v * 10) / 10}${unit}` : String(v)])
   }
   add('Pipeline', t.pipeline)
+  if (t.fallback)
+    add(
+      'Fallback',
+      `${t.fallback.requested} → ${t.fallback.answered} (${t.fallback.attempts[0]?.code ?? 'unavailable'})`,
+    )
+  if (t.provider) {
+    add('Cloud provider', `${t.provider.name} · ${t.provider.model}`)
+    add('Provider requests', t.provider.requests)
+    add('Provider time', t.provider.latency_ms, ' ms')
+    add('Sent / received', `${fmtBytes(t.provider.bytes_sent)} / ${fmtBytes(t.provider.bytes_received)}`)
+  }
+  if (t.cost) add('Estimated cost', fmtCost(t.cost))
   add('Diarizer', t.diarization_model)
   add('Speakers', t.speakers)
   add('Speakers before consolidation', t.speakers_before_consolidation)

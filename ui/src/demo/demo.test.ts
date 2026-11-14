@@ -105,7 +105,7 @@ describe('demo backend', () => {
       const { status, body } = await get<{ detail: string }>(path, init)
       expect(status, path).toBe(501)
       expect(body.detail).toMatch(/needs a bolo server/i)
-      expect(body.detail).toContain('pipx install')
+      expect(body.detail).toContain('uv tool install')
     }
   })
 

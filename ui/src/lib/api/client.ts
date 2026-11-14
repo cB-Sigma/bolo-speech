@@ -6,6 +6,10 @@ import type {
   Catalog,
   Component,
   Job,
+  Provider,
+  ProviderList,
+  ProviderTest,
+  ProviderUpdate,
   RequestTrace,
   Sample,
   ServerInfo,
@@ -124,6 +128,15 @@ export const api = {
   stats: (signal?: AbortSignal) => json<Stats>('api/v1/stats', { signal }),
   requests: (q: { limit?: number; kind?: string; model?: string } = {}, signal?: AbortSignal) =>
     json<{ requests: RequestTrace[] }>('api/v1/requests', { query: q, signal }),
+  requestTrace: (id: string, signal?: AbortSignal) =>
+    json<RequestTrace>(`api/v1/requests/${encodeURIComponent(id)}`, { signal }),
+  /** Cloud providers. No call returns an API key: the server only says whether one is stored. */
+  providers: (signal?: AbortSignal) => json<ProviderList>('api/v1/providers', { signal }),
+  putProvider: (name: string, body: ProviderUpdate) =>
+    json<Provider>(`api/v1/providers/${encodeURIComponent(name)}`, { method: 'PUT', json: body }),
+  deleteProvider: (name: string) => json<void>(`api/v1/providers/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  testProvider: (name: string) =>
+    json<ProviderTest>(`api/v1/providers/${encodeURIComponent(name)}/test`, { method: 'POST' }),
   /** Optional components. Older servers have no such route: that reads as an empty list. */
   components: async (signal?: AbortSignal): Promise<{ components: Component[] }> => {
     try {
@@ -146,7 +159,12 @@ export const api = {
   /** Pins (null removes the pin) the phonemiser, the text normaliser or the word lists of a voice. */
   setModelSettings: (
     id: string,
-    settings: { phonemizer?: string | null; text_normalizer?: string | null; wordlists?: string[] | null },
+    settings: {
+      phonemizer?: string | null
+      text_normalizer?: string | null
+      wordlists?: string[] | null
+      fallback?: string[] | null
+    },
   ) =>
     json<{ model: string; settings: Record<string, unknown> }>(`api/v1/models/${encodeURIComponent(id)}/settings`, {
       method: 'PUT',
@@ -217,6 +235,23 @@ export const api = {
     if (language) form.set('language', language)
     const res = await request('v1/audio/transcriptions', { method: 'POST', body: form, signal })
     return res.json() as Promise<{ text: string }>
+  },
+
+  /** One-shot transcription that also returns the response headers (request id, model that answered, cost). */
+  async transcribeWithHeaders(
+    file: Blob,
+    model: string,
+    language?: string,
+    signal?: AbortSignal,
+  ): Promise<{ text: string; headers: Headers }> {
+    const form = new FormData()
+    form.set('file', file, 'audio.wav')
+    form.set('model', model)
+    form.set('response_format', 'json')
+    if (language) form.set('language', language)
+    const res = await request('v1/audio/transcriptions', { method: 'POST', body: form, signal })
+    const body = (await res.json()) as { text: string }
+    return { text: body.text, headers: res.headers }
   },
 
   /** Transcription with segments, optionally speaker-attributed (diarization, separation of overlaps). */

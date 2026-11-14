@@ -14,8 +14,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from bolo import samples
 from bolo.api.common import get_core, parse_bool, sse
 from bolo.bench import run_bench
+from bolo.catalog import CLOUD_NOTICE
 from bolo.errors import BoloError, InvalidRequest, ModelNotFound
 from bolo.obs.metrics import render_metrics
+from bolo.providers import DEFAULT_BASE_URLS, TERMS
+from bolo.providers import KINDS as PROVIDER_KINDS
 from bolo.text.wordlists import check_name as check_wordlist_name
 
 router = APIRouter(prefix="/api/v1")
@@ -95,6 +98,11 @@ class ModelSettingsRequest(BaseModel):
         default=None,
         description="Pin pronunciation word lists to the model, highest priority first; null removes the pin.",
     )
+    fallback: list[str] | None = Field(
+        default=None,
+        description="Models (of the same task, local or cloud) that answer instead when this one is unavailable, "
+        "overloaded or its provider fails, in order; null removes the pin, [] switches a configured fallback off.",
+    )
 
 
 @router.get("/models/{model_id:path}/settings", tags=["native"], summary="Settings pinned for one model")
@@ -117,9 +125,93 @@ async def put_model_settings(request: Request, model_id: str, body: ModelSetting
         core.components.validate_pin(spec, values["phonemizer"])
     for name in values.get("wordlists") or []:
         check_wordlist_name(name)
+    for name in values.get("fallback") or []:
+        other = core.resolve(name, spec.task)  # unknown model or wrong task: 404 / 400
+        if other.id == spec.id:
+            raise InvalidRequest("a model cannot be its own fallback", param="fallback")
     settings = core.store.set_model_settings(spec.id, values)
     core.events.publish("model", {"id": spec.id, "event": "settings", "settings": settings})
     return JSONResponse({"model": spec.id, "settings": settings})
+
+
+class ProviderRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: str | None = Field(default=None, description="openai-compatible, sarvam, elevenlabs or deepgram.")
+    base_url: str | None = Field(default=None, description="Default: the provider's own address.")
+    api_key: str | None = Field(
+        default=None,
+        description="Write-only. Absent or empty keeps the stored key; it is never returned by any route.",
+    )
+    clear_api_key: bool = Field(default=False, description="Remove the stored key.")
+    options: dict[str, Any] | None = None
+    prices: dict[str, Any] | None = Field(
+        default=None,
+        description="Price table for cost estimates: {<provider model or *>: {per_minute, per_hour, per_1k_chars, "
+        "per_1m_chars, per_request, currency}}.",
+    )
+
+
+async def _unload_provider_models(core: Any, name: str) -> None:
+    """Loaded models keep their provider's address and key: unload them when the provider changes."""
+    for entry in list(core.manager.loaded.values()):
+        if entry.spec.cloud and entry.model is not None:
+            provider = getattr(entry.model, "provider", None)
+            if provider is not None and provider.name == name:
+                await core.manager.unload(entry.id, reason="provider changed")
+
+
+@router.get("/providers", tags=["native"], summary="Cloud providers (keys are never returned)")
+async def list_providers(request: Request) -> JSONResponse:
+    core = get_core(request)
+    return JSONResponse(
+        {
+            "providers": core.providers.public(),
+            "kinds": [
+                {"kind": kind, "default_base_url": DEFAULT_BASE_URLS[kind], "terms_url": TERMS[kind]}
+                for kind in PROVIDER_KINDS
+            ],
+            "editable": core.providers.edit_blocked_reason() is None,
+            "edit_blocked_reason": core.providers.edit_blocked_reason(),
+            "notice": CLOUD_NOTICE,
+        }
+    )
+
+
+@router.get("/providers/{name}", tags=["native"], summary="One cloud provider")
+async def get_provider(request: Request, name: str) -> JSONResponse:
+    core = get_core(request)
+    cfg = core.providers.get(name)
+    if cfg is None:
+        raise ModelNotFound(f"unknown provider '{name}'")
+    return JSONResponse({**cfg.public(), "stats": core.providers.stats_for(cfg.name)})
+
+
+@router.put("/providers/{name}", tags=["native"], summary="Add or change a cloud provider")
+async def put_provider(request: Request, name: str, body: ProviderRequest) -> JSONResponse:
+    """Stored in ``<data_dir>/providers.json`` (mode 0600). Providers from the configuration file or the
+    environment cannot be changed here. Refused on a non-loopback bind without an API key."""
+    core = get_core(request)
+    cfg = core.providers.put(name, body.model_dump(exclude_unset=True))
+    await _unload_provider_models(core, cfg.name)
+    core.events.publish("provider", {"name": cfg.name, "event": "saved"})
+    return JSONResponse(cfg.public())
+
+
+@router.delete("/providers/{name}", status_code=204, tags=["native"], summary="Remove a stored cloud provider")
+async def delete_provider(request: Request, name: str) -> Response:
+    core = get_core(request)
+    core.providers.delete(name)
+    await _unload_provider_models(core, name.strip().lower())
+    core.events.publish("provider", {"name": name.strip().lower(), "event": "removed"})
+    return Response(status_code=204)
+
+
+@router.post("/providers/{name}/test", tags=["native"], summary="Check that a provider answers and accepts the key")
+async def test_provider(request: Request, name: str) -> JSONResponse:
+    """One cheap request to the provider (a model, voice or project listing; nothing billed). The answer says
+    whether the key itself was checked (``checked: credentials``) or only the address (``reachability``)."""
+    core = get_core(request)
+    return JSONResponse(await asyncio.to_thread(core.providers.test, name))
 
 
 @router.post("/models/{model_id:path}/load", tags=["native"], summary="Load a model into memory")

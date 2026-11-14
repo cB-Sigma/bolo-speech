@@ -4,7 +4,9 @@ import { toast } from 'sonner'
 import { api, ApiError, NetworkError } from '@/lib/api/client'
 import { isDemo } from '@/lib/api/config'
 import type { Catalog, CatalogModel, Component, Task } from '@/lib/api/types'
+import { providersOffered, wordListsAnnounced } from '@/lib/capabilities'
 import { live } from '@/lib/live'
+import type { NavFeatures } from '@/lib/nav'
 import { prefs, setPref } from '@/lib/prefs'
 import { useStore } from './use-store'
 
@@ -69,15 +71,39 @@ export function missingComponent(
   )
 }
 
-/** Word lists, when the server has them: a 404 (older server, or the demo) reads as "not offered". */
+/**
+ * Word lists, when the server has them. Newer servers announce them (`capabilities.wordlists`); for older ones
+ * the route is probed, and a 404 (or the demo) reads as "not offered".
+ */
 export function useWordLists() {
+  const announced = wordListsAnnounced(useInfo().data)
   const q = useQuery({
     queryKey: ['wordlists'],
     queryFn: ({ signal }) => api.wordLists(signal),
     staleTime: 30_000,
     retry: false,
+    enabled: announced !== false,
   })
-  return { ...q, offered: q.isSuccess }
+  return { ...q, offered: announced ?? q.isSuccess }
+}
+
+/** Cloud providers (`GET /api/v1/providers`); only asked for when the server announces them. */
+export function useProviders() {
+  const offered = providersOffered(useInfo().data)
+  const q = useQuery({
+    queryKey: ['providers'],
+    queryFn: ({ signal }) => api.providers(signal),
+    staleTime: 15_000,
+    retry: false,
+    enabled: offered && !isDemo,
+  })
+  return { ...q, offered }
+}
+
+/** Which optional screens this server has. */
+export function useNavFeatures(): NavFeatures {
+  const info = useInfo().data
+  return { wordLists: useWordLists().offered, providers: providersOffered(info) }
 }
 
 export function useSamples() {

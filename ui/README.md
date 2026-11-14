@@ -2,6 +2,10 @@
 
 The web console for [bolo](../README.md): a playground for speech to text and text to speech, a
 model catalog, a live latency dashboard, a concurrency benchmark and copy-paste client snippets.
+Against a server with cloud providers it also has a Providers screen (add, edit and test a
+provider; the key field is write-only), a "Cloud" mark and filter on the Models screen, and a
+Compare screen that sends the same audio or text to several models, local and cloud, and shows
+output, latency and estimated cost side by side.
 
 It is a static single-page app (React, TypeScript, Vite, Tailwind CSS, shadcn/ui, Recharts). The
 production bundle is written to `../server/src/bolo/_ui/` and served by the bolo server at `/`, so
@@ -145,6 +149,8 @@ src/
   lib/stt/          transcript and latency tracking, server and in-browser transcribers, energy VAD
   lib/tts/          streaming synthesis session with per-chunk timing and underrun detection
   lib/browser-stt/  web worker running Moonshine with ONNX Runtime Web (WebGPU or WebAssembly)
+  lib/compare.ts    the Compare screen's runs: one request per model, timings and cost from its trace
+  lib/cost.ts       price tables and estimated-cost formatting; lib/providers.ts: the provider form
   lib/browser-tts/  in-browser voices: text front end, numbers, worker running VITS with ONNX Runtime Web
   vendor/uccharan/  vendored text-to-phoneme library (Apache-2.0) for the Piper voice
 scripts/voices/     prepares the voices the live demo publishes (shrink, check, index)

@@ -672,7 +672,7 @@ async def test_kitten_through_uccharan(core: Bolo) -> None:
 
 @pytest.mark.skipif(
     not os.environ.get("BOLO_DICOW_ONNX_DIR"),
-    reason="set BOLO_DICOW_ONNX_DIR to an export of tools/export_dicow_onnx.py (dicow-v3.3-onnx is not hosted yet)",
+    reason="set BOLO_DICOW_ONNX_DIR to an export of tools/export_dicow_onnx.py (a 1.5 GB model)",
 )
 async def test_dicow_onnx_transcribes_both_voices_of_an_overlap(core: Bolo) -> None:
     """Torch-free DiCoW on two Kokoro voices that talk at once for 2 s: each speaker's own words, both intelligible."""
@@ -802,5 +802,185 @@ async def test_orpheus_family_on_llama_server_with_snac_onnx() -> None:
         )
         assert rate == 24000 and 2.0 < len(audio) / rate < 15.0
         assert wer <= 0.35
+    finally:
+        await core.stop()
+
+
+# -- cloud providers (docs/providers.md) ------------------------------------------------------------------------------
+# Opt-in twice over: BOLO_TEST_REAL=1 as for everything in this file, and the provider's key in the environment
+# (the vendor's usual variable, or BOLO_PROVIDER_<NAME>_API_KEY). These calls are billed by the provider: a few
+# seconds of audio and a few sentences of text per test. Where a credential proxy adds the real key to requests
+# for the provider's host, any placeholder value in the variable will do.
+CLOUD_KEYS = {
+    "openai": ("OPENAI_API_KEY", "BOLO_PROVIDER_OPENAI_API_KEY"),
+    "sarvam": ("SARVAM_API_KEY", "BOLO_PROVIDER_SARVAM_API_KEY"),
+    "elevenlabs": ("ELEVENLABS_API_KEY", "BOLO_PROVIDER_ELEVENLABS_API_KEY"),
+    "deepgram": ("DEEPGRAM_API_KEY", "BOLO_PROVIDER_DEEPGRAM_API_KEY"),
+}
+
+
+def cloud_key(provider: str) -> str | None:
+    return next((os.environ[name] for name in CLOUD_KEYS[provider] if os.environ.get(name)), None)
+
+
+def needs_cloud(provider: str) -> pytest.MarkDecorator:
+    names = " or ".join(CLOUD_KEYS[provider])
+    return pytest.mark.skipif(cloud_key(provider) is None, reason=f"needs a real {provider} key in {names}")
+
+
+@pytest.fixture
+async def cloud_core(tmp_path: Path) -> AsyncIterator[Bolo]:
+    providers = {name: {"api_key": key} for name in CLOUD_KEYS if (key := cloud_key(name))}
+    c = Bolo(Settings(data_dir=tmp_path / "data", auto_pull=False, providers=providers))
+    await c.start()
+    try:
+        yield c
+    finally:
+        await c.stop()
+
+
+async def cloud_round_trip(core: Bolo, tts: str, stt: str, text: str, language: str, voice: str | None = None) -> float:
+    """Speak ``text`` with one cloud model, transcribe it with another; returns the word error rate."""
+    trace = Trace("tts", "test", tts)
+    audio, rate = await core.synthesize_all(text, model=tts, voice=voice, language=language, trace=trace)
+    core.complete_tts(trace)
+    assert len(audio) > rate, "less than a second of audio came back"
+    heard = await core.transcribe(audio, rate, model=stt, language=language)
+    wer = word_error_rate(text, heard.text)
+    print(f"\n{tts} -> {stt}: WER {wer:.2f}; provider {trace.extra.get('provider')}; heard: {heard.text!r}")
+    return wer
+
+
+@needs_cloud("openai")
+async def test_cloud_openai(cloud_core: Bolo) -> None:
+    check = await asyncio.to_thread(cloud_core.providers.test, "openai")
+    assert check["ok"] and check["checked"] == "credentials", check
+    assert (
+        await cloud_round_trip(cloud_core, "openai-gpt-4o-mini-tts", "openai-gpt-4o-mini-transcribe", EN_TEXT, "en")
+        < 0.2
+    )
+    assert await cloud_round_trip(cloud_core, "openai-tts-1", "openai-whisper-1", EN_TEXT, "en", "nova") < 0.2
+    audio, rate = await cloud_core.synthesize_all("Word timestamps, please.", model="openai-tts-1")
+    timed = await cloud_core.transcribe(audio, rate, model="openai-whisper-1", language="en", word_timestamps=True)
+    assert len(timed.words) >= 3 and timed.words[-1].t1 <= len(audio) / rate + 0.5
+
+
+@needs_cloud("sarvam")
+async def test_cloud_sarvam(cloud_core: Bolo) -> None:
+    check = await asyncio.to_thread(cloud_core.providers.test, "sarvam")
+    assert check["ok"], check
+    assert await cloud_round_trip(cloud_core, "sarvam-bulbul-v3", "sarvam-saaras-v4", HI_TEXT, "hi") < 0.4
+    assert await cloud_round_trip(cloud_core, "sarvam-bulbul-v4-flash", "sarvam-saaras-v3", HI_TEXT, "hi") < 0.4
+    audio, rate = await cloud_core.synthesize_all(HI_TEXT, model="sarvam-bulbul-v2", language="hi")
+    english = await cloud_core.transcribe(audio, rate, model="sarvam-saaras-v4", task="translate")
+    assert any(word in english.text.lower() for word in ("weather", "hello", "how are you"))
+
+
+@needs_cloud("elevenlabs")
+async def test_cloud_elevenlabs(cloud_core: Bolo) -> None:
+    check = await asyncio.to_thread(cloud_core.providers.test, "elevenlabs")
+    assert check["ok"] and check["checked"] == "credentials", check
+    async with cloud_core.manager.use("elevenlabs-flash-v2.5") as entry:
+        voices = entry.model.voices  # type: ignore[attr-defined]
+    assert voices, "the account lists no voices"
+    wer = await cloud_round_trip(
+        cloud_core, "elevenlabs-flash-v2.5", "elevenlabs-scribe-v3", EN_TEXT, "en", voices[0].id
+    )
+    assert wer < 0.2
+
+
+@needs_cloud("deepgram")
+async def test_cloud_deepgram(cloud_core: Bolo) -> None:
+    check = await asyncio.to_thread(cloud_core.providers.test, "deepgram")
+    assert check["ok"] and check["checked"] == "credentials", check
+    samples, rate = librispeech(real_settings().data_dir)
+    heard = await cloud_core.transcribe(samples, rate, model="deepgram-nova-3", language="en", word_timestamps=True)
+    assert word_error_rate(LIBRISPEECH_REF, heard.text) < 0.15 and len(heard.words) > 10
+    # the live socket, at the pace of a microphone
+    async with cloud_core.manager.use("deepgram-nova-3") as entry:
+        stream = entry.model.create_stream("en")  # type: ignore[attr-defined]
+        try:
+            audio = resample(samples, rate, 16000)
+            for off in range(0, len(audio), 1600):
+                stream.accept(audio[off : off + 1600])
+                await asyncio.sleep(0.1)
+            stream.finish()
+            await asyncio.to_thread(stream.settle)
+            live_text = stream.result().text
+        finally:
+            stream.close()
+    print(f"\ndeepgram live: {live_text!r}")
+    assert word_error_rate(LIBRISPEECH_REF, live_text) < 0.25
+
+
+# -- LFM3-Audio in ONNX Runtime (in-process speech-to-speech) ---------------------------------------------------------
+# A 2.7 GB download and about 3.4 GB of memory: also opt-in by name, BOLO_TEST_S2S_ONNX=1 (needs bolo-speech[s2s]).
+needs_s2s_onnx = pytest.mark.skipif(
+    os.environ.get("BOLO_TEST_S2S_ONNX") != "1",
+    reason="set BOLO_TEST_S2S_ONNX=1 (2.7 GB model, needs bolo-speech[s2s])",
+)
+
+
+@needs_s2s_onnx
+@needs_phonemes_en_hi
+async def test_lfm3_audio_onnx_speech_to_speech() -> None:
+    """A spoken question, the spoken answer, a follow-up that needs the first turn, and a barge-in."""
+    import time
+
+    from bolo.s2s import AudioDelta, ResponseEnd, S2SConfig, TextDelta
+
+    settings = real_settings()
+    settings.s2s_model = "lfm3-audio-2b-onnx"
+    core = Bolo(settings)
+    await core.start()
+    try:
+        backend = await core.s2s.backend()
+        assert backend.describe()["backend"] == "onnx" and core.s2s.describe()["available"]
+        conversation = await backend.open(S2SConfig(instructions="Answer in one short sentence."))
+
+        async def turn(question: str, stop_after_s: float | None = None) -> tuple[str, np.ndarray, str]:
+            asked, rate = await core.synthesize_all(question, model="piper-en-us-amy-low")
+            asked = resample(asked, rate, 16000)
+            for off in range(0, len(asked), 1600):  # at the pace of a microphone: the audio is prefilled
+                await conversation.append_audio(asked[off : off + 1600])
+                await asyncio.sleep(0.1)
+            await conversation.commit()
+            started, first, text, parts, status = time.perf_counter(), None, "", [], "cancelled"
+            stream = conversation.respond(modalities=["text", "audio"], max_output_tokens=300)
+            async for event in stream:
+                if isinstance(event, TextDelta):
+                    text += event.text
+                elif isinstance(event, AudioDelta):
+                    first = first or time.perf_counter() - started
+                    parts.append(event.samples)
+                    if stop_after_s and sum(map(len, parts)) / event.sample_rate >= stop_after_s:
+                        break
+                elif isinstance(event, ResponseEnd):
+                    status = event.status
+            await stream.aclose()
+            audio = np.concatenate(parts)
+            took = time.perf_counter() - started
+            print(
+                f"\nlfm3-audio-2b-onnx: {question!r} -> {text!r} [{status}] first audio {first:.2f} s, "
+                f"{len(audio) / 24000:.1f} s of speech in {took:.1f} s (RTF {took / (len(audio) / 24000):.2f})"
+            )
+            return text, audio, status
+
+        text, audio, status = await turn("What is the capital of France?")
+        assert status == "completed" and "paris" in text.lower()
+        heard = await core.transcribe(audio, 24000, model="moonshine-tiny-en")
+        assert word_error_rate(text, heard.text, "en") <= 0.3, heard.text
+        text, audio, status = await turn("And what about Italy?")
+        assert "rome" in text.lower()
+        _text, audio, status = await turn("Tell me a long story about a fox.", stop_after_s=1.0)
+        assert status == "cancelled" and len(audio) / 24000 < 4.0
+        text, _audio, status = await turn("How many days are there in a week?")
+        assert status == "completed" and "seven" in text.lower()
+        await conversation.close()
+        # the same graphs as a voice
+        spoken, rate = await core.synthesize_all("The weather is lovely today.", model="lfm3-audio-2b-onnx")
+        heard = await core.transcribe(spoken, rate, model="moonshine-tiny-en")
+        print(f"\nlfm3-audio-2b-onnx as a voice: {heard.text!r}")
+        assert rate == 24000 and word_error_rate("The weather is lovely today.", heard.text, "en") <= 0.34
     finally:
         await core.stop()
