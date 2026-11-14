@@ -11,7 +11,7 @@ import type { FetchRecord, FileProgress, LoadStage } from '@/lib/browser-stt/mod
 import { VOICE_CACHE, type TtsWorkerRequest, type TtsWorkerResponse } from './protocol'
 import type * as UccharanModule from '@/vendor/uccharan/index.js'
 import { scaleSilence } from './silence'
-import { coquiIds, piperIds, withLeadIn, type VoiceConfig } from './text'
+import { coquiIds, piperConfigFromJson, piperIds, withLeadIn, type VoiceConfig } from './text'
 
 /**
  * Runs one voice with ONNX Runtime Web (WebAssembly). The VITS graph is called
@@ -26,6 +26,7 @@ const stage = (s: LoadStage, loaded?: number, total?: number) => post({ type: 's
 let session: ort.InferenceSession | null = null
 let config: VoiceConfig | null = null
 let uccharan: typeof UccharanModule | null = null
+let kokoroStyle: Float32Array | null = null
 let chain: Promise<void> = Promise.resolve()
 
 const record = (r: FetchRecord) => post({ type: 'fetch', record: r })
@@ -94,26 +95,55 @@ async function load(req: Extract<TtsWorkerRequest, { type: 'load' }>): Promise<v
     }
   }
   stage('model')
-  const dir = `${req.base}${req.voice}/`
-  const v = `?v=${encodeURIComponent(req.version)}`
   const get = (url: string, name: string, type?: string) =>
-    cachedDownload(url + v, VOICE_CACHE, { progress: track(name), record }, { contentType: type })
+    cachedDownload(url, VOICE_CACHE, { progress: track(name), record }, { contentType: type })
+  const short = (url: string) =>
+    url
+      .replace(/[?#].*$/, '')
+      .split('/')
+      .slice(-2)
+      .join('/')
   const pending: Promise<unknown>[] = []
-  const settings = get(`${dir}voice.json`, `${req.voice}/voice.json`, 'application/json')
-  const model = get(`${dir}model.onnx`, `${req.voice}/model.onnx`)
+  const model = get(req.model, short(req.model))
+  const settings = req.config ? get(req.config, short(req.config), 'application/json') : null
+  const style = req.style ? get(req.style, short(req.style)) : null
   if (req.phonemizer === 'uccharan') {
     pending.push(
       (async () => {
         const mod = await import('@/vendor/uccharan/index.js')
-        const data = await get(`${req.base}uccharan/en-us.ucd`, 'uccharan/en-us.ucd')
-        await mod.init()
-        await mod.loadLanguage('en-us', data.data)
+        // Language data is fetched from next to the voices the first time a language is used.
+        await mod.init({ dataBaseUrl: req.uccharanBase })
+        const lang = req.phonemeLanguage ?? 'en-us'
+        await mod.loadLanguage(lang)
+        if (req.kind === 'kokoro' && lang.startsWith('en')) await mod.loadKokoro(lang)
         uccharan = mod
       })(),
     )
   }
-  const [cfgFile, modelFile] = await Promise.all([settings, model, ...pending])
-  config = JSON.parse(new TextDecoder().decode(cfgFile.data)) as VoiceConfig
+  const [modelFile, cfgFile, styleFile] = await Promise.all([model, settings, style, ...pending])
+  if (req.kind === 'kokoro') {
+    if (!styleFile) throw new Error('The voice style is missing')
+    kokoroStyle = new Float32Array(styleFile.data)
+    config = {
+      id: req.voice,
+      kind: 'kokoro',
+      sample_rate: 24000,
+      phoneme_language: req.phonemeLanguage ?? 'en-us',
+      inference: { noise_scale: 0, length_scale: 1, noise_scale_w: 0 },
+    }
+  } else {
+    if (!cfgFile) throw new Error('The voice settings are missing')
+    const json = JSON.parse(new TextDecoder().decode(cfgFile.data)) as unknown
+    config =
+      req.configFormat === 'piper'
+        ? piperConfigFromJson(req.voice, json as Parameters<typeof piperConfigFromJson>[1], req.phonemeLanguage)
+        : (json as VoiceConfig)
+    if (req.configFormat === 'piper' || config.kind === 'piper')
+      config = {
+        ...config,
+        phoneme_language: req.phonemeLanguage ?? (config as { phoneme_language: string }).phoneme_language,
+      } as VoiceConfig
+  }
   stage('compiling')
   session = await ort.InferenceSession.create(new Uint8Array(modelFile.data), {
     executionProviders: ['wasm'],
@@ -125,7 +155,8 @@ async function load(req: Extract<TtsWorkerRequest, { type: 'load' }>): Promise<v
   })
   stage('warmup')
   // A short run so the first sentence does not pay for first-use allocations.
-  await run(config.kind === 'coqui' ? coquiIds(config, 'a') : piperIds(config.phoneme_id_map, 'ə').ids, [0, 1, 0])
+  if (config.kind === 'kokoro') await runKokoro([0, 50, 83, 0], 1)
+  else await run(config.kind === 'coqui' ? coquiIds(config, 'a') : piperIds(config.phoneme_id_map, 'ə').ids, [0, 1, 0])
   post({
     type: 'ready',
     loadMs: performance.now() - started,
@@ -133,7 +164,7 @@ async function load(req: Extract<TtsWorkerRequest, { type: 'load' }>): Promise<v
     config,
     threads: req.threads,
     cached: modelFile.fromCache,
-    cacheKeys: [`${dir}voice.json${v}`, `${dir}model.onnx${v}`],
+    cacheKeys: [req.model, req.config, req.style].filter((x): x is string => Boolean(x)),
   })
 }
 
@@ -155,17 +186,59 @@ async function run(ids: number[], scales: [number, number, number]): Promise<Flo
   return audio
 }
 
+/** Kokoro: token ids, the style row for this length (510 rows of 256), and the speed. */
+async function runKokoro(ids: number[], speed: number): Promise<Float32Array> {
+  if (!session || !kokoroStyle) throw new Error('The voice is not loaded')
+  const rows = kokoroStyle.length / 256
+  const row = Math.min(Math.max(ids.length - 2, 0), rows - 1)
+  const feeds = {
+    input_ids: new ort.Tensor(
+      'int64',
+      BigInt64Array.from(ids, (x) => BigInt(x)),
+      [1, ids.length],
+    ),
+    style: new ort.Tensor('float32', kokoroStyle.slice(row * 256, row * 256 + 256), [1, 256]),
+    speed: new ort.Tensor('float32', Float32Array.from([speed]), [1]),
+  }
+  const out = await session.run(feeds)
+  const tensor = out[session.outputNames[0] as string] as ort.Tensor
+  const audio = new Float32Array(tensor.data as Float32Array)
+  tensor.dispose()
+  return audio
+}
+
 async function synth(req: Extract<TtsWorkerRequest, { type: 'synth' }>): Promise<void> {
   if (!config) throw new Error('The voice is not loaded')
   const started = performance.now()
   let ids: number[][]
   let phonemes: string | undefined
   const missing: string[] = []
+  if (config.kind === 'kokoro') {
+    if (!uccharan) throw new Error('The phonemiser is not loaded')
+    const tokens = await uccharan.phonemize(req.text, { lang: config.phoneme_language, profile: 'kokoro' })
+    // Kokoro reads at most 510 tokens per call.
+    const all = uccharan.kokoroIds(tokens)
+    const audio = await runKokoro(all.length > 512 ? [...all.slice(0, 511), 0] : all, 1 / (req.scales[1] || 1))
+    post(
+      {
+        type: 'audio',
+        id: req.id,
+        audio,
+        ms: performance.now() - started,
+        tokens: all.length,
+        phonemes: tokens,
+        missing,
+        memoryBytes: runtimeMemoryBytes(),
+      },
+      [audio.buffer],
+    )
+    return
+  }
   if (config.kind === 'coqui') {
     ids = [coquiIds(config, withLeadIn(config, req.text))]
   } else {
     if (!uccharan) throw new Error('The phonemiser is not loaded')
-    const sentences = uccharan.phonemizeSync(req.text, { lang: config.phoneme_language, profile: 'piper' })
+    const sentences = await uccharan.phonemize(req.text, { lang: config.phoneme_language, profile: 'piper' })
     phonemes = sentences.join(' ')
     ids = sentences.map((s) => {
       const r = piperIds(config?.kind === 'piper' ? config.phoneme_id_map : {}, s)

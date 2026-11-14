@@ -7,9 +7,18 @@ export type TtsWorkerRequest =
       /** Absolute URL of the voices directory (ends in a slash). */
       base: string
       voice: string
-      /** Changes when the published files change, so a stale cached copy is not used. */
-      version: string
+      kind: 'coqui' | 'piper' | 'kokoro'
+      /** Absolute URLs of the files (published ones carry a version query, so a stale cached copy is not used). */
+      model: string
+      config: string | null
+      configFormat: 'bolo' | 'piper' | null
+      /** Kokoro's style vectors for the voice. */
+      style?: string
       phonemizer: 'uccharan' | null
+      /** uccharan's language for the phonemes. */
+      phonemeLanguage?: string
+      /** Directory with uccharan's language data (ends in a slash). */
+      uccharanBase: string
       threads: number
       /** Directory with ort-wasm-simd-threaded.{wasm,mjs}; defaults to the jsDelivr copy of the bundled version. */
       ortWasmBase?: string

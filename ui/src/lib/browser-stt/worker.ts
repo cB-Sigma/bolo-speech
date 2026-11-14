@@ -17,7 +17,9 @@ const scope = self as unknown as DedicatedWorkerGlobalScope
 const post = (msg: WorkerResponse) => scope.postMessage(msg)
 
 let asr: Asr | null = null
-let family: 'Moonshine' | 'Whisper' = 'Moonshine'
+let family: 'Moonshine' | 'Whisper' | 'Wav2Vec2' = 'Moonshine'
+let englishOnly = false
+let forceLanguage: string | undefined
 let chain: Promise<void> = Promise.resolve()
 
 const stage = (s: LoadStage, loaded?: number, total?: number) => post({ type: 'stage', stage: s, loaded, total })
@@ -117,6 +119,8 @@ function instrumentFetch(): void {
 async function load(req: Extract<WorkerRequest, { type: 'load' }>): Promise<void> {
   const started = performance.now()
   family = req.family
+  englishOnly = Boolean(req.englishOnly)
+  forceLanguage = req.forceLanguage
   env.allowLocalModels = false
   if (req.config.modelHost) env.remoteHost = req.config.modelHost.replace(/\/?$/, '/')
   instrumentFetch()
@@ -160,7 +164,7 @@ async function load(req: Extract<WorkerRequest, { type: 'load' }>): Promise<void
       // Both graphs (encoder and decoder) fetched: what remains is building the sessions.
       const graphs = list.filter((f) => f.file.endsWith('.onnx'))
       const complete = list.every((f) => f.total > 0 && f.loaded >= f.total)
-      if (!compiling && graphs.length >= 2 && complete) {
+      if (!compiling && graphs.length >= (family === 'Wav2Vec2' ? 1 : 2) && complete) {
         compiling = true
         stage('compiling')
       } else if (!compiling) {
@@ -180,7 +184,13 @@ async function load(req: Extract<WorkerRequest, { type: 'load' }>): Promise<void
   stage('warmup')
   await asr(
     new Float32Array(16000),
-    family === 'Whisper' ? { language: 'en', task: 'transcribe', max_new_tokens: 4 } : {},
+    family === 'Whisper'
+      ? englishOnly
+        ? { max_new_tokens: 4 }
+        : { language: forceLanguage ?? 'en', task: 'transcribe', max_new_tokens: 4 }
+      : family === 'Wav2Vec2'
+        ? {}
+        : { max_new_tokens: 4 },
   )
   // transformers.js keys its cache by the remote URL of each file.
   const host = (env.remoteHost ?? 'https://huggingface.co/').replace(/\/+$/, '')
@@ -223,7 +233,22 @@ async function transcribe(req: Extract<WorkerRequest, { type: 'transcribe' }>): 
   const seconds = req.audio.length / 16000
   let language: string | null
   let options: AsrOptions
-  if (family === 'Whisper') {
+  if (family === 'Wav2Vec2') {
+    // A character model: no decoding loop, no language token.
+    language = req.language && req.language !== 'auto' ? req.language : null
+    options = {}
+  } else if (family === 'Whisper' && englishOnly) {
+    language = 'en'
+    options = { max_new_tokens: Math.min(220, Math.ceil(seconds * 8) + 12) }
+  } else if (family === 'Whisper' && forceLanguage) {
+    // Fine-tunes that write Hindi speech in Latin letters are run with the English token, as their authors do.
+    language = req.language && req.language !== 'auto' ? req.language : 'hi'
+    options = {
+      language: forceLanguage,
+      task: 'transcribe',
+      max_new_tokens: Math.min(220, Math.ceil(seconds * 10) + 12),
+    }
+  } else if (family === 'Whisper') {
     language = req.language && req.language !== 'auto' ? req.language : await detectLanguage(req.audio)
     // Indic scripts take several tokens per word; the cap only stops run-on repetition.
     options = {
@@ -232,7 +257,7 @@ async function transcribe(req: Extract<WorkerRequest, { type: 'transcribe' }>): 
       max_new_tokens: Math.min(220, Math.ceil(seconds * 16) + 12),
     }
   } else {
-    language = 'en'
+    language = req.language && req.language !== 'auto' ? req.language : 'en'
     // Moonshine has no length penalty; cap tokens relative to the audio to avoid run-on hallucination.
     options = { max_new_tokens: Math.max(8, Math.ceil(seconds * 6.5)) }
   }

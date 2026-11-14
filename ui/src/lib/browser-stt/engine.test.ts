@@ -3,20 +3,35 @@ import { diagnostics } from '@/lib/diagnostics'
 import { fmtBytes } from '@/lib/format'
 import { FakeSpeechWorker } from '@/mock/fake-stt-worker'
 import { BrowserSttEngine, describeLoad, setSpeechWorkerFactory } from './engine'
-import { browserModel, BROWSER_MODELS, suggestedModelFor } from './models'
+import { browserModel, BROWSER_MODELS, modelsByGroup, suggestedModelFor } from './models'
 
 describe('browser model registry', () => {
-  it('lists an English model, a Hindi model and two multilingual ones, each with size and licence', () => {
-    expect(BROWSER_MODELS.map((m) => m.id)).toEqual([
+  it('lists every recogniser that runs in a browser, each with size, memory, licence and source', () => {
+    for (const id of [
       'moonshine-tiny',
+      'moonshine-base',
       'whisper-tiny-hindi',
       'whisper-tiny-q8',
       'whisper-base-q8',
+      'whisper-small',
+      'whisper-medium',
+      'whisper-large-v3-turbo',
+      'whisper-large-v3-turbo-f16',
+      'distil-small-en',
+      'distil-medium-en',
+      'whisper-hindi-small',
+      'whisper-hinglish-swift',
+      'indicwav2vec-hindi',
     ])
+      expect(BROWSER_MODELS.map((m) => m.id)).toContain(id)
+    expect(new Set(BROWSER_MODELS.map((m) => m.id)).size).toBe(BROWSER_MODELS.length)
     for (const m of BROWSER_MODELS) {
-      expect(m.approxBytes).toBeGreaterThan(20e6)
-      expect(m.license).toMatch(/MIT|Apache-2\.0/)
-      expect(m.source).toMatch(/^https:\/\/huggingface\.co\//)
+      expect(m.approxBytes, m.id).toBeGreaterThan(20e6)
+      expect(m.peakBytes, m.id).toBeGreaterThan(m.approxBytes)
+      expect(m.license, m.id).toMatch(/MIT|Apache-2\.0|Moonshine Community License/)
+      if (m.license.startsWith('Moonshine')) expect(m.licenseNote, m.id).toMatch(/licence/)
+      expect(m.source, m.id).toMatch(/^https:\/\/huggingface\.co\//)
+      if (m.dtype === 'q4f16' || m.dtype === 'fp16') expect(m.requiresWebGpu, m.id).toBe(true)
     }
     const whisper = browserModel('whisper-base-q8')
     for (const code of ['hi', 'bn', 'ta', 'te', 'mr', 'gu', 'kn', 'ml', 'pa', 'ur', 'ne', 'as']) {
@@ -24,6 +39,17 @@ describe('browser model registry', () => {
     }
     // Odia is not in Whisper's language list.
     expect(whisper.languages).not.toContain('or')
+  })
+  it('groups the models for the picker by language, every model once', () => {
+    const groups = modelsByGroup()
+    expect(groups.map((g) => g.group)).toEqual([
+      'English',
+      'Hindi and Indian languages',
+      'Many languages',
+      'Other languages',
+    ])
+    expect(groups.flatMap((g) => g.models).length).toBe(BROWSER_MODELS.length)
+    expect(groups[1]?.models.map((m) => m.id)).toContain('indicwav2vec-hindi')
   })
   it('suggests the language-specific model when there is one, otherwise the larger multilingual model', () => {
     expect(suggestedModelFor('hi')?.id).toBe('whisper-tiny-hindi')

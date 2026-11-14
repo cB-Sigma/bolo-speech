@@ -13,6 +13,7 @@ async function open(page: Page, route = '', opts: { theme?: 'dark' | 'light' } =
       localStorage.setItem('bolo.theme', theme as string)
       // Stand-in for huggingface.co and jsDelivr (see playwright.demo.config.ts).
       localStorage.setItem('bolo.browserStt', JSON.stringify({ modelHost: cdn, ortWasmBase: `${cdn}/ort/` }))
+      localStorage.setItem('bolo.browserTts', JSON.stringify({ hubHost: cdn }))
     },
     [opts.theme ?? 'dark', CDN],
   )
@@ -118,8 +119,10 @@ test('server-only features are disabled with an explanation and the install comm
   await expect(serverCard).toContainText('Needs the server')
   await expect(serverCard.getByRole('button', { name: /Pull/ })).toHaveCount(0)
   await page.getByLabel('Search models').fill('')
-  // Four models run in the page; each says what it is and what it costs.
-  await expect(page.getByTestId('model-card').filter({ hasText: 'onnxruntime-web' })).toHaveCount(4)
+  // Every model that runs in the page is listed; each says what it is and what it costs.
+  await expect(page.getByTestId('model-card').filter({ hasText: 'onnxruntime-web' })).toHaveCount(12)
+  await page.getByRole('button', { name: 'Show all 28' }).click()
+  await expect(page.getByTestId('model-card').filter({ hasText: 'onnxruntime-web' })).toHaveCount(28)
   const browserCard = page.getByTestId('model-card').filter({ has: page.getByTestId('pull-moonshine-tiny') })
   await expect(browserCard).toContainText('MIT')
   await expect(
@@ -244,6 +247,18 @@ test.describe('with the model available', () => {
     console.log(`[demo] offline: transcribed from cache ${Date.now() - t1} ms after the click`)
     await context.setOffline(false)
     expect(errors).toEqual([])
+  })
+
+  test('more recognisers: Moonshine Base transcribes the sample', async ({ page }) => {
+    await page.addInitScript(() => {
+      if (!localStorage.getItem('bolo.prefs'))
+        localStorage.setItem('bolo.prefs', JSON.stringify({ browserModel: 'moonshine-base', browserModelPicked: true }))
+    })
+    await open(page, 'stt')
+    await expect(page.getByTestId('browser-model-picker')).toContainText('Moonshine Base')
+    await page.getByTestId('sample-en-fellow-americans').click()
+    await expect(page.getByTestId('final-text').first()).toContainText(/fellow americans/i, { timeout: 180_000 })
+    await expect(page.getByTestId('downloads-panel')).toContainText('Moonshine Base')
   })
 
   test('microphone path in the demo (fake device)', async ({ page }) => {
@@ -458,6 +473,80 @@ test.describe('with the models available: first use and Hindi', () => {
       `[demo-hindi] ready ${readyMs} ms · ${p50.replace(/\s+/g, ' ')} · ${rtf.replace(/\s+/g, ' ')} · ${transcript.trim()}`,
     )
     await axe(page)
+  })
+})
+
+test.describe('every model that runs in a browser, labelled for this device', () => {
+  test('pickers group by language with size, licence and needs, and fit a phone screen', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await open(page, 'stt')
+    await page.getByTestId('browser-model-picker').click()
+    for (const g of ['English', 'Hindi and Indian languages', 'Many languages', 'Other languages'])
+      await expect(page.getByRole('group').filter({ hasText: g }).first()).toBeVisible()
+    await expect(page.getByTestId('stt-model-whisper-large-v3-turbo-f16')).toContainText('needs WebGPU')
+    await expect(page.getByTestId('stt-model-indicwav2vec-hindi')).toContainText('Apache-2.0')
+    await expect(page.getByTestId('stt-model-moonshine-tiny-ja')).toContainText('Moonshine Community License')
+    const overflow = () =>
+      page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+    expect(await overflow()).toBeLessThanOrEqual(1)
+    await page.keyboard.press('Escape')
+
+    await page.goto('./#/tts')
+    await page.getByTestId('voice-picker').click()
+    for (const name of ['বাংলা · Bengali', 'తెలుగు · Telugu', 'मगही · Magahi', 'Deutsch · German', 'English (UK)'])
+      await expect(page.getByRole('group').filter({ hasText: name }).first()).toBeVisible()
+    await expect(page.getByTestId('voice-syspin-hi-female-fp32')).toContainText('32-bit')
+    await expect(page.getByTestId('voice-piper-hi-in-priyamvada-medium')).toContainText('CC-BY-NC-SA-4.0')
+    await expect(page.getByTestId('voice-kokoro-hf-alpha')).toContainText('approximate phonemes')
+    expect(await overflow()).toBeLessThanOrEqual(1)
+    await page.getByTestId('voice-kokoro-af-heart').click()
+    await expect(page.getByTestId('kokoro-precision')).toContainText('8-bit')
+    await page.getByTestId('kokoro-precision').click()
+    await page.getByRole('option', { name: /32-bit/ }).click()
+    await expect(page.getByTestId('voice-about')).toContainText('32-bit (original) weights')
+    await axe(page)
+  })
+
+  test('on a phone without WebGPU and little storage: warned, asked, never blocked', async ({ browser }) => {
+    const context = await browser.newContext({
+      userAgent:
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+      viewport: { width: 390, height: 844 },
+    })
+    const page = await context.newPage()
+    await page.addInitScript(() =>
+      localStorage.setItem(
+        'bolo.fakeDevice',
+        JSON.stringify({
+          platform: 'ios',
+          webgpu: {
+            available: false,
+            f16: false,
+            maxBufferSize: null,
+            maxStorageBufferBindingSize: null,
+            adapter: null,
+          },
+          storage: { usage: 100e6, quota: 400e6, persisted: false },
+        }),
+      ),
+    )
+    await open(page, 'stt')
+    await expect(page.getByTestId('device-panel')).toContainText('iPhone (iOS)')
+    await expect(page.getByTestId('device-panel')).toContainText('no: models run on the CPU')
+    await page.getByTestId('browser-model-picker').click()
+    const turbo = page.getByTestId('stt-model-whisper-large-v3-turbo-f16')
+    await expect(turbo.getByTestId('verdict-badge')).toHaveAttribute('data-level', 'unlikely')
+    await expect(page.getByTestId('stt-model-moonshine-tiny').getByTestId('verdict-badge')).toHaveCount(0)
+    await turbo.click()
+    const dialog = page.getByTestId('risk-dialog')
+    await expect(dialog).toContainText('needs WebGPU')
+    await expect(dialog).toContainText('567 MB')
+    await expect(dialog).toContainText('free in this browser')
+    await axe(page)
+    await page.getByTestId('risk-confirm').click()
+    await expect(page.getByTestId('browser-model-picker')).toContainText('Whisper Large v3 Turbo (WebGPU, 16-bit)')
+    await expect(page.getByTestId('verdict-line').first()).toContainText('Unlikely to work here')
+    await context.close()
   })
 })
 
@@ -731,6 +820,36 @@ test.describe('text to speech in the page', () => {
       await expect(page.getByTestId('model-chip')).toHaveAttribute('data-status', 'idle')
       expect(page.workers().filter((w) => /\/assets\/worker-/.test(w.url())).length).toBe(1)
       await context.close()
+    })
+
+    test('voices from the Hub: a Piper voice in German, Kokoro in English with a round trip', async ({ page }) => {
+      await open(page, 'tts')
+      await page.getByTestId('voice-picker').click()
+      await page.getByTestId('voice-piper-de-de-thorsten-medium').click()
+      await page.getByTestId('tts-text').fill('Guten Morgen. Wie geht es dir?')
+      await page.getByTestId('speak').click()
+      await expect(page.getByTestId('ttfa')).toHaveText(/^\d+$/, { timeout: 180_000 })
+      await expect(page.getByTestId('speak')).toBeVisible({ timeout: 60_000 })
+      await expect(page.getByTestId('downloads-panel')).toContainText('Piper Thorsten, German')
+
+      await page.getByTestId('voice-picker').click()
+      await page.getByTestId('voice-kokoro-af-heart').click()
+      await page.getByTestId('tts-text').fill('Hello there. This voice runs entirely in your browser.')
+      await page.getByTestId('round-trip').click()
+      await expect(page.getByTestId('wer')).toBeVisible({ timeout: 240_000 })
+      const wer = await page.getByTestId('wer').innerText()
+      console.log(`[tts] kokoro af_heart round trip WER ${wer}`)
+      expect(Number.parseFloat(wer)).toBeLessThanOrEqual(30)
+      await expect(page.getByTestId('downloads-panel')).toContainText('Kokoro-82M (8-bit)')
+    })
+
+    test('the text front end: romanised Hindi into Devanagari, numbers spoken, phonemes', async ({ page }) => {
+      await open(page, 'tts')
+      await page.getByTestId('playground-text').fill('aap kaise ho? 25')
+      await page.getByTestId('playground-run').click()
+      await expect(page.getByTestId('playground-native')).toContainText('आप कैसे हो', { timeout: 60_000 })
+      await expect(page.getByTestId('playground-normalised')).toContainText('पच्चीस')
+      await expect(page.getByTestId('playground-phonemes')).toContainText('ˈ')
     })
 
     test('speaks US English through uccharan and transcribes it back in the page', async ({ page }) => {

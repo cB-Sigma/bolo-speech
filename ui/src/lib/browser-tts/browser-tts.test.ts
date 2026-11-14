@@ -15,7 +15,8 @@ import {
   type CoquiVoiceConfig,
   type VoiceConfig,
 } from './text'
-import { BROWSER_VOICES, languageLabel, voicesByLanguage } from './voices'
+import { LANGUAGES as UCCHARAN_LANGUAGES } from '@/vendor/uccharan/index.js'
+import { baseVoiceId, browserVoice, BROWSER_VOICES, languageLabel, voicesByLanguage } from './voices'
 
 const coqui = (symbols: Record<string, number>, blank = 99): VoiceConfig => ({
   id: 'test',
@@ -245,33 +246,72 @@ describe('pause shortening (sherpa-onnx ScaleSilence)', () => {
 })
 
 describe('voice catalogue', () => {
-  it('matches the build list one to one', () => {
-    expect(BROWSER_VOICES.map((v) => v.id)).toEqual(spec.voices.map((v) => v.id))
+  const published = BROWSER_VOICES.filter((v) => v.files.from === 'published')
+  it('the voices published with the demo match the build list one to one', () => {
+    expect(published.map((v) => v.id).sort()).toEqual(spec.voices.map((v) => v.id).sort())
   })
-  it('says who made every voice and under which licence, with a sample and honest notes', () => {
+  it('says who made every voice and under which licence, with a sample, size and honest notes', () => {
     for (const v of BROWSER_VOICES) {
-      expect(v.credit).toMatch(/\S/)
-      expect(v.license).toMatch(/MIT/)
-      expect(v.source).toMatch(/^https:\/\/huggingface\.co\//)
-      expect(v.sample.length).toBeLessThan(110)
-      expect(v.notes.length).toBeGreaterThan(0)
-      expect(v.approxBytes).toBeGreaterThan(10e6)
+      expect(v.credit, v.id).toMatch(/\S/)
+      expect(v.license, v.id).toMatch(/MIT|Apache-2\.0/)
+      expect(v.dataLicense, v.id).toMatch(/\S/)
+      expect(v.source, v.id).toMatch(/^https:\/\/huggingface\.co\//)
+      expect(v.sample.length, v.id).toBeLessThan(110)
+      expect(v.notes.length, v.id).toBeGreaterThan(0)
+      expect(v.approxBytes, v.id).toBeGreaterThan(10e6)
+      expect(v.peakBytes, v.id).toBeGreaterThan(v.approxBytes)
+      if (v.files.from !== 'published')
+        expect(v.files.model, v.id).toMatch(/^https:\/\/huggingface\.co\/.+\/resolve\/[0-9a-f]{40}\//)
     }
     // The build list's sample for each voice is the console's sample.
     for (const s of spec.voices) {
       const v = BROWSER_VOICES.find((x) => x.id === s.id)
-      if ('sample' in s && v?.kind === 'coqui') expect(v.sample).toBe(s.sample)
+      if ('sample' in s && v?.kind === 'coqui') expect(v.sample, s.id).toBe(s.sample)
     }
   })
-  it('groups voices by language with native names', () => {
-    expect(voicesByLanguage().map((g) => languageLabel(g))).toEqual([
+  it('every SYSPIN voice is offered 8-bit and as the original 32-bit export', () => {
+    const syspin = BROWSER_VOICES.filter((v) => v.id.startsWith('syspin-'))
+    expect(syspin.filter((v) => v.precision === '8-bit')).toHaveLength(22)
+    expect(syspin.filter((v) => v.precision === '32-bit')).toHaveLength(22)
+    expect(browserVoice('syspin-hi-female-fp32').files).toMatchObject({
+      from: 'remote',
+      config: 'syspin-hi-female/voice.json',
+    })
+  })
+  it('Piper and Kokoro voices use only languages uccharan reads, and say when the phonemes are approximate', () => {
+    for (const v of BROWSER_VOICES.filter((x) => x.kind !== 'coqui')) {
+      expect(v.phonemizer, v.id).toBe('uccharan')
+      expect(
+        UCCHARAN_LANGUAGES.some((l) => v.phonemeLanguage?.toLowerCase().startsWith(l)),
+        v.id,
+      ).toBe(true)
+    }
+    expect(browserVoice('kokoro-hf-alpha').approximate).toMatch(/Approximate/)
+    expect(browserVoice('kokoro-af-heart').approximate).toBeUndefined()
+    expect(browserVoice('piper-es-mx-ald-medium').approximate).toMatch(/Castilian/)
+  })
+  it('Kokoro voices come in three precisions sharing one download per precision', () => {
+    expect(browserVoice('kokoro-af-heart').downloadId).toBe('kokoro-82m@q8')
+    expect(browserVoice('kokoro-bf-emma@fp32')).toMatchObject({
+      id: 'kokoro-bf-emma@fp32',
+      downloadId: 'kokoro-82m@fp32',
+    })
+    expect(browserVoice('kokoro-bf-emma@fp16').approxBytes).toBeGreaterThan(160e6)
+    expect(baseVoiceId('kokoro-bf-emma@fp16')).toBe('kokoro-bf-emma')
+  })
+  it('groups voices by language with native names, Indian languages first', () => {
+    const labels = voicesByLanguage().map((g) => languageLabel(g))
+    expect(labels.slice(0, 6)).toEqual([
       'हिन्दी · Hindi',
       'मैथिली · Maithili',
       'भोजपुरी · Bhojpuri',
+      'मगही · Magahi',
+      'छत्तीसगढ़ी · Chhattisgarhi',
       'मराठी · Marathi',
-      'ಕನ್ನಡ · Kannada',
-      'English (India)',
-      'English (US)',
     ])
+    for (const l of ['বাংলা · Bengali', 'తెలుగు · Telugu', 'ગુજરાતી · Gujarati', 'English (US)', 'Deutsch · German'])
+      expect(labels).toContain(l)
+    const hindi = voicesByLanguage()[0]?.voices.map((v) => v.kind)
+    expect(new Set(hindi)).toEqual(new Set(['coqui', 'piper', 'kokoro']))
   })
 })

@@ -82,7 +82,10 @@ self.addEventListener('fetch', (event) => {
   const sameOrigin = url.origin === self.location.origin
   const cacheable = request.method === 'GET' && !request.headers.has('range')
   let work
-  if (sameOrigin && /\/voices\//.test(url.pathname)) {
+  if (sameOrigin && cacheable && /\/voices\/uccharan\//.test(url.pathname)) {
+    // The phonemiser's language data: small, fetched by the library itself; network first (a new version has new files), kept for offline use.
+    work = networkFirst(request)
+  } else if (sameOrigin && /\/voices\//.test(url.pathname)) {
     // Voices are large and the synthesiser keeps its own copy (Cache Storage, "bolo-voices"): pass through.
     work = fetch(request)
   } else if (sameOrigin && cacheable) {

@@ -1,4 +1,5 @@
 import { Globe } from 'lucide-react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -19,7 +20,15 @@ import {
 } from '@/components/ui/select'
 import { useStore } from '@/hooks/use-store'
 import { sharedEngine } from '@/lib/browser-stt/engine'
-import { BROWSER_MODELS, suggestedModelFor, type BrowserModel } from '@/lib/browser-stt/models'
+import {
+  browserModel,
+  BROWSER_MODELS,
+  modelsByGroup,
+  suggestedModelFor,
+  type BrowserModel,
+} from '@/lib/browser-stt/models'
+import { peakFor, verdictFor, type DeviceInfo, type ModelNeeds } from '@/lib/device'
+import { RiskDialog, useDevice, VerdictBadge } from '@/components/model-fit'
 import { fmtBytes, languageName } from '@/lib/format'
 import { groupLanguages, languageLabel } from '@/lib/languages'
 import { cn } from '@/lib/utils'
@@ -93,7 +102,47 @@ function coverage(m: BrowserModel): string {
   return m.multilingual ? `${m.languages.length} languages` : languageName(m.languages[0] ?? 'en')
 }
 
-/** Picks which model the in-browser recogniser runs: name, coverage, download size and licence. */
+/** What a recogniser needs, for the device verdict. */
+export function sttNeeds(m: BrowserModel, downloaded: boolean): ModelNeeds {
+  return {
+    bytes: m.approxBytes,
+    peakBytes: peakFor(m.id, m.peakBytes),
+    requiresWebGpu: m.requiresWebGpu,
+    prefersWebGpu: m.prefersWebGpu,
+    needsF16: m.requiresWebGpu,
+    downloaded,
+  }
+}
+
+function ModelOption({ m, downloaded, d }: { m: BrowserModel; downloaded: boolean; d: DeviceInfo }) {
+  const verdict = verdictFor(sttNeeds(m, downloaded), d)
+  return (
+    <span className="flex min-w-0 flex-col">
+      <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-[13px] font-medium">
+        {m.label}
+        <span className="[[data-slot=select-trigger]_&]:hidden">
+          <VerdictBadge verdict={verdict} />
+        </span>
+      </span>
+      <span className="text-xs text-muted-foreground [[data-slot=select-trigger]_&]:hidden">
+        {coverage(m)} · {fmtBytes(m.approxBytes)}
+        {downloaded ? ' (downloaded)' : ' download'} · {m.license}
+        {m.requiresWebGpu ? ' · needs WebGPU' : m.prefersWebGpu ? ' · best with WebGPU' : ''}
+        {m.peakBytes > 900e6 ? ' · heavy for phones' : ''}
+      </span>
+      <span className="text-xs text-muted-foreground [[data-slot=select-trigger]_&]:hidden">
+        {m.blurb}
+        {m.licenseNote ? ` ${m.licenseNote}` : ''}
+      </span>
+    </span>
+  )
+}
+
+/**
+ * Picks which model the in-browser recogniser runs, grouped by language: name,
+ * coverage, download size, licence, what it needs, and how it is expected to
+ * fare on this device. A model not expected to work here asks first.
+ */
 export function BrowserModelPicker({
   value,
   onChange,
@@ -106,30 +155,61 @@ export function BrowserModelPicker({
   className?: string
 }) {
   const cachedIds = useStore(sharedEngine().store).cachedIds
+  const d = useDevice()
+  const [pending, setPending] = useState<BrowserModel | null>(null)
+  const choose = (id: string) => {
+    const m = browserModel(id)
+    const verdict = verdictFor(sttNeeds(m, cachedIds.includes(id)), d)
+    if (verdict.level === 'unlikely' || verdict.reasons.some((r) => r.includes('free in this browser'))) setPending(m)
+    else onChange(id)
+  }
   return (
-    <Select value={value} onValueChange={onChange} disabled={disabled}>
-      <SelectTrigger
-        className={cn('h-8 w-56 min-w-0', className)}
-        aria-label="In-browser model"
-        data-testid="browser-model-picker"
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent position="popper" align="start" className="min-w-80">
-        {BROWSER_MODELS.map((m) => (
-          <SelectItem key={m.id} value={m.id} textValue={m.label} className="py-1.5">
-            <span className="flex min-w-0 flex-col">
-              <span className="text-[13px] font-medium">{m.label}</span>
-              <span className="text-xs text-muted-foreground [[data-slot=select-trigger]_&]:hidden">
-                {coverage(m)} · {fmtBytes(m.approxBytes)}
-                {cachedIds.includes(m.id) ? ' (downloaded)' : ' download'} · {m.license}
-              </span>
-              <span className="text-xs text-muted-foreground [[data-slot=select-trigger]_&]:hidden">{m.blurb}</span>
-            </span>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <>
+      <Select value={value} onValueChange={choose} disabled={disabled}>
+        <SelectTrigger
+          className={cn('h-8 w-56 min-w-0', className)}
+          aria-label="In-browser model"
+          data-testid="browser-model-picker"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent
+          position="popper"
+          align="start"
+          className="max-h-[min(30rem,var(--radix-select-content-available-height))] w-[min(26rem,calc(100vw-2rem))]"
+        >
+          {modelsByGroup().map((g) => (
+            <SelectGroup key={g.group}>
+              <SelectLabel className="eyebrow">{g.group}</SelectLabel>
+              {g.models.map((m) => (
+                <SelectItem
+                  key={m.id}
+                  value={m.id}
+                  textValue={m.label}
+                  className="py-1.5"
+                  data-testid={`stt-model-${m.id}`}
+                >
+                  <ModelOption m={m} downloaded={cachedIds.includes(m.id)} d={d} />
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          ))}
+        </SelectContent>
+      </Select>
+      {pending && (
+        <RiskDialog
+          open
+          label={pending.label}
+          bytes={pending.approxBytes}
+          verdict={verdictFor(sttNeeds(pending, cachedIds.includes(pending.id)), d)}
+          onConfirm={() => {
+            onChange(pending.id)
+            setPending(null)
+          }}
+          onCancel={() => setPending(null)}
+        />
+      )}
+    </>
   )
 }
 
@@ -150,6 +230,7 @@ export function SwitchModelDialog({
   onCancel: () => void
 }) {
   const cachedIds = useStore(sharedEngine().store).cachedIds
+  const d = useDevice()
   const suggestedId = language ? suggestedModelFor(language)?.id : null
   const options = BROWSER_MODELS.filter((m) => language != null && m.languages.includes(language)).sort(
     (a, b) => Number(b.id === suggestedId) - Number(a.id === suggestedId),
@@ -158,7 +239,10 @@ export function SwitchModelDialog({
   const suggested = language ? suggestedModelFor(language) : null
   return (
     <Dialog open={language != null} onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent className="sm:max-w-lg" data-testid="switch-model-dialog">
+      <DialogContent
+        className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-lg"
+        data-testid="switch-model-dialog"
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Globe className="size-4 text-muted-foreground" aria-hidden />
@@ -181,6 +265,7 @@ export function SwitchModelDialog({
             >
               <span className="flex flex-wrap items-baseline gap-x-2">
                 <span className="text-sm font-medium">{m.label}</span>
+                <VerdictBadge verdict={verdictFor(sttNeeds(m, cachedIds.includes(m.id)), d)} />
                 {m.id === suggested?.id && (
                   <span className="rounded-md border border-border px-1.5 text-[11px] font-medium">Suggested</span>
                 )}

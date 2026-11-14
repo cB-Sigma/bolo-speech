@@ -6,6 +6,7 @@ import {
   releaseRuntime,
   requireOneRuntime,
 } from '@/lib/browser-runtime'
+import { pageMemoryBytes, rememberMeasured } from '@/lib/device'
 import { diag } from '@/lib/diagnostics'
 import {
   downloadedIds,
@@ -261,7 +262,12 @@ export class BrowserSttEngine {
       safeMode: safe,
     })
     this.startWatchdog()
-    const device: BrowserDevice = safe ? 'wasm' : (config.device ?? ((await probeWebGpu()) ? 'webgpu' : 'wasm'))
+    // A 16-bit model has no WebAssembly path: it is tried on WebGPU whatever happens (the visitor was warned).
+    const device: BrowserDevice = model.requiresWebGpu
+      ? 'webgpu'
+      : safe
+        ? 'wasm'
+        : (config.device ?? ((await probeWebGpu()) ? 'webgpu' : 'wasm'))
     // Threads need SharedArrayBuffer, i.e. a cross-origin-isolated page.
     const threads = !safe && support.wasmThreads ? Math.max(1, Math.min(4, support.hardwareConcurrency)) : 1
     if (generation !== this.generation) throw new Error('Load cancelled')
@@ -314,6 +320,7 @@ export class BrowserSttEngine {
           })
           diag.event('model', `ready after ${Math.round(msg.loadMs)} ms`)
           markSettled()
+          void pageMemoryBytes().then((memoryBytes) => rememberMeasured(model.id, { loadMs: msg.loadMs, memoryBytes }))
           void recordDownload({
             id: model.id,
             kind: 'stt',
@@ -351,6 +358,8 @@ export class BrowserSttEngine {
         repo: model.repo,
         family: model.family,
         dtype: model.dtype,
+        englishOnly: model.englishOnly,
+        forceLanguage: model.forceLanguage,
         device,
         threads,
         plainRuntimeLoad: safe,

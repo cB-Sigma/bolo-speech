@@ -24,6 +24,7 @@ import { SegmentedBar } from '@/components/charts/segmented-bar'
 import { Page } from '@/components/layout/app-shell'
 import { ModelPicker } from '@/components/model-picker'
 import { Panel, Readout } from '@/components/panel'
+import { DevicePanel } from '@/components/model-fit'
 import { DownloadsPanel, InterruptedLoadNotice } from '@/components/downloads-panel'
 import { BrowserEnginePanel } from '@/components/stt/engine-panel'
 import { BrowserModelPicker, LanguageSelect, SwitchModelDialog } from '@/components/stt/language-controls'
@@ -1004,6 +1005,7 @@ export default function SttPage() {
           </Panel>
 
           {mode !== 'server' && <DownloadsPanel />}
+          {mode !== 'server' && <DevicePanel />}
           {mode !== 'server' && (
             <BrowserEnginePanel
               support={support}

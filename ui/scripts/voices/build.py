@@ -51,6 +51,18 @@ from shrink import shrink  # noqa: E402
 
 # The vendored copy of uccharan (text to phonemes for Piper voices) whose data file is published with them.
 UCCHARAN = HERE.parents[1] / "src" / "vendor" / "uccharan"
+# uccharan's transliteration packs (romanised text to native script) for the text playground: CC BY-SA 4.0,
+# from the uccharan release that matches the vendored copy, checked against these SHA-256 sums.
+XLIT_RELEASE = "https://github.com/cB-Sigma/uccharan/releases/download/v0.4.0/"
+XLIT = {
+    "xlit-hi.ucd": "59e5dde0354e4d4c55530baedc3034d5ed7eff0a382056a1d269d012b0c9ca52",
+    "xlit-mr.ucd": "623f1a488324d18819d84177f21f3a900bd47025904fb80d5f7dbda2efb4bec8",
+    "xlit-bn.ucd": "0273a468778c752d8a070852abfb39cd0cd0a61b2148a58c20626a06e99fded1",
+    "xlit-te.ucd": "c6d63469c0184646d0ff4f12198313f409a536f2fbf269a127648ad488e59c83",
+    "xlit-gu.ucd": "4f5c4e575c3d465643b8a3ef2ade0b4b1206736d156914f99213558c9cfd0e39",
+    "xlit-LICENSE-CC-BY-SA-4.0.txt": "28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5",
+    "xlit-NOTICE.txt": "414e5f6105b9d8cefec1be2866f4f16f16f6ae2f7188d3abac6fd77b0ea8bc4b",
+}
 # Parts of each architecture whose weights stay 16-bit (see shrink.py for why).
 KEEP = {"coqui": ("text_encoder", "duration_predictor"), "piper": ("enc_p", "dp", "dec")}
 # Mean |Δ log10 mel| over the loudest frames, shrunk vs original, with the noise switched off.
@@ -139,6 +151,36 @@ def get_piper(voice: dict[str, Any], local: dict[str, str], work: Path) -> Path:
     return directory
 
 
+# Where the SYSPIN checkpoints come from (repository and pinned revision): tools/voices/syspin.json.
+SYSPIN_SPEC = HERE.parents[2] / "tools" / "voices" / "syspin.json"
+SHERPA_DEFAULTS = {"noise_scale": 0.667, "length_scale": 1.0, "noise_scale_w": 0.8}
+
+
+def syspin_inference(voice_id: str) -> dict[str, Any]:
+    """The checkpoint's own inference settings (Coqui config.json, model_args), not sherpa-onnx's defaults.
+
+    Coqui synthesises SYSPIN voices with inference_noise_scale 0.667 and inference_noise_scale_dp 1.0
+    (the stochastic duration predictor's noise); sherpa-onnx uses 0.8 for the latter, which gives a flatter,
+    more regular rhythm. Falls back to sherpa-onnx's values (and says so) when the config cannot be read.
+    """
+    try:
+        spec = {v["id"]: v for v in json.loads(SYSPIN_SPEC.read_text(encoding="utf-8"))["voices"]}[voice_id]
+        url = f"https://huggingface.co/{spec['repo']}/resolve/{spec['revision']}/config.json"
+        request = urllib.request.Request(url, headers={"User-Agent": "bolo-voices"})
+        with urllib.request.urlopen(request, timeout=60) as response:
+            cfg = json.loads(response.read().decode("utf-8"))
+        args = cfg.get("model_args", {})
+        return {
+            "noise_scale": float(args.get("inference_noise_scale", 0.667)),
+            "length_scale": float(args.get("length_scale", 1.0)),
+            "noise_scale_w": float(args.get("inference_noise_scale_dp", 1.0)),
+            "source": f"{spec['repo']}@{spec['revision'][:12]} config.json",
+        }
+    except (OSError, KeyError, ValueError) as err:
+        print(f"   {voice_id}: checkpoint settings not readable ({err}); using sherpa-onnx defaults")
+        return {**SHERPA_DEFAULTS, "source": "sherpa-onnx defaults"}
+
+
 def coqui_config(directory: Path, session_meta: dict[str, str]) -> dict[str, Any]:
     tokens = read_tokens(directory / "tokens.txt")
     meta = session_meta
@@ -157,8 +199,7 @@ def coqui_config(directory: Path, session_meta: dict[str, str]) -> dict[str, Any
         # Coqui's multilingual_cleaners ran on the training text: NFC, lower case, ; : → , and - → space,
         # brackets and double quotes removed, whitespace collapsed. The browser applies the same.
         "cleaner": "multilingual",
-        # sherpa-onnx's defaults for these voices.
-        "inference": {"noise_scale": 0.667, "length_scale": 1.0, "noise_scale_w": 0.8},
+        "inference": dict(SHERPA_DEFAULTS),  # replaced by the checkpoint's own settings in build()
         "symbols": {k: v for k, v in tokens.items() if k not in special},
         "source": info.get("source"),
         "license": info.get("license"),
@@ -257,6 +298,8 @@ def build(voice: dict[str, Any], spec: dict[str, Any], out: Path, local: dict[st
     if voice["kind"] == "coqui":
         meta = ort.InferenceSession(str(original), providers=["CPUExecutionProvider"]).get_modelmeta().custom_metadata_map
         cfg = coqui_config(src, meta)
+        if voice["source"] == "syspin":
+            cfg["inference"] = syspin_inference(voice["id"])
         ids = coqui_ids(cfg, voice["sample"])
         shutil.copy2(src / "LICENSE", dest / "LICENSE")
         (dest / "ATTRIBUTION").write_text((src / "ATTRIBUTION").read_text(encoding="utf-8") + SYSPIN_NOTE, encoding="utf-8")
@@ -288,11 +331,6 @@ def build(voice: dict[str, Any], spec: dict[str, Any], out: Path, local: dict[st
     if voice["kind"] == "piper":
         # Piper voices read phonemes; uccharan makes them in the page and needs its English data.
         data = UCCHARAN / "data" / "en-us.ucd"
-        shared = out / "uccharan"
-        shared.mkdir(exist_ok=True)
-        shutil.copy2(data, shared / "en-us.ucd")
-        for name in ("LICENSE", "NOTICE", "DATA_LICENSES.md"):
-            shutil.copy2(UCCHARAN / name, shared / name)
         entry["shared"] = {"uccharan/en-us.ucd": {"bytes": data.stat().st_size, "sha256": sha256(data)}}
         entry["bytes"] += data.stat().st_size
     print(f"   {entry['original_bytes']:,} → {entry['bytes']:,} bytes, log-mel distance {result['logmel_distance']}")
@@ -330,6 +368,24 @@ def main() -> int:
                     missing.append(voice["id"])
                     continue
                 raise
+    # uccharan's language data (Piper and Kokoro voices, the text playground), next to the voices.
+    shared = out / "uccharan"
+    shared.mkdir(exist_ok=True)
+    for data in sorted((UCCHARAN / "data").glob("*.ucd")):
+        shutil.copy2(data, shared / data.name)
+    for name in ("LICENSE", "NOTICE", "DATA_LICENSES.md"):
+        shutil.copy2(UCCHARAN / name, shared / name)
+    for name, digest in XLIT.items():
+        dest = shared / name
+        if not (dest.is_file() and sha256(dest) == digest):
+            try:
+                fetch(XLIT_RELEASE + name, dest)
+            except OSError as err:  # optional: the playground falls back to uccharan's rules
+                print(f"   {name}: not fetched ({err})")
+                continue
+            if sha256(dest) != digest:
+                dest.unlink()
+                raise SystemExit(f"{name} does not match the pinned SHA-256")
     index_path = out / "index.json"
     if only and index_path.is_file():  # a partial run keeps the other voices' entries
         previous = json.loads(index_path.read_text(encoding="utf-8"))

@@ -131,11 +131,21 @@ async function deleteKeys(cacheName: string, keys: string[]): Promise<void> {
  * are no longer used (a voice republished with new files) are deleted. Then
  * the storage limit is applied.
  */
-export async function recordDownload(entry: Omit<DownloadEntry, 'addedAt' | 'lastUsed'>): Promise<string[]> {
+export async function recordDownload(
+  input: Omit<DownloadEntry, 'addedAt' | 'lastUsed'> & {
+    /** Add these keys to the ones already listed (a shared model whose voices each bring a file). */
+    merge?: boolean
+  },
+): Promise<string[]> {
+  const { merge, ...entry } = input
   const now = Date.now()
   const s = downloads.get()
   const previous = s.entries.find((e) => e.id === entry.id)
-  const keys = entry.keys.length ? entry.keys : (previous?.keys ?? [])
+  const keys = merge
+    ? [...new Set([...(previous?.keys ?? []), ...entry.keys])]
+    : entry.keys.length
+      ? entry.keys
+      : (previous?.keys ?? [])
   const next: DownloadEntry = {
     ...entry,
     keys,
@@ -309,4 +319,25 @@ export function dismissInterrupted(): void {
 /** Re-read the interrupted-load marker (tests). */
 export function reloadInterrupted(): void {
   interrupted.set(readInterrupted())
+}
+
+/**
+ * Make room for a download of `bytes`: remove the least recently used models
+ * (never a loaded one) until the browser's quota has that much free, or
+ * nothing more can go. Returns the ids removed.
+ */
+export async function freeSpaceFor(bytes: number): Promise<string[]> {
+  const { usage, quota } = await storageUse()
+  if (quota == null) return []
+  let free = quota - (usage ?? 0)
+  const removed: string[] = []
+  const protect = residentIds()
+  for (const e of [...downloads.get().entries].sort((a, b) => a.lastUsed - b.lastUsed)) {
+    if (free >= bytes) break
+    if (protect.includes(e.id)) continue
+    await deleteDownload(e.id)
+    removed.push(e.id)
+    free += e.bytes
+  }
+  return removed
 }

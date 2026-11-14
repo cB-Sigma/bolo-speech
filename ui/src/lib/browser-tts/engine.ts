@@ -7,6 +7,7 @@ import {
   requireOneRuntime,
   TTS_MEMORY_PAGES,
 } from '@/lib/browser-runtime'
+import { rememberMeasured } from '@/lib/device'
 import { diag } from '@/lib/diagnostics'
 import {
   downloadedIds,
@@ -26,6 +27,7 @@ import type { VoiceConfig } from './text'
 import {
   browserVoice,
   BROWSER_VOICES,
+  hubUrl,
   DEFAULT_BROWSER_VOICE,
   voicesBase,
   type BrowserVoice,
@@ -93,9 +95,9 @@ const STAGE_TEXT: Record<LoadStage, string> = {
   warmup: 'warming up',
 }
 
-function modelOf(voice: BrowserVoice, index: VoiceIndex | null) {
-  const published = index?.voices.find((v) => v.id === voice.id)
-  return { id: voice.id, label: voice.label, approxBytes: published?.bytes ?? voice.approxBytes }
+function modelOf(voice: BrowserVoice, index: VoiceIndex | null, bytes?: number) {
+  const published = voice.files.from === 'published' ? index?.voices.find((v) => v.id === voice.id) : undefined
+  return { id: voice.id, label: voice.label, approxBytes: bytes ?? published?.bytes ?? voice.approxBytes }
 }
 
 /**
@@ -147,7 +149,7 @@ export class BrowserTtsEngine {
     this.refreshCached()
     downloads.subscribe(() => this.refreshCached())
     registerHolder('tts', {
-      current: () => (this.store.get().status === 'idle' ? null : this.store.get().voice.id),
+      current: () => (this.store.get().status === 'idle' ? null : this.store.get().voice.downloadId),
       release: () => this.dispose(),
     })
   }
@@ -176,7 +178,9 @@ export class BrowserTtsEngine {
   /** Which voices are downloaded, from the downloads list. */
   refreshCached(): void {
     const listed = downloadedIds('tts')
-    const cachedIds = BROWSER_VOICES.filter((v) => listed.includes(v.id)).map((v) => v.id)
+    const cachedIds = BROWSER_VOICES.filter((v) => listed.includes(v.downloadId)).map((v) => v.id)
+    const current = this.store.get().voice
+    if (listed.includes(current.downloadId) && !cachedIds.includes(current.id)) cachedIds.push(current.id)
     const s = this.store.get()
     if (s.cachedIds.join() === cachedIds.join() && s.cached === cachedIds.includes(s.voice.id)) return
     this.store.patch({ cachedIds, cached: cachedIds.includes(s.voice.id) })
@@ -286,12 +290,9 @@ export class BrowserTtsEngine {
       safeMode: safe,
     })
     this.startWatchdog()
-    const index = await this.readIndex()
-    const published = index?.voices.find((v) => v.id === voice.id)
-    if (index && !published) throw new Error(`${voice.label} is not published with this build of the demo.`)
-    if (!index || !published)
-      throw new Error(`The voices could not be found (${this.store.get().indexError ?? 'no index'}).`)
-    const files = published.files
+    const base = voicesBase()
+    const located = await this.locate(voice, base)
+    const bytes = located.bytes
     const threads = !safe && support.wasmThreads ? Math.max(1, Math.min(4, support.hardwareConcurrency)) : 1
     if (generation !== this.generation) throw new Error('Load cancelled')
     this.store.patch({ device: 'wasm', threads })
@@ -301,7 +302,7 @@ export class BrowserTtsEngine {
     )
     // On WebKit and phones only one model runtime fits in the page: this releases the recogniser's, if it is loaded.
     claimRuntime('tts', () => this.dispose())
-    markLoading('tts', voice.id)
+    markLoading('tts', voice.downloadId)
     const worker: TtsWorker = workerFactory
       ? await workerFactory()
       : (new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }) as unknown as TtsWorker)
@@ -342,13 +343,16 @@ export class BrowserTtsEngine {
           )
           void reportPageMemory('after loading the voice')
           markSettled()
+          rememberMeasured(voice.downloadId, { loadMs: msg.loadMs, memoryBytes: msg.memoryBytes })
           void recordDownload({
-            id: voice.id,
+            id: voice.downloadId,
             kind: 'tts',
-            label: voice.label,
-            bytes: published.bytes,
+            label: voice.downloadLabel,
+            bytes,
             cache: VOICE_CACHE,
             keys: msg.cacheKeys ?? [],
+            // Kokoro voices share their model: each voice adds its own small style file.
+            merge: voice.kind === 'kokoro',
           })
           this.store.patch({
             status: 'ready',
@@ -356,6 +360,7 @@ export class BrowserTtsEngine {
             progress: 1,
             cached: true,
             cachedIds: [...new Set([...this.store.get().cachedIds, voice.id])],
+            model: modelOf(voice, this.store.get().index, bytes),
             stage: null,
             stalled: null,
             config: msg.config,
@@ -385,13 +390,18 @@ export class BrowserTtsEngine {
           }
         }
       }
-      const version = (files['model.onnx']?.sha256 ?? '').slice(0, 12) + (files['voice.json']?.sha256 ?? '').slice(0, 6)
       const req: TtsWorkerRequest = {
         type: 'load',
-        base: voicesBase(),
+        base,
         voice: voice.id,
-        version,
+        kind: voice.kind,
+        model: located.model,
+        config: located.config,
+        configFormat: located.configFormat,
+        style: located.style,
         phonemizer: voice.phonemizer,
+        phonemeLanguage: voice.phonemeLanguage,
+        uccharanBase: `${base}uccharan/`,
         threads,
         ortWasmBase: readBrowserSttConfig().ortWasmBase,
         plainRuntimeLoad: safe,
@@ -401,13 +411,68 @@ export class BrowserTtsEngine {
     })
   }
 
+  /**
+   * Where a voice's files are: the demo's own voices directory (checked
+   * against the published index, with a version so a republished voice is not
+   * read from a stale cache), or a pinned Hugging Face URL.
+   */
+  private async locate(
+    voice: BrowserVoice,
+    base: string,
+  ): Promise<{
+    model: string
+    config: string | null
+    configFormat: 'bolo' | 'piper' | null
+    style?: string
+    bytes: number
+  }> {
+    const files = voice.files
+    if (files.from === 'kokoro')
+      return {
+        model: hubUrl(files.model),
+        config: null,
+        configFormat: null,
+        style: hubUrl(files.style),
+        bytes: voice.approxBytes,
+      }
+    if (files.from === 'remote' && files.configFormat === 'piper')
+      return {
+        model: hubUrl(files.model),
+        config: hubUrl(files.config),
+        configFormat: 'piper',
+        bytes: voice.approxBytes,
+      }
+    const index = await this.readIndex()
+    // A remote model with a published configuration (the 32-bit SYSPIN voices) needs its 8-bit sibling's settings.
+    const publishedId = files.from === 'remote' ? files.config.split('/')[0] : voice.id
+    const published = index?.voices.find((v) => v.id === publishedId)
+    if (index && !published) throw new Error(`${voice.label} is not published with this build of the demo.`)
+    if (!index || !published)
+      throw new Error(`The voices could not be found (${this.store.get().indexError ?? 'no index'}).`)
+    const f = published.files
+    const v = `?v=${encodeURIComponent((f['model.onnx']?.sha256 ?? '').slice(0, 12) + (f['voice.json']?.sha256 ?? '').slice(0, 6))}`
+    if (files.from === 'remote')
+      return {
+        model: files.model,
+        config: `${base}${files.config}${v}`,
+        configFormat: 'bolo',
+        bytes: voice.approxBytes,
+      }
+    return {
+      model: `${base}${voice.id}/model.onnx${v}`,
+      config: `${base}${voice.id}/voice.json${v}`,
+      configFormat: 'bolo',
+      bytes: published.bytes,
+    }
+  }
+
   /** Synthesise one prepared chunk. Requests run one at a time in the worker. */
   async synthesize(text: string): Promise<SynthResult> {
     await this.load()
     const worker = this.worker
     const cfg = this.store.get().config
     if (!worker || !cfg) throw new Error('The voice is not loaded')
-    touchDownload(this.store.get().voice.id)
+    touchDownload(this.store.get().voice.downloadId)
     const id = this.nextId++
     const { noise_scale, length_scale, noise_scale_w } = cfg.inference
     return new Promise((resolve, reject) => {
@@ -425,7 +490,7 @@ export class BrowserTtsEngine {
   dispose(): void {
     this.generation += 1
     releaseRuntime('tts')
-    if (this.store.get().status === 'loading') markSettled(this.store.get().voice.id)
+    if (this.store.get().status === 'loading') markSettled(this.store.get().voice.downloadId)
     this.peakMemory = null
     this.stopWatchdog()
     this.worker?.terminate()

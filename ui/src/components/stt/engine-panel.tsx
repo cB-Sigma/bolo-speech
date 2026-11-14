@@ -1,3 +1,5 @@
+import { useVerdict, VerdictLine } from '@/components/model-fit'
+import { sttNeeds } from '@/components/stt/language-controls'
 import { deleteDownload, downloadedIds } from '@/lib/downloads'
 import { Cpu, Download, HardDrive, Trash2, Zap } from 'lucide-react'
 import { toast } from 'sonner'
@@ -38,6 +40,12 @@ const MULTILINGUAL_INDIC_NOTE =
   'We have only measured Hindi, where Whisper Tiny and Base were unusable; other Indian languages are unlikely to be better, and the text may come out in the wrong script.'
 const WHISPER_GENERAL_NOTE =
   'Whisper Tiny and Base are small general-purpose models: reasonable for major European languages, poor for Indian ones. Audio is decoded a stretch at a time, so text arrives later than with Moonshine.'
+
+function EngineVerdict() {
+  const s = useStore(sharedEngine().store)
+  const verdict = useVerdict(sttNeeds(s.model, Boolean(s.cached)))
+  return <VerdictLine className="mt-2" verdict={verdict} bytes={s.model.approxBytes} />
+}
 
 /** Status of the in-browser recogniser: download, cache, and what the browser offers it. */
 export function BrowserEnginePanel({
@@ -116,6 +124,7 @@ export function BrowserEnginePanel({
         </span>
       </div>
 
+      {s.status !== 'ready' && <EngineVerdict />}
       <LoadProgress className="mt-3" />
       <LoadTrouble className="mt-3" />
       {s.model.family === 'Whisper' && (

@@ -29,7 +29,41 @@ export interface PiperVoiceConfig {
   inference: { noise_scale: number; length_scale: number; noise_scale_w: number }
 }
 
-export type VoiceConfig = (CoquiVoiceConfig | PiperVoiceConfig) & { id: string }
+/** Kokoro-82M: phonemes from uccharan's Kokoro profile, one style vector per voice. */
+export interface KokoroVoiceConfig {
+  kind: 'kokoro'
+  sample_rate: number
+  phoneme_language: string
+  /** Speed, as Kokoro takes it (1 = as trained). Mapped to length_scale = 1 / speed in the shared scales. */
+  inference: { noise_scale: number; length_scale: number; noise_scale_w: number }
+}
+
+export type VoiceConfig = (CoquiVoiceConfig | PiperVoiceConfig | KokoroVoiceConfig) & { id: string }
+
+/** A Piper `.onnx.json` turned into what the browser needs (as build.py does for published voices). */
+export function piperConfigFromJson(
+  id: string,
+  cfg: {
+    audio: { sample_rate: number }
+    espeak: { voice: string }
+    phoneme_id_map: Record<string, number[]>
+    inference?: { noise_scale?: number; length_scale?: number; noise_w?: number }
+  },
+  phonemeLanguage?: string,
+): VoiceConfig {
+  return {
+    id,
+    kind: 'piper',
+    sample_rate: cfg.audio.sample_rate,
+    phoneme_language: phonemeLanguage ?? cfg.espeak.voice,
+    phoneme_id_map: cfg.phoneme_id_map,
+    inference: {
+      noise_scale: cfg.inference?.noise_scale ?? 0.667,
+      length_scale: cfg.inference?.length_scale ?? 1,
+      noise_scale_w: cfg.inference?.noise_w ?? 0.8,
+    },
+  }
+}
 
 /**
  * Coqui's `multilingual_cleaners`, which ran on these voices' training text:
@@ -184,7 +218,7 @@ export interface PreparedText {
  * applies to them.
  */
 export function prepareText(text: string, cfg: VoiceConfig, numbers: NumberLanguage | null): PreparedText {
-  if (cfg.kind === 'piper') {
+  if (cfg.kind === 'piper' || cfg.kind === 'kokoro') {
     const chunks = splitSentences(text.replace(/\s+/g, ' ').trim())
     return { spoken: chunks.join(' '), chunks, dropped: [], rewritten: false }
   }

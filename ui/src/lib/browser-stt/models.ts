@@ -1,22 +1,39 @@
 /**
  * Models the in-browser mode can run, fetched from the Hugging Face Hub on first use.
  * Keep docs/ui-server-notes.md in step when adding one (name, licence, source).
+ *
+ * Every model that runs in a browser is listed, light or heavy: each says
+ * what it costs (download, memory, WebGPU) and the visitor decides.
  */
 export interface BrowserModel {
   id: string
   label: string
-  family: 'Moonshine' | 'Whisper'
+  family: 'Moonshine' | 'Whisper' | 'Wav2Vec2'
   repo: string
   /** transformers.js quantisation to request. */
-  dtype: 'q8' | 'fp32' | 'q4'
+  dtype: 'q8' | 'fp32' | 'q4' | 'q4f16' | 'fp16'
   /** Bytes fetched on first use (weights, tokenizer and configuration), as listed on the Hub. */
   approxBytes: number
+  /** Estimated peak memory while it runs, bytes. */
+  peakBytes: number
   params: number
   languages: string[]
   /** One model for many languages: the language is chosen (or guessed) per utterance. */
   multilingual: boolean
+  /** Whisper checkpoints trained on English only take no language or task tokens. */
+  englishOnly?: boolean
+  /** Whisper fine-tunes that must be given this language token whatever is spoken (Hinglish output). */
+  forceLanguage?: string
+  /** Only runs with WebGPU (16-bit weights). */
+  requiresWebGpu?: boolean
+  /** Runs on the CPU too, but is meant for WebGPU: on the CPU it is slow. */
+  prefersWebGpu?: boolean
   license: string
+  /** Licence or access terms worth knowing before use (non-commercial, gated original, …). */
+  licenseNote?: string
   source: string
+  /** Picker group. */
+  group: 'English' | 'Hindi and Indian languages' | 'Many languages' | 'Other languages'
   /** Short honest description for pickers. */
   blurb: string
 }
@@ -26,6 +43,42 @@ export const WHISPER_LANGUAGES =
   'en zh de es ru ko fr ja pt tr pl ca nl ar sv it id hi fi vi he uk el ms cs ro da hu ta no th ur hr bg lt la mi ml cy sk te fa lv bn sr az sl kn et mk br eu is hy ne mn bs kk sq sw gl mr pa si km sn yo so af oc ka be tg sd gu am yi lo uz fo ht ps tk nn mt sa lb my bo tl mg as tt haw ln ha ba jw su'.split(
     ' ',
   )
+/** large-v3 added Cantonese. */
+const WHISPER_V3_LANGUAGES = [...WHISPER_LANGUAGES, 'yue']
+
+/** Peak memory estimate: the weights as loaded plus the runtime and activations. */
+const peak = (bytes: number, factor = 2.2) => Math.round(bytes * factor + 120e6)
+
+const HUB = 'https://huggingface.co/'
+const MOONSHINE_LICENCE =
+  'Moonshine Community License: free for research and for organisations under USD 1M revenue; others need a licence from Useful Sensors.'
+
+function moonshineLanguage(
+  size: 'tiny' | 'base',
+  code: string,
+  name: string,
+  bytes: number,
+  license = 'Moonshine Community License',
+): BrowserModel {
+  const repo = `onnx-community/moonshine-${size}-${code}-ONNX`
+  return {
+    id: `moonshine-${size}-${code}`,
+    label: `Moonshine ${size === 'tiny' ? 'Tiny' : 'Base'} ${name}`,
+    family: 'Moonshine',
+    repo,
+    dtype: 'q8',
+    approxBytes: bytes,
+    peakBytes: peak(bytes),
+    params: size === 'tiny' ? 27_000_000 : 61_000_000,
+    languages: [code],
+    multilingual: false,
+    license,
+    licenseNote: license === 'MIT' ? undefined : MOONSHINE_LICENCE,
+    source: `${HUB}${repo}`,
+    group: 'Other languages',
+    blurb: `${name} only. Moonshine trained for one language by Useful Sensors.`,
+  }
+}
 
 export const BROWSER_MODELS: BrowserModel[] = [
   {
@@ -35,11 +88,13 @@ export const BROWSER_MODELS: BrowserModel[] = [
     repo: 'onnx-community/moonshine-tiny-ONNX',
     dtype: 'q8',
     approxBytes: 32_100_000,
+    peakBytes: peak(32_100_000),
     params: 27_000_000,
     languages: ['en'],
     multilingual: false,
     license: 'MIT',
     source: 'https://huggingface.co/onnx-community/moonshine-tiny-ONNX',
+    group: 'English',
     blurb: 'English only. The fastest: built for live use.',
   },
   {
@@ -50,13 +105,14 @@ export const BROWSER_MODELS: BrowserModel[] = [
     repo: 'astronova001/whisper-tiny-hindi-ONNX',
     dtype: 'q8',
     approxBytes: 124_000_000,
+    peakBytes: peak(124_000_000),
     params: 39_000_000,
     languages: ['hi'],
     multilingual: false,
     license: 'Apache-2.0',
     source: 'https://huggingface.co/ARTPARK-IISc/whisper-tiny-vaani-hindi',
-    blurb:
-      'Hindi only. Whisper Tiny fine-tuned on about 700 hours of Hindi; the only one here that is usable for Hindi.',
+    group: 'Hindi and Indian languages',
+    blurb: 'Hindi only. Whisper Tiny fine-tuned on about 700 hours of Hindi; small and quick, usable for Hindi.',
   },
   {
     id: 'whisper-tiny-q8',
@@ -65,11 +121,13 @@ export const BROWSER_MODELS: BrowserModel[] = [
     repo: 'onnx-community/whisper-tiny',
     dtype: 'q8',
     approxBytes: 43_600_000,
+    peakBytes: peak(43_600_000),
     params: 39_000_000,
     languages: WHISPER_LANGUAGES,
     multilingual: true,
     license: 'Apache-2.0',
     source: 'https://huggingface.co/onnx-community/whisper-tiny',
+    group: 'Many languages',
     blurb: 'Multilingual. Fine for major European languages; in our Hindi test it got nothing usable.',
   },
   {
@@ -79,16 +137,260 @@ export const BROWSER_MODELS: BrowserModel[] = [
     repo: 'onnx-community/whisper-base',
     dtype: 'q8',
     approxBytes: 79_700_000,
+    peakBytes: peak(79_700_000),
     params: 74_000_000,
     languages: WHISPER_LANGUAGES,
     multilingual: true,
     license: 'Apache-2.0',
     source: 'https://huggingface.co/onnx-community/whisper-base',
+    group: 'Many languages',
     blurb: 'Multilingual, a step up from Tiny. Still poor in Indian languages: a rough guess at best.',
   },
+  {
+    id: 'moonshine-base',
+    label: 'Moonshine Base',
+    family: 'Moonshine',
+    repo: 'onnx-community/moonshine-base-ONNX',
+    dtype: 'q8',
+    approxBytes: 67_100_000,
+    peakBytes: peak(67_100_000),
+    params: 61_000_000,
+    languages: ['en'],
+    multilingual: false,
+    license: 'MIT',
+    source: `${HUB}onnx-community/moonshine-base-ONNX`,
+    group: 'English',
+    blurb: 'English only. More accurate than Tiny and still quick enough for live use on a laptop.',
+  },
+  {
+    id: 'whisper-tiny-en',
+    label: 'Whisper Tiny (English)',
+    family: 'Whisper',
+    repo: 'onnx-community/whisper-tiny.en',
+    dtype: 'q8',
+    approxBytes: 45_200_000,
+    peakBytes: peak(45_200_000),
+    params: 39_000_000,
+    languages: ['en'],
+    multilingual: false,
+    englishOnly: true,
+    license: 'Apache-2.0',
+    source: `${HUB}onnx-community/whisper-tiny.en`,
+    group: 'English',
+    blurb: 'English only. The English-trained Tiny: a little better than the multilingual one in English.',
+  },
+  {
+    id: 'whisper-base-en',
+    label: 'Whisper Base (English)',
+    family: 'Whisper',
+    repo: 'onnx-community/whisper-base.en',
+    dtype: 'q8',
+    approxBytes: 81_300_000,
+    peakBytes: peak(81_300_000),
+    params: 74_000_000,
+    languages: ['en'],
+    multilingual: false,
+    englishOnly: true,
+    license: 'Apache-2.0',
+    source: `${HUB}onnx-community/whisper-base.en`,
+    group: 'English',
+    blurb: 'English only.',
+  },
+  {
+    id: 'distil-small-en',
+    label: 'Distil-Whisper Small (English)',
+    family: 'Whisper',
+    repo: 'onnx-community/distil-small.en',
+    dtype: 'q8',
+    approxBytes: 176_000_000,
+    peakBytes: peak(176_000_000),
+    params: 166_000_000,
+    languages: ['en'],
+    multilingual: false,
+    englishOnly: true,
+    license: 'MIT',
+    source: `${HUB}distil-whisper/distil-small.en`,
+    group: 'English',
+    blurb: 'English only. Whisper Small distilled to a shallow decoder: close to Small, much faster.',
+  },
+  {
+    id: 'whisper-small-en',
+    label: 'Whisper Small (English)',
+    family: 'Whisper',
+    repo: 'onnx-community/whisper-small.en',
+    dtype: 'q8',
+    approxBytes: 253_000_000,
+    peakBytes: peak(253_000_000),
+    params: 244_000_000,
+    languages: ['en'],
+    multilingual: false,
+    englishOnly: true,
+    license: 'Apache-2.0',
+    source: `${HUB}onnx-community/whisper-small.en`,
+    group: 'English',
+    prefersWebGpu: true,
+    blurb: 'English only. Accurate; slow on a phone.',
+  },
+  {
+    id: 'distil-medium-en',
+    label: 'Distil-Whisper Medium (English)',
+    family: 'Whisper',
+    repo: 'distil-whisper/distil-medium.en',
+    dtype: 'q8',
+    approxBytes: 406_000_000,
+    peakBytes: peak(406_000_000),
+    params: 394_000_000,
+    languages: ['en'],
+    multilingual: false,
+    englishOnly: true,
+    license: 'MIT',
+    source: `${HUB}distil-whisper/distil-medium.en`,
+    group: 'English',
+    prefersWebGpu: true,
+    blurb: 'English only. Near Whisper Medium in English at a fraction of its decoding time. Heavy for phones.',
+  },
+  {
+    id: 'whisper-small',
+    label: 'Whisper Small',
+    family: 'Whisper',
+    repo: 'onnx-community/whisper-small',
+    dtype: 'q8',
+    approxBytes: 253_000_000,
+    peakBytes: peak(253_000_000),
+    params: 244_000_000,
+    languages: WHISPER_LANGUAGES,
+    multilingual: true,
+    license: 'Apache-2.0',
+    source: `${HUB}onnx-community/whisper-small`,
+    group: 'Many languages',
+    prefersWebGpu: true,
+    blurb: 'Multilingual. The smallest Whisper that gets Indian languages partly right. Slow on a phone.',
+  },
+  {
+    id: 'whisper-medium',
+    label: 'Whisper Medium',
+    family: 'Whisper',
+    repo: 'onnx-community/whisper-medium-ONNX',
+    dtype: 'q4',
+    approxBytes: 685_000_000,
+    peakBytes: peak(685_000_000, 2),
+    params: 769_000_000,
+    languages: WHISPER_LANGUAGES,
+    multilingual: true,
+    license: 'Apache-2.0',
+    source: `${HUB}onnx-community/whisper-medium-ONNX`,
+    group: 'Many languages',
+    prefersWebGpu: true,
+    blurb: 'Multilingual, 4-bit weights. Much better in Indian languages than Small; a laptop with WebGPU is advised.',
+  },
+  {
+    id: 'whisper-large-v3-turbo',
+    label: 'Whisper Large v3 Turbo',
+    family: 'Whisper',
+    repo: 'onnx-community/whisper-large-v3-turbo',
+    dtype: 'q4',
+    approxBytes: 763_000_000,
+    peakBytes: peak(763_000_000, 2),
+    params: 809_000_000,
+    languages: WHISPER_V3_LANGUAGES,
+    multilingual: true,
+    license: 'MIT',
+    source: `${HUB}openai/whisper-large-v3-turbo`,
+    group: 'Many languages',
+    prefersWebGpu: true,
+    blurb:
+      'Multilingual, the best Whisper that fits a tab (4-bit weights). Needs a laptop; with WebGPU it is usable live.',
+  },
+  {
+    id: 'whisper-large-v3-turbo-f16',
+    label: 'Whisper Large v3 Turbo (WebGPU, 16-bit)',
+    family: 'Whisper',
+    repo: 'onnx-community/whisper-large-v3-turbo',
+    dtype: 'q4f16',
+    approxBytes: 567_000_000,
+    peakBytes: peak(567_000_000, 1.6),
+    params: 809_000_000,
+    languages: WHISPER_V3_LANGUAGES,
+    multilingual: true,
+    license: 'MIT',
+    source: `${HUB}openai/whisper-large-v3-turbo`,
+    group: 'Many languages',
+    requiresWebGpu: true,
+    blurb: 'The same model with 16-bit activations: smaller and faster, but only on a GPU with 16-bit shaders.',
+  },
+  {
+    id: 'whisper-hindi-small',
+    label: 'Whisper Small Hindi (IIT Madras)',
+    family: 'Whisper',
+    repo: 'onnx-community/whisper-hindi-small-ONNX',
+    dtype: 'q4',
+    approxBytes: 304_000_000,
+    peakBytes: peak(304_000_000, 2),
+    params: 244_000_000,
+    languages: ['hi'],
+    multilingual: false,
+    license: 'Apache-2.0',
+    source: `${HUB}vasista22/whisper-hindi-small`,
+    group: 'Hindi and Indian languages',
+    prefersWebGpu: true,
+    blurb:
+      'Hindi only. Whisper Small fine-tuned on Hindi by SPRING Lab, IIT Madras (4-bit weights): more accurate than Tiny Hindi, much slower.',
+  },
+  {
+    id: 'whisper-hinglish-swift',
+    label: 'Whisper Hindi to Hinglish (Swift)',
+    family: 'Whisper',
+    repo: 'Hirecentive-D3l/Whisper-Hindi2Hinglish-Swift-ONNX',
+    dtype: 'q8',
+    approxBytes: 108_000_000,
+    peakBytes: peak(108_000_000),
+    params: 74_000_000,
+    languages: ['hi'],
+    multilingual: false,
+    forceLanguage: 'en',
+    license: 'Apache-2.0',
+    source: `${HUB}Oriserve/Whisper-Hindi2Hinglish-Swift`,
+    group: 'Hindi and Indian languages',
+    blurb:
+      'Hindi and Hindi-English speech written out in Latin letters (Hinglish), by Oriserve; trained on noisy Indian audio.',
+  },
+  {
+    id: 'indicwav2vec-hindi',
+    label: 'IndicWav2Vec Hindi (AI4Bharat)',
+    family: 'Wav2Vec2',
+    repo: 'onnx-community/indicwav2vec-hindi-ONNX',
+    dtype: 'q8',
+    approxBytes: 317_000_000,
+    peakBytes: peak(317_000_000),
+    params: 315_000_000,
+    languages: ['hi'],
+    multilingual: false,
+    license: 'Apache-2.0',
+    licenseNote: 'The original checkpoint on the Hub asks you to accept its terms; this ONNX copy does not.',
+    source: `${HUB}ai4bharat/indicwav2vec-hindi`,
+    group: 'Hindi and Indian languages',
+    blurb: 'Hindi only. A character model (CTC) from AI4Bharat: no punctuation, never invents text that was not said.',
+  },
+  moonshineLanguage('tiny', 'ar', 'Arabic', 32_100_000),
+  moonshineLanguage('tiny', 'zh', 'Chinese', 32_100_000),
+  moonshineLanguage('base', 'zh', 'Chinese', 67_100_000),
+  moonshineLanguage('tiny', 'ja', 'Japanese', 32_100_000),
+  moonshineLanguage('base', 'ja', 'Japanese', 67_100_000),
+  moonshineLanguage('tiny', 'ko', 'Korean', 32_100_000),
+  moonshineLanguage('base', 'ko', 'Korean', 67_100_000),
+  moonshineLanguage('tiny', 'uk', 'Ukrainian', 129_000_000),
+  moonshineLanguage('base', 'uk', 'Ukrainian', 246_000_000),
+  moonshineLanguage('tiny', 'vi', 'Vietnamese', 129_000_000),
+  moonshineLanguage('tiny', 'fr', 'French', 32_100_000, 'MIT'),
 ]
 
 export const DEFAULT_BROWSER_MODEL = BROWSER_MODELS[0] as BrowserModel
+
+/** Picker groups in order, each with its models. */
+export function modelsByGroup(): { group: BrowserModel['group']; models: BrowserModel[] }[] {
+  const order: BrowserModel['group'][] = ['English', 'Hindi and Indian languages', 'Many languages', 'Other languages']
+  return order.map((group) => ({ group, models: BROWSER_MODELS.filter((m) => m.group === group) }))
+}
 
 /**
  * The model to suggest for a language: a model made for that language if there
@@ -140,6 +442,8 @@ export type WorkerRequest =
       repo: string
       family: BrowserModel['family']
       dtype: string
+      englishOnly?: boolean
+      forceLanguage?: string
       device: BrowserDevice
       threads: number
       /** Leave fetching the runtime binary entirely to the library (no progress reporting). */

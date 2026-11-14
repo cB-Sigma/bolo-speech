@@ -2,6 +2,7 @@ import { Download, ExternalLink, Info, Languages, Play, Repeat2, Square, Triangl
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { BudgetBar } from '@/components/charts/budget-bar'
+import { DevicePanel, RiskDialog, useDevice, VerdictBadge, VerdictLine } from '@/components/model-fit'
 import { DownloadsPanel, InterruptedLoadNotice } from '@/components/downloads-panel'
 import { Page } from '@/components/layout/app-shell'
 import { Empty, Panel, Readout } from '@/components/panel'
@@ -9,9 +10,18 @@ import { LoadProgress, LoadTrouble, ModelStatusChip } from '@/components/stt/mod
 import { ChunkTimeline } from '@/components/tts/chunk-timeline'
 import { PlaybackWave } from '@/components/tts/playback-wave'
 import { RoundTripPanel, type RoundTrip } from '@/components/tts/round-trip'
+import { UccharanPlayground } from '@/components/tts/uccharan-playground'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useStore } from '@/hooks/use-store'
@@ -25,12 +35,15 @@ import { browserModel } from '@/lib/browser-stt/models'
 import { sharedTtsEngine } from '@/lib/browser-tts/engine'
 import { BrowserTtsSession, type BrowserTtsExtra } from '@/lib/browser-tts/session'
 import {
+  baseVoiceId,
   browserVoice,
   BROWSER_VOICES,
+  KOKORO_PRECISIONS,
   languageLabel,
   voicesByLanguage,
   type BrowserVoice,
 } from '@/lib/browser-tts/voices'
+import { peakFor, verdictFor, type ModelNeeds } from '@/lib/device'
 import { fmtBytes, fmtMs, fmtRtf, fmtSeconds, fmtSpeed } from '@/lib/format'
 import { wordErrorRate } from '@/lib/latency/wer'
 import { prefs } from '@/lib/prefs'
@@ -48,6 +61,20 @@ const idleExtra = new Store<BrowserTtsExtra>({
 })
 const SAMPLES = new Set(BROWSER_VOICES.map((v) => v.sample))
 const VOICE_PREF = 'bolo.browserTtsVoice'
+/** Quick language buttons under the text: the Indian languages and English (the picker has every language). */
+const TRY_LANGUAGES = new Set([
+  'Hindi',
+  'Maithili',
+  'Bhojpuri',
+  'Magahi',
+  'Chhattisgarhi',
+  'Marathi',
+  'Bengali',
+  'Gujarati',
+  'Telugu',
+  'Kannada',
+  'English (US)',
+])
 
 function savedVoice(): BrowserVoice {
   try {
@@ -62,41 +89,124 @@ function htmlLang(v: BrowserVoice): string {
   return v.language
 }
 
+/** What a voice needs, for the device verdict. */
+function ttsNeeds(v: BrowserVoice, downloaded: boolean, bytes = v.approxBytes): ModelNeeds {
+  return { bytes, peakBytes: peakFor(v.downloadId, v.peakBytes), downloaded }
+}
+
 function VoicePicker({
   value,
   onChange,
   disabled,
   sizes,
+  cachedIds,
 }: {
   value: BrowserVoice
   onChange: (id: string) => void
   disabled?: boolean
   sizes: Record<string, number>
+  cachedIds: string[]
 }) {
+  const d = useDevice()
+  const [pending, setPending] = useState<BrowserVoice | null>(null)
+  const sizeOf = (v: BrowserVoice) => (v.files.from === 'published' ? sizes[v.id] : undefined) ?? v.approxBytes
+  const verdictOf = (v: BrowserVoice) => verdictFor(ttsNeeds(v, cachedIds.includes(v.id), sizeOf(v)), d)
+  const choose = (id: string) => {
+    const v = browserVoice(id)
+    const verdict = verdictOf(v)
+    if (verdict.level === 'unlikely' || verdict.reasons.some((r) => r.includes('free in this browser'))) setPending(v)
+    else onChange(id)
+  }
   return (
-    <Select value={value.id} onValueChange={onChange} disabled={disabled}>
-      <SelectTrigger className="h-8 w-64 max-sm:min-w-0 max-sm:flex-1" aria-label="Voice" data-testid="voice-picker">
-        <span className="min-w-0 truncate text-left">
-          <span lang={htmlLang(value)}>{value.nativeName}</span>
-          {value.nativeName !== value.englishName && !value.englishName.startsWith(value.nativeName) && (
-            <span className="text-muted-foreground"> · {value.englishName}</span>
-          )}
-          <span className="text-muted-foreground"> · {value.gender}</span>
-        </span>
+    <>
+      <Select value={baseVoiceId(value.id)} onValueChange={choose} disabled={disabled}>
+        <SelectTrigger className="h-8 w-64 max-sm:min-w-0 max-sm:flex-1" aria-label="Voice" data-testid="voice-picker">
+          <span className="min-w-0 truncate text-left">
+            <span lang={htmlLang(value)}>{value.nativeName}</span>
+            {value.nativeName !== value.englishName && !value.englishName.startsWith(value.nativeName) && (
+              <span className="text-muted-foreground"> · {value.englishName}</span>
+            )}
+            <span className="text-muted-foreground"> · {value.label}</span>
+          </span>
+        </SelectTrigger>
+        <SelectContent
+          position="popper"
+          align="start"
+          className="max-h-[min(28rem,var(--radix-select-content-available-height))] w-[min(26rem,calc(100vw-2rem))]"
+        >
+          {voicesByLanguage().map((g) => (
+            <SelectGroup key={g.englishName}>
+              <SelectLabel>
+                <span lang={g.language}>{languageLabel(g)}</span>
+              </SelectLabel>
+              {g.voices.map((v) => (
+                <SelectItem
+                  key={v.id}
+                  value={v.id}
+                  textValue={`${v.label} ${g.englishName}`}
+                  data-testid={`voice-${v.id}`}
+                >
+                  <span className="flex min-w-0 flex-col">
+                    <span className="flex min-w-0 flex-wrap items-center gap-x-2">
+                      <span>{v.label}</span>
+                      <VerdictBadge verdict={verdictOf(v)} />
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {v.gender ? `${v.gender} · ` : ''}
+                      <span className="num">{fmtBytes(sizeOf(v))}</span>
+                      {cachedIds.includes(v.id) ? ' (downloaded)' : ''} · {v.precision} · data {v.dataLicense}
+                      {v.approximate ? ' · approximate phonemes' : ''}
+                    </span>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          ))}
+        </SelectContent>
+      </Select>
+      {pending && (
+        <RiskDialog
+          open
+          label={pending.label}
+          bytes={sizeOf(pending)}
+          verdict={verdictOf(pending)}
+          onConfirm={() => {
+            onChange(pending.id)
+            setPending(null)
+          }}
+          onCancel={() => setPending(null)}
+        />
+      )}
+    </>
+  )
+}
+
+/** Kokoro's weights come in three precisions; the voice's style is the same in each. */
+function KokoroPrecision({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: BrowserVoice
+  onChange: (id: string) => void
+  disabled?: boolean
+}) {
+  if (value.kind !== 'kokoro') return null
+  const current = value.id.split('@')[1] ?? 'q8'
+  return (
+    <Select
+      value={current}
+      onValueChange={(p) => onChange(p === 'q8' ? baseVoiceId(value.id) : `${baseVoiceId(value.id)}@${p}`)}
+      disabled={disabled}
+    >
+      <SelectTrigger className="h-8 w-40" aria-label="Kokoro precision" data-testid="kokoro-precision">
+        <SelectValue />
       </SelectTrigger>
-      <SelectContent position="popper" align="start" className="max-h-96">
-        {voicesByLanguage().map((g) => (
-          <SelectGroup key={g.englishName}>
-            <SelectLabel>
-              <span lang={g.language}>{languageLabel(g)}</span>
-            </SelectLabel>
-            {g.voices.map((v) => (
-              <SelectItem key={v.id} value={v.id} data-testid={`voice-${v.id}`}>
-                <span>{v.label}</span>
-                <span className="ml-2 num text-xs text-muted-foreground">{fmtBytes(sizes[v.id] ?? v.approxBytes)}</span>
-              </SelectItem>
-            ))}
-          </SelectGroup>
+      <SelectContent position="popper" align="start">
+        {Object.entries(KOKORO_PRECISIONS).map(([id, p]) => (
+          <SelectItem key={id} value={id} textValue={p.label}>
+            {p.label} · {fmtBytes(p.bytes)}
+          </SelectItem>
         ))}
       </SelectContent>
     </Select>
@@ -138,10 +248,12 @@ function AboutVoice({ voice, bytes }: { voice: BrowserVoice; bytes: number }) {
           <li key={n}>{n}</li>
         ))}
         <li>Nobody who speaks this language has reviewed what this page makes the voice say.</li>
-        <li>
-          Converted for the browser by bolo: 8-bit weights where that made no measurable difference, 16-bit elsewhere.
-          The voice was not retrained.
-        </li>
+        {voice.files.from === 'published' && (
+          <li>
+            Converted for the browser by bolo: 8-bit weights where that made no measurable difference, 16-bit elsewhere.
+            The voice was not retrained.
+          </li>
+        )}
       </ul>
     </Panel>
   )
@@ -154,6 +266,7 @@ function AboutVoice({ voice, bytes }: { voice: BrowserVoice; bytes: number }) {
 export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
   const engine = sharedTtsEngine()
   const es = useStore(engine.store)
+  const device = useDevice()
   const p = useStore(prefs)
   const [voice, setVoice] = useState<BrowserVoice>(savedVoice)
   const [text, setText] = useState(voice.sample)
@@ -175,7 +288,14 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
 
   const sizes = Object.fromEntries((es.index?.voices ?? []).map((v) => [v.id, v.bytes]))
   const published = es.index ? new Set(es.index.voices.map((v) => v.id)) : null
-  const unavailable = published != null && !published.has(voice.id)
+  // A voice published with the demo (or whose settings are) must be in the index; Hub voices need nothing from it.
+  const publishedId =
+    voice.files.from === 'published'
+      ? voice.id
+      : voice.files.from === 'remote' && voice.files.configFormat === 'bolo'
+        ? voice.files.config.split('/')[0]
+        : null
+  const unavailable = published != null && publishedId != null && !published.has(publishedId)
 
   const chooseVoice = (id: string) => {
     const next = browserVoice(id)
@@ -262,13 +382,16 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
   }
 
   const roundTrip = () => {
-    const s = state.totalMs != null && session && !busy ? session : speak()
+    // Reuse what was just spoken only when it is this voice saying this text.
+    const fresh = session && session.voice.id === voice.id && session.text === text.trim()
+    const s = state.totalMs != null && session && fresh && !busy ? session : speak()
     if (s) void transcribe(s)
   }
 
   const hasAudio = state.audioSeconds > 0 && state.totalMs != null
   const underrun = state.underruns > 0
-  const bytes = sizes[voice.id] ?? voice.approxBytes
+  const bytes = (voice.files.from === 'published' ? sizes[voice.id] : undefined) ?? voice.approxBytes
+  const voiceVerdict = verdictFor(ttsNeeds(voice, Boolean(es.cached), bytes), device)
   const prepared = extra.prepared
   const tripTip = voice.roundTrip
     ? `Transcribes the audio with ${browserModel(voice.roundTrip.model).label} in this browser (${fmtBytes(browserModel(voice.roundTrip.model).approxBytes)} the first time)`
@@ -276,7 +399,8 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
 
   const toolbar = (
     <>
-      <VoicePicker value={voice} onChange={chooseVoice} disabled={busy} sizes={sizes} />
+      <VoicePicker value={voice} onChange={chooseVoice} disabled={busy} sizes={sizes} cachedIds={es.cachedIds} />
+      <KokoroPrecision value={voice} onChange={chooseVoice} disabled={busy} />
       {modeToggle && <div className="ml-auto">{modeToggle}</div>}
     </>
   )
@@ -325,28 +449,30 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <Languages className="mr-0.5 size-3.5 text-muted-foreground" aria-hidden />
               <span className="mr-1 text-xs text-muted-foreground">Try</span>
-              {voicesByLanguage().map((g) => {
-                const v = g.voices.find((x) => x.gender === voice.gender) ?? (g.voices[0] as BrowserVoice)
-                const active = g.voices.some((x) => x.id === voice.id)
-                return (
-                  <Button
-                    key={g.englishName}
-                    size="xs"
-                    variant={active ? 'secondary' : 'ghost'}
-                    onClick={() => {
-                      if (!active) chooseVoice(v.id)
-                      setText(active ? voice.sample : v.sample)
-                    }}
-                    disabled={busy}
-                    title={v.sample}
-                    className="border border-border"
-                  >
-                    <span lang={g.language}>
-                      {g.englishName.startsWith(g.nativeName) ? g.englishName : g.nativeName}
-                    </span>
-                  </Button>
-                )
-              })}
+              {voicesByLanguage()
+                .filter((g) => TRY_LANGUAGES.has(g.englishName) || g.voices.some((x) => x.id === voice.id))
+                .map((g) => {
+                  const v = g.voices.find((x) => x.gender === voice.gender) ?? (g.voices[0] as BrowserVoice)
+                  const active = g.voices.some((x) => x.id === voice.id)
+                  return (
+                    <Button
+                      key={g.englishName}
+                      size="xs"
+                      variant={active ? 'secondary' : 'ghost'}
+                      onClick={() => {
+                        if (!active) chooseVoice(v.id)
+                        setText(active ? voice.sample : v.sample)
+                      }}
+                      disabled={busy}
+                      title={v.sample}
+                      className="border border-border"
+                    >
+                      <span lang={g.language}>
+                        {g.englishName.startsWith(g.nativeName) ? g.englishName : g.nativeName}
+                      </span>
+                    </Button>
+                  )
+                })}
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-2">
               {busy ? (
@@ -389,6 +515,12 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
                 <Download /> WAV
               </Button>
             </div>
+            {es.status !== 'ready' && <VerdictLine className="mt-3" verdict={voiceVerdict} bytes={bytes} />}
+            {voice.approximate && (
+              <p className="mt-2 text-xs text-muted-foreground" data-testid="approximate-note">
+                {voice.approximate}
+              </p>
+            )}
             <LoadProgress className="mt-3" engine={engine} noun="voice" />
             <LoadTrouble className="mt-3" engine={engine} noun="voice" />
             {prepared && (prepared.rewritten || prepared.dropped.length > 0 || extra.missing.length > 0) && (
@@ -542,7 +674,9 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
           </Panel>
 
           <AboutVoice voice={voice} bytes={bytes} />
+          <UccharanPlayground />
           <DownloadsPanel />
+          <DevicePanel />
 
           <Panel title="Reading the numbers" bodyClassName="grid gap-2.5 text-[13px] leading-5 text-muted-foreground">
             <p>

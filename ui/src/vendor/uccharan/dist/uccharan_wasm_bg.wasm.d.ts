@@ -1,0 +1,35 @@
+/* tslint:disable */
+/* eslint-disable */
+export const memory: WebAssembly.Memory;
+export const __wbg_soundindex_free: (a: number, b: number) => void;
+export const convertWordlist: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+export const has: (a: number, b: number) => number;
+export const hasMisaki: (a: number, b: number) => number;
+export const hasTranslit: (a: number, b: number) => number;
+export const kittenIds: (a: number, b: number, c: number) => void;
+export const kokoroIds: (a: number, b: number, c: number) => void;
+export const load: (a: number, b: number, c: number, d: number, e: number) => void;
+export const loadKokoro: (a: number, b: number, c: number) => void;
+export const loadMisaki: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+export const loadPack: (a: number, b: number, c: number) => void;
+export const matchaIds: (a: number, b: number, c: number) => void;
+export const normalizeJson: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+export const render: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number) => void;
+export const renderWordlists: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number) => void;
+export const respell: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void;
+export const sentences: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void;
+export const soundindex_applyJson: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
+export const soundindex_findJson: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
+export const soundindex_length: (a: number) => number;
+export const soundindex_new: (a: number, b: number, c: number, d: number, e: number) => void;
+export const transliterateJson: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+export const version: (a: number) => void;
+export const __wbindgen_export: (a: number, b: number) => number;
+export const __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
+export const __wbindgen_export3: (a: number, b: number, c: number) => void;
+export const __wbindgen_externrefs: WebAssembly.Table;
+export const __wbindgen_add_to_stack_pointer: (a: number) => number;
+export const __wbindgen_export4: (a: number) => void;
+export const __wbindgen_export5: () => number;
+export const __wbindgen_export6: (a: number, b: number) => void;
+export const __wbindgen_start: () => void;

@@ -25,7 +25,7 @@ export function shortFirstChunk(chunks: string[], over = 90): string[] {
  * its phonemiser makes one model call per sentence whatever it is handed), so
  * its sentences stay apart and the first one is heard as early as possible.
  */
-export function synthesisChunks(sentences: string[], kind: 'coqui' | 'piper'): string[] {
+export function synthesisChunks(sentences: string[], kind: 'coqui' | 'piper' | 'kokoro'): string[] {
   return shortFirstChunk(kind === 'coqui' ? mergeShortChunks(sentences) : sentences)
 }
 
@@ -68,8 +68,8 @@ export class BrowserTtsSession {
   private sentAt = 0
   private stopped = false
   private readonly engine: BrowserTtsEngine
-  private readonly voice: BrowserVoice
-  private readonly text: string
+  readonly voice: BrowserVoice
+  readonly text: string
 
   constructor(
     engine: BrowserTtsEngine,

@@ -51,6 +51,90 @@
       "sample": "Hello! How are you today? The weather is lovely this morning."
     },
     {
+      "id": "syspin-hi-male",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "नमस्ते! आप कैसे हैं? आज मौसम बहुत अच्छा है।"
+    },
+    {
+      "id": "syspin-bn-female",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "নমস্কার! আপনি কেমন আছেন? আজ আবহাওয়া খুব ভালো।"
+    },
+    {
+      "id": "syspin-bn-male",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "নমস্কার! আপনি কেমন আছেন? আজ আবহাওয়া খুব ভালো।"
+    },
+    {
+      "id": "syspin-mr-male",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "नमस्कार! तुम्ही कसे आहात? आज हवामान खूप छान आहे."
+    },
+    {
+      "id": "syspin-te-female",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "నమస్కారం! మీరు ఎలా ఉన్నారు? ఈ రోజు వాతావరణం చాలా బాగుంది."
+    },
+    {
+      "id": "syspin-te-male",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "నమస్కారం! మీరు ఎలా ఉన్నారు? ఈ రోజు వాతావరణం చాలా బాగుంది."
+    },
+    {
+      "id": "syspin-kn-male",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "ನಮಸ್ಕಾರ! ನೀವು ಹೇಗಿದ್ದೀರಿ? ಇಂದು ಹವಾಮಾನ ತುಂಬಾ ಚೆನ್ನಾಗಿದೆ."
+    },
+    {
+      "id": "syspin-gu-female",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "નમસ્તે! તમે કેમ છો? આજે હવામાન ખૂબ સરસ છે."
+    },
+    {
+      "id": "syspin-gu-male",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "નમસ્તે! તમે કેમ છો? આજે હવામાન ખૂબ સરસ છે."
+    },
+    {
+      "id": "syspin-mag-female",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "प्रणाम! अपने कइसन ही? आज मौसम बड़ी बढ़िया हे।"
+    },
+    {
+      "id": "syspin-mag-male",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "प्रणाम! अपने कइसन ही? आज मौसम बड़ी बढ़िया हे।"
+    },
+    {
+      "id": "syspin-hne-female",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "जय जोहार! तुमन कइसे हव? आज मौसम बड़ सुग्घर हे।"
+    },
+    {
+      "id": "syspin-hne-male",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "जय जोहार! तुमन कइसे हव? आज मौसम बड़ सुग्घर हे।"
+    },
+    {
+      "id": "syspin-en-male",
+      "kind": "coqui",
+      "source": "syspin",
+      "sample": "Hello! How are you today? The weather is lovely this morning."
+    },
+    {
       "id": "piper-en-us-amy-low",
       "kind": "piper",
       "source": "url",

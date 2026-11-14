@@ -68,6 +68,14 @@ export const DEMO_SAMPLES: Sample[] = [
   },
 ]
 
+const DTYPE_TEXT: Record<BrowserModel['dtype'], string> = {
+  q8: '8-bit',
+  q4: '4-bit',
+  q4f16: '4-bit (16-bit activations)',
+  fp16: '16-bit',
+  fp32: '32-bit',
+}
+
 function browserEntry(m: BrowserModel, installed: boolean, loaded: boolean, progress: number | null): CatalogModel {
   return {
     id: m.id,
@@ -82,14 +90,14 @@ function browserEntry(m: BrowserModel, installed: boolean, loaded: boolean, prog
     size_bytes: m.approxBytes,
     params: m.params,
     license: m.license,
-    commercial_use: true,
+    commercial_use: !m.license.startsWith('Moonshine'),
     gated: false,
     voices: [],
     features: ['partials', 'in-browser'],
     installed,
     loaded,
     pulling: progress != null ? { job_id: 'browser-load', progress } : null,
-    description: `${m.label}, 8-bit quantised, running in this page with ONNX Runtime Web. ${m.blurb} Downloaded once from the Hugging Face Hub, then kept in the browser cache.`,
+    description: `${m.label}, ${DTYPE_TEXT[m.dtype]} weights, running in this page with ONNX Runtime Web${m.requiresWebGpu ? ' (WebGPU only)' : m.prefersWebGpu ? ' (best with WebGPU)' : ''}. ${m.blurb}${m.licenseNote ? ` ${m.licenseNote}` : ''} Downloaded once from the Hugging Face Hub, then kept in the browser cache.`,
     source_url: m.source,
     validated: 'untested',
     measured: null,
