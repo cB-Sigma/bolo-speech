@@ -67,6 +67,9 @@ XLIT = {
 KEEP = {"coqui": ("text_encoder", "duration_predictor"), "piper": ("enc_p", "dp", "dec")}
 # Mean |Δ log10 mel| over the loudest frames, shrunk vs original, with the noise switched off.
 MAX_DISTANCE = 0.08
+# Output frame of the VITS decoder, in samples, and how many frames the shrunk voice may differ by.
+HOP = 256
+MAX_HOPS = 1
 
 PIPER_ATTRIBUTION = """{id}: Piper voice "{name}" ({quality}), {language}
 
@@ -276,14 +279,41 @@ def check(original: Path, shrunk: Path, ids: list[int], sr: int) -> dict[str, An
     options.intra_op_num_threads = 2
     a = ort.InferenceSession(str(original), options).run(None, feed)[0].reshape(-1)
     b = ort.InferenceSession(str(shrunk), options).run(None, feed)[0].reshape(-1)
-    if len(a) != len(b):
+    # VITS rounds each symbol's predicted duration up to whole frames of 256 samples. A weight that moves by
+    # a rounding error can tip one symbol over a frame boundary: one frame (11.6 ms at 22.05 kHz) longer or
+    # shorter, well under what a listener notices in a segment's length (a few tens of ms). That much is
+    # allowed; anything more is a changed voice. The frames are then compared along the best alignment.
+    hops = abs(len(a) - len(b)) // HOP
+    if len(a) % HOP or len(b) % HOP or hops > MAX_HOPS:
         raise SystemExit(f"{shrunk}: the shrunk voice changed the timing ({len(a)} vs {len(b)} samples)")
     ma, mb = logmel(a, sr), logmel(b, sr)
     loud = ma.max(axis=1) > ma.max() - 4
-    distance = float(np.abs(ma[loud] - mb[loud]).mean())
+    distance = aligned_distance(ma, mb, loud)
     if distance > MAX_DISTANCE:
         raise SystemExit(f"{shrunk}: log-mel distance {distance:.3f} is above {MAX_DISTANCE}")
-    return {"seconds": round(len(a) / sr, 2), "logmel_distance": round(distance, 4)}
+    return {"seconds": round(len(a) / sr, 2), "logmel_distance": round(distance, 4), "frames_off": hops}
+
+
+def aligned_distance(ma: np.ndarray, mb: np.ndarray, loud: np.ndarray, band: int = 4) -> float:
+    """Mean |Δ log10 mel| over the loud frames of `ma`, along a dynamic time warping path kept within `band`
+    frames of the diagonal (with equal lengths and no shift this is the plain frame-by-frame mean)."""
+    n, m = len(ma), len(mb)
+    if n == m:
+        return float(np.abs(ma[loud] - mb[loud]).mean())
+    cost = np.abs(ma[:, None, :] - mb[None, :, :]).mean(axis=2)
+    acc = np.full((n + 1, m + 1), np.inf)
+    acc[0, 0] = 0.0
+    for i in range(1, n + 1):
+        lo, hi = max(1, i - band), min(m, i + band)
+        for j in range(lo, hi + 1):
+            acc[i, j] = cost[i - 1, j - 1] + min(acc[i - 1, j], acc[i, j - 1], acc[i - 1, j - 1])
+    i, j, used = n, m, {}
+    while i > 0 and j > 0:
+        used.setdefault(i - 1, cost[i - 1, j - 1])
+        step = int(np.argmin([acc[i - 1, j - 1], acc[i - 1, j], acc[i, j - 1]]))
+        i, j = (i - 1, j - 1) if step == 0 else (i - 1, j) if step == 1 else (i, j - 1)
+    rows = [k for k in range(n) if loud[k] and k in used]
+    return float(np.mean([used[k] for k in rows]))
 
 
 def build(voice: dict[str, Any], spec: dict[str, Any], out: Path, local: dict[str, str], work: Path) -> dict[str, Any]:
