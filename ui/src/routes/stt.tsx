@@ -35,7 +35,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { describeError, useSamples, useSelectedModel } from '@/hooks/use-api'
+import { describeError, useCatalog, useInfo, useSamples, useSelectedModel } from '@/hooks/use-api'
+import { SpeakersPanel } from '@/components/stt/speakers-panel'
 import { usePing } from '@/hooks/use-ping'
 import { useStore } from '@/hooks/use-store'
 import { useSttSession, type EngineMode, type SessionInput } from '@/hooks/use-stt-session'
@@ -216,6 +217,8 @@ export default function SttPage() {
   const { models, model, select, isLoading: modelsLoading, error: modelsError } = useSelectedModel('stt')
   const p = useStore(prefs)
   const samples = useSamples()
+  const catalog = useCatalog()
+  const info = useInfo()
   const support = useSupport()
   const session = useSttSession()
   const [mode, setMode] = useState<EngineMode>(isDemo ? 'browser' : 'server')
@@ -1044,6 +1047,16 @@ export default function SttPage() {
           )}
         </Panel>
       </div>
+      {!isDemo && mode === 'server' && (
+        <SpeakersPanel
+          className="mt-4"
+          info={info.data}
+          catalog={catalog.data?.models ?? []}
+          model={model}
+          language={language}
+          samples={samples.data?.samples ?? []}
+        />
+      )}
     </Page>
   )
 }

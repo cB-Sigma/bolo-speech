@@ -404,21 +404,46 @@ export class DemoBackend {
     }
     if (path === '/api/v1/components') {
       const server = snapshot.models as unknown as CatalogModel[]
+      const needing = (id: string) => server.filter((m) => m.requires?.includes(id)).length
+      const readOnly = {
+        installed: false,
+        source: null,
+        version: null,
+        installable: false,
+        install_blocked_reason: NEEDS_SERVER,
+        manual_command: '',
+      }
       return json({
         components: [
           {
+            ...readOnly,
             id: 'espeak-ng',
             name: 'eSpeak NG',
-            installed: false,
-            source: null,
-            version: null,
+            kind: 'phonemizer',
             license: 'GPL-3.0-or-later',
             license_url: 'https://github.com/espeak-ng/espeak-ng/blob/master/COPYING',
-            required_by_count: server.filter((m) => m.requires?.includes('espeak-ng')).length,
-            installable: false,
-            install_blocked_reason: NEEDS_SERVER,
-            manual_command: '',
+            required_by_count: needing('espeak-ng'),
             description: 'Text-to-phoneme front end that some voices need. Not shipped with bolo.',
+          },
+          {
+            ...readOnly,
+            id: 'llama-server',
+            name: 'llama.cpp server (llama-server)',
+            kind: 'tts-server',
+            license: 'MIT',
+            license_url: 'https://github.com/ggml-org/llama.cpp/blob/master/LICENSE',
+            required_by_count: needing('llama-server'),
+            description: 'Speech server for the voices marked llama.cpp. A bolo server can install it.',
+          },
+          {
+            ...readOnly,
+            id: 'audio.cpp',
+            name: 'audio.cpp server (audiocpp_server)',
+            kind: 'tts-server',
+            license: 'Apache-2.0',
+            license_url: 'https://github.com/0xShug0/audio.cpp/blob/main/LICENSE',
+            required_by_count: needing('audio.cpp'),
+            description: 'Speech server for the voices marked audio.cpp. A bolo server can install it.',
           },
         ],
       })

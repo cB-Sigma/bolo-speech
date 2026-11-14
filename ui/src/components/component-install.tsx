@@ -25,8 +25,39 @@ export function componentSentence(c: Component): string {
   const what =
     c.id === 'espeak-ng'
       ? 'eSpeak NG is a small open-source program that some voices use to turn text into phonemes'
-      : `${c.name} is an extra piece of software that some models use`
-  return `${what}; it is optional, is not part of bolo, and is licensed separately${c.license ? ` under ${c.license}` : ''}.`
+      : c.id === 'uccharan'
+        ? 'uccharan turns English and Hindi text into the phonemes many voices read'
+        : c.kind === 'tts-server' || c.id === 'llama-server' || c.id === 'audio.cpp'
+          ? `${c.name} is a separate speech server that bolo starts for the voices that run on it`
+          : c.kind === 'engine-plugin'
+            ? `${c.name} runs models in a process of its own, for models that need PyTorch`
+            : `${c.name} is an extra piece of software that some models use`
+  const licence = c.license && !/^see /i.test(c.license) ? ` under ${c.license}` : ''
+  return `${what}; it is optional, is not part of bolo, and is licensed separately${licence}.`
+}
+
+/** Whether installing asks the user to accept a licence first (copyleft components). */
+export function needsLicenceAcceptance(c: Pick<Component, 'id' | 'license'>): boolean {
+  return c.id === 'espeak-ng' || /^(a?gpl|lgpl)/i.test(c.license)
+}
+
+function hostOf(url: string | null | undefined): string | null {
+  if (!url) return null
+  try {
+    return new URL(url).host
+  } catch {
+    return null
+  }
+}
+
+/** What the server does when asked to install this component. */
+export function installDescription(c: Component): string {
+  if (c.kind === 'tts-server' || c.release) {
+    const host = hostOf(c.release?.url)
+    const version = c.release?.version ? `${c.release.version} ` : ''
+    return `The server downloads the prebuilt ${version}release${host ? ` from ${host}` : ''}, checks its SHA-256, unpacks it into its data directory and checks that the program starts on this machine. Nothing else on the machine changes, and the server keeps running.`
+  }
+  return "A Python package is installed into the server's own environment. Nothing else on the machine changes, and the server keeps running."
 }
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -113,8 +144,9 @@ export function InstallComponentDialog({
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['components'] }),
         qc.invalidateQueries({ queryKey: ['catalog'] }),
+        qc.invalidateQueries({ queryKey: ['info'] }),
       ])
-      toast.success(`${component.name} installed`, { description: 'Voices that need it can be used now.' })
+      toast.success(`${component.name} installed`, { description: 'Models that need it can be used now.' })
       if (alive.current) {
         setPhase({ step: 'confirm' })
         onOpenChange(false)
@@ -149,10 +181,7 @@ export function InstallComponentDialog({
             )}
           </dd>
           <dt className="text-muted-foreground">What happens</dt>
-          <dd>
-            A Python package is installed into the server&apos;s own environment. Nothing else on the machine changes,
-            and the server keeps running.
-          </dd>
+          <dd>{installDescription(component)}</dd>
         </dl>
         {phase.step === 'running' && (
           <div role="status">
@@ -185,7 +214,13 @@ export function InstallComponentDialog({
           </Button>
           <Button onClick={() => void install()} disabled={running} data-testid="install-confirm">
             <PackagePlus />{' '}
-            {running ? 'Installing…' : phase.step === 'error' ? 'Try again' : `Accept the licence and install`}
+            {running
+              ? 'Installing…'
+              : phase.step === 'error'
+                ? 'Try again'
+                : needsLicenceAcceptance(component)
+                  ? 'Accept the licence and install'
+                  : 'Install'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -263,8 +298,58 @@ export function NeedsComponentMark({ name, className }: { name: string; classNam
   )
 }
 
-function ComponentRow({ c }: { c: Component }) {
+/** Install button with its dialog, for places that name a missing component (model cards, notices). */
+export function ComponentInstallButton({
+  component,
+  label,
+  className,
+}: {
+  component: Component
+  label?: string
+  className?: string
+}) {
   const [open, setOpen] = useState(false)
+  if (isDemo || component.installed || !component.installable) return null
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="outline"
+        className={className}
+        onClick={() => setOpen(true)}
+        data-testid={`install-${component.id}`}
+      >
+        <PackagePlus /> {label ?? `Install ${component.name}`}
+      </Button>
+      <InstallComponentDialog component={component} open={open} onOpenChange={setOpen} />
+    </>
+  )
+}
+
+export const KIND_LABEL: Record<string, string> = {
+  phonemizer: 'Phonemisers',
+  'tts-server': 'Speech servers',
+  'engine-plugin': 'Engine plugins',
+  other: 'Other components',
+}
+
+export function componentKind(c: Component): string {
+  if (c.kind) return c.kind
+  if (c.id === 'espeak-ng' || c.id === 'uccharan') return 'phonemizer'
+  if (c.id === 'llama-server' || c.id === 'audio.cpp') return 'tts-server'
+  if (c.id.startsWith('plugin:')) return 'engine-plugin'
+  return 'other'
+}
+
+function ComponentRow({ c, detailed }: { c: Component; detailed?: boolean }) {
+  const detail: [string, string][] = detailed
+    ? ([
+        c.path ? ['Program', c.path] : null,
+        c.servers?.length ? ['Connected servers', c.servers.join(', ')] : null,
+        !c.installed && c.release ? ['Would install', `${c.release.version} (prebuilt, checksum pinned)`] : null,
+        c.languages?.length ? ['Languages', c.languages.join(', ')] : null,
+      ].filter(Boolean) as [string, string][])
+    : []
   return (
     <li
       className="grid gap-x-4 gap-y-1 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
@@ -284,7 +369,7 @@ function ComponentRow({ c }: { c: Component }) {
             ) : (
               <CircleDashed className="size-3.5" aria-hidden />
             )}
-            {c.installed ? 'Installed' : 'Not installed'}
+            {c.installed ? 'Installed' : c.servers?.length ? 'Connected' : 'Not installed'}
           </span>
         </div>
         <div className="mt-0.5 text-xs leading-5 text-muted-foreground">
@@ -305,15 +390,21 @@ function ComponentRow({ c }: { c: Component }) {
           {' · '}
           needed by <span className="num">{c.required_by_count}</span> model{c.required_by_count === 1 ? '' : 's'}
         </div>
+        {detailed && c.description && (
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">{c.description}</p>
+        )}
+        {detail.length > 0 && (
+          <dl className="mt-1.5 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-xs">
+            {detail.map(([k, v]) => (
+              <div key={k} className="contents">
+                <dt className="text-muted-foreground">{k}</dt>
+                <dd className="min-w-0 num break-all">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
       </div>
-      {!c.installed && !isDemo && c.installable && (
-        <>
-          <Button size="sm" variant="outline" onClick={() => setOpen(true)} data-testid={`install-${c.id}`}>
-            <PackagePlus /> Install
-          </Button>
-          <InstallComponentDialog component={c} open={open} onOpenChange={setOpen} />
-        </>
-      )}
+      {!c.installed && <ComponentInstallButton component={c} label="Install" />}
       {!c.installed && !isDemo && !c.installable && (
         <div className="min-w-0 sm:col-span-2">
           <p className="mb-1.5 text-xs leading-5 text-muted-foreground">
@@ -327,9 +418,21 @@ function ComponentRow({ c }: { c: Component }) {
 }
 
 /** Compact list of optional components: status, where it came from, licence, and who needs it. */
-export function ComponentsCard({ className, bare }: { className?: string; bare?: boolean }) {
+export function ComponentsCard({
+  className,
+  bare,
+  detailed,
+  kind,
+}: {
+  className?: string
+  bare?: boolean
+  /** Also show description, program path, connected servers and the release that would be installed. */
+  detailed?: boolean
+  /** Only components of this kind. */
+  kind?: string
+}) {
   const q = useComponents()
-  const list = q.data?.components ?? []
+  const list = (q.data?.components ?? []).filter((c) => !kind || componentKind(c) === kind)
   if (!q.isLoading && !q.isError && list.length === 0) return null
   const body = q.isLoading ? (
     <Skeleton className="h-10 w-full" />
@@ -339,7 +442,7 @@ export function ComponentsCard({ className, bare }: { className?: string; bare?:
     <>
       <ul className="divide-y divide-border">
         {list.map((c) => (
-          <ComponentRow key={c.id} c={c} />
+          <ComponentRow key={c.id} c={c} detailed={detailed} />
         ))}
       </ul>
       {isDemo && (
@@ -353,7 +456,7 @@ export function ComponentsCard({ className, bare }: { className?: string; bare?:
   return (
     <Panel
       title="Optional components"
-      description="Not shipped with bolo; some voices need them"
+      description="Not shipped with bolo; some models need them"
       className={className}
       bodyClassName="py-1.5"
       data-testid="components-card"

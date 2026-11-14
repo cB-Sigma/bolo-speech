@@ -12,7 +12,31 @@ import type { CatalogModel } from '@/lib/api/types'
 import { fmtBytes, languageName } from '@/lib/format'
 import { supportsLanguage } from '@/lib/languages'
 import { cn } from '@/lib/utils'
+import { hardwareLabel, runtimeLabel } from '@/lib/capabilities'
 import { languageSummary, TIER_LABEL, TIERS } from './model-bits'
+
+const GROUP_ORDER = [
+  'Built-in voices',
+  'Orpheus family (llama.cpp)',
+  'llama.cpp voices',
+  'audio.cpp voices',
+  'Engine plugin voices',
+]
+
+function groups(models: CatalogModel[], groupBy?: (m: CatalogModel) => string) {
+  if (!groupBy) return TIERS.map((t) => ({ key: t, label: TIER_LABEL[t], models: models.filter((m) => m.tier === t) }))
+  const order: string[] = []
+  for (const m of models) {
+    const g = groupBy(m)
+    if (!order.includes(g)) order.push(g)
+  }
+  const rank = (g: string) => {
+    const i = GROUP_ORDER.indexOf(g)
+    return i < 0 ? GROUP_ORDER.length : i
+  }
+  order.sort((a, b) => rank(a) - rank(b))
+  return order.map((g) => ({ key: g, label: g, models: models.filter((m) => groupBy(m) === g) }))
+}
 
 /** Model select grouped by tier, showing size, languages and whether it is loaded. */
 export function ModelPicker({
@@ -25,6 +49,7 @@ export function ModelPicker({
   className,
   label = 'Model',
   language,
+  groupBy,
 }: {
   models: CatalogModel[]
   value: string | null
@@ -36,6 +61,8 @@ export function ModelPicker({
   label?: string
   /** When set (and not `auto`), only models that cover this language are offered. */
   language?: string
+  /** Group by this label instead of by tier (e.g. voice family); groups keep the order of first appearance. */
+  groupBy?: (m: CatalogModel) => string
 }) {
   if (loading) return <Skeleton className={cn('h-8 w-56', className)} />
   // Catalogs run to hundreds of entries; the picker offers what can be used now.
@@ -62,12 +89,11 @@ export function ModelPicker({
         align="start"
         className="max-h-[min(28rem,var(--radix-select-content-available-height))] min-w-80"
       >
-        {TIERS.map((tier) => {
-          const group = shown.filter((m) => m.tier === tier)
+        {groups(shown, groupBy).map(({ key, label: heading, models: group }) => {
           if (group.length === 0) return null
           return (
-            <SelectGroup key={tier}>
-              <SelectLabel className="eyebrow">{TIER_LABEL[tier]}</SelectLabel>
+            <SelectGroup key={key}>
+              <SelectLabel className="eyebrow">{heading}</SelectLabel>
               {group.map((m) => (
                 <SelectItem key={m.id} value={m.id} textValue={m.id} disabled={!m.installed} className="py-1.5">
                   <span className="flex w-full min-w-0 items-center gap-2">
@@ -81,6 +107,8 @@ export function ModelPicker({
                     <span className="truncate num text-[13px]">{m.id}</span>
                     <span className="ml-auto shrink-0 pl-3 text-xs text-muted-foreground [[data-slot=select-trigger]_&]:hidden">
                       {languageSummary(m.languages, 2)} · {fmtBytes(m.size_bytes)}
+                      {runtimeLabel(m) ? ` · ${runtimeLabel(m)}` : ''}
+                      {m.hardware && m.hardware.gpu !== 'optional' ? ` · ${hardwareLabel(m.hardware)}` : ''}
                       {m.available === false
                         ? ' · needs a component'
                         : m.loaded

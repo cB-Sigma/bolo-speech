@@ -235,6 +235,15 @@
   animation: bolo-pulse 1.6s ease-in-out infinite;
 }
 
+/* Overlapping speech: diagonal stripes over the speaker colour, so it never relies on colour alone. */
+@utility speaker-overlap {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 3px,
+    color-mix(in oklab, var(--background) 70%, transparent) 3px 5px
+  );
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

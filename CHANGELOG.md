@@ -27,6 +27,10 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   `<say-as>` (characters, cardinal, ordinal, digits/telephone, date with format), `<break>`,
   `<p>`, `<s>`, `<lang>`, `<emphasis>`, `<prosody>`. `WS /api/v1/tts/stream` takes `normalize` and
   `wordlists` query parameters.
+- Console: a Word lists screen (editor, import, and a preview of what each voice receives; shown
+  when the server has word lists), a Conversation screen for talking to a voice agent and picking
+  its pipeline, a Components screen for optional software, per-model settings, voice cloning on
+  the text-to-speech screen and speaker results on the speech-to-text screen.
 
 - **Orpheus-family voices without PyTorch** (kind `orpheus-llamacpp` of the
   `tts-server` engine, `bolo/engines/orpheus_llamacpp.py`): llama.cpp's

@@ -1,6 +1,6 @@
 /** Types for the bolo native API (`/api/v1`). Field names mirror the wire format. */
 
-export type Task = 'stt' | 'tts' | 'vad' | 'diarization' | 'translation'
+export type Task = 'stt' | 'tts' | 'vad' | 'diarization' | 'translation' | 'separation' | 'turn'
 export type Tier = 'realtime' | 'balanced' | 'accuracy'
 export type Validated = 'cpu' | 'untested'
 
@@ -20,6 +20,52 @@ export interface ServerInfo {
   platform: string
   auth_required: boolean
   data_dir: string
+  /** Newer servers only. */
+  defaults?: Partial<Record<'stt' | 'realtime_stt' | 'tts' | 'realtime_tts' | 'vad', string>>
+  components?: Component[]
+  capabilities?: Capabilities
+}
+
+/** `info.capabilities`: what the server can do beyond plain STT/TTS. Every part is optional (older servers). */
+export interface Capabilities {
+  diarization?: {
+    available?: boolean
+    installed?: boolean
+    default_model?: string | null
+    speaker_conditioned_models?: string[]
+    [k: string]: unknown
+  }
+  separation?: {
+    available?: boolean
+    installed?: boolean
+    default_model?: string | null
+    languages?: string[]
+    min_sample_rate?: number
+    context_s?: number
+    min_overlap_s?: number
+    [k: string]: unknown
+  }
+  realtime?: {
+    endpoint?: string
+    transcription_sessions?: boolean
+    conversation_sessions?: boolean
+    pipeline?: string
+    pipelines?: Record<string, RealtimePipelineInfo | undefined>
+    [k: string]: unknown
+  }
+  llm?: { configured?: boolean; base_url?: string | null; model?: string | null }
+  [k: string]: unknown
+}
+
+export interface RealtimePipelineInfo {
+  available?: boolean
+  configured?: boolean
+  base_url?: string | null
+  model?: string | null
+  url?: string | null
+  backend?: string
+  managed?: boolean
+  process?: unknown
 }
 
 export interface Voice {
@@ -27,6 +73,23 @@ export interface Voice {
   name: string
   language: string
   gender?: string | null
+  /** Kokoro-style multi-language models carry the phonemiser choices per voice. */
+  phonemizers?: PhonemizerChoice[]
+}
+
+/** One way of turning text into phonemes for a voice (`uccharan`, `uccharan:improved`, `espeak-ng`). */
+export interface PhonemizerChoice {
+  id: string
+  available: boolean
+  default: boolean
+  note?: string | null
+}
+
+/** GPU advice for a model; null means it runs fine on a CPU. */
+export interface Hardware {
+  gpu: 'optional' | 'recommended' | 'required' | string
+  vram_gb?: number | null
+  note?: string | null
 }
 
 export interface PullState {
@@ -65,6 +128,13 @@ export interface CatalogModel {
   requires?: string[]
   /** False when a required component is not installed; absent on older servers (treated as true). */
   available?: boolean
+  /** Phonemiser choices for voices that read phonemes (`[]` otherwise). */
+  phonemizers?: PhonemizerChoice[]
+  /** Settings the user pinned for this model, e.g. `{"phonemizer": "espeak-ng"}`. */
+  settings?: Record<string, unknown>
+  /** `pending`: described but its files are not published yet. */
+  status?: 'pending' | string | null
+  hardware?: Hardware | null
   /** Live demo only: where this entry can run. */
   runtime?: 'browser' | 'server'
 }
@@ -128,6 +198,22 @@ export interface Phase {
 }
 
 export interface RequestTrace {
+  /** Extra fields some traces carry (diarization, separation, voice agents, …). */
+  diarization_model?: string
+  speakers?: number
+  separation?: string
+  separation_model?: string
+  separation_windows?: number
+  separation_ms?: number
+  pipeline?: string
+  first_token_ms?: number
+  overlapped_speech_s?: number
+  /** TTS: which normaliser ran, the text the voice received (first 500 characters), and word-list matches. */
+  normalizer?: string
+  normalized_text?: string
+  pronunciations_applied?: AppliedPronunciation[]
+  speakers_before_consolidation?: number
+  conditioning?: unknown
   id: string
   kind: 'stt' | 'tts' | string
   transport: string
@@ -188,12 +274,20 @@ export interface Component {
   source: 'system-executable' | 'python-package' | 'configured' | string | null
   version: string | null
   license: string
-  license_url: string
+  license_url: string | null
   required_by_count: number
   installable: boolean
   install_blocked_reason: string | null
   manual_command: string
   description: string
+  /** Newer servers: `phonemizer`, `tts-server` or `engine-plugin`. */
+  kind?: 'phonemizer' | 'tts-server' | 'engine-plugin' | string
+  /** uccharan: the languages it covers. */
+  languages?: string[]
+  /** tts-server components: binary in use, configured server URLs, pinned upstream release. */
+  path?: string | null
+  servers?: string[]
+  release?: { version: string; url: string; sha256: string } | null
 }
 
 /** Server-sent events on `/api/v1/events`. */
@@ -202,9 +296,10 @@ export type ServerEvent =
   | ({ type: 'request' } & RequestTrace)
   | { type: 'request_progress'; id: string; phase?: string; [k: string]: unknown }
   | ({ type: 'job' } & Job)
-  | { type: 'model'; id: string; event: 'loaded' | 'unloaded' | 'installed' | 'removed' }
+  | { type: 'model'; id: string; event: 'loaded' | 'unloaded' | 'installed' | 'removed' | 'settings' }
   | { type: 'component'; id: string; event: 'installed' | 'removed' | string }
   | { type: 'log'; level: string; message: string }
+  | { type: 'wordlist'; name: string; event: 'updated' | 'deleted' | string }
 
 /** Messages on the STT websocket (server → client). */
 export interface SttWord {
@@ -262,4 +357,64 @@ export interface TtsStreamParams {
   voice?: string
   format?: 'pcm_s16le'
   sample_rate?: number
+}
+
+/** Pronunciation word lists (`/api/v1/wordlists`). */
+export interface WordListSummary {
+  name: string
+  entries: number
+  languages: string[]
+  bytes: number
+  updated: string
+}
+
+export type WordMatch = 'word' | 'case' | 'exact' | 'regex'
+
+export interface WordEntry {
+  word: string
+  lang: string
+  ipa: string | null
+  say: string | null
+  match: WordMatch | string
+  note: string | null
+  line?: number
+}
+
+export interface WordList extends Omit<WordListSummary, 'entries'> {
+  entries: WordEntry[]
+}
+
+export interface WordListPutResult extends WordListSummary {
+  warnings: { line: number; message: string }[]
+}
+
+/** How a voice takes text (`GET /api/v1/text-input/{model}`). */
+export interface TextInput {
+  reads: 'phonemes' | 'text' | 'characters' | string
+  normalizer: string
+  markup: string
+  latin: string
+  respell: string
+  digits: string
+  wordlists: string[]
+  pronunciation: 'phonemes' | 'markup' | 'respelling' | string
+}
+
+/** One word-list match in a preview or a trace. */
+export interface AppliedPronunciation {
+  text: string
+  word?: string
+  spoken?: string
+  ipa?: string
+}
+
+export interface WordListPreview {
+  model: string
+  voice: string | null
+  language: string
+  text_input: TextInput
+  normalizer: string
+  text: string
+  applied: AppliedPronunciation[]
+  phonemes?: string | null
 }

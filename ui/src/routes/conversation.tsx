@@ -1,0 +1,206 @@
+import { Info, MessagesSquare, Mic, MicOff, PhoneOff } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { PipelinePicker } from '@/components/conversation/pipeline-picker'
+import { NeedsServer } from '@/components/demo'
+import { Page } from '@/components/layout/app-shell'
+import { Empty, Panel } from '@/components/panel'
+import { MicHelpPanel } from '@/components/stt/mic-help'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useComponents, useInfo } from '@/hooks/use-api'
+import { useStore } from '@/hooks/use-store'
+import { useSupport } from '@/hooks/use-support'
+import { isDemo } from '@/lib/api/config'
+import { defaultPipeline, hasPipelines, pipelineOptions, type PipelineId } from '@/lib/capabilities'
+import { fmtMs } from '@/lib/format'
+import { ConversationSession, emptyConversation, type ConversationState } from '@/lib/realtime/session'
+import { Store } from '@/lib/store'
+import { cn } from '@/lib/utils'
+
+const idle = new Store<ConversationState>(emptyConversation())
+
+const STATUS: Record<ConversationState['status'], string> = {
+  idle: 'Not started',
+  starting: 'Connecting',
+  live: 'Live',
+  ended: 'Ended',
+  error: 'Stopped by an error',
+}
+
+export default function ConversationPage() {
+  const info = useInfo()
+  const components = useComponents().data?.components
+  const support = useSupport()
+  const options = useMemo(() => pipelineOptions(info.data, components ?? []), [info.data, components])
+  const [chosen, setChosen] = useState<PipelineId | null>(null)
+  const pipeline = chosen ?? defaultPipeline(info.data, options)
+  const [session, setSession] = useState<ConversationSession | null>(null)
+  const state = useStore(session?.store ?? idle)
+  const active = state.status === 'starting' || state.status === 'live'
+  const selected = options.find((o) => o.id === pipeline)
+  const micBlocked = !support.getUserMedia || !support.audioWorklet || !support.secureContext
+
+  useEffect(() => () => void session?.stop(), [session])
+
+  const start = () => {
+    // Everything that needs the tap happens inside start(): the microphone prompt first.
+    const s = new ConversationSession(pipeline)
+    void s.start()
+    setSession(s)
+  }
+
+  if (isDemo) {
+    return (
+      <Page title="Conversation">
+        <NeedsServer title="Voice conversations need a bolo server">
+          A conversation sends your voice to a speech server, which hears you, asks a language model (or a
+          speech-to-speech model) for an answer and speaks it back. This demo runs in your browser only.
+        </NeedsServer>
+      </Page>
+    )
+  }
+
+  const known = hasPipelines(info.data)
+  const noneAvailable = !options.some((o) => o.available)
+
+  return (
+    <Page title="Conversation">
+      {info.isLoading ? (
+        <Skeleton className="mb-4 h-32 rounded-xl" />
+      ) : (
+        <Panel
+          className="mb-4"
+          title="Pipeline"
+          description={
+            known
+              ? 'What answers you. Sent as session.pipeline before any audio, then fixed for the conversation.'
+              : 'This server does not report pipelines; it uses its configured one.'
+          }
+        >
+          <PipelinePicker options={options} value={pipeline} onChange={setChosen} locked={active} />
+        </Panel>
+      )}
+
+      {noneAvailable && !info.isLoading && (
+        <Alert className="mb-4">
+          <Info />
+          <AlertTitle>No pipeline is set up on this server</AlertTitle>
+          <AlertDescription>
+            Connect a language model (setting llm_base_url, or bolo serve --llm-base-url …) for the cascade, an
+            audio-understanding model for audio-llm, or a speech-to-speech model (s2s_model with llama-server, or
+            s2s_server_url). See docs/voice-agents.md, &quot;Pipelines&quot;.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {state.mic && (
+        <MicHelpPanel className="mb-4" failure={state.mic} onRetry={start} onDismiss={() => setSession(null)} />
+      )}
+      {state.error && !state.mic && (
+        <Alert className="mb-4" variant="destructive" data-testid="conversation-error">
+          <Info />
+          <AlertTitle>{state.errorCode === 'engine_unavailable' ? 'The model is not reachable' : 'Error'}</AlertTitle>
+          <AlertDescription>{state.error}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+        <Panel
+          title="Conversation"
+          description={`${STATUS[state.status]}${state.serverPipeline ? ` · pipeline ${state.serverPipeline}` : ''}`}
+          actions={
+            active ? (
+              <Button variant="destructive" size="sm" onClick={() => void session?.stop()} data-testid="end-call">
+                <PhoneOff /> End
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={start}
+                disabled={micBlocked || !selected?.available}
+                title={
+                  micBlocked
+                    ? 'This browser cannot capture the microphone here'
+                    : !selected?.available
+                      ? (selected?.reason ?? undefined)
+                      : undefined
+                }
+                data-testid="start-call"
+              >
+                <Mic /> Start talking
+              </Button>
+            )
+          }
+        >
+          <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground" aria-live="polite">
+            <Indicator on={state.userSpeaking} label="You are speaking" idleLabel="You: quiet" />
+            <Indicator on={state.agentSpeaking} label="Agent is speaking" idleLabel="Agent: quiet" />
+            {micBlocked && (
+              <span className="inline-flex items-center gap-1 text-warning-text">
+                <MicOff className="size-3.5" aria-hidden /> Microphone capture is unavailable here (HTTPS or localhost
+                needed)
+              </span>
+            )}
+          </div>
+          {state.turns.length === 0 ? (
+            <Empty icon={MessagesSquare} title={active ? 'Listening' : 'Nothing said yet'} className="py-8">
+              {active
+                ? 'Say something. Your words and the answer appear here as they are recognised and spoken.'
+                : 'Pick a pipeline and press Start talking. The browser asks for the microphone when you press it.'}
+            </Empty>
+          ) : (
+            <ol className="grid gap-2" data-testid="turns">
+              {state.turns.map((t) => (
+                <li
+                  key={`${t.role}-${t.id}`}
+                  className={cn(
+                    'max-w-[85%] rounded-lg border px-3 py-2 text-[14px] leading-6',
+                    t.role === 'user'
+                      ? 'justify-self-end border-chart-1/30 bg-chart-1/10'
+                      : 'border-border bg-muted/40',
+                  )}
+                >
+                  <div className="mb-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <span className="font-medium">{t.role === 'user' ? 'You' : 'Agent'}</span>
+                    {t.firstAudioMs != null && <span className="num">first audio {fmtMs(t.firstAudioMs)}</span>}
+                    {t.status && <span className="text-warning-text">{t.status}</span>}
+                  </div>
+                  <span className={cn(!t.final && 'text-muted-foreground')}>{t.text || '…'}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Panel>
+
+        <Panel title="About the pipelines" bodyClassName="grid gap-2.5 text-[13px] leading-5 text-muted-foreground">
+          <p>
+            <span className="text-foreground">Cascade</span> is speech to text, your language model, then text to
+            speech. Every step is visible on the Latency screen.
+          </p>
+          <p>
+            <span className="text-foreground">Audio LLM</span> lets a model that understands audio hear your turn
+            itself, so it can pick up tone; bolo still speaks the answer.
+          </p>
+          <p>
+            <span className="text-foreground">Speech to speech</span> hands the whole turn to a model that answers in
+            its own voice. bolo keeps turn detection, interruptions and the transcripts.
+          </p>
+          <p>
+            Interrupt the agent by talking: its audio stops at once. The server default is{' '}
+            <span className="num text-foreground">{info.data?.capabilities?.realtime?.pipeline ?? 'cascade'}</span>.
+          </p>
+        </Panel>
+      </div>
+    </Page>
+  )
+}
+
+function Indicator({ on, label, idleLabel }: { on: boolean; label: string; idleLabel: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span aria-hidden className={cn('size-2 rounded-full', on ? 'live-dot bg-chart-1' : 'bg-chart-mute')} />
+      {on ? label : idleLabel}
+    </span>
+  )
+}

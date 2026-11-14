@@ -1,4 +1,20 @@
-import { Activity, AudioLines, Boxes, Gauge, Mic, Plug, type LucideIcon } from 'lucide-react'
+import {
+  Activity,
+  AudioLines,
+  BookA,
+  Boxes,
+  Gauge,
+  MessagesSquare,
+  Mic,
+  Plug,
+  Puzzle,
+  type LucideIcon,
+} from 'lucide-react'
+
+/** Server features some screens depend on. */
+export interface NavFeatures {
+  wordLists: boolean
+}
 
 export interface NavItem {
   to: string
@@ -7,6 +23,8 @@ export interface NavItem {
   description: string
   icon: LucideIcon
   group: 'Playground' | 'Server'
+  /** Shown only when this returns true for the server's info (features newer servers add). */
+  when?: (features: NavFeatures) => boolean
 }
 
 export const NAV: NavItem[] = [
@@ -58,4 +76,35 @@ export const NAV: NavItem[] = [
     icon: Plug,
     group: 'Server',
   },
+  // Newer screens go last so the existing `g` + digit shortcuts keep their numbers.
+  {
+    to: '/conversation',
+    label: 'Conversation',
+    short: 'Talk',
+    description: 'Talk to a voice agent and pick its pipeline',
+    icon: MessagesSquare,
+    group: 'Playground',
+  },
+  {
+    to: '/components',
+    label: 'Components',
+    short: 'Components',
+    description: 'Optional software some models need',
+    icon: Puzzle,
+    group: 'Server',
+  },
+  {
+    to: '/wordlists',
+    label: 'Word lists',
+    short: 'Words',
+    description: 'How voices pronounce names and terms',
+    icon: BookA,
+    group: 'Playground',
+    when: (f) => f.wordLists,
+  },
 ]
+
+/** The screens this server offers, in NAV order. */
+export function visibleNav(features: NavFeatures): NavItem[] {
+  return NAV.filter((n) => !n.when || n.when(features))
+}

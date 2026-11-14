@@ -16,7 +16,9 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Page } from '@/components/layout/app-shell'
 import {
+  AvailabilityMark,
   GatedMark,
+  HardwareMark,
   languageSummary,
   StateDot,
   TIER_LABEL,
@@ -50,7 +52,14 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { ComponentNotice, ComponentsCard, NeedsComponentMark } from '@/components/component-install'
+import {
+  ComponentInstallButton,
+  ComponentNotice,
+  ComponentsCard,
+  NeedsComponentMark,
+} from '@/components/component-install'
+import { ModelSettingsSection } from '@/components/model-settings'
+import { isCpuFriendly, isNotImplemented, isPending, PHONEMIZER_LABEL, runtimeLabel } from '@/lib/capabilities'
 import { describeError, missingComponent, useCatalog, useComponents, useLive, useModelActions } from '@/hooks/use-api'
 import { useStore } from '@/hooks/use-store'
 import type { CatalogModel, ModelStats, Task } from '@/lib/api/types'
@@ -66,6 +75,8 @@ const TASK_LABEL: Record<Task, string> = {
   tts: 'Text to speech',
   vad: 'Voice activity',
   diarization: 'Diarization',
+  separation: 'Overlapped speech separation',
+  turn: 'End of turn',
   translation: 'Translation',
 }
 const TASK_SHORT: Record<Task, string> = {
@@ -73,12 +84,32 @@ const TASK_SHORT: Record<Task, string> = {
   tts: 'TTS',
   vad: 'VAD',
   diarization: 'Diarization',
+  separation: 'Separation',
+  turn: 'Turn',
   translation: 'Translation',
 }
+const TASK_ORDER: Task[] = ['stt', 'tts', 'vad', 'diarization', 'separation', 'turn', 'translation']
+
 /** "Needs eSpeak NG" for a model whose optional component is not installed; nothing otherwise. */
 function UnmetMark({ m }: { m: CatalogModel }) {
   const missing = missingComponent(m, useComponents().data?.components)
   return missing ? <NeedsComponentMark name={missing.name} /> : null
+}
+
+/** A row under a card: what the model still needs, with an install button when the server can install it. */
+function UnmetRow({ m }: { m: CatalogModel }) {
+  const missing = missingComponent(m, useComponents().data?.components)
+  if (!missing || isDemo) return null
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-2">
+      <NeedsComponentMark name={missing.name} />
+      {missing.installable ? (
+        <ComponentInstallButton component={missing} label={`Install ${missing.id}`} className="h-7" />
+      ) : (
+        <span className="text-xs text-muted-foreground">see Components</span>
+      )}
+    </div>
+  )
 }
 
 function UnmetNotice({ m }: { m: CatalogModel }) {
@@ -109,6 +140,13 @@ function ModelActions({
     return (
       <span className="text-xs text-muted-foreground" title={SERVER_ONLY_HINT}>
         Needs the server
+      </span>
+    )
+  }
+  if (!m.installed && (isPending(m) || isNotImplemented(m))) {
+    return (
+      <span className="text-xs text-muted-foreground" title="This model cannot be pulled yet">
+        {isPending(m) ? 'Files not published' : 'Cannot run yet'}
       </span>
     )
   }
@@ -224,7 +262,7 @@ function ModelCard({
           <div className="min-w-0">
             <div className="truncate num text-sm font-medium">{m.id}</div>
             <div className="mt-0.5 truncate text-xs text-muted-foreground">
-              {m.family} · {TASK_SHORT[m.task]} · {m.engine}
+              {m.family} · {TASK_SHORT[m.task] ?? m.task} · {runtimeLabel(m) ?? m.engine}
             </div>
           </div>
           <TierBadge tier={m.tier} className="shrink-0" />
@@ -245,11 +283,13 @@ function ModelCard({
           </dd>
         </dl>
         <div className="mt-3 flex w-full flex-wrap items-center gap-x-3 gap-y-1">
+          <AvailabilityMark model={m} />
           <ValidatedMark validated={m.validated} />
           {m.gated && <GatedMark />}
-          <UnmetMark m={m} />
+          <HardwareMark hardware={m.hardware} />
         </div>
       </button>
+      <UnmetRow m={m} />
       {m.loaded && stats && stats.memory_bytes > 0 && (
         <div className="px-4 pb-3">
           <MemoryBar bytes={stats.memory_bytes} max={maxMem} />
@@ -280,14 +320,16 @@ function Details({ m, stats, onClose }: { m: CatalogModel | null; stats?: ModelS
             <SheetHeader className="border-b border-border">
               <SheetTitle className="num text-base">{m.id}</SheetTitle>
               <SheetDescription>
-                {m.family} · {TASK_LABEL[m.task]}
+                {m.family} · {TASK_LABEL[m.task] ?? m.task}
               </SheetDescription>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <TierBadge tier={m.tier} />
                 <StateDot model={m} />
+                <AvailabilityMark model={m} />
                 <ValidatedMark validated={m.validated} />
                 <UnmetMark m={m} />
                 {m.gated && <GatedMark />}
+                <HardwareMark hardware={m.hardware} />
               </div>
             </SheetHeader>
             <div className="grid gap-5 p-4 text-sm">
@@ -345,6 +387,10 @@ function Details({ m, stats, onClose }: { m: CatalogModel | null; stats?: ModelS
                 )}
               </section>
 
+              {m.task === 'tts' && !isDemo && (
+                <ModelSettingsSection key={`${m.id}:${JSON.stringify(m.settings ?? {})}`} m={m} />
+              )}
+
               {m.measured && Object.keys(m.measured).length > 0 && (
                 <section>
                   <h3 className="mb-2 eyebrow">Measured by the maintainers</h3>
@@ -377,7 +423,66 @@ function Details({ m, stats, onClose }: { m: CatalogModel | null; stats?: ModelS
                   <dt className="text-muted-foreground">Streaming</dt>
                   <dd className="text-right">{m.streaming ? 'Yes' : 'No'}</dd>
                   <dt className="text-muted-foreground">Licence</dt>
-                  <dd className="text-right">{m.license}</dd>
+                  <dd className="text-right">
+                    {m.license_url ? (
+                      <a href={m.license_url} target="_blank" rel="noreferrer" className="text-link underline">
+                        {m.license}
+                      </a>
+                    ) : (
+                      m.license
+                    )}
+                  </dd>
+                  <dt className="text-muted-foreground">Commercial use</dt>
+                  <dd className="text-right">
+                    {m.commercial_use == null ? (
+                      'not stated'
+                    ) : m.commercial_use ? (
+                      'Allowed'
+                    ) : (
+                      <span className="text-warning-text">Not allowed</span>
+                    )}
+                  </dd>
+                  <dt className="text-muted-foreground">Gated</dt>
+                  <dd className="text-right">{m.gated ? 'Yes: accept the terms, set HF_TOKEN' : 'No'}</dd>
+                  <dt className="text-muted-foreground">Hardware</dt>
+                  <dd className="text-right">
+                    {m.hardware ? (
+                      <>
+                        {m.hardware.gpu === 'optional' ? 'GPU optional' : `GPU ${m.hardware.gpu}`}
+                        {m.hardware.vram_gb != null && <span className="num">, ~{m.hardware.vram_gb} GB</span>}
+                        {m.hardware.note && (
+                          <span className="block text-xs text-muted-foreground">{m.hardware.note}</span>
+                        )}
+                      </>
+                    ) : (
+                      'Runs on a CPU'
+                    )}
+                  </dd>
+                  {(m.requires?.length ?? 0) > 0 && (
+                    <>
+                      <dt className="text-muted-foreground">Needs</dt>
+                      <dd className="text-right num">{m.requires?.join(', ')}</dd>
+                    </>
+                  )}
+                  {m.status && (
+                    <>
+                      <dt className="text-muted-foreground">Status</dt>
+                      <dd className="text-right">{isPending(m) ? 'Files not published yet' : m.status}</dd>
+                    </>
+                  )}
+                  {(m.phonemizers?.length ?? 0) > 0 && (
+                    <>
+                      <dt className="text-muted-foreground">Phonemisers</dt>
+                      <dd className="text-right">
+                        {m.phonemizers
+                          ?.map(
+                            (p) =>
+                              `${PHONEMIZER_LABEL[p.id] ?? p.id}${p.default ? ' (default)' : ''}${p.available ? '' : ' (not installed)'}`,
+                          )
+                          .join(', ')}
+                      </dd>
+                    </>
+                  )}
                   {m.aliases.length > 0 && (
                     <>
                       <dt className="text-muted-foreground">Aliases</dt>
@@ -489,6 +594,8 @@ export default function ModelsPage() {
   const [family, setFamily] = useState(ANY)
   const [installedOnly, setInstalledOnly] = useState(false)
   const [noExtras, setNoExtras] = useState(false)
+  const [commercialOnly, setCommercialOnly] = useState(false)
+  const [cpuOnly, setCpuOnly] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   const [toDelete, setToDelete] = useState<CatalogModel | null>(null)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
@@ -508,7 +615,18 @@ export default function ModelsPage() {
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    const rank = (m: CatalogModel) => (m.loaded ? 0 : m.pulling ? 1 : m.installed ? 2 : m.validated === 'cpu' ? 3 : 4)
+    const rank = (m: CatalogModel) =>
+      m.loaded
+        ? 0
+        : m.pulling
+          ? 1
+          : m.installed
+            ? 2
+            : isPending(m) || isNotImplemented(m)
+              ? 5
+              : m.validated === 'cpu'
+                ? 3
+                : 4
     return all
       .filter(
         (m) =>
@@ -519,11 +637,13 @@ export default function ModelsPage() {
           (family === ANY || m.family === family) &&
           (!installedOnly || m.installed) &&
           (!noExtras || !(m.requires?.length ?? 0)) &&
+          (!commercialOnly || m.commercial_use !== false) &&
+          (!cpuOnly || isCpuFriendly(m)) &&
           (!needle ||
             `${m.id} ${m.aliases.join(' ')} ${m.family} ${m.description} ${m.engine}`.toLowerCase().includes(needle)),
       )
       .sort((a, b) => rank(a) - rank(b) || a.family.localeCompare(b.family) || a.id.localeCompare(b.id))
-  }, [all, q, task, tier, lang, license, family, installedOnly, noExtras])
+  }, [all, q, task, tier, lang, license, family, installedOnly, noExtras, commercialOnly, cpuOnly])
 
   const filtersActive =
     q !== '' ||
@@ -533,7 +653,9 @@ export default function ModelsPage() {
     license !== ANY ||
     family !== ANY ||
     installedOnly ||
-    noExtras
+    noExtras ||
+    commercialOnly ||
+    cpuOnly
   const reset = () => {
     setQ('')
     setTask('all')
@@ -543,6 +665,8 @@ export default function ModelsPage() {
     setFamily(ANY)
     setInstalledOnly(false)
     setNoExtras(false)
+    setCommercialOnly(false)
+    setCpuOnly(false)
   }
   const open = all.find((m) => m.id === openId) ?? null
   const installed = all.filter((m) => m.installed)
@@ -560,7 +684,7 @@ export default function ModelsPage() {
           },
         ]
       : []),
-    ...(['stt', 'tts', 'vad', 'diarization', 'translation'] as Task[]).map((t) => ({
+    ...TASK_ORDER.map((t) => ({
       task: t,
       label: TASK_LABEL[t],
       note: isDemo ? 'available when you run the server' : undefined,
@@ -616,7 +740,7 @@ export default function ModelsPage() {
         </ToggleGroupItem>
         {options.tasks.map((t) => (
           <ToggleGroupItem key={t} value={t} className="px-2.5 text-xs">
-            {TASK_SHORT[t]}
+            {TASK_SHORT[t] ?? t}
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
@@ -661,6 +785,25 @@ export default function ModelsPage() {
       >
         No extra components
         <Switch checked={noExtras} onCheckedChange={setNoExtras} size="sm" />
+      </label>
+      <label
+        className="flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-input px-2.5 text-xs dark:bg-input/30"
+        title="Hide models whose licence does not allow commercial use"
+      >
+        Commercial use
+        <Switch
+          checked={commercialOnly}
+          onCheckedChange={setCommercialOnly}
+          size="sm"
+          data-testid="filter-commercial"
+        />
+      </label>
+      <label
+        className="flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-input px-2.5 text-xs dark:bg-input/30"
+        title="Hide models that need or are much faster with a GPU"
+      >
+        CPU-friendly
+        <Switch checked={cpuOnly} onCheckedChange={setCpuOnly} size="sm" data-testid="filter-cpu" />
       </label>
       {filtersActive && (
         <Button variant="ghost" size="sm" onClick={reset}>
@@ -819,7 +962,7 @@ export default function ModelsPage() {
                       </button>
                       <div className="text-xs text-muted-foreground">{m.family}</div>
                     </TableCell>
-                    <TableCell className="text-xs">{TASK_SHORT[m.task]}</TableCell>
+                    <TableCell className="text-xs">{TASK_SHORT[m.task] ?? m.task}</TableCell>
                     <TableCell>
                       <TierBadge tier={m.tier} />
                     </TableCell>
@@ -828,12 +971,15 @@ export default function ModelsPage() {
                     <TableCell className="text-xs">
                       <span className="flex items-center gap-2">
                         {m.license}
+                        {m.commercial_use === false && <span className="text-warning-text">non-commercial</span>}
                         {m.gated && <GatedMark />}
                       </span>
                     </TableCell>
                     <TableCell>
                       <span className="flex flex-col gap-0.5">
+                        <AvailabilityMark model={m} />
                         <ValidatedMark validated={m.validated} />
+                        <HardwareMark hardware={m.hardware} />
                         <UnmetMark m={m} />
                       </span>
                     </TableCell>

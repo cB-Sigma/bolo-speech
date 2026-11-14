@@ -11,6 +11,9 @@ const ModelsPage = lazy(() => import('./routes/models'))
 const LatencyPage = lazy(() => import('./routes/latency'))
 const BenchmarkPage = lazy(() => import('./routes/benchmark'))
 const ConnectPage = lazy(() => import('./routes/connect'))
+const ConversationPage = lazy(() => import('./routes/conversation'))
+const ComponentsPage = lazy(() => import('./routes/components'))
+const WordListsPage = lazy(() => import('./routes/wordlists'))
 
 function PageFallback() {
   return (
@@ -85,6 +88,30 @@ export function App() {
             element={
               <Suspense fallback={<PageFallback />}>
                 <ConnectPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="conversation"
+            element={
+              <Suspense fallback={<PageFallback />}>
+                <ConversationPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="components"
+            element={
+              <Suspense fallback={<PageFallback />}>
+                <ComponentsPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="wordlists"
+            element={
+              <Suspense fallback={<PageFallback />}>
+                <WordListsPage />
               </Suspense>
             }
           />

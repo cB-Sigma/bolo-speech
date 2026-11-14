@@ -109,6 +109,10 @@ export class LiveFeed {
         void this.queryClient?.invalidateQueries({ queryKey: ['catalog'] })
         this.store.patch({ lastEventAt: now })
         break
+      case 'wordlist':
+        void this.queryClient?.invalidateQueries({ queryKey: ['wordlists'] })
+        this.store.patch({ lastEventAt: now })
+        break
       case 'log':
         this.store.patch({
           logs: [{ t: now, level: ev.level, message: ev.message }, ...s.logs].slice(0, 200),

@@ -14,7 +14,16 @@ import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ComponentNotice } from '@/components/component-install'
-import { describeError, missingComponent, useComponents, useSamples, useSelectedModel } from '@/hooks/use-api'
+import {
+  describeError,
+  missingComponent,
+  useComponents,
+  useSamples,
+  useSelectedModel,
+  useWordLists,
+} from '@/hooks/use-api'
+import { WordListSelect } from '@/components/wordlists/wordlist-select'
+import { Switch } from '@/components/ui/switch'
 import { useStore } from '@/hooks/use-store'
 import type { Sample } from '@/lib/api/types'
 import { STT_RATE } from '@/lib/audio/capture'
@@ -32,6 +41,8 @@ import { RoundTripPanel, type RoundTrip } from '@/components/tts/round-trip'
 import { isDemo } from '@/lib/api/config'
 import { detectSupport } from '@/lib/support'
 import { BrowserTts } from './tts-browser'
+import { VoiceClonePanel, type CloneReference } from '@/components/tts/voice-clone'
+import { canClone, PHONEMIZER_LABEL, phonemizerChoices, voiceFamily } from '@/lib/capabilities'
 import { cn } from '@/lib/utils'
 
 const FALLBACK_TEXTS: Sample[] = [
@@ -86,6 +97,34 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
 
   const voices = useMemo(() => model?.voices ?? [], [model])
   const voice = voices.find((v) => v.id === p.ttsVoice) ?? voices[0] ?? null
+  // Per-request options. Empty means "the voice's own" (or what is pinned for it on the server).
+  const [language, setLanguage] = useState('')
+  const [phonemizer, setPhonemizer] = useState('')
+  const [cloning, setCloning] = useState(false)
+  const [reference, setReference] = useState<CloneReference | null>(null)
+  const [ssml, setSsml] = useState(false)
+  const [lists, setLists] = useState<string[]>([])
+  const wordLists = useWordLists()
+  const listNames = (wordLists.data?.wordlists ?? []).map((l) => l.name)
+  const chosenLists = lists.filter((n) => listNames.includes(n))
+  const languages = useMemo(() => (model?.languages ?? []).filter((l) => l !== 'multi'), [model])
+  const multilingual = languages.length > 1
+  const lang = multilingual && languages.includes(language) ? language : ''
+  const phonemizers = phonemizerChoices(model, voice)
+  const phon =
+    phonemizers.length && (phonemizer === 'auto' || phonemizers.some((c) => c.id === phonemizer)) ? phonemizer : ''
+  const pinned = typeof model?.settings?.phonemizer === 'string' ? model.settings.phonemizer : null
+  const clone = canClone(model) && cloning
+  const cloneReady = !clone || reference != null
+  const requestOptions = {
+    language: lang || undefined,
+    phonemizer: phon || undefined,
+    referenceAudio: clone ? reference?.dataUrl : undefined,
+    referenceText: clone ? reference?.text || undefined : undefined,
+    inputFormat: ssml ? ('ssml' as const) : undefined,
+    wordlists: chosenLists.length ? chosenLists : undefined,
+  }
+  const forcedHttp = clone || ssml
   const fromServer = (samples.data?.samples ?? []).filter((s) => s.kind === 'text')
   const texts = fromServer.length ? fromServer : FALLBACK_TEXTS
 
@@ -101,7 +140,7 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
   const speak = (): TtsSession | null => {
     if (!model || !text.trim()) return null
     void previewRef.current?.dispose()
-    const s = new TtsSession({ model: model.id, voice: voice?.id, text: text.trim(), transport })
+    const s = new TtsSession({ model: model.id, voice: voice?.id, text: text.trim(), transport, ...requestOptions })
     setSession(s)
     setTrip(null)
     s.start()
@@ -116,6 +155,9 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
       model: model.id,
       voice: voice.id,
       text: voice.language.startsWith('hi') ? `नमस्ते, मैं ${voice.name} हूँ।` : `Hello, this is ${voice.name}.`,
+      language: lang || undefined,
+      phonemizer: phon || undefined,
+      wordlists: chosenLists.length ? chosenLists : undefined,
     })
     previewRef.current = s
     s.start()
@@ -187,14 +229,15 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
         loading={isLoading}
         disabled={busy}
         className="w-52 max-sm:min-w-44 max-sm:flex-1"
+        groupBy={voiceFamily}
       />
       <div className="flex items-center gap-1">
         <Select
           value={voice?.id ?? undefined}
           onValueChange={(v) => setPref('ttsVoice', v)}
-          disabled={busy || voices.length === 0}
+          disabled={busy || voices.length === 0 || clone}
         >
-          <SelectTrigger className="h-8 w-48" aria-label="Voice">
+          <SelectTrigger className="h-8 w-48" aria-label="Voice" data-testid="voice-picker">
             <SelectValue placeholder={voices.length ? 'Voice' : 'Default voice'} />
           </SelectTrigger>
           <SelectContent position="popper" align="start" className="max-h-72">
@@ -224,15 +267,58 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
           <TooltipContent>Preview this voice</TooltipContent>
         </Tooltip>
       </div>
+      {multilingual && (
+        <Select value={lang || 'voice'} onValueChange={(v) => setLanguage(v === 'voice' ? '' : v)} disabled={busy}>
+          <SelectTrigger className="h-8 w-40" aria-label="Language" data-testid="tts-language">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent position="popper" align="start" className="max-h-72">
+            <SelectItem value="voice">Language: auto</SelectItem>
+            {languages.map((l) => (
+              <SelectItem key={l} value={l}>
+                {languageName(l)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+      {phonemizers.length > 0 && (
+        <Select
+          value={phon || 'default'}
+          onValueChange={(v) => setPhonemizer(v === 'default' ? '' : v)}
+          disabled={busy}
+        >
+          <SelectTrigger className="h-8 w-48" aria-label="Phonemiser" data-testid="phonemizer">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent position="popper" align="start" className="max-w-80">
+            <SelectItem value="default">
+              Phonemes: {pinned ? `pinned (${PHONEMIZER_LABEL[pinned] ?? pinned})` : 'default'}
+            </SelectItem>
+            <SelectItem value="auto">Phonemes: automatic</SelectItem>
+            {phonemizers.map((c) => (
+              <SelectItem key={c.id} value={c.id} disabled={!c.available}>
+                <span className="flex flex-col">
+                  <span>
+                    {PHONEMIZER_LABEL[c.id] ?? c.id}
+                    {c.default ? ' (default)' : ''}
+                  </span>
+                  {c.note && <span className="text-xs text-muted-foreground">{c.note}</span>}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
       {modeToggle && <div className="ml-auto">{modeToggle}</div>}
       <ToggleGroup
         type="single"
         variant="outline"
         size="sm"
-        value={transport}
+        value={forcedHttp ? 'http' : transport}
         onValueChange={(v) => v && setTransport(v as TtsTransport)}
         aria-label="Transport"
-        disabled={busy}
+        disabled={busy || forcedHttp}
         className={modeToggle ? undefined : 'ml-auto'}
       >
         <ToggleGroupItem value="websocket" className="px-3 text-xs">
@@ -282,6 +368,7 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
               placeholder="Type something to say…"
               className="min-h-32 resize-y text-[15px] leading-7"
               lang={/[ऀ-ॿ]/.test(text) ? 'hi' : undefined}
+              spellCheck={!ssml}
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !busy) speak()
               }}
@@ -307,6 +394,27 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
                 </Button>
               ))}
             </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <label className="flex h-8 items-center gap-2 rounded-lg border border-input px-2.5 text-xs dark:bg-input/30">
+                SSML
+                <Switch
+                  checked={ssml}
+                  onCheckedChange={setSsml}
+                  size="sm"
+                  disabled={busy}
+                  aria-label="The text is SSML"
+                  data-testid="tts-ssml"
+                />
+              </label>
+              {wordLists.offered && (
+                <WordListSelect names={listNames} value={chosenLists} onChange={setLists} disabled={busy} />
+              )}
+              {forcedHttp && (
+                <span className="text-xs text-muted-foreground">
+                  {ssml ? 'SSML' : 'A cloned voice'} is sent over chunked HTTP.
+                </span>
+              )}
+            </div>
             <div className="mt-4 flex flex-wrap items-center gap-2">
               {busy ? (
                 <Button
@@ -321,7 +429,7 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
                 <Button
                   onClick={speak}
                   className="h-9 min-w-24"
-                  disabled={!model?.installed || !text.trim() || blocked}
+                  disabled={!model?.installed || !text.trim() || blocked || !cloneReady}
                   data-testid="speak"
                 >
                   <Play className="fill-current" /> Speak
@@ -345,6 +453,16 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
               </span>
             </div>
           </Panel>
+
+          {canClone(model) && (
+            <VoiceClonePanel
+              enabled={cloning}
+              onEnabledChange={setCloning}
+              reference={reference}
+              onReferenceChange={setReference}
+              disabled={busy}
+            />
+          )}
 
           <Panel
             title="Audio"

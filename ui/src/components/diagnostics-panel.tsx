@@ -7,6 +7,9 @@ import { sharedEngine, type EngineState } from '@/lib/browser-stt/engine'
 import { diagnostics, environmentReport, type DiagnosticsState, type EnvironmentReport } from '@/lib/diagnostics'
 import { fmtBytes } from '@/lib/format'
 import { detectEnvironment } from '@/lib/mic-help'
+import { useInfo, useLive, useWordLists } from '@/hooks/use-api'
+import type { RequestTrace, ServerInfo } from '@/lib/api/types'
+import { traceExtras } from '@/lib/phases'
 
 function engineLines(e: EngineState): [string, string][] {
   return [
@@ -44,8 +47,47 @@ function envLines(env: EnvironmentReport): [string, string][] {
   ]
 }
 
+/** What the server says it can do: realtime pipelines, the diarizer, separation. */
+export function serverLines(info: ServerInfo | undefined): [string, string][] {
+  if (!info) return [['Server', 'not reached']]
+  const c = info.capabilities
+  if (!c) return [['Server', `${info.name} ${info.version} (reports no capabilities)`]]
+  const pipes = Object.entries(c.realtime?.pipelines ?? {})
+    .map(([id, p]) => {
+      const ok = p?.available ?? p?.configured ?? Boolean(p?.url)
+      return `${id}${ok ? '' : ' (not set up)'}`
+    })
+    .join(', ')
+  return [
+    ['Server', `${info.name} ${info.version}`],
+    ['Realtime pipeline', `${c.realtime?.pipeline ?? 'not reported'}${pipes ? `; offers ${pipes}` : ''}`],
+    [
+      'Default diarizer',
+      `${c.diarization?.default_model ?? 'none'}${c.diarization?.installed ? ', installed' : ', not installed'}${c.diarization?.speaker_conditioned_models?.length ? `; speaker-conditioned: ${c.diarization.speaker_conditioned_models.join(', ')}` : ''}`,
+    ],
+    [
+      'Default separation',
+      c.separation
+        ? `${c.separation.default_model ?? 'none'}${c.separation.available ? '' : ' (unavailable)'}${c.separation.installed ? ', installed' : ''}`
+        : 'not reported',
+    ],
+  ]
+}
+
+/** The newest server trace with diarization, separation or pipeline fields. */
+export function lastTraceLines(requests: RequestTrace[]): [string, string][] {
+  const t = requests.find((r) => traceExtras(r).length > 0)
+  if (!t) return []
+  return [['Request', `${t.id} (${t.kind}, ${t.model})`], ...traceExtras(t)]
+}
+
 /** The whole report as plain text, for pasting into an issue. */
-export function diagnosticsText(env: EnvironmentReport | null, e: EngineState, d: DiagnosticsState): string {
+export function diagnosticsText(
+  env: EnvironmentReport | null,
+  e: EngineState,
+  d: DiagnosticsState,
+  server: [string, string][] = [],
+): string {
   const rows = (pairs: [string, string][]) => pairs.map(([k, v]) => `${k}: ${v}`).join('\n')
   const fetches = d.fetches.length
     ? d.fetches
@@ -63,6 +105,7 @@ export function diagnosticsText(env: EnvironmentReport | null, e: EngineState, d
     '',
     rows(engineLines(e)),
     '',
+    ...(server.length ? [rows(server), ''] : []),
     'Fetches (status, size, time to response, URL):',
     fetches,
     '',
@@ -93,6 +136,19 @@ export function DiagnosticsPanel() {
   const e = useStore(sharedEngine().store)
   const [env, setEnv] = useState<EnvironmentReport | null>(null)
   const [copied, setCopied] = useState(false)
+  const info = useInfo().data
+  const requests = useLive().requests
+  const lists = useWordLists()
+  const server: [string, string][] = [
+    ...serverLines(info),
+    [
+      'Word lists',
+      lists.offered
+        ? `${lists.data?.wordlists.length ?? 0} list(s)${lists.data?.available ? '' : ', uccharan missing'}`
+        : 'not offered',
+    ],
+    ...lastTraceLines(requests),
+  ]
   const refresh = useCallback(() => {
     void environmentReport().then(setEnv)
   }, [])
@@ -102,7 +158,7 @@ export function DiagnosticsPanel() {
 
   const copy = async () => {
     // No await before the clipboard call: Safari only allows it directly inside the tap.
-    const text = diagnosticsText(env, e, d)
+    const text = diagnosticsText(env, e, d, server)
     try {
       await navigator.clipboard.writeText(text)
       setCopied(true)
@@ -139,6 +195,10 @@ export function DiagnosticsPanel() {
           <div className="min-w-0" data-testid="diagnostics-engine">
             <h3 className="mb-1 eyebrow">In-browser model</h3>
             <Rows pairs={engineLines(e)} />
+          </div>
+          <div className="min-w-0 lg:col-span-2" data-testid="diagnostics-server">
+            <h3 className="mb-1 eyebrow">Server features and last trace</h3>
+            <Rows pairs={server} />
           </div>
           <div className="min-w-0 lg:col-span-2" data-testid="diagnostics-fetches">
             <h3 className="mb-1 eyebrow">Model and runtime requests</h3>

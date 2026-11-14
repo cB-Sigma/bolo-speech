@@ -11,10 +11,10 @@ import {
   CommandList,
   CommandShortcut,
 } from '@/components/ui/command'
-import { useCatalog } from '@/hooks/use-api'
+import { useCatalog, useWordLists } from '@/hooks/use-api'
 import { useStore } from '@/hooks/use-store'
 import { useTheme } from '@/hooks/use-theme'
-import { NAV } from '@/lib/nav'
+import { visibleNav } from '@/lib/nav'
 import { prefs, setPref } from '@/lib/prefs'
 import { askForApiKey } from './connection'
 
@@ -25,6 +25,7 @@ export default function CommandPalette() {
   const { setChoice } = useTheme()
   const catalog = useCatalog()
   const p = useStore(prefs)
+  const nav = visibleNav({ wordLists: useWordLists().offered })
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -60,7 +61,7 @@ export default function CommandPalette() {
         <CommandList>
           <CommandEmpty>Nothing matches.</CommandEmpty>
           <CommandGroup heading="Go to">
-            {NAV.map((n, i) => (
+            {nav.map((n, i) => (
               <CommandItem
                 key={n.to}
                 value={n.label}

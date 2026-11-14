@@ -13,13 +13,13 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useInfo, useLive } from '@/hooks/use-api'
+import { useInfo, useLive, useWordLists } from '@/hooks/use-api'
 import { useTheme, type ThemeChoice } from '@/hooks/use-theme'
 import { DemoBanner } from '@/components/demo'
 import { isDemo, isMock } from '@/lib/api/config'
 import { isDebug } from '@/lib/diagnostics'
 import { fmtDuration } from '@/lib/format'
-import { NAV, type NavItem } from '@/lib/nav'
+import { NAV, visibleNav, type NavItem } from '@/lib/nav'
 import { cn } from '@/lib/utils'
 import { openCommandPalette, PaletteHost } from './palette-host'
 import { ApiKeyDialog, ConnectionIndicator, OfflineBanner } from './connection'
@@ -32,17 +32,20 @@ export const DOCS_URL = 'https://github.com/cb-Sigma/bolo/tree/main/docs'
 
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const groups = ['Playground', 'Server'] as const
+  const items = visibleNav({ wordLists: useWordLists().offered })
   return (
     <nav aria-label="Main" className="flex flex-col gap-5">
       {groups.map((g) => (
         <div key={g}>
           <div className="mb-1.5 px-2.5 eyebrow">{g}</div>
           <ul className="flex flex-col gap-0.5">
-            {NAV.filter((n) => n.group === g).map((n) => (
-              <li key={n.to}>
-                <NavItemLink item={n} onNavigate={onNavigate} />
-              </li>
-            ))}
+            {items
+              .filter((n) => n.group === g)
+              .map((n) => (
+                <li key={n.to}>
+                  <NavItemLink item={n} onNavigate={onNavigate} />
+                </li>
+              ))}
           </ul>
         </div>
       ))}

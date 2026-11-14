@@ -73,6 +73,17 @@ export interface TtsOptions {
   transport?: TtsTransport
   /** Skip playback (used for previews that only need the audio). */
   silent?: boolean
+  /** Language for multilingual models (and text normalisation). */
+  language?: string
+  /** `auto`, `uccharan`, `uccharan:improved` or `espeak-ng`; omitted means the voice's pin or the server default. */
+  phonemizer?: string
+  /** Voice cloning: a `data:audio/…;base64,` recording. Only chunked HTTP carries it. */
+  referenceAudio?: string
+  referenceText?: string
+  /** `text` (default), `ssml` or `markdown`. Only chunked HTTP carries a format other than text. */
+  inputFormat?: 'text' | 'ssml' | 'markdown'
+  /** Word lists to apply, highest priority first. */
+  wordlists?: string[]
 }
 
 /** Finds the PCM payload of a WAV stream once enough header bytes have arrived. */
@@ -119,12 +130,18 @@ export class TtsSession {
   constructor(opts: TtsOptions, ctx?: AudioContext) {
     this.opts = opts
     this.player = opts.silent ? null : new GaplessPlayer(ctx)
-    this.store.patch({ transport: opts.transport ?? 'websocket' })
+    this.store.patch({ transport: TtsSession.transportFor(opts) })
     if (this.player) {
       this.player.onEnded = () => {
         if (this.store.get().status === 'playing') this.store.patch({ status: 'done' })
       }
     }
+  }
+
+  /** The WebSocket cannot carry a reference recording, so cloning always goes over HTTP. */
+  static transportFor(opts: Pick<TtsOptions, 'transport' | 'referenceAudio' | 'inputFormat'>): TtsTransport {
+    if (opts.referenceAudio || (opts.inputFormat && opts.inputFormat !== 'text')) return 'http'
+    return opts.transport ?? 'websocket'
   }
 
   /** All audio received so far, mono float at `sampleRate`. */
@@ -135,7 +152,7 @@ export class TtsSession {
   start(): void {
     this.sentAt = performance.now()
     this.store.patch({ status: 'connecting' })
-    if ((this.opts.transport ?? 'websocket') === 'http') void this.runHttp()
+    if (TtsSession.transportFor(this.opts) === 'http') void this.runHttp()
     else this.runWs()
   }
 
@@ -241,11 +258,20 @@ export class TtsSession {
   }
 
   private runWs(): void {
-    const { model, voice, text } = this.opts
+    const { model, voice, text, language, phonemizer, wordlists } = this.opts
     let ws: WebSocket
     try {
       const WS = getTransport().WebSocket
-      ws = new WS(wsUrl('api/v1/tts/stream', { model, voice, format: 'pcm_s16le' }))
+      ws = new WS(
+        wsUrl('api/v1/tts/stream', {
+          model,
+          voice,
+          format: 'pcm_s16le',
+          language,
+          phonemizer,
+          wordlists: wordlists?.length ? wordlists.join(',') : undefined,
+        }),
+      )
     } catch (err) {
       this.fail(err instanceof Error ? err.message : 'Could not open the stream')
       return
@@ -302,10 +328,25 @@ export class TtsSession {
   }
 
   private async runHttp(): Promise<void> {
-    const { model, voice, text } = this.opts
+    const { model, voice, text, language, phonemizer, referenceAudio, referenceText, inputFormat, wordlists } =
+      this.opts
     this.abort = new AbortController()
     try {
-      const res = await api.speech({ model, input: text, voice, response_format: 'wav' }, this.abort.signal)
+      const res = await api.speech(
+        {
+          model,
+          input: text,
+          voice: referenceAudio ? undefined : voice,
+          response_format: 'wav',
+          language,
+          phonemizer,
+          reference_audio: referenceAudio,
+          reference_text: referenceAudio && referenceText ? referenceText : undefined,
+          input_format: inputFormat && inputFormat !== 'text' ? inputFormat : undefined,
+          wordlists: wordlists?.length ? wordlists : undefined,
+        },
+        this.abort.signal,
+      )
       if (!res.body) throw new Error('The server sent no audio')
       const reader = res.body.getReader()
       let head: Uint8Array = new Uint8Array(0)

@@ -32,6 +32,14 @@ export function useComponents() {
   return useQuery({ queryKey: ['components'], queryFn: ({ signal }) => api.components(signal), staleTime: 30_000 })
 }
 
+const COMPONENT_NAMES: Record<string, string> = {
+  'espeak-ng': 'eSpeak NG',
+  uccharan: 'uccharan',
+  'llama-server': 'llama-server',
+  'audio.cpp': 'audio.cpp',
+  'plugin:torch': 'the torch engine plugin',
+}
+
 /** The first required component of a model that is not installed, if the model is unavailable because of it. */
 export function missingComponent(
   model: CatalogModel | null | undefined,
@@ -45,7 +53,7 @@ export function missingComponent(
     (need[0]
       ? {
           id: need[0],
-          name: need[0] === 'espeak-ng' ? 'eSpeak NG' : need[0],
+          name: COMPONENT_NAMES[need[0]] ?? need[0],
           installed: false,
           source: null,
           version: null,
@@ -59,6 +67,17 @@ export function missingComponent(
         }
       : null)
   )
+}
+
+/** Word lists, when the server has them: a 404 (older server, or the demo) reads as "not offered". */
+export function useWordLists() {
+  const q = useQuery({
+    queryKey: ['wordlists'],
+    queryFn: ({ signal }) => api.wordLists(signal),
+    staleTime: 30_000,
+    retry: false,
+  })
+  return { ...q, offered: q.isSuccess }
 }
 
 export function useSamples() {

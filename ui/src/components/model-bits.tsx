@@ -1,6 +1,7 @@
-import { CircleCheck, CircleDashed, Lock, Scale, Target, Zap } from 'lucide-react'
+import { Ban, CircleCheck, CircleDashed, Clock, Cpu, Lock, Scale, Target, Zap } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { CatalogModel, Tier } from '@/lib/api/types'
+import { hardwareLabel, isNotImplemented, isPending } from '@/lib/capabilities'
 import { languageName } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -115,5 +116,70 @@ export function StateDot({
       />
       {label}
     </span>
+  )
+}
+
+/** GPU advice ("GPU recommended, ~2 GB"); nothing for models that are fine on a CPU. */
+export function HardwareMark({ hardware, className }: { hardware: CatalogModel['hardware']; className?: string }) {
+  const label = hardwareLabel(hardware)
+  if (!hardware || !label) return null
+  const strong = hardware.gpu === 'required' || hardware.gpu === 'recommended'
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          className={cn(
+            'inline-flex items-center gap-1 text-xs',
+            strong ? 'text-warning-text' : 'text-muted-foreground',
+            className,
+          )}
+          data-testid="hardware-mark"
+        >
+          <Cpu className="size-3.5" aria-hidden /> {label}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-64">
+        {hardware.gpu === 'optional'
+          ? 'Runs on a CPU; a GPU makes it faster.'
+          : hardware.gpu === 'required'
+            ? 'Too slow to be useful without a GPU.'
+            : 'Works on a CPU but far slower than real time; use a GPU for live use.'}
+        {hardware.vram_gb != null && ` Needs about ${hardware.vram_gb} GB of GPU memory.`}
+        {hardware.note ? ` ${hardware.note.charAt(0).toUpperCase()}${hardware.note.slice(1)}.` : ''}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+/** "Not published yet" for pending entries, "Not runnable yet" for entries no runtime can run. */
+export function AvailabilityMark({
+  model,
+  className,
+}: {
+  model: Pick<CatalogModel, 'status' | 'description'>
+  className?: string
+}) {
+  const pending = isPending(model)
+  const notImpl = !pending && isNotImplemented(model)
+  if (!pending && !notImpl) return null
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          className={cn('inline-flex items-center gap-1 text-xs text-warning-text', className)}
+          data-testid={pending ? 'pending-mark' : 'not-implemented-mark'}
+        >
+          {pending ? <Clock className="size-3.5" aria-hidden /> : <Ban className="size-3.5" aria-hidden />}
+          {pending ? 'Not published yet' : 'Not runnable yet'}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-64">
+        {pending
+          ? 'Described in the catalog, but its files are not published yet. It cannot be pulled or used.'
+          : 'Listed for reference: no runtime bolo can use runs it yet, so loading it fails. The description says why.'}
+      </TooltipContent>
+    </Tooltip>
   )
 }

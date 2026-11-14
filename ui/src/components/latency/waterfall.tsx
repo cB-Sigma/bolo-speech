@@ -6,9 +6,10 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import type { RequestTrace } from '@/lib/api/types'
 import { fmtClock, fmtMs, fmtRtf, fmtSeconds } from '@/lib/format'
 import { niceStep, percentile } from '@/lib/latency/stats'
-import { BROWSER_STT_PHASES, phaseColor, phaseLabel, phasesFor } from '@/lib/phases'
+import { BROWSER_STT_PHASES, phaseColor, phaseLabel, phasesFor, traceExtras } from '@/lib/phases'
 import { cn } from '@/lib/utils'
 import { ListTree } from 'lucide-react'
+import { OverrideText } from '@/components/wordlists/override-text'
 
 function Bars({ trace, scaleMs, height = 'h-3' }: { trace: RequestTrace; scaleMs: number; height?: string }) {
   const pct = (ms: number) => `${Math.min(100, (ms / scaleMs) * 100)}%`
@@ -168,6 +169,14 @@ export function Waterfall({
   )
 }
 
+const KIND_LABEL: Record<string, string> = {
+  stt: 'Speech to text',
+  tts: 'Text to speech',
+  vad: 'Voice activity',
+  diarization: 'Diarization',
+  agent: 'Voice agent turn',
+}
+
 export function RequestDrawer({ trace, onClose }: { trace: RequestTrace | null; onClose: () => void }) {
   return (
     <Sheet open={trace != null} onOpenChange={(o) => !o && onClose()}>
@@ -185,8 +194,7 @@ export function RequestDrawer({ trace, onClose }: { trace: RequestTrace | null; 
             <SheetHeader className="border-b border-border">
               <SheetTitle className="num text-base">{trace.id}</SheetTitle>
               <SheetDescription>
-                {trace.kind === 'tts' ? 'Text to speech' : 'Speech to text'} · {trace.transport} ·{' '}
-                {fmtClock(trace.started_at)}
+                {KIND_LABEL[trace.kind] ?? trace.kind} · {trace.transport} · {fmtClock(trace.started_at)}
               </SheetDescription>
             </SheetHeader>
             <div className="grid gap-5 p-4">
@@ -295,12 +303,48 @@ export function RequestDrawer({ trace, onClose }: { trace: RequestTrace | null; 
                   </dd>
                 </dl>
               </section>
+              {traceExtras(trace).length > 0 && (
+                <section data-testid="trace-extras">
+                  <h3 className="mb-2 eyebrow">Speakers, separation and pipeline</h3>
+                  <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
+                    {traceExtras(trace).map(([k, v]) => (
+                      <div key={k} className="contents">
+                        <dt className="text-muted-foreground">{k}</dt>
+                        <dd className="truncate text-right num">{v}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              )}
               {trace.text_preview && (
                 <section>
                   <h3 className="mb-2 eyebrow">Text</h3>
                   <p className="rounded-lg border border-border bg-muted/40 p-3 text-[13px] leading-5">
                     {trace.text_preview}
                   </p>
+                </section>
+              )}
+              {(trace.normalized_text || (trace.pronunciations_applied?.length ?? 0) > 0) && (
+                <section data-testid="trace-text-prep">
+                  <h3 className="mb-2 eyebrow">
+                    What the voice received{trace.normalizer ? ` (normaliser ${trace.normalizer})` : ''}
+                  </h3>
+                  {trace.normalized_text && (
+                    <OverrideText text={trace.normalized_text} className="text-[13px] leading-6" />
+                  )}
+                  {(trace.pronunciations_applied?.length ?? 0) > 0 && (
+                    <ul className="mt-2 grid gap-1 text-xs" aria-label="Pronunciations applied">
+                      {trace.pronunciations_applied?.map((a, i) => (
+                        <li key={i}>
+                          <span className="text-foreground">{a.text}</span> →{' '}
+                          <span className="num">{a.spoken ?? (a.ipa ? `/${a.ipa}/` : '?')}</span>
+                          {a.word && a.word !== a.text && (
+                            <span className="text-muted-foreground"> (entry {a.word})</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </section>
               )}
             </div>

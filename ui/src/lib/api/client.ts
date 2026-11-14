@@ -1,4 +1,5 @@
 import { apiUrl, authHeaders, getTransport } from './config'
+import { parseTranscription, transcriptionForm, type DiarizedResult, type TranscribeOptions } from '@/lib/diarize'
 import type {
   BenchRequest,
   BenchResult,
@@ -10,6 +11,11 @@ import type {
   ServerInfo,
   Stats,
   Task,
+  TextInput,
+  WordList,
+  WordListPreview,
+  WordListPutResult,
+  WordListSummary,
 } from './types'
 
 export class ApiError extends Error {
@@ -127,11 +133,59 @@ export const api = {
       throw err
     }
   },
+  /** Starts a server-side install. Only eSpeak NG asks for licence acceptance; the flag is harmless elsewhere. */
   installComponent: (id: string) =>
     json<{ job_id: string }>(`api/v1/components/${encodeURIComponent(id)}/install`, {
       method: 'POST',
       json: { accept_license: true },
     }),
+  modelSettings: (id: string, signal?: AbortSignal) =>
+    json<{ model: string; settings: Record<string, unknown> }>(`api/v1/models/${encodeURIComponent(id)}/settings`, {
+      signal,
+    }),
+  /** Pins (null removes the pin) the phonemiser, the text normaliser or the word lists of a voice. */
+  setModelSettings: (
+    id: string,
+    settings: { phonemizer?: string | null; text_normalizer?: string | null; wordlists?: string[] | null },
+  ) =>
+    json<{ model: string; settings: Record<string, unknown> }>(`api/v1/models/${encodeURIComponent(id)}/settings`, {
+      method: 'PUT',
+      json: settings,
+    }),
+  /** Word lists. Servers without them answer 404, which `useWordLists` reads as "not offered". */
+  wordLists: (signal?: AbortSignal) =>
+    json<{ wordlists: WordListSummary[]; available: boolean }>('api/v1/wordlists', { signal }),
+  wordList: (name: string, signal?: AbortSignal) =>
+    json<WordList>(`api/v1/wordlists/${encodeURIComponent(name)}`, { signal }),
+  /** Replaces a list. `body` is TSV, PLS or JSON text, sent as is. */
+  putWordList: (name: string, body: string, contentType = 'text/tab-separated-values') =>
+    json<WordListPutResult>(`api/v1/wordlists/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      body,
+      headers: { 'Content-Type': contentType },
+    }),
+  deleteWordList: (name: string) =>
+    json<{ deleted: string }>(`api/v1/wordlists/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  /** The list as a file: TSV, or PLS for one language. */
+  async exportWordList(name: string, format: 'tsv' | 'pls', lang?: string): Promise<Blob> {
+    const res = await request(`api/v1/wordlists/${encodeURIComponent(name)}`, { query: { format, lang } })
+    return res.blob()
+  },
+  previewWordList: (
+    name: string,
+    body: { text: string; models: string[]; language?: string; voice?: string; input_format?: string },
+    signal?: AbortSignal,
+  ) =>
+    json<{ previews: WordListPreview[] }>(`api/v1/wordlists/${encodeURIComponent(name)}/preview`, {
+      method: 'POST',
+      json: body,
+      signal,
+    }),
+  textInput: (model: string, voice?: string, signal?: AbortSignal) =>
+    json<{ model: string; voice: string | null; text_input: TextInput }>(
+      `api/v1/text-input/${encodeURIComponent(model)}`,
+      { query: { voice }, signal },
+    ),
   samples: (signal?: AbortSignal) => json<{ samples: Sample[] }>('api/v1/samples', { signal }),
   bench: (req: BenchRequest) => json<{ job_id: string }>('api/v1/bench', { method: 'POST', json: req }),
   benchJob: (jobId: string, signal?: AbortSignal) => api.job<BenchResult>(jobId, signal),
@@ -150,10 +204,7 @@ export const api = {
   },
 
   /** One-shot synthesis through the OpenAI-compatible route. */
-  async speech(
-    body: { model: string; input: string; voice?: string; response_format?: string },
-    signal?: AbortSignal,
-  ): Promise<Response> {
+  async speech(body: SpeechBody, signal?: AbortSignal): Promise<Response> {
     return request('v1/audio/speech', { method: 'POST', json: body, signal })
   },
 
@@ -167,4 +218,35 @@ export const api = {
     const res = await request('v1/audio/transcriptions', { method: 'POST', body: form, signal })
     return res.json() as Promise<{ text: string }>
   },
+
+  /** Transcription with segments, optionally speaker-attributed (diarization, separation of overlaps). */
+  async transcribeSegments(
+    file: Blob,
+    name: string,
+    opts: TranscribeOptions,
+    signal?: AbortSignal,
+  ): Promise<DiarizedResult> {
+    const form = transcriptionForm(file, name, opts)
+    const res = await request('v1/audio/transcriptions', { method: 'POST', body: form, signal })
+    return parseTranscription(await res.json(), res.headers)
+  },
+}
+
+/** Body of `POST /v1/audio/speech`, with the bolo extensions the console uses. */
+export interface SpeechBody {
+  model: string
+  input: string
+  voice?: string
+  response_format?: string
+  language?: string
+  phonemizer?: string
+  /** Base64 or `data:audio/…;base64,` recording of the voice to imitate (models with `voice-cloning`). */
+  reference_audio?: string
+  reference_text?: string
+  /** `text` (default), `ssml` or `markdown`. */
+  input_format?: string
+  /** Word lists to apply, highest priority first. */
+  wordlists?: string[]
+  normalize?: boolean | string
+  pronunciations?: { word: string; ipa?: string; say?: string; lang?: string; match?: string }[]
 }

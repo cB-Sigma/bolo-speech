@@ -13,6 +13,9 @@ const LABEL: Record<string, string> = {
   synthesize_first: 'First audio',
   synthesize_rest: 'Remaining audio',
   encode: 'Encode',
+  diarize: 'Diarize',
+  consolidate: 'Consolidate speakers',
+  separate: 'Separate overlaps',
   // in-browser recogniser
   load: 'Model load',
   endpoint: 'Endpointing',
@@ -45,3 +48,25 @@ export function headlineMs(t: RequestTrace): number | null {
 
 /** Phases the in-browser recogniser reports, in pipeline order. */
 export const BROWSER_STT_PHASES = ['load', 'endpoint', 'queue', 'decode'] as const
+
+/** Extra trace fields worth showing (diarization, separation, voice agents), as label/value pairs. */
+export function traceExtras(t: RequestTrace): [string, string][] {
+  const out: [string, string][] = []
+  const add = (label: string, v: unknown, unit = '') => {
+    if (v == null || v === '') return
+    out.push([label, typeof v === 'number' ? `${Math.round(v * 10) / 10}${unit}` : String(v)])
+  }
+  add('Pipeline', t.pipeline)
+  add('Diarizer', t.diarization_model)
+  add('Speakers', t.speakers)
+  add('Speakers before consolidation', t.speakers_before_consolidation)
+  add('Overlapped speech', t.overlapped_speech_s, ' s')
+  add('Separation', t.separation)
+  add('Separation model', t.separation_model)
+  add('Separation windows', t.separation_windows)
+  add('Separation time', t.separation_ms, ' ms')
+  add('First token', t.first_token_ms, ' ms')
+  add('Normaliser', t.normalizer)
+  add('Pronunciations applied', t.pronunciations_applied?.length || null)
+  return out
+}
