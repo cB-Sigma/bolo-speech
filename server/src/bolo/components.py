@@ -1,7 +1,7 @@
 """Optional third-party components that bolo can use but does not require.
 
 * **uccharan** (Apache-2.0): the phonemiser for Piper, Kitten, Matcha and Kokoro voices in the
-  languages it covers (English US and British, Hindi). Part of ``bolo[all]``; installable here.
+  languages it covers (English US and British, Hindi). Part of ``bolo-speech[all]``; installable here.
 * **eSpeak NG** (GPL-3.0-or-later): the phonemiser for every other language. Never shipped or
   installed by default: only when the operator asks for it (console, ``bolo components install
   espeak-ng``, the ``espeak`` extra, or the system package manager).
@@ -82,12 +82,12 @@ def manual_command(component: str = ESPEAK) -> str:
     if Path("/.dockerenv").exists():
         if component == ESPEAK:
             return "rebuild the image with: docker build --build-arg WITH_ESPEAK=1 ..."
-        return "rebuild the image (uccharan is part of bolo[all])"
+        return "rebuild the image (uccharan is part of bolo-speech[all])"
     if "/pipx/venvs/" in prefix:
         return f"pipx inject bolo {package}"
     if "/uv/tools/" in prefix:
         return f"uv tool install --with {package} bolo"
-    return f"pip install 'bolo[{extra}]'"
+    return f"pip install 'bolo-speech[{extra}]'"
 
 
 class ComponentManager:
@@ -347,7 +347,7 @@ class ComponentManager:
                 "description": (
                     "Text-to-phoneme front end (Apache-2.0) for Piper-format, KittenTTS, Matcha-TTS and Kokoro "
                     "voices in English (US, British) and Hindi; for Kokoro English a port of misaki, the front end "
-                    "Kokoro was trained with. Part of bolo[all]. Voices in other languages need eSpeak NG."
+                    "Kokoro was trained with. Part of bolo-speech[all]. Voices in other languages need eSpeak NG."
                 ),
             }
         )

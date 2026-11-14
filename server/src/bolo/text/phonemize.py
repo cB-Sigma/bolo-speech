@@ -5,8 +5,8 @@ trained on phonemes (espeak-ng IPA; misaki's tokens for Kokoro English).
 Since version 2.0 the sherpa-onnx runtime no longer contains a phonemiser and
 expects phonemes from the caller. Two phonemisers can provide them:
 
-* **uccharan** (Apache-2.0, ``pip install 'bolo[uccharan]'``, part of
-  ``bolo[all]``): the default where it covers the voice's language and
+* **uccharan** (Apache-2.0, ``pip install 'bolo-speech[uccharan]'``, part of
+  ``bolo-speech[all]``): the default where it covers the voice's language and
   output profile, see :data:`UCCHARAN_SUPPORT` (English US and British, Hindi;
   for Kokoro English it is a port of misaki, the front end Kokoro was trained
   with). Runs in process, no GPL code or data.
@@ -55,7 +55,7 @@ _LANG_FLAG = re.compile(r"\([a-z-]+\)")
 INSTALL_HINT = (
     "this voice needs the optional component 'espeak-ng' (eSpeak NG, GPL-3.0-or-later), which is not shipped "
     "with bolo. Install it from the console (Models, Components), with `bolo components install espeak-ng`, "
-    "with `pip install 'bolo[espeak]'`, or with your system package manager (`apt install espeak-ng`); "
+    "with `pip install 'bolo-speech[espeak]'`, or with your system package manager (`apt install espeak-ng`); "
     "or choose a voice that does not need it, such as Kokoro English."
 )
 
@@ -486,7 +486,7 @@ def missing_hint(profile: str, language: str) -> str:
         )
     if wanted[0] == UCCHARAN:
         return (
-            "this voice needs a phonemiser: install uccharan (Apache-2.0) with `pip install 'bolo[uccharan]'` or "
+            "this voice needs a phonemiser: install uccharan (Apache-2.0) with `pip install 'bolo-speech[uccharan]'` or "
             "`bolo components install uccharan`"
             + ("" if len(wanted) == 1 else "; eSpeak NG (`bolo components install espeak-ng`) works too")
         )

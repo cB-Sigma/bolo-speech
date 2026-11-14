@@ -42,7 +42,7 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   chunk, 3 frames of left context, one frame held back). Sampling per the model
   cards, stop at end-of-speech (the stream is closed, which frees the slot), a
   token budget per character. Managed or operator-run llama-server, as for
-  every `tts-server` model; new extra `bolo[orpheus]` (onnxruntime). New tool
+  every `tts-server` model; new extra `bolo-speech[orpheus]` (onnxruntime). New tool
   `server/tools/export_snac_onnx.py`: bolo's own fp32 and fp16 export of the
   SNAC decoder, checked against PyTorch SNAC (fp32: 112-127 dB SNR, max abs
   difference at most 2.9e-6 on random and real Svara code sequences, noise

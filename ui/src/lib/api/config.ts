@@ -99,5 +99,5 @@ export const isMock = import.meta.env.VITE_BOLO_MOCK === '1'
 export const isDemo = import.meta.env.VITE_BOLO_DEMO === '1'
 
 /** How to get a real server; shown wherever the demo cannot do something. */
-export const INSTALL_COMMAND = "pipx install 'bolo[all] @ git+https://github.com/cb-Sigma/bolo#subdirectory=server'"
+export const INSTALL_COMMAND = "pipx install 'bolo-speech[all] @ git+https://github.com/cb-Sigma/bolo#subdirectory=server'"
 export const REPO_URL = 'https://github.com/cb-Sigma/bolo'

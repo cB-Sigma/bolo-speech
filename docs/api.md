@@ -143,7 +143,7 @@ Multipart form.
 
 | Field | | |
 | --- | --- | --- |
-| `file` | required | audio. WAV, FLAC, OGG/Vorbis, OGG/Opus, MP3, AIFF decode with no extra install; M4A/AAC, WebM, MP4 and others need `bolo[av]` or `ffmpeg` on `PATH`. Raw headerless audio is accepted when the part's content type says so: `audio/basic` or `audio/x-mulaw` (8 kHz μ-law), `audio/x-alaw`, `audio/pcm;rate=16000` (16-bit little-endian) |
+| `file` | required | audio. WAV, FLAC, OGG/Vorbis, OGG/Opus, MP3, AIFF decode with no extra install; M4A/AAC, WebM, MP4 and others need `bolo-speech[av]` or `ffmpeg` on `PATH`. Raw headerless audio is accepted when the part's content type says so: `audio/basic` or `audio/x-mulaw` (8 kHz μ-law), `audio/x-alaw`, `audio/pcm;rate=16000` (16-bit little-endian) |
 | `model` | optional | see model names |
 | `language` | optional | ISO-639-1 code. Improves accuracy and latency for multilingual models |
 | `prompt` | optional | initial prompt (Whisper models) |
@@ -203,7 +203,7 @@ JSON body.
 | `input` | required | text. Split into sentences and synthesised one at a time |
 | `model` | optional | see model names |
 | `voice` | optional | a voice id of the model (`GET /api/v1/models/{id}`), or `{"id": …}`. OpenAI voice names (`alloy`, `echo`, `nova`, …) are mapped onto the model's voices so stock clients work |
-| `response_format` | `mp3` | `mp3`, `opus` (Ogg), `aac` (ADTS; needs `bolo[av]` or ffmpeg), `flac`, `wav`, `pcm` (16-bit little-endian mono at the model's rate), and the telephony extensions `mulaw` / `alaw` (raw 8 kHz G.711) |
+| `response_format` | `mp3` | `mp3`, `opus` (Ogg), `aac` (ADTS; needs `bolo-speech[av]` or ffmpeg), `flac`, `wav`, `pcm` (16-bit little-endian mono at the model's rate), and the telephony extensions `mulaw` / `alaw` (raw 8 kHz G.711) |
 | `speed` | `1.0` | 0.25 to 4.0 |
 | `stream_format` | `audio` | `sse` wraps the audio in `speech.audio.delta` events (base64) followed by `speech.audio.done` |
 | `instructions` | - | accepted and ignored |
@@ -220,7 +220,7 @@ JSON body.
 The body is streamed (chunked transfer) while synthesis is still running:
 the first sentence is audible while the rest is being generated. `pcm`,
 `wav` and `mp3` are forwarded as soon as each piece exists. Ogg/Opus is
-written in pages of 100 ms when PyAV is installed (`bolo[av]` or
+written in pages of 100 ms when PyAV is installed (`bolo-speech[av]` or
 `[webrtc]`; in our check every 100 ms of input produced output) and in pages
 of roughly one second through libsndfile otherwise, in which case prefer
 `pcm` or `mp3` when time-to-first-audio matters. A streamed `wav` has a header that declares an
@@ -269,7 +269,7 @@ first audio arrives after about 5 frames (0.4 s of speech) have been generated.
 `voice` is one of the entry's voices (by id or name; the first one when
 omitted; another name → `400`, `param: "voice"`); `speed` must be 1.0 and
 `reference_audio` is refused (`400`). Without onnxruntime installed the model
-answers `424 component_missing` (`pip install "bolo[orpheus]"`).
+answers `424 component_missing` (`pip install "bolo-speech[orpheus]"`).
 
 #### Text preparation, SSML and pronunciation word lists
 
@@ -650,7 +650,7 @@ Both are pulled on first use. Which one to use, with measurements, is in
 models.md, "Speaker diarization"; in short, Nemotron tells similar voices and
 telephone voices apart far better and finds the number of speakers more
 often, at a fifth of the cost. `nemotron-3-diarization` needs the
-`onnxruntime` Python package (installed with `bolo[all]`, which brings it with
+`onnxruntime` Python package (installed with `bolo-speech[all]`, which brings it with
 faster-whisper; otherwise `pip install onnxruntime`) and, for named speakers
 and live streams, sherpa-onnx for its speaker embeddings.
 
@@ -920,7 +920,7 @@ differences from OpenAI are in [voice-agents.md](voice-agents.md).
 | --- | --- |
 | `WS /v1/realtime?model=…` | OpenAI Realtime API over WebSocket (GA event names, as typed in `openai` 3.50.0). `?intent=transcription` or `session.update` with `type: "transcription"` for transcription-only sessions. Audio: base64 `audio/pcm` (24 kHz PCM16), `audio/pcmu`, `audio/pcma`. User transcripts arrive as incremental deltas. `turn_detection`: `server_vad`, `semantic_vad` (with the optional end-of-turn model) or `null`. Auth: `Authorization: Bearer`, or subprotocols `realtime` + `openai-insecure-api-key.<key>`; an ephemeral `ek_…` key is accepted in the same places. bolo extension `session.pipeline`: `cascade` (default, setting `realtime_pipeline`), `audio-llm` (an audio-understanding model hears the turn, bolo's TTS speaks) or `speech-to-speech` (a speech-to-speech model, first backend llama-server `/v1/realtime` with LFM3-Audio, answers with speech and tool calls; bolo keeps turn detection, barge-in, codecs and transcripts); see [voice-agents.md](voice-agents.md#pipelines-cascade-audio-in-language-model-speech-to-speech). `GET /api/v1/info` lists them under `capabilities.realtime.pipelines` |
 | `POST /v1/realtime/client_secrets` | mint an ephemeral key (`{"value": "ek_…", "expires_at", "session"}`) for browsers. Needs the server key. Body: `{"expires_after": {"anchor": "created_at", "seconds": 600}, "session": {…}}`, all optional |
-| `POST /v1/realtime/calls` | the same sessions over **WebRTC**: SDP offer in (`application/sdp`, or multipart `sdp` + `session`), `201` with the SDP answer and `Location: /v1/realtime/calls/{call_id}`. Needs `bolo[webrtc]` (else `503 engine_unavailable`). `POST …/{call_id}/hangup` ends the call. Not implemented: SIP |
+| `POST /v1/realtime/calls` | the same sessions over **WebRTC**: SDP offer in (`application/sdp`, or multipart `sdp` + `session`), `201` with the SDP answer and `Location: /v1/realtime/calls/{call_id}`. Needs `bolo-speech[webrtc]` (else `503 engine_unavailable`). `POST …/{call_id}/hangup` ends the call. Not implemented: SIP |
 | `POST /v1/chat/completions` | `input_audio` content parts are transcribed; `modalities: ["text","audio"]` + `audio: {voice, format}` adds a spoken reply (`message.audio`, or `delta.audio` when streaming); everything else is forwarded to the language model untouched; requests without audio are proxied as they are |
 
 Voice-agent turns are traces of kind `agent` (transport `realtime` or `chat`)
@@ -930,7 +930,7 @@ with `first_token_ms` and `ttfa_ms`; see
 ## Optional components
 
 Pieces bolo can use but does not require: two phonemisers, **uccharan**
-(Apache-2.0, part of `bolo[all]`; English US/GB and Hindi) and **eSpeak NG**
+(Apache-2.0, part of `bolo-speech[all]`; English US/GB and Hindi) and **eSpeak NG**
 (GPL-3.0-or-later, never installed by default; every other language), and
 engine plugins (`plugin:<name>`, [plugins.md](plugins.md)), which are listed so
 that a client can say what a model needs but are installed as packages.
@@ -960,7 +960,7 @@ server is exposed without an API key. A runtime is not needed for a model that
   "license_url": "https://github.com/espeak-ng/espeak-ng/blob/master/COPYING",
   "required_by_count": 82,              // catalog models that need it
   "installable": true, "install_blocked_reason": null,
-  "manual_command": "pip install 'bolo[espeak]'",
+  "manual_command": "pip install 'bolo-speech[espeak]'",
   "description": "…"}]}
 ```
 

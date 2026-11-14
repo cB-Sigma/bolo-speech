@@ -46,7 +46,7 @@ try:
     from bolo.engines.base import SpeakerRequest
 except ImportError as exc:  # a bolo without speaker-conditioned recognition
     raise MissingDependency(
-        "DiCoW needs a bolo release with speaker-conditioned recognition (0.2.0 or later): pip install -U bolo"
+        "DiCoW needs a bolo release with speaker-conditioned recognition (0.2.0 or later): pip install -U bolo-speech"
     ) from exc
 
 SR = 16000

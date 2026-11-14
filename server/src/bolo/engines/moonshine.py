@@ -57,7 +57,7 @@ class MoonshineEngine(Engine):
                 False,
                 None,
                 f"{type(exc).__name__}: {exc}. Optional: Moonshine models run through sherpa-onnx; "
-                "install with: pip install 'bolo[moonshine]'",
+                "install with: pip install 'bolo-speech[moonshine]'",
             )
 
     def load(self, kind: str, task: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Model:

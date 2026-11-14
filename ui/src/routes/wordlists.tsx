@@ -95,7 +95,7 @@ export default function WordListsPage() {
           <AlertDescription>
             <span>
               Lists can be listed and deleted, but not read, saved or applied until it is installed (
-              <span className="num">pip install &apos;bolo[uccharan]&apos;</span>).
+              <span className="num">pip install &apos;bolo-speech[uccharan]&apos;</span>).
             </span>
             {uccharan && !uccharan.installed && <ComponentInstallButton component={uccharan} className="mt-2" />}
           </AlertDescription>

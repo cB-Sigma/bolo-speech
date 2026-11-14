@@ -144,5 +144,5 @@ Apache License 2.0.
    starts the same workflow.
 
 Before the first release that lists `uccharan` in `[all]`, make sure uccharan
-is on PyPI: otherwise `pip install 'bolo[all]'` cannot be resolved (the
+is on PyPI: otherwise `pip install 'bolo-speech[all]'` cannot be resolved (the
 image jobs detect this and build without it, with a warning).

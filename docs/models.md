@@ -804,7 +804,7 @@ Choose per request with `diarization_model=nemotron-3-diarization`
 (`/v1/audio/transcriptions`) or `model=nemotron-3-diarization`
 (`/api/v1/diarize`), or for the whole server with `default_diarization`
 (configuration.md). It needs the `onnxruntime` Python package (part of
-`bolo[all]` through faster-whisper; otherwise `pip install onnxruntime`).
+`bolo-speech[all]` through faster-whisper; otherwise `pip install onnxruntime`).
 
 **When to use Nemotron.** Meetings and conversations where people talk over
 each other, telephone audio, and voices that sound alike: there it gets the
@@ -1603,7 +1603,7 @@ The server is managed or operator-run as for every `tts-server` model (see
 "External TTS servers" above; managed servers get `-c 4096 -np 1`). With
 `tts_servers = ["llama-server=…"]` every llama-server model goes to that one
 server, so name these models by id when your server runs another GGUF.
-onnxruntime is needed for the decoder: `pip install "bolo[orpheus]"`.
+onnxruntime is needed for the decoder: `pip install "bolo-speech[orpheus]"`.
 
 ### The SNAC decoder
 
@@ -1718,7 +1718,7 @@ sherpa-onnx 2.x expects the caller to supply them. bolo has two phonemisers:
 
 | Phonemiser | Licence | Covers | How it gets there |
 | --- | --- | --- | --- |
-| **uccharan** (default) | Apache-2.0 | Piper and Kokoro voices in English (US, British) and Hindi; Kitten and Matcha (US English). For Kokoro English it is a port of misaki, the front end Kokoro was trained with, with misaki's dictionaries built in | `bolo[uccharan]`, part of `bolo[all]` and the Docker image; `bolo components install uccharan` |
+| **uccharan** (default) | Apache-2.0 | Piper and Kokoro voices in English (US, British) and Hindi; Kitten and Matcha (US English). For Kokoro English it is a port of misaki, the front end Kokoro was trained with, with misaki's dictionaries built in | `bolo-speech[uccharan]`, part of `bolo-speech[all]` and the Docker image; `bolo components install uccharan` |
 | **espeak-ng** | GPL-3.0-or-later | every language espeak-ng has | optional component, never installed by default (next section) |
 
 With the default setting (`phonemizer = "auto"`) a voice uses uccharan when uccharan covers its
@@ -1860,9 +1860,9 @@ it, and what you download, carry their own terms.
 | faster-whisper / CTranslate2 | MIT / MIT | |
 | useful-moonshine-onnx | MIT | optional |
 | onnxruntime | MIT | runs the optional end-of-turn model (Smart Turn v3, BSD-2-Clause); installed with faster-whisper anyway |
-| aiortc | BSD-3-Clause | optional (`bolo[webrtc]`): the WebRTC transport of the Realtime API; brings PyAV |
+| aiortc | BSD-3-Clause | optional (`bolo-speech[webrtc]`): the WebRTC transport of the Realtime API; brings PyAV |
 | pywhispercpp / whisper.cpp | MIT / MIT | optional |
-| kokoro-onnx | MIT, **but depends on `phonemizer` (GPL-3.0-or-later)** and loads espeak-ng in process | optional, deliberately not in `bolo[all]` |
+| kokoro-onnx | MIT, **but depends on `phonemizer` (GPL-3.0-or-later)** and loads espeak-ng in process | optional, deliberately not in `bolo-speech[all]` |
 | piper-tts (`piper1-gpl`) | GPL-3.0 | **not used and not supported**: Piper-format voices run through sherpa-onnx instead |
 | llama.cpp (`llama-server`) | MIT | optional, a separate process: the `tts-server` engine starts it or connects to one (`bolo components install llama-server` downloads the upstream release) |
 | audio.cpp (`audiocpp_server`) | Apache-2.0 | optional, a separate process, as llama-server. Model weights keep their own licences (audio.cpp's `docs/model_licenses.md`) |
@@ -1892,7 +1892,7 @@ to turn text into those phonemes at run time. What we found:
   "Phonemisers" above).
 
 **bolo does not ship espeak-ng.** It is not in the wheel, not in
-`bolo[all]`, and not in the Docker images unless you build them with
+`bolo-speech[all]`, and not in the Docker images unless you build them with
 `--build-arg WITH_ESPEAK=1`. It is an *optional component*, installed only
 when you ask for it. Voices that read phonemes have `requires: ["phonemizer"]`
 in the catalog files; in the API their `requires` names the phonemiser they
@@ -1907,7 +1907,7 @@ Ways to install it, any one of:
 | --- | --- |
 | the console (Models → Optional components, or the notice next to a voice) | asks you to accept the licence, then the same as the next row |
 | `bolo components install espeak-ng --accept-license`, or `POST /api/v1/components/espeak-ng/install` with `{"accept_license": true}` | `pip install espeakng-loader` (or `uv pip install`) into the server's own Python environment; a running server starts using it without a restart |
-| `pip install 'bolo[espeak]'` | the same package, installed by you |
+| `pip install 'bolo-speech[espeak]'` | the same package, installed by you |
 | `apt install espeak-ng` / `brew install espeak-ng` | the system executable |
 
 `bolo components list`, `bolo doctor` and `GET /api/v1/components` show

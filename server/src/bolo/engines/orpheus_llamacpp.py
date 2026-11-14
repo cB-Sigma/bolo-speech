@@ -164,7 +164,7 @@ def open_session(path: Path, threads: int) -> OrtSession:
     except ImportError as exc:
         raise ComponentMissing(
             "the Orpheus route decodes audio with onnxruntime, which is not installed: pip install onnxruntime "
-            '(or pip install "bolo[orpheus]")'
+            '(or pip install "bolo-speech[orpheus]")'
         ) from exc
     opts = ort.SessionOptions()
     opts.intra_op_num_threads = max(1, threads)

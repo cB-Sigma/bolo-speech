@@ -135,7 +135,7 @@ export class MockServer {
       engines: [
         { id: 'sherpa-onnx', version: '1.12.14', available: true, reason: null },
         { id: 'onnxruntime', version: '1.23.0', available: true, reason: null },
-        { id: 'ctranslate2', version: null, available: false, reason: 'not installed (pip install bolo[whisper])' },
+        { id: 'ctranslate2', version: null, available: false, reason: 'not installed (pip install bolo-speech[whisper])' },
       ],
       device: 'cpu',
       cpu_count: 4,

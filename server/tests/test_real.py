@@ -42,9 +42,9 @@ LIBRISPEECH_REF = (
 
 needs_espeak = pytest.mark.skipif(get_phonemizer() is None, reason="needs an espeak-ng installation (not bundled: GPL)")
 needs_phonemes_en_hi = pytest.mark.skipif(
-    select("piper", "en-us") is None, reason="needs a phonemiser: uccharan (bolo[uccharan]) or espeak-ng"
+    select("piper", "en-us") is None, reason="needs a phonemiser: uccharan (bolo-speech[uccharan]) or espeak-ng"
 )
-needs_uccharan = pytest.mark.skipif(get_uccharan() is None, reason="needs uccharan (bolo[uccharan])")
+needs_uccharan = pytest.mark.skipif(get_uccharan() is None, reason="needs uccharan (bolo-speech[uccharan])")
 
 
 def real_settings() -> Settings:

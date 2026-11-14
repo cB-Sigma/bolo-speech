@@ -92,10 +92,10 @@ def test_component_listing_shape(live: LiveServer, no_espeak) -> None:  # type: 
     assert c["name"] == "eSpeak NG" and c["license"] == "GPL-3.0-or-later" and c["kind"] == "phonemizer"
     assert c["installed"] is False and c["source"] is None and c["version"] is None
     assert c["required_by_count"] >= 80 and c["installable"] is True and c["install_blocked_reason"] is None
-    assert c["manual_command"] == "pip install 'bolo[espeak]'" and c["license_url"].startswith("https://")
+    assert c["manual_command"] == "pip install 'bolo-speech[espeak]'" and c["license_url"].startswith("https://")
     u = components["uccharan"]
     assert u["license"] == "Apache-2.0" and u["installed"] is False and u["installable"] is True
-    assert u["manual_command"] == "pip install 'bolo[uccharan]'" and 20 <= u["required_by_count"] < 40
+    assert u["manual_command"] == "pip install 'bolo-speech[uccharan]'" and 20 <= u["required_by_count"] < 40
     assert set(u["languages"]) == {"en-us", "en-gb", "hi"}
     assert httpx.get(live.url + "/api/v1/info").json()["components"] == doc["components"]
     # English and Hindi Piper voices: uccharan first, espeak-ng as the alternative

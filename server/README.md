@@ -101,11 +101,11 @@
 ## Quick start
 
 ```bash
-pipx install 'bolo[all] @ git+https://github.com/cb-Sigma/bolo#subdirectory=server'
+pipx install 'bolo-speech[all] @ git+https://github.com/cb-Sigma/bolo#subdirectory=server'
 bolo serve
 ```
 
-(`pip install` into a virtual environment works the same way. Once the package is on PyPI this becomes `pipx install 'bolo[all]'`, or `pipx run --spec 'bolo[all]' bolo serve`.)
+(`pip install` into a virtual environment works the same way. Once the package is on PyPI this becomes `pipx install 'bolo-speech[all]'`, or `pipx run --spec 'bolo-speech[all]' bolo serve`.)
 
 Open <http://127.0.0.1:8000> for the console, or use the API. The first request for a model downloads it:
 
@@ -141,7 +141,7 @@ client.audio.speech.create(model="tts-1", voice="alloy", input=text).write_to_fi
 
 Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AAC through bundled FFmpeg), `wyoming`, `all` (those four), and `espeak` (see below; never part of `all`).
 
-**eSpeak NG is optional and not shipped with bolo.** Voices in Piper format, KittenTTS and the non-English Kokoro voices need the eSpeak NG phonemiser, which is GPL-3.0-or-later. The default voice (Kokoro English) does not. If you want those voices, install it when you choose to: one click in the console (Models → Components), `bolo components install espeak-ng --accept-license`, `pip install 'bolo[espeak]'`, or your system's package (`apt install espeak-ng`). It takes effect without a restart. Until then those voices answer with a clear `component_missing` error. Details: [Licences](#licences).
+**eSpeak NG is optional and not shipped with bolo.** Voices in Piper format, KittenTTS and the non-English Kokoro voices need the eSpeak NG phonemiser, which is GPL-3.0-or-later. The default voice (Kokoro English) does not. If you want those voices, install it when you choose to: one click in the console (Models → Components), `bolo components install espeak-ng --accept-license`, `pip install 'bolo-speech[espeak]'`, or your system's package (`apt install espeak-ng`). It takes effect without a restart. Until then those voices answer with a clear `component_missing` error. Details: [Licences](#licences).
 
 ## What it does
 
@@ -373,7 +373,7 @@ Stated plainly, so you do not find out the hard way:
 bolo itself is [Apache-2.0](LICENSE). It contains no third-party source code; [NOTICE](NOTICE) lists what it works with.
 
 - **Engines**: sherpa-onnx (Apache-2.0), ONNX Runtime (MIT), faster-whisper and CTranslate2 (MIT). The optional `kokoro-onnx` plugin is MIT but pulls in the GPL `phonemizer` package, so it is not part of `[all]`.
-- **eSpeak NG (GPL-3.0-or-later) is a separate, optional component.** It turns text into phonemes for Piper-format voices, KittenTTS, Matcha-TTS (English) and the non-English Kokoro voices. bolo's wheel does not contain it, the `all` extra does not install it, and the container image does not include it unless you build with `--build-arg WITH_ESPEAK=1`. It arrives only when you ask: the console's install button (which asks you to accept the licence), `bolo components install espeak-ng --accept-license`, `pip install 'bolo[espeak]'` (the `espeakng-loader` package: a prebuilt library plus data), or a system package. bolo's own code stays Apache-2.0 either way: Apache-2.0 code may be combined with GPLv3 code, and bolo only calls the component's public interface. But **if you redistribute a bundle that contains eSpeak NG** (an image built with `WITH_ESPEAK=1`, an appliance, an installer) **you must comply with the GPL for that component**. Without it you still have Kokoro English and Mandarin, MeloTTS, MMS-TTS (non-commercial) and the Coqui Bengali voices. sherpa-onnx removed espeak-ng from its own binaries in version 2.0, and the GPL `piper-tts` runtime is not used at all. More in [docs/models.md](docs/models.md#licences-and-the-espeak-ng-question).
+- **eSpeak NG (GPL-3.0-or-later) is a separate, optional component.** It turns text into phonemes for Piper-format voices, KittenTTS, Matcha-TTS (English) and the non-English Kokoro voices. bolo's wheel does not contain it, the `all` extra does not install it, and the container image does not include it unless you build with `--build-arg WITH_ESPEAK=1`. It arrives only when you ask: the console's install button (which asks you to accept the licence), `bolo components install espeak-ng --accept-license`, `pip install 'bolo-speech[espeak]'` (the `espeakng-loader` package: a prebuilt library plus data), or a system package. bolo's own code stays Apache-2.0 either way: Apache-2.0 code may be combined with GPLv3 code, and bolo only calls the component's public interface. But **if you redistribute a bundle that contains eSpeak NG** (an image built with `WITH_ESPEAK=1`, an appliance, an installer) **you must comply with the GPL for that component**. Without it you still have Kokoro English and Mandarin, MeloTTS, MMS-TTS (non-commercial) and the Coqui Bengali voices. sherpa-onnx removed espeak-ng from its own binaries in version 2.0, and the GPL `piper-tts` runtime is not used at all. More in [docs/models.md](docs/models.md#licences-and-the-espeak-ng-question).
 - **Models** are downloaded from their publishers under their own licences, which the catalog records per model and the console shows. Most are MIT, Apache-2.0 or CC-BY-4.0. Some are **non-commercial** (MMS-TTS, non-English Moonshine, several Piper voices, flagged ⚠) or have custom terms (SenseVoice, Paraformer). Nothing in the default catalog is gated, and bolo never downloads a gated model without your own token.
 
 ## Roadmap

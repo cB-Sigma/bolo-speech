@@ -863,7 +863,7 @@ class SherpaOnnxEngine(Engine):
             return EngineStatus(self.id, True, str(getattr(sherpa_onnx, "__version__", "unknown")), None)
         except Exception as exc:
             return EngineStatus(
-                self.id, False, None, f"{type(exc).__name__}: {exc}. Install with: pip install 'bolo[sherpa]'"
+                self.id, False, None, f"{type(exc).__name__}: {exc}. Install with: pip install 'bolo-speech[sherpa]'"
             )
 
     def load(self, kind: str, task: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Model:

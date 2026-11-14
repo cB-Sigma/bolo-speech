@@ -307,7 +307,7 @@ llama-server, **not against a real LFM3-Audio model.**
 ### Browsers: WebRTC and ephemeral keys
 
 `POST /v1/realtime/calls` is the WebRTC transport of the same sessions
-(`pip install 'bolo[webrtc]'`, which brings
+(`pip install 'bolo-speech[webrtc]'`, which brings
 [aiortc](https://github.com/aiortc/aiortc), BSD-3-Clause; without it the
 route answers `503 engine_unavailable` and everything else works). The body
 is the browser's SDP offer (`Content-Type: application/sdp`), or a multipart

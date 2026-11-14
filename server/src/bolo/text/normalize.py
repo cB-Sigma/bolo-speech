@@ -8,7 +8,7 @@ example Hindi with English words in Latin script) is passed through
 untouched: nothing is transliterated.
 
 For evaluation (WER) :func:`normalize_for_wer` uses ``whisper-normalizer``
-when it is installed (``bolo[text]``) and a simple fallback otherwise.
+when it is installed (``bolo-speech[text]``) and a simple fallback otherwise.
 """
 
 from __future__ import annotations
