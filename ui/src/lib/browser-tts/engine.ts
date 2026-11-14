@@ -7,7 +7,8 @@ import {
   requireOneRuntime,
   TTS_MEMORY_PAGES,
 } from '@/lib/browser-runtime'
-import { peakFor, rememberMeasured } from '@/lib/device'
+import { device as deviceInfo, ensureDeviceProbe, peakFor, rememberMeasured } from '@/lib/device'
+import { placementChoice, rememberSpeed, resolvePlacement, type PlaceableModel, type Placement } from '@/lib/placement'
 import { diag } from '@/lib/diagnostics'
 import {
   downloadedIds,
@@ -48,6 +49,12 @@ export interface TtsEngineState {
   /** `model` is what the shared load components read: label and size. */
   model: { id: string; label: string; approxBytes: number }
   device: BrowserDevice | null
+  /** Where the loaded voice runs: WebGPU, the CPU, or its two halves split between them. */
+  placement: Placement | null
+  /** Why Auto chose it, or why it fell back. */
+  placementWhy: string
+  /** Share of the weights on WebGPU, 0..1. */
+  gpuShare: number
   threads: number
   files: FileProgress[]
   progress: number
@@ -106,6 +113,32 @@ function modelOf(voice: BrowserVoice, index: VoiceIndex | null, bytes?: number) 
  * browser cache itself is not listed: in WebKit that reads every stored file
  * into memory (see lib/downloads.ts).
  */
+interface Halves {
+  front: string
+  back: string
+  /** Share of the weights in the front half, by bytes. */
+  frontShare: number
+}
+
+/** Whether the published index has the voice's graph cut in two (front and back halves). */
+export function hasHalves(voice: BrowserVoice, index: VoiceIndex | null): boolean {
+  const f = index?.voices.find((v) => v.id === voice.id)?.files
+  return Boolean(voice.files.from === 'published' && f?.['front.onnx'] && f['back.onnx'])
+}
+
+/** A voice in the terms of lib/placement.ts. Kokoro starts on WebGPU; the small VITS voices on the CPU. */
+export function placeableVoice(voice: BrowserVoice, located?: { halves?: unknown }): PlaceableModel {
+  return {
+    id: voice.downloadId,
+    modules: ['model'],
+    bytes: voice.approxBytes,
+    peakBytes: voice.peakBytes,
+    gpuFirst: voice.kind === 'kokoro',
+    cutHalves: Boolean(located?.halves),
+    splitText: 'front half on WebGPU, back half on the CPU',
+  }
+}
+
 export function isVoiceCached(id: string): boolean {
   return isDownloaded(id)
 }
@@ -132,6 +165,9 @@ export class BrowserTtsEngine {
       voice,
       model: modelOf(voice, null),
       device: null,
+      placement: null,
+      placementWhy: '',
+      gpuShare: 0,
       threads: 1,
       files: [],
       progress: 0,
@@ -161,14 +197,22 @@ export class BrowserTtsEngine {
     const s = this.store.get()
     if (s.status === 'idle' || s.status === 'error') return null
     const bytes = peakFor(s.voice.downloadId, s.voice.peakBytes)
-    const backend = s.device ?? 'wasm'
+    const backend = s.placement ?? s.device ?? 'wasm'
     return {
       id: s.voice.downloadId,
       label: s.voice.downloadLabel,
       task: 'tts',
       backend,
       bytes,
-      gpuBytes: backend === 'webgpu' ? bytes : 0,
+      gpuBytes: Math.round(bytes * s.gpuShare),
+      placement:
+        [
+          backend === 'split' ? 'front half on WebGPU, back half on the CPU' : '',
+          backend === 'webgpu' ? 'operators WebGPU lacks run on the CPU' : '',
+          s.placementWhy,
+        ]
+          .filter(Boolean)
+          .join(' · ') || undefined,
       busy: this.pending.size > 0,
       loading: s.status === 'loading',
     }
@@ -315,7 +359,21 @@ export class BrowserTtsEngine {
     const bytes = located.bytes
     const threads = !safe && support.wasmThreads ? Math.max(1, Math.min(4, support.hardwareConcurrency)) : 1
     if (generation !== this.generation) throw new Error('Load cancelled')
-    this.store.patch({ device: 'wasm', threads })
+    await Promise.race([ensureDeviceProbe(), new Promise((r) => setTimeout(r, 3000))])
+    const resolved = resolvePlacement(
+      placeableVoice(voice, located),
+      safe ? 'wasm' : placementChoice(voice.downloadId),
+      deviceInfo.get(),
+    )
+    const halves = resolved.placement === 'split' ? located.halves : undefined
+    const gpu: 'webgpu' | 'wasm' = resolved.placement === 'wasm' ? 'wasm' : 'webgpu'
+    this.store.patch({
+      device: gpu,
+      threads,
+      placement: halves ? 'split' : gpu,
+      placementWhy: resolved.why,
+      gpuShare: halves ? halves.frontShare : gpu === 'webgpu' ? 1 : 0,
+    })
     diag.event(
       'voice',
       `loading ${voice.id}, ${threads} thread${threads === 1 ? '' : 's'}${safe ? ' (single-threaded retry)' : ''}`,
@@ -374,6 +432,8 @@ export class BrowserTtsEngine {
             // Kokoro voices share their model: each voice adds its own small style file.
             merge: voice.kind === 'kokoro',
           })
+          if (msg.device === 'wasm' && this.store.get().placement !== 'wasm')
+            this.store.patch({ device: 'wasm', placement: 'wasm', gpuShare: 0, placementWhy: 'WebGPU failed here' })
           this.store.patch({
             status: 'ready',
             loadMs: msg.loadMs,
@@ -423,6 +483,8 @@ export class BrowserTtsEngine {
         phonemeLanguage: voice.phonemeLanguage,
         uccharanBase: `${base}uccharan/`,
         threads,
+        device: gpu,
+        halves: halves ? { front: halves.front, back: halves.back } : undefined,
         ortWasmBase: readBrowserSttConfig().ortWasmBase,
         plainRuntimeLoad: safe,
         memoryPages: TTS_MEMORY_PAGES,
@@ -445,6 +507,8 @@ export class BrowserTtsEngine {
     configFormat: 'bolo' | 'piper' | null
     style?: string
     bytes: number
+    /** The graph cut in two at build time, when published: front for WebGPU, back for the CPU. */
+    halves?: Halves
   }> {
     const files = voice.files
     if (files.from === 'kokoro')
@@ -478,11 +542,21 @@ export class BrowserTtsEngine {
         configFormat: 'bolo',
         bytes: voice.approxBytes,
       }
+    const front = f['front.onnx']
+    const back = f['back.onnx']
     return {
       model: `${base}${voice.id}/model.onnx${v}`,
       config: `${base}${voice.id}/voice.json${v}`,
       configFormat: 'bolo',
       bytes: published.bytes,
+      halves:
+        front && back
+          ? {
+              front: `${base}${voice.id}/front.onnx?v=${front.sha256.slice(0, 12)}`,
+              back: `${base}${voice.id}/back.onnx?v=${back.sha256.slice(0, 12)}`,
+              frontShare: front.bytes / (front.bytes + back.bytes),
+            }
+          : undefined,
     }
   }
 
@@ -495,8 +569,17 @@ export class BrowserTtsEngine {
     touchDownload(this.store.get().voice.downloadId)
     const id = this.nextId++
     const { noise_scale, length_scale, noise_scale_w } = cfg.inference
+    const { placement, voice } = this.store.get()
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject })
+      this.pending.set(id, {
+        resolve: (r) => {
+          // Speeds measured here let Auto choose between WebGPU and the CPU next time.
+          const seconds = r.audio.length / r.sampleRate
+          if (placement && seconds >= 1) rememberSpeed(voice.downloadId, placement, r.ms / 1000 / seconds)
+          resolve(r)
+        },
+        reject,
+      })
       worker.postMessage({ type: 'synth', id, text, scales: [noise_scale, length_scale, noise_scale_w] })
     })
   }

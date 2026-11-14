@@ -1,3 +1,5 @@
+import { PlacementSelect } from '@/components/placement-select'
+import { placeableStt } from '@/lib/browser-stt/models'
 import { useVerdict, VerdictLine } from '@/components/model-fit'
 import { sttNeeds } from '@/components/stt/language-controls'
 import { deleteDownload, downloadedIds } from '@/lib/downloads'
@@ -74,7 +76,7 @@ export function BrowserEnginePanel({
   return (
     <Panel
       title="In-browser model"
-      description="Runs on this device with WebAssembly. Audio never leaves the page."
+      description="Runs on this device with WebGPU or WebAssembly. Audio never leaves the page."
       data-testid="browser-engine"
       actions={
         s.status === 'idle' || s.status === 'error' ? (
@@ -124,6 +126,18 @@ export function BrowserEnginePanel({
         </span>
       </div>
 
+      <PlacementSelect
+        className="mt-3"
+        model={placeableStt(s.model)}
+        disabled={s.status === 'loading' || engine.busy}
+        onChange={() => {
+          // Load again where the visitor asked, if it was loaded.
+          if (s.status === 'ready') {
+            engine.dispose()
+            void engine.load().catch(() => undefined)
+          }
+        }}
+      />
       {s.status !== 'ready' && <EngineVerdict />}
       <LoadProgress className="mt-3" />
       <LoadTrouble className="mt-3" />
@@ -156,7 +170,12 @@ export function BrowserEnginePanel({
 
       <div className="mt-3 divide-y divide-border border-t border-border">
         <Fact label="Runs on" ok={s.status === 'ready' ? true : null}>
-          {s.device === 'webgpu' ? (
+          {s.placement === 'split' ? (
+            <>
+              <Zap className="size-3" aria-hidden /> Encoder on WebGPU, decoder on WebAssembly · {s.threads} thread
+              {s.threads === 1 ? '' : 's'}
+            </>
+          ) : s.device === 'webgpu' ? (
             <>
               <Zap className="size-3" aria-hidden /> WebGPU
             </>

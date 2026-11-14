@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import * as ort from 'onnxruntime-web/wasm'
+import type * as Ort from 'onnxruntime-web/wasm'
 import {
   cachedDownload,
   lowerMemoryMaximum,
@@ -23,7 +23,38 @@ const scope = self as unknown as DedicatedWorkerGlobalScope
 const post = (msg: TtsWorkerResponse, transfer: Transferable[] = []) => scope.postMessage(msg, transfer)
 const stage = (s: LoadStage, loaded?: number, total?: number) => post({ type: 'stage', stage: s, loaded, total })
 
-let session: ort.InferenceSession | null = null
+/** One ONNX Runtime session, or two (front on WebGPU, back on the CPU) behind the same surface. */
+interface Runner {
+  readonly outputNames: readonly string[]
+  run(feeds: Record<string, Ort.Tensor>): Promise<Record<string, Ort.OnnxValue>>
+  release(): Promise<void>
+}
+
+/**
+ * Two halves of one graph, cut at build time (the server's bolo/onnx_split.py): the front runs on WebGPU, the
+ * back on the CPU, and the tensors that cross the cut come back to the CPU in between.
+ */
+function twoPart(front: Ort.InferenceSession, back: Ort.InferenceSession): Runner {
+  return {
+    outputNames: back.outputNames.length ? back.outputNames : front.outputNames,
+    async run(feeds) {
+      const frontFeeds = Object.fromEntries(front.inputNames.filter((n) => n in feeds).map((n) => [n, feeds[n]]))
+      const mid = await front.run(frontFeeds as Record<string, Ort.Tensor>)
+      const backFeeds: Record<string, Ort.OnnxValue> = {}
+      for (const n of back.inputNames) backFeeds[n] = (mid[n] ?? feeds[n]) as Ort.OnnxValue
+      // A graph output the front already makes is passed on as it is.
+      return { ...mid, ...(await back.run(backFeeds)) }
+    },
+    async release() {
+      await front.release()
+      await back.release()
+    },
+  }
+}
+
+/** The ONNX Runtime build in use: the WebAssembly-only one, or the one with WebGPU (and WebAssembly). */
+let ort: typeof Ort
+let session: Runner | null = null
 let config: VoiceConfig | null = null
 let uccharan: typeof UccharanModule | null = null
 let kokoroStyle: Float32Array | null = null
@@ -32,11 +63,15 @@ let chain: Promise<void> = Promise.resolve()
 const record = (r: FetchRecord) => post({ type: 'fetch', record: r })
 
 async function loadRuntime(req: Extract<TtsWorkerRequest, { type: 'load' }>): Promise<void> {
+  const gpu = req.device === 'webgpu' || Boolean(req.halves)
+  ort = gpu ? ((await import('onnxruntime-web/webgpu')) as unknown as typeof Ort) : await import('onnxruntime-web/wasm')
   const wasm = ort.env.wasm
   wasm.numThreads = req.threads
   wasm.proxy = false
   const base = req.ortWasmBase?.replace(/\/?$/, '/') ?? ortCdnBase(ort.env.versions.web ?? '')
-  const paths = { mjs: `${base}ort-wasm-simd-threaded.mjs`, wasm: `${base}ort-wasm-simd-threaded.wasm` }
+  // The WebGPU build needs the asyncify variant of the WebAssembly runtime.
+  const variant = gpu ? 'ort-wasm-simd-threaded.asyncify' : 'ort-wasm-simd-threaded'
+  const paths = { mjs: `${base}${variant}.mjs`, wasm: `${base}${variant}.wasm` }
   wasm.wasmPaths = { ...paths }
   stage('runtime')
   // The loader asks for a shared memory of up to 4 GiB; a voice needs far less, and on iPhones a second
@@ -104,7 +139,10 @@ async function load(req: Extract<TtsWorkerRequest, { type: 'load' }>): Promise<v
       .slice(-2)
       .join('/')
   const pending: Promise<unknown>[] = []
-  const model = get(req.model, short(req.model))
+  const model = req.halves ? null : get(req.model, short(req.model))
+  const halves = req.halves
+    ? Promise.all([get(req.halves.front, short(req.halves.front)), get(req.halves.back, short(req.halves.back))])
+    : null
   const settings = req.config ? get(req.config, short(req.config), 'application/json') : null
   const style = req.style ? get(req.style, short(req.style)) : null
   if (req.phonemizer === 'uccharan') {
@@ -120,7 +158,7 @@ async function load(req: Extract<TtsWorkerRequest, { type: 'load' }>): Promise<v
       })(),
     )
   }
-  const [modelFile, cfgFile, styleFile] = await Promise.all([model, settings, style, ...pending])
+  const [modelFile, cfgFile, styleFile, halfFiles] = await Promise.all([model, settings, style, halves, ...pending])
   if (req.kind === 'kokoro') {
     if (!styleFile) throw new Error('The voice style is missing')
     kokoroStyle = new Float32Array(styleFile.data)
@@ -145,14 +183,33 @@ async function load(req: Extract<TtsWorkerRequest, { type: 'load' }>): Promise<v
       } as VoiceConfig
   }
   stage('compiling')
-  session = await ort.InferenceSession.create(new Uint8Array(modelFile.data), {
-    executionProviders: ['wasm'],
+  const options = (providers: string[]): Ort.InferenceSession.SessionOptions => ({
+    executionProviders: providers,
     graphOptimizationLevel: 'all',
     // The 8-bit weights are stored with a DequantizeLinear in front of each. Without this the runtime keeps
     // those nodes (for quantised kernels this graph does not use) and expands the weights on every call;
     // with it they are folded into constants once, at load, and synthesis is as fast as with the fp32 file.
     extra: { session: { disable_quant_qdq: '1' } },
   })
+  const create = async (data: ArrayBuffer, gpu: boolean): Promise<Ort.InferenceSession> => {
+    if (!gpu) return ort.InferenceSession.create(new Uint8Array(data), options(['wasm']))
+    try {
+      // Operators WebGPU lacks run on the CPU within the same session.
+      return await ort.InferenceSession.create(new Uint8Array(data), options(['webgpu', 'wasm']))
+    } catch (err) {
+      post({ type: 'note', text: `WebGPU failed (${err instanceof Error ? err.message : String(err)}); using the CPU` })
+      placed = 'wasm'
+      return ort.InferenceSession.create(new Uint8Array(data), options(['wasm']))
+    }
+  }
+  let placed: 'webgpu' | 'wasm' | 'split' = req.halves ? 'split' : req.device
+  if (halfFiles) {
+    const front = await create(halfFiles[0].data, true)
+    const back = await create(halfFiles[1].data, false)
+    session = twoPart(front, back)
+  } else if (modelFile) {
+    session = await create(modelFile.data, req.device === 'webgpu')
+  } else throw new Error('The voice model is missing')
   stage('warmup')
   // A short run so the first sentence does not pay for first-use allocations.
   if (config.kind === 'kokoro') await runKokoro([0, 50, 83, 0], 1)
@@ -163,8 +220,11 @@ async function load(req: Extract<TtsWorkerRequest, { type: 'load' }>): Promise<v
     memoryBytes: runtimeMemoryBytes(),
     config,
     threads: req.threads,
-    cached: modelFile.fromCache,
-    cacheKeys: [req.model, req.config, req.style].filter((x): x is string => Boolean(x)),
+    cached: (modelFile ?? halfFiles?.[0])?.fromCache ?? false,
+    device: placed,
+    cacheKeys: [req.halves ? null : req.model, req.halves?.front, req.halves?.back, req.config, req.style].filter(
+      (x): x is string => Boolean(x),
+    ),
   })
 }
 
@@ -180,7 +240,7 @@ async function run(ids: number[], scales: [number, number, number]): Promise<Flo
     scales: new ort.Tensor('float32', Float32Array.from(scales), [3]),
   }
   const out = await session.run(feeds)
-  const tensor = out[session.outputNames[0] as string] as ort.Tensor
+  const tensor = out[session.outputNames[0] as string] as Ort.Tensor
   const audio = new Float32Array(tensor.data as Float32Array)
   tensor.dispose()
   return audio
@@ -201,7 +261,7 @@ async function runKokoro(ids: number[], speed: number): Promise<Float32Array> {
     speed: new ort.Tensor('float32', Float32Array.from([speed]), [1]),
   }
   const out = await session.run(feeds)
-  const tensor = out[session.outputNames[0] as string] as ort.Tensor
+  const tensor = out[session.outputNames[0] as string] as Ort.Tensor
   const audio = new Float32Array(tensor.data as Float32Array)
   tensor.dispose()
   return audio

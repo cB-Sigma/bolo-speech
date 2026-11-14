@@ -20,6 +20,10 @@ export type TtsWorkerRequest =
       /** Directory with uccharan's language data (ends in a slash). */
       uccharanBase: string
       threads: number
+      /** Run the graph on WebGPU (operators it lacks fall back to the CPU) or on the CPU only. */
+      device: 'webgpu' | 'wasm'
+      /** The graph cut in two at build time: front on WebGPU, back on the CPU (instead of `model`). */
+      halves?: { front: string; back: string }
       /** Directory with ort-wasm-simd-threaded.{wasm,mjs}; defaults to the jsDelivr copy of the bundled version. */
       ortWasmBase?: string
       /** Leave fetching the runtime binary to ONNX Runtime (no progress, no shared cache). */
@@ -45,6 +49,8 @@ export type TtsWorkerResponse =
       config: VoiceConfig
       threads: number
       cached: boolean
+      /** Where it ended up (WebGPU falls back to the CPU when it fails). */
+      device: 'webgpu' | 'wasm' | 'split'
       /** Size of the runtime's WebAssembly memory after loading, when known. */
       memoryBytes: number | null
       /** Cache Storage keys of this voice's own files (for deleting it later without listing the cache). */

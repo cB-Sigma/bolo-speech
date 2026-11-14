@@ -504,6 +504,8 @@ test.describe('every model that runs in a browser, labelled for this device', ()
     await page.getByTestId('kokoro-precision').click()
     await page.getByRole('option', { name: /32-bit/ }).click()
     await expect(page.getByTestId('voice-about')).toContainText('32-bit (original) weights')
+    // The precision menu has closed (axe reads the page while it animates away otherwise).
+    await expect(page.getByRole('listbox')).toHaveCount(0)
     await axe(page)
   })
 
@@ -944,5 +946,126 @@ test.describe('loaded models in the page', () => {
     await page.clock.fastForward('01:10')
     await expect(panel).toContainText('No models loaded')
     expect(await page.evaluate(() => localStorage.getItem('bolo.keepAlive'))).toContain('"minutes":1')
+  })
+})
+
+test.describe('GPU/CPU placement', () => {
+  const device = (maxStorageBufferBindingSize: number) => ({
+    memoryGb: 8,
+    webgpu: {
+      available: true,
+      f16: true,
+      maxBufferSize: maxStorageBufferBindingSize,
+      maxStorageBufferBindingSize,
+      adapter: 'apple metal-3',
+    },
+  })
+
+  test('Auto splits by graph when a graph exceeds the GPU buffer; the choice shows in Loaded models by bytes', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 900 })
+    await page.addInitScript(
+      (d) => {
+        localStorage.setItem('bolo.mock.browserStt', JSON.stringify({ loadMs: 300 }))
+        localStorage.setItem('bolo.fakeDevice', d)
+        // The decoder was seen at 20 MB when this model last loaded; this GPU's largest buffer is 16 MB.
+        if (!sessionStorage.getItem('seeded')) {
+          sessionStorage.setItem('seeded', '1')
+          localStorage.setItem(
+            'bolo.placement',
+            JSON.stringify({
+              moduleBytes: { 'moonshine-tiny': { encoder_model: 7_937_661, decoder_model_merged: 20_243_286 } },
+            }),
+          )
+        }
+      },
+      JSON.stringify(device(16e6)),
+    )
+    await open(page, 'stt')
+    const panel = page.getByTestId('browser-engine')
+    const placement = panel.getByTestId('placement')
+    await expect(placement.getByTestId('placement-select')).toHaveText(/Auto \(split\)/)
+    await expect(placement.getByTestId('placement-why')).toContainText("larger than this GPU's largest buffer")
+    // Apple GPU: memory is shared, and the page says what a split does and does not buy.
+    await expect(placement.getByTestId('placement-shared')).toContainText('not with total memory')
+    // The page may already be fetching it while idle; otherwise load it.
+    const load = panel.getByRole('button', { name: /^(Load|Download)$/ })
+    const status = panel.getByTestId('engine-status')
+    await expect(async () => {
+      if ((await status.getAttribute('data-status')) !== 'loading' && (await load.isVisible()))
+        await load.click({ timeout: 1000 })
+      expect(await status.getAttribute('data-status')).toBe('ready')
+    }).toPass({ timeout: 30_000 })
+    await page.goto('./#/models')
+    const row = page.getByTestId('loaded-models').getByTestId('loaded-model')
+    // Encoder (7.9 MB) on WebGPU, decoder (20.2 MB) on the CPU: 28% of the bytes on the GPU.
+    await expect(row.getByTestId('processor')).toHaveText('72%/28% CPU/GPU')
+    await expect(row).toContainText('encoder_model on WebGPU, decoder_model_merged on the CPU')
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    )
+    expect(overflow).toBeLessThanOrEqual(1)
+    await axe(page)
+
+    // All CPU, chosen by hand: reloaded there.
+    await page.goto('./#/stt')
+    await page.getByTestId('placement-select').click()
+    await page.getByTestId('placement-wasm').click()
+    await expect(page.getByTestId('browser-engine').getByTestId('engine-status')).toHaveAttribute(
+      'data-status',
+      'ready',
+    )
+    await page.goto('./#/models')
+    await expect(row.getByTestId('processor')).toHaveText('100% CPU')
+    await axe(page)
+  })
+
+  test('a choice that cannot work here is warned about, not refused', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('bolo.mock.browserStt', JSON.stringify({ loadMs: 300 }))
+      localStorage.setItem(
+        'bolo.fakeDevice',
+        JSON.stringify({
+          webgpu: {
+            available: false,
+            f16: false,
+            maxBufferSize: null,
+            maxStorageBufferBindingSize: null,
+            adapter: null,
+          },
+        }),
+      )
+    })
+    await open(page, 'stt')
+    await expect(page.getByTestId('placement-select')).toHaveText(/Auto \(CPU\)/)
+    await page.getByTestId('placement-select').click()
+    await page.getByTestId('placement-webgpu').click()
+    await expect(page.getByTestId('placement-warning')).toContainText('No WebGPU in this browser')
+    await expect(page.getByTestId('placement-select')).toBeEnabled()
+  })
+
+  test.describe('with the voices published', () => {
+    test.skip(!VOICES || !MIRROR, 'set BOLO_E2E_VOICE_DIR (voices) and BOLO_E2E_MODEL_DIR (runtime mirror) to run')
+
+    test('a voice cut in two at build time runs as two sessions and speaks', async ({ page }) => {
+      const notes: string[] = []
+      page.on('console', (m) => notes.push(m.text()))
+      await open(page, 'tts')
+      await page.getByTestId('voice-picker').click()
+      await page.getByTestId('voice-syspin-hi-female').click()
+      await page.getByTestId('placement-select').click()
+      await page.getByTestId('placement-split').click()
+      await page.getByTestId('tts-text').fill('नमस्ते! आज मौसम बहुत अच्छा है।')
+      await page.getByTestId('speak').click()
+      await expect(page.getByTestId('model-chip')).toHaveAttribute('data-status', 'ready', { timeout: 120_000 })
+      await expect(page.getByTestId('ttfa')).toHaveText(/^\d+$/, { timeout: 60_000 })
+      await expect(page.getByTestId('speak')).toBeVisible({ timeout: 60_000 })
+      await page.goto('./#/models')
+      const row = page.getByTestId('loaded-models').getByTestId('loaded-model').filter({ hasText: 'syspin-hi-female' })
+      // Front half on WebGPU where the browser has it; this test browser may not, and then both halves run on the CPU.
+      await expect(row.getByTestId('processor')).toHaveText(/^(49%\/51% CPU\/GPU|100% CPU)$/)
+      console.log(`[placement] split voice: ${await row.getByTestId('processor').innerText()}`)
+    })
   })
 })

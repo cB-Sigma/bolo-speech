@@ -32,7 +32,8 @@ import { encodeWav } from '@/lib/audio/wav'
 import { download } from '@/lib/bench'
 import { sharedEngine } from '@/lib/browser-stt/engine'
 import { browserModel } from '@/lib/browser-stt/models'
-import { sharedTtsEngine } from '@/lib/browser-tts/engine'
+import { hasHalves, placeableVoice, sharedTtsEngine } from '@/lib/browser-tts/engine'
+import { PlacementSelect } from '@/components/placement-select'
 import { BrowserTtsSession, type BrowserTtsExtra } from '@/lib/browser-tts/session'
 import {
   baseVoiceId,
@@ -516,6 +517,17 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
               </Button>
             </div>
             {es.status !== 'ready' && <VerdictLine className="mt-3" verdict={voiceVerdict} bytes={bytes} />}
+            <PlacementSelect
+              className="mt-3"
+              model={placeableVoice(voice, { halves: hasHalves(voice, es.index) || undefined })}
+              disabled={busy || es.status === 'loading'}
+              onChange={() => {
+                if (es.status === 'ready') {
+                  engine.dispose()
+                  void engine.load().catch(() => undefined)
+                }
+              }}
+            />
             {voice.approximate && (
               <p className="mt-2 text-xs text-muted-foreground" data-testid="approximate-note">
                 {voice.approximate}
@@ -666,7 +678,13 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
                     label="Runs on"
                     value={es.status === 'ready' ? `${es.threads}` : '–'}
                     unit={es.status === 'ready' ? `thread${es.threads === 1 ? '' : 's'}` : undefined}
-                    hint="WebAssembly, ONNX Runtime Web"
+                    hint={
+                      es.placement === 'split'
+                        ? 'front half on WebGPU, back half on the CPU (WebAssembly), ONNX Runtime Web'
+                        : es.placement === 'webgpu'
+                          ? 'WebGPU (operators it lacks on the CPU), ONNX Runtime Web'
+                          : 'WebAssembly, ONNX Runtime Web'
+                    }
                   />
                 </div>
               </>

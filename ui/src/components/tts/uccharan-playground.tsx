@@ -162,7 +162,7 @@ export function UccharanPlayground() {
         </dl>
       )}
       <p className="text-xs text-muted-foreground">
-        uccharan 0.4.0, Apache-2.0. Romanised text is turned into {LANGS.filter((l) => l.xlit).length} scripts with its
+        uccharan 0.5.0, Apache-2.0. Romanised text is turned into {LANGS.filter((l) => l.xlit).length} scripts with its
         transliteration packs (CC BY-SA 4.0, built from Dakshina, Aksharantar and other corpora); for the other
         languages and without a pack it falls back to its own rules.
       </p>

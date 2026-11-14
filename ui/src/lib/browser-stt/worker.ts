@@ -133,7 +133,8 @@ async function load(req: Extract<WorkerRequest, { type: 'load' }>): Promise<void
     const base = req.config.ortWasmBase?.replace(/\/?$/, '/') ?? cdnBase
     if (base) {
       // The plain build is half the size of the asyncify one and is all the wasm backend needs.
-      const variant = req.device === 'wasm' ? 'ort-wasm-simd-threaded' : 'ort-wasm-simd-threaded.asyncify'
+      const anyGpu = req.device === 'webgpu' || Object.values(req.devices ?? {}).includes('webgpu')
+      const variant = anyGpu ? 'ort-wasm-simd-threaded.asyncify' : 'ort-wasm-simd-threaded'
       const paths = { mjs: `${base}${variant}.mjs`, wasm: `${base}${variant}.wasm` }
       wasm.wasmPaths = paths
       stage('runtime')
@@ -176,7 +177,8 @@ async function load(req: Extract<WorkerRequest, { type: 'load' }>): Promise<void
   stage('model')
   const create = pipeline as unknown as (task: string, model: string, options: Record<string, unknown>) => Promise<Asr>
   asr = await create('automatic-speech-recognition', req.repo, {
-    device: req.device,
+    // A split model gives each graph its own device (transformers.js per-module placement).
+    device: req.devices && new Set(Object.values(req.devices)).size > 1 ? req.devices : req.device,
     dtype: req.dtype,
     progress_callback: progress,
   })

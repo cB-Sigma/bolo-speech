@@ -6,7 +6,7 @@ import {
   releaseRuntime,
   requireOneRuntime,
 } from '@/lib/browser-runtime'
-import { pageMemoryBytes, peakFor, rememberMeasured } from '@/lib/device'
+import { device as deviceInfo, ensureDeviceProbe, pageMemoryBytes, peakFor, rememberMeasured } from '@/lib/device'
 import { diag } from '@/lib/diagnostics'
 import {
   downloadedIds,
@@ -20,12 +20,25 @@ import {
   type Resident,
 } from '@/lib/downloads'
 import { recordBrowserTrace } from './traces'
-import { detectSupport, probeWebGpu } from '@/lib/support'
+import { detectSupport } from '@/lib/support'
+import {
+  bytesByModule,
+  describeDevices,
+  gpuShare,
+  placementChoice,
+  placements,
+  rememberModuleBytes,
+  rememberSpeed,
+  resolvePlacement,
+  type Placement,
+} from '@/lib/placement'
 import {
   browserModel,
   BROWSER_MODELS,
   DEFAULT_BROWSER_MODEL,
+  placeableStt,
   readBrowserSttConfig,
+  sttModules,
   type BrowserDevice,
   type BrowserModel,
   type FileProgress,
@@ -40,6 +53,12 @@ export interface EngineState {
   status: EngineStatus
   model: BrowserModel
   device: BrowserDevice | null
+  /** Where the loaded model runs: all WebGPU, all CPU, or split by graph. */
+  placement: Placement | null
+  /** Device per graph. */
+  devices: Record<string, BrowserDevice>
+  /** Why Auto chose the placement, or why it fell back. */
+  placementWhy: string
   threads: number
   files: FileProgress[]
   /** 0..1 over all model files seen so far. */
@@ -65,6 +84,8 @@ export interface LoadOptions {
   safe?: boolean
   /** A speculative preload: a failure is recorded quietly instead of becoming the visible error. */
   background?: boolean
+  /** Everything on the CPU (after WebGPU failed). */
+  cpuOnly?: boolean
 }
 
 export interface TranscribeResult {
@@ -127,6 +148,9 @@ export class BrowserSttEngine {
       status: 'idle',
       model,
       device: null,
+      placement: null,
+      devices: {},
+      placementWhy: '',
       threads: 1,
       files: [],
       progress: 0,
@@ -153,16 +177,18 @@ export class BrowserSttEngine {
     const s = this.store.get()
     if (s.status === 'idle' || s.status === 'error') return null
     const bytes = peakFor(s.model.id, s.model.peakBytes)
-    const backend = s.device ?? 'wasm'
+    const backend = s.placement ?? s.device ?? 'wasm'
+    const share = gpuShare(s.devices, placements.get().moduleBytes[s.model.id])
     return {
       id: s.model.id,
       label: s.model.label,
       task: 'stt',
       backend,
       bytes,
-      gpuBytes: backend === 'webgpu' ? bytes : 0,
+      gpuBytes: Math.round(bytes * share),
       busy: this.pending.size > 0,
       loading: s.status === 'loading',
+      placement: [describeDevices(s.devices), s.placementWhy].filter(Boolean).join(' · ') || undefined,
     }
   }
 
@@ -194,6 +220,14 @@ export class BrowserSttEngine {
       .catch(async (err: unknown) => {
         if (generation !== this.generation) throw err
         const message = err instanceof Error ? err.message : String(err)
+        const usedGpu = Object.values(this.store.get().devices).includes('webgpu')
+        if (!isOutOfMemory(message) && usedGpu && !this.store.get().model.requiresWebGpu && !opts.cpuOnly) {
+          // WebGPU did not work for this model here: the same load, all on the CPU.
+          this.worker?.terminate()
+          this.worker = null
+          diag.error('model', `WebGPU failed (${message}); loading on the CPU instead`)
+          return this.doLoad({ ...opts, cpuOnly: true }, generation)
+        }
         if (!isOutOfMemory(message) || opts.safe) throw err
         // Out of memory: release the synthesiser's runtime if it is loaded, keep one at a time from now on,
         // and try once more on one thread before reporting the error.
@@ -282,19 +316,25 @@ export class BrowserSttEngine {
       safeMode: safe,
     })
     this.startWatchdog()
+    // Where it runs: the visitor's choice for this model, or Auto from the device probe and measured speeds.
     // A 16-bit model has no WebAssembly path: it is tried on WebGPU whatever happens (the visitor was warned).
-    const device: BrowserDevice = model.requiresWebGpu
-      ? 'webgpu'
-      : safe
-        ? 'wasm'
-        : (config.device ?? ((await probeWebGpu()) ? 'webgpu' : 'wasm'))
+    await Promise.race([ensureDeviceProbe(), new Promise((r) => setTimeout(r, 3000))])
+    const choice = config.device ?? placementChoice(model.id)
+    const resolved = resolvePlacement(
+      placeableStt(model),
+      safe || opts.cpuOnly ? (model.requiresWebGpu ? 'webgpu' : 'wasm') : choice,
+      deviceInfo.get(),
+    )
+    const devices: Record<string, BrowserDevice> = resolved.devices
+    const device: BrowserDevice = Object.values(devices).includes('webgpu') ? 'webgpu' : 'wasm'
+    const placementWhy = opts.cpuOnly ? 'WebGPU failed here, so the CPU' : resolved.why
     // Threads need SharedArrayBuffer, i.e. a cross-origin-isolated page.
     const threads = !safe && support.wasmThreads ? Math.max(1, Math.min(4, support.hardwareConcurrency)) : 1
     if (generation !== this.generation) throw new Error('Load cancelled')
-    this.store.patch({ device, threads })
+    this.store.patch({ device, threads, placement: resolved.placement, devices, placementWhy })
     diag.event(
       'model',
-      `loading ${model.id} on ${device}, ${threads} thread${threads === 1 ? '' : 's'}${safe ? ' (single-threaded retry)' : ''}`,
+      `loading ${model.id} on ${resolved.placement === 'split' ? describeDevices(devices) : device}, ${threads} thread${threads === 1 ? '' : 's'}${safe ? ' (single-threaded retry)' : ''}`,
     )
 
     // On WebKit only one model runtime fits in the page: this releases the synthesiser's, if it is loaded.
@@ -340,6 +380,7 @@ export class BrowserSttEngine {
           })
           diag.event('model', `ready after ${Math.round(msg.loadMs)} ms`)
           markSettled()
+          rememberModuleBytes(model.id, bytesByModule(this.store.get().files, sttModules(model)))
           void pageMemoryBytes().then((memoryBytes) => rememberMeasured(model.id, { loadMs: msg.loadMs, memoryBytes }))
           void recordDownload({
             id: model.id,
@@ -381,6 +422,7 @@ export class BrowserSttEngine {
         englishOnly: model.englishOnly,
         forceLanguage: model.forceLanguage,
         device,
+        devices,
         threads,
         plainRuntimeLoad: safe,
         config,
@@ -397,8 +439,18 @@ export class BrowserSttEngine {
     touchDownload(this.store.get().model.id)
     const id = this.nextId++
     const copy = audio.slice()
+    const seconds = audio.length / 16000
+    const placement = this.store.get().placement
+    const modelId = this.store.get().model.id
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject })
+      this.pending.set(id, {
+        resolve: (r) => {
+          // Speeds measured here let Auto pick between WebGPU, the CPU and a split next time.
+          if (placement && seconds >= 1) rememberSpeed(modelId, placement, r.ms / 1000 / seconds)
+          resolve(r)
+        },
+        reject,
+      })
       const req: WorkerRequest = { type: 'transcribe', id, audio: copy, language: opts.language }
       worker.postMessage(req, [copy.buffer])
     })

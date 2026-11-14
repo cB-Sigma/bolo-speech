@@ -13,7 +13,10 @@ For every voice in voices.json it:
 2. shrinks the ONNX graph (shrink.py: 8-bit convolution weights outside the text encoder, 16-bit
    elsewhere; the browser still computes in fp32) and checks the result against the original:
    same length, log-mel distance on the loudest frames below a threshold;
-3. writes ``<id>/model.onnx``, ``<id>/voice.json`` (what the browser front end needs: symbol
+3. for voices marked ``"halves": true``, cuts the shrunk graph in two at a layer boundary (the server's
+   bolo/onnx_split.py) for the demo's split placement, front half on WebGPU and back half on the CPU,
+   and checks that the halves together give the whole graph's output;
+4. writes ``<id>/model.onnx``, ``<id>/voice.json`` (what the browser front end needs: symbol
    table, blank handling, sample rate, inference scales), the licence and attribution files, and
    an ``index.json`` with sizes and SHA-256 of everything.
 
@@ -53,7 +56,7 @@ from shrink import shrink  # noqa: E402
 UCCHARAN = HERE.parents[1] / "src" / "vendor" / "uccharan"
 # uccharan's transliteration packs (romanised text to native script) for the text playground: CC BY-SA 4.0,
 # from the uccharan release that matches the vendored copy, checked against these SHA-256 sums.
-XLIT_RELEASE = "https://github.com/cB-Sigma/uccharan/releases/download/v0.4.0/"
+XLIT_RELEASE = "https://github.com/cB-Sigma/uccharan/releases/download/v0.5.0/"
 XLIT = {
     "xlit-hi.ucd": "59e5dde0354e4d4c55530baedc3034d5ed7eff0a382056a1d269d012b0c9ca52",
     "xlit-mr.ucd": "623f1a488324d18819d84177f21f3a900bd47025904fb80d5f7dbda2efb4bec8",
@@ -294,6 +297,51 @@ def check(original: Path, shrunk: Path, ids: list[int], sr: int) -> dict[str, An
     return {"seconds": round(len(a) / sr, 2), "logmel_distance": round(distance, 4), "frames_off": hops}
 
 
+def cut_in_two(model: Path, dest: Path, ids: list[int]) -> dict[str, Any]:
+    """Cut the voice's graph in two at a layer boundary with the server's bolo/onnx_split.py, for the demo's
+    split placement (front half on WebGPU, back half on the CPU), and check that the halves run together give
+    the whole graph's output. Writes ``front.onnx`` and ``back.onnx`` next to ``model.onnx``."""
+    import importlib.util
+
+    import onnx
+    import onnxruntime as ort
+
+    path = HERE.parents[2] / "server" / "src" / "bolo" / "onnx_split.py"
+    spec = importlib.util.spec_from_file_location("onnx_split", path)
+    assert spec and spec.loader
+    split = importlib.util.module_from_spec(spec)
+    sys.modules["onnx_split"] = split  # its dataclasses look themselves up there
+    spec.loader.exec_module(split)
+    whole = onnx.load(str(model))
+    points = split.cut_points(whole)
+    weights = max(p.front_bytes + p.back_bytes for p in points)
+    cut = split.choose_cut(points, front_budget=weights // 2)
+    if cut is None:
+        raise SystemExit(f"{model}: no layer boundary to cut at")
+    front, back = split.build_halves(whole, cut)
+    onnx.save(front, str(dest / "front.onnx"))
+    onnx.save(back, str(dest / "back.onnx"))
+    feed = {
+        "input": np.array([ids], dtype=np.int64),
+        "input_lengths": np.array([len(ids)], dtype=np.int64),
+        "scales": np.array([0.0, 1.0, 0.0], dtype=np.float32),
+    }
+    options = ort.SessionOptions()
+    options.intra_op_num_threads = 2
+    a = ort.InferenceSession(str(model), options).run(None, feed)[0].reshape(-1)
+    fs = ort.InferenceSession(str(dest / "front.onnx"), options)
+    bs = ort.InferenceSession(str(dest / "back.onnx"), options)
+    fin = {i.name for i in fs.get_inputs()}
+    mid = dict(zip([o.name for o in fs.get_outputs()], fs.run(None, {k: v for k, v in feed.items() if k in fin})))
+    back_feed = {i.name: mid[i.name] if i.name in mid else feed[i.name] for i in bs.get_inputs()}
+    out_name = whole.graph.output[0].name
+    b = (mid[out_name] if out_name in mid else bs.run([out_name], back_feed)[0]).reshape(-1)
+    if len(a) != len(b) or float(np.abs(a - b).max()) > 1e-3:
+        raise SystemExit(f"{model}: the two halves do not give the whole graph's output")
+    print(f"   cut at node {cut.index}: {cut.front_bytes:,} + {cut.back_bytes:,} weight bytes, {len(cut.crossing)} crossing")
+    return {"index": cut.index, "front_bytes": cut.front_bytes, "back_bytes": cut.back_bytes, "crossing": len(cut.crossing)}
+
+
 def aligned_distance(ma: np.ndarray, mb: np.ndarray, loud: np.ndarray, band: int = 4) -> float:
     """Mean |Δ log10 mel| over the loud frames of `ma`, along a dynamic time warping path kept within `band`
     frames of the diagonal (with equal lengths and no shift this is the plain frame-by-frame mean)."""
@@ -350,6 +398,7 @@ def build(voice: dict[str, Any], spec: dict[str, Any], out: Path, local: dict[st
     result = check(original, dest / "model.onnx", ids, cfg["sample_rate"])
     cfg = {"id": voice["id"], **cfg, "weights": {"int8": counts["int8"], "fp16": counts["fp16"]}}
     (dest / "voice.json").write_text(json.dumps(cfg, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    halves = cut_in_two(dest / "model.onnx", dest, ids) if voice.get("halves") else None
     files = sorted(p.name for p in dest.iterdir())
     entry = {
         "id": voice["id"],
@@ -357,7 +406,10 @@ def build(voice: dict[str, Any], spec: dict[str, Any], out: Path, local: dict[st
         "original_bytes": original.stat().st_size,
         "check": result,
     }
-    entry["bytes"] = sum(f["bytes"] for f in entry["files"].values())
+    if halves:
+        entry["halves"] = halves
+    # A download is either the whole graph or its two halves, never both: the size counts the whole one.
+    entry["bytes"] = sum(f["bytes"] for n, f in entry["files"].items() if n not in ("front.onnx", "back.onnx"))
     if voice["kind"] == "piper":
         # Piper voices read phonemes; uccharan makes them in the page and needs its English data.
         data = UCCHARAN / "data" / "en-us.ucd"

@@ -1,3 +1,5 @@
+import type { PlaceableModel } from '@/lib/placement'
+
 /**
  * Models the in-browser mode can run, fetched from the Hugging Face Hub on first use.
  * Keep docs/ui-server-notes.md in step when adding one (name, licence, source).
@@ -410,6 +412,24 @@ export function browserModel(id: string | null | undefined): BrowserModel {
 
 export type BrowserDevice = 'webgpu' | 'wasm'
 
+/** The graphs a recogniser is made of, as transformers.js names its sessions. */
+export function sttModules(m: Pick<BrowserModel, 'family'>): string[] {
+  return m.family === 'Wav2Vec2' ? ['model'] : ['encoder_model', 'decoder_model_merged']
+}
+
+/** A recogniser in the terms of lib/placement.ts. */
+export function placeableStt(m: BrowserModel): PlaceableModel {
+  return {
+    id: m.id,
+    modules: sttModules(m),
+    bytes: m.approxBytes,
+    peakBytes: m.peakBytes,
+    requiresWebGpu: m.requiresWebGpu,
+    gpuFirst: true,
+    splitText: m.family === 'Wav2Vec2' ? undefined : 'encoder on WebGPU, decoder on the CPU',
+  }
+}
+
 export interface BrowserSttConfig {
   /** Origin serving model files in Hub layout; defaults to huggingface.co. */
   modelHost?: string
@@ -445,6 +465,8 @@ export type WorkerRequest =
       englishOnly?: boolean
       forceLanguage?: string
       device: BrowserDevice
+      /** Device per graph when the model is split (encoder on WebGPU, decoder on the CPU). */
+      devices?: Record<string, BrowserDevice>
       threads: number
       /** Leave fetching the runtime binary entirely to the library (no progress reporting). */
       plainRuntimeLoad: boolean

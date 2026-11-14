@@ -6,6 +6,7 @@
       "id": "syspin-hi-female",
       "kind": "coqui",
       "source": "syspin",
+      "halves": true,
       "sample": "नमस्ते! आप कैसे हैं? आज मौसम बहुत अच्छा है।"
     },
     {
