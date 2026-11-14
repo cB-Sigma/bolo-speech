@@ -1,4 +1,4 @@
-"""Command-line interface: ``bolo serve``, ``pull``, ``rm``, ``list``, ``ps``, ``show``,
+"""Command-line interface: ``bolo serve``, ``pull``, ``rm``, ``list``, ``ps``, ``load``/``run``, ``stop``, ``show``,
 ``transcribe``, ``speak``, ``bench``, ``recommend`` and ``doctor``."""
 
 from __future__ import annotations
@@ -248,37 +248,172 @@ def cmd_models(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_ps(args: argparse.Namespace) -> int:
+def _client_get(args: argparse.Namespace, path: str) -> Any:
     import httpx
 
     headers = {"Authorization": f"Bearer {args.api_key}"} if args.api_key else {}
+    return httpx.get(f"{args.url.rstrip('/')}{path}", headers=headers, timeout=10.0)
+
+
+def _gb_pair(used: int | None, total: int | None) -> str:
+    if total is None:
+        return "memory unknown"
+    gb = 1024**3
+    return f"{(used or 0) / gb:.1f}/{total / gb:.1f} GB"
+
+
+def format_ps(doc: dict[str, Any], verbose: bool = False) -> str:
+    """``bolo ps``: a header line for the machine, then Ollama's columns (MODEL, TASK, SIZE, PROCESSOR, DEVICE,
+    UNTIL); ``verbose`` adds ACTIVE, REQUESTS, latency and real-time factor."""
+    system = doc.get("system") or {}
+    head = [f"cpu {system.get('cpu_percent', 0)}%", f"rss {_human(system.get('rss_bytes'))}"]
+    if system.get("ram_total_bytes"):
+        total, avail = system["ram_total_bytes"], system.get("ram_available_bytes") or 0
+        head.append(f"ram {_gb_pair(total - avail, total)}")
+    gpus = system.get("gpus") or []
+    for g in gpus:
+        label = g.get("name") or g.get("vendor") or "GPU"
+        if g.get("unified"):
+            mem = f"unified memory {_gb_pair(g.get('used_bytes'), g.get('total_bytes'))}"
+        else:
+            mem = f"vram {_gb_pair(g.get('used_bytes'), g.get('total_bytes'))}"
+            if g.get("process_bytes") is not None:
+                mem += f" (bolo {_human(g['process_bytes'])})"
+        util = f" {g['utilization']:.0f}% busy" if g.get("utilization") is not None else ""
+        head.append(f"gpu{g.get('index', 0)} {label} {mem}{util}")
+    if not gpus:
+        head.append("no GPU memory readings" if system.get("device", "cpu") != "cpu" else "device cpu")
+    rows = []
+    for m in doc.get("models") or []:
+        row = [
+            m["name"], m.get("task", ""), _human(m.get("size")), m.get("processor", "100% CPU"),
+            m.get("device", "cpu"), m.get("until", ""),
+        ]  # fmt: skip
+        if verbose:
+            lat = (m.get("latency_ms") or {}).get("final") or (m.get("latency_ms") or {}).get("ttfa") or {}
+            row += [
+                str(m.get("active", 0)), str(m.get("requests", 0)), f"{lat.get('p50', '-')}",
+                f"{(m.get('rtf') or {}).get('p50', '-')}", f"{m.get('idle_s', 0)}s",
+            ]  # fmt: skip
+        rows.append(row)
+    headers = ["MODEL", "TASK", "SIZE", "PROCESSOR", "DEVICE", "UNTIL"]
+    if verbose:
+        headers += ["ACTIVE", "REQUESTS", "P50 MS", "RTF P50", "IDLE"]
+    lines = ["  ".join(head)]
+    lines.append(_table(rows, headers) if rows else "no models loaded")
+    notices = [
+        f"{m['name']}: {m['placement']['notice']}"
+        for m in doc.get("models") or []
+        if (m.get("placement") or {}).get("notice")
+    ]
+    lines += [f"note: {n}" for n in notices] if verbose else []
+    return "\n".join(lines)
+
+
+def _ps_from_stats(stats: dict[str, Any]) -> dict[str, Any]:
+    """An older server has no /api/v1/ps: the same table from /api/v1/stats."""
+    models = []
+    for m in stats.get("models", []):
+        if not m.get("loaded"):
+            continue
+        ttl = m.get("ttl_s")
+        left = None if ttl is None or ttl < 0 else max(0.0, ttl - (m.get("idle_s") or 0))
+        from bolo.keepalive import humanize_until
+
+        models.append({
+            "name": m["id"], "task": m["task"], "size": m["memory_bytes"], "processor": m.get("processor", "100% CPU"),
+            "device": m.get("device", "cpu"), "until": humanize_until(left), "active": m["active"],
+            "requests": m["requests"], "latency_ms": m["latency_ms"], "rtf": m.get("rtf"), "idle_s": m.get("idle_s"),
+        })  # fmt: skip
+    return {"models": models, "system": stats.get("system") or {}}
+
+
+def cmd_ps(args: argparse.Namespace) -> int:
+    import httpx
+
     try:
-        stats = (
-            httpx.get(f"{args.url.rstrip('/')}/api/v1/stats", headers=headers, timeout=5.0).raise_for_status().json()
-        )
+        r = _client_get(args, "/api/v1/ps")
+        if r.status_code == 404:
+            doc = _ps_from_stats(_client_get(args, "/api/v1/stats").raise_for_status().json())
+        else:
+            doc = r.raise_for_status().json()
     except httpx.HTTPError as exc:
         print(f"could not reach a bolo server at {args.url}: {exc}", file=sys.stderr)
         return 1
     if args.json:
-        print(json.dumps(stats, indent=2))
+        print(json.dumps(doc, indent=2))
         return 0
-    rows = []
-    for m in stats["models"]:
-        if not m["loaded"]:
-            continue
-        lat = m["latency_ms"]["final"] or m["latency_ms"]["ttfa"] or {}
-        rows.append([
-            m["id"], m["task"], _human(m["memory_bytes"]), str(m["active"]), str(m["requests"]),
-            f"{lat.get('p50', '-')}", f"{(m['rtf'] or {}).get('p50', '-')}", f"{m['idle_s']}s",
-        ])  # fmt: skip
-    print(f"uptime {stats['uptime_s']:.0f}s  streams {stats['active_streams']}  queue {stats['queue_depth']}  "
-          f"cpu {stats['system']['cpu_percent']}%  rss {_human(stats['system']['rss_bytes'])}")  # fmt: skip
-    print(
-        _table(rows, ["MODEL", "TASK", "MEMORY", "ACTIVE", "REQUESTS", "P50 MS", "RTF P50", "IDLE"])
-        if rows
-        else "no models loaded"
-    )
+    print(format_ps(doc, verbose=args.verbose))
     return 0
+
+
+def _post(args: argparse.Namespace, path: str, body: dict[str, Any] | None = None) -> Any:
+    import httpx
+
+    headers = {"Authorization": f"Bearer {args.api_key}"} if args.api_key else {}
+    return httpx.post(f"{args.url.rstrip('/')}{path}", headers=headers, json=body, timeout=None)
+
+
+def cmd_load(args: argparse.Namespace) -> int:
+    """``bolo load <model> [--keep-alive 10m]`` (also ``bolo run``): load into a running server now."""
+    from urllib.parse import quote
+
+    import httpx
+
+    from bolo.keepalive import format_keep_alive, parse_keep_alive
+
+    if args.keep_alive is not None:
+        parse_keep_alive(args.keep_alive)  # a typo fails here, not after a long load
+    body = {"keep_alive": args.keep_alive} if args.keep_alive is not None else None
+    try:
+        r = _post(args, f"/api/v1/models/{quote(args.model, safe='')}/load", body)
+    except httpx.HTTPError as exc:
+        print(f"could not reach a bolo server at {args.url}: {exc}", file=sys.stderr)
+        return 1
+    doc = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+    if r.status_code >= 400:
+        print(f"error: {(doc.get('error') or {}).get('message') or r.text}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(doc, indent=2))
+        return 0
+    if not doc.get("loaded"):
+        print(f"{doc.get('id', args.model)} loaded and unloaded again (keep_alive 0)")
+        return 0
+    keep = format_keep_alive(doc.get("keep_alive_s"))
+    print(
+        f"{doc['id']}: {_human(doc.get('memory_bytes'))}, {doc.get('processor', '100% CPU')} on "
+        f"{doc.get('device', 'cpu')}, loaded in {doc.get('load_ms', 0) / 1000:.1f} s, keep alive {keep}"
+    )
+    if doc.get("notice"):
+        print(f"note: {doc['notice']}")
+    for w in doc.get("warnings") or []:
+        print(f"warning: {w.get('message', w) if isinstance(w, dict) else w}")
+    return 0
+
+
+def cmd_stop(args: argparse.Namespace) -> int:
+    """``bolo stop <model>``: unload now (a request still using it finishes first)."""
+    from urllib.parse import quote
+
+    import httpx
+
+    status = 0
+    for name in args.models:
+        try:
+            r = _post(args, f"/api/v1/models/{quote(name, safe='')}/unload")
+        except httpx.HTTPError as exc:
+            print(f"could not reach a bolo server at {args.url}: {exc}", file=sys.stderr)
+            return 1
+        doc = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+        if r.status_code >= 400:
+            print(f"error: {(doc.get('error') or {}).get('message') or r.text}", file=sys.stderr)
+            status = 1
+        elif doc.get("unloaded") is False:
+            print(f"{doc.get('id', name)} was not loaded")
+        else:
+            print(f"unloaded {doc.get('id', name)}")
+    return status
 
 
 # -- one-shot inference ---------------------------------------------------
@@ -1038,11 +1173,33 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--clear", action="store_true", help="remove the pinned settings")
     s.set_defaults(func=cmd_models)
 
-    s = sub.add_parser("ps", help="show models loaded in a running server")
-    s.add_argument("--url", default=os.environ.get("BOLO_URL", "http://127.0.0.1:8000"))
-    s.add_argument("--api-key", dest="api_key", default=os.environ.get("BOLO_API_KEY"))
+    def _remote(s: argparse.ArgumentParser) -> None:
+        s.add_argument("--url", default=os.environ.get("BOLO_URL", "http://127.0.0.1:8000"))
+        s.add_argument("--api-key", dest="api_key", default=os.environ.get("BOLO_API_KEY"))
+
+    s = sub.add_parser("ps", help="show models loaded in a running server: size, GPU/CPU split, time left")
+    _remote(s)
     s.add_argument("--json", action="store_true")
+    s.add_argument("--verbose", "-v", action="store_true", help="also requests in flight, totals and latency")
     s.set_defaults(func=cmd_ps)
+
+    for name, aliases, text in (
+        ("load", ["run"], "load a model into a running server now (preload), optionally with a keep-alive"),
+    ):
+        s = sub.add_parser(name, aliases=aliases, help=text)
+        _remote(s)
+        s.add_argument("model")
+        s.add_argument(
+            "--keep-alive", dest="keep_alive",
+            help="how long it stays loaded once idle: seconds or a duration (10m, 1h); -1 forever; 0 unload at once",
+        )  # fmt: skip
+        s.add_argument("--json", action="store_true")
+        s.set_defaults(func=cmd_load)
+
+    s = sub.add_parser("stop", help="unload models from a running server now")
+    _remote(s)
+    s.add_argument("models", nargs="+")
+    s.set_defaults(func=cmd_stop)
 
     s = sub.add_parser("transcribe", help="transcribe an audio file")
     _common(s)

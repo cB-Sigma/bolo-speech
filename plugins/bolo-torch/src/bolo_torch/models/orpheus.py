@@ -24,7 +24,15 @@ import numpy as np
 from bolo.engines.base import FloatArray, TTSModel
 
 from bolo_torch.models import to_voices, voices_from_options
-from bolo_torch.runtime import InvalidRequest, LoadContext, hub_snapshot, model_dir, require
+from bolo_torch.runtime import (
+    InvalidRequest,
+    LoadContext,
+    device_map_report,
+    hub_snapshot,
+    model_dir,
+    require,
+    split_kwargs,
+)
 from bolo_torch.text import split_sentences
 
 BOS = 128000
@@ -107,6 +115,9 @@ class _TokenQueue:
 
 
 class OrpheusSNAC(TTSModel):
+    #: how the weights were split across the GPU and the CPU (sent to bolo in the load reply), when known
+    placement_report: dict[str, Any] | None = None
+
     def __init__(
         self,
         generate: Callable[[list[int], Any, Callable[[], bool], int], None],
@@ -219,8 +230,10 @@ def load(ctx: LoadContext) -> OrpheusSNAC:
     if params is None:
         raise InvalidRequest(f"unknown prompt_format {fmt!r} (veena or svara)")
     tokenizer = transformers.AutoTokenizer.from_pretrained(str(root))
-    model = transformers.AutoModelForCausalLM.from_pretrained(str(root), torch_dtype=ctx.dtype)
-    model = model.to(ctx.device).eval()
+    split = split_kwargs(ctx)  # bolo found too little GPU memory for all of it: layers on the GPU while they fit
+    model = transformers.AutoModelForCausalLM.from_pretrained(str(root), torch_dtype=ctx.dtype, **split)
+    model = (model if split else model.to(ctx.device)).eval()
+    report = device_map_report(model)
     codec_dir = hub_snapshot(str(ctx.option("codec_repo", SNAC_REPO)), str(ctx.option("codec_revision", SNAC_REVISION)))
     codec = snac.SNAC.from_config(str(codec_dir / "config.json"))
     codec.load_state_dict(torch.load(str(codec_dir / "pytorch_model.bin"), map_location="cpu", weights_only=True))
@@ -253,8 +266,10 @@ def load(ctx: LoadContext) -> OrpheusSNAC:
             audio = codec.decode(codes)
         return audio.reshape(-1).to(torch.float32).cpu().numpy()  # type: ignore[no-any-return]
 
-    return OrpheusSNAC(
+    tts = OrpheusSNAC(
         generate, tokenizer, decode, prompt_format=fmt, voices=voices_from_options(ctx.options),
         max_chars=int(ctx.option("max_chars", 200)), max_new_tokens=int(ctx.option("max_new_tokens", 2048)),
         stream_frames=int(ctx.option("stream_frames", 4)), context_frames=int(ctx.option("context_frames", 3)),
     )  # fmt: skip
+    tts.placement_report = report  # how the weights were split (info.placement in the load reply)
+    return tts

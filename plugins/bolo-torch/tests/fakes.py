@@ -60,7 +60,11 @@ def fake_separate_batch(mix: torch.Tensor) -> torch.Tensor:
 
 # loaders used by the fake plugin process (tests/fake_plugin.py)
 def load_fake_parler(ctx: LoadContext) -> ParlerTTS:
-    return fake_parler(voices=list(ctx.options.get("voices") or []))
+    model = fake_parler(voices=list(ctx.options.get("voices") or []))
+    if ctx.max_memory:  # bolo asked for a GPU/CPU split: report one, as a device_map="auto" load would
+        gpu = int(ctx.max_memory.get("0", 0))
+        model.placement_report = {"gpu_bytes": gpu, "cpu_bytes": 1000, "device_map": {"model": "0"}}
+    return model
 
 
 def load_fake_sepformer(ctx: LoadContext) -> SepFormer:

@@ -483,7 +483,7 @@ class Bolo:
             st = self.traces.models.get(model_id)
             spec = self.catalog.resolve(model_id)
             task = entry.spec.task if entry else (st.task if st else (spec.task if spec else "stt"))
-            ttl = self.manager.ttl_for(spec) if spec else None
+            ttl = self.manager.ttl_for(spec, entry) if spec else None
             item: dict[str, Any] = {
                 "id": model_id,
                 "task": task,
@@ -498,6 +498,7 @@ class Bolo:
                 "rtf": st.rtf_summary() if st else None,
             }
             if entry:
+                item.update(self._placement_fields(entry))
                 q = entry.queue
                 item["queue"] = {
                     "depth": q.depth,
@@ -515,7 +516,12 @@ class Bolo:
             "uptime_s": round(time.monotonic() - self.started, 1),
             "active_streams": self.active_streams,
             "queue_depth": sum(m.queue.depth for m in self.manager.loaded.values()),
-            "system": {"cpu_percent": self.cpu_percent(), "rss_bytes": mem.rss, "threads": self._proc.num_threads()},
+            "system": {
+                "cpu_percent": self.cpu_percent(),
+                "rss_bytes": mem.rss,
+                "threads": self._proc.num_threads(),
+                **self._machine(),
+            },
             "totals": {
                 "requests": self.traces.total_requests,
                 "errors": self.traces.total_errors,
@@ -535,6 +541,82 @@ class Bolo:
                 {"requested": a, "answered": b, "count": n} for (a, b), n in self.providers.fallbacks.items()
             ],
         }
+
+    def _machine(self) -> dict[str, Any]:
+        """RAM and accelerators, for stats and ps."""
+        out: dict[str, Any] = {}
+        with contextlib.suppress(Exception):
+            vm = psutil.virtual_memory()
+            out.update(ram_total_bytes=int(vm.total), ram_available_bytes=int(vm.available))
+        gpus: list[dict[str, Any]] = []
+        with contextlib.suppress(Exception):
+            gpus = [d.to_dict() for d in self.manager.accel.devices()]
+        out["gpus"] = gpus
+        out["accelerator_source"] = self.manager.accel.source or None
+        out["models_vram_bytes"] = self.manager.gpu_in_use()
+        out["models_ram_bytes"] = self.manager.memory_in_use()
+        return out
+
+    def _placement_fields(self, entry: Any) -> dict[str, Any]:
+        expires_in = None if entry.stopping else self.manager.expires_in(entry)
+        ttl = self.manager.ttl_for(entry.spec, entry)
+        return {
+            "size_vram_bytes": entry.vram_bytes,
+            "ram_bytes": entry.ram_bytes,
+            "vram_measured": entry.vram_measured,
+            "processor": entry.processor(),
+            "device": entry.placement.device,
+            "placement": entry.placement.to_dict(),
+            "keep_alive_s": ttl,
+            "expires_in_s": None if expires_in is None else round(expires_in, 1),
+            "expires_at": None if expires_in is None else _iso(time.time() + expires_in),
+            "stopping": entry.stopping,
+        }
+
+    def ps(self) -> dict[str, Any]:
+        """Loaded models, Ollama style (``GET /api/v1/ps``, ``bolo ps``)."""
+        from bolo.keepalive import format_keep_alive, humanize_until
+
+        models: list[dict[str, Any]] = []
+        entries = [*self.manager.loaded.values(), *self.manager.stopping.values()]
+        for entry in entries:
+            fields = self._placement_fields(entry)
+            st = self.traces.models.get(entry.id)
+            p = entry.placement
+            models.append({
+                "name": entry.id, "model": entry.id, "task": entry.spec.task,
+                "size": entry.memory_bytes, "size_vram": entry.vram_bytes, "size_ram": entry.ram_bytes,
+                "processor": fields["processor"], "device": p.device, "split": p.split,
+                "expires_at": fields["expires_at"], "expires_in_s": fields["expires_in_s"],
+                "until": humanize_until(fields["expires_in_s"], entry.stopping),
+                "keep_alive": format_keep_alive(fields["keep_alive_s"]), "keep_alive_s": fields["keep_alive_s"],
+                "active": entry.active, "requests": entry.requests, "idle_s": round(entry.idle_s(), 1),
+                "load_ms": round(entry.load_ms, 1), "vram_measured": entry.vram_measured,
+                "latency_ms": st.latency_summary() if st else None, "rtf": st.rtf_summary() if st else None,
+                "placement": fields["placement"],
+                "details": {"engine": entry.spec.engine, "kind": entry.spec.kind, "family": entry.spec.family},
+            })  # fmt: skip
+        mem = self._proc.memory_info()
+        s = self.settings
+        out: dict[str, Any] = {
+            "models": models,
+            "system": {
+                "cpu_percent": self.cpu_percent(),
+                "rss_bytes": mem.rss,
+                "device": s.device,
+                **self._machine(),
+            },
+            "budgets": {
+                "memory_budget_bytes": s.memory_budget_mb * 1024 * 1024 or None,
+                "gpu_memory_budget_bytes": s.gpu_memory_budget_mb * 1024 * 1024 or None,
+                "gpu_reserve_bytes": s.gpu_reserve_mb * 1024 * 1024,
+                "max_loaded_models": s.max_loaded_models or None,
+                "keep_alive": format_keep_alive(self.manager.default_keep_alive()),
+            },
+        }
+        if self.s2s.placement is not None:
+            out["speech_to_speech"] = {"model": s.s2s_model, "placement": self.s2s.placement.to_dict()}
+        return out
 
     # ------------------------------------------------------------------
     # model resolution, pulling
@@ -1629,6 +1711,12 @@ class Bolo:
 
 
 REFERENCE_MAX_S = 30.0
+
+
+def _iso(epoch: float) -> str:
+    import datetime as dt
+
+    return dt.datetime.fromtimestamp(epoch, dt.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def fallback_worthy(exc: BoloError) -> bool:

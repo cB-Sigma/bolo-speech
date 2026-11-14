@@ -72,6 +72,7 @@ class TorchEngine(Engine):
         ctx = LoadContext(
             kind, task, path, dict(spec), device=device, dtype=dtype, threads=threads,
             model_id=str(spec.get("model_id", path.name)),
+            max_memory=getattr(opts, "max_memory", None),  # bolo 0.5 and later
         )  # fmt: skip
         t0 = time.perf_counter()
         model = loader(ctx)

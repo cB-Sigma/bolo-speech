@@ -549,6 +549,21 @@ class ServerTTS(TTSModel):
             yield x[i : i + step]
 
 
+def gpu_layer_args(device: str, gpu_layers: int | None, extra: list[str]) -> list[str]:
+    """``-ngl`` for a llama-server bolo starts: none when the operator set it in the arguments; the scheduler's
+    count when it computed one (bolo.placement, from free accelerator memory and the GGUF); else all layers
+    (``99``) for any device other than the CPU, as before."""
+    from bolo.placement import operator_layers
+
+    if operator_layers(extra) is not None:
+        return []
+    if gpu_layers is not None:
+        return ["-ngl", str(max(0, gpu_layers))]
+    if device != "cpu":
+        return ["-ngl", "99"]
+    return []
+
+
 class TTSServerEngine(Engine):
     id = ENGINE_ID
     name = "External TTS server (llama-server, audio.cpp)"
@@ -632,8 +647,7 @@ class TTSServerEngine(Engine):
             if spec.get("mmproj_file"):
                 argv += ["-mm", str(path / str(spec["mmproj_file"]))]
             argv += ["-t", str(max(1, opts.threads))]
-            if opts.device != "cpu" and not any(a in ("-ngl", "--n-gpu-layers", "--gpu-layers") for a in extra):
-                argv += ["-ngl", "99"]
+            argv += gpu_layer_args(opts.device, opts.gpu_layers, extra)
         else:
             config = self._audiocpp_config(name, path, spec, opts, port)
             run_dir = Path(s.data_dir) / "run" / "tts-server"

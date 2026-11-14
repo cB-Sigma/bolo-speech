@@ -68,7 +68,11 @@ def test_load_unload_and_loaded_flag(live: LiveServer) -> None:
     assert r.status_code == 200 and r.json()["loaded"] is True
     cat = {m["id"]: m for m in httpx.get(live.url + "/api/v1/catalog", params={"installed": "true"}).json()["models"]}
     assert cat["fake-stt"]["loaded"] is True and cat["fake-tts"]["loaded"] is False
-    assert httpx.post(live.url + "/api/v1/models/fake-stt/unload").json() == {"id": "fake-stt", "loaded": False}
+    assert httpx.post(live.url + "/api/v1/models/fake-stt/unload").json() == {
+        "id": "fake-stt",
+        "loaded": False,
+        "unloaded": True,
+    }
     assert httpx.post(live.url + "/api/v1/models/nope/load").status_code == 404
     assert httpx.delete(live.url + "/api/v1/models/fake-stt").status_code == 400  # built-in models cannot be deleted
 
@@ -239,7 +243,7 @@ def test_events_stream(live: LiveServer) -> None:
     request = next(e for e in events if e["type"] == "request")
     assert request["kind"] == "stt" and request["model"] == "fake-stt" and "phases" in request
     model = next(e for e in events if e["type"] == "model")
-    assert model == {"type": "model", "id": "fake-stt", "event": "loaded"}
+    assert model == {"type": "model", "id": "fake-stt", "event": "loaded", "processor": "100% CPU"}
     job = next(e for e in events if e["type"] == "job")
     assert job["id"] == job_id and job["kind"] == "bench"
 

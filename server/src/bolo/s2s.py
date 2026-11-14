@@ -523,6 +523,8 @@ class S2SManager:
         self.core = core
         self._backend: S2SBackend | None = None
         self._lock = asyncio.Lock()
+        #: where the managed llama-server's layers went (bolo.placement), once one was started
+        self.placement: Any = None
 
     async def backend(self) -> S2SBackend:
         async with self._lock:
@@ -538,6 +540,8 @@ class S2SManager:
         out.update(configured=configured, available=available, reason=reason)
         if self._backend is not None:
             out.update(self._backend.describe())
+        if self.placement is not None:
+            out["placement"] = self.placement.to_dict()
         return out
 
     def _cloud(self) -> tuple[Any, str] | None:
@@ -645,7 +649,7 @@ class S2SManager:
     def _process(self, name: str, path: Path, options: dict[str, Any]) -> ServerProcess:
         import os
 
-        from bolo.engines.tts_server import ServerProcess, free_port
+        from bolo.engines.tts_server import ServerProcess, free_port, gpu_layer_args
         from bolo.tts_runtimes import LLAMA, RUNTIME_INFO, find_binary
 
         s = self.core.settings
@@ -666,8 +670,8 @@ class S2SManager:
             argv += ["-mm", str(path / str(options["mmproj_file"]))]
         argv += ["-t", str(s.resolved_threads()), "--parallel", str(max(1, s.s2s_parallel))]
         extra = [str(a) for a in options.get("server_args") or []] + list(s.s2s_server_args)
-        if s.device != "cpu" and not any(a in ("-ngl", "--n-gpu-layers", "--gpu-layers") for a in extra):
-            argv += ["-ngl", "99"]
+        self.placement = self.core.manager.place_llama_server(name, path, options, extra)
+        argv += gpu_layer_args(self.placement.device, self.placement.gpu_layers, extra)
         env = {
             "LD_LIBRARY_PATH": os.pathsep.join(
                 p for p in (str(binary.parent), os.environ.get("LD_LIBRARY_PATH", "")) if p

@@ -70,6 +70,18 @@ class OnnxRuntimeEngine(Engine):
                 "pip install onnxruntime",
             )  # fmt: skip
 
+    def graphs(self, kind: str, path: Path, spec: dict[str, Any]) -> dict[str, int]:
+        """DiCoW (encoder, decoder) and LFM3-Audio (four graphs) are placed graph by graph (bolo.placement)."""
+        if kind == "dicow_onnx":
+            from bolo.engines.dicow_onnx import graph_files
+
+            return graph_files(path, spec)
+        if kind == "lfm3_audio_onnx":
+            from bolo.s2s_onnx import graph_files as lfm3_graph_files
+
+            return lfm3_graph_files(path, spec)
+        return {}
+
     def load(self, kind: str, task: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Model:
         if kind == "nemotron_diarization":
             from bolo.engines.nemotron import NemotronDiarization

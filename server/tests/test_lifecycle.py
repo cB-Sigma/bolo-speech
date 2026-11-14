@@ -37,7 +37,7 @@ async def test_lazy_load_and_single_flight(core: Bolo) -> None:
     assert len(core.engines.get("fake").loaded) == 1
     assert entries[0].load_ms == pytest.approx(150, abs=60)
     events.append(await task)
-    assert events[0] == {"type": "model", "id": "slow", "event": "loaded"}
+    assert events[0] == {"type": "model", "id": "slow", "event": "loaded", "processor": "100% CPU"}
     await sub.aclose()
 
 

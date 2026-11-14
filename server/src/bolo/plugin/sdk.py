@@ -115,7 +115,10 @@ class _Server:
             self.cancelled.discard(rid)
 
     def load(self, rid: str, m: dict[str, Any]) -> None:
-        opts = LoadOptions(threads=int(m.get("threads", 1)), device=str(m.get("device", "cpu")))
+        placement = m.get("placement")
+        wanted = placement.get("max_memory") if isinstance(placement, dict) else None
+        max_memory = {str(k): int(v) for k, v in wanted.items()} if isinstance(wanted, dict) else None
+        opts = LoadOptions(threads=int(m.get("threads", 1)), device=str(m.get("device", "cpu")), max_memory=max_memory)
         model = self.engine.load(
             str(m["kind"]), str(m["task"]), Path(str(m["path"])), dict(m.get("options") or {}), opts
         )
@@ -134,6 +137,9 @@ class _Server:
             )  # fmt: skip
             if model.speaker_conditioned:
                 info["speaker_conditioned"] = True
+        report = getattr(model, "placement_report", None)
+        if isinstance(report, dict):  # {"gpu_bytes", "cpu_bytes", "device_map"}: how the model was split
+            info["placement"] = report
         self.reply(rid, handle=handle, sample_rate=model.sample_rate, task=model.task, info=info)
 
     def model(self, m: dict[str, Any]) -> Model:

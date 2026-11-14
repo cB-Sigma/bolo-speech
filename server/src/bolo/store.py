@@ -264,7 +264,7 @@ class ModelStore:
         self._guard = threading.Lock()
 
     # -- per-model settings chosen by the user (model-settings.json) ------
-    MODEL_SETTINGS = ("phonemizer", "text_normalizer", "wordlists", "fallback", "romanised")
+    MODEL_SETTINGS = ("phonemizer", "text_normalizer", "wordlists", "fallback", "romanised", "device", "keep_alive")
 
     def model_settings(self, model_id: str | None = None) -> dict[str, Any]:
         """Settings pinned for one model (or, without an id, for all of them)."""

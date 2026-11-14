@@ -375,7 +375,8 @@ class OnnxGraphs:
         precision: str = "q4",
         threads: int = 4,
         spinning: bool = False,
-        providers: Sequence[str] | None = None,
+        providers: Sequence[Any] | None = None,
+        graph_providers: dict[str, Sequence[Any]] | None = None,
     ) -> None:
         try:
             import onnxruntime as ort
@@ -389,7 +390,7 @@ class OnnxGraphs:
             if not (onnx_dir / name).exists():
                 raise EngineUnavailable(f"{onnx_dir / name} is missing (precision {precision}); pull the model again")
 
-        def session(name: str, n_threads: int) -> Any:
+        def session(name: str, n_threads: int, role: str) -> Any:
             options = ort.SessionOptions()
             options.intra_op_num_threads = max(1, n_threads)
             options.inter_op_num_threads = 1
@@ -397,14 +398,14 @@ class OnnxGraphs:
                 # worker threads that spin while idle take the cores from the other graphs and from every other
                 # process of a shared machine
                 options.add_session_config_entry("session.intra_op.allow_spinning", "0")
-            return ort.InferenceSession(
-                str(onnx_dir / name), sess_options=options, providers=list(providers or ["CPUExecutionProvider"])
-            )
+            chosen = (graph_providers or {}).get(role) or providers or ["CPUExecutionProvider"]
+            return ort.InferenceSession(str(onnx_dir / name), sess_options=options, providers=list(chosen))
 
-        self.decoder = session(decoder, threads)
-        self.encoder = session(encoder, threads)
-        self.depth_decoder = session("depth_decoder.onnx", threads)
-        self.codec_decoder = session(codec, threads)
+        # each graph can sit on its own device (bolo.placement places the largest on the GPU while they fit)
+        self.decoder = session(decoder, threads, "decoder")
+        self.encoder = session(encoder, threads, "encoder")
+        self.depth_decoder = session("depth_decoder.onnx", threads, "depth_decoder")
+        self.codec_decoder = session(codec, threads, "codec_decoder")
         self._cache_inputs = [
             (i.name, i.shape, np.float16 if "float16" in i.type else np.float32)
             for i in self.decoder.get_inputs()
@@ -769,7 +770,14 @@ class Lfm3Model:
 
     @classmethod
     def from_dir(
-        cls, path: Path, *, precision: str = "q4", threads: int = 4, device: str = "cpu", **options: Any
+        cls,
+        path: Path,
+        *,
+        precision: str = "q4",
+        threads: int = 4,
+        device: str = "cpu",
+        graph_devices: dict[str, str] | None = None,
+        **options: Any,
     ) -> Lfm3Model:
         try:
             from tokenizers import Tokenizer
@@ -785,7 +793,13 @@ class Lfm3Model:
             if hasattr(generation, key) and options[key] is not None:
                 setattr(generation, key, type(getattr(generation, key))(options.pop(key)))
         return cls(
-            OnnxGraphs(path, precision=precision, threads=threads, providers=providers_for(device)),
+            OnnxGraphs(
+                path,
+                precision=precision,
+                threads=threads,
+                providers=providers_for(device),
+                graph_providers={role: providers_for(d) for role, d in (graph_devices or {}).items()},
+            ),
             lambda text: list(tokenizer.encode(text, add_special_tokens=False).ids),
             lambda ids: str(tokenizer.decode(ids, skip_special_tokens=True)),
             Tokens.from_lookup(tokenizer.token_to_id),
@@ -817,19 +831,45 @@ _models: dict[tuple[str, str, int, str, str], Lfm3Model] = {}
 _models_lock = threading.Lock()
 
 
-def shared_model(path: Path, options: dict[str, Any], threads: int, device: str = "cpu") -> Lfm3Model:
+def shared_model(
+    path: Path,
+    options: dict[str, Any],
+    threads: int,
+    device: str = "cpu",
+    graph_devices: dict[str, str] | None = None,
+) -> Lfm3Model:
     """The model of a directory, loaded once: speech-to-speech sessions and text-to-speech use the same graphs
     (about 3 GB of memory for the q4 files)."""
     precision = str(options.get("precision") or "q4")
     overrides = {k: options[k] for k in GENERATION_OPTIONS if options.get(k) is not None}
-    key = (str(Path(path).resolve()), precision, threads, json.dumps(overrides, sort_keys=True), device)
+    where = device + (json.dumps(graph_devices, sort_keys=True) if graph_devices else "")
+    key = (str(Path(path).resolve()), precision, threads, json.dumps(overrides, sort_keys=True), where)
     with _models_lock:
         model = _models.get(key)
         if model is None:
             model = _models[key] = Lfm3Model.from_dir(
-                Path(path), precision=precision, threads=threads, device=device, **overrides
-            )
+                Path(path), precision=precision, threads=threads, device=device, graph_devices=graph_devices,
+                **overrides,
+            )  # fmt: skip
         return model
+
+
+def graph_files(path: Path, options: dict[str, Any]) -> dict[str, int]:
+    """The four graphs of a precision and their sizes (with external weights), for placement."""
+    precision = str(options.get("precision") or "q4")
+    if precision not in PRECISIONS:
+        return {}
+    decoder, encoder, codec = PRECISIONS[precision]
+    out: dict[str, int] = {}
+    for role, name in (("decoder", decoder), ("encoder", encoder), ("depth_decoder", "depth_decoder.onnx"),
+                       ("codec_decoder", codec)):  # fmt: skip
+        f = Path(path) / "onnx" / name
+        if f.is_file():
+            out[role] = f.stat().st_size + sum(x.stat().st_size for x in f.parent.glob(name + "_data*") if x.is_file())
+            data = f.with_name(name + ".data")
+            if data.is_file():
+                out[role] += data.stat().st_size
+    return out
 
 
 def release_models() -> None:
@@ -1299,7 +1339,8 @@ class Lfm3Tts(TTSModel):
 
     @classmethod
     def from_dir(cls, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Lfm3Tts:
-        return cls(shared_model(path, spec, opts.threads, opts.device), spec)
+        placed = {"graph_devices": dict(opts.graph_devices)} if opts.graph_devices else {}
+        return cls(shared_model(path, spec, opts.threads, opts.device, **placed), spec)
 
     def synthesize(
         self,

@@ -13,6 +13,7 @@ from bolo import realtime
 from bolo.api.common import _presented_key, check_auth
 from bolo.core import Bolo
 from bolo.errors import AuthError, BoloError, EngineUnavailable, InvalidRequest, ModelNotFound
+from bolo.keepalive import request_keep_alive
 
 router = APIRouter()
 
@@ -78,12 +79,26 @@ async def realtime_ws(ws: WebSocket) -> None:
 
     params = ws.query_params
     try:
+        # bolo extension (Ollama style): ?keep_alive= for the speech models the session uses, applied when it ends
+        ka = request_keep_alive(params.get("keep_alive"), ("stt", "tts"), session=True)
+    except BoloError as exc:
+        with contextlib.suppress(Exception):
+            await send({"type": "error", "event_id": realtime.new_id("event"), "error": {
+                "type": exc.type, "code": exc.code, "message": exc.message, "param": exc.param, "event_id": None,
+            }})  # fmt: skip
+            await ws.close(code=1008)
+        return
+    try:
         await realtime.serve(
             core, receive, send, model=params.get("model"), transcription=params.get("intent") == "transcription",
             config=config,
         )  # fmt: skip
     except (WebSocketDisconnect, RuntimeError):
         pass
+    finally:
+        if ka is not None:
+            with contextlib.suppress(Exception):
+                await core.manager.apply_keep_alive(ka.used, ka.seconds)
     with contextlib.suppress(Exception):
         await ws.close()
 

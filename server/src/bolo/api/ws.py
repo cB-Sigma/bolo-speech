@@ -17,6 +17,7 @@ from bolo.audio.encode import StreamEncoder, normalize_format
 from bolo.audio.resample import StreamResampler
 from bolo.core import Bolo
 from bolo.errors import BoloError, InvalidRequest
+from bolo.keepalive import request_keep_alive
 from bolo.obs.trace import Trace
 from bolo.streaming.session import SessionConfig, STTSession
 from bolo.text.romanised import parse_mode as parse_romanised
@@ -90,12 +91,39 @@ def _stt_config(params: Any, base: SessionConfig | None = None) -> SessionConfig
     )
 
 
+async def _with_keep_alive(ws: WebSocket, tasks: tuple[str, ...], handler: Any) -> None:
+    """A session's ``?keep_alive=`` (bolo extension, Ollama style): applied to the models of ``tasks`` the session
+    used when it ends, so ``0`` unloads them then and not between utterances."""
+    core: Bolo = ws.app.state.core
+    try:
+        ka = request_keep_alive(ws.query_params.get("keep_alive"), tasks, session=True)
+    except InvalidRequest as exc:
+        await ws.accept()
+        await _fail(ws, exc)
+        return
+    try:
+        await handler(ws)
+    finally:
+        if ka is not None:
+            with contextlib.suppress(Exception):
+                await core.manager.apply_keep_alive(ka.used, ka.seconds)
+
+
 @router.websocket("/api/v1/stt/stream")
 async def stt_stream(ws: WebSocket) -> None:
+    await _with_keep_alive(ws, ("stt",), _stt_stream)
+
+
+@router.websocket("/api/v1/tts/stream")
+async def tts_stream(ws: WebSocket) -> None:
+    await _with_keep_alive(ws, ("tts",), _tts_stream)
+
+
+async def _stt_stream(ws: WebSocket) -> None:
     """Realtime transcription.
 
     Query: ``model``, ``language``, ``sample_rate`` (16000), ``encoding``
-    (pcm_s16le | pcm_f32le | mulaw | alaw), ``interim`` (true), ``vad`` (true).
+    (pcm_s16le | pcm_f32le | mulaw | alaw), ``interim`` (true), ``vad`` (true), ``keep_alive``.
     Client sends binary audio frames and JSON ``config`` / ``flush`` / ``stop``.
     """
     core: Bolo = ws.app.state.core
@@ -163,15 +191,14 @@ async def stt_stream(ws: WebSocket) -> None:
 _WS_TTS_FORMATS = {"pcm_s16le": "pcm", "pcm": "pcm", "pcm_f32le": "pcm_f32le"}
 
 
-@router.websocket("/api/v1/tts/stream")
-async def tts_stream(ws: WebSocket) -> None:
+async def _tts_stream(ws: WebSocket) -> None:
     """Streaming synthesis.
 
     Query: ``model``, ``voice``, ``format`` (pcm_s16le | pcm_f32le | mulaw |
     alaw | wav | mp3 | opus | flac | aac), ``sample_rate``, ``speed``,
     ``phonemizer`` (auto | uccharan | uccharan:improved | espeak-ng; bolo extension),
     ``wordlists`` (comma-separated word-list names; empty applies none) and ``normalize``
-    (uccharan | light | model | none).
+    (uccharan | light | model | none), ``keep_alive``.
     Client sends JSON ``{"type":"text","text":…}`` (incrementally),
     ``flush`` and ``stop``; the server answers with binary audio frames and
     JSON ``ready`` / ``chunk`` / ``metrics`` / ``done`` / ``error``.

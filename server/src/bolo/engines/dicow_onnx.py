@@ -246,18 +246,21 @@ class Network(Protocol):
 
 
 class OnnxNetwork:
-    def __init__(self, encoder: Path, decoder: Path, threads: int, device: str = "cpu") -> None:
+    def __init__(
+        self, encoder: Path, decoder: Path, threads: int, device: str = "cpu", decoder_device: str | None = None
+    ) -> None:
         import onnxruntime as ort
 
-        def session(path: Path) -> Any:
+        def session(path: Path, on: str) -> Any:
             options = ort.SessionOptions()
             options.intra_op_num_threads = max(1, threads)
             options.inter_op_num_threads = 1
             options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-            return ort.InferenceSession(str(path), sess_options=options, providers=providers_for(device))
+            return ort.InferenceSession(str(path), sess_options=options, providers=providers_for(on))
 
-        self.encoder = session(encoder)
-        self.decoder = session(decoder)
+        # the scheduler may place the two graphs apart (bolo.placement: the larger one on the GPU when only one fits)
+        self.encoder = session(encoder, device)
+        self.decoder = session(decoder, decoder_device or device)
         names = {i.name for i in self.decoder.get_inputs()}
         if names != {"input_ids", "self_k", "self_v", "cross_k", "cross_v"}:
             raise ValueError(f"{decoder} is not a DiCoW decoder graph (inputs {sorted(names)})")
@@ -547,7 +550,11 @@ class DiCoWOnnx(STTModel):
         encoder = _find(path, spec.get("encoder"), ("encoder.int8.onnx", "encoder.onnx"))
         decoder = _find(path, spec.get("decoder"), ("decoder.int8.onnx", "decoder.onnx"))
         gen = GenerationSettings.from_dir(path)
-        network = OnnxNetwork(encoder, decoder, opts.threads, opts.device)
+        apart = opts.device_for("decoder") != opts.device_for("encoder")
+        network = OnnxNetwork(
+            encoder, decoder, opts.threads, opts.device_for("encoder"),
+            **({"decoder_device": opts.device_for("decoder")} if apart else {}),
+        )  # fmt: skip
         return cls(
             network,
             gen,
@@ -600,6 +607,24 @@ class DiCoWOnnx(STTModel):
             end = min(max(start, seg.end), duration)
             out.append(Segment(start, end, text))
         return STTResult(" ".join(s.text for s in out), language, out)
+
+
+def graph_files(path: Path, spec: dict[str, Any]) -> dict[str, int]:
+    """The two graphs and their sizes, for placement (empty when they are not there yet)."""
+    try:
+        encoder = _find(path, spec.get("encoder"), ("encoder.int8.onnx", "encoder.onnx"))
+        decoder = _find(path, spec.get("decoder"), ("decoder.int8.onnx", "decoder.onnx"))
+    except FileNotFoundError:
+        return {}
+    return {"encoder": _size(encoder), "decoder": _size(decoder)}
+
+
+def _size(path: Path) -> int:
+    total = path.stat().st_size
+    data = path.with_name(path.name + ".data")  # external weights next to the graph
+    if data.is_file():
+        total += data.stat().st_size
+    return total
 
 
 def _find(path: Path, chosen: Any, defaults: tuple[str, ...]) -> Path:

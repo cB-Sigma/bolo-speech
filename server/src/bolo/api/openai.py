@@ -27,6 +27,7 @@ from bolo.core import Bolo, SynthChunk, Transcript, fallback_headers
 from bolo.diarize import DiarizeOptions, KnownSpeaker
 from bolo.engines.base import Segment
 from bolo.errors import BoloError, InvalidRequest, ModelNotFound
+from bolo.keepalive import request_keep_alive
 from bolo.obs.trace import Trace
 from bolo.separate import SeparateOptions
 from bolo.text.formats import to_srt, to_vtt
@@ -355,6 +356,8 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
         except ValueError as exc:
             raise InvalidRequest("temperature must be a number", param="temperature") from exc
         model = str(form.get("model") or "") or None
+        # extension (Ollama's keep_alive): how long the model stays loaded after this request
+        request_keep_alive(form.get("keep_alive"), ("stt", "diarization", "separation"))
         diarize = await _diarize_options(form, fmt, model, task)
         separate = separate_options(form)
         spec = core.resolve(model, "stt")
@@ -490,6 +493,11 @@ class SpeechRequest(BaseModel):
     stream_format: str = "audio"
     sample_rate: int | None = Field(default=None, ge=8000, le=48000, description="Extension: resample the output.")
     language: str | None = Field(default=None, description="Extension: language hint for text normalisation.")
+    keep_alive: str | float | None = Field(
+        default=None,
+        description="Extension (Ollama's keep_alive): how long the voice stays loaded after this request: seconds or "
+        "a duration ('10m'); 0 unloads it when the request ends; -1 keeps it loaded.",
+    )
     normalize: bool | Literal["uccharan", "light", "model", "none"] = Field(
         default=True,
         description="Extension: text normalisation. true: the voice's default (uccharan's normalise-only mode for voices "
@@ -606,6 +614,7 @@ async def create_speech(request: Request, body: SpeechRequest) -> Response:
         if body.stream_format not in ("audio", "sse"):
             raise InvalidRequest("stream_format must be 'audio' or 'sse'", param="stream_format")
         voice = body.voice.get("id") if isinstance(body.voice, dict) else body.voice
+        request_keep_alive(body.keep_alive, ("tts",))
         reference = decode_reference(body.reference_audio) if body.reference_audio else None
         spec = core.resolve(body.model, "tts")
         trace.model = spec.id

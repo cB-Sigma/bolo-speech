@@ -43,8 +43,20 @@ class EngineStatus:
 @dataclass
 class LoadOptions:
     threads: int = 1
+    #: where the model runs, as placed by the lifecycle manager (``bolo.placement``): "cpu", "cuda:0", "coreml"...
     device: str = "cpu"
     options: dict[str, Any] = field(default_factory=dict)
+    #: llama.cpp models: layers to offload (``-ngl``); None: the engine's own default for ``device``
+    gpu_layers: int | None = None
+    #: ONNX Runtime models made of several graphs: role ("encoder", "decoder", ...) -> device; a role not listed
+    #: runs on ``device``
+    graph_devices: dict[str, str] = field(default_factory=dict)
+    #: PyTorch plugin models: accelerate's ``max_memory`` (device -> bytes) for ``device_map="auto"``
+    max_memory: dict[str, int] | None = None
+
+    def device_for(self, role: str) -> str:
+        """The device of one graph of a multi-graph model."""
+        return self.graph_devices.get(role, self.device)
 
 
 @dataclass
@@ -405,3 +417,7 @@ class Engine(abc.ABC):
     def detect(self, path: Path) -> dict[str, Any] | None:
         """Guess ``{"kind", "task", "options"}`` for an unknown model directory, or None."""
         return None
+
+    def graphs(self, kind: str, path: Path, spec: dict[str, Any]) -> dict[str, int]:
+        """Models made of several separately placeable graphs: role -> bytes on disk (empty: one piece)."""
+        return {}

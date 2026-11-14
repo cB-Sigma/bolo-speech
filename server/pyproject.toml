@@ -71,6 +71,9 @@ s2s = ["onnxruntime>=1.20", "tokenizers>=0.20"]
 # inbound SIP endpoint for trunks and PBXs (sipmessage is BSD-2-Clause, pure Python: it parses and writes SIP messages)
 sip = ["sipmessage>=0.7"]
 text = ["whisper-normalizer>=0.1"]
+# NVIDIA GPU memory per process through NVML (BSD-3-Clause), for GPU/CPU placement and `bolo ps`; without it bolo
+# asks nvidia-smi
+nvidia = ["nvidia-ml-py>=12"]
 all = [
   "sherpa-onnx>=2.0,<3",
   "uccharan>=0.4",

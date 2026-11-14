@@ -203,6 +203,16 @@ class ModelSettingsRequest(BaseModel):
         description="Models (of the same task, local or cloud) that answer instead when this one is unavailable, "
         "overloaded or its provider fails, in order; null removes the pin, [] switches a configured fallback off.",
     )
+    device: str | None = Field(
+        default=None,
+        description="Pin where the model runs: cpu, cuda, cuda:1, coreml, auto, ... (overrides the `device` setting "
+        "for this model; it still goes on the CPU when it does not fit on the accelerator); null removes the pin.",
+    )
+    keep_alive: str | float | None = Field(
+        default=None,
+        description="Pin how long the model stays loaded when idle: seconds or a duration ('10m'); -1 keeps it "
+        "loaded; 0 unloads it after each request; null removes the pin.",
+    )
 
 
 @router.get("/models/{model_id:path}/settings", tags=["native"], summary="Settings pinned for one model")
@@ -225,6 +235,15 @@ async def put_model_settings(request: Request, model_id: str, body: ModelSetting
         core.components.validate_pin(spec, values["phonemizer"])
     for name in values.get("wordlists") or []:
         check_wordlist_name(name)
+    if values.get("keep_alive") is not None:
+        from bolo.keepalive import parse_keep_alive
+
+        try:
+            parse_keep_alive(values["keep_alive"])
+        except ValueError as exc:
+            raise InvalidRequest(str(exc), param="keep_alive") from exc
+    if values.get("device") is not None:
+        values["device"] = str(values["device"]).strip().lower() or None
     for name in values.get("fallback") or []:
         other = core.resolve(name, spec.task)  # unknown model or wrong task: 404 / 400
         if other.id == spec.id:
@@ -314,14 +333,45 @@ async def test_provider(request: Request, name: str) -> JSONResponse:
     return JSONResponse(await asyncio.to_thread(core.providers.test, name))
 
 
+class LoadRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    keep_alive: str | float | None = Field(
+        default=None,
+        description="How long the model stays loaded once idle: seconds or a duration ('10m', '1h'); -1 keeps it "
+        "loaded until it is unloaded; 0 unloads it at once (Ollama's keep_alive). Unset: the model's setting.",
+    )
+
+
 @router.post("/models/{model_id:path}/load", tags=["native"], summary="Load a model into memory")
-async def load(request: Request, model_id: str) -> JSONResponse:
+async def load(request: Request, model_id: str, keep_alive: str | None = None) -> JSONResponse:
+    """Optional JSON body ``{"keep_alive": "10m"}`` (or ``?keep_alive=``). The answer says where the model went:
+    ``processor`` ("100% GPU", "35%/65% CPU/GPU", ...), ``placement`` and, when it is not all on the accelerator
+    that was asked for, a ``notice``."""
+    from bolo.keepalive import parse_keep_alive
+
     core = get_core(request)
+    raw: Any = keep_alive
+    if raw is None and request.headers.get("content-type", "").startswith("application/json"):
+        with contextlib.suppress(ValueError):
+            body = LoadRequest.model_validate(await request.json())
+            raw = body.keep_alive
+    try:
+        seconds = parse_keep_alive(raw)
+    except ValueError as exc:
+        raise InvalidRequest(str(exc), param="keep_alive") from exc
     core.require_components(core.manager.resolve(model_id))
     entry = await core.manager.load(model_id)
+    core.manager.set_keep_alive(entry, seconds)
+    if seconds == 0 and entry.active == 0:
+        await core.manager.unload(entry.id, reason="keep_alive 0")
+        return JSONResponse({"id": entry.id, "loaded": False, "load_ms": round(entry.load_ms, 1)})
     out: dict[str, Any] = {
-        "id": entry.id, "loaded": True, "memory_bytes": entry.memory_bytes, "load_ms": round(entry.load_ms, 1)
+        "id": entry.id, "loaded": True, "memory_bytes": entry.memory_bytes, "load_ms": round(entry.load_ms, 1),
+        "size_vram_bytes": entry.vram_bytes, "processor": entry.processor(), "device": entry.placement.device,
+        "placement": entry.placement.to_dict(), "keep_alive_s": core.manager.ttl_for(entry.spec, entry),
     }  # fmt: skip
+    if entry.placement.notice:
+        out["notice"] = entry.placement.notice
     warnings = await asyncio.to_thread(core.advisor.warnings, entry.spec)
     if warnings:  # notices only: the model is loaded
         out["warnings"] = warnings
@@ -330,10 +380,20 @@ async def load(request: Request, model_id: str) -> JSONResponse:
 
 @router.post("/models/{model_id:path}/unload", tags=["native"], summary="Unload a model from memory")
 async def unload(request: Request, model_id: str) -> JSONResponse:
+    """Unloads now (``bolo stop``). A request still using the model finishes first."""
     core = get_core(request)
     spec = core.manager.resolve(model_id)
-    await core.manager.unload(spec.id)
-    return JSONResponse({"id": spec.id, "loaded": False})
+    was_loaded = await core.manager.unload(spec.id)
+    return JSONResponse({"id": spec.id, "loaded": False, "unloaded": was_loaded})
+
+
+@router.get("/ps", tags=["native"], summary="Loaded models: size, GPU/CPU split, keep-alive (Ollama style)")
+async def ps(request: Request) -> JSONResponse:
+    """Like Ollama's ``/api/ps``: per model ``size``, ``size_vram`` (bytes), ``processor`` ("100% GPU", "100% CPU",
+    "35%/65% CPU/GPU"), ``device``, ``expires_at`` (null: kept loaded), ``until``; plus the machine (CPU, RAM, each
+    GPU's used and total memory) and the budgets."""
+    core = get_core(request)
+    return JSONResponse(await asyncio.to_thread(core.ps))
 
 
 @router.delete("/models/{model_id:path}", status_code=204, tags=["native"], summary="Delete an installed model")

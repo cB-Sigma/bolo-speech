@@ -362,6 +362,7 @@ class _PluginModelMixin:
     _load_message: dict[str, Any]
     _handle: str | None
     _generation: int
+    placement_report: dict[str, Any] | None = None
 
     def _ensure_loaded(self) -> str:
         proc = self.process
@@ -372,6 +373,9 @@ class _PluginModelMixin:
             self._generation = proc.generation
             proc.handles.add(self._handle)
             self._apply_load_reply(reply)
+            # how the plugin split the model across the GPU and the CPU (optional; bolo 0.5)
+            report = (reply.get("info") or {}).get("placement")
+            self.placement_report = dict(report) if isinstance(report, dict) else None
         return self._handle
 
     def _apply_load_reply(self, reply: dict[str, Any]) -> None:
@@ -531,6 +535,8 @@ class PluginEngine(Engine):
             "op": "load", "kind": kind, "task": task, "path": str(path), "options": options,
             "threads": opts.threads, "device": opts.device, "model": str(spec.get("model_id", path.name)),
         }  # fmt: skip
+        if opts.max_memory:  # the model may be split across the GPU and the CPU (accelerate's device_map="auto")
+            message["placement"] = {"device_map": "auto", "max_memory": dict(opts.max_memory)}
         if task == "stt":
             return PluginSTT(self.process, message)
         if task == "tts":

@@ -92,10 +92,13 @@ class Settings:
     preload: list[str] = field(default_factory=list)
 
     # -- lifecycle --------------------------------------------------------
-    stt_ttl_s: float = 300.0
-    tts_ttl_s: float = 300.0
-    vad_ttl_s: float = -1.0  # -1: never unload
-    diarization_ttl_s: float = 300.0
+    #: how long a model stays loaded after its last use (Ollama's keep_alive): seconds or a duration ("5m", "1h");
+    #: 0 unloads after each request, a negative value never unloads. The per-task TTLs below override it.
+    keep_alive: str = "5m"
+    stt_ttl_s: float | None = None  # unset: keep_alive
+    tts_ttl_s: float | None = None  # unset: keep_alive
+    vad_ttl_s: float | None = -1.0  # -1: never unload
+    diarization_ttl_s: float | None = None  # unset: keep_alive (also separation models)
 
     # -- language model for voice agents (any OpenAI-compatible chat-completions endpoint) --
     llm_base_url: str | None = None  # e.g. http://127.0.0.1:11434/v1 (Ollama)
@@ -199,6 +202,11 @@ class Settings:
 
     # -- misc ---------------------------------------------------------------
     device: str = "cpu"
+    #: accelerator memory left free when placing models on the GPU (for the display, other programs, spikes)
+    gpu_reserve_mb: int = 512
+    #: accelerator memory bolo's models may use in all; 0: as much as is free. Over it, the least recently used
+    #: idle GPU-resident model is unloaded; when none can be, the new model is placed on the CPU
+    gpu_memory_budget_mb: int = 0
     #: attach a notice (API responses, traces, the command line, the console) when a model that is pulled or
     #: loaded is unlikely to fit this machine or to run in real time. Notices only: nothing is ever refused.
     hardware_warnings: bool = True
@@ -435,6 +443,12 @@ def load_settings(
 
     settings = Settings(**values)
     _check_cloud(settings)
+    from bolo.keepalive import parse_keep_alive
+
+    try:
+        parse_keep_alive(settings.keep_alive)
+    except ValueError as exc:
+        raise ValueError(f"keep_alive: {exc}") from exc
     if settings.workers < 1:
         raise ValueError("workers must be >= 1")
     if settings.max_batch < 1:

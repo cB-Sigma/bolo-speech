@@ -20,7 +20,7 @@ hello      ``protocol`` (int, the highest version bolo speaks)          ``protoc
                                                                         ``version``, ``kinds``
 health     -                                                            ``rss_mb`` (optional)
 load       ``model``, ``kind``, ``task``, ``path``, ``options``,        ``handle``, ``sample_rate``,
-           ``threads``, ``device``                                      ``info`` (see below)
+           ``threads``, ``device``, ``placement`` (optional)            ``info`` (see below)
 unload     ``handle``                                                   -
 transcribe ``handle``, ``requests``: list of ``{n, language, task,      ``results``: list of
            prompt, word_timestamps, temperature, hotwords}``; the       ``{text, language, segments,
@@ -46,7 +46,11 @@ shutdown   -                                                            - (then 
 ``supports_word_timestamps`` and ``speaker_conditioned`` (true: the model answers ``speakers``, diarization-
 conditioned recognition of a whole recording, bolo sends it only to such models); a separation model (task ``separation``) gives ``mode``
 (``"blind"``: answers ``separate``; ``"target"``: answers ``enrol``/``extract``/``release``) and
-``min_sample_s`` (seconds of voice a target model needs). Segments are ``{start, end, text, words}``, words ``{w, t0, t1}``.
+``min_sample_s`` (seconds of voice a target model needs). ``placement`` in a ``load`` request (bolo 0.5) is
+``{"device_map": "auto", "max_memory": {"0": bytes, "cpu": bytes}}`` when bolo's scheduler found less free
+accelerator memory than the model needs: a plugin that can split the model (accelerate's ``device_map``) may use it,
+and answers with ``info.placement`` = ``{"gpu_bytes", "cpu_bytes", "device_map"}``; a plugin that cannot ignores
+it. Segments are ``{start, end, text, words}``, words ``{w, t0, t1}``.
 
 Versioning: bolo sends the highest version it speaks in ``hello``; the plugin answers with the
 version it will use (at most bolo's). A plugin that cannot speak any version bolo knows answers

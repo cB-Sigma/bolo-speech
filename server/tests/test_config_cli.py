@@ -146,4 +146,4 @@ def test_cli_ps_against_live_server(live, capsys: pytest.CaptureFixture[str]) ->
     httpx.post(live.url + "/v1/audio/speech", json={"input": "Hello there.", "response_format": "pcm"})
     assert main(["ps", "--url", live.url]) == 0
     out = capsys.readouterr().out
-    assert "fake-tts" in out and "uptime" in out
+    assert "fake-tts" in out and "PROCESSOR" in out and "100% CPU" in out

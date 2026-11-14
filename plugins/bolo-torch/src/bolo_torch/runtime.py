@@ -188,7 +188,46 @@ class LoadContext:
     threads: int = 1
     model_id: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
+    #: bolo's scheduler found less free accelerator memory than the model needs: accelerate's ``max_memory``
+    #: (``{"0": bytes, "cpu": bytes}``) for ``device_map="auto"``; None: the whole model on ``device``
+    max_memory: dict[str, int] | None = None
 
     def option(self, name: str, default: Any = None) -> Any:
         value = self.options.get(name)
         return default if value is None else value
+
+
+def split_kwargs(ctx: LoadContext) -> dict[str, Any]:
+    """``from_pretrained`` arguments that split a model across the GPU and the CPU (accelerate's
+    ``device_map="auto"`` limited by ``max_memory``), when bolo asked for a split and accelerate is installed;
+    empty otherwise (load whole, then ``.to(device)``)."""
+    if not ctx.max_memory or ctx.device == "cpu":
+        return {}
+    import importlib.util
+
+    if importlib.util.find_spec("accelerate") is None:
+        return {}
+    limits: dict[Any, Any] = {}
+    for key, value in ctx.max_memory.items():
+        limits[int(key) if str(key).isdigit() else str(key)] = int(value)
+    return {"device_map": "auto", "max_memory": limits}
+
+
+def device_map_report(model: Any) -> dict[str, Any] | None:
+    """How a loaded model's weights are spread: ``{"gpu_bytes", "cpu_bytes", "device_map"}`` (sent to bolo as
+    ``info.placement``), or None for something without parameters."""
+    params = getattr(model, "parameters", None)
+    if params is None:
+        return None
+    gpu = cpu = 0
+    for p in params():
+        size = int(p.numel()) * int(p.element_size())
+        if getattr(p.device, "type", "cpu") in ("cuda", "mps", "xpu"):
+            gpu += size
+        else:
+            cpu += size
+    out: dict[str, Any] = {"gpu_bytes": gpu, "cpu_bytes": cpu}
+    hf_map = getattr(model, "hf_device_map", None)
+    if isinstance(hf_map, dict):
+        out["device_map"] = {str(k): str(v) for k, v in hf_map.items()}
+    return out

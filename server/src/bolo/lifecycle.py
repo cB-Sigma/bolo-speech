@@ -1,4 +1,12 @@
-"""Model lifecycle: lazy loading, idle unloading, memory budget and LRU eviction."""
+"""Model lifecycle: lazy loading, keep-alive unloading, memory budgets, LRU eviction and GPU/CPU placement.
+
+Loading a model first places it (:mod:`bolo.placement`): on the accelerator when it fits in the free accelerator
+memory minus ``gpu_reserve_mb`` and in ``gpu_memory_budget_mb``, after unloading idle GPU-resident models (least
+recently used first) when that makes it fit; otherwise split (llama.cpp layers, ONNX Runtime graphs, a PyTorch
+plugin's device map) or on the CPU, with a notice. Then it makes room in RAM (``memory_budget_mb``,
+``max_loaded_models``), loads, and measures what the load took: the growth of this process and the processes it
+started (RSS), and of the accelerator memory they hold (:mod:`bolo.accel`).
+"""
 
 from __future__ import annotations
 
@@ -15,6 +23,7 @@ from typing import Any
 
 import psutil
 
+from bolo.accel import Accelerators, our_pids
 from bolo.catalog import Catalog, ModelSpec
 from bolo.config import Settings
 from bolo.engines import EngineRegistry
@@ -29,7 +38,19 @@ from bolo.engines.base import (
     TurnModel,
 )
 from bolo.errors import EngineUnavailable, ModelNotFound, ModelNotInstalled, Overloaded
+from bolo.keepalive import REQUEST_KEEP_ALIVE, parse_keep_alive
 from bolo.obs.events import EventBus
+from bolo.placement import (
+    MB,
+    LayerInfo,
+    Placement,
+    family,
+    gguf_block_count,
+    operator_layers,
+    plan,
+    processor,
+    split_mode,
+)
 from bolo.providers import ProviderRegistry
 from bolo.scheduler import Handler, ModelQueue
 from bolo.store import ModelStore
@@ -48,10 +69,37 @@ class LoadedModel:
     last_used: float = field(default_factory=time.monotonic)
     active: int = 0
     requests: int = 0
+    #: of ``memory_bytes``, the part in accelerator memory
+    vram_bytes: int = 0
+    #: ``vram_bytes`` was measured (NVML, nvidia-smi, the plugin's report), not taken from the plan
+    vram_measured: bool = False
+    placement: Placement = field(default_factory=Placement)
+    #: set by a request's or a load's ``keep_alive`` (seconds; -1: forever); None: the settings decide
+    keep_alive_s: float | None = None
+    stopping: bool = False
 
     @property
     def id(self) -> str:
         return self.spec.id
+
+    @property
+    def ram_bytes(self) -> int:
+        return max(0, self.memory_bytes - self.vram_bytes)
+
+    def processor(self) -> str:
+        """Where the weights are, as Ollama's PROCESSOR column says it. A model placed whole on one side reads
+        "100% GPU" / "100% CPU" (the runtime's own host memory of a GPU model is in SIZE, not here); a split model
+        reads by bytes: measured when the accelerator memory was measured, else as planned."""
+        p = self.placement
+        if p.device in ("remote", "cloud"):
+            return p.device
+        if p.gpu_bytes <= 0 or self.vram_bytes <= 0:
+            return "100% CPU"
+        if p.cpu_bytes <= 0:
+            return "100% GPU"
+        if self.vram_measured:
+            return processor(self.vram_bytes, self.memory_bytes)
+        return p.processor()
 
     def idle_s(self) -> float:
         return 0.0 if self.active else time.monotonic() - self.last_used
@@ -96,6 +144,7 @@ class ModelManager:
         engines: EngineRegistry,
         events: EventBus,
         ensure_installed: Callable[[ModelSpec], Any] | None = None,
+        accel: Accelerators | None = None,
     ) -> None:
         self.settings = settings
         self.catalog = catalog
@@ -103,6 +152,11 @@ class ModelManager:
         self.engines = engines
         self.events = events
         self.loaded: dict[str, LoadedModel] = {}
+        #: models being unloaded (shown as "Stopping..." by ps)
+        self.stopping: dict[str, LoadedModel] = {}
+        #: accelerator memory (NVML, nvidia-smi, unified memory); tests pass a fake
+        self.accel = accel or Accelerators()
+        self.gpu_evictions = 0
         self._locks: dict[str, asyncio.Lock] = {}
         self._reaper: asyncio.Task[None] | None = None
         self._ensure_installed = ensure_installed
@@ -137,7 +191,19 @@ class ModelManager:
             return provider is not None and provider.configured
         return spec.builtin or self.store.is_installed(spec.id) or remote_url(self.settings, spec) is not None
 
-    def ttl_for(self, spec: ModelSpec) -> float:
+    def ttl_for(self, spec: ModelSpec, entry: LoadedModel | None = None) -> float:
+        """Seconds a model stays loaded once idle (-1: forever). The first that is set wins: the keep-alive of the
+        last request or load that gave one, the model's pinned ``keep_alive`` setting, the catalog entry's
+        ``options.keep_alive``, the per-task TTL (``stt_ttl_s``, ...), the ``keep_alive`` setting."""
+        if entry is not None and entry.keep_alive_s is not None:
+            return entry.keep_alive_s
+        for raw in (self.store.model_settings(spec.id).get("keep_alive"), spec.options.get("keep_alive")):
+            try:
+                value = parse_keep_alive(raw)
+            except ValueError:
+                value = None  # a damaged pin must not fail requests
+            if value is not None:
+                return value
         s = self.settings
         ttls = {
             "stt": s.stt_ttl_s,
@@ -146,10 +212,153 @@ class ModelManager:
             "diarization": s.diarization_ttl_s,
             "separation": s.diarization_ttl_s,
         }
-        return ttls.get(spec.task, s.stt_ttl_s)
+        ttl = ttls.get(spec.task)
+        if ttl is not None:
+            return -1.0 if ttl < 0 else float(ttl)
+        return self.default_keep_alive()
+
+    def default_keep_alive(self) -> float:
+        try:
+            value = parse_keep_alive(self.settings.keep_alive)
+        except ValueError:
+            value = None
+        return 300.0 if value is None else value
+
+    def expires_in(self, entry: LoadedModel) -> float | None:
+        """Seconds until an idle unload (counted from now while the model is in use); None: never."""
+        ttl = self.ttl_for(entry.spec, entry)
+        if ttl < 0:
+            return None
+        return max(0.0, ttl - entry.idle_s())
 
     def memory_in_use(self) -> int:
-        return sum(m.memory_bytes for m in self.loaded.values())
+        """RAM held by loaded models (accelerator memory is counted apart: :meth:`gpu_in_use`)."""
+        return sum(m.ram_bytes for m in self.loaded.values())
+
+    def gpu_in_use(self) -> int:
+        return sum(m.vram_bytes for m in self.loaded.values())
+
+    # -- placement ----------------------------------------------------------
+    def requested_device(self, spec: ModelSpec) -> str:
+        """``device`` pinned for the model (``PUT /api/v1/models/{id}/settings``), else the catalog entry's
+        ``options.device``, else the ``device`` setting."""
+        pinned = self.store.model_settings(spec.id).get("device") or spec.options.get("device")
+        return str(pinned or self.settings.device or "cpu").strip().lower()
+
+    def resolve_device(self, requested: str) -> str:
+        """``auto`` -> the accelerator found (``cuda:0``, ``coreml``) or ``cpu``; anything else as it is."""
+        if requested in ("", "auto"):
+            return self.accel.default_device() or "cpu"
+        return requested
+
+    def gpu_available(self, device: str) -> int | None:
+        """Bytes a new model may take on ``device``: free memory minus the reserve, capped by what is left of
+        ``gpu_memory_budget_mb``; None when neither is known."""
+        s = self.settings
+        found = self.accel.device(device, fresh=True)
+        free = None
+        if found is not None and found.free_bytes is not None:
+            free = found.free_bytes - s.gpu_reserve_mb * MB
+        if s.gpu_memory_budget_mb > 0:
+            left = s.gpu_memory_budget_mb * MB - self.gpu_in_use()
+            free = left if free is None else min(free, left)
+        return None if free is None else max(0, free)
+
+    def estimate_bytes(self, spec: ModelSpec) -> int:
+        need = int((self.store.size_on_disk(spec.id) or spec.size_bytes) * 1.2)
+        hw = spec.options.get("hardware")
+        if isinstance(hw, dict) and hw.get("vram_gb"):
+            with contextlib.suppress(TypeError, ValueError):
+                need = max(need, int(float(hw["vram_gb"]) * 1024**3))
+        return need
+
+    def _layers(self, path: Any, options: dict[str, Any]) -> LayerInfo | None:
+        from pathlib import Path
+
+        if not options.get("model_file"):
+            return None
+        model_file = Path(path) / str(options["model_file"])
+        blocks = gguf_block_count(model_file)
+        if blocks is None or blocks <= 0:
+            blocks = int(options.get("block_count") or 0)
+        if blocks <= 0 or not model_file.is_file():
+            return None
+        extra = 0
+        if options.get("mmproj_file"):
+            mm = Path(path) / str(options["mmproj_file"])
+            extra = mm.stat().st_size if mm.is_file() else 0
+        return LayerInfo(blocks, model_file.stat().st_size, extra)
+
+    def _plan(self, spec: ModelSpec, available: int | None) -> Placement:
+        from bolo.tts_runtimes import remote_url
+
+        requested = self.requested_device(spec)
+        if spec.cloud or spec.engine == "remote":
+            return Placement(device="cloud", requested=requested)
+        if remote_url(self.settings, spec) is not None:
+            return Placement(device="remote", requested=requested)
+        device = self.resolve_device(requested)
+        need = self.estimate_bytes(spec)
+        split = split_mode(spec.engine, spec.kind, spec.options)
+        path = self.store.model_dir(spec.id)
+        layers = graphs = None
+        op_ngl = None
+        if split == "layers":
+            layers = self._layers(path, spec.options)
+            args = [str(a) for a in spec.options.get("server_args") or []] + list(self.settings.tts_server_args)
+            op_ngl = operator_layers(args)
+        elif split == "graphs":
+            engine = self.engines.get(spec.engine)
+            with contextlib.suppress(Exception):
+                graphs = engine.graphs(spec.kind, path, spec.options) if engine is not None else None
+        _, _, idx = device.partition(":")
+        return plan(
+            model_id=spec.id, engine_id=spec.engine, requested=requested, device=device, split=split,
+            need_bytes=need, available_bytes=available, layers=layers, graphs=graphs, operator_ngl=op_ngl,
+            device_index=int(idx) if idx.isdigit() else 0,
+        )  # fmt: skip
+
+    async def place(self, spec: ModelSpec) -> Placement:
+        """Decide where a model goes, unloading idle GPU-resident models (LRU) when that lets it fit whole."""
+        requested = self.requested_device(spec)
+        device = self.resolve_device(requested)
+        if family(device) == "cpu" or spec.cloud or spec.engine == "remote":
+            return self._plan(spec, None)
+        while True:
+            available = self.gpu_available(device)
+            p = self._plan(spec, available)
+            whole = p.device not in ("cpu",) and p.cpu_bytes == 0
+            if whole or p.operator_layers or available is None or p.device in ("remote", "cloud"):
+                return p
+            idle = sorted(
+                (m for m in self.loaded.values() if m.active == 0 and m.vram_bytes > 0), key=lambda m: m.last_used
+            )
+            # evict only when unloading every idle GPU-resident model would make this one fit whole
+            if not idle or self._plan(spec, available + sum(m.vram_bytes for m in idle)).cpu_bytes > 0:
+                return p
+            victim = idle[0]
+            log.info("unloading %s from %s to make room for %s", victim.id, device, spec.id)
+            self.gpu_evictions += 1
+            self.evictions += 1
+            await self.unload(victim.id, reason="evicted")
+
+    def place_llama_server(self, name: str, path: Any, options: dict[str, Any], extra: list[str]) -> Placement:
+        """Layers of a llama-server bolo starts outside the model manager (the speech-to-speech server)."""
+        requested = str(self.settings.device or "cpu").strip().lower()
+        device = self.resolve_device(requested)
+        layers = self._layers(path, options)
+        size = (layers.file_bytes + layers.extra_bytes) if layers else 0
+        p = plan(
+            model_id=name, engine_id="tts-server", requested=requested, device=device,
+            split="layers" if layers else "whole", need_bytes=size,
+            available_bytes=self.gpu_available(device) if family(device) != "cpu" else None, layers=layers,
+            operator_ngl=operator_layers(extra),
+        )  # fmt: skip
+        if layers is None and family(device) != "cpu":
+            p.device = device  # layer count unknown: all layers, as before (-ngl 99)
+        if p.notice:
+            log.warning("%s", p.notice)
+        return p
 
     # -- loading ----------------------------------------------------------
     def _build_queue(self, spec: ModelSpec, model: Model) -> ModelQueue:
@@ -199,7 +408,28 @@ class ModelManager:
             queue_timeout_s=s.queue_timeout_s,
         )
 
-    def _load_blocking(self, spec: ModelSpec) -> tuple[Model, int, float]:
+    def _rss(self) -> int:
+        """Resident memory of this process and the processes it started (servers, plugins)."""
+        total = 0
+        for pid in our_pids():
+            with contextlib.suppress(Exception):
+                total += psutil.Process(pid).memory_info().rss
+        return total
+
+    def _vram(self, device: str) -> tuple[int | None, bool]:
+        """(accelerator memory held now, by this server where that can be told else on the whole device; unified)."""
+        if family(device) in ("cpu", "remote", "cloud"):
+            return None, False
+        found = self.accel.device(device, fresh=True)
+        if found is None:
+            return None, False
+        if found.unified:
+            return None, True
+        return (found.process_bytes if found.process_bytes is not None else found.used_bytes), False
+
+    def _load_blocking(
+        self, spec: ModelSpec, placement: Placement | None = None
+    ) -> tuple[Model, int, float, int, bool]:
         engine = self.engines.get(spec.engine)
         if engine is None:
             raise EngineUnavailable(f"model '{spec.id}' needs the unknown engine '{spec.engine}'")
@@ -209,16 +439,21 @@ class ModelManager:
                 f"model '{spec.id}' needs the '{spec.engine}' engine, which is not available: {status.reason}"
             )
         self._probe(spec)
-        proc = psutil.Process()
-        before = proc.memory_info().rss
+        place = placement or Placement(device=self.settings.device)
+        device = place.device if place.device not in ("remote", "cloud") else self.settings.device
+        before = self._rss()
+        vram_before, unified = self._vram(place.device)
         t0 = time.perf_counter()
         opts = LoadOptions(
             threads=int(spec.options.get("threads", self.settings.resolved_threads())),
-            device=self.settings.device,
+            device=device,
             options={
                 "endpoint_silence_s": self.settings.endpoint_silence_ms / 1000.0,
                 "max_utterance_s": self.settings.max_utterance_s,
             },
+            gpu_layers=place.gpu_layers if place.split == "layers" and not place.operator_layers else None,
+            graph_devices=dict(place.graphs),
+            max_memory=place.max_memory,
         )
         model_opts = dict(spec.options)
         if spec.voices:
@@ -236,11 +471,26 @@ class ModelManager:
         if isinstance(model, TTSModel):
             model.warm_up()
         load_ms = (time.perf_counter() - t0) * 1000.0
-        grown = max(0, proc.memory_info().rss - before)
+        grown = max(0, self._rss() - before)
+        vram_after, _ = self._vram(place.device)
+        measured = vram_before is not None and vram_after is not None
+        if measured:
+            vram = max(0, int(vram_after or 0) - int(vram_before or 0))
+        else:  # unified memory (it is in the RSS growth already) or nothing to ask: what was planned
+            vram = place.gpu_bytes if place.device not in ("cpu", "remote", "cloud") else 0
+        report = getattr(model, "placement_report", None)
+        if isinstance(report, dict) and report.get("gpu_bytes") is not None:
+            # a plugin that split the model says how (accelerate's device map); more precise than a delta
+            with contextlib.suppress(TypeError, ValueError):
+                vram, measured = int(report["gpu_bytes"]), True
+                place.gpu_bytes, place.cpu_bytes = vram, int(report.get("cpu_bytes") or 0)
         # An estimate. RSS growth during the load reads low, sometimes zero, when the allocator reuses memory
         # that an unloaded model gave back, so it is never taken to be less than the model's files on disk.
-        memory = max(grown, self.store.size_on_disk(spec.id))
-        return model, memory, load_ms
+        ram = grown if unified else grown + vram
+        memory = max(ram, self.store.size_on_disk(spec.id), vram)
+        if isinstance(report, dict) and report.get("gpu_bytes") is not None:
+            memory = max(memory, place.gpu_bytes + place.cpu_bytes)
+        return model, memory, load_ms, min(vram, memory), measured
 
     def _probe(self, spec: ModelSpec) -> None:
         """First load of an installed model happens in a child process (see ``bolo._probe``)."""
@@ -275,10 +525,11 @@ class ModelManager:
         with contextlib.suppress(OSError):
             path.write_text(json.dumps(manifest, indent=2))
 
-    async def _make_room(self, spec: ModelSpec) -> None:
+    async def _make_room(self, spec: ModelSpec, need: int | None = None) -> None:
         s = self.settings
         budget = s.memory_budget_mb * 1024 * 1024
-        need = int((self.store.size_on_disk(spec.id) or spec.size_bytes) * 1.2)
+        if need is None:
+            need = int((self.store.size_on_disk(spec.id) or spec.size_bytes) * 1.2)
 
         def over() -> bool:
             too_many = bool(s.max_loaded_models) and len(self.loaded) >= s.max_loaded_models
@@ -319,13 +570,28 @@ class ModelManager:
                 if self._ensure_installed is None:
                     raise ModelNotInstalled(f"model '{spec.id}' is not installed; run `bolo pull {spec.id}`")
                 await self._ensure_installed(spec)
-            await self._make_room(spec)
+            placement = await self.place(spec)
+            if placement.notice:
+                log.warning("%s", placement.notice)
+            need_ram = int((self.store.size_on_disk(spec.id) or spec.size_bytes) * 1.2)
+            if placement.gpu_bytes and (placement.gpu_bytes + placement.cpu_bytes):
+                need_ram = int(need_ram * placement.cpu_bytes / (placement.gpu_bytes + placement.cpu_bytes))
+            await self._make_room(spec, need_ram)
             loop = asyncio.get_running_loop()
-            model, memory, load_ms = await loop.run_in_executor(None, self._load_blocking, spec)
+            model, memory, load_ms, vram, measured = await loop.run_in_executor(
+                None, self._load_blocking, spec, placement
+            )
             entry = LoadedModel(spec, model, self._build_queue(spec, model), memory, load_ms)
+            entry.vram_bytes, entry.vram_measured, entry.placement = vram, measured, placement
             self.loaded[spec.id] = entry
-            log.info("loaded %s in %.0f ms (~%.0f MB)", spec.id, load_ms, memory / 1e6)
-            self.events.publish("model", {"id": spec.id, "event": "loaded"})
+            log.info(
+                "loaded %s in %.0f ms (~%.0f MB, %s on %s)",
+                spec.id, load_ms, memory / 1e6, entry.processor(), placement.device,
+            )  # fmt: skip
+            event: dict[str, Any] = {"id": spec.id, "event": "loaded", "processor": entry.processor()}
+            if placement.notice:
+                event["notice"] = placement.notice
+            self.events.publish("model", event)
             if self.on_loaded is not None:
                 with contextlib.suppress(Exception):
                     self.on_loaded(spec)
@@ -337,17 +603,31 @@ class ModelManager:
         if spec is None or spec.id not in self.loaded:
             return False
         entry = self.loaded.pop(spec.id)
-        await entry.queue.close()
-        with contextlib.suppress(Exception):
-            entry.model.close()
+        entry.stopping = True
+        self.stopping[spec.id] = entry
+        try:
+            await entry.queue.close()
+            with contextlib.suppress(Exception):
+                entry.model.close()
+        finally:
+            self.stopping.pop(spec.id, None)
         log.info("unloaded %s (%s)", spec.id, reason)
         self.events.publish("model", {"id": spec.id, "event": "unloaded", "reason": reason})
         return True
 
     @contextlib.asynccontextmanager
     async def use(self, name: str) -> AsyncIterator[LoadedModel]:
-        """Borrow a model: loads it if needed and keeps it from being unloaded."""
+        """Borrow a model: loads it if needed and keeps it from being unloaded.
+
+        The request's ``keep_alive`` (:data:`bolo.keepalive.REQUEST_KEEP_ALIVE`), when it has one and it applies to
+        the model's task, becomes the model's keep-alive; ``0`` unloads the model when the last request using it
+        ends (for sessions: when the session ends, see :meth:`apply_keep_alive`)."""
         entry = await self.load(name)
+        ka = REQUEST_KEEP_ALIVE.get()
+        if ka is not None and ka.applies(entry.spec.task):
+            ka.used.add(entry.id)
+            if not ka.session or ka.seconds != 0:
+                entry.keep_alive_s = ka.seconds
         entry.active += 1
         entry.requests += 1
         entry.last_used = time.monotonic()
@@ -356,6 +636,29 @@ class ModelManager:
         finally:
             entry.active -= 1
             entry.last_used = time.monotonic()
+            if entry.active == 0 and entry.keep_alive_s == 0 and self.loaded.get(entry.id) is entry:
+                with contextlib.suppress(Exception):
+                    await self.unload(entry.id, reason="keep_alive 0")
+
+    async def apply_keep_alive(self, ids: Any, seconds: float) -> None:
+        """At the end of a session: give the models it used this keep-alive (``0`` unloads the idle ones now)."""
+        for model_id in list(ids):
+            entry = self.loaded.get(model_id)
+            if entry is None:
+                continue
+            entry.keep_alive_s = seconds
+            entry.last_used = time.monotonic()
+            if seconds == 0 and entry.active == 0:
+                with contextlib.suppress(Exception):
+                    await self.unload(model_id, reason="keep_alive 0")
+
+    def set_keep_alive(self, entry: LoadedModel, seconds: float | None) -> None:
+        """A load's ``keep_alive`` (``bolo load``, the console's "Keep loaded"); restarts the countdown."""
+        if seconds is None:
+            return
+        entry.keep_alive_s = seconds
+        entry.last_used = time.monotonic()
+        self._ensure_reaper()
 
     # -- idle unloading ---------------------------------------------------
     def _ensure_reaper(self) -> None:
@@ -365,7 +668,7 @@ class ModelManager:
     async def reap_once(self) -> list[str]:
         gone: list[str] = []
         for entry in list(self.loaded.values()):
-            ttl = self.ttl_for(entry.spec)
+            ttl = self.ttl_for(entry.spec, entry)
             if ttl >= 0 and entry.active == 0 and entry.idle_s() >= ttl:
                 await self.unload(entry.id, reason="idle")
                 gone.append(entry.id)
@@ -373,7 +676,7 @@ class ModelManager:
 
     async def _reap_loop(self) -> None:
         while self.loaded:
-            ttls = [t for t in (self.ttl_for(m.spec) for m in self.loaded.values()) if t >= 0]
+            ttls = [t for t in (self.ttl_for(m.spec, m) for m in self.loaded.values()) if t >= 0]
             await asyncio.sleep(max(0.05, min([1.0, *[t / 4 for t in ttls]])))
             with contextlib.suppress(Exception):
                 await self.reap_once()
@@ -385,6 +688,7 @@ class ModelManager:
                 await self._reaper
         for model_id in list(self.loaded):
             await self.unload(model_id, reason="shutdown")
+        self.accel.close()
 
 
 def _enrol(separator: SeparationModel, item: tuple[str, Any]) -> bool:
