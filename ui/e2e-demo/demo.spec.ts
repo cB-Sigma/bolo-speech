@@ -1168,3 +1168,77 @@ test.describe('speakers: who spoke when in the page', () => {
     }
   })
 })
+
+test.describe('voice conversation in the page', () => {
+  test('mic → recogniser → language model → voice, with latencies, barge-in and the model listed as loaded', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 900 })
+    await page.addInitScript(() => {
+      // Scripted recogniser, language model and voice; the fake microphone plays the Kennedy sample.
+      localStorage.setItem('bolo.mock.browserStt', JSON.stringify({ loadMs: 200 }))
+      localStorage.setItem('bolo.mock.llm', '1')
+      localStorage.setItem('bolo.mock.tts', '1')
+    })
+    await open(page, 'conversation')
+    await page.getByTestId('llm-model').click()
+    await expect(page.getByTestId('llm-qwen2.5-1.5b')).toContainText('needs WebGPU')
+    await expect(page.getByTestId('llm-llama-3.2-1b')).toContainText('Llama 3.2 Community License')
+    await page.getByTestId('llm-smollm2-360m').click()
+    await expect(page.getByTestId('s2s-note')).toContainText('LFM3-Audio')
+    await page.getByTestId('conversation-start').click()
+    const turns = page.getByTestId('conversation-turns')
+    await expect(turns.locator('[data-role="user"]').first()).toContainText('pretend transcript', { timeout: 30_000 })
+    await expect(turns.locator('[data-role="assistant"]').first()).toContainText('I heard you')
+    await expect(turns.getByTestId('turn-latency').first()).toContainText(/text→first word \d+ ms/)
+    // The sample keeps talking over the reply: the reply is cut off.
+    await expect(page.getByTestId('barge-ins')).toBeVisible({ timeout: 30_000 })
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    )
+    expect(overflow).toBeLessThanOrEqual(1)
+    await axe(page)
+    await page.getByTestId('conversation-stop').click()
+    await page.goto('./#/models')
+    await expect(
+      page.getByTestId('loaded-models').getByTestId('loaded-model').filter({ hasText: 'llm-smollm2-360m' }),
+    ).toBeVisible()
+  })
+
+  test('your own endpoint: kept in this browser only', async ({ page }) => {
+    await open(page, 'conversation')
+    await page.getByTestId('llm-source').click()
+    await page.getByRole('option', { name: /own OpenAI-compatible/ }).click()
+    const form = page.getByTestId('endpoint-form')
+    await form.getByLabel('Base URL').fill('https://llm.example.invalid/v1')
+    await form.getByLabel('Model').fill('my-model')
+    await form.getByLabel('API key').fill('sk-test')
+    await form.getByLabel('Base URL').focus()
+    const saved = await page.evaluate(() => localStorage.getItem('bolo.llmEndpoint'))
+    expect(JSON.parse(saved ?? '{}')).toEqual({
+      url: 'https://llm.example.invalid/v1',
+      model: 'my-model',
+      key: 'sk-test',
+    })
+    await expect(form).toContainText('Kept only in this browser')
+    await axe(page)
+  })
+
+  test.describe('with the models available', () => {
+    test.skip(!MIRROR, 'set BOLO_E2E_MODEL_DIR to a mirror with SmolLM2 360M to run')
+    test('a real language model in the page answers, streamed', async ({ page }) => {
+      test.setTimeout(300_000)
+      await page.addInitScript(() => {
+        localStorage.setItem('bolo.mock.tts', '1')
+      })
+      await open(page, 'conversation')
+      await page.getByTestId('conversation-type').fill('Say hello in one short sentence.')
+      await page.getByTestId('conversation-send').click()
+      const reply = page.getByTestId('conversation-turns').locator('[data-role="assistant"]').first()
+      await expect(reply.getByTestId('turn-text')).toHaveText(/[A-Za-z]+ [A-Za-z]+/, { timeout: 240_000 })
+      await expect(reply.getByTestId('turn-latency')).toContainText(/text→first sound \d+ ms/, { timeout: 120_000 })
+      await expect(page.getByTestId('llm-status')).toContainText('Ready on')
+      console.log(`[llm] ${await page.getByTestId('llm-status').innerText()} · ${await reply.innerText()}`)
+    })
+  })
+})

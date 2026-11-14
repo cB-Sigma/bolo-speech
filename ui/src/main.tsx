@@ -40,6 +40,13 @@ async function boot() {
         ])
         setDiarizeWorkerFactory(() => new FakeDiarizeWorker())
       }
+      if (localStorage.getItem('bolo.mock.llm')) {
+        const [{ FakeLlmWorker }, { setLlmWorkerFactory }] = await Promise.all([
+          import('./mock/fake-llm-worker'),
+          import('./lib/browser-llm/engine'),
+        ])
+        setLlmWorkerFactory(() => new FakeLlmWorker())
+      }
     } catch {
       // storage blocked: the real diarizer
     }

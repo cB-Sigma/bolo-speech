@@ -1,5 +1,6 @@
 import { Info, MessagesSquare, Mic, MicOff, PhoneOff } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { BrowserConversation } from '@/components/conversation/browser-conversation'
 import { PipelinePicker } from '@/components/conversation/pipeline-picker'
 import { NeedsServer } from '@/components/demo'
 import { Page } from '@/components/layout/app-shell'
@@ -29,6 +30,10 @@ const STATUS: Record<ConversationState['status'], string> = {
 }
 
 export default function ConversationPage() {
+  return isDemo ? <BrowserConversation /> : <ServerConversation />
+}
+
+function ServerConversation() {
   const info = useInfo()
   const components = useComponents().data?.components
   const support = useSupport()
