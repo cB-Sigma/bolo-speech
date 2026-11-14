@@ -513,8 +513,8 @@ async def test_nemotron_on_a_clean_dialogue_as_telephone_audio(core: Bolo) -> No
     Here Nemotron's answer depends on small differences between one synthesis of the same text and the next
     (docs/models.md, "Clean two-voice dialogues"): of 40 dialogues put together from five syntheses of each line
     it found two speakers in 38 and gave every line its own speaker in 31, and it missed up to 44 % of the speech
-    (median 23 %; false alarm at most 9 %). On GitHub's CPUs the same dialogue came out as one speaker once and
-    with 25 % and 41 % missed speech. So this test asserts only what held every time: speech is found, there are never more than
+    (median 23 %). On GitHub's CPUs the same dialogue came out as one speaker once, and with 25 % and 41 %
+    missed speech. So this test asserts only what held every time: speech is found, there are never more than
     two speakers, and little is reported outside the lines. It does not assert that the voices are told apart."""
     from bolo.audio import mulaw_encode
     from bolo.diarize import DiarizeOptions, diarization_error_rate
@@ -542,7 +542,9 @@ async def test_nemotron_on_a_clean_dialogue_as_telephone_audio(core: Bolo) -> No
     score = diarization_error_rate(reference, turns)
     print(f"\nnemotron, clean dialogue at 8000 Hz: {len({t.speaker for t in turns})} speakers ({score})")
     assert 1 <= len({t.speaker for t in turns}) <= 2
-    assert score["false_alarm"] <= 0.15 and score["missed"] <= 0.6
+    # False alarm: when the two voices are heard as one, the three 0.6 s pauses between the lines are closed
+    # (pauses under 1 s inside one speaker's turn are), which alone is 13 % of the speech; the most seen was that.
+    assert score["false_alarm"] <= 0.2 and score["missed"] <= 0.6
     assert opts.activity is not None and abs(len(opts.activity.probs) - len(dialogue) / 8000 * 100) <= 2
 
 
