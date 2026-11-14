@@ -84,6 +84,8 @@ export interface TtsOptions {
   inputFormat?: 'text' | 'ssml' | 'markdown'
   /** Word lists to apply, highest priority first. */
   wordlists?: string[]
+  /** Romanised text: `off`, `auto` or `on`; omitted means the voice's setting. */
+  romanised?: string
 }
 
 /** Finds the PCM payload of a WAV stream once enough header bytes have arrived. */
@@ -258,7 +260,7 @@ export class TtsSession {
   }
 
   private runWs(): void {
-    const { model, voice, text, language, phonemizer, wordlists } = this.opts
+    const { model, voice, text, language, phonemizer, wordlists, romanised } = this.opts
     let ws: WebSocket
     try {
       const WS = getTransport().WebSocket
@@ -270,6 +272,7 @@ export class TtsSession {
           language,
           phonemizer,
           wordlists: wordlists?.length ? wordlists.join(',') : undefined,
+          romanised,
         }),
       )
     } catch (err) {
@@ -328,8 +331,18 @@ export class TtsSession {
   }
 
   private async runHttp(): Promise<void> {
-    const { model, voice, text, language, phonemizer, referenceAudio, referenceText, inputFormat, wordlists } =
-      this.opts
+    const {
+      model,
+      voice,
+      text,
+      language,
+      phonemizer,
+      referenceAudio,
+      referenceText,
+      inputFormat,
+      wordlists,
+      romanised,
+    } = this.opts
     this.abort = new AbortController()
     try {
       const res = await api.speech(
@@ -344,6 +357,7 @@ export class TtsSession {
           reference_text: referenceAudio && referenceText ? referenceText : undefined,
           input_format: inputFormat && inputFormat !== 'text' ? inputFormat : undefined,
           wordlists: wordlists?.length ? wordlists : undefined,
+          romanised,
         },
         this.abort.signal,
       )

@@ -13,6 +13,10 @@ export interface Prefs {
   /** End-to-end latency target in ms used by budget bars and target lines. */
   targetMs: number
   modelsView: 'cards' | 'table'
+  /** Order of the Models screen: the catalog's own, or best fit for the server's machine first. */
+  modelsSort: 'default' | 'fit'
+  /** The first-run "Pick for me" prompt was dismissed. */
+  pickDismissed: boolean
 }
 
 const KEY = 'bolo.prefs'
@@ -26,6 +30,8 @@ const defaults: Prefs = {
   // A tab's recogniser waits half a second of silence before it answers, so the demo starts with a looser target.
   targetMs: isDemo ? 800 : 300,
   modelsView: 'cards',
+  modelsSort: 'default',
+  pickDismissed: false,
 }
 
 function read(): Prefs {

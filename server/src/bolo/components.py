@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any
 from bolo import tts_runtimes
 from bolo.errors import InvalidRequest, ModelNotFound
 from bolo.jobs import Job
-from bolo.text import phonemize
+from bolo.text import phonemize, romanised
 
 if TYPE_CHECKING:
     from bolo.catalog import ModelSpec
@@ -39,10 +39,12 @@ if TYPE_CHECKING:
 ESPEAK = phonemize.ESPEAK
 UCCHARAN = phonemize.UCCHARAN
 ESPEAK_PACKAGE = "espeakng-loader>=0.2.4"
-UCCHARAN_PACKAGE = "uccharan>=0.1"
+UCCHARAN_PACKAGE = "uccharan>=0.4"
 PACKAGES = {ESPEAK: ESPEAK_PACKAGE, UCCHARAN: UCCHARAN_PACKAGE}
 LOOPBACK = ("127.0.0.1", "localhost", "::1")
 PLUGIN_PREFIX = "plugin:"
+#: uccharan's romanised-text packs as components: "uccharan-xlit-hi" (bolo.text.romanised)
+XLIT_PREFIX = romanised.COMPONENT_PREFIX + romanised.PACK_PREFIX
 #: Kokoro voice-name prefix -> phonemiser language (Mandarin "z" reads from its lexicon)
 KOKORO_LANGUAGES = {"a": "en-us", "b": "en-gb", "e": "es", "f": "fr-fr", "h": "hi", "i": "it", "p": "pt-br", "j": "ja"}
 
@@ -310,6 +312,8 @@ class ComponentManager:
         return count
 
     def is_installed(self, component: str) -> bool:
+        if component.startswith(XLIT_PREFIX):
+            return romanised.pack_present(component[len(XLIT_PREFIX) :])
         if component == ESPEAK:
             return espeak_status()[0]
         if component == UCCHARAN:
@@ -374,6 +378,7 @@ class ComponentManager:
                 ),
             }
         )
+        out.extend(self.pack_status())
         out.extend(self.runtime_status())
         for plugin in self.plugin_ids():
             st = self.core.engines.status(plugin)
@@ -402,6 +407,48 @@ class ComponentManager:
                         "An engine that runs in its own process (for example models that need PyTorch, which bolo "
                         "itself never loads). " + ("" if st.available else (st.reason or ""))
                     ).strip(),
+                }
+            )
+        return out
+
+    # -- uccharan's romanised-text packs ---------------------------------------
+    def pack_blocked_reason(self) -> str | None:
+        """Packs go into uccharan's cache directory, not into the Python environment."""
+        s = self.core.settings
+        if s.host not in LOOPBACK and not s.api_key:
+            return "installing components is never allowed on a non-loopback address without an API key"
+        if s.allow_component_install is False:
+            return "the operator disabled component installation (allow_component_install = false)"
+        return None
+
+    def pack_status(self) -> list[dict[str, Any]]:
+        """One component per pack the installed uccharan lists; none when it has no transliterator."""
+        blocked = self.pack_blocked_reason()
+        version = romanised.api().version
+        out: list[dict[str, Any]] = []
+        for language in romanised.pack_languages():
+            installed = romanised.pack_present(language)
+            out.append(
+                {
+                    "id": romanised.component_id(language),
+                    "name": f"uccharan romanised-text pack ({language})",
+                    "kind": "language-pack",
+                    "installed": installed,
+                    "source": "uccharan" if installed else None,
+                    "version": version if installed else None,
+                    "license": romanised.PACK_LICENSE,
+                    "license_url": "https://github.com/cb-Sigma/uccharan/blob/main/DATA_LICENSES.md",
+                    "required_by_count": 0,
+                    "installable": blocked is None and not installed,
+                    "install_blocked_reason": None if installed else blocked,
+                    "manual_command": romanised.manual_command(language),
+                    "languages": [language],
+                    "description": (
+                        f"Data for the `romanised` option of text-to-speech: '{language}' text typed in Latin letters "
+                        "is written in its own script before a voice reads it. Downloaded from uccharan's release, "
+                        "checked against its SHA-256 and kept in uccharan's cache. Licensed CC BY-SA 4.0 (it is "
+                        "built from share-alike data), so it is installed only on request."
+                    ),
                 }
             )
         return out
@@ -513,6 +560,8 @@ class ComponentManager:
             self.core._tasks.append(task)
             task.add_done_callback(lambda t: self.core._tasks.remove(t) if t in self.core._tasks else None)
             return job
+        if component.startswith(XLIT_PREFIX):
+            return self._start_pack_install(component, accept_license)
         if component not in PACKAGES:
             if component.startswith(PLUGIN_PREFIX):
                 raise InvalidRequest(f"engine plugins are installed as packages, not from the API ({component})")
@@ -534,10 +583,37 @@ class ComponentManager:
         task.add_done_callback(lambda t: self.core._tasks.remove(t) if t in self.core._tasks else None)
         return job
 
+    def _start_pack_install(self, component: str, accept_license: bool) -> Job:
+        language = component[len(XLIT_PREFIX) :]
+        if language not in romanised.pack_languages():
+            reason = romanised.api().reason or f"the installed uccharan has no pack for '{language}'"
+            raise ModelNotFound(f"unknown component '{component}': {reason}")
+        if accept_license is not True:
+            raise InvalidRequest(
+                f"the romanised-text packs are licensed {romanised.PACK_LICENSE}; "
+                'send {"accept_license": true} to install one',
+                param="accept_license",
+            )
+        blocked = self.pack_blocked_reason()
+        if blocked:
+            raise InvalidRequest(
+                f"cannot install {component}: {blocked}. Manual route: {romanised.manual_command(language)}"
+            )
+        job = self.core.jobs.create("install", component)
+        if self.is_installed(component):
+            job.state, job.progress = "done", 1.0
+            return job
+        task = asyncio.create_task(self._install(job), name=f"bolo-install-{component}")
+        self.core._tasks.append(task)
+        task.add_done_callback(lambda t: self.core._tasks.remove(t) if t in self.core._tasks else None)
+        return job
+
     def install_blocking(self, job: Job | None = None, component: str = ESPEAK) -> str | None:
         """Install the component's package and activate it. Returns an error message, or None on success."""
         if component in tts_runtimes.RUNTIMES:
             return self.install_runtime_blocking(component, job)
+        if component.startswith(XLIT_PREFIX):
+            return romanised.install_pack(component[len(XLIT_PREFIX) :])
         cmd = installer_command()
         if cmd is None:
             return "neither pip nor uv is available in this environment"
@@ -547,6 +623,7 @@ class ComponentManager:
             return f"the installer exited with {code}: {tail}"
         importlib.invalidate_caches()
         phonemize.reset_phonemizer()
+        romanised.refresh()  # a newer uccharan may bring the transliterator
         if not self.is_installed(component):
             return f"the package was installed but {component} could not be loaded"
         return None

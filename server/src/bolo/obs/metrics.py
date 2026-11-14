@@ -66,6 +66,17 @@ def render_metrics(core: Bolo) -> str:
         stats["totals"]["audio_seconds_out"],
         direction="out",
     )
+    telephony = stats.get("telephony") or {}
+    w.add("bolo_telephony_active_calls", "gauge", "Phone calls in progress.", telephony.get("active_calls"))
+    for item in telephony.get("by_outcome", []):
+        w.add(
+            "bolo_telephony_calls_total",
+            "counter",
+            "Finished phone calls by provider and outcome.",
+            item["calls"],
+            provider=str(item["provider"]),
+            outcome=str(item["outcome"]),
+        )
     for item in stats.get("providers", []):
         labels = {"provider": str(item["provider"]), "model": str(item["model"])}
         w.add(

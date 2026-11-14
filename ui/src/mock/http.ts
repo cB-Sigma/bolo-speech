@@ -1,4 +1,4 @@
-import type { BenchRequest, CatalogModel, ProviderUpdate } from '@/lib/api/types'
+import type { BenchRequest, CatalogModel, ProviderUpdate, SetupUse } from '@/lib/api/types'
 import { encodeWav } from '@/lib/audio/wav'
 import { SAMPLE_SEGMENTS, SAMPLES } from './catalog'
 import { HttpError, MOCK_KEY, sleep, type MockServer } from './engine'
@@ -130,6 +130,45 @@ export async function handleRequest(
       const t = server.traces.find((x) => x.id === oneTrace[1])
       return t ? json(t) : json({ detail: 'Unknown request' }, 404)
     }
+    if (path.startsWith('/api/v1/telephony')) {
+      const phone = server.telephony
+      const body = () => JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+      const rest = decodeURIComponent(path.slice('/api/v1/telephony'.length))
+      const agent = /^\/agents\/([\w-]+)$/.exec(rest)
+      const number = /^\/numbers\/(.+)$/.exec(rest)
+      const call = /^\/calls\/([\w-]+)$/.exec(rest)
+      try {
+        if (rest === '') return json(phone.overview())
+        if (agent && method === 'PUT') return json(phone.putAgent(agent[1] as string, body()))
+        if (agent && method === 'DELETE') {
+          phone.deleteAgent(agent[1] as string)
+          return new Response(null, { status: 204 })
+        }
+        if (number && method === 'PUT') return json(phone.putNumber(number[1] as string, String(body().agent)))
+        if (number && method === 'DELETE') {
+          phone.deleteNumber(number[1] as string)
+          return new Response(null, { status: 204 })
+        }
+        if (rest === '/calls') return json({ calls: phone.summaries() })
+        if (call) {
+          const found = phone.calls.find((c) => c.id === call[1])
+          return found ? json(found) : json({ detail: 'Unknown call' }, 404)
+        }
+        if (rest === '/scenarios')
+          return json({
+            scenarios: [
+              { name: 'basic', description: 'The caller says one thing and hangs up.' },
+              { name: 'barge-in', description: "The caller interrupts the agent's answer." },
+            ],
+          })
+        if (rest === '/simulate' && method === 'POST') {
+          await sleep(200)
+          return json(phone.simulate(body()))
+        }
+      } catch (err) {
+        throw new HttpError(400, err instanceof Error ? err.message : String(err), 'invalid_request')
+      }
+    }
     if (path === '/api/v1/providers') return json(server.providers())
     const providerTest = /^\/api\/v1\/providers\/([\w-]+)\/test$/.exec(path)
     if (providerTest && method === 'POST') {
@@ -174,7 +213,21 @@ export async function handleRequest(
     }
     if (path === '/api/v1/models/pull' && method === 'POST') {
       const body = JSON.parse(String(init?.body ?? '{}')) as { id: string }
-      return json({ job_id: server.pull(body.id).id }, 202)
+      const job = server.pull(body.id)
+      // a model that is unlikely to suit the machine is pulled all the same, with a notice
+      const warnings = server.warnings(body.id)
+      return json(warnings.length ? { job_id: job.id, warnings } : { job_id: job.id }, 202)
+    }
+    if (path === '/api/v1/hardware') return json(server.hardware)
+    if (path === '/api/v1/hardware/benchmark' && method === 'POST') {
+      await sleep(400)
+      const hw = server.runBenchmark()
+      return json({ benchmark: hw.speed.benchmark, speed: hw.speed })
+    }
+    if (path === '/api/v1/recommendations/setup') {
+      const use = query.get('use') ?? 'live'
+      if (!['live', 'files', 'voiceover'].includes(use)) return json({ detail: `unknown use '${use}'` }, 400)
+      return json(server.setup(use as SetupUse, query.get('language') || null, query.get('commercial') === 'true'))
     }
     const job = /^\/api\/v1\/jobs\/([\w-]+)$/.exec(path)
     if (job) {
@@ -186,7 +239,8 @@ export async function handleRequest(
       const id = decodeURIComponent(action[1] as string)
       if (action[2] === 'load') await server.loadModel(id)
       else server.unloadModel(id)
-      return json({ id, loaded: action[2] === 'load' })
+      const warnings = action[2] === 'load' ? server.warnings(id) : []
+      return json({ id, loaded: action[2] === 'load', ...(warnings.length ? { warnings } : {}) })
     }
     const del = /^\/api\/v1\/models\/([^/]+)$/.exec(path)
     if (del && method === 'DELETE') {

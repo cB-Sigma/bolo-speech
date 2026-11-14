@@ -3,7 +3,9 @@
 //   node scripts/export-catalog.mjs --base http://127.0.0.1:8000
 //
 // The demo has no server, so its Models screen lists this snapshot as
-// "available when you run the server". Machine-specific state is stripped.
+// "available when you run the server". Machine-specific state is stripped:
+// install and load state, and `fit` (how well a model suits the exporting
+// server's hardware), which would say nothing about a visitor's browser.
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { parseArgs } from 'node:util'

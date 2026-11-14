@@ -76,14 +76,20 @@ from bolo.obs.events import EventBus
 from bolo.obs.trace import Trace, TraceStore, preview
 from bolo.providers import KINDS as PROVIDER_KINDS
 from bolo.providers import TERMS, ProviderRegistry, Usage
+from bolo.recommend import ALL_LEVELS as FIT_LEVELS
+from bolo.recommend import TASKS as RECOMMEND_TASKS
+from bolo.recommend import USES as RECOMMEND_USES
+from bolo.recommend import Advisor
 from bolo.s2s import S2SManager
 from bolo.separate import SeparateOptions, SeparationResult, check_request, is_narrowband, plan_chunks, split_long
 from bolo.separate import separate as run_separation
 from bolo.store import HubClient, ModelStore
 from bolo.streaming.vad import EnergyVad, FallbackVad, detect_segments, merge_segments
+from bolo.telephony.manager import TelephonyManager
 from bolo.text import phonemize
 from bolo.text.phonemize import strip_overrides
 from bolo.text.prepare import prepare as prepare_text
+from bolo.text.romanised import status as romanised_status
 from bolo.text.segment import chunk_text
 from bolo.text.wordlists import MAX_LISTS_PER_REQUEST
 
@@ -154,6 +160,12 @@ class Bolo:
         self.client_secrets: dict[str, tuple[float, dict[str, Any]]] = {}
         #: open WebRTC calls by id (objects from bolo.webrtc; closed in stop())
         self.calls: dict[str, Any] = {}
+        #: phone calls: providers, agents, numbers, call records (bolo.telephony)
+        self.telephony = TelephonyManager(self)
+        #: what this machine is and which models suit it; it recommends and warns, it never restricts
+        self.advisor = Advisor(self)
+        self.manager.on_loaded = self._on_model_loaded
+        self.sip: Any = None  # the inbound SIP endpoint, when the setting sip is on (bolo.telephony.sip)
         self.active_streams = 0
         #: requests that asked for separate_overlaps, by outcome, and seconds of audio separated
         self.separation_counts: dict[str, int] = {"applied": 0, "partial": 0, "skipped": 0}
@@ -174,8 +186,21 @@ class Bolo:
         self.events.bind(asyncio.get_running_loop())
         self._tasks.append(asyncio.create_task(self._stats_ticker(), name="bolo-stats"))
         self.ready = True
+        # look at the machine off the event loop, so the first catalog request does not wait for it
+        self.advisor.refresh_soon()
         if self.settings.preload:
             self._tasks.append(asyncio.create_task(self._preload(), name="bolo-preload"))
+
+    def _on_model_loaded(self, spec: ModelSpec) -> None:
+        """Say once, in the log, when a model that was just loaded is unlikely to suit this machine."""
+        with contextlib.suppress(Exception):
+            self.advisor.warn_once(spec)
+
+    def note_fit(self, trace: Trace, spec: ModelSpec) -> None:
+        """Record on the request's trace that its model is expected to be slow or not to fit here."""
+        found = self.advisor.warnings(spec, wait=False)  # from what is known: a request never waits for this
+        if found:
+            trace.extra["warnings"] = found
 
     async def _preload(self) -> None:
         for name in self.settings.preload:
@@ -195,6 +220,8 @@ class Bolo:
         for call in list(self.calls.values()):
             with contextlib.suppress(Exception):
                 await call.close()
+        with contextlib.suppress(Exception):
+            await self.telephony.close()
         with contextlib.suppress(Exception):
             await self.s2s.close()
         await self.manager.close()
@@ -271,6 +298,13 @@ class Bolo:
                 "preview": "/api/v1/wordlists/{name}/preview",
                 "max_lists_per_request": MAX_LISTS_PER_REQUEST,
             },
+            # romanised text for text-to-speech (docs/api.md, "Romanised text"): what the installed uccharan can do
+            "romanised": {
+                **romanised_status(),
+                "default": s.romanised,
+                "request_field": "romanised",
+                "pin_per_model": True,
+            },
             # cloud providers and models (docs/providers.md)
             "providers": {
                 "endpoint": "/api/v1/providers",
@@ -334,6 +368,20 @@ class Bolo:
                 "audio": llm["configured"],
             },
             "llm": {"configured": llm["configured"], "base_url": llm["base_url"], "model": llm["model"]},
+            # phone calls (docs/telephony.md)
+            "telephony": self.telephony.capability(),
+            # hardware detection and model recommendations (docs/recommendations.md): advice, never a restriction
+            "recommendations": {
+                "hardware": "/api/v1/hardware",
+                "endpoint": "/api/v1/recommendations",
+                "setup": "/api/v1/recommendations/setup",
+                "benchmark": "/api/v1/hardware/benchmark",
+                "tasks": list(RECOMMEND_TASKS),
+                "uses": list(RECOMMEND_USES),
+                "fit_levels": list(FIT_LEVELS),
+                "warnings": s.hardware_warnings,
+                "restricts": False,
+            },
         }
 
     def _separation_capability(self) -> dict[str, Any]:
@@ -380,6 +428,11 @@ class Bolo:
             settings=self.store.model_settings(spec.id),
         )
         entry["fallback"] = self.fallback_ids(spec)
+        # how well the model suits this machine (bolo.recommend); advice only, never a restriction
+        try:
+            entry["fit"] = self.advisor.fit(spec, stale_ok=True).to_dict()
+        except Exception:  # pragma: no cover - a fit is never worth failing a catalog request for
+            entry["fit"] = None
         if spec.cloud:
             provider = self.providers.find(
                 str(spec.options.get("provider") or "") or None, str(spec.options.get("provider_kind") or "") or None
@@ -474,6 +527,8 @@ class Bolo:
                 "requests": dict(self.separation_counts),
                 "audio_seconds": round(self.separation_audio_s, 2),
             },
+            # phone calls: in progress, total, and by provider and outcome
+            "telephony": self.telephony.stats(),
             # cloud providers: requests, errors, time, bytes and estimated cost per provider and model
             "providers": self.providers.stats(),
             "fallbacks": [
@@ -634,6 +689,7 @@ class Bolo:
         try:
             await asyncio.get_running_loop().run_in_executor(None, self._pull_blocking, spec, job)
             job.state, job.progress = "done", 1.0
+            self.advisor.invalidate()
             self.events.publish("model", {"id": spec.id, "event": "installed"})
             self.log("info", f"installed {spec.id}")
         except asyncio.CancelledError:
@@ -656,6 +712,10 @@ class Bolo:
         if existing:
             return existing
         job = self.jobs.create("pull", spec.id)
+        if not (spec.builtin or spec.cloud or self.store.is_installed(spec.id)):
+            job.warnings = self.advisor.warnings(spec, pulling=True, wait=False)
+            for warning in job.warnings:
+                self.log("warning", str(warning["message"]))
         if spec.builtin or self.store.is_installed(spec.id):
             job.state, job.progress = "done", 1.0
             return job
@@ -719,6 +779,7 @@ class Bolo:
         if spec.custom:
             self.catalog.remove_custom(spec.id)
         if removed:
+            self.advisor.invalidate()
             self.events.publish("model", {"id": spec.id, "event": "removed"})
         return removed
 
@@ -844,6 +905,7 @@ class Bolo:
         """One model's attempt. With ``more`` (a fallback is left), an availability error leaves the trace open."""
         handed_on = False
         trace.model = spec.id
+        self.note_fit(trace, spec)
         trace.audio_seconds = len(samples) / sample_rate if sample_rate else 0.0
         duration = trace.audio_seconds
         separation: SeparationResult | None = None
@@ -1358,8 +1420,14 @@ class Bolo:
         wordlists: list[str] | None = None,
         pronunciations: list[dict[str, Any]] | None = None,
         input_format: str = "text",
+        romanised: bool | str | None = None,
+        romanised_strict: bool = True,
     ) -> AsyncGenerator[SynthChunk, None]:
         """Synthesise ``text`` sentence by sentence, yielding audio as soon as it exists.
+
+        ``romanised`` (``off`` / ``auto`` / ``on``; None: the voice's default) writes an Indian language typed in
+        Latin letters in the voice's script first (bolo.text.romanised). With ``romanised_strict`` false (sessions,
+        agents) a conversion that cannot happen is a notice in the trace, never an error.
 
         This generator records the ``queue``, ``normalize``, ``synthesize_first``
         and ``synthesize_rest`` phases. ``reference_audio`` (any decodable recording) asks a model that clones
@@ -1380,7 +1448,8 @@ class Bolo:
                     text, candidate, trace, more, own_voice=i == 0,
                     voice=voice, speed=speed, language=language, normalize=normalize, phonemizer=phonemizer,
                     reference_audio=reference_audio, reference_text=reference_text, wordlists=wordlists,
-                    pronunciations=pronunciations, input_format=input_format,
+                    pronunciations=pronunciations, input_format=input_format, romanised=romanised,
+                    romanised_strict=romanised_strict,
                 )  # fmt: skip
                 try:
                     async for chunk in attempt:
@@ -1418,10 +1487,13 @@ class Bolo:
         wordlists: list[str] | None,
         pronunciations: list[dict[str, Any]] | None,
         input_format: str,
+        romanised: bool | str | None,
+        romanised_strict: bool,
     ) -> AsyncGenerator[SynthChunk, None]:
         """One model's attempt at :meth:`synthesize`. ``own_voice`` is false for a fallback model: a voice it
         does not have is replaced by its default instead of refused."""
         trace.model = spec.id
+        self.note_fit(trace, spec)
         trace.chars = len(text)
         trace.text_preview = preview(text)
         total_samples = 0
@@ -1465,6 +1537,7 @@ class Bolo:
                     prepared = prepare_text(
                         self, spec, chosen.id if chosen else voice, text, lang, normalize=normalize,
                         wordlists=wordlists, pronunciations=pronunciations, input_format=input_format,
+                        romanised=romanised, romanised_strict=romanised_strict,
                     )  # fmt: skip
                     trace.extra.update(prepared.trace_extra())
                     clean = prepared.text

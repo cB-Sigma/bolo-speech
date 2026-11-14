@@ -109,6 +109,8 @@ class ModelManager:
         self.evictions = 0
         #: set by the core: who the cloud providers are (a cloud model is installed when its provider is configured)
         self.providers: ProviderRegistry | None = None
+        #: called with the spec after a model was loaded (the core logs a hardware notice; it cannot stop the load)
+        self.on_loaded: Callable[[ModelSpec], None] | None = None
 
     # -- helpers ----------------------------------------------------------
     def resolve(self, name: str) -> ModelSpec:
@@ -324,6 +326,9 @@ class ModelManager:
             self.loaded[spec.id] = entry
             log.info("loaded %s in %.0f ms (~%.0f MB)", spec.id, load_ms, memory / 1e6)
             self.events.publish("model", {"id": spec.id, "event": "loaded"})
+            if self.on_loaded is not None:
+                with contextlib.suppress(Exception):
+                    self.on_loaded(spec)
             self._ensure_reaper()
             return entry
 

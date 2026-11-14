@@ -28,6 +28,7 @@ from bolo.audio.encode import StreamEncoder, encode_audio, normalize_format
 from bolo.core import Bolo
 from bolo.errors import BoloError, InvalidRequest
 from bolo.obs.trace import Trace, preview
+from bolo.text.romanised import parse_mode as parse_romanised
 
 router = APIRouter()
 
@@ -139,6 +140,8 @@ async def chat_completions(request: Request) -> Response:
         if isinstance(voice, dict):
             voice = voice.get("id")
         phonemizer = audio_cfg.get("phonemizer")  # bolo extension
+        # bolo extension: romanised text in the model's answer is written in the voice's script (notice, never an error)
+        romanised = parse_romanised(audio_cfg.get("romanised", audio_cfg.get("romanized")), "audio.romanised")
         if wants_audio and not audio_cfg:
             raise InvalidRequest(
                 "'audio' (voice and format) is required when modalities contains 'audio'", param="audio"
@@ -170,8 +173,9 @@ async def chat_completions(request: Request) -> Response:
                         continue
                     t_tts = trace.now()
                     samples, rate = await core.synthesize_all(
-                        text, model=tts_spec.id, voice=voice, phonemizer=phonemizer
-                    )
+                        text, model=tts_spec.id, voice=voice, phonemizer=phonemizer,
+                        romanised=romanised, romanised_strict=False,
+                    )  # fmt: skip
                     data = await asyncio.to_thread(encode_audio, samples, rate, fmt)
                     trace.add_phase("synthesize", t_tts, trace.now())
                     trace.mark_ttfa()
@@ -257,8 +261,9 @@ async def chat_completions(request: Request) -> Response:
             if wants_audio and tts_spec is not None:
                 encoder = StreamEncoder(fmt, tts_spec.sample_rate)
                 async for kind, value in speak_stream(
-                    core, text_deltas(), model=tts_spec.id, voice=voice, transport="chat", phonemizer=phonemizer
-                ):
+                    core, text_deltas(), model=tts_spec.id, voice=voice, transport="chat", phonemizer=phonemizer,
+                    romanised=romanised,
+                ):  # fmt: skip
                     if kind == "text":
                         said.append(value)
                         yield envelope({"audio": {"id": audio_id, "transcript": value}})

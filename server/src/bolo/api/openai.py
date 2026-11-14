@@ -18,7 +18,7 @@ from typing import Any, Literal, TypeVar
 import numpy as np
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response, StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from bolo.api.common import get_core, parse_bool, read_upload, sse
 from bolo.audio import decode_audio, resample
@@ -510,6 +510,15 @@ class SpeechRequest(BaseModel):
         default=None,
         description="Extension: inline word-list entries [{word, ipa?, say?, lang?, match?}], applied before any list.",
     )
+    romanised: bool | Literal["off", "auto", "on"] | None = Field(
+        default=None,
+        validation_alias=AliasChoices("romanised", "romanized"),
+        description='Extension: write an Indian language typed in Latin letters ("mujhe kal office jana hai") in the '
+        "voice's script before it is read. `auto`: when the voice speaks an Indian language and the text is mostly "
+        "Latin script; `on` (or true): always for such a voice, 424 `component_missing` when uccharan's transliterator "
+        "or the language's pack is not installed; `off` (or false). Default: the model's pinned setting, else the "
+        "server's `romanised` setting.",
+    )
     phonemizer: str | None = Field(
         default=None,
         description="Extension: who turns text into phonemes for voices that read phonemes: auto, uccharan "
@@ -611,6 +620,7 @@ async def create_speech(request: Request, body: SpeechRequest) -> Response:
         text=body.input, model=spec.id, voice=voice, speed=body.speed, language=body.language, normalize=body.normalize,
         phonemizer=body.phonemizer, reference_audio=reference, reference_text=body.reference_text,
         wordlists=body.wordlists, pronunciations=body.pronunciations, input_format=body.input_format,
+        romanised=body.romanised,
     )  # fmt: skip
     chunks = stream.chunks()
     try:

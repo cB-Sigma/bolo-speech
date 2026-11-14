@@ -75,6 +75,8 @@ SEMANTIC_THRESHOLD = 0.5
 PIPELINES = ("cascade", "audio-llm", "speech-to-speech")
 #: audio-llm: user turns whose audio is kept for the model (older ones go as their transcript)
 KEEP_USER_AUDIO = 8
+#: audio kept after the detected end of speech (so a turn's audio_end_ms lies this far after the last speech)
+END_PADDING_S = 0.2
 
 
 def new_id(prefix: str) -> str:
@@ -165,6 +167,13 @@ class RealtimeSession:
         self.speed = 1.0
         #: bolo extension, session.audio.output.phonemizer
         self.phonemizer: str | None = None
+        #: bolo extension, session.audio.output.romanised: "off" | "auto" | "on" (None: the voice's default)
+        self.romanised: str | None = None
+        #: set by transports that configure a session from a named agent (telephony): the text-to-speech model
+        #: and the language model's name for this session, and fields added to every turn's trace
+        self.tts_model: str | None = None
+        self.llm_model: str | None = None
+        self.trace_extra: dict[str, Any] = {}
         self.in_codec, self.in_rate, self.in_format = _format(None, "")
         self.out_codec, self.out_rate, self.out_format = _format(None, "")
         self.transcription: dict[str, Any] = {"model": s.default_realtime_stt, "language": None, "prompt": None}
@@ -200,6 +209,7 @@ class RealtimeSession:
         self._response_id: str | None = None
         self._cancel_reason = "client_cancelled"
         self._closed = False
+        self._busy = False  # a turn (transcription, response) is running in the worker
         # speech-to-speech pipeline: the model's conversation (opened on first use), how far the audio of the
         # current turn has been sent to it, and whether anything was sent since the last commit
         self._s2s: S2SConversation | None = None
@@ -257,6 +267,7 @@ class RealtimeSession:
                     "voice": self.voice,
                     "speed": self.speed,
                     "phonemizer": self.phonemizer,
+                    "romanised": self.romanised,
                 },
             },
             "tools": self.tools,
@@ -292,6 +303,7 @@ class RealtimeSession:
             job = await self._turns.get()
             if job is None:
                 return
+            self._busy = True
             try:
                 await job()
             except asyncio.CancelledError:
@@ -301,6 +313,8 @@ class RealtimeSession:
             except Exception as exc:
                 log.exception("realtime turn failed")
                 await self.error(f"{type(exc).__name__}: {exc}", code="internal_error", type_="server_error")
+            finally:
+                self._busy = False
 
     # -- client events ------------------------------------------------------
     async def handle(self, event: dict[str, Any]) -> None:
@@ -407,6 +421,13 @@ class RealtimeSession:
             except Exception as exc:
                 raise RealtimeError(str(getattr(exc, "message", exc)), param="session.audio.output.phonemizer") from exc
             self.phonemizer = value or None
+        if "romanised" in audio_out or "romanized" in audio_out:
+            from bolo.text.romanised import parse_mode
+
+            try:
+                self.romanised = parse_mode(audio_out.get("romanised", audio_out.get("romanized")))
+            except Exception as exc:
+                raise RealtimeError(str(getattr(exc, "message", exc)), param="session.audio.output.romanised") from exc
         if self.kind == "realtime":
             if "pipeline" in session:
                 pipeline = session["pipeline"] or self.core.settings.realtime_pipeline
@@ -521,7 +542,7 @@ class RealtimeSession:
                     self._s2s_broken = False
                     await self._s2s_forward(self._speech_start)
             elif ev.kind == "speech_end" and self._speech_start is not None:
-                end = min(ev.sample + int(0.2 * SR), self._pos)
+                end = min(ev.sample + int(END_PADDING_S * SR), self._pos)
                 if self._semantic and not await self._turn_complete(end):
                     self._held_end = end  # only a pause, says the model: keep the turn open for a while
                     self._hold_until = ev.sample + int(self._max_pause_s() * SR)
@@ -591,7 +612,27 @@ class RealtimeSession:
         """A voice-agent trace that says which pipeline answers (or would answer) the turn."""
         trace = Trace("agent", self.transport, "voice-agent")
         trace.extra["pipeline"] = self.pipeline if self.kind == "realtime" else "transcription"
+        trace.extra.update(self.trace_extra)
         return trace
+
+    # -- state other transports read ----------------------------------------------
+    @property
+    def responding(self) -> bool:
+        """A response is being generated, or a committed turn is waiting for its transcript and response."""
+        return (self._response is not None and not self._response.done()) or not self._turns.empty() or self._busy
+
+    async def interrupt(self, reason: str = "client_cancelled") -> None:
+        """Stop the response in progress, if there is one (no error when there is none)."""
+        await self._cancel_response(reason)
+
+    @property
+    def user_speaking(self) -> bool:
+        return self._speech_start is not None
+
+    @property
+    def input_ms(self) -> int:
+        """Milliseconds of input audio received so far."""
+        return self._ms(self._pos)
 
     async def _end_turn(self, end: int) -> None:
         item_id = self._pending_item or new_id("item")
@@ -971,7 +1012,9 @@ class RealtimeSession:
             body: dict[str, Any] = {"model": model_name}
         else:
             body = {
-                "model": (core.audio_llm.model if self.pipeline == "audio-llm" else core.settings.llm_model)
+                "model": (
+                    core.audio_llm.model if self.pipeline == "audio-llm" else self.llm_model or core.settings.llm_model
+                )
                 or self.model,
                 "messages": self._messages(instructions, params.get("input")),
                 "stream_options": {"include_usage": True},
@@ -1128,15 +1171,16 @@ class RealtimeSession:
             if self._s2s_mode:
                 await speech_to_speech()
             elif audio_mode:
-                tts_spec = core.realtime_tts(voice)
+                tts_spec = core.resolve(self.tts_model, "tts") if self.tts_model else core.realtime_tts(voice)
                 async for kind, value in speak_stream(
                     core,
                     text_deltas(),
                     model=tts_spec.id,
                     voice=voice,
                     speed=self.speed,
-                    transport="realtime",
+                    transport="telephony" if self.transport == "telephony" else "realtime",
                     phonemizer=self.phonemizer,
+                    romanised=self.romanised,
                 ):
                     msg = await open_message()
                     base = {"response_id": response_id, "item_id": msg["id"], "output_index": 0, "content_index": 0}

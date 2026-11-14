@@ -7,6 +7,7 @@ import type { RequestTrace } from '@/lib/api/types'
 import { fmtClock, fmtMs, fmtRtf, fmtSeconds } from '@/lib/format'
 import { niceStep, percentile } from '@/lib/latency/stats'
 import { BROWSER_STT_PHASES, phaseColor, phaseLabel, phasesFor, traceExtras } from '@/lib/phases'
+import { romanisedSummary } from '@/lib/romanised'
 import { cn } from '@/lib/utils'
 import { ListTree } from 'lucide-react'
 import { OverrideText } from '@/components/wordlists/override-text'
@@ -324,13 +325,24 @@ export function RequestDrawer({ trace, onClose }: { trace: RequestTrace | null; 
                   </p>
                 </section>
               )}
-              {(trace.normalized_text || (trace.pronunciations_applied?.length ?? 0) > 0) && (
+              {(trace.normalized_text || (trace.pronunciations_applied?.length ?? 0) > 0 || trace.romanised) && (
                 <section data-testid="trace-text-prep">
                   <h3 className="mb-2 eyebrow">
                     What the voice received{trace.normalizer ? ` (normaliser ${trace.normalizer})` : ''}
                   </h3>
                   {trace.normalized_text && (
                     <OverrideText text={trace.normalized_text} className="text-[13px] leading-6" />
+                  )}
+                  {trace.romanised && (
+                    <p
+                      className={cn(
+                        'mt-2 text-xs',
+                        trace.romanised.applied ? 'text-muted-foreground' : 'text-warning-text',
+                      )}
+                      data-testid="trace-romanised"
+                    >
+                      {romanisedSummary(trace.romanised)}
+                    </p>
                   )}
                   {(trace.pronunciations_applied?.length ?? 0) > 0 && (
                     <ul className="mt-2 grid gap-1 text-xs" aria-label="Pronunciations applied">

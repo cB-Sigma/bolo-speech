@@ -63,6 +63,15 @@ import {
   phonemizerChoices,
   voiceFamily,
 } from '@/lib/capabilities'
+import {
+  isIndicLanguage,
+  ROMANISED_HINT,
+  ROMANISED_LABEL,
+  ROMANISED_MODES,
+  romanisedBlocked,
+  romanisedOffered,
+  type RomanisedMode,
+} from '@/lib/romanised'
 import { cn } from '@/lib/utils'
 
 const FALLBACK_TEXTS: Sample[] = [
@@ -125,6 +134,7 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
   const [reference, setReference] = useState<CloneReference | null>(null)
   const [ssml, setSsml] = useState(false)
   const [lists, setLists] = useState<string[]>([])
+  const [romanised, setRomanised] = useState('')
   const wordLists = useWordLists()
   const listNames = (wordLists.data?.wordlists ?? []).map((l) => l.name)
   const chosenLists = lists.filter((n) => listNames.includes(n))
@@ -135,6 +145,13 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
   const phon =
     phonemizers.length && (phonemizer === 'auto' || phonemizers.some((c) => c.id === phonemizer)) ? phonemizer : ''
   const pinned = typeof model?.settings?.phonemizer === 'string' ? model.settings.phonemizer : null
+  // Romanised text: offered for voices of Indian languages by a server that announces the option.
+  const voiceLanguage = lang || voice?.language || languages[0] || ''
+  const romanisedCap = isIndicLanguage(voiceLanguage) ? romanisedOffered(info.data) : null
+  const romanisedPin = typeof model?.settings?.romanised === 'string' ? model.settings.romanised : null
+  const romanisedDefault = romanisedPin ?? romanisedCap?.default ?? 'off'
+  const romanisedNote = romanisedCap ? romanisedBlocked(info.data, voiceLanguage) : null
+  const roman = romanisedCap && ROMANISED_MODES.includes(romanised as RomanisedMode) ? romanised : ''
   const clone = canClone(model) && cloning
   const cloneReady = !clone || reference != null
   const requestOptions = {
@@ -144,6 +161,7 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
     referenceText: clone ? reference?.text || undefined : undefined,
     inputFormat: ssml ? ('ssml' as const) : undefined,
     wordlists: chosenLists.length ? chosenLists : undefined,
+    romanised: roman || undefined,
   }
   const forcedHttp = clone || ssml
   const fromServer = (samples.data?.samples ?? []).filter((s) => s.kind === 'text')
@@ -442,6 +460,41 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
               </label>
               {wordLists.offered && (
                 <WordListSelect names={listNames} value={chosenLists} onChange={setLists} disabled={busy} />
+              )}
+              {romanisedCap && (
+                <Select
+                  value={roman || 'default'}
+                  onValueChange={(v) => setRomanised(v === 'default' ? '' : v)}
+                  disabled={busy}
+                >
+                  <SelectTrigger
+                    className="h-8 w-56"
+                    aria-label="Romanised text"
+                    data-testid="tts-romanised"
+                    title="Text typed in Latin letters (mujhe kal jana hai) is written in the voice's script before it is read"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper" align="start" className="max-w-80">
+                    <SelectItem value="default">
+                      Romanised text: {romanisedPin ? 'pinned' : 'default'} (
+                      {ROMANISED_LABEL[romanisedDefault as RomanisedMode] ?? romanisedDefault})
+                    </SelectItem>
+                    {ROMANISED_MODES.map((m) => (
+                      <SelectItem key={m} value={m}>
+                        <span className="flex flex-col">
+                          <span>Romanised text: {ROMANISED_LABEL[m]}</span>
+                          <span className="text-xs text-muted-foreground">{ROMANISED_HINT[m]}</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {romanisedCap && romanisedNote && (roman === 'auto' || roman === 'on') && (
+                <span className="text-xs text-warning-text" data-testid="tts-romanised-note">
+                  {romanisedNote}
+                </span>
               )}
               {forcedHttp && (
                 <span className="text-xs text-muted-foreground">

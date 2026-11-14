@@ -10,6 +10,7 @@ import { describeError, useWordLists } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import type { CatalogModel } from '@/lib/api/types'
 import { PHONEMIZER_LABEL } from '@/lib/capabilities'
+import { isIndicLanguage, ROMANISED_LABEL, ROMANISED_MODES } from '@/lib/romanised'
 
 const SERVER = '__server'
 
@@ -48,9 +49,12 @@ export function ModelSettingsSection({ m }: { m: CatalogModel }) {
   const [wordlists, setWordlists] = useState<string[]>(
     Array.isArray(pinned.wordlists) ? (pinned.wordlists as string[]) : [],
   )
+  const [romanised, setRomanised] = useState(str(pinned.romanised))
   const [saving, setSaving] = useState(false)
   const choices = m.phonemizers ?? []
   const ti = textInput.data?.text_input
+  // a server with the option reports the voice's mode; it applies to voices of Indian languages
+  const romanisable = typeof ti?.romanised === 'string' && m.languages.some(isIndicLanguage)
   const save = async () => {
     setSaving(true)
     try {
@@ -58,6 +62,7 @@ export function ModelSettingsSection({ m }: { m: CatalogModel }) {
       if (choices.length) body.phonemizer = phonemizer || null
       if (ti) body.text_normalizer = normalizer || null
       if (lists.offered) body.wordlists = wordlists.length ? wordlists : null
+      if (romanisable) body.romanised = romanised || null
       await api.setModelSettings(m.id, body)
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['catalog'] }),
@@ -112,6 +117,26 @@ export function ModelSettingsSection({ m }: { m: CatalogModel }) {
                 {NORMALIZERS.map((n) => (
                   <SelectItem key={n.id} value={n.id}>
                     {n.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {romanisable && (
+          <div className="grid gap-1.5">
+            <Label htmlFor={`${id}-rom`} className="text-xs">
+              Romanised text (Latin letters written in the voice’s script)
+            </Label>
+            <Select value={romanised || SERVER} onValueChange={(v) => setRomanised(v === SERVER ? '' : v)}>
+              <SelectTrigger id={`${id}-rom`} className="h-8 w-full" data-testid="romanised-select">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper" align="start">
+                <SelectItem value={SERVER}>Server setting</SelectItem>
+                {ROMANISED_MODES.map((mode) => (
+                  <SelectItem key={mode} value={mode}>
+                    {ROMANISED_LABEL[mode]}
                   </SelectItem>
                 ))}
               </SelectContent>

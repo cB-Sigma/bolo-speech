@@ -45,10 +45,11 @@ The source tree mirrors the picture:
 | `streaming/` | realtime sessions, VAD helpers, partial-result stabilisation |
 | `scheduler.py` | per-model queue with micro-batching |
 | `lifecycle.py`, `_probe.py` | model loading, unloading, eviction, crash isolation |
+| `hardware.py`, `recommend.py` | what this machine is (CPU, memory, GPUs, runtimes, container limits), the micro-benchmark, a fit per catalog model and the rankings; advice and notices only, never a restriction ([recommendations.md](recommendations.md)) |
 | `engines/` | the plugin interface (`base.py`) and one module per engine |
 | `catalog/` | YAML model catalog and its validation |
 | `store.py`, `custom.py` | downloads, the blob cache, `hf:` pulls |
-| `audio/`, `text/` | codecs, resampling, encoders; segmentation, normalisation, phonemes |
+| `audio/`, `text/` | codecs, resampling, encoders; segmentation, normalisation, word lists, romanised text, phonemes |
 | `obs/` | traces, quantile sketches, event bus, Prometheus text |
 | `bench.py`, `samples/` | load generator and built-in samples |
 
@@ -179,6 +180,15 @@ latency definitions.
   as it is complete. Speech detected while a response is playing cancels the
   language-model stream and the queued synthesis (barge-in). Every turn is
   one trace of kind `agent`.
+* **Phone calls** (`bolo/telephony/`) put a phone line in front of a voice
+  agent. Each provider (Twilio, Plivo, Telnyx, Exotel) is a thin adapter:
+  its media-stream frames become neutral events, its webhooks are verified
+  and answered, its REST API places calls. One `CallSession` per call owns
+  a `RealtimeSession` and adds what only a call has: tracking what the
+  provider has played, clearing its queue on barge-in, greeting and prompts,
+  key presses, hang-up and transfer, and the call record. The SIP endpoint
+  (`sip.py`) feeds the same session from RTP. `simulator.py` plays the
+  provider and the caller for tests. See [telephony.md](telephony.md).
 * **Components** (`bolo/components.py`) tracks optional pieces: the two
   phonemisers (uccharan, eSpeak NG), reports which one each voice would use
   and whether it is installed, and can install them into the running

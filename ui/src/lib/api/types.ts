@@ -60,6 +60,17 @@ export interface Capabilities {
   llm?: { configured?: boolean; base_url?: string | null; model?: string | null }
   /** Pronunciation word lists: announced by newer servers (older ones are probed with a request). */
   wordlists?: { available?: boolean; endpoint?: string; install?: string | null; [k: string]: unknown }
+  /** Romanised text for text-to-speech: what the server's transliterator can do. */
+  romanised?: {
+    available?: boolean
+    reason?: string | null
+    modes?: string[]
+    /** Languages the installed uccharan lists a pack for, and those whose pack is on the server. */
+    languages?: string[]
+    installed?: string[]
+    default?: string
+    [k: string]: unknown
+  }
   /** Cloud providers behind `engine: remote` models. */
   providers?: {
     endpoint?: string
@@ -68,6 +79,30 @@ export interface Capabilities {
     edit_blocked_reason?: string | null
     configured?: string[]
     cost_estimates?: boolean
+    [k: string]: unknown
+  }
+  /** Phone calls: telephony providers connected to voice agents. */
+  telephony?: {
+    endpoint?: string
+    providers?: string[]
+    configured?: string[]
+    exposed?: string[]
+    validate_signatures?: boolean
+    agents?: number
+    sip?: { enabled?: boolean; listening?: boolean; port?: number }
+    [k: string]: unknown
+  }
+  /** Hardware detection and model recommendations. They advise; `restricts` is always false. */
+  recommendations?: {
+    hardware?: string
+    endpoint?: string
+    setup?: string
+    benchmark?: string
+    tasks?: string[]
+    uses?: string[]
+    fit_levels?: string[]
+    warnings?: boolean
+    restricts?: boolean
     [k: string]: unknown
   }
   [k: string]: unknown
@@ -115,6 +150,44 @@ export interface Hardware {
   note?: string | null
 }
 
+/** How well a model suits the server's machine. `unlikely` models are never hidden or refused: this is advice. */
+export type FitLevel = 'comfortable' | 'usable' | 'slow' | 'unlikely' | 'cloud' | 'unavailable'
+
+export interface ModelFit {
+  level: FitLevel | string
+  label?: string
+  /** Expected real-time factor on this machine; null when nothing was measured or estimated. */
+  expected_rtf: number | null
+  rtf_range?: [number, number] | null
+  /** `measured` (run by the maintainers, scaled to this machine), `estimated` (from a sibling model) or `unknown`. */
+  rtf_basis?: 'measured' | 'estimated' | 'unknown' | string
+  /** What scaled the catalog's figure: the stored micro-benchmark or a rougher estimate from the CPU. */
+  scaled_by?: 'benchmark' | 'heuristic' | string | null
+  device?: 'cpu' | 'gpu' | 'cloud' | string | null
+  memory?: {
+    needed_bytes: number | null
+    available_bytes: number | null
+    kind: 'ram' | 'vram' | string | null
+    basis: string | null
+  } | null
+  engine_available?: boolean
+  reason: string
+  notes?: string[]
+  /** Among the few recommended for its task on this machine, whatever the language. */
+  recommended?: boolean
+  /** Languages (base codes; `*` is "any") this model is among the recommended ones for. */
+  recommended_for?: string[]
+  default_for?: string[]
+}
+
+/** A notice attached to a pull or load. It never means the action was refused. */
+export interface FitWarning {
+  code: 'hardware_fit' | 'disk_space' | string
+  model: string
+  level: string
+  message: string
+}
+
 export interface PullState {
   job_id: string
   progress: number
@@ -158,6 +231,8 @@ export interface CatalogModel {
   /** `pending`: described but its files are not published yet. */
   status?: 'pending' | string | null
   hardware?: Hardware | null
+  /** How well the model suits the server's machine (newer servers; absent in the live demo). */
+  fit?: ModelFit | null
   /** False when no runtime the server has can run the model yet; `not_runnable_reason` says why. */
   runnable?: boolean
   not_runnable_reason?: string | null
@@ -266,6 +341,107 @@ export interface Catalog {
   models: CatalogModel[]
 }
 
+/** `GET /api/v1/hardware`: what the server detected. `null` means "could not be read", never "none". */
+export interface HardwareInfo {
+  system: string | null
+  cpu: {
+    model: string | null
+    vendor: string | null
+    architecture: string | null
+    physical_cores: number | null
+    logical_cores: number | null
+    usable_cores: number | null
+    features: string[] | null
+  }
+  memory: {
+    total_bytes: number | null
+    available_bytes: number | null
+    limit_bytes: number | null
+    usable_bytes: number | null
+  }
+  disk: { path: string | null; total_bytes: number | null; free_bytes: number | null }
+  gpus: {
+    vendor: string
+    name: string | null
+    vram_total_bytes: number | null
+    vram_free_bytes: number | null
+    driver: string | null
+    unified_memory: boolean
+    backend: string | null
+  }[]
+  gpus_known: boolean
+  runtimes: Record<string, Record<string, unknown>>
+  container: {
+    detected: boolean | null
+    kind: string | null
+    virtual_machine: boolean | null
+    hypervisor: string | null
+    cpu_quota: number | null
+    memory_limit_bytes: number | null
+  }
+  device: string
+  threads: number | null
+  notes: string[]
+  detected_at: string
+  summary: string
+  speed: SpeedInfo
+}
+
+/** This machine against the one the catalog was measured on. */
+export interface SpeedInfo {
+  factor: number
+  source: 'benchmark' | 'heuristic' | string
+  spread?: [number, number]
+  note: string
+  benchmark?: Record<string, unknown> | null
+  reference?: string
+}
+
+/** One row of `GET /api/v1/recommendations`. */
+export interface Recommendation {
+  rank: number
+  id: string
+  task: Task
+  family: string
+  engine: string
+  tier: Tier
+  languages: string[]
+  size_bytes: number
+  installed: boolean
+  license: string
+  commercial_use: boolean
+  cloud: boolean
+  validated: Validated
+  quality: { metric: string; label: string; value: number; note: string } | null
+  recommended: boolean
+  default: boolean
+  fit: ModelFit
+}
+
+export type SetupUse = 'live' | 'files' | 'voiceover'
+
+/** `GET /api/v1/recommendations/setup`: one model per task for a use and language. */
+export interface SetupPlan {
+  use: SetupUse | string
+  label: string
+  language: string | null
+  commercial: boolean
+  local_only: boolean
+  hardware: string
+  speed: SpeedInfo
+  picks: {
+    task: Task | string
+    optional: boolean
+    realtime: boolean
+    model: Recommendation | null
+    alternatives: Recommendation[]
+    note: string | null
+  }[]
+  /** Ids of the chosen models that are not installed yet. */
+  pull: string[]
+  download_bytes: number
+}
+
 export type JobState = 'queued' | 'running' | 'done' | 'error'
 
 export interface Job<R = unknown> {
@@ -278,6 +454,8 @@ export interface Job<R = unknown> {
   bytes_total?: number | null
   error: string | null
   result?: R | null
+  /** Notices about the job (a model that is unlikely to fit this machine). They never stop it. */
+  warnings?: FitWarning[]
 }
 
 export interface Percentiles {
@@ -349,6 +527,8 @@ export interface RequestTrace {
   normalizer?: string
   normalized_text?: string
   pronunciations_applied?: AppliedPronunciation[]
+  /** TTS: what happened to romanised text (absent when the option did not come into play). */
+  romanised?: RomanisedRecord
   speakers_before_consolidation?: number
   conditioning?: unknown
   id: string
@@ -438,6 +618,8 @@ export type ServerEvent =
   | { type: 'log'; level: string; message: string }
   | { type: 'wordlist'; name: string; event: 'updated' | 'deleted' | string }
   | { type: 'provider'; name: string; event: 'saved' | 'removed' | string }
+  | { type: 'call'; event: 'started' | 'ended' | 'summary' | 'dialing' | string; call: CallSummary }
+  | { type: 'telephony'; event: string; name?: string; number?: string }
 
 /** Messages on the STT websocket (server → client). */
 export interface SttWord {
@@ -536,6 +718,25 @@ export interface TextInput {
   digits: string
   wordlists: string[]
   pronunciation: 'phonemes' | 'markup' | 'respelling' | string
+  /** Romanised text: the voice's effective mode (`off`, `auto`, `on`); absent on older servers. */
+  romanised?: string
+}
+
+/** What happened to romanised text in one request (`romanised` in a TTS trace and in the preview). */
+export interface RomanisedRecord {
+  mode: string
+  /** `request`, or `voice` for the model's pin or the server's default. */
+  source: string
+  language: string | null
+  applied: boolean
+  latin_share?: number
+  pack?: string
+  /** The converted text (first 500 characters). */
+  text?: string
+  /** Words written in the script, when the transliterator reports them. */
+  words?: number
+  /** Why nothing was converted. */
+  notice?: string
 }
 
 /** One word-list match in a preview or a trace. */
@@ -555,4 +756,221 @@ export interface WordListPreview {
   text: string
   applied: AppliedPronunciation[]
   phonemes?: string | null
+  /** What happened to romanised text for this voice (null when the option did not come into play). */
+  romanised?: RomanisedRecord | null
+}
+
+// --- phone calls (docs/telephony.md) ---------------------------------------------------------------------------
+
+/** Where to paste one of bolo's addresses in a telephony provider's dashboard. */
+export interface TelephonyWebhook {
+  name: string
+  where: string
+  url: string
+  method: string
+}
+
+export interface TelephonyProvider {
+  name: string
+  label: string
+  /** Some credentials are in the server's configuration. */
+  configured: boolean
+  /** The provider's webhook and stream endpoints answer. */
+  exposed: boolean
+  /** Why they do not (missing settings), when `exposed` is false. */
+  problems: string[]
+  /** `signature`: requests are checked against the provider's signature; `basic`: against credentials it sends. */
+  protection: string
+  can_validate: boolean
+  can_place_calls: boolean
+  machine_detection: boolean
+  ends_by: string
+  /** Settings by name; secrets read `***` when set, never their value. */
+  settings: Record<string, string | null>
+  docs_url: string
+  webhooks: TelephonyWebhook[]
+  stream_url: string
+  notes: string[]
+}
+
+export interface AgentTool {
+  name: string
+  description?: string
+  parameters?: Record<string, unknown>
+  url?: string
+  timeout_s?: number
+}
+
+/** A voice agent that answers and places calls. Unset fields fall back to the server's settings. */
+export interface PhoneAgent {
+  name: string
+  instructions: string | null
+  greeting: string | null
+  voice: string | null
+  language: string | null
+  stt_model: string | null
+  tts_model: string | null
+  llm_model: string | null
+  pipeline: string | null
+  tools: AgentTool[]
+  max_duration_s: number
+  max_duration_message: string | null
+  silence_timeout_s: number
+  silence_prompt: string
+  silence_prompts: number
+  goodbye: string | null
+  transfer_number: string | null
+  transfer_message: string | null
+  recording_consent: string | null
+  voicemail: 'hangup' | 'leave_message' | 'ignore' | string
+  voicemail_message: string | null
+  dtmf: 'message' | 'ignore' | string
+  summary: boolean
+  turn_detection: Record<string, unknown> | null
+  source: 'settings' | 'stored' | string
+  editable: boolean
+}
+
+/** Body of `PUT /api/v1/telephony/agents/{name}`: the agent without its name and where it came from. */
+export type PhoneAgentUpdate = Partial<Omit<PhoneAgent, 'name' | 'source' | 'editable'>>
+
+export interface PhoneNumber {
+  number: string
+  agent: string
+  source: string
+  editable: boolean
+}
+
+export interface TelephonyOverview {
+  public_base_url: string | null
+  validate_signatures: boolean
+  default_agent: string | null
+  providers: TelephonyProvider[]
+  agents: PhoneAgent[]
+  numbers: PhoneNumber[]
+  editable: boolean
+  edit_blocked_reason: string | null
+  llm_configured: boolean
+  stats: {
+    active_calls: number
+    calls_total: number
+    by_outcome: { provider: string; outcome: string; calls: number }[]
+  }
+  compliance_notice: string
+}
+
+export interface LatencyQuantiles {
+  p50: number
+  max: number
+  mean: number
+}
+
+/** Per-call latency: each part of a turn, from the end of the caller's speech to the first audio sent back. */
+export interface CallLatency {
+  turns: number
+  endpoint_ms?: LatencyQuantiles
+  stt_ms?: LatencyQuantiles
+  llm_first_token_ms?: LatencyQuantiles
+  tts_first_audio_ms?: LatencyQuantiles
+  send_ms?: LatencyQuantiles
+  total_ms?: LatencyQuantiles
+  response_ms?: LatencyQuantiles
+}
+
+export interface CallSummary {
+  id: string
+  provider: string
+  direction: 'inbound' | 'outbound' | string
+  agent: string | null
+  from: string | null
+  to: string | null
+  provider_call_id: string | null
+  created_at: string
+  started_at: string | null
+  ended_at: string | null
+  status: 'ringing' | 'in_progress' | 'ended' | string
+  outcome: string | null
+  error: string | null
+  answered_by: string | null
+  duration_s: number | null
+  pipeline: string | null
+  turns: number
+  interruptions: number
+  latency: CallLatency
+  summary: string | null
+}
+
+export interface CallTurn {
+  index: number
+  kind: 'speech' | 'dtmf' | 'tool' | 'prompt' | string
+  started_ms: number
+  user_text: string | null
+  assistant_text: string | null
+  interrupted: boolean
+  status: string
+  tool_calls: string[]
+  latency: {
+    endpoint_ms: number | null
+    stt_ms: number | null
+    llm_first_token_ms: number | null
+    tts_first_audio_ms: number | null
+    send_ms: number | null
+    total_ms: number | null
+    response_ms: number | null
+  }
+}
+
+export interface CallTranscriptLine {
+  t_ms: number
+  speaker: 'caller' | 'agent' | string
+  text: string
+  kind?: string
+  interrupted?: boolean
+  full_text?: string
+}
+
+export interface CallEvent {
+  t_ms: number
+  type: string
+  [k: string]: unknown
+}
+
+export interface CallRecord extends Omit<CallSummary, 'turns'> {
+  stream_id: string | null
+  transfer_to: string | null
+  dtmf: string
+  summary_error: string | null
+  metadata: Record<string, unknown>
+  timeline: CallEvent[]
+  turns: CallTurn[]
+  transcript: CallTranscriptLine[]
+}
+
+export interface SimulationCheck {
+  type: string
+  ok: boolean
+  detail: string
+}
+
+/** The call simulator's report (`POST /api/v1/telephony/simulate`). */
+export interface SimulationReport {
+  scenario: string
+  description?: string | null
+  provider: string
+  agent: string | null
+  call_id: string | null
+  passed: boolean
+  checks: SimulationCheck[]
+  duration_s: number
+  noise_db: number | null
+  caller: {
+    utterances: { label: string; end_s: number; seconds: number; response_ms: number | null }[]
+    response_ms: LatencyQuantiles | null
+    agent_audio_s: number
+    clears: number
+    cleared_s: number
+  }
+  outcome: string | null
+  latency: CallLatency | null
+  record: CallRecord | null
 }

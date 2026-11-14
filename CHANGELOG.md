@@ -4,6 +4,168 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
+## [Unreleased]
+
+## [0.4.0] - 2026-11-14
+
+### Added
+
+- **Hardware detection and model recommendations**
+  ([docs/recommendations.md](docs/recommendations.md)). bolo looks at the machine it runs on and
+  rates every catalog model for it. **It recommends and warns; it never restricts**: no model is
+  hidden, refused or blocked because of hardware.
+  - `bolo/hardware.py` detects, best effort and without new dependencies: the CPU (model,
+    physical / logical / usable cores, AVX2, AVX-512, AVX-512 VNNI / BF16, AMX, NEON, dot product,
+    SVE), memory, free disk in the data directory, NVIDIA GPUs (`nvidia-smi`, else `pynvml`),
+    Apple Silicon's unified memory, Intel and AMD graphics from sysfs, what the runtimes can use
+    (ONNX Runtime providers, CTranslate2 CUDA devices, the torch plugin's device, `llama-server`
+    and `audio.cpp` builds), containers, virtual machines and cgroup CPU and memory limits. It
+    never raises; what cannot be read is reported as unknown.
+  - Every catalog entry gains a **`fit`** for this machine: a level (`comfortable`, `usable`,
+    `slow`, `unlikely`, plus `cloud` and `unavailable`), the expected real-time factor with a
+    range, whether it is measured-and-scaled, estimated from a sibling model or unknown, the
+    memory or VRAM it needs against what there is, and a one-sentence reason. Untested entries say
+    so instead of carrying an invented number.
+  - **A micro-benchmark** (`bolo recommend --benchmark`, `POST /api/v1/hardware/benchmark`; about
+    three seconds, nothing downloaded) times a tiny fixed workload (a hand-built ONNX graph in
+    onnxruntime, else numpy) and stores the result in `<data_dir>/hardware-benchmark.json`; the
+    catalog's measured real-time factors are then scaled by it. Without it they are scaled by a
+    documented rule from the core count and instruction sets, and every surface says the estimate
+    is rougher.
+  - **`bolo recommend`** `[--task … --language … --commercial --local-only --realtime | --batch
+    --max-size-mb N --use live|files|voiceover --all --why --json --benchmark]`: this machine,
+    then a default pick per task, a ranked table for one task, or a whole setup for a use.
+    `bolo doctor` gains "this machine" and a short recommended setup.
+  - API: `GET /api/v1/hardware`, `POST /api/v1/hardware/benchmark`,
+    `GET /api/v1/recommendations?task=&language=&commercial=&local_only=&realtime=&max_size_mb=`
+    (every model of the task stays in the list, the unlikely ones last, each with its reason; at
+    most three are marked recommended, one of them the default pick) and
+    `GET /api/v1/recommendations/setup?use=&language=`. `GET /api/v1/info` gains
+    `capabilities.recommendations`.
+  - **Warnings, not restrictions**: pulling or loading a model that is unlikely to fit or to run
+    in real time adds a `warnings` list to the answers of `POST /api/v1/models/pull` and
+    `/load`, to the job and to request traces, a log line, and a `warning:` line from
+    `bolo pull`. Status codes and behaviour do not change. New setting `hardware_warnings`
+    (default `true`) turns the notices off.
+  - **Console**: on the Models screen a "This machine" card (with "Run benchmark"), a fit line on
+    every card and an "On this machine" section in the details, a "Recommended for this machine"
+    badge, "Sort: best for this machine", an optional "Hide unlikely to fit" toggle (off by
+    default, not remembered, and it says how many it hides), a notice when a pull or load comes
+    back with warnings, and **"Pick for me"**: choose a language and a use (live conversation,
+    transcribing files, voice-over), see the proposed models with their reasons, pull them in one
+    click. The browser-only demo shows none of it: there the machine is the visitor's browser.
+
+- **Phone calls** ([docs/telephony.md](docs/telephony.md)). Telephony providers connect a call to a
+  bolo voice agent: **Twilio Media Streams**, **Plivo audio streams**, **Telnyx media streaming**
+  and the **Exotel Voicebot applet**, each a thin adapter (`bolo/telephony/adapters.py`) in front
+  of one provider-neutral call session that bridges into the existing Realtime session, so turn
+  detection, the three pipelines, tools and traces are the ones `/v1/realtime` has. Routes
+  `/telephony/{provider}/voice` (the answer webhook: TwiML `<Connect><Stream>`, Plivo XML
+  `<Stream bidirectional keepCallAlive>`, the Telnyx `answer` command, Exotel's `{"url": …}`),
+  `/telephony/{provider}/stream/{token}` (WebSocket), `/after` (hang up or `<Dial>` once bolo
+  closed the stream) and `/status`. **No real call has been made with it**: it was written against
+  the providers' documentation as read on 2026-11-14 and is tested against fake providers; the
+  document lists what was verified and what was assumed for each.
+- **On a call**: a recording-consent announcement (never interrupted), a greeting, **barge-in**
+  that clears the audio queued at the provider (`clear` / `clearAudio`) and truncates the
+  assistant's message to what was played, key presses (DTMF) handed to the agent as a user
+  message and to tools, built-in `hang_up` and `transfer_call` tools (transfer by TwiML / Plivo
+  XML `<Dial>`, the Telnyx `transfer` command, or Exotel's Passthru applet), tools with a `url`
+  called by HTTP POST, "are you still there?" prompts and a hang-up after silence, a longest
+  call length.
+- **Agents and numbers**: named agents (instructions, greeting, voice, language, STT / TTS / LLM
+  models, pipeline, tools, limits, transfer number, voicemail policy) and a called-number → agent
+  map in the `telephony` setting (`[telephony.agents.<name>]`, `[telephony.numbers]`) and through
+  `GET/PUT/DELETE /api/v1/telephony/agents/{name}` and `/numbers/{number}`
+  (`<data_dir>/telephony.json`, mode 0600).
+- **Outbound calls**: `POST /api/v1/telephony/calls` asks the provider to place a call and attach
+  an agent (Twilio `Calls.json`, Plivo `Call/`, Telnyx `POST /v2/calls`, Exotel connect-to-flow),
+  with the provider's **answering-machine detection** where it has one (Twilio `MachineDetection`,
+  Plivo `machine_detection`, Telnyx `answering_machine_detection`; none for Exotel) and a per-agent
+  policy: hang up, leave a message, or ignore. Compliance with outbound-calling rules (TRAI and
+  DND in India, the TCPA in the United States, …) is the operator's responsibility; bolo checks
+  none of it, and the API's answer says so.
+- **Security**: every provider request is checked (Twilio `X-Twilio-Signature`, Plivo
+  `X-Plivo-Signature-V3`, Telnyx Ed25519 with a five-minute tolerance, Exotel's Basic
+  credentials); media streams need a one-time token handed out by the verified answer webhook.
+  A provider's routes answer `503 telephony_not_configured`, naming the missing settings, until
+  requests can be checked or `telephony.validate_signatures = false` is set on purpose. New
+  setting `telephony.public_base_url`. Provider credentials come from the configuration or the
+  environment (`BOLO_TELEPHONY_<PROVIDER>_<FIELD>`), are never logged or returned, and are removed
+  from provider error messages. Ed25519 verification is implemented from RFC 8032 (checked against
+  its test vectors and the `cryptography` package), so Telnyx needs no extra dependency.
+- **Call records**: `GET /api/v1/telephony/calls` and `/calls/{id}`: a timeline, turns with a
+  latency breakdown (`endpoint_ms`, `stt_ms`, `llm_first_token_ms`, `tts_first_audio_ms`,
+  `send_ms`, `total_ms`, `response_ms`), the transcript with speakers (an interrupted line holds
+  what was heard, with the full text beside it), the outcome, and a summary written by the
+  language model when one is configured. In memory, like request traces. Each turn is also an
+  `agent` trace with transport `telephony` and the `call_id`. `GET /api/v1/stats` gains
+  `telephony`, `/metrics` gains `bolo_telephony_active_calls` and `bolo_telephony_calls_total`,
+  the event stream gains `call` events, `GET /api/v1/info` gains `capabilities.telephony`.
+- **Call simulator**: `bolo telephony simulate` (and `POST /api/v1/telephony/simulate`, and a
+  button in the console). A scripted caller (speech from text-to-speech or files, silences, key
+  presses, interruptions, noise) rings an agent through a fake provider that behaves like a phone
+  line (8 kHz frames in real time, real-time playback, `clear`, marks) over the whole provider
+  path (signed webhook, answer document, WebSocket), then reports what the caller heard, the
+  response time as the caller experiences it, and whether the expected behaviours happened.
+  Built-in scenarios `basic`, `barge-in`, `silence`, `dtmf`, `noisy`. `bolo telephony status`
+  prints what is configured and the URLs to paste into each provider's dashboard.
+- **Inbound SIP** (`sip = true`, `pip install 'bolo-speech[sip]'`; experimental): a minimal
+  endpoint for trunks and PBXs: `INVITE` with an SDP offer, PCMU / PCMA RTP, key presses as RTP
+  telephone events (RFC 4733), `ACK`, `BYE` from either side, `CANCEL`, `OPTIONS`,
+  retransmissions; callers admitted by source address (`sip_allowed_ips`, loopback only by
+  default). No REGISTER, digest authentication, TLS, SRTP, re-INVITE or transfer. SIP messages are
+  parsed with sipmessage (BSD-2-Clause). Tested against the suite's own SIP user agent, not
+  against a trunk or a softphone.
+- **Console**: a **Phone** page: each provider's state, what is missing and the webhook URLs to
+  paste (with where to paste them), agents (add, edit, remove), the number → agent map, recent
+  calls with per-turn latency bars, transcript and timeline, and "Simulate a call".
+- Realtime sessions: `RealtimeSession.responding`, `.user_speaking`, `.input_ms`, `.interrupt()`
+  and per-session `tts_model` / `llm_model` / `trace_extra`, used by the telephony bridge.
+
+- **Romanised text for text-to-speech** (docs/api.md, "Romanised text"). An Indian language typed
+  in Latin letters ("mujhe kal office jana hai") is written in the voice's script ("मुझे कल office
+  जाना है") by uccharan's transliterator before the normaliser and the phonemiser see it; English
+  words stay English. Modes `off` (default), `auto` (the voice speaks an Indian language and at
+  least 60 % of the text's letters are Latin) and `on`, set per request (`romanised` in
+  `/v1/audio/speech`, `?romanised=` on the TTS WebSocket, `session.audio.output.romanised`,
+  `audio.romanised` in chat completions, `romanised` on a telephony agent,
+  `bolo speak --romanised`), per model (`PUT /api/v1/models/{id}/settings`, catalog option
+  `romanised`) and server-wide (new setting `romanised`). Word-list entries, inline
+  pronunciations, URLs and email addresses are not converted.
+  - The transliterator and its language packs are optional and detected when bolo starts
+    (`bolo/text/romanised.py`). With uccharan 0.3.0 or older, without uccharan, or without the
+    language's pack, text is passed on unchanged and the request's trace carries a `romanised`
+    record with a notice that says what to install; only a request that itself says
+    `"romanised": "on"` is refused (`424 component_missing`, or `400` for a language or voice it
+    cannot apply to). Sessions, chat completions and phone calls never fail on it.
+  - uccharan's packs (`xlit-<language>`, CC BY-SA 4.0) are components: `uccharan-xlit-hi`, … in
+    `GET /api/v1/components` (kind `language-pack`), installed on request only with
+    `bolo components install uccharan-xlit-hi --accept-license` or the API with
+    `{"accept_license": true}`; uccharan downloads and checks them.
+  - `GET /api/v1/info` gains `capabilities.romanised`; `GET /api/v1/text-input/{model}` and the
+    word-list preview gain `romanised`.
+  - Console: a "Romanised text" choice on the Text to speech screen for voices of Indian
+    languages, a pin in a model's settings, and a line in a request's "What the voice received"
+    and in the word-list preview that says what was converted, or why not.
+  - Tested against a stand-in transliterator, against uccharan 0.3.0 (which has none), without
+    uccharan, and against uccharan 0.4.0 with its Hindi pack (the component install and one
+    request on a Piper Hindi voice); no listening test of converted text was made.
+
+### Changed
+
+- `bolo list` has a `FIT` column (how the model suits this machine, as on the catalog's `fit`).
+- The `uccharan` extra and the `uccharan` component ask for uccharan 0.4 or later, so that word
+  lists and the romanised-text option work from a plain install.
+- The README shown on PyPI has absolute links and images (`tools/pypi_readme.py` writes
+  `server/README.md` from the repository's README).
+
+### Fixed
+
+- `bolo recommend` and `GET /api/v1/recommendations` without a language no longer suggest
+  single-language voices of arbitrary languages for text to speech ("also recommended:
+  mimic3-ne-google"): English and multilingual voices come first when no language is asked for.
+
 ## [0.3.0] - 2026-11-14
 
 ### Added

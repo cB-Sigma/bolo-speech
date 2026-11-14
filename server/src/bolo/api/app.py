@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from bolo import __version__
-from bolo.api import chat, native, openai, realtime, speaches, static, ws
+from bolo.api import chat, native, openai, realtime, speaches, static, telephony, ws
 from bolo.api import wordlists as wordlists_api
 from bolo.api.common import check_auth, error_body, error_response
 from bolo.config import Settings
@@ -53,9 +53,23 @@ def create_app(settings: Settings | None = None, core: Bolo | None = None) -> Fa
                 core.log("info", f"Wyoming protocol listening on tcp://{settings.wyoming_host}:{settings.wyoming_port}")
             except Exception as exc:
                 core.log("error", f"could not start the Wyoming server: {exc}")
+        if settings.sip:
+            try:
+                from bolo.telephony.sip import start_sip
+
+                core.sip = await start_sip(core.telephony)
+                core.log("info", f"SIP listening on udp://{settings.sip_host}:{core.sip.port}")
+            except ImportError:
+                core.log("error", "the SIP endpoint needs sipmessage: pip install 'bolo-speech[sip]'")
+            except Exception as exc:
+                core.log("error", f"could not start the SIP endpoint: {exc}")
         try:
             yield
         finally:
+            if core.sip is not None:
+                with contextlib.suppress(Exception):
+                    await core.sip.stop()
+                core.sip = None
             if wyoming_server is not None:
                 with contextlib.suppress(Exception):
                     await wyoming_server.stop()
@@ -125,6 +139,8 @@ def create_app(settings: Settings | None = None, core: Bolo | None = None) -> Fa
     app.include_router(chat.router, dependencies=protected)
     app.include_router(ws.router)
     app.include_router(realtime.router)
+    app.include_router(telephony.router, dependencies=protected)
+    app.include_router(telephony.public_router)
     if settings.ui:
         app.include_router(static.router)
     return app

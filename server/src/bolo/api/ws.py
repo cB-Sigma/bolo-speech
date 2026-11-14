@@ -19,6 +19,7 @@ from bolo.core import Bolo
 from bolo.errors import BoloError, InvalidRequest
 from bolo.obs.trace import Trace
 from bolo.streaming.session import SessionConfig, STTSession
+from bolo.text.romanised import parse_mode as parse_romanised
 from bolo.text.segment import IncrementalSegmenter
 
 router = APIRouter()
@@ -198,6 +199,7 @@ async def tts_stream(ws: WebSocket) -> None:
         normalize: bool | str = (
             True if raw_norm in ("", "true", "1") else False if raw_norm in ("false", "0", "off") else raw_norm
         )
+        romanised = parse_romanised(params.get("romanised") or params.get("romanized"))
         async with core.manager.use(spec.id) as entry:
             model_rate = entry.model.sample_rate
             core.active_streams += 1
@@ -239,6 +241,7 @@ async def tts_stream(ws: WebSocket) -> None:
                             phonemizer=phonemizer,
                             wordlists=wordlists,
                             normalize=normalize,
+                            romanised=romanised,
                         )
                         first = True
                         try:

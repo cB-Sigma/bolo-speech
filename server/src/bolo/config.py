@@ -47,6 +47,10 @@ class Settings:
     #: who turns text into phonemes for Piper, Kitten, Matcha and Kokoro voices: "auto" (uccharan where it covers
     #: the voice's language, else espeak-ng), "uccharan" (never espeak-ng) or "espeak-ng" (as in bolo 0.1)
     phonemizer: str = "auto"
+    #: romanised text (an Indian language typed in Latin letters) for text-to-speech: "off", "auto" (written in the
+    #: voice's script when the voice speaks an Indian language and the text is mostly Latin) or "on". Needs
+    #: uccharan's transliterator and the language's pack; without them text is passed on unchanged with a notice
+    romanised: str = "off"
     # Install optional components (uccharan, espeak-ng) from the API. Unset: allowed on a loopback bind or with an API key.
     allow_component_install: bool | None = None
     #: STUN/TURN URLs offered to WebRTC peers (e.g. "stun:stun.example.org:3478"). Empty: none is contacted,
@@ -176,8 +180,28 @@ class Settings:
     allow_provider_edit: bool | None = None
     provider_timeout_s: float = 60.0  # longest wait for a provider's answer (or its next bytes while streaming)
 
+    # -- phone calls (docs/telephony.md) ---------------------------------------------------------
+    #: public_base_url, validate_signatures, default_agent, call_buffer, and the tables providers.<twilio|plivo|
+    #: telnyx|exotel> (credentials), agents.<name> (voice agents) and numbers (called number = agent). In a file:
+    #: a [telephony] table. In the environment: BOLO_TELEPHONY (JSON), BOLO_TELEPHONY_PUBLIC_BASE_URL,
+    #: BOLO_TELEPHONY_<PROVIDER>_<FIELD>. Credentials are never logged or returned by any API.
+    telephony: dict[str, Any] = field(default_factory=dict)
+    #: inbound SIP (docs/telephony.md): listen for INVITEs from a trunk or PBX on sip_host:sip_port (UDP)
+    sip: bool = False
+    sip_host: str = "0.0.0.0"
+    sip_port: int = 5060
+    #: the address written into SDP answers (the one the trunk sends RTP to); unset: the address the INVITE reached
+    sip_public_ip: str | None = None
+    #: source addresses allowed to send INVITEs ("203.0.113.10", "10.0.0.0/8"); empty: loopback only
+    sip_allowed_ips: list[str] = field(default_factory=list)
+    sip_rtp_port_min: int = 40000
+    sip_rtp_port_max: int = 40100
+
     # -- misc ---------------------------------------------------------------
     device: str = "cpu"
+    #: attach a notice (API responses, traces, the command line, the console) when a model that is pulled or
+    #: loaded is unlikely to fit this machine or to run in real time. Notices only: nothing is ever refused.
+    hardware_warnings: bool = True
     log_level: str = "info"
     trace_buffer: int = 1000
     fake_engine: bool = False
@@ -205,6 +229,10 @@ class Settings:
                 from bolo.providers import redact_provider
 
                 v = {str(name): redact_provider(entry) for name, entry in dict(v).items()}
+            elif f.name == "telephony":
+                from bolo.telephony.config import redact_telephony
+
+                v = redact_telephony(v)
             elif isinstance(v, Path):
                 v = str(v)
             out[f.name] = v
@@ -282,12 +310,27 @@ def _check_cloud(settings: Settings) -> None:
     """Fail at start-up, with the setting's name, for a provider or fallback entry that cannot be read."""
     from bolo.errors import BoloError
     from bolo.providers import ProviderConfig
+    from bolo.text.romanised import MODES, parse_mode
+
+    try:
+        settings.romanised = parse_mode(settings.romanised) or "off"
+    except BoloError as exc:
+        raise ValueError(f"romanised: expected one of {', '.join(MODES)}, got {settings.romanised!r}") from exc
 
     for name, entry in settings.providers.items():
         try:
             ProviderConfig.from_dict(str(name), entry)
         except BoloError as exc:
             raise ValueError(f"providers: {exc.message}") from exc
+    if settings.telephony:
+        from bolo.telephony.config import TelephonyConfig
+
+        try:
+            TelephonyConfig(settings)
+        except BoloError as exc:
+            raise ValueError(
+                exc.message if exc.message.startswith("telephony") else f"telephony: {exc.message}"
+            ) from exc
     for item in settings.fallbacks:
         model, sep, rest = str(item).partition("=")
         if not sep or not model.strip() or not rest.strip():
@@ -352,7 +395,7 @@ def load_settings(
             doc = tomllib.load(fh)
         flat: dict[str, Any] = {}
         for key, val in doc.items():
-            if key == "providers" and isinstance(val, dict):  # this table stays nested
+            if key in ("providers", "telephony") and isinstance(val, dict):  # these tables stay nested
                 flat[key] = val
             elif isinstance(val, dict):  # allow [server] / [models] style sections
                 for sub_key, sub_val in val.items():
@@ -378,6 +421,9 @@ def load_settings(
             values[name] = _coerce(name, environ[envname], types[name])
 
     _provider_env(values, environ)
+    from bolo.telephony.config import telephony_env
+
+    telephony_env(values, environ)
 
     # 3. explicit overrides (CLI flags)
     for name, val in (overrides or {}).items():

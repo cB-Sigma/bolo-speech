@@ -1,5 +1,5 @@
 """Command-line interface: ``bolo serve``, ``pull``, ``rm``, ``list``, ``ps``, ``show``,
-``transcribe``, ``speak``, ``bench`` and ``doctor``."""
+``transcribe``, ``speak``, ``bench``, ``recommend`` and ``doctor``."""
 
 from __future__ import annotations
 
@@ -158,6 +158,9 @@ def cmd_pull(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 1
+    for warning in core.advisor.warnings(spec, pulling=True):
+        # advice only: the download goes ahead (`hardware_warnings = false` silences it)
+        print(f"warning: {warning['message']}", file=sys.stderr)
     last = 0.0
 
     def progress(done: int, total: int) -> None:
@@ -204,11 +207,13 @@ def cmd_list(args: argparse.Namespace) -> int:
     rows = [
         [
             m["id"], m["task"], m["tier"], m["engine"], ",".join(m["languages"][:4]) + ("…" if len(m["languages"]) > 4 else ""),
-            _human(m["size_bytes"]), m["license"], "yes" if m["installed"] else "", "cpu" if m["validated"] == "cpu" else "",
+            _human(m["size_bytes"]), (m.get("fit") or {}).get("label") or "", "yes" if m["installed"] else "",
+            "cpu" if m["validated"] == "cpu" else "", m["license"],
         ]
         for m in models
     ]  # fmt: skip
-    print(_table(rows, ["ID", "TASK", "TIER", "ENGINE", "LANG", "SIZE", "LICENCE", "INSTALLED", "VALIDATED"]))
+    # FIT: how the model suits this machine (advice only; `bolo recommend` has the numbers and the reasons)
+    print(_table(rows, ["ID", "TASK", "TIER", "ENGINE", "LANG", "SIZE", "FIT", "INSTALLED", "VALIDATED", "LICENCE"]))
     return 0
 
 
@@ -336,8 +341,9 @@ def cmd_speak(args: argparse.Namespace) -> int:
             rate = 0
             try:
                 async for chunk in core.synthesize(
-                    text, model=args.model, voice=args.voice, speed=args.speed, trace=trace
-                ):
+                    text, model=args.model, voice=args.voice, speed=args.speed, trace=trace,
+                    romanised=args.romanised,
+                ):  # fmt: skip
                     trace.mark_ttfa()
                     parts.append(chunk.samples)
                     rate = chunk.sample_rate
@@ -425,13 +431,14 @@ def cmd_components(args: argparse.Namespace) -> int:
         for c in manager.status():
             state = f"installed ({c['source']}, {c['version']})" if c["installed"] else "not installed"
             print(f"{c['id']:<12} {state:<40} {c['license']:<18} needed by {c['required_by_count']} catalog models")
-            if not c["installed"] and c.get("kind") == "phonemizer":
-                flag = " --accept-license" if c["id"] == "espeak-ng" else ""
+            if not c["installed"] and c.get("kind") in ("phonemizer", "language-pack"):
+                flag = " --accept-license" if c["id"] == "espeak-ng" or c.get("kind") == "language-pack" else ""
                 print(f"             install: bolo components install {c['id']}{flag}   (or: {c['manual_command']})")
             elif not c["installed"]:
                 print(f"             install: {c['manual_command']}")
         return 0
-    installable = ("espeak-ng", "uccharan", "llama-server", "audio.cpp")
+    packs = tuple(c["id"] for c in manager.pack_status())
+    installable = ("espeak-ng", "uccharan", "llama-server", "audio.cpp", *packs)
     if args.component not in installable:
         print(f"error: unknown component '{args.component}' (installable: {', '.join(installable)})", file=sys.stderr)
         return 1
@@ -445,6 +452,13 @@ def cmd_components(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 1
+    if args.component in packs and not args.accept_license:
+        print(
+            "error: uccharan's romanised-text packs are licensed CC BY-SA 4.0 (they are built from share-alike "
+            "data). Re-run with --accept-license to download this one.",
+            file=sys.stderr,
+        )
+        return 1
     if args.component in ("llama-server", "audio.cpp"):
         blocked = manager.runtime_blocked_reason(args.component)
         if blocked:
@@ -454,6 +468,9 @@ def cmd_components(args: argparse.Namespace) -> int:
     if error:
         print(f"error: {error}", file=sys.stderr)
         return 1
+    if args.component in packs:
+        print(f"installed {args.component}; romanised text for this language can now be converted")
+        return 0
     print(f"installed {args.component}; voices that need it are now available")
     return 0
 
@@ -484,6 +501,352 @@ def cmd_providers(args: argparse.Namespace) -> int:
         return 0
     print(f"{result['name']}: failed ({result['code']}): {result['message']}", file=sys.stderr)
     return 1
+
+
+def _print_report(report: dict[str, Any]) -> None:
+    caller, latency = report["caller"], report.get("latency") or {}
+    verdict = "PASS" if report["passed"] else "FAIL"
+    print(f"{report['scenario']}: {verdict}  ({report['provider']}, agent {report['agent']}, {report['duration_s']} s, "
+          f"outcome {report.get('outcome')})")  # fmt: skip
+    heard = caller.get("response_ms")
+    if heard:
+        print(f"  caller heard the agent after: p50 {heard['p50']:.0f} ms, max {heard['max']:.0f} ms "
+              "(end of the caller's speech to the first audio at the provider)")  # fmt: skip
+    parts = [(n, latency[n]["p50"]) for n in ("endpoint_ms", "stt_ms", "llm_first_token_ms", "tts_first_audio_ms",
+                                              "send_ms") if isinstance(latency.get(n), dict)]  # fmt: skip
+    if parts:
+        print("  server breakdown (p50): " + "  ".join(f"{n[:-3]} {v:.0f} ms" for n, v in parts))
+    print(f"  agent audio heard {caller['agent_audio_s']} s; barge-in clears {caller['clears']} "
+          f"({caller['cleared_s']} s dropped)")  # fmt: skip
+    for check in report["checks"]:
+        print(f"  [{'ok' if check['ok'] else 'FAILED'}] {check['type']}: {check['detail']}")
+    for line in (report.get("record") or {}).get("transcript") or []:
+        print(f"    {line['t_ms'] / 1000:6.1f}s {line['speaker']:<6} {line['text']}")
+
+
+def cmd_telephony(args: argparse.Namespace) -> int:
+    """Phone calls (docs/telephony.md): what is configured, and the call simulator."""
+    if args.action == "simulate":
+        from bolo.telephony.simulator import SCENARIOS, simulate_with_server
+
+        settings = _settings(args)
+        _setup_logging(settings.log_level if args.log_level else "warning")
+        names = list(SCENARIOS) if args.all else (args.scenario or ["basic"])
+        reports = simulate_with_server(
+            settings, names, provider=args.provider, agent=args.agent, noise_db=args.noise_db, direct=args.direct
+        )
+        if args.json:
+            print(json.dumps(reports, indent=2, ensure_ascii=False))
+        else:
+            for report in reports:
+                _print_report(report)
+        return 0 if all(r["passed"] for r in reports) else 1
+    overview = _core(args).telephony.overview()
+    if args.json:
+        print(json.dumps(overview, indent=2, ensure_ascii=False))
+        return 0
+    print(f"public_base_url: {overview['public_base_url'] or 'not set'}   "
+          f"signature validation: {'on' if overview['validate_signatures'] else 'OFF'}")  # fmt: skip
+    for p in overview["providers"]:
+        state = "ready" if p["exposed"] and p["configured"] else "closed" if not p["exposed"] else "not configured"
+        print(f"{p['label']}: {state}" + ("" if p["exposed"] else f" ({'; '.join(p['problems'])})"))
+        for hook in p["webhooks"]:
+            print(f"  {hook['name']}: {hook['method']} {hook['url']}")
+    agents = ", ".join(a["name"] for a in overview["agents"]) or "none"
+    print(f"agents: {agents}   default: {overview['default_agent'] or 'none'}")
+    for number in overview["numbers"]:
+        print(f"  {number['number']} -> {number['agent']}")
+    return 0
+
+
+# -- hardware and recommendations ---------------------------------------------------------------------
+_TASK_TITLES = {
+    "stt": "Speech to text", "tts": "Text to speech", "diarization": "Speaker diarization",
+    "vad": "Voice-activity detection", "turn": "End-of-turn detection", "separation": "Overlapped-speech separation",
+    "speech-to-speech": "Speech to speech",
+}  # fmt: skip
+
+
+def _unknown(value: Any, unit: str = "") -> str:
+    return "unknown" if value is None else f"{value}{unit}"
+
+
+def _cores(value: float | None) -> str:
+    return "unknown" if value is None else f"{value:g}"
+
+
+def _hardware_lines(hw: dict[str, Any]) -> list[str]:
+    """This machine, as lines of text. What could not be read is printed as "unknown"."""
+    from bolo.hardware import gigabytes
+
+    cpu, mem, disk, box = hw["cpu"], hw["memory"], hw["disk"], hw["container"]
+    features = "unknown" if cpu["features"] is None else (", ".join(cpu["features"]) or "none that matter")
+    lines = [
+        f"cpu: {_unknown(cpu['model'])} ({_unknown(cpu['architecture'])}); cores: {_unknown(cpu['physical_cores'])} "
+        f"physical, {_unknown(cpu['logical_cores'])} logical, {_cores(cpu['usable_cores'])} usable; "
+        f"inference threads: {_unknown(hw['threads'])}",
+        f"instruction sets: {features}",
+        f"memory: {gigabytes(mem['total_bytes']) or 'unknown'} total, "
+        f"{gigabytes(mem['available_bytes']) or 'unknown'} available"
+        + (f", limited to {gigabytes(mem['limit_bytes'])} by the container" if mem["limit_bytes"] else ""),
+        f"disk: {gigabytes(disk['free_bytes']) or 'unknown'} free in {_unknown(disk['path'])}",
+    ]
+    if hw["gpus"]:
+        for g in hw["gpus"]:
+            memory = (
+                "memory shared with the system"
+                if g["unified_memory"] and g["vendor"] != "amd"
+                else f"{gigabytes(g['vram_total_bytes']) or 'unknown'} VRAM, "
+                f"{gigabytes(g['vram_free_bytes']) or 'unknown'} free"
+            )
+            use = f"usable through {g['backend']}" if g["backend"] else "no runtime bolo starts uses it"
+            driver = f", driver {g['driver']}" if g["driver"] else ""
+            lines.append(f"gpu: {_unknown(g['name'])} ({memory}{driver}; {use})")
+    else:
+        lines.append("gpu: none found" if hw["gpus_known"] else "gpu: unknown (could not be detected)")
+    rt = hw["runtimes"]
+    parts = []
+    ort = rt.get("onnxruntime", {})
+    if ort.get("installed"):
+        providers = "unknown" if ort.get("providers") is None else ", ".join(ort["providers"])
+        parts.append(f"onnxruntime {ort.get('version') or ''} ({providers})")
+    else:
+        parts.append("onnxruntime not installed")
+    sherpa = rt.get("sherpa-onnx", {})
+    parts.append(
+        f"sherpa-onnx {sherpa.get('version') or ''} (GPU build: unknown)"
+        if sherpa.get("installed")
+        else "sherpa-onnx not installed"
+    )
+    ct2 = rt.get("ctranslate2", {})
+    parts.append(
+        f"CTranslate2 {ct2.get('version') or ''} (CUDA devices: {_unknown(ct2.get('cuda_devices'))})"
+        if ct2.get("installed")
+        else "CTranslate2 not installed"
+    )
+    torch = rt.get("plugin:torch", {})
+    parts.append(
+        f"torch plugin (device: {_unknown(torch.get('device'))})"
+        if torch.get("installed")
+        else "torch plugin not installed"
+    )
+    for name in ("llama-server", "audio.cpp"):
+        entry = rt.get(name, {})
+        if entry.get("installed"):
+            gpu = {True: "GPU build", False: "CPU build", None: "GPU support unknown"}[entry.get("gpu")]
+            parts.append(f"{name} {entry.get('version') or ''} ({gpu})".replace("  ", " "))
+        else:
+            parts.append(f"{name} not installed")
+    lines.append("runtimes: " + "; ".join(parts))
+    where = []
+    if box["detected"] is None:
+        where.append("container: unknown")
+    elif box["detected"]:
+        where.append(f"container: {box['kind']}")
+    if box["virtual_machine"]:
+        where.append("virtual machine" + (f" ({box['hypervisor']})" if box["hypervisor"] else ""))
+    if box["cpu_quota"] is not None:
+        where.append(f"CPU quota {box['cpu_quota']} cores")
+    if box["memory_limit_bytes"]:
+        where.append(f"memory limit {gigabytes(box['memory_limit_bytes'])}")
+    if where:
+        lines.append("environment: " + ", ".join(where))
+    lines += [f"note: {note}" for note in hw["notes"]]
+    return lines
+
+
+def _speed_line(speed: dict[str, Any]) -> str:
+    return f"speed against the reference machine: {speed['factor']:.2f}x, {speed['note']}"
+
+
+def _fit_cells(r: dict[str, Any]) -> list[str]:
+    from bolo.hardware import gigabytes
+
+    fit = r["fit"]
+    if fit["expected_rtf"] is None:
+        rtf = "-"
+    else:
+        lo, hi = fit["rtf_range"]
+        rtf = f"{fit['expected_rtf']:g} ({lo:g}-{hi:g})"
+    basis = {"measured": "measured", "estimated": "estimated"}.get(fit["rtf_basis"], "guess")
+    if fit["level"] in ("cloud", "unavailable"):
+        basis = "-"
+    mem = fit["memory"]
+    memory = "-"
+    if mem and mem["needed_bytes"] is not None:
+        have = gigabytes(mem["available_bytes"]) or "unknown"
+        memory = f"{gigabytes(mem['needed_bytes'])} of {have}" + (" VRAM" if mem["kind"] == "vram" else "")
+    q = r["quality"]
+    quality = f"{q['metric'].replace('round_trip_', 'rt-').upper()} {q['value']:.1%}" if q else r["tier"]
+    licence = r["license"] + ("" if r["commercial_use"] else " (non-commercial)")
+    mark = "*" if r["default"] else ("+" if r["recommended"] else "")
+    return [str(r["rank"]), f"{r['id']} {mark}".rstrip(), fit["label"], rtf, basis, memory, quality, licence]
+
+
+def _print_ranking(answer: dict[str, Any], limit: int | None, why: bool) -> None:
+    q = answer["query"]
+    title = _TASK_TITLES.get(q["task"], q["task"])
+    asked = [
+        x
+        for x in (
+            q["language"],
+            "commercial use only" if q["commercial"] else None,
+            "local only" if q["local_only"] else None,
+            {True: "real time", False: "batch"}.get(q["realtime"]),
+            f"at most {q['max_size_bytes'] // (1024 * 1024)} MB" if q["max_size_bytes"] else None,
+        )
+        if x
+    ]
+    hidden = sum(answer["filtered_out"].values())
+    print(
+        f"{title}{' (' + ', '.join(asked) + ')' if asked else ''}: {answer['total']} models"
+        + (f"; {hidden} more do not pass the filters you asked for" if hidden else "")
+    )
+    results = answer["results"]
+    shown = results if limit is None else results[:limit]
+    if not shown:
+        print("  no catalog model matches.")
+        return
+    headers = ["#", "MODEL", "FIT", "RTF HERE (RANGE)", "BASIS", "MEMORY", "QUALITY", "LICENCE"]
+    print(_table([_fit_cells(r) for r in shown], headers))
+    if len(shown) < len(results):
+        print(
+            f"... and {len(results) - len(shown)} more, the least suitable last (--all lists every one; "
+            "nothing is left out because of hardware)."
+        )
+    print("* default pick   + also recommended for this machine")
+    if answer["note"]:
+        print(answer["note"])
+    for r in shown:
+        if why or r["default"] or r["recommended"]:
+            notes = "".join(f" Note: {n}." for n in r["fit"]["notes"])
+            print(f"  {r['id']}: {r['fit']['reason']}{notes}")
+
+
+def _print_overview(core: Any, language: str | None, commercial: bool, local_only: bool) -> None:
+    """The default pick per task: what `bolo recommend` prints without --task, and `bolo doctor` in short."""
+    from bolo.recommend import TASKS, Query
+
+    rows = []
+    for task, live in [("stt", None), ("stt", True), ("tts", None), ("tts", True), *[(t, None) for t in TASKS[2:]]]:
+        answer = core.advisor.recommend(Query(task, language, commercial, local_only, live))
+        by_id = {r["id"]: r for r in answer["results"]}
+        pick = by_id.get(answer["default"]) if answer["default"] else None
+        name = _TASK_TITLES[task] + (", live" if live else "")
+        if pick is None:
+            rows.append([name, "(nothing suitable)", "-", "-", "-", ""])
+            continue
+        cells = _fit_cells(pick)
+        also = ", ".join(i for i in answer["recommended"] if i != pick["id"])
+        rows.append([name, pick["id"], cells[2], cells[3], cells[4], also])
+    print(_table(rows, ["FOR", "DEFAULT PICK", "FIT", "RTF HERE (RANGE)", "BASIS", "ALSO RECOMMENDED"]))
+
+
+def cmd_recommend(args: argparse.Namespace) -> int:
+    """``bolo recommend``: this machine, and the catalog models that suit it. Advice only: nothing is restricted."""
+    from bolo.recommend import TASKS, USES, Query, normalize_task
+
+    core = _core(args)
+    advisor = core.advisor
+    advisor.hardware(refresh=True, deep=True)
+    if args.benchmark:
+        print("running the micro-benchmark (a few seconds)...", file=sys.stderr)
+        result = advisor.benchmark()
+        where = "not stored: " + result["not_saved"] if "not_saved" in result else f"stored in {core.settings.data_dir}"
+        print(
+            f"benchmark: {result['workload']} workload, {result['threads']} threads, {result['ms']} ms per run "
+            f"(reference {result['reference_ms']} ms) -> {result['speed']}x the reference machine; {where}",
+            file=sys.stderr,
+        )
+    realtime = True if args.realtime else (False if args.batch else None)
+    max_size = int(args.max_size_mb * 1024 * 1024) if args.max_size_mb else None
+    task = normalize_task(args.task) if args.task else None
+    if task is not None and task not in TASKS:
+        print(f"error: unknown task {args.task!r}; use one of: {', '.join(TASKS)}", file=sys.stderr)
+        return 1
+    if args.use and args.use not in USES:
+        print(f"error: unknown use {args.use!r}; use one of: {', '.join(USES)}", file=sys.stderr)
+        return 1
+    limit = None if args.all else args.limit
+    if args.json:
+        doc: dict[str, Any] = {"hardware": advisor.hardware_api()}
+        if args.use:
+            doc["setup"] = advisor.setup(args.use, args.language, args.commercial, not args.cloud)
+        elif task:
+            query = Query(task, args.language, args.commercial, args.local_only, realtime, max_size)
+            doc["recommendations"] = advisor.recommend(query, limit)
+        else:
+            doc["recommendations"] = {
+                t: advisor.recommend(Query(t, args.language, args.commercial, args.local_only, realtime, max_size), 5)
+                for t in TASKS
+            }
+        print(json.dumps(doc, indent=2, ensure_ascii=False))
+        return 0
+    hw = advisor.hardware_api()
+    print("this machine:")
+    for line in _hardware_lines(hw):
+        print(f"  {line}")
+    print(f"  {_speed_line(hw['speed'])}")
+    if hw["speed"]["source"] != "benchmark":
+        print("  (no benchmark stored: real-time factors below are rougher; run `bolo recommend --benchmark`)")
+    print()
+    if args.use:
+        setup = advisor.setup(args.use, args.language, args.commercial, not args.cloud)
+        print(f"{setup['label']}{' in ' + args.language if args.language else ''}:")
+        rows = []
+        for pick in setup["picks"]:
+            m = pick["model"]
+            name = _TASK_TITLES[pick["task"]] + (" (optional)" if pick["optional"] else "")
+            if m is None:
+                rows.append([name, "(nothing suitable)", "-", "-", "-", "-"])
+            else:
+                cells = _fit_cells(m)
+                rows.append(
+                    [name, m["id"], cells[2], cells[3], cells[4], "yes" if m["installed"] else _human(m["size_bytes"])]
+                )
+        print(_table(rows, ["FOR", "MODEL", "FIT", "RTF HERE (RANGE)", "BASIS", "INSTALLED / DOWNLOAD"]))
+        if setup["pull"]:
+            print(f"to install them ({_human(setup['download_bytes'])}):")
+            for model_id in setup["pull"]:
+                print(f"  bolo pull {model_id}")
+    elif task:
+        query = Query(task, args.language, args.commercial, args.local_only, realtime, max_size)
+        _print_ranking(advisor.recommend(query), limit, args.why)
+    else:
+        print("recommended for this machine (`bolo recommend --task stt` ranks every model of a task):")
+        _print_overview(core, args.language, args.commercial, args.local_only)
+    print()
+    print("These are recommendations, not restrictions: every catalog model can still be pulled and loaded.")
+    return 0
+
+
+def _doctor_hardware(args: argparse.Namespace) -> None:
+    """The machine and a short recommended setup. Never fails the doctor."""
+    try:
+        core = _core(args)
+        hw = core.advisor.hardware_api(refresh=True)
+        print("this machine:")
+        for line in _hardware_lines(hw):
+            print(f"  {line}")
+        print(f"  {_speed_line(hw['speed'])}")
+        print("recommended setup for this machine (advice only; `bolo recommend` has the details):")
+        from bolo.recommend import Query
+
+        for label, task, live in (
+            ("speech to text", "stt", None), ("live speech to text", "stt", True), ("text to speech", "tts", None),
+            ("live text to speech", "tts", True), ("diarization", "diarization", None),
+        ):  # fmt: skip
+            answer = core.advisor.recommend(Query(task, realtime=live), 0)
+            pick = next((r for r in answer["results"] if r["id"] == answer["default"]), None)
+            if pick is None:
+                print(f"  {label}: nothing in the catalog is expected to run well here")
+                continue
+            fit = pick["fit"]
+            rtf = f", real-time factor about {fit['expected_rtf']:g}" if fit["expected_rtf"] is not None else ""
+            basis = {"measured": "measured, scaled", "estimated": "estimated"}.get(fit["rtf_basis"], "a guess")
+            print(f"  {label}: {pick['id']} ({fit['label']}{rtf}; {basis})")
+    except Exception as exc:  # pragma: no cover - advice must never break the doctor
+        print(f"this machine: could not be described ({type(exc).__name__}: {exc})")
 
 
 def _doctor_providers(settings: Settings) -> None:
@@ -574,6 +937,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         )
     _doctor_llm(settings)
     _doctor_providers(settings)
+    _doctor_hardware(args)
     try:
         import wyoming
 
@@ -697,6 +1061,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--model", "-m")
     s.add_argument("--voice")
     s.add_argument("--speed", type=float, default=1.0)
+    s.add_argument(
+        "--romanised",
+        "--romanized",
+        choices=["off", "auto", "on"],
+        help="write an Indian language typed in Latin letters in the voice's script first (default: the "
+        "model's setting, else the `romanised` setting)",
+    )
     s.add_argument("--format", "-f", help="default: from the output file extension")
     s.add_argument("--sample-rate", dest="sample_rate", type=int)
     s.add_argument("--verbose", "-v", action="store_true")
@@ -734,6 +1105,41 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("action", choices=["list", "test"])
     s.add_argument("provider", nargs="?")
     s.set_defaults(func=cmd_providers)
+
+    s = sub.add_parser("telephony", help="phone calls (docs/telephony.md): status, simulate")
+    _common(s)
+    s.add_argument("action", choices=["status", "simulate"])
+    s.add_argument("--scenario", action="append", help="a built-in scenario or a JSON file (repeatable); default basic")
+    s.add_argument("--all", action="store_true", help="run every built-in scenario")
+    s.add_argument("--provider", default="twilio", choices=["twilio", "plivo", "telnyx", "exotel"],
+                   help="whose protocol the fake provider speaks")  # fmt: skip
+    s.add_argument("--agent", help="the agent to call (default: telephony.default_agent)")
+    s.add_argument("--noise-db", dest="noise_db", type=float, help="background noise, as a signal-to-noise ratio in dB")
+    s.add_argument("--direct", action="store_true", help="skip the webhook and WebSocket: straight into the session")
+    s.add_argument("--json", action="store_true", help="print the full reports as JSON")
+    s.set_defaults(func=cmd_telephony)
+
+    s = sub.add_parser(
+        "recommend",
+        help="describe this machine and rank the catalog's models for it (advice only: nothing is restricted)",
+    )
+    _common(s)
+    s.add_argument("--task", help="stt, tts, diarization, vad, turn, separation or speech-to-speech")
+    s.add_argument("--language", help="only models that cover this language (a code such as en or hi)")
+    s.add_argument("--commercial", action="store_true", help="only models whose licence allows commercial use")
+    s.add_argument("--local-only", dest="local_only", action="store_true", help="leave cloud models out")
+    s.add_argument("--realtime", action="store_true", help="rank for live speech (stricter speed levels)")
+    s.add_argument("--batch", action="store_true", help="rank for files and voice-over: the most capable that keeps up")
+    s.add_argument("--max-size-mb", dest="max_size_mb", type=float, help="only models with a download up to this size")
+    s.add_argument("--use", help="a whole setup instead of one task: live, files or voiceover")
+    s.add_argument("--cloud", action="store_true", help="with --use: let cloud models be proposed too")
+    s.add_argument("--limit", type=int, default=15, help="rows to print for a task (default 15)")
+    s.add_argument("--all", action="store_true", help="print every model of the task, the least suitable last")
+    s.add_argument("--why", action="store_true", help="print the reason for every row, not only the recommended ones")
+    s.add_argument("--benchmark", action="store_true",
+                   help="first time a tiny fixed workload (a few seconds) and store the result in the data directory")  # fmt: skip
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(func=cmd_recommend)
 
     s = sub.add_parser("doctor", help="check engines, codecs, components, the language model and the data directory")
     _common(s)

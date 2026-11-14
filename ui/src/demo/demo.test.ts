@@ -30,6 +30,13 @@ describe('demo backend', () => {
     expect(body.auth_required).toBe(false)
   })
 
+  it('rates nothing for "this machine": the machine is the visitor\'s browser', async () => {
+    const { body: info } = await get<ServerInfo>('api/v1/info')
+    expect(info.capabilities?.recommendations).toBeUndefined()
+    const { body } = await get<Catalog>('api/v1/catalog')
+    expect(body.models.some((m) => m.fit != null)).toBe(false)
+  })
+
   it('lists the browser model first and the server catalog as a read-only snapshot', async () => {
     const { body } = await get<Catalog>('api/v1/catalog')
     const browser = body.models.filter((m) => m.runtime === 'browser')

@@ -3,9 +3,16 @@ import { parseTranscription, transcriptionForm, type DiarizedResult, type Transc
 import type {
   BenchRequest,
   BenchResult,
+  CallRecord,
+  CallSummary,
   Catalog,
   Component,
+  FitWarning,
+  HardwareInfo,
   Job,
+  PhoneAgent,
+  PhoneAgentUpdate,
+  PhoneNumber,
   Provider,
   ProviderList,
   ProviderTest,
@@ -13,8 +20,13 @@ import type {
   RequestTrace,
   Sample,
   ServerInfo,
+  SetupPlan,
+  SetupUse,
+  SimulationReport,
+  SpeedInfo,
   Stats,
   Task,
+  TelephonyOverview,
   TextInput,
   WordList,
   WordListPreview,
@@ -119,10 +131,23 @@ export const api = {
   info: (signal?: AbortSignal) => json<ServerInfo>('api/v1/info', { signal }),
   catalog: (q: CatalogQuery = {}, signal?: AbortSignal) =>
     json<Catalog>('api/v1/catalog', { query: { task: q.task, q: q.q, installed: q.installed }, signal }),
-  pull: (id: string) => json<{ job_id: string }>('api/v1/models/pull', { method: 'POST', json: { id } }),
+  pull: (id: string) =>
+    json<{ job_id: string; warnings?: FitWarning[] }>('api/v1/models/pull', { method: 'POST', json: { id } }),
   job: <R = unknown>(jobId: string, signal?: AbortSignal) =>
     json<Job<R>>(`api/v1/jobs/${encodeURIComponent(jobId)}`, { signal }),
-  load: (id: string) => json<unknown>(`api/v1/models/${encodeURIComponent(id)}/load`, { method: 'POST' }),
+  load: (id: string) =>
+    json<{ warnings?: FitWarning[] } | undefined>(`api/v1/models/${encodeURIComponent(id)}/load`, { method: 'POST' }),
+  /** This machine as the server sees it; `refresh` looks again and runs the slower probes too. */
+  hardware: (refresh = false, signal?: AbortSignal) =>
+    json<HardwareInfo>('api/v1/hardware', { query: { refresh: refresh || undefined }, signal }),
+  /** A few seconds of CPU on the server: times a tiny workload so real-time factors are scaled, not guessed. */
+  benchmarkHardware: () =>
+    json<{ benchmark: Record<string, unknown>; speed: SpeedInfo }>('api/v1/hardware/benchmark', { method: 'POST' }),
+  /** Models for one use and language, picked for the server's machine. Advice: nothing is pulled by this call. */
+  recommendSetup: (
+    q: { use: SetupUse; language?: string; commercial?: boolean; local_only?: boolean },
+    signal?: AbortSignal,
+  ) => json<SetupPlan>('api/v1/recommendations/setup', { query: q, signal }),
   unload: (id: string) => json<unknown>(`api/v1/models/${encodeURIComponent(id)}/unload`, { method: 'POST' }),
   remove: (id: string) => json<void>(`api/v1/models/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   stats: (signal?: AbortSignal) => json<Stats>('api/v1/stats', { signal }),
@@ -137,6 +162,27 @@ export const api = {
   deleteProvider: (name: string) => json<void>(`api/v1/providers/${encodeURIComponent(name)}`, { method: 'DELETE' }),
   testProvider: (name: string) =>
     json<ProviderTest>(`api/v1/providers/${encodeURIComponent(name)}/test`, { method: 'POST' }),
+  /** Phone calls: providers and the addresses to give them, agents, numbers. No call returns a credential. */
+  telephony: (signal?: AbortSignal) => json<TelephonyOverview>('api/v1/telephony', { signal }),
+  putAgent: (name: string, body: PhoneAgentUpdate) =>
+    json<PhoneAgent>(`api/v1/telephony/agents/${encodeURIComponent(name)}`, { method: 'PUT', json: body }),
+  deleteAgent: (name: string) =>
+    json<void>(`api/v1/telephony/agents/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  putNumber: (number: string, agent: string) =>
+    json<{ numbers: PhoneNumber[] }>(`api/v1/telephony/numbers/${encodeURIComponent(number)}`, {
+      method: 'PUT',
+      json: { agent },
+    }),
+  deleteNumber: (number: string) =>
+    json<void>(`api/v1/telephony/numbers/${encodeURIComponent(number)}`, { method: 'DELETE' }),
+  calls: (q: { limit?: number; provider?: string; agent?: string } = {}, signal?: AbortSignal) =>
+    json<{ calls: CallSummary[] }>('api/v1/telephony/calls', { query: q, signal }),
+  call: (id: string, signal?: AbortSignal) =>
+    json<CallRecord>(`api/v1/telephony/calls/${encodeURIComponent(id)}`, { signal }),
+  scenarios: (signal?: AbortSignal) =>
+    json<{ scenarios: { name: string; description: string }[] }>('api/v1/telephony/scenarios', { signal }),
+  simulate: (body: { agent?: string; provider?: string; scenario?: string; noise_db?: number }) =>
+    json<SimulationReport>('api/v1/telephony/simulate', { method: 'POST', json: body }),
   /** Optional components. Older servers have no such route: that reads as an empty list. */
   components: async (signal?: AbortSignal): Promise<{ components: Component[] }> => {
     try {
@@ -163,6 +209,7 @@ export const api = {
       phonemizer?: string | null
       text_normalizer?: string | null
       wordlists?: string[] | null
+      romanised?: string | null
       fallback?: string[] | null
     },
   ) =>
@@ -283,5 +330,7 @@ export interface SpeechBody {
   /** Word lists to apply, highest priority first. */
   wordlists?: string[]
   normalize?: boolean | string
+  /** Romanised text: `off`, `auto` or `on` (omitted: the model's setting, else the server's). */
+  romanised?: string
   pronunciations?: { word: string; ipa?: string; say?: string; lang?: string; match?: string }[]
 }

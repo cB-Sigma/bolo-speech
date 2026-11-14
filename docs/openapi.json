@@ -7,7 +7,7 @@
    "name": "Apache-2.0",
    "url": "https://www.apache.org/licenses/LICENSE-2.0"
   },
-  "version": "0.3.0"
+  "version": "0.4.0"
  },
  "paths": {
   "/v1/models": {
@@ -528,6 +528,301 @@
         }
        ],
        "title": "Installed"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/hardware": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "This machine: CPU, memory, disk, GPUs, runtimes, container limits",
+    "description": "What bolo detected, best effort: a value it could not read is ``null`` (unknown). ``refresh=true`` looks\nagain and also runs the slower probes (the torch plugin's device, server binaries). ``speed`` says how fast\nthis machine is against the one the catalog was measured on, and whether that was measured (the\nmicro-benchmark) or estimated. Nothing here restricts what can be pulled or loaded.",
+    "operationId": "hardware_api_v1_hardware_get",
+    "parameters": [
+     {
+      "name": "refresh",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Refresh"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/hardware/benchmark": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Run the micro-benchmark (a few seconds of CPU)",
+    "description": "Times a tiny fixed workload, stores the result in the data directory and scales the catalog's measured\nreal-time factors with it from then on (``bolo recommend --benchmark`` does the same).",
+    "operationId": "hardware_benchmark_api_v1_hardware_benchmark_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/recommendations": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Catalog models for a task, ranked for this machine",
+    "description": "Every model of the task that passes the filters asked for, best fit first. Hardware never removes a\nmodel from the list: the ones that are unlikely to fit sort last, each with the reason. ``realtime=true``\nranks for live speech, ``realtime=false`` for batch work (files, voice-over).",
+    "operationId": "recommendations_api_v1_recommendations_get",
+    "parameters": [
+     {
+      "name": "task",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Task"
+      }
+     },
+     {
+      "name": "language",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Language"
+      }
+     },
+     {
+      "name": "commercial",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Commercial"
+      }
+     },
+     {
+      "name": "local_only",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Local Only"
+      }
+     },
+     {
+      "name": "realtime",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Realtime"
+      }
+     },
+     {
+      "name": "max_size_mb",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Max Size Mb"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/recommendations/setup": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "A set of models for one use and language",
+    "description": "``use`` is ``live`` (conversation: STT and TTS that keep up with speech, plus VAD and end of turn),\n``files`` (transcription: STT, plus diarization) or ``voiceover`` (TTS). The answer names one model per\ntask with alternatives, and lists what would have to be pulled. Local models unless ``local_only=false``.",
+    "operationId": "recommendations_setup_api_v1_recommendations_setup_get",
+    "parameters": [
+     {
+      "name": "use",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "live",
+       "title": "Use"
+      }
+     },
+     {
+      "name": "language",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Language"
+      }
+     },
+     {
+      "name": "commercial",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Commercial"
+      }
+     },
+     {
+      "name": "local_only",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Local Only"
       }
      }
     ],
@@ -1862,6 +2157,474 @@
      }
     }
    }
+  },
+  "/api/v1/telephony": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Telephony: providers, webhook URLs, agents, numbers (no secrets)",
+    "operationId": "overview_api_v1_telephony_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/telephony/agents": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Voice agents that answer and place calls",
+    "operationId": "list_agents_api_v1_telephony_agents_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/telephony/agents/{name}": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "One voice agent",
+    "operationId": "get_agent_api_v1_telephony_agents__name__get",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Name"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Add or change a voice agent",
+    "description": "Stored in ``<data_dir>/telephony.json``. Agents from the configuration file cannot be changed here.\nRefused on a non-loopback bind without an API key.",
+    "operationId": "put_agent_api_v1_telephony_agents__name__put",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Name"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Remove a stored voice agent",
+    "operationId": "delete_agent_api_v1_telephony_agents__name__delete",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Name"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/telephony/numbers": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Which agent answers which number",
+    "operationId": "list_numbers_api_v1_telephony_numbers_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/telephony/numbers/{number}": {
+   "put": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Map a called number to an agent",
+    "operationId": "put_number_api_v1_telephony_numbers__number__put",
+    "parameters": [
+     {
+      "name": "number",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Number"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Remove a number's mapping",
+    "operationId": "delete_number_api_v1_telephony_numbers__number__delete",
+    "parameters": [
+     {
+      "name": "number",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Number"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/telephony/calls": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Recent calls, newest first",
+    "operationId": "list_calls_api_v1_telephony_calls_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "provider",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Provider"
+      }
+     },
+     {
+      "name": "agent",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Agent"
+      }
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Place an outbound call and attach an agent",
+    "description": "Body: ``{\"provider\": \"twilio\", \"to\": \"+14155550100\", \"agent\": \"front-desk\", \"from\": \"+1...\",\n\"metadata\": {}}``. ``from`` defaults to the provider's ``from_number``. The answer is the call record;\npoll ``GET /api/v1/telephony/calls/{id}`` for what happened.\n\nOutbound calling is regulated (consent, calling hours, do-not-call registers such as TRAI's DND in India,\ndisclosure that a machine is speaking). Compliance is the operator's responsibility.",
+    "operationId": "place_call_api_v1_telephony_calls_post",
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/telephony/calls/{call_id}": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "One call: timeline, turns with latency, transcript",
+    "operationId": "get_call_api_v1_telephony_calls__call_id__get",
+    "parameters": [
+     {
+      "name": "call_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Call Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/telephony/calls/{call_id}/hangup": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "End a call in progress",
+    "operationId": "hangup_call_api_v1_telephony_calls__call_id__hangup_post",
+    "parameters": [
+     {
+      "name": "call_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Call Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/telephony/scenarios": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Built-in call-simulator scenarios",
+    "operationId": "scenarios_api_v1_telephony_scenarios_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/telephony/simulate": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Simulate a call to an agent through a fake provider",
+    "description": "Body: ``{\"agent\": \"front-desk\", \"provider\": \"twilio\", \"scenario\": \"basic\" | {...}, \"noise_db\": 20}``.\nA scripted caller speaks to the agent through a fake provider connection inside this process (no network,\nno telephony account) with the models this server is configured with. The answer is the simulator's report:\nwhat the caller heard, latency as the caller experiences it, and whether the expectations were met. The\ncall also appears among the recent calls.",
+    "operationId": "simulate_api_v1_telephony_simulate_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
   }
  },
  "components": {
@@ -1999,6 +2762,23 @@
       "title": "Wordlists",
       "description": "Pin pronunciation word lists to the model, highest priority first; null removes the pin."
      },
+     "romanised": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "off",
+         "auto",
+         "on"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Romanised",
+      "description": "Pin how the model's voices take romanised text (an Indian language typed in Latin letters): off, auto (convert to the voice's script when the text is mostly Latin) or on; null removes the pin (the server's `romanised` setting applies)."
+     },
      "fallback": {
       "anyOf": [
        {
@@ -2077,6 +2857,26 @@
       ],
       "title": "Normalize",
       "default": true
+     },
+     "romanised": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "string",
+        "enum": [
+         "off",
+         "auto",
+         "on"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Romanised",
+      "description": "off, auto or on (default: each model's setting). The preview never refuses: when the conversion cannot happen the item's `romanised.notice` says why."
      }
     },
     "additionalProperties": false,
@@ -2343,6 +3143,26 @@
       ],
       "title": "Pronunciations",
       "description": "Extension: inline word-list entries [{word, ipa?, say?, lang?, match?}], applied before any list."
+     },
+     "romanised": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "string",
+        "enum": [
+         "off",
+         "auto",
+         "on"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Romanised",
+      "description": "Extension: write an Indian language typed in Latin letters (\"mujhe kal office jana hai\") in the voice's script before it is read. `auto`: when the voice speaks an Indian language and the text is mostly Latin script; `on` (or true): always for such a voice, 424 `component_missing` when uccharan's transliterator or the language's pack is not installed; `off` (or false). Default: the model's pinned setting, else the server's `romanised` setting."
      },
      "phonemizer": {
       "anyOf": [

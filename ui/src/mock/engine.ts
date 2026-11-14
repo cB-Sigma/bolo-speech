@@ -3,6 +3,8 @@ import type {
   BenchRequest,
   CatalogModel,
   Component,
+  FitWarning,
+  HardwareInfo,
   Job,
   ModelStats,
   Percentiles,
@@ -14,10 +16,14 @@ import type {
   RequestTrace,
   ServerEvent,
   ServerInfo,
+  SetupPlan,
+  SetupUse,
   Stats,
 } from '@/lib/api/types'
 import { percentile } from '@/lib/latency/stats'
 import { seedCatalog, type HintSegment } from './catalog'
+import { applyFits, mockHardware, mockSetup, mockWarnings } from './hardware'
+import { MockTelephony } from './telephony'
 
 /** Deterministic PRNG so screenshots and tests are repeatable. */
 export function mulberry32(seed: number): () => number {
@@ -107,6 +113,10 @@ export class MockServer {
   private pendingTimeouts = new Set<ReturnType<typeof setTimeout>>()
   liveStreams = 0
   private espeak = false
+  /** Phone calls: providers, agents, numbers and calls. */
+  telephony = new MockTelephony()
+  /** The machine the mock runs on, and how fast it is against the reference machine. */
+  hardware: HardwareInfo = mockHardware()
   /** Cloud providers: `openai` came with the configuration, others are added through the API. */
   providerList: Provider[] = [
     {
@@ -127,6 +137,7 @@ export class MockServer {
     this.flags = flags
     this.espeak = Boolean(flags.espeak)
     this.applyComponents()
+    applyFits(this.models, this.hardware)
     for (const m of this.models) {
       this.perModel.set(m.id, { requests: Math.floor(this.rand() * 4000), lastUsed: Date.now(), active: 0 })
     }
@@ -192,8 +203,45 @@ export class MockServer {
           configured: this.providerList.filter((p) => p.configured).map((p) => p.name),
           cost_estimates: true,
         },
+        telephony: {
+          endpoint: '/api/v1/telephony',
+          providers: ['twilio', 'plivo', 'telnyx', 'exotel'],
+          configured: ['twilio'],
+          exposed: ['twilio'],
+          validate_signatures: true,
+          agents: this.telephony.agents.length,
+          sip: { enabled: false, listening: false, port: 5060 },
+        },
+        recommendations: {
+          hardware: '/api/v1/hardware',
+          endpoint: '/api/v1/recommendations',
+          setup: '/api/v1/recommendations/setup',
+          benchmark: '/api/v1/hardware/benchmark',
+          uses: ['live', 'files', 'voiceover'],
+          warnings: true,
+          restricts: false,
+        },
       },
     }
+  }
+
+  // --- hardware and recommendations --------------------------------------------------------------------------
+
+  /** The micro-benchmark: from then on real-time factors are scaled by a measurement, not a guess. */
+  runBenchmark(): HardwareInfo {
+    this.hardware = mockHardware(true)
+    applyFits(this.models, this.hardware)
+    return this.hardware
+  }
+
+  setup(use: SetupUse, language: string | null, commercial: boolean): SetupPlan {
+    return mockSetup(this.models, this.hardware, use, language, commercial)
+  }
+
+  /** Notices for a pull or load of a model that is unlikely to suit this machine. They never stop it. */
+  warnings(id: string): FitWarning[] {
+    const m = this.model(id)
+    return m ? mockWarnings(m) : []
   }
 
   // --- cloud providers ---------------------------------------------------------------------------------------

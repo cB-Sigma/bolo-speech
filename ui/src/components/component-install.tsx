@@ -27,18 +27,20 @@ export function componentSentence(c: Component): string {
       ? 'eSpeak NG is a small open-source program that some voices use to turn text into phonemes'
       : c.id === 'uccharan'
         ? 'uccharan turns English and Hindi text into the phonemes many voices read'
-        : c.kind === 'tts-server' || c.id === 'llama-server' || c.id === 'audio.cpp'
-          ? `${c.name} is a separate speech server that bolo starts for the voices that run on it`
-          : c.kind === 'engine-plugin'
-            ? `${c.name} runs models in a process of its own, for models that need PyTorch`
-            : `${c.name} is an extra piece of software that some models use`
+        : c.kind === 'language-pack'
+          ? `${c.name} is data that lets voices read text typed in Latin letters: it is written in the language's own script first`
+          : c.kind === 'tts-server' || c.id === 'llama-server' || c.id === 'audio.cpp'
+            ? `${c.name} is a separate speech server that bolo starts for the voices that run on it`
+            : c.kind === 'engine-plugin'
+              ? `${c.name} runs models in a process of its own, for models that need PyTorch`
+              : `${c.name} is an extra piece of software that some models use`
   const licence = c.license && !/^see /i.test(c.license) ? ` under ${c.license}` : ''
   return `${what}; it is optional, is not part of bolo, and is licensed separately${licence}.`
 }
 
-/** Whether installing asks the user to accept a licence first (copyleft components). */
+/** Whether installing asks the user to accept a licence first (copyleft and share-alike components). */
 export function needsLicenceAcceptance(c: Pick<Component, 'id' | 'license'>): boolean {
-  return c.id === 'espeak-ng' || /^(a?gpl|lgpl)/i.test(c.license)
+  return c.id === 'espeak-ng' || /^(a?gpl|lgpl)/i.test(c.license) || /^cc[ -]by[ -]sa/i.test(c.license)
 }
 
 function hostOf(url: string | null | undefined): string | null {
@@ -57,6 +59,8 @@ export function installDescription(c: Component): string {
     const version = c.release?.version ? `${c.release.version} ` : ''
     return `The server downloads the prebuilt ${version}release${host ? ` from ${host}` : ''}, checks its SHA-256, unpacks it into its data directory and checks that the program starts on this machine. Nothing else on the machine changes, and the server keeps running.`
   }
+  if (c.kind === 'language-pack')
+    return "The server downloads the pack from uccharan's release, checks its SHA-256 and keeps it in uccharan's cache directory. Nothing else on the machine changes, and the server keeps running."
   return "A Python package is installed into the server's own environment. Nothing else on the machine changes, and the server keeps running."
 }
 
@@ -328,6 +332,7 @@ export function ComponentInstallButton({
 
 export const KIND_LABEL: Record<string, string> = {
   phonemizer: 'Phonemisers',
+  'language-pack': 'Language packs',
   'tts-server': 'Speech servers',
   'engine-plugin': 'Engine plugins',
   other: 'Other components',

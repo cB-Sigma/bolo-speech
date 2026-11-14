@@ -7,6 +7,22 @@ was not.
 
 ## Indian languages
 
+At a glance (the sections below have the models and what was measured for each). Licence
+classes: **P** permissive (MIT, Apache-2.0, CC-BY, CC0), **NC** non-commercial, **G** gated, **T** needs the PyTorch plugin ([bolo-torch](../plugins/bolo-torch/README.md)).
+
+| Language | STT | TTS |
+| --- | --- | --- |
+| Hindi | P, run here (also G/T: SraVaani, official IndicConformer) | P (Piper, Kokoro, SYSPIN; some Piper voices NC); NC MMS; G/T Indic Parler-TTS, IndicF5 |
+| Bengali, Telugu, Tamil, Malayalam, Marathi, Urdu, Nepali, Gujarati | P, run here | P (some Piper voices NC); NC MMS for most |
+| Kannada, Maithili | P, run here | P (SYSPIN); NC MMS |
+| Magahi, Chhattisgarhi | Hindi model only | P (SYSPIN); NC MMS (run here) |
+| Bhojpuri (not a scheduled language) | Hindi model (41 % WER) | P (SYSPIN) |
+| Punjabi, Odia, Assamese | P, run here | NC MMS (run here); G/T Indic Parler-TTS |
+| Dogri | P, untested | NC MMS (run here) |
+| Sanskrit, Sindhi | P, run here (Sindhi without an error rate) | G/T only (Indic Parler-TTS) |
+| Bodo, Kashmiri, Konkani, Manipuri, Santali | P, untested | none (Bodo, Kashmiri: G/T or T only) |
+
+
 ### Speech to text: all 22 scheduled languages
 
 Every scheduled language of India has a model of its own: AI4Bharat's
@@ -119,8 +135,8 @@ The fine-tune is worse on this read speech (its card reports 36.4 % WER on
 Vaani's own test set, which is spontaneous speech) and nine times slower, so
 it is **not** added and the Hindi model stays the Bhojpuri default. IISc's
 SraVaani (MIT, gated, TorchScript) reports 20.8 % WER on RESPIN Bhojpuri; it
-is in the catalog for the future PyTorch engine plugin
-([plugins.md](plugins.md)), untested. No permissively licensed Maithili or
+is in the catalog for the PyTorch engine plugin
+([plugins.md](plugins.md)), which does not implement it yet. No permissively licensed Maithili or
 Magahi Whisper fine-tune exists that we could find (the one Maithili
 fine-tune on Hugging Face states no licence). For Maithili do not use
 the Hindi model: it does worse than the Maithili one and rewrites Maithili
@@ -166,7 +182,7 @@ in Latin script. We did not measure code-mixed accuracy for either.
 | Gujarati | `mimic3-gu-cmu-indic` | yes | validated (audio produced) |
 | Maithili, Bhojpuri, Kannada, Magahi, Chhattisgarhi; more voices for hi, bn, mr, te, gu and Indian English | `syspin-<lang>-<female\|male>` (IISc SYSPIN, MIT weights, CC-BY-4.0 data; character input) | no | **published** (release `voices-v1`); pull them like any other voice. Round trips: below |
 | Punjabi, Odia, Assamese, Dogri; more voices for Maithili, Magahi, Chhattisgarhi, Urdu, Awadhi, Haryanvi and the major languages | `mms-tts-<iso>` (Meta MMS-TTS, **CC-BY-NC-4.0: non-commercial only**; character input, 16 kHz) | no | **published** (release `voices-v1`, Hugging Face `codebucketsolutions/`). Run here from a local conversion, 5 sentences each, transcribed back by the language's IndicConformer: Punjabi 19.4 % WER / 10.3 % CER, Odia 18.5 / 5.7, Assamese 13.3 / 3.2, Dogri 18.8 / 8.0, Maithili 48.6 / 12.9, Urdu 24.2 / 7.5; Magahi 52.9 / 30.5 and Chhattisgarhi 45.7 / 12.3 through the *Hindi* recogniser (there is none of their own). Most Punjabi and Odia errors are a stray syllable added at the start or end (`docs/measurements/mms-tts-round-trip.json`) |
-| Sanskrit, Sindhi, Kashmiri, Konkani, Manipuri, Bodo, Santali | - | - | **no voice** that runs without PyTorch: MMS-TTS has none of them; Indic Parler-TTS (Apache-2.0, gated) and Svara (Apache-2.0) cover some and are listed for the future PyTorch engine plugin ([plugins.md](plugins.md)) |
+| Sanskrit, Sindhi, Kashmiri, Konkani, Manipuri, Bodo, Santali | - | - | **no voice** that runs without PyTorch: MMS-TTS has none of them; Indic Parler-TTS (Apache-2.0, gated) and Svara (Apache-2.0) cover some and run through the PyTorch engine plugin ([plugins.md](plugins.md); Indic Parler-TTS was run on CPU there, far slower than real time) |
 
 ⚠ = the voice's training data is under a non-commercial licence.
 
@@ -297,10 +313,12 @@ last = framer.flush(pad=MULAW_SILENCE)         # pad the tail with digital silen
   add narrow-band microphones, packet loss, jitter, echo and background
   noise; accuracy on them will be lower than on synthesised speech passed
   through G.711, and we have no numbers for it.
-* bolo is not a SIP or RTP endpoint. It does not parse RTP headers, reorder
-  packets, conceal losses or detect DTMF. Put a media gateway in front
-  (Asterisk, FreeSWITCH, LiveKit SIP, or a provider's media-stream webhook)
-  and forward payloads.
+* The routes on this page take audio, not calls: they do not parse RTP
+  headers, reorder packets, conceal losses or detect DTMF. For whole calls
+  use [telephony.md](telephony.md): bolo connects Twilio, Plivo, Telnyx and
+  Exotel media streams and has a minimal SIP endpoint (G.711 RTP, RFC 4733
+  key presses) for trunks and PBXs. None of that has met a real phone
+  network yet either.
 * Models are trained on 16 kHz audio. Upsampled 8 kHz audio has no content
   above 4 kHz, which costs some accuracy with every model. No model in the
   catalog is trained specifically for 8 kHz telephone speech; sherpa-onnx has

@@ -82,5 +82,6 @@ export function traceExtras(t: RequestTrace): [string, string][] {
   add('First token', t.first_token_ms, ' ms')
   add('Normaliser', t.normalizer)
   add('Pronunciations applied', t.pronunciations_applied?.length || null)
+  if (t.romanised) add('Romanised text', t.romanised.applied ? `converted (${t.romanised.mode})` : 'not converted')
   return out
 }

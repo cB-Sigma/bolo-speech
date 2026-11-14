@@ -60,6 +60,7 @@ import {
   ComponentsCard,
   NeedsComponentMark,
 } from '@/components/component-install'
+import { FirstRunPick, FitLine, FitSection, HardwareCard, PickForMe, RecommendedBadge } from '@/components/fit-bits'
 import { ModelSettingsSection } from '@/components/model-settings'
 import {
   cloudNotice,
@@ -74,6 +75,7 @@ import { describePrice } from '@/lib/cost'
 import { describeError, missingComponent, useCatalog, useComponents, useLive, useModelActions } from '@/hooks/use-api'
 import { useStore } from '@/hooks/use-store'
 import type { CatalogModel, ModelStats, Task } from '@/lib/api/types'
+import { isUnlikely, sortByFit } from '@/lib/fit'
 import { groupLanguages, languageLabel } from '@/lib/languages'
 import { fmtBytes, fmtInt, fmtMs, fmtParams, fmtRtf, fmtSpeed, languageName } from '@/lib/format'
 import { prefs, setPref } from '@/lib/prefs'
@@ -263,6 +265,7 @@ function ModelCard({
   stats,
   maxMem,
   actions,
+  lang,
   onOpen,
   onDelete,
 }: {
@@ -270,6 +273,8 @@ function ModelCard({
   stats?: ModelStats
   maxMem: number
   actions: Actions
+  /** The language filter, if one is set: "recommended" is judged for it. */
+  lang: string | null
   onOpen: () => void
   onDelete: (m: CatalogModel) => void
 }) {
@@ -320,6 +325,12 @@ function ModelCard({
           {m.gated && <GatedMark />}
           <HardwareMark hardware={m.hardware} />
         </div>
+        {m.fit && !isDemo && (
+          <div className="mt-2 flex w-full flex-wrap items-center gap-x-3 gap-y-1">
+            <RecommendedBadge m={m} lang={lang} />
+            <FitLine fit={m.fit} />
+          </div>
+        )}
       </button>
       <UnmetRow m={m} />
       {m.loaded && stats && stats.memory_bytes > 0 && (
@@ -335,7 +346,17 @@ function ModelCard({
   )
 }
 
-function Details({ m, stats, onClose }: { m: CatalogModel | null; stats?: ModelStats; onClose: () => void }) {
+function Details({
+  m,
+  stats,
+  lang,
+  onClose,
+}: {
+  m: CatalogModel | null
+  stats?: ModelStats
+  lang: string | null
+  onClose: () => void
+}) {
   const navigate = useNavigate()
   return (
     <Sheet open={m != null} onOpenChange={(o) => !o && onClose()}>
@@ -406,6 +427,7 @@ function Details({ m, stats, onClose }: { m: CatalogModel | null; stats?: ModelS
                 </p>
               )}
               <UnmetNotice m={m} />
+              {!isDemo && <FitSection m={m} lang={lang} />}
 
               <section>
                 <h3 className="mb-2 eyebrow">Measured on this server</h3>
@@ -658,7 +680,7 @@ export default function ModelsPage() {
   const catalog = useCatalog()
   const feed = useLive()
   const actions = useModelActions()
-  const view = useStore(prefs).modelsView
+  const { modelsView: view, modelsSort: sort, pickDismissed } = useStore(prefs)
   const [q, setQ] = useState('')
   const [task, setTask] = useState<string>('all')
   const [tier, setTier] = useState(ANY)
@@ -669,6 +691,9 @@ export default function ModelsPage() {
   const [noExtras, setNoExtras] = useState(false)
   const [commercialOnly, setCommercialOnly] = useState(false)
   const [cpuOnly, setCpuOnly] = useState(false)
+  // Off by default, and never remembered: hardware only reorders and highlights unless this is switched on.
+  const [hideUnlikely, setHideUnlikely] = useState(false)
+  const [picking, setPicking] = useState(false)
   const [where, setWhere] = useState(ANY)
   const [openId, setOpenId] = useState<string | null>(null)
   const [toDelete, setToDelete] = useState<CatalogModel | null>(null)
@@ -676,6 +701,10 @@ export default function ModelsPage() {
 
   const all = useMemo(() => catalog.data?.models ?? [], [catalog.data])
   const statsById = useMemo(() => new Map((feed.stats?.models ?? []).map((m) => [m.id, m])), [feed.stats])
+  // The server rates each model for its own machine. The live demo has no server: the machine is the browser's.
+  const fitOffered = !isDemo && all.some((m) => m.fit)
+  const fitLang = lang === ANY ? null : lang
+  const byFit = fitOffered && sort === 'fit'
   const maxMem = Math.max(1, ...[...statsById.values()].map((m) => m.memory_bytes))
   const options = useMemo(() => {
     const uniq = (xs: string[]) => [...new Set(xs)].sort((a, b) => a.localeCompare(b))
@@ -701,7 +730,7 @@ export default function ModelsPage() {
               : m.validated === 'cpu'
                 ? 3
                 : 4
-    return all
+    const base = all
       .filter(
         (m) =>
           (task === 'all' || m.task === task) &&
@@ -713,12 +742,32 @@ export default function ModelsPage() {
           (!noExtras || !(m.requires?.length ?? 0)) &&
           (!commercialOnly || m.commercial_use !== false) &&
           (!cpuOnly || isCpuFriendly(m)) &&
+          (!(fitOffered && hideUnlikely) || !isUnlikely(m)) &&
           (where === ANY || (where === 'cloud') === isCloud(m)) &&
           (!needle ||
             `${m.id} ${m.aliases.join(' ')} ${m.family} ${m.description} ${m.engine}`.toLowerCase().includes(needle)),
       )
       .sort((a, b) => rank(a) - rank(b) || a.family.localeCompare(b.family) || a.id.localeCompare(b.id))
-  }, [all, q, task, tier, lang, license, family, installedOnly, noExtras, commercialOnly, cpuOnly, where])
+    return byFit ? sortByFit(base, fitLang) : base
+  }, [
+    all,
+    q,
+    task,
+    tier,
+    lang,
+    license,
+    family,
+    installedOnly,
+    noExtras,
+    commercialOnly,
+    cpuOnly,
+    where,
+    fitOffered,
+    hideUnlikely,
+    byFit,
+    fitLang,
+  ])
+  const unlikelyHidden = fitOffered && hideUnlikely ? all.filter(isUnlikely).length : 0
 
   const filtersActive =
     q !== '' ||
@@ -731,6 +780,7 @@ export default function ModelsPage() {
     noExtras ||
     commercialOnly ||
     cpuOnly ||
+    hideUnlikely ||
     where !== ANY
   const reset = () => {
     setWhere(ANY)
@@ -744,7 +794,9 @@ export default function ModelsPage() {
     setNoExtras(false)
     setCommercialOnly(false)
     setCpuOnly(false)
+    setHideUnlikely(false)
   }
+  const nothingInstalled = !catalog.isLoading && all.length > 0 && all.every((m) => !m.installed || isCloud(m))
   const open = all.find((m) => m.id === openId) ?? null
   const installed = all.filter((m) => m.installed)
   const loaded = all.filter((m) => m.loaded)
@@ -893,6 +945,26 @@ export default function ModelsPage() {
         CPU-friendly
         <Switch checked={cpuOnly} onCheckedChange={setCpuOnly} size="sm" data-testid="filter-cpu" />
       </label>
+      {fitOffered && (
+        <>
+          <Select value={sort} onValueChange={(v) => setPref('modelsSort', v as 'default' | 'fit')}>
+            <SelectTrigger className="h-8 w-52" aria-label="Sort" data-testid="sort-models">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" align="start">
+              <SelectItem value="default">Sort: installed first</SelectItem>
+              <SelectItem value="fit">Sort: best for this machine</SelectItem>
+            </SelectContent>
+          </Select>
+          <label
+            className="flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-input px-2.5 text-xs dark:bg-input/30"
+            title="Optional, off by default: leaves out the models the server expects not to fit or run well on its hardware. They can still be pulled; switch this off to see them"
+          >
+            Hide unlikely to fit
+            <Switch checked={hideUnlikely} onCheckedChange={setHideUnlikely} size="sm" data-testid="filter-unlikely" />
+          </label>
+        </>
+      )}
       {filtersActive && (
         <Button variant="ghost" size="sm" onClick={reset}>
           <X /> Clear
@@ -945,10 +1017,27 @@ export default function ModelsPage() {
               <span className="num text-foreground">{loaded.length}</span> loaded ·{' '}
               <span className="num">{memTotal ? fmtBytes(memTotal) : '–'}</span> in memory
             </span>
+            {unlikelyHidden > 0 && (
+              <span data-testid="unlikely-hidden">
+                <span className="num text-foreground">{unlikelyHidden}</span> unlikely to fit this machine hidden by
+                your filter ·{' '}
+                <button type="button" className="underline underline-offset-2" onClick={() => setHideUnlikely(false)}>
+                  show them
+                </button>
+              </span>
+            )}
           </>
         )}
       </div>
 
+      {fitOffered && nothingInstalled && !pickDismissed && (
+        <FirstRunPick
+          className="mb-4"
+          onPick={() => setPicking(true)}
+          onDismiss={() => setPref('pickDismissed', true)}
+        />
+      )}
+      {!isDemo && <HardwareCard className="mb-4" onPick={() => setPicking(true)} />}
       <ComponentsCard className="mb-5" />
 
       {catalog.isLoading ? (
@@ -998,6 +1087,7 @@ export default function ModelsPage() {
                     stats={statsById.get(m.id)}
                     maxMem={maxMem}
                     actions={actions}
+                    lang={fitLang}
                     onOpen={() => setOpenId(m.id)}
                     onDelete={setToDelete}
                   />
@@ -1072,6 +1162,12 @@ export default function ModelsPage() {
                         <ValidatedMark validated={m.validated} />
                         <HardwareMark hardware={m.hardware} />
                         <UnmetMark m={m} />
+                        {fitOffered && (
+                          <>
+                            <FitLine fit={m.fit} className="max-w-56" />
+                            <RecommendedBadge m={m} lang={fitLang} />
+                          </>
+                        )}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -1097,7 +1193,13 @@ export default function ModelsPage() {
         </div>
       )}
 
-      <Details m={open} stats={open ? statsById.get(open.id) : undefined} onClose={() => setOpenId(null)} />
+      <Details
+        m={open}
+        stats={open ? statsById.get(open.id) : undefined}
+        lang={fitLang}
+        onClose={() => setOpenId(null)}
+      />
+      {!isDemo && <PickForMe open={picking} onOpenChange={setPicking} />}
 
       <Dialog open={toDelete != null} onOpenChange={(o) => !o && setToDelete(null)}>
         <DialogContent className="sm:max-w-md">

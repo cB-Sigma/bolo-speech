@@ -29,6 +29,7 @@ async def speak_stream(
     speed: float = 1.0,
     transport: str = "agent",
     phonemizer: str | None = None,
+    romanised: str | None = None,
 ) -> AsyncIterator[tuple[str, Any]]:
     """Yield ``("text", delta)``, ``("sentence", text)`` and ``("audio", SynthChunk)`` items as they become available.
 
@@ -61,7 +62,10 @@ async def speak_stream(
                 continue  # nothing pronounceable ("...", emoji)
             await out.put(("sentence", sentence))
             trace = Trace("tts", transport, "")
-            gen = core.synthesize(sentence, model=model, voice=voice, speed=speed, trace=trace, phonemizer=phonemizer)
+            gen = core.synthesize(
+                sentence, model=model, voice=voice, speed=speed, trace=trace, phonemizer=phonemizer,
+                romanised=romanised, romanised_strict=False,
+            )  # fmt: skip
             try:
                 async for chunk in gen:
                     trace.mark_ttfa()

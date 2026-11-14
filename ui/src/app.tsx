@@ -15,6 +15,7 @@ const ConversationPage = lazy(() => import('./routes/conversation'))
 const ComponentsPage = lazy(() => import('./routes/components'))
 const WordListsPage = lazy(() => import('./routes/wordlists'))
 const ProvidersPage = lazy(() => import('./routes/providers'))
+const PhonePage = lazy(() => import('./routes/phone'))
 const ComparePage = lazy(() => import('./routes/compare'))
 
 function PageFallback() {
@@ -122,6 +123,14 @@ export function App() {
             element={
               <Suspense fallback={<PageFallback />}>
                 <ProvidersPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="phone"
+            element={
+              <Suspense fallback={<PageFallback />}>
+                <PhonePage />
               </Suspense>
             }
           />

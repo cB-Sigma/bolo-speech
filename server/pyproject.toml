@@ -5,13 +5,16 @@ build-backend = "hatchling.build"
 [project]
 name = "bolo-speech"
 dynamic = ["version"]
-description = "A lightweight, torch-free speech server: speech-to-text, text-to-speech and VAD behind OpenAI-compatible, WebSocket and Wyoming APIs."
+description = "A self-hosted speech server without PyTorch: speech-to-text, text-to-speech, diarization and voice agents (OpenAI audio and Realtime APIs, phone calls, Wyoming), with a model catalog, optional cloud providers and a web console."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.10"
 authors = [{ name = "The bolo Authors" }]
-keywords = ["speech", "stt", "tts", "asr", "vad", "whisper", "openai", "wyoming", "telephony", "indic", "onnx"]
+keywords = [
+  "speech", "speech-to-text", "text-to-speech", "stt", "tts", "asr", "vad", "diarization", "voice-agent", "realtime",
+  "whisper", "openai", "openai-compatible", "wyoming", "telephony", "sip", "indic", "hindi", "onnx", "self-hosted",
+]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
@@ -48,8 +51,9 @@ whispercpp = ["pywhispercpp>=1.3"]
 # kokoro-onnx itself is MIT but depends on `phonemizer` (GPL-3.0-or-later).
 # It is deliberately NOT part of `all`; Kokoro runs through sherpa-onnx by default.
 kokoro-onnx = ["kokoro-onnx>=0.4"]
-# uccharan (Apache-2.0): phonemes for Piper, Kitten, Matcha and Kokoro voices in English (US, GB) and Hindi.
-uccharan = ["uccharan>=0.1"]
+# uccharan (Apache-2.0): phonemes for Piper, Kitten, Matcha and Kokoro voices, pronunciation word lists (0.2 and
+# later) and romanised text into native script (0.4 and later).
+uccharan = ["uccharan>=0.4"]
 # eSpeak NG (GPL-3.0-or-later) as a prebuilt shared library with its data. Optional, never part of `all`:
 # phoneme-based voices in languages uccharan does not cover need it; everything else does not.
 espeak = ["espeakng-loader>=0.2.4"]
@@ -64,10 +68,12 @@ orpheus = ["onnxruntime>=1.17"]
 # LFM3-Audio in this process (speech-to-speech and text-to-speech without llama-server): the model's ONNX graphs
 # use MatMulNBits, GatherBlockQuantized and GroupQueryAttention, which need a recent onnxruntime
 s2s = ["onnxruntime>=1.20", "tokenizers>=0.20"]
+# inbound SIP endpoint for trunks and PBXs (sipmessage is BSD-2-Clause, pure Python: it parses and writes SIP messages)
+sip = ["sipmessage>=0.7"]
 text = ["whisper-normalizer>=0.1"]
 all = [
   "sherpa-onnx>=2.0,<3",
-  "uccharan>=0.1",
+  "uccharan>=0.4",
   "faster-whisper>=1.1",
   "av>=12",
   "wyoming>=1.6",
@@ -135,7 +141,7 @@ warn_unused_ignores = false
 module = [
   "sherpa_onnx.*", "faster_whisper.*", "ctranslate2.*", "soundfile.*", "soxr.*", "av.*",
   "moonshine_onnx.*", "kokoro_onnx.*", "pywhispercpp.*", "wyoming.*", "whisper_normalizer.*",
-  "onnxruntime.*", "tomli.*", "aiortc.*", "uccharan.*", "tokenizers.*",
+  "onnxruntime.*", "tomli.*", "aiortc.*", "uccharan.*", "tokenizers.*", "sipmessage.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"

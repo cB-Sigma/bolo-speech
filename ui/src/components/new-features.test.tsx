@@ -217,6 +217,8 @@ describe('components and synthesis options', () => {
   it('asks for licence acceptance only for copyleft components', () => {
     expect(needsLicenceAcceptance(comp({ id: 'espeak-ng', license: 'GPL-3.0-or-later' }))).toBe(true)
     expect(needsLicenceAcceptance(comp({ id: 'llama-server', license: 'MIT' }))).toBe(false)
+    expect(needsLicenceAcceptance(comp({ id: 'uccharan-xlit-hi', license: 'CC BY-SA 4.0' }))).toBe(true)
+    expect(installDescription(comp({ id: 'uccharan-xlit-hi', kind: 'language-pack' }))).toMatch(/uccharan's release/)
   })
   it('describes a binary install for speech servers', () => {
     const c = comp({

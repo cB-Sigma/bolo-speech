@@ -25,6 +25,7 @@ from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from bolo.errors import ComponentMissing, InvalidRequest
+from bolo.text import romanised as rom
 from bolo.text import wordlists as wl
 from bolo.text.normalize import OVERRIDE, normalize_for_tts, strip_markup
 
@@ -56,6 +57,9 @@ class TextInput:
     digits: str = "context"
     #: word lists pinned to the model, in priority order
     wordlists: tuple[str, ...] = ()
+    #: romanised text (an Indian language typed in Latin letters) is written in the voice's script first:
+    #: "off" | "auto" | "on" (the model's pin, else the catalog option, else the server's `romanised` setting)
+    romanised: str = "off"
 
     @property
     def pronunciation(self) -> str:
@@ -94,7 +98,20 @@ def text_input(core: Bolo, spec: ModelSpec, voice_id: str | None = None) -> Text
         respell=respell,
         digits=str(opts.get("numbers") or opts.get("text_digits") or "context"),
         wordlists=tuple(str(x) for x in (pins.get("wordlists") or opts.get("wordlists") or ())),
+        romanised=_default_romanised(core, pins.get("romanised"), opts.get("romanised")),
     )
+
+
+def _default_romanised(core: Bolo, pinned: Any, option: Any) -> str:
+    """The voice's default mode. A stored value that is not a mode is ignored: it must not fail a request."""
+    for value in (pinned, option, getattr(core.settings, "romanised", None)):
+        try:
+            mode = rom.parse_mode(value)
+        except InvalidRequest:
+            continue
+        if mode is not None:
+            return mode
+    return "off"
 
 
 def uccharan_language(language: str | None) -> str | None:
@@ -117,11 +134,15 @@ class Prepared:
     text: str
     normalizer: str
     applied: list[dict[str, Any]] = field(default_factory=list)
+    #: what happened to romanised text (bolo.text.romanised), or None when the option did not come into play
+    romanised: dict[str, Any] | None = None
 
     def trace_extra(self) -> dict[str, Any]:
         out: dict[str, Any] = {"normalizer": self.normalizer, "normalized_text": self.text[:500]}
         if self.applied:
             out["pronunciations_applied"] = self.applied[:50]
+        if self.romanised:
+            out["romanised"] = self.romanised
         return out
 
 
@@ -205,6 +226,20 @@ def apply_lists(
     return "".join(out), applied
 
 
+def _protected_words(lists: list[Any]) -> list[tuple[str, bool]]:
+    """Words with a pronunciation of their own: they are matched as written, so they are not converted.
+    Each comes with whether its entry matches in its own case only (``match`` = case or exact)."""
+    words: list[tuple[str, bool]] = []
+    for item in lists:
+        try:
+            words += [
+                (str(e.get("word") or ""), str(e.get("match") or "") in ("case", "exact")) for e in item.entries()
+            ]
+        except Exception:  # a list that cannot be read protects nothing
+            continue
+    return words
+
+
 def prepare(
     core: Bolo,
     spec: ModelSpec,
@@ -216,8 +251,15 @@ def prepare(
     wordlists: list[str] | None = None,
     pronunciations: list[dict[str, Any]] | None = None,
     input_format: str = "text",
+    romanised: bool | str | None = None,
+    romanised_strict: bool = True,
 ) -> Prepared:
-    """The text one voice receives for a request (before the voice's own character fitting)."""
+    """The text one voice receives for a request (before the voice's own character fitting).
+
+    ``romanised`` is the request's choice (``off`` / ``auto`` / ``on``; None: the voice's default).
+    ``romanised_strict`` says the caller named it for this very text: ``on`` is then refused when it cannot be
+    done; a session or an agent passes False and gets a notice instead.
+    """
     if input_format not in INPUT_FORMATS:
         raise InvalidRequest(f"input_format must be one of {', '.join(INPUT_FORMATS)}", param="input_format")
     cap = text_input(core, spec, voice_id)
@@ -230,6 +272,24 @@ def prepare(
     text, marked = extract_overrides(text)
     inline_entries += marked
     lists = build_lists(core, cap, inline_entries, pronunciations, wordlists)
+    requested = rom.parse_mode(romanised)
+    outcome = rom.apply(
+        text,
+        language,
+        requested or cap.romanised,
+        source="request" if requested else "voice",
+        strict=romanised_strict and requested is not None,
+        protect=lambda: [*((str(e.get("word") or ""), True) for e in inline_entries), *_protected_words(lists)],
+    )
+    prepared = _normalise(core, cap, outcome.text, language, lists, normalize)
+    prepared.romanised = outcome.record
+    return prepared
+
+
+def _normalise(
+    core: Bolo, cap: TextInput, text: str, language: str, lists: list[Any], normalize: bool | str
+) -> Prepared:
+    """Normaliser and word lists (the text is already in the voice's script)."""
 
     if normalize is True:
         mode = cap.normalizer

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import threading
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -30,6 +31,9 @@ class EngineRegistry:
         self._factories: dict[str, Callable[[], Engine]] = {}
         self._engines: dict[str, Engine] = {}
         self._settings = settings
+        #: engines are asked for from the event loop, worker threads and the hardware advisor's thread:
+        #: each is created once
+        self._lock = threading.RLock()
         for engine_id, target in BUILTIN_ENGINES.items():
             if engine_id == "fake" and not include_fake:
                 continue
@@ -86,14 +90,18 @@ class EngineRegistry:
         return list(self._factories)
 
     def get(self, engine_id: str) -> Engine | None:
-        if engine_id in self._engines:
-            return self._engines[engine_id]
-        factory = self._factories.get(engine_id)
-        if factory is None:
-            return None
-        engine = factory()
-        self._engines[engine_id] = engine
-        return engine
+        found = self._engines.get(engine_id)
+        if found is not None:
+            return found
+        with self._lock:
+            if engine_id in self._engines:
+                return self._engines[engine_id]
+            factory = self._factories.get(engine_id)
+            if factory is None:
+                return None
+            engine = factory()
+            self._engines[engine_id] = engine
+            return engine
 
     def statuses(self) -> list[EngineStatus]:
         out: list[EngineStatus] = []

@@ -117,7 +117,7 @@ async def test_stats_shape(core: Bolo) -> None:
     stats = core.stats()
     assert set(stats) == {
         "uptime_s", "active_streams", "queue_depth", "system", "totals", "models", "separation", "providers",
-        "fallbacks",
+        "fallbacks", "telephony",
     }  # fmt: skip
     assert set(stats["system"]) == {"cpu_percent", "rss_bytes", "threads"}
     assert stats["totals"]["requests"] == 2 and stats["totals"]["audio_seconds_in"] == 1.0

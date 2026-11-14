@@ -51,6 +51,7 @@ jobs:
         run: pytest -q
       - name: Build and check the distribution
         run: |
+          python ../tools/pypi_readme.py --check ../README.md README.md
           python -m build
           twine check dist/*
       - name: Install the wheel in a clean environment and smoke-test it

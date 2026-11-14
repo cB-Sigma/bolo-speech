@@ -12,6 +12,7 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 * [Streaming text-to-speech WebSocket](#ws-apiv1ttsstream)
 * [Speaker diarization](#speaker-diarization)
 * [Realtime API and chat completions](#realtime-api-and-chat-completions)
+* [Phone calls](#phone-calls)
 * [Optional components](#optional-components)
 * [Latency definitions](#latency-definitions)
 * [Wyoming protocol](#wyoming-protocol)
@@ -54,6 +55,10 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | --- | --- | --- |
 | `GET` | `/api/v1/info` | Server, engine and platform information |
 | `GET` | `/api/v1/catalog` | Model catalog with install and load state |
+| `GET` | `/api/v1/hardware` | This machine: CPU, memory, disk, GPUs, runtimes, container limits |
+| `POST` | `/api/v1/hardware/benchmark` | Run the micro-benchmark (a few seconds of CPU) |
+| `GET` | `/api/v1/recommendations` | Catalog models for a task, ranked for this machine |
+| `GET` | `/api/v1/recommendations/setup` | A set of models for one use and language |
 | `POST` | `/api/v1/models/pull` | Start downloading a model |
 | `GET` | `/api/v1/jobs/{job_id}` | Poll a background job |
 | `GET` | `/api/v1/jobs` | List background jobs |
@@ -84,6 +89,20 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `DELETE` | `/api/v1/wordlists/{name}` | Delete a word list |
 | `POST` | `/api/v1/wordlists/{name}/preview` | What each voice would receive |
 | `GET` | `/api/v1/text-input/{model_id}` | How a model's voices take text |
+| `GET` | `/api/v1/telephony` | Telephony: providers, webhook URLs, agents, numbers (no secrets) |
+| `GET` | `/api/v1/telephony/agents` | Voice agents that answer and place calls |
+| `GET` | `/api/v1/telephony/agents/{name}` | One voice agent |
+| `PUT` | `/api/v1/telephony/agents/{name}` | Add or change a voice agent |
+| `DELETE` | `/api/v1/telephony/agents/{name}` | Remove a stored voice agent |
+| `GET` | `/api/v1/telephony/numbers` | Which agent answers which number |
+| `PUT` | `/api/v1/telephony/numbers/{number}` | Map a called number to an agent |
+| `DELETE` | `/api/v1/telephony/numbers/{number}` | Remove a number's mapping |
+| `GET` | `/api/v1/telephony/calls` | Recent calls, newest first |
+| `POST` | `/api/v1/telephony/calls` | Place an outbound call and attach an agent |
+| `GET` | `/api/v1/telephony/calls/{call_id}` | One call: timeline, turns with latency, transcript |
+| `POST` | `/api/v1/telephony/calls/{call_id}/hangup` | End a call in progress |
+| `GET` | `/api/v1/telephony/scenarios` | Built-in call-simulator scenarios |
+| `POST` | `/api/v1/telephony/simulate` | Simulate a call to an agent through a fake provider |
 
 **operations**
 
@@ -236,6 +255,7 @@ JSON body.
 | `input_format` | `text` | extension: `ssml` accepts the SSML subset below; `markdown` is the same as `text`. In every format, Kokoro-style `[word](/ipa/)` sets the pronunciation of that word |
 | `wordlists` | model pins, then `default` | extension: names of pronunciation word lists (`/api/v1/wordlists`), highest priority first. `[]` applies none. An unknown name → `404 wordlist_not_found` |
 | `pronunciations` | - | extension: inline entries `[{"word", "ipa"?, "say"?, "lang"?, "match"?}]`, applied before any list |
+| `romanised` | model pin, else the server's `romanised` setting (`off`) | extension: `"off"`, `"auto"` or `"on"` (`true` / `false` are `on` / `off`; `romanized` is accepted too). An Indian language typed in Latin letters is written in the voice's script before it is read; see "Romanised text" below. `on` → `424 component_missing` when the transliterator or the language's pack is not installed, `400` for a voice or language it cannot apply to |
 | `phonemizer` | voice's pin, else the server's `phonemizer` setting | extension, for voices that read phonemes: `auto`, `uccharan` (= `uccharan:compatible`), `uccharan:improved`, `espeak-ng`. `424 component_missing` when the chosen one is not installed, `400` (`param: "phonemizer"`) when uccharan does not cover the voice's language. Ignored for voices that read characters or a lexicon. See models.md, "Phonemisers" |
 | `reference_audio` | - | extension, for models that clone voices (`features` contains `voice-cloning`, today the `tts-server` models): a recording of the voice to imitate, plain base64 or a `data:audio/…;base64,` URL (WAV, FLAC, MP3, … whatever bolo can decode). Up to 30 s are used; it is sent to the server as mono 16-bit WAV. `400` (`param: "reference_audio"`) for a model that cannot clone, an empty, undecodable or shorter-than-0.5 s recording. It takes precedence over `voice` |
 | `reference_text` | - | extension: what is said in `reference_audio`; some cloning models (audio.cpp CosyVoice3, IndexTTS-2, …) use it |
@@ -306,8 +326,8 @@ receives:
 | `characters` | closed character sets (Coqui VITS, SYSPIN, MMS) | `light`, then the voice's own fitting | its `say` form |
 
 The record's other fields: `latin` (`keep` or `transliterate` Latin words), `respell`
-(`native`, `latin-hyphen`, `latin-plain`), `digits` (which language reads digits) and
-`wordlists` (pinned lists). They come from the catalog entry's options and the model's pinned
+(`native`, `latin-hyphen`, `latin-plain`), `digits` (which language reads digits),
+`wordlists` (pinned lists) and `romanised` (the voice's mode for romanised text, below). They come from the catalog entry's options and the model's pinned
 settings (configuration.md, "Per-model options").
 
 Pronunciation sources, the first match wins for any stretch of text: SSML `<phoneme>` and
@@ -316,8 +336,63 @@ the model, then the list named `default`. Inside one list the longest match wins
 earlier source wins even over a longer one in a later source. Word lists apply before number
 reading, so entries such as `2G` or `MH12` win over the normaliser. Entries that a voice cannot
 use are skipped, not errors (an IPA-only entry on a voice without a respelling for its script).
-The trace of each request (`GET /api/v1/requests/{id}`) records `normalizer`, `normalized_text`
-and `pronunciations_applied`.
+The trace of each request (`GET /api/v1/requests/{id}`) records `normalizer`, `normalized_text`,
+`pronunciations_applied` and, when romanised text came into play, `romanised`.
+
+**Romanised text.** People type Indian languages in Latin letters ("mujhe kal office jana
+hai"), and a Hindi voice reads that badly or not at all. With `romanised`, bolo first writes such
+text in the voice's script ("मुझे कल office जाना है") with uccharan's transliterator: words of the
+language are converted, English words stay as they are and are then handled like any Latin word
+by the voice's normaliser or phonemiser.
+
+| Mode | What happens |
+| --- | --- |
+| `off` (default) | text is passed on as written |
+| `auto` | converted when the voice speaks an Indian language and at least 60 % of the text's letters are Latin; text that is already in the script, or mostly so, is left alone |
+| `on` | converted whenever the voice speaks an Indian language and the text has Latin-letter words |
+
+The mode comes from the request (`romanised`), else the model's pin (`PUT
+/api/v1/models/{id}/settings` with `romanised`, or the catalog option `romanised`), else the
+server's `romanised` setting. The language is the request's `language`, else the voice's.
+Words with a pronunciation of their own (inline `pronunciations`, `[word](/ipa/)`, word-list
+entries) and URLs and email addresses are not converted. The conversion runs before the
+normaliser and the word lists.
+
+It needs two optional pieces, and bolo never fails a request because one is missing unless that
+request itself said `"on"`:
+
+* uccharan 0.4 or later (`uccharan.transliterate`). uccharan 0.3.0 and older have no
+  transliterator; `capabilities.romanised.available` in `GET /api/v1/info` says what is installed;
+* the language's pack, `xlit-<language>` (uccharan lists Hindi, Marathi, Bengali, Tamil, Telugu,
+  Gujarati, Punjabi, Kannada and Malayalam; the installed release decides, see
+  `capabilities.romanised.languages`). The packs are **CC BY-SA 4.0**, not Apache-2.0 (they are
+  built from share-alike word lists), so they are never downloaded on their own: install one as
+  the component `uccharan-xlit-<language>` ([Optional components](#optional-components)).
+
+| Situation | `auto`, or `on` from a pin, the server setting, a session or an agent | `"on"` in the request |
+| --- | --- | --- |
+| no uccharan, or one without a transliterator | text unchanged, notice in the trace | `424 component_missing` (the message says `pip install -U uccharan`) |
+| the language's pack is not installed | text unchanged, notice in the trace | `424 component_missing` (the message names the component) |
+| the installed uccharan has no pack for the language | text unchanged, notice in the trace | `400 invalid_request`, `param: "romanised"` |
+| the voice does not speak an Indian language | `auto`: nothing; `on`: notice in the trace | `400 invalid_request`, `param: "romanised"` |
+| the transliterator raises | text unchanged, notice in the trace | the same: text unchanged, notice |
+
+The trace of the request (`GET /api/v1/requests/{id}`) carries `romanised` whenever the option
+came into play: `{"mode", "source": "request" | "voice", "language", "applied", "latin_share",
+"pack", "text" (the converted text, first 500 characters), "words"}`, or with `"applied": false`
+and a `"notice"` that says what is missing and how to install it. The preview route
+(`POST /api/v1/wordlists/{name}/preview`, which takes `romanised` too) returns the same record
+per voice and never refuses.
+
+Where else it can be set: `romanised` as a query parameter of `WS /api/v1/tts/stream`,
+`session.audio.output.romanised` in a Realtime session, `audio.romanised` in
+`/v1/chat/completions`, `romanised` on a telephony agent ([telephony.md](telephony.md)),
+`bolo speak --romanised auto`. In sessions, chat completions and calls the text comes from a
+language model, so nothing is ever refused there: a conversion that cannot happen is a notice in
+the sentence's trace. **Not validated end to end**: bolo's side is tested against a stand-in for
+the transliterator, and with uccharan 0.4.0 and its Hindi pack a romanised request was converted
+and spoken by one Piper Hindi voice; conversion quality is uccharan's (its
+documentation has the accuracy figures), and no listening test of converted text was made.
 
 SSML subset (`input_format: "ssml"`; the `<speak>` wrapper is optional): `<sub alias>`,
 `<phoneme alphabet="ipa" ph>`, `<say-as interpret-as>` with `characters` / `spell-out`,
@@ -369,6 +444,10 @@ For clients written against speaches; details and differences are in
                  "endpoint": "/api/v1/wordlists", "install": null, "request_fields": ["wordlists", "pronunciations"],
                  "formats": ["tsv", "pls", "json"], "pin_per_model": true,
                  "preview": "/api/v1/wordlists/{name}/preview", "max_lists_per_request": 8},
+   // romanised text for text-to-speech: "available" is false (with a "reason") when the installed uccharan has
+   // no transliterator; "languages" have a pack in that uccharan, "installed" are the packs on this machine
+   "romanised": {"available": true, "reason": null, "modes": ["off", "auto", "on"], "languages": ["hi"],
+                 "installed": ["hi"], "default": "off", "request_field": "romanised", "pin_per_model": true},
    "providers": {"endpoint": "/api/v1/providers", "kinds": ["openai-compatible", "sarvam", "elevenlabs", "deepgram"],
                  "editable": true, "edit_blocked_reason": null, "configured": ["openai"],
                  "adhoc_models": "<provider>:<model>", "fallback": true, "cost_estimates": false},
@@ -400,7 +479,12 @@ For clients written against speaches; details and differences are in
                                        "reason": "llama-server is not installed (bolo components install llama-server)",
                                        "model": "lfm3-audio-2b-llamacpp", "url": null}}},
    "chat_completions": {"endpoint": "/v1/chat/completions", "available": false, "audio": false},
-   "llm": {"configured": false, "base_url": null, "model": null}}}
+   "llm": {"configured": false, "base_url": null, "model": null},
+   // phone calls (telephony.md): "exposed" lists the providers whose webhook and stream routes answer
+   "telephony": {"endpoint": "/api/v1/telephony", "providers": ["twilio", "plivo", "telnyx", "exotel"],
+                 "configured": [], "exposed": [], "validate_signatures": true, "agents": 0, "outbound": true,
+                 "simulator": "/api/v1/telephony/simulate",
+                 "sip": {"enabled": false, "listening": false, "port": 5060}}}}
 ```
 
 ### `GET /api/v1/catalog?task=&q=&installed=`
@@ -434,9 +518,29 @@ in the id, aliases, family, engine, languages, licence or description.
   "notice": null,                     // cloud models: "paid cloud API; audio leaves this server"
   "provider": null,                   // cloud models: {"name","kind","model","configured","price"}
   "fallback": [],                     // models that answer instead when this one cannot (providers.md, "Fallback")
-  "hardware": null                    // or {"gpu": "optional"|"recommended"|"required", "vram_gb": 2.0, "note": "…"}
+  "hardware": null,                   // or {"gpu": "optional"|"recommended"|"required", "vram_gb": 2.0, "note": "…"}
+  "fit": {                            // how well the model suits THIS machine; advice, never a restriction
+    "level": "comfortable",           // comfortable | usable | slow | unlikely | cloud | unavailable
+    "label": "comfortable",
+    "expected_rtf": 0.033,            // null when nothing was measured or estimated
+    "rtf_range": [0.017, 0.066],
+    "rtf_basis": "measured",          // measured | estimated (from a sibling model) | unknown
+    "scaled_by": "heuristic",         // benchmark | heuristic | null
+    "device": "cpu",                  // cpu | gpu | cloud | null
+    "memory": {"needed_bytes": 306067849, "available_bytes": 16869146624, "kind": "ram", "basis": "estimated"},
+    "engine_available": true,
+    "reason": "About 30x faster than real time here (…); needs about 0.3 GB of the 15.7 GB of memory.",
+    "notes": [],
+    "recommended": false,             // among the few recommended for its task, whatever the language
+    "recommended_for": ["en"],        // languages it is among the recommended for; "*" = any
+    "default_for": []                 // languages it is the default pick for
+  }
 }]}
 ```
+
+`fit` is computed for the machine the server runs on
+([recommendations.md](recommendations.md)). It never changes what can be
+pulled or loaded: a model whose level is `unlikely` is listed like any other.
 
 Feature tags: `partials` (interim results on the realtime WebSocket: every
 speech-to-text model), `timestamps` (word times), `punctuation`, `translate`,
@@ -476,6 +580,134 @@ was used by name and is not a curated entry.
 
 Pulling an installed model yields a job that is already `done`. Pulling a
 gated model without a token yields a job in state `error` that says what to do.
+
+**Hardware notices.** When the model is unlikely to fit this machine or to
+run in real time (`fit.level` is `slow` or `unlikely`), the answers of
+`POST /api/v1/models/pull` and `POST /api/v1/models/{id}/load` carry an extra
+`warnings` list, and so does the pull's job:
+
+```jsonc
+{"job_id": "j_4", "warnings": [{
+  "code": "hardware_fit",             // or "disk_space": the download is larger than the free disk space
+  "model": "parler-tts-tiny-v1", "level": "unlikely",
+  "message": "'parler-tts-tiny-v1' is unlikely to fit or to run well on this machine. … This is a recommendation, not a restriction."
+}]}
+```
+
+The status code does not change and nothing is refused: the pull has
+started, the model is loaded. The key is absent when there is nothing to
+say, and always absent with `hardware_warnings = false`. Requests served by
+such a model have the same `warnings` on their trace.
+
+### Hardware and recommendations
+
+Full description: [recommendations.md](recommendations.md). These routes
+describe and advise; none of them restricts anything.
+
+`GET /api/v1/hardware[?refresh=true]`: what bolo detected. A value it could
+not read is `null`, which means "unknown", never "none". `refresh=true` looks
+again and also runs the slower probes (the torch plugin's device, the server
+binaries' versions).
+
+```jsonc
+{
+  "system": "linux",
+  "cpu": {"model": "Intel(R) Xeon(R) Processor @ 2.10GHz", "vendor": "GenuineIntel", "architecture": "x86_64",
+          "physical_cores": 4, "logical_cores": 4,
+          "usable_cores": 4.0,        // min(logical cores, CPU affinity, cgroup quota)
+          "features": ["avx2", "avx512", "avx512_vnni", "amx", …]},   // or ["neon", "dotprod", …]
+  "memory": {"total_bytes": 16869146624, "available_bytes": 12609163264,
+             "limit_bytes": null,     // a cgroup limit below the machine's memory
+             "usable_bytes": 16869146624},
+  "disk": {"path": "/home/me/.cache/bolo", "total_bytes": 270553174016, "free_bytes": 8192065536},
+  "gpus": [{"vendor": "nvidia", "name": "NVIDIA GeForce RTX 4090", "vram_total_bytes": 25757220864,
+            "vram_free_bytes": 24127733760, "driver": "550.54.14", "unified_memory": false,
+            "backend": "cuda",        // cuda | metal | null (no runtime bolo starts uses it)
+            "source": "nvidia-smi"}],
+  "gpus_known": true,                 // false: GPU detection could not run; [] then means "unknown"
+  "runtimes": {
+    "onnxruntime": {"installed": true, "version": "1.29.0", "providers": ["CPUExecutionProvider"], "gpu": false},
+    "sherpa-onnx": {"installed": true, "version": "2.0.1", "gpu": null},   // null: cannot tell
+    "ctranslate2": {"installed": true, "version": "4.5.0", "cuda_devices": 0, "gpu": false},
+    "plugin:torch": {"installed": false, "version": null, "torch": null, "device": null, "cuda": null, "probed": false},
+    "llama-server": {"installed": false, "path": null, "source": null, "version": null, "gpu": null, "gpu_devices": null},
+    "audio.cpp": {"installed": false, "path": null, "source": null, "version": null, "gpu": null, "gpu_devices": null}
+  },
+  "container": {"detected": false, "kind": null, "virtual_machine": true, "hypervisor": null,
+                "cpu_quota": null, "memory_limit_bytes": null},
+  "device": "cpu", "threads": 4,      // the `device` setting; inference threads per worker
+  "notes": [],                        // e.g. a CPU quota below the thread count, a GPU the device setting does not use
+  "detected_at": "2026-11-14T13:31:24Z", "deep": false,
+  "summary": "4 cores (Intel(R) Xeon(R) Processor @ 2.10GHz, AMX), 15.7 GB RAM, no GPU found",
+  "speed": {
+    "factor": 1.0,                    // this machine against the reference machine; catalog RTFs are divided by it
+    "source": "heuristic",            // "benchmark" once the micro-benchmark has run
+    "spread": [0.5, 2.0],             // how far off it may be ([0.75, 1.33] with a benchmark)
+    "note": "estimated from the CPU (…), not measured; `bolo recommend --benchmark` measures it",
+    "benchmark": null,                // the stored result: {"workload","threads","ms","reference_ms","speed","at",…}
+    "reference": "4 vCPUs of an Intel Xeon at 2.1 GHz (AVX-512, AMX), no GPU, 4 inference threads"
+  }
+}
+```
+
+`POST /api/v1/hardware/benchmark`: runs the micro-benchmark on the server (a
+few seconds of CPU), stores it in `<data_dir>/hardware-benchmark.json` and
+answers `{"benchmark": {…}, "speed": {…}}`. Fits use it from then on.
+
+`GET /api/v1/recommendations?task=&language=&commercial=&local_only=&realtime=&max_size_mb=&limit=`:
+the models of a task, best fit for this machine first. `task` (required):
+`stt`, `tts`, `diarization`, `vad`, `turn`, `separation` or
+`speech-to-speech` (`s2s`); anything else is `400`. `realtime=true` ranks for
+live speech, `false` for batch work; `limit` cuts the list after ranking.
+
+```jsonc
+{
+  "query": {"task": "stt", "language": "hi", "commercial": false, "local_only": false, "realtime": null, "max_size_bytes": null},
+  "hardware": "4 cores (…), 15.7 GB RAM, no GPU found",
+  "speed": {…},                       // as in GET /api/v1/hardware
+  "default": "indicconformer-hi-community",   // the default pick, or null when nothing runs here
+  "recommended": ["indicconformer-hi-community", "…"],   // at most three, of different families
+  "total": 37,
+  "filtered_out": {"language": 93, "commercial": 0, "local_only": 0, "max_size": 0},   // hidden by YOUR filters
+  "note": null,                       // set when nothing keeps up with real time
+  "results": [{
+    "rank": 1, "id": "indicconformer-hi-community", "task": "stt", "family": "IndicConformer",
+    "engine": "sherpa-onnx", "tier": "balanced", "streaming": false, "languages": ["hi"],
+    "size_bytes": 197000000, "installed": false,
+    "license": "MIT", "commercial_use": true, "cloud": false, "validated": "cpu",
+    "quality": {"metric": "wer", "label": "word error rate", "value": 0.152,
+                "note": "measured by the maintainers on that model's own test audio; not comparable across models"},
+    "recommended": true, "default": true,
+    "fit": {…}                        // as on catalog entries
+  }]
+}
+```
+
+Hardware never removes a model from `results`: `total` plus the counts in
+`filtered_out` is every catalog model of the task, and the models that are
+unlikely to fit are at the end with their reason.
+
+`GET /api/v1/recommendations/setup?use=&language=&commercial=&local_only=`:
+one model per task for a use. `use`: `live` (STT and TTS for live speech,
+plus optional VAD and end of turn), `files` (STT, plus optional diarization)
+or `voiceover` (TTS). `local_only` defaults to `true` here.
+
+```jsonc
+{
+  "use": "live", "label": "Live conversation", "language": "hi", "commercial": false, "local_only": true,
+  "hardware": "…", "speed": {…},
+  "picks": [{"task": "stt", "optional": false, "realtime": true,
+             "model": {…},            // a row as in `results`, or null when nothing suits
+             "alternatives": [{…}],   // the other recommended ones
+             "note": null}],
+  "pull": ["indicconformer-hi-community", "piper-hi-in-rohan-medium", "silero-vad"],   // chosen and not installed
+  "download_bytes": 262000000
+}
+```
+
+`GET /api/v1/info` announces all of this as `capabilities.recommendations`
+(`restricts` is always `false`; `warnings` mirrors the `hardware_warnings`
+setting).
 
 ### Cloud providers
 
@@ -521,16 +753,17 @@ is `word` (whole words, any case; the default), `case`, `exact` (any substring) 
   → `400` naming the line. Publishes a `wordlist` event.
 - `DELETE /api/v1/wordlists/{name}` → `{"deleted": name}`; `404 wordlist_not_found` for an unknown list.
 - `POST /api/v1/wordlists/{name}/preview` with `{"text", "models": [up to 8 TTS ids], "language"?,
-  "voice"?, "input_format"?, "normalize"?}` → `{"previews": [{"model", "voice", "language",
-  "text_input", "normalizer", "text", "applied", "phonemes"?}]}`: exactly the text each voice would
+  "voice"?, "input_format"?, "normalize"?, "romanised"?}` → `{"previews": [{"model", "voice", "language",
+  "text_input", "normalizer", "text", "applied", "romanised", "phonemes"?}]}`: exactly the text each voice would
   receive (with `[word](/ipa/)` overrides for phoneme voices), the entries applied, and for phoneme
   voices the phonemes (one line per sentence) when a phonemiser is available. `name` `-` previews
   with the pinned and `default` lists only. Nothing is synthesised; send the same text to
   `/v1/audio/speech` with `wordlists` to hear it.
 - `GET /api/v1/text-input/{model}?voice=` → `{"model", "voice", "text_input": {"reads", "normalizer",
-  "markup", "latin", "respell", "digits", "wordlists", "pronunciation"}}`.
+  "markup", "latin", "respell", "digits", "wordlists", "romanised", "pronunciation"}}`.
 - `PUT /api/v1/models/{id}/settings` also takes `text_normalizer` (`uccharan`, `light`, `model`,
-  `none`) and `wordlists` (a list of names, pinned in that order); `null` removes a pin.
+  `none`), `wordlists` (a list of names, pinned in that order) and `romanised` (`off`, `auto`,
+  `on`); `null` removes a pin.
 
 ### `GET /api/v1/stats`
 
@@ -551,6 +784,9 @@ is `word` (whole words, any case; the default), `case`, `exact` (any substring) 
              "rejected": 0, "queue_ms": {"p50": 0.1, "p95": 38.0, "p99": 71.2}}
  }],
  "separation": {"requests": {"applied": 0, "partial": 0, "skipped": 0}, "audio_seconds": 0.0},
+ // phone calls: in progress, counted since the server started, and finished calls by provider and outcome
+ "telephony": {"active_calls": 0, "calls_total": 3,
+               "by_outcome": [{"provider": "twilio", "outcome": "caller_hangup", "calls": 3}]},
  // cloud providers, per provider and provider model (empty without cloud requests)
  "providers": [{"provider": "openai", "model": "whisper-1", "requests": 12, "errors": 0, "latency_ms_mean": 640.2,
                 "latency_ms_total": 7682.4, "bytes_sent": 3841024, "bytes_received": 2210, "audio_seconds": 120.0,
@@ -709,9 +945,10 @@ A connection produces one trace in `/api/v1/requests` (`request_id`), with
 Streaming synthesis with text that may arrive in pieces. Query parameters:
 `model`, `voice`, `format` (`pcm_s16le` default, `pcm_f32le`, `mulaw`, `alaw`,
 `wav`, `mp3`, `opus`, `flac`, `aac`), `sample_rate`, `speed`, `language`,
-`phonemizer`, `normalize` (`uccharan`, `light`, `model`, `none`/`false`) and
-`wordlists` (comma-separated names; an empty value applies none), as for
-`/v1/audio/speech`.
+`phonemizer`, `normalize` (`uccharan`, `light`, `model`, `none`/`false`),
+`wordlists` (comma-separated names; an empty value applies none) and
+`romanised` (`off`, `auto`, `on`), as for `/v1/audio/speech`. A `romanised=on`
+that cannot be done is an `error` message with code `component_missing`.
 
 Client → server (JSON): `{"type":"text","text":"…"}` (optionally
 `"flush": true`), `{"type":"flush"}`, `{"type":"stop"}`, `{"type":"ping"}`.
@@ -1018,12 +1255,52 @@ differences from OpenAI are in [voice-agents.md](voice-agents.md).
 | --- | --- |
 | `WS /v1/realtime?model=…` | OpenAI Realtime API over WebSocket (GA event names, as typed in `openai` 3.50.0). `?intent=transcription` or `session.update` with `type: "transcription"` for transcription-only sessions. Audio: base64 `audio/pcm` (24 kHz PCM16), `audio/pcmu`, `audio/pcma`. User transcripts arrive as incremental deltas. `turn_detection`: `server_vad`, `semantic_vad` (with the optional end-of-turn model) or `null`. Auth: `Authorization: Bearer`, or subprotocols `realtime` + `openai-insecure-api-key.<key>`; an ephemeral `ek_…` key is accepted in the same places. bolo extension `session.pipeline`: `cascade` (default, setting `realtime_pipeline`), `audio-llm` (an audio-understanding model hears the turn, bolo's TTS speaks) or `speech-to-speech` (a speech-to-speech model, first backend llama-server `/v1/realtime` with LFM3-Audio, answers with speech and tool calls; bolo keeps turn detection, barge-in, codecs and transcripts); see [voice-agents.md](voice-agents.md#pipelines-cascade-audio-in-language-model-speech-to-speech). `GET /api/v1/info` lists them under `capabilities.realtime.pipelines` |
 | `POST /v1/realtime/client_secrets` | mint an ephemeral key (`{"value": "ek_…", "expires_at", "session"}`) for browsers. Needs the server key. Body: `{"expires_after": {"anchor": "created_at", "seconds": 600}, "session": {…}}`, all optional |
-| `POST /v1/realtime/calls` | the same sessions over **WebRTC**: SDP offer in (`application/sdp`, or multipart `sdp` + `session`), `201` with the SDP answer and `Location: /v1/realtime/calls/{call_id}`. Needs `bolo-speech[webrtc]` (else `503 engine_unavailable`). `POST …/{call_id}/hangup` ends the call. Not implemented: SIP |
+| `POST /v1/realtime/calls` | the same sessions over **WebRTC**: SDP offer in (`application/sdp`, or multipart `sdp` + `session`), `201` with the SDP answer and `Location: /v1/realtime/calls/{call_id}`. Needs `bolo-speech[webrtc]` (else `503 engine_unavailable`). `POST …/{call_id}/hangup` ends the call. Not implemented: OpenAI's SIP connector (for phone calls see [Phone calls](#phone-calls)) |
 | `POST /v1/chat/completions` | `input_audio` content parts are transcribed; `modalities: ["text","audio"]` + `audio: {voice, format}` adds a spoken reply (`message.audio`, or `delta.audio` when streaming); everything else is forwarded to the language model untouched; requests without audio are proxied as they are |
 
-Voice-agent turns are traces of kind `agent` (transport `realtime` or `chat`)
-with `first_token_ms` and `ttfa_ms`; see
+Voice-agent turns are traces of kind `agent` (transport `realtime`, `webrtc`,
+`chat` or `telephony`) with `first_token_ms` and `ttfa_ms`; see
 [voice-agents.md](voice-agents.md#latency-and-where-to-look).
+
+## Phone calls
+
+Telephony providers and SIP trunks connected to voice agents; the full
+description (setup per provider, security, agents, the simulator, what was
+verified) is in [telephony.md](telephony.md).
+
+Called by the providers. **No API key**: each request is checked against the
+provider's signature (Twilio `X-Twilio-Signature`, Plivo
+`X-Plivo-Signature-V3`, Telnyx `telnyx-signature-ed25519`) or the Basic
+credentials it sends (Exotel), and a provider's routes answer
+`503 telephony_not_configured` until that check is possible or
+`telephony.validate_signatures = false`. A wrong signature answers `403`
+(`401` for Exotel) with code `invalid_signature`. These routes are not in the
+OpenAPI schema.
+
+| Endpoint | Summary |
+| --- | --- |
+| `POST /telephony/{provider}/voice[/{token}]` | the answer webhook. Returns TwiML `<Connect><Stream>` (Twilio), Plivo XML `<Stream bidirectional keepCallAlive>`, or `200 {}` after sending Telnyx the `answer` command; `GET /telephony/exotel/voice` returns `{"url": "wss://…"}`. `{token}` marks a call bolo placed |
+| `WS /telephony/{provider}/stream/{token}` | the media stream, in the provider's JSON framing. The one-time token comes from the answer webhook; without a valid one the handshake is refused (`403`). `WS /telephony/exotel/stream` takes Basic credentials instead |
+| `POST /telephony/{provider}/after/{token}` | what happens once bolo closed the stream: `<Hangup/>` or `<Dial>` (Twilio, Plivo); `GET /telephony/exotel/after` answers `200` (transfer) or `302` |
+| `POST /telephony/{provider}/status[/{token}]`, `POST /telephony/plivo/amd/{token}` | call-status and machine-detection callbacks |
+
+The operator's API:
+
+| Endpoint | Summary |
+| --- | --- |
+| `GET /api/v1/telephony` | `{public_base_url, validate_signatures, default_agent, providers: [{name, label, configured, exposed, problems, protection, can_validate, can_place_calls, machine_detection, ends_by, settings, webhooks: [{name, where, url, method}], stream_url, notes, docs_url}], agents, numbers, editable, edit_blocked_reason, llm_configured, stats, compliance_notice}`. `settings` shows `***` for a secret that is set, never a value |
+| `GET /api/v1/telephony/agents`, `GET` / `PUT` / `DELETE /api/v1/telephony/agents/{name}` | voice agents (fields in [telephony.md](telephony.md#agents)). `PUT` replaces the agent; agents from the configuration are read-only (`400`); stored in `<data_dir>/telephony.json` |
+| `GET /api/v1/telephony/numbers`, `PUT` / `DELETE /api/v1/telephony/numbers/{number}` | the called number → agent map; `PUT` body `{"agent": "<name>"}` |
+| `GET /api/v1/telephony/calls?limit=50&provider=&agent=&status=` | recent calls, newest first: `{calls: [{id, provider, direction, agent, from, to, status, outcome, duration_s, turns, interruptions, latency, summary, …}]}` |
+| `GET /api/v1/telephony/calls/{id}` | one call with `timeline`, `turns` (each with `latency: {endpoint_ms, stt_ms, llm_first_token_ms, tts_first_audio_ms, send_ms, total_ms, response_ms}`), `transcript` (`speaker`: `caller` / `agent`), `dtmf`, `transfer_to`, `summary`. `404` once it rotated out |
+| `POST /api/v1/telephony/calls` | place a call: `{"provider", "to", "agent", "from", "metadata"}` → `202` with the call record and a `compliance_notice`. `503 telephony_not_configured` names missing credentials; `502 telephony_provider_error` carries the provider's refusal (credentials removed) |
+| `POST /api/v1/telephony/calls/{id}/hangup` | end a call |
+| `GET /api/v1/telephony/scenarios`, `POST /api/v1/telephony/simulate` | the call simulator: `{"agent", "provider", "scenario", "noise_db"}` → a report `{passed, checks, caller: {utterances, response_ms, agent_audio_s, clears}, latency, outcome, record}`. Runs in real time (10 to 20 s per scenario) |
+
+`GET /api/v1/stats` has `telephony: {active_calls, calls_total, by_outcome}`;
+`/metrics` has `bolo_telephony_active_calls` and
+`bolo_telephony_calls_total{provider,outcome}`; `GET /api/v1/events` sends
+`{"type": "call", "event": "started" | "ended" | "summary" | "dialing", "call": {…}}`.
 
 ## Optional components
 
@@ -1032,8 +1309,19 @@ Pieces bolo can use but does not require: two phonemisers, **uccharan**
 (GPL-3.0-or-later, never installed by default; every other language), and
 engine plugins (`plugin:<name>`, [plugins.md](plugins.md)), which are listed so
 that a client can say what a model needs but are installed as packages.
-Find items by `id`; `kind` is `phonemizer`, `engine-plugin` or `tts-server`.
+Find items by `id`; `kind` is `phonemizer`, `language-pack`, `engine-plugin` or `tts-server`.
 `POST /api/v1/components/uccharan/install` needs no licence acceptance.
+
+The `language-pack` components are uccharan's romanised-text packs, one per language the
+installed uccharan lists: `uccharan-xlit-hi`, `uccharan-xlit-mr`, … (none when uccharan has no
+transliterator). They are data for the `romanised` option of text-to-speech, licensed
+CC BY-SA 4.0, so `POST /api/v1/components/uccharan-xlit-hi/install` needs
+`{"accept_license": true}` like eSpeak NG, and `bolo components install uccharan-xlit-hi
+--accept-license` does the same from the shell. The pack is downloaded by uccharan from its
+release, checked against the SHA-256 that is part of the installed uccharan, kept in uccharan's
+cache (`~/.cache/uccharan/<version>/`, or `$UCCHARAN_DATA_DIR` for machines without network
+access) and used without a restart. Without bolo:
+`python -c "import uccharan; uccharan.load_pack('xlit-hi')"`.
 
 The `tts-server` components are the speech servers of the `tts-server` engine:
 `llama-server` (llama.cpp, MIT) and `audio.cpp` (`audiocpp_server`,

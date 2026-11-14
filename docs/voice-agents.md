@@ -18,9 +18,11 @@ two interfaces that existing clients already use:
 
 Read this first:
 
-* **bolo is a cascade, not a speech-to-speech model.** The language model
-  receives text. It does not hear tone, laughter or hesitation, and it cannot
-  choose how something is said.
+* **By default bolo is a cascade, not a speech-to-speech model.** The language
+  model receives text. It does not hear tone, laughter or hesitation, and it
+  cannot choose how something is said. Two opt-in pipelines change that
+  ([below](#pipelines-cascade-audio-in-language-model-speech-to-speech)): a
+  language model that takes audio in, and a speech-to-speech model.
 * **The quality of the conversation is the quality of the model you connect.**
   bolo was developed with models of 360M and 500M parameters on a shared
   CPU, which is enough to prove that every part works and far too small to
@@ -76,7 +78,7 @@ Which models are used:
 | --- | --- | --- |
 | speech to text | `default_realtime_stt` (`moonshine-tiny-en`) in Realtime sessions, `default_stt` in chat completions | `session.audio.input.transcription.model` / the `transcription_model` body field |
 | language model | `llm_model` (if unset, the `model` the client sent is passed on) | configuration |
-| text to speech | `default_realtime_tts` (`piper-en-us-amy-low`) | `default_realtime_tts`; `speech_model` in chat completions; the voice with `session.audio.output.voice` / `audio.voice` (a Kokoro voice such as `af_heart` selects Kokoro); `session.audio.output.phonemizer` / `audio.phonemizer` |
+| text to speech | `default_realtime_tts` (`piper-en-us-amy-low`) | `default_realtime_tts`; `speech_model` in chat completions; the voice with `session.audio.output.voice` / `audio.voice` (a Kokoro voice such as `af_heart` selects Kokoro); `session.audio.output.phonemizer` / `audio.phonemizer`; `session.audio.output.romanised` / `audio.romanised` (`off`, `auto`, `on`: a language model that answers in romanised Hindi is read in Devanagari; api.md, "Romanised text") |
 
 Agents speak with the low-latency voice by default: Piper `amy` starts in
 about 150 ms per sentence (its phonemes come from uccharan, so nothing
@@ -417,9 +419,24 @@ turns completed over WebRTC and the reply, recorded from the incoming Opus
 track and transcribed again, matched the reply text with a word error rate of
 0, 0.18 and 0 (`docs/measurements/webrtc-real-models.json`). **No browser
 was used**: Chrome, Firefox and Safari are untested, as are NAT traversal,
-TURN and calls across the internet. **SIP is not implemented** and is out of
-scope for now; for telephony use the WebSocket transport with
-`audio/pcmu` (see [indic-telephony.md](indic-telephony.md)).
+TURN and calls across the internet. OpenAI's SIP connector for Realtime
+sessions (`sip:...@sip.api.openai.com`) is not implemented; phone calls have
+their own path, below.
+
+### Phone calls
+
+The same sessions answer and place phone calls: Twilio Media Streams, Plivo
+audio streams, Telnyx media streaming, the Exotel Voicebot applet and a
+minimal inbound SIP endpoint each bridge a call into a Realtime session
+(transport `telephony` on its traces). On top of what a session does anyway
+(turn detection, the pipelines, tools) a call gets named agents, a greeting,
+barge-in that clears the audio queued at the provider and truncates the
+assistant's message to what was heard, key presses, hang-up and transfer
+tools, silence prompts, a longest call length, voicemail handling on
+outbound calls and a per-call record with a latency breakdown. See
+[telephony.md](telephony.md). If you run your own media gateway instead, the
+WebSocket transport with `audio/pcmu` still works as before
+(see [indic-telephony.md](indic-telephony.md)).
 
 ### What is different from OpenAI, or missing
 
@@ -427,7 +444,7 @@ scope for now; for telephony use the WebSocket transport with
   (above). No emotional prosody control, no noise reduction. `semantic_vad` is an acoustic end-of-turn model added to
   silence detection (above), not OpenAI's.
 * Input transcription events are always sent (bolo has to transcribe anyway).
-* Not implemented: SIP, MCP tools, image input, `prompt`
+* Not implemented: OpenAI's SIP connector (bolo has its own telephony, [telephony.md](telephony.md)), MCP tools, image input, `prompt`
   templates, `reasoning`, `tracing`, `truncation` settings, log probabilities,
   DTMF, idle timeouts, rate-limit events, the realtime translation sessions.
   Unsupported settings in `session.update` are ignored unless they would

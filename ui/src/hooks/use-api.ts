@@ -4,7 +4,8 @@ import { toast } from 'sonner'
 import { api, ApiError, NetworkError } from '@/lib/api/client'
 import { isDemo } from '@/lib/api/config'
 import type { Catalog, CatalogModel, Component, Task } from '@/lib/api/types'
-import { providersOffered, wordListsAnnounced } from '@/lib/capabilities'
+import { providersOffered, recommendationsOffered, telephonyOffered, wordListsAnnounced } from '@/lib/capabilities'
+import { warningText } from '@/lib/fit'
 import { live } from '@/lib/live'
 import type { NavFeatures } from '@/lib/nav'
 import { prefs, setPref } from '@/lib/prefs'
@@ -100,10 +101,62 @@ export function useProviders() {
   return { ...q, offered }
 }
 
+/** The server's machine (`GET /api/v1/hardware`); never asked for in the live demo, whose machine is the browser. */
+export function useHardware() {
+  const offered = recommendationsOffered(useInfo().data) && !isDemo
+  const q = useQuery({
+    queryKey: ['hardware'],
+    queryFn: ({ signal }) => api.hardware(false, signal),
+    staleTime: 60_000,
+    retry: false,
+    enabled: offered,
+  })
+  return { ...q, offered }
+}
+
 /** Which optional screens this server has. */
 export function useNavFeatures(): NavFeatures {
   const info = useInfo().data
-  return { wordLists: useWordLists().offered, providers: providersOffered(info) }
+  return {
+    wordLists: useWordLists().offered,
+    providers: providersOffered(info),
+    telephony: telephonyOffered(info) && !isDemo,
+  }
+}
+
+/** Phone calls: providers, agents, numbers (`GET /api/v1/telephony`); only asked for when the server has them. */
+export function useTelephony() {
+  const offered = telephonyOffered(useInfo().data)
+  const q = useQuery({
+    queryKey: ['telephony'],
+    queryFn: ({ signal }) => api.telephony(signal),
+    staleTime: 10_000,
+    retry: false,
+    enabled: offered && !isDemo,
+  })
+  return { ...q, offered }
+}
+
+/** Recent calls, refreshed while the screen is open (calls in progress change by the second). */
+export function useCalls(enabled = true) {
+  return useQuery({
+    queryKey: ['calls'],
+    queryFn: ({ signal }) => api.calls({ limit: 50 }, signal),
+    refetchInterval: 3000,
+    retry: false,
+    enabled: enabled && !isDemo,
+  })
+}
+
+export function useCall(id: string | null) {
+  return useQuery({
+    queryKey: ['call', id],
+    queryFn: ({ signal }) => api.call(id as string, signal),
+    enabled: id != null,
+    retry: false,
+    refetchInterval: (q) =>
+      q.state.data && q.state.data.status === 'ended' && q.state.data.summary !== null ? false : 2000,
+  })
 }
 
 export function useSamples() {
@@ -164,15 +217,20 @@ export function useModelActions() {
     mutationFn: (id: string) => api.pull(id),
     onSuccess: (res, id) => {
       patch(id, (m) => ({ ...m, pulling: { job_id: res.job_id, progress: 0 } }))
-      toast.info(`Pulling ${id}`, { description: 'You can keep working; progress shows on the model.' })
+      const warning = warningText(res.warnings)
+      // a notice, not a refusal: the download has started either way
+      if (warning) toast.warning(`Pulling ${id} anyway`, { description: warning, duration: 12_000 })
+      else toast.info(`Pulling ${id}`, { description: 'You can keep working; progress shows on the model.' })
     },
     onError: (err, id) => toast.error(`Could not pull ${id}`, { description: describeError(err) }),
   })
   const load = useMutation({
     mutationFn: (id: string) => api.load(id),
-    onSuccess: (_r, id) => {
+    onSuccess: (res, id) => {
       patch(id, (m) => ({ ...m, loaded: true }))
-      toast.success(`${id} loaded`)
+      const warning = warningText(res?.warnings)
+      if (warning) toast.warning(`${id} loaded`, { description: warning, duration: 12_000 })
+      else toast.success(`${id} loaded`)
     },
     onError: (err, id) => toast.error(`Could not load ${id}`, { description: describeError(err) }),
     onSettled: refresh,

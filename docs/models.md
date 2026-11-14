@@ -11,7 +11,13 @@ bolo list --all -q hindi        # filter
 bolo show kokoro-v1.0-int8      # one entry, with its source and voices
 bolo pull moonshine-tiny-en     # download
 bolo pull hf:owner/repo         # any compatible model that is not in the catalog
+bolo recommend --task stt       # the same models, ranked for the machine you are on
 ```
+
+Which of these suit your machine is a separate question, answered by
+`bolo recommend`, the `fit` on every catalog entry and the console's Models
+screen: see [recommendations.md](recommendations.md). That is advice only;
+nothing in the catalog is hidden or refused because of hardware.
 
 ## What "validated" means
 
@@ -1785,8 +1791,8 @@ was measured for each language. In short:
 * **Text to speech** for Hindi, Bengali, Telugu, Tamil, Malayalam, Marathi,
   Urdu, Nepali, Gujarati, Kannada, Maithili, Bhojpuri, Magahi and
   Chhattisgarhi (the SYSPIN voices are published). Non-commercial MMS-TTS
-  voices for Punjabi, Odia, Assamese, Dogri and more are converted and wait
-  for publication. **No voice** that runs without PyTorch for Sanskrit,
+  voices for Punjabi, Odia, Assamese, Dogri and more are converted and
+  published. **No voice** that runs without PyTorch for Sanskrit,
   Sindhi, Kashmiri, Konkani, Manipuri, Bodo and Santali.
 * **Bhojpuri** has no speech-to-text model of its own here; the Hindi model
   is the best we measured (41 % word error rate on 120 utterances), better than
@@ -1833,6 +1839,35 @@ not what the voices were trained on), `espeak-ng`, `auto`. Asking for espeak-ng 
 installed answers `424 component_missing`; asking for uccharan in a language it does not cover
 answers `400` with the list of languages it does cover. Each catalog entry lists the choices for
 its voice in `phonemizers` (`[{id, available, default, note}]`; for Kokoro per voice).
+
+### Text normalisation, word lists and romanised text
+
+uccharan is also bolo's text normaliser, apart from phonemes. For voices that read text themselves
+(`tts-server` models, Orpheus-family voices on llama.cpp, plugin voices) its normalise-only mode
+writes numbers, money, dates, times, phone numbers, units, abbreviations, URLs and email addresses
+out in words in the voice's language, and pronunciation word lists (`/api/v1/wordlists`) set how
+names, brands and jargon are said for every kind of voice: as phonemes, as `[word](/ipa/)` markup
+or as a respelling, whichever the voice can take. Each voice's text-input record says which
+(`GET /api/v1/text-input/{model}`; api.md, "Text preparation, SSML and pronunciation word lists").
+
+**Romanised text** is the third part: an Indian language typed in Latin letters ("mujhe kal
+office jana hai") is written in the voice's script ("मुझे कल office जाना है") before the
+normaliser and the phonemiser see it; English words are left as English. It applies to every
+kind of voice (phonemes, text, characters) because it runs first.
+
+| | |
+| --- | --- |
+| Modes | `off` (the default), `auto` (when the voice speaks an Indian language and at least 60 % of the letters are Latin), `on` |
+| Where it is set | per request (`romanised` in `/v1/audio/speech`, `?romanised=` on the TTS WebSocket, `session.audio.output.romanised`, `audio.romanised` in chat completions, `romanised` on a telephony agent, `bolo speak --romanised`); per model (`PUT /api/v1/models/{id}/settings` with `{"romanised": "auto"}`, or the catalog option `romanised`); server-wide (the `romanised` setting) |
+| What it needs | uccharan 0.4 or later (0.3.0 and older have no transliterator) and the language's pack |
+| Packs | `xlit-<language>`; uccharan lists Hindi, Marathi, Bengali, Tamil, Telugu, Gujarati, Punjabi, Kannada and Malayalam. **CC BY-SA 4.0** (built from the Dakshina and Aksharantar word lists), unlike uccharan itself (Apache-2.0), so a pack is only installed on request: `bolo components install uccharan-xlit-hi --accept-license`, the console's Components screen, or `python -c "import uccharan; uccharan.load_pack('xlit-hi')"` |
+| When something is missing | the text is spoken as written and the request's trace says what is missing and how to install it; only a request that itself says `"romanised": "on"` is refused (`424 component_missing`) |
+
+Not converted: words that have a pronunciation of their own (word lists, inline
+`pronunciations`, `[word](/ipa/)`), URLs and email addresses. What is not known: how good the
+conversion sounds on bolo's voices. The transliterator's accuracy is measured in uccharan's own
+documentation; in bolo the option was tested with a stand-in transliterator and against a development
+build of uccharan (after 0.3.0) with its Hindi pack, and no listening or round-trip test of converted text was made.
 
 ### Measured: uccharan against espeak-ng, voice by voice
 

@@ -6,6 +6,18 @@ Against a server with cloud providers it also has a Providers screen (add, edit 
 provider; the key field is write-only), a "Cloud" mark and filter on the Models screen, and a
 Compare screen that sends the same audio or text to several models, local and cloud, and shows
 output, latency and estimated cost side by side.
+Against a server with phone-call support it has a Phone screen: each telephony provider's state
+and the webhook addresses to paste into its dashboard, agents and the number → agent map, recent
+calls with per-turn latency, transcript and timeline, and a button that simulates a call.
+Against a server that rates its catalog for its own hardware, the Models screen shows a "This
+machine" card, a fit line and a "Recommended for this machine" badge on models, a "best for this
+machine" sort, an optional toggle that hides the models unlikely to fit (off by default: hardware
+only reorders and highlights), and "Pick for me", which proposes models for a language and a use
+and pulls them in one click. The console never disables a model because of hardware.
+Against a server that announces romanised-text support, the Text to speech screen offers a
+"Romanised text" choice for voices of Indian languages (off, automatic, always), a model's
+settings can pin it, and a request's "What the voice received" says what was converted, or why
+nothing was.
 
 It is a static single-page app (React, TypeScript, Vite, Tailwind CSS, shadcn/ui, Recharts). The
 production bundle is written to `../server/src/bolo/_ui/` and served by the bolo server at `/`, so
@@ -94,6 +106,7 @@ storage key at run time, to point the console at a different origin.
 - The Models screen lists the browser models (download and cache state, size, licence) and a
   read-only snapshot of a server's catalog, `src/demo/catalog-snapshot.json`, labelled "available
   when you run the server". Refresh it with `node scripts/export-catalog.mjs --base <server>`.
+  The snapshot carries no hardware fit and the demo shows none: its machine is the visitor's browser.
 - Text to speech runs in the page too: nine voices (Hindi, Maithili, Bhojpuri, Marathi, Kannada,
   Indian and US English) with ONNX Runtime Web, sentence-by-sentence playback, time to first audio,
   real-time factor and a round trip through the in-browser recogniser. The voices are published
@@ -151,6 +164,7 @@ src/
   lib/browser-stt/  web worker running Moonshine with ONNX Runtime Web (WebGPU or WebAssembly)
   lib/compare.ts    the Compare screen's runs: one request per model, timings and cost from its trace
   lib/cost.ts       price tables and estimated-cost formatting; lib/providers.ts: the provider form
+  lib/telephony.ts  the Phone screen's agent form, outcome labels and per-turn latency shares
   lib/browser-tts/  in-browser voices: text front end, numbers, worker running VITS with ONNX Runtime Web
   vendor/uccharan/  vendored text-to-phoneme library (Apache-2.0) for the Piper voice
 scripts/voices/     prepares the voices the live demo publishes (shrink, check, index)

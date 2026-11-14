@@ -32,6 +32,7 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `default_tts` | `kokoro-v1.0-int8` | `--default-tts` | the quality voice: requests that name no model, `tts-1-hd`, `gpt-4o-mini-tts` |
 | `default_realtime_tts` | `piper-en-us-amy-low` | | the low-latency voice: `tts-1`, `model=realtime`, voice agents (Realtime API conversations, `/v1/chat/completions` audio without `speech_model`) and Wyoming synthesis without a voice. A voice that only `default_tts` has (e.g. `af_heart`) still selects `default_tts`. See models.md, "Default voices" |
 | `phonemizer` | `auto` | | who turns text into phonemes for Piper, Kitten, Matcha and Kokoro voices: `auto` (uccharan where it covers the voice's language: English US/GB and Hindi; espeak-ng otherwise), `uccharan` (never espeak-ng), `espeak-ng` (as in bolo 0.1). Requests (`phonemizer` field) and per-model pins (`bolo models config <id> --phonemizer …`, `PUT /api/v1/models/{id}/settings`, stored in `<data_dir>/model-settings.json`) override it. See models.md, "Phonemisers" |
+| `romanised` | `off` | | romanised text for text-to-speech: an Indian language typed in Latin letters is written in the voice's script before it is read. `off`; `auto` (when the voice speaks an Indian language and the text is mostly Latin script); `on`. A request (`romanised`) and a model pin override it. Needs a uccharan release with a transliterator and the language's pack (component `uccharan-xlit-<language>`, CC BY-SA 4.0); when one is missing the text is passed on unchanged with a notice in the request's trace. See api.md, "Romanised text" |
 | `default_vad` | `silero-vad` | | detector for long-file segmentation and realtime endpointing |
 | `default_diarization` | `pyannote-3.0-eres2net` | | speaker-diarization model used when a request names none; `nemotron-3-diarization` is the end-to-end alternative (models.md, "Speaker diarization") |
 | `diarization_min_speaker_s` | `3` | | after clustering, a "speaker" with less speech than this in the whole recording (and never more than a tenth of the speech) is folded into the most similar speaker; `0` switches it off. Not applied to `nemotron-3-diarization`, whose speakers come from the model rather than from clustering. See api.md, "How many speakers" |
@@ -95,6 +96,13 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `fallbacks` | `[]` | | `"<model>=<fallback>[,<fallback>…]"` per model: what answers instead when the model's engine is unavailable, its queue is full, or its provider fails (5xx, timeout, rate limit). Local and cloud models can be mixed (`"whisper-base=openai-whisper-1"`, `"sarvam-saaras-v4=whisper-base"`). A pin through `PUT /api/v1/models/{id}/settings` wins; a catalog entry's `options.fallback` is the default. See providers.md, "Fallback" |
 | `allow_provider_edit` | unset | | add, change and remove providers through the API and the console (stored in `<data_dir>/providers.json`, mode 0600). Unset: allowed on a loopback bind or with `api_key`; never on a non-loopback bind without one |
 | `provider_timeout_s` | `60` | | longest wait for a cloud provider's answer, or for its next bytes while streaming (a provider or model option `timeout_s` overrides it) |
+| `telephony` | `{}` | | phone calls: a `[telephony]` table with `public_base_url` (the `https://` address providers reach this server at), `validate_signatures` (default `true`; the provider endpoints stay closed until requests can be checked, unless this is `false`), `default_agent`, `call_buffer` (call records kept, default 200), and the tables `[telephony.providers.<twilio\|plivo\|telnyx\|exotel>]` (credentials), `[telephony.agents.<name>]` (voice agents) and `[telephony.numbers]` (`"<called number>" = "<agent>"`). In the environment: `BOLO_TELEPHONY` (the table as JSON), `BOLO_TELEPHONY_PUBLIC_BASE_URL`, `BOLO_TELEPHONY_DEFAULT_AGENT`, `BOLO_TELEPHONY_VALIDATE_SIGNATURES`, `BOLO_TELEPHONY_<PROVIDER>_<FIELD>` (these add to the file's table). Credentials are never logged or returned by any API. Every field: [telephony.md](telephony.md) |
+| `hardware_warnings` | `true` | | attach a notice when a model that is pulled or loaded is unlikely to fit this machine or to run in real time: a `warnings` list in the answers of `POST /api/v1/models/pull` and `/load`, on the job and on request traces, a log line, a `warning:` line from `bolo pull`, a notice in the console. Notices only: nothing is ever refused, hidden or slowed down, with the setting on or off. `false` removes the notices; the `fit` on catalog entries and `bolo recommend` stay. See [recommendations.md](recommendations.md) |
+| `sip` | `false` | | listen for inbound SIP calls from a trunk or PBX (UDP, G.711 RTP; needs `bolo-speech[sip]`). See telephony.md, "SIP" |
+| `sip_host`, `sip_port` | `0.0.0.0`, `5060` | | the SIP listening address (UDP) |
+| `sip_public_ip` | unset | | the media address written into SDP answers; unset: the local address the INVITE reached. Set it behind NAT |
+| `sip_allowed_ips` | `[]` | | source addresses and networks (`"203.0.113.10"`, `"10.0.0.0/8"`) allowed to send SIP requests; empty: loopback only. There is no other authentication |
+| `sip_rtp_port_min`, `sip_rtp_port_max` | `40000`, `40100` | | UDP port range for RTP, one port per call |
 
 Four more environment variables are read outside the settings object. `BOLO_UCCHARAN=off` hides an installed
 uccharan (to test the espeak-ng route). For
@@ -139,6 +147,21 @@ api_key = "…"                         # or BOLO_PROVIDER_SARVAM_API_KEY in the
 
 [providers.sarvam.prices]             # optional, for cost estimates: what you pay
 "saaras:v4" = { per_hour = 30, currency = "INR" }
+
+# phone calls: docs/telephony.md
+[telephony]
+public_base_url = "https://voice.example.org"
+default_agent = "front-desk"
+
+[telephony.providers.twilio]
+auth_token = "…"                      # or BOLO_TELEPHONY_TWILIO_AUTH_TOKEN in the environment
+
+[telephony.agents.front-desk]
+instructions = "You answer the phone for Example Clinic."
+greeting = "Example Clinic, how can I help?"
+
+[telephony.numbers]
+"+14155550100" = "front-desk"
 ```
 
 `fallbacks = ["whisper-base=openai-whisper-1"]` and the other top-level
@@ -149,8 +172,9 @@ Section names are mostly for your own orientation: `[models]`, `[scheduler]`
 and so on are flattened, so every key must be one of the settings above.
 The one rule: if `<section>_<key>` is a setting, that is what is set, so
 `[llm]` with `base_url`, `model`, `api_key` means `llm_base_url`, `llm_model`,
-`llm_api_key`. `[providers.<name>]` tables are the exception: they stay
-nested and make up the `providers` setting.
+`llm_api_key`. `[providers.<name>]` tables and the `[telephony]` table are
+the exceptions: they stay nested and make up the `providers` and `telephony`
+settings.
 An unknown key is an error.
 
 ## speaches environment variables
@@ -198,8 +222,10 @@ when the voice's front end takes `[word](/ipa/)` markup; default `none`),
 IPA; `latin-plain` when the entry also sets `lowercases: true`), `numbers` (the
 language that reads digits, e.g. `hi`; default: the request language, English
 next to English words) and `wordlists` (lists applied to every request for the
-model). `text_normalizer` and `wordlists` can also be pinned at run time with
-`PUT /api/v1/models/{id}/settings`, which wins over the catalog.
+model) and `romanised` (`off`, `auto` or `on` for this model's voices; default: the
+server's `romanised` setting). `text_normalizer`, `wordlists` and `romanised` can
+also be pinned at run time with `PUT /api/v1/models/{id}/settings`, which wins
+over the catalog.
 
 Pronunciation word lists are files in `<data_dir>/wordlists/<name>.tsv`
 (uccharan's TSV format; manage them with `/api/v1/wordlists`); the list named

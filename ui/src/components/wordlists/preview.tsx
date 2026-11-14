@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { describeError } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { romanisedSummary } from '@/lib/romanised'
 import type { CatalogModel, WordListPreview } from '@/lib/api/types'
 import { OverrideText } from './override-text'
 
@@ -209,6 +210,11 @@ export function WordListPreviewPane({
                   </Button>
                 </div>
                 <OverrideText text={p.text} />
+                {p.romanised && (
+                  <p className="mt-1.5 text-xs text-muted-foreground" data-testid="preview-romanised">
+                    {romanisedSummary(p.romanised)}
+                  </p>
+                )}
                 {p.phonemes && (
                   <pre className="mt-1.5 overflow-x-auto rounded-md bg-muted/50 px-2 py-1 num text-[12px] leading-5 whitespace-pre-wrap">
                     {p.phonemes}

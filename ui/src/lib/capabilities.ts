@@ -245,6 +245,16 @@ export function wordListsAnnounced(info: ServerInfo | undefined): boolean | null
   return info?.capabilities && 'providers' in info.capabilities ? false : null
 }
 
+/** Whether the server can connect phone calls to voice agents (the Phone screen). */
+export function telephonyOffered(info: ServerInfo | undefined): boolean {
+  return Boolean(info?.capabilities?.telephony)
+}
+
+/** Whether the server describes its hardware and rates models for it (the fit line, the hardware card). */
+export function recommendationsOffered(info: ServerInfo | undefined): boolean {
+  return Boolean(info?.capabilities?.recommendations)
+}
+
 /** Whether the server has cloud providers (the Providers screen and cost estimates). */
 export function providersOffered(info: ServerInfo | undefined): boolean {
   return Boolean(info?.capabilities?.providers)

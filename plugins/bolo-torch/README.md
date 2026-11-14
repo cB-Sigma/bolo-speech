@@ -4,7 +4,7 @@ The PyTorch engine plugin for [bolo](https://github.com/cb-Sigma/bolo), the torc
 
 bolo never imports PyTorch. When a catalog entry says `engine: plugin:torch`, bolo starts this package in a
 separate process (`python -m bolo_torch`) and talks to it over the plugin protocol
-([docs/plugins.md](../../docs/plugins.md)): it loads models there, streams synthesis back sentence by sentence,
+([docs/plugins.md](https://github.com/cB-Sigma/bolo/blob/main/docs/plugins.md)): it loads models there, streams synthesis back sentence by sentence,
 restarts the process if it crashes and stops it when it has been idle. Everything else (queues, traces, metrics,
 the console, the OpenAI-compatible API) works as for bolo's own engines.
 
@@ -35,9 +35,11 @@ The DiCoW models are bolo `stt` models that are *speaker-conditioned*: in a diar
 plugin with the speakers' frame activity, and the model transcribes it once per speaker. Overlapping speech is
 transcribed for each speaker instead of being cut at turn boundaries. Without diarization they work as an
 ordinary (slow) Whisper. See "DiCoW" below and docs/models.md, "Diarization-conditioned recognition".
+DiCoW v3.3 also runs without PyTorch, in bolo's own process, as the catalog entry `dicow-v3.3-onnx`
+(docs/models.md, "DiCoW without PyTorch").
 
-The catalog also lists `sravaani-1.0` and `indicconformer-600m-official` for this plugin. bolo-torch 0.1.0 does
-not implement them; loading one answers `400 invalid_request` saying so.
+The catalog also lists `sravaani-1.0` and `indicconformer-600m-official` for this plugin. bolo-torch does
+not implement them yet; loading one answers `400 invalid_request` saying so.
 
 ### How each family runs
 

@@ -23,6 +23,8 @@ class Job:
     result: dict[str, Any] | None = None
     created: float = field(default_factory=time.time)
     cancel_requested: bool = False
+    #: notices about the job (a model that is unlikely to fit this machine); they never stop it
+    warnings: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -37,6 +39,8 @@ class Job:
         }
         if self.result is not None:
             out["result"] = self.result
+        if self.warnings:
+            out["warnings"] = self.warnings
         return out
 
 

@@ -92,7 +92,10 @@ def test_cli_list_show(cli_env: Path, capsys: pytest.CaptureFixture[str]) -> Non
     models = json.loads(capsys.readouterr().out)["models"]
     assert {m["id"] for m in models} >= {"silero-vad"} and all(m["task"] == "vad" for m in models)
     assert main(["list", "-a", "-q", "hindi"]) == 0
-    assert "piper-hi-in-rohan-medium" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "piper-hi-in-rohan-medium" in out
+    header = out.splitlines()[0].split()
+    assert header[:7] == ["ID", "TASK", "TIER", "ENGINE", "LANG", "SIZE", "FIT"]  # how each suits this machine
     assert main(["show", "moonshine-tiny"]) == 0
     shown = json.loads(capsys.readouterr().out)
     assert shown["id"] == "moonshine-tiny-en" and shown["source"]["repo"] and shown["kind"] == "moonshine"

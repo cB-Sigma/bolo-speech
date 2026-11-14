@@ -8,6 +8,7 @@ import {
   Gauge,
   MessagesSquare,
   Mic,
+  Phone,
   Plug,
   Puzzle,
   type LucideIcon,
@@ -18,6 +19,8 @@ export interface NavFeatures {
   wordLists: boolean
   /** Cloud providers behind `engine: remote` models. */
   providers?: boolean
+  /** Phone calls through telephony providers. */
+  telephony?: boolean
 }
 
 export interface NavItem {
@@ -122,6 +125,15 @@ export const NAV: NavItem[] = [
     icon: Cloud,
     group: 'Server',
     when: (f) => Boolean(f.providers),
+  },
+  {
+    to: '/phone',
+    label: 'Phone',
+    short: 'Phone',
+    description: 'Phone calls: providers, agents, numbers and recent calls',
+    icon: Phone,
+    group: 'Server',
+    when: (f) => Boolean(f.telephony),
   },
 ]
 

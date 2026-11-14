@@ -5,7 +5,7 @@ Lists live in ``<data_dir>/wordlists/<name>.tsv`` (see :mod:`bolo.text.wordlists
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
@@ -79,6 +79,11 @@ class PreviewRequest(BaseModel):
     voice: str | None = Field(default=None, description="Voice id, for models whose voices differ.")
     input_format: str = Field(default="text", description="text, ssml or markdown.")
     normalize: bool | str = True
+    romanised: bool | Literal["off", "auto", "on"] | None = Field(
+        default=None,
+        description="off, auto or on (default: each model's setting). The preview never refuses: when the conversion "
+        "cannot happen the item's `romanised.notice` says why.",
+    )
 
 
 def _phonemes(core: Any, spec: Any, voice: str | None, text: str) -> str | None:
@@ -116,7 +121,7 @@ async def preview(request: Request, name: str, body: PreviewRequest) -> JSONResp
         cap = text_input(core, spec, voice)
         prepared = prepare(
             core, spec, voice, body.text, lang, normalize=body.normalize, wordlists=lists,
-            input_format=body.input_format,
+            input_format=body.input_format, romanised=body.romanised, romanised_strict=False,
         )  # fmt: skip
         item: dict[str, Any] = {
             "model": spec.id,
@@ -126,6 +131,7 @@ async def preview(request: Request, name: str, body: PreviewRequest) -> JSONResp
             "normalizer": prepared.normalizer,
             "text": prepared.text,
             "applied": prepared.applied,
+            "romanised": prepared.romanised,
         }
         if cap.reads == "phonemes":
             item["phonemes"] = _phonemes(core, spec, voice, prepared.text)

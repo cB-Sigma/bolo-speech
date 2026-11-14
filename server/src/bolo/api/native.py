@@ -19,6 +19,8 @@ from bolo.errors import BoloError, InvalidRequest, ModelNotFound
 from bolo.obs.metrics import render_metrics
 from bolo.providers import DEFAULT_BASE_URLS, TERMS
 from bolo.providers import KINDS as PROVIDER_KINDS
+from bolo.recommend import TASKS as RECOMMEND_TASKS
+from bolo.recommend import USES, Query, normalize_task
 from bolo.text.wordlists import check_name as check_wordlist_name
 
 router = APIRouter(prefix="/api/v1")
@@ -37,6 +39,93 @@ async def catalog(
     core = get_core(request)
     flag = parse_bool(installed) if installed not in (None, "") else None
     return JSONResponse({"models": core.catalog_api(task or None, q, flag)})
+
+
+@router.get("/hardware", tags=["native"], summary="This machine: CPU, memory, disk, GPUs, runtimes, container limits")
+async def hardware(request: Request, refresh: str | None = None) -> JSONResponse:
+    """What bolo detected, best effort: a value it could not read is ``null`` (unknown). ``refresh=true`` looks
+    again and also runs the slower probes (the torch plugin's device, server binaries). ``speed`` says how fast
+    this machine is against the one the catalog was measured on, and whether that was measured (the
+    micro-benchmark) or estimated. Nothing here restricts what can be pulled or loaded."""
+    core = get_core(request)
+    again = parse_bool(refresh) if refresh not in (None, "") else False
+    return JSONResponse(await asyncio.to_thread(core.advisor.hardware_api, again))
+
+
+@router.post("/hardware/benchmark", tags=["native"], summary="Run the micro-benchmark (a few seconds of CPU)")
+async def hardware_benchmark(request: Request) -> JSONResponse:
+    """Times a tiny fixed workload, stores the result in the data directory and scales the catalog's measured
+    real-time factors with it from then on (``bolo recommend --benchmark`` does the same)."""
+    core = get_core(request)
+    result = await asyncio.to_thread(core.advisor.benchmark)
+    return JSONResponse({"benchmark": result, "speed": core.advisor.speed().to_dict()})
+
+
+def _recommend_query(
+    task: str,
+    language: str | None,
+    commercial: str | None,
+    local_only: str | None,
+    realtime: str | None,
+    max_size_mb: float | None,
+) -> Query:
+    name = normalize_task(task)
+    if name not in RECOMMEND_TASKS:
+        raise InvalidRequest(f"unknown task {task!r}; use one of: {', '.join(RECOMMEND_TASKS)}", param="task")
+    if max_size_mb is not None and max_size_mb <= 0:
+        raise InvalidRequest("max_size_mb must be positive", param="max_size_mb")
+    return Query(
+        task=name,
+        language=(language or "").strip() or None,
+        commercial=parse_bool(commercial) if commercial not in (None, "") else False,
+        local_only=parse_bool(local_only) if local_only not in (None, "") else False,
+        realtime=parse_bool(realtime) if realtime not in (None, "") else None,
+        max_size_bytes=int(max_size_mb * 1024 * 1024) if max_size_mb is not None else None,
+    )
+
+
+@router.get("/recommendations", tags=["native"], summary="Catalog models for a task, ranked for this machine")
+async def recommendations(
+    request: Request,
+    task: str,
+    language: str | None = None,
+    commercial: str | None = None,
+    local_only: str | None = None,
+    realtime: str | None = None,
+    max_size_mb: float | None = None,
+    limit: int | None = None,
+) -> JSONResponse:
+    """Every model of the task that passes the filters asked for, best fit first. Hardware never removes a
+    model from the list: the ones that are unlikely to fit sort last, each with the reason. ``realtime=true``
+    ranks for live speech, ``realtime=false`` for batch work (files, voice-over)."""
+    core = get_core(request)
+    query = _recommend_query(task, language, commercial, local_only, realtime, max_size_mb)
+    return JSONResponse(await asyncio.to_thread(core.advisor.recommend, query, limit if limit and limit > 0 else None))
+
+
+@router.get("/recommendations/setup", tags=["native"], summary="A set of models for one use and language")
+async def recommendations_setup(
+    request: Request,
+    use: str = "live",
+    language: str | None = None,
+    commercial: str | None = None,
+    local_only: str | None = None,
+) -> JSONResponse:
+    """``use`` is ``live`` (conversation: STT and TTS that keep up with speech, plus VAD and end of turn),
+    ``files`` (transcription: STT, plus diarization) or ``voiceover`` (TTS). The answer names one model per
+    task with alternatives, and lists what would have to be pulled. Local models unless ``local_only=false``."""
+    core = get_core(request)
+    if use not in USES:
+        raise InvalidRequest(f"unknown use {use!r}; use one of: {', '.join(USES)}", param="use")
+    return JSONResponse(
+        await asyncio.to_thread(
+            core.advisor.setup,
+            use,
+            (language or "").strip() or None,
+            parse_bool(commercial) if commercial not in (None, "") else False,
+            parse_bool(local_only) if local_only not in (None, "") else True,
+        )
+    )
 
 
 class PullRequest(BaseModel):
@@ -66,8 +155,13 @@ async def pull(request: Request, body: PullRequest) -> JSONResponse:
         raise InvalidRequest(
             "local directories are registered from the command line (bolo pull ./dir), not over HTTP", param="id"
         )
+    # how the model suits this machine is worked out off the event loop, before the pull's notices are read
+    await asyncio.to_thread(core.advisor.fits, True)
     job = core.start_pull(name)
-    return JSONResponse({"job_id": job.id}, status_code=202)
+    body_out: dict[str, Any] = {"job_id": job.id}
+    if job.warnings:  # notices only (the model is unlikely to fit this machine): the pull has started
+        body_out["warnings"] = job.warnings
+    return JSONResponse(body_out, status_code=202)
 
 
 @router.get("/jobs/{job_id}", tags=["native"], summary="Poll a background job")
@@ -97,6 +191,12 @@ class ModelSettingsRequest(BaseModel):
     wordlists: list[str] | None = Field(
         default=None,
         description="Pin pronunciation word lists to the model, highest priority first; null removes the pin.",
+    )
+    romanised: Literal["off", "auto", "on"] | None = Field(
+        default=None,
+        description="Pin how the model's voices take romanised text (an Indian language typed in Latin letters): off, "
+        "auto (convert to the voice's script when the text is mostly Latin) or on; null removes the pin (the server's "
+        "`romanised` setting applies).",
     )
     fallback: list[str] | None = Field(
         default=None,
@@ -219,9 +319,13 @@ async def load(request: Request, model_id: str) -> JSONResponse:
     core = get_core(request)
     core.require_components(core.manager.resolve(model_id))
     entry = await core.manager.load(model_id)
-    return JSONResponse(
-        {"id": entry.id, "loaded": True, "memory_bytes": entry.memory_bytes, "load_ms": round(entry.load_ms, 1)}
-    )
+    out: dict[str, Any] = {
+        "id": entry.id, "loaded": True, "memory_bytes": entry.memory_bytes, "load_ms": round(entry.load_ms, 1)
+    }  # fmt: skip
+    warnings = await asyncio.to_thread(core.advisor.warnings, entry.spec)
+    if warnings:  # notices only: the model is loaded
+        out["warnings"] = warnings
+    return JSONResponse(out)
 
 
 @router.post("/models/{model_id:path}/unload", tags=["native"], summary="Unload a model from memory")
