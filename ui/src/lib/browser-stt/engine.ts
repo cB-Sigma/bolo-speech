@@ -6,7 +6,7 @@ import {
   releaseRuntime,
   requireOneRuntime,
 } from '@/lib/browser-runtime'
-import { pageMemoryBytes, rememberMeasured } from '@/lib/device'
+import { pageMemoryBytes, peakFor, rememberMeasured } from '@/lib/device'
 import { diag } from '@/lib/diagnostics'
 import {
   downloadedIds,
@@ -17,6 +17,7 @@ import {
   recordDownload,
   registerHolder,
   touchDownload,
+  type Resident,
 } from '@/lib/downloads'
 import { recordBrowserTrace } from './traces'
 import { detectSupport, probeWebGpu } from '@/lib/support'
@@ -143,7 +144,26 @@ export class BrowserSttEngine {
     registerHolder('stt', {
       current: () => (this.store.get().status === 'idle' ? null : this.store.get().model.id),
       release: () => this.dispose(),
+      describe: () => this.describe(),
     })
+  }
+
+  /** The loaded model for the Loaded models view (memory is an estimate). */
+  describe(): Resident | null {
+    const s = this.store.get()
+    if (s.status === 'idle' || s.status === 'error') return null
+    const bytes = peakFor(s.model.id, s.model.peakBytes)
+    const backend = s.device ?? 'wasm'
+    return {
+      id: s.model.id,
+      label: s.model.label,
+      task: 'stt',
+      backend,
+      bytes,
+      gpuBytes: backend === 'webgpu' ? bytes : 0,
+      busy: this.pending.size > 0,
+      loading: s.status === 'loading',
+    }
   }
 
   /** Which models are downloaded, from the downloads list. */

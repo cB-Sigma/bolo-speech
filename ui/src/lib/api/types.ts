@@ -497,6 +497,8 @@ export interface ModelStats {
   expires_in_s?: number | null
   expires_at?: string | null
   stopping?: boolean
+  /** `memory_bytes` is an estimate, not a measurement (the browser demo: a page cannot measure one model). */
+  memory_estimated?: boolean
 }
 
 export interface ModelPlacement {

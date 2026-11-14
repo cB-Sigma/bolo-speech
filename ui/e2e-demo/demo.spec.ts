@@ -866,3 +866,83 @@ test.describe('text to speech in the page', () => {
     })
   })
 })
+
+test.describe('loaded models in the page', () => {
+  test('a loaded model is listed with its backend, estimated memory, idle time, keep-alive and actions', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 900 })
+    await page.clock.install()
+    await page.addInitScript(() => {
+      // A scripted recogniser (no model download), already downloaded, and a device without WebGPU.
+      localStorage.setItem('bolo.mock.browserStt', JSON.stringify({ loadMs: 300 }))
+      localStorage.setItem(
+        'bolo.fakeDevice',
+        JSON.stringify({
+          memoryGb: 4,
+          webgpu: {
+            available: false,
+            f16: false,
+            maxBufferSize: null,
+            maxStorageBufferBindingSize: null,
+            adapter: null,
+          },
+        }),
+      )
+      if (!sessionStorage.getItem('seeded')) {
+        sessionStorage.setItem('seeded', '1')
+        localStorage.setItem(
+          'bolo.downloads',
+          JSON.stringify({
+            entries: [
+              {
+                id: 'moonshine-tiny',
+                kind: 'stt',
+                label: 'Moonshine Tiny',
+                bytes: 32_100_000,
+                cache: 'transformers-cache',
+                keys: [],
+                addedAt: 1,
+                lastUsed: 1,
+              },
+            ],
+            capBytes: null,
+          }),
+        )
+      }
+    })
+    await open(page, 'models')
+    const panel = page.getByTestId('loaded-models')
+    await expect(panel).toContainText('No models loaded')
+    await expect(panel.getByTestId('browser-gpu')).toContainText('Not offered here')
+    await page.getByTestId('load-moonshine-tiny').first().click()
+    const row = panel.getByTestId('loaded-model')
+    await expect(row).toHaveCount(1)
+    await expect(row.getByTestId('processor')).toHaveText('100% CPU')
+    await expect(row.getByTestId('model-memory')).toContainText('(estimate)')
+    await expect(row.getByTestId('model-memory')).toContainText('WASM CPU')
+    await expect(row.getByTestId('countdown')).toContainText(/4:5\d/)
+    await expect(panel.getByTestId('browser-memory')).toContainText('estimate')
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    )
+    expect(overflow).toBeLessThanOrEqual(1)
+    await axe(page)
+
+    // Keep loaded: no countdown; Unload: gone.
+    await row.getByRole('button', { name: 'Keep loaded: moonshine-tiny' }).click()
+    await expect(row.getByTestId('countdown')).toContainText('Kept loaded')
+    await row.getByRole('button', { name: 'Unload moonshine-tiny' }).click()
+    await expect(panel).toContainText('No models loaded')
+
+    // Keep-alive of 1 minute: idle for longer, and the model is unloaded by itself.
+    await panel.getByTestId('keep-alive').click()
+    await page.getByRole('option', { name: '1 min' }).click()
+    await page.getByTestId('load-moonshine-tiny').first().click()
+    await expect(row).toHaveCount(1)
+    await expect(row.getByTestId('countdown')).toContainText(/0:5\d/)
+    await page.clock.fastForward('01:10')
+    await expect(panel).toContainText('No models loaded')
+    expect(await page.evaluate(() => localStorage.getItem('bolo.keepAlive'))).toContain('"minutes":1')
+  })
+})

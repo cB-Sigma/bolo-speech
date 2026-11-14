@@ -20,6 +20,10 @@ export interface LoadedRow {
   notice: string | null
   /** The GPU the model's memory is on, when one is reported. */
   gpu: GpuMemory | null
+  /** Seconds since its last request. */
+  idle: number
+  /** `size` is an estimate (the browser demo). */
+  estimated: boolean
 }
 
 function gpuFor(device: string, gpus: GpuMemory[]): GpuMemory | null {
@@ -59,6 +63,8 @@ export function loadedRows(stats: Stats | null): LoadedRow[] {
         requests: m.requests,
         notice: m.placement?.notice ?? null,
         gpu: gpuFor(device, gpus),
+        idle: m.idle_s,
+        estimated: m.memory_estimated ?? false,
       }
     })
     .sort((a, b) => b.size - a.size || a.id.localeCompare(b.id))
@@ -68,6 +74,15 @@ export function loadedRows(stats: Stats | null): LoadedRow[] {
 export function remaining(expiresIn: number | null, elapsedMs: number): number | null {
   if (expiresIn == null) return null
   return Math.max(0, expiresIn - elapsedMs / 1000)
+}
+
+/** "0:42", "12:05", "1:02:03" */
+export function clock(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds))
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = String(s % 60).padStart(2, '0')
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`
 }
 
 /** "4:59", "1:02:03", "Kept loaded", "Unloading…" */

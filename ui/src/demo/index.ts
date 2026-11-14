@@ -1,4 +1,5 @@
 import { setTransport } from '@/lib/api/config'
+import { startKeepAlive } from '@/lib/keepalive'
 import { DemoBackend, isApiUrl, NEEDS_SERVER } from './backend'
 
 /** A WebSocket that refuses to connect: there is no server to stream to. */
@@ -19,6 +20,8 @@ class NoServerSocket {
 /** Route the API client to the in-page backend. Used only by the live demo build. */
 export function installDemo(): DemoBackend {
   const backend = new DemoBackend()
+  // Models idle longer than the keep-alive (5 minutes unless the visitor changes it) are unloaded.
+  startKeepAlive()
   setTransport({
     fetch: (input, init) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url

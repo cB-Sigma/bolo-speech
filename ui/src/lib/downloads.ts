@@ -78,17 +78,44 @@ export function reloadDownloads(): void {
   downloads.set(read())
 }
 
+/** Where an in-page model's weights live while it is loaded. */
+export type Backend = 'webgpu' | 'wasm' | 'split'
+
+/** One model held in the page right now, as the Loaded models view shows it. */
+export interface Resident {
+  id: string
+  label: string
+  task: 'stt' | 'tts' | 'diarize' | 'llm' | 'vad' | 's2s'
+  backend: Backend
+  /** Estimated memory it takes while loaded (a page cannot measure one model's share), bytes. */
+  bytes: number
+  /** Of `bytes`, the part placed on WebGPU. */
+  gpuBytes: number
+  /** A request is running. */
+  busy: boolean
+  /** Still downloading or compiling. */
+  loading: boolean
+  /** How the model is placed, in words ("encoder on WebGPU, decoder on the CPU"). */
+  placement?: string
+}
+
 interface Holder {
   /** Id of the model it has loaded or is loading; null when idle. */
   current: () => string | null
   release: () => void
+  /** The loaded model for the Loaded models view; null when idle. */
+  describe?: () => Resident | null
 }
 
-const holders = new Map<ModelKind, Holder>()
+const holders = new Map<string, Holder>()
 
-/** The recogniser and the synthesiser register here so a model can be unloaded before its files are deleted. */
-export function registerHolder(kind: ModelKind, holder: Holder): void {
-  holders.set(kind, holder)
+/**
+ * Everything that holds a model in the page registers here (the recogniser, the synthesiser, diarization, the
+ * language model, …) so a model can be unloaded before its files are deleted, listed as loaded, and unloaded
+ * when it has been idle too long. `key` names the holder; a later registration with the same key replaces it.
+ */
+export function registerHolder(key: string, holder: Holder): void {
+  holders.set(key, holder)
 }
 
 /** Ids of the models loaded (or loading) right now. */
@@ -96,9 +123,40 @@ export function residentIds(): string[] {
   return [...holders.values()].map((h) => h.current()).filter((x): x is string => x != null)
 }
 
+/** The models loaded (or loading) right now, described by their holders. */
+export function residentModels(): Resident[] {
+  return [...holders.values()]
+    .map((h) => (h.current() == null ? null : (h.describe?.() ?? null)))
+    .filter((x): x is Resident => x != null)
+}
+
+/** Unload one model, if it is loaded. Returns whether something was released. */
+export function releaseModel(id: string): boolean {
+  let released = false
+  for (const h of holders.values())
+    if (h.current() === id) {
+      h.release()
+      released = true
+    }
+  return released
+}
+
 /** Unload every in-page model (workers terminated, memory returned). */
 export function releaseAllModels(): void {
   for (const h of holders.values()) h.release()
+}
+
+const lastActive = new Map<string, number>()
+
+/** A model was just used (or finished loading): its idle time starts again. */
+export function noteActivity(id: string, now = Date.now()): void {
+  lastActive.set(id, now)
+}
+
+/** Seconds since the model was last used in this visit (0 when never noted). */
+export function idleSeconds(id: string, now = Date.now()): number {
+  const t = lastActive.get(id)
+  return t == null ? 0 : Math.max(0, (now - t) / 1000)
 }
 
 export function isDownloaded(id: string): boolean {
@@ -139,6 +197,7 @@ export async function recordDownload(
 ): Promise<string[]> {
   const { merge, ...entry } = input
   const now = Date.now()
+  noteActivity(entry.id, now)
   const s = downloads.get()
   const previous = s.entries.find((e) => e.id === entry.id)
   const keys = merge
@@ -163,6 +222,7 @@ export async function recordDownload(
 
 /** Mark a model as just used (for least-recently-used removal). */
 export function touchDownload(id: string): void {
+  noteActivity(id)
   const s = downloads.get()
   if (!s.entries.some((e) => e.id === id)) return
   downloads.patch({ entries: s.entries.map((e) => (e.id === id ? { ...e, lastUsed: Date.now() } : e)) })

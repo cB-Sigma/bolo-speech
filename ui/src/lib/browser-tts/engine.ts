@@ -7,7 +7,7 @@ import {
   requireOneRuntime,
   TTS_MEMORY_PAGES,
 } from '@/lib/browser-runtime'
-import { rememberMeasured } from '@/lib/device'
+import { peakFor, rememberMeasured } from '@/lib/device'
 import { diag } from '@/lib/diagnostics'
 import {
   downloadedIds,
@@ -17,6 +17,7 @@ import {
   markSettled,
   recordDownload,
   registerHolder,
+  type Resident,
   touchDownload,
 } from '@/lib/downloads'
 import { readBrowserSttConfig, type BrowserDevice, type FileProgress, type LoadStage } from '@/lib/browser-stt/models'
@@ -151,7 +152,26 @@ export class BrowserTtsEngine {
     registerHolder('tts', {
       current: () => (this.store.get().status === 'idle' ? null : this.store.get().voice.downloadId),
       release: () => this.dispose(),
+      describe: () => this.describe(),
     })
+  }
+
+  /** The loaded voice for the Loaded models view (memory is an estimate). */
+  describe(): Resident | null {
+    const s = this.store.get()
+    if (s.status === 'idle' || s.status === 'error') return null
+    const bytes = peakFor(s.voice.downloadId, s.voice.peakBytes)
+    const backend = s.device ?? 'wasm'
+    return {
+      id: s.voice.downloadId,
+      label: s.voice.downloadLabel,
+      task: 'tts',
+      backend,
+      bytes,
+      gpuBytes: backend === 'webgpu' ? bytes : 0,
+      busy: this.pending.size > 0,
+      loading: s.status === 'loading',
+    }
   }
 
   /** Read the published index (sizes, which voices this deployment has). Cached for the page's lifetime. */

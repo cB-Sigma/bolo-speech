@@ -3,6 +3,7 @@ import type {
   BenchRequest,
   CatalogModel,
   Job,
+  ModelPlacement,
   ModelStats,
   Percentiles,
   RequestTrace,
@@ -21,7 +22,8 @@ import { percentile } from '@/lib/latency/stats'
 import longUrl from '../mock/assets/en-ask-not.wav?url'
 import shortUrl from '../mock/assets/en-fellow-americans.wav?url'
 import hindiUrl from './assets/hi-short.wav?url'
-import { deleteDownload } from '@/lib/downloads'
+import { deleteDownload, idleSeconds, residentModels, type Resident } from '@/lib/downloads'
+import { keepAliveSeconds, keepLoaded, unloadModel } from '@/lib/keepalive'
 import { pickBrowserModel, prefs } from '@/lib/prefs'
 import snapshot from './catalog-snapshot.json'
 
@@ -105,6 +107,35 @@ function browserEntry(m: BrowserModel, installed: boolean, loaded: boolean, prog
   }
 }
 
+/** Ollama's PROCESSOR text from bytes on the GPU and in all. */
+export function processorText(gpuBytes: number, bytes: number): string {
+  if (bytes <= 0 || gpuBytes <= 0) return '100% CPU'
+  const gpu = Math.round((100 * gpuBytes) / bytes)
+  if (gpu >= 100) return '100% GPU'
+  if (gpu <= 0) return '100% CPU'
+  return `${100 - gpu}%/${gpu}% CPU/GPU`
+}
+
+const BACKEND_TEXT: Record<Resident['backend'], string> = {
+  webgpu: 'WebGPU',
+  wasm: 'WASM CPU',
+  split: 'WebGPU + WASM CPU',
+}
+
+/** A resident model's placement in the server's terms. */
+function placementOf(r: Resident): ModelPlacement {
+  const processor = processorText(r.gpuBytes, r.bytes)
+  return {
+    device: BACKEND_TEXT[r.backend],
+    requested: r.backend,
+    split: r.backend === 'split' ? 'graphs' : 'whole',
+    gpu_bytes: r.gpuBytes,
+    cpu_bytes: Math.max(0, r.bytes - r.gpuBytes),
+    processor,
+    notice: r.placement ?? null,
+  }
+}
+
 const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 
@@ -180,28 +211,40 @@ export class DemoBackend {
             p99: Math.round(percentile(xs, 99)),
           }
     const rtfs = nums(recent.map((t) => t.rtf))
-    const models: ModelStats[] =
-      e.status === 'ready'
-        ? [
-            {
-              id: e.model.id,
-              task: 'stt',
-              loaded: true,
-              // A page cannot measure this; zero is shown as unavailable.
-              memory_bytes: 0,
-              idle_s: 0,
-              ttl_s: null,
-              active: engine.pendingCount > 0 ? 1 : 0,
-              requests: all.filter((t) => t.final_ms != null).length,
-              latency_ms: {
-                first_partial: pct(nums(recent.map((t) => t.first_partial_ms))),
-                final: pct(nums(recent.map((t) => t.final_ms))),
-                ttfa: null,
-              },
-              rtf: rtfs.length ? { p50: percentile(rtfs, 50), p95: percentile(rtfs, 95) } : null,
-            },
-          ]
-        : []
+    const sttRequests = all.filter((t) => t.final_ms != null).length
+    const sttLatency = {
+      first_partial: pct(nums(recent.map((t) => t.first_partial_ms))),
+      final: pct(nums(recent.map((t) => t.final_ms))),
+      ttfa: null,
+    }
+    const models: ModelStats[] = residentModels()
+      .filter((r) => !r.loading)
+      .map((r) => {
+        const idle = r.busy ? 0 : idleSeconds(r.id, now)
+        const ttl = keepAliveSeconds(r.id)
+        const isStt = r.id === e.model.id && r.task === 'stt'
+        const p = placementOf(r)
+        return {
+          id: r.id,
+          task: r.task === 'tts' ? 'tts' : 'stt',
+          loaded: true,
+          memory_bytes: r.bytes,
+          memory_estimated: true,
+          size_vram_bytes: r.gpuBytes,
+          ram_bytes: Math.max(0, r.bytes - r.gpuBytes),
+          processor: p.processor,
+          device: p.device,
+          placement: p,
+          idle_s: idle,
+          ttl_s: ttl,
+          keep_alive_s: ttl ?? -1,
+          expires_in_s: ttl == null ? null : Math.max(0, ttl - idle),
+          active: r.busy ? 1 : 0,
+          requests: isStt ? sttRequests : 0,
+          latency_ms: isStt ? sttLatency : { first_partial: null, final: null, ttfa: null },
+          rtf: isStt && rtfs.length ? { p50: percentile(rtfs, 50), p95: percentile(rtfs, 95) } : null,
+        }
+      })
     return {
       uptime_s: (performance.now() - this.started) / 1000,
       active_streams: engine.pendingCount > 0 ? 1 : 0,
@@ -474,12 +517,20 @@ export class DemoBackend {
     const action = /^\/api\/v1\/models\/([^/]+)\/(load|unload)$/.exec(path)
     if (action && method === 'POST') {
       const id = decodeURIComponent(action[1] as string)
-      if (!BROWSER_MODELS.some((m) => m.id === id)) return needsServer()
-      if (action[2] === 'load') {
+      const resident = residentModels().some((r) => r.id === id)
+      if (action[2] === 'unload') {
+        if (!resident && !BROWSER_MODELS.some((m) => m.id === id)) return needsServer()
+        unloadModel(id)
+        return json({ id, loaded: false })
+      }
+      const keep = (JSON.parse(String(init?.body ?? '{}')) as { keep_alive?: number | string }).keep_alive
+      if (!resident) {
+        if (!BROWSER_MODELS.some((m) => m.id === id)) return needsServer()
         this.use(id)
         await sharedEngine().load()
-      } else if (sharedEngine().store.get().model.id === id) sharedEngine().dispose()
-      return json({ id, loaded: action[2] === 'load' })
+      }
+      if (keep === -1 || keep === '-1') keepLoaded(id)
+      return json({ id, loaded: true })
     }
     const del = /^\/api\/v1\/models\/([^/]+)$/.exec(path)
     if (del && method === 'DELETE') {

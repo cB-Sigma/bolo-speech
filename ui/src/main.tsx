@@ -9,21 +9,33 @@ import './index.css'
 import { installErrorCapture } from './lib/diagnostics'
 import { live } from './lib/live'
 
+async function installFakeStt() {
+  const { FakeSpeechWorker, readFakeSttOptions } = await import('./mock/fake-stt-worker')
+  const fake = readFakeSttOptions()
+  if (fake) {
+    const { setSpeechWorkerFactory } = await import('./lib/browser-stt/engine')
+    setSpeechWorkerFactory(() => new FakeSpeechWorker(fake))
+  }
+}
+
 async function boot() {
   installErrorCapture()
   if (import.meta.env.VITE_BOLO_DEMO === '1') {
     const [{ ensureIsolation }, { installDemo }] = await Promise.all([import('./demo/isolation'), import('./demo')])
     if (await ensureIsolation()) return // reloading to become cross-origin isolated
     installDemo()
+    // Tests only: a scripted recogniser instead of a real model, when the page is told to use one.
+    let fake = false
+    try {
+      fake = Boolean(localStorage.getItem('bolo.mock.browserStt'))
+    } catch {
+      // storage blocked: the real recogniser
+    }
+    if (fake) await installFakeStt()
   } else if (import.meta.env.VITE_BOLO_MOCK === '1') {
     const { installMock } = await import('./mock')
     installMock()
-    const { FakeSpeechWorker, readFakeSttOptions } = await import('./mock/fake-stt-worker')
-    const fake = readFakeSttOptions()
-    if (fake) {
-      const { setSpeechWorkerFactory } = await import('./lib/browser-stt/engine')
-      setSpeechWorkerFactory(() => new FakeSpeechWorker(fake))
-    }
+    await installFakeStt()
   }
   const queryClient = new QueryClient({
     defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },

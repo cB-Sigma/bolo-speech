@@ -1,6 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Cpu, Infinity as InfinityIcon, MemoryStick, PowerOff, Timer } from 'lucide-react'
+import { Cpu, Hourglass, Infinity as InfinityIcon, MemoryStick, MonitorSmartphone, PowerOff, Timer } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useDevice } from '@/components/model-fit'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useStore } from '@/hooks/use-store'
+import { tabMemoryBudget } from '@/lib/device'
+import { KEEP_ALIVE_CHOICES, keepAlive, setKeepAliveMinutes } from '@/lib/keepalive'
 import { toast } from 'sonner'
 import { Empty, Panel } from '@/components/panel'
 import { Badge } from '@/components/ui/badge'
@@ -9,7 +14,7 @@ import { describeError, useLive } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { isDemo } from '@/lib/api/config'
 import { fmtBytes } from '@/lib/format'
-import { countdown, loadedRows, machineTotals, remaining, split, type LoadedRow } from '@/lib/loaded'
+import { clock, countdown, loadedRows, machineTotals, remaining, split, type LoadedRow } from '@/lib/loaded'
 import { cn } from '@/lib/utils'
 
 /** A thin meter: `value` of `max`, with an optional second share (bolo's part of a GPU's memory). */
@@ -63,6 +68,130 @@ function useTick(ms: number): number {
   return now
 }
 
+const keepAliveLabel = (m: number | null) => (m == null ? 'Never' : m < 60 ? `${m} min` : `${m / 60} h`)
+
+/** Phones, tablets and Apple-silicon Macs: the GPU uses the same memory as everything else. */
+function sharedMemoryDevice(platform: string, adapter: string | null): boolean {
+  return platform !== 'desktop' || /apple/i.test(adapter ?? '')
+}
+
+/**
+ * The demo's totals: what the browser says about this device (a page cannot read its own CPU or memory use),
+ * the models' estimated memory against what a tab may use here, and the in-browser keep-alive.
+ */
+function BrowserTotals({ rows }: { rows: LoadedRow[] }) {
+  const d = useDevice()
+  const ka = useStore(keepAlive)
+  const budget = tabMemoryBudget(d)
+  const used = rows.reduce((a, r) => a + r.size, 0)
+  const onGpu = rows.reduce((a, r) => a + r.vram, 0)
+  const gpu = d.webgpu
+  const shared = sharedMemoryDevice(d.platform, gpu?.adapter ?? null)
+  return (
+    <div className="grid gap-3 border-b border-border px-4 py-3 text-xs" data-testid="machine-totals">
+      <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="min-w-0">
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-x-2 text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <MemoryStick className="size-3.5" aria-hidden /> Models in this tab
+            </span>
+            <span className="num text-foreground" data-testid="browser-memory">
+              {fmtBytes(used)} of about {fmtBytes(budget.bytes)}
+              <span className="text-muted-foreground"> · estimate</span>
+            </span>
+          </div>
+          <Meter
+            value={used}
+            max={budget.bytes}
+            label="Estimated memory of the loaded models against this tab's limit"
+          />
+          <p className="mt-1 text-muted-foreground">Limit: {budget.why}.</p>
+        </div>
+        <div className="min-w-0" data-testid="browser-device">
+          <div className="mb-1 flex items-center gap-1.5 text-muted-foreground">
+            <MonitorSmartphone className="size-3.5" aria-hidden /> This device
+          </div>
+          <p className="text-foreground">
+            {d.memoryGb != null ? (
+              <>
+                <span className="num">{d.memoryGb} GB</span> memory reported
+                {d.memoryGb >= 8 && <span className="text-muted-foreground"> (browsers report at most 8)</span>}
+              </>
+            ) : (
+              'Memory not reported by this browser'
+            )}
+            <span className="text-muted-foreground">
+              {' '}
+              · <span className="num">{d.cores}</span> cores{d.threads ? '' : ', one thread (no isolation)'}
+            </span>
+          </p>
+        </div>
+        <div className="min-w-0" data-testid="browser-gpu">
+          <div className="mb-1 flex items-center gap-1.5 text-muted-foreground">
+            <Cpu className="size-3.5" aria-hidden /> WebGPU
+          </div>
+          {gpu == null ? (
+            <p className="text-muted-foreground">Checking…</p>
+          ) : gpu.available ? (
+            <p className="text-foreground">
+              {gpu.adapter ?? 'Available'}
+              {gpu.maxBufferSize != null && (
+                <span className="text-muted-foreground">
+                  {' '}
+                  · largest buffer <span className="num">{fmtBytes(gpu.maxBufferSize)}</span>
+                </span>
+              )}
+              {onGpu > 0 && (
+                <span className="text-muted-foreground">
+                  {' '}
+                  · models on it <span className="num">{fmtBytes(onGpu)}</span>
+                </span>
+              )}
+            </p>
+          ) : (
+            <p className="text-muted-foreground">Not offered here: every model runs on the CPU (WebAssembly).</p>
+          )}
+        </div>
+      </div>
+      {gpu?.available && shared && (
+        <p className="text-muted-foreground" data-testid="shared-memory-note">
+          On this device the GPU shares memory with everything else, so placing a model on WebGPU does not free memory:
+          a CPU/GPU split here helps with WebGPU&apos;s buffer limits and with speed, not with total memory.
+        </p>
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <p className="min-w-0 text-muted-foreground">
+          Memory figures are estimates from each model&apos;s size, or measured once on this device: a page cannot read
+          one model&apos;s share.
+        </p>
+        <label className="flex items-center gap-2">
+          <Hourglass className="size-3.5 text-muted-foreground" aria-hidden />
+          <span className="text-muted-foreground">Unload after idle</span>
+          <Select
+            value={ka.minutes == null ? 'never' : String(ka.minutes)}
+            onValueChange={(v) => setKeepAliveMinutes(v === 'never' ? null : Number(v))}
+          >
+            <SelectTrigger
+              className="h-7 w-24"
+              aria-label="Unload models after this long idle"
+              data-testid="keep-alive"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {KEEP_ALIVE_CHOICES.map((m) => (
+                <SelectItem key={String(m)} value={m == null ? 'never' : String(m)}>
+                  {keepAliveLabel(m)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </label>
+      </div>
+    </div>
+  )
+}
+
 /**
  * Models the server holds in memory, Ollama-`ps` style: size, where each one runs (GPU, CPU or split), how
  * much accelerator memory it takes, and when it will be unloaded for being idle. Plus the machine's totals.
@@ -98,10 +227,7 @@ export function LoadedModelsPanel({ className }: { className?: string }) {
       bodyClassName="p-0"
     >
       {isDemo ? (
-        <p className="border-b border-border px-4 py-3 text-xs text-muted-foreground" data-testid="machine-totals">
-          Models here run in this browser tab. A page cannot read its own CPU or memory use, so no totals are shown; a
-          bolo server shows CPU, RAM and each GPU&apos;s memory here.
-        </p>
+        <BrowserTotals rows={rows} />
       ) : (
         totals && (
           <div
@@ -190,9 +316,12 @@ export function LoadedModelsPanel({ className }: { className?: string }) {
                     <span className="num text-foreground" data-testid="processor">
                       {row.processor}
                     </span>
-                    <span className="num text-muted-foreground">
+                    <span className="num text-muted-foreground" data-testid="model-memory">
                       {fmtBytes(row.size)}
-                      {row.onGpu && <> · VRAM {fmtBytes(row.vram)}</>} · {row.device}
+                      {row.estimated && ' (estimate)'}
+                      {row.onGpu &&
+                        (isDemo ? <> · WebGPU {fmtBytes(row.vram)}</> : <> · VRAM {fmtBytes(row.vram)}</>)}{' '}
+                      · {row.device}
                     </span>
                   </div>
                   <SplitBar row={row} />
@@ -216,6 +345,11 @@ export function LoadedModelsPanel({ className }: { className?: string }) {
                     <Timer className="size-3.5" aria-hidden />
                   )}
                   {countdown(left, row.stopping)}
+                  {isDemo && (
+                    <span data-testid="idle">
+                      · idle {clock(row.idle + (row.active > 0 ? 0 : (now - sampledAt) / 1000))}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-1.5 md:justify-end">
                   <Button
