@@ -35,7 +35,11 @@ def main(argv: list[str]) -> int:
     if spec.voices:
         options.setdefault("voices", spec.voices)
     model = engine.load(
-        spec.kind, spec.task, ModelStore(data_dir).model_dir(spec.id), options, LoadOptions(threads=threads)
+        spec.kind,
+        spec.task,
+        ModelStore(data_dir).model_dir(spec.preset_of or spec.id),
+        options,
+        LoadOptions(threads=threads),
     )
     model.close()
     sys.stdout.write("ok\n")

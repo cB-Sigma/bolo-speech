@@ -1,5 +1,5 @@
-"""Command-line interface: ``bolo serve``, ``pull``, ``rm``, ``list``, ``ps``, ``load``/``run``, ``stop``, ``show``,
-``transcribe``, ``speak``, ``bench``, ``recommend`` and ``doctor``."""
+"""Command-line interface: ``bolo serve``, ``pull``, ``rm``, ``cp``, ``list``, ``ps``, ``load``/``run``, ``stop``,
+``show``, ``models``, ``logs``, ``transcribe``, ``speak``, ``bench``, ``recommend`` and ``doctor``."""
 
 from __future__ import annotations
 
@@ -77,17 +77,23 @@ def cmd_serve(args: argparse.Namespace) -> int:
         args,
         ("host", "port", "api_key", "preload", "cors_origins", "wyoming", "wyoming_host", "wyoming_port", "auto_pull",
          "ui", "default_stt", "default_tts", "default_realtime_stt", "memory_budget_mb", "batch_wait_ms", "max_queue",
-         "llm_base_url", "llm_model", "llm_api_key"),
+         "llm_base_url", "llm_model", "llm_api_key", "num_parallel", "gpus", "gpu_spread", "log_file"),
     )  # fmt: skip
-    _setup_logging(settings.log_level)
+    from bolo import logs
+
+    log_file = logs.configure(settings)
     app = create_app(settings)
     where = f"http://{settings.host}:{settings.port}"
     print(f"bolo {__version__} listening on {where}  (console: {where}/  API docs: {where}/docs)", file=sys.stderr)
+    if log_file is not None:
+        print(f"log file: {log_file} (`bolo logs -f` follows it)", file=sys.stderr)
     if settings.host not in ("127.0.0.1", "localhost", "::1") and not settings.api_key:
         print("warning: listening on a non-loopback address without an API key", file=sys.stderr)
-    uvicorn.run(
+    config = uvicorn.Config(
         app, host=settings.host, port=settings.port, log_level=settings.log_level.lower(), ws_max_size=16 * 1024 * 1024
     )
+    logs.attach_file_handler("uvicorn", "uvicorn.error", "uvicorn.access")  # uvicorn's loggers skip the root logger
+    uvicorn.Server(config).run()
     return 0
 
 
@@ -180,19 +186,104 @@ def cmd_pull(args: argparse.Namespace) -> int:
     return 0
 
 
+def _server(args: argparse.Namespace, method: str, path: str, body: dict[str, Any] | None = None) -> Any:
+    """A request to the running server at ``--url``, or None when nothing answers there."""
+    import httpx
+
+    headers = {"Authorization": f"Bearer {args.api_key}"} if getattr(args, "api_key", None) else {}
+    url = getattr(args, "url", None)
+    if not url:
+        return None
+    try:
+        return httpx.request(method, f"{url.rstrip('/')}{path}", headers=headers, json=body, timeout=5.0)
+    except httpx.HTTPError:
+        return None
+
+
+def _error_of(r: Any) -> str:
+    try:
+        return str((r.json().get("error") or {}).get("message") or r.text)
+    except ValueError:
+        return str(r.text)
+
+
 def cmd_rm(args: argparse.Namespace) -> int:
+    """``bolo rm <model>...``: delete a model's files (a preset: only the preset). A model the running server has
+    loaded is refused unless ``--force``, which unloads it first."""
+    from urllib.parse import quote
+
     core = _core(args)
     code = 0
+    ps = _server(args, "GET", "/api/v1/ps")
+    loaded = {m.get("name") for m in ps.json().get("models", [])} if ps is not None and ps.status_code == 200 else None
     for name in args.models:
         spec = core.catalog.resolve(name)
-        if spec is None or not core.store.remove(spec.id):
+        if spec is None or (not spec.preset_of and not core.store.is_installed(spec.id)):
             print(f"{name}: not installed", file=sys.stderr)
             code = 1
             continue
-        if spec.custom:
-            core.catalog.remove_custom(spec.id)
-        print(f"removed {spec.id}")
+        if loaded is not None and spec.id in loaded:
+            if not args.force:
+                print(
+                    f"{spec.id} is loaded in the server at {args.url}: `bolo stop {spec.id}` first, or `bolo rm --force`",
+                    file=sys.stderr,
+                )
+                code = 1
+                continue
+            _server(args, "POST", f"/api/v1/models/{quote(spec.id, safe='')}/unload")
+        if loaded is not None:  # the server removes it, so its catalog (presets, custom models) stays right
+            r = _server(args, "DELETE", f"/api/v1/models/{quote(spec.id, safe='')}")
+            if r is not None and r.status_code < 300:
+                print(f"removed {spec.id}" + (" (a preset: the model's files stay)" if spec.preset_of else ""))
+                continue
+            if r is not None:
+                print(f"error: {_error_of(r)}", file=sys.stderr)
+                code = 1
+                continue
+        if not asyncio.run(core.remove(spec.id)):
+            print(f"{name}: not installed", file=sys.stderr)
+            code = 1
+            continue
+        print(f"removed {spec.id}" + (" (a preset: the model's files stay)" if spec.preset_of else ""))
     return code
+
+
+def cmd_cp(args: argparse.Namespace) -> int:
+    """``bolo cp <source> <destination>``: a preset, a new name with the source's files and its own settings."""
+    r = _server(args, "POST", "/api/v1/models/copy", {"source": args.source, "destination": args.destination})
+    if r is not None and r.status_code != 404:
+        if r.status_code >= 400:
+            print(f"error: {_error_of(r)}", file=sys.stderr)
+            return 1
+        doc = r.json()
+    else:
+        core = _core(args)
+        spec = core.copy_model(args.source, args.destination)
+        doc = core.model_api(spec)
+    print(
+        f"copied {doc.get('preset_of') or args.source} to {doc['id']}; change its settings with "
+        f"`bolo models config {doc['id']} --set key=value`"
+    )
+    return 0
+
+
+def _ago(iso: str | None) -> str:
+    """``2026-11-14T10:00:00Z`` -> ``3 days ago`` (Ollama's MODIFIED)."""
+    if not iso:
+        return "-"
+    from datetime import datetime, timezone
+
+    try:
+        then = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except ValueError:
+        return "-"
+    secs = max(0.0, (datetime.now(timezone.utc) - then).total_seconds())
+    for unit, size in (("year", 365 * 86400), ("month", 30 * 86400), ("week", 7 * 86400), ("day", 86400),
+                       ("hour", 3600), ("minute", 60)):  # fmt: skip
+        if secs >= size:
+            n = int(secs // size)
+            return f"{n} {unit}{'s' if n > 1 else ''} ago"
+    return "just now"
 
 
 def cmd_list(args: argparse.Namespace) -> int:
@@ -203,6 +294,17 @@ def cmd_list(args: argparse.Namespace) -> int:
         return 0
     if not models:
         print("no models installed. `bolo list --all` shows the catalog; `bolo pull <id>` installs one.")
+        return 0
+    if not args.all:
+        # downloaded models, as `ollama list` shows them: name, size on disk, when they were downloaded
+        rows = [
+            [
+                m["id"], m["task"], m["engine"], "-" if m["cloud"] else _human(m["size_bytes"]), _ago(m.get("modified_at")),
+                f"preset of {m['preset_of']}" if m.get("preset_of") else ("cloud" if m["cloud"] else m["license"]),
+            ]
+            for m in models
+        ]  # fmt: skip
+        print(_table(rows, ["ID", "TASK", "ENGINE", "SIZE", "MODIFIED", "LICENCE"]))
         return 0
     rows = [
         [
@@ -217,30 +319,154 @@ def cmd_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def format_show(doc: dict[str, Any]) -> str:
+    """``bolo show``: the parts of :meth:`bolo.core.Bolo.show_api` a person reads, in sections."""
+    out: list[str] = []
+
+    def section(title: str, rows: list[tuple[str, Any]]) -> None:
+        rows = [(k, v) for k, v in rows if v not in (None, "", [], {})]
+        if not rows:
+            return
+        out.append(f"  {title}")
+        width = max(len(k) for k, _ in rows)
+        out.extend(f"    {k.ljust(width)}  {v}" for k, v in rows)
+        out.append("")
+
+    state = "loaded" if doc.get("loaded") else ("installed" if doc.get("installed") else "not installed")
+    out.append(f"{doc['id']}  ({doc.get('task')}, {state})")
+    if doc.get("description"):
+        out.append(f"  {doc['description']}")
+    out.append("")
+    section("Model", [
+        ("engine", f"{doc.get('engine')} (kind {doc.get('kind')})"), ("family", doc.get("family")),
+        ("tier", doc.get("tier")), ("parameters", f"{doc['params']:,}" if doc.get("params") else None),
+        ("sample rate", f"{doc.get('sample_rate')} Hz"), ("streaming", "yes" if doc.get("streaming") else "no"),
+        ("aliases", ", ".join(doc.get("aliases") or [])), ("preset of", doc.get("preset_of")),
+        ("presets", ", ".join(doc.get("presets") or [])),
+    ])  # fmt: skip
+    section("Licence", [
+        ("licence", doc.get("license")), ("url", doc.get("license_url")),
+        ("commercial use", "yes" if doc.get("commercial_use") else "NO (restricted by the licence)"),
+        ("gated", "yes: accept the terms on Hugging Face and set hf_token" if doc.get("gated") else "no"),
+        ("cloud", "yes: audio or text leaves this server" if doc.get("cloud") else None),
+    ])  # fmt: skip
+    langs = doc.get("languages") or []
+    voices = doc.get("voices") or []
+    section("Languages and voices", [
+        ("languages", ", ".join(langs[:24]) + (f" (+{len(langs) - 24})" if len(langs) > 24 else "")),
+        ("voices", ", ".join(v["id"] for v in voices[:16]) + (f" (+{len(voices) - 16})" if len(voices) > 16 else "")),
+    ])  # fmt: skip
+    files = doc.get("files") or []
+    on_disk = bool(doc.get("path"))
+    section("Files", [
+        ("directory", doc.get("path")), ("size", _human(doc.get("size_bytes")) if on_disk else None),
+        ("modified", _ago(doc.get("modified_at")) if on_disk else None),
+        *[(f["path"], _human(f.get("size"))) for f in files[:20]],
+        ("…", f"{len(files) - 20} more" if len(files) > 20 else None),
+    ])  # fmt: skip
+    eff = doc.get("effective") or {}
+    from bolo.keepalive import format_keep_alive
+
+    section("Settings", [
+        ("device", eff.get("device")), ("keep alive", format_keep_alive(eff.get("keep_alive_s"))),
+        ("num_parallel", eff.get("num_parallel")), ("max_queue", eff.get("max_queue")),
+        *[(f"llama {k}", v) for k, v in (eff.get("llama") or {}).items()],
+        *[(f"pinned {k}", json.dumps(v)) for k, v in (doc.get("settings") or {}).items()],
+    ])  # fmt: skip
+    speed = doc.get("speed") or {}
+    server = speed.get("server") or {}
+    catalog = speed.get("catalog") or {}
+    section("Speed", [
+        ("expected here", f"real-time factor about {speed['expected_rtf']:g} ({speed.get('rtf_basis')})"
+         if speed.get("expected_rtf") is not None else None),
+        ("measured (catalog)", ", ".join(f"{k} {v}" for k, v in catalog.items() if not isinstance(v, (dict, list)))),
+        ("measured (server)", f"{server.get('requests')} requests, rtf p50 {(server.get('rtf') or {}).get('p50', '-')}"
+         if server.get("requests") else None),
+    ])  # fmt: skip
+    return "\n".join(out).rstrip()
+
+
 def cmd_show(args: argparse.Namespace) -> int:
+    """``bolo show <model> [--license] [--json]``: licence, files, settings, languages, voices, engine and speed."""
     core = _core(args)
     spec = core.manager.resolve(args.model)
-    entry = core.model_api(spec)
-    entry["source"] = spec.source.to_dict()
-    entry["kind"] = spec.kind
-    if len(entry["voices"]) > 12 and not args.json:
-        entry["voices"] = [v["id"] for v in entry["voices"]]
-    print(json.dumps(entry, indent=2, ensure_ascii=False))
+    doc = core.show_api(spec, license_text=args.license)
+    if args.json:
+        print(json.dumps(doc, indent=2, ensure_ascii=False))
+        return 0
+    if args.license:
+        print(f"{spec.id}: {spec.license}" + (f"  {spec.license_url}" if spec.license_url else ""))
+        print(f"commercial use: {'yes' if spec.commercial_use else 'no'}; gated: {'yes' if spec.gated else 'no'}")
+        if doc.get("license_text"):
+            print()
+            print(doc["license_text"].rstrip())
+        elif not doc.get("installed"):
+            print("(the model's files are not downloaded; its licence file, if it has one, is shown after `bolo pull`)")
+        else:
+            print("(no licence file among the model's files; the link above has the terms)")
+        return 0
+    print(format_show(doc))
     return 0
 
 
+_INT_SETTINGS = ("num_parallel", "max_queue", "context_size", "batch_size")
+_LIST_SETTINGS = ("wordlists", "fallback")
+
+
+def _model_setting(key: str, raw: str) -> Any:
+    """A ``--set key=value`` of ``bolo models config``, as the type the setting takes."""
+    from bolo.keepalive import parse_keep_alive
+    from bolo.llama_args import check_tuning
+
+    if key in _INT_SETTINGS:
+        value: Any = int(raw)
+        if value < (1 if key == "num_parallel" else 0):
+            raise ValueError(f"{key}: expected a number of at least {1 if key == 'num_parallel' else 0}")
+    elif key in _LIST_SETTINGS:
+        value = [x.strip() for x in raw.split(",") if x.strip()]
+    elif key == "keep_alive":
+        parse_keep_alive(raw)
+        value = raw
+    else:
+        value = raw.strip().lower() if key in ("device", "flash_attention", "kv_cache_type") else raw
+    check_tuning({key: value})
+    return value
+
+
 def cmd_models(args: argparse.Namespace) -> int:
-    """``bolo models config <id> [--phonemizer X | --clear]``: settings pinned for one model."""
+    """``bolo models config <id> [--set key=value ...] [--unset key ...] [--phonemizer X] [--clear]``: settings
+    pinned for one model (the same as ``PUT /api/v1/models/{id}/settings``)."""
     from bolo.errors import BoloError
 
     core = _core(args)
     spec = core.manager.resolve(args.model)
+    known = core.store.MODEL_SETTINGS
     try:
-        if args.clear:
-            core.store.set_model_settings(spec.id, {"phonemizer": None})
-        elif args.phonemizer:
+        values: dict[str, Any] = {}
+        if args.clear:  # every pin goes (then --set and --phonemizer, if given, pin again)
+            values.update(dict.fromkeys(core.store.model_settings(spec.id)))
+        if args.phonemizer:
             core.components.validate_pin(spec, args.phonemizer)
-            core.store.set_model_settings(spec.id, {"phonemizer": args.phonemizer})
+            values["phonemizer"] = args.phonemizer
+        for item in args.set or []:
+            key, sep, raw = item.partition("=")
+            key = key.strip().replace("-", "_")
+            if not sep or key not in known:
+                print(
+                    f"error: --set expects key=value with key one of {', '.join(known)}; got {item!r}", file=sys.stderr
+                )
+                return 1
+            if key == "phonemizer":
+                core.components.validate_pin(spec, raw)
+            values[key] = _model_setting(key, raw)
+        for key in args.unset or []:
+            key = key.strip().replace("-", "_")
+            if key not in known:
+                print(f"error: unknown model setting {key!r} (one of {', '.join(known)})", file=sys.stderr)
+                return 1
+            values[key] = None
+        if values:
+            core.store.set_model_settings(spec.id, values)
     except BoloError as exc:
         print(f"error: {exc.message}", file=sys.stderr)
         return 1
@@ -263,8 +489,9 @@ def _gb_pair(used: int | None, total: int | None) -> str:
 
 
 def format_ps(doc: dict[str, Any], verbose: bool = False) -> str:
-    """``bolo ps``: a header line for the machine, then Ollama's columns (MODEL, TASK, SIZE, PROCESSOR, DEVICE,
-    UNTIL); ``verbose`` adds ACTIVE, REQUESTS, latency and real-time factor."""
+    """``bolo ps``: a header line for the machine, then Ollama's columns (MODEL, TASK, SIZE, PROCESSOR, DEVICE, GPU,
+    UNTIL); ``verbose`` adds ACTIVE (requests and sessions using the model), QUEUED (requests waiting for it),
+    PARALLEL (``num_parallel``), REQUESTS, latency and real-time factor."""
     system = doc.get("system") or {}
     head = [f"cpu {system.get('cpu_percent', 0)}%", f"rss {_human(system.get('rss_bytes'))}"]
     if system.get("ram_total_bytes"):
@@ -280,25 +507,28 @@ def format_ps(doc: dict[str, Any], verbose: bool = False) -> str:
             if g.get("process_bytes") is not None:
                 mem += f" (bolo {_human(g['process_bytes'])})"
         util = f" {g['utilization']:.0f}% busy" if g.get("utilization") is not None else ""
-        head.append(f"gpu{g.get('index', 0)} {label} {mem}{util}")
+        skipped = " (not used: gpus setting)" if g.get("allowed") is False else ""
+        head.append(f"gpu{g.get('index', 0)} {label} {mem}{util}{skipped}")
     if not gpus:
         head.append("no GPU memory readings" if system.get("device", "cpu") != "cpu" else "device cpu")
     rows = []
     for m in doc.get("models") or []:
+        gpus = m.get("gpus") or (m.get("placement") or {}).get("gpus") or []
         row = [
             m["name"], m.get("task", ""), _human(m.get("size")), m.get("processor", "100% CPU"),
-            m.get("device", "cpu"), m.get("until", ""),
+            m.get("device", "cpu"), ",".join(str(g) for g in gpus) or "-", m.get("until", ""),
         ]  # fmt: skip
         if verbose:
             lat = (m.get("latency_ms") or {}).get("final") or (m.get("latency_ms") or {}).get("ttfa") or {}
             row += [
-                str(m.get("active", 0)), str(m.get("requests", 0)), f"{lat.get('p50', '-')}",
-                f"{(m.get('rtf') or {}).get('p50', '-')}", f"{m.get('idle_s', 0)}s",
+                str(m.get("active", 0)), str(m.get("queued", 0)), str(m.get("num_parallel", "-")),
+                str(m.get("requests", 0)), f"{lat.get('p50', '-')}", f"{(m.get('rtf') or {}).get('p50', '-')}",
+                f"{m.get('idle_s', 0)}s",
             ]  # fmt: skip
         rows.append(row)
-    headers = ["MODEL", "TASK", "SIZE", "PROCESSOR", "DEVICE", "UNTIL"]
+    headers = ["MODEL", "TASK", "SIZE", "PROCESSOR", "DEVICE", "GPU", "UNTIL"]
     if verbose:
-        headers += ["ACTIVE", "REQUESTS", "P50 MS", "RTF P50", "IDLE"]
+        headers += ["ACTIVE", "QUEUED", "PARALLEL", "REQUESTS", "P50 MS", "RTF P50", "IDLE"]
     lines = ["  ".join(head)]
     lines.append(_table(rows, headers) if rows else "no models loaded")
     notices = [
@@ -323,6 +553,7 @@ def _ps_from_stats(stats: dict[str, Any]) -> dict[str, Any]:
         models.append({
             "name": m["id"], "task": m["task"], "size": m["memory_bytes"], "processor": m.get("processor", "100% CPU"),
             "device": m.get("device", "cpu"), "until": humanize_until(left), "active": m["active"],
+            "queued": (m.get("queue") or {}).get("depth", 0), "num_parallel": (m.get("queue") or {}).get("workers"),
             "requests": m["requests"], "latency_ms": m["latency_ms"], "rtf": m.get("rtf"), "idle_s": m.get("idle_s"),
         })  # fmt: skip
     return {"models": models, "system": stats.get("system") or {}}
@@ -1070,6 +1301,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             "espeak-ng: not installed (optional, GPL-3.0-or-later; phoneme-based voices in languages uccharan does "
             "not cover need it: `bolo components install espeak-ng --accept-license`)"
         )
+    print(f"logs: {_log_where(settings)}")
     _doctor_llm(settings)
     _doctor_providers(settings)
     _doctor_hardware(args)
@@ -1087,6 +1319,56 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             print(f"hugging face: HTTP {r.status_code}")
         except httpx.HTTPError as exc:
             print(f"hugging face: unreachable ({exc})")
+    return 0
+
+
+def _log_where(settings: Settings) -> str:
+    """Where the server's log goes, for ``bolo doctor`` and ``bolo logs``."""
+    from bolo import logs
+
+    path = logs.resolve_log_file(settings.log_file, serving=False)
+    default = logs.default_log_path()
+    if path is not None:
+        return f"{path} (log_file; rotated at {settings.log_max_mb} MB, {settings.log_backups} old files kept)"
+    found = f"; a service's log file is at {default}" if default.is_file() else ""
+    return (
+        "standard error of `bolo serve` (journalctl -u bolo under systemd, `docker logs` in a container)"
+        f'{found}. Set log_file = "auto" to also write {default}'
+    )
+
+
+def cmd_logs(args: argparse.Namespace) -> int:
+    """``bolo logs [-f] [--lines N]``: the server's log file (the running server says which; else the settings,
+    else the platform's default place)."""
+    from bolo import logs
+
+    path: Path | None = None
+    r = _server(args, "GET", "/api/v1/info")
+    told = r is not None and r.status_code == 200
+    if told and r.json().get("log_file"):
+        path = Path(r.json()["log_file"])
+    if path is None:
+        settings = _settings(args)
+        path = logs.resolve_log_file(settings.log_file, serving=False)
+        if path is None and logs.default_log_path().is_file():
+            path = logs.default_log_path()
+        if path is None:
+            who = f"the server at {args.url} writes no log file" if told else "no log file is configured"
+            print(f"{who}: the log goes to {_log_where(settings)}", file=sys.stderr)
+            return 1
+    if not path.is_file() and not args.follow:
+        print(f"no log file at {path} yet", file=sys.stderr)
+        return 1
+    if path.is_file():
+        for line in logs.tail(path, args.lines):
+            print(line)
+    if args.follow:
+        sys.stdout.flush()
+        try:
+            for line in logs.follow(path):
+                print(line, flush=True)
+        except KeyboardInterrupt:
+            return 0
     return 0
 
 
@@ -1130,6 +1412,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.add_argument("--llm-model", dest="llm_model", default=None)
     s.add_argument("--llm-api-key", dest="llm_api_key", default=None)
+    s.add_argument("--num-parallel", dest="num_parallel", type=int, default=None,
+                   help="requests each model works on at once (default: workers)")  # fmt: skip
+    s.add_argument("--gpus", dest="gpus", default=None, help="GPUs bolo may use, e.g. 0,2 (default: all visible)")
+    s.add_argument("--gpu-spread", dest="gpu_spread", action="store_const", const=True, default=None,
+                   help="spread llama.cpp models over every allowed GPU")  # fmt: skip
+    s.add_argument("--log-file", dest="log_file", default=None,
+                   help='also write the log to this file ("auto": the platform\'s log directory; "off")')  # fmt: skip
     s.set_defaults(func=cmd_serve)
 
     s = sub.add_parser(
@@ -1146,10 +1435,23 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--option", action="append", help="local models: loader option key=value (repeatable)")
     s.set_defaults(func=cmd_pull)
 
-    s = sub.add_parser("rm", help="delete installed models")
+    def _remote(s: argparse.ArgumentParser) -> None:
+        s.add_argument("--url", default=os.environ.get("BOLO_URL", "http://127.0.0.1:8000"))
+        s.add_argument("--api-key", dest="api_key", default=os.environ.get("BOLO_API_KEY"))
+
+    s = sub.add_parser("rm", help="delete downloaded models (refused while loaded, unless --force)")
     _common(s)
+    _remote(s)
     s.add_argument("models", nargs="+")
+    s.add_argument("--force", "-f", action="store_true", help="unload the model from the running server first")
     s.set_defaults(func=cmd_rm)
+
+    s = sub.add_parser("cp", help="copy a model's settings to a new name (a preset with settings of its own)")
+    _common(s)
+    _remote(s)
+    s.add_argument("source")
+    s.add_argument("destination")
+    s.set_defaults(func=cmd_cp)
 
     s = sub.add_parser("list", aliases=["ls"], help="list installed models (--all: the whole catalog)")
     _common(s)
@@ -1159,28 +1461,38 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--json", action="store_true")
     s.set_defaults(func=cmd_list)
 
-    s = sub.add_parser("show", help="show one catalog entry")
+    s = sub.add_parser("show", help="one model: licence, files, settings, languages, voices, engine, speed")
     _common(s)
     s.add_argument("model")
+    s.add_argument("--license", "--licence", dest="license", action="store_true",
+                   help="print the licence (and the licence file shipped with the model, when there is one)")  # fmt: skip
     s.add_argument("--json", action="store_true")
     s.set_defaults(func=cmd_show)
 
-    s = sub.add_parser("models", help="per-model settings: models config <id> --phonemizer espeak-ng")
+    s = sub.add_parser("models", help="per-model settings: models config <id> --set num_parallel=2")
     _common(s)
     s.add_argument("action", choices=["config"])
     s.add_argument("model")
     s.add_argument("--phonemizer", help="auto | uccharan | uccharan:improved | espeak-ng")
-    s.add_argument("--clear", action="store_true", help="remove the pinned settings")
+    s.add_argument("--set", action="append", metavar="KEY=VALUE",
+                   help="pin a setting (repeatable): device, keep_alive, num_parallel, max_queue, flash_attention, "
+                   "kv_cache_type, context_size, batch_size, phonemizer, text_normalizer, wordlists, fallback, romanised")  # fmt: skip
+    s.add_argument("--unset", action="append", metavar="KEY", help="remove one pinned setting (repeatable)")
+    s.add_argument("--clear", action="store_true", help="remove every pinned setting")
     s.set_defaults(func=cmd_models)
 
-    def _remote(s: argparse.ArgumentParser) -> None:
-        s.add_argument("--url", default=os.environ.get("BOLO_URL", "http://127.0.0.1:8000"))
-        s.add_argument("--api-key", dest="api_key", default=os.environ.get("BOLO_API_KEY"))
+    s = sub.add_parser("logs", help="print the server's log file (-f: follow it)")
+    _common(s)
+    _remote(s)
+    s.add_argument("--follow", "-f", action="store_true", help="keep printing new lines as they are written")
+    s.add_argument("--lines", "-n", type=int, default=100, help="lines to print first (default 100; 0: all)")
+    s.set_defaults(func=cmd_logs)
 
     s = sub.add_parser("ps", help="show models loaded in a running server: size, GPU/CPU split, time left")
     _remote(s)
     s.add_argument("--json", action="store_true")
-    s.add_argument("--verbose", "-v", action="store_true", help="also requests in flight, totals and latency")
+    s.add_argument("--verbose", "-v", action="store_true",
+                   help="also requests active and queued per model, num_parallel, totals and latency")  # fmt: skip
     s.set_defaults(func=cmd_ps)
 
     for name, aliases, text in (

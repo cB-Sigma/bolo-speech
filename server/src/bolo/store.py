@@ -262,9 +262,14 @@ class ModelStore:
         self.hub = hub or HubClient()
         self._locks: dict[str, threading.Lock] = {}
         self._guard = threading.Lock()
+        #: presets (``bolo cp``): preset id -> the model whose files it uses
+        self.links: dict[str, str] = {}
 
     # -- per-model settings chosen by the user (model-settings.json) ------
-    MODEL_SETTINGS = ("phonemizer", "text_normalizer", "wordlists", "fallback", "romanised", "device", "keep_alive")
+    MODEL_SETTINGS = (
+        "phonemizer", "text_normalizer", "wordlists", "fallback", "romanised", "device", "keep_alive",
+        "num_parallel", "max_queue", "flash_attention", "kv_cache_type", "context_size", "batch_size",
+    )  # fmt: skip
 
     def model_settings(self, model_id: str | None = None) -> dict[str, Any]:
         """Settings pinned for one model (or, without an id, for all of them)."""
@@ -312,7 +317,7 @@ class ModelStore:
 
     # -- queries ----------------------------------------------------------
     def model_dir(self, model_id: str) -> Path:
-        return self.models / safe_id(model_id)
+        return self.models / safe_id(self.links.get(model_id, model_id))
 
     def manifest(self, model_id: str) -> dict[str, Any] | None:
         path = self.model_dir(model_id) / "manifest.json"
@@ -491,7 +496,8 @@ class ModelStore:
         cancelled: Callable[[], bool] | None = None,
         meta: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Fetch every file of a model and write its manifest. Safe to re-run."""
+        """Fetch every file of a model and write its manifest. Safe to re-run. A preset fetches its model's files."""
+        model_id = self.links.get(model_id, model_id)
         if source.local:
             path = Path(source.local)
             if not path.is_dir():
@@ -595,6 +601,8 @@ class ModelStore:
 
     # -- removal ----------------------------------------------------------
     def remove(self, model_id: str) -> bool:
+        if model_id in self.links:
+            return False  # a preset has no files of its own
         mdir = self.model_dir(model_id)
         if not (mdir.exists() or mdir.is_symlink()):
             return False

@@ -5,8 +5,9 @@ Settings come from, lowest to highest priority:
 1. built-in defaults;
 2. a TOML file: `--config FILE`, else `$BOLO_CONFIG`, else `./bolo.toml`, else
    `~/.config/bolo/config.toml`;
-3. environment variables `BOLO_<NAME>` (a few `speaches` names are honoured
-   too, see below);
+3. environment variables `BOLO_<NAME>`: every setting below has one, its name in capitals (`gpu_spread` is
+   `BOLO_GPU_SPREAD`, `llama_kv_cache_type` is `BOLO_LLAMA_KV_CACHE_TYPE`); a few `speaches` names are honoured
+   too, see below, and Ollama users will find their `OLLAMA_*` variables mapped in "Coming from Ollama";
 4. command-line flags of `bolo serve`.
 
 Lists can be written as TOML arrays, JSON arrays or comma-separated strings.
@@ -72,13 +73,20 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `max_loaded_models` | `0` (off) | | cap on models in memory |
 | `gpu_reserve_mb` | `512` | | with an accelerator: accelerator memory left free when placing a model (the display, other programs, allocation spikes). A model goes on the GPU only when its estimated memory fits in the free memory minus this; see "GPU and CPU placement" below |
 | `onnx_split` | `auto` | | `auto`: an ONNX Runtime model that does not fit in free accelerator memory whole (Nemotron diarization, the end-of-turn model, or the largest graph of DiCoW ONNX and LFM3-Audio) is cut in two at a layer boundary; the front half runs on the accelerator, the back half on the CPU. Needs the `onnx` package (`bolo-speech[onnx-split]`); without it, or with `off`, such a model runs on the CPU. The halves are written once to `.bolo-split/` next to the model. See "GPU and CPU placement" |
+| `gpus` | `[]` (all) | `--gpus` | the NVIDIA GPUs bolo may use, as CUDA numbers them in bolo's process (after `CUDA_VISIBLE_DEVICES`), e.g. `[0, 2]`. A model with `device = "cuda"` goes on the one of them with the most memory available; a pin to a GPU outside the list puts the model on the CPU with a notice. See "Several GPUs" |
+| `gpu_spread` | `false` | `--gpu-spread` | spread every llama.cpp model over all allowed GPUs (`--tensor-split`), like `OLLAMA_SCHED_SPREAD`, instead of keeping it on one GPU when it fits there. Other runtimes cannot split a model over GPUs and take one GPU each either way |
+| `llama_flash_attention` | unset | | flash attention (`-fa on\|off\|auto`) for the llama-servers bolo starts (tts-server and Orpheus-family voices, the speech-to-speech server); unset: llama-server's default (`auto`). `true`/`false` mean `on`/`off`. See "llama.cpp speed and memory" |
+| `llama_kv_cache_type` | unset (`f16`) | | the K and V cache type (`--cache-type-k`/`--cache-type-v`) of those servers, like `OLLAMA_KV_CACHE_TYPE`: `f16`, `q8_0`, `q4_0` (also `f32`, `bf16`, `q4_1`, `iq4_nl`, `q5_0`, `q5_1`). A quantized type turns flash attention on unless it is set |
+| `llama_context_size` | `0` (llama-server's default) | | context size (`-c`) of those servers, like `OLLAMA_CONTEXT_LENGTH` |
+| `llama_batch_size` | `0` (llama-server's default) | | logical batch size (`-b`) of those servers |
 | `gpu_memory_budget_mb` | `0` (off) | | accelerator memory bolo's models may take in all. Loading a model that would go over it first unloads idle GPU-resident models, least recently used first; when every one is in use, the new model is placed on the CPU (with a notice) instead. Nothing is refused |
 | `probe_models` | `true` | | load a newly installed model once in a child process first |
-| `threads` | `0` = min(4, CPUs) / `workers` | `--threads` | inference threads per engine call. If the machine also runs other work (a language model, other services), set this below the number of cores: oversubscribed inference threads slow each other down badly |
-| `workers` | `1` | `--workers` | concurrent engine calls per model |
+| `threads` | `0` = min(4, CPUs) / `num_parallel` | `--threads` | inference threads per engine call. If the machine also runs other work (a language model, other services), set this below the number of cores: oversubscribed inference threads slow each other down badly |
+| `workers` | `1` | `--workers` | concurrent engine calls per model (the older name of `num_parallel`, used when that is `0`) |
+| `num_parallel` | `0` (= `workers`) | `--num-parallel` | requests one model works on at once, like `OLLAMA_NUM_PARALLEL`. A model can have its own (`options.num_parallel` in the catalog, or a pin); a llama-server bolo starts gets `--parallel N` with it. See "Parallel requests and queues" |
 | `max_batch` | `8` | `--max-batch` | largest micro-batch |
 | `batch_wait_ms` | `0` | `--batch-wait-ms` | linger for a fuller batch (adds latency; see architecture.md) |
-| `max_queue` | `64` | `--max-queue` | queued jobs per model before `429` |
+| `max_queue` | `64` | `--max-queue` | requests waiting per model before `429`, like `OLLAMA_MAX_QUEUE` (which counts the whole server). A model can have its own (`options.max_queue`, or a pin) |
 | `queue_timeout_s` | `30` | | fail jobs that waited longer than this |
 | `partial_interval_ms` | `350` | | how often a pseudo-streaming session re-decodes for a partial |
 | `endpoint_silence_ms` | `500` | | trailing silence that ends an utterance. Per stream: `?endpointing=fast\|balanced\|patient` or `?endpoint_ms=` (see realtime.md for the trade-off) |
@@ -88,6 +96,9 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `wyoming_host`, `wyoming_port` | `127.0.0.1`, `10300` | `--wyoming-host`, `--wyoming-port` | Wyoming bind address |
 | `device` | `cpu` | | where models run (per model, as placed by the scheduler: see "GPU and CPU placement" below; a model can pin its own with `PUT /api/v1/models/{id}/settings` `{"device": "cpu"}` or a catalog `options.device`): `cpu`, `cuda` (or `cuda:1`), `coreml` (also `mps`, `metal`), `rocm`, `dml`, `openvino`, or `auto` (the first accelerator found). sherpa-onnx models use `cuda` or `coreml`; faster-whisper uses `cuda`; the ONNX Runtime engines (Nemotron diarization, DiCoW ONNX, the Orpheus-family decoder, the end-of-turn model, in-process speech-to-speech) use the matching execution provider when the installed `onnxruntime` has it (for `cuda`, install `onnxruntime-gpu`), and otherwise run on the CPU with one warning; llama-server gets `-ngl N`, the layers that fit in the free accelerator memory (all of them when everything fits; none when nothing does), unless you set `-ngl` yourself in `tts_server_args`, `s2s_server_args` or the entry's `server_args`; audio.cpp gets the device as its backend. **Untested on a GPU** |
 | `log_level` | `info` | `--log-level` | `debug`, `info`, `warning`, `error` |
+| `log_file` | unset (off, except under systemd or launchd) | `--log-file` | also write the server's log to a file: `auto` (the platform's place, see "Logs"), a path, or `off`. Unset: no file, unless `bolo serve` runs as a service |
+| `log_max_mb` | `10` | | rotate the log file at this size |
+| `log_backups` | `3` | | rotated files kept (`server.log.1`, `server.log.2`, ...) |
 | `trace_buffer` | `1000` | | request traces kept in memory |
 | `fake_engine` | `false` | `--fake-engine` | add deterministic test models (development) |
 | `tts_servers` | `[]` | | external TTS servers the operator runs, as `"<model id or runtime>=<url>"`, e.g. `"llama-server=http://127.0.0.1:8080"` (every llama-server model goes there) or `"voxcpm2-audiocpp=http://gpu-box:8080"` (one model). A model id or alias wins over a runtime name. Such a model needs no download and no binary; for audio.cpp the server's config must declare the model under the id in the entry's `options.server_model` (the catalog id). See models.md, "External TTS servers" |
@@ -139,14 +150,24 @@ memory_budget_mb = 3000
 
 # with an accelerator (device = "cuda"): models that do not fit in free VRAM go on the CPU
 device = "cuda"
+gpus = [0, 1]                         # the GPUs bolo may use (after CUDA_VISIBLE_DEVICES)
 [gpu]
 reserve_mb = 1024                     # gpu_reserve_mb
 memory_budget_mb = 8000               # gpu_memory_budget_mb
+spread = false                        # gpu_spread
 
 [scheduler]
 threads = 4
+num_parallel = 2                      # requests each model works on at once (OLLAMA_NUM_PARALLEL)
 max_batch = 8
 max_queue = 32
+
+[llama]                               # llama-servers bolo starts: llama_kv_cache_type, llama_flash_attention
+kv_cache_type = "q8_0"
+flash_attention = "on"
+
+[log]
+file = "auto"                         # log_file: also write the platform's log file (see "Logs")
 
 [tts]
 # a llama-server you run yourself serves every llama-server model; audio.cpp models are started by bolo
@@ -258,12 +279,138 @@ with them on, since ONNX Runtime fuses nodes differently on each side of the cut
 
 None of this has run on a real GPU in bolo's tests: it is tested with fake NVML readings and made-up memory figures.
 
+### Several GPUs
+
+On a machine with several NVIDIA GPUs:
+
+* **Which GPUs.** `gpus = [0, 2]` (`BOLO_GPUS=0,2`, `bolo serve --gpus 0,2`) limits bolo to those; empty means all
+  of them. The numbers are CUDA's as bolo's process sees them: with `CUDA_VISIBLE_DEVICES=2,3` set, GPU 2 is `0`
+  and GPU 3 is `1`, exactly as for `cuda:N` (bolo reads `CUDA_VISIBLE_DEVICES`, by index or `GPU-<uuid>`, and maps
+  NVML's numbers to CUDA's; `/api/v1/ps` lists both, `index` and `physical_index`). The servers and plugins bolo
+  starts inherit the variable, so the numbers mean the same to them.
+* **Which GPU for a model.** `device = "cuda"` (or `auto`) names no GPU: each model goes on the allowed GPU with
+  the most memory available when it is loaded (free memory minus `gpu_reserve_mb`, within what is left of
+  `gpu_memory_budget_mb`, which counts all GPUs together). `cuda:1`, set or pinned for a model, means that GPU.
+* **Spreading a model.** A llama.cpp model that does not fit whole on the best GPU is spread over the allowed GPUs
+  by layers, in proportion to the memory each has, when that puts more layers on GPUs than one GPU would (Ollama's
+  rule); the GPU with the most memory is the main one (it also holds the projector and the KV cache share). bolo
+  starts llama-server with `--split-mode layer --tensor-split a,b,... --main-gpu N`. A model that fits on one GPU
+  gets `--split-mode none --main-gpu N`, because llama-server would otherwise spread it over every visible GPU.
+  `gpu_spread = true` (Ollama's `OLLAMA_SCHED_SPREAD`) spreads every llama.cpp model over all allowed GPUs, which
+  can help a model that is slow on one GPU and costs PCIe traffic between them. Arguments you give llama-server
+  yourself (`-sm`, `-mg`, `-ts`, `--device`) win, and bolo then leaves the GPUs to them.
+* **Other runtimes take one GPU each.** ONNX Runtime and faster-whisper models get the chosen GPU's number
+  (`cuda:N`); bolo-torch plugin models get it in accelerate's `max_memory`. sherpa-onnx cannot choose a GPU and
+  always uses GPU 0, so its models are placed on GPU 0 or, when `gpus` leaves GPU 0 out, on the CPU with a notice.
+  audio.cpp servers get the `cuda` backend and use their default GPU.
+* **What you see.** `bolo ps` has a GPU column (`0`, `0,1` for a spread model, `-` on the CPU) and marks GPUs the
+  `gpus` setting leaves out; `/api/v1/ps` gives `gpus` per model, `placement.gpu_bytes_by_gpu`,
+  `placement.tensor_split` and `main_gpu` for a spread model, and per GPU `allowed` and `models_vram_bytes`. The
+  console's Loaded models panel shows a memory bar per GPU.
+
+None of this has run on a machine with two GPUs: it is tested with a fake NVML of several made-up GPUs and with
+llama-server command lines that are built but not run.
+
+### llama.cpp speed and memory
+
+Four settings reach every llama-server bolo starts (tts-server and Orpheus-family voices, and the
+speech-to-speech server). Each can be set for all of them (`llama_flash_attention`, `llama_kv_cache_type`,
+`llama_context_size`, `llama_batch_size`), per catalog entry (`options.flash_attention`, `kv_cache_type`,
+`context_size`, `batch_size`) or per model at run time (`PUT /api/v1/models/{id}/settings`, or
+`bolo models config <id> --set kv_cache_type=q8_0`). The pin wins over the catalog, the catalog over the setting,
+and an argument you wrote yourself (`tts_server_args`, `s2s_server_args`, a catalog `server_args`: `-fa`,
+`--cache-type-k`, `-c`, `-b` in any spelling) wins over all of them. A change applies when the model is next
+loaded (`bolo stop <model>` unloads it).
+
+| Setting | llama-server | What it trades |
+| --- | --- | --- |
+| flash attention: `on`, `off`, `auto` | `-fa` | the same attention computed in fewer passes over memory: less memory for the KV cache's work buffers and faster prompt processing on CUDA and Metal. Output is the same up to float rounding. For a voice the prompts are short, so the gain is small: about 0 to 15% faster generation on a recent NVIDIA GPU [estimate]; on a CPU it can be slower [estimate]. llama-server's default `auto` turns it on where the backend supports it |
+| KV cache type: `f16`, `q8_0`, `q4_0` | `--cache-type-k`, `--cache-type-v` | the memory of the cache that holds every token so far. A 3B Llama-architecture voice (Orpheus 3B: 28 layers, 8 KV heads of 128) needs 112 KB per token in `f16`, so about 900 MB for an 8192-token context; `q8_0` about 500 MB, `q4_0` about 260 MB (arithmetic, not measured). `q8_0` is close to lossless for text models; `q4_0` loses more. For voices, whose tokens are audio codes, nobody has measured it here: expect `q8_0` to sound the same and `q4_0` to risk mispronunciations and artefacts on long sentences [estimate]. Speed is about the same [estimate]. A quantized V cache needs flash attention, so bolo adds `-fa on` with one unless flash attention is set |
+| context size | `-c` | memory (the KV cache grows with it) against the longest prompt plus generated audio a request can have. An Orpheus-family voice writes up to `max_new_tokens` (2048) audio tokens per piece of text, so keep each slot at 3072 or more [estimate]. With `--parallel N` some llama-server builds divide the context between the slots |
+| batch size | `-b` | prompt tokens processed per step: a larger batch processes long prompts faster and needs a larger compute buffer. Voice prompts are short, so it rarely matters [estimate] |
+
+None of these has been measured on a GPU with bolo yet; the values marked [estimate] are expectations from
+llama.cpp's own documentation and the arithmetic above.
+
+### Parallel requests and queues
+
+Every loaded model has a queue (`bolo/scheduler.py`): requests wait there, `num_parallel` of them run at once,
+compatible requests waiting together run as one micro-batch where the engine can (`max_batch`, `batch_wait_ms`),
+and when `max_queue` requests are already waiting the next one is refused at once with `429` and a `Retry-After`
+(the backpressure), rather than waiting without limit; a request that waited longer than `queue_timeout_s` fails.
+
+| Ollama | bolo | Notes |
+| --- | --- | --- |
+| `OLLAMA_NUM_PARALLEL` | `num_parallel` (the same knob as the older `workers`, used when `num_parallel` is `0`) | per model; a catalog entry's `options.num_parallel` (or `options.workers`) or a pin (`--set num_parallel=2`) wins. A llama-server bolo starts for a voice gets `--parallel N` with it (above 1), so that the server holds N requests at once; the speech-to-speech server keeps `s2s_parallel` |
+| `OLLAMA_MAX_QUEUE` | `max_queue` | per model in bolo (Ollama counts the whole server); `options.max_queue` or a pin wins |
+| (micro-batching) | `max_batch`, `batch_wait_ms` | nothing like it in Ollama |
+
+Changes apply when the model is next loaded. `bolo ps -v` shows per model ACTIVE (requests and sessions using
+it), QUEUED (requests waiting) and PARALLEL; `/api/v1/ps` has `running`, `queued`, `num_parallel` and `max_queue`
+per model. More in parallel helps only while the hardware has room: on a CPU, each request's threads (`threads`)
+share the cores, so `num_parallel` × `threads` should stay near the number of cores.
+
+## Logs
+
+`bolo serve` always logs to its standard error. With `log_file` it also writes a file, rotated at `log_max_mb`
+(10 MB) with `log_backups` (3) older files kept. `log_file = "auto"` puts it in the platform's place:
+
+| Where bolo runs | Where the log is |
+| --- | --- |
+| Linux, `bolo serve` in a terminal | the terminal; with `log_file = "auto"`: `$XDG_STATE_HOME/bolo/logs/server.log` (`~/.local/state/bolo/logs/server.log`) |
+| macOS | the terminal; with `log_file = "auto"`: `~/Library/Logs/bolo/server.log` (Console.app shows it) |
+| Windows | the console; with `log_file = "auto"`: `%LOCALAPPDATA%\bolo\logs\server.log`. Run as a Windows service (NSSM, Task Scheduler), set `BOLO_LOG_FILE=auto`: bolo cannot tell it is a service there |
+| the systemd unit (`deploy/systemd/bolo.service`) | `journalctl -u bolo`, and `/var/lib/bolo/logs/server.log` (the unit sets `BOLO_LOG_FILE`; without it, a service writes the `auto` place of its user) |
+| launchd (macOS) | the job's `StandardErrorPath`, and `~/Library/Logs/bolo/server.log` |
+| Docker (`deploy/Dockerfile`) | `docker logs <container>`; no file unless you set `BOLO_LOG_FILE=/data/logs/server.log` (in the `/data` volume) |
+
+Unset, `log_file` is off, except when `bolo serve` runs under systemd (it sets `INVOCATION_ID`) or launchd (it sets
+`XPC_SERVICE_NAME` to the job's label), where it means `auto`; `log_file = "off"` switches that off too.
+
+`bolo logs` prints the last 100 lines of the log file (`--lines N`, `0` for all; `-f` keeps following it, across
+rotations). It asks the running server (`--url`, default `$BOLO_URL` or `http://127.0.0.1:8000`) which file it
+writes (`GET /api/v1/info` has `log_file`), else uses the settings, else the platform's place when a file is there.
+`bolo doctor` says where the logs are.
+
+## Coming from Ollama
+
+bolo borrows Ollama's model handling. What each `OLLAMA_*` variable is called here (as a setting; its environment
+variable is `BOLO_` and the name in capitals):
+
+| Ollama | bolo | Notes |
+| --- | --- | --- |
+| `OLLAMA_HOST` | `host`, `port` | two settings; bolo listens on `127.0.0.1:8000` |
+| `OLLAMA_MODELS` | `data_dir` | models are under `<data_dir>/models` |
+| `OLLAMA_KEEP_ALIVE` | `keep_alive` | the same values (`5m`, `0`, `-1`); per-task `stt_ttl_s`, `tts_ttl_s`, ... override it |
+| `OLLAMA_MAX_LOADED_MODELS` | `max_loaded_models` | plus `memory_budget_mb` and `gpu_memory_budget_mb` |
+| `OLLAMA_NUM_PARALLEL` | `num_parallel` | per model, see "Parallel requests and queues" |
+| `OLLAMA_MAX_QUEUE` | `max_queue` | per model |
+| `OLLAMA_SCHED_SPREAD` | `gpu_spread` | llama.cpp models only |
+| `OLLAMA_GPU_OVERHEAD` | `gpu_reserve_mb` | in MB, per GPU |
+| `CUDA_VISIBLE_DEVICES` | `CUDA_VISIBLE_DEVICES`, or `gpus` | both are honoured; `gpus` numbers the GPUs that are visible |
+| `OLLAMA_FLASH_ATTENTION` | `llama_flash_attention` | llama-server voices and the speech-to-speech server |
+| `OLLAMA_KV_CACHE_TYPE` | `llama_kv_cache_type` | the same values (`f16`, `q8_0`, `q4_0`) |
+| `OLLAMA_CONTEXT_LENGTH` | `llama_context_size` | |
+| `OLLAMA_ORIGINS` | `cors_origins` | |
+| `OLLAMA_DEBUG` | `log_level = "debug"` | |
+| `OLLAMA_LOAD_TIMEOUT` | `tts_server_start_timeout_s` | for the servers bolo starts |
+| `OLLAMA_NOPRUNE`, `OLLAMA_NOHISTORY`, `OLLAMA_LLM_LIBRARY` | none | |
+
+And the commands: `ollama list` / `ps` / `show` / `rm` / `cp` / `run` / `stop` are `bolo list` / `ps` / `show` /
+`rm` / `cp` / `load` (or `run`) / `stop`; `ollama pull` is `bolo pull`; the server's log is `bolo logs`. `bolo cp`
+makes a preset: a new name for the same files with settings of its own (README, "Models"; api.md,
+`POST /api/v1/models/copy`).
+
 ## Per-model options
 
 A catalog entry (or a custom entry in `<data_dir>/custom.yaml`) may carry
 `options` that override the server-wide values for that model: `threads`,
-`workers`, `max_batch`, `max_chunk_s`, and engine-specific keys such as
-`beam_size` or `compute_type` for faster-whisper.
+`num_parallel` (or its older name `workers`), `max_queue`, `max_batch`, `max_chunk_s`,
+the llama.cpp settings `flash_attention`, `kv_cache_type`, `context_size` and
+`batch_size`, and engine-specific keys such as `beam_size` or `compute_type` for
+faster-whisper. `num_parallel`, `max_queue` and the four llama.cpp settings can
+also be pinned with `PUT /api/v1/models/{id}/settings` (or
+`bolo models config <id> --set key=value`), which wins over the catalog.
 
 `fallback` (a list of model ids of the same task) names what answers instead
 when the model is unavailable, overloaded or, for a cloud model, its provider

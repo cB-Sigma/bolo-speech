@@ -56,6 +56,14 @@ class LoadOptions:
     #: ONNX Runtime graphs cut in two (bolo.onnx_split): role ("model" for a single-graph model) -> bytes of
     #: weights the front half may put on ``device_for(role)``; the back half runs on the CPU
     graph_split: dict[str, int] = field(default_factory=dict)
+    #: llama.cpp models on NVIDIA GPUs: the GPUs the layers go on, each one's share (several GPUs) and the main GPU
+    gpus: list[int] = field(default_factory=list)
+    tensor_split: list[float] | None = None
+    main_gpu: int | None = None
+    #: NVIDIA GPUs this process can see (``--tensor-split`` takes one share per visible GPU)
+    visible_gpus: int = 1
+    #: requests the model works on at once (``num_parallel``); a llama-server bolo starts gets ``--parallel``
+    parallel: int = 1
 
     def device_for(self, role: str) -> str:
         """The device of one graph of a multi-graph model."""

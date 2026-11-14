@@ -108,6 +108,10 @@ class ModelQueue:
     def workers(self) -> int:
         return self._workers_n
 
+    @property
+    def max_queue(self) -> int:
+        return self._max_queue
+
     def batch_limit(self, kind: str) -> int:
         if isinstance(self._max_batch, int):
             return max(1, self._max_batch)

@@ -18,6 +18,8 @@ Group=bolo
 Environment=BOLO_DATA_DIR=/var/lib/bolo/models
 Environment=BOLO_HOST=127.0.0.1
 Environment=BOLO_PORT=8000
+# the log also goes to the journal: journalctl -u bolo; `bolo logs -f` reads this file
+Environment=BOLO_LOG_FILE=/var/lib/bolo/logs/server.log
 EnvironmentFile=-/etc/bolo.env
 ExecStart=/var/lib/bolo/venv/bin/bolo serve
 Restart=on-failure

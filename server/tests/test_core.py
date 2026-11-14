@@ -121,7 +121,7 @@ async def test_stats_shape(core: Bolo) -> None:
     }  # fmt: skip
     assert set(stats["system"]) == {
         "cpu_percent", "rss_bytes", "threads", "ram_total_bytes", "ram_available_bytes", "gpus", "accelerator_source",
-        "models_vram_bytes", "models_ram_bytes",
+        "models_vram_bytes", "models_ram_bytes", "gpu_spread",
     }  # fmt: skip
     assert stats["totals"]["requests"] == 2 and stats["totals"]["audio_seconds_in"] == 1.0
     by_id = {m["id"]: m for m in stats["models"]}

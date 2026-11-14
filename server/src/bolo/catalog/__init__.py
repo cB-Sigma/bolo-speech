@@ -71,6 +71,8 @@ class ModelSpec:
     not_runnable_reason: str | None = None
     #: a ``provider:model`` id that was asked for by name and is not a curated entry
     adhoc: bool = False
+    #: a preset (``bolo cp``): this entry is a copy of that model, with the same files and its own settings
+    preset_of: str | None = None
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> ModelSpec:
@@ -153,8 +155,10 @@ class ModelSpec:
         for name in self.__dataclass_fields__:
             if name == "source":
                 out["source"] = self.source.to_dict()
-            elif name in ("cloud", "adhoc", "not_runnable_reason") and not getattr(self, name):
+            elif name in ("cloud", "adhoc", "not_runnable_reason", "preset_of") and not getattr(self, name):
                 continue  # defaults stay out of custom.yaml
+            elif name == "builtin" and self.builtin:
+                out[name] = True  # a preset of a built-in model
             elif name == "runnable" and self.runnable:
                 continue  # (so does this one)
             elif name not in ("custom", "builtin") and not (name == "status" and self.status is None):
@@ -227,6 +231,8 @@ class ModelSpec:
             # a paid cloud API: nothing is downloaded, and audio or text leaves this server
             "cloud": self.cloud,
             "notice": CLOUD_NOTICE if self.cloud else None,
+            # a preset (`bolo cp`): the model whose files this entry uses, with settings of its own
+            "preset_of": self.preset_of,
             # what the model needs to run well, when the catalog says (options.hardware), e.g.
             # {"gpu": "recommended", "vram_gb": 3.5, "note": "..."}; null for entries that run fine on a CPU
             "hardware": self.options.get("hardware"),

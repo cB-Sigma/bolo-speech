@@ -112,9 +112,11 @@ and later sentences of an abandoned request are never synthesised.
 **Isolation.** If a batched engine call raises, the jobs are retried one by
 one, so a single bad input fails alone.
 
-**Threads.** `workers` (default 1) is the number of concurrent engine calls
-per model; `threads` is the intra-op thread count each call may use (default:
-CPU count, at most 4, divided by `workers`). One worker with all cores and
+**Threads.** `num_parallel` (Ollama's name; `workers`, default 1, when it is
+0) is the number of concurrent engine calls per model, and can be set per
+model like `max_queue` (configuration.md, "Parallel requests and queues");
+`threads` is the intra-op thread count each call may use (default:
+CPU count, at most 4, divided by `num_parallel`). One worker with all cores and
 batching is the right default for speech-to-text on a small machine. More
 workers with fewer threads each can help text-to-speech throughput.
 
@@ -182,6 +184,17 @@ cannot be told apart. `memory_budget_mb` counts each model's RAM side,
 result: size, `size_vram`, `PROCESSOR` ("100% GPU", "100% CPU",
 "35%/65% CPU/GPU"), device and time until unload.
 
+**Several GPUs.** With NVIDIA GPUs, `accel.py` numbers them as CUDA does in
+this process (it applies `CUDA_VISIBLE_DEVICES`), the `gpus` setting narrows
+them, and `ModelManager._place_gpus` runs the decision above once per allowed
+GPU and keeps the one with the most memory available. For a llama.cpp model
+that does not fit whole there (or always, with `gpu_spread`),
+`placement.plan_spread` shares its layers over the GPUs in proportion to their
+free memory; the result reaches llama-server as `--tensor-split` and
+`--main-gpu` (`bolo/llama_args.py`), and one-GPU placements get
+`--split-mode none --main-gpu N` so llama-server does not spread them itself.
+The eviction step counts what unloading idle models would give back per GPU.
+
 A single ONNX graph that does not fit (or the largest graph of a multi-graph
 model) is cut in two at a layer boundary when `onnx_split = "auto"`
 (`bolo/onnx_split.py`): every prefix of a graph's node list is a valid front,
@@ -199,6 +212,10 @@ and nvidia-smi readings, the GPU budget and eviction, `-ngl` and the per-graph
 providers are tested with fake NVML modules and made-up memory figures only;
 graph cuts are tested with both halves on the CPU (outputs compared with the
 whole graph on small built graphs, and on Smart Turn and Nemotron where cached).
+Several GPUs (`gpus`, `gpu_spread`, `CUDA_VISIBLE_DEVICES`, `--tensor-split`)
+are tested with a fake NVML of several made-up GPUs, and the llama-server
+arguments for GPUs, flash attention, the KV cache type and parallel slots by
+the command lines bolo builds, without running llama-server.
 
 ## The model store
 

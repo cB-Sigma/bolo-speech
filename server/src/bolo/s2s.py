@@ -649,7 +649,8 @@ class S2SManager:
     def _process(self, name: str, path: Path, options: dict[str, Any]) -> ServerProcess:
         import os
 
-        from bolo.engines.tts_server import ServerProcess, free_port, gpu_layer_args
+        from bolo.engines.base import LoadOptions
+        from bolo.engines.tts_server import ServerProcess, free_port, llama_server_args
         from bolo.tts_runtimes import LLAMA, RUNTIME_INFO, find_binary
 
         s = self.core.settings
@@ -668,10 +669,17 @@ class S2SManager:
         argv = [str(binary), "-m", str(model_file), "--host", "127.0.0.1", "--port", str(port), "--api-key", key]
         if options.get("mmproj_file"):
             argv += ["-mm", str(path / str(options["mmproj_file"]))]
-        argv += ["-t", str(s.resolved_threads()), "--parallel", str(max(1, s.s2s_parallel))]
         extra = [str(a) for a in options.get("server_args") or []] + list(s.s2s_server_args)
-        self.placement = self.core.manager.place_llama_server(name, path, options, extra)
-        argv += gpu_layer_args(self.placement.device, self.placement.gpu_layers, extra)
+        self.placement = p = self.core.manager.place_llama_server(name, path, options, extra)
+        opts = LoadOptions(
+            threads=s.resolved_threads(), device=p.device,
+            gpu_layers=p.gpu_layers if p.split == "layers" and not p.operator_layers else None,
+            gpus=list(p.gpus) if p.device.startswith("cuda") else [], tensor_split=p.tensor_split,
+            main_gpu=p.main_gpu, visible_gpus=max(1, len(self.core.manager.accel.cuda_devices())),
+        )  # fmt: skip
+        # flash attention, KV cache type, context and batch size: pinned for the model, its catalog options, settings
+        tuning = {**options, **self.core.store.model_settings(name)}
+        argv += llama_server_args(s, tuning, opts, extra, parallel=max(1, s.s2s_parallel))
         env = {
             "LD_LIBRARY_PATH": os.pathsep.join(
                 p for p in (str(binary.parent), os.environ.get("LD_LIBRARY_PATH", "")) if p

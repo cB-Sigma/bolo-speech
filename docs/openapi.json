@@ -1334,6 +1334,97 @@
     }
    }
   },
+  "/api/v1/models/copy": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Copy a model's settings to a new name (a preset)",
+    "description": "Like Ollama's ``/api/copy``: ``destination`` becomes a preset of ``source``, a catalog entry that uses the same\nfiles and starts with the same settings (catalog options and pinned settings), which can then be changed with\n``PUT /api/v1/models/{destination}/settings`` without touching ``source``. Nothing is downloaded or copied on\ndisk; deleting the preset leaves the files alone.",
+    "operationId": "copy_api_v1_models_copy_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CopyRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/models/{model_id}/show": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Everything about one model (bolo show)",
+    "description": "The catalog entry plus its files and sizes, the settings that apply (``effective``: device, keep-alive,\nnum_parallel, max_queue and, for llama.cpp voices, the llama-server tuning), the presets made from it and its\nspeed (the catalog's measurements, this server's, and the expected real-time factor here). ``?license=true``\nadds the text of a licence file shipped with the model (``license_text``).",
+    "operationId": "show_details_api_v1_models__model_id__show_get",
+    "parameters": [
+     {
+      "name": "model_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Model Id"
+      }
+     },
+     {
+      "name": "license",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "default": false,
+       "title": "License"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/models/{model_id}": {
    "delete": {
     "tags": [
@@ -2729,6 +2820,27 @@
     "type": "object",
     "title": "BenchRequest"
    },
+   "CopyRequest": {
+    "properties": {
+     "source": {
+      "type": "string",
+      "title": "Source",
+      "description": "The model to copy (an id or alias)."
+     },
+     "destination": {
+      "type": "string",
+      "title": "Destination",
+      "description": "The new name: lowercase letters, digits, '.', '_' and '-'."
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "source",
+     "destination"
+    ],
+    "title": "CopyRequest"
+   },
    "HTTPValidationError": {
     "properties": {
      "detail": {
@@ -2858,6 +2970,87 @@
       ],
       "title": "Keep Alive",
       "description": "Pin how long the model stays loaded when idle: seconds or a duration ('10m'); -1 keeps it loaded; 0 unloads it after each request; null removes the pin."
+     },
+     "num_parallel": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Num Parallel",
+      "description": "Requests the model works on at once (Ollama's num_parallel; a llama-server bolo starts gets --parallel). Applies from the next load; null removes the pin."
+     },
+     "max_queue": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Queue",
+      "description": "Requests that may wait for the model before it answers 429. Applies from the next load; null removes the pin."
+     },
+     "flash_attention": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "off",
+         "auto",
+         "on"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Flash Attention",
+      "description": "llama.cpp models: flash attention (-fa) of the llama-server bolo starts. Applies from the next load; null removes the pin."
+     },
+     "kv_cache_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Kv Cache Type",
+      "description": "llama.cpp models: K and V cache type (f16, q8_0, q4_0, ...), like OLLAMA_KV_CACHE_TYPE. Applies from the next load; null removes the pin."
+     },
+     "context_size": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Context Size",
+      "description": "llama.cpp models: context size (-c); 0: llama-server's default."
+     },
+     "batch_size": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Batch Size",
+      "description": "llama.cpp models: batch size (-b); 0: llama-server's default."
      }
     },
     "additionalProperties": false,

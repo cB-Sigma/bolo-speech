@@ -86,7 +86,9 @@ bolo pull moonshine-tiny-en       # 124 MB, the fastest English recogniser here
 bolo transcribe recording.wav -m moonshine-tiny-en
 bolo speak "Hello there." -o hello.wav -m kokoro-v1.0-int8 --voice af_heart
 bolo ps                           # what a running server has in memory: size, CPU/GPU, time until unload
-bolo doctor                       # engines, codecs, components, this machine
+bolo show kokoro-v1.0-int8        # licence, files, settings, voices, speed (`bolo list`, `rm`, `cp` as in Ollama)
+bolo logs -f                      # the server's log file, when it writes one (log_file)
+bolo doctor                       # engines, codecs, components, this machine, where the logs are
 ```
 
 For a voice agent, point bolo at any OpenAI-compatible language model and connect a Realtime client to `ws://127.0.0.1:8000/v1/realtime` (or open the console's Conversation page):
@@ -114,7 +116,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | **A web console** | playgrounds, the catalog, latency dashboards, benchmarks, conversations, calls, served by the same process | [below](#the-console) |
 | **Engine plugins** | models that need another runtime run out of process behind the same API: [bolo-torch](https://github.com/cB-Sigma/bolo/blob/main/plugins/bolo-torch/README.md) for PyTorch models | [plugins.md](https://github.com/cB-Sigma/bolo/blob/main/docs/plugins.md) |
 | **Wyoming** | speech-to-text and text-to-speech for Home Assistant on one TCP port | [api.md](https://github.com/cB-Sigma/bolo/blob/main/docs/api.md#wyoming-protocol), [examples/home_assistant.md](https://github.com/cB-Sigma/bolo/blob/main/examples/home_assistant.md) |
-| **Ollama-style model scheduling** | each model goes on the GPU when it fits in free VRAM and on the CPU when it does not (llama.cpp models split by layers, ONNX models by graph or cut in two at a layer boundary); `keep_alive` per request, `bolo ps` with size, CPU/GPU split and time until unload, `bolo load` / `bolo stop`, a "Loaded models" panel in the console. GPU side tested with fakes only | [configuration.md](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md#gpu-and-cpu-placement), [api.md](https://github.com/cB-Sigma/bolo/blob/main/docs/api.md#keep-alive) |
+| **Ollama-style model scheduling** | each model goes on the GPU when it fits in free VRAM and on the CPU when it does not (llama.cpp models split by layers, ONNX models by graph or cut in two at a layer boundary); several GPUs (`gpus`, `gpu_spread`, `--tensor-split` for llama.cpp); `keep_alive` per request, `num_parallel` and `max_queue` per model, flash attention and a quantized KV cache for llama.cpp voices; `bolo ps` with size, CPU/GPU split, GPU and time until unload, `bolo load` / `stop` / `show` / `rm` / `cp` (presets) / `logs`, a "Loaded models" panel in the console; `OLLAMA_*` variables mapped. GPU side tested with fakes only | [configuration.md](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md#gpu-and-cpu-placement), [coming from Ollama](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md#coming-from-ollama), [api.md](https://github.com/cB-Sigma/bolo/blob/main/docs/api.md#keep-alive) |
 | **Server behaviour** | per-model queues with micro-batching, backpressure (`429`, not a growing delay), cancellation, lazy loading, idle unloading, a memory budget, resumable verified downloads, Prometheus metrics, and a phase-by-phase trace of every request | [architecture.md](https://github.com/cB-Sigma/bolo/blob/main/docs/architecture.md), [configuration.md](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md) |
 
 ## Models and licences

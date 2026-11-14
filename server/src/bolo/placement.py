@@ -18,6 +18,11 @@ everything else           whole model on one device (sherpa-onnx owns its sessio
                           CTranslate2/faster-whisper: one device per model)
 ========================= ==========================================================================================
 
+Several NVIDIA GPUs (``gpus``, ``gpu_spread``): a model that names no GPU (``device = "cuda"``) goes on the allowed
+GPU with the most memory available. A llama.cpp model that does not fit whole on that GPU is spread over several by
+layers (llama-server's ``--tensor-split``), as Ollama does; with ``gpu_spread`` every llama.cpp model is spread over
+all allowed GPUs. Other runtimes cannot split a model across GPUs: they take one GPU each.
+
 The pure functions here take the free memory as a number, so tests drive them with made-up figures.
 """
 
@@ -115,6 +120,13 @@ class Placement:
     notice: str | None = None
     #: the free accelerator memory was known when the decision was made
     measured: bool = True
+    #: CUDA GPUs the model's weights are on (several: llama.cpp layers spread with ``--tensor-split``)
+    gpus: list[int] = field(default_factory=list)
+    #: planned accelerator bytes per GPU
+    gpu_bytes_by_gpu: dict[int, int] = field(default_factory=dict)
+    #: llama.cpp across several GPUs: each GPU's share of the layers (in ``gpus`` order) and the main GPU
+    tensor_split: list[float] | None = None
+    main_gpu: int | None = None
 
     @property
     def on_gpu(self) -> bool:
@@ -142,6 +154,11 @@ class Placement:
             out["max_memory"] = dict(self.max_memory)
         if self.graph_split:
             out["graph_split"] = dict(self.graph_split)
+        out["gpus"] = list(self.gpus)
+        if self.gpu_bytes_by_gpu:
+            out["gpu_bytes_by_gpu"] = {str(k): v for k, v in sorted(self.gpu_bytes_by_gpu.items())}
+        if self.tensor_split is not None:
+            out.update(tensor_split=list(self.tensor_split), main_gpu=self.main_gpu)
         return out
 
 
@@ -283,6 +300,68 @@ def assign_graphs(graphs: dict[str, int], available_bytes: int, overhead: float 
         else:
             out[role] = False
     return out
+
+
+# -- several GPUs ----------------------------------------------------------------------------------------------
+def best_gpu(available: dict[int, int | None]) -> int:
+    """The GPU with the most memory available (unknown counts as none); the lowest number on a tie."""
+    return min(available, key=lambda i: (-(available[i] or 0), i))
+
+
+def spread_layers(layers: LayerInfo, available: dict[int, int], overhead: float = LLAMA_OVERHEAD) -> dict[int, int]:
+    """llama.cpp layers per GPU when a model is spread over several (``--tensor-split``): as many layers as fit in
+    all of them together, shared in proportion to what each has available. The projector and the share for the KV
+    cache and buffers are counted on the GPU with the most memory (llama.cpp's main GPU)."""
+    usable = {i: max(0, int(a)) for i, a in available.items()}
+    if not usable:
+        return {}
+    main = best_gpu(dict(usable))
+    usable[main] = max(0, usable[main] - layers.extra_bytes - int(layers.file_bytes * overhead))
+    room = sum(usable.values())
+    if room <= 0:
+        return {}
+    n = layers.total_layers if room >= layers.file_bytes else max(0, math.floor(room / layers.per_layer))
+    n = min(n, sum(math.floor(u / layers.per_layer) for u in usable.values()) if n < layers.total_layers else n)
+    if n <= 0:
+        return {}
+    # largest remainder: each GPU's share of n, never more layers than fit on it
+    exact = {i: n * u / room for i, u in usable.items()}
+    out = {i: math.floor(x) for i, x in exact.items()}
+    for i in sorted(exact, key=lambda i: (-(exact[i] - out[i]), i)):
+        if sum(out.values()) >= n:
+            break
+        out[i] += 1
+    return {i: k for i, k in out.items() if k > 0}
+
+
+def plan_spread(
+    *,
+    model_id: str,
+    requested: str,
+    layers: LayerInfo,
+    available: dict[int, int],
+) -> Placement:
+    """A llama.cpp model spread over several GPUs by layers."""
+    per_gpu = spread_layers(layers, available)
+    n = sum(per_gpu.values())
+    p = Placement(device="cpu", requested=requested, split="layers", total_layers=layers.total_layers, gpu_layers=n)
+    p.gpu_bytes, p.cpu_bytes = layer_split(layers, n)
+    if n <= 0:
+        free = sum(max(0, a) for a in available.values()) // MB
+        p.notice = f"'{model_id}' does not fit in {free} MB on GPUs {', '.join(map(str, sorted(available)))}: it runs on the CPU"
+        return p
+    gpus = sorted(per_gpu)
+    main = best_gpu({i: available[i] for i in gpus})
+    p.device = f"cuda:{main}"
+    p.gpus = gpus
+    p.main_gpu = main
+    p.tensor_split = [round(per_gpu[i] / n, 4) for i in gpus]
+    weights = p.gpu_bytes - layers.extra_bytes if n else 0
+    p.gpu_bytes_by_gpu = {i: int(weights * per_gpu[i] / n) for i in gpus}
+    p.gpu_bytes_by_gpu[main] += p.gpu_bytes - sum(p.gpu_bytes_by_gpu.values())  # the projector and rounding
+    if n < layers.total_layers:
+        p.notice = f"'{model_id}': {n} of {layers.total_layers} layers on GPUs {', '.join(map(str, gpus))}; the rest on the CPU"
+    return p
 
 
 # -- the decision ----------------------------------------------------------------------------------------------

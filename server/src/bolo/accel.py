@@ -8,6 +8,10 @@ server (and the processes it started) holds.
   ``process_bytes: null``).
 * Anything else: nothing is reported, and the scheduler treats free accelerator memory as unknown.
 
+NVIDIA devices are numbered as CUDA numbers them in this process: when ``CUDA_VISIBLE_DEVICES`` is set (indices or
+``GPU-<uuid>`` prefixes), only the GPUs it lists are reported, in its order, as 0, 1, ...; ``physical_index`` keeps
+the number NVML and nvidia-smi use. The ``gpus`` setting and ``cuda:N`` devices use the CUDA numbers.
+
 Everything here is best effort and never raises; tests pass a fake NVML module or command runner. None of it has
 run on a real GPU in bolo's CI (docs/architecture.md, "Placement").
 """
@@ -50,6 +54,9 @@ class DeviceMemory:
     #: accelerator memory held by this server and the processes it started; None when it cannot be told
     process_bytes: int | None = None
     source: str = ""
+    #: the number NVML and nvidia-smi give the GPU (differs from ``index`` under CUDA_VISIBLE_DEVICES)
+    physical_index: int | None = None
+    uuid: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -64,6 +71,8 @@ class DeviceMemory:
             "utilization": self.utilization,
             "process_bytes": self.process_bytes,
             "source": self.source,
+            "physical_index": self.physical_index if self.physical_index is not None else self.index,
+            "uuid": self.uuid,
         }
 
 
@@ -115,6 +124,7 @@ class Accelerators:
         virtual_memory: Callable[[], Any] | None = None,
         max_age_s: float = 2.0,
         which: Callable[[str], str | None] | None = None,
+        environ: dict[str, str] | None = None,
     ) -> None:
         self._nvml = nvml
         self._nvml_tried = nvml is not None
@@ -127,6 +137,13 @@ class Accelerators:
         self._vm = virtual_memory or psutil.virtual_memory
         self.max_age_s = max_age_s
         self._cache: tuple[float, list[DeviceMemory]] | None = None
+        env = os.environ if environ is None else environ
+        #: CUDA_VISIBLE_DEVICES as a list (None: not set, every GPU is visible)
+        self.cuda_visible: list[str] | None = (
+            [x.strip() for x in env["CUDA_VISIBLE_DEVICES"].split(",") if x.strip()]
+            if "CUDA_VISIBLE_DEVICES" in env
+            else None
+        )
         self._lock = threading.Lock()
         #: where the last reading came from: "nvml", "nvidia-smi", "unified", or "" (nothing to ask)
         self.source = ""
@@ -166,15 +183,46 @@ class Accelerators:
         self._nvml_ready = False
 
     # -- sources --------------------------------------------------------------------------------------------
+    def cuda_devices(self) -> list[DeviceMemory]:
+        """The NVIDIA GPUs this process can use, numbered as CUDA numbers them."""
+        return [d for d in self.devices() if d.backend == "cuda"]
+
+    def _visible(self, found: list[DeviceMemory]) -> list[DeviceMemory]:
+        """Apply CUDA_VISIBLE_DEVICES: keep the GPUs it names, in its order, renumbered from 0."""
+        for d in found:
+            d.physical_index = d.index
+        if self.cuda_visible is None:
+            return found
+        out: list[DeviceMemory] = []
+        for entry in self.cuda_visible:
+            if entry.startswith("-"):
+                break  # CUDA stops at the first invalid entry ("-1" hides every GPU)
+            match = next(
+                (
+                    d
+                    for d in found
+                    if (entry.isdigit() and d.index == int(entry))
+                    or (d.uuid and not entry.isdigit() and d.uuid.lower().startswith(entry.lower()))
+                ),
+                None,
+            )
+            if match is None:
+                break
+            if match not in out:
+                out.append(match)
+        for i, d in enumerate(out):
+            d.index = i
+        return out
+
     def _read(self) -> list[DeviceMemory]:
         found = self._from_nvml()
         if found is not None:
             self.source = "nvml"
-            return found
+            return self._visible(found)
         found = self._from_smi()
         if found is not None:
             self.source = "nvidia-smi"
-            return found
+            return self._visible(found)
         if self._system == "darwin" and self._machine in ("arm64", "aarch64"):
             self.source = "unified"
             return [self._apple()]
@@ -219,6 +267,9 @@ class Accelerators:
                 with contextlib.suppress(Exception):
                     procs = nv.nvmlDeviceGetComputeRunningProcesses(handle)
                     ours = sum(int(p.usedGpuMemory or 0) for p in procs if int(p.pid) in pids)
+                uuid: str | None = None
+                with contextlib.suppress(Exception):
+                    uuid = _text(nv.nvmlDeviceGetUUID(handle))
                 out.append(
                     DeviceMemory(
                         index=i,
@@ -230,6 +281,7 @@ class Accelerators:
                         utilization=util,
                         process_bytes=ours,
                         source="nvml",
+                        uuid=uuid,
                     )
                 )
         except Exception as exc:
@@ -266,6 +318,7 @@ class Accelerators:
                 used_bytes=_mib(cells[5]),
                 utilization=_float(cells[6]),
                 source="nvidia-smi",
+                uuid=cells[1] or None,
             )
             devices.append(d)
             uuids[cells[1]] = d

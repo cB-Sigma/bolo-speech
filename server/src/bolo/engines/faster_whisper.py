@@ -30,7 +30,12 @@ class FasterWhisperSTT(STTModel):
         device = "cuda" if opts.device.startswith("cuda") else "cpu"
         compute = str(spec.get("compute_type", "int8" if device == "cpu" else "float16"))
         self.model = WhisperModel(
-            str(path), device=device, compute_type=compute, cpu_threads=opts.threads, num_workers=1
+            str(path),
+            device=device,
+            compute_type=compute,
+            cpu_threads=opts.threads,
+            num_workers=1,
+            device_index=int(opts.device.partition(":")[2] or 0) if device == "cuda" else 0,
         )
         self.batched = BatchedInferencePipeline(self.model)
         self.max_batch = int(spec.get("max_batch", 8))

@@ -369,7 +369,7 @@ async def test_models_go_on_the_gpu_while_they_fit(settings: Settings, gpu: Fake
     try:
         add(core, "a")
         a = await core.manager.load("a")
-        assert a.model.seen_device == "cuda"  # type: ignore[attr-defined]
+        assert a.model.seen_device == "cuda:0"  # type: ignore[attr-defined]  # "cuda": the GPU with the most free memory
         assert a.vram_bytes == 100 * MB and a.vram_measured and a.processor() == "100% GPU"
         assert core.manager.gpu_in_use() == 100 * MB
         # 12 GB - 1 GB used by others - 100 MB - 512 MB reserve: about 10.4 GB left; 11 GB does not fit
@@ -388,7 +388,7 @@ async def test_models_go_on_the_gpu_while_they_fit(settings: Settings, gpu: Fake
         (g,) = stats["system"]["gpus"]
         assert g["name"] == "NVIDIA GeForce RTX 3060" and g["process_bytes"] == 100 * MB and g["utilization"] == 37
         row = next(m for m in stats["models"] if m["id"] == "a")
-        assert row["processor"] == "100% GPU" and row["size_vram_bytes"] == 100 * MB and row["device"] == "cuda"
+        assert row["processor"] == "100% GPU" and row["size_vram_bytes"] == 100 * MB and row["device"] == "cuda:0"
 
         await core.manager.unload("a")
         assert gpu.ours == 0 and core.manager.gpu_in_use() == 0
@@ -660,10 +660,11 @@ def test_format_ps() -> None:
     lines = text.splitlines()
     assert lines[0].startswith("cpu 12.5%  rss 1.5 GB  ram 12.0/32.0 GB  gpu0 NVIDIA GeForce RTX 3060 vram 3.1/12.0 GB")
     assert "(bolo 2.0 GB) 41% busy" in lines[0]
-    assert lines[1].split() == ["MODEL", "TASK", "SIZE", "PROCESSOR", "DEVICE", "UNTIL"]
+    assert lines[1].split() == ["MODEL", "TASK", "SIZE", "PROCESSOR", "DEVICE", "GPU", "UNTIL"]
     assert "35%/65% CPU/GPU" in text and "4 minutes from now" in text and "Stopping..." in text
     verbose = cli.format_ps(doc, verbose=True)
     assert "ACTIVE" in verbose and "note: orpheus-3b-llamacpp: 19 of 29 layers on cuda" in verbose
+    assert verbose.splitlines()[1].split()[7:10] == ["ACTIVE", "QUEUED", "PARALLEL"]
     mac = {"system": {"cpu_percent": 1, "rss_bytes": 1, "gpus": [{"index": 0, "name": "Apple GPU (unified memory)",
            "unified": True, "used_bytes": 6 * GB, "total_bytes": 16 * GB}]}, "models": []}  # fmt: skip
     assert "unified memory 6.0/16.0 GB" in cli.format_ps(mac) and "no models loaded" in cli.format_ps(mac)

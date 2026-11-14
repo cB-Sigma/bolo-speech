@@ -17,12 +17,13 @@ import threading
 import time
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import psutil
 
-from bolo import __version__
+from bolo import __version__, logs
 from bolo.audio.decode import decode_audio
 from bolo.audio.encode import encode_audio
 from bolo.audio.resample import resample
@@ -141,6 +142,9 @@ class Bolo:
         self.catalog = Catalog.load(s.data_dir, include_fake=s.fake_engine)
         token = s.hf_token or os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
         self.store = ModelStore(s.data_dir, HubClient(s.hf_endpoint, token))
+        for spec in self.catalog.all():  # presets (`bolo cp`) use their model's files
+            if spec.preset_of:
+                self.store.links[spec.id] = spec.preset_of
         self.manager = ModelManager(s, self.catalog, self.store, self.engines, self.events, self._auto_pull)
         #: cloud providers (settings and <data_dir>/providers.json), their counters and price tables
         self.providers = ProviderRegistry(s)
@@ -270,9 +274,11 @@ class Bolo:
             "components": self.components.status(),
             "capabilities": self.capabilities(),
             "scheduler": {
-                "workers": s.workers, "threads": s.resolved_threads(), "max_batch": s.max_batch,
-                "batch_wait_ms": s.batch_wait_ms, "max_queue": s.max_queue,
+                "workers": s.workers, "num_parallel": s.parallel(), "threads": s.resolved_threads(),
+                "max_batch": s.max_batch, "batch_wait_ms": s.batch_wait_ms, "max_queue": s.max_queue,
             },
+            # the file this server also writes its log to (null: standard error only); `bolo logs` reads it
+            "log_file": str(logs.ACTIVE_LOG_FILE) if logs.ACTIVE_LOG_FILE else None,
         }  # fmt: skip
 
     def capabilities(self) -> dict[str, Any]:
@@ -416,6 +422,7 @@ class Bolo:
         size = self.store.size_on_disk(spec.id) if installed and not spec.builtin else None
         if spec.cloud:
             size, pulling = None, None
+        manifest = self.store.manifest(spec.id) if installed and not spec.builtin and not spec.cloud else None
         entry = spec.to_api(
             installed=installed,
             loaded=spec.id in self.manager.loaded,
@@ -428,6 +435,9 @@ class Bolo:
             settings=self.store.model_settings(spec.id),
         )
         entry["fallback"] = self.fallback_ids(spec)
+        # when the files were downloaded (or registered): `bolo list`'s MODIFIED
+        stamp = (manifest or {}).get("installed_at")
+        entry["modified_at"] = _iso(float(stamp)) if isinstance(stamp, (int, float)) else None
         # how well the model suits this machine (bolo.recommend); advice only, never a restriction
         try:
             entry["fit"] = self.advisor.fit(spec, stale_ok=True).to_dict()
@@ -504,6 +514,8 @@ class Bolo:
                     "depth": q.depth,
                     "inflight": q.inflight,
                     "workers": q.workers,
+                    "num_parallel": q.workers,
+                    "max_queue": q.max_queue,
                     "batches": q.stats.batches,
                     "mean_batch": round(q.stats.mean_batch, 2),
                     "max_batch": q.stats.max_batch_seen,
@@ -551,7 +563,14 @@ class Bolo:
         gpus: list[dict[str, Any]] = []
         with contextlib.suppress(Exception):
             gpus = [d.to_dict() for d in self.manager.accel.devices()]
+        allowed = set(self.manager.allowed_gpus() or [])
+        by_gpu = self.manager.gpu_use_by_gpu()
+        for g in gpus:
+            if g.get("backend") == "cuda":
+                g["allowed"] = g["index"] in allowed  # the gpus setting
+            g["models_vram_bytes"] = by_gpu.get(int(g["index"]), 0)  # what bolo's loaded models hold on it
         out["gpus"] = gpus
+        out["gpu_spread"] = self.settings.gpu_spread
         out["accelerator_source"] = self.manager.accel.source or None
         out["models_vram_bytes"] = self.manager.gpu_in_use()
         out["models_ram_bytes"] = self.manager.memory_in_use()
@@ -586,7 +605,9 @@ class Bolo:
             models.append({
                 "name": entry.id, "model": entry.id, "task": entry.spec.task,
                 "size": entry.memory_bytes, "size_vram": entry.vram_bytes, "size_ram": entry.ram_bytes,
-                "processor": fields["processor"], "device": p.device, "split": p.split,
+                "processor": fields["processor"], "device": p.device, "split": p.split, "gpus": list(p.gpus),
+                "queued": entry.queue.depth, "running": entry.queue.inflight, "num_parallel": entry.queue.workers,
+                "max_queue": entry.queue.max_queue,
                 "expires_at": fields["expires_at"], "expires_in_s": fields["expires_in_s"],
                 "until": humanize_until(fields["expires_in_s"], entry.stopping),
                 "keep_alive": format_keep_alive(fields["keep_alive_s"]), "keep_alive_s": fields["keep_alive_s"],
@@ -610,6 +631,8 @@ class Bolo:
                 "memory_budget_bytes": s.memory_budget_mb * 1024 * 1024 or None,
                 "gpu_memory_budget_bytes": s.gpu_memory_budget_mb * 1024 * 1024 or None,
                 "gpu_reserve_bytes": s.gpu_reserve_mb * 1024 * 1024,
+                "gpus": list(s.gpus) or None,
+                "gpu_spread": s.gpu_spread,
                 "max_loaded_models": s.max_loaded_models or None,
                 "keep_alive": format_keep_alive(self.manager.default_keep_alive()),
             },
@@ -857,6 +880,12 @@ class Bolo:
     async def remove(self, name: str) -> bool:
         spec = self.manager.resolve(name)
         await self.manager.unload(spec.id, reason="removed")
+        if spec.preset_of:  # a preset: its entry and settings go, the model's files stay
+            self.catalog.remove_custom(spec.id)
+            self.store.links.pop(spec.id, None)
+            self.store.set_model_settings(spec.id, dict.fromkeys(self.store.model_settings(spec.id)))
+            self.events.publish("model", {"id": spec.id, "event": "removed"})
+            return True
         removed = await asyncio.get_running_loop().run_in_executor(None, self.store.remove, spec.id)
         if spec.custom:
             self.catalog.remove_custom(spec.id)
@@ -864,6 +893,89 @@ class Bolo:
             self.advisor.invalidate()
             self.events.publish("model", {"id": spec.id, "event": "removed"})
         return removed
+
+    def copy_model(self, source: str, destination: str) -> ModelSpec:
+        """``bolo cp`` / ``POST /api/v1/models/copy``: a preset, i.e. a new catalog entry ``destination`` that uses
+        ``source``'s files and starts with its settings (catalog options and pinned settings), which can then be
+        changed on their own. Kept in ``<data_dir>/custom.yaml``; removing it leaves the files alone."""
+        from bolo.catalog import CatalogError
+
+        src = self.manager.resolve(source)
+        if src.cloud or src.adhoc:
+            raise InvalidRequest(f"'{src.id}' is a cloud model; copy it by adding a catalog entry", param="source")
+        dst = str(destination or "").strip()
+        if self.catalog.resolve(dst) is not None:
+            raise InvalidRequest(f"a model called '{dst}' already exists", param="destination")
+        base = src.preset_of or src.id
+        entry = src.to_dict()
+        entry.update(id=dst, aliases=[], preset_of=base, builtin=src.builtin)
+        entry["description"] = f"Preset of {base}. " + (src.description or "")
+        try:
+            spec = ModelSpec.from_dict(entry)
+            self.catalog.add_custom(spec)
+        except CatalogError as exc:
+            raise InvalidRequest(str(exc), param="destination") from exc
+        self.store.links[spec.id] = base
+        pins = self.store.model_settings(src.id)
+        if pins:
+            self.store.set_model_settings(spec.id, pins)
+        self.events.publish("model", {"id": spec.id, "event": "copied", "source": src.id})
+        return spec
+
+    def show_api(self, spec: ModelSpec, license_text: bool = False) -> dict[str, Any]:
+        """Everything about one model (``bolo show``, ``GET /api/v1/models/{id}/show``): the catalog entry, its files
+        and sizes, the settings that apply to it (and where each comes from), and how fast it is."""
+        from bolo.llama_args import resolve_tuning
+
+        entry = self.model_api(spec)
+        entry["kind"] = spec.kind
+        entry["source"] = spec.source.to_dict()
+        entry["options"] = {k: v for k, v in spec.options.items() if k not in ("hardware",)}
+        manifest = self.store.manifest(spec.id) if not spec.cloud else None
+        entry["path"] = str(self.store.model_dir(spec.id)) if manifest else None
+        entry["files"] = [
+            {"path": f.get("path"), "size": f.get("size"), "sha256": f.get("sha256")}
+            for f in (manifest or {}).get("files", [])
+        ]
+        entry["presets"] = sorted(s.id for s in self.catalog.all() if s.preset_of == spec.id)
+        pins = self.store.model_settings(spec.id)
+        effective: dict[str, Any] = {
+            "device": self.manager.requested_device(spec),
+            "keep_alive_s": self.manager.ttl_for(spec, self.manager.loaded.get(spec.id)),
+            "num_parallel": self.manager.num_parallel(spec),
+            "max_queue": self.manager.max_queue(spec),
+        }
+        if spec.engine == "tts-server" and str(spec.options.get("runtime") or "llama-server") == "llama-server":
+            effective["llama"] = resolve_tuning(self.settings, spec.options, pins)
+        entry["effective"] = effective
+        st = self.traces.models.get(spec.id)
+        live = self.manager.loaded.get(spec.id)
+        entry["speed"] = {
+            # the catalog's measurements (and the machine they were taken on)
+            "catalog": spec.measured or None,
+            # what this server measured since it started: real-time factor and latency
+            "server": {"requests": st.requests, "rtf": st.rtf_summary(), "latency_ms": st.latency_summary()}
+            if st
+            else None,
+            "expected_rtf": (entry.get("fit") or {}).get("expected_rtf"),
+            "rtf_basis": (entry.get("fit") or {}).get("rtf_basis"),
+        }
+        entry["loaded_placement"] = live.placement.to_dict() if live is not None else None
+        if license_text:
+            entry["license_text"] = self.license_text(spec)
+        return entry
+
+    def license_text(self, spec: ModelSpec) -> str | None:
+        """The licence file shipped with the model's files (LICENSE, LICENCE, COPYING, ...), when there is one."""
+        if spec.cloud or not self.store.is_installed(spec.id):
+            return None
+        root = self.store.model_dir(spec.id)
+        for f in (self.store.manifest(spec.id) or {}).get("files", []):
+            name = Path(str(f.get("path", ""))).name.lower()
+            if name.startswith(("license", "licence", "copying", "notice")) and (root / str(f["path"])).is_file():
+                with contextlib.suppress(OSError):
+                    return (root / str(f["path"])).read_text(encoding="utf-8", errors="replace")
+        return None
 
     # ------------------------------------------------------------------
     # VAD

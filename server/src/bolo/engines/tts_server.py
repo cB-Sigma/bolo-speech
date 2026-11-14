@@ -552,16 +552,29 @@ class ServerTTS(TTSModel):
 def gpu_layer_args(device: str, gpu_layers: int | None, extra: list[str]) -> list[str]:
     """``-ngl`` for a llama-server bolo starts: none when the operator set it in the arguments; the scheduler's
     count when it computed one (bolo.placement, from free accelerator memory and the GGUF); else all layers
-    (``99``) for any device other than the CPU, as before."""
-    from bolo.placement import operator_layers
+    (``99``) for any device other than the CPU, as before. :func:`bolo.llama_args.gpu_args` adds the GPU choice."""
+    from bolo.llama_args import gpu_args
 
-    if operator_layers(extra) is not None:
-        return []
-    if gpu_layers is not None:
-        return ["-ngl", str(max(0, gpu_layers))]
-    if device != "cpu":
-        return ["-ngl", "99"]
-    return []
+    return gpu_args(device, gpu_layers, extra)
+
+
+def llama_server_args(
+    settings: Settings, spec: dict[str, Any], opts: LoadOptions, extra: list[str], parallel: int | None = None
+) -> list[str]:
+    # (``parallel`` given: the speech-to-speech server, whose slot count is always passed)
+    """What bolo adds to a managed llama-server's command line besides the model and the address: threads, GPU
+    layers and GPUs, parallel slots, and the speed settings (flash attention, KV cache type, context and batch
+    size). Anything ``extra`` (the operator's arguments) already sets is left out."""
+    from bolo.llama_args import gpu_args, parallel_args, resolve_tuning, tuning_args
+
+    out = ["-t", str(max(1, opts.threads))]
+    out += gpu_args(
+        opts.device, opts.gpu_layers, extra, gpus=opts.gpus, tensor_split=opts.tensor_split,
+        main_gpu=opts.main_gpu, visible=opts.visible_gpus,
+    )  # fmt: skip
+    out += parallel_args(opts.parallel if parallel is None else parallel, extra, always=parallel is not None)
+    out += tuning_args(resolve_tuning(settings, spec), extra)
+    return out
 
 
 class TTSServerEngine(Engine):
@@ -646,8 +659,7 @@ class TTSServerEngine(Engine):
             argv = [str(binary), "-m", str(model_file), "--host", "127.0.0.1", "--port", str(port), "--api-key", key]
             if spec.get("mmproj_file"):
                 argv += ["-mm", str(path / str(spec["mmproj_file"]))]
-            argv += ["-t", str(max(1, opts.threads))]
-            argv += gpu_layer_args(opts.device, opts.gpu_layers, extra)
+            argv += llama_server_args(s, spec, opts, extra)
         else:
             config = self._audiocpp_config(name, path, spec, opts, port)
             run_dir = Path(s.data_dir) / "run" / "tts-server"

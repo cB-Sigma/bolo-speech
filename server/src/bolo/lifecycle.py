@@ -39,15 +39,18 @@ from bolo.engines.base import (
 )
 from bolo.errors import EngineUnavailable, ModelNotFound, ModelNotInstalled, Overloaded
 from bolo.keepalive import REQUEST_KEEP_ALIVE, parse_keep_alive
+from bolo.llama_args import has_gpu_flags
 from bolo.obs.events import EventBus
 from bolo.placement import (
     MB,
     LayerInfo,
     Placement,
+    best_gpu,
     family,
     gguf_block_count,
     operator_layers,
     plan,
+    plan_spread,
     processor,
     split_mode,
 )
@@ -246,23 +249,41 @@ class ModelManager:
         return str(pinned or self.settings.device or "cpu").strip().lower()
 
     def resolve_device(self, requested: str) -> str:
-        """``auto`` -> the accelerator found (``cuda:0``, ``coreml``) or ``cpu``; anything else as it is."""
+        """``auto`` -> the accelerator found (``cuda`` when there are NVIDIA GPUs: one is picked per model; else
+        ``coreml``) or ``cpu``; anything else as it is."""
         if requested in ("", "auto"):
-            return self.accel.default_device() or "cpu"
+            found = self.accel.default_device()
+            return "cuda" if found and found.startswith("cuda") else (found or "cpu")
         return requested
 
-    def gpu_available(self, device: str) -> int | None:
+    def allowed_gpus(self) -> list[int] | None:
+        """NVIDIA GPUs bolo may use, as CUDA numbers them here: the ``gpus`` setting within the visible GPUs (all
+        of them when it is empty); None when no NVIDIA GPU can be read."""
+        found = [d.index for d in self.accel.cuda_devices()]
+        if not found:
+            return None
+        wanted = set(self.settings.gpus)
+        return [i for i in found if i in wanted] if wanted else found
+
+    def gpu_available(self, device: str, freed: int = 0, freed_total: int | None = None) -> int | None:
         """Bytes a new model may take on ``device``: free memory minus the reserve, capped by what is left of
-        ``gpu_memory_budget_mb``; None when neither is known."""
+        ``gpu_memory_budget_mb``; None when neither is known. ``freed``: bytes that unloading idle models would
+        give back on this device (``freed_total`` on all of them, for the budget)."""
         s = self.settings
         found = self.accel.device(device, fresh=True)
         free = None
         if found is not None and found.free_bytes is not None:
-            free = found.free_bytes - s.gpu_reserve_mb * MB
+            free = found.free_bytes - s.gpu_reserve_mb * MB + freed
         if s.gpu_memory_budget_mb > 0:
-            left = s.gpu_memory_budget_mb * MB - self.gpu_in_use()
+            left = s.gpu_memory_budget_mb * MB - self.gpu_in_use() + (freed if freed_total is None else freed_total)
             free = left if free is None else min(free, left)
         return None if free is None else max(0, free)
+
+    def gpu_budget_left(self, freed_total: int = 0) -> int | None:
+        s = self.settings
+        if s.gpu_memory_budget_mb <= 0:
+            return None
+        return max(0, s.gpu_memory_budget_mb * MB - self.gpu_in_use() + freed_total)
 
     def estimate_bytes(self, spec: ModelSpec) -> int:
         need = int((self.store.size_on_disk(spec.id) or spec.size_bytes) * 1.2)
@@ -289,7 +310,10 @@ class ModelManager:
             extra = mm.stat().st_size if mm.is_file() else 0
         return LayerInfo(blocks, model_file.stat().st_size, extra)
 
-    def _plan(self, spec: ModelSpec, available: int | None) -> Placement:
+    def _llama_args(self, spec: ModelSpec) -> list[str]:
+        return [str(a) for a in spec.options.get("server_args") or []] + list(self.settings.tts_server_args)
+
+    def _plan(self, spec: ModelSpec, available: int | None, device: str | None = None) -> Placement:
         from bolo.tts_runtimes import remote_url
 
         requested = self.requested_device(spec)
@@ -297,7 +321,7 @@ class ModelManager:
             return Placement(device="cloud", requested=requested)
         if remote_url(self.settings, spec) is not None:
             return Placement(device="remote", requested=requested)
-        device = self.resolve_device(requested)
+        device = device or self.resolve_device(requested)
         need = self.estimate_bytes(spec)
         split = split_mode(spec.engine, spec.kind, spec.options)
         path = self.store.model_dir(spec.id)
@@ -305,18 +329,110 @@ class ModelManager:
         op_ngl = None
         if split == "layers":
             layers = self._layers(path, spec.options)
-            args = [str(a) for a in spec.options.get("server_args") or []] + list(self.settings.tts_server_args)
-            op_ngl = operator_layers(args)
+            op_ngl = operator_layers(self._llama_args(spec))
         elif split == "graphs":
             engine = self.engines.get(spec.engine)
             with contextlib.suppress(Exception):
                 graphs = engine.graphs(spec.kind, path, spec.options) if engine is not None else None
         _, _, idx = device.partition(":")
-        return plan(
+        return self._finish(plan(
             model_id=spec.id, engine_id=spec.engine, requested=requested, device=device, split=split,
             need_bytes=need, available_bytes=available, layers=layers, graphs=graphs, operator_ngl=op_ngl,
             device_index=int(idx) if idx.isdigit() else 0, onnx_split=self.onnx_split_allowed(spec),
-        )  # fmt: skip
+        ))  # fmt: skip
+
+    @staticmethod
+    def _finish(p: Placement) -> Placement:
+        """Fill in which GPU a model placed on one device uses."""
+        fam = family(p.device)
+        if p.gpus or p.gpu_bytes <= 0 or fam not in ("cuda", "metal"):
+            return p
+        _, _, idx = p.device.partition(":")
+        if fam == "cuda" and not idx.isdigit():
+            return p  # no GPU readings: the runtime's default GPU, number unknown
+        index = int(idx) if idx.isdigit() else 0
+        p.gpus, p.gpu_bytes_by_gpu = [index], {index: p.gpu_bytes}
+        return p
+
+    def _on_cpu(self, spec: ModelSpec, requested: str, notice: str) -> Placement:
+        return Placement(device="cpu", requested=requested, cpu_bytes=self.estimate_bytes(spec), notice=notice)
+
+    def _place_gpus(self, spec: ModelSpec, device: str, freed: dict[int, int]) -> Placement:
+        """One placement decision, as if the bytes in ``freed`` (GPU -> bytes) had been given back.
+
+        Several NVIDIA GPUs: a model that names no GPU goes on the allowed one with the most memory available; a
+        llama.cpp model is spread over several when it does not fit whole on that one (or always, with
+        ``gpu_spread``)."""
+        requested = self.requested_device(spec)
+        total_freed = sum(freed.values())
+        allowed = self.allowed_gpus() if family(device) == "cuda" else None
+        if allowed is None:
+            return self._plan(spec, self.gpu_available(device, total_freed), device)
+        if not allowed:
+            return self._on_cpu(
+                spec,
+                requested,
+                f"none of the GPUs in gpus = {self.settings.gpus} is visible: '{spec.id}' runs on the CPU",
+            )
+        _, _, idx = device.partition(":")
+        candidates = allowed
+        if idx.isdigit():
+            if int(idx) not in allowed:
+                return self._on_cpu(
+                    spec,
+                    requested,
+                    f"GPU {idx} is not one bolo may use (gpus = {self.settings.gpus}): '{spec.id}' runs on the CPU",
+                )
+            candidates = [int(idx)]
+        if spec.engine == "sherpa-onnx":
+            # sherpa-onnx builds its CUDA sessions itself and always uses GPU 0
+            candidates = [c for c in candidates if c == 0]
+            if not candidates:
+                return self._on_cpu(
+                    spec,
+                    requested,
+                    f"sherpa-onnx can only use GPU 0, which is not in gpus: '{spec.id}' runs on the CPU",
+                )
+        avail = {i: self.gpu_available(f"cuda:{i}", freed.get(i, 0), total_freed) for i in candidates}
+        best = best_gpu(avail)
+        single = self._plan(spec, avail[best], f"cuda:{best}")
+        if len(candidates) < 2 or None in avail.values() or single.split != "layers" or single.operator_layers:
+            return single
+        if has_gpu_flags(self._llama_args(spec)):
+            return single  # the operator chose the GPUs (-sm, -mg, -ts, --device)
+        layers = self._layers(self.store.model_dir(spec.id), spec.options)
+        if layers is None:
+            return single
+        if not self.settings.gpu_spread and (single.gpu_layers or 0) >= layers.total_layers:
+            return single  # fits whole on one GPU
+        room = {i: int(a or 0) for i, a in avail.items()}
+        budget = self.gpu_budget_left(total_freed)
+        if budget is not None and sum(room.values()) > budget:  # gpu_memory_budget_mb counts every GPU together
+            total = sum(room.values()) or 1
+            room = {i: int(a * budget / total) for i, a in room.items()}
+        spread = plan_spread(model_id=spec.id, requested=requested, layers=layers, available=room)
+        if self.settings.gpu_spread or (spread.gpu_layers or 0) > (single.gpu_layers or 0):
+            return spread
+        return single
+
+    def _vram_by_gpu(self, models: list[LoadedModel]) -> dict[int, int]:
+        """Accelerator bytes the given models hold, per GPU."""
+        out: dict[int, int] = {}
+        for m in models:
+            p = m.placement
+            planned = sum(p.gpu_bytes_by_gpu.values())
+            if planned > 0:
+                for i, b in p.gpu_bytes_by_gpu.items():
+                    out[i] = out.get(i, 0) + int(m.vram_bytes * b / planned)
+            else:
+                _, _, idx = p.device.partition(":")
+                i = p.gpus[0] if p.gpus else (int(idx) if idx.isdigit() else 0)
+                out[i] = out.get(i, 0) + m.vram_bytes
+        return out
+
+    def gpu_use_by_gpu(self) -> dict[int, int]:
+        """Accelerator bytes held by loaded models, per GPU (``bolo ps``, the console)."""
+        return self._vram_by_gpu([m for m in self.loaded.values() if m.vram_bytes > 0])
 
     def onnx_split_allowed(self, spec: ModelSpec) -> bool:
         """``onnx_split = "auto"``, the ``onnx`` package installed, and a model whose graphs bolo can cut."""
@@ -334,16 +450,15 @@ class ModelManager:
         if family(device) == "cpu" or spec.cloud or spec.engine == "remote":
             return self._plan(spec, None)
         while True:
-            available = self.gpu_available(device)
-            p = self._plan(spec, available)
+            p = self._place_gpus(spec, device, {})
             whole = p.device not in ("cpu",) and p.cpu_bytes == 0
-            if whole or p.operator_layers or available is None or p.device in ("remote", "cloud"):
+            if whole or p.operator_layers or not p.measured or p.device in ("remote", "cloud"):
                 return p
             idle = sorted(
                 (m for m in self.loaded.values() if m.active == 0 and m.vram_bytes > 0), key=lambda m: m.last_used
             )
             # evict only when unloading every idle GPU-resident model would make this one fit whole
-            if not idle or self._plan(spec, available + sum(m.vram_bytes for m in idle)).cpu_bytes > 0:
+            if not idle or self._place_gpus(spec, device, self._vram_by_gpu(idle)).cpu_bytes > 0:
                 return p
             victim = idle[0]
             log.info("unloading %s from %s to make room for %s", victim.id, device, spec.id)
@@ -357,13 +472,40 @@ class ModelManager:
         device = self.resolve_device(requested)
         layers = self._layers(path, options)
         size = (layers.file_bytes + layers.extra_bytes) if layers else 0
-        p = plan(
-            model_id=name, engine_id="tts-server", requested=requested, device=device,
-            split="layers" if layers else "whole", need_bytes=size,
-            available_bytes=self.gpu_available(device) if family(device) != "cpu" else None, layers=layers,
-            operator_ngl=operator_layers(extra),
-        )  # fmt: skip
-        if layers is None and family(device) != "cpu":
+
+        def one(dev: str) -> Placement:
+            return self._finish(plan(
+                model_id=name, engine_id="tts-server", requested=requested, device=dev,
+                split="layers" if layers else "whole", need_bytes=size,
+                available_bytes=self.gpu_available(dev) if family(dev) != "cpu" else None, layers=layers,
+                operator_ngl=operator_layers(extra),
+            ))  # fmt: skip
+
+        allowed = self.allowed_gpus() if family(device) == "cuda" else None
+        _, _, idx = device.partition(":")
+        candidates = [int(idx)] if idx.isdigit() else (allowed or [])
+        if allowed is not None and allowed and all(c in allowed for c in candidates):
+            avail = {i: self.gpu_available(f"cuda:{i}") for i in candidates}
+            best = best_gpu(avail)
+            p = one(f"cuda:{best}")
+            device = f"cuda:{best}"
+            if (
+                layers is not None and len(candidates) > 1 and None not in avail.values()
+                and operator_layers(extra) is None and not has_gpu_flags(extra)
+                and (self.settings.gpu_spread or (p.gpu_layers or 0) < layers.total_layers)
+            ):  # fmt: skip
+                spread = plan_spread(
+                    model_id=name, requested=requested, layers=layers,
+                    available={i: int(a or 0) for i, a in avail.items()},
+                )  # fmt: skip
+                if self.settings.gpu_spread or (spread.gpu_layers or 0) > (p.gpu_layers or 0):
+                    p = spread
+        elif allowed is not None:
+            p = Placement(device="cpu", requested=requested, cpu_bytes=size,
+                          notice=f"no GPU bolo may use (gpus = {self.settings.gpus}): '{name}' runs on the CPU")  # fmt: skip
+        else:
+            p = one(device)
+        if layers is None and family(device) != "cpu" and p.device == "cpu" and not p.notice:
             p.device = device  # layer count unknown: all layers, as before (-ngl 99)
         if p.notice:
             log.warning("%s", p.notice)
@@ -410,12 +552,35 @@ class ModelManager:
         return ModelQueue(
             spec.id,
             handlers,
-            workers=max(1, int(spec.options.get("workers", s.workers))),
+            workers=self.num_parallel(spec),
             max_batch=max_batch,
             max_wait_ms=s.batch_wait_ms,
-            max_queue=s.max_queue,
+            max_queue=self.max_queue(spec),
             queue_timeout_s=s.queue_timeout_s,
         )
+
+    def _pinned_int(self, spec: ModelSpec, keys: tuple[str, ...]) -> int | None:
+        """The first of ``keys`` set as a pin, then as a catalog option, as a whole number."""
+        pins = self.store.model_settings(spec.id)
+        for source in (pins, spec.options):
+            for key in keys:
+                raw = source.get(key)
+                if raw in (None, ""):
+                    continue
+                with contextlib.suppress(TypeError, ValueError):
+                    return int(raw)
+        return None
+
+    def num_parallel(self, spec: ModelSpec) -> int:
+        """Requests the model works on at once (Ollama's num_parallel): a pin, the catalog's ``num_parallel`` (or its
+        older name ``workers``), else the ``num_parallel`` setting (``workers`` when that is 0)."""
+        value = self._pinned_int(spec, ("num_parallel", "workers"))
+        return max(1, value if value is not None and value > 0 else self.settings.parallel())
+
+    def max_queue(self, spec: ModelSpec) -> int:
+        """Requests that may wait for the model before 429: a pin, the catalog's ``max_queue``, else the setting."""
+        value = self._pinned_int(spec, ("max_queue",))
+        return max(0, value if value is not None and value >= 0 else self.settings.max_queue)
 
     def _rss(self) -> int:
         """Resident memory of this process and the processes it started (servers, plugins)."""
@@ -425,16 +590,25 @@ class ModelManager:
                 total += psutil.Process(pid).memory_info().rss
         return total
 
-    def _vram(self, device: str) -> tuple[int | None, bool]:
-        """(accelerator memory held now, by this server where that can be told else on the whole device; unified)."""
+    def _vram(self, place: Placement) -> tuple[int | None, bool]:
+        """(accelerator memory held now on the placement's GPUs, by this server where that can be told else on the
+        whole device; unified)."""
+        device = place.device
         if family(device) in ("cpu", "remote", "cloud"):
             return None, False
-        found = self.accel.device(device, fresh=True)
-        if found is None:
-            return None, False
-        if found.unified:
-            return None, True
-        return (found.process_bytes if found.process_bytes is not None else found.used_bytes), False
+        names = [f"cuda:{i}" for i in place.gpus] if family(device) == "cuda" and len(place.gpus) > 1 else [device]
+        total = 0
+        for name in names:
+            found = self.accel.device(name, fresh=True)
+            if found is None:
+                return None, False
+            if found.unified:
+                return None, True
+            held = found.process_bytes if found.process_bytes is not None else found.used_bytes
+            if held is None:
+                return None, False
+            total += held
+        return total, False
 
     def _load_blocking(
         self, spec: ModelSpec, placement: Placement | None = None
@@ -451,7 +625,7 @@ class ModelManager:
         place = placement or Placement(device=self.settings.device)
         device = place.device if place.device not in ("remote", "cloud") else self.settings.device
         before = self._rss()
-        vram_before, unified = self._vram(place.device)
+        vram_before, unified = self._vram(place)
         t0 = time.perf_counter()
         opts = LoadOptions(
             threads=int(spec.options.get("threads", self.settings.resolved_threads())),
@@ -464,8 +638,19 @@ class ModelManager:
             graph_devices=dict(place.graphs),
             max_memory=place.max_memory,
             graph_split=dict(place.graph_split),
+            gpus=list(place.gpus) if family(place.device) == "cuda" else [],
+            tensor_split=list(place.tensor_split) if place.tensor_split else None,
+            main_gpu=place.main_gpu,
+            visible_gpus=max(1, len(self.accel.cuda_devices())),
+            parallel=self.num_parallel(spec),
         )
         model_opts = dict(spec.options)
+        pins = self.store.model_settings(spec.id)
+        from bolo.llama_args import TUNING_KEYS
+
+        for key in TUNING_KEYS:  # llama.cpp speed settings pinned for the model win over the catalog's
+            if pins.get(key) not in (None, ""):
+                model_opts[key] = pins[key]
         if spec.voices:
             model_opts.setdefault("voices", spec.voices)
         if len(spec.languages) == 1:
@@ -482,7 +667,7 @@ class ModelManager:
             model.warm_up()
         load_ms = (time.perf_counter() - t0) * 1000.0
         grown = max(0, self._rss() - before)
-        vram_after, _ = self._vram(place.device)
+        vram_after, _ = self._vram(place)
         measured = vram_before is not None and vram_after is not None
         if measured:
             vram = max(0, int(vram_after or 0) - int(vram_before or 0))

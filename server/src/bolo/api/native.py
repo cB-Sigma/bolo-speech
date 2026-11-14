@@ -213,6 +213,34 @@ class ModelSettingsRequest(BaseModel):
         description="Pin how long the model stays loaded when idle: seconds or a duration ('10m'); -1 keeps it "
         "loaded; 0 unloads it after each request; null removes the pin.",
     )
+    num_parallel: int | None = Field(
+        default=None,
+        ge=1,
+        description="Requests the model works on at once (Ollama's num_parallel; a llama-server bolo starts gets "
+        "--parallel). Applies from the next load; null removes the pin.",
+    )
+    max_queue: int | None = Field(
+        default=None,
+        ge=0,
+        description="Requests that may wait for the model before it answers 429. Applies from the next load; null "
+        "removes the pin.",
+    )
+    flash_attention: Literal["on", "off", "auto"] | None = Field(
+        default=None,
+        description="llama.cpp models: flash attention (-fa) of the llama-server bolo starts. Applies from the next "
+        "load; null removes the pin.",
+    )
+    kv_cache_type: str | None = Field(
+        default=None,
+        description="llama.cpp models: K and V cache type (f16, q8_0, q4_0, ...), like OLLAMA_KV_CACHE_TYPE. "
+        "Applies from the next load; null removes the pin.",
+    )
+    context_size: int | None = Field(
+        default=None, ge=0, description="llama.cpp models: context size (-c); 0: llama-server's default."
+    )
+    batch_size: int | None = Field(
+        default=None, ge=0, description="llama.cpp models: batch size (-b); 0: llama-server's default."
+    )
 
 
 @router.get("/models/{model_id:path}/settings", tags=["native"], summary="Settings pinned for one model")
@@ -244,6 +272,14 @@ async def put_model_settings(request: Request, model_id: str, body: ModelSetting
             raise InvalidRequest(str(exc), param="keep_alive") from exc
     if values.get("device") is not None:
         values["device"] = str(values["device"]).strip().lower() or None
+    from bolo.llama_args import check_tuning
+
+    try:
+        check_tuning(values)
+    except ValueError as exc:
+        raise InvalidRequest(str(exc), param=str(exc).split(":", 1)[0]) from exc
+    if values.get("kv_cache_type") is not None:
+        values["kv_cache_type"] = str(values["kv_cache_type"]).strip().lower()
     for name in values.get("fallback") or []:
         other = core.resolve(name, spec.task)  # unknown model or wrong task: 404 / 400
         if other.id == spec.id:
@@ -396,11 +432,41 @@ async def ps(request: Request) -> JSONResponse:
     return JSONResponse(await asyncio.to_thread(core.ps))
 
 
+class CopyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    source: str = Field(description="The model to copy (an id or alias).")
+    destination: str = Field(description="The new name: lowercase letters, digits, '.', '_' and '-'.")
+
+
+@router.post(
+    "/models/copy", status_code=201, tags=["native"], summary="Copy a model's settings to a new name (a preset)"
+)
+async def copy(request: Request, body: CopyRequest) -> JSONResponse:
+    """Like Ollama's ``/api/copy``: ``destination`` becomes a preset of ``source``, a catalog entry that uses the same
+    files and starts with the same settings (catalog options and pinned settings), which can then be changed with
+    ``PUT /api/v1/models/{destination}/settings`` without touching ``source``. Nothing is downloaded or copied on
+    disk; deleting the preset leaves the files alone."""
+    core = get_core(request)
+    spec = core.copy_model(body.source, body.destination)
+    return JSONResponse(core.model_api(spec), status_code=201)
+
+
+@router.get("/models/{model_id:path}/show", tags=["native"], summary="Everything about one model (bolo show)")
+async def show_details(request: Request, model_id: str, license: bool = False) -> JSONResponse:
+    """The catalog entry plus its files and sizes, the settings that apply (``effective``: device, keep-alive,
+    num_parallel, max_queue and, for llama.cpp voices, the llama-server tuning), the presets made from it and its
+    speed (the catalog's measurements, this server's, and the expected real-time factor here). ``?license=true``
+    adds the text of a licence file shipped with the model (``license_text``)."""
+    core = get_core(request)
+    spec = core.manager.resolve(model_id)
+    return JSONResponse(await asyncio.to_thread(core.show_api, spec, license))
+
+
 @router.delete("/models/{model_id:path}", status_code=204, tags=["native"], summary="Delete an installed model")
 async def delete(request: Request, model_id: str) -> Response:
     core = get_core(request)
     spec = core.manager.resolve(model_id)
-    if spec.builtin:
+    if spec.builtin and not spec.preset_of:
         raise InvalidRequest(f"model '{spec.id}' is built in and cannot be deleted")
     await core.remove(spec.id)
     return Response(status_code=204)

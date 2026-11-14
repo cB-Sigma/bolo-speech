@@ -72,6 +72,8 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `POST` | `/api/v1/models/{model_id}/load` | Load a model into memory |
 | `POST` | `/api/v1/models/{model_id}/unload` | Unload a model from memory |
 | `GET` | `/api/v1/ps` | Loaded models: size, GPU/CPU split, keep-alive (Ollama style) |
+| `POST` | `/api/v1/models/copy` | Copy a model's settings to a new name (a preset) |
+| `GET` | `/api/v1/models/{model_id}/show` | Everything about one model (bolo show) |
 | `DELETE` | `/api/v1/models/{model_id}` | Delete an installed model |
 | `GET` | `/api/v1/models/{model_id}` | One catalog entry |
 | `POST` | `/api/v1/diarize` | Speaker diarization: who spoke when |
@@ -438,7 +440,8 @@ For clients written against speaches; details and differences are in
  "providers": [{"name": "openai", "kind": "openai-compatible", "configured": true}],   // cloud providers; never a key
  "defaults": {"stt": "whisper-base", "realtime_stt": "moonshine-tiny-en", "tts": "kokoro-v1.0-int8", "vad": "silero-vad"},
  "wyoming": {"enabled": false, "host": "127.0.0.1", "port": 10300},
- "scheduler": {"workers": 1, "threads": 4, "max_batch": 8, "batch_wait_ms": 0.0, "max_queue": 64},
+ "scheduler": {"workers": 1, "num_parallel": 1, "threads": 4, "max_batch": 8, "batch_wait_ms": 0.0, "max_queue": 64},
+ "log_file": "/home/u/.local/state/bolo/logs/server.log",   // the file the server also logs to; null: stderr only
  "components": [ … the list from GET /api/v1/components … ],
  "capabilities": {
    "wordlists": {"available": true,          // false without uccharan; "install" then says how to add it
@@ -575,10 +578,14 @@ was used by name and is not a curated entry.
 | `POST /api/v1/models/{id}/load` | `200 {"id","loaded":true,"memory_bytes","load_ms","size_vram_bytes","processor","device","placement","keep_alive_s"}` (+ `notice` when the model is not all on the accelerator that was asked for). Optional body `{"keep_alive": "10m"}` or `?keep_alive=`: how long it stays loaded once idle (`-1`: until unloaded; `0`: load and unload at once, answering `"loaded": false`, Ollama's way to unload). CLI: `bolo load <id> --keep-alive 10m` (also `bolo run`) |
 | `POST /api/v1/models/{id}/unload` | `200 {"id","loaded":false,"unloaded":true\|false}` (`false`: it was not loaded). A request still using the model finishes first. CLI: `bolo stop <id>…` |
 | `GET /api/v1/ps` | loaded models, Ollama style: see "Loaded models" below. CLI: `bolo ps` |
-| `DELETE /api/v1/models/{id}` | `204`; unloads first |
+| `DELETE /api/v1/models/{id}` | `204`; unloads first. A preset: its entry and pinned settings go, the files stay. CLI: `bolo rm <id>…`, which refuses a model the running server has loaded unless `--force` (it unloads first) |
+| `GET /api/v1/models/{id}/show` | everything about one model, like Ollama's `/api/show`: the catalog entry plus `kind`, `source`, `options`, `path`, `files` (`[{"path","size","sha256"}]`), `modified_at`, `presets` (presets made from it), `effective` (`device`, `keep_alive_s`, `num_parallel`, `max_queue` and, for llama-server voices, `llama`: the flash attention, KV cache type, context and batch size it would start with), `speed` (`catalog`: the catalog's measurements; `server`: this server's requests, real-time factor and latency; `expected_rtf` here and its `rtf_basis`) and `loaded_placement`. `?license=true` adds `license_text`, the licence file shipped with the model (null without one). CLI: `bolo show <id>` (`--json`, `--license`) |
+| `POST /api/v1/models/copy` `{"source": "kokoro-v1.0-int8", "destination": "kokoro-fast"}` | `201` and the new entry: a **preset**, like Ollama's `/api/copy`. `kokoro-fast` uses `kokoro-v1.0-int8`'s files (nothing is copied or downloaded; pulling it pulls the source) and starts with its catalog options and pinned settings, which can then be changed for the preset alone (`PUT /api/v1/models/kokoro-fast/settings`). Kept in `<data_dir>/custom.yaml` with `preset_of`; a preset of a preset points at the model with the files. `400` when the name is taken or not a valid id (lowercase letters, digits, `.`, `_`, `-`); cloud models cannot be copied. CLI: `bolo cp <source> <destination>` |
 | `GET /api/v1/models/{id}/settings` | `{"model","settings":{…}}`: what the user pinned for that model (`{}` by default) |
 | `PUT /api/v1/models/{id}/settings` `{"fallback": ["openai-whisper-1"]}` | pins the model's [fallback list](providers.md#fallback) (same task, local or cloud; `[]` switches a configured fallback off, `null` removes the pin) |
 | `PUT /api/v1/models/{id}/settings` `{"device": "cpu", "keep_alive": "30m"}` | pins where the model runs (overrides the `device` setting for it; it still goes on the CPU when it does not fit on the accelerator) and how long it stays loaded once idle (overrides `keep_alive` and the per-task TTLs; `-1` keeps it loaded). `null` removes a pin. Takes effect at the next load |
+| `PUT /api/v1/models/{id}/settings` `{"num_parallel": 2, "max_queue": 16}` | requests the model works on at once and requests that may wait before `429` (override the settings `num_parallel` and `max_queue` and the catalog's options; configuration.md, "Parallel requests and queues"). Takes effect at the next load |
+| `PUT /api/v1/models/{id}/settings` `{"flash_attention": "on", "kv_cache_type": "q8_0", "context_size": 4096, "batch_size": 512}` | llama.cpp voices: what the llama-server bolo starts for the model gets (`-fa`, `--cache-type-k/-v`, `-c`, `-b`), over the `llama_*` settings and the catalog's options; arguments in `tts_server_args` win. `400` for an unknown cache type or flash-attention value. Takes effect at the next load. CLI: `bolo models config <id> --set kv_cache_type=q8_0` |
 | `PUT /api/v1/models/{id}/settings` `{"phonemizer": "espeak-ng"}` | pins the phonemiser of a voice (`null` removes the pin); stored in `<data_dir>/model-settings.json`, shown as `settings` in catalog entries, announced as a `model` event with `"event":"settings"`. `400` for a model that reads characters, or uccharan on a language it does not cover. CLI: `bolo models config <id> --phonemizer X` / `--clear` |
 
 Pulling an installed model yields a job that is already `done`. Pulling a
@@ -637,13 +644,18 @@ Like Ollama's `/api/ps` (bolo's `/api/ps` is speaches' route, which lists model 
    "expires_at": "2026-11-14T21:04:05Z",  // when it is unloaded if it stays idle; null: kept loaded
    "expires_in_s": 241.3, "until": "4 minutes from now",   // "Forever", "Stopping..."
    "keep_alive": "5m", "keep_alive_s": 300.0,
+   "gpus": [0],                           // CUDA GPUs its weights are on ([0, 1]: llama.cpp layers spread); [] on the CPU
    "active": 0, "requests": 12, "idle_s": 58.7, "load_ms": 2110.4,
+   "running": 0, "queued": 0,             // requests running and waiting in its queue
+   "num_parallel": 1, "max_queue": 64,    // its queue's limits (configuration.md, "Parallel requests and queues")
    "vram_measured": true,                 // false: the accelerator share is the plan, not a measurement
    "latency_ms": {…}, "rtf": {…},         // as in /api/v1/stats
    "placement": {"device": "cuda:0", "requested": "cuda", "split": "whole", "gpu_bytes": 1610612736,
                  "cpu_bytes": 0, "processor": "100% GPU", "notice": null, "free_memory_known": true},
                  // llama.cpp: + "gpu_layers": 19, "total_layers": 29, "operator_layers": false
                  // ONNX Runtime graphs: + "graphs": {"encoder": "cuda:0", "decoder": "cpu"}
+                 // always: "gpus": [0], "gpu_bytes_by_gpu": {"0": 1610612736}
+                 // spread over GPUs: "gpus": [0, 1], "tensor_split": [0.6, 0.4], "main_gpu": 0
    "details": {"engine": "sherpa-onnx", "kind": "whisper", "family": "Whisper"}
  }],
  "system": {"cpu_percent": 12.5, "rss_bytes": 2147483648, "device": "cuda",
@@ -652,10 +664,15 @@ Like Ollama's `/api/ps` (bolo's `/api/ps` is speaches' route, which lists model 
                       "total_bytes": 12884901888, "free_bytes": 9556148224, "used_bytes": 3328753664,
                       "unified": false, "utilization": 41.0,
                       "process_bytes": 2147483648,   // held by bolo and the servers and plugins it started
-                      "source": "nvml"}],             // nvml | nvidia-smi | unified (Apple Silicon) ; [] when unknown
-            "accelerator_source": "nvml", "models_vram_bytes": 1610612736, "models_ram_bytes": 107374182},
+                      "source": "nvml",               // nvml | nvidia-smi | unified (Apple Silicon) ; [] when unknown
+                      "physical_index": 0,            // NVML's number; "index" is CUDA's (after CUDA_VISIBLE_DEVICES)
+                      "uuid": "GPU-5f0c…",
+                      "allowed": true,                // in the gpus setting (NVIDIA only)
+                      "models_vram_bytes": 1610612736}],   // what bolo's loaded models hold on this GPU
+            "accelerator_source": "nvml", "gpu_spread": false,
+            "models_vram_bytes": 1610612736, "models_ram_bytes": 107374182},
  "budgets": {"memory_budget_bytes": null, "gpu_memory_budget_bytes": null, "gpu_reserve_bytes": 536870912,
-             "max_loaded_models": null, "keep_alive": "5m"},
+             "gpus": null, "gpu_spread": false, "max_loaded_models": null, "keep_alive": "5m"},
  "speech_to_speech": {"model": "lfm3-audio-2b-llamacpp", "placement": {…}}   // once its llama-server started
 }
 ```
@@ -669,13 +686,15 @@ runtime holds some host memory too (that is in `size`). On Apple Silicon the GPU
 
 ```
 cpu 12.5%  rss 2.0 GB  ram 12.0/32.0 GB  gpu0 NVIDIA GeForce RTX 3060 vram 3.1/12.0 GB (bolo 2.0 GB) 41% busy
-MODEL                   TASK  SIZE    PROCESSOR        DEVICE  UNTIL
-whisper-large-v3-turbo  stt   1.6 GB  100% GPU         cuda:0  4 minutes from now
-orpheus-3b-llamacpp     tts   3.0 GB  35%/65% CPU/GPU  cuda:0  Forever
-silero-vad              vad   2.0 MB  100% CPU         cpu     Forever
+MODEL                   TASK  SIZE    PROCESSOR        DEVICE  GPU  UNTIL
+whisper-large-v3-turbo  stt   1.6 GB  100% GPU         cuda:0  0    4 minutes from now
+orpheus-3b-llamacpp     tts   3.0 GB  35%/65% CPU/GPU  cuda:0  0    Forever
+silero-vad              vad   2.0 MB  100% CPU         cpu     -    Forever
 ```
 
-`bolo ps -v` adds ACTIVE, REQUESTS, P50 MS, RTF P50 and IDLE, and the placement notices; `--json` prints the document.
+GPU is the CUDA number of each GPU a model is on (`0,1` for a llama.cpp model spread over two). `bolo ps -v` adds
+ACTIVE (requests and sessions using the model), QUEUED (requests waiting in its queue), PARALLEL (`num_parallel`),
+REQUESTS, P50 MS, RTF P50 and IDLE, and the placement notices; `--json` prints the document.
 
 ### Hardware and recommendations
 
@@ -865,7 +884,7 @@ is `word` (whole words, any case; the default), `case`, `exact` (any substring) 
    "size_vram_bytes": 0, "ram_bytes": 210000000, "vram_measured": false, "processor": "100% CPU", "device": "cpu",
    "placement": {…}, "keep_alive_s": 300.0, "expires_in_s": 296.8, "expires_at": "2026-11-14T21:04:05Z",
    "stopping": false,
-   "queue": {"depth": 0, "inflight": 1, "workers": 1, "batches": 61, "mean_batch": 1.31, "max_batch": 4,
+   "queue": {"depth": 0, "inflight": 1, "workers": 1, "num_parallel": 1, "max_queue": 64, "batches": 61, "mean_batch": 1.31, "max_batch": 4,
              "rejected": 0, "queue_ms": {"p50": 0.1, "p95": 38.0, "p99": 71.2}}
  }],
  "separation": {"requests": {"applied": 0, "partial": 0, "skipped": 0}, "audio_seconds": 0.0},

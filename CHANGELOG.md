@@ -8,6 +8,53 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **More of Ollama's model handling.** GPU-side behaviour is tested with a fake NVML of several made-up GPUs and
+  with llama-server command lines that are built but not run: untested on hardware.
+  - **Several GPUs** (docs/configuration.md, "Several GPUs"). New setting `gpus` (`[0, 2]`, `BOLO_GPUS`,
+    `bolo serve --gpus`): the GPUs bolo may use, numbered as CUDA numbers them after `CUDA_VISIBLE_DEVICES` (which
+    bolo now applies to its NVML and nvidia-smi readings; `/api/v1/ps` gives `index` and `physical_index`). With
+    `device = "cuda"` (or `auto`) each model goes on the allowed GPU with the most memory available, so models
+    are spread over the GPUs as they load. A llama.cpp model that does not fit whole on one GPU is spread over
+    several by layers (`--tensor-split`, `--main-gpu`); new `gpu_spread` (like `OLLAMA_SCHED_SPREAD`) spreads every
+    llama.cpp model over all allowed GPUs. One-GPU placements on a machine with several get `--split-mode none
+    --main-gpu N`. faster-whisper models get the chosen GPU's index; sherpa-onnx models use GPU 0 only. `-sm`,
+    `-mg`, `-ts` or `--device` in your server arguments win.
+  - **GPU per model** in `bolo ps` (a GPU column; GPUs left out by `gpus` are marked) and `/api/v1/ps` (`gpus`,
+    `placement.gpu_bytes_by_gpu`, `tensor_split`, `main_gpu`; per GPU `allowed` and `models_vram_bytes`).
+  - **Faster llama.cpp voices**: new settings `llama_flash_attention` (`-fa on|off|auto`), `llama_kv_cache_type`
+    (`--cache-type-k/-v`: `f16`, `q8_0`, `q4_0`, ..., like `OLLAMA_KV_CACHE_TYPE`), `llama_context_size` (`-c`)
+    and `llama_batch_size` (`-b`) for the llama-servers bolo starts (tts-server and Orpheus-family voices, the
+    speech-to-speech server). Per model as catalog options (`flash_attention`, `kv_cache_type`, `context_size`,
+    `batch_size`) or pins (`PUT /api/v1/models/{id}/settings`); an operator's own arguments win. A quantized KV
+    cache turns flash attention on unless it is set. The quality and speed trade-offs are documented, with
+    [estimate] marks: nothing was measured on a GPU.
+  - **Parallel requests per model**: `num_parallel` (like `OLLAMA_NUM_PARALLEL`; the existing `workers` under
+    Ollama's name, used when `num_parallel` is 0) and `max_queue` (existing; like `OLLAMA_MAX_QUEUE` but per
+    model) can now be set per model (catalog `options.num_parallel` / `options.max_queue`, or pins). A llama-server
+    bolo starts for a voice gets `--parallel N`. `bolo ps -v` shows ACTIVE, QUEUED and PARALLEL per model;
+    `/api/v1/ps` has `running`, `queued`, `num_parallel` and `max_queue`.
+  - **`bolo show <model>`** now prints licence, gated and commercial-use flags, files and sizes, the settings that
+    apply (and pins), languages, voices, engine and speed (the catalog's measurements, the expected real-time
+    factor here); `--license` prints the licence and the licence file shipped with the model, `--json` the
+    document. New **`GET /api/v1/models/{id}/show`** (`?license=true`).
+  - **`bolo cp <source> <destination>`** and **`POST /api/v1/models/copy`**: a preset, a new name that uses the
+    source's files and starts with its settings, then has its own (`preset_of` in `custom.yaml`, the catalog and
+    `bolo list`). Deleting a preset leaves the files.
+  - **`bolo rm`** refuses a model the running server (`--url`, `$BOLO_URL`) has loaded unless `--force`, which
+    unloads it first, and removes through the server when one answers.
+  - **`bolo list`** shows downloaded models as `ollama list` does: ID, TASK, ENGINE, SIZE, MODIFIED, LICENCE
+    (`--all` keeps the catalog view). Catalog entries carry `modified_at` and `preset_of`.
+  - **`bolo models config <id> --set key=value / --unset key`** for every pinnable setting; `--clear` now removes
+    every pin.
+  - **Logs** (docs/configuration.md, "Logs"): new settings `log_file` (`auto`: `~/.local/state/bolo/logs/server.log`
+    on Linux, `~/Library/Logs/bolo/server.log` on macOS, `%LOCALAPPDATA%\bolo\logs\server.log` on Windows; a
+    path; `off`), `log_max_mb` (10) and `log_backups` (3): the log is also written to a rotating file. Off by
+    default, on when `bolo serve` runs under systemd or launchd; the systemd unit writes
+    `/var/lib/bolo/logs/server.log`. New **`bolo logs [-f] [--lines N]`**; `bolo doctor` says where the logs are;
+    `/api/v1/info` has `log_file`.
+  - **"Coming from Ollama"** in docs/configuration.md: each `OLLAMA_*` variable and its bolo setting. Every new
+    setting has a `BOLO_*` variable and a TOML key; a test checks that every setting is documented.
+
 - **Ollama-style model scheduling: GPU/CPU placement, keep-alive, `bolo ps`.** Untested on a GPU: everything
   GPU-side is tested with fake NVML readings and made-up memory figures.
   - **Placement per model** (docs/configuration.md, "GPU and CPU placement"). With an accelerator, each model goes

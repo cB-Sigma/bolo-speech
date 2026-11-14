@@ -96,9 +96,15 @@ def test_cli_list_show(cli_env: Path, capsys: pytest.CaptureFixture[str]) -> Non
     assert "piper-hi-in-rohan-medium" in out
     header = out.splitlines()[0].split()
     assert header[:7] == ["ID", "TASK", "TIER", "ENGINE", "LANG", "SIZE", "FIT"]  # how each suits this machine
-    assert main(["show", "moonshine-tiny"]) == 0
+    assert main(["show", "moonshine-tiny", "--json"]) == 0
     shown = json.loads(capsys.readouterr().out)
     assert shown["id"] == "moonshine-tiny-en" and shown["source"]["repo"] and shown["kind"] == "moonshine"
+    assert shown["files"] == [] and shown["effective"]["num_parallel"] == 1 and "speed" in shown
+    assert main(["show", "moonshine-tiny"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("moonshine-tiny-en  (stt, not installed)") and "commercial use" in out and "Settings" in out
+    assert main(["show", "moonshine-tiny", "--license"]) == 0
+    assert "moonshine-tiny-en: " in capsys.readouterr().out
     assert main(["show", "nope"]) == 1
     assert "does not exist" in capsys.readouterr().err
 

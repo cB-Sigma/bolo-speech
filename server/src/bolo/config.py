@@ -113,8 +113,12 @@ class Settings:
     # -- scheduler --------------------------------------------------------
     threads: int = 0  # intra-op threads per worker; 0: derive from the CPU count
     workers: int = 1  # worker threads per model
+    #: requests one model works on at once (Ollama's OLLAMA_NUM_PARALLEL); 0: ``workers``. Per model: the catalog's
+    #: ``options.num_parallel`` or a pin. A llama-server bolo starts gets ``--parallel`` with it
+    num_parallel: int = 0
     max_batch: int = 8
     batch_wait_ms: float = 0.0
+    #: requests waiting per model before 429 (Ollama's OLLAMA_MAX_QUEUE, which counts the whole server)
     max_queue: int = 64
     queue_timeout_s: float = 30.0
 
@@ -200,8 +204,22 @@ class Settings:
     sip_rtp_port_min: int = 40000
     sip_rtp_port_max: int = 40100
 
+    # -- llama.cpp servers bolo starts (tts-server voices, Orpheus-family voices, the speech-to-speech server) --
+    #: flash attention (``-fa``): "on", "off" or "auto"; unset: llama-server's default (auto)
+    llama_flash_attention: str = ""
+    #: K and V cache type (``--cache-type-k/--cache-type-v``, Ollama's OLLAMA_KV_CACHE_TYPE): f16, q8_0, q4_0, ...;
+    #: unset: llama-server's default (f16)
+    llama_kv_cache_type: str = ""
+    llama_context_size: int = 0  # ``-c``; 0: llama-server's default (the model's own)
+    llama_batch_size: int = 0  # ``-b``; 0: llama-server's default
+
     # -- misc ---------------------------------------------------------------
     device: str = "cpu"
+    #: the GPUs bolo may use (CUDA device numbers as this process sees them, after CUDA_VISIBLE_DEVICES); empty: all
+    gpus: list[int] = field(default_factory=list)
+    #: spread each llama.cpp model over every allowed GPU (Ollama's OLLAMA_SCHED_SPREAD) instead of placing it on
+    #: the one GPU with the most free memory when it fits there
+    gpu_spread: bool = False
     #: accelerator memory left free when placing models on the GPU (for the display, other programs, spikes)
     gpu_reserve_mb: int = 512
     #: accelerator memory bolo's models may use in all; 0: as much as is free. Over it, the least recently used
@@ -214,6 +232,11 @@ class Settings:
     #: loaded is unlikely to fit this machine or to run in real time. Notices only: nothing is ever refused.
     hardware_warnings: bool = True
     log_level: str = "info"
+    #: also write the server's log to a file: "auto" (the platform's log directory, docs/configuration.md "Logs"),
+    #: a path, or "off". Unset: off, except when `bolo serve` runs as a service (systemd, launchd)
+    log_file: str = ""
+    log_max_mb: int = 10  # rotate the log file at this size
+    log_backups: int = 3  # rotated files kept (server.log.1, ...)
     trace_buffer: int = 1000
     fake_engine: bool = False
 
@@ -221,7 +244,11 @@ class Settings:
         if self.threads > 0:
             return self.threads
         cpus = os.cpu_count() or 1
-        return max(1, min(4, cpus) // max(1, self.workers))
+        return max(1, min(4, cpus) // max(1, self.parallel()))
+
+    def parallel(self) -> int:
+        """Requests per model at once by default: ``num_parallel``, else ``workers``."""
+        return self.num_parallel if self.num_parallel > 0 else max(1, self.workers)
 
     def public_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {}
@@ -304,14 +331,21 @@ def _coerce(name: str, raw: Any, target: Any) -> Any:
             raise ValueError(f"{name}: expected a JSON object")
         return doc
     if origin is list:
+        item: Any = int if getattr(target, "__args__", (str,))[0] is int else str
         if isinstance(raw, (list, tuple)):
-            return [str(x) for x in raw]
-        s = str(raw).strip()
-        if s.startswith("["):
-            import json
+            items = list(raw)
+        else:
+            s = str(raw).strip()
+            if s.startswith("["):
+                import json
 
-            return [str(x) for x in json.loads(s)]
-        return [p.strip() for p in s.split(",") if p.strip()]
+                items = list(json.loads(s))
+            else:
+                items = [p.strip() for p in s.split(",") if p.strip()]
+        try:
+            return [item(x) for x in items]
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{name}: expected a list of numbers, got {raw!r}") from exc
     if raw is None:
         return None
     return str(raw)
@@ -456,6 +490,25 @@ def load_settings(
         raise ValueError(f"keep_alive: {exc}") from exc
     if settings.workers < 1:
         raise ValueError("workers must be >= 1")
+    if settings.num_parallel < 0:
+        raise ValueError("num_parallel must be >= 0")
+    if settings.max_queue < 0:
+        raise ValueError("max_queue must be >= 0")
+    if any(i < 0 for i in settings.gpus):
+        raise ValueError(f"gpus: device numbers start at 0, got {settings.gpus}")
+    from bolo.llama_args import check_tuning
+
+    check_tuning(
+        {
+            "flash_attention": settings.llama_flash_attention,
+            "kv_cache_type": settings.llama_kv_cache_type,
+            "context_size": settings.llama_context_size,
+            "batch_size": settings.llama_batch_size,
+        },
+        prefix="llama_",
+    )
+    if settings.log_max_mb < 1 or settings.log_backups < 0:
+        raise ValueError("log_max_mb must be >= 1 and log_backups >= 0")
     if settings.max_batch < 1:
         raise ValueError("max_batch must be >= 1")
     return settings
