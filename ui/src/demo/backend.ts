@@ -21,6 +21,7 @@ import { percentile } from '@/lib/latency/stats'
 import longUrl from '../mock/assets/en-ask-not.wav?url'
 import shortUrl from '../mock/assets/en-fellow-americans.wav?url'
 import hindiUrl from './assets/hi-short.wav?url'
+import { deleteDownload } from '@/lib/downloads'
 import { pickBrowserModel, prefs } from '@/lib/prefs'
 import snapshot from './catalog-snapshot.json'
 
@@ -135,7 +136,7 @@ export class DemoBackend {
   async catalog(): Promise<CatalogModel[]> {
     const engine = sharedEngine()
     const e = engine.store.get()
-    const cached = await Promise.all(BROWSER_MODELS.map((m) => isModelCached(m)))
+    const cached = BROWSER_MODELS.map((m) => isModelCached(m))
     const browser = BROWSER_MODELS.map((m, i) => {
       const current = m.id === e.model.id
       return browserEntry(
@@ -476,16 +477,8 @@ export class DemoBackend {
     if (del && method === 'DELETE') {
       const id = decodeURIComponent(del[1] as string)
       if (!BROWSER_MODELS.some((m) => m.id === id)) return needsServer()
-      const model = BROWSER_MODELS.find((m) => m.id === id)
-      if (sharedEngine().store.get().model.id === id) sharedEngine().dispose()
-      // Remove only this model's files from the cache.
-      try {
-        const cache = await caches.open('transformers-cache')
-        for (const key of await cache.keys()) if (model && key.url.includes(model.repo)) await cache.delete(key)
-      } catch {
-        // no Cache Storage: nothing to remove
-      }
-      await sharedEngine().refreshCached()
+      // Unloads it if loaded, then removes only this model's files (by their keys: the cache is not listed).
+      await deleteDownload(id)
       return new Response(null, { status: 204 })
     }
     if (path === '/api/v1/bench' && method === 'POST')

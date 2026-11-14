@@ -133,6 +133,7 @@ async function load(req: Extract<TtsWorkerRequest, { type: 'load' }>): Promise<v
     config,
     threads: req.threads,
     cached: modelFile.fromCache,
+    cacheKeys: [`${dir}voice.json${v}`, `${dir}model.onnx${v}`],
   })
 }
 

@@ -1,3 +1,5 @@
+import { oneRuntimeAtATime } from '@/lib/browser-runtime'
+import { interrupted } from '@/lib/downloads'
 import {
   Cloud,
   Copy,
@@ -22,6 +24,7 @@ import { SegmentedBar } from '@/components/charts/segmented-bar'
 import { Page } from '@/components/layout/app-shell'
 import { ModelPicker } from '@/components/model-picker'
 import { Panel, Readout } from '@/components/panel'
+import { DownloadsPanel, InterruptedLoadNotice } from '@/components/downloads-panel'
 import { BrowserEnginePanel } from '@/components/stt/engine-panel'
 import { BrowserModelPicker, LanguageSelect, SwitchModelDialog } from '@/components/stt/language-controls'
 import { MicHelpPanel, MicStatusLine } from '@/components/stt/mic-help'
@@ -368,7 +371,9 @@ export default function SttPage() {
     void engine.load({ background: true }).catch(() => undefined)
   }, [engine])
   useEffect(() => {
-    if (!isDemo || mode !== 'browser' || !support.wasm || lessData) return
+    // Not after the page closed mid-load last time (most likely out of memory), and not on phones, where
+    // memory is short and the visitor may be paying for data: there the model loads when it is asked for.
+    if (!isDemo || mode !== 'browser' || !support.wasm || lessData || interrupted.get() || oneRuntimeAtATime()) return
     const w = globalThis as typeof globalThis & {
       requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number
       cancelIdleCallback?: (id: number) => void
@@ -586,6 +591,7 @@ export default function SttPage() {
 
   return (
     <Page title="Speech to text" toolbar={toolbar}>
+      {mode !== 'server' && <InterruptedLoadNotice />}
       {micBlocked && !micFailure && (
         <Alert className="mb-4">
           <MicOff />
@@ -997,6 +1003,7 @@ export default function SttPage() {
             )}
           </Panel>
 
+          {mode !== 'server' && <DownloadsPanel />}
           {mode !== 'server' && (
             <BrowserEnginePanel
               support={support}

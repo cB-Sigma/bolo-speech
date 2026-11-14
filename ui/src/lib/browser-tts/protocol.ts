@@ -38,6 +38,8 @@ export type TtsWorkerResponse =
       cached: boolean
       /** Size of the runtime's WebAssembly memory after loading, when known. */
       memoryBytes: number | null
+      /** Cache Storage keys of this voice's own files (for deleting it later without listing the cache). */
+      cacheKeys?: string[]
     }
   | {
       type: 'audio'

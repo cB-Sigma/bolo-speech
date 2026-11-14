@@ -1,7 +1,8 @@
-import { Download, ExternalLink, Info, Languages, Play, Repeat2, Square, Trash2, TriangleAlert } from 'lucide-react'
+import { Download, ExternalLink, Info, Languages, Play, Repeat2, Square, TriangleAlert } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { BudgetBar } from '@/components/charts/budget-bar'
+import { DownloadsPanel, InterruptedLoadNotice } from '@/components/downloads-panel'
 import { Page } from '@/components/layout/app-shell'
 import { Empty, Panel, Readout } from '@/components/panel'
 import { LoadProgress, LoadTrouble, ModelStatusChip } from '@/components/stt/model-status'
@@ -21,7 +22,7 @@ import { encodeWav } from '@/lib/audio/wav'
 import { download } from '@/lib/bench'
 import { sharedEngine } from '@/lib/browser-stt/engine'
 import { browserModel } from '@/lib/browser-stt/models'
-import { clearVoiceCache, sharedTtsEngine } from '@/lib/browser-tts/engine'
+import { sharedTtsEngine } from '@/lib/browser-tts/engine'
 import { BrowserTtsSession, type BrowserTtsExtra } from '@/lib/browser-tts/session'
 import {
   browserVoice,
@@ -102,7 +103,7 @@ function VoicePicker({
   )
 }
 
-function AboutVoice({ voice, bytes, onCleared }: { voice: BrowserVoice; bytes: number; onCleared: () => void }) {
+function AboutVoice({ voice, bytes }: { voice: BrowserVoice; bytes: number }) {
   return (
     <Panel title="About this voice" bodyClassName="grid gap-3 text-[13px] leading-5" data-testid="voice-about">
       <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5">
@@ -142,20 +143,6 @@ function AboutVoice({ voice, bytes, onCleared }: { voice: BrowserVoice; bytes: n
           The voice was not retrained.
         </li>
       </ul>
-      <div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() =>
-            void clearVoiceCache()
-              .then(onCleared)
-              .then(() => toast.success('Downloaded voices removed from this browser'))
-          }
-          data-testid="clear-voices"
-        >
-          <Trash2 /> Remove downloaded voices
-        </Button>
-      </div>
     </Panel>
   )
 }
@@ -296,6 +283,7 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
 
   return (
     <Page title="Text to speech" toolbar={toolbar}>
+      <InterruptedLoadNotice />
       {es.indexError && (
         <Alert className="mb-4" data-testid="voices-missing">
           <Info />
@@ -553,7 +541,8 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
             )}
           </Panel>
 
-          <AboutVoice voice={voice} bytes={bytes} onCleared={() => void engine.refreshCached()} />
+          <AboutVoice voice={voice} bytes={bytes} />
+          <DownloadsPanel />
 
           <Panel title="Reading the numbers" bodyClassName="grid gap-2.5 text-[13px] leading-5 text-muted-foreground">
             <p>

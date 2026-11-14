@@ -27,7 +27,7 @@ export function Panel({
             <h2 className="truncate text-[13px] leading-5 font-semibold">{title}</h2>
             {description && <p className="truncate text-xs leading-4 text-muted-foreground">{description}</p>}
           </div>
-          {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
+          {actions && <div className="flex max-w-full min-w-0 shrink-0 items-center gap-1.5">{actions}</div>}
         </header>
       )}
       <div className={cn('min-w-0 flex-1 p-4', bodyClassName)}>{children}</div>

@@ -1,10 +1,12 @@
-import { AlertTriangle, Download, Loader2, Play, RotateCcw } from 'lucide-react'
+import { AlertTriangle, Download, Loader2, Play, RotateCcw, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { useStore } from '@/hooks/use-store'
 import { describeLoad, sharedEngine, type EngineState } from '@/lib/browser-stt/engine'
 import { isOutOfMemory } from '@/lib/browser-runtime'
+import { clearAllDownloads } from '@/lib/downloads'
 import type { Store } from '@/lib/store'
 import type { LoadStage } from '@/lib/browser-stt/models'
 import { fmtBytes } from '@/lib/format'
@@ -281,6 +283,22 @@ export function LoadTrouble({
             >
               <RotateCcw /> Retry single-threaded
             </Button>
+            {failed && isOutOfMemory(s.error) && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  void clearAllDownloads().then(() =>
+                    toast.success('Unloaded every model and removed the downloads', {
+                      description: 'Pick a model and it downloads afresh.',
+                    }),
+                  )
+                }
+                data-testid="oom-clear"
+              >
+                <Trash2 /> Unload all and clear downloads
+              </Button>
+            )}
             {onSample && (
               <Button size="sm" variant="outline" onClick={onSample} data-testid="trouble-sample">
                 <Play className="fill-current" /> Play a sample

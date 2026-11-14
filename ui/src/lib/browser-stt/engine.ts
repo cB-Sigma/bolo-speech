@@ -7,6 +7,16 @@ import {
   requireOneRuntime,
 } from '@/lib/browser-runtime'
 import { diag } from '@/lib/diagnostics'
+import {
+  downloadedIds,
+  downloads,
+  isDownloaded,
+  markLoading,
+  markSettled,
+  recordDownload,
+  registerHolder,
+  touchDownload,
+} from '@/lib/downloads'
 import { recordBrowserTrace } from './traces'
 import { detectSupport, probeWebGpu } from '@/lib/support'
 import {
@@ -61,17 +71,17 @@ export interface TranscribeResult {
   language: string | null
 }
 
-/** Whether the model's weights are already in the browser's Cache Storage. */
-export async function isModelCached(model: BrowserModel): Promise<boolean> {
-  try {
-    if (typeof caches === 'undefined') return false
-    const cache = await caches.open('transformers-cache')
-    const keys = await cache.keys()
-    return keys.some((k) => k.url.includes(model.repo) && k.url.endsWith('.onnx'))
-  } catch {
-    return false
-  }
+/**
+ * Whether the model has been downloaded, from the downloads list (the cache
+ * itself is not listed: in WebKit that reads every stored file into memory;
+ * see lib/downloads.ts).
+ */
+export function isModelCached(model: BrowserModel): boolean {
+  return isDownloaded(model.id)
 }
+
+/** transformers.js keeps Cache Storage here. */
+export const MODEL_CACHE = 'transformers-cache'
 
 /** Minimal surface of a Worker that the engine relies on (the tests substitute a scripted one). */
 export interface SpeechWorker {
@@ -127,14 +137,21 @@ export class BrowserSttEngine {
       cachedIds: [],
       error: null,
     })
-    void this.refreshCached()
+    this.refreshCached()
+    downloads.subscribe(() => this.refreshCached())
+    registerHolder('stt', {
+      current: () => (this.store.get().status === 'idle' ? null : this.store.get().model.id),
+      release: () => this.dispose(),
+    })
   }
 
-  /** Re-read which models are in the browser cache. */
-  async refreshCached(): Promise<void> {
-    const flags = await Promise.all(BROWSER_MODELS.map((m) => isModelCached(m)))
-    const cachedIds = BROWSER_MODELS.filter((_, i) => flags[i]).map((m) => m.id)
-    this.store.patch({ cachedIds, cached: cachedIds.includes(this.store.get().model.id) })
+  /** Which models are downloaded, from the downloads list. */
+  refreshCached(): void {
+    const listed = downloadedIds('stt')
+    const cachedIds = BROWSER_MODELS.filter((m) => listed.includes(m.id)).map((m) => m.id)
+    const s = this.store.get()
+    if (s.cachedIds.join() === cachedIds.join() && s.cached === cachedIds.includes(s.model.id)) return
+    this.store.patch({ cachedIds, cached: cachedIds.includes(s.model.id) })
   }
 
   get busy(): boolean {
@@ -174,6 +191,7 @@ export class BrowserSttEngine {
       .catch((err: unknown) => {
         if (generation !== this.generation) throw err
         releaseRuntime('stt')
+        markSettled()
         this.loading = null
         this.stopWatchdog()
         this.worker?.terminate()
@@ -255,6 +273,7 @@ export class BrowserSttEngine {
 
     // On WebKit only one model runtime fits in the page: this releases the synthesiser's, if it is loaded.
     claimRuntime('stt', () => this.dispose())
+    markLoading('stt', model.id)
     const worker: SpeechWorker = workerFactory
       ? await workerFactory()
       : (new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }) as unknown as SpeechWorker)
@@ -294,6 +313,15 @@ export class BrowserSttEngine {
             text: `Model ${this.store.get().cached ? 'loaded from cache' : 'downloaded'} and compiled (${msg.device === 'webgpu' ? 'WebGPU' : `WebAssembly, ${threads} thread${threads === 1 ? '' : 's'}`})`,
           })
           diag.event('model', `ready after ${Math.round(msg.loadMs)} ms`)
+          markSettled()
+          void recordDownload({
+            id: model.id,
+            kind: 'stt',
+            label: model.label,
+            bytes: msg.bytes || model.approxBytes,
+            cache: MODEL_CACHE,
+            keys: msg.cacheKeys ?? [],
+          })
           const cachedIds = [...new Set([...this.store.get().cachedIds, model.id])]
           this.store.patch({
             status: 'ready',
@@ -337,6 +365,7 @@ export class BrowserSttEngine {
     await this.load()
     const worker = this.worker
     if (!worker) throw new Error('Speech worker is not running')
+    touchDownload(this.store.get().model.id)
     const id = this.nextId++
     const copy = audio.slice()
     return new Promise((resolve, reject) => {
@@ -354,6 +383,7 @@ export class BrowserSttEngine {
   dispose(): void {
     this.generation += 1
     releaseRuntime('stt')
+    if (this.store.get().status === 'loading') markSettled(this.store.get().model.id)
     this.stopWatchdog()
     this.worker?.terminate()
     this.worker = null

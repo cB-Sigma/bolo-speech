@@ -182,7 +182,11 @@ async function load(req: Extract<WorkerRequest, { type: 'load' }>): Promise<void
     new Float32Array(16000),
     family === 'Whisper' ? { language: 'en', task: 'transcribe', max_new_tokens: 4 } : {},
   )
-  post({ type: 'ready', device: req.device, loadMs: performance.now() - started })
+  // transformers.js keys its cache by the remote URL of each file.
+  const host = (env.remoteHost ?? 'https://huggingface.co/').replace(/\/+$/, '')
+  const cacheKeys = [...files.keys()].map((f) => `${host}/${req.repo}/resolve/main/${f.replace(/^\/+/, '')}`)
+  const bytes = [...files.values()].reduce((a, f) => a + f.total, 0)
+  post({ type: 'ready', device: req.device, loadMs: performance.now() - started, cacheKeys, bytes })
 }
 
 /**

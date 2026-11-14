@@ -461,6 +461,102 @@ test.describe('with the models available: first use and Hindi', () => {
   })
 })
 
+test.describe('downloaded models', () => {
+  const seeded = {
+    entries: [
+      {
+        id: 'syspin-mai-female',
+        kind: 'tts',
+        label: 'SYSPIN Maithili, female',
+        bytes: 36_500_000,
+        cache: 'bolo-voices',
+        keys: [],
+        addedAt: 1,
+        lastUsed: 3,
+      },
+      {
+        id: 'syspin-hi-female',
+        kind: 'tts',
+        label: 'SYSPIN Hindi, female',
+        bytes: 36_500_000,
+        cache: 'bolo-voices',
+        keys: [],
+        addedAt: 1,
+        lastUsed: 1,
+      },
+      {
+        id: 'whisper-base-q8',
+        kind: 'stt',
+        label: 'Whisper Base',
+        bytes: 79_700_000,
+        cache: 'transformers-cache',
+        keys: [],
+        addedAt: 1,
+        lastUsed: 2,
+      },
+    ],
+    capBytes: null,
+  }
+
+  test('both screens list every downloaded model with its size; delete, limit and clear all', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 900 })
+    await page.addInitScript((s) => {
+      if (!sessionStorage.getItem('seeded')) {
+        localStorage.setItem('bolo.downloads', s)
+        sessionStorage.setItem('seeded', '1')
+      }
+    }, JSON.stringify(seeded))
+    await open(page, 'tts')
+    const panel = page.getByTestId('downloads-panel')
+    await expect(panel).toContainText('3 models')
+    await expect(panel.getByTestId('download-whisper-base-q8')).toContainText('Speech to text')
+    await expect(panel.getByTestId('download-syspin-mai-female')).toContainText('36.5 MB')
+    await expect(panel.getByTestId('storage-use')).toContainText('This site stores')
+    await page.getByTestId('delete-syspin-mai-female').click()
+    await expect(panel).toContainText('2 models')
+    // A limit below what is stored removes the least recently used first.
+    await page.getByTestId('storage-cap').click()
+    await page.getByRole('option', { name: '250 MB' }).click()
+    await expect(panel).toContainText('2 models')
+    await page.getByTestId('storage-cap').click()
+    await page.getByRole('option', { name: 'No limit' }).click()
+    await expect(page.getByRole('listbox')).toHaveCount(0)
+    await page.waitForTimeout(400)
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    )
+    expect(overflow).toBeLessThanOrEqual(1)
+    await axe(page)
+
+    await page.goto('./#/stt')
+    await expect(page.getByTestId('downloads-panel')).toContainText('Whisper Base')
+    await page.getByTestId('downloads-panel').getByTestId('clear-downloads').click()
+    await expect(page.getByTestId('downloads-panel')).toContainText('Nothing yet')
+  })
+
+  test('after the page closed mid-load, nothing loads by itself and clearing is offered', async ({ page }) => {
+    await page.addInitScript(() => {
+      if (!sessionStorage.getItem('seeded')) {
+        localStorage.setItem('bolo.loadingModel', JSON.stringify({ kind: 'stt', id: 'whisper-base-q8', at: 1 }))
+        sessionStorage.setItem('seeded', '1')
+      }
+    })
+    const modelRequests: string[] = []
+    page.on('request', (r) => {
+      if (/\.onnx|ort-wasm/.test(r.url())) modelRequests.push(r.url())
+    })
+    await open(page, 'stt')
+    const notice = page.getByTestId('interrupted-load')
+    await expect(notice).toContainText('The page closed while loading Whisper Base')
+    await page.waitForTimeout(5000)
+    expect(modelRequests).toEqual([])
+    await expect(page.getByTestId('demo-hero').getByTestId('model-chip')).toHaveAttribute('data-status', 'idle')
+    await axe(page)
+    await page.getByTestId('interrupted-clear').click()
+    await expect(notice).toHaveCount(0)
+  })
+})
+
 test.describe('text to speech in the page', () => {
   test('the voice picker lists every language by its own name, with size and licence', async ({ page }) => {
     await open(page, 'tts')
@@ -544,6 +640,10 @@ test.describe('text to speech in the page', () => {
       await expect(page.getByTestId('load-oom')).toContainText('Close other tabs', { timeout: 120_000 })
       await expect(page.getByTestId('load-trouble')).toContainText('already retried on one thread')
       await axe(page)
+      // The way out: unload everything and remove the downloads, with no reload loop.
+      await page.getByTestId('oom-clear').click()
+      await expect(page.getByTestId('model-chip')).toHaveAttribute('data-status', 'idle')
+      await expect(page.getByTestId('downloads-panel')).toContainText('Nothing yet')
     })
 
     test('on an iPhone only one model runtime is kept: the voice gives way to the recogniser and back', async ({
@@ -565,6 +665,71 @@ test.describe('text to speech in the page', () => {
       await expect(page.getByTestId('model-chip')).toHaveAttribute('data-status', 'idle')
       await page.getByTestId('speak').click()
       await expect(page.getByTestId('model-chip')).toHaveAttribute('data-status', 'ready', { timeout: 120_000 })
+      await context.close()
+    })
+
+    test('switching models keeps one voice and one recogniser loaded; nothing loads at start-up', async ({ page }) => {
+      const live = new Set<string>()
+      page.on('worker', (w) => {
+        live.add(w.url())
+        w.on('close', () => live.delete(w.url()))
+      })
+      const modelWorkers = () => page.workers().filter((w) => /\/assets\/worker-/.test(w.url())).length
+      await open(page, 'tts')
+      for (const id of ['syspin-mai-male', 'piper-en-us-amy-low', 'syspin-hi-female']) {
+        await page.getByTestId('voice-picker').click()
+        await page.getByTestId(`voice-${id}`).click()
+        await page.getByTestId('tts-text').fill(id.startsWith('piper') ? 'Good morning.' : 'नमस्ते।')
+        await page.getByTestId('speak').click()
+        await expect(page.getByTestId('model-chip')).toHaveAttribute('data-status', 'ready', { timeout: 120_000 })
+        await expect(page.getByTestId('speak')).toBeVisible({ timeout: 60_000 })
+        // The previous voice's worker was terminated: one model worker, whatever was loaded before.
+        await expect.poll(modelWorkers).toBe(1)
+      }
+      const panel = page.getByTestId('downloads-panel')
+      for (const id of ['syspin-mai-male', 'piper-en-us-amy-low', 'syspin-hi-female'])
+        await expect(panel.getByTestId(`download-${id}`)).toContainText('MB')
+      await expect(panel.getByTestId('download-syspin-hi-female')).toContainText('loaded now')
+
+      // A reload with three voices downloaded starts nothing.
+      await page.reload()
+      await expect(page.getByTestId('downloads-panel')).toContainText('3 models')
+      await page.waitForTimeout(4000)
+      expect(modelWorkers()).toBe(0)
+      await expect(page.getByTestId('model-chip')).toHaveAttribute('data-status', 'idle')
+
+      // Delete one: it goes from the list and from the cache, by its own keys.
+      await page.getByTestId('delete-syspin-mai-male').click()
+      await expect(page.getByTestId('download-syspin-mai-male')).toHaveCount(0)
+      const left = await page.evaluate(async () =>
+        Promise.all(
+          ['syspin-mai-male', 'syspin-hi-female'].map(async (id) => {
+            const c = await caches.open('bolo-voices')
+            const hit = await c.match(new URL(`voices/${id}/voice.json`, location.href).href, { ignoreSearch: true })
+            return Boolean(hit)
+          }),
+        ),
+      )
+      expect(left).toEqual([false, true])
+      await page.getByTestId('clear-downloads').click()
+      await expect(page.getByTestId('downloads-panel')).toContainText('Nothing yet')
+    })
+
+    test('on an Android phone only one model runtime is kept in total', async ({ browser }) => {
+      const context = await browser.newContext({
+        userAgent:
+          'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Mobile Safari/537.36',
+        viewport: { width: 390, height: 844 },
+      })
+      const page = await context.newPage()
+      await open(page, 'tts')
+      await page.getByTestId('voice-picker').click()
+      await page.getByTestId('voice-piper-en-us-amy-low').click()
+      await page.getByTestId('tts-text').fill('Good morning.')
+      await page.getByTestId('round-trip').click()
+      await expect(page.getByTestId('wer')).toBeVisible({ timeout: 180_000 })
+      await expect(page.getByTestId('model-chip')).toHaveAttribute('data-status', 'idle')
+      expect(page.workers().filter((w) => /\/assets\/worker-/.test(w.url())).length).toBe(1)
       await context.close()
     })
 

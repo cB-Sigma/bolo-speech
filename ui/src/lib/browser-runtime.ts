@@ -168,12 +168,26 @@ export function isWebKit(
   return ios || safari
 }
 
+/** A phone or tablet (iOS, iPadOS, Android), or a device that says it has 4 GB of memory or less. */
+export function isPhoneLike(
+  nav: (Pick<Navigator, 'userAgent' | 'maxTouchPoints'> & { deviceMemory?: number }) | undefined = globalThis.navigator,
+): boolean {
+  if (!nav) return false
+  const ua = nav.userAgent
+  if (/iPad|iPhone|iPod|Android|Mobi/.test(ua) || (/Macintosh/.test(ua) && nav.maxTouchPoints > 1)) return true
+  return typeof nav.deviceMemory === 'number' && nav.deviceMemory > 0 && nav.deviceMemory <= 4
+}
+
 let exclusive: boolean | null = null
 const holders = new Map<string, () => void>()
 
-/** Whether only one in-browser model runtime may be alive in the page at a time. */
+/**
+ * Whether only one in-browser model runtime may be alive in the page at a
+ * time: on WebKit (address space) and on phones and small devices (memory).
+ * Elsewhere one recogniser and one synthesiser may be loaded together.
+ */
 export function oneRuntimeAtATime(): boolean {
-  exclusive ??= isWebKit()
+  exclusive ??= isWebKit() || isPhoneLike()
   return exclusive
 }
 

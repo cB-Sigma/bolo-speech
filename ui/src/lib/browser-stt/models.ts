@@ -176,6 +176,13 @@ export type WorkerResponse =
   | { type: 'progress'; files: FileProgress[] }
   | { type: 'stage'; stage: LoadStage; loaded?: number; total?: number }
   | { type: 'fetch'; record: FetchRecord }
-  | { type: 'ready'; device: BrowserDevice; loadMs: number }
+  | {
+      type: 'ready'
+      device: BrowserDevice
+      loadMs: number
+      /** Cache Storage keys of the model's files, and their size (for the downloads list). */
+      cacheKeys?: string[]
+      bytes?: number
+    }
   | { type: 'result'; id: number; text: string; ms: number; language: string | null }
   | { type: 'error'; id?: number; message: string }

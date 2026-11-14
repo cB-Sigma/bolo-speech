@@ -1,3 +1,4 @@
+import { deleteDownload, downloadedIds } from '@/lib/downloads'
 import { Cpu, Download, HardDrive, Trash2, Zap } from 'lucide-react'
 import { toast } from 'sonner'
 import { Panel } from '@/components/panel'
@@ -54,11 +55,9 @@ export function BrowserEnginePanel({
   const s = useStore(engine.store)
 
   const clear = async () => {
-    engine.dispose()
     try {
-      await caches.delete('transformers-cache')
-      engine.store.patch({ cached: false, cachedIds: [] })
-      toast.success('Removed the downloaded models from this browser')
+      for (const id of downloadedIds('stt')) await deleteDownload(id)
+      toast.success('Removed the downloaded speech-to-text models from this browser')
     } catch {
       toast.error('Could not clear the cache')
     }

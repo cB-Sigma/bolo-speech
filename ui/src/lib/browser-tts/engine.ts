@@ -8,6 +8,16 @@ import {
   TTS_MEMORY_PAGES,
 } from '@/lib/browser-runtime'
 import { diag } from '@/lib/diagnostics'
+import {
+  downloadedIds,
+  downloads,
+  isDownloaded,
+  markLoading,
+  markSettled,
+  recordDownload,
+  registerHolder,
+  touchDownload,
+} from '@/lib/downloads'
 import { readBrowserSttConfig, type BrowserDevice, type FileProgress, type LoadStage } from '@/lib/browser-stt/models'
 import { Store } from '@/lib/store'
 import { detectSupport } from '@/lib/support'
@@ -88,20 +98,13 @@ function modelOf(voice: BrowserVoice, index: VoiceIndex | null) {
   return { id: voice.id, label: voice.label, approxBytes: published?.bytes ?? voice.approxBytes }
 }
 
-/** Whether a voice's files are in the browser cache. */
-export async function isVoiceCached(id: string): Promise<boolean> {
-  try {
-    if (typeof caches === 'undefined') return false
-    const keys = await (await caches.open(VOICE_CACHE)).keys()
-    return keys.some((k) => k.url.includes(`/${id}/model.onnx`))
-  } catch {
-    return false
-  }
-}
-
-/** Remove every downloaded voice from the browser. */
-export async function clearVoiceCache(): Promise<void> {
-  if (typeof caches !== 'undefined') await caches.delete(VOICE_CACHE)
+/**
+ * Whether a voice has been downloaded, from the list in local storage. The
+ * browser cache itself is not listed: in WebKit that reads every stored file
+ * into memory (see lib/downloads.ts).
+ */
+export function isVoiceCached(id: string): boolean {
+  return isDownloaded(id)
 }
 
 /**
@@ -141,7 +144,12 @@ export class BrowserTtsEngine {
       index: null,
       indexError: null,
     })
-    void this.refreshCached()
+    this.refreshCached()
+    downloads.subscribe(() => this.refreshCached())
+    registerHolder('tts', {
+      current: () => (this.store.get().status === 'idle' ? null : this.store.get().voice.id),
+      release: () => this.dispose(),
+    })
   }
 
   /** Read the published index (sizes, which voices this deployment has). Cached for the page's lifetime. */
@@ -165,10 +173,13 @@ export class BrowserTtsEngine {
     return this.indexRead
   }
 
-  async refreshCached(): Promise<void> {
-    const flags = await Promise.all(BROWSER_VOICES.map((v) => isVoiceCached(v.id)))
-    const cachedIds = BROWSER_VOICES.filter((_, i) => flags[i]).map((v) => v.id)
-    this.store.patch({ cachedIds, cached: cachedIds.includes(this.store.get().voice.id) })
+  /** Which voices are downloaded, from the downloads list. */
+  refreshCached(): void {
+    const listed = downloadedIds('tts')
+    const cachedIds = BROWSER_VOICES.filter((v) => listed.includes(v.id)).map((v) => v.id)
+    const s = this.store.get()
+    if (s.cachedIds.join() === cachedIds.join() && s.cached === cachedIds.includes(s.voice.id)) return
+    this.store.patch({ cachedIds, cached: cachedIds.includes(s.voice.id) })
   }
 
   /** Switch voice. The current one is unloaded; nothing is downloaded until `load()`. */
@@ -217,6 +228,7 @@ export class BrowserTtsEngine {
         this.worker?.terminate()
         this.worker = null
         releaseRuntime('tts')
+        markSettled()
         const message = err instanceof Error ? err.message : String(err)
         const s = this.store.get()
         diag.error('voice', `${s.stage ? `${STAGE_TEXT[s.stage]}: ` : ''}${message}`)
@@ -287,8 +299,9 @@ export class BrowserTtsEngine {
       'voice',
       `loading ${voice.id}, ${threads} thread${threads === 1 ? '' : 's'}${safe ? ' (single-threaded retry)' : ''}`,
     )
-    // On WebKit only one model runtime fits in the page: this releases the recogniser's, if it is loaded.
+    // On WebKit and phones only one model runtime fits in the page: this releases the recogniser's, if it is loaded.
     claimRuntime('tts', () => this.dispose())
+    markLoading('tts', voice.id)
     const worker: TtsWorker = workerFactory
       ? await workerFactory()
       : (new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }) as unknown as TtsWorker)
@@ -328,6 +341,15 @@ export class BrowserTtsEngine {
             `ready after ${Math.round(msg.loadMs)} ms${msg.memoryBytes != null ? ` · runtime memory ${(msg.memoryBytes / 2 ** 20).toFixed(0)} MiB` : ''}`,
           )
           void reportPageMemory('after loading the voice')
+          markSettled()
+          void recordDownload({
+            id: voice.id,
+            kind: 'tts',
+            label: voice.label,
+            bytes: published.bytes,
+            cache: VOICE_CACHE,
+            keys: msg.cacheKeys ?? [],
+          })
           this.store.patch({
             status: 'ready',
             loadMs: msg.loadMs,
@@ -385,6 +407,7 @@ export class BrowserTtsEngine {
     const worker = this.worker
     const cfg = this.store.get().config
     if (!worker || !cfg) throw new Error('The voice is not loaded')
+    touchDownload(this.store.get().voice.id)
     const id = this.nextId++
     const { noise_scale, length_scale, noise_scale_w } = cfg.inference
     return new Promise((resolve, reject) => {
@@ -402,6 +425,7 @@ export class BrowserTtsEngine {
   dispose(): void {
     this.generation += 1
     releaseRuntime('tts')
+    if (this.store.get().status === 'loading') markSettled(this.store.get().voice.id)
     this.peakMemory = null
     this.stopWatchdog()
     this.worker?.terminate()
