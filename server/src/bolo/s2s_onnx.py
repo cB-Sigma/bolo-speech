@@ -377,6 +377,7 @@ class OnnxGraphs:
         spinning: bool = False,
         providers: Sequence[Any] | None = None,
         graph_providers: dict[str, Sequence[Any]] | None = None,
+        graph_split: dict[str, int] | None = None,
     ) -> None:
         try:
             import onnxruntime as ort
@@ -391,6 +392,17 @@ class OnnxGraphs:
                 raise EngineUnavailable(f"{onnx_dir / name} is missing (precision {precision}); pull the model again")
 
         def session(name: str, n_threads: int, role: str) -> Any:
+            chosen = (graph_providers or {}).get(role) or providers or ["CPUExecutionProvider"]
+            budget = (graph_split or {}).get(role)
+            if budget:  # cut in two (bolo.onnx_split): the front on the GPU, the back on the CPU
+                from bolo.onnx_split import make_session
+
+                return make_session(onnx_dir / name, list(chosen), lambda: options_for(n_threads), budget)
+            return ort.InferenceSession(
+                str(onnx_dir / name), sess_options=options_for(n_threads), providers=list(chosen)
+            )
+
+        def options_for(n_threads: int) -> Any:
             options = ort.SessionOptions()
             options.intra_op_num_threads = max(1, n_threads)
             options.inter_op_num_threads = 1
@@ -398,8 +410,7 @@ class OnnxGraphs:
                 # worker threads that spin while idle take the cores from the other graphs and from every other
                 # process of a shared machine
                 options.add_session_config_entry("session.intra_op.allow_spinning", "0")
-            chosen = (graph_providers or {}).get(role) or providers or ["CPUExecutionProvider"]
-            return ort.InferenceSession(str(onnx_dir / name), sess_options=options, providers=list(chosen))
+            return options
 
         # each graph can sit on its own device (bolo.placement places the largest on the GPU while they fit)
         self.decoder = session(decoder, threads, "decoder")
@@ -777,6 +788,7 @@ class Lfm3Model:
         threads: int = 4,
         device: str = "cpu",
         graph_devices: dict[str, str] | None = None,
+        graph_split: dict[str, int] | None = None,
         **options: Any,
     ) -> Lfm3Model:
         try:
@@ -799,6 +811,7 @@ class Lfm3Model:
                 threads=threads,
                 providers=providers_for(device),
                 graph_providers={role: providers_for(d) for role, d in (graph_devices or {}).items()},
+                graph_split=graph_split,
             ),
             lambda text: list(tokenizer.encode(text, add_special_tokens=False).ids),
             lambda ids: str(tokenizer.decode(ids, skip_special_tokens=True)),
@@ -837,19 +850,20 @@ def shared_model(
     threads: int,
     device: str = "cpu",
     graph_devices: dict[str, str] | None = None,
+    graph_split: dict[str, int] | None = None,
 ) -> Lfm3Model:
     """The model of a directory, loaded once: speech-to-speech sessions and text-to-speech use the same graphs
     (about 3 GB of memory for the q4 files)."""
     precision = str(options.get("precision") or "q4")
     overrides = {k: options[k] for k in GENERATION_OPTIONS if options.get(k) is not None}
-    where = device + (json.dumps(graph_devices, sort_keys=True) if graph_devices else "")
+    where = device + (json.dumps([graph_devices, graph_split], sort_keys=True) if graph_devices or graph_split else "")
     key = (str(Path(path).resolve()), precision, threads, json.dumps(overrides, sort_keys=True), where)
     with _models_lock:
         model = _models.get(key)
         if model is None:
             model = _models[key] = Lfm3Model.from_dir(
                 Path(path), precision=precision, threads=threads, device=device, graph_devices=graph_devices,
-                **overrides,
+                graph_split=graph_split, **overrides,
             )  # fmt: skip
         return model
 
@@ -1339,7 +1353,9 @@ class Lfm3Tts(TTSModel):
 
     @classmethod
     def from_dir(cls, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Lfm3Tts:
-        placed = {"graph_devices": dict(opts.graph_devices)} if opts.graph_devices else {}
+        placed: dict[str, Any] = {"graph_devices": dict(opts.graph_devices)} if opts.graph_devices else {}
+        if opts.graph_split:
+            placed["graph_split"] = dict(opts.graph_split)
         return cls(shared_model(path, spec, opts.threads, opts.device, **placed), spec)
 
     def synthesize(

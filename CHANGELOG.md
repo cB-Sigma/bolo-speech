@@ -15,7 +15,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
     after unloading idle GPU-resident models when that makes it fit; otherwise on the CPU, with a notice. Nothing is
     refused. llama.cpp models (tts-server, Orpheus-family voices, the speech-to-speech server) get `-ngl N` computed
     from the free memory and the GGUF's layer count and size, unless `-ngl` is set in their arguments. ONNX Runtime
-    models made of several graphs (DiCoW ONNX, LFM3-Audio) are placed graph by graph. bolo-torch plugin models get
+    models made of several graphs (DiCoW ONNX, LFM3-Audio) are placed graph by graph. A single ONNX graph that
+    does not fit (Nemotron diarization, the end-of-turn model, or the largest graph of a multi-graph model) is cut
+    in two at a layer boundary: the front on the GPU, the back on the CPU (new setting `onnx_split`, default
+    `auto`; needs `onnx`, new extra `bolo-speech[onnx-split]`). The halves are cached next to the model; tested
+    with both halves on the CPU against the whole graph. bolo-torch plugin models get
     accelerate's `device_map="auto"` with a `max_memory` and report their split back (plugin protocol: optional
     `placement` in `load`, `info.placement` in the reply). sherpa-onnx and faster-whisper models move whole. A model
     can pin its device (`PUT /api/v1/models/{id}/settings {"device": "cpu"}`, or `options.device` in the catalog).

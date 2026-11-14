@@ -45,7 +45,7 @@ The source tree mirrors the picture:
 | `streaming/` | realtime sessions, VAD helpers, partial-result stabilisation |
 | `scheduler.py` | per-model queue with micro-batching |
 | `lifecycle.py`, `_probe.py` | model loading, unloading, eviction, crash isolation |
-| `placement.py`, `accel.py`, `keepalive.py` | GPU/CPU placement (llama.cpp layers, ONNX Runtime graphs), accelerator memory (NVML, nvidia-smi, unified memory), keep-alive parsing |
+| `placement.py`, `accel.py`, `keepalive.py`, `onnx_split.py` | GPU/CPU placement (llama.cpp layers, ONNX Runtime graphs, one graph cut in two), accelerator memory (NVML, nvidia-smi, unified memory), keep-alive parsing |
 | `hardware.py`, `recommend.py` | what this machine is (CPU, memory, GPUs, runtimes, container limits), the micro-benchmark, a fit per catalog model and the rankings; advice and notices only, never a restriction ([recommendations.md](recommendations.md)) |
 | `engines/` | the plugin interface (`base.py`) and one module per engine |
 | `catalog/` | YAML model catalog and its validation |
@@ -182,14 +182,23 @@ cannot be told apart. `memory_budget_mb` counts each model's RAM side,
 result: size, `size_vram`, `PROCESSOR` ("100% GPU", "100% CPU",
 "35%/65% CPU/GPU"), device and time until unload.
 
-What is not done: splitting a single large ONNX graph in two at a layer
-boundary (`onnx.utils.Extractor` could cut it; the front half would run on
-the GPU, the back on the CPU) is left for later; CTranslate2 cannot split a
-model; sherpa-onnx builds its own sessions, so its models move whole.
+A single ONNX graph that does not fit (or the largest graph of a multi-graph
+model) is cut in two at a layer boundary when `onnx_split = "auto"`
+(`bolo/onnx_split.py`): every prefix of a graph's node list is a valid front,
+so bolo scans them once, keeping the weights on each side and the tensors that
+cross up to date, refuses points where a control-flow subgraph would read
+across, moves weight-only nodes (dequantisation) with their reader, and takes
+the layer boundary that puts the most weights within the free memory. The
+halves run as two sessions behind `SplitSession`, which answers `run`,
+`get_inputs` and `get_outputs` like one, and are cached next to the model by
+its hash and the cut. CTranslate2 cannot split a model; sherpa-onnx builds its
+own sessions, so its models move whole.
 
 **Untested on hardware.** CI has no GPU. The placement arithmetic, the NVML
 and nvidia-smi readings, the GPU budget and eviction, `-ngl` and the per-graph
-providers are tested with fake NVML modules and made-up memory figures only.
+providers are tested with fake NVML modules and made-up memory figures only;
+graph cuts are tested with both halves on the CPU (outputs compared with the
+whole graph on small built graphs, and on Smart Turn and Nemotron where cached).
 
 ## The model store
 

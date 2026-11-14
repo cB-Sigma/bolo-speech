@@ -9,7 +9,10 @@ runtime                   granularity
 ========================= ==========================================================================================
 llama.cpp (llama-server)  layers: ``-ngl N`` computed from free memory, the GGUF's layer count and its size
 ONNX Runtime, several     graphs: each graph (encoder, decoder, ...) gets its own execution provider; the largest
-graphs (DiCoW, LFM3)      go on the GPU while they fit, the rest stay on the CPU
+graphs (DiCoW, LFM3)      go on the GPU while they fit, the rest stay on the CPU; with ``onnx_split = "auto"`` the
+                          largest graph left over is cut in two (:mod:`bolo.onnx_split`)
+ONNX Runtime, one graph   with ``onnx_split = "auto"``: cut in two at a layer boundary, the front on the GPU and the
+(Nemotron, Smart Turn)    back on the CPU (:mod:`bolo.onnx_split`); else whole
 PyTorch plugin            ``device_map="auto"`` with ``max_memory`` from the free memory (accelerate), reported back
 everything else           whole model on one device (sherpa-onnx owns its sessions: one provider per model;
                           CTranslate2/faster-whisper: one device per model)
@@ -43,6 +46,8 @@ GRAPH_KINDS = ("dicow_onnx", "lfm3_audio_onnx")
 LLAMA_OVERHEAD = 0.10
 #: ONNX Runtime and the other in-process runtimes need about this much more than the files on the accelerator
 GRAPH_OVERHEAD = 1.2
+#: single-graph ONNX Runtime models that may be cut in two (bolo.onnx_split)
+SPLITTABLE_KINDS = ("smart_turn", "nemotron_diarization")
 
 
 def family(device: str | None) -> str:
@@ -104,6 +109,8 @@ class Placement:
     graphs: dict[str, str] = field(default_factory=dict)
     #: PyTorch plugin: accelerate's ``max_memory`` (device -> bytes)
     max_memory: dict[str, int] | None = None
+    #: ONNX Runtime graphs cut in two (bolo.onnx_split): role -> bytes of weights its front half may put on the GPU
+    graph_split: dict[str, int] = field(default_factory=dict)
     #: why the model is not (all) on the accelerator, when it was asked for
     notice: str | None = None
     #: the free accelerator memory was known when the decision was made
@@ -133,6 +140,8 @@ class Placement:
             out["graphs"] = dict(self.graphs)
         if self.max_memory is not None:
             out["max_memory"] = dict(self.max_memory)
+        if self.graph_split:
+            out["graph_split"] = dict(self.graph_split)
         return out
 
 
@@ -290,8 +299,12 @@ def plan(
     graphs: dict[str, int] | None = None,
     operator_ngl: int | None = None,
     device_index: int = 0,
+    onnx_split: bool = False,
 ) -> Placement:
     """Place one model.
+
+    ``onnx_split``: ONNX Runtime graphs that do not fit whole may be cut in two (the ``onnx_split`` setting is
+    ``auto`` and the ``onnx`` package is installed).
 
     ``requested`` is the ``device`` asked for (``auto`` included), ``device`` the concrete accelerator it resolved to
     (``cpu`` when there is none), ``need_bytes`` the model's estimated memory, ``available_bytes`` what may be used
@@ -337,11 +350,25 @@ def plan(
         total = sum(graphs.values())
         p.graphs = {role: (device if on else "cpu") for role, on in placed.items()}
         gpu = sum(graphs[r] for r, on in placed.items() if on)
+        left = avail - sum(int(graphs[r] * GRAPH_OVERHEAD) for r, on in placed.items() if on)
+        rest = [r for r, on in placed.items() if not on]
+        if onnx_split and rest and left > 0 and available_bytes is not None:
+            # the largest graph that did not fit is cut in two: its front takes what is left
+            role = max(rest, key=lambda r: (graphs[r], r))
+            budget = int(left / GRAPH_OVERHEAD)
+            p.graphs[role] = device
+            p.graph_split[role] = budget
+            gpu += min(budget, graphs[role])
         p.gpu_bytes = int(need_bytes * gpu / total) if total else 0
         p.cpu_bytes = need_bytes - p.gpu_bytes
         if gpu:
             p.device = device
-        if gpu < total:
+        if p.graph_split:
+            role, budget = next(iter(p.graph_split.items()))
+            p.notice = f"'{model_id}': graph {role} is cut in two, about {budget // mb} MB of it on {device}" + (
+                f"; graphs {', '.join(sorted(r for r in rest if r != role))} run on the CPU" if len(rest) > 1 else ""
+            )
+        elif gpu < total:
             on_cpu = ", ".join(sorted(r for r, on in placed.items() if not on))
             p.notice = (
                 f"'{model_id}': graphs {on_cpu} run on the CPU ({max(0, avail) // mb} MB available on {device})"
@@ -361,6 +388,16 @@ def plan(
     if need_bytes <= avail:
         p.device = device
         p.gpu_bytes, p.cpu_bytes = need_bytes, 0
+        return p
+    if onnx_split and split == "whole" and engine_id == "onnxruntime" and available_bytes is not None and avail > 0:
+        # one graph that does not fit: cut it at a layer boundary, the front's weights within the free memory
+        budget = int(avail / GRAPH_OVERHEAD)
+        p.split = "onnx_split"
+        p.device = device
+        p.graph_split = {"model": budget}
+        p.gpu_bytes = min(int(budget * GRAPH_OVERHEAD), need_bytes)
+        p.cpu_bytes = need_bytes - p.gpu_bytes
+        p.notice = f"'{model_id}' is cut in two: about {budget // mb} MB of weights on {device}, the rest on the CPU"
         return p
     p.notice = (
         f"'{model_id}' needs about {need_bytes // mb} MB and {max(0, avail) // mb} MB is available on {device}: "

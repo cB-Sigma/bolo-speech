@@ -247,20 +247,34 @@ class Network(Protocol):
 
 class OnnxNetwork:
     def __init__(
-        self, encoder: Path, decoder: Path, threads: int, device: str = "cpu", decoder_device: str | None = None
+        self,
+        encoder: Path,
+        decoder: Path,
+        threads: int,
+        device: str = "cpu",
+        decoder_device: str | None = None,
+        split: dict[str, int] | None = None,
     ) -> None:
         import onnxruntime as ort
 
-        def session(path: Path, on: str) -> Any:
-            options = ort.SessionOptions()
-            options.intra_op_num_threads = max(1, threads)
-            options.inter_op_num_threads = 1
-            options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-            return ort.InferenceSession(str(path), sess_options=options, providers=providers_for(on))
+        from bolo.onnx_split import make_session
+
+        def options() -> Any:
+            o = ort.SessionOptions()
+            o.intra_op_num_threads = max(1, threads)
+            o.inter_op_num_threads = 1
+            o.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            return o
+
+        def session(path: Path, on: str, role: str) -> Any:
+            budget = (split or {}).get(role)
+            if budget:  # this graph is cut in two: its front on ``on``, its back on the CPU (bolo.onnx_split)
+                return make_session(path, providers_for(on), options, budget)
+            return ort.InferenceSession(str(path), sess_options=options(), providers=providers_for(on))
 
         # the scheduler may place the two graphs apart (bolo.placement: the larger one on the GPU when only one fits)
-        self.encoder = session(encoder, device)
-        self.decoder = session(decoder, decoder_device or device)
+        self.encoder = session(encoder, device, "encoder")
+        self.decoder = session(decoder, decoder_device or device, "decoder")
         names = {i.name for i in self.decoder.get_inputs()}
         if names != {"input_ids", "self_k", "self_v", "cross_k", "cross_v"}:
             raise ValueError(f"{decoder} is not a DiCoW decoder graph (inputs {sorted(names)})")
@@ -550,11 +564,12 @@ class DiCoWOnnx(STTModel):
         encoder = _find(path, spec.get("encoder"), ("encoder.int8.onnx", "encoder.onnx"))
         decoder = _find(path, spec.get("decoder"), ("decoder.int8.onnx", "decoder.onnx"))
         gen = GenerationSettings.from_dir(path)
-        apart = opts.device_for("decoder") != opts.device_for("encoder")
-        network = OnnxNetwork(
-            encoder, decoder, opts.threads, opts.device_for("encoder"),
-            **({"decoder_device": opts.device_for("decoder")} if apart else {}),
-        )  # fmt: skip
+        extra: dict[str, Any] = {}
+        if opts.device_for("decoder") != opts.device_for("encoder"):
+            extra["decoder_device"] = opts.device_for("decoder")
+        if opts.graph_split:
+            extra["split"] = dict(opts.graph_split)
+        network = OnnxNetwork(encoder, decoder, opts.threads, opts.device_for("encoder"), **extra)
         return cls(
             network,
             gen,

@@ -207,6 +207,9 @@ class Settings:
     #: accelerator memory bolo's models may use in all; 0: as much as is free. Over it, the least recently used
     #: idle GPU-resident model is unloaded; when none can be, the new model is placed on the CPU
     gpu_memory_budget_mb: int = 0
+    #: "auto": an ONNX Runtime graph that does not fit in free accelerator memory is cut in two at a layer boundary,
+    #: the front on the accelerator, the back on the CPU (needs the onnx package); "off": it runs on the CPU
+    onnx_split: str = "auto"
     #: attach a notice (API responses, traces, the command line, the console) when a model that is pulled or
     #: loaded is unlikely to fit this machine or to run in real time. Notices only: nothing is ever refused.
     hardware_warnings: bool = True
@@ -445,6 +448,8 @@ def load_settings(
     _check_cloud(settings)
     from bolo.keepalive import parse_keep_alive
 
+    if str(settings.onnx_split).lower() not in ("auto", "off"):
+        raise ValueError(f"onnx_split: expected auto or off, got {settings.onnx_split!r}")
     try:
         parse_keep_alive(settings.keep_alive)
     except ValueError as exc:

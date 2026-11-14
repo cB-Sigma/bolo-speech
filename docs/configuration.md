@@ -71,6 +71,7 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `memory_budget_mb` | `0` (off) | `--memory-budget-mb` | evict idle models (LRU) to stay under this estimate. A model's memory is estimated as the growth of the process during its load, and never less than the size of its files |
 | `max_loaded_models` | `0` (off) | | cap on models in memory |
 | `gpu_reserve_mb` | `512` | | with an accelerator: accelerator memory left free when placing a model (the display, other programs, allocation spikes). A model goes on the GPU only when its estimated memory fits in the free memory minus this; see "GPU and CPU placement" below |
+| `onnx_split` | `auto` | | `auto`: an ONNX Runtime model that does not fit in free accelerator memory whole (Nemotron diarization, the end-of-turn model, or the largest graph of DiCoW ONNX and LFM3-Audio) is cut in two at a layer boundary; the front half runs on the accelerator, the back half on the CPU. Needs the `onnx` package (`bolo-speech[onnx-split]`); without it, or with `off`, such a model runs on the CPU. The halves are written once to `.bolo-split/` next to the model. See "GPU and CPU placement" |
 | `gpu_memory_budget_mb` | `0` (off) | | accelerator memory bolo's models may take in all. Loading a model that would go over it first unloads idle GPU-resident models, least recently used first; when every one is in use, the new model is placed on the CPU (with a notice) instead. Nothing is refused |
 | `probe_models` | `true` | | load a newly installed model once in a child process first |
 | `threads` | `0` = min(4, CPUs) / `workers` | `--threads` | inference threads per engine call. If the machine also runs other work (a language model, other services), set this below the number of cores: oversubscribed inference threads slow each other down badly |
@@ -226,11 +227,12 @@ How a model can be split depends on its runtime:
 | Runtime | Placement |
 | --- | --- |
 | llama.cpp (`tts-server` models on llama-server, Orpheus-family voices, the speech-to-speech server) | by layers: `-ngl N` from the free memory, the GGUF's layer count (read from its header) and its size, the projector (`-mm`) first, plus 10% of the model for the KV cache and buffers. An `-ngl` you set yourself wins |
-| ONNX Runtime models made of several graphs (DiCoW ONNX: encoder and decoder; LFM3-Audio: four graphs) | by graph: the largest graphs go on the accelerator while they fit, the rest run on the CPU |
+| ONNX Runtime models made of several graphs (DiCoW ONNX: encoder and decoder; LFM3-Audio: four graphs) | by graph: the largest graphs go on the accelerator while they fit, the rest run on the CPU; with `onnx_split = "auto"` the largest graph left over is cut in two with the memory that is left |
+| single-graph ONNX Runtime models (Nemotron diarization, the end-of-turn model) | with `onnx_split = "auto"`: cut in two at a layer boundary, the front (as many weights as fit) on the accelerator, the back on the CPU; otherwise whole on one device |
 | bolo-torch plugin models (PyTorch) | the plugin gets accelerate's `device_map="auto"` with a `max_memory` from the free memory and reports back how it split the weights (docs/plugins.md); models whose loader supports it (Orpheus SNAC so far) are split by layers, others load whole |
 | sherpa-onnx | whole model on one device: sherpa-onnx builds its sessions itself, with one provider per model |
 | faster-whisper (CTranslate2) | whole model on one device (CTranslate2 cannot split a model); CUDA only, so `coreml` runs it on the CPU |
-| single-graph ONNX Runtime models (Nemotron, end-of-turn, the SNAC decoder) | whole model on one device. Cutting one graph in two at a layer boundary is possible with `onnx.utils.Extractor` but is not done yet |
+| the SNAC decoder of Orpheus-family voices | whole, on the device of the voice's layers |
 | kokoro-onnx, Moonshine, whisper.cpp, cloud and operator-run servers | the CPU (or wherever the operator's server runs) |
 
 `device = "auto"` means the accelerator bolo can read: the first NVIDIA GPU (NVML or nvidia-smi) or Apple Silicon's
@@ -239,6 +241,18 @@ GPU without driver tools), a model goes on the device as before, and `bolo ps` s
 load took: the growth of its own resident memory and that of the processes it started (llama-server, audio.cpp,
 plugins), and the growth of their accelerator memory (NVML's per-process figures, else the whole device's). On Apple
 Silicon the accelerator's share cannot be told apart from ordinary memory; it is reported as planned.
+
+**Cutting a graph in two** (`onnx_split`, `bolo/onnx_split.py`). ONNX graphs list their nodes in order, so any
+point in the list divides a graph into a front and a back. bolo picks a layer boundary (a point where few tensors
+cross, typically the hidden state and what every layer shares) that puts the most weights in the front within the
+free memory. Nodes that only turn weights into weights (the DequantizeLinear of a quantized weight, a Constant) go
+with the half that reads them. A point is refused when an If, Loop or Scan would read a value from the other half
+through its subgraph. Weights both halves read are copied into both. The two halves run as two ONNX Runtime
+sessions: the crossing tensors come back to the host between them (a few MB per call for a speech model). The
+halves are written to `<model dir>/.bolo-split/<model sha>-<cut>/` once and reused while the model file is the same.
+If a split cannot be made or opened, the model runs whole on the CPU with a warning. Tested on CPU only: the halves
+answer as the whole graph does (bit for bit with ONNX Runtime's graph optimisations off; within float rounding
+with them on, since ONNX Runtime fuses nodes differently on each side of the cut).
 
 `memory_budget_mb` counts the RAM side of each model, `gpu_memory_budget_mb` the accelerator side.
 

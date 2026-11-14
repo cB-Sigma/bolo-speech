@@ -53,6 +53,9 @@ class LoadOptions:
     graph_devices: dict[str, str] = field(default_factory=dict)
     #: PyTorch plugin models: accelerate's ``max_memory`` (device -> bytes) for ``device_map="auto"``
     max_memory: dict[str, int] | None = None
+    #: ONNX Runtime graphs cut in two (bolo.onnx_split): role ("model" for a single-graph model) -> bytes of
+    #: weights the front half may put on ``device_for(role)``; the back half runs on the CPU
+    graph_split: dict[str, int] = field(default_factory=dict)
 
     def device_for(self, role: str) -> str:
         """The device of one graph of a multi-graph model."""

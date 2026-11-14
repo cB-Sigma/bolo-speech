@@ -502,7 +502,7 @@ export interface ModelStats {
 export interface ModelPlacement {
   device: string
   requested: string
-  split: 'whole' | 'layers' | 'graphs' | 'device_map'
+  split: 'whole' | 'layers' | 'graphs' | 'device_map' | 'onnx_split'
   gpu_bytes: number
   cpu_bytes: number
   processor: string

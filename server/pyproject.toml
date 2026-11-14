@@ -74,6 +74,8 @@ text = ["whisper-normalizer>=0.1"]
 # NVIDIA GPU memory per process through NVML (BSD-3-Clause), for GPU/CPU placement and `bolo ps`; without it bolo
 # asks nvidia-smi
 nvidia = ["nvidia-ml-py>=12"]
+# cut an ONNX graph that does not fit in free GPU memory in two (onnx is Apache-2.0)
+onnx-split = ["onnx>=1.16"]
 all = [
   "sherpa-onnx>=2.0,<3",
   "uccharan>=0.4",
@@ -144,7 +146,7 @@ warn_unused_ignores = false
 module = [
   "sherpa_onnx.*", "faster_whisper.*", "ctranslate2.*", "soundfile.*", "soxr.*", "av.*",
   "moonshine_onnx.*", "kokoro_onnx.*", "pywhispercpp.*", "wyoming.*", "whisper_normalizer.*",
-  "onnxruntime.*", "tomli.*", "aiortc.*", "uccharan.*", "tokenizers.*", "sipmessage.*",
+  "onnxruntime.*", "tomli.*", "aiortc.*", "uccharan.*", "tokenizers.*", "sipmessage.*", "onnx.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"

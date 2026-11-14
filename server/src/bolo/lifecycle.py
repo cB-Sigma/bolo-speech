@@ -315,8 +315,17 @@ class ModelManager:
         return plan(
             model_id=spec.id, engine_id=spec.engine, requested=requested, device=device, split=split,
             need_bytes=need, available_bytes=available, layers=layers, graphs=graphs, operator_ngl=op_ngl,
-            device_index=int(idx) if idx.isdigit() else 0,
+            device_index=int(idx) if idx.isdigit() else 0, onnx_split=self.onnx_split_allowed(spec),
         )  # fmt: skip
+
+    def onnx_split_allowed(self, spec: ModelSpec) -> bool:
+        """``onnx_split = "auto"``, the ``onnx`` package installed, and a model whose graphs bolo can cut."""
+        from bolo.onnx_split import available
+        from bolo.placement import GRAPH_KINDS, SPLITTABLE_KINDS
+
+        if str(self.settings.onnx_split).lower() != "auto" or spec.engine != "onnxruntime":
+            return False
+        return spec.kind in (*SPLITTABLE_KINDS, *GRAPH_KINDS) and available()
 
     async def place(self, spec: ModelSpec) -> Placement:
         """Decide where a model goes, unloading idle GPU-resident models (LRU) when that lets it fit whole."""
@@ -454,6 +463,7 @@ class ModelManager:
             gpu_layers=place.gpu_layers if place.split == "layers" and not place.operator_layers else None,
             graph_devices=dict(place.graphs),
             max_memory=place.max_memory,
+            graph_split=dict(place.graph_split),
         )
         model_opts = dict(spec.options)
         if spec.voices:

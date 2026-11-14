@@ -34,7 +34,20 @@ class SmartTurn(TurnModel):
         options = ort.SessionOptions()
         options.intra_op_num_threads = max(1, min(2, opts.threads))
         options.inter_op_num_threads = 1
-        self._session = ort.InferenceSession(str(files[0]), sess_options=options, providers=providers_for(opts.device))
+        if opts.graph_split.get("model"):  # cut in two by the scheduler (bolo.onnx_split): front on the GPU
+            from bolo.onnx_split import make_session
+
+            def fresh() -> Any:
+                o = ort.SessionOptions()
+                o.intra_op_num_threads = options.intra_op_num_threads
+                o.inter_op_num_threads = 1
+                return o
+
+            self._session = make_session(files[0], providers_for(opts.device), fresh, opts.graph_split["model"])
+        else:
+            self._session = ort.InferenceSession(
+                str(files[0]), sess_options=options, providers=providers_for(opts.device)
+            )
         self._input = self._session.get_inputs()[0].name
         self._lock = threading.Lock()
 
