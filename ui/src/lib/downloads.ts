@@ -15,7 +15,7 @@ import { Store } from '@/lib/store'
  * "Clear all" deletes whole caches.
  */
 
-export type ModelKind = 'tts' | 'stt'
+export type ModelKind = 'tts' | 'stt' | 'diarize' | 'llm'
 
 export interface DownloadEntry {
   id: string
@@ -356,7 +356,8 @@ function readInterrupted(): InterruptedLoad | null {
     const raw = globalThis.localStorage?.getItem(LOADING_KEY)
     if (!raw) return null
     const v = JSON.parse(raw) as Partial<InterruptedLoad>
-    return typeof v.id === 'string' && (v.kind === 'tts' || v.kind === 'stt')
+    return typeof v.id === 'string' &&
+      (v.kind === 'tts' || v.kind === 'stt' || v.kind === 'diarize' || v.kind === 'llm')
       ? { kind: v.kind, id: v.id, at: Number(v.at) || 0 }
       : null
   } catch {

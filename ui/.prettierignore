@@ -7,3 +7,4 @@ src/components/ui
 dist-demo
 src/demo/catalog-snapshot.json
 src/vendor
+public/diarization

@@ -61,6 +61,13 @@ const capLabel = (c: number | null) => (c == null ? 'No limit' : fmtBytes(c))
  * voices: size, when it was last used, delete one or all, and an optional
  * limit that removes the least recently used ones.
  */
+const KIND_TEXT: Record<DownloadEntry['kind'], string> = {
+  tts: 'Voice',
+  stt: 'Speech to text',
+  diarize: 'Speaker diarization',
+  llm: 'Language model',
+}
+
 export function DownloadsPanel({ className }: { className?: string }) {
   const state = useStore(downloads)
   const use = useStorageUse()
@@ -133,8 +140,7 @@ export function DownloadsPanel({ className }: { className?: string }) {
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{e.label}</div>
                 <div className="truncate text-xs text-muted-foreground">
-                  {e.kind === 'tts' ? 'Voice' : 'Speech to text'} · <span className="num">{fmtBytes(e.bytes)}</span> ·
-                  used {ago(e.lastUsed)}
+                  {KIND_TEXT[e.kind]} · <span className="num">{fmtBytes(e.bytes)}</span> · used {ago(e.lastUsed)}
                   {resident.includes(e.id) && ' · loaded now'}
                 </div>
               </div>

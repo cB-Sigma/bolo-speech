@@ -32,6 +32,17 @@ async function boot() {
       // storage blocked: the real recogniser
     }
     if (fake) await installFakeStt()
+    try {
+      if (localStorage.getItem('bolo.mock.diarize')) {
+        const [{ FakeDiarizeWorker }, { setDiarizeWorkerFactory }] = await Promise.all([
+          import('./mock/fake-diarize-worker'),
+          import('./lib/browser-diarize/engine'),
+        ])
+        setDiarizeWorkerFactory(() => new FakeDiarizeWorker())
+      }
+    } catch {
+      // storage blocked: the real diarizer
+    }
   } else if (import.meta.env.VITE_BOLO_MOCK === '1') {
     const { installMock } = await import('./mock')
     installMock()

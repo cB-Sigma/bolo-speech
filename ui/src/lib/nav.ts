@@ -11,8 +11,10 @@ import {
   Phone,
   Plug,
   Puzzle,
+  Users,
   type LucideIcon,
 } from 'lucide-react'
+import { isDemo } from '@/lib/api/config'
 
 /** Server features some screens depend on. */
 export interface NavFeatures {
@@ -125,6 +127,15 @@ export const NAV: NavItem[] = [
     icon: Cloud,
     group: 'Server',
     when: (f) => Boolean(f.providers),
+  },
+  {
+    to: '/speakers',
+    label: 'Speakers',
+    short: 'Speakers',
+    description: 'Who spoke when, in this browser: examples, your audio, a transcript per speaker',
+    icon: Users,
+    group: 'Playground',
+    when: () => isDemo,
   },
   {
     to: '/phone',

@@ -1,3 +1,4 @@
+import path from 'node:path'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 
@@ -1067,5 +1068,103 @@ test.describe('GPU/CPU placement', () => {
       await expect(row.getByTestId('processor')).toHaveText(/^(49%\/51% CPU\/GPU|100% CPU)$/)
       console.log(`[placement] split voice: ${await row.getByTestId('processor').innerText()}`)
     })
+  })
+})
+
+test.describe('speakers: who spoke when in the page', () => {
+  test('examples come first; a run shows the reference, the result, DER and a transcript per speaker', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 900 })
+    await page.addInitScript(() => {
+      // Scripted diarizer and recogniser: the page's flow without the models.
+      localStorage.setItem('bolo.mock.diarize', '1')
+      localStorage.setItem('bolo.mock.browserStt', JSON.stringify({ loadMs: 200 }))
+    })
+    await open(page, 'speakers')
+    const examples = page.getByTestId('diarize-examples')
+    await expect(examples.getByRole('listitem')).toHaveCount(3)
+    // The ready examples sit above the upload and record area.
+    const top = async (id: string) => (await page.getByTestId(id).boundingBox())?.y ?? 0
+    expect(await top('diarize-examples')).toBeLessThan(await top('diarize-own'))
+    await expect(page.getByTestId('example-two-speakers-hi')).toContainText('Hindi')
+    await expect(page.getByTestId('example-three-speakers-overlap-en')).toContainText('3 speakers')
+    await expect(page.getByTestId('diarize-server')).toContainText('OpenMDW-1.1')
+    await page.getByTestId('embedding-select').click()
+    await expect(page.getByTestId('embedding-wespeaker-resnet34-lm')).toContainText('CC-BY-4.0')
+    await expect(page.getByTestId('embedding-campplus-voxceleb')).toContainText('Apache-2.0')
+    await expect(page.getByTestId('embedding-wavlm-base-plus-sv')).toContainText('laptop or desktop')
+    await page.keyboard.press('Escape')
+
+    const card = page.getByTestId('example-two-speakers-en')
+    await card.getByTestId('run-example-two-speakers-en').click()
+    await expect(card.getByTestId('reference-timeline').getByTestId('lane')).toHaveCount(2)
+    await expect(card.getByTestId('result-timeline').getByTestId('lane')).toHaveCount(2)
+    await expect(card.getByTestId('der')).toContainText(/DER \d+\.\d%/)
+    await card.getByTestId('transcribe-speakers').click()
+    await expect(card.getByTestId('speaker-transcript')).toContainText('pretend transcript')
+    await expect(card.getByTestId('speaker-transcript')).toContainText('S2')
+    // The diarizer is listed among the downloaded models.
+    await expect(page.getByTestId('downloads-panel')).toContainText('Speaker diarization')
+
+    // A fixed speaker count is honoured.
+    await page.getByTestId('speaker-count').click()
+    await page.getByRole('option', { name: '1', exact: true }).click()
+    await expect(page.getByRole('listbox')).toHaveCount(0)
+    await page.getByTestId('example-two-speakers-hi').getByTestId('run-example-two-speakers-hi').click()
+    await expect(
+      page.getByTestId('example-two-speakers-hi').getByTestId('result-timeline').getByTestId('lane'),
+    ).toHaveCount(1)
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    )
+    expect(overflow).toBeLessThanOrEqual(1)
+    await axe(page)
+  })
+
+  test('your own audio: upload, who spoke when', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('bolo.mock.diarize', '1'))
+    await open(page, 'speakers')
+    await page
+      .getByTestId('diarize-upload')
+      .setInputFiles(path.resolve(import.meta.dirname, '../src/mock/assets/en-ask-not.wav'))
+    await expect(page.getByTestId('own-audio')).toContainText('11.0 s')
+    await page.getByTestId('run-own').click()
+    await expect(page.getByTestId('diarize-own').getByTestId('result-timeline')).toBeVisible()
+    await expect(page.getByTestId('diarize-own').getByTestId('der')).toHaveCount(0)
+  })
+
+  test.describe('with the models available', () => {
+    test.skip(!MIRROR, 'set BOLO_E2E_MODEL_DIR to a mirror with the diarization models to run')
+    for (const embedding of ['wespeaker-resnet34-lm', 'campplus-voxceleb']) {
+      test(`real models (${embedding}): the bundled conversations, scored`, async ({ page }) => {
+        test.setTimeout(400_000)
+        await open(page, 'speakers')
+        await page.getByTestId('embedding-select').click()
+        await page.getByTestId(`embedding-${embedding}`).click()
+        const scores: string[] = []
+        for (const id of ['two-speakers-en', 'three-speakers-overlap-en', 'two-speakers-hi']) {
+          const card = page.getByTestId(`example-${id}`)
+          await card.getByTestId(`run-example-${id}`).click()
+          await expect(card.getByTestId('der')).toBeVisible({ timeout: 180_000 })
+          scores.push(`${id}: ${await card.getByTestId('der').innerText()}`)
+        }
+        console.log(`[diarize] ${embedding}\n  ${scores.join('\n  ')}`)
+        // The clean two-speaker conversation is told apart.
+        const clean = page.getByTestId('example-two-speakers-en')
+        await expect(clean.getByTestId('result-timeline').getByTestId('lane')).toHaveCount(2)
+        const der = Number(/DER (\d+\.\d)%/.exec(scores[0] ?? '')?.[1])
+        expect(der).toBeLessThan(25)
+        await expect(page.getByTestId('downloads-panel')).toContainText(
+          embedding === 'campplus-voxceleb' ? 'CAM++' : 'WeSpeaker',
+        )
+        // Listed as loaded, on the CPU, with an estimate.
+        await page.goto('./#/models')
+        await expect(page.getByTestId('loaded-models').getByTestId('loaded-model')).toContainText(
+          `diarize-${embedding}`,
+        )
+      })
+    }
   })
 })
