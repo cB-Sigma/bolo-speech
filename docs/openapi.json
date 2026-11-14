@@ -627,15 +627,22 @@
      "native"
     ],
     "summary": "Catalog models for a task, ranked for this machine",
-    "description": "Every model of the task that passes the filters asked for, best fit first. Hardware never removes a\nmodel from the list: the ones that are unlikely to fit sort last, each with the reason. ``realtime=true``\nranks for live speech, ``realtime=false`` for batch work (files, voice-over).",
+    "description": "Every model of the task that passes the filters asked for, best fit first. Hardware never removes a\nmodel from the list: the ones that are unlikely to fit sort last, each with the reason. ``realtime=true``\nranks for live speech, ``realtime=false`` for batch work (files, voice-over). Without ``task``: an overview\nof every task, each with its default, its recommendations and its first ``limit`` results (3 by default).",
     "operationId": "recommendations_api_v1_recommendations_get",
     "parameters": [
      {
       "name": "task",
       "in": "query",
-      "required": true,
+      "required": false,
       "schema": {
-       "type": "string",
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
        "title": "Task"
       }
      },

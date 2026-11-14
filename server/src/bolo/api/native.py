@@ -87,7 +87,7 @@ def _recommend_query(
 @router.get("/recommendations", tags=["native"], summary="Catalog models for a task, ranked for this machine")
 async def recommendations(
     request: Request,
-    task: str,
+    task: str | None = None,
     language: str | None = None,
     commercial: str | None = None,
     local_only: str | None = None,
@@ -97,10 +97,27 @@ async def recommendations(
 ) -> JSONResponse:
     """Every model of the task that passes the filters asked for, best fit first. Hardware never removes a
     model from the list: the ones that are unlikely to fit sort last, each with the reason. ``realtime=true``
-    ranks for live speech, ``realtime=false`` for batch work (files, voice-over)."""
+    ranks for live speech, ``realtime=false`` for batch work (files, voice-over). Without ``task``: an overview
+    of every task, each with its default, its recommendations and its first ``limit`` results (3 by default)."""
     core = get_core(request)
+    if task is None or not task.strip():
+        queries = [
+            _recommend_query(name, language, commercial, local_only, realtime, max_size_mb) for name in RECOMMEND_TASKS
+        ]
+        return JSONResponse(await asyncio.to_thread(_overview, core, queries, limit if limit and limit > 0 else 3))
     query = _recommend_query(task, language, commercial, local_only, realtime, max_size_mb)
     return JSONResponse(await asyncio.to_thread(core.advisor.recommend, query, limit if limit and limit > 0 else None))
+
+
+def _overview(core: Any, queries: list[Query], limit: int) -> dict[str, Any]:
+    """``GET /recommendations`` without a task: one entry per task, in the shape of a single task's answer."""
+    tasks: dict[str, Any] = {}
+    answer: dict[str, Any] = {}
+    for q in queries:
+        answer = core.advisor.recommend(q, limit)
+        tasks[q.task] = {k: answer[k] for k in ("default", "recommended", "total", "filtered_out", "note", "results")}
+    query = {**queries[0].to_dict(), "task": None}
+    return {"query": query, "hardware": answer.get("hardware"), "speed": answer.get("speed"), "tasks": tasks}
 
 
 @router.get("/recommendations/setup", tags=["native"], summary="A set of models for one use and language")

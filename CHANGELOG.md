@@ -88,6 +88,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   - **Console**: a "Loaded models" panel on the Models page: each loaded model with its size, CPU/GPU split, VRAM
     share, a countdown to unloading, and Unload / Keep loaded buttons, plus CPU, RAM and GPU totals.
 
+- `GET /api/v1/recommendations` without `task` answers an overview of every task (each with its default, its
+  recommendations and its first `limit` results, 3 by default) instead of `400`.
+
 ### Changed
 
 - The `model` event of `/api/v1/events` for a load carries `processor` (and `notice` when the model is not all on

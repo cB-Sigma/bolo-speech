@@ -752,10 +752,14 @@ few seconds of CPU), stores it in `<data_dir>/hardware-benchmark.json` and
 answers `{"benchmark": {…}, "speed": {…}}`. Fits use it from then on.
 
 `GET /api/v1/recommendations?task=&language=&commercial=&local_only=&realtime=&max_size_mb=&limit=`:
-the models of a task, best fit for this machine first. `task` (required):
+the models of a task, best fit for this machine first. `task`:
 `stt`, `tts`, `diarization`, `vad`, `turn`, `separation` or
 `speech-to-speech` (`s2s`); anything else is `400`. `realtime=true` ranks for
 live speech, `false` for batch work; `limit` cuts the list after ranking.
+Without `task` the answer is an overview of every task:
+`{"query": {…, "task": null}, "hardware", "speed", "tasks": {"stt": {"default", "recommended",
+"total", "filtered_out", "note", "results"}, "tts": {…}, …}}`, each task with its first
+`limit` results (3 by default) and the same filters applied.
 
 ```jsonc
 {

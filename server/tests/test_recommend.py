@@ -595,7 +595,17 @@ def test_recommendations_api(live: LiveServer) -> None:
     assert s2s["query"]["task"] == "speech-to-speech" and s2s["total"] >= 1
     bad = httpx.get(live.url + "/api/v1/recommendations", params={"task": "cooking"})
     assert bad.status_code == 400 and "unknown task" in bad.text
-    assert httpx.get(live.url + "/api/v1/recommendations").status_code == 400  # a task is required
+    # without a task: an overview of every task, each in the shape of a single task's answer
+    overview = httpx.get(live.url + "/api/v1/recommendations", params={"language": "hi", "limit": 2})
+    assert overview.status_code == 200
+    doc = overview.json()
+    assert set(doc) == {"query", "hardware", "speed", "tasks"} and doc["query"]["task"] is None
+    assert doc["query"]["language"] == "hi" and list(doc["tasks"]) == list(rec.TASKS)
+    tts = doc["tasks"]["tts"]
+    assert {"default", "recommended", "total", "filtered_out", "note", "results"} == set(tts)
+    assert len(tts["results"]) == 2 and tts["results"][0]["id"] == tts["default"] and tts["total"] > 2
+    assert len(httpx.get(live.url + "/api/v1/recommendations").json()["tasks"]["stt"]["results"]) == 3
+    assert httpx.get(live.url + "/api/v1/recommendations", params={"task": ""}).json()["tasks"]
     setup = httpx.get(live.url + "/api/v1/recommendations/setup", params={"use": "files", "language": "en"}).json()
     assert [p["task"] for p in setup["picks"]] == ["stt", "diarization"] and setup["local_only"] is True
     assert setup["picks"][1]["optional"] is True and isinstance(setup["download_bytes"], int)
