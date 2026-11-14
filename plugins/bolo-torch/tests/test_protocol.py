@@ -42,7 +42,8 @@ def test_hello_and_tts_through_the_host(engine: PluginEngine, tmp_path: Path) ->
 
 
 def test_placement_goes_to_the_plugin_and_the_split_comes_back(engine: PluginEngine, tmp_path: Path) -> None:
-    opts = LoadOptions(threads=1, device="cuda:0", max_memory={"0": 4000, "cpu": 9000})
+    # CI has CPU torch only: the device stays cpu; the placement still travels to the loader and back
+    opts = LoadOptions(threads=1, device="cpu", max_memory={"0": 4000, "cpu": 9000})
     model = engine.load("parler-tts", "tts", tmp_path, {"model_id": "split"}, opts)
     report = getattr(model, "placement_report", None)
     assert report == {"gpu_bytes": 4000, "cpu_bytes": 1000, "device_map": {"model": "0"}}
