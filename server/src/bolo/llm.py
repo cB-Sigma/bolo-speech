@@ -136,3 +136,42 @@ class LLMClient:
         except (httpx.HTTPError, ValueError) as exc:
             out["error"] = f"{type(exc).__name__}: {exc}"
         return out
+
+
+class AudioLLMClient(LLMClient):
+    """The model of the Realtime ``audio-llm`` pipeline: a chat-completions endpoint that takes ``input_audio``
+    content (llama-server with Gemma 4 E2B/E4B, Ultravox, Qwen2.5-Omni, ...). Falls back to the ``llm_*``
+    settings for whatever ``audio_llm_*`` leaves unset."""
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.settings.audio_llm_base_url or self.settings.llm_base_url)
+
+    @property
+    def base_url(self) -> str:
+        url = self.settings.audio_llm_base_url or self.settings.llm_base_url
+        if not url:
+            raise LLMNotConfigured(
+                "the audio-llm pipeline needs an audio-understanding model: set audio_llm_base_url (and "
+                "audio_llm_model) to a chat-completions endpoint that accepts input_audio, for example a llama-server "
+                "started with -hf ggml-org/gemma-4-E4B-it-GGUF"
+            )
+        return url.rstrip("/")
+
+    @property
+    def model(self) -> str | None:
+        return self.settings.audio_llm_model or self.settings.llm_model
+
+    def headers(self) -> dict[str, str]:
+        h = {"Content-Type": "application/json"}
+        key = self.settings.audio_llm_api_key if self.settings.audio_llm_base_url else self.settings.llm_api_key
+        if key:
+            h["Authorization"] = f"Bearer {key}"
+        return h
+
+    def describe(self) -> dict[str, Any]:
+        return {
+            "configured": self.configured,
+            "base_url": self.settings.audio_llm_base_url or self.settings.llm_base_url,
+            "model": self.model,
+        }

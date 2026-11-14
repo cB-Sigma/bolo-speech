@@ -226,6 +226,84 @@ the function, send its result as a `function_call_output` item and then
 in streaming mode. It is tested with a scripted fake model only: **no real
 model's tool calling was exercised.**
 
+### Pipelines: cascade, audio-in language model, speech-to-speech
+
+What answers a conversation turn is the session's *pipeline*: the setting
+`realtime_pipeline`, or per session the bolo extension field
+`session.pipeline` in `session.update` (`session.created` reports it). It
+can change until the first audio or item. In every pipeline bolo keeps the
+session itself: authentication and client secrets, the event set,
+`audio/pcmu` / `audio/pcma` and resampling, turn detection (`server_vad`,
+`semantic_vad`, manual commits), barge-in, conversation items, tool-call
+items, user transcripts from its own STT, and traces.
+
+| `pipeline` | Who hears the user | Who answers | Who speaks | Needs |
+| --- | --- | --- | --- | --- |
+| `cascade` (default) | bolo's STT | the `llm_*` chat-completions model | bolo's TTS | `llm_base_url` |
+| `audio-llm` | the model itself (the turn's audio as `input_audio`, WAV) | an audio-understanding model, `audio_llm_*` (falls back to `llm_*`) | bolo's TTS | a chat-completions server that takes `input_audio` |
+| `speech-to-speech` | the model itself (16 kHz PCM, streamed while the user speaks) | a speech-to-speech model | the same model | `s2s_server_url`, or `s2s_model` + llama-server |
+
+**`audio-llm`.** The latest user turn is sent to the model as audio, earlier
+turns as their transcripts (or as audio while a transcript is missing; the
+last eight turns' audio is kept). Tool calls work as in the cascade. bolo's
+STT still transcribes each turn, in parallel with the response
+(`realtime_transcribe_user`), for the transcript events and the history, and
+bolo's TTS speaks the answer, so any of bolo's voices (Indic included) can
+speak what the model says. llama-server accepts `input_audio` content in
+`/v1/chat/completions` for its audio models (tools/server/README.md and
+docs/multimodal.md of llama.cpp): Gemma 4 E2B / E4B
+(`llama-server -hf ggml-org/gemma-4-E4B-it-GGUF`, Apache-2.0), Ultravox 0.5
+(`ggml-org/ultravox-v0_5-llama-3_2-1b-GGUF`; Llama 3.2 licence), Voxtral,
+Qwen2.5-Omni and Qwen3-Omni. Whether Gemma 4 understands spoken Hindi well
+was **not measured**.
+
+```toml
+realtime_pipeline = "audio-llm"
+audio_llm_base_url = "http://127.0.0.1:8081/v1"   # llama-server -hf ggml-org/gemma-4-E4B-it-GGUF --port 8081
+```
+
+**`speech-to-speech`.** The model behind it is a small backend interface in
+`bolo/s2s.py` (append the turn's audio, commit, add user text or a tool
+result, stream a response of text, audio and tool calls, cancel), so the
+session logic does not depend on any one server. The first backend is
+llama.cpp's `llama-server` and its WebSocket `/v1/realtime` in conversation
+mode, which runs **LFM3-Audio 2B** (and LFM3-Omni) with tool calls: English
+conversation only (its speech languages do not include Hindi), CPU-capable,
+under the **LFM Open License v1.0** (commercial use only for organisations
+below USD 10M yearly revenue; bolo's default pipeline stays the cascade).
+Either run llama-server yourself:
+
+```sh
+llama-server -hf LiquidAI/LFM3-Audio-2B-GGUF --port 8090 --parallel 2
+bolo serve   # with s2s_server_url = "http://127.0.0.1:8090" and realtime_pipeline = "speech-to-speech"
+```
+
+or let bolo start one: `bolo components install llama-server`, then the
+default `s2s_model = "lfm3-audio-2b-llamacpp"` (the same GGUF files as that
+TTS catalog entry, pulled on first use) is served by a llama-server on a
+loopback port with a random API key and `--parallel s2s_parallel`, restarted
+after a crash with a back-off as TTS servers are. Each Realtime session holds
+one upstream session (one llama-server slot).
+
+How a turn maps onto the upstream protocol: when bolo's turn detection hears
+speech start, the audio from `prefix_padding_ms` before it is sent upstream
+and the rest follows as it arrives (llama-server prefills it while the user
+speaks); at the end of the turn bolo sends `input_audio_buffer.commit` and
+then `response.create`. Barge-in sends `response.cancel` and drops what is
+left of the cancelled response. With turn detection off, all appended audio
+is forwarded and the client's commit is passed on. User text items and
+`function_call_output` items are forwarded; assistant and system messages
+created by the client stay in bolo's history only. The model's text becomes
+`response.output_audio_transcript.delta` (or `response.output_text.delta`
+for `["text"]` sessions), its audio (PCM16 at the model's rate) is resampled
+and encoded to the session's output format, and its tool calls become
+`function_call` items as in the cascade. Limits: `instructions`, `tools` and
+the voice reach the model only when its session opens (the first turn);
+`input_audio_buffer.clear` cannot take back audio already forwarded; OpenAI
+voice names are not sent (LFM3's voices are `female` and `male`); upstream
+token usage is output tokens only. Tested against a scripted fake
+llama-server, **not against a real LFM3-Audio model.**
+
 ### Browsers: WebRTC and ephemeral keys
 
 `POST /v1/realtime/calls` is the WebRTC transport of the same sessions
@@ -294,8 +372,8 @@ scope for now; for telephony use the WebSocket transport with
 
 ### What is different from OpenAI, or missing
 
-* A cascade: no speech-to-speech model, no emotional prosody control, no
-  noise reduction. `semantic_vad` is an acoustic end-of-turn model added to
+* A cascade by default; speech-to-speech only through an opt-in pipeline
+  (above). No emotional prosody control, no noise reduction. `semantic_vad` is an acoustic end-of-turn model added to
   silence detection (above), not OpenAI's.
 * Input transcription events are always sent (bolo has to transcribe anyway).
 * Not implemented: SIP, MCP tools, image input, `prompt`

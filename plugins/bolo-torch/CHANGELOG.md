@@ -2,12 +2,22 @@
 
 The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.1.0] - unreleased
+## [0.1.0] - 2026-11-14
 
 First release, for bolo 0.2.
 
 ### Added
 
+- The original F5-TTS checkpoints (`f5-tts` kind with `layout: f5-tts`, extra `f5-original`): catalog entry
+  `f5-tts-v1-base` (CC-BY-NC-4.0). F5 voices can name bolo's built-in reference clips (`reference:`).
+- Indic-Speak (`indic-speak` kind, extra `indic-speak`): Bodhan AI's gated Indic TTS through its repository's own
+  `inference.py`; catalog entry `indic-speak`. Kinds `diarizen`, `spark-tts` and `maskgct` are listed as not
+  implemented (catalogued with a note on what is missing). Unit-tested with fakes only.
+- DiCoW (`dicow` kind, extra `dicow`): BUT-FIT's diarization-conditioned Whisper as a speaker-conditioned STT
+  model (bolo's `speakers` plugin request). Catalog entries `dicow-v3.3` (CC-BY-4.0) and `se-dicow` (Apache-2.0,
+  self-enrolment), both run here on CPU. STNO masks and self-enrolment windows are built as BUT's inference
+  pipeline builds them; on two AMI excerpts the transcripts were identical to that pipeline's for every speaker. bfloat16 on CPUs
+  with AMX or AVX512-BF16. Needs transformers 4.55.
 - Engine plugin `torch` (entry point `bolo.engines: torch = bolo_torch:plugin`), served with bolo's plugin SDK;
   errors keep their meaning across the process boundary (`model_gated`, `invalid_request`,
   `component_missing`, `download_failed`).
@@ -23,3 +33,4 @@ First release, for bolo 0.2.
 - Device (`auto`, `cpu`, `cuda`, `mps`), dtype and thread selection; downloads through the Hugging Face hub with
   `HF_TOKEN`; `bolo-torch doctor`.
 - Extras per model family: `parler`, `f5`, `orpheus`, `sepformer`, `pyannote`.
+

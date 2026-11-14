@@ -15,15 +15,26 @@ the console, the OpenAI-compatible API) works as for bolo's own engines.
 | `indic-parler-tts` | TTS | AI4Bharat Indic Parler-TTS, 69 named voices, 21 languages | `parler` | Apache-2.0 | yes | CPU, see below |
 | `parler-tts-tiny-v1` | TTS | Parler-TTS Tiny v1, English | `parler` | Apache-2.0 | no | CPU, see below |
 | `indic-f5` | TTS | AI4Bharat IndicF5, voice cloning from a reference clip, 11 languages | `f5` | MIT | yes | CPU, see below |
+| `f5-tts-v1-base` | TTS | SWivid F5-TTS v1 Base, English and Chinese voice cloning (bolo's reference clips or `voices_dir`) | `f5-original` | CC-BY-NC-4.0 (non-commercial) | no | **no** |
+| `indic-speak` | TTS | Bodhan AI Indic-Speak, 3B Llama + SNAC + Vocos, 22 Indian languages and English | `indic-speak` | Indic Open Model License v1.0 (conditional) | yes | **no** |
 | `veena` | TTS | Maya Research Veena, 3B Llama + SNAC, Hindi and English | `orpheus` | Apache-2.0 | no | **no** (only the SNAC decoder) |
 | `svara-tts-v1` | TTS | Kenpath Svara v1, 3B Llama + SNAC, 19 languages, 38 voices | `orpheus` | Apache-2.0 | no | **no** (only the SNAC decoder) |
 | `sepformer-whamr16k` | separation | SpeechBrain SepFormer, WHAMR!, 16 kHz, 2 speakers | `sepformer` | Apache-2.0 (WSJ0 data, see below) | no | CPU, see below |
 | `sepformer-whamr` | separation | SpeechBrain SepFormer, WHAMR!, 8 kHz, 2 speakers | `sepformer` | Apache-2.0 (WSJ0 data, see below) | no | CPU, see below |
 | `pixit-ami` | separation | pyannote PixIT `speech-separation-ami-1.0`, diarization + separation | `pyannote` | MIT | yes (two repositories) | CPU, see below |
+| `dicow-v3.3` | STT, diarization-conditioned | BUT-FIT DiCoW v3.3: Whisper large-v3-turbo told who talks when | `dicow` | CC-BY-4.0 | no | CPU, see below |
+| `se-dicow` | STT, diarization-conditioned | BUT-FIT SE-DiCoW: DiCoW with self-enrolment | `dicow` | Apache-2.0 | no | CPU, see below |
 
 The separation models are bolo `separation` models in "blind" mode: bolo uses them for `separate_overlaps=true`
 on diarized transcription and on `POST /api/v1/diarize`, and assigns their tracks to its own diarized speakers.
 They can also be run without bolo: `bolo-torch separate mix.wav -m sepformer-whamr16k -o out/`.
+
+The DiCoW models are bolo `stt` models that are *speaker-conditioned*: in a diarized transcription
+(`diarize=true` or `response_format=diarized_json`) bolo diarizes the recording (with
+`nemotron-3-diarization` unless the request names another diarizer), then sends the whole recording to the
+plugin with the speakers' frame activity, and the model transcribes it once per speaker. Overlapping speech is
+transcribed for each speaker instead of being cut at turn boundaries. Without diarization they work as an
+ordinary (slow) Whisper. See "DiCoW" below and docs/models.md, "Diarization-conditioned recognition".
 
 The catalog also lists `sravaani-1.0` and `indicconformer-600m-official` for this plugin. bolo-torch 0.1.0 does
 not implement them; loading one answers `400 invalid_request` saying so.
@@ -38,6 +49,14 @@ not implement them; loading one answers `400 invalid_request` saying so.
   sentence at a time (bolo also splits text into sentences before it reaches the plugin). The option
   `stream_seconds` turns on Parler's own streamer inside a sentence; on CPU it did not start audio sooner and
   almost doubled the real-time factor (measured below), so it is off by default.
+* **F5-TTS v1 Base** (`layout: f5-tts`): `f5_tts.infer.utils_infer.load_model` builds the v1 DiT from
+  `F5TTS_v1_Base/model_1250000.safetensors` and its `vocab.txt`, the Vocos vocoder comes from the pinned
+  `charactr/vocos-mel-24khz` files, and generation is the package's `infer_batch_process` (as for IndicF5).
+  Catalog voices with `reference: <bolo sample id>` use bolo's built-in synthetic clips and their transcripts.
+* **Indic-Speak**: the gated repository ships its own `inference.py`; the loader imports it from the model
+  directory and calls `TTS(<dir>)(text, speaker=…, style=…)` as the model card documents (24 kHz). Voice ids are
+  the speaker names (`amit`, `kavya`, …), optionally `<speaker>:<STYLE>`; unknown names are refused because the
+  model would silently average them.
 * **IndicF5**: the loader builds the DiT from the `f5_tts` copy that ships in the model repository and loads
   `model.safetensors` from the local directory. The repository's `model.py` is not used: it looks its vocabulary
   up as a Hub repository id (which fails for a local directory), wraps the models in `torch.compile` and reads
@@ -63,6 +82,20 @@ not implement them; loading one answers `400 invalid_request` saying so.
   ECAPA embedding was not honoured in that path (the current `main` was downloaded). Option `leakage_removal`
   overrides the pipeline's setting (default true), which zeroes a track wherever its speaker is judged silent.
 
+* **DiCoW** (BUT-FIT, `BUT-FIT/DiCoW_v3_3`; Whisper large-v3-turbo with frame-level diarization-dependent
+  transformations, FDDT). For each diarized speaker the plugin builds the four-class STNO mask (silence / only the
+  target / only others / target in overlap) every 20 ms from the activity bolo sends, with the formula of BUT's
+  inference pipeline (`BUTSpeechFIT/DiCoW`, `pipeline.py`, Apache-2.0), and runs the model's own generation code
+  (Whisper long-form decoding in 30 s windows, greedy, all speakers of a recording in one batch, up to the option
+  `batch`, default 4). The repository's Python files are imported as a package (what `trust_remote_code` runs):
+  transformers 4.55 cannot load them from a local directory because it copies only the modules
+  `modeling_dicow.py` imports directly. Segment times come from the generator's own segments. A speaker with less
+  than 0.2 s of speech (option `skip_silent_s`) is not decoded. On a CPU with AMX or AVX512-BF16 the weights are
+  loaded in bfloat16 unless `dtype` is set; otherwise float32. Output is lower-case without punctuation and with
+  contractions spelled out ("we are", "do not"), the normalised style of its training references. SE-DiCoW uses
+  the same loader and also passes each speaker's self-enrolment window (the 30 s where that speaker talks alone the
+  most, chosen as BUT's pipeline does).
+
 ## Install
 
 bolo-torch is not on PyPI yet (neither is bolo 0.2.0; both are published by the release workflow). From a
@@ -81,12 +114,16 @@ Once published, step 2 becomes:
 pip install "bolo-torch[parler,sepformer]"     # also installs bolo
 ```
 
-Extras: `parler` (Parler-TTS), `f5` (IndicF5), `orpheus` (Veena, Svara), `sepformer`, `pyannote` (PixIT).
+Extras: `parler` (Parler-TTS), `f5` (IndicF5), `f5-original` (the original F5-TTS checkpoints, on the `f5-tts`
+package, which pins its own libraries: give it its own environment), `indic-speak` (transformers 5 and SNAC),
+`orpheus` (Veena, Svara), `sepformer`, `pyannote` (PixIT),
+`dicow` (DiCoW, SE-DiCoW: transformers 4.55 and pandas). DiCoW uses the plugin
+protocol's `speakers` request (bolo 0.2.0 or later).
 Installed in bolo's environment, the plugin is found through its entry point (`bolo.engines: torch`) and
 `bolo doctor` lists `plugin:torch`. Check the plugin's own environment with `bolo-torch doctor`.
 
-**Two extras do not mix.** `parler-tts` 0.2.3 pins `transformers==4.46.1`, while `pyannote.audio[separation]`
-needs `transformers>=4.48.3`. Put PixIT in a second environment and point bolo at it (a configured command wins
+**Some extras do not mix.** `parler-tts` 0.2.3 pins `transformers==4.46.1`, while `pyannote.audio[separation]`
+needs `transformers>=4.48.3` and DiCoW's model code needs transformers 4.55. Put PixIT in a second environment and point bolo at it (a configured command wins
 over the entry point):
 
 ```bash
@@ -193,6 +230,28 @@ afternoon of 2026-11-13; it was reworked afterwards (it now also weighs each tra
 speech) and checked with perfect tracks, so this single observation may no longer apply. The word-error
 evaluation of both separators through the current bolo is in docs/models.md, "Overlapping speech".
 
+### DiCoW
+
+2026-11-14, same machine type (it has AMX, so DiCoW ran in bfloat16), bolo and the plugin at 2 threads, the
+machine idle for the speeds. Full numbers in docs/models.md, "Diarization-conditioned recognition", and
+docs/measurements/dicow-conditioned.json.
+
+* **Against the reference.** On two AMI excerpts with Nemotron's speaker turns, the plugin's STNO masks were
+  identical to those of BUT's `pipeline.py` and every speaker's transcript was word for word the reference
+  pipeline's (6 of 6 speaker streams, DiCoW v3.3; the same for SE-DiCoW, including its self-enrolment windows).
+* **Accuracy through bolo** (cpWER, diarized transcription):
+
+| Audio | Files | pyannote + whisper-base (bolo default) | Nemotron + whisper-base | Nemotron + `dicow-v3.3` | Nemotron + `se-dicow` |
+| --- | --- | --- | --- | --- | --- |
+| AMI far-field excerpts (45 s) | 24 | 69.4 % | 61.2 % | **26.0 %** | 25.3 % |
+| Synthetic two-voice mixes (16 and 8 kHz) | 44 | 55.4 % | 25.4 % | **6.6 %** | 7.9 % |
+
+* **Speed** (diarization included, 45 s excerpts with 3-4 speakers): RTF 0.45 at 2 threads, 0.26 at 4 threads;
+  1.41 at 2 threads in float32. Load about 4.5 s; the plugin process holds about 3 GB in bfloat16. SE-DiCoW: RTF
+  0.59 at 2 threads.
+* **Known failure:** SE-DiCoW once repeated one word for the last 6 s of a speaker's stream (a 16 kHz Hindi mix);
+  decoding is greedy without Whisper's temperature fallback, as in BUT's pipeline.
+
 ## Not tested
 
 * **Veena and Svara** end to end: the language models were not downloaded (7.6 GB / 13.2 GB, no GPU here). The
@@ -200,9 +259,17 @@ evaluation of both separators through the current bolo is in docs/models.md, "Ov
 * **PixIT** on real meeting audio, and with pyannote.audio 3.x (it ran with 4.0.7 and the shim above). Before
   `pyannote/separation-ami-1.0` was accepted for the test account, loading it came back through bolo as
   `401 model_gated` naming that repository.
-* GPU (CUDA, MPS), float16 / bfloat16, Python 3.10, 3.11 and 3.13 for the plugin (it ran on 3.12), macOS.
+* GPU (CUDA, MPS), float16, bfloat16 other than DiCoW on CPU, Python 3.10, 3.11 and 3.13 for the plugin (it ran
+  on 3.12), macOS.
+* DiCoW on whole meetings (only 45 s excerpts and ~30 s mixes), on real telephone calls, on Hindi beyond one
+  synthetic voice pair, and on single-speaker audio against plain Whisper large-v3-turbo; on CPUs without AMX /
+  AVX512-BF16 only float32 speed was measured (forced on this machine). DiCoW gives no word timestamps.
 * Telephone (8 kHz) recordings with the 8 kHz SepFormer; real meeting audio with any separator.
-* `sravaani-1.0` and `indicconformer-600m-official`: not implemented.
+* `sravaani-1.0` and `indicconformer-600m-official`: not implemented. `spark-tts-0.5b`, `maskgct` and
+  `diarizen-wavlm-large-s80-md-v2` are catalogued but not implemented (no packaged inference code; the plugin
+  protocol has no diarization request).
+* `f5-tts-v1-base` and `indic-speak`: unit-tested with fake backends only; the weights (1.3 GB / 7.1 GB, Indic-Speak
+  gated) were not downloaded, and Indic-Speak's `inference.py` (gated) was not read.
 
 ## Licences
 
@@ -217,6 +284,8 @@ card before commercial use.
 | Veena | Apache-2.0 | Training data "proprietary" per its card. |
 | Svara v1 | Apache-2.0 | Base `canopylabs/3b-hi-ft-research_release` (Llama 3.2 lineage); trained on SYSPIN, RASA, IndicTTS, SPICOR. SNAC codec MIT. |
 | SepFormer WHAMR! (8 kHz, 16 kHz) | Apache-2.0 | Trained on WHAMR!, built from WSJ0 (LDC licence, research use) and WHAM! noise (CC-BY-NC-4.0): a provenance risk for commercial use. |
+| DiCoW v3.3 | CC-BY-4.0 | Attribution to BUT Speech@FIT (cite the DiCoW and SE-DiCoW papers, model card). Fine-tuned from Whisper large-v3-turbo (MIT) on AMI and NOTSOFAR-1 (CC BY 4.0), LibriMix and synthetic LibriSpeech mixtures (LibriSpeech CC BY 4.0; LibriMix's noisy variants use WHAM! noise, CC-BY-NC-4.0, and which variants were used is not stated: unverified). The model repository's Python code is under the repository's licence; BUT's inference code (`BUTSpeechFIT/DiCoW`) is Apache-2.0. |
+| SE-DiCoW | Apache-2.0 | Same base model and training-data notes as DiCoW v3.3. |
 | PixIT `speech-separation-ami-1.0` | MIT | Gated (both repositories). Downloads `speechbrain/spkrec-ecapa-voxceleb` (Apache-2.0) and `microsoft/wavlm-large` (no licence stated on its model card; check before commercial use). |
 
 No model here is marked non-commercial by its publisher; the SepFormer training-data caveat above is the one to

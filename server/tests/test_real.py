@@ -587,3 +587,139 @@ async def test_kitten_through_uccharan(core: Bolo) -> None:
     audio, rate = await core.synthesize_all(EN_TEXT, model="kitten-nano-0.8-int8", phonemizer="uccharan")
     heard = await core.transcribe(audio, rate, model="moonshine-tiny-en")
     assert word_error_rate(EN_TEXT, heard.text, "en") <= 0.2
+
+
+@pytest.mark.skipif(
+    not os.environ.get("BOLO_DICOW_ONNX_DIR"),
+    reason="set BOLO_DICOW_ONNX_DIR to an export of tools/export_dicow_onnx.py (dicow-v3.3-onnx is not hosted yet)",
+)
+async def test_dicow_onnx_transcribes_both_voices_of_an_overlap(core: Bolo) -> None:
+    """Torch-free DiCoW on two Kokoro voices that talk at once for 2 s: each speaker's own words, both intelligible."""
+    from bolo.custom import register_local_model
+    from bolo.diarize import DiarizeOptions
+
+    spec = register_local_model(core, os.environ["BOLO_DICOW_ONNX_DIR"], name="dicow-onnx-test")
+    assert spec.kind == "dicow_onnx" and "speaker-conditioned" in spec.features
+    core.store.pull(spec.id, spec.source)
+    texts = {
+        "af_heart": "Please send the updated schedule to everyone before the meeting starts tomorrow morning.",
+        "am_michael": "We moved the old printer into the storage room next to the kitchen last week.",
+    }
+    voices = {}
+    for voice, text in texts.items():
+        audio, native = await core.synthesize_all(text, model="kokoro-v1.0-int8", voice=voice)
+        voices[voice] = resample(audio, native, 16000)
+    a, b = voices["af_heart"], voices["am_michael"]
+    start_b = len(a) - 2 * 16000  # B starts 2 s before A ends
+    mix = np.zeros(start_b + len(b) + 8000, np.float32)
+    mix[: len(a)] += a
+    mix[start_b : start_b + len(b)] += b
+    result = await core.transcribe(mix, 16000, model=spec.id, language="en", diarize=DiarizeOptions())
+    by_speaker: dict[str, str] = {}
+    for seg in result.segments:
+        by_speaker[seg.speaker or "?"] = (by_speaker.get(seg.speaker or "?", "") + " " + seg.text).strip()
+    print("\ndicow-onnx:", by_speaker)
+    assert len(by_speaker) == 2
+    first, second = (by_speaker[k] for k in sorted(by_speaker))
+    assert word_error_rate(texts["af_heart"], first, "en") <= 0.25
+    assert word_error_rate(texts["am_michael"], second, "en") <= 0.25
+
+
+def _llama_server_settings() -> Settings:
+    s = real_settings()
+    s.llama_server_bin = os.environ.get("BOLO_LLAMA_SERVER_BIN") or None
+    s.threads = int(os.environ.get("BOLO_THREADS") or 0)  # a shared machine: fewer threads than cores is faster
+    return s
+
+
+async def test_pocket_tts_on_a_managed_llama_server() -> None:
+    """tts-server engine, managed mode: bolo starts llama-server (a release build) for Pocket TTS (219 MB)."""
+    from bolo.tts_runtimes import find_binary
+
+    settings = _llama_server_settings()
+    if find_binary(settings, "llama-server")[0] is None:
+        pytest.skip("needs llama-server: bolo components install llama-server, or BOLO_LLAMA_SERVER_BIN")
+    core = Bolo(settings)
+    await core.start()
+    try:
+        await core.manager.load("pocket-tts-en-llamacpp")  # pull + start the server; not part of the timing
+        results = []
+        for voice in ("heart", "michael"):
+            trace = Trace("tts", "bench", "pocket-tts-en-llamacpp")
+            parts, rate = [], 24000
+            try:
+                async for chunk in core.synthesize(EN_TEXT, model="pocket-tts-en-llamacpp", voice=voice, trace=trace):
+                    trace.mark_ttfa()
+                    parts.append(chunk.samples)
+                    rate = chunk.sample_rate
+            finally:
+                core.complete_tts(trace)
+            audio = np.concatenate(parts)
+            heard = await core.transcribe(audio, rate, model="moonshine-tiny-en")
+            wer = word_error_rate(EN_TEXT, heard.text, "en")
+            results.append(wer)
+            print(
+                f"\npocket-tts-en-llamacpp ({voice}): {len(audio) / rate:.2f} s audio, TTFA {trace.ttfa_ms:.0f} ms, "
+                f"RTF {trace.rtf:.3f}, round-trip WER {wer:.3f} | {heard.text}"
+            )
+            assert rate == 24000 and 3.0 < len(audio) / rate < 15.0
+        assert min(results) <= 0.3
+    finally:
+        await core.stop()
+
+
+async def test_orpheus_family_on_llama_server_with_snac_onnx() -> None:
+    """orpheus-llamacpp kind: Svara or Veena on a managed llama-server, SNAC decoded in onnxruntime, Hindi round trip.
+
+    The catalog entries are ``pending`` until bolo's SNAC decoder export is published, so this test needs local
+    files: ``BOLO_ORPHEUS_GGUF`` (the GGUF of the entry named by ``BOLO_ORPHEUS_MODEL``, default
+    ``svara-tts-v1-llamacpp``; e.g. ``svara-tts-v1.Q4_K_M.gguf`` from mradermacher/svara-tts-v1-GGUF or
+    ``Veena-q4_k_m.gguf`` from Mungert/Veena-GGUF for ``veena-llamacpp``) and ``BOLO_SNAC_DECODER``
+    (``tools/export_snac_onnx.py`` output, or any SNAC 24 kHz decoder ONNX file). About 15 times slower than real
+    time on a 4-core CPU. Q2_K files are not good enough for this check (Veena Q2_K garbles Hindi).
+    """
+    pytest.importorskip("onnxruntime")
+    from bolo.catalog import ModelSpec, packaged_entries
+    from bolo.tts_runtimes import find_binary
+
+    gguf, decoder = os.environ.get("BOLO_ORPHEUS_GGUF"), os.environ.get("BOLO_SNAC_DECODER")
+    if not gguf or not decoder:
+        pytest.skip("needs BOLO_ORPHEUS_GGUF (a Svara or Veena GGUF) and BOLO_SNAC_DECODER (a SNAC decoder ONNX file)")
+    settings = _llama_server_settings()
+    if find_binary(settings, "llama-server")[0] is None:
+        pytest.skip("needs llama-server: bolo components install llama-server, or BOLO_LLAMA_SERVER_BIN")
+    base = os.environ.get("BOLO_ORPHEUS_MODEL") or "svara-tts-v1-llamacpp"
+    entry = dict(next(e for e in packaged_entries() if e["id"] == base))
+    entry.pop("status", None)
+    entry["id"] = f"{base}-realtest"
+    entry["source"] = {"local": str(Path(gguf).resolve().parent)}
+    entry["options"] = {**entry["options"], "model_file": Path(gguf).name, "snac_path": str(Path(decoder).resolve())}
+    voice = next(str(v["id"]) for v in entry["voices"] if str(v.get("language", "")).startswith("hi"))
+    core = Bolo(settings)
+    await core.start()
+    try:
+        spec = ModelSpec.from_dict(entry)
+        core.catalog.add(spec)
+        if not core.store.is_installed(spec.id):
+            core.store.pull(spec.id, spec.source)
+        await core.manager.load(spec.id)  # starts llama-server; not part of the timing
+        trace = Trace("tts", "bench", spec.id)
+        parts, rate = [], 24000
+        try:
+            async for chunk in core.synthesize(HI_TEXT, model=spec.id, voice=voice, trace=trace):
+                trace.mark_ttfa()
+                parts.append(chunk.samples)
+                rate = chunk.sample_rate
+        finally:
+            core.complete_tts(trace)
+        audio = np.concatenate(parts)
+        heard = await core.transcribe(audio, rate, model="indicconformer-hi-community", language="hi")
+        wer = word_error_rate(HI_TEXT, heard.text, "hi")
+        print(
+            f"\n{base} ({Path(gguf).name}, {voice}): {len(audio) / rate:.2f} s audio, TTFA {trace.ttfa_ms:.0f} ms, "
+            f"RTF {trace.rtf:.2f}, round-trip WER {wer:.3f} | {heard.text}"
+        )
+        assert rate == 24000 and 2.0 < len(audio) / rate < 15.0
+        assert wer <= 0.35
+    finally:
+        await core.stop()

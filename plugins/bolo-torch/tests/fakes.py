@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 import torch
 
+from bolo_torch.models.dicow import Backend, DecodedSegment, DiCoW
 from bolo_torch.models.parler import ParlerTTS
 from bolo_torch.models.separation import SepFormer
 from bolo_torch.runtime import LoadContext, ModelGated, gated_message
@@ -73,3 +74,38 @@ def load_gated(ctx: LoadContext) -> ParlerTTS:
 def tone(seconds: float, rate: int = 16000, freq: float = 220.0) -> np.ndarray:
     t = np.arange(int(seconds * rate)) / rate
     return (0.3 * np.sin(2 * np.pi * freq * t)).astype(np.float32)
+
+
+# -- DiCoW ---------------------------------------------------------------------------------------------
+
+
+class FakeDiCoWBackend(Backend):
+    """Records the STNO masks it is given; "decodes" one segment per stretch where the target talks (alone or in
+    overlap), with the text ``spk<i> <start>-<end>``. Masks are 30 s long for short input, as Whisper pads."""
+
+    def __init__(self, use_enrollments: bool = False) -> None:
+        self.calls: list[tuple[np.ndarray, str | None, str, list[int] | None]] = []
+        self.use_enrollments = use_enrollments
+
+    def mask_frames(self, num_samples: int) -> int:
+        return max(1500, num_samples // 320)
+
+    def decode(
+        self, audio: np.ndarray, masks: np.ndarray, language: str | None, task: str, enrol_starts: list[int] | None
+    ) -> list[list[DecodedSegment]]:
+        self.calls.append((masks.copy(), language, task, enrol_starts))
+        out: list[list[DecodedSegment]] = []
+        for i, mask in enumerate(masks):
+            on = np.concatenate([[0], ((mask[1] + mask[3]) > 0.5).astype(np.int8), [0]])
+            edges = np.flatnonzero(np.diff(on))
+            out.append(
+                [
+                    DecodedSegment(a / 50, b / 50, f" spk{i} {a / 50:.2f}-{b / 50:.2f}")
+                    for a, b in zip(edges[0::2], edges[1::2])
+                ]
+            )
+        return out
+
+
+def load_fake_dicow(ctx: LoadContext) -> DiCoW:
+    return DiCoW(FakeDiCoWBackend())

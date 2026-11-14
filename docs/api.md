@@ -64,7 +64,7 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `DELETE` | `/api/v1/models/{model_id}` | Delete an installed model |
 | `GET` | `/api/v1/models/{model_id}` | One catalog entry |
 | `POST` | `/api/v1/diarize` | Speaker diarization: who spoke when |
-| `GET` | `/api/v1/components` | Optional components (uccharan, espeak-ng, engine plugins) |
+| `GET` | `/api/v1/components` | Optional components (uccharan, espeak-ng, TTS servers, engine plugins) |
 | `POST` | `/api/v1/components/{component_id}/install` | Install an optional component |
 | `GET` | `/api/v1/stats` | Live server statistics |
 | `GET` | `/api/v1/requests` | Recent request traces, newest first |
@@ -205,6 +205,8 @@ JSON body.
 | `language` | voice's | extension: language for text normalisation |
 | `normalize` | `true` | extension: `false` sends the text to the voice untouched |
 | `phonemizer` | voice's pin, else the server's `phonemizer` setting | extension, for voices that read phonemes: `auto`, `uccharan` (= `uccharan:compatible`), `uccharan:improved`, `espeak-ng`. `424 component_missing` when the chosen one is not installed, `400` (`param: "phonemizer"`) when uccharan does not cover the voice's language. Ignored for voices that read characters or a lexicon. See models.md, "Phonemisers" |
+| `reference_audio` | - | extension, for models that clone voices (`features` contains `voice-cloning`, today the `tts-server` models): a recording of the voice to imitate, plain base64 or a `data:audio/…;base64,` URL (WAV, FLAC, MP3, … whatever bolo can decode). Up to 30 s are used; it is sent to the server as mono 16-bit WAV. `400` (`param: "reference_audio"`) for a model that cannot clone, an empty, undecodable or shorter-than-0.5 s recording. It takes precedence over `voice` |
+| `reference_text` | - | extension: what is said in `reference_audio`; some cloning models (audio.cpp CosyVoice3, IndexTTS-2, …) use it |
 
 The body is streamed (chunked transfer) while synthesis is still running:
 the first sentence is audible while the rest is being generated. `pcm`,
@@ -227,6 +229,30 @@ does not know is replaced or dropped, and any letter or digit that is left
 answers `400 unsupported_characters` naming the characters, for example
 `this voice reads a fixed set of characters and has no symbol for: '4', '2'.
 There is no number normaliser for language 'bn': write numbers out in words.`
+
+Models on an external TTS server (`engine: "tts-server"`, llama-server or
+audio.cpp; [models.md](models.md#external-tts-servers-llama-server-audiocpp)) behave
+the same way: bolo forwards each sentence to the server, streams its PCM back
+(resampled to the catalog's `sample_rate`) and encodes it as asked. `language`
+is passed on to multilingual models. Voices named `… (reference clip)` are
+bolo's synthetic reference recordings sent as the voice to imitate; `default`
+is the model's own voice. Errors: the server binary is missing → `424
+component_missing` (install it with `bolo components install llama-server` /
+`audio.cpp`, or point `tts_servers` at a running server); the server cannot be
+reached, did not start, crashed or answers 5xx → `503 engine_unavailable` (a
+crashed server is started again on a later request, after 1 s, doubling up to
+60 s); a request the server refuses (an unknown voice, a speed other than
+1.0 on a model that has one speed) → `400`.
+
+Orpheus-family voices on llama.cpp (`kind: "orpheus-llamacpp"`: Svara, Veena,
+Orpheus, snorTTS; [models.md](models.md#orpheus-family-voices-on-llamacpp-svara-veena-orpheus-snortts))
+run on the same llama-server management, but bolo writes the prompt, streams
+the generated token ids from llama-server and decodes the audio itself, so the
+first audio arrives after about 5 frames (0.4 s of speech) have been generated.
+`voice` is one of the entry's voices (by id or name; the first one when
+omitted; another name → `400`, `param: "voice"`); `speed` must be 1.0 and
+`reference_audio` is refused (`400`). Without onnxruntime installed the model
+answers `424 component_missing` (`pip install "bolo[orpheus]"`).
 
 ### `GET /v1/models`, `GET /v1/models/{id}`
 
@@ -268,7 +294,8 @@ For clients written against speaches; details and differences are in
    "diarization": {"available": true, "installed": false, "default_model": "pyannote-3.0-eres2net",
                    "http": {"endpoint": "/api/v1/diarize", "transcriptions": ["diarize", "diarized_json"]},
                    "websocket": "diarize=true (one speaker per utterance, labelled online)",
-                   "word_timestamps": true, "known_speakers": true, "revised_labels_at_end_of_stream": true},
+                   "word_timestamps": true, "known_speakers": true, "revised_labels_at_end_of_stream": true,
+                   "speaker_conditioned_models": ["dicow-v3.3", "se-dicow"]},
    "separation": {"available": true, "installed": false, "default_model": "voxlock-int8",
                   "http": {"transcriptions": "separate_overlaps=true (with diarization)", "diarize": "separate_overlaps=true"},
                   "default_on": false, "languages": ["en"], "min_sample_rate": 16000,
@@ -311,7 +338,8 @@ in the id, aliases, family, engine, languages, licence or description.
   "custom": false,                    // true for models added with hf:
   "requires": [],                     // optional components, e.g. ["espeak-ng"]
   "available": true,                  // false while a required component is not installed
-  "status": null                      // "pending": described but its files are not published yet (see below)
+  "status": null,                     // "pending": described but its files are not published yet (see below)
+  "hardware": null                    // or {"gpu": "optional"|"recommended"|"required", "vram_gb": 2.0, "note": "…"}
 }]}
 ```
 
@@ -616,7 +644,28 @@ default): on three synthetic two-voice mixes with 2.5 s of overlap the second
 speaker's word error rate got worse in two of three (the recogniser wrote the
 louder speaker's words into both texts; `docs/measurements/diarization-overlap.json`),
 so it is not the default and not exposed in the API. To get both voices,
-use `separate_overlaps` (next section).
+use a diarization-conditioned model or `separate_overlaps` (next two
+paragraphs).
+
+**Diarization-conditioned recognition.** With a speaker-conditioned model
+(`model=dicow-v3.3`; needs the bolo-torch plugin, `pip install
+"bolo-torch[dicow]"`; or the same model without PyTorch in bolo's core,
+`dicow-v3.3-onnx`, which until its files are hosted is registered from a local
+export with `bolo pull ./dir`) a diarized transcription is not cut at speaker turns.
+bolo diarizes the recording, then the model transcribes the whole recording
+once per speaker, told every 20 ms whether that speaker, someone else, both or
+nobody is talking, so overlapping speech is transcribed for each speaker. The
+response is the usual `diarized_json` / `verbose_json` (segments with
+`speaker`, `overlap`); segments of different speakers may overlap in time.
+Such a model brings its own diarizer, `nemotron-3-diarization`, unless the
+request names one with `diarization_model`; with a clustering diarizer
+(`pyannote-*`), which gives no frame probabilities, the model is conditioned
+on its speaker turns. `separate_overlaps` cannot be combined with it (400,
+`param: "separate_overlaps"`). Without diarization the model transcribes like
+an ordinary Whisper. On CPU it is several times slower than the default
+pipeline; measurements in models.md, "Diarization-conditioned recognition".
+`GET /api/v1/info` lists such models under
+`capabilities.diarization.speaker_conditioned_models`.
 
 **Separating overlapping speech** (opt-in, bolo extension). Add
 `separate_overlaps=true` to a diarized transcription (`diarize=true` or
@@ -781,12 +830,13 @@ error rate on real recordings was measured, only speaker counts.
 ## Realtime API and chat completions
 
 Both need a language model configured with `llm_base_url` (except Realtime
-transcription sessions). The full description, the supported events and the
+transcription sessions, and Realtime conversations on the `speech-to-speech`
+pipeline). The full description, the supported events and the
 differences from OpenAI are in [voice-agents.md](voice-agents.md).
 
 | Endpoint | Summary |
 | --- | --- |
-| `WS /v1/realtime?model=…` | OpenAI Realtime API over WebSocket (GA event names, as typed in `openai` 3.50.0). `?intent=transcription` or `session.update` with `type: "transcription"` for transcription-only sessions. Audio: base64 `audio/pcm` (24 kHz PCM16), `audio/pcmu`, `audio/pcma`. User transcripts arrive as incremental deltas. `turn_detection`: `server_vad`, `semantic_vad` (with the optional end-of-turn model) or `null`. Auth: `Authorization: Bearer`, or subprotocols `realtime` + `openai-insecure-api-key.<key>`; an ephemeral `ek_…` key is accepted in the same places |
+| `WS /v1/realtime?model=…` | OpenAI Realtime API over WebSocket (GA event names, as typed in `openai` 3.50.0). `?intent=transcription` or `session.update` with `type: "transcription"` for transcription-only sessions. Audio: base64 `audio/pcm` (24 kHz PCM16), `audio/pcmu`, `audio/pcma`. User transcripts arrive as incremental deltas. `turn_detection`: `server_vad`, `semantic_vad` (with the optional end-of-turn model) or `null`. Auth: `Authorization: Bearer`, or subprotocols `realtime` + `openai-insecure-api-key.<key>`; an ephemeral `ek_…` key is accepted in the same places. bolo extension `session.pipeline`: `cascade` (default, setting `realtime_pipeline`), `audio-llm` (an audio-understanding model hears the turn, bolo's TTS speaks) or `speech-to-speech` (a speech-to-speech model, first backend llama-server `/v1/realtime` with LFM3-Audio, answers with speech and tool calls; bolo keeps turn detection, barge-in, codecs and transcripts); see [voice-agents.md](voice-agents.md#pipelines-cascade-audio-in-language-model-speech-to-speech). `GET /api/v1/info` lists them under `capabilities.realtime.pipelines` |
 | `POST /v1/realtime/client_secrets` | mint an ephemeral key (`{"value": "ek_…", "expires_at", "session"}`) for browsers. Needs the server key. Body: `{"expires_after": {"anchor": "created_at", "seconds": 600}, "session": {…}}`, all optional |
 | `POST /v1/realtime/calls` | the same sessions over **WebRTC**: SDP offer in (`application/sdp`, or multipart `sdp` + `session`), `201` with the SDP answer and `Location: /v1/realtime/calls/{call_id}`. Needs `bolo[webrtc]` (else `503 engine_unavailable`). `POST …/{call_id}/hangup` ends the call. Not implemented: SIP |
 | `POST /v1/chat/completions` | `input_audio` content parts are transcribed; `modalities: ["text","audio"]` + `audio: {voice, format}` adds a spoken reply (`message.audio`, or `delta.audio` when streaming); everything else is forwarded to the language model untouched; requests without audio are proxied as they are |
@@ -802,8 +852,21 @@ Pieces bolo can use but does not require: two phonemisers, **uccharan**
 (GPL-3.0-or-later, never installed by default; every other language), and
 engine plugins (`plugin:<name>`, [plugins.md](plugins.md)), which are listed so
 that a client can say what a model needs but are installed as packages.
-Find items by `id`; `kind` is `phonemizer` or `engine-plugin`.
+Find items by `id`; `kind` is `phonemizer`, `engine-plugin` or `tts-server`.
 `POST /api/v1/components/uccharan/install` needs no licence acceptance.
+
+The `tts-server` components are the speech servers of the `tts-server` engine:
+`llama-server` (llama.cpp, MIT) and `audio.cpp` (`audiocpp_server`,
+Apache-2.0). Their items add `path` (the binary bolo would start, or null),
+`servers` (URLs configured for that runtime in `tts_servers`) and `release`
+(`{"version","url","sha256"}` of the prebuilt upstream archive bolo installs on
+this platform, or null). `POST /api/v1/components/llama-server/install` (no
+licence acceptance needed) downloads that archive into
+`<data_dir>/components/<id>/<version>/`, checks its SHA-256, unpacks it and
+checks that the binary starts here; the job and events are as below. `400` when
+no release is pinned for the platform, the operator disabled installs or the
+server is exposed without an API key. A runtime is not needed for a model that
+`tts_servers` points at a running server (its `requires` is then `[]`).
 
 `GET /api/v1/components`
 
@@ -834,7 +897,8 @@ job in state `error`.
 
 Catalog entries carry `requires` (for a voice that reads phonemes, the
 phonemiser it would use here: `["uccharan"]` or `["espeak-ng"]`; `["plugin:torch"]`
-for a model on an engine plugin; else `[]`), `available` (false while that is
+for a model on an engine plugin; `["llama-server"]` or `["audio.cpp"]` for a model on an external TTS server
+that bolo would start; else `[]`), `available` (false while that is
 missing) and `phonemizers` (the choices for the voice, `[{id, available,
 default, note}]`; for Kokoro on each voice instead). Synthesis with such a
 voice fails fast with `424 component_missing` and a message that names the

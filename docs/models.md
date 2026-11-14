@@ -58,7 +58,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-277 models: 116 validated on CPU by the maintainers, 161 untested.
+334 models: 119 validated on CPU by the maintainers, 215 untested. 10 more are described but not yet published (dicow-v3.3-onnx, fish-drama-3-llamacpp, mira-tts-audiocpp, orpheus-3b-0.1-ft-llamacpp, snortts-indic-v0-llamacpp, soprano-1.1-80m-llamacpp, svara-tts-v1-llamacpp, svara-tts-v1-q8-llamacpp, veena-llamacpp, veena-q8-llamacpp).
 
 ### Speech to text
 
@@ -99,6 +99,14 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `indicconformer-ta` | ta | balanced | pseudo | 138 MB | MIT | **CPU** · RTF 0.228 · WER 29.0% · CER 10.3% |
 | `indicconformer-te` | te | balanced | pseudo | 138 MB | MIT | **CPU** · RTF 0.262 · WER 21.7% · CER 10.5% |
 | `indicconformer-ml` | ml | balanced | pseudo | 138 MB | MIT | **CPU** · RTF 0.174 · WER 34.3% · CER 9.8% |
+
+#### DiCoW
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `dicow-v3.3` | en | accuracy | pseudo | 3.6 GB | CC-BY-4.0 · needs plugin torch | **CPU** · RTF 0.453 |
+| `se-dicow` | en | accuracy | pseudo | 4.4 GB | Apache-2.0 · needs plugin torch | **CPU** · RTF 0.589 |
+| `dicow-v3.3-onnx` | en | accuracy | pseudo | 1.5 GB | CC-BY-4.0 | not yet published |
 
 #### Whisper
 
@@ -257,6 +265,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `indic-f5` | as, bn, gu, hi, kn, ml +5 | accuracy | - | 1.4 GB | MIT · needs plugin torch · gated | **CPU** · RTF 119.700 · first audio 211280 ms |
+| `f5-tts-v1-base` | en, zh | accuracy | - | 1.3 GB | CC-BY-NC-4.0 ⚠ · needs plugin torch | untested |
 
 #### Veena
 
@@ -269,6 +278,24 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `svara-tts-v1` | as, bho, bn, brx, doi, en +13 | accuracy | - | 13.2 GB | Apache-2.0 · needs plugin torch | untested |
+
+#### Indic-Speak
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `indic-speak` | as, bn, brx, doi, en, gu +17 | accuracy | - | 7.1 GB | Indic Open Model License v1.0 ⚠ · needs plugin torch · gated | untested |
+
+#### Spark-TTS
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `spark-tts-0.5b` | en, zh | accuracy | - | 3.9 GB | CC-BY-NC-SA-4.0 ⚠ · needs plugin torch | untested |
+
+#### MaskGCT
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `maskgct` | en, zh, ja, ko, fr, de | accuracy | - | 6.6 GB | CC-BY-NC-4.0 ⚠ · needs plugin torch | untested |
 
 #### MMS-TTS
 
@@ -299,6 +326,17 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `mms-tts-rus` | ru | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
 | `mms-tts-ukr` | uk | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
 | `mms-tts-tha` | th | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
+
+#### Orpheus family on llama.cpp (SNAC in onnxruntime)
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `svara-tts-v1-llamacpp` (Svara) | hi, bn, mr, te, kn, ta +13 | accuracy | - | 2.1 GB | Apache-2.0 · runs on llama-server · GPU recommended | not yet published |
+| `svara-tts-v1-q8-llamacpp` (Svara) | hi, bn, mr, te, kn, ta +13 | accuracy | - | 3.6 GB | Apache-2.0 · runs on llama-server · GPU recommended | not yet published |
+| `veena-llamacpp` (Veena) | hi, en | accuracy | - | 2.5 GB | Apache-2.0 · runs on llama-server · GPU recommended | not yet published |
+| `veena-q8-llamacpp` (Veena) | hi, en | accuracy | - | 4.1 GB | Apache-2.0 · runs on llama-server · GPU recommended | not yet published |
+| `orpheus-3b-0.1-ft-llamacpp` (Orpheus) | en | accuracy | - | 2.1 GB | Apache-2.0 (Llama 3.2 Community License for the base model) · runs on llama-server · GPU recommended | not yet published |
+| `snortts-indic-v0-llamacpp` (snorTTS Indic) | hi, bn, gu, kn, ml, mr +3 | accuracy | - | 2.4 GB | Apache-2.0 (Llama 3.2 Community License for the base model) · runs on llama-server · GPU recommended | not yet published |
 
 #### Piper
 
@@ -390,6 +428,69 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `piper-ta-in-rasa-female-medium` | ta | realtime | - | 64 MB | Voice: CC-BY-4.0 (AI4Bharat Rasa data; third-party voice … · needs espeak-ng | **CPU** · RTF 0.110 · first audio 487 ms · round-trip WER 0.0% · round-trip CER 0.0% |
 | `piper-ta-in-rasa-male-medium` | ta | realtime | - | 64 MB | Voice: CC-BY-4.0 (AI4Bharat Rasa data; third-party voice … · needs espeak-ng | **CPU** · RTF 0.147 · first audio 563 ms · round-trip WER 10.0% · round-trip CER 3.1% |
 
+#### External TTS server: llama-server
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `chatterbox-multilingual-v3-llamacpp` (Chatterbox Multilingual V3) | en, ar, da, de, el, es +17 | accuracy | - | 1.2 GB | MIT · runs on llama-server · GPU recommended | untested |
+| `chatterbox-turbo-llamacpp` (Chatterbox Turbo) | en | accuracy | - | 1.0 GB | MIT · runs on llama-server · GPU recommended | untested |
+| `qwen3-tts-1.7b-base-llamacpp` (Qwen3-TTS 1.7B Base) | en, de, es, fr, it, ja +4 | accuracy | - | 1.5 GB | Apache-2.0 · runs on llama-server · GPU recommended | untested |
+| `pocket-tts-en-llamacpp` (Kyutai Pocket TTS (English)) | en | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | **CPU** · RTF 0.716 · first audio 774 ms · round-trip WER 0.0% |
+| `pocket-tts-de-llamacpp` (Kyutai Pocket TTS (German)) | de | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | untested |
+| `pocket-tts-es-llamacpp` (Kyutai Pocket TTS (Spanish)) | es | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | untested |
+| `pocket-tts-fr-llamacpp` (Kyutai Pocket TTS (French)) | fr | balanced | - | 673 MB | CC-BY-4.0 · runs on llama-server | untested |
+| `pocket-tts-it-llamacpp` (Kyutai Pocket TTS (Italian)) | it | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | untested |
+| `pocket-tts-pt-llamacpp` (Kyutai Pocket TTS (Portuguese)) | pt | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | untested |
+| `lfm3-audio-2b-llamacpp` (LFM3-Audio 2B) | en, ar, da, de, el, es +12 | accuracy | - | 1.4 GB | LFM Open License v1.0 ⚠ · runs on llama-server · GPU recommended | untested |
+| `soprano-1.1-80m-llamacpp` (Soprano 1.1 80M) | en | balanced | - | 0 MB | Apache-2.0 · runs on llama-server | not yet published |
+| `fish-drama-3-llamacpp` (Fish Audio Drama 3) | - | accuracy | - | 22.5 GB | Fish Audio Community License 1.0 ⚠ · runs on llama-server · GPU required | not yet published |
+
+#### External TTS server: audio.cpp
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `chatterbox-multilingual-audiocpp` (Chatterbox Multilingual (V3 talker)) | en, ar, da, de, el, es +13 | accuracy | - | 2.1 GB | MIT · runs on audio.cpp · GPU recommended | untested |
+| `chatterbox-turbo-audiocpp` (Chatterbox Turbo) | en | accuracy | - | 699 MB | MIT · runs on audio.cpp · GPU recommended | untested |
+| `cosyvoice3-0.5b-audiocpp` (Fun-CosyVoice3 0.5B) | en, de, es, fr, it, ja +4 | accuracy | - | 2.3 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
+| `voxcpm2-audiocpp` (VoxCPM2 2B) | en, ar, da, de, el, es +24 | accuracy | - | 3.0 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
+| `magpie-tts-multilingual-357m-audiocpp` (NVIDIA Magpie TTS Multilingual 357M) | en, ar, de, es, fr, hi +5 | accuracy | - | 1.6 GB | NVIDIA Open Model License · runs on audio.cpp · GPU recommended | untested |
+| `maya1-audiocpp` (Maya1 3B) | en | accuracy | - | 4.0 GB | Apache-2.0 AND MIT · runs on audio.cpp · GPU required | untested |
+| `qwen3-tts-0.6b-base-audiocpp` (Qwen3-TTS 0.6B Base) | en, de, es, fr, it, ja +4 | accuracy | - | 2.0 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
+| `qwen3-tts-1.7b-customvoice-audiocpp` (Qwen3-TTS 1.7B CustomVoice) | en, de, es, fr, it, ja +4 | accuracy | - | 2.8 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
+| `pocket-tts-en-audiocpp` (Kyutai Pocket TTS (English)) | en | balanced | - | 134 MB | CC-BY-4.0 · runs on audio.cpp | untested |
+| `soprano-1.1-80m-audiocpp` (Soprano 1.1 80M) | en | balanced | - | 123 MB | Apache-2.0 · runs on audio.cpp | untested |
+| `supertonic-3-audiocpp` (Supertonic 3) | en, ar, bg, cs, da, de +25 | accuracy | - | 454 MB | BigScience OpenRAIL-M · runs on audio.cpp · GPU recommended | untested |
+| `kitten-tts-2-audiocpp` (Kitten TTS 2) | en, ar, de, es, fr, hi +10 | accuracy | - | 3.3 GB | Stellon Labs Community License ⚠ · runs on audio.cpp · GPU recommended | untested |
+| `moss-tts-local-v1.5-audiocpp` (MOSS-TTS Local Transformer v1.5) | en, ar, cs, da, de, el +25 | accuracy | - | 7.5 GB | Apache-2.0 · runs on audio.cpp · GPU required | untested |
+| `moss-tts-nano-100m-audiocpp` (MOSS-TTS Nano 100M) | en, ar, cs, da, de, el +13 | balanced | - | 193 MB | Apache-2.0 · runs on audio.cpp | untested |
+| `omnivoice-audiocpp` (OmniVoice) | - | accuracy | - | 1.4 GB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · GPU recommended | untested |
+| `voxtral-4b-tts-audiocpp` (Voxtral 4B TTS) | en, ar, de, es, fr, hi +3 | accuracy | - | 8.0 GB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · GPU required | untested |
+| `fish-audio-s2-pro-audiocpp` (Fish Audio S2 Pro) | - | accuracy | - | 6.3 GB | Fish Audio Research License ⚠ · runs on audio.cpp · GPU required | untested |
+| `fish-drama-3-audiocpp` (Fish Audio Drama 3) | - | accuracy | - | 24.6 GB | Fish Audio Community License v1.0 ⚠ · runs on audio.cpp · GPU required | untested |
+| `higgs-tts-3-4b-audiocpp` (Higgs TTS 3 4B) | - | accuracy | - | 5.1 GB | Boson Higgs TTS 3 Research and Non-Commercial License ⚠ · runs on audio.cpp · GPU required | untested |
+| `indextts-2-audiocpp` (IndexTTS-2) | en, ar, es, ja, zh | accuracy | - | 3.6 GB | bilibili Model Use License ⚠ · runs on audio.cpp · GPU recommended | untested |
+| `vibevoice-1.5b-audiocpp` (VibeVoice 1.5B) | en, zh | accuracy | - | 3.2 GB | MIT · runs on audio.cpp · GPU recommended | untested |
+| `xtts-v2-audiocpp` (Coqui XTTS v2) | en, ar, cs, de, es, fr +11 | accuracy | - | 568 MB | Coqui Public Model License 1.0.0 ⚠ · runs on audio.cpp · GPU recommended | untested |
+| `outetts-1.0-1b-audiocpp` (OuteTTS 1.0 1B) | en, ar, be, bn, de, es +17 | accuracy | - | 3.0 GB | CC-BY-NC-SA-4.0 ⚠ · runs on audio.cpp · GPU recommended | untested |
+| `neutts-2e-audiocpp` (NeuTTS 2E) | en | accuracy | - | 3.0 GB | NeuTTS Open License v1.0 ⚠ · runs on audio.cpp · GPU recommended | untested |
+| `sanotts-hi-audiocpp` (sanoTTS (Hindi voice)) | hi | balanced | - | 6 MB | GPL-3.0 · runs on audio.cpp | untested |
+| `fireredtts3-instruct-audiocpp` (FireRedTTS3 Instruct) | en, ar, cs, de, el, es +18 | accuracy | - | 4.1 GB | Apache-2.0 · runs on audio.cpp · GPU required | untested |
+| `ming-3.0-tts-0.5b-audiocpp` (Ming 3.0 TTS 0.5B) | en, de, es, fr, ja, ko +1 | accuracy | - | 3.0 GB | MIT · runs on audio.cpp · GPU recommended | untested |
+| `breeze-tts-2-audiocpp` (BreezeTTS 2) | en, zh | accuracy | - | 5.1 GB | BreezeBlue Research and Non-Commercial License ⚠ · runs on audio.cpp · GPU required | untested |
+| `kugelaudio-0-open-audiocpp` (KugelAudio-0-Open) | en, bg, cs, da, de, el +17 | accuracy | - | 9.8 GB | MIT · runs on audio.cpp · GPU required | untested |
+| `zonos3-mini-audiocpp` (ZONOS3-Mini) | en, de, es, fr, it, ja +3 | accuracy | - | 1.2 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
+| `dots-tts-soar-audiocpp` (dots.tts SOAR) | - | accuracy | - | 3.0 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
+| `irodori-tts-audiocpp` (Irodori-TTS) | ja | accuracy | - | 1.4 GB | MIT · runs on audio.cpp · GPU recommended | untested |
+| `miotts-1.7b-audiocpp` (MioTTS 1.7B) | en, ja | accuracy | - | 2.2 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
+| `gradium-phonon-31m-audiocpp` (Gradium Phonon 31M) | en | balanced | - | 85 MB | Apache-2.0 · runs on audio.cpp | untested |
+| `audio8-tts-0.6b-audiocpp` (Audio8 TTS Preview 0.6B) | en, de, es, fr, it, ja +5 | accuracy | - | 1.4 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
+| `confucius4-tts-audiocpp` (Confucius4-TTS) | en, de, es, fr, id, it +8 | accuracy | - | 8.2 GB | Apache-2.0 · runs on audio.cpp · GPU required | untested |
+| `plapre-3-audiocpp` (Plapre 3 (Danish)) | da | accuracy | - | 1.1 GB | CC-BY-4.0 · runs on audio.cpp · GPU recommended | untested |
+| `echo-tts-audiocpp` (Echo-TTS) | en | accuracy | - | 3.0 GB | CC-BY-NC-SA-4.0 ⚠ · runs on audio.cpp · GPU recommended | untested |
+| `lfm3-audio-2b-audiocpp` (LFM3-Audio 2B) | en, ar, da, de, el, es +12 | accuracy | - | 2.2 GB | LFM Open License v1.0 ⚠ · runs on audio.cpp · GPU recommended | untested |
+| `indextts-2.5-audiocpp` (IndexTTS-2.5) | en, ar, es, ja, zh | accuracy | - | 3.5 GB | bilibili Model Use License ⚠ · runs on audio.cpp · GPU recommended | untested |
+| `mira-tts-audiocpp` (MiraTTS) | en | accuracy | - | 1.6 GB | CC-BY-NC-SA-4.0 ⚠ · runs on audio.cpp · GPU recommended | not yet published |
+
 #### Kokoro
 
 | id | languages | tier | streaming | download | licence | validated |
@@ -475,6 +576,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `nemotron-3-diarization` | - | balanced | - | 147 MB | OpenMDW-1.1 | **CPU** · RTF 0.039 · DER 24.1% on AMI meeting excerpts |
 
+#### DiariZen
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `diarizen-wavlm-large-s80-md-v2` | - | accuracy | - | 278 MB | CC-BY-NC-4.0 (segmentation) + CC-BY-4.0 (PLDA) ⚠ · needs plugin torch | untested |
+
 ### End-of-turn detection
 
 #### Smart Turn
@@ -506,6 +613,28 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 ⚠ = the licence restricts commercial use. RTF = processing time / audio duration (lower is faster).
 <!-- END GENERATED: models -->
+
+## Non-commercial and restricted models, and how each runs
+
+Licences never keep a model out of the catalog: each entry states `license`, `commercial_use` and `gated`
+(marked ⚠ in the tables above when commercial use is not plainly allowed), and the defaults stay permissive. The
+models below were checked against their model cards and licence files on 2026-11-14; none of them was run here
+(`validated: untested`).
+
+| id | Licence (commercial use) | Route | State |
+| --- | --- | --- | --- |
+| `f5-tts-v1-base` | CC-BY-NC-4.0 weights, MIT code (no) | bolo-torch, `f5-tts` kind with `layout: f5-tts` on the `f5-tts` package (`bolo-torch[f5-original]`); voices are bolo's reference clips or `voices_dir` | catalogued |
+| `indic-speak` | Indic Open Model License v1.0, gated (conditional: hosting it as an API for others needs Bodhan AI's approval, size thresholds, use policy) | bolo-torch, `indic-speak` kind running the repository's own `inference.py` (`bolo-torch[indic-speak]`) | catalogued; the loader follows the model card, the gated code was not read |
+| `indextts-2.5-audiocpp` | bilibili Model Use License (conditional) | tts-server, audio.cpp `index_tts2` family, `IndexTTS2.5-GGUF` q8_0 | catalogued |
+| `mira-tts-audiocpp` | CC-BY-NC-SA-4.0 (no) | tts-server, audio.cpp `mira_tts` family | pending: audio.cpp publishes no package; convert it with audio.cpp's tools and register the folder |
+| `spark-tts-0.5b` | CC-BY-NC-SA-4.0 (no) | none yet: no ggml/ONNX runtime runs the BiCodec decoder, and the reference code is not packaged | catalogued, not runnable (bolo-torch answers "not implemented") |
+| `maskgct` | CC-BY-NC-4.0 (no) | none yet: Amphion's code is not packaged (the PyPI `maskgct` wrapper is a third-party GPL-3.0 project) | catalogued, not runnable |
+| `diarizen-wavlm-large-s80-md-v2` | CC-BY-NC-4.0, PLDA CC-BY-4.0 (no) | none yet: engine plugins cannot serve diarization, and the community ONNX export needs a VBx/PLDA pipeline that sherpa-onnx lacks | catalogued, not runnable |
+| `breeze-tts-2-audiocpp`, `indextts-2-audiocpp`, `omnivoice-audiocpp`, `voxtral-4b-tts-audiocpp`, `higgs-tts-3-4b-audiocpp`, `fish-audio-s2-pro-audiocpp`, … | non-commercial or conditional | tts-server (audio.cpp, llama-server) | catalogued earlier |
+
+Speech-to-speech: `s2s_model` (default `lfm3-audio-2b-llamacpp`, LFM Open License v1.0: commercial use only
+below USD 10M yearly revenue) is used only by the opt-in `speech-to-speech` Realtime pipeline
+([voice-agents.md](voice-agents.md#pipelines-cascade-audio-in-language-model-speech-to-speech)).
 
 ## Models outside the catalog
 
@@ -812,7 +941,7 @@ where Nemotron keeps the first speaker active through part of the overlap,
 bolo transcribes the overlap with the first speaker's turn and the second
 speaker's turn starts late (the worst mix lost most of a sentence). This is
 the known limit of cutting the recording at turns; diarization-conditioned
-recognition (research note, section 7) is the way past it.
+recognition (below) is the way past it.
 
 **Clean two-voice dialogues** (no overlap). 32 dialogues of four lines (about
 16 s, 0.6 s pauses) read by pairs of Kokoro voices, 15 cross-gender and 17
@@ -863,12 +992,244 @@ reference to 0.00002. A directory made by the tool can be registered with
 directory name contains "nemotron" and "diar"); it gets the same
 post-processing defaults as the catalog entry.
 
+### Diarization-conditioned recognition (DiCoW, bolo-torch)
+
+The diarized transcription above cuts the recording at speaker turns and
+transcribes each turn on its own, so where two people talk at once the turn
+that started first gets the overlap and the other speaker loses words. A
+**speaker-conditioned** model works the other way round: bolo diarizes, then
+the model transcribes the whole recording once per speaker, told every 20 ms
+whether that speaker is talking alone, someone else is, both are, or nobody
+(the *STNO* mask: silence, target, non-target, overlap). No audio is cut and
+none is separated.
+
+The first such models are BUT-FIT's **DiCoW v3.3** (`dicow-v3.3`,
+CC-BY-4.0) and **SE-DiCoW** (`se-dicow`, Apache-2.0, with self-enrolment): Whisper
+large-v3-turbo with frame-level diarization-dependent transformations in front
+of the encoder, fine-tuned on AMI, NOTSOFAR-1 and LibriMix. They run in the
+bolo-torch plugin (`pip install "bolo-torch[dicow]"`, PyTorch and
+transformers 4.55; [plugins.md](plugins.md)). Use one as the `model` of a
+diarized transcription (`diarize=true` or `response_format=diarized_json`):
+
+* **Diarizer.** `nemotron-3-diarization`, unless the request names another
+  one (`diarization_model`); the catalog option `diarization_model` sets it.
+* **Conditioning.** By default the model is told who talks when from the
+  diarizer's final speaker turns, 0 or 1 per speaker and 20 ms frame, which
+  is what BUT's own inference pipeline feeds it. This works with any
+  diarizer, including the clustering ones that give no frame probabilities.
+  The catalog option `conditioning: probabilities` passes Nemotron's soft
+  per-frame probabilities instead (measured below: not better).
+* **Output.** One segment list per speaker, merged in time order; segments
+  of different speakers may overlap in time, and a segment is marked
+  `overlap` when the diarization has another speaker in it. The text is
+  lower-case, without punctuation and with contractions spelled out ("we
+  are", "do not"): the normalised style of the model's training references.
+  No word timestamps. A speaker with less than 0.2 s of speech is not
+  decoded.
+* **Not combined with** `separate_overlaps` (400). Without diarization the
+  model transcribes like an ordinary Whisper large-v3-turbo.
+
+**Checked against the reference implementation.** On two AMI excerpts (a 2-
+and a 4-speaker one, Nemotron's turns) the plugin's STNO masks were identical
+to those of `DiCoWPipeline.get_diarization_mask` / `get_stno_mask` from
+`BUTSpeechFIT/DiCoW` (0 of 13,500 frame values differ; this needs the turns
+put on the 20 ms grid with the reference's own rounding, which an earlier
+10 ms grid did not do), and every speaker's transcript was word for word the
+same as the reference pipeline's decode of the same model (6 of 6 speaker
+streams).
+
+**Measured** (2026-11-14, `docs/measurements/dicow-conditioned.json`; 4 vCPU
+Xeon @ 2.1 GHz with AMX, no GPU; bolo's models at 2 threads, the plugin at 2
+threads, DiCoW in bfloat16). Data: the 24 AMI excerpts and the 44 synthetic
+two-voice mixes of "Measured: Nemotron against clustering" above (the mixes
+rebuilt with the same texts, voices and layout; bolo's two pipelines re-run on
+exactly these files). cpWER with MeetEval 0.4.3 and Whisper's English
+normaliser as above, pooled; 95 % intervals by paired bootstrap over files.
+Each system's own hypothesis text is normalised the same way, so DiCoW's
+missing punctuation and spelled-out contractions do not count against or for
+it.
+
+| audio | files | pyannote + whisper-base (default) | Nemotron + whisper-base | **Nemotron + DiCoW v3.3** | relative to default (95 % CI) | files better / worse | worst file |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| AMI excerpts | 24 | 69.4 % | 61.2 % | **26.0 %** | **-62 % (-66 to -59 %)** | 24 / 0 | -24.0 pt |
+| synthetic, all | 44 | 55.4 % | 25.4 % | **6.6 %** | **-88 % (-91 to -84 %)** | 42 / 1 | +2.8 pt |
+| · 16 kHz cross-gender | 8 | 20.0 % | 24.4 % | 5.1 % | -75 % | 7 / 0 | 0.0 pt |
+| · 16 kHz same-gender female | 6 | 68.7 % | 19.3 % | 7.9 % | -89 % | 5 / 1 | +2.8 pt |
+| · 16 kHz same-gender male | 6 | 50.4 % | 21.2 % | 6.3 % | -88 % | 6 / 0 | -19.8 pt |
+| · 8 kHz cross-gender | 8 | 46.6 % | 30.1 % | 3.9 % | -92 % | 8 / 0 | -18.6 pt |
+| · 8 kHz same-gender female | 6 | 84.3 % | 24.4 % | 3.5 % | -96 % | 6 / 0 | -72.8 pt |
+| · 8 kHz same-gender male | 6 | 84.8 % | 27.3 % | 6.9 % | -92 % | 6 / 0 | -67.3 pt |
+| · Hindi, 16 / 8 kHz (one pair; whisper-base rows use faster-whisper-tiny-hindi) | 2 + 2 | 23.9 / 59.1 % | 27.3 / 39.2 % | 14.8 / 26.1 % | | 4 / 0 | |
+
+tcpWER (5 s collar, AMI word times as reference) moves with cpWER: 71.6 /
+62.9 / 27.2 %, so the segment times are sane. The two left columns
+reproduce the AMI numbers of the Nemotron section exactly; the synthetic mixes
+were rebuilt (Kokoro is not bit-exact), so those columns differ slightly from
+the table above.
+
+Reading:
+
+* **Every AMI excerpt got better, by at least 24 points.** Most of the gain
+  needs both halves: the same model conditioned on the clustering diarizer
+  (`pyannote-3.0-eres2net`'s turns) reached 47.6 % (-31 %, 23 of 24 better,
+  none worse), Nemotron's turns 26.0 %. On the synthetic mixes it removes
+  the cases neither diarizer fixed: 8 kHz μ-law and same-gender voices end
+  at 3.5-7.9 %. The research note (`docs/_research-overlap-v2.md`, section 6)
+  has the control for the bigger recogniser alone (the same weights run
+  turn by turn without conditioning): -15 %, not significant, on four of
+  these excerpts.
+* **Hindi:** one synthetic pair (2 files per rate), 14.8 / 26.1 % against
+  23.9 / 59.1 % (`language=hi`); the model was not trained on Hindi
+  multi-talker speech. Too small to rely on.
+* **Probabilities instead of turns** (`conditioning: probabilities`, AMI):
+  26.4 % against 26.0 % (+1.4 %, 95 % CI -2.7 to +5.9 %, 9 files better, 11
+  worse). Not better, so the turns stay the default; they also work with
+  every diarizer.
+* **Limits of the evidence.** 45 s excerpts and ~30 s synthetic mixes, not
+  whole meetings or real calls; 24 + 44 files. TS-ASR models are reported to
+  be worse than their base model on clean single-speaker speech (research
+  note, section 7); that was not measured here, and bolo does not route
+  single-speaker audio elsewhere: choose the model per request.
+
+**Speed** (idle machine, four AMI excerpts of 45 s with 3-4 speakers after
+one warm-up file; diarization included): pyannote + whisper-base RTF 0.25,
+Nemotron + whisper-base 0.13, **Nemotron + DiCoW 0.45 at 2 threads and 0.26
+at 4 threads** (bfloat16). The decode is one pass per speaker, so the cost
+grows with the number of speakers. In float32 (`dtype: float32`, the default
+on CPUs without AMX or AVX512-BF16) the same files took RTF 1.41 at 2 threads
+instead of 0.46, with the same accuracy (29.6 against 29.4 % on three
+files). Loading the plugin and the model took about 4.5 s with the files in
+the page cache; the plugin process holds about 3 GB (bfloat16). The research
+note's RTF 2-3 was measured on the same machine type while two other jobs
+were running. No GPU was used.
+
+**SE-DiCoW** (`se-dicow`), the same way on the same files: AMI 25.3 %
+(-64 %, 95 % CI -67 to -60 %, all 24 excerpts better; tcpWER 26.5 %),
+synthetic 7.9 % (43 of 44 better). Against DiCoW v3.3 it is slightly better
+on AMI and on the 16 kHz English mixes (3.0-4.8 % against 5.1-7.9 %), and
+it failed once: on one 16 kHz Hindi mix it repeated one word for the last
+6 s of a speaker's stream (greedy decoding has no fallback against such
+loops), which put that pair at 78 %. RTF 0.59 at 2 threads on the four
+timing excerpts (one more cross-attention block over each speaker's
+self-enrolment window), measured in a run of its own, not the idle timing
+run. Its self-enrolment windows and transcripts were identical to BUT's
+pipeline on the two reference excerpts.
+
+### DiCoW without PyTorch (`dicow-v3.3-onnx`, core)
+
+The same DiCoW v3.3 also runs in bolo's core, in ONNX Runtime with NumPy and
+no PyTorch (`bolo/engines/dicow_onnx.py`, engine `onnxruntime`, kind
+`dicow_onnx`). It is used exactly like `dicow-v3.3` (speaker-conditioned,
+`nemotron-3-diarization` by default, conditioned on the turns, no
+`separate_overlaps`).
+
+**What the port reproduces.** DiCoW's decoder is stock Whisper; what differs
+is in the encoder (the FDDT layers that take the STNO mask) and in the model's
+own generation code. The model also has a CTC head (joint CTC/attention
+decoding), but its published generation config sets `ctc_weight: 0` and the
+plugin does not turn it on, so it is not exported. The engine reproduces, step
+by step: Whisper's 128-band log-mel (short input padded to 30 s, longer input
+processed whole); the STNO masks of the plugin (the same functions; a plugin
+test checks they agree); transformers 4.55's long-form loop (30 s windows from
+`seek`, the features of a short last window padded with zeros and its mask
+with silence); greedy search with the suppress-token list and Whisper's
+timestamp rules, plus DiCoW's exception that end-of-text may be the first token
+of a window; DiCoW's own `_retrieve_segment` (cutting a window into segments
+and moving `seek`, with a different rule from transformers' when a window has
+no pair of timestamps); language detection on the first window when no
+language is given; and byte-level BPE decoding with transformers' space
+clean-up.
+
+**Checked against the plugin.** With the fp32 graphs, on the two reference
+excerpts (ES2004a_00355 with 4 speakers, IS1009a_00275 with 2; Nemotron's
+turns) every speaker's transcript and every segment time was identical to the
+plugin's in float32 (6 of 6 speaker streams); features differ from
+transformers' by at most 3e-5, and the token decoder agreed with transformers'
+tokenizer on every segment. The int8 graphs change some words: 2 of the 6
+streams differ (4 of 6 when every encoder matrix was quantised, for example
+"a sign of it rather" for "the same figure out").
+
+**Measured** (2026-11-14, `docs/measurements/dicow-onnx.json`; same machine,
+data and scoring as the table above; int8 = `encoder.int8.onnx` +
+`decoder.int8.onnx`, dynamic quantisation of every weight matrix):
+
+| system | AMI, 24 excerpts | synthetic, 40 English mixes | synthetic, all 44 |
+| --- | --- | --- | --- |
+| `dicow-v3.3` (torch plugin, bfloat16; table above) | 26.0 % | 5.5 % | 6.6 % |
+| ONNX fp32 | (2 excerpts only) | 5.3 % | 6.6 % |
+| **ONNX int8 (`dicow-v3.3-onnx`)** | **26.0 %** (7 files better, 7 worse; 95 % CI -2 to +3 %) | **6.0 %** | **7.8 %** (95 % CI -7 to +47 %) |
+| ONNX int8, every MatMul quantised (rejected) | 26.2 % | 8.3 % | 9.9 % |
+
+Reading:
+
+* **int8 matches the plugin on AMI** and is within 0.6 points on the English
+  mixes (0.8 points above the fp32 graphs, which match the plugin). Over all
+  44 mixes it is 1.2 points worse, mostly from one 8 kHz Hindi mix (+37.5
+  points); Hindi was never a strength of the model. The synthetic mixes were
+  rebuilt once more for this run (Kokoro is not bit-exact; 34 of 44 files have
+  the same length), so the torch column there is not paired on identical audio;
+  ONNX fp32 against int8 is.
+* **Which matrices stay fp32.** Quantising every weight matrix of the encoder
+  cost 2-3 points on the mixes (first attempt, last row). The second
+  feed-forward matrix of each encoder layer (`fc2`), whose input has
+  outlier channels after the GELU, is kept in fp32; that recovered most of it.
+  8-bit block-wise weight-only quantisation (`MatMulNBits`) was as accurate as
+  fp32 but no faster than fp32 here.
+* **Speed** (four 45 s AMI excerpts, the torch timing files, diarization
+  included): RTF 1.0 at 2 threads and 0.73 at 4 threads, measured while other
+  jobs shared the 4 vCPUs (load average 2-5), so upper bounds; a decode-only
+  rerun of the 4-speaker excerpt at 4 threads took 34 s (RTF 0.76), the
+  2-speaker one 16 s (0.35). The plugin in bfloat16 with AMX was faster on an
+  idle machine (0.45 / 0.26); in float32, the plugin's default on CPUs without
+  AMX or AVX512-BF16, it took 1.41 at 2 threads, slower than int8 here. The
+  evaluation process (Nemotron plus int8 DiCoW, 4 speakers) held about 4.7 GB.
+* **Small sample.** 24 excerpts of 45 s and 44 synthetic mixes; one machine;
+  no idle-machine timing; fp32 was scored on two AMI excerpts only.
+
+**Files.** `server/tools/export_dicow_onnx.py MODEL_DIR OUT_DIR` exports
+`BUT-FIT/DiCoW_v3_3` (revision `c34b64d9…`) to `encoder.onnx` (input
+features `[batch, 128, 3000]` and STNO mask `[batch, 4, 1500]`; outputs the
+decoder's cross-attention keys and values) and `decoder.onnx` (token ids, the
+self-attention cache and the cross keys/values; logits of the last position
+and the extended cache; one graph for the first and every later step), then
+`encoder.int8.onnx` / `decoder.int8.onnx`, plus the tokenizer and config files
+and `dicow_onnx.json` (sha256 of every file). It needs PyTorch, transformers
+4.55, `onnx` and `onnxruntime`; bolo does not. The int8 export is 1.5 GB (fp32
+3.2 GB). Engine options: `encoder` / `decoder` (file names; default the int8
+graphs, else the fp32 ones), `batch` (speakers decoded together, 4),
+`skip_silent_s` (0.2).
+
+**Not hosted yet.** No public ONNX conversion of DiCoW existed on Hugging Face
+(searched 2026-11-14), so the catalog entry `dicow-v3.3-onnx` is `status:
+pending` (hidden from listings, cannot be pulled) until the export is
+published as `codebucketsolutions/dicow-v3.3-onnx`. Until then register a local
+export: `bolo pull ./dicow-onnx` detects the kind from `dicow_onnx.json` and
+gives the model the entry's features and options (speaker-conditioned,
+`diarization_model: nemotron-3-diarization`). To publish (needs a write token
+for the organisation):
+
+```
+python server/tools/export_dicow_onnx.py ./DiCoW_v3_3 ./dicow-onnx --drop-fp32   # or reuse an export
+huggingface-cli upload codebucketsolutions/dicow-v3.3-onnx ./dicow-onnx . --repo-type model \
+    --exclude "manifest.json" --commit-message "DiCoW v3.3 ONNX export (int8)"
+```
+
+then, in `server/src/bolo/catalog/stt-onnxruntime.yaml`, pin
+`source.revision` to the upload's commit, set `size_bytes` to the uploaded
+files' total, remove `status: pending` and, once someone has run the
+published files, set `validated: cpu` with the `measured` block of
+`docs/measurements/dicow-onnx.json` (`server/tests/test_real.py::test_dicow_onnx_transcribes_both_voices_of_an_overlap`
+runs it with `BOLO_DICOW_ONNX_DIR` set). The README the script writes keeps the
+CC-BY-4.0 attribution and asks users to cite the two DiCoW papers.
+
 ## Overlapping speech
 
 When two people talk at once, diarization marks the stretch (`overlap: true`)
 but the recogniser hears one mixture and usually writes only the louder
 voice. `separate_overlaps=true` (api.md, "Separating overlapping speech")
-gives each speaker in an overlap a track of their own first. **It is off by
+gives each speaker in an overlap a track of their own first. (A
+diarization-conditioned model, "Diarization-conditioned recognition" above,
+does far better on the same audio, at a much higher CPU cost.) **It is off by
 default and stays opt-in**: in our evaluation it improved the transcript of
 16 kHz English two-speaker audio with clearly different voices, but it never
 met the cost limit we set for turning it on by default, and it did not help
@@ -1024,6 +1385,280 @@ result against.
 
 With `diarize=true`, words also carry their speaker. For word times with
 Whisper, use the `faster-whisper-*` entries.
+
+## External TTS servers (llama-server, audio.cpp)
+
+Many 2026 text-to-speech models (Chatterbox, Qwen3-TTS, VoxCPM2, Magpie,
+CosyVoice3, Maya1, …) are large autoregressive models that bolo does not run
+in-process. Two ggml runtimes do, and both have an HTTP server:
+
+* **llama.cpp's `llama-server`** (MIT). `POST /tts` takes `input`, `lang`,
+  `voice` (one of the `voices` that `GET /props` lists), `speaker_ref_b64` (a
+  reference recording to clone), sampling fields and `response_format` `wav` /
+  `pcm` / `pcm16`, and with `stream: true` sends audio as it is generated;
+  `POST /v1/audio/speech` is the OpenAI-shaped variant (only `speed` 1.0).
+  One model per process: `llama-server -m model.gguf -mm mmproj.gguf`.
+  Documented speech families (tools/tts/README.md): Qwen3-TTS, Pocket TTS,
+  Soprano, LFM3-Audio, Chatterbox (Turbo and Multilingual V3) and Fish
+  Drama 3. Chatterbox Multilingual's classifier-free guidance runs in
+  `llama-tts` but not yet in `llama-server`.
+* **audio.cpp's `audiocpp_server`** (Apache-2.0, v0.9.4). `POST
+  /v1/audio/speech` with `model` (an id from the server's JSON config),
+  `input`, `language`, `voice` (a preset, a reference-library name or a
+  model-native voice), `voice_ref` (`{"type": "base64", "data": …}`, WAV, at most
+  5 MiB), `reference_text`, `speed` where the model supports it and
+  model-specific `options`; WAV by default, raw PCM16 with `stream_format:
+  "audio"` for models configured with `mode: "streaming"`. `GET
+  /v1/audio/voices?model=` lists voices. About 60 speech-generation families.
+
+bolo talks to both through one engine, **`tts-server`**
+(`server/src/bolo/engines/tts_server.py`). Every catalog entry names its
+runtime (`options.runtime`) and what the server must load; the rest of bolo
+sees an ordinary voice: `/v1/audio/speech` (all formats, `stream_format: sse`),
+the TTS WebSocket, Realtime conversations and `GET /v1/audio/voices` work
+unchanged. Audio is streamed back where the runtime streams (llama-server
+always, as PCM16) and resampled to the entry's `sample_rate` with bolo's
+resampler.
+
+### Two ways to run the server
+
+**Connect** to a server you run (any machine, any GPU build). Name it in the
+setting `tts_servers`:
+
+```toml
+[tts]
+servers = [
+  "llama-server=http://127.0.0.1:8080",          # every llama-server model goes here
+  "voxcpm2-audiocpp=http://gpu-box:8080",        # one model, by catalog id (wins over the runtime)
+]
+server_api_key = "…"                             # if your server has --api-key
+```
+
+Nothing is downloaded and no binary is needed: the entry counts as installed.
+Start llama-server with the model the entry lists (for example
+`llama-server -hf ggml-org/chatterbox-GGUF`, or `-m … -mm …` with the files in
+the entry's `source`). For audio.cpp, declare the model in the server's config
+under the id in the entry's `options.server_model` (the catalog id), with the
+entry's `family`:
+
+```json
+{"host": "0.0.0.0", "port": 8080, "backend": "cuda", "models": [
+  {"id": "voxcpm2-audiocpp", "family": "voxcpm2", "path": "/models/VoxCPM2-GGUF", "task": "tts", "mode": "offline"}]}
+```
+
+**Managed**: when no URL is configured, bolo downloads the files the entry
+lists (`bolo pull <id>`), starts the binary on a free loopback port when the
+model is first used (llama-server with a random `--api-key`; audio.cpp with a
+config bolo writes to `<data_dir>/run/tts-server/<id>.json`), waits for `GET
+/health` (llama-server answers 503 while it loads), and stops it when the
+model is unloaded (`tts_ttl_s`) or bolo exits. A server that dies fails the
+requests in flight with `503 engine_unavailable` and is started again on a
+later request after a back-off of 1 s, doubling up to 60 s while crashes keep
+coming, as engine plugins are. The binary comes from the setting
+`llama_server_bin` / `audiocpp_server_bin`, else from
+
+```bash
+bolo components install llama-server    # llama.cpp b12375 release (CPU build), SHA-256 checked, 23 MB
+bolo components install audio.cpp      # audio.cpp v0.9.4 release (portable CPU build), 70 MB
+```
+
+(also `POST /api/v1/components/<id>/install`), else from `PATH`. The pinned
+archives are upstream's own release assets for Linux x86-64 (both), Linux
+arm64 and macOS (llama.cpp) and macOS arm64 Metal (audio.cpp); their SHA-256
+sums were computed from the downloads. **The audio.cpp Linux release is built on
+Ubuntu 26.04 and needs glibc 2.43**: on older systems the install stops with
+that message, and you build `audiocpp_server` from source or connect to one.
+Both prebuilt Linux builds are CPU-only; for a GPU point the `*_bin` setting at
+a CUDA/Vulkan build or connect to a server. With `device = "cuda"` bolo adds
+`-ngl 99` to llama-server; audio.cpp gets `"backend": "cuda"`.
+
+A missing binary answers `424 component_missing` naming both routes; an
+unreachable server, one that did not start (its last log lines are in the
+message) or crashed answers `503 engine_unavailable`; what the server refuses
+(an unknown voice, an option the model lacks) answers `400` with the server's
+message.
+
+### Voices and cloning
+
+* Entries of models that clone voices have `features: ["voice-cloning"]`.
+  `POST /v1/audio/speech` takes `reference_audio` (base64 or a data URL, up to
+  30 s are used) and optionally `reference_text`; bolo decodes it, makes it
+  mono 16-bit WAV and sends it as `speaker_ref_b64` (llama-server) or
+  `voice_ref` + `reference_text` (audio.cpp). Models that cannot clone answer
+  `400`.
+* Voices named `heart`, `michael` and `alpha-hi` are **bolo's synthetic
+  reference clips** (the built-in samples `en-short`, `en-long`, `hi-short`,
+  spoken by Kokoro voices, so no real person's voice is imitated), sent as the
+  voice to imitate. Pocket TTS and Qwen3-TTS on llama.cpp need a reference for
+  every request, so they have only these.
+* `default` is the model's own voice (no reference sent). Voices the server
+  lists (`/props`, `/v1/audio/voices`) are added to the model's voices once it
+  is loaded; other names are passed through, and OpenAI names (`alloy`, …) that
+  the server does not know are dropped instead of being refused.
+* `language` reaches multilingual models (`lang` / `language`); the text is
+  normalised for that language first, as for every voice.
+
+The reference is sent again for every sentence (llama-server does not cache
+it), so a long reference costs time on each sentence: with an 11.8 s clip
+Pocket TTS on CPU ran at RTF 1.7-2.3 instead of 0.7 with a 3 s clip.
+
+### A model that is not in the catalog
+
+Add an entry to `<data_dir>/custom.yaml` with `engine: tts-server`, `kind:
+tts-server`, `requires: [llama-server]` (or `[audio.cpp]`), a `source` (a
+repository and `include`, or `local: /path`) and `options`: `runtime`;
+`model_file` and `mmproj_file` (llama-server) or `family`, `model_file`
+(optional: the package folder is used without it), `mode`-related `stream`,
+`load_options`, `session_options` and `server_model` (audio.cpp); `cloning`,
+`send_language`, `language_option`, `language_names`, `speed` (the server
+honours `speed`), `request` (extra request fields, audio.cpp: model
+`options`), `server_args` and `hardware`. Voices may carry `reference:
+<sample id>` (a reference clip) or `server_voice: <name>` (`""` for the
+model's own voice). The entries in `catalog/tts-server.yaml` are examples of
+each.
+
+### What is catalogued
+
+51 entries (`server/src/bolo/catalog/tts-server.yaml`): 12 for llama-server,
+39 for audio.cpp. Licences never exclude a model; each entry states
+`license`, `commercial_use` and `gated`, and `options.hardware` gives the GPU
+advice (`optional`, `recommended`, `required`) and an approximate memory need
+(weights x 1.3 + 0.5 GB, an estimate, not a measurement). The catalog API
+returns it as `hardware`.
+
+| Runtime | Entries | Licences (commercial use) |
+| --- | --- | --- |
+| llama-server | Chatterbox Multilingual V3 (23 languages incl. **Hindi**), Chatterbox Turbo, Qwen3-TTS 1.7B Base, Pocket TTS (en, de, es, fr, it, pt), LFM3-Audio 2B; *pending*: Soprano 1.1 (no GGUF + mmproj pair published: convert it with llama.cpp's converter), Fish Drama 3 (the only GGUF was made with a llama.cpp branch) | MIT, Apache-2.0, CC-BY-4.0 (yes); LFM Open License (only under USD 10M revenue), Fish Audio Community License (revenue threshold) - marked `commercial_use: false` |
+| audio.cpp | **Hindi**: Chatterbox Multilingual (V3 talker), VoxCPM2, NVIDIA Magpie Multilingual 357M, MOSS-TTS Local v1.5, FireRedTTS3, Kitten TTS 2, Supertonic 3, sanoTTS (Hindi voice), XTTS v2, Voxtral TTS; and CosyVoice3, Maya1, Qwen3-TTS (0.6B Base, 1.7B CustomVoice), Pocket TTS, Soprano 1.1, Chatterbox Turbo, MOSS-TTS Nano, OmniVoice, Fish Audio S2 Pro, Fish Drama 3, Higgs TTS 3, IndexTTS-2, VibeVoice 1.5B, OuteTTS 1.0, NeuTTS 2E, Ming 3.0 TTS, BreezeTTS 2, KugelAudio, ZONOS3-Mini, dots.tts, Irodori-TTS, MioTTS, Gradium Phonon, Audio8 TTS, Confucius4-TTS, Plapre 3, Echo-TTS, LFM3-Audio | per audio.cpp's `docs/model_licenses.md`: MIT, Apache-2.0, CC-BY-4.0, NVIDIA Open Model License, OpenRAIL-M, GPL-3.0 (yes); CC-BY-NC(-SA), Fish, Boson, BreezeBlue, Coqui (no); bilibili, Stellon, NeuTTS, LFM (conditional, marked `false`) |
+
+Sizes run from 6 MB (sanoTTS) to 25 GB (Drama 3); the table in "The catalog"
+above has each one. File lists come from audio.cpp's `model_specs/*.json`
+(default package of each family) and were checked against the Hugging Face
+listing, pinned to a commit. The output rate the catalog states is what bolo
+resamples to; audio.cpp's WAV carries the model's real rate.
+
+**What was run**: `pocket-tts-en-llamacpp` on the upstream llama-server b12375
+release, started by bolo (`bolo components install llama-server`), on the
+shared 4-vCPU Xeon with 2 threads: RTF 0.72, first audio 0.77 s, two English
+sentences transcribed back word for word by `moonshine-tiny-en`; cloning from
+an uploaded recording and SSE streaming through `/v1/audio/speech` worked.
+Everything else is `validated: untested`: the request fields come from each
+project's documentation and server source (read 2026-11-14), and the engine is
+tested against fake servers. The audio.cpp release binary does not start on
+this machine (glibc 2.39), so no audio.cpp model was run here.
+
+## Orpheus-family voices on llama.cpp (Svara, Veena, Orpheus, snorTTS)
+
+Orpheus (Canopy Labs) and the models built on its recipe are stock Llama
+language models whose vocabulary was extended with SNAC audio codes, so stock
+`llama-server` runs their GGUF files. bolo does the rest itself, without
+PyTorch: kind **`orpheus-llamacpp`** of the `tts-server` engine
+(`server/src/bolo/engines/orpheus_llamacpp.py`, catalog
+`server/src/bolo/catalog/tts-orpheus.yaml`).
+
+1. **Prompt.** bolo tokenises the text with the server (`POST /tokenize`,
+   special tokens parsed, no BOS added; identical ids to the Hugging Face
+   tokenizer for Svara and Veena) and wraps it in the model's special tokens:
+   `orpheus` `[SOH] [BOS] "speaker: text" [EOT] [EOH] [SOAI] [SOS]`, `veena`
+   `[SOH] "<spk_kavya> text" [EOH] [SOAI] [SOS]`, `svara` (Kenpath's
+   svara-tts-inference) `[BOS] [SOH] [AUDIO] "Hindi (Male): text" [EOH] [EOT]
+   [SOAI] [SOS]`.
+2. **Generation.** `POST /completion` with the prompt as a token array,
+   `stream: true`, `return_tokens: true`; sampling from the model card
+   (Svara 0.75 / 0.9 / repetition penalty 1.1, Veena and snorTTS 0.4 / 0.9 /
+   1.05, Orpheus 0.6 / 0.8 / 1.3), temperature before top-p, top-k and min-p
+   off, the penalty over the whole sequence. It stops at the end-of-speech id
+   (bolo closes the stream, and llama-server frees the slot), at llama.cpp's
+   own end-of-generation ids, or at a budget of 2 frames per character of text
+   plus 12 frames (bolo-torch's 1.3 frames per character cut ordinary Bengali
+   and Hindi sentences short in our runs).
+3. **Audio.** Every 7 audio tokens are one SNAC frame (1 + 2 + 4 codes, 2048
+   samples, 85.3 ms at 24 kHz). Every 4 new frames, bolo decodes them with 3
+   frames of left context (whose audio is dropped), holding one frame back
+   until the end: the same windows as bolo-torch's `OrpheusSNAC`. PCM streams
+   out as it is decoded; first audio needs 5 frames (35 tokens).
+
+The server is managed or operator-run as for every `tts-server` model (see
+"External TTS servers" above; managed servers get `-c 4096 -np 1`). With
+`tts_servers = ["llama-server=…"]` every llama-server model goes to that one
+server, so name these models by id when your server runs another GGUF.
+onnxruntime is needed for the decoder: `pip install "bolo[orpheus]"`.
+
+### The SNAC decoder
+
+`server/tools/export_snac_onnx.py` exports the decoder of
+`hubertsiuzdak/snac_24khz` (MIT, revision `d73ad17`) itself: weight
+normalisation folded, `repeat_interleave` written as expand + flatten (the
+tracer otherwise bakes one length in), dynamic batch and length, opset 17; fp16
+by onnxconverter-common with the noise op kept in fp32. The decoder's noise
+blocks stay (random, as in PyTorch). Files (`snac_onnx.json` records versions
+and the verification; the export is byte-identical when repeated with the same
+packages: torch 2.15.0+cpu, snac 1.2.1, onnx 1.23.2, onnxconverter-common
+1.16.0):
+
+| file | size | sha256 |
+| --- | --- | --- |
+| `snac_24khz_decoder.onnx` (fp32, used by the catalog) | 52,581,828 | `33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911` |
+| `snac_24khz_decoder_fp16.onnx` | 26,368,793 | `0d9f92693bf05e453365f87aad6052d8939b2575eba64eacad5b60d53a317a41` |
+
+They are to be published at `codebucketsolutions/snac-24khz-onnx`; until then
+the catalog entries are `pending` (no download), and `options.snac_path` can
+point at a local copy. With an operator-run server nothing is pulled, so the
+decoder is fetched once into `<data_dir>/components/snac/` and checked against
+its SHA-256.
+
+**Parity with PyTorch**, with the noise term set to zero on both sides (the
+only way to compare sample by sample), on 3 random code sequences and 7 real
+Svara generations (Q2_K and Q4_K_M; Hindi, Bengali, Tamil; 27-51 frames):
+
+| | max abs difference | SNR vs PyTorch |
+| --- | --- | --- |
+| fp32, whole sequence | 6.1e-7 to 2.9e-6 | 112.3-126.7 dB |
+| fp16, whole sequence | 4.9e-4 to 7.1e-3 | 49.7-67.4 dB |
+| fp32, bolo's streaming windows vs bolo-torch's (same token ids) | 8.1e-7 to 1.6e-6 | 118.6-126.6 dB, same length and chunking |
+
+With the noise on, PyTorch, our fp32 and our fp16 graphs all sit 19-44 dB
+above the noise-free output (same size of noise), and `onnx-community/snac_24khz-ONNX`
+(a cross-check only) does the same. fp16 is not faster on a CPU (106 ms
+against 97 ms for a 7-frame window with 2 threads, about 0.3 x real time with
+the overlap), so the catalog uses fp32. int8 is not offered (it is reported to
+fail).
+
+### What was run
+
+On the shared 4-vCPU Xeon (no GPU), llama.cpp b12375 CPU release with 3
+threads, while other jobs used the machine:
+
+| model, quant | route | languages | RTF | first audio | round trip (IndicConformer; whisper-base for English) |
+| --- | --- | --- | --- | --- | --- |
+| Svara Q2_K (1.4 GB), Kenpath layout | bolo HTTP, managed server | hi, bn | 11-34 | 5 s | Hindi word for word (2/2); Bengali failed (the model spoke the speaker label, and the old budget cut the sentence). Functional check only |
+| Svara Q4_K_M (2.1 GB), Kenpath layout | direct | hi, bn, ta | 11-15 | 5 s | mean CER 14 %: Bengali spoke the speaker label in 2/2, one Tamil word dropped |
+| Svara Q4_K_M, Orpheus layout, Svara sampling | direct | hi, bn, ta | 11-16 | 5 s | 6/6 word for word |
+| Svara Q4_K_M, the catalog entry as shipped | bolo HTTP, managed server | hi, bn, ta | 14.4-15.7 | 5.0-5.3 s (16 s with the server start) | CER 0 % in 4/6; a dropped first word (bn), one letter (ta); mean CER 6 % |
+| Veena Q2_K (1.6 GB) | direct | hi, en | 10-15 | 4.6 s | English word for word; Hindi garbled. Too lossy |
+| Veena Q4_K_M (2.5 GB) | direct, and `test_real.py` through bolo | hi, en | 11-15 | 4.6 s | Hindi and English word for word |
+
+That is 3-8 generated tokens per second (5-8 when the machine was quieter) against the 82 that real time needs:
+**on a CPU these voices are for offline jobs, not live use**; on a GPU the
+estimate in the research note is RTF 0.7-0.9 at Q4 on an RTX 3060 (not
+measured). From these runs the Svara entries use the Orpheus layout (the one
+mlx-audio and the transformers.js export use for Svara) with Svara's sampling;
+`prompt_format: svara` gives Kenpath's layout. The samples are small (2-3
+sentences per language and setting); quality was judged by speech recognition
+only, not by listening. Orpheus 3B and snorTTS were not run.
+
+### Licences
+
+Licences never exclude a model; each entry states `license`, `commercial_use`
+and `gated`. Svara and Veena are Apache-2.0 and ungated. **Svara's training
+data includes the IIT Madras IndicTTS corpus; whether its terms allow
+commercial use of derived models was not verified.** Orpheus 3B 0.1 and
+snorTTS-Indic are labelled Apache-2.0 but are Llama 3.2 3B derivatives
+(Orpheus: Llama 3.2 3B Instruct; snorTTS: Canopy's Hindi pretrain, tagged
+`llama3.2`), so the Llama 3.2 Community License applies too; Canopy's own
+repository is gated (click-through), the Unsloth GGUF used here is not. Veena's
+tokenizer has 11 speaker tokens; the card documents 4 voices (kavya, agastya,
+maitri, vinaya), which are the catalogued ones.
 
 ## Indian languages
 
@@ -1208,6 +1843,8 @@ it, and what you download, carry their own terms.
 | pywhispercpp / whisper.cpp | MIT / MIT | optional |
 | kokoro-onnx | MIT, **but depends on `phonemizer` (GPL-3.0-or-later)** and loads espeak-ng in process | optional, deliberately not in `bolo[all]` |
 | piper-tts (`piper1-gpl`) | GPL-3.0 | **not used and not supported**: Piper-format voices run through sherpa-onnx instead |
+| llama.cpp (`llama-server`) | MIT | optional, a separate process: the `tts-server` engine starts it or connects to one (`bolo components install llama-server` downloads the upstream release) |
+| audio.cpp (`audiocpp_server`) | Apache-2.0 | optional, a separate process, as llama-server. Model weights keep their own licences (audio.cpp's `docs/model_licenses.md`) |
 
 Codec libraries: `soundfile` bundles libsndfile (LGPL-2.1+) with mpg123 and
 LAME (LGPL), `soxr` is LGPL-2.1+, PyAV bundles FFmpeg libraries (LGPL-2.1+ in
@@ -1318,6 +1955,11 @@ copied when the entry was written. Things to watch:
 * **SenseVoice / Paraformer** use Alibaba's FunASR model licence (custom).
 * **Kroko** community models are CC-BY-SA.
 * **Parakeet, Canary, NeMo FastConformer** are CC-BY-4.0.
+* **DiCoW v3.3** (`dicow-v3.3`) is CC-BY-4.0: commercial use allowed with attribution to BUT Speech@FIT
+  (the model card asks for the DiCoW and SE-DiCoW papers to be cited); **SE-DiCoW** (`se-dicow`) is
+  Apache-2.0. Both are fine-tuned from Whisper large-v3-turbo (MIT) on AMI and NOTSOFAR-1 (CC BY 4.0) and
+  LibriMix / LibriSpeech mixtures; LibriMix's noisy variants contain WHAM! noise (CC-BY-NC-4.0) and the
+  cards do not say which variants were used (unverified). Both need the bolo-torch plugin.
 * **Nemotron-3-Diarization** (`nemotron-3-diarization`) is under the OpenMDW License Agreement 1.1:
   commercial use allowed; whoever redistributes the model files must include the agreement and the
   model's notices; suing over patents or copyright in the model ends the licence. The catalog uses a

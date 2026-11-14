@@ -917,7 +917,7 @@
     "tags": [
      "native"
     ],
-    "summary": "Optional components (uccharan, espeak-ng, engine plugins)",
+    "summary": "Optional components (uccharan, espeak-ng, TTS servers, engine plugins)",
     "operationId": "components_api_v1_components_get",
     "responses": {
      "200": {
@@ -937,7 +937,7 @@
      "native"
     ],
     "summary": "Install an optional component",
-    "description": "Installs the component into the running environment and activates it without a restart.\nRequires ``{\"accept_license\": true}``: eSpeak NG is GPL-3.0-or-later.",
+    "description": "Installs the component and activates it without a restart. eSpeak NG (GPL-3.0-or-later) requires\n``{\"accept_license\": true}``. ``llama-server`` and ``audio.cpp`` download a pinned upstream release (SHA-256\nchecked) into the data directory.",
     "operationId": "install_component_api_v1_components__component_id__install_post",
     "parameters": [
      {
@@ -1654,6 +1654,30 @@
       ],
       "title": "Phonemizer",
       "description": "Extension: who turns text into phonemes for voices that read phonemes: auto, uccharan (= uccharan:compatible), uccharan:improved or espeak-ng. Default: the voice's pinned choice, else the server's `phonemizer` setting."
+     },
+     "reference_audio": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reference Audio",
+      "description": "Extension: a recording of the voice to imitate, base64 or a data URL (WAV, FLAC, MP3, …), for models that clone voices (`features` has `voice-cloning`). Up to 30 s are used."
+     },
+     "reference_text": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reference Text",
+      "description": "Extension: the transcript of `reference_audio` (some cloning models use it)."
      }
     },
     "type": "object",

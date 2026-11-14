@@ -10,7 +10,8 @@ import pytest
 import torch
 
 from bolo_torch.models import orpheus
-from bolo_torch.models.f5 import F5TTS, collect_voices, normalize_ref_text
+from bolo_torch.models.f5 import F5TTS, batch_result, collect_voices, normalize_ref_text
+from bolo_torch.models.indic_speak import IndicSpeakTTS
 from bolo_torch.models.separation import PixIT, SepFormer
 from bolo_torch.runtime import InvalidRequest, PluginError
 from fakes import FakeTokenizer, fake_parler, fake_separate_batch, tone
@@ -215,3 +216,67 @@ def test_pixit_tracks_and_turns() -> None:
     assert all(len(t) == len(mix) for t in tracks)
     assert float(np.max(np.abs(np.concatenate(tracks)))) <= 0.991  # scaled down instead of clipping
     assert model.last_turns == [(0.0, 0.6, 0), (0.5, 1.0, 1)]
+
+
+# -- original F5-TTS checkpoints --------------------------------------------------
+
+
+def test_f5_voices_from_bolo_samples(tmp_path: Path) -> None:
+    options = {"voices": [{"id": "heart", "reference": "en-short"}, {"id": "nothing", "reference": "no-such-clip"}]}
+    voices = collect_voices(tmp_path, options)
+    assert [v["id"] for v in voices] == ["heart"]
+    assert Path(voices[0]["ref_audio"]).is_file() and voices[0]["ref_text"].startswith("Good morning.")
+
+
+def test_f5_batch_result_takes_both_forms() -> None:
+    wave = np.zeros(4, dtype=np.float32)
+
+    def generator() -> Any:
+        yield wave, 24000, None
+
+    assert batch_result((wave, 24000, None))[0] is wave
+    assert batch_result(generator())[0] is wave
+
+
+# -- Indic-Speak --------------------------------------------------------------------
+
+
+def test_indic_speak_speakers_styles_and_sentences() -> None:
+    calls: list[tuple[str, str, str | None]] = []
+
+    def generate(text: str, speaker: str, style: str | None) -> np.ndarray:
+        calls.append((text, speaker, style))
+        return np.full(2400, 2.0, dtype=np.float64)  # loud: scaled down, never clipped
+
+    voices = [
+        {"id": "amit", "name": "Amit", "language": "hi-IN", "gender": "m"},
+        {"id": "kavya", "name": "Kavya", "language": "hi-IN", "gender": "f"},
+    ]
+    model = IndicSpeakTTS(generate, voices, style=None)
+    assert model.sample_rate == 24000 and [v.id for v in model.voices] == ["amit", "kavya"]
+    chunks = list(model.synthesize("पहला वाक्य। दूसरा वाक्य।", "Kavya:anger"))
+    assert calls == [("पहला वाक्य।", "Kavya", "ANGER"), ("दूसरा वाक्य।", "Kavya", "ANGER")]
+    assert chunks[0].dtype == np.float32 and float(np.max(np.abs(chunks[0]))) == pytest.approx(1.0)
+    list(model.synthesize("Hello."))
+    assert calls[-1] == ("Hello.", "Amit", None)  # the first voice by default
+    with pytest.raises(InvalidRequest, match="unknown voice"):
+        list(model.synthesize("x", "nobody"))
+    with pytest.raises(InvalidRequest, match="one speed"):
+        list(model.synthesize("x", "amit", speed=1.5))
+    stop = iter([False, True])
+    calls.clear()
+    list(model.synthesize("One. Two. Three.", "amit", cancelled=lambda: next(stop)))
+    assert len(calls) == 1
+    with pytest.raises(InvalidRequest):
+        IndicSpeakTTS(generate, [])
+
+
+def test_indic_speak_needs_the_repository(tmp_path: Path) -> None:
+    pytest.importorskip("snac")
+    pytest.importorskip("transformers")
+    from bolo_torch.models.indic_speak import load
+    from bolo_torch.runtime import LoadContext
+
+    (tmp_path / "x").write_text("")
+    with pytest.raises(InvalidRequest, match=r"inference\.py"):
+        load(LoadContext("indic-speak", "tts", tmp_path, {}))

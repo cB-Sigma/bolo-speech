@@ -92,23 +92,36 @@ def licence(spec: ModelSpec) -> str:
         extra = " · phonemes: uccharan" if uccharan_language(*spec.phoneme_target()) else " · needs espeak-ng"
     if spec.plugin:
         extra += f" · needs plugin {spec.plugin}"
+    if spec.engine == "tts-server":
+        gpu = (spec.options.get("hardware") or {}).get("gpu")
+        extra += f" · runs on {spec.options.get('runtime')}" + (f" · GPU {gpu}" if gpu and gpu != "optional" else "")
     if spec.gated:
         extra += " · gated"
     return text + ("" if spec.commercial_use else " ⚠") + extra
+
+
+def group(spec: ModelSpec) -> str:
+    """The heading a model is listed under: its family, or one heading per external TTS server runtime."""
+    if spec.kind == "orpheus-llamacpp":
+        return "Orpheus family on llama.cpp (SNAC in onnxruntime)"
+    if spec.engine == "tts-server":
+        return f"External TTS server: {spec.options.get('runtime')}"
+    return spec.family
 
 
 def models_table(specs: list[ModelSpec]) -> str:
     out: list[str] = []
     by_task: dict[str, dict[str, list[ModelSpec]]] = defaultdict(lambda: defaultdict(list))
     for s in specs:
-        by_task[s.task][s.family].append(s)
+        by_task[s.task][group(s)].append(s)
     pending = sum(s.status == "pending" for s in specs)
     total = len(specs) - pending
     valid = sum(s.validated == "cpu" for s in specs)
     out.append(
         f"{total} models: {valid} validated on CPU by the maintainers, {total - valid} untested."
         + (
-            f' {pending} more are described but not yet published (see "Voices converted by this project").'
+            f" {pending} more {'is' if pending == 1 else 'are'} described but not yet published"
+            f" ({', '.join(sorted(s.id for s in specs if s.status == 'pending'))})."
             if pending
             else ""
         )
@@ -121,8 +134,9 @@ def models_table(specs: list[ModelSpec]) -> str:
             out.append("| id | languages | tier | streaming | download | licence | validated |")
             out.append("| --- | --- | --- | --- | --- | --- | --- |")
             for s in items:
+                name = f"`{s.id}`" + (f" ({s.family})" if s.engine == "tts-server" else "")
                 out.append(
-                    f"| `{s.id}` | {langs(s)} | {s.tier} | {'native' if s.streaming else ('-' if task != 'stt' else 'pseudo')} "
+                    f"| {name} | {langs(s)} | {s.tier} | {'native' if s.streaming else ('-' if task != 'stt' else 'pseudo')} "
                     f"| {size(s.size_bytes)} | {licence(s)} | {measured(s)} |"
                 )
             out.append("")
@@ -134,7 +148,7 @@ def summary_table(specs: list[ModelSpec]) -> str:
     specs = [s for s in specs if s.status != "pending"]
     rows: dict[tuple[str, str], list[ModelSpec]] = defaultdict(list)
     for s in specs:
-        rows[(s.task, s.family)].append(s)
+        rows[(s.task, group(s))].append(s)
     out = [
         "| Task | Family | Models | Languages | Validated on CPU | Best measured RTF |",
         "| --- | --- | --- | --- | --- | --- |",

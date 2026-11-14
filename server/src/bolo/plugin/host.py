@@ -42,6 +42,7 @@ from bolo.engines.base import (
     Model,
     Segment,
     SeparationModel,
+    SpeakerRequest,
     STTModel,
     STTRequest,
     STTResult,
@@ -50,7 +51,14 @@ from bolo.engines.base import (
     Word,
 )
 from bolo.errors import EngineUnavailable, GatedModel, InvalidRequest
-from bolo.plugin.protocol import PROTOCOL_VERSION, audio_bytes, audio_from_bytes, read_message, write_message
+from bolo.plugin.protocol import (
+    PROTOCOL_VERSION,
+    audio_bytes,
+    audio_from_bytes,
+    read_message,
+    speaker_payload,
+    write_message,
+)
 
 log = logging.getLogger("bolo.plugin")
 
@@ -391,6 +399,30 @@ class PluginSTT(_PluginModelMixin, STTModel):
         self.languages = tuple(info.get("languages") or ())
         self.supports_translate = bool(info.get("supports_translate"))
         self.supports_word_timestamps = bool(info.get("supports_word_timestamps"))
+        self.speaker_conditioned = bool(info.get("speaker_conditioned"))
+
+    def transcribe_speakers(self, request: SpeakerRequest) -> list[STTResult]:
+        if not self.speaker_conditioned:
+            raise InvalidRequest("this plugin model is not conditioned on speaker diarization")
+        handle = self._ensure_loaded()
+        probs = request.activity.probs
+        frames, speakers = (int(probs.shape[0]), int(probs.shape[1])) if probs.ndim == 2 else (0, 0)
+        message = {
+            "op": "speakers", "handle": handle, "n": len(request.samples), "language": request.language,
+            "task": request.task, "prompt": request.prompt, "word_timestamps": request.word_timestamps,
+            "temperature": request.temperature, "frame_s": request.activity.frame_s, "frames": frames,
+            "speakers": speakers,
+        }  # fmt: skip
+        # one decode per speaker over the whole recording: allow far longer than a batch of short chunks
+        seconds = len(request.samples) / (self.sample_rate or 16000)
+        timeout = max(self.process.config.request_timeout_s, 30.0 * seconds * max(1, speakers))
+        reply = self.process.request(message, speaker_payload(request.samples, probs), timeout=timeout)
+        out = _results(reply)
+        if len(out) != speakers:
+            raise EngineUnavailable(
+                f"plugin '{self.process.config.name}' returned {len(out)} results for {speakers} speakers"
+            )
+        return out
 
     def transcribe(self, requests: list[STTRequest]) -> list[STTResult]:
         handle = self._ensure_loaded()
@@ -403,14 +435,7 @@ class PluginSTT(_PluginModelMixin, STTModel):
 
         audio = np.concatenate([r.samples for r in requests]) if requests else np.zeros(0, np.float32)
         reply = self.process.request({"op": "transcribe", "handle": handle, "requests": meta}, audio_bytes(audio))
-        out: list[STTResult] = []
-        for res in reply.get("results", []):
-            words = [_word(w) for w in res.get("words", [])]
-            segments = [
-                Segment(float(s["start"]), float(s["end"]), str(s["text"]), [_word(w) for w in s.get("words", [])])
-                for s in res.get("segments", [])
-            ]
-            out.append(STTResult(str(res.get("text", "")), res.get("language"), segments, words))
+        out = _results(reply)
         if len(out) != len(requests):
             raise EngineUnavailable(
                 f"plugin '{self.process.config.name}' returned {len(out)} results for {len(requests)}"
@@ -516,6 +541,18 @@ class PluginEngine(Engine):
 
     def shutdown(self) -> None:
         self.process.stop()
+
+
+def _results(reply: dict[str, Any]) -> list[STTResult]:
+    out: list[STTResult] = []
+    for res in reply.get("results", []):
+        words = [_word(w) for w in res.get("words", [])]
+        segments = [
+            Segment(float(s["start"]), float(s["end"]), str(s["text"]), [_word(w) for w in s.get("words", [])])
+            for s in res.get("segments", [])
+        ]
+        out.append(STTResult(str(res.get("text", "")), res.get("language"), segments, words))
+    return out
 
 
 def _word(w: dict[str, Any]) -> Word:

@@ -26,6 +26,11 @@ transcribe ``handle``, ``requests``: list of ``{n, language, task,      ``result
            prompt, word_timestamps, temperature, hotwords}``; the       ``{text, language, segments,
            audio of all requests follows, concatenated (``n``           words}``
            samples each)
+speakers   ``handle``, ``n``, ``language``, ``task``, ``prompt``,          ``results``: one per speaker
+           ``word_timestamps``, ``temperature``, ``frame_s``,             (as for ``transcribe``), times
+           ``frames``, ``speakers``; ``n`` samples of audio follow,       from the start of the audio
+           then the speaker activity: ``frames`` x ``speakers``
+           float32, row by row (frame by frame)
 synthesize ``handle``, ``text``, ``voice``, ``speed``                   ``sample_rate`` (chunks before)
 separate   ``handle``; the mixture follows (16 kHz)                     ``tracks`` (count); the tracks
                                                                         follow, concatenated, equal length
@@ -38,14 +43,16 @@ shutdown   -                                                            - (then 
 
 ``info`` of a loaded model may hold ``voices`` (list of ``{id, name, language, gender}``),
 ``languages``, ``max_batch`` (default 1: no batching), ``supports_translate`` and
-``supports_word_timestamps``; a separation model (task ``separation``) gives ``mode``
+``supports_word_timestamps`` and ``speaker_conditioned`` (true: the model answers ``speakers``, diarization-
+conditioned recognition of a whole recording, bolo sends it only to such models); a separation model (task ``separation``) gives ``mode``
 (``"blind"``: answers ``separate``; ``"target"``: answers ``enrol``/``extract``/``release``) and
 ``min_sample_s`` (seconds of voice a target model needs). Segments are ``{start, end, text, words}``, words ``{w, t0, t1}``.
 
 Versioning: bolo sends the highest version it speaks in ``hello``; the plugin answers with the
 version it will use (at most bolo's). A plugin that cannot speak any version bolo knows answers
-with ``ok: false``. New optional members may be added within a version; anything incompatible
-gets a new version number.
+with ``ok: false``. New optional members may be added within a version, and new ops that bolo
+only sends to models announcing them in ``info`` (``speakers``, added in bolo 0.3); anything
+incompatible gets a new version number.
 """
 
 from __future__ import annotations
@@ -104,3 +111,16 @@ def audio_bytes(samples: FloatArray) -> bytes:
 
 def audio_from_bytes(payload: bytes) -> FloatArray:
     return np.frombuffer(payload, dtype="<f4").astype(np.float32)
+
+
+def speaker_payload(samples: FloatArray, probs: FloatArray) -> bytes:
+    """The payload of a ``speakers`` request: the audio, then the activity matrix (frames x speakers)."""
+    return audio_bytes(samples) + np.ascontiguousarray(probs, dtype="<f4").tobytes()
+
+
+def split_speaker_payload(payload: bytes, n: int, frames: int, speakers: int) -> tuple[FloatArray, FloatArray]:
+    """Audio and activity ``(frames, speakers)`` of a ``speakers`` request."""
+    data = audio_from_bytes(payload)
+    if len(data) != n + frames * speakers:
+        raise ProtocolError(f"speakers payload holds {len(data)} values, expected {n} + {frames} x {speakers}")
+    return data[:n], data[n:].reshape(frames, speakers)

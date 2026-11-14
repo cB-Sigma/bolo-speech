@@ -214,9 +214,18 @@ def test_every_packaged_entry_is_well_formed() -> None:
     assert len(ids) == len(set(ids))
     # entries whose files are not published yet: described, but without checksums and never offered
     pending = [s for s in every if s.status == "pending"]
+    # (a release asset of this repository, or a repository of the project's Hugging Face organisation)
     assert all(
         s.validated == "untested"
-        and s.source.urls[0]["url"].startswith("https://github.com/cb-Sigma/bolo/releases/download/")
+        and (
+            (
+                s.source.urls
+                and s.source.urls[0]["url"].startswith("https://github.com/cb-Sigma/bolo/releases/download/")
+            )
+            or (s.source.repo or "").startswith("codebucketsolutions/")
+            # external TTS servers: upstream has no file the runtime can load yet (conversion needed, fork-only)
+            or s.engine == "tts-server"
+        )
         for s in pending
     )
     specs = [s for s in every if s.status != "pending"]
@@ -232,9 +241,9 @@ def test_every_packaged_entry_is_well_formed() -> None:
                 assert u.get("sha256") or (u.get("size") or 0) < 1_000_000, f"{s.id}: {u['path']} needs a sha256"
         assert s.size_bytes > 100_000, s.id
         assert s.description and s.source_url.startswith("https://"), s.id
-        assert s.engine in ("sherpa-onnx", "faster-whisper", "onnxruntime", "plugin:torch"), s.id
+        assert s.engine in ("sherpa-onnx", "faster-whisper", "onnxruntime", "plugin:torch", "tts-server"), s.id
         if s.task == "tts":
-            assert s.sample_rate in (8000, 16000, 22050, 24000, 44100, 48000), s.id
+            assert s.sample_rate in (8000, 16000, 22050, 24000, 32000, 44100, 48000), s.id
         if s.validated == "cpu":
             assert s.measured.get("rtf") is not None and s.measured.get("hardware"), s.id
         if "non-commercial" in s.license.lower() or "-nc" in s.license.lower():

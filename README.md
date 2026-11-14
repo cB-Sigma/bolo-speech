@@ -177,13 +177,18 @@ Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AA
 | DIARIZATION | pyannote + speaker embeddings | 3 | - | 1 | 0.106 (`pyannote-3.0-eres2net`) |
 | DIARIZATION | Nemotron diarization | 1 | - | 1 | 0.039 (`nemotron-3-diarization`) |
 | TTS | Parler-TTS | 2 | as, bn, brx, doi, en, gu, hi, hne +13 | 2 | 4.540 (`parler-tts-tiny-v1`) |
-| TTS | F5-TTS | 1 | as, bn, gu, hi, kn, ml, mr, or +3 | 1 | 119.700 (`indic-f5`) |
+| TTS | F5-TTS | 2 | as, bn, en, gu, hi, kn, ml, mr +5 | 1 | 119.700 (`indic-f5`) |
 | TTS | Veena | 1 | en, hi | 0 | - |
 | TTS | Svara | 1 | as, bho, bn, brx, doi, en, gu, hi +11 | 0 | - |
 | STT | SraVaani | 1 | as, bn, en, gu, hi, kn, ml, mr +6 | 0 | - |
 | STT | IndicConformer | 27 | as, bn, brx, doi, gu, hi, kn, kok +14 | 20 | 0.060 (`indicconformer-ta-community`) |
 | SEPARATION | SepFormer | 2 | en | 2 | 1.440 (`sepformer-whamr`) |
 | SEPARATION | PixIT | 1 | en | 1 | 5.690 (`pixit-ami`) |
+| STT | DiCoW | 2 | en | 2 | 0.453 (`dicow-v3.3`) |
+| TTS | Indic-Speak | 1 | as, bn, brx, doi, en, gu, hi, kn +15 | 0 | - |
+| TTS | Spark-TTS | 1 | en, zh | 0 | - |
+| TTS | MaskGCT | 1 | de, en, fr, ja, ko, zh | 0 | - |
+| DIARIZATION | DiariZen | 1 | - | 0 | - |
 | SEPARATION | VoxLock | 1 | en | 1 | 0.460 (`voxlock-int8`) |
 | STT | Whisper | 38 | af, am, ar, as, az, ba, be, bg +92 | 20 | 0.081 (`faster-whisper-tiny.en`) |
 | STT | Moonshine | 11 | ar, en, es, ja, ko, uk, vi, zh | 4 | 0.033 (`moonshine-tiny-en`) |
@@ -198,6 +203,8 @@ Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AA
 | STT | Nemotron | 1 | ar, bg, cs, da, de, el, en, es +26 | 1 | 0.312 (`nemotron-3.5-streaming-560ms`) |
 | TTS | MMS-TTS | 25 | as, awa, bgc, bn, de, doi, en, es +17 | 1 | 0.196 (`mms-tts-eng`) |
 | TTS | Piper | 85 | ar, bn, ca, cs, cy, da, de, el +35 | 28 | 0.040 (`piper-ne-np-google-medium`) |
+| TTS | External TTS server: llama-server | 10 | ar, da, de, el, en, es, fi, fr +15 | 1 | 0.716 (`pocket-tts-en-llamacpp`) |
+| TTS | External TTS server: audio.cpp | 40 | ar, be, bg, bn, cs, da, de, el +41 | 0 | - |
 | TTS | Kokoro | 2 | en, es, fr, hi, it, ja, pt, zh | 2 | 0.759 (`kokoro-v1.0`) |
 | TTS | KittenTTS | 4 | en | 4 | 0.107 (`kitten-nano-0.8`) |
 | TTS | Matcha-TTS | 2 | en, zh | 1 | 0.205 (`matcha-en-ljspeech`) |
@@ -206,7 +213,7 @@ Installation extras: `sherpa` (most models), `faster-whisper`, `av` (M4A/WebM/AA
 | TURN | Smart Turn | 1 | ar, bn, da, de, en, es, fi, fr +15 | 0 | - |
 | VAD | Silero VAD | 2 | - | 2 | 0.006 (`silero-vad-v5`) |
 
-**277 models in the catalog, 116 validated on CPU, 161 untested.** Full list: [docs/models.md](docs/models.md).
+**334 models in the catalog, 119 validated on CPU, 215 untested.** Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run on the machine described under [Performance](#performance) by `server/tools/validate_models.py`; the table in [docs/models.md](docs/models.md) has every model with its measured real-time factor and licence. Anything else that sherpa-onnx or faster-whisper can load can be added with `bolo pull hf:<owner>/<repo>`.

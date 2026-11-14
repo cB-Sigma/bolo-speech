@@ -356,6 +356,44 @@ def remap_activity(activity: SpeakerActivity, mapping: dict[int, int]) -> Speake
     return SpeakerActivity(out, activity.frame_s)
 
 
+def turns_to_activity(
+    turns: list[SpeakerTurn], duration: float, *, frame_s: float = 0.01, num_speakers: int | None = None
+) -> SpeakerActivity:
+    """0/1 speaker activity from speaker turns: column ``k`` is 1 in the frames where speaker ``k`` talks."""
+    n_spk = num_speakers if num_speakers is not None else max((t.speaker for t in turns), default=-1) + 1
+    rate = 1.0 / frame_s  # times x rate, as DiCoW's reference does (x / frame_s rounds differently at .5)
+    probs = np.zeros((max(0, round(duration * rate)), n_spk), np.float32)
+    for t in turns:
+        if 0 <= t.speaker < n_spk:
+            probs[max(0, round(t.start * rate)) : max(0, round(t.end * rate)), t.speaker] = 1.0
+    return SpeakerActivity(probs, frame_s)
+
+
+#: how a speaker-conditioned recogniser is told who talks when (the model's ``conditioning`` option)
+CONDITIONING = ("turns", "probabilities")
+#: frame step of activity made from turns for conditioned recognition
+TURN_FRAME_S = 0.02
+
+
+def conditioning_activity(
+    turns: list[SpeakerTurn], activity: SpeakerActivity | None, duration: float, mode: str = "turns"
+) -> tuple[SpeakerActivity, str]:
+    """The speaker activity to condition recognition on, and which kind it is.
+
+    ``"turns"``: 0/1 from the final speaker turns (any diarizer; what DiCoW's reference pipeline does), on a 20 ms
+    grid: the 50 Hz of a Whisper encoder's input, so frame ``j`` is active exactly where the reference's
+    ``round(start * 50) <= j < round(end * 50)`` is.
+    ``"probabilities"``: the diarizer's per-frame probabilities when it gives them (Nemotron) and they have
+    one column per speaker of the turns; otherwise the turns.
+    """
+    if mode not in CONDITIONING:
+        raise ValueError(f"unknown conditioning {mode!r} (one of {', '.join(CONDITIONING)})")
+    n_spk = max((t.speaker for t in turns), default=-1) + 1
+    if mode == "probabilities" and activity is not None and activity.num_speakers == n_spk:
+        return activity, "probabilities"
+    return turns_to_activity(turns, duration, frame_s=TURN_FRAME_S, num_speakers=n_spk), "turns"
+
+
 def limit_speakers(
     turns: list[SpeakerTurn], activity: SpeakerActivity, max_speakers: int
 ) -> tuple[list[SpeakerTurn], SpeakerActivity]:

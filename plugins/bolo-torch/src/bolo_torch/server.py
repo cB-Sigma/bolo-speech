@@ -37,6 +37,8 @@ class TorchServer(_Server):
                 self.reply(rid)
             elif op == "transcribe":
                 self.transcribe(rid, message, payload)
+            elif op == "speakers" and hasattr(self, "speakers"):  # bolo 0.2.0 and later
+                self.speakers(rid, message, payload)
             elif op == "synthesize":
                 self.synthesize(rid, message)
             elif op in ("separate", "enrol", "extract", "release"):

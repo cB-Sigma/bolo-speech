@@ -1,4 +1,5 @@
-"""IndicF5 (AI4Bharat): F5-TTS flow matching that clones the voice of a short reference recording.
+"""F5-TTS flow matching that clones the voice of a short reference recording: IndicF5 (AI4Bharat) and the
+original F5-TTS checkpoints (SWivid, option ``layout: f5-tts``).
 
 The model repository ships its weights (``model.safetensors``: the EMA DiT and the Vocos vocoder), its vocabulary
 and its own copy of the ``f5_tts`` package. The repository's ``model.py`` (``trust_remote_code``) is not used: it
@@ -7,14 +8,21 @@ looks the vocabulary up as a Hub repository id, wraps the models in ``torch.comp
 instead, loads the weights from the local file, and fetches only Vocos's ``config.yaml``
 (``charactr/vocos-mel-24khz``, MIT, not gated).
 
+The original checkpoints (``SWivid/F5-TTS``: ``F5TTS_v1_Base/model_1250000.safetensors`` and ``vocab.txt``,
+CC-BY-NC-4.0 weights) run on the ``f5_tts`` package from PyPI (MIT, extra ``f5-original``): its ``load_model``
+builds the v1 DiT from the options ``checkpoint`` and ``vocab`` (paths in the model directory) and its Vocos
+loader reads the pinned ``charactr/vocos-mel-24khz`` files.
+
 A voice is a reference clip plus its transcript: the catalog's voices (``ref_audio`` relative to the model
-directory, ``ref_text``) and any ``<name>.wav`` + ``<name>.txt`` pair in ``voices_dir`` (option or
-``BOLO_TORCH_VOICES_DIR``). Clips are cut to 15 s, as F5-TTS does.
+directory, ``ref_text``; or ``reference: <bolo sample id>``, one of bolo's built-in synthetic clips with its
+text) and any ``<name>.wav`` + ``<name>.txt`` pair in ``voices_dir`` (option or ``BOLO_TORCH_VOICES_DIR``).
+Clips are cut to 15 s, as F5-TTS does.
 """
 
 from __future__ import annotations
 
 import importlib
+import inspect
 import os
 import sys
 import threading
@@ -32,7 +40,16 @@ from bolo_torch.text import split_sentences
 VOCOS_REPO = "charactr/vocos-mel-24khz"
 VOCOS_REVISION = "0feb3fdd929bcd6649e0e7c5a688cf7dd012ef21"
 DIT_CONFIG = {"dim": 1024, "depth": 22, "heads": 16, "ff_mult": 2, "text_dim": 512, "conv_layers": 4}
+LAYOUTS = ("indicf5", "f5-tts")
 MAX_REF_S = 15.0
+
+
+def batch_result(result: Any) -> Any:
+    """``infer_batch_process`` returns ``(wave, rate, mel)`` in IndicF5's copy of f5_tts and yields it once in the
+    PyPI package (where the function also streams)."""
+    if inspect.isgenerator(result):
+        return next(result)
+    return result
 
 
 def normalize_ref_text(text: str) -> str:
@@ -55,7 +72,7 @@ class F5TTS(TTSModel):
         max_chars: int = 160,
     ) -> None:
         if not voices:
-            raise InvalidRequest("IndicF5 needs at least one reference voice (catalog voices or voices_dir)")
+            raise InvalidRequest("F5-TTS needs at least one reference voice (catalog voices or voices_dir)")
         self.generate = generate
         self._voices = {str(v["id"]).lower(): v for v in voices}
         self.voices = to_voices(voices)
@@ -86,9 +103,29 @@ class F5TTS(TTSModel):
                 yield peak_safe(audio)
 
 
+def sample_reference(sample_id: str) -> tuple[Path, str] | None:
+    """A built-in bolo sample clip (``bolo.samples``) and its transcript, or None when there is no such clip."""
+    from importlib import resources
+
+    try:
+        from bolo import samples
+
+        entry = samples.get(sample_id)
+    except Exception:
+        return None
+    path = Path(str(resources.files("bolo.samples") / str(entry.get("file", ""))))
+    text = str(entry.get("text") or "")
+    return (path, text) if path.is_file() and text else None
+
+
 def collect_voices(root: Path, options: dict[str, Any]) -> list[dict[str, Any]]:
     voices: list[dict[str, Any]] = []
     for v in voices_from_options(options):
+        if v.get("reference") and not v.get("ref_audio"):
+            found = sample_reference(str(v["reference"]))
+            if found is not None:
+                voices.append({**v, "ref_audio": str(found[0]), "ref_text": v.get("ref_text") or found[1]})
+            continue
         if not v.get("ref_audio") or not v.get("ref_text"):
             continue
         path = Path(str(v["ref_audio"]))
@@ -109,14 +146,44 @@ def collect_voices(root: Path, options: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def load(ctx: LoadContext) -> F5TTS:
-    import soundfile as sf
+    layout = str(ctx.option("layout", "indicf5"))
+    if layout not in LAYOUTS:
+        raise InvalidRequest(f"unknown F5-TTS layout {layout!r} (one of {', '.join(LAYOUTS)})")
+    root = model_dir(ctx.path, ctx.options)
+    if layout == "f5-tts":
+        ui, model, vocoder = _load_package(ctx, root)
+    else:
+        ui, model, vocoder = _load_indicf5(ctx, root)
+    return _model(ctx, root, ui, model, vocoder)
+
+
+def _load_package(ctx: LoadContext, root: Path) -> tuple[Any, Any, Any]:
+    """The original SWivid checkpoints, on the ``f5_tts`` package from PyPI."""
+    require("f5_tts", "f5-original")
+    ui = importlib.import_module("f5_tts.infer.utils_infer")
+    dit = importlib.import_module("f5_tts.model").DiT
+    checkpoint = root / str(ctx.option("checkpoint", "F5TTS_v1_Base/model_1250000.safetensors"))
+    vocab = root / str(ctx.option("vocab", "F5TTS_v1_Base/vocab.txt"))
+    if not checkpoint.is_file() or not vocab.is_file():
+        raise InvalidRequest(f"{root} does not hold the F5-TTS checkpoint {checkpoint.name} and its vocab.txt")
+    config = {**DIT_CONFIG, **dict(ctx.option("dit_config", {}))}
+    model = ui.load_model(dit, config, str(checkpoint), mel_spec_type="vocos", vocab_file=str(vocab), device=ctx.device)
+    vocos_dir = hub_snapshot(
+        str(ctx.option("vocoder_repo", VOCOS_REPO)),
+        str(ctx.option("vocoder_revision", VOCOS_REVISION)),
+        ["config.yaml", "pytorch_model.bin"],
+    )
+    vocoder = ui.load_vocoder("vocos", is_local=True, local_path=str(vocos_dir), device=ctx.device)
+    return ui, model, vocoder
+
+
+def _load_indicf5(ctx: LoadContext, root: Path) -> tuple[Any, Any, Any]:
     import torch
 
     require("vocos", "f5")
     require("torchdiffeq", "f5")
     require("x_transformers", "f5")
     safetensors = require("safetensors.torch", "f5")
-    root = model_dir(ctx.path, ctx.options)
     if not (root / "f5_tts").is_dir() or not (root / "model.safetensors").is_file():
         raise InvalidRequest(f"{root} does not look like the IndicF5 repository (f5_tts/ and model.safetensors)")
     # the bundled f5_tts matches the weights; it must win over any other installed f5_tts
@@ -159,6 +226,12 @@ def load(ctx: LoadContext) -> F5TTS:
     )
     vocoder = vocoder.to(ctx.device).eval()
     del state
+    return ui, model, vocoder
+
+
+def _model(ctx: LoadContext, root: Path, ui: Any, model: Any, vocoder: Any) -> F5TTS:
+    import soundfile as sf
+    import torch
 
     nfe = int(ctx.option("nfe_step", 32))
     refs: dict[str, tuple[Any, int, str]] = {}
@@ -181,10 +254,11 @@ def load(ctx: LoadContext) -> F5TTS:
         max_chars = int(len(ref_text.encode("utf-8")) / seconds * (25 - seconds))
         batches = ui.chunk_text(text, max_chars=max(max_chars, 20))
         with torch.inference_mode():
-            wave, _, _ = ui.infer_batch_process(
+            result = ui.infer_batch_process(
                 (audio, sr), ref_text, batches, model, vocoder, mel_spec_type="vocos", progress=None,
                 nfe_step=nfe, speed=float(speed), device=ctx.device,
             )  # fmt: skip
+            wave, _, _ = batch_result(result)
         return wave
 
     return F5TTS(

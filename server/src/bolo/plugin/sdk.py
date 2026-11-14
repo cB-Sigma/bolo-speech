@@ -22,8 +22,26 @@ from typing import IO, Any
 
 import numpy as np
 
-from bolo.engines.base import Engine, LoadOptions, Model, SeparationModel, STTModel, STTRequest, TTSModel
-from bolo.plugin.protocol import PROTOCOL_VERSION, audio_bytes, audio_from_bytes, read_message, write_message
+from bolo.engines.base import (
+    Engine,
+    LoadOptions,
+    Model,
+    SeparationModel,
+    SpeakerActivity,
+    SpeakerRequest,
+    STTModel,
+    STTRequest,
+    STTResult,
+    TTSModel,
+)
+from bolo.plugin.protocol import (
+    PROTOCOL_VERSION,
+    audio_bytes,
+    audio_from_bytes,
+    read_message,
+    split_speaker_payload,
+    write_message,
+)
 
 
 class _Server:
@@ -83,6 +101,8 @@ class _Server:
                 self.reply(rid)
             elif op == "transcribe":
                 self.transcribe(rid, message, payload)
+            elif op == "speakers":
+                self.speakers(rid, message, payload)
             elif op == "synthesize":
                 self.synthesize(rid, message)
             elif op in ("separate", "enrol", "extract", "release"):
@@ -112,6 +132,8 @@ class _Server:
                 languages=list(model.languages), max_batch=model.max_batch,
                 supports_translate=model.supports_translate, supports_word_timestamps=model.supports_word_timestamps,
             )  # fmt: skip
+            if model.speaker_conditioned:
+                info["speaker_conditioned"] = True
         self.reply(rid, handle=handle, sample_rate=model.sample_rate, task=model.task, info=info)
 
     def model(self, m: dict[str, Any]) -> Model:
@@ -136,20 +158,23 @@ class _Server:
                 )
             )  # fmt: skip
             offset += n
-        results = model.transcribe(requests)
-        out = [
-            {
-                "text": res.text,
-                "language": res.language,
-                "segments": [
-                    {"start": s.start, "end": s.end, "text": s.text, "words": [w.to_dict() for w in s.words]}
-                    for s in res.segments
-                ],
-                "words": [w.to_dict() for w in res.words],
-            }
-            for res in results
-        ]
-        self.reply(rid, results=out)
+        self.reply(rid, results=[_result_dict(res) for res in model.transcribe(requests)])
+
+    def speakers(self, rid: str, m: dict[str, Any], payload: bytes) -> None:
+        model = self.model(m)
+        if not isinstance(model, STTModel) or not model.speaker_conditioned:
+            raise TypeError("this model is not conditioned on speaker diarization")
+        frames, speakers = int(m.get("frames", 0)), int(m.get("speakers", 0))
+        audio, probs = split_speaker_payload(payload, int(m.get("n", 0)), frames, speakers)
+        request = SpeakerRequest(
+            audio, SpeakerActivity(probs, float(m.get("frame_s", 0.01))), m.get("language"),
+            m.get("task", "transcribe"), m.get("prompt"), bool(m.get("word_timestamps")),
+            float(m.get("temperature", 0.0)),
+        )  # fmt: skip
+        results = model.transcribe_speakers(request)
+        if len(results) != speakers:
+            raise RuntimeError(f"the model returned {len(results)} results for {speakers} speakers")
+        self.reply(rid, results=[_result_dict(res) for res in results])
 
     def separation(self, rid: str, op: str, m: dict[str, Any], payload: bytes) -> None:
         model = self.model(m)
@@ -184,6 +209,18 @@ class _Server:
             self.send({"id": rid, "chunk": seq}, audio_bytes(chunk))
             seq += 1
         self.reply(rid, sample_rate=model.sample_rate, chunks=seq, cancelled=rid in self.cancelled)
+
+
+def _result_dict(res: STTResult) -> dict[str, Any]:
+    return {
+        "text": res.text,
+        "language": res.language,
+        "segments": [
+            {"start": s.start, "end": s.end, "text": s.text, "words": [w.to_dict() for w in s.words]}
+            for s in res.segments
+        ],
+        "words": [w.to_dict() for w in res.words],
+    }
 
 
 def _rss_mb() -> float | None:

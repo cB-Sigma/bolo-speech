@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import binascii
 import contextlib
 import time
 from collections.abc import AsyncGenerator, AsyncIterator, Coroutine
@@ -495,6 +496,14 @@ class SpeechRequest(BaseModel):
         "(= uccharan:compatible), uccharan:improved or espeak-ng. Default: the voice's pinned choice, else the "
         "server's `phonemizer` setting.",
     )
+    reference_audio: str | None = Field(
+        default=None,
+        description="Extension: a recording of the voice to imitate, base64 or a data URL (WAV, FLAC, MP3, …), for "
+        "models that clone voices (`features` has `voice-cloning`). Up to 30 s are used.",
+    )
+    reference_text: str | None = Field(
+        default=None, description="Extension: the transcript of `reference_audio` (some cloning models use it)."
+    )
 
 
 class SpeechStream:
@@ -568,6 +577,7 @@ async def create_speech(request: Request, body: SpeechRequest) -> Response:
         if body.stream_format not in ("audio", "sse"):
             raise InvalidRequest("stream_format must be 'audio' or 'sse'", param="stream_format")
         voice = body.voice.get("id") if isinstance(body.voice, dict) else body.voice
+        reference = decode_reference(body.reference_audio) if body.reference_audio else None
         spec = core.resolve(body.model, "tts")
         trace.model = spec.id
         encoder = StreamEncoder(fmt, spec.sample_rate, body.sample_rate)
@@ -579,7 +589,7 @@ async def create_speech(request: Request, body: SpeechRequest) -> Response:
     stream = SpeechStream(
         core, trace, encoder,
         text=body.input, model=spec.id, voice=voice, speed=body.speed, language=body.language, normalize=body.normalize,
-        phonemizer=body.phonemizer,
+        phonemizer=body.phonemizer, reference_audio=reference, reference_text=body.reference_text,
     )  # fmt: skip
     chunks = stream.chunks()
     try:
@@ -637,6 +647,19 @@ async def create_speech(request: Request, body: SpeechRequest) -> Response:
     }
     media = "text/event-stream" if as_sse else encoder.media_type
     return StreamingResponse(gen(), media_type=media, headers=headers)
+
+
+def decode_reference(value: str) -> bytes:
+    """``reference_audio`` of a speech request: plain base64 or a ``data:audio/...;base64,`` URL."""
+    text = value.strip()
+    if text.startswith("data:"):
+        _, sep, text = text.partition(",")
+        if not sep:
+            raise InvalidRequest("reference_audio is a data URL without data", param="reference_audio")
+    try:
+        return base64.b64decode(text, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise InvalidRequest("reference_audio must be base64 or a base64 data URL", param="reference_audio") from exc
 
 
 def now_ms() -> int:

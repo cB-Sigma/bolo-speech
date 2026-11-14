@@ -203,6 +203,9 @@ class ModelSpec:
             "settings": settings or {},
             "available": available,
             "status": self.status,
+            # what the model needs to run well, when the catalog says (options.hardware), e.g.
+            # {"gpu": "recommended", "vram_gb": 3.5, "note": "..."}; null for entries that run fine on a CPU
+            "hardware": self.options.get("hardware"),
         }
 
 

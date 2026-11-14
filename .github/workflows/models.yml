@@ -1,0 +1,161 @@
+# Rebuild a converted model from its upstream weights and publish it to the Hugging Face organisation.
+# Run by hand (Actions > Publish a converted model > Run workflow). Needs the HF_TOKEN secret with write access.
+# The export is checked against the checksums recorded in docs/measurements before anything is uploaded.
+name: Publish a converted model
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: Model to rebuild and publish
+        type: choice
+        options: [dicow-v3.3-onnx, snac-24khz-onnx]
+        default: dicow-v3.3-onnx
+      allow_new_checksums:
+        description: Upload even if the export's checksums differ from the recorded ones
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  dicow:
+    if: inputs.model == 'dicow-v3.3-onnx'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SOURCE_REPO: BUT-FIT/DiCoW_v3_3
+      SOURCE_REVISION: c34b64d9a9c5148c65fd355bb188d60343a6b44f
+      TARGET_REPO: codebucketsolutions/dicow-v3.3-onnx
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install the export tools (the versions the published files were made with)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "torch==2.15.0" --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install "transformers==4.55.0" "onnx==1.23.2" "onnxruntime==1.31.1" "huggingface_hub>=0.25" numpy safetensors
+
+      - name: Download the upstream weights
+        run: |
+          python - <<'EOF'
+          import os
+          from huggingface_hub import snapshot_download
+          snapshot_download(os.environ["SOURCE_REPO"], revision=os.environ["SOURCE_REVISION"], local_dir="src-model")
+          EOF
+
+      - name: Export (fp32, then int8; the fp32 graphs are deleted)
+        run: python server/tools/export_dicow_onnx.py src-model out --drop-fp32
+
+      - name: Compare checksums with the recorded ones
+        env:
+          ALLOW_NEW: ${{ inputs.allow_new_checksums }}
+        run: |
+          python - <<'EOF'
+          import hashlib, json, os, sys
+          from pathlib import Path
+          want = json.loads(Path("docs/measurements/dicow-onnx.json").read_text())["export_files"]["int8"]
+          bad = []
+          for name, meta in sorted(want.items()):
+              p = Path("out") / name
+              if not p.exists():
+                  bad.append(f"{name}: missing")
+                  continue
+              h = hashlib.sha256(p.read_bytes()).hexdigest()
+              print(f"{name}: {h}")
+              if h != meta["sha256"]:
+                  bad.append(f"{name}: {h} (recorded {meta['sha256']})")
+          if bad:
+              print("Checksums differ from the validated export:\n  " + "\n  ".join(bad))
+              if os.environ.get("ALLOW_NEW") != "true":
+                  sys.exit(1)
+          EOF
+
+      - name: Upload to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then echo "The HF_TOKEN secret is not set."; exit 1; fi
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo = os.environ["TARGET_REPO"]
+          api.create_repo(repo, repo_type="model", exist_ok=True)
+          info = api.upload_folder(folder_path="out", repo_id=repo, repo_type="model",
+                                   commit_message=f"Export of {os.environ['SOURCE_REPO']}@{os.environ['SOURCE_REVISION'][:12]}")
+          print(f"Uploaded: {info.commit_url}")
+          print(f"Pin this revision in the catalog: {info.oid}")
+          EOF
+
+  snac:
+    if: inputs.model == 'snac-24khz-onnx'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TARGET_REPO: codebucketsolutions/snac-24khz-onnx
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install the export tools (the versions the recorded files were made with)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "torch==2.15.0" --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install "snac==1.2.1" "onnx==1.23.2" "onnxconverter-common==1.16.0" "onnxruntime==1.32.0" "huggingface_hub>=0.25" numpy
+
+      - name: Export the decoder (fp32 and fp16), with the script's own verification
+        run: python server/tools/export_snac_onnx.py out
+
+      - name: Compare checksums with the ones the catalog pins
+        env:
+          ALLOW_NEW: ${{ inputs.allow_new_checksums }}
+        run: |
+          python - <<'PY'
+          import hashlib, os, sys
+          from pathlib import Path
+          want = {
+              "snac_24khz_decoder.onnx": "33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911",
+              "snac_24khz_decoder_fp16.onnx": "0d9f92693bf05e453365f87aad6052d8939b2575eba64eacad5b60d53a317a41",
+          }
+          bad = []
+          for name, sha in want.items():
+              h = hashlib.sha256((Path("out") / name).read_bytes()).hexdigest()
+              print(f"{name}: {h}")
+              if h != sha:
+                  bad.append(f"{name}: {h} (recorded {sha})")
+          if bad:
+              print("Checksums differ from the validated export:\n  " + "\n  ".join(bad))
+              if os.environ.get("ALLOW_NEW") != "true":
+                  sys.exit(1)
+          PY
+
+      - name: Upload to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then echo "The HF_TOKEN secret is not set."; exit 1; fi
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo = os.environ["TARGET_REPO"]
+          api.create_repo(repo, repo_type="model", exist_ok=True)
+          info = api.upload_folder(folder_path="out", repo_id=repo, repo_type="model",
+                                   commit_message="Export of hubertsiuzdak/snac_24khz (decoder)")
+          print(f"Uploaded: {info.commit_url}")
+          print(f"Pin this revision in the catalog: {info.oid}")
+          PY

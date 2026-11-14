@@ -23,11 +23,19 @@ LOADERS: dict[str, tuple[str, str]] = {
     "parler-tts": ("bolo_torch.models.parler", "load"),
     "f5-tts": ("bolo_torch.models.f5", "load"),
     "orpheus-snac": ("bolo_torch.models.orpheus", "load"),
+    "indic-speak": ("bolo_torch.models.indic_speak", "load"),
     "sepformer": ("bolo_torch.models.separation", "load_sepformer"),
     "pixit": ("bolo_torch.models.separation", "load_pixit"),
+    "dicow": ("bolo_torch.models.dicow", "load"),
 }
 #: kinds the catalog lists for this plugin that are not implemented yet
-NOT_IMPLEMENTED = {"sravaani": "SraVaani (TorchScript STT)", "indicconformer-official": "IndicConformer official"}
+NOT_IMPLEMENTED = {
+    "sravaani": "SraVaani (TorchScript STT)",
+    "indicconformer-official": "IndicConformer official",
+    "diarizen": "DiariZen diarization (the plugin protocol has no diarization request yet)",
+    "spark-tts": "Spark-TTS (no packaged inference code)",
+    "maskgct": "MaskGCT (no packaged inference code)",
+}
 
 
 class TorchEngine(Engine):

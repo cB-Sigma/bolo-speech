@@ -47,6 +47,17 @@ KINDS: dict[str, tuple[str, str, bool]] = {
     "silero_vad": ("sherpa-onnx", "vad", False),
     "ten_vad": ("sherpa-onnx", "vad", False),
     "nemotron_diarization": ("onnxruntime", "diarization", False),
+    "dicow_onnx": ("onnxruntime", "stt", False),
+}
+
+#: what a model of these kinds is, whatever directory or repository it comes from: features, default options and
+#: languages (the catalog entry of DiCoW's ONNX export, for a directory registered before the files are hosted)
+KIND_DEFAULTS: dict[str, dict[str, Any]] = {
+    "dicow_onnx": {
+        "features": ["timestamps", "speaker-conditioned"],
+        "options": {"diarization_model": "nemotron-3-diarization", "conditioning": "turns"},
+        "languages": ["en"],
+    },
 }
 
 
@@ -60,6 +71,8 @@ def detect_kind(repo: str, paths: list[str]) -> str | None:
 
     if "model.bin" in names and "config.json" in names and (has(r"^tokenizer\.json$") or has(r"^vocabulary\.")):
         return "ct2-whisper"
+    if "dicow_onnx.json" in names or ("dicow" in name and has(r"^encoder(\.int8)?\.onnx$") and has(r"^decoder")):
+        return "dicow_onnx"
     if "nemotron" in name and "diar" in name and has(r"\.onnx$"):
         return "nemotron_diarization"
     if has(r"silero_vad.*\.onnx$"):
@@ -106,6 +119,10 @@ def choose_files(kind: str, files: list[RemoteFile], precision: str = "int8") ->
         return exclude
     if kind == "nemotron_diarization":  # one int8 graph (onnx/model_quantized.onnx + its data file), no other precision
         return [*exclude, "*.nemo", "*.gguf", "*.safetensors", "onnx/model.onnx*", "onnx/model_fp16*", "onnx/model_q4*"]
+    if kind == "dicow_onnx":  # the int8 graphs, or the fp32 ones with precision="float"
+        if precision == "float":
+            return [*exclude, "*.int8.onnx", "*.int8.onnx.data"]
+        return [*exclude, "encoder.onnx", "encoder.onnx.data", "decoder.onnx", "decoder.onnx.data"]
     paths = {f.path for f in files}
     for path in sorted(paths):
         if not path.endswith(".onnx") or path.endswith(".int8.onnx"):
@@ -155,6 +172,7 @@ def register_hf_model(core: Bolo, repo: str, kind: str | None = None, task: str 
     langs = card.get("language") or []
     if isinstance(langs, str):
         langs = [langs]
+    defaults = KIND_DEFAULTS.get(detected, {})
     spec = ModelSpec(
         id=model_id,
         aliases=[repo],
@@ -162,7 +180,9 @@ def register_hf_model(core: Bolo, repo: str, kind: str | None = None, task: str 
         engine=engine,
         kind=detected,
         family="Custom",
-        languages=[str(x) for x in langs][:50],
+        languages=[str(x) for x in langs][:50] or list(defaults.get("languages", [])),
+        features=list(defaults.get("features", [])),
+        options=dict(defaults.get("options", {})),
         tier="balanced",
         streaming=streaming,
         size_bytes=size,
@@ -217,7 +237,8 @@ def register_local_model(
     if detected not in KINDS:
         raise InvalidRequest(f"unknown kind '{detected}'. Known kinds: {', '.join(sorted(KINDS))}", param="kind")
     engine, default_task, streaming = KINDS[detected]
-    opts = dict(options or {})
+    defaults = KIND_DEFAULTS.get(detected, {})
+    opts = {**defaults.get("options", {}), **(options or {})}
     if languages and "language" not in opts and (task or default_task) == "tts":
         opts["language"] = languages[0]
     spec = ModelSpec(
@@ -226,7 +247,8 @@ def register_local_model(
         engine=engine,
         kind=detected,
         family="Custom",
-        languages=list(languages or []),
+        languages=list(languages or defaults.get("languages", [])),
+        features=list(defaults.get("features", [])),
         tier="balanced",
         streaming=streaming,
         size_bytes=sum((directory / f).stat().st_size for f in files if f != "manifest.json"),

@@ -1,8 +1,8 @@
 # Models that need PyTorch. bolo itself never imports PyTorch: these run on the out-of-process engine plugin
 # bolo-torch (engine: plugin:torch, plugins/bolo-torch, docs/plugins.md), which is installed separately, per model
-# family: pip install "bolo-torch[parler]" / "[f5]" / "[orpheus]" / "[sepformer]" / "[pyannote]". Until it is installed these
-# entries are listed with requires: [plugin:torch] and available: false, and using one answers 424 with the
-# install hint in options.plugin_install.
+# family: pip install "bolo-torch[parler]" / "[f5]" / "[orpheus]" / "[sepformer]" / "[pyannote]" / "[dicow]".
+# Until it is installed these entries are listed with requires: [plugin:torch] and available: false, and using one
+# answers 424 with the install hint in options.plugin_install.
 - id: indic-parler-tts
   task: tts
   engine: plugin:torch
@@ -418,3 +418,281 @@
     revision: 9486b106945ae0cc0784041a08bfcdba5edadfb9
   options:
     plugin_install: pip install "bolo-torch[pyannote]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+- id: dicow-v3.3
+  aliases: [dicow]
+  task: stt
+  engine: plugin:torch
+  kind: dicow
+  family: DiCoW
+  languages: [en]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 3573829548
+  params: 892000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/BUT-FIT/DiCoW_v3_3
+  features: [timestamps, speaker-conditioned]
+  description: 'BUT-FIT DiCoW v3.3: Whisper large-v3-turbo conditioned on speaker diarization (target-speaker ASR).
+    For diarized transcription (diarize=true) it decodes the whole recording once per speaker, told frame by frame
+    whether that speaker, someone else, both or nobody is talking, instead of cutting the audio at speaker turns:
+    overlapping speech is transcribed for each speaker. Trained on English meetings and mixtures (AMI, NOTSOFAR-1,
+    LibriMix). Needs PyTorch (torch engine plugin, dicow extra); several times slower than real time on CPU.'
+  source_url: https://huggingface.co/BUT-FIT/DiCoW_v3_3
+  validated: cpu
+  measured:
+    rtf: 0.453
+    load_s: 4.5
+    audio_s: 180.0
+    threads: 2
+    engine: bolo-torch 0.1.0, torch 2.15.0+cpu, transformers 4.55.0, bfloat16
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz, AMX), no GPU
+    date: '2026-11-14'
+    note: 'Diarized transcription with nemotron-3-diarization, RTF including diarization, four 45 s AMI excerpts
+      with 3-4 speakers (0.26 at 4 threads; 1.41 in float32, the default on CPUs without AMX or AVX512-BF16).
+      cpWER on 24 AMI far-field excerpts 26.0 % against 69.4 % for pyannote + whisper-base (every excerpt better),
+      on 44 synthetic two-voice mixes 6.6 % against 55.4 %. Transcripts identical to BUT''s reference pipeline on
+      two excerpts. Output is lower-case without punctuation. docs/measurements/dicow-conditioned.json.'
+  source:
+    repo: BUT-FIT/DiCoW_v3_3
+    revision: c34b64d9a9c5148c65fd355bb188d60343a6b44f
+    exclude: ['*.png', README.md, .gitattributes]
+  options:
+    plugin_install: pip install "bolo-torch[dicow]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    diarization_model: nemotron-3-diarization
+    conditioning: turns
+- id: se-dicow
+  task: stt
+  engine: plugin:torch
+  kind: dicow
+  family: DiCoW
+  languages: [en]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 4413030846
+  params: 1100000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/BUT-FIT/SE-DiCoW
+  features: [timestamps, speaker-conditioned]
+  description: 'BUT-FIT SE-DiCoW: DiCoW (diarization-conditioned Whisper large-v3-turbo) with self-enrolment: for each
+    speaker it also attends to the 30 s of the recording where that speaker talks alone the most, which helps when
+    several people talk at once for long. For diarized transcription (diarize=true), like dicow-v3.3. English
+    meetings and mixtures. Needs PyTorch (torch engine plugin, dicow extra); slower than real time on CPU.'
+  source_url: https://huggingface.co/BUT-FIT/SE-DiCoW
+  validated: cpu
+  measured:
+    rtf: 0.589
+    load_s: 5.3
+    audio_s: 180.0
+    threads: 2
+    engine: bolo-torch 0.1.0, torch 2.15.0+cpu, transformers 4.55.0, bfloat16
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz, AMX), no GPU
+    date: '2026-11-14'
+    note: 'Diarized transcription with nemotron-3-diarization, RTF including diarization, four 45 s AMI excerpts.
+      cpWER on 24 AMI excerpts 25.3 % (dicow-v3.3 26.0 %, pyannote + whisper-base 69.4 %), on 44 synthetic
+      two-voice mixes 7.9 % (dicow-v3.3 6.6 %); once repeated a word for 6 s on a Hindi mix. Self-enrolment windows
+      and transcripts identical to BUT''s reference pipeline on two excerpts. docs/measurements/dicow-conditioned.json.'
+  source:
+    repo: BUT-FIT/SE-DiCoW
+    revision: 470fce9ffff844dd53a27751cdf6c6df9efecb39
+    exclude: ['*.png', README.md, .gitattributes]
+  options:
+    plugin_install: pip install "bolo-torch[dicow]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    diarization_model: nemotron-3-diarization
+    conditioning: turns
+- id: f5-tts-v1-base
+  task: tts
+  engine: plugin:torch
+  kind: f5-tts
+  family: F5-TTS
+  languages: [en, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 1348449561
+  params: 336000000
+  license: CC-BY-NC-4.0
+  license_url: https://huggingface.co/SWivid/F5-TTS
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'SWivid F5-TTS v1 Base, the original English and Chinese flow-matching voice-cloning model (a short
+    reference clip and its transcript set the voice). The weights are non-commercial (CC-BY-NC-4.0, inherited from the
+    Emilia training data); the f5-tts code is MIT. Voices here are bolo''s synthetic reference clips, or put
+    <name>.wav + <name>.txt pairs in voices_dir. Needs PyTorch (torch engine plugin, f5-original extra) and, in
+    practice, a GPU.'
+  source_url: https://huggingface.co/SWivid/F5-TTS
+  validated: untested
+  source:
+    repo: SWivid/F5-TTS
+    revision: 84e5a410d9cead4de2f847e7c9369a6440bdfaca
+    include: [F5TTS_v1_Base/model_1250000.safetensors, F5TTS_v1_Base/vocab.txt]
+  options:
+    plugin_install: pip install "bolo-torch[f5-original]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    layout: f5-tts
+    checkpoint: F5TTS_v1_Base/model_1250000.safetensors
+    vocab: F5TTS_v1_Base/vocab.txt
+    first_chunk_chars: 80
+    hardware: {gpu: recommended, vram_gb: 2.5, note: 'slower than real time on a CPU (IndicF5, the same architecture, measured RTF 120 here)'}
+  voices:
+    - {id: heart, name: Heart (English reference clip), language: en-US, gender: f, reference: en-short}
+    - {id: michael, name: Michael (English reference clip), language: en-US, gender: m, reference: en-long}
+- id: indic-speak
+  task: tts
+  engine: plugin:torch
+  kind: indic-speak
+  family: Indic-Speak
+  languages: [as, bn, brx, doi, en, gu, hi, kn, kok, ks, mai, ml, mni, mr, ne, or, pa, sa, sat, sd, ta, te, ur]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 7092489725
+  params: 3000000000
+  license: Indic Open Model License v1.0
+  license_url: https://github.com/Bodhan-AI/bodhan-model-info/blob/main/licenses/indic-open-model-license/v1/Indic_Open_Model_License.md
+  commercial_use: false
+  gated: true
+  features: []
+  description: 'Bodhan AI Indic-Speak: a Llama-3.2-3B speech model writing SNAC codes, decoded by a fine-tuned Vocos,
+    for 22 Indian languages and English (13 production, 10 preview), built for teaching (STEM text, code-mixed
+    sentences); two voices per language, voice ids <speaker> or <speaker>:<STYLE>. Commercial use is conditional:
+    self-hosting is allowed, but serving it as an API for others needs Bodhan AI''s written approval (except
+    non-profit, government and academic users), derivatives keep the licence, a separate licence is needed above
+    the licence''s size thresholds, and there is a use policy (no voice clones of real people without consent, no
+    robocalls). Gated: accept the conditions on the model page and set HF_TOKEN. Runs the repository''s own
+    inference.py; needs PyTorch (torch engine plugin, indic-speak extra) and, in practice, a GPU.'
+  source_url: https://huggingface.co/bodhan-ai/indic-speak
+  validated: untested
+  source:
+    repo: bodhan-ai/indic-speak
+    revision: 76e0814f189321efe550011850cd288dae366aad
+    exclude: [banner.png, 'vocos/__pycache__/*', .gitattributes]
+  options:
+    plugin_install: pip install "bolo-torch[indic-speak]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    first_chunk_chars: 80
+    hardware: {gpu: recommended, vram_gb: 8.0, note: 'approximate: 3 B parameters in bfloat16 plus the decoder'}
+  voices:
+    - {id: ankur, name: Ankur, language: as-IN}
+    - {id: prastuti, name: Prastuti, language: as-IN}
+    - {id: sourav, name: Sourav, language: bn-IN}
+    - {id: ishita, name: Ishita, language: bn-IN}
+    - {id: gwrbw, name: Gwrbw, language: brx-IN}
+    - {id: sansuma, name: Sansuma, language: brx-IN}
+    - {id: sham, name: Sham, language: doi-IN}
+    - {id: preeti, name: Preeti, language: doi-IN}
+    - {id: parth, name: Parth, language: gu-IN}
+    - {id: dhara, name: Dhara, language: gu-IN}
+    - {id: amit, name: Amit, language: hi-IN}
+    - {id: kavya, name: Kavya, language: hi-IN}
+    - {id: adarsh, name: Adarsh, language: kn-IN}
+    - {id: deepika, name: Deepika, language: kn-IN}
+    - {id: ishfaq, name: Ishfaq, language: ks-IN}
+    - {id: zoon, name: Zoon, language: ks-IN}
+    - {id: sandeep, name: Sandeep, language: kok-IN}
+    - {id: anjali, name: Anjali, language: kok-IN}
+    - {id: madhukar, name: Madhukar, language: mai-IN}
+    - {id: vaidehi, name: Vaidehi, language: mai-IN}
+    - {id: kiran, name: Kiran, language: ml-IN}
+    - {id: lakshmi, name: Lakshmi, language: ml-IN}
+    - {id: chaoba, name: Chaoba, language: mni-IN}
+    - {id: thoibi, name: Thoibi, language: mni-IN}
+    - {id: chinmay, name: Chinmay, language: mr-IN}
+    - {id: anagha, name: Anagha, language: mr-IN}
+    - {id: sagar, name: Sagar, language: ne-IN}
+    - {id: srijana, name: Srijana, language: ne-IN}
+    - {id: akash, name: Akash, language: or-IN}
+    - {id: itishree, name: Itishree, language: or-IN}
+    - {id: manpreet, name: Manpreet, language: pa-IN}
+    - {id: kaur, name: Kaur, language: pa-IN}
+    - {id: aryaman, name: Aryaman, language: sa-IN}
+    - {id: bharati, name: Bharati, language: sa-IN}
+    - {id: sibu, name: Sibu, language: sat-IN}
+    - {id: phulmani, name: Phulmani, language: sat-IN}
+    - {id: rano, name: Rano, language: sd-IN}
+    - {id: moomal, name: Moomal, language: sd-IN}
+    - {id: arun, name: Arun, language: ta-IN}
+    - {id: anitha, name: Anitha, language: ta-IN}
+    - {id: vamsi, name: Vamsi, language: te-IN}
+    - {id: sravani, name: Sravani, language: te-IN}
+    - {id: zaid, name: Zaid, language: ur-IN}
+    - {id: saba, name: Saba, language: ur-IN}
+- id: spark-tts-0.5b
+  task: tts
+  engine: plugin:torch
+  kind: spark-tts
+  family: Spark-TTS
+  languages: [en, zh]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 3945426224
+  params: 500000000
+  license: CC-BY-NC-SA-4.0
+  license_url: https://huggingface.co/SparkAudio/Spark-TTS-0.5B
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'SparkAudio Spark-TTS 0.5B (Qwen2.5-0.5B writing BiCodec tokens), English and Chinese, voice cloning
+    and controllable voice creation. Non-commercial, share-alike weights. Not runnable yet: no runtime bolo can use runs it.
+    llama.cpp and audio.cpp have no Spark-TTS family (the GGUF conversions on the Hub hold only the language model,
+    not the BiCodec decoder), and the reference code (github.com/SparkAudio/Spark-TTS) is not a package bolo-torch
+    can depend on.'
+  source_url: https://huggingface.co/SparkAudio/Spark-TTS-0.5B
+  validated: untested
+  source:
+    repo: SparkAudio/Spark-TTS-0.5B
+    revision: 642071559bfc6346c2359d19dcb6be3f9dd8a05d
+    exclude: ['src/*', .gitattributes]
+  options:
+    plugin_install: not supported by bolo-torch yet (no packaged inference code)
+- id: maskgct
+  task: tts
+  engine: plugin:torch
+  kind: maskgct
+  family: MaskGCT
+  languages: [en, zh, ja, ko, fr, de]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 6581023757
+  license: CC-BY-NC-4.0
+  license_url: https://huggingface.co/amphion/MaskGCT
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'Amphion MaskGCT: non-autoregressive masked generative codec TTS (text-to-semantic and
+    semantic-to-acoustic models, 6.6 GB) with zero-shot voice cloning in six languages. Non-commercial weights.
+    Not runnable yet: no ggml or ONNX runtime has it, and its inference code lives in the Amphion repository (it also needs
+    facebook/w2v-bert-2.0 and an eSpeak-based phonemiser), which is not a package bolo-torch can depend on; the
+    maskgct package on PyPI is a third-party GPL-3.0 wrapper.'
+  source_url: https://huggingface.co/amphion/MaskGCT
+  validated: untested
+  source:
+    repo: amphion/MaskGCT
+    revision: 265c6cef07625665d0c28d2faafb1415562379dc
+    exclude: [s2a_model/s2a_model_1layer/*, .gitattributes]
+  options:
+    plugin_install: not supported by bolo-torch yet (no packaged inference code)
+- id: diarizen-wavlm-large-s80-md-v2
+  task: diarization
+  engine: plugin:torch
+  kind: diarizen
+  family: DiariZen
+  languages: []
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 278346859
+  license: CC-BY-NC-4.0 (segmentation) + CC-BY-4.0 (PLDA)
+  license_url: https://huggingface.co/BUT-FIT/diarizen-wavlm-large-s80-md-v2
+  commercial_use: false
+  gated: false
+  features: []
+  description: 'BUT-FIT DiariZen (v2): end-to-end neural diarization on a pruned WavLM Large with Conformer layers (up
+    to four overlapping speakers), then speaker embeddings and VBx clustering, built on pyannote. The model card reports
+    DER 13.9 % on AMI against 22.4 % for pyannote 3.1 (collar 0). Non-commercial (CC-BY-NC-4.0; the PLDA files are
+    CC-BY-4.0). Not runnable yet: bolo''s engine plugins cannot serve diarization models yet, and the community ONNX export
+    (christopherthompson81/diarizen_onnx, CC-BY-NC-4.0) needs a VBx/PLDA clustering pipeline that sherpa-onnx does not
+    have.'
+  source_url: https://huggingface.co/BUT-FIT/diarizen-wavlm-large-s80-md-v2
+  validated: untested
+  source:
+    repo: BUT-FIT/diarizen-wavlm-large-s80-md-v2
+    revision: 027b3e221b9d81dce2be794084f1dbd3ba2da403
+    exclude: [.gitattributes]
+  options:
+    plugin_install: not supported by bolo-torch yet (the plugin protocol has no diarization request)

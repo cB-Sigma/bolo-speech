@@ -105,9 +105,10 @@ messages before its final reply. Replies to different requests may interleave.
 | --- | --- | --- |
 | `hello` | `protocol` (highest version bolo speaks) | `protocol` (version used), `name`, `version`, `kinds` |
 | `health` | - | `rss_mb` |
-| `load` | `model`, `kind`, `task`, `path`, `options`, `threads`, `device` | `handle`, `sample_rate`, `info` (`voices`, `languages`, `max_batch`, `supports_translate`, `supports_word_timestamps`) |
+| `load` | `model`, `kind`, `task`, `path`, `options`, `threads`, `device` | `handle`, `sample_rate`, `info` (`voices`, `languages`, `max_batch`, `supports_translate`, `supports_word_timestamps`, `speaker_conditioned`) |
 | `unload` | `handle` | - |
 | `transcribe` | `handle`, `requests: [{n, language, task, prompt, word_timestamps, temperature, hotwords}]` + the audio of all requests, concatenated | `results: [{text, language, segments: [{start, end, text, words}], words: [{w, t0, t1}]}]` |
+| `speakers` | `handle`, `n`, `language`, `task`, `prompt`, `word_timestamps`, `temperature`, `frame_s`, `frames`, `speakers` + `n` audio samples, then the speaker activity (`frames` x `speakers` float32, frame by frame) | `results`: one per speaker, as for `transcribe`, times from the start of the audio |
 | `synthesize` | `handle`, `text`, `voice`, `speed` | chunks, then `sample_rate`, `chunks`, `cancelled` |
 | `separate` | `handle` + the mixture (16 kHz) | `tracks` (count) + the tracks, concatenated, equal length |
 | `enrol` | `handle`, `key` + a voice sample (16 kHz) | - |
@@ -119,12 +120,22 @@ messages before its final reply. Replies to different requests may interleave.
 A separation model's `load` reply carries `info.mode` (`"blind"`: answers `separate`; `"target"`:
 answers `enrol` / `extract` / `release`) and `info.min_sample_s`.
 
+A speech-recognition model whose `load` reply says `info.speaker_conditioned: true` is a
+diarization-conditioned (target-speaker) recogniser. For a diarized transcription bolo then does not
+cut the recording at speaker turns: it diarizes, and sends the whole recording once with `speakers`,
+together with per-frame speaker activity (column `k` is speaker `k` of the diarization, values 0..1,
+`frame_s` seconds per row). The plugin answers with one result per speaker. bolo sends `speakers`
+only to models that announce it, so older plugins are unaffected; the protocol version stays 1. In a
+plugin built on bolo's SDK, an `STTModel` with `speaker_conditioned = True` implements
+`transcribe_speakers(SpeakerRequest) -> list[STTResult]`.
+
 Errors: `error.code` `model_gated` becomes bolo's `401 model_gated` and `invalid_request` its
 `400 invalid_request` (so a gated download inside the plugin reaches the client as such); any other
 code is a `503 engine_unavailable` naming the code. bolo's SDK reports an exception by its class
 name; bolo-torch sends the code of its own errors instead.
 
-Compatibility: new optional members can appear within version 1; an incompatible change gets
+Compatibility: new optional members, and new ops that bolo sends only to models announcing them in
+`info` (`speakers`), can appear within version 1; an incompatible change gets
 version 2, and bolo will keep speaking version 1 to plugins that answer `hello` with 1. The exact
 definitions are in `server/src/bolo/plugin/protocol.py`.
 
@@ -143,11 +154,13 @@ definitions are in `server/src/bolo/plugin/protocol.py`.
 | `sepformer-whamr16k` | separation (blind, 2 speakers, 16 kHz) | `sepformer` | Apache-2.0, WSJ0-derived data | no | RTF 3.7 |
 | `sepformer-whamr` | separation (blind, 2 speakers, 8 kHz) | `sepformer` | Apache-2.0, WSJ0-derived data | no | RTF 1.4 |
 | `pixit-ami` (pyannote PixIT) | separation with diarization | `pyannote` | MIT | yes (two repositories) | RTF 5.7; little gain on a synthetic mix |
+| `dicow-v3.3` (BUT-FIT DiCoW) | STT, diarization-conditioned (speaker request) | `dicow` | CC-BY-4.0 | no | RTF 0.45 with Nemotron diarization (bf16, AMX); AMI cpWER 69 → 26 % |
+| `se-dicow` (BUT-FIT SE-DiCoW) | STT, diarization-conditioned, self-enrolment | `dicow` | Apache-2.0 | no | RTF 0.59 with Nemotron diarization (bf16); AMI cpWER 69 → 25 % |
 | `sravaani-1.0`, `indicconformer-600m-official` | STT | - | MIT | yes | not implemented in bolo-torch 0.1.0 |
 
 Install (CPU): `pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu`, then
-`pip install "bolo-torch[parler,sepformer]"` with the extras you need. `parler` and `pyannote` need
-different `transformers` versions; run PixIT from a second environment with
+`pip install "bolo-torch[parler,sepformer]"` with the extras you need. `parler` needs a
+different `transformers` version from `pyannote` and `dicow`; run PixIT from a second environment with
 `BOLO_PLUGINS="torch=/path/to/env/bin/python -m bolo_torch"`. GPUs: set `BOLO_TORCH_DEVICE=auto`
 (bolo's own `device` setting defaults to `cpu`); no GPU was used in testing. Details, measurements
 and licences: [plugins/bolo-torch/README.md](../plugins/bolo-torch/README.md).

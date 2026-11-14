@@ -1,0 +1,798 @@
+{
+ "what": "Diarization-conditioned recognition in bolo: BUT-FIT DiCoW v3.3 and SE-DiCoW in the bolo-torch plugin (plugin request 'speakers'), against bolo's turn-by-turn diarized transcription; plus a check of the plugin's conditioning against BUT's reference inference pipeline",
+ "date": "2026-11-14",
+ "conditions": "4 vCPU Xeon @ 2.1 GHz with AMX / AVX512-BF16, no GPU; bolo's models and the plugin at 2 threads; DiCoW in bfloat16 (the plugin's default on such CPUs); torch 2.15.0+cpu, transformers 4.55.0, Python 3.12 (plugin), bolo's own venv for the server (onnxruntime 1.31.1, sherpa-onnx 2.0.1). Accuracy runs partly overlapped with other evaluation jobs of this study; speeds come from a separate run on the idle machine",
+ "models": {
+  "dicow-v3.3": "BUT-FIT/DiCoW_v3_3@c34b64d9a9c5148c65fd355bb188d60343a6b44f (model.safetensors sha256 73dee45746bb4a6e...)",
+  "se-dicow": "BUT-FIT/SE-DiCoW@470fce9ffff844dd53a27751cdf6c6df9efecb39",
+  "diarizers": "nemotron-3-diarization as shipped (threshold 0.5, gaps under 1 s closed); pyannote-3.0-eres2net defaults",
+  "baseline_recogniser": "whisper-base (sherpa-onnx int8); faster-whisper-tiny-hindi for the Hindi pair"
+ },
+ "systems": {
+  "b0": "pyannote-3.0-eres2net + whisper-base (bolo default, turn by turn)",
+  "d1": "nemotron-3-diarization + whisper-base (turn by turn)",
+  "t1": "nemotron-3-diarization + dicow-v3.3 (conditioned on the turns)",
+  "t1p": "nemotron-3-diarization + dicow-v3.3 (conditioned on Nemotron's probabilities)",
+  "t1b": "pyannote-3.0-eres2net + dicow-v3.3 (conditioned on the clustering turns)",
+  "t2": "nemotron-3-diarization + se-dicow (conditioned on the turns)"
+ },
+ "data": {
+  "ami": "the 24 AMI SDM (Array1-01) excerpts of 45 s of docs/measurements/diarization-nemotron.json (test meetings ES2004a, IS1009a, TS3003a, EN2002a; 12-65 % overlap; CC BY 4.0), re-cut from the meetings",
+  "synthetic": "bolo's 44 two-voice mixes (11 voice pairs: 4 cross-gender English, 3 same-gender female, 3 same-gender male, 1 Hindi; 2.5 s and 5 s overlap at 0 dB; 16 kHz and 8 kHz G.711 mu-law), rebuilt with the same texts, voices and layout (Kokoro TTS is not bit-exact between runs), every system run on exactly these files"
+ },
+ "scoring": "MeetEval 0.4.3 cp_word_error_rate, Whisper EnglishTextNormalizer after html.unescape for every system (Hindi: NFC, punctuation removed), pooled over files; relative change and 95 % interval by paired bootstrap over files (2000 resamples). tcpWER: MeetEval tcpwer, collar 5 s, AMI word times as reference. The 'rtf' values inside the cpwer_* sections come from the accuracy runs (some overlapped other jobs and include the first model load); the speed_* sections are the timing figures",
+ "validation_against_reference": {
+  "reference": "BUTSpeechFIT/DiCoW pipeline.py (main, fetched 2026-11-13): get_diarization_mask, get_stno_mask, _process_enrollment_sample, then model.generate on the same features (long-form, return_timestamps) and tokenizer.batch_decode",
+  "input": "Nemotron turns of ES2004a_00355 (4 speakers) and IS1009a_00275 (2 speakers)",
+  "dicow-v3.3": {
+   "mask_values_differing": 0,
+   "mask_frames_compared": 13500,
+   "speaker_streams_identical": "6 of 6"
+  },
+  "se-dicow": {
+   "mask_values_differing": 0,
+   "enrolment_windows_identical": "6 of 6",
+   "speaker_streams_identical": "6 of 6"
+  },
+  "note": "a first version put the turns on a 10 ms grid: 6 and 22 mask frames differed by one 20 ms frame at turn edges and 2 of 6 speaker transcripts differed slightly; the shipped 20 ms grid with the reference's rounding (t * 50) makes them identical"
+ },
+ "cpwer_ami": {
+  "AMI excerpts": {
+   "files": 24,
+   "b0": {
+    "cpwer": 69.43,
+    "rtf": 0.31
+   },
+   "d1": {
+    "cpwer": 61.22,
+    "rtf": 0.172,
+    "relative_to_b0": -11.8,
+    "ci95": [
+     -16.2,
+     -7.9
+    ],
+    "files_better": 20,
+    "files_worse": 3,
+    "worst_file_change_pt": 1.3
+   },
+   "t1": {
+    "cpwer": 26.03,
+    "rtf": 0.707,
+    "relative_to_b0": -62.5,
+    "ci95": [
+     -66.5,
+     -58.7
+    ],
+    "files_better": 24,
+    "files_worse": 0,
+    "worst_file_change_pt": -24.0
+   },
+   "t1p": {
+    "cpwer": 26.4,
+    "rtf": 0.557,
+    "relative_to_b0": -62.0,
+    "ci95": [
+     -65.9,
+     -57.8
+    ],
+    "files_better": 24,
+    "files_worse": 0,
+    "worst_file_change_pt": -24.8
+   },
+   "t1b": {
+    "cpwer": 47.62,
+    "rtf": 0.637,
+    "relative_to_b0": -31.4,
+    "ci95": [
+     -39.0,
+     -24.4
+    ],
+    "files_better": 23,
+    "files_worse": 0,
+    "worst_file_change_pt": 0.0
+   }
+  }
+ },
+ "cpwer_ami_probabilities_vs_turns": {
+  "AMI excerpts": {
+   "files": 24,
+   "t1": {
+    "cpwer": 26.03,
+    "rtf": 0.707
+   },
+   "t1p": {
+    "cpwer": 26.4,
+    "rtf": 0.557,
+    "relative_to_t1": 1.4,
+    "ci95": [
+     -2.7,
+     5.9
+    ],
+    "files_better": 9,
+    "files_worse": 11,
+    "worst_file_change_pt": 7.2
+   }
+  }
+ },
+ "tcpwer_ami": {
+  "b0": 71.64,
+  "d1": 62.93,
+  "t1": 27.24,
+  "t1p": 27.66,
+  "t1b": 49.72
+ },
+ "cpwer_synthetic": {
+  "synthetic 16 kHz Hindi": {
+   "files": 2,
+   "b0": {
+    "cpwer": 23.86,
+    "rtf": 0.353
+   },
+   "d1": {
+    "cpwer": 27.27,
+    "rtf": 0.084,
+    "relative_to_b0": 14.3,
+    "ci95": [
+     3.6,
+     35.7
+    ],
+    "files_better": 0,
+    "files_worse": 2,
+    "worst_file_change_pt": 5.7
+   },
+   "t1": {
+    "cpwer": 14.77,
+    "rtf": 0.567,
+    "relative_to_b0": -38.1,
+    "ci95": [
+     -53.6,
+     -7.1
+    ],
+    "files_better": 2,
+    "files_worse": 0,
+    "worst_file_change_pt": -1.1
+   }
+  },
+  "synthetic 16 kHz cross-gender": {
+   "files": 8,
+   "b0": {
+    "cpwer": 19.95,
+    "rtf": 0.319
+   },
+   "d1": {
+    "cpwer": 24.4,
+    "rtf": 0.168,
+    "relative_to_b0": 22.3,
+    "ci95": [
+     1.7,
+     49.0
+    ],
+    "files_better": 1,
+    "files_worse": 5,
+    "worst_file_change_pt": 21.5
+   },
+   "t1": {
+    "cpwer": 5.05,
+    "rtf": 0.472,
+    "relative_to_b0": -74.7,
+    "ci95": [
+     -90.8,
+     -54.0
+    ],
+    "files_better": 7,
+    "files_worse": 0,
+    "worst_file_change_pt": 0.0
+   }
+  },
+  "synthetic 16 kHz same-gender female": {
+   "files": 6,
+   "b0": {
+    "cpwer": 68.7,
+    "rtf": 0.308
+   },
+   "d1": {
+    "cpwer": 19.26,
+    "rtf": 0.156,
+    "relative_to_b0": -72.0,
+    "ci95": [
+     -83.0,
+     -46.4
+    ],
+    "files_better": 4,
+    "files_worse": 1,
+    "worst_file_change_pt": 2.9
+   },
+   "t1": {
+    "cpwer": 7.87,
+    "rtf": 0.379,
+    "relative_to_b0": -88.6,
+    "ci95": [
+     -95.4,
+     -70.1
+    ],
+    "files_better": 5,
+    "files_worse": 1,
+    "worst_file_change_pt": 2.8
+   }
+  },
+  "synthetic 16 kHz same-gender male": {
+   "files": 6,
+   "b0": {
+    "cpwer": 50.4,
+    "rtf": 0.285
+   },
+   "d1": {
+    "cpwer": 21.19,
+    "rtf": 0.146,
+    "relative_to_b0": -58.0,
+    "ci95": [
+     -72.8,
+     -31.7
+    ],
+    "files_better": 5,
+    "files_worse": 1,
+    "worst_file_change_pt": 2.9
+   },
+   "t1": {
+    "cpwer": 6.26,
+    "rtf": 0.36,
+    "relative_to_b0": -87.6,
+    "ci95": [
+     -94.6,
+     -80.1
+    ],
+    "files_better": 6,
+    "files_worse": 0,
+    "worst_file_change_pt": -19.8
+   }
+  },
+  "synthetic 8 kHz Hindi": {
+   "files": 2,
+   "b0": {
+    "cpwer": 59.09,
+    "rtf": 0.201
+   },
+   "d1": {
+    "cpwer": 39.2,
+    "rtf": 0.081,
+    "relative_to_b0": -33.7,
+    "ci95": [
+     -58.2,
+     10.8
+    ],
+    "files_better": 1,
+    "files_worse": 1,
+    "worst_file_change_pt": 4.5
+   },
+   "t1": {
+    "cpwer": 26.14,
+    "rtf": 0.551,
+    "relative_to_b0": -55.8,
+    "ci95": [
+     -67.2,
+     -35.1
+    ],
+    "files_better": 2,
+    "files_worse": 0,
+    "worst_file_change_pt": -14.8
+   }
+  },
+  "synthetic 8 kHz cross-gender": {
+   "files": 8,
+   "b0": {
+    "cpwer": 46.63,
+    "rtf": 0.366
+   },
+   "d1": {
+    "cpwer": 30.05,
+    "rtf": 0.201,
+    "relative_to_b0": -35.6,
+    "ci95": [
+     -54.5,
+     -5.9
+    ],
+    "files_better": 6,
+    "files_worse": 1,
+    "worst_file_change_pt": 16.8
+   },
+   "t1": {
+    "cpwer": 3.85,
+    "rtf": 0.972,
+    "relative_to_b0": -91.8,
+    "ci95": [
+     -95.0,
+     -87.4
+    ],
+    "files_better": 8,
+    "files_worse": 0,
+    "worst_file_change_pt": -18.6
+   }
+  },
+  "synthetic 8 kHz same-gender female": {
+   "files": 6,
+   "b0": {
+    "cpwer": 84.27,
+    "rtf": 0.296
+   },
+   "d1": {
+    "cpwer": 24.4,
+    "rtf": 0.165,
+    "relative_to_b0": -71.0,
+    "ci95": [
+     -80.1,
+     -60.1
+    ],
+    "files_better": 6,
+    "files_worse": 0,
+    "worst_file_change_pt": -42.1
+   },
+   "t1": {
+    "cpwer": 3.53,
+    "rtf": 0.378,
+    "relative_to_b0": -95.8,
+    "ci95": [
+     -98.3,
+     -93.1
+    ],
+    "files_better": 6,
+    "files_worse": 0,
+    "worst_file_change_pt": -72.8
+   }
+  },
+  "synthetic 8 kHz same-gender male": {
+   "files": 6,
+   "b0": {
+    "cpwer": 84.75,
+    "rtf": 0.281
+   },
+   "d1": {
+    "cpwer": 27.29,
+    "rtf": 0.149,
+    "relative_to_b0": -67.8,
+    "ci95": [
+     -75.9,
+     -59.3
+    ],
+    "files_better": 6,
+    "files_worse": 0,
+    "worst_file_change_pt": -42.1
+   },
+   "t1": {
+    "cpwer": 6.9,
+    "rtf": 0.365,
+    "relative_to_b0": -91.9,
+    "ci95": [
+     -94.9,
+     -88.7
+    ],
+    "files_better": 6,
+    "files_worse": 0,
+    "worst_file_change_pt": -67.3
+   }
+  },
+  "synthetic (all)": {
+   "files": 44,
+   "b0": {
+    "cpwer": 55.35,
+    "rtf": 0.309
+   },
+   "d1": {
+    "cpwer": 25.38,
+    "rtf": 0.159,
+    "relative_to_b0": -54.1,
+    "ci95": [
+     -62.8,
+     -43.7
+    ],
+    "files_better": 29,
+    "files_worse": 11,
+    "worst_file_change_pt": 21.5
+   },
+   "t1": {
+    "cpwer": 6.63,
+    "rtf": 0.515,
+    "relative_to_b0": -88.0,
+    "ci95": [
+     -91.3,
+     -83.7
+    ],
+    "files_better": 42,
+    "files_worse": 1,
+    "worst_file_change_pt": 2.8
+   }
+  }
+ },
+ "speed_idle_2_threads": {
+  "b0": {
+   "rtf": 0.245,
+   "diarize_rtf": 0.13,
+   "decode_rtf": 0.099,
+   "files": [
+    "EN2002a_01010",
+    "ES2004a_00355",
+    "IS1009a_00275",
+    "TS3003a_00105"
+   ]
+  },
+  "d1": {
+   "rtf": 0.126,
+   "diarize_rtf": 0.03,
+   "decode_rtf": 0.096,
+   "files": [
+    "EN2002a_01010",
+    "ES2004a_00355",
+    "IS1009a_00275",
+    "TS3003a_00105"
+   ]
+  },
+  "t1": {
+   "rtf": 0.453,
+   "diarize_rtf": 0.03,
+   "decode_rtf": 0.423,
+   "files": [
+    "EN2002a_01010",
+    "ES2004a_00355",
+    "IS1009a_00275",
+    "TS3003a_00105"
+   ]
+  }
+ },
+ "speed_idle_4_threads": {
+  "t1": {
+   "rtf": 0.26,
+   "diarize_rtf": 0.018,
+   "decode_rtf": 0.243,
+   "files": [
+    "EN2002a_01010",
+    "ES2004a_00355",
+    "IS1009a_00275",
+    "TS3003a_00105"
+   ]
+  }
+ },
+ "speed_float32_2_threads": {
+  "t1": {
+   "rtf": 1.41,
+   "diarize_rtf": 0.03,
+   "decode_rtf": 1.379,
+   "files": [
+    "ES2004a_00355",
+    "IS1009a_00275"
+   ]
+  },
+  "bfloat16_same_files_rtf": 0.456,
+  "note": "float32 is the default on CPUs without AMX / AVX512-BF16; cpWER on these files 29.6 % (float32) vs 29.4 % (bfloat16)"
+ },
+ "load_s": "about 4.5 s for plugin start + model load with the files in the page cache",
+ "not_measured": [
+  "GPU",
+  "whole meetings (only 45 s excerpts and ~30 s mixes)",
+  "real telephone calls",
+  "single-speaker accuracy against plain Whisper large-v3-turbo",
+  "Hindi beyond one synthetic voice pair",
+  "word timestamps (not produced)"
+ ],
+ "cpwer_se_dicow": {
+  "ami": {
+   "AMI excerpts": {
+    "files": 24,
+    "b0": {
+     "cpwer": 69.43,
+     "rtf": 0.31
+    },
+    "t1": {
+     "cpwer": 26.03,
+     "rtf": 0.707,
+     "relative_to_b0": -62.5,
+     "ci95": [
+      -66.4,
+      -58.9
+     ],
+     "files_better": 24,
+     "files_worse": 0,
+     "worst_file_change_pt": -24.0
+    },
+    "t2": {
+     "cpwer": 25.33,
+     "rtf": 0.721,
+     "relative_to_b0": -63.5,
+     "ci95": [
+      -67.2,
+      -60.2
+     ],
+     "files_better": 24,
+     "files_worse": 0,
+     "worst_file_change_pt": -25.5
+    }
+   }
+  },
+  "synthetic": {
+   "synthetic 16 kHz Hindi": {
+    "files": 2,
+    "b0": {
+     "cpwer": 23.86,
+     "rtf": 0.353
+    },
+    "t1": {
+     "cpwer": 14.77,
+     "rtf": 0.567,
+     "relative_to_b0": -38.1,
+     "ci95": [
+      -53.6,
+      -7.1
+     ],
+     "files_better": 2,
+     "files_worse": 0,
+     "worst_file_change_pt": -1.1
+    },
+    "t2": {
+     "cpwer": 78.41,
+     "rtf": 0.888,
+     "relative_to_b0": 228.6,
+     "ci95": [
+      -57.1,
+      800.0
+     ],
+     "files_better": 1,
+     "files_worse": 1,
+     "worst_file_change_pt": 127.3
+    }
+   },
+   "synthetic 16 kHz cross-gender": {
+    "files": 8,
+    "b0": {
+     "cpwer": 19.95,
+     "rtf": 0.319
+    },
+    "t1": {
+     "cpwer": 5.05,
+     "rtf": 0.472,
+     "relative_to_b0": -74.7,
+     "ci95": [
+      -90.7,
+      -55.7
+     ],
+     "files_better": 7,
+     "files_worse": 0,
+     "worst_file_change_pt": 0.0
+    },
+    "t2": {
+     "cpwer": 3.12,
+     "rtf": 0.463,
+     "relative_to_b0": -84.3,
+     "ci95": [
+      -92.6,
+      -75.4
+     ],
+     "files_better": 8,
+     "files_worse": 0,
+     "worst_file_change_pt": -6.6
+    }
+   },
+   "synthetic 16 kHz same-gender female": {
+    "files": 6,
+    "b0": {
+     "cpwer": 68.7,
+     "rtf": 0.308
+    },
+    "t1": {
+     "cpwer": 7.87,
+     "rtf": 0.379,
+     "relative_to_b0": -88.6,
+     "ci95": [
+      -95.3,
+      -70.1
+     ],
+     "files_better": 5,
+     "files_worse": 1,
+     "worst_file_change_pt": 2.8
+    },
+    "t2": {
+     "cpwer": 3.05,
+     "rtf": 0.498,
+     "relative_to_b0": -95.6,
+     "ci95": [
+      -98.5,
+      -90.2
+     ],
+     "files_better": 6,
+     "files_worse": 0,
+     "worst_file_change_pt": -8.5
+    }
+   },
+   "synthetic 16 kHz same-gender male": {
+    "files": 6,
+    "b0": {
+     "cpwer": 50.4,
+     "rtf": 0.285
+    },
+    "t1": {
+     "cpwer": 6.26,
+     "rtf": 0.36,
+     "relative_to_b0": -87.6,
+     "ci95": [
+      -94.5,
+      -80.2
+     ],
+     "files_better": 6,
+     "files_worse": 0,
+     "worst_file_change_pt": -19.8
+    },
+    "t2": {
+     "cpwer": 4.82,
+     "rtf": 0.488,
+     "relative_to_b0": -90.4,
+     "ci95": [
+      -96.5,
+      -83.3
+     ],
+     "files_better": 6,
+     "files_worse": 0,
+     "worst_file_change_pt": -19.8
+    }
+   },
+   "synthetic 8 kHz Hindi": {
+    "files": 2,
+    "b0": {
+     "cpwer": 59.09,
+     "rtf": 0.201
+    },
+    "t1": {
+     "cpwer": 26.14,
+     "rtf": 0.551,
+     "relative_to_b0": -55.8,
+     "ci95": [
+      -67.2,
+      -35.1
+     ],
+     "files_better": 2,
+     "files_worse": 0,
+     "worst_file_change_pt": -14.8
+    },
+    "t2": {
+     "cpwer": 27.27,
+     "rtf": 0.652,
+     "relative_to_b0": -53.8,
+     "ci95": [
+      -62.7,
+      -37.8
+     ],
+     "files_better": 2,
+     "files_worse": 0,
+     "worst_file_change_pt": -15.9
+    }
+   },
+   "synthetic 8 kHz cross-gender": {
+    "files": 8,
+    "b0": {
+     "cpwer": 46.63,
+     "rtf": 0.366
+    },
+    "t1": {
+     "cpwer": 3.85,
+     "rtf": 0.972,
+     "relative_to_b0": -91.8,
+     "ci95": [
+      -95.0,
+      -87.4
+     ],
+     "files_better": 8,
+     "files_worse": 0,
+     "worst_file_change_pt": -18.6
+    },
+    "t2": {
+     "cpwer": 3.97,
+     "rtf": 0.455,
+     "relative_to_b0": -91.5,
+     "ci95": [
+      -94.8,
+      -87.8
+     ],
+     "files_better": 8,
+     "files_worse": 0,
+     "worst_file_change_pt": -18.6
+    }
+   },
+   "synthetic 8 kHz same-gender female": {
+    "files": 6,
+    "b0": {
+     "cpwer": 84.27,
+     "rtf": 0.296
+    },
+    "t1": {
+     "cpwer": 3.53,
+     "rtf": 0.378,
+     "relative_to_b0": -95.8,
+     "ci95": [
+      -98.3,
+      -93.1
+     ],
+     "files_better": 6,
+     "files_worse": 0,
+     "worst_file_change_pt": -72.8
+    },
+    "t2": {
+     "cpwer": 4.01,
+     "rtf": 0.495,
+     "relative_to_b0": -95.2,
+     "ci95": [
+      -97.5,
+      -92.9
+     ],
+     "files_better": 6,
+     "files_worse": 0,
+     "worst_file_change_pt": -69.9
+    }
+   },
+   "synthetic 8 kHz same-gender male": {
+    "files": 6,
+    "b0": {
+     "cpwer": 84.75,
+     "rtf": 0.281
+    },
+    "t1": {
+     "cpwer": 6.9,
+     "rtf": 0.365,
+     "relative_to_b0": -91.9,
+     "ci95": [
+      -95.1,
+      -88.8
+     ],
+     "files_better": 6,
+     "files_worse": 0,
+     "worst_file_change_pt": -67.3
+    },
+    "t2": {
+     "cpwer": 5.78,
+     "rtf": 0.494,
+     "relative_to_b0": -93.2,
+     "ci95": [
+      -96.0,
+      -90.2
+     ],
+     "files_better": 6,
+     "files_worse": 0,
+     "worst_file_change_pt": -68.2
+    }
+   },
+   "synthetic (all)": {
+    "files": 44,
+    "b0": {
+     "cpwer": 55.35,
+     "rtf": 0.309
+    },
+    "t1": {
+     "cpwer": 6.63,
+     "rtf": 0.515,
+     "relative_to_b0": -88.0,
+     "ci95": [
+      -91.4,
+      -83.8
+     ],
+     "files_better": 42,
+     "files_worse": 1,
+     "worst_file_change_pt": 2.8
+    },
+    "t2": {
+     "cpwer": 7.87,
+     "rtf": 0.506,
+     "relative_to_b0": -85.8,
+     "ci95": [
+      -93.0,
+      -72.0
+     ],
+     "files_better": 43,
+     "files_worse": 1,
+     "worst_file_change_pt": 127.3
+    }
+   }
+  },
+  "tcpwer_ami": 26.49,
+  "speed_2_threads": {
+   "rtf_four_timing_excerpts": 0.589,
+   "rtf_23_ami_excerpts": 0.719,
+   "note": "from its own accuracy run (machine otherwise idle), not the dedicated timing run"
+  },
+  "failure": "p12_cross_hi_ov2.5_16k: speaker B's stream repeated one word for its last 6 s (greedy decoding, no temperature fallback); that Hindi pair scored 78 % at 16 kHz"
+ }
+}

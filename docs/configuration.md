@@ -53,6 +53,14 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `llm_api_key` | none | `--llm-api-key` | bearer token for that endpoint |
 | `llm_timeout_s` | `120` | | |
 | `llm_instructions` | a short "helpful voice assistant" prompt | | default system prompt of Realtime conversations |
+| `realtime_pipeline` | `cascade` | | what answers a Realtime conversation turn: `cascade` (bolo's STT, then the `llm_*` language model, then bolo's TTS), `audio-llm` (the user's audio goes to an audio-understanding model, `audio_llm_*`; bolo's TTS speaks the answer) or `speech-to-speech` (a speech-to-speech model hears the turn and answers with speech and tool calls, `s2s_*`). A session can pick another one with the bolo extension `session.pipeline`. See voice-agents.md, "Pipelines" |
+| `audio_llm_base_url`, `audio_llm_model`, `audio_llm_api_key` | unset (the `llm_*` values) | | `audio-llm`: a chat-completions endpoint whose model accepts `input_audio`, e.g. a llama-server running Gemma 4 E2B/E4B or Ultravox |
+| `realtime_transcribe_user` | `true` | | `audio-llm` and `speech-to-speech`: also transcribe the user's turns with bolo's STT (transcript events and conversation history), in parallel with the response |
+| `s2s_model` | `lfm3-audio-2b-llamacpp` | | `speech-to-speech`: the catalog model of a llama-server that bolo starts (needs `bolo components install llama-server` or `llama_server_bin`; the model is pulled on first use). LFM Open License: commercial use only below USD 10M yearly revenue |
+| `s2s_server_url` | unset | | `speech-to-speech`: a llama-server you run (`http://host:port`); bolo opens its WebSocket `/v1/realtime`, one upstream session per Realtime session. Nothing is downloaded or started then |
+| `s2s_server_api_key` | unset | | sent as `Authorization: Bearer …` to `s2s_server_url` |
+| `s2s_parallel` | `2` | | sessions the managed server holds at once (`llama-server --parallel`; one slot per session) |
+| `s2s_server_args` | `[]` | | extra command-line arguments for the managed server (bolo adds `-ngl 99` when `device` is not `cpu`) |
 | `allow_component_install` | unset | | whether optional components (eSpeak NG) may be installed through the API. Unset: allowed on a loopback bind or when an API key is set. Never allowed on a non-loopback bind without a key |
 | `preload` | `[]` | `--preload` (repeatable) | models to load at startup; `/readyz` waits for them |
 | `stt_ttl_s`, `tts_ttl_s` | `300` | | unload after this many idle seconds; `-1` never, `0` at once |
@@ -77,6 +85,12 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `log_level` | `info` | `--log-level` | `debug`, `info`, `warning`, `error` |
 | `trace_buffer` | `1000` | | request traces kept in memory |
 | `fake_engine` | `false` | `--fake-engine` | add deterministic test models (development) |
+| `tts_servers` | `[]` | | external TTS servers the operator runs, as `"<model id or runtime>=<url>"`, e.g. `"llama-server=http://127.0.0.1:8080"` (every llama-server model goes there) or `"voxcpm2-audiocpp=http://gpu-box:8080"` (one model). A model id or alias wins over a runtime name. Such a model needs no download and no binary; for audio.cpp the server's config must declare the model under the id in the entry's `options.server_model` (the catalog id). See models.md, "External TTS servers" |
+| `tts_server_api_key` | unset | | sent as `Authorization: Bearer …` to the servers in `tts_servers` (llama-server `--api-key`) |
+| `llama_server_bin`, `audiocpp_server_bin` | unset | | the binary bolo starts for a model whose runtime has no URL in `tts_servers`. Unset: the one `bolo components install llama-server` / `audio.cpp` put in `<data_dir>/components/`, then `llama-server` / `audiocpp_server` on `PATH`. Point it at a CUDA/Vulkan/Metal build to use a GPU |
+| `tts_server_args` | `[]` | | extra command-line arguments for every server bolo starts (e.g. `["-ngl", "99"]` for llama-server; bolo adds `-ngl 99` itself when `device` is not `cpu`) |
+| `tts_server_start_timeout_s` | `300` | | how long a started server may take to answer `GET /health` (loading its model) |
+| `tts_server_timeout_s` | `300` | | longest wait for the next bytes of a synthesis answer |
 
 Four more environment variables are read outside the settings object. `BOLO_UCCHARAN=off` hides an installed
 uccharan (to test the espeak-ng route). For
@@ -110,6 +124,10 @@ memory_budget_mb = 3000
 threads = 4
 max_batch = 8
 max_queue = 32
+
+[tts]
+# a llama-server you run yourself serves every llama-server model; audio.cpp models are started by bolo
+servers = ["llama-server=http://127.0.0.1:8080"]
 ```
 
 Section names are mostly for your own orientation: `[models]`, `[scheduler]`
@@ -146,3 +164,20 @@ A catalog entry (or a custom entry in `<data_dir>/custom.yaml`) may carry
 `options` that override the server-wide values for that model: `threads`,
 `workers`, `max_batch`, `max_chunk_s`, and engine-specific keys such as
 `beam_size` or `compute_type` for faster-whisper.
+
+Orpheus-family voices on llama.cpp (`kind: orpheus-llamacpp`; see models.md,
+"Orpheus-family voices on llama.cpp") read: `prompt_format` (`svara`, `veena`
+or `orpheus`), `temperature`, `top_p`, `repetition_penalty` (defaults: the
+model card's values for the format), `seed`, `eos_tokens`, `max_chars` (longest
+piece of text per generation, 200), `max_new_tokens` (2048), `frames_per_char`
+(the token budget per character of text, 2.0 frames), `stream_frames` (frames
+decoded per streamed chunk, 4), `context_frames` (left context per decode, 3),
+`speaker_field` (`name` or `id`: what a voice is called in the prompt when it has no `speaker`), `decoder_threads` (onnxruntime threads of the SNAC decoder, at most 2 by
+default), `request` (extra `/completion` fields), `snac` (the decoder file:
+`file`, `url`, `sha256`, `size`) and `snac_path` (an absolute path to another
+SNAC decoder ONNX file, which wins). The llama-server options of the
+`tts-server` engine apply too (`model_file`, `server_args`, the settings
+`tts_servers`, `llama_server_bin`, `tts_server_args`). Note that
+`tts_servers = ["llama-server=…"]` sends these models to that server as well:
+name an Orpheus model by its id (`"svara-tts-v1-llamacpp=http://…"`) when your
+llama-server runs another model.

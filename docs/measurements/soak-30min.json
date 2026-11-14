@@ -1,6 +1,6 @@
 {
  "what": "30-minute mixed load against bolo serve (defaults, 4 threads): each client loops over a random choice of moonshine-tiny-en STT (3 s clip), whisper-base STT (11.8 s English or 4.1 s Hindi clip), piper-en-us-amy-low TTS (mp3) and kitten-nano-0.8-int8 TTS (wav); 1, 2, 4, 6, 8, 8 concurrent clients in six 5-minute stages; server RSS, threads and open files sampled every 10 s",
- "conditions": "shared 4-vCPU x86_64, no GPU; another builder's jobs kept the 1-minute load average at 6 to 13 throughout (load1 in the samples), so latencies are far above an idle machine's; uccharan phonemes for both voices",
+ "conditions": "shared 4-vCPU x86_64, no GPU; other jobs on the machine kept the 1-minute load average at 6 to 13 throughout (load1 in the samples), so latencies are far above an idle machine's; uccharan phonemes for both voices",
  "date": "2026-11-13",
  "requests": 1494,
  "errors": [

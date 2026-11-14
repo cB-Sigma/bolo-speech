@@ -19,6 +19,7 @@ BUILTIN_ENGINES: dict[str, str] = {
     "kokoro-onnx": "bolo.engines.kokoro_onnx:KokoroOnnxEngine",
     "whisper.cpp": "bolo.engines.whispercpp:WhisperCppEngine",
     "onnxruntime": "bolo.engines.onnx_turn:OnnxRuntimeEngine",
+    "tts-server": "bolo.engines.tts_server:TTSServerEngine",
     "fake": "bolo.engines.fake:FakeEngine",
 }
 
@@ -27,6 +28,7 @@ class EngineRegistry:
     def __init__(self, include_fake: bool = False, settings: Settings | None = None) -> None:
         self._factories: dict[str, Callable[[], Engine]] = {}
         self._engines: dict[str, Engine] = {}
+        self._settings = settings
         for engine_id, target in BUILTIN_ENGINES.items():
             if engine_id == "fake" and not include_fake:
                 continue
@@ -57,18 +59,20 @@ class EngineRegistry:
         return [e for i, e in self._engines.items() if i.startswith(PREFIX)]
 
     def shutdown(self) -> None:
-        """Stop plugin processes."""
-        for engine in self.plugins():
+        """Stop plugin processes and the TTS servers bolo started."""
+        for engine in [*self.plugins(), *([self._engines["tts-server"]] if "tts-server" in self._engines else [])]:
             stop = getattr(engine, "shutdown", None)
             if stop is not None:
                 stop()
 
-    @staticmethod
-    def _lazy(target: str) -> Callable[[], Engine]:
+    def _lazy(self, target: str) -> Callable[[], Engine]:
         def factory() -> Engine:
             module_name, _, cls_name = target.partition(":")
             cls = getattr(importlib.import_module(module_name), cls_name)
             engine: Engine = cls()
+            configure = getattr(engine, "configure", None)
+            if configure is not None and self._settings is not None:
+                configure(self._settings)  # engines that read settings (tts-server: server URLs, binaries)
             return engine
 
         return factory

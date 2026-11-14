@@ -117,6 +117,27 @@ class Settings:
     max_utterance_s: float = 20.0
     agreement: int = 2
 
+    #: what answers in Realtime conversation sessions (a session can pick another with the bolo extension
+    #: session.pipeline): "cascade" (bolo's STT -> the language model -> bolo's TTS), "audio-llm" (the user's audio
+    #: goes to an audio-understanding language model, bolo's TTS speaks the answer) or "speech-to-speech" (a
+    #: speech-to-speech model hears and answers; bolo keeps turn detection, barge-in, codecs and transcripts)
+    realtime_pipeline: str = "cascade"
+    #: audio-llm: an OpenAI-compatible chat-completions endpoint whose model takes input_audio (llama-server with
+    #: Gemma 4 E2B/E4B or Ultravox); unset: llm_base_url / llm_model / llm_api_key
+    audio_llm_base_url: str | None = None
+    audio_llm_model: str | None = None
+    audio_llm_api_key: str | None = None
+    #: audio-llm and speech-to-speech: also transcribe the user's turns with bolo's STT (transcript events and
+    #: conversation history), in parallel with the response
+    realtime_transcribe_user: bool = True
+    #: speech-to-speech: the catalog model bolo serves with a llama-server it starts (needs llama-server), unless
+    #: s2s_server_url names a llama-server you run (its WebSocket /v1/realtime)
+    s2s_model: str = "lfm3-audio-2b-llamacpp"
+    s2s_server_url: str | None = None
+    s2s_server_api_key: str | None = None  # sent as "Authorization: Bearer ..." to s2s_server_url
+    s2s_parallel: int = 2  # sessions the managed server holds at once (llama-server --parallel)
+    s2s_server_args: list[str] = field(default_factory=list)  # extra arguments for the managed server
+
     # -- other protocols --------------------------------------------------
     wyoming: bool = False
     wyoming_host: str = "127.0.0.1"
@@ -129,6 +150,17 @@ class Settings:
     plugin_idle_s: float = 300.0  # stop a plugin process when none of its models has been loaded for this long
     plugin_memory_limit_mb: int = 0  # address-space limit of a plugin process (POSIX); 0: none
     plugin_nice: int = 0  # scheduling niceness added to plugin processes
+
+    # -- external TTS servers (engine tts-server: llama-server, audio.cpp; docs/models.md) ---------
+    #: "<model id or runtime>=<url>" per operator-run server, e.g. "llama-server=http://127.0.0.1:8080" or
+    #: "voxcpm2-audiocpp=http://gpu-box:8080". Models without one are served by a server bolo starts itself.
+    tts_servers: list[str] = field(default_factory=list)
+    tts_server_api_key: str | None = None  # sent as "Authorization: Bearer …" to operator-run servers
+    llama_server_bin: str | None = None  # llama-server binary for managed models (else bolo's component, then PATH)
+    audiocpp_server_bin: str | None = None  # audiocpp_server binary for managed models
+    tts_server_args: list[str] = field(default_factory=list)  # extra command-line arguments for managed servers
+    tts_server_start_timeout_s: float = 300.0  # how long a managed server may take to load its model
+    tts_server_timeout_s: float = 300.0  # longest wait for the next bytes of a synthesis response
 
     # -- misc ---------------------------------------------------------------
     device: str = "cpu"
@@ -146,7 +178,14 @@ class Settings:
         out: dict[str, Any] = {}
         for f in fields(self):
             v = getattr(self, f.name)
-            if f.name in {"api_key", "hf_token", "llm_api_key"}:
+            if f.name in {
+                "api_key",
+                "hf_token",
+                "llm_api_key",
+                "tts_server_api_key",
+                "audio_llm_api_key",
+                "s2s_server_api_key",
+            }:
                 v = "***" if v else None
             elif isinstance(v, Path):
                 v = str(v)

@@ -217,7 +217,9 @@ async def diarize(request: Request) -> JSONResponse:
     )
 
 
-@router.get("/components", tags=["native"], summary="Optional components (uccharan, espeak-ng, engine plugins)")
+@router.get(
+    "/components", tags=["native"], summary="Optional components (uccharan, espeak-ng, TTS servers, engine plugins)"
+)
 async def components(request: Request) -> JSONResponse:
     return JSONResponse({"components": get_core(request).components.status()})
 
@@ -231,8 +233,9 @@ class InstallRequest(BaseModel):
     "/components/{component_id}/install", status_code=202, tags=["native"], summary="Install an optional component"
 )
 async def install_component(request: Request, component_id: str, body: InstallRequest) -> JSONResponse:
-    """Installs the component into the running environment and activates it without a restart.
-    Requires ``{"accept_license": true}``: eSpeak NG is GPL-3.0-or-later."""
+    """Installs the component and activates it without a restart. eSpeak NG (GPL-3.0-or-later) requires
+    ``{"accept_license": true}``. ``llama-server`` and ``audio.cpp`` download a pinned upstream release (SHA-256
+    checked) into the data directory."""
     job = get_core(request).components.start_install(component_id, body.accept_license)
     return JSONResponse({"job_id": job.id}, status_code=202)
 

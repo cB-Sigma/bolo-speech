@@ -34,7 +34,7 @@ def test_hello_and_tts_through_the_host(engine: PluginEngine, tmp_path: Path) ->
     model = engine.load("parler-tts", "tts", tmp_path, {"voices": voices, "model_id": "x"}, LoadOptions(threads=1))
     assert isinstance(model, TTSModel)
     assert engine.process.hello["name"] == "torch" and engine.process.hello["protocol"] == 1
-    assert engine.process.hello["kinds"] == ["parler-tts", "sepformer", "gated"]
+    assert engine.process.hello["kinds"] == ["parler-tts", "sepformer", "gated", "dicow"]
     assert model.sample_rate == 44100 and [v.id for v in model.voices] == ["divya", "rohit"]
     chunks = list(model.synthesize("पहला वाक्य। दूसरा वाक्य।", "rohit"))
     assert len(chunks) == 2 and all(c.dtype == np.float32 for c in chunks)

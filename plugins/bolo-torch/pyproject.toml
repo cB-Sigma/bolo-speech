@@ -5,13 +5,13 @@ build-backend = "hatchling.build"
 [project]
 name = "bolo-torch"
 dynamic = ["version"]
-description = "PyTorch engine plugin for the bolo speech server: Indic Parler-TTS, IndicF5, Veena, Svara, SepFormer and pyannote PixIT, run out of process."
+description = "PyTorch engine plugin for the bolo speech server: Indic Parler-TTS, IndicF5 and F5-TTS, Veena, Svara, Indic-Speak, SepFormer, pyannote PixIT and DiCoW diarization-conditioned recognition, run out of process."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [{ name = "The bolo Authors" }]
-keywords = ["speech", "tts", "separation", "diarization", "pytorch", "indic", "bolo", "plugin"]
+keywords = ["speech", "tts", "asr", "separation", "diarization", "pytorch", "indic", "bolo", "plugin"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
@@ -44,6 +44,11 @@ f5 = [
   "accelerate>=0.33", "cached-path", "pydub", "librosa", "matplotlib", "pypinyin", "jieba", "datasets", "wandb",
   "torchaudio>=2.1", "soundfile>=0.12.1",
 ]
+# The original F5-TTS checkpoints (SWivid/F5-TTS, CC-BY-NC-4.0 weights) on the f5-tts package (MIT code). It pins
+# its own transformers and other libraries: keep it in its own environment.
+f5-original = ["f5-tts>=1.1,<2", "soundfile>=0.12.1"]
+# Indic-Speak (gated): the repository's own inference.py needs transformers 5 and SNAC (its quantizer)
+indic-speak = ["transformers>=5", "snac>=1.2", "soundfile>=0.12.1"]
 # Veena and Svara (Llama-style language model + SNAC codec)
 orpheus = ["transformers>=4.46", "snac>=1.2", "accelerate>=0.33"]
 # SpeechBrain SepFormer speech separation (not gated)
@@ -51,6 +56,9 @@ sepformer = ["speechbrain>=1.0", "torchaudio>=2.1"]
 # pyannote PixIT joint diarization and separation (gated). Needs transformers>=4.48.3, so it cannot share an
 # environment with the `parler` extra.
 pyannote = ["pyannote.audio[separation]>=3.3.2"]
+# DiCoW (diarization-conditioned Whisper, BUT-FIT). Its model code is written for transformers 4.55 and imports
+# pandas. Cannot share an environment with the `parler` extra (transformers 4.46.1).
+dicow = ["transformers>=4.55.0,<4.56", "pandas"]
 dev = ["pytest>=8", "pytest-timeout>=2.3", "ruff>=0.8", "mypy>=1.13", "build", "twine"]
 
 [project.scripts]

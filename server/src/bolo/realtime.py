@@ -14,9 +14,21 @@ Two kinds of session:
   text-to-speech out, with server-side turn detection, barge-in, text input,
   function calling and per-turn latency traces.
 
-bolo is a cascade (STT → LLM → TTS), not a speech-to-speech model: the model
-never hears tone of voice, and what it says is only as good as the language
-model the operator connected.
+By default bolo is a cascade (STT → LLM → TTS): the model never hears tone of
+voice, and what it says is only as good as the language model the operator
+connected. Two opt-in *pipelines* (setting ``realtime_pipeline``, or the bolo
+extension ``session.pipeline``) change what answers a conversation turn:
+
+* ``audio-llm``: the user's audio goes to an audio-understanding language model
+  (chat completions with ``input_audio``: Gemma 4, Ultravox on llama-server)
+  in place of STT → LLM; bolo's TTS still speaks the answer.
+* ``speech-to-speech``: a speech-to-speech model (:mod:`bolo.s2s`, first
+  backend llama-server's ``/v1/realtime`` with LFM3-Audio) hears the turn and
+  answers with speech and tool calls.
+
+In every pipeline bolo keeps the session itself: authentication, codecs and
+resampling, turn detection and barge-in, conversation items, transcripts of the
+user (its own STT) and traces.
 """
 
 from __future__ import annotations
@@ -39,10 +51,12 @@ import numpy as np
 
 from bolo.agents import speak_stream
 from bolo.audio.codecs import alaw_decode, alaw_encode, float_to_pcm16, mulaw_decode, mulaw_encode, pcm16_to_float
+from bolo.audio.encode import encode_audio
 from bolo.audio.resample import StreamResampler, resample
 from bolo.engines.base import FloatArray, VadDetector, VadParams
-from bolo.errors import BoloError
+from bolo.errors import BoloError, EngineUnavailable
 from bolo.obs.trace import Trace, preview
+from bolo.s2s import AudioDelta, ResponseEnd, S2SConfig, S2SConversation, TextDelta, ToolCall
 from bolo.streaming.agreement import LocalAgreement
 
 if TYPE_CHECKING:
@@ -57,6 +71,10 @@ MAX_BUFFER_S = 120.0
 #: semantic_vad: the end-of-turn model is asked after this much silence, and believed above this probability
 SEMANTIC_PAUSE_S = 0.3
 SEMANTIC_THRESHOLD = 0.5
+#: what answers a conversation turn (see the module docstring)
+PIPELINES = ("cascade", "audio-llm", "speech-to-speech")
+#: audio-llm: user turns whose audio is kept for the model (older ones go as their transcript)
+KEEP_USER_AUDIO = 8
 
 
 def new_id(prefix: str) -> str:
@@ -132,6 +150,11 @@ class RealtimeSession:
         self.conversation_id = new_id("conv")
         self.kind = "transcription" if transcription else "realtime"
         s = core.settings
+        if s.realtime_pipeline not in PIPELINES:
+            raise RealtimeError(
+                f"the setting realtime_pipeline must be one of {', '.join(PIPELINES)}", code="server_misconfigured"
+            )
+        self.pipeline = s.realtime_pipeline
         self.model = model or s.llm_model or "bolo-realtime"
         self.instructions = s.llm_instructions
         self.output_modalities = ["audio"]
@@ -177,6 +200,15 @@ class RealtimeSession:
         self._response_id: str | None = None
         self._cancel_reason = "client_cancelled"
         self._closed = False
+        # speech-to-speech pipeline: the model's conversation (opened on first use), how far the audio of the
+        # current turn has been sent to it, and whether anything was sent since the last commit
+        self._s2s: S2SConversation | None = None
+        self._s2s_lock = asyncio.Lock()
+        self._s2s_sent = 0
+        self._s2s_pending = False
+        self._s2s_broken = False
+        # audio-llm pipeline: the audio of recent user turns, by item id
+        self._user_audio: dict[str, FloatArray] = {}
 
     # -- plumbing -----------------------------------------------------------
     async def send(self, type_: str, **fields: Any) -> None:
@@ -231,6 +263,7 @@ class RealtimeSession:
             "tool_choice": self.tool_choice,
             "max_output_tokens": self.max_output_tokens,
             "truncation": "auto",
+            "pipeline": self.pipeline,  # bolo extension
         }
 
     async def start(self) -> None:
@@ -248,6 +281,10 @@ class RealtimeSession:
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError, Exception):
                     await task
+        conv, self._s2s = self._s2s, None
+        if conv is not None:
+            with contextlib.suppress(Exception):
+                await conv.close()
 
     async def _work(self) -> None:
         """Turns (commit → transcribe → respond) run one at a time, in order."""
@@ -371,6 +408,20 @@ class RealtimeSession:
                 raise RealtimeError(str(getattr(exc, "message", exc)), param="session.audio.output.phonemizer") from exc
             self.phonemizer = value or None
         if self.kind == "realtime":
+            if "pipeline" in session:
+                pipeline = session["pipeline"] or self.core.settings.realtime_pipeline
+                if pipeline not in PIPELINES:
+                    raise RealtimeError(f"pipeline must be one of {', '.join(PIPELINES)}", param="session.pipeline")
+                if pipeline != self.pipeline and (self.items or self._pos):
+                    raise RealtimeError(
+                        "the pipeline cannot change after audio or items were sent", param="session.pipeline"
+                    )
+                self.pipeline = pipeline
+            if self._s2s is not None and any(k in session for k in ("instructions", "tools", "tool_choice")):
+                log.info(
+                    "session %s: instructions and tools reach the speech-to-speech model only before the first turn",
+                    self.id,
+                )
             if isinstance(session.get("instructions"), str):
                 self.instructions = session["instructions"]
             if session.get("output_modalities"):
@@ -444,6 +495,8 @@ class RealtimeSession:
                 raise RealtimeError(
                     "the input audio buffer is full; commit or clear it", code="input_audio_buffer_full"
                 )
+            if self._s2s_mode:
+                await self._s2s_forward(self._commit_from)
             return
         prefix = int(float((self.turn_detection or {}).get("prefix_padding_ms", 300)) * SR / 1000)
         for ev in detector.accept(samples):
@@ -464,6 +517,9 @@ class RealtimeSession:
                 self._partial_task = asyncio.create_task(
                     self._partials(self._pending_item, self._speech_start), name="bolo-realtime-partials"
                 )
+                if self._s2s_mode:
+                    self._s2s_broken = False
+                    await self._s2s_forward(self._speech_start)
             elif ev.kind == "speech_end" and self._speech_start is not None:
                 end = min(ev.sample + int(0.2 * SR), self._pos)
                 if self._semantic and not await self._turn_complete(end):
@@ -476,7 +532,42 @@ class RealtimeSession:
                 await self._end_turn(self._held_end)
             else:
                 self._held_end = None
+        if self._s2s_mode and self._speech_start is not None:
+            await self._s2s_forward(self._speech_start)
         self._trim()
+
+    # -- speech-to-speech pipeline ------------------------------------------------
+    @property
+    def _s2s_mode(self) -> bool:
+        return self.kind == "realtime" and self.pipeline == "speech-to-speech"
+
+    async def _s2s_conversation(self) -> S2SConversation:
+        async with self._s2s_lock:
+            if self._s2s is None:
+                backend = await self.core.s2s.backend()
+                config = S2SConfig(
+                    instructions=self.instructions, tools=list(self.tools), tool_choice=self.tool_choice,
+                    voice=self.voice, max_output_tokens=self.max_output_tokens,
+                )  # fmt: skip
+                self._s2s = await backend.open(config)
+            return self._s2s
+
+    async def _s2s_forward(self, start: int) -> None:
+        """Send the model the audio of the current turn from ``start`` (or where the last send stopped) to now.
+
+        A failure is reported once as an ``error`` event; nothing more is sent until the next turn starts."""
+        begin = max(start, self._s2s_sent, self._buf_start)
+        if self._s2s_broken or self._pos <= begin:
+            return
+        try:
+            conv = await self._s2s_conversation()
+            await conv.append_audio(self._slice(begin, self._pos))
+        except BoloError as exc:
+            self._s2s_broken = True
+            await self.error(exc.message, code=exc.code, type_=exc.type)
+            return
+        self._s2s_sent = self._pos
+        self._s2s_pending = True
 
     @property
     def _semantic(self) -> bool:
@@ -592,6 +683,17 @@ class RealtimeSession:
             "content": [{"type": "input_audio", "transcript": None}],
         }  # fmt: skip
         self.items.append(item)
+        if self.kind == "realtime" and self.pipeline == "audio-llm":
+            self._user_audio[item_id] = audio
+            for old in list(self._user_audio)[:-KEEP_USER_AUDIO]:
+                del self._user_audio[old]
+        if self._s2s_mode and self._s2s_pending and self._s2s is not None:
+            # in order with the audio already sent: the next turn's audio must not join this one
+            self._s2s_pending = False
+            try:
+                await self._s2s.commit()
+            except BoloError as exc:
+                await self.error(exc.message, code=exc.code, type_=exc.type)
         await self.send("input_audio_buffer.committed", item_id=item_id, previous_item_id=previous)
         await self.send("conversation.item.added", item=item, previous_item_id=previous)
         await self.send("conversation.item.done", item=item, previous_item_id=previous)
@@ -603,6 +705,23 @@ class RealtimeSession:
         trace.audio_seconds = len(audio) / SR
 
         async def turn() -> None:
+            if self.kind == "realtime" and self.pipeline != "cascade":
+                # the model hears the audio itself: the transcript (for the client and the history) runs alongside
+                transcript: asyncio.Task[bool] | None = None
+                if self.core.settings.realtime_transcribe_user:
+                    transcript = asyncio.create_task(
+                        self._transcribe(item, audio, trace), name="bolo-realtime-transcript"
+                    )
+                if respond:
+                    await self._start_response({}, trace)
+                ok = True
+                if transcript is not None:
+                    ok = bool(await transcript)
+                if not respond:
+                    trace.kind, trace.model = "stt", self.transcription["model"]
+                    trace.finish("ok" if ok else "error")
+                    self.core.traces.record(trace)
+                return
             ok = await self._transcribe(item, audio, trace)
             if ok and respond and self.kind == "realtime":
                 await self._start_response({}, trace)
@@ -694,9 +813,24 @@ class RealtimeSession:
             **{k: v for k, v in item.items() if k != "id"},
         }
         previous = self.items[-1]["id"] if self.items else None
+        if self._s2s_mode:
+            await self._s2s_item(stored)
         self.items.append(stored)
         await self.send("conversation.item.added", item=stored, previous_item_id=previous)
         await self.send("conversation.item.done", item=stored, previous_item_id=previous)
+
+    async def _s2s_item(self, item: dict[str, Any]) -> None:
+        """Give the speech-to-speech model a client-created item: user text, or the output of a tool call. Other
+        items (assistant or system messages) stay in bolo's conversation only."""
+        if item.get("type") == "function_call_output":
+            conv = await self._s2s_conversation()
+            await conv.add_tool_output(str(item["call_id"]), str(item["output"]))
+        elif item.get("type") == "message" and item.get("role") == "user":
+            texts = [p.get("text") or p.get("transcript") or "" for p in item.get("content", [])]
+            text = " ".join(t for t in texts if t).strip()
+            if text:
+                conv = await self._s2s_conversation()
+                await conv.add_text(text)
 
     async def _on_item_delete(self, event: dict[str, Any]) -> None:
         item = self._find(event.get("item_id"))
@@ -764,16 +898,25 @@ class RealtimeSession:
         with contextlib.suppress(asyncio.CancelledError, Exception):
             await task
 
+    def _audio_part(self, item_id: str) -> dict[str, Any]:
+        wav = encode_audio(self._user_audio[item_id], SR, "wav")
+        return {"type": "input_audio", "input_audio": {"data": base64.b64encode(wav).decode(), "format": "wav"}}
+
     def _messages(self, instructions: str | None, extra: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
         messages: list[dict[str, Any]] = []
         if instructions:
             messages.append({"role": "system", "content": instructions})
-        for item in [*self.items, *(extra or [])]:
+        items = [*self.items, *(extra or [])]
+        # audio-llm: the latest user turn is sent as audio (and earlier ones whose transcript is not there)
+        heard = [i["id"] for i in items if i.get("id") in self._user_audio] if self.pipeline == "audio-llm" else []
+        for item in items:
             kind = item.get("type")
             if kind == "message":
                 texts = [p.get("text") or p.get("transcript") or "" for p in item.get("content", [])]
                 text = " ".join(t for t in texts if t).strip()
-                if text:
+                if item.get("id") in heard and (item["id"] == heard[-1] or not text):
+                    messages.append({"role": "user", "content": [self._audio_part(item["id"])]})
+                elif text:
                     messages.append({"role": item["role"], "content": text})
             elif kind == "function_call":
                 call = {
@@ -811,11 +954,17 @@ class RealtimeSession:
             "audio": {"output": {"format": self.out_format, "voice": voice}}, "metadata": params.get("metadata"),
         }  # fmt: skip
         await self.send("response.created", response=response)
-        body: dict[str, Any] = {
-            "model": core.settings.llm_model or self.model,
-            "messages": self._messages(instructions, params.get("input")),
-            "stream_options": {"include_usage": True},
-        }
+        llm = core.audio_llm if self.pipeline == "audio-llm" else core.llm
+        if self._s2s_mode:
+            model_name = str(core.s2s.describe().get("model") or "speech-to-speech")
+            body: dict[str, Any] = {"model": model_name}
+        else:
+            body = {
+                "model": (core.audio_llm.model if self.pipeline == "audio-llm" else core.settings.llm_model)
+                or self.model,
+                "messages": self._messages(instructions, params.get("input")),
+                "stream_options": {"include_usage": True},
+            }
         if tools:
             body["tools"] = [
                 {
@@ -879,7 +1028,7 @@ class RealtimeSession:
 
         async def text_deltas() -> AsyncIterator[str]:
             nonlocal first_token, finish_reason
-            async for chunk in core.llm.stream_chat(body):
+            async for chunk in llm.stream_chat(body):
                 if chunk.get("usage"):
                     usage.update(chunk["usage"])
                 for choice in chunk.get("choices") or []:
@@ -901,8 +1050,73 @@ class RealtimeSession:
 
         status = "completed"
         details: dict[str, Any] | None = None
+
+        async def speech_to_speech() -> None:
+            """The response of the speech-to-speech model, as the same events the cascade sends."""
+            nonlocal first_token, first_audio, audio_ms, finish_reason
+            conv = await self._s2s_conversation()
+            choice = params.get("tool_choice", self.tool_choice)
+            stream = conv.respond(
+                modalities=list(modalities), max_output_tokens=params.get("max_output_tokens"),
+                tool_choice=choice if isinstance(choice, str) else None,
+            )  # fmt: skip
+            sentence, sentence_ms = "", 0.0
+            try:
+                async for ev in stream:
+                    if isinstance(ev, (TextDelta, AudioDelta)) and first_token is None:
+                        first_token = trace.now()
+                        trace.extra["first_token_ms"] = round(trace.elapsed_ms(), 1)
+                    if isinstance(ev, TextDelta):
+                        msg = await open_message()
+                        base = {"response_id": response_id, "item_id": msg["id"], "output_index": 0, "content_index": 0}
+                        text_parts.append(ev.text)
+                        if audio_mode:
+                            if not sentence:
+                                sentence_ms = audio_ms
+                            sentence += ev.text
+                            if sentence.rstrip().endswith((".", "!", "?", "।")):
+                                self._item_audio[msg["id"]].append((sentence_ms, sentence.strip()))
+                                sentence = ""
+                            part["transcript"] += ev.text
+                            await self.send("response.output_audio_transcript.delta", delta=ev.text, **base)
+                        else:
+                            part["text"] += ev.text
+                            await self.send("response.output_text.delta", delta=ev.text, **base)
+                    elif isinstance(ev, AudioDelta) and audio_mode and len(ev.samples):
+                        msg = await open_message()
+                        base = {"response_id": response_id, "item_id": msg["id"], "output_index": 0, "content_index": 0}
+                        if first_audio is None:
+                            first_audio = trace.now()
+                            trace.mark_ttfa()
+                        audio_ms += len(ev.samples) * 1000.0 / ev.sample_rate
+                        await self.send(
+                            "response.output_audio.delta", delta=self._encode(ev.samples, ev.sample_rate), **base
+                        )
+                    elif isinstance(ev, ToolCall):
+                        calls[len(calls)] = {"id": ev.call_id or None, "name": ev.name, "arguments": ev.arguments}
+                    elif isinstance(ev, ResponseEnd):
+                        usage.update(
+                            prompt_tokens=ev.usage.get("input_tokens", 0), completion_tokens=ev.usage.get("output_tokens", 0),
+                            total_tokens=ev.usage.get("total_tokens")
+                            or ev.usage.get("input_tokens", 0) + ev.usage.get("output_tokens", 0),
+                        )  # fmt: skip
+                        if ev.status == "failed":
+                            raise EngineUnavailable(
+                                f"the speech-to-speech model failed: {ev.error or 'no reason given'}"
+                            )
+                        if ev.status == "cancelled":
+                            raise asyncio.CancelledError
+                        if ev.status == "incomplete":
+                            finish_reason = "length"
+            finally:
+                if item is not None and sentence.strip():
+                    self._item_audio[item["id"]].append((sentence_ms, sentence.strip()))
+                await stream.aclose()
+
         try:
-            if audio_mode:
+            if self._s2s_mode:
+                await speech_to_speech()
+            elif audio_mode:
                 tts_spec = core.realtime_tts(voice)
                 async for kind, value in speak_stream(
                     core,

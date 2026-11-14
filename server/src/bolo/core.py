@@ -23,12 +23,16 @@ import numpy as np
 import psutil
 
 from bolo import __version__
+from bolo.audio.decode import decode_audio
+from bolo.audio.encode import encode_audio
 from bolo.audio.resample import resample
 from bolo.catalog import Catalog, ModelSpec
 from bolo.components import ComponentManager
 from bolo.config import Settings
 from bolo.diarize import (
+    CONDITIONING,
     DiarizeOptions,
+    conditioning_activity,
     consolidate_speakers,
     find_overlaps,
     label_speakers,
@@ -42,10 +46,12 @@ from bolo.engines import EngineRegistry
 from bolo.engines.base import (
     FloatArray,
     Segment,
+    SpeakerRequest,
     SpeakerTurn,
     STTModel,
     STTRequest,
     STTResult,
+    SynthesisExtras,
     TTSModel,
     VadDetector,
     VADModel,
@@ -64,9 +70,10 @@ from bolo.errors import (
 )
 from bolo.jobs import Job, JobStore
 from bolo.lifecycle import LoadedModel, ModelManager
-from bolo.llm import LLMClient
+from bolo.llm import AudioLLMClient, LLMClient
 from bolo.obs.events import EventBus
 from bolo.obs.trace import Trace, TraceStore, preview
+from bolo.s2s import S2SManager
 from bolo.separate import SeparateOptions, SeparationResult, check_request, is_narrowband, plan_chunks, split_long
 from bolo.separate import separate as run_separation
 from bolo.store import HubClient, ModelStore
@@ -127,6 +134,9 @@ class Bolo:
         self.components = ComponentManager(self)
         phonemize.set_preference(s.phonemizer)
         self.llm = LLMClient(s)
+        self.audio_llm = AudioLLMClient(s)
+        #: the backend of the Realtime speech-to-speech pipeline (built on first use)
+        self.s2s = S2SManager(self)
         #: ephemeral Realtime keys: value -> (expiry as epoch seconds, session configuration)
         self.client_secrets: dict[str, tuple[float, dict[str, Any]]] = {}
         #: open WebRTC calls by id (objects from bolo.webrtc; closed in stop())
@@ -172,6 +182,8 @@ class Bolo:
         for call in list(self.calls.values()):
             with contextlib.suppress(Exception):
                 await call.close()
+        with contextlib.suppress(Exception):
+            await self.s2s.close()
         await self.manager.close()
         await asyncio.get_running_loop().run_in_executor(None, self.engines.shutdown)
 
@@ -236,6 +248,11 @@ class Bolo:
                 "word_timestamps": True,
                 "known_speakers": True,
                 "revised_labels_at_end_of_stream": True,
+                "speaker_conditioned_models": [
+                    m.id
+                    for m in self.catalog.all()
+                    if m.task == "stt" and "speaker-conditioned" in m.features and m.status != "pending"
+                ],
             },
             "separation": self._separation_capability(),
             "realtime": {
@@ -260,6 +277,12 @@ class Bolo:
                     "installed": bool(turn and self.manager.is_installed(turn)),
                 },
                 "sip": False,
+                "pipeline": s.realtime_pipeline,
+                "pipelines": {
+                    "cascade": {"available": llm["configured"]},
+                    "audio-llm": self.audio_llm.describe(),
+                    "speech-to-speech": self.s2s.describe(),
+                },
             },
             "chat_completions": {
                 "endpoint": "/v1/chat/completions",
@@ -602,14 +625,20 @@ class Bolo:
         trace.audio_seconds = len(samples) / sample_rate if sample_rate else 0.0
         duration = trace.audio_seconds
         separation: SeparationResult | None = None
+        conditioned = "speaker-conditioned" in spec.features
         try:
             if separate is not None:
                 if diarize is None:
                     raise InvalidRequest(
                         "separate_overlaps needs diarization (diarize=true)", param="separate_overlaps"
                     )
+                if conditioned:
+                    raise _conditioned_separation(spec.id)
                 check_request(sample_rate, separate)
                 self.resolve(separate.model, "separation")
+            if diarize is not None and conditioned and not diarize.model and spec.options.get("diarization_model"):
+                # a speaker-conditioned model brings the diarizer it works best with, unless the request names one
+                diarize.model = str(spec.options["diarization_model"])
             async with self.manager.use(spec.id) as entry:
                 stt = entry.model
                 assert isinstance(stt, STTModel)
@@ -625,52 +654,64 @@ class Bolo:
                             samples = resample(samples, sample_rate, stt.sample_rate)
                     samples = np.ascontiguousarray(samples, dtype=np.float32)
                 sr = stt.sample_rate
-                use_vad = vad_filter if vad_filter is not None else duration > stt.max_chunk_s
-                chunks: list[tuple[int, int]]
-                speakers: list[str] | None = None
-                overlapped: list[bool] | None = None
-                sources: list[FloatArray | None] | None = None
-                if diarize is not None:
-                    # Cut at the speaker turns and transcribe each turn: the speaker of every
-                    # piece of text is then known without needing word timestamps. Stretches where two
-                    # people talk at once are marked on the segments (keep_overlap: see DiarizeOptions).
-                    raw = await self._speaker_turns(samples, diarize, trace)
-                    overlaps = find_overlaps(raw)
-                    diarize.overlaps = overlaps
-                    turns = merge_turns(raw, max_len_s=stt.max_chunk_s, keep_overlap=diarize.keep_overlap)
-                    chunks = [(int(t.start * sr), min(len(samples), int(t.end * sr))) for t in turns]
-                    speakers = [diarize.label(t.speaker) for t in turns]
-                    overlapped = [any(o.start < t.end and o.end > t.start for o in overlaps) for t in turns]
-                    if overlaps:
-                        trace.extra["overlapped_speech_s"] = round(sum(o.end - o.start for o in overlaps), 2)
+                if diarize is not None and stt.speaker_conditioned:
                     if separate is not None:
-                        separation, plan = await self._separated_plan(
-                            samples, sr, raw, overlaps, turns, separate, trace,
-                            narrowband=sample_rate < 16000, max_chunk_s=stt.max_chunk_s,
-                            diarization_model=diarize.model,
-                        )  # fmt: skip
-                        if plan is not None:
-                            chunks = [(int(c.start * sr), min(len(samples), int(c.end * sr))) for c in plan]
-                            speakers = [diarize.label(c.speaker) for c in plan]
-                            overlapped = [c.overlap for c in plan]
-                            sources = [self._track_audio(separation, c, sr) for c in plan]
-                elif use_vad:
-                    with trace.phase("vad"):
-                        detector, _ = await self.vad_detector(
-                            VadParams(min_silence_s=0.3, max_speech_s=stt.max_chunk_s)
-                        )
-                        speech = await asyncio.to_thread(detect_segments, detector, samples)
-                        chunks = merge_segments(speech, len(samples), sample_rate=sr, max_chunk_s=stt.max_chunk_s)
-                elif len(samples) < int(0.05 * sr):
-                    chunks = []
+                        raise _conditioned_separation(spec.id)
+                    mode = str(spec.options.get("conditioning", "turns"))
+                    if mode not in CONDITIONING:
+                        raise InvalidRequest(f"model '{spec.id}' has an unknown conditioning option {mode!r}")
+                    transcript = await self._decode_speakers(
+                        entry, stt, samples, diarize, trace, mode,
+                        language=language, task=task, prompt=prompt, word_timestamps=word_timestamps,
+                        temperature=temperature, on_segment=on_segment,
+                    )  # fmt: skip
                 else:
-                    chunks = [(0, len(samples))]
-                transcript = await self._decode_chunks(
-                    entry, stt, samples, chunks, trace,
-                    language=language, task=task, prompt=prompt, word_timestamps=word_timestamps,
-                    temperature=temperature, hotwords=hotwords, on_segment=on_segment, speakers=speakers,
-                    overlapped=overlapped, sources=sources,
-                )  # fmt: skip
+                    use_vad = vad_filter if vad_filter is not None else duration > stt.max_chunk_s
+                    chunks: list[tuple[int, int]]
+                    speakers: list[str] | None = None
+                    overlapped: list[bool] | None = None
+                    sources: list[FloatArray | None] | None = None
+                    if diarize is not None:
+                        # Cut at the speaker turns and transcribe each turn: the speaker of every
+                        # piece of text is then known without needing word timestamps. Stretches where two
+                        # people talk at once are marked on the segments (keep_overlap: see DiarizeOptions).
+                        raw = await self._speaker_turns(samples, diarize, trace)
+                        overlaps = find_overlaps(raw)
+                        diarize.overlaps = overlaps
+                        turns = merge_turns(raw, max_len_s=stt.max_chunk_s, keep_overlap=diarize.keep_overlap)
+                        chunks = [(int(t.start * sr), min(len(samples), int(t.end * sr))) for t in turns]
+                        speakers = [diarize.label(t.speaker) for t in turns]
+                        overlapped = [any(o.start < t.end and o.end > t.start for o in overlaps) for t in turns]
+                        if overlaps:
+                            trace.extra["overlapped_speech_s"] = round(sum(o.end - o.start for o in overlaps), 2)
+                        if separate is not None:
+                            separation, plan = await self._separated_plan(
+                                samples, sr, raw, overlaps, turns, separate, trace,
+                                narrowband=sample_rate < 16000, max_chunk_s=stt.max_chunk_s,
+                                diarization_model=diarize.model,
+                            )  # fmt: skip
+                            if plan is not None:
+                                chunks = [(int(c.start * sr), min(len(samples), int(c.end * sr))) for c in plan]
+                                speakers = [diarize.label(c.speaker) for c in plan]
+                                overlapped = [c.overlap for c in plan]
+                                sources = [self._track_audio(separation, c, sr) for c in plan]
+                    elif use_vad:
+                        with trace.phase("vad"):
+                            detector, _ = await self.vad_detector(
+                                VadParams(min_silence_s=0.3, max_speech_s=stt.max_chunk_s)
+                            )
+                            speech = await asyncio.to_thread(detect_segments, detector, samples)
+                            chunks = merge_segments(speech, len(samples), sample_rate=sr, max_chunk_s=stt.max_chunk_s)
+                    elif len(samples) < int(0.05 * sr):
+                        chunks = []
+                    else:
+                        chunks = [(0, len(samples))]
+                    transcript = await self._decode_chunks(
+                        entry, stt, samples, chunks, trace,
+                        language=language, task=task, prompt=prompt, word_timestamps=word_timestamps,
+                        temperature=temperature, hotwords=hotwords, on_segment=on_segment, speakers=speakers,
+                        overlapped=overlapped, sources=sources,
+                    )  # fmt: skip
                 transcript.duration = duration
                 transcript.model = spec.id
                 if separation is not None and diarize is not None:
@@ -785,6 +826,70 @@ class Bolo:
             self.traces.observe_latency(entry.id, "stt", queue_ms=(start - submitted) * 1000.0)
         with trace.phase("finalize"):
             text = " ".join(s.text for s in segments).strip()
+        return Transcript(text, detected, 0.0, segments, words)
+
+    async def _decode_speakers(
+        self,
+        entry: LoadedModel,
+        stt: STTModel,
+        samples: FloatArray,
+        diarize: DiarizeOptions,
+        trace: Trace,
+        mode: str,
+        *,
+        language: str | None,
+        task: str,
+        prompt: str | None,
+        word_timestamps: bool,
+        temperature: float,
+        on_segment: Callable[[Segment], Awaitable[None]] | None,
+    ) -> Transcript:
+        """Diarization-conditioned recognition: diarize, then decode the whole recording once per speaker.
+
+        The recogniser hears the full mixture and is told per frame who talks (``conditioning_activity``), so
+        overlapping speech is transcribed for each speaker instead of being cut at turn boundaries."""
+        sr = stt.sample_rate
+        samples16 = samples if sr == 16000 else resample(samples, sr, 16000)
+        turns = await self._speaker_turns(samples16, diarize, trace)
+        overlaps = find_overlaps(turns)
+        diarize.overlaps = overlaps
+        if overlaps:
+            trace.extra["overlapped_speech_s"] = round(sum(o.end - o.start for o in overlaps), 2)
+        duration = len(samples) / sr
+        if not turns:
+            return Transcript("", language, 0.0)
+        activity, used = conditioning_activity(turns, diarize.activity, duration, mode)
+        trace.extra["conditioning"] = used
+        request = SpeakerRequest(samples, activity, language, task, prompt, word_timestamps, temperature)
+        submitted = trace.now()
+        results, info = await entry.queue.submit("speakers", request)
+        trace.note_batch(info.batch_size)
+        trace.add_phase("queue", submitted, info.started)
+        trace.add_phase("decode", info.started, info.finished)
+        self.traces.observe_latency(entry.id, "stt", queue_ms=(info.started - submitted) * 1000.0)
+        segments: list[Segment] = []
+        for k, result in enumerate(results):
+            label = diarize.label(k)
+            pieces = result.segments or ([Segment(0.0, duration, result.text)] if result.text.strip() else [])
+            for seg in pieces:
+                text = seg.text.strip()
+                if not text:
+                    continue
+                overlap = any(o.start < seg.end and o.end > seg.start and k in o.speakers for o in overlaps)
+                segments.append(
+                    Segment(
+                        seg.start, seg.end, text, list(seg.words), seg.avg_logprob, seg.no_speech_prob, label, overlap
+                    )
+                )
+        segments.sort(key=lambda seg: (seg.start, seg.end))
+        if on_segment is not None:
+            for seg in segments:
+                trace.mark_first_partial()
+                await on_segment(seg)
+        with trace.phase("finalize"):
+            text = " ".join(seg.text for seg in segments).strip()
+            words = sorted((w for seg in segments for w in seg.words), key=lambda w: w.t0)
+        detected = language or next((r.language for r in results if r.language), None)
         return Transcript(text, detected, 0.0, segments, words)
 
     async def _separated_plan(
@@ -1019,11 +1124,14 @@ class Bolo:
         normalize: bool = True,
         trace: Trace | None = None,
         phonemizer: str | None = None,
+        reference_audio: bytes | None = None,
+        reference_text: str | None = None,
     ) -> AsyncGenerator[SynthChunk, None]:
         """Synthesise ``text`` sentence by sentence, yielding audio as soon as it exists.
 
         This generator records the ``queue``, ``normalize``, ``synthesize_first``
-        and ``synthesize_rest`` phases. A caller that passes its own ``trace``
+        and ``synthesize_rest`` phases. ``reference_audio`` (any decodable recording) asks a model that clones
+        voices to speak in that voice; other models answer 400. A caller that passes its own ``trace``
         owns the ``encode`` phase and ``ttfa`` and must call
         :meth:`complete_tts` when it has delivered the audio.
         """
@@ -1052,6 +1160,17 @@ class Bolo:
                     chosen.language if chosen and chosen.language else (spec.languages[0] if spec.languages else "en")
                 )
                 trace.language = lang
+                extras: SynthesisExtras | None = None
+                if reference_audio is not None and not tts.supports_cloning:
+                    raise InvalidRequest(
+                        f"model '{spec.id}' cannot imitate a voice from reference audio", param="reference_audio"
+                    )
+                if tts.accepts_extras:
+                    extras = SynthesisExtras(
+                        language=language or (chosen.language if chosen and chosen.language else None),
+                        reference_audio=reference_wav(reference_audio) if reference_audio is not None else None,
+                        reference_text=reference_text,
+                    )
                 with trace.phase("normalize"):
                     clean = normalize_for_tts(text, lang) if normalize else text
                     clean = tts.fit_text(clean, lang)  # closed character sets: spell digits out, or refuse
@@ -1072,7 +1191,8 @@ class Bolo:
                     submitted = trace.now()
                     job = asyncio.ensure_future(
                         entry.queue.submit(
-                            "tts", (piece, chosen.id if chosen else voice, speed, emit, stop.is_set, phonemizer)
+                            "tts",
+                            (piece, chosen.id if chosen else voice, speed, emit, stop.is_set, phonemizer, extras),
                         )
                     )
                     job.add_done_callback(lambda _f, _out=out: _out.put_nowait(None))  # type: ignore[misc]
@@ -1136,3 +1256,30 @@ class Bolo:
         if not parts:
             return np.zeros(0, dtype=np.float32), rate or 16000
         return np.concatenate(parts), rate
+
+
+REFERENCE_MAX_S = 30.0
+
+
+def reference_wav(data: bytes) -> bytes:
+    """A voice reference as the servers take it: mono PCM16 WAV, at most ``REFERENCE_MAX_S`` seconds."""
+    if not data:
+        raise InvalidRequest("the reference audio is empty", param="reference_audio")
+    try:
+        samples, rate = decode_audio(data)
+    except BoloError as exc:
+        raise InvalidRequest(
+            f"the reference audio could not be decoded: {exc.message}", param="reference_audio"
+        ) from exc
+    if len(samples) < rate * 0.5:
+        raise InvalidRequest("the reference audio is shorter than half a second", param="reference_audio")
+    samples = samples[: int(rate * REFERENCE_MAX_S)]
+    return encode_audio(samples, rate, "wav")
+
+
+def _conditioned_separation(model_id: str) -> InvalidRequest:
+    return InvalidRequest(
+        f"model '{model_id}' transcribes overlapping speech for each speaker itself; separate_overlaps cannot be "
+        "combined with it",
+        param="separate_overlaps",
+    )

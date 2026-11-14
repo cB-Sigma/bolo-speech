@@ -1,0 +1,1958 @@
+# Text-to-speech models served by an external speech server: the tts-server engine (bolo/engines/tts_server.py).
+# options.runtime names the server: llama-server (llama.cpp, MIT) or audio.cpp (audiocpp_server, Apache-2.0).
+# bolo starts the server for the model in use (bolo components install llama-server / audio.cpp, or the settings
+# llama_server_bin / audiocpp_server_bin), or forwards to one the operator runs (setting tts_servers,
+# "<model id or runtime>=<url>"; nothing is downloaded then). requires names the runtime; options.hardware gives
+# the GPU advice and an approximate memory need (weights x 1.3 + 0.5 GB). Licences never exclude a model: each
+# entry states licence, commercial_use and gated. Voices with `reference:` are bolo's synthetic reference clips
+# (bolo/samples, made with Kokoro voices), sent to the server as the voice to imitate.
+# Sources, read 2026-11-14: llama.cpp tools/tts/README.md and tools/server/README.md (build b12375); audio.cpp
+# README, app/server/README.md, app/server/api.md, model_specs/*.json and docs/model_licenses.md (v0.9.4); the
+# Hugging Face API for every file (size, revision). validated: untested unless measured. status: pending where the
+# files the runtime needs are not published.
+- id: chatterbox-multilingual-v3-llamacpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Chatterbox Multilingual V3
+  languages: [en, ar, da, de, el, es, fi, fr, he, hi, it, ja, ko, ms, nl, 'no', pl, pt, ru, sv, sw, tr, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 1153705760
+  license: MIT
+  license_url: https://huggingface.co/ResembleAI/chatterbox
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: Resemble AI Chatterbox Multilingual V3 (0.5 B, 23 languages including Hindi) as converted by ggml-org, on
+    llama.cpp. Clones a voice from reference audio. Outputs carry Resemble's Perth watermark. llama.cpp notes that llama-server
+    does not run this variant's classifier-free guidance yet (llama-tts does), so quality through the server may be below
+    the reference. Runs in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting
+    tts_servers).
+  source_url: https://huggingface.co/ResembleAI/chatterbox
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: ggml-org/chatterbox-GGUF
+    revision: a5c19d4a1377a265a3488d13d9ef53314cc06e81
+    include: [chatterbox-Q8_0.gguf, mmproj-chatterbox-F16.gguf]
+  options:
+    runtime: llama-server
+    model_file: chatterbox-Q8_0.gguf
+    cloning: true
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 2.0, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    mmproj_file: mmproj-chatterbox-F16.gguf
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+  - {id: alpha-hi, name: Alpha (Hindi reference clip), gender: f, reference: hi-short}
+- id: chatterbox-turbo-llamacpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Chatterbox Turbo
+  languages: [en]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 1037163104
+  license: MIT
+  license_url: https://huggingface.co/ResembleAI/chatterbox-turbo
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: Resemble AI Chatterbox Turbo (English) as converted by ggml-org, on llama.cpp. Clones a voice from reference
+    audio; outputs carry Resemble's Perth watermark. Runs in a llama-server that bolo starts (bolo components install llama-server)
+    or one you run (setting tts_servers).
+  source_url: https://huggingface.co/ResembleAI/chatterbox-turbo
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: ggml-org/chatterbox-turbo-GGUF
+    revision: 66f0393558d0ac1e0337e23a4d15f26e8eca0e12
+    include: [chatterbox-turbo-Q8_0.gguf, mmproj-chatterbox-turbo-F16.gguf]
+  options:
+    runtime: llama-server
+    model_file: chatterbox-turbo-Q8_0.gguf
+    cloning: true
+    send_language: false
+    hardware: {gpu: recommended, vram_gb: 1.8, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    mmproj_file: mmproj-chatterbox-turbo-F16.gguf
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: qwen3-tts-1.7b-base-llamacpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Qwen3-TTS 1.7B Base
+  languages: [en, de, es, fr, it, ja, ko, pt, ru, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 1482388192
+  license: Apache-2.0
+  license_url: https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: Alibaba Qwen3-TTS 1.7B Base (Q4_K_M backbone, Q8_0 codec) as converted by ggml-org, on llama.cpp. llama.cpp
+    recommends always giving a speaker reference, so every voice here is a reference clip (or send reference_audio). No
+    Hindi. Runs in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).
+  source_url: https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: ggml-org/Qwen3-TTS-12Hz-1.7B-Base-GGUF
+    revision: ca27d74bc954b73dadab5b71ca265d87fc861a7c
+    include: [Qwen3-TTS-12Hz-1.7B-Base-Q4_K_M.gguf, mmproj-Qwen3-TTS-12Hz-1.7B-Base-Q8_0.gguf]
+  options:
+    runtime: llama-server
+    model_file: Qwen3-TTS-12Hz-1.7B-Base-Q4_K_M.gguf
+    cloning: true
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 2.4, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    mmproj_file: mmproj-Qwen3-TTS-12Hz-1.7B-Base-Q8_0.gguf
+  voices:
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: pocket-tts-en-llamacpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Kyutai Pocket TTS (English)
+  languages: [en]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 219248896
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/pocket-tts
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'Kyutai Pocket TTS (English, about 100 M parameters), GGUF model + mmproj pair converted by EryriLabs for
+    upstream llama.cpp. CPU-first. It needs a speaker reference for every request (llama.cpp: almost no audio without one),
+    so its voices are bolo''s synthetic reference clips (or send reference_audio). Attribution required (CC-BY-4.0). Runs
+    in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).'
+  source_url: https://huggingface.co/kyutai/pocket-tts
+  validated: cpu
+  requires: [llama-server]
+  source:
+    repo: EryriLabs/pocket-tts-GGUF
+    revision: 701bad4152d97b3755686a6c7a4cec8b752a3e6e
+    include: [pocket-tts-en.gguf, mmproj-pocket-tts-en.gguf]
+  options:
+    runtime: llama-server
+    model_file: pocket-tts-en.gguf
+    cloning: true
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.8, note: built for CPUs}
+    mmproj_file: mmproj-pocket-tts-en.gguf
+  voices:
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+  measured:
+    rtf: 0.716
+    ttfa_ms: 774
+    audio_s: 4.48
+    round_trip_wer: 0.0
+    threads: 2
+    engine: llama.cpp b12375 llama-server (upstream release build, CPU), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-14'
+    note: 'tests/test_real.py::test_pocket_tts_on_a_managed_llama_server, voice heart (3 s reference clip), best of three
+      runs; two sentences (93 characters), transcribed back word for word by moonshine-tiny-en. The machine was shared (load
+      average 5-7 from other work). Voice michael (11.8 s reference clip): RTF 1.7-2.3, first audio 2.4-3.4 s, because llama-server
+      encodes the reference again for every sentence. With 4 threads on the busy machine RTF was about 12: give the server
+      fewer threads than free cores.'
+- id: pocket-tts-de-llamacpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Kyutai Pocket TTS (German)
+  languages: [de]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 219249344
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/pocket-tts
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'Kyutai Pocket TTS (German, about 100 M parameters), GGUF model + mmproj pair converted by EryriLabs for
+    upstream llama.cpp. CPU-first. It needs a speaker reference for every request (llama.cpp: almost no audio without one),
+    so its voices are bolo''s synthetic reference clips (or send reference_audio). Attribution required (CC-BY-4.0). Runs
+    in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).'
+  source_url: https://huggingface.co/kyutai/pocket-tts
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: EryriLabs/pocket-tts-GGUF
+    revision: 701bad4152d97b3755686a6c7a4cec8b752a3e6e
+    subdir: german
+    include: [pocket-tts-german.gguf, mmproj-pocket-tts-german.gguf]
+  options:
+    runtime: llama-server
+    model_file: pocket-tts-german.gguf
+    cloning: true
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.8, note: built for CPUs}
+    mmproj_file: mmproj-pocket-tts-german.gguf
+  voices:
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: pocket-tts-es-llamacpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Kyutai Pocket TTS (Spanish)
+  languages: [es]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 219250400
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/pocket-tts
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'Kyutai Pocket TTS (Spanish, about 100 M parameters), GGUF model + mmproj pair converted by EryriLabs for
+    upstream llama.cpp. CPU-first. It needs a speaker reference for every request (llama.cpp: almost no audio without one),
+    so its voices are bolo''s synthetic reference clips (or send reference_audio). Attribution required (CC-BY-4.0). Runs
+    in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).'
+  source_url: https://huggingface.co/kyutai/pocket-tts
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: EryriLabs/pocket-tts-GGUF
+    revision: 701bad4152d97b3755686a6c7a4cec8b752a3e6e
+    subdir: spanish
+    include: [pocket-tts-spanish.gguf, mmproj-pocket-tts-spanish.gguf]
+  options:
+    runtime: llama-server
+    model_file: pocket-tts-spanish.gguf
+    cloning: true
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.8, note: built for CPUs}
+    mmproj_file: mmproj-pocket-tts-spanish.gguf
+  voices:
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: pocket-tts-fr-llamacpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Kyutai Pocket TTS (French)
+  languages: [fr]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 672539840
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/pocket-tts
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'Kyutai Pocket TTS (French, about 300 M parameters (24 layers)), GGUF model + mmproj pair converted by EryriLabs
+    for upstream llama.cpp. CPU-first. It needs a speaker reference for every request (llama.cpp: almost no audio without
+    one), so its voices are bolo''s synthetic reference clips (or send reference_audio). Attribution required (CC-BY-4.0).
+    Runs in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).'
+  source_url: https://huggingface.co/kyutai/pocket-tts
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: EryriLabs/pocket-tts-GGUF
+    revision: 701bad4152d97b3755686a6c7a4cec8b752a3e6e
+    subdir: french
+    include: [pocket-tts-french.gguf, mmproj-pocket-tts-french.gguf]
+  options:
+    runtime: llama-server
+    model_file: pocket-tts-french.gguf
+    cloning: true
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 1.4, note: built for CPUs}
+    mmproj_file: mmproj-pocket-tts-french.gguf
+  voices:
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: pocket-tts-it-llamacpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Kyutai Pocket TTS (Italian)
+  languages: [it]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 219249568
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/pocket-tts
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'Kyutai Pocket TTS (Italian, about 100 M parameters), GGUF model + mmproj pair converted by EryriLabs for
+    upstream llama.cpp. CPU-first. It needs a speaker reference for every request (llama.cpp: almost no audio without one),
+    so its voices are bolo''s synthetic reference clips (or send reference_audio). Attribution required (CC-BY-4.0). Runs
+    in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).'
+  source_url: https://huggingface.co/kyutai/pocket-tts
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: EryriLabs/pocket-tts-GGUF
+    revision: 701bad4152d97b3755686a6c7a4cec8b752a3e6e
+    subdir: italian
+    include: [pocket-tts-italian.gguf, mmproj-pocket-tts-italian.gguf]
+  options:
+    runtime: llama-server
+    model_file: pocket-tts-italian.gguf
+    cloning: true
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.8, note: built for CPUs}
+    mmproj_file: mmproj-pocket-tts-italian.gguf
+  voices:
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: pocket-tts-pt-llamacpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Kyutai Pocket TTS (Portuguese)
+  languages: [pt]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 219250496
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/pocket-tts
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'Kyutai Pocket TTS (Portuguese, about 100 M parameters), GGUF model + mmproj pair converted by EryriLabs
+    for upstream llama.cpp. CPU-first. It needs a speaker reference for every request (llama.cpp: almost no audio without
+    one), so its voices are bolo''s synthetic reference clips (or send reference_audio). Attribution required (CC-BY-4.0).
+    Runs in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).'
+  source_url: https://huggingface.co/kyutai/pocket-tts
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: EryriLabs/pocket-tts-GGUF
+    revision: 701bad4152d97b3755686a6c7a4cec8b752a3e6e
+    subdir: portuguese
+    include: [pocket-tts-portuguese.gguf, mmproj-pocket-tts-portuguese.gguf]
+  options:
+    runtime: llama-server
+    model_file: pocket-tts-portuguese.gguf
+    cloning: true
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.8, note: built for CPUs}
+    mmproj_file: mmproj-pocket-tts-portuguese.gguf
+  voices:
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: lfm3-audio-2b-llamacpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: LFM3-Audio 2B
+  languages: [en, ar, da, de, el, es, fi, fr, he, it, ja, ko, nl, pl, pt, sv, tr, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 1403437856
+  license: LFM Open License v1.0
+  license_url: https://huggingface.co/LiquidAI/LFM3-Audio-2B-GGUF/blob/main/LICENSE
+  commercial_use: false
+  gated: false
+  features: []
+  description: 'Liquid AI LFM3-Audio 2B speaking text (it is also a speech-to-speech model; bolo uses its text-to-speech
+    only). Two voices, no cloning. Commercial use is conditional: licensed only to organisations under USD 10M yearly revenue.
+    Runs in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).'
+  source_url: https://huggingface.co/LiquidAI/LFM3-Audio-2B
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: LiquidAI/LFM3-Audio-2B-GGUF
+    revision: 39670cb5c42e9c4bfe046519ba7ffbe47f9552ad
+    include: [LFM3-Audio-2B-Q4_K_M.gguf, mmproj-LFM3-Audio-2B-Q8_0.gguf]
+  options:
+    runtime: llama-server
+    model_file: LFM3-Audio-2B-Q4_K_M.gguf
+    cloning: false
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 2.3, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    mmproj_file: mmproj-LFM3-Audio-2B-Q8_0.gguf
+  voices:
+  - {id: female, name: Female, server_voice: female, gender: f}
+  - {id: male, name: Male, server_voice: male, gender: m}
+- id: soprano-1.1-80m-llamacpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Soprano 1.1 80M
+  languages: [en]
+  tier: balanced
+  sample_rate: 32000
+  size_bytes: 0
+  license: Apache-2.0
+  license_url: https://huggingface.co/ekwek/Soprano-1.1-80M
+  commercial_use: true
+  gated: false
+  features: []
+  description: 'Soprano 1.1 80M (English, fixed voice) on llama.cpp. Pending: no GGUF + mmproj pair for upstream llama.cpp
+    is published; convert ekwek/Soprano-1.1-80M with llama.cpp''s convert_hf_to_gguf.py (model and --mmproj, including decoder.pth)
+    and register the folder, or use soprano-1.1-80m-audiocpp. Normalised English text only.'
+  source_url: https://huggingface.co/ekwek/Soprano-1.1-80M
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: ekwek/Soprano-1.1-80M
+    revision: 27b5a5f5f541a1db3a51d6fd1b0fc7147b92cd01
+    include: ['*']
+  options:
+    runtime: llama-server
+    model_file: soprano.gguf
+    cloning: false
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.5, note: small enough for a CPU}
+    mmproj_file: mmproj-soprano.gguf
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  status: pending
+- id: fish-drama-3-llamacpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Fish Audio Drama 3
+  languages: []
+  tier: accuracy
+  sample_rate: 44100
+  size_bytes: 22484399200
+  license: Fish Audio Community License 1.0
+  license_url: https://huggingface.co/fishaudio/drama-3/blob/main/LICENSE
+  commercial_use: false
+  gated: false
+  features: []
+  description: 'Fish Audio Drama 3 (35 B mixture of experts, 3 B active; speaker tags <|speaker:N|> in the text), the best
+    open model on the Artificial Analysis TTS arena. Licence: Fish Audio Community License (commercial use only under its
+    revenue threshold; treated here as non-commercial). Pending: this GGUF was built with a llama.cpp branch and is not
+    confirmed to load in upstream llama-server; about 22.5 GB, needs a large GPU.'
+  source_url: https://huggingface.co/fishaudio/drama-3
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: EryriLabs/drama-3-llamacpp-GGUF
+    revision: 2dd2bbcda0dc5189e883014bddaf21e457025a09
+    include: [drama-3-q4k-experts-q8-backbone.gguf, drama-3-mmproj-q8_0.gguf]
+  options:
+    runtime: llama-server
+    model_file: drama-3-q4k-experts-q8-backbone.gguf
+    cloning: false
+    send_language: false
+    hardware: {gpu: required, vram_gb: 29.7, note: 'approximate: weights x 1.3 + 0.5 GB'}
+    mmproj_file: drama-3-mmproj-q8_0.gguf
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  status: pending
+- id: chatterbox-multilingual-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Chatterbox Multilingual (V3 talker)
+  languages: [en, ar, da, de, el, es, fi, fr, hi, it, ko, ms, nl, 'no', pl, pt, sv, sw, tr]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 2088399204
+  license: MIT
+  license_url: https://huggingface.co/ResembleAI/chatterbox
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'Chatterbox Multilingual (V3 talker) on audio.cpp (chatterbox, supported there). Languages: ar, da, de, el,
+    en, es, fi, fr, hi, it, ko, ms, nl, no, pl, pt, sv, sw, tr. Clones a voice from reference audio (reference_audio, or
+    the reference-clip voices). | 2026-09-21 Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp)
+    or one you run (setting tts_servers). GPU recommended, about 3.2 GB.'
+  source_url: https://huggingface.co/ResembleAI/chatterbox
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: Chatterbox-GGUF
+    include: [chatterbox-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: chatterbox
+    server_model: chatterbox-multilingual-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 3.2, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    session_options:
+      multilingual_t3: v3
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+  - {id: alpha-hi, name: Alpha (Hindi reference clip), gender: f, reference: hi-short}
+- id: chatterbox-turbo-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Chatterbox Turbo
+  languages: [en]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 699102368
+  license: MIT
+  license_url: https://huggingface.co/ResembleAI/chatterbox-turbo
+  commercial_use: true
+  gated: false
+  features: []
+  description: 'Chatterbox Turbo on audio.cpp (chatterbox_turbo, testing there). Languages: en. | 2026-09-21 Runs in an
+    audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU recommended,
+    about 1.4 GB.'
+  source_url: https://huggingface.co/ResembleAI/chatterbox-turbo
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: Chatterbox-Turbo-GGUF
+    include: [chatterbox-turbo-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: chatterbox_turbo
+    server_model: chatterbox-turbo-audiocpp
+    cloning: false
+    send_language: false
+    hardware: {gpu: recommended, vram_gb: 1.4, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+- id: cosyvoice3-0.5b-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Fun-CosyVoice3 0.5B
+  languages: [en, de, es, fr, it, ja, ko, ru, yue, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 2257658336
+  license: Apache-2.0
+  license_url: https://huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'Fun-CosyVoice3 0.5B on audio.cpp (cosyvoice3, supported there). Languages: zh, en, ja, ko, de, es, fr, it,
+    ru, yue. Clones a voice from reference audio (reference_audio, or the reference-clip voices). | 2026-09-21 Runs in an
+    audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU recommended,
+    about 3.4 GB.'
+  source_url: https://huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: CosyVoice3-GGUF
+    include: [cosyvoice3-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: cosyvoice3
+    server_model: cosyvoice3-0.5b-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 3.4, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+  voices:
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: voxcpm2-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: VoxCPM2 2B
+  languages: [en, ar, da, de, el, es, fi, fr, he, hi, id, it, ja, km, ko, lo, ms, my, nl, 'no', pl, pt, ru, sv, sw, th,
+    tl, tr, vi, zh]
+  tier: accuracy
+  sample_rate: 48000
+  size_bytes: 2955007488
+  license: Apache-2.0
+  license_url: https://huggingface.co/openbmb/VoxCPM2
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'VoxCPM2 2B on audio.cpp (voxcpm2, supported there). Languages: ar, my, zh, zh dialects, da, nl, en, fi,
+    fr, de, el, he, hi, id, it, ja, km, ko, lo, ms, no, pl, pt, ru, es, sw, sv, tl, th, tr, vi. Clones a voice from reference
+    audio (reference_audio, or the reference-clip voices). | 2026-09-21 Runs in an audiocpp_server that bolo starts (bolo
+    components install audio.cpp) or one you run (setting tts_servers). GPU recommended, about 4.3 GB. audio.cpp also streams
+    this family (stream: true in the catalog options, served with mode streaming).'
+  source_url: https://huggingface.co/openbmb/VoxCPM2
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: VoxCPM2-GGUF
+    include: [voxcpm2-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: voxcpm2
+    server_model: voxcpm2-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 4.3, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+  - {id: alpha-hi, name: Alpha (Hindi reference clip), gender: f, reference: hi-short}
+- id: magpie-tts-multilingual-357m-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: NVIDIA Magpie TTS Multilingual 357M
+  languages: [en, ar, de, es, fr, hi, it, ko, pt, vi, zh]
+  tier: accuracy
+  sample_rate: 22050
+  size_bytes: 1562142912
+  license: NVIDIA Open Model License
+  license_url: https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/
+  commercial_use: true
+  gated: false
+  features: []
+  description: 'NVIDIA Magpie TTS Multilingual 357M on audio.cpp (magpie_tts, supported there). Languages: ar-AE, ar-MSA,
+    ar-SA, de, en, es, fr, hi, it, ko, pt-BR, vi, zh. | 2026-09-21 Runs in an audiocpp_server that bolo starts (bolo components
+    install audio.cpp) or one you run (setting tts_servers). GPU recommended, about 2.5 GB.'
+  source_url: https://huggingface.co/nvidia/magpie_tts_multilingual_357m
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: MagpieTTS-Multilingual-357M-GGUF
+    include: [magpie-tts-multilingual-357m-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: magpie_tts
+    server_model: magpie-tts-multilingual-357m-audiocpp
+    cloning: false
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 2.5, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    language_option: true
+- id: maya1-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Maya1 3B
+  languages: [en]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 4040216160
+  license: Apache-2.0 AND MIT
+  license_url: https://huggingface.co/maya-research/maya1
+  commercial_use: true
+  gated: false
+  features: []
+  description: 'Maya1 3B on audio.cpp (maya1, supported there). Languages: en. The combined GGUF contains weights from both
+    projects. Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers).
+    GPU required, about 5.8 GB.'
+  source_url: https://huggingface.co/maya-research/maya1
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: Maya1-GGUF
+    include: [maya1-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: maya1
+    server_model: maya1-audiocpp
+    cloning: false
+    send_language: false
+    hardware: {gpu: required, vram_gb: 5.8, note: 'approximate: weights x 1.3 + 0.5 GB'}
+- id: qwen3-tts-0.6b-base-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Qwen3-TTS 0.6B Base
+  languages: [en, de, es, fr, it, ja, ko, pt, ru, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 1991217728
+  license: Apache-2.0
+  license_url: https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'Qwen3-TTS 0.6B Base on audio.cpp (qwen3_tts, supported there). Languages: zh, en, ja, ko, de, fr, ru, pt,
+    es, it. Clones a voice from reference audio (reference_audio, or the reference-clip voices). | 2026-09-21 Runs in an
+    audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU recommended,
+    about 3.1 GB. audio.cpp also streams this family (stream: true in the catalog options, served with mode streaming).'
+  source_url: https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: Qwen3-TTS-12Hz-0.6B-Base-GGUF
+    include: [qwen3-tts-12hz-0.6b-base-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: qwen3_tts
+    server_model: qwen3-tts-0.6b-base-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 3.1, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    language_option: true
+  voices:
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: qwen3-tts-1.7b-customvoice-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Qwen3-TTS 1.7B CustomVoice
+  languages: [en, de, es, fr, it, ja, ko, pt, ru, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 2817055200
+  license: Apache-2.0
+  license_url: https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'Qwen3-TTS 1.7B CustomVoice on audio.cpp (qwen3_tts, supported there). Languages: zh, en, ja, ko, de, fr,
+    ru, pt, es, it. Clones a voice from reference audio (reference_audio, or the reference-clip voices). | 2026-09-21 Runs
+    in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU
+    recommended, about 4.2 GB. audio.cpp also streams this family (stream: true in the catalog options, served with mode
+    streaming).'
+  source_url: https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: Qwen3-TTS-12Hz-1.7B-CustomVoice-GGUF
+    include: [qwen3-tts-12hz-1.7b-customvoice-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: qwen3_tts
+    server_model: qwen3-tts-1.7b-customvoice-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 4.2, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    language_option: true
+- id: pocket-tts-en-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Kyutai Pocket TTS (English)
+  languages: [en]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 134062392
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/pocket-tts
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'Kyutai Pocket TTS (English) on audio.cpp (pocket_tts, supported there). Languages: en, fr, de, it, pt, es.
+    Clones a voice from reference audio (reference_audio, or the reference-clip voices). Packaged language checkpoints,
+    including the six-layer French model, share the upstream model-card license. Attribution required. Runs in an audiocpp_server
+    that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU optional, about 0.7 GB.
+    audio.cpp also streams this family (stream: true in the catalog options, served with mode streaming).'
+  source_url: https://huggingface.co/kyutai/pocket-tts
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: PocketTTS-GGUF/english
+    include: [pocket-tts-english-q8_0.gguf, embeddings/alba.safetensors]
+  options:
+    runtime: audio.cpp
+    family: pocket_tts
+    server_model: pocket-tts-en-audiocpp
+    cloning: true
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.7, note: built for CPUs}
+    model_file: pocket-tts-english-q8_0.gguf
+    load_options:
+      language: english
+  voices:
+  - {id: alba, name: Alba, language: en, gender: f}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: soprano-1.1-80m-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Soprano 1.1 80M
+  languages: [en]
+  tier: balanced
+  sample_rate: 32000
+  size_bytes: 123162336
+  license: Apache-2.0
+  license_url: https://huggingface.co/ekwek/Soprano-1.1-80M
+  commercial_use: true
+  gated: false
+  features: []
+  description: 'Soprano 1.1 80M on audio.cpp (soprano_tts, community there). Languages: en. | 2026-09-21 Runs in an audiocpp_server
+    that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU optional, about 0.7 GB.
+    audio.cpp also streams this family (stream: true in the catalog options, served with mode streaming).'
+  source_url: https://huggingface.co/ekwek/Soprano-1.1-80M
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: WalkingCat/Soprano-1.1-80M-GGUF
+    revision: 36c6f47cf91421b7f0cf3d862d28ae2e41aab3f2
+    subdir: Soprano-1.1-80M-GGUF
+    include: [soprano-1.1-80m-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: soprano_tts
+    server_model: soprano-1.1-80m-audiocpp
+    cloning: false
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.7, note: small enough for a CPU}
+- id: supertonic-3-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Supertonic 3
+  languages: [en, ar, bg, cs, da, de, el, es, et, fi, fr, hi, hr, hu, id, it, ja, ko, lt, lv, nl, pl, pt, ro, ru, sk, sl,
+    sv, tr, uk, vi]
+  tier: accuracy
+  sample_rate: 44100
+  size_bytes: 454076228
+  license: BigScience OpenRAIL-M
+  license_url: https://huggingface.co/Supertone/supertonic-3/blob/main/LICENSE
+  commercial_use: true
+  gated: false
+  features: []
+  description: 'Supertonic 3 on audio.cpp (supertonic, supported there). Languages: en, ko, ja, ar, bg, cs, da, de, el,
+    es, et, fi, fr, hi, hr, hu, id, it, lt, lv, nl, pl, pt, ro, ru, sk, sl, sv, tr, uk, vi. Its use restrictions apply and
+    must be passed on. Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting
+    tts_servers). GPU recommended, about 1.1 GB. audio.cpp also streams this family (stream: true in the catalog options,
+    served with mode streaming).'
+  source_url: https://huggingface.co/Supertone/supertonic-3
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: Supertonic-3-GGUF
+    include: [supertonic-3-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: supertonic
+    server_model: supertonic-3-audiocpp
+    cloning: false
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 1.1, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    speed: true
+- id: kitten-tts-2-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Kitten TTS 2
+  languages: [en, ar, de, es, fr, hi, id, it, ja, ko, nl, pl, pt, ru, tr, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 3343404128
+  license: Stellon Labs Community License
+  license_url: https://huggingface.co/KittenML/kitten-tts-2/blob/main/LICENSE.md
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'Kitten TTS 2 on audio.cpp (kitten_tts2, experimental there). Languages: en, ar, zh, fr, de, hi, it, pt,
+    ru, es, nl, id, ja, ko, pl, tr. Clones a voice from reference audio (reference_audio, or the reference-clip voices).
+    Commercial use is conditional: Commercial registration and revenue/funding limits; distribution and product attribution
+    requirements apply. Decoder components retain their upstream terms. Runs in an audiocpp_server that bolo starts (bolo
+    components install audio.cpp) or one you run (setting tts_servers). GPU recommended, about 4.8 GB.'
+  source_url: https://huggingface.co/KittenML/kitten-tts-2
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: KittenTTS2-GGUF
+    include: [kitten-tts2-20261021-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: kitten_tts2
+    server_model: kitten-tts-2-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 4.8, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+- id: moss-tts-local-v1.5-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: MOSS-TTS Local Transformer v1.5
+  languages: [en, ar, cs, da, de, el, es, fa, fi, fr, he, hi, hu, it, ja, ko, mk, ms, nl, pl, pt, ro, ru, sv, sw, th, tl,
+    tr, vi, yue, zh]
+  tier: accuracy
+  sample_rate: 48000
+  size_bytes: 7512224256
+  license: Apache-2.0
+  license_url: https://huggingface.co/OpenMOSS-Team/MOSS-TTS-Local-Transformer-v1.5
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'MOSS-TTS Local Transformer v1.5 on audio.cpp (moss_tts_local, supported there). Languages: ar, cs, da, de,
+    el, en, es, fa, fi, fr, he, hi, hu, it, ja, ko, mk, ms, nl, pl, pt, ro, ru, sv, sw, th, tl, tr, vi, yue, zh. Clones
+    a voice from reference audio (reference_audio, or the reference-clip voices). | 2026-09-21 Runs in an audiocpp_server
+    that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU required, about 10.3
+    GB.'
+  source_url: https://huggingface.co/OpenMOSS-Team/MOSS-TTS-Local-Transformer-v1.5
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: MOSS-TTS-Local-v1.5-GGUF
+    include: [moss-tts-local-v1.5-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: moss_tts_local
+    server_model: moss-tts-local-v1.5-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: required, vram_gb: 10.3, note: 'approximate: weights x 1.3 + 0.5 GB'}
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+  - {id: alpha-hi, name: Alpha (Hindi reference clip), gender: f, reference: hi-short}
+- id: moss-tts-nano-100m-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: MOSS-TTS Nano 100M
+  languages: [en, ar, cs, da, de, el, es, fa, fr, hu, it, ja, ko, pl, pt, ru, sv, tr, zh]
+  tier: balanced
+  sample_rate: 48000
+  size_bytes: 193343328
+  license: Apache-2.0
+  license_url: https://huggingface.co/OpenMOSS-Team/MOSS-TTS-Nano-100M
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'MOSS-TTS Nano 100M on audio.cpp (moss_tts_nano, supported there). Languages: ar, cs, da, de, el, en, es,
+    fa, fr, hu, it, ja, ko, pl, pt, ru, sv, tr, zh. Clones a voice from reference audio (reference_audio, or the reference-clip
+    voices). | 2026-09-21 Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run
+    (setting tts_servers). GPU optional, about 0.8 GB. audio.cpp also streams this family (stream: true in the catalog options,
+    served with mode streaming).'
+  source_url: https://huggingface.co/OpenMOSS-Team/MOSS-TTS-Nano-100M
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: MOSS-TTS-Nano-100M-GGUF
+    include: [moss-tts-nano-100m-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: moss_tts_nano
+    server_model: moss-tts-nano-100m-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: optional, vram_gb: 0.8, note: small enough for a CPU}
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: omnivoice-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: OmniVoice
+  languages: []
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 1350296096
+  license: CC-BY-NC-4.0
+  license_url: https://huggingface.co/k2-fsa/OmniVoice#license
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'OmniVoice on audio.cpp (omnivoice, supported there). Languages: 600+ languages. Clones a voice from reference
+    audio (reference_audio, or the reference-clip voices). Non-commercial licence. Changed from Apache-2.0 on 2026-07-03,
+    "due to constraints from its training data (e.g., Emilia)". The code is Apache-2.0. The audio tokenizer, bosonai/higgs-audio-v2-tokenizer,
+    is under the Boson Higgs Audio 2 Community License. VoiceTut-TTS is a fine-tune of OmniVoice that its model card declares
+    as Apache-2.0; it reuses the OmniVoice audio tokenizer unchanged. Runs in an audiocpp_server that bolo starts (bolo
+    components install audio.cpp) or one you run (setting tts_servers). GPU recommended, about 2.3 GB. audio.cpp also streams
+    this family (stream: true in the catalog options, served with mode streaming).'
+  source_url: https://huggingface.co/k2-fsa/OmniVoice
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: OmniVoice-GGUF
+    include: [omnivoice-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: omnivoice
+    server_model: omnivoice-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 2.3, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    language_option: true
+    speed: true
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+  - {id: alpha-hi, name: Alpha (Hindi reference clip), gender: f, reference: hi-short}
+- id: voxtral-4b-tts-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Voxtral 4B TTS
+  languages: [en, ar, de, es, fr, hi, it, nl, pt]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 8030847808
+  license: CC-BY-NC-4.0
+  license_url: https://huggingface.co/mistralai/Voxtral-4B-TTS-2603
+  commercial_use: false
+  gated: false
+  features: []
+  description: 'Voxtral 4B TTS on audio.cpp (voxtral_tts, supported there). Languages: en, fr, es, de, it, pt, nl, ar, hi.
+    Non-commercial licence. Includes the upstream preset voice embeddings, which share the model''s non-commercial license.
+    Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers).
+    GPU required, about 10.9 GB. audio.cpp also streams this family (stream: true in the catalog options, served with mode
+    streaming).'
+  source_url: https://huggingface.co/mistralai/Voxtral-4B-TTS-2603
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: Voxtral-4B-TTS-2603-GGUF
+    include: [voxtral-4b-tts-2603-bf16.gguf]
+  options:
+    runtime: audio.cpp
+    family: voxtral_tts
+    server_model: voxtral-4b-tts-audiocpp
+    cloning: false
+    send_language: true
+    hardware: {gpu: required, vram_gb: 10.9, note: 'approximate: weights x 1.3 + 0.5 GB'}
+- id: fish-audio-s2-pro-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Fish Audio S2 Pro
+  languages: []
+  tier: accuracy
+  sample_rate: 44100
+  size_bytes: 6317915552
+  license: Fish Audio Research License
+  license_url: https://huggingface.co/fishaudio/s2-pro/blob/main/LICENSE.md
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'Fish Audio S2 Pro on audio.cpp (fish_audio, supported there). Languages: 80+ languages. Clones a voice from
+    reference audio (reference_audio, or the reference-clip voices). Non-commercial licence. Commercial use needs a separate
+    license from Fish Audio. Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you
+    run (setting tts_servers). GPU required, about 8.7 GB. audio.cpp also streams this family (stream: true in the catalog
+    options, served with mode streaming).'
+  source_url: https://huggingface.co/fishaudio/s2-pro
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: Fish-Audio-S2-Pro-GGUF
+    include: [fish-audio-s2-pro-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: fish_audio
+    server_model: fish-audio-s2-pro-audiocpp
+    cloning: true
+    send_language: false
+    hardware: {gpu: required, vram_gb: 8.7, note: 'approximate: weights x 1.3 + 0.5 GB'}
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: fish-drama-3-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Fish Audio Drama 3
+  languages: []
+  tier: accuracy
+  sample_rate: 44100
+  size_bytes: 24603394560
+  license: Fish Audio Community License v1.0
+  license_url: https://huggingface.co/fishaudio/drama-3/blob/main/LICENSE
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'Fish Audio Drama 3 on audio.cpp (fish_drama3, experimental there). Languages: auto. Clones a voice from
+    reference audio (reference_audio, or the reference-clip voices). Commercial use is conditional: Community commercial
+    use has a revenue threshold; hosted services and other uses may require a separate license. See the source terms. Runs
+    in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU
+    required, about 32.5 GB. audio.cpp also streams this family (stream: true in the catalog options, served with mode streaming).'
+  source_url: https://huggingface.co/fishaudio/drama-3
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: Jmica/Drama-3-GGUF
+    revision: 060acc8e5d9e5d16baf647c775dfe1a1438f5f35
+    include: [drama-3-backbone-8bit-experts-Q4_K_S.gguf]
+  options:
+    runtime: audio.cpp
+    family: fish_drama3
+    server_model: fish-drama-3-audiocpp
+    cloning: true
+    send_language: false
+    hardware: {gpu: required, vram_gb: 32.5, note: 'approximate: weights x 1.3 + 0.5 GB'}
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: higgs-tts-3-4b-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Higgs TTS 3 4B
+  languages: []
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 5095359136
+  license: Boson Higgs TTS 3 Research and Non-Commercial License
+  license_url: https://huggingface.co/bosonai/higgs-tts-3-4b/blob/main/LICENSE
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'Higgs TTS 3 4B on audio.cpp (higgs_audio_tts, supported there). Languages: 100+ languages. Clones a voice
+    from reference audio (reference_audio, or the reference-clip voices). Non-commercial licence. | 2026-09-21 Runs in an
+    audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU required,
+    about 7.1 GB. audio.cpp also streams this family (stream: true in the catalog options, served with mode streaming).'
+  source_url: https://huggingface.co/bosonai/higgs-tts-3-4b
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: Higgs-Audio-v3-TTS-4B-GGUF
+    include: [higgs-audio-v3-tts-4b-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: higgs_audio_tts
+    server_model: higgs-tts-3-4b-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: required, vram_gb: 7.1, note: 'approximate: weights x 1.3 + 0.5 GB'}
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+  - {id: alpha-hi, name: Alpha (Hindi reference clip), gender: f, reference: hi-short}
+- id: indextts-2-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: IndexTTS-2
+  languages: [en, ar, es, ja, zh]
+  tier: accuracy
+  sample_rate: 22050
+  size_bytes: 3633895968
+  license: bilibili Model Use License
+  license_url: https://huggingface.co/IndexTeam/IndexTTS-2.5/blob/main/LICENSE
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'IndexTTS-2 on audio.cpp (index_tts2, supported there). Languages: zh, en, ja, es, ar. Clones a voice from
+    reference audio (reference_audio, or the reference-clip voices). Commercial use is conditional: A separate license is
+    needed above RMB 1 billion yearly revenue or 100 million monthly users. The model and its outputs may not be used to
+    improve other commercial AI models. Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp)
+    or one you run (setting tts_servers). GPU recommended, about 5.2 GB. audio.cpp also streams this family (stream: true
+    in the catalog options, served with mode streaming).'
+  source_url: https://huggingface.co/IndexTeam/IndexTTS-2
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: IndexTTS2-GGUF
+    include: [index-tts2-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: index_tts2
+    server_model: indextts-2-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 5.2, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    language_option: true
+  voices:
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: vibevoice-1.5b-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: VibeVoice 1.5B
+  languages: [en, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 3224706114
+  license: MIT
+  license_url: https://huggingface.co/microsoft/VibeVoice-1.5B
+  commercial_use: true
+  gated: false
+  features: []
+  description: 'VibeVoice 1.5B on audio.cpp (vibevoice, supported there). Languages: en, zh. | 2026-09-21 Runs in an audiocpp_server
+    that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU recommended, about 4.7
+    GB. audio.cpp also streams this family (stream: true in the catalog options, served with mode streaming).'
+  source_url: https://huggingface.co/microsoft/VibeVoice-1.5B
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: VibeVoice-1.5B-GGUF
+    include: [vibevoice-1.5b-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: vibevoice
+    server_model: vibevoice-1.5b-audiocpp
+    cloning: false
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 4.7, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+- id: xtts-v2-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Coqui XTTS v2
+  languages: [en, ar, cs, de, es, fr, hi, hu, it, ja, ko, nl, pl, pt, ru, tr, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 568061664
+  license: Coqui Public Model License 1.0.0
+  license_url: https://coqui.ai/cpml
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'Coqui XTTS v2 on audio.cpp (xtts_v2, community there). Languages: en, es, fr, de, it, pt, pl, tr, ru, nl,
+    cs, ar, zh-cn, hu, ko, ja, hi. Clones a voice from reference audio (reference_audio, or the reference-clip voices).
+    Non-commercial licence. Non-commercial use only. Runs in an audiocpp_server that bolo starts (bolo components install
+    audio.cpp) or one you run (setting tts_servers). GPU recommended, about 1.2 GB.'
+  source_url: https://huggingface.co/onicubag/xTTSv2-GGUF
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: onicubag/xTTSv2-GGUF
+    revision: e7e11a2d65a7a1b1284a7dd6433d278a6b86f703
+    subdir: q8_0
+    include: [xtts-v2-gpt-q8_0.gguf, xtts-v2-vocoder-f16.gguf, mel_norms.bin]
+  options:
+    runtime: audio.cpp
+    family: xtts_v2
+    server_model: xtts-v2-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 1.2, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    language_option: true
+  voices:
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+  - {id: alpha-hi, name: Alpha (Hindi reference clip), gender: f, reference: hi-short}
+- id: outetts-1.0-1b-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: OuteTTS 1.0 1B
+  languages: [en, ar, be, bn, de, es, fa, fr, hu, it, ja, ka, ko, lt, lv, nl, pl, pt, ru, sw, ta, uk, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 3029895456
+  license: CC-BY-NC-SA-4.0
+  license_url: https://huggingface.co/OuteAI/Llama-OuteTTS-1.0-1B
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'OuteTTS 1.0 1B on audio.cpp (outetts, community there). Languages: ar, be, bn, de, en, es, fa, fr, hu, it,
+    ja, ka, ko, lt, lv, nl, pl, pt, ru, sw, ta, uk, zh. Clones a voice from reference audio (reference_audio, or the reference-clip
+    voices). Non-commercial licence. | 2026-09-21 Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp)
+    or one you run (setting tts_servers). GPU recommended, about 4.4 GB.'
+  source_url: https://huggingface.co/OuteAI/Llama-OuteTTS-1.0-1B
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: mirek190/audio.cpp
+    revision: 94bbade143c5f62c0c842ef5b2119f7880fa9ee4
+    include: [Text to audio (TTS)/Llama-OuteTTS-1.0-1B_Q8.gguf]
+  options:
+    runtime: audio.cpp
+    family: outetts
+    server_model: outetts-1.0-1b-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 4.4, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: neutts-2e-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: NeuTTS 2E
+  languages: [en]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 3016181288
+  license: NeuTTS Open License v1.0
+  license_url: https://huggingface.co/neuphonic/neutts-2e/blob/main/LICENSE
+  commercial_use: false
+  gated: false
+  features: []
+  description: 'NeuTTS 2E on audio.cpp (neutts, supported there). Languages: en. Commercial use is conditional: Commercial
+    use is licensed only while yearly revenue stays under USD 5M. Runs in an audiocpp_server that bolo starts (bolo components
+    install audio.cpp) or one you run (setting tts_servers). GPU recommended, about 4.4 GB. audio.cpp also streams this
+    family (stream: true in the catalog options, served with mode streaming).'
+  source_url: https://huggingface.co/neuphonic/neutts-2e
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: NeuTTS-2E-GGUF
+    include: [neutts-2e-orig.gguf]
+  options:
+    runtime: audio.cpp
+    family: neutts
+    server_model: neutts-2e-audiocpp
+    cloning: false
+    send_language: false
+    hardware: {gpu: recommended, vram_gb: 4.4, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+- id: sanotts-hi-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: sanoTTS (Hindi voice)
+  languages: [hi]
+  tier: balanced
+  sample_rate: 22050
+  size_bytes: 6026880
+  license: GPL-3.0
+  license_url: https://huggingface.co/ampixa/sanoTTS
+  commercial_use: true
+  gated: false
+  features: []
+  description: 'sanoTTS (Hindi voice) on audio.cpp (sanotts, community there). Languages: en, vi, id, cs, de, es, fr, it,
+    pt, ro, ru, tr, ne, hi. Copyleft. Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp) or
+    one you run (setting tts_servers). GPU optional, about 0.5 GB.'
+  source_url: https://huggingface.co/ampixa/sanoTTS
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: ampixa/sanoTTS
+    revision: 4a8194aa1dd958033ee449b3ad30c37e536b216e
+    subdir: gguf/hi
+    include: [hi-f32.gguf, config.json]
+  options:
+    runtime: audio.cpp
+    family: sanotts
+    server_model: sanotts-hi-audiocpp
+    cloning: false
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.5, note: small enough for a CPU}
+    speed: true
+- id: fireredtts3-instruct-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: FireRedTTS3 Instruct
+  languages: [en, ar, cs, de, el, es, fi, fr, hi, id, it, ja, ko, nl, pl, pt, ro, ru, th, tr, uk, vi, yue, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 4149194336
+  license: Apache-2.0
+  license_url: https://huggingface.co/FireRedTeam/FireRedTTS3
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'FireRedTTS3 Instruct on audio.cpp (fireredtts3, experimental there). Languages: Chinese, English, Cantonese,
+    Japanese, Korean, Spanish, French, Russian, Arabic, Turkish, Indonesian, Portuguese, Italian, Dutch, Vietnamese, German,
+    Ukrainian, Thai, Polish, Romanian, …. Clones a voice from reference audio (reference_audio, or the reference-clip voices).
+    | 2026-09-21 Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting
+    tts_servers). GPU required, about 5.9 GB.'
+  source_url: https://huggingface.co/FireRedTeam/FireRedTTS3
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: FireRedTTS3-Instruct-GGUF
+    include: [fireredtts3-instruct-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: fireredtts3
+    server_model: fireredtts3-instruct-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: required, vram_gb: 5.9, note: 'approximate: weights x 1.3 + 0.5 GB'}
+    language_names: true
+    language_option: true
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+  - {id: alpha-hi, name: Alpha (Hindi reference clip), gender: f, reference: hi-short}
+- id: ming-3.0-tts-0.5b-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Ming 3.0 TTS 0.5B
+  languages: [en, de, es, fr, ja, ko, zh]
+  tier: accuracy
+  sample_rate: 44100
+  size_bytes: 2998284288
+  license: MIT
+  license_url: https://huggingface.co/inclusionAI/Ming-3.0-tts-0.5B
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'Ming 3.0 TTS 0.5B on audio.cpp (ming3_tts, supported there). Languages: zh, en, ja, ko, de, fr, es. Clones
+    a voice from reference audio (reference_audio, or the reference-clip voices). Retain the inclusionAI MIT notice; the
+    official package includes its audio VAE and CAMPPlus speaker encoder. Runs in an audiocpp_server that bolo starts (bolo
+    components install audio.cpp) or one you run (setting tts_servers). GPU recommended, about 4.4 GB. audio.cpp also streams
+    this family (stream: true in the catalog options, served with mode streaming).'
+  source_url: https://huggingface.co/inclusionAI/Ming-3.0-tts-0.5B
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/Ming-3.0-TTS-0.5B-GGUF
+    revision: 2eb8d37c7f10672e69c8aa33091baa04c461b66c
+    include: [ming-3.0-tts-0.5b-bf16.gguf]
+  options:
+    runtime: audio.cpp
+    family: ming3_tts
+    server_model: ming-3.0-tts-0.5b-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 4.4, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    language_option: true
+    speed: true
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: breeze-tts-2-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: BreezeTTS 2
+  languages: [en, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 5079670336
+  license: BreezeBlue Research and Non-Commercial License
+  license_url: https://huggingface.co/BreezeBlue/Breeze-TTS-2/blob/main/LICENSE
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'BreezeTTS 2 on audio.cpp (breeze_tts, supported there). Languages: zh, en. Clones a voice from reference
+    audio (reference_audio, or the reference-clip voices). Non-commercial licence. | 2026-09-21 Runs in an audiocpp_server
+    that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU required, about 7.1 GB.
+    audio.cpp also streams this family (stream: true in the catalog options, served with mode streaming).'
+  source_url: https://huggingface.co/BreezeBlue/Breeze-TTS-2
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: Breeze-TTS-2-GGUF
+    include: [breeze-tts-2-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: breeze_tts
+    server_model: breeze-tts-2-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: required, vram_gb: 7.1, note: 'approximate: weights x 1.3 + 0.5 GB'}
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: kugelaudio-0-open-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: KugelAudio-0-Open
+  languages: [en, bg, cs, da, de, el, es, fi, fr, hr, hu, it, nl, 'no', pl, pt, ro, ru, sk, sr, sv, tr, uk]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 9752398658
+  license: MIT
+  license_url: https://huggingface.co/kugelaudio/kugelaudio-0-open
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'KugelAudio-0-Open on audio.cpp (kugelaudio, experimental there). Languages: en, de, fr, es, it, pt, nl,
+    pl, ru, uk, cs, ro, hu, sv, da, fi, no, el, bg, sk, hr, sr, tr. Clones a voice from reference audio (reference_audio,
+    or the reference-clip voices). Includes upstream preset voice features and optional original acoustic encoder. Runs
+    in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU
+    required, about 13.2 GB. audio.cpp also streams this family (stream: true in the catalog options, served with mode streaming).'
+  source_url: https://huggingface.co/kugelaudio/kugelaudio-0-open
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: KugelAudio-0-Open-GGUF
+    include: [kugelaudio-0-open-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: kugelaudio
+    server_model: kugelaudio-0-open-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: required, vram_gb: 13.2, note: 'approximate: weights x 1.3 + 0.5 GB'}
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: zonos3-mini-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: ZONOS3-Mini
+  languages: [en, de, es, fr, it, ja, ko, pt, zh]
+  tier: accuracy
+  sample_rate: 44100
+  size_bytes: 1160861792
+  license: Apache-2.0
+  license_url: https://huggingface.co/Zyphra/ZONOS3-Mini
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'ZONOS3-Mini on audio.cpp (zonos3, community there). Languages: en, fr, de, es, it, pt, ja, zh, ko. Clones
+    a voice from reference audio (reference_audio, or the reference-clip voices). Runtime code ported from Zyphra/ZONOS3
+    (MIT); optional zyphra-textnorm (MIT) is linked only with `AUDIOCPP_ZONOS3_TEXTNORM`. Runs in an audiocpp_server that
+    bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU recommended, about 2.0 GB.
+    audio.cpp also streams this family (stream: true in the catalog options, served with mode streaming).'
+  source_url: https://huggingface.co/Zyphra/ZONOS3-Mini
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: Zyphra/ZONOS3-Mini
+    revision: 727302c1cb61bee229a649d859ebb3e517da1a41
+    subdir: gguf
+    include: [backbone-ptq.gguf, zac-keep2.gguf, spk-encoder.gguf]
+  options:
+    runtime: audio.cpp
+    family: zonos3
+    server_model: zonos3-mini-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 2.0, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    language_option: true
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: dots-tts-soar-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: dots.tts SOAR
+  languages: []
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 2962751232
+  license: Apache-2.0
+  license_url: https://huggingface.co/dots-studio/dots.tts-soar
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'dots.tts SOAR on audio.cpp (dots_tts, supported there). Languages: multilingual. Clones a voice from reference
+    audio (reference_audio, or the reference-clip voices). The dots.tts.edit card defers to the dots.tts project, which
+    is Apache-2.0. Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting
+    tts_servers). GPU recommended, about 4.4 GB. audio.cpp also streams this family (stream: true in the catalog options,
+    served with mode streaming).'
+  source_url: https://huggingface.co/dots-studio/dots.tts-soar
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: DotTTS-SOAR-GGUF
+    include: [dots-tts-soar-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: dots_tts
+    server_model: dots-tts-soar-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 4.4, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    language_option: true
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+  - {id: alpha-hi, name: Alpha (Hindi reference clip), gender: f, reference: hi-short}
+- id: irodori-tts-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Irodori-TTS
+  languages: [ja]
+  tier: accuracy
+  sample_rate: 48000
+  size_bytes: 1368994144
+  license: MIT
+  license_url: https://huggingface.co/Aratako/Irodori-TTS-500M-v3
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'Irodori-TTS on audio.cpp (irodori_tts, supported there). Languages: ja. Clones a voice from reference audio
+    (reference_audio, or the reference-clip voices). | 2026-09-21 Runs in an audiocpp_server that bolo starts (bolo components
+    install audio.cpp) or one you run (setting tts_servers). GPU recommended, about 2.3 GB. audio.cpp also streams this
+    family (stream: true in the catalog options, served with mode streaming).'
+  source_url: https://huggingface.co/Aratako/Irodori-TTS-500M-v3
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: Irodori-TTS-v4-Small-GGUF
+    include: [irodori-tts-v4-small-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: irodori_tts
+    server_model: irodori-tts-audiocpp
+    cloning: true
+    send_language: false
+    hardware: {gpu: recommended, vram_gb: 2.3, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+- id: miotts-1.7b-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: MioTTS 1.7B
+  languages: [en, ja]
+  tier: accuracy
+  sample_rate: 44100
+  size_bytes: 2197332000
+  license: Apache-2.0
+  license_url: https://huggingface.co/Aratako/MioTTS-1.7B
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'MioTTS 1.7B on audio.cpp (miotts, supported there). Languages: en, ja. Clones a voice from reference audio
+    (reference_audio, or the reference-clip voices). | 2026-09-21 Runs in an audiocpp_server that bolo starts (bolo components
+    install audio.cpp) or one you run (setting tts_servers). GPU recommended, about 3.4 GB.'
+  source_url: https://huggingface.co/Aratako/MioTTS-1.7B
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: MioTTS-1.7B-GGUF
+    include: [miotts-1.7b-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: miotts
+    server_model: miotts-1.7b-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 3.4, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: gradium-phonon-31m-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Gradium Phonon 31M
+  languages: [en]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 85460904
+  license: Apache-2.0
+  license_url: https://huggingface.co/gradium/phonon-31m-en
+  commercial_use: true
+  gated: false
+  features: []
+  description: 'Gradium Phonon 31M on audio.cpp (gradium_phonon, experimental there). Languages: en. Both packages come
+    from Gradium''s repositories: the Q8_0 GGUF and the published safetensors checkpoint, each with its default voice. The
+    40m checkpoints (gradium/phonon-40m-en and other languages) are CC-BY-NC-4.0 and gated, and are not packaged. Runs in
+    an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU optional,
+    about 0.6 GB. audio.cpp also streams this family (stream: true in the catalog options, served with mode streaming).'
+  source_url: https://huggingface.co/gradium/phonon-31m-en
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: gradium/phonon-31m-en-audiocpp
+    revision: 2431a0781d54814ea1ddb067849a8c6f24f4aaae
+    include: [phonon-31m-en-q8_0.gguf, default-voice.safetensors]
+  options:
+    runtime: audio.cpp
+    family: gradium_phonon
+    server_model: gradium-phonon-31m-audiocpp
+    cloning: false
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.6, note: small enough for a CPU}
+- id: audio8-tts-0.6b-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Audio8 TTS Preview 0.6B
+  languages: [en, de, es, fr, it, ja, ko, nl, pl, yue, zh]
+  tier: accuracy
+  sample_rate: 44100
+  size_bytes: 1429545312
+  license: Apache-2.0
+  license_url: https://huggingface.co/Edge0/Audio8-TTS-Preview-0.6b
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'Audio8 TTS Preview 0.6B on audio.cpp (audio8_tts, community there). Languages: auto, yue, zh, nl, en, fr,
+    de, it, ja, ko, pl, es. Clones a voice from reference audio (reference_audio, or the reference-clip voices). | 2026-09-21
+    Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers).
+    GPU recommended, about 2.4 GB. audio.cpp also streams this family (stream: true in the catalog options, served with
+    mode streaming).'
+  source_url: https://huggingface.co/Edge0/Audio8-TTS-Preview-0.6b
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: js-byte/Audio8-TTS-Preview-0.6b-GGUF
+    revision: 788f6fdb0bbdbbc407c63f3265cea9875b4a7c14
+    include: [audio8-tts-preview-0.6b-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: audio8_tts
+    server_model: audio8-tts-0.6b-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 2.4, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    language_option: true
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: confucius4-tts-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Confucius4-TTS
+  languages: [en, de, es, fr, id, it, ja, ko, ms, pt, ru, th, vi, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 8192757760
+  license: Apache-2.0
+  license_url: https://huggingface.co/netease-youdao/Confucius4-TTS
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'Confucius4-TTS on audio.cpp (confucius4_tts, experimental there). Languages: zh, en, ja, ko, de, fr, es,
+    id, it, th, pt, ru, ms, vi. Clones a voice from reference audio (reference_audio, or the reference-clip voices). | 2026-09-21
+    Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers).
+    GPU required, about 11.2 GB. audio.cpp also streams this family (stream: true in the catalog options, served with mode
+    streaming).'
+  source_url: https://huggingface.co/netease-youdao/Confucius4-TTS
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: Confucius4-TTS-GGUF
+    include: [confucius4-tts-orig.gguf]
+  options:
+    runtime: audio.cpp
+    family: confucius4_tts
+    server_model: confucius4-tts-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: required, vram_gb: 11.2, note: 'approximate: weights x 1.3 + 0.5 GB'}
+    language_option: true
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: plapre-3-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Plapre 3 (Danish)
+  languages: [da]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 1145069888
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/syvai/plapre-3
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'Plapre 3 (Danish) on audio.cpp (plapre, supported there). Languages: da. Clones a voice from reference audio
+    (reference_audio, or the reference-clip voices). Includes Kanade (MIT), WavLM and CosyVoice2 HiFT components; retain
+    their upstream notices as well. Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one
+    you run (setting tts_servers). GPU recommended, about 2.0 GB. audio.cpp also streams this family (stream: true in the
+    catalog options, served with mode streaming).'
+  source_url: https://huggingface.co/syvai/plapre-3
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: Plapre-3-GGUF
+    include: [plapre-3-bf16.gguf]
+  options:
+    runtime: audio.cpp
+    family: plapre
+    server_model: plapre-3-audiocpp
+    cloning: true
+    send_language: false
+    hardware: {gpu: recommended, vram_gb: 2.0, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
+- id: echo-tts-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Echo-TTS
+  languages: [en]
+  tier: accuracy
+  sample_rate: 44100
+  size_bytes: 3028207456
+  license: CC-BY-NC-SA-4.0
+  license_url: https://huggingface.co/jordand/echo-tts-base
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'Echo-TTS on audio.cpp (echo_tts, experimental there). Languages: en. Clones a voice from reference audio
+    (reference_audio, or the reference-clip voices). Non-commercial licence. | 2026-09-21 Runs in an audiocpp_server that
+    bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU recommended, about 4.4 GB.'
+  source_url: https://huggingface.co/jordand/echo-tts-base
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: dignome/Echo-TTS
+    revision: 5a7c7c5f510410a8841ba7e46cf6bfd91ea25c21
+    include: [echo-tts-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: echo_tts
+    server_model: echo-tts-audiocpp
+    cloning: true
+    send_language: false
+    hardware: {gpu: recommended, vram_gb: 4.4, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+  voices:
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: lfm3-audio-2b-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: LFM3-Audio 2B
+  languages: [en, ar, da, de, el, es, fi, fr, he, it, ja, ko, nl, pl, pt, sv, tr, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 2150048544
+  license: LFM Open License v1.0
+  license_url: https://huggingface.co/LiquidAI/LFM3-Audio-2B/blob/main/LICENSE
+  commercial_use: false
+  gated: false
+  features: []
+  description: 'LFM3-Audio 2B on audio.cpp (lfm3_audio, experimental there). Languages: en, ar, da, de, el, es, fi, fr,
+    he, it, ja, ko, nl, pl, pt, sv, tr, zh. Commercial use is conditional: Commercial use is licensed only to organizations
+    with less than USD 10M yearly revenue. Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp)
+    or one you run (setting tts_servers). GPU recommended, about 3.3 GB. audio.cpp also streams this family (stream: true
+    in the catalog options, served with mode streaming).'
+  source_url: https://huggingface.co/LiquidAI/LFM3-Audio-2B
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: LiquidAI/LFM3-Audio-2B-GGUF
+    revision: 39670cb5c42e9c4bfe046519ba7ffbe47f9552ad
+    include: [LFM3-Audio-2B-Q8_0.gguf, mmproj-LFM3-Audio-2B-Q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: lfm3_audio
+    server_model: lfm3-audio-2b-audiocpp
+    cloning: false
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 3.3, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    language_option: true
+- id: indextts-2.5-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: IndexTTS-2.5
+  languages: [en, ar, es, ja, zh]
+  tier: accuracy
+  sample_rate: 22050
+  size_bytes: 3502960096
+  license: bilibili Model Use License
+  license_url: https://huggingface.co/IndexTeam/IndexTTS-2.5/blob/main/LICENSE
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'IndexTTS-2.5 on audio.cpp (index_tts2, version 2.5: multilingual tokenizer adding Japanese, Spanish and
+    Arabic to Chinese and English). Clones a voice from reference audio (reference_audio, or the reference-clip
+    voices). Commercial use is conditional: a separate licence is needed above RMB 1 billion yearly revenue or 100
+    million monthly users, and the model and its outputs may not be used to improve other AI models. Runs in an
+    audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU
+    recommended, about 5.1 GB.'
+  source_url: https://huggingface.co/IndexTeam/IndexTTS-2.5
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: IndexTTS2.5-GGUF
+    include: [index-tts2_5-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: index_tts2
+    server_model: indextts-2.5-audiocpp
+    cloning: true
+    send_language: true
+    hardware: {gpu: recommended, vram_gb: 5.1, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    language_option: true
+  voices:
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: mira-tts-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: MiraTTS
+  languages: [en]
+  tier: accuracy
+  sample_rate: 48000
+  size_bytes: 1570670804
+  license: CC-BY-NC-SA-4.0
+  license_url: https://huggingface.co/YatharthS/MiraTTS
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'MiraTTS (Qwen2 speech-token generator, speaker encoder, DAC decoder and learned upsampler, 48 kHz) on
+    audio.cpp (mira_tts, experimental there). Clones a voice from reference audio; it needs one for every request, so
+    its voices are bolo''s reference clips. Non-commercial, share-alike weights. Pending: audio.cpp publishes no
+    package for it; convert the checkpoint with audio.cpp''s tools/community_models/convert_mira_tts.py and audiocpp_gguf
+    (--family mira_tts, bf16) into a folder holding mira-tts.gguf with config.json and the tokenizer files, and
+    register that folder (bolo pull ./dir).'
+  source_url: https://huggingface.co/YatharthS/MiraTTS
+  validated: untested
+  requires: [audio.cpp]
+  status: pending
+  source:
+    repo: YatharthS/MiraTTS
+    revision: ff750bd74e7b2a2d9313873d583df34a91ed7d8a
+    exclude: ['*.wav', .gitattributes]
+  options:
+    runtime: audio.cpp
+    family: mira_tts
+    model_file: mira-tts.gguf
+    server_model: mira-tts-audiocpp
+    cloning: true
+    send_language: false
+    stream: true
+    hardware: {gpu: recommended, vram_gb: 2.5, note: 'approximate: weights x 1.3 + 0.5 GB; audio.cpp validated it on CUDA'}
+  voices:
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}

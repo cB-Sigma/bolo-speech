@@ -431,8 +431,9 @@ def cmd_components(args: argparse.Namespace) -> int:
             elif not c["installed"]:
                 print(f"             install: {c['manual_command']}")
         return 0
-    if args.component not in ("espeak-ng", "uccharan"):
-        print(f"error: unknown component '{args.component}' (installable: uccharan, espeak-ng)", file=sys.stderr)
+    installable = ("espeak-ng", "uccharan", "llama-server", "audio.cpp")
+    if args.component not in installable:
+        print(f"error: unknown component '{args.component}' (installable: {', '.join(installable)})", file=sys.stderr)
         return 1
     if manager.is_installed(args.component):
         print(f"{args.component} is already installed")
@@ -444,6 +445,11 @@ def cmd_components(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 1
+    if args.component in ("llama-server", "audio.cpp"):
+        blocked = manager.runtime_blocked_reason(args.component)
+        if blocked:
+            print(f"error: cannot install {args.component}: {blocked}", file=sys.stderr)
+            return 1
     error = manager.install_blocking(component=args.component)
     if error:
         print(f"error: {error}", file=sys.stderr)
@@ -667,7 +673,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--json", action="store_true")
     s.set_defaults(func=cmd_bench)
 
-    s = sub.add_parser("components", help="optional components (uccharan, espeak-ng, engine plugins): list, install")
+    s = sub.add_parser(
+        "components",
+        help="optional components (uccharan, espeak-ng, llama-server, audio.cpp, engine plugins): list, install",
+    )
     _common(s)
     s.add_argument("action", choices=["list", "install"])
     s.add_argument("component", nargs="?", default="espeak-ng")

@@ -348,7 +348,7 @@ therefore published **with the Pages site, same origin, under `voices/`** and ar
 It needs only `numpy`, `onnx` and `onnxruntime` and takes a few minutes; the output is cached by
 the workflow (key: the release's `voices.json` and the build scripts). Voices whose archive is not
 published yet are left out (`--skip-missing`) and the demo says "not published with this build".
-**Order of operations for the owner:** run the "Voices" workflow once (it creates `voices-v1`),
+**Order of operations:** run the "Voices" workflow once (it creates `voices-v1`),
 then the "Live demo" workflow (it also runs by itself when "Voices" completes). The Pages artifact
 grows by about 320 MB; the largest single file is 36.5 MB.
 

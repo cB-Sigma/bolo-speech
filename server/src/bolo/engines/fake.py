@@ -23,6 +23,7 @@ import numpy as np
 from bolo import __version__
 from bolo.engines.base import (
     DiarizationModel,
+    DiarizationResult,
     Engine,
     EngineStatus,
     FloatArray,
@@ -30,6 +31,8 @@ from bolo.engines.base import (
     Model,
     Segment,
     SeparationModel,
+    SpeakerActivity,
+    SpeakerRequest,
     SpeakerTurn,
     StreamResult,
     STTModel,
@@ -129,6 +132,34 @@ class FakeSTT(STTModel):
         finally:
             with self._lock:
                 self.concurrent -= 1
+
+
+class FakeSpeakerSTT(FakeSTT):
+    """Speaker-conditioned test model: for each speaker, one segment per stretch where that speaker's activity is
+    above one half, with words in proportion to its length. Remembers every request."""
+
+    speaker_conditioned = True
+
+    def __init__(self, opts: dict[str, Any]) -> None:
+        super().__init__(opts)
+        self.requests: list[SpeakerRequest] = []
+
+    def transcribe_speakers(self, request: SpeakerRequest) -> list[STTResult]:
+        self.requests.append(request)
+        time.sleep(self.base_delay_s)
+        probs, step = request.activity.probs, request.activity.frame_s
+        out: list[STTResult] = []
+        for k in range(request.activity.num_speakers):
+            on = np.concatenate([[0], (probs[:, k] > 0.5).astype(np.int8), [0]])
+            edges = np.flatnonzero(np.diff(on))
+            segments: list[Segment] = []
+            for a, b in zip(edges[0::2], edges[1::2]):
+                words = fake_words((b - a) * step, self.words_per_second)
+                if words:
+                    text = f"speaker{k} " + " ".join(w.w for w in words)
+                    segments.append(Segment(a * step, b * step, text))
+            out.append(STTResult(" ".join(s.text for s in segments), request.language or "en", segments))
+        return out
 
 
 class _FakeStream(STTStream):
@@ -246,7 +277,21 @@ class FakeDiarization(DiarizationModel):
         self.delay_s = float(opts.get("delay_s", 0.02))
         #: find several tones at once (overlapping "speakers") in 0.25 s frames
         self.multi_pitch = bool(opts.get("multi_pitch", False))
+        #: also return per-frame "probabilities" (0.9 inside a speaker's turns, 0.05 outside), as Nemotron does
+        self.activity = bool(opts.get("activity", False))
         self.calls: list[tuple[int | None, float | None]] = []
+
+    def diarize_detailed(
+        self, samples: FloatArray, num_speakers: int | None = None, threshold: float | None = None
+    ) -> DiarizationResult:
+        turns = self.diarize(samples, num_speakers, threshold)
+        if not self.activity:
+            return DiarizationResult(turns)
+        n_spk = max((t.speaker for t in turns), default=-1) + 1
+        probs = np.full((len(samples) // 160 + 1, n_spk), 0.05, np.float32)
+        for t in turns:
+            probs[round(t.start * 100) : round(t.end * 100), t.speaker] = 0.9
+        return DiarizationResult(turns, SpeakerActivity(probs, 0.01))
 
     def _multi_pitch_turns(self, samples: FloatArray) -> list[SpeakerTurn]:
         """Every tone above a fifth of the loudest frame's peak is a speaker; its frames make its turns."""
@@ -398,7 +443,8 @@ class FakeEngine(Engine):
     name = "Fake engine (testing)"
     license = "Apache-2.0"
     kinds = (
-        "fake-stt", "fake-stt-streaming", "fake-tts", "fake-vad", "fake-diarization", "fake-turn", "fake-separation",
+        "fake-stt", "fake-stt-streaming", "fake-stt-speakers", "fake-tts", "fake-vad", "fake-diarization", "fake-turn",
+        "fake-separation",
     )  # fmt: skip
 
     def __init__(self) -> None:
@@ -414,6 +460,8 @@ class FakeEngine(Engine):
             model = FakeSTT(merged)
         elif kind == "fake-stt-streaming":
             model = FakeStreamingSTT(merged)
+        elif kind == "fake-stt-speakers":
+            model = FakeSpeakerSTT(merged)
         elif kind == "fake-tts":
             model = FakeTTS(merged)
         elif kind == "fake-vad":

@@ -62,7 +62,10 @@ def _tts_handler(model: TTSModel) -> Handler:
         for text, voice, speed, emit, cancelled, *extra in payloads:
             n = 0
             phonemizer = extra[0] if extra else None
-            kwargs = {"phonemizer": phonemizer} if phonemizer and model.accepts_phonemizer else {}
+            extras = extra[1] if len(extra) > 1 else None
+            kwargs: dict[str, Any] = {"phonemizer": phonemizer} if phonemizer and model.accepts_phonemizer else {}
+            if extras is not None and model.accepts_extras:
+                kwargs["extras"] = extras
             for chunk in model.synthesize(text, voice, speed, cancelled, **kwargs):
                 emit(chunk)
                 n += len(chunk)
@@ -114,7 +117,10 @@ class ModelManager:
         return spec
 
     def is_installed(self, spec: ModelSpec) -> bool:
-        return spec.builtin or self.store.is_installed(spec.id)
+        """Files on disk, or nothing to download: built in, or served by an operator-run TTS server."""
+        from bolo.tts_runtimes import remote_url
+
+        return spec.builtin or self.store.is_installed(spec.id) or remote_url(self.settings, spec) is not None
 
     def ttl_for(self, spec: ModelSpec) -> float:
         s = self.settings
@@ -138,6 +144,10 @@ class ModelManager:
         if isinstance(model, STTModel):
             handlers["batch"] = model.transcribe
             max_batch["batch"] = max(1, min(model.max_batch, s.max_batch))
+            if model.speaker_conditioned:
+                stt = model
+                handlers["speakers"] = lambda items: [stt.transcribe_speakers(item) for item in items]
+                max_batch["speakers"] = 1
             if model.streaming:
                 handlers["stream"] = _stream_handler(model)
                 max_batch["stream"] = 1 if s.max_batch <= 1 else s.max_batch * 4
@@ -200,8 +210,11 @@ class ModelManager:
             model_opts.setdefault("voices", spec.voices)
         if len(spec.languages) == 1:
             model_opts.setdefault("language", spec.languages[0])
-        if spec.engine.startswith("plugin:"):
+        if spec.engine.startswith("plugin:") or spec.engine == "tts-server":
             model_opts.setdefault("model_id", spec.id)
+        if spec.engine == "tts-server":
+            model_opts.setdefault("model_aliases", list(spec.aliases))
+            model_opts.setdefault("sample_rate", spec.sample_rate)
         model = engine.load(spec.kind, spec.task, self.store.model_dir(spec.id), model_opts, opts)
         if isinstance(model, TTSModel):
             model.warm_up()
@@ -216,6 +229,8 @@ class ModelManager:
         """First load of an installed model happens in a child process (see ``bolo._probe``)."""
         if spec.builtin or not self.settings.probe_models or spec.engine.startswith("plugin:"):
             return  # plugins run in their own process already
+        if spec.engine == "tts-server":
+            return  # the model runs in a server process; loading it there is the check
         manifest = self.store.manifest(spec.id)
         engine_version = self.engines.status(spec.engine).version
         if manifest is None or manifest.get("probed") == engine_version:

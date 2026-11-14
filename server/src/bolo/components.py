@@ -8,6 +8,10 @@
 * **Engine plugins** (``plugin:<name>``): out-of-process engines such as a PyTorch engine
   (docs/plugins.md). Listed so that the console can say which plugin a model needs; they are
   installed as packages by the operator, not from here.
+* **TTS server runtimes** (``llama-server`` from llama.cpp, MIT; ``audio.cpp``, Apache-2.0): the binaries the
+  ``tts-server`` engine starts for its models (bolo.tts_runtimes). Installable here as pinned upstream release
+  archives checked against their SHA-256, or provided by the operator (a setting, PATH, or a running server
+  named in ``tts_servers``, in which case the model does not need the binary at all).
 """
 
 from __future__ import annotations
@@ -23,6 +27,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from bolo import tts_runtimes
 from bolo.errors import InvalidRequest, ModelNotFound
 from bolo.jobs import Job
 from bolo.text import phonemize
@@ -185,15 +190,26 @@ class ComponentManager:
             component = (default["id"] if default else ESPEAK).split(":")[0]
             requires.append(component)
             available = bool(default and default["available"])
-        for item in spec.requires:
-            if item not in ("phonemizer", ESPEAK):
-                requires.append(item)
-                available = available and self.is_installed(item)
+        for item in self._component_requires(spec):
+            requires.append(item)
+            available = available and self.is_installed(item)
         if spec.plugin:
             plugin = PLUGIN_PREFIX + spec.plugin
             requires.append(plugin)
             available = available and self.is_installed(plugin)
         return requires, options, available
+
+    def _component_requires(self, spec: ModelSpec) -> list[str]:
+        """Components named in ``requires`` that this installation needs (a server runtime is not needed when
+        the operator points ``tts_servers`` at a running server for the model)."""
+        out: list[str] = []
+        for item in spec.requires:
+            if item in ("phonemizer", ESPEAK):
+                continue
+            if item in tts_runtimes.RUNTIMES and tts_runtimes.remote_url(self.core.settings, spec):
+                continue
+            out.append(item)
+        return out
 
     def voice_phonemizers(self, spec: ModelSpec) -> dict[str, list[dict[str, Any]]]:
         """Per-voice choices for a model whose voices differ in language (Kokoro)."""
@@ -251,9 +267,17 @@ class ComponentManager:
                 phonemize.resolve(profile, language, effective)
             elif phonemize.select(profile, language) is None:
                 return phonemize.missing_hint(profile, language)
-        for item in spec.requires:
-            if item not in ("phonemizer", ESPEAK) and not self.is_installed(item):
-                return f"it needs the component '{item}', which is not installed"
+        for item in self._component_requires(spec):
+            if self.is_installed(item):
+                continue
+            if item in tts_runtimes.RUNTIMES:
+                info = tts_runtimes.RUNTIME_INFO[item]
+                return (
+                    f"it runs on {info.name}, which is not installed. Install it with `bolo components install "
+                    f"{item}` (or POST /api/v1/components/{item}/install), set {info.setting} to a binary, or point "
+                    f'the setting tts_servers at a running server ("{spec.id}=http://host:port")'
+                )
+            return f"it needs the component '{item}', which is not installed"
         return None
 
     # -- policy -----------------------------------------------------------
@@ -292,6 +316,8 @@ class ComponentManager:
             return uccharan_status()[0]
         if component.startswith(PLUGIN_PREFIX):
             return self.core.engines.status(component).available
+        if component in tts_runtimes.RUNTIMES:
+            return tts_runtimes.find_binary(self.core.settings, component)[0] is not None
         return False
 
     def plugin_ids(self) -> list[str]:
@@ -348,6 +374,7 @@ class ComponentManager:
                 ),
             }
         )
+        out.extend(self.runtime_status())
         for plugin in self.plugin_ids():
             st = self.core.engines.status(plugin)
             hint = next(
@@ -379,8 +406,113 @@ class ComponentManager:
             )
         return out
 
+    # -- TTS server runtimes ------------------------------------------------
+    def runtime_blocked_reason(self, runtime: str) -> str | None:
+        s = self.core.settings
+        if s.host not in LOOPBACK and not s.api_key:
+            return "installing components is never allowed on a non-loopback address without an API key"
+        if s.allow_component_install is False:
+            return "the operator disabled component installation (allow_component_install = false)"
+        if tts_runtimes.platform_key() not in tts_runtimes.RUNTIME_INFO[runtime].releases:
+            return f"no prebuilt release is pinned for this platform ({tts_runtimes.platform_key()})"
+        target = tts_runtimes.components_dir(s)
+        probe = target if target.exists() else Path(s.data_dir)
+        while not probe.exists() and probe != probe.parent:
+            probe = probe.parent
+        if not os.access(probe, os.W_OK):
+            return f"the data directory is read-only ({probe})"
+        return None
+
+    def runtime_status(self) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for runtime in tts_runtimes.RUNTIMES:
+            info = tts_runtimes.RUNTIME_INFO[runtime]
+            state = tts_runtimes.install_status(self.core.settings, runtime)
+            installed = state["path"] is not None
+            blocked = self.runtime_blocked_reason(runtime)
+            release = state["release"]
+            manual = (
+                f"bolo components install {runtime}"
+                if release
+                else f"build {info.binary} from {info.homepage} and set {info.setting}"
+            )
+            out.append(
+                {
+                    "id": runtime,
+                    "name": info.name,
+                    "kind": "tts-server",
+                    "installed": installed,
+                    "source": state["source"],
+                    "version": info.version if state["source"] == "bolo" else ("found" if installed else None),
+                    "license": info.license,
+                    "license_url": info.license_url,
+                    "required_by_count": self.required_by(runtime),
+                    "installable": blocked is None and not installed,
+                    "install_blocked_reason": None if installed else blocked,
+                    "manual_command": manual
+                    + f'; or run the server yourself and set tts_servers = ["{runtime}=http://host:port"]',
+                    "path": state["path"],
+                    "servers": state["urls"],
+                    "release": {"version": info.version, "url": release.url, "sha256": release.sha256}
+                    if release
+                    else None,
+                    "description": info.description,
+                }
+            )
+        return out
+
+    def install_runtime_blocking(self, runtime: str, job: Job | None = None) -> str | None:
+        """Download the pinned release archive for this platform, check its SHA-256 and unpack it."""
+        from bolo.store import RemoteFile
+
+        info = tts_runtimes.RUNTIME_INFO[runtime]
+        release = info.releases.get(tts_runtimes.platform_key())
+        if release is None:
+            return f"no prebuilt {info.name} release is pinned for {tts_runtimes.platform_key()}"
+
+        def progress(n: int) -> None:
+            if job is not None and release.size:
+                job.bytes_done += n
+                job.bytes_total = release.size
+                job.progress = min(0.95, job.bytes_done / release.size)
+
+        target = tts_runtimes.install_dir(self.core.settings, runtime)
+        tmp = target.with_name(target.name + ".partial")
+        try:
+            blob, _ = self.core.store.fetch_blob(
+                RemoteFile(release.url.rsplit("/", 1)[-1], release.url, release.size, release.sha256), on_bytes=progress
+            )
+            shutil.rmtree(tmp, ignore_errors=True)
+            tts_runtimes.extract_release(blob, tmp)
+            shutil.rmtree(target, ignore_errors=True)
+            tmp.rename(target)
+            blob.unlink(missing_ok=True)
+        except Exception as exc:
+            shutil.rmtree(tmp, ignore_errors=True)
+            return f"{type(exc).__name__}: {exc}"
+        path = tts_runtimes.find_binary(self.core.settings, runtime)[0]
+        if path is None:
+            return f"the release was unpacked but {info.binary} was not found in it"
+        problem = tts_runtimes.check_runs(path) if path.is_relative_to(target) else None
+        if problem:
+            shutil.rmtree(target, ignore_errors=True)
+            return f"{info.binary} {info.version} does not run here: {problem}"
+        return None
+
     # -- install ----------------------------------------------------------
     def start_install(self, component: str, accept_license: bool) -> Job:
+        if component in tts_runtimes.RUNTIMES:
+            blocked = self.runtime_blocked_reason(component)
+            if blocked:
+                raise InvalidRequest(f"cannot install {component}: {blocked}")
+            job = self.core.jobs.create("install", component)
+            if self.is_installed(component):
+                job.state, job.progress = "done", 1.0
+                return job
+            task = asyncio.create_task(self._install(job), name=f"bolo-install-{component}")
+            self.core._tasks.append(task)
+            task.add_done_callback(lambda t: self.core._tasks.remove(t) if t in self.core._tasks else None)
+            return job
         if component not in PACKAGES:
             if component.startswith(PLUGIN_PREFIX):
                 raise InvalidRequest(f"engine plugins are installed as packages, not from the API ({component})")
@@ -404,6 +536,8 @@ class ComponentManager:
 
     def install_blocking(self, job: Job | None = None, component: str = ESPEAK) -> str | None:
         """Install the component's package and activate it. Returns an error message, or None on success."""
+        if component in tts_runtimes.RUNTIMES:
+            return self.install_runtime_blocking(component, job)
         cmd = installer_command()
         if cmd is None:
             return "neither pip nor uv is available in this environment"

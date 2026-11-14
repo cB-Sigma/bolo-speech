@@ -52,21 +52,29 @@ def mel_filterbank(n_mels: int = N_MELS, n_fft: int = N_FFT, rate: int = RATE) -
 
 
 _WINDOW = 0.5 - 0.5 * np.cos(2.0 * np.pi * np.arange(N_FFT) / N_FFT)  # periodic Hann
-_FILTERS = mel_filterbank()
+_FILTERS = {N_MELS: mel_filterbank()}
+_WHISPER_BLOCK = 6000  # STFT frames per block (60 s): bounds the memory used on long recordings
 
 
-def whisper_log_mel(audio: FloatArray, *, normalize: bool = False) -> FloatArray:
-    """Features of shape ``(80, len(audio) // 160)``. ``normalize`` first gives the waveform zero mean and unit variance."""
+def whisper_log_mel(audio: FloatArray, *, normalize: bool = False, n_mels: int = N_MELS) -> FloatArray:
+    """Features of shape ``(n_mels, len(audio) // 160)``. ``normalize`` first gives the waveform zero mean and unit
+    variance. ``n_mels`` is 80 (Whisper up to large-v2) or 128 (large-v3 and its derivatives)."""
     x = np.asarray(audio, dtype=np.float64)
     if normalize and len(x):
         x = (x - x.mean()) / np.sqrt(x.var() + 1e-7)
+    filters = _FILTERS.get(n_mels)
+    if filters is None:
+        filters = _FILTERS[n_mels] = mel_filterbank(n_mels)
     padded = np.pad(x, N_FFT // 2, mode="reflect")
-    count = 1 + (len(padded) - N_FFT) // HOP
-    index = np.arange(N_FFT)[None, :] + HOP * np.arange(count)[:, None]
-    power = np.abs(np.fft.rfft(padded[index] * _WINDOW, axis=1)) ** 2
-    mel = np.maximum(power @ _FILTERS, 1e-10)
-    log = np.log10(mel)[:-1]  # Whisper drops the last frame
-    log = np.maximum(log, log.max() - 8.0)
+    count = 1 + (len(padded) - N_FFT) // HOP - 1  # Whisper drops the last frame
+    log = np.empty((max(0, count), n_mels))
+    for first in range(0, count, _WHISPER_BLOCK):
+        n = min(_WHISPER_BLOCK, count - first)
+        index = np.arange(N_FFT)[None, :] + HOP * (first + np.arange(n))[:, None]
+        power = np.abs(np.fft.rfft(padded[index] * _WINDOW, axis=1)) ** 2
+        log[first : first + n] = np.log10(np.maximum(power @ filters, 1e-10))
+    if count > 0:
+        log = np.maximum(log, float(np.max(log)) - 8.0)
     return np.ascontiguousarray(((log + 4.0) / 4.0).T, dtype=np.float32)
 
 

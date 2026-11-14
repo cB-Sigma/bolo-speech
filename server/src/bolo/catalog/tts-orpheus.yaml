@@ -1,0 +1,413 @@
+# Orpheus-family text-to-speech on llama.cpp, without PyTorch: the tts-server engine, kind orpheus-llamacpp
+# (bolo/engines/orpheus_llamacpp.py). llama-server (llama.cpp, MIT) runs the language model from a GGUF file; bolo
+# builds the prompt, streams the generated token ids from /completion and decodes the SNAC 24 kHz codes with
+# onnxruntime, using bolo's own export of the SNAC decoder (server/tools/export_snac_onnx.py; fp32, checked
+# against PyTorch SNAC). bolo starts llama-server for the model in use (bolo components install llama-server, or the
+# setting llama_server_bin) or forwards to one the operator runs with the same GGUF (setting tts_servers,
+# "<model id>=<url>"; the GGUF is then not downloaded, the 53 MB decoder is fetched on first load).
+# Licences never exclude a model: each entry states licence, commercial_use and gated. options.hardware gives the
+# GPU advice and an approximate memory need (weights x 1.3 + 0.5 GB; the KV cache of -c 4096 adds about 0.45 GB).
+# Sources, read 2026-11-14: the Hugging Face API for every repository (revision, files, sizes, SHA-256, gating,
+# licence tags), the model cards, Kenpath's svara-tts-inference (prompt), canopyai/Orpheus-TTS (prompt, sampling),
+# llama.cpp tools/server/README.md (build b12375).
+# status: pending until the SNAC decoder is published at codebucketsolutions/snac-24khz-onnx (then pin the
+# revision in the decoder URL and drop the status). validated: untested (the files bolo would download are not
+# published yet); Svara and Veena Q4_K_M were run on a 4-vCPU machine, see docs/models.md.
+- id: svara-tts-v1-llamacpp
+  task: tts
+  engine: tts-server
+  kind: orpheus-llamacpp
+  family: Svara
+  languages: [hi, bn, mr, te, kn, ta, ml, gu, pa, as, ne, sa, mai, bho, mag, hne, brx, doi, en]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 2145150756
+  params: 3300000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/kenpath/svara-tts-v1
+  commercial_use: true
+  gated: false
+  status: pending
+  description: 'Kenpath Svara TTS v1 (3.3 B Llama, Orpheus Hindi base) for 19 Indian languages including Bhojpuri, Magahi,
+    Maithili, Chhattisgarhi, Bodo and Dogri, two voices per language, without PyTorch: Q4_K_M GGUF by mradermacher on
+    llama.cpp, SNAC decoded by bolo in onnxruntime. Needs a GPU for live use. Licence: Apache-2.0 as labelled by
+    Kenpath; its training data includes the IIT Madras IndicTTS corpus, whose terms for commercial use of derived models
+    were not verified; derived from Llama 3.2 3B. No published quality evaluation.'
+  source_url: https://huggingface.co/kenpath/svara-tts-v1
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: mradermacher/svara-tts-v1-GGUF
+    revision: 97a29a804ce4e369efa7a16bb4cf9e309300aa3e
+    include: [svara-tts-v1.Q4_K_M.gguf]
+    urls:
+    - path: snac/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      size: 52581828
+      sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
+  options:
+    runtime: llama-server
+    model_file: svara-tts-v1.Q4_K_M.gguf
+    # the Orpheus layout (as mlx-audio and the transformers.js export use for Svara): with Kenpath's own layout
+    # (svara-tts-inference) the model spoke the speaker label in Bengali and dropped words; see docs/models.md
+    prompt_format: orpheus
+    speaker_field: name
+    temperature: 0.75
+    top_p: 0.9
+    repetition_penalty: 1.1
+    server_args: ['-c', '4096', '-np', '1']
+    first_chunk_chars: 80
+    hardware: {gpu: recommended, vram_gb: 3.2, note: 'approximate: weights x 1.3 + 0.5 GB, plus about 0.45 GB of KV cache; 11-16 times slower than real time on a 4-core CPU (measured at Q4_K_M)'}
+    snac:
+      file: snac/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
+      size: 52581828
+  voices:
+  - {id: hi_male, name: 'Hindi (Male)', language: hi-IN, gender: m}
+  - {id: hi_female, name: 'Hindi (Female)', language: hi-IN, gender: f}
+  - {id: bn_male, name: 'Bengali (Male)', language: bn-IN, gender: m}
+  - {id: bn_female, name: 'Bengali (Female)', language: bn-IN, gender: f}
+  - {id: mr_male, name: 'Marathi (Male)', language: mr-IN, gender: m}
+  - {id: mr_female, name: 'Marathi (Female)', language: mr-IN, gender: f}
+  - {id: te_male, name: 'Telugu (Male)', language: te-IN, gender: m}
+  - {id: te_female, name: 'Telugu (Female)', language: te-IN, gender: f}
+  - {id: kn_male, name: 'Kannada (Male)', language: kn-IN, gender: m}
+  - {id: kn_female, name: 'Kannada (Female)', language: kn-IN, gender: f}
+  - {id: bh_male, name: 'Bhojpuri (Male)', language: bho-IN, gender: m}
+  - {id: bh_female, name: 'Bhojpuri (Female)', language: bho-IN, gender: f}
+  - {id: mag_male, name: 'Magahi (Male)', language: mag-IN, gender: m}
+  - {id: mag_female, name: 'Magahi (Female)', language: mag-IN, gender: f}
+  - {id: hne_male, name: 'Chhattisgarhi (Male)', language: hne-IN, gender: m}
+  - {id: hne_female, name: 'Chhattisgarhi (Female)', language: hne-IN, gender: f}
+  - {id: mai_male, name: 'Maithili (Male)', language: mai-IN, gender: m}
+  - {id: mai_female, name: 'Maithili (Female)', language: mai-IN, gender: f}
+  - {id: as_male, name: 'Assamese (Male)', language: as-IN, gender: m}
+  - {id: as_female, name: 'Assamese (Female)', language: as-IN, gender: f}
+  - {id: brx_male, name: 'Bodo (Male)', language: brx-IN, gender: m}
+  - {id: brx_female, name: 'Bodo (Female)', language: brx-IN, gender: f}
+  - {id: doi_male, name: 'Dogri (Male)', language: doi-IN, gender: m}
+  - {id: doi_female, name: 'Dogri (Female)', language: doi-IN, gender: f}
+  - {id: gu_male, name: 'Gujarati (Male)', language: gu-IN, gender: m}
+  - {id: gu_female, name: 'Gujarati (Female)', language: gu-IN, gender: f}
+  - {id: ml_male, name: 'Malayalam (Male)', language: ml-IN, gender: m}
+  - {id: ml_female, name: 'Malayalam (Female)', language: ml-IN, gender: f}
+  - {id: pa_male, name: 'Punjabi (Male)', language: pa-IN, gender: m}
+  - {id: pa_female, name: 'Punjabi (Female)', language: pa-IN, gender: f}
+  - {id: ta_male, name: 'Tamil (Male)', language: ta-IN, gender: m}
+  - {id: ta_female, name: 'Tamil (Female)', language: ta-IN, gender: f}
+  - {id: en_male, name: 'English (Indian) (Male)', language: en-IN, gender: m}
+  - {id: en_female, name: 'English (Indian) (Female)', language: en-IN, gender: f}
+  - {id: ne_male, name: 'Nepali (Male)', language: ne-IN, gender: m}
+  - {id: ne_female, name: 'Nepali (Female)', language: ne-IN, gender: f}
+  - {id: sa_male, name: 'Sanskrit (Male)', language: sa-IN, gender: m}
+  - {id: sa_female, name: 'Sanskrit (Female)', language: sa-IN, gender: f}
+- id: svara-tts-v1-q8-llamacpp
+  task: tts
+  engine: tts-server
+  kind: orpheus-llamacpp
+  family: Svara
+  languages: [hi, bn, mr, te, kn, ta, ml, gu, pa, as, ne, sa, mai, bho, mag, hne, brx, doi, en]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 3569013252
+  params: 3300000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/kenpath/svara-tts-v1
+  commercial_use: true
+  gated: false
+  status: pending
+  description: 'Kenpath Svara TTS v1 (3.3 B Llama, Orpheus Hindi base) for 19 Indian languages including Bhojpuri, Magahi,
+    Maithili, Chhattisgarhi, Bodo and Dogri, two voices per language, without PyTorch: Q8_0 (closest to the original
+    weights) GGUF by mradermacher on llama.cpp, SNAC decoded by bolo in onnxruntime. Needs a GPU for live use. Licence:
+    Apache-2.0 as labelled by Kenpath; its training data includes the IIT Madras IndicTTS corpus, whose terms for
+    commercial use of derived models were not verified; derived from Llama 3.2 3B. No published quality evaluation.'
+  source_url: https://huggingface.co/kenpath/svara-tts-v1
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: mradermacher/svara-tts-v1-GGUF
+    revision: 97a29a804ce4e369efa7a16bb4cf9e309300aa3e
+    include: [svara-tts-v1.Q8_0.gguf]
+    urls:
+    - path: snac/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      size: 52581828
+      sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
+  options:
+    runtime: llama-server
+    model_file: svara-tts-v1.Q8_0.gguf
+    # the Orpheus layout (as mlx-audio and the transformers.js export use for Svara): with Kenpath's own layout
+    # (svara-tts-inference) the model spoke the speaker label in Bengali and dropped words; see docs/models.md
+    prompt_format: orpheus
+    speaker_field: name
+    temperature: 0.75
+    top_p: 0.9
+    repetition_penalty: 1.1
+    server_args: ['-c', '4096', '-np', '1']
+    first_chunk_chars: 80
+    hardware: {gpu: recommended, vram_gb: 5.1, note: 'approximate: weights x 1.3 + 0.5 GB, plus about 0.45 GB of KV cache; 11-16 times slower than real time on a 4-core CPU (measured at Q4_K_M)'}
+    snac:
+      file: snac/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
+      size: 52581828
+  voices:
+  - {id: hi_male, name: 'Hindi (Male)', language: hi-IN, gender: m}
+  - {id: hi_female, name: 'Hindi (Female)', language: hi-IN, gender: f}
+  - {id: bn_male, name: 'Bengali (Male)', language: bn-IN, gender: m}
+  - {id: bn_female, name: 'Bengali (Female)', language: bn-IN, gender: f}
+  - {id: mr_male, name: 'Marathi (Male)', language: mr-IN, gender: m}
+  - {id: mr_female, name: 'Marathi (Female)', language: mr-IN, gender: f}
+  - {id: te_male, name: 'Telugu (Male)', language: te-IN, gender: m}
+  - {id: te_female, name: 'Telugu (Female)', language: te-IN, gender: f}
+  - {id: kn_male, name: 'Kannada (Male)', language: kn-IN, gender: m}
+  - {id: kn_female, name: 'Kannada (Female)', language: kn-IN, gender: f}
+  - {id: bh_male, name: 'Bhojpuri (Male)', language: bho-IN, gender: m}
+  - {id: bh_female, name: 'Bhojpuri (Female)', language: bho-IN, gender: f}
+  - {id: mag_male, name: 'Magahi (Male)', language: mag-IN, gender: m}
+  - {id: mag_female, name: 'Magahi (Female)', language: mag-IN, gender: f}
+  - {id: hne_male, name: 'Chhattisgarhi (Male)', language: hne-IN, gender: m}
+  - {id: hne_female, name: 'Chhattisgarhi (Female)', language: hne-IN, gender: f}
+  - {id: mai_male, name: 'Maithili (Male)', language: mai-IN, gender: m}
+  - {id: mai_female, name: 'Maithili (Female)', language: mai-IN, gender: f}
+  - {id: as_male, name: 'Assamese (Male)', language: as-IN, gender: m}
+  - {id: as_female, name: 'Assamese (Female)', language: as-IN, gender: f}
+  - {id: brx_male, name: 'Bodo (Male)', language: brx-IN, gender: m}
+  - {id: brx_female, name: 'Bodo (Female)', language: brx-IN, gender: f}
+  - {id: doi_male, name: 'Dogri (Male)', language: doi-IN, gender: m}
+  - {id: doi_female, name: 'Dogri (Female)', language: doi-IN, gender: f}
+  - {id: gu_male, name: 'Gujarati (Male)', language: gu-IN, gender: m}
+  - {id: gu_female, name: 'Gujarati (Female)', language: gu-IN, gender: f}
+  - {id: ml_male, name: 'Malayalam (Male)', language: ml-IN, gender: m}
+  - {id: ml_female, name: 'Malayalam (Female)', language: ml-IN, gender: f}
+  - {id: pa_male, name: 'Punjabi (Male)', language: pa-IN, gender: m}
+  - {id: pa_female, name: 'Punjabi (Female)', language: pa-IN, gender: f}
+  - {id: ta_male, name: 'Tamil (Male)', language: ta-IN, gender: m}
+  - {id: ta_female, name: 'Tamil (Female)', language: ta-IN, gender: f}
+  - {id: en_male, name: 'English (Indian) (Male)', language: en-IN, gender: m}
+  - {id: en_female, name: 'English (Indian) (Female)', language: en-IN, gender: f}
+  - {id: ne_male, name: 'Nepali (Male)', language: ne-IN, gender: m}
+  - {id: ne_female, name: 'Nepali (Female)', language: ne-IN, gender: f}
+  - {id: sa_male, name: 'Sanskrit (Male)', language: sa-IN, gender: m}
+  - {id: sa_female, name: 'Sanskrit (Female)', language: sa-IN, gender: f}
+- id: veena-llamacpp
+  task: tts
+  engine: tts-server
+  kind: orpheus-llamacpp
+  family: Veena
+  languages: [hi, en]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 2525208196
+  params: 3000000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/maya-research/Veena
+  commercial_use: true
+  gated: false
+  status: pending
+  description: 'Maya Research Veena (3 B Llama) for Hindi, English and code-mixed text, four voices, without PyTorch: Q4_K_M GGUF
+    by Mungert on llama.cpp, SNAC decoded by bolo in onnxruntime. Needs a GPU for live use. Apache-2.0; training data
+    not disclosed.'
+  source_url: https://huggingface.co/maya-research/Veena
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: Mungert/Veena-GGUF
+    revision: 3a10a20b3fa95fad626fa327069d9fbcf894f433
+    include: [Veena-q4_k_m.gguf]
+    urls:
+    - path: snac/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      size: 52581828
+      sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
+  options:
+    runtime: llama-server
+    model_file: Veena-q4_k_m.gguf
+    prompt_format: veena
+    server_args: ['-c', '4096', '-np', '1']
+    first_chunk_chars: 80
+    hardware: {gpu: recommended, vram_gb: 3.7, note: 'approximate: weights x 1.3 + 0.5 GB, plus about 0.45 GB of KV cache; 11-16 times slower than real time on a 4-core CPU (measured at Q4_K_M)'}
+    snac:
+      file: snac/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
+      size: 52581828
+  voices:
+  - {id: kavya, name: Kavya, language: hi-IN, gender: f}
+  - {id: agastya, name: Agastya, language: hi-IN, gender: m}
+  - {id: maitri, name: Maitri, language: hi-IN, gender: f}
+  - {id: vinaya, name: Vinaya, language: hi-IN, gender: m}
+- id: veena-q8-llamacpp
+  task: tts
+  engine: tts-server
+  kind: orpheus-llamacpp
+  family: Veena
+  languages: [hi, en]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 4081332964
+  params: 3000000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/maya-research/Veena
+  commercial_use: true
+  gated: false
+  status: pending
+  description: 'Maya Research Veena (3 B Llama) for Hindi, English and code-mixed text, four voices, without PyTorch: Q8_0 GGUF by
+    Mungert on llama.cpp, SNAC decoded by bolo in onnxruntime. Needs a GPU for live use. Apache-2.0; training data not
+    disclosed.'
+  source_url: https://huggingface.co/maya-research/Veena
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: Mungert/Veena-GGUF
+    revision: 3a10a20b3fa95fad626fa327069d9fbcf894f433
+    include: [Veena-q8_0.gguf]
+    urls:
+    - path: snac/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      size: 52581828
+      sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
+  options:
+    runtime: llama-server
+    model_file: Veena-q8_0.gguf
+    prompt_format: veena
+    server_args: ['-c', '4096', '-np', '1']
+    first_chunk_chars: 80
+    hardware: {gpu: recommended, vram_gb: 5.7, note: 'approximate: weights x 1.3 + 0.5 GB, plus about 0.45 GB of KV cache; 11-16 times slower than real time on a 4-core CPU (measured at Q4_K_M)'}
+    snac:
+      file: snac/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
+      size: 52581828
+  voices:
+  - {id: kavya, name: Kavya, language: hi-IN, gender: f}
+  - {id: agastya, name: Agastya, language: hi-IN, gender: m}
+  - {id: maitri, name: Maitri, language: hi-IN, gender: f}
+  - {id: vinaya, name: Vinaya, language: hi-IN, gender: m}
+- id: orpheus-3b-0.1-ft-llamacpp
+  task: tts
+  engine: tts-server
+  kind: orpheus-llamacpp
+  family: Orpheus
+  aliases: [orpheus-3b-llamacpp]
+  languages: [en]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 2145150948
+  params: 3300000000
+  license: Apache-2.0 (Llama 3.2 Community License for the base model)
+  license_url: https://huggingface.co/canopylabs/orpheus-3b-0.1-ft
+  commercial_use: true
+  gated: false
+  status: pending
+  description: 'Canopy Labs Orpheus 3B 0.1 (English), eight voices and emotive tags such as <laugh> and <sigh>, without PyTorch:
+    Q4_K_M GGUF by Unsloth on llama.cpp, SNAC decoded by bolo in onnxruntime. Needs a GPU for live use. The weights are
+    labelled Apache-2.0 and are a fine-tune of Llama 3.2 3B Instruct, so Meta''s Llama 3.2 Community License terms
+    (attribution, acceptable-use policy) apply too. Canopy Labs'' own repository asks for a click-through (gated); the
+    GGUF repository used here does not.'
+  source_url: https://huggingface.co/canopylabs/orpheus-3b-0.1-ft
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: unsloth/orpheus-3b-0.1-ft-GGUF
+    revision: e2b00302c46af8205f521f60016600aa25a068e6
+    include: [orpheus-3b-0.1-ft-Q4_K_M.gguf]
+    urls:
+    - path: snac/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      size: 52581828
+      sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
+  options:
+    runtime: llama-server
+    model_file: orpheus-3b-0.1-ft-Q4_K_M.gguf
+    prompt_format: orpheus
+    server_args: ['-c', '4096', '-np', '1']
+    first_chunk_chars: 80
+    hardware: {gpu: recommended, vram_gb: 3.2, note: 'approximate: weights x 1.3 + 0.5 GB, plus about 0.45 GB of KV cache; 11-16 times slower than real time on a 4-core CPU (measured at Q4_K_M)'}
+    snac:
+      file: snac/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
+      size: 52581828
+  voices:
+  - {id: tara, name: Tara, language: en-US, gender: f}
+  - {id: leah, name: Leah, language: en-US, gender: f}
+  - {id: jess, name: Jess, language: en-US, gender: f}
+  - {id: leo, name: Leo, language: en-US, gender: m}
+  - {id: dan, name: Dan, language: en-US, gender: m}
+  - {id: mia, name: Mia, language: en-US, gender: f}
+  - {id: zac, name: Zac, language: en-US, gender: m}
+  - {id: zoe, name: Zoe, language: en-US, gender: f}
+- id: snortts-indic-v0-llamacpp
+  task: tts
+  engine: tts-server
+  kind: orpheus-llamacpp
+  family: snorTTS Indic
+  languages: [hi, bn, gu, kn, ml, mr, pa, ta, te]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 2416342980
+  params: 3000000000
+  license: Apache-2.0 (Llama 3.2 Community License for the base model)
+  license_url: https://huggingface.co/snorbyte/snorTTS-Indic-v0
+  commercial_use: true
+  gated: false
+  status: pending
+  description: 'snorbyte snorTTS-Indic-v0 (3 B Llama, Orpheus Hindi pretrain base) for nine Indian languages and code-switched
+    text, 24 speakers, without PyTorch: Q4_K_M GGUF by mradermacher on llama.cpp, SNAC decoded by bolo in onnxruntime.
+    Needs a GPU for live use. Labelled Apache-2.0; its base canopylabs/3b-hi-pretrain-research_release is under the
+    Llama 3.2 Community License; trained on snorbyte''s IndicTTS sample set (CC-BY-4.0). The card recommends speeding
+    the output up by 5-25 % per speaker, which bolo does not do.'
+  source_url: https://huggingface.co/snorbyte/snorTTS-Indic-v0
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: mradermacher/snorTTS-Indic-v0-GGUF
+    revision: 3bce1d5dd58985bccd809d9ba201ffcd551a4427
+    include: [snorTTS-Indic-v0.Q4_K_M.gguf]
+    urls:
+    - path: snac/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      size: 52581828
+      sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
+  options:
+    runtime: llama-server
+    model_file: snorTTS-Indic-v0.Q4_K_M.gguf
+    prompt_format: orpheus
+    server_args: ['-c', '4096', '-np', '1']
+    first_chunk_chars: 80
+    hardware: {gpu: recommended, vram_gb: 3.6, note: 'approximate: weights x 1.3 + 0.5 GB, plus about 0.45 GB of KV cache; 11-16 times slower than real time on a 4-core CPU (measured at Q4_K_M)'}
+    snac:
+      file: snac/snac_24khz_decoder.onnx
+      url: https://huggingface.co/codebucketsolutions/snac-24khz-onnx/resolve/main/snac_24khz_decoder.onnx
+      sha256: 33d7968c2a635c66ffbd2e9c38491a059c181edf7c03d8ed783a7b10f99cb911
+      size: 52581828
+    temperature: 0.4
+    top_p: 0.9
+    repetition_penalty: 1.05
+  voices:
+  - {id: hi_159, name: 'Hindi 159', language: hi-IN, speaker: hindi159}
+  - {id: hi_49, name: 'Hindi 49', language: hi-IN, speaker: hindi49}
+  - {id: hi_43, name: 'Hindi 43', language: hi-IN, speaker: hindi43}
+  - {id: ta_188, name: 'Tamil 188', language: ta-IN, speaker: tamil188}
+  - {id: ta_128, name: 'Tamil 128', language: ta-IN, speaker: tamil128}
+  - {id: ta_176, name: 'Tamil 176', language: ta-IN, speaker: tamil176}
+  - {id: bn_125, name: 'Bengali 125', language: bn-IN, speaker: bengali125}
+  - {id: ml_189, name: 'Malayalam 189', language: ml-IN, speaker: malayalam189}
+  - {id: ml_124, name: 'Malayalam 124', language: ml-IN, speaker: malayalam124}
+  - {id: kn_142, name: 'Kannada 142', language: kn-IN, speaker: kannada142}
+  - {id: kn_138, name: 'Kannada 138', language: kn-IN, speaker: kannada138}
+  - {id: kn_131, name: 'Kannada 131', language: kn-IN, speaker: kannada131}
+  - {id: kn_59, name: 'Kannada 59', language: kn-IN, speaker: kannada59}
+  - {id: te_69, name: 'Telugu 69', language: te-IN, speaker: telugu69}
+  - {id: te_133, name: 'Telugu 133', language: te-IN, speaker: telugu133}
+  - {id: pa_191, name: 'Punjabi 191', language: pa-IN, speaker: punjabi191}
+  - {id: pa_67, name: 'Punjabi 67', language: pa-IN, speaker: punjabi67}
+  - {id: pa_201, name: 'Punjabi 201', language: pa-IN, speaker: punjabi201}
+  - {id: gu_62, name: 'Gujarati 62', language: gu-IN, speaker: gujarati62}
+  - {id: gu_190, name: 'Gujarati 190', language: gu-IN, speaker: gujarati190}
+  - {id: mr_205, name: 'Marathi 205', language: mr-IN, speaker: marathi205}
+  - {id: mr_82, name: 'Marathi 82', language: mr-IN, speaker: marathi82}
+  - {id: mr_199, name: 'Marathi 199', language: mr-IN, speaker: marathi199}
+  - {id: mr_203, name: 'Marathi 203', language: mr-IN, speaker: marathi203}

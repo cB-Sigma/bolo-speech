@@ -125,6 +125,9 @@ class Model(abc.ABC):
 
 class STTModel(Model):
     task = "stt"
+    #: diarization-conditioned (target-speaker) recognition: :meth:`transcribe_speakers` decodes a whole
+    #: recording once per speaker, steered by per-frame speaker activity, instead of turn by turn
+    speaker_conditioned: bool = False
     #: largest batch ``transcribe`` decodes in one native call
     max_batch: int = 1
     #: longest utterance the model accepts in one piece (seconds); longer audio is segmented
@@ -139,6 +142,11 @@ class STTModel(Model):
     @abc.abstractmethod
     def transcribe(self, requests: list[STTRequest]) -> list[STTResult]:
         """Decode a batch of utterances. Must return one result per request, in order."""
+
+    def transcribe_speakers(self, request: SpeakerRequest) -> list[STTResult]:
+        """Speaker-conditioned models: one result per column of ``request.activity`` (speaker ``k`` of the
+        diarization), segment times measured from the start of the recording."""
+        raise NotImplementedError("this model is not conditioned on speaker diarization")
 
     def create_stream(self, language: str | None = None) -> STTStream:
         raise NotImplementedError("this model does not support incremental decoding")
@@ -160,11 +168,27 @@ class Voice:
         return {"id": self.id, "name": self.name or self.id, "language": self.language, "gender": self.gender}
 
 
+@dataclass
+class SynthesisExtras:
+    """Per-request inputs that only some voices use (passed as ``extras=`` when ``accepts_extras`` is true)."""
+
+    #: language of the text (BCP-47 or ISO 639-1), for multilingual models that are told the language
+    language: str | None = None
+    #: a recording of the voice to imitate (WAV, mono PCM16), for models that clone voices
+    reference_audio: bytes | None = None
+    #: what is said in ``reference_audio``, for models that want the transcript of the reference
+    reference_text: str | None = None
+
+
 class TTSModel(Model):
     task = "tts"
     voices: tuple[Voice, ...] = ()
     #: True when ``synthesize`` takes a ``phonemizer`` keyword (voices that read phonemes)
     accepts_phonemizer: bool = False
+    #: True when ``synthesize`` takes an ``extras`` keyword (:class:`SynthesisExtras`)
+    accepts_extras: bool = False
+    #: True when the model can imitate a voice from ``SynthesisExtras.reference_audio``
+    supports_cloning: bool = False
 
     @abc.abstractmethod
     def synthesize(
@@ -266,6 +290,19 @@ class SpeakerActivity:
 
     def frame(self, t: float) -> int:
         return max(0, min(len(self.probs), round(t / self.frame_s)))
+
+
+@dataclass
+class SpeakerRequest:
+    """A whole recording for a speaker-conditioned recogniser (:meth:`STTModel.transcribe_speakers`)."""
+
+    samples: FloatArray  # mono float32 at the model's sample rate
+    activity: SpeakerActivity  # who talks when: one column per speaker, frames from the start of ``samples``
+    language: str | None = None
+    task: str = "transcribe"
+    prompt: str | None = None
+    word_timestamps: bool = False
+    temperature: float = 0.0
 
 
 @dataclass

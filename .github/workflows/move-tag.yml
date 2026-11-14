@@ -1,0 +1,33 @@
+# Point an existing tag at another commit (for example after history was rewritten).
+# Run by hand: Actions > Move a tag > Run workflow.
+name: Move a tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to move
+        required: true
+      commit:
+        description: Full commit SHA the tag should point to
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  move:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Move the tag
+        env:
+          TAG: ${{ inputs.tag }}
+          COMMIT: ${{ inputs.commit }}
+        run: |
+          git cat-file -e "$COMMIT^{commit}"
+          git tag -f "$TAG" "$COMMIT"
+          git push --force origin "refs/tags/$TAG"
+          git ls-remote origin "refs/tags/$TAG"

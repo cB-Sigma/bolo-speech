@@ -1,0 +1,904 @@
+{
+ "what": "DiCoW v3.3 without PyTorch: bolo's ONNX export (server/tools/export_dicow_onnx.py) run by the core engine bolo.engines.dicow_onnx (ONNX Runtime + NumPy), against the bolo-torch plugin (docs/measurements/dicow-conditioned.json)",
+ "date": "2026-11-14",
+ "conditions": "4 vCPU Xeon @ 2.1 GHz (AMX), no GPU, shared with other jobs (load average 2-7 during every run, so speeds are upper bounds); onnxruntime 1.31.1, numpy, Python 3.12; export with torch 2.15.0+cpu, transformers 4.55.0, onnx 1.23.2, opset 17. Diarizer nemotron-3-diarization as shipped, conditioning on its turns, language en (hi for the Hindi mixes).",
+ "model": "BUT-FIT/DiCoW_v3_3@c34b64d9a9c5148c65fd355bb188d60343a6b44f; CTC head not exported (generation_config ctc_weight 0)",
+ "systems": {
+  "torch_bf16": "bolo-torch plugin, bfloat16 (numbers of dicow-conditioned.json, system t1)",
+  "onnx_fp32": "encoder.onnx + decoder.onnx (fp32)",
+  "onnx_int8": "encoder.int8.onnx + decoder.int8.onnx as exported: dynamic int8, per-channel weights, every MatMul except the encoder's 32 fc2 matrices (kept fp32); decoder MatMuls and token-embedding Gather int8",
+  "onnx_int8_all_matmuls": "first int8 attempt: every encoder MatMul int8 (rejected)"
+ },
+ "export_files": {
+  "int8": {
+   "README.md": {
+    "size": 1938,
+    "sha256": "eb019c0dd5da34309a15090683a0b67d7f2443ec22199b77cde16a9f7b4d6f8a"
+   },
+   "added_tokens.json": {
+    "size": 34648,
+    "sha256": "3c51f66c4c21f9e126970078f11ae77a78c74aee8df606ee9daba86e467108e0"
+   },
+   "config.json": {
+    "size": 2000,
+    "sha256": "8a7767c79feab0d8277f11b85825fc6258fcf7cf5b104e6cddd954de5c3e456b"
+   },
+   "decoder.int8.onnx": {
+    "size": 658536,
+    "sha256": "e2731d5ccc6ace2db727610dedb44a130373544230e2ef1840102bd10e2945df"
+   },
+   "decoder.int8.onnx.data": {
+    "size": 225438720,
+    "sha256": "af6b978b917ca2b4f6a28c225b897877758a137b92669d7708a08865b32453e7"
+   },
+   "encoder.int8.onnx": {
+    "size": 2733026,
+    "sha256": "5281ad60b0eb14318ff96fc203d398dd36651ffb2586c32aa180ca858f4a2862"
+   },
+   "encoder.int8.onnx.data": {
+    "size": 1304064000,
+    "sha256": "500ce0d59601bbc6af6a121f4b38843e5b7202a4d38a22c0458bc89d21bc4c9e"
+   },
+   "generation_config.json": {
+    "size": 3733,
+    "sha256": "5f16cf3f2d75b6b24946f6855455af784574c8a6098326742653ce4ea7648b47"
+   },
+   "merges.txt": {
+    "size": 493869,
+    "sha256": "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6"
+   },
+   "preprocessor_config.json": {
+    "size": 357,
+    "sha256": "654cf18d3e163b948ceaf9766da56ce0b52de265d58673cf61c9376f126bd499"
+   },
+   "special_tokens_map.json": {
+    "size": 2186,
+    "sha256": "baea4ea09372eb4fca86b4e4346139fd73cb807d5087e9de0948e971739c3e74"
+   },
+   "tokenizer_config.json": {
+    "size": 282873,
+    "sha256": "3c75940dfce3a294fca7041a5faff011677f1b68fa85e47511bb8cf6dccaded6"
+   },
+   "vocab.json": {
+    "size": 835528,
+    "sha256": "6788c80b082e9b0d1393147d3a3e62ba19285ac0c82ace8e5ef00f37ead58971"
+   }
+  },
+  "fp32_deleted_after_validation": {
+   "README.md": {
+    "size": 1659,
+    "sha256": "675e9b006b49ac18db29c7f3e1e3cd359c43cacb6286a5366c4264891eaa12d3"
+   },
+   "added_tokens.json": {
+    "size": 34648,
+    "sha256": "3c51f66c4c21f9e126970078f11ae77a78c74aee8df606ee9daba86e467108e0"
+   },
+   "config.json": {
+    "size": 2000,
+    "sha256": "8a7767c79feab0d8277f11b85825fc6258fcf7cf5b104e6cddd954de5c3e456b"
+   },
+   "decoder.onnx": {
+    "size": 61212,
+    "sha256": "772e760586fcf4b37d2f2527a03ee1e9144381552adb04c66d28dcb7bcc1454b"
+   },
+   "decoder.onnx.data": {
+    "size": 635394664,
+    "sha256": "29af824c4d508ac92af60b85af6406dc3d0d6484d98d35abc0fe417ba7dfdd0e"
+   },
+   "encoder.onnx": {
+    "size": 624565,
+    "sha256": "f238c2d39fc8cab6847b01d9ff2e5513cf2370ebbaa85f8d06199e24d523331b"
+   },
+   "encoder.onnx.data": {
+    "size": 2601676800,
+    "sha256": "4e6f1bb000c853c206ac3480ca0a568dc3906465a4d03373aa276ed6181c1bc4"
+   },
+   "generation_config.json": {
+    "size": 3733,
+    "sha256": "5f16cf3f2d75b6b24946f6855455af784574c8a6098326742653ce4ea7648b47"
+   },
+   "merges.txt": {
+    "size": 493869,
+    "sha256": "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6"
+   },
+   "preprocessor_config.json": {
+    "size": 357,
+    "sha256": "654cf18d3e163b948ceaf9766da56ce0b52de265d58673cf61c9376f126bd499"
+   },
+   "special_tokens_map.json": {
+    "size": 2186,
+    "sha256": "baea4ea09372eb4fca86b4e4346139fd73cb807d5087e9de0948e971739c3e74"
+   },
+   "tokenizer_config.json": {
+    "size": 282873,
+    "sha256": "3c75940dfce3a294fca7041a5faff011677f1b68fa85e47511bb8cf6dccaded6"
+   },
+   "vocab.json": {
+    "size": 835528,
+    "sha256": "6788c80b082e9b0d1393147d3a3e62ba19285ac0c82ace8e5ef00f37ead58971"
+   }
+  }
+ },
+ "validation_against_torch": {
+  "input": "ES2004a_00355 (4 speakers) and IS1009a_00275 (2 speakers), Nemotron turns, language en",
+  "reference": "bolo-torch plugin's TransformersBackend in float32 (BOLO_TORCH_DTYPE=float32), 4 threads",
+  "onnx_fp32": {
+   "speaker_streams_identical": "6 of 6",
+   "segment_times_identical": true,
+   "features_max_abs_diff": 3e-05,
+   "token_decoder_mismatches_vs_transformers_tokenizer": 0
+  },
+  "onnx_int8": {
+   "speaker_streams_identical": "4 of 6"
+  },
+  "onnx_int8_all_matmuls": {
+   "speaker_streams_identical": "2 of 6"
+  },
+  "wrapper_vs_model_logits_max_abs_diff": {
+   "full": 0.0,
+   "with_kv_cache": 0.00027,
+   "logit_scale": 10.06
+  }
+ },
+ "scoring": "as dicow-conditioned.json: MeetEval 0.4.3 cpWER, Whisper EnglishTextNormalizer, pooled; relative change and 95 % interval by paired bootstrap over files (2000 resamples). The 'rtf' values inside cpwer sections come from runs that overlapped other jobs.",
+ "data_note": "AMI: the same 24 excerpts as dicow-conditioned.json. Synthetic: the 44 mixes rebuilt again (Kokoro is not bit-exact: 34 of 44 files have the same length as in the torch run, the others differ by about 0.1 s); torch_bf16 was run on the earlier build, the ONNX systems on this one, so synthetic torch comparisons are not paired on identical audio. onnx_fp32 vs onnx_int8 are.",
+ "cpwer_ami": {
+  "AMI excerpts": {
+   "files": 24,
+   "torch_bf16": {
+    "cpwer": 26.03,
+    "rtf": 0.707
+   },
+   "onnx_int8_all_matmuls": {
+    "cpwer": 26.22,
+    "rtf": 0.857,
+    "relative_to_torch_bf16": 0.7,
+    "ci95": [
+     -2.8,
+     4.3
+    ],
+    "files_better": 12,
+    "files_worse": 12,
+    "worst_file_change_pt": 7.9
+   },
+   "onnx_int8": {
+    "cpwer": 26.03,
+    "rtf": 1.384,
+    "relative_to_torch_bf16": 0.0,
+    "ci95": [
+     -2.2,
+     2.7
+    ],
+    "files_better": 7,
+    "files_worse": 7,
+    "worst_file_change_pt": 5.4
+   }
+  }
+ },
+ "cpwer_synthetic": {
+  "synthetic 16 kHz Hindi": {
+   "files": 2,
+   "onnx_fp32": {
+    "cpwer": 14.2,
+    "rtf": 3.009
+   },
+   "onnx_int8_all_matmuls": {
+    "cpwer": 30.68,
+    "rtf": 0.707,
+    "relative_to_onnx_fp32": 116.0,
+    "ci95": [
+     7.7,
+     233.3
+    ],
+    "files_better": 0,
+    "files_worse": 2,
+    "worst_file_change_pt": 31.8
+   },
+   "onnx_int8": {
+    "cpwer": 13.64,
+    "rtf": 1.142,
+    "relative_to_onnx_fp32": -4.0,
+    "ci95": [
+     -7.7,
+     0.0
+    ],
+    "files_better": 1,
+    "files_worse": 0,
+    "worst_file_change_pt": 0.0
+   },
+   "torch_bf16": {
+    "cpwer": 14.77,
+    "rtf": 0.567,
+    "relative_to_onnx_fp32": 4.0,
+    "ci95": [
+     0.0,
+     8.3
+    ],
+    "files_better": 0,
+    "files_worse": 1,
+    "worst_file_change_pt": 1.1
+   }
+  },
+  "synthetic 16 kHz cross-gender": {
+   "files": 8,
+   "onnx_fp32": {
+    "cpwer": 4.45,
+    "rtf": 2.382
+   },
+   "onnx_int8_all_matmuls": {
+    "cpwer": 6.73,
+    "rtf": 1.131,
+    "relative_to_onnx_fp32": 51.4,
+    "ci95": [
+     4.8,
+     276.5
+    ],
+    "files_better": 0,
+    "files_worse": 4,
+    "worst_file_change_pt": 11.3
+   },
+   "onnx_int8": {
+    "cpwer": 5.05,
+    "rtf": 1.013,
+    "relative_to_onnx_fp32": 13.5,
+    "ci95": [
+     0.0,
+     100.0
+    ],
+    "files_better": 0,
+    "files_worse": 2,
+    "worst_file_change_pt": 3.9
+   },
+   "torch_bf16": {
+    "cpwer": 5.05,
+    "rtf": 0.472,
+    "relative_to_onnx_fp32": 13.5,
+    "ci95": [
+     -17.4,
+     150.0
+    ],
+    "files_better": 2,
+    "files_worse": 1,
+    "worst_file_change_pt": 8.5
+   }
+  },
+  "synthetic 16 kHz same-gender female": {
+   "files": 6,
+   "onnx_fp32": {
+    "cpwer": 6.26,
+    "rtf": 2.263
+   },
+   "onnx_int8_all_matmuls": {
+    "cpwer": 9.47,
+    "rtf": 0.607,
+    "relative_to_onnx_fp32": 51.3,
+    "ci95": [
+     0.0,
+     176.0
+    ],
+    "files_better": 0,
+    "files_worse": 2,
+    "worst_file_change_pt": 10.7
+   },
+   "onnx_int8": {
+    "cpwer": 7.54,
+    "rtf": 1.05,
+    "relative_to_onnx_fp32": 20.5,
+    "ci95": [
+     -5.8,
+     112.5
+    ],
+    "files_better": 1,
+    "files_worse": 1,
+    "worst_file_change_pt": 8.8
+   },
+   "torch_bf16": {
+    "cpwer": 7.87,
+    "rtf": 0.379,
+    "relative_to_onnx_fp32": 25.6,
+    "ci95": [
+     -5.3,
+     113.0
+    ],
+    "files_better": 1,
+    "files_worse": 2,
+    "worst_file_change_pt": 8.8
+   }
+  },
+  "synthetic 16 kHz same-gender male": {
+   "files": 6,
+   "onnx_fp32": {
+    "cpwer": 6.26,
+    "rtf": 1.917
+   },
+   "onnx_int8_all_matmuls": {
+    "cpwer": 8.19,
+    "rtf": 0.569,
+    "relative_to_onnx_fp32": 30.8,
+    "ci95": [
+     1.8,
+     133.3
+    ],
+    "files_better": 0,
+    "files_worse": 3,
+    "worst_file_change_pt": 6.9
+   },
+   "onnx_int8": {
+    "cpwer": 6.26,
+    "rtf": 0.969,
+    "relative_to_onnx_fp32": 0.0,
+    "ci95": [
+     0.0,
+     0.0
+    ],
+    "files_better": 0,
+    "files_worse": 0,
+    "worst_file_change_pt": 0.0
+   },
+   "torch_bf16": {
+    "cpwer": 6.26,
+    "rtf": 0.36,
+    "relative_to_onnx_fp32": 0.0,
+    "ci95": [
+     0.0,
+     0.0
+    ],
+    "files_better": 0,
+    "files_worse": 0,
+    "worst_file_change_pt": 0.0
+   }
+  },
+  "synthetic 8 kHz Hindi": {
+   "files": 2,
+   "onnx_fp32": {
+    "cpwer": 30.11,
+    "rtf": 3.24
+   },
+   "onnx_int8_all_matmuls": {
+    "cpwer": 26.7,
+    "rtf": 0.694,
+    "relative_to_onnx_fp32": -11.3,
+    "ci95": [
+     -16.1,
+     -4.5
+    ],
+    "files_better": 2,
+    "files_worse": 0,
+    "worst_file_change_pt": -1.1
+   },
+   "onnx_int8": {
+    "cpwer": 43.18,
+    "rtf": 1.227,
+    "relative_to_onnx_fp32": 43.4,
+    "ci95": [
+     -13.6,
+     83.9
+    ],
+    "files_better": 1,
+    "files_worse": 1,
+    "worst_file_change_pt": 29.5
+   },
+   "torch_bf16": {
+    "cpwer": 26.14,
+    "rtf": 0.551,
+    "relative_to_onnx_fp32": -13.2,
+    "ci95": [
+     -22.6,
+     0.0
+    ],
+    "files_better": 1,
+    "files_worse": 0,
+    "worst_file_change_pt": 0.0
+   }
+  },
+  "synthetic 8 kHz cross-gender": {
+   "files": 8,
+   "onnx_fp32": {
+    "cpwer": 4.57,
+    "rtf": 2.195
+   },
+   "onnx_int8_all_matmuls": {
+    "cpwer": 5.41,
+    "rtf": 0.813,
+    "relative_to_onnx_fp32": 18.4,
+    "ci95": [
+     -19.0,
+     75.7
+    ],
+    "files_better": 3,
+    "files_worse": 2,
+    "worst_file_change_pt": 9.3
+   },
+   "onnx_int8": {
+    "cpwer": 4.45,
+    "rtf": 0.985,
+    "relative_to_onnx_fp32": -2.6,
+    "ci95": [
+     -10.5,
+     0.0
+    ],
+    "files_better": 1,
+    "files_worse": 0,
+    "worst_file_change_pt": 0.0
+   },
+   "torch_bf16": {
+    "cpwer": 3.85,
+    "rtf": 0.972,
+    "relative_to_onnx_fp32": -15.8,
+    "ci95": [
+     -46.8,
+     26.3
+    ],
+    "files_better": 2,
+    "files_worse": 3,
+    "worst_file_change_pt": 1.9
+   }
+  },
+  "synthetic 8 kHz same-gender female": {
+   "files": 6,
+   "onnx_fp32": {
+    "cpwer": 4.82,
+    "rtf": 2.11
+   },
+   "onnx_int8_all_matmuls": {
+    "cpwer": 8.99,
+    "rtf": 0.605,
+    "relative_to_onnx_fp32": 86.7,
+    "ci95": [
+     0.0,
+     250.0
+    ],
+    "files_better": 1,
+    "files_worse": 3,
+    "worst_file_change_pt": 12.7
+   },
+   "onnx_int8": {
+    "cpwer": 8.99,
+    "rtf": 1.079,
+    "relative_to_onnx_fp32": 86.7,
+    "ci95": [
+     -5.9,
+     270.1
+    ],
+    "files_better": 1,
+    "files_worse": 2,
+    "worst_file_change_pt": 14.7
+   },
+   "torch_bf16": {
+    "cpwer": 3.53,
+    "rtf": 0.378,
+    "relative_to_onnx_fp32": -26.7,
+    "ci95": [
+     -50.0,
+     -2.7
+    ],
+    "files_better": 5,
+    "files_worse": 1,
+    "worst_file_change_pt": 0.9
+   }
+  },
+  "synthetic 8 kHz same-gender male": {
+   "files": 6,
+   "onnx_fp32": {
+    "cpwer": 5.62,
+    "rtf": 1.891
+   },
+   "onnx_int8_all_matmuls": {
+    "cpwer": 12.68,
+    "rtf": 0.562,
+    "relative_to_onnx_fp32": 125.7,
+    "ci95": [
+     54.0,
+     229.6
+    ],
+    "files_better": 0,
+    "files_worse": 6,
+    "worst_file_change_pt": 12.6
+   },
+   "onnx_int8": {
+    "cpwer": 4.82,
+    "rtf": 1.041,
+    "relative_to_onnx_fp32": -14.3,
+    "ci95": [
+     -36.4,
+     3.0
+    ],
+    "files_better": 3,
+    "files_worse": 1,
+    "worst_file_change_pt": 1.0
+   },
+   "torch_bf16": {
+    "cpwer": 6.9,
+    "rtf": 0.365,
+    "relative_to_onnx_fp32": 22.9,
+    "ci95": [
+     -12.9,
+     57.6
+    ],
+    "files_better": 2,
+    "files_worse": 4,
+    "worst_file_change_pt": 3.8
+   }
+  },
+  "synthetic (all)": {
+   "files": 44,
+   "onnx_fp32": {
+    "cpwer": 6.57,
+    "rtf": 2.232
+   },
+   "onnx_int8_all_matmuls": {
+    "cpwer": 9.92,
+    "rtf": 0.737,
+    "relative_to_onnx_fp32": 51.0,
+    "ci95": [
+     23.9,
+     90.7
+    ],
+    "files_better": 6,
+    "files_worse": 22,
+    "worst_file_change_pt": 31.8
+   },
+   "onnx_int8": {
+    "cpwer": 7.79,
+    "rtf": 1.035,
+    "relative_to_onnx_fp32": 18.6,
+    "ci95": [
+     -0.4,
+     40.9
+    ],
+    "files_better": 8,
+    "files_worse": 7,
+    "worst_file_change_pt": 29.5
+   },
+   "torch_bf16": {
+    "cpwer": 6.63,
+    "rtf": 0.515,
+    "relative_to_onnx_fp32": 1.0,
+    "ci95": [
+     -10.8,
+     15.6
+    ],
+    "files_better": 13,
+    "files_worse": 12,
+    "worst_file_change_pt": 8.8
+   }
+  }
+ },
+ "cpwer_synthetic_english_only": {
+  "synthetic 16 kHz cross-gender": {
+   "files": 8,
+   "onnx_fp32": {
+    "cpwer": 4.45,
+    "rtf": 2.382
+   },
+   "onnx_int8_all_matmuls": {
+    "cpwer": 6.73,
+    "rtf": 1.131,
+    "relative_to_onnx_fp32": 51.4,
+    "ci95": [
+     4.8,
+     276.5
+    ],
+    "files_better": 0,
+    "files_worse": 4,
+    "worst_file_change_pt": 11.3
+   },
+   "onnx_int8": {
+    "cpwer": 5.05,
+    "rtf": 1.013,
+    "relative_to_onnx_fp32": 13.5,
+    "ci95": [
+     0.0,
+     100.0
+    ],
+    "files_better": 0,
+    "files_worse": 2,
+    "worst_file_change_pt": 3.9
+   },
+   "torch_bf16": {
+    "cpwer": 5.05,
+    "rtf": 0.472,
+    "relative_to_onnx_fp32": 13.5,
+    "ci95": [
+     -17.4,
+     150.0
+    ],
+    "files_better": 2,
+    "files_worse": 1,
+    "worst_file_change_pt": 8.5
+   }
+  },
+  "synthetic 16 kHz same-gender female": {
+   "files": 6,
+   "onnx_fp32": {
+    "cpwer": 6.26,
+    "rtf": 2.263
+   },
+   "onnx_int8_all_matmuls": {
+    "cpwer": 9.47,
+    "rtf": 0.607,
+    "relative_to_onnx_fp32": 51.3,
+    "ci95": [
+     0.0,
+     176.0
+    ],
+    "files_better": 0,
+    "files_worse": 2,
+    "worst_file_change_pt": 10.7
+   },
+   "onnx_int8": {
+    "cpwer": 7.54,
+    "rtf": 1.05,
+    "relative_to_onnx_fp32": 20.5,
+    "ci95": [
+     -5.8,
+     112.5
+    ],
+    "files_better": 1,
+    "files_worse": 1,
+    "worst_file_change_pt": 8.8
+   },
+   "torch_bf16": {
+    "cpwer": 7.87,
+    "rtf": 0.379,
+    "relative_to_onnx_fp32": 25.6,
+    "ci95": [
+     -5.3,
+     113.0
+    ],
+    "files_better": 1,
+    "files_worse": 2,
+    "worst_file_change_pt": 8.8
+   }
+  },
+  "synthetic 16 kHz same-gender male": {
+   "files": 6,
+   "onnx_fp32": {
+    "cpwer": 6.26,
+    "rtf": 1.917
+   },
+   "onnx_int8_all_matmuls": {
+    "cpwer": 8.19,
+    "rtf": 0.569,
+    "relative_to_onnx_fp32": 30.8,
+    "ci95": [
+     1.8,
+     133.3
+    ],
+    "files_better": 0,
+    "files_worse": 3,
+    "worst_file_change_pt": 6.9
+   },
+   "onnx_int8": {
+    "cpwer": 6.26,
+    "rtf": 0.969,
+    "relative_to_onnx_fp32": 0.0,
+    "ci95": [
+     0.0,
+     0.0
+    ],
+    "files_better": 0,
+    "files_worse": 0,
+    "worst_file_change_pt": 0.0
+   },
+   "torch_bf16": {
+    "cpwer": 6.26,
+    "rtf": 0.36,
+    "relative_to_onnx_fp32": 0.0,
+    "ci95": [
+     0.0,
+     0.0
+    ],
+    "files_better": 0,
+    "files_worse": 0,
+    "worst_file_change_pt": 0.0
+   }
+  },
+  "synthetic 8 kHz cross-gender": {
+   "files": 8,
+   "onnx_fp32": {
+    "cpwer": 4.57,
+    "rtf": 2.195
+   },
+   "onnx_int8_all_matmuls": {
+    "cpwer": 5.41,
+    "rtf": 0.813,
+    "relative_to_onnx_fp32": 18.4,
+    "ci95": [
+     -19.0,
+     75.7
+    ],
+    "files_better": 3,
+    "files_worse": 2,
+    "worst_file_change_pt": 9.3
+   },
+   "onnx_int8": {
+    "cpwer": 4.45,
+    "rtf": 0.985,
+    "relative_to_onnx_fp32": -2.6,
+    "ci95": [
+     -10.5,
+     0.0
+    ],
+    "files_better": 1,
+    "files_worse": 0,
+    "worst_file_change_pt": 0.0
+   },
+   "torch_bf16": {
+    "cpwer": 3.85,
+    "rtf": 0.972,
+    "relative_to_onnx_fp32": -15.8,
+    "ci95": [
+     -46.8,
+     26.3
+    ],
+    "files_better": 2,
+    "files_worse": 3,
+    "worst_file_change_pt": 1.9
+   }
+  },
+  "synthetic 8 kHz same-gender female": {
+   "files": 6,
+   "onnx_fp32": {
+    "cpwer": 4.82,
+    "rtf": 2.11
+   },
+   "onnx_int8_all_matmuls": {
+    "cpwer": 8.99,
+    "rtf": 0.605,
+    "relative_to_onnx_fp32": 86.7,
+    "ci95": [
+     0.0,
+     250.0
+    ],
+    "files_better": 1,
+    "files_worse": 3,
+    "worst_file_change_pt": 12.7
+   },
+   "onnx_int8": {
+    "cpwer": 8.99,
+    "rtf": 1.079,
+    "relative_to_onnx_fp32": 86.7,
+    "ci95": [
+     -5.9,
+     270.1
+    ],
+    "files_better": 1,
+    "files_worse": 2,
+    "worst_file_change_pt": 14.7
+   },
+   "torch_bf16": {
+    "cpwer": 3.53,
+    "rtf": 0.378,
+    "relative_to_onnx_fp32": -26.7,
+    "ci95": [
+     -50.0,
+     -2.7
+    ],
+    "files_better": 5,
+    "files_worse": 1,
+    "worst_file_change_pt": 0.9
+   }
+  },
+  "synthetic 8 kHz same-gender male": {
+   "files": 6,
+   "onnx_fp32": {
+    "cpwer": 5.62,
+    "rtf": 1.891
+   },
+   "onnx_int8_all_matmuls": {
+    "cpwer": 12.68,
+    "rtf": 0.562,
+    "relative_to_onnx_fp32": 125.7,
+    "ci95": [
+     54.0,
+     229.6
+    ],
+    "files_better": 0,
+    "files_worse": 6,
+    "worst_file_change_pt": 12.6
+   },
+   "onnx_int8": {
+    "cpwer": 4.82,
+    "rtf": 1.041,
+    "relative_to_onnx_fp32": -14.3,
+    "ci95": [
+     -36.4,
+     3.0
+    ],
+    "files_better": 3,
+    "files_worse": 1,
+    "worst_file_change_pt": 1.0
+   },
+   "torch_bf16": {
+    "cpwer": 6.9,
+    "rtf": 0.365,
+    "relative_to_onnx_fp32": 22.9,
+    "ci95": [
+     -12.9,
+     57.6
+    ],
+    "files_better": 2,
+    "files_worse": 4,
+    "worst_file_change_pt": 3.8
+   }
+  },
+  "synthetic (all)": {
+   "files": 40,
+   "onnx_fp32": {
+    "cpwer": 5.25,
+    "rtf": 2.142
+   },
+   "onnx_int8_all_matmuls": {
+    "cpwer": 8.33,
+    "rtf": 0.74,
+    "relative_to_onnx_fp32": 58.7,
+    "ci95": [
+     30.2,
+     96.9
+    ],
+    "files_better": 4,
+    "files_worse": 20,
+    "worst_file_change_pt": 12.7
+   },
+   "onnx_int8": {
+    "cpwer": 6.04,
+    "rtf": 1.02,
+    "relative_to_onnx_fp32": 15.1,
+    "ci95": [
+     -1.5,
+     40.5
+    ],
+    "files_better": 6,
+    "files_worse": 6,
+    "worst_file_change_pt": 14.7
+   },
+   "torch_bf16": {
+    "cpwer": 5.46,
+    "rtf": 0.511,
+    "relative_to_onnx_fp32": 4.1,
+    "ci95": [
+     -10.9,
+     22.6
+    ],
+    "files_better": 12,
+    "files_worse": 11,
+    "worst_file_change_pt": 8.8
+   }
+  }
+ },
+ "speed_onnx_int8": {
+  "2_threads": {
+   "rtf": 1.01,
+   "diarize_rtf": 0.04,
+   "decode_rtf": 0.97,
+   "files": [
+    "EN2002a_01010",
+    "ES2004a_00355",
+    "IS1009a_00275",
+    "TS3003a_00105"
+   ]
+  },
+  "4_threads": {
+   "rtf": 0.725,
+   "diarize_rtf": 0.041,
+   "decode_rtf": 0.684,
+   "files": [
+    "EN2002a_01010",
+    "ES2004a_00355",
+    "IS1009a_00275",
+    "TS3003a_00105"
+   ]
+  },
+  "note": "same four 45 s AMI excerpts as the torch timing (3-4 speakers), after one warm-up file; diarization included. The machine was shared (load average 2-5), so these are upper bounds: a decode-only rerun of ES2004a_00355 at 4 threads took 34.3 s (RTF 0.76), IS1009a_00275 15.9 s (0.35). Torch plugin on an idle machine: 0.453 (2 threads) / 0.26 (4 threads) in bfloat16 with AMX, 1.41 in float32. onnx_int8_all_matmuls decoded ES2004a_00355 in 19.5 s at 4 threads; onnx_fp32 in 54 s.",
+  "memory": "about 4.7 GB resident for the evaluation process with nemotron + int8 DiCoW at 4 speakers (fp32 graphs: about 5.7 GB)"
+ },
+ "decision": "onnx_int8 matches the torch plugin on AMI (26.03 % vs 26.03 %, 7 files better, 7 worse) and is within 0.6 pt on the 40 English synthetic mixes (6.04 vs 5.46 %; onnx_fp32 5.25 %), 1.2 pt over all 44 (7.79 vs 6.63 %; one 8 kHz Hindi mix, 37.5 pt worse, carries most of it). Meets the ~1 pt bar on AMI and English; Hindi worse on one file. Catalog entry stays validated: untested while status: pending (the hosted files have not been run).",
+ "not_measured": [
+  "fp32 on all 24 AMI excerpts (2 files only, stopped for time)",
+  "an idle-machine timing",
+  "GPU",
+  "whole meetings",
+  "SE-DiCoW (not exported)"
+ ]
+}

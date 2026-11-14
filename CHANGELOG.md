@@ -4,10 +4,129 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
-## [0.2.0] - unreleased
+## [0.2.0] - 2026-11-14
 
 ### Added
 
+- **Orpheus-family voices without PyTorch** (kind `orpheus-llamacpp` of the
+  `tts-server` engine, `bolo/engines/orpheus_llamacpp.py`): llama.cpp's
+  `llama-server` runs the language model from a GGUF; bolo builds the prompt
+  token ids (formats `svara`, `veena`, `orpheus`), streams the generated ids
+  from `/completion` (token-array prompt, `return_tokens`), groups them into
+  7-token SNAC frames and decodes them with the SNAC 24 kHz decoder in
+  onnxruntime, streaming PCM with the same windows as bolo-torch (4 frames per
+  chunk, 3 frames of left context, one frame held back). Sampling per the model
+  cards, stop at end-of-speech (the stream is closed, which frees the slot), a
+  token budget per character. Managed or operator-run llama-server, as for
+  every `tts-server` model; new extra `bolo[orpheus]` (onnxruntime). New tool
+  `server/tools/export_snac_onnx.py`: bolo's own fp32 and fp16 export of the
+  SNAC decoder, checked against PyTorch SNAC (fp32: 112-127 dB SNR, max abs
+  difference at most 2.9e-6 on random and real Svara code sequences, noise
+  term off on both sides; bolo's streaming windows match bolo-torch's).
+  Catalog (`catalog/tts-orpheus.yaml`, all `pending` until the decoder is
+  published at `codebucketsolutions/snac-24khz-onnx`): `svara-tts-v1-llamacpp`
+  (Q4_K_M) and `svara-tts-v1-q8-llamacpp`, `veena-llamacpp` (Q4_K_M) and
+  `veena-q8-llamacpp`, `orpheus-3b-0.1-ft-llamacpp` (English),
+  `snortts-indic-v0-llamacpp` (nine Indian languages). Svara and Veena Q4_K_M
+  were run on the 4-vCPU test machine (RTF 11-16, CPU is for offline use;
+  Hindi, Bengali, Tamil and English transcribed back; Q2_K is too lossy). The
+  Svara entries use the Orpheus prompt layout, with which Bengali no longer
+  speaks the speaker label; see docs/models.md.
+- **Realtime pipelines** (opt-in; the cascade stays the default): setting
+  `realtime_pipeline` and the bolo extension `session.pipeline`. `audio-llm`
+  sends the user's turn as `input_audio` to an audio-understanding
+  chat-completions model (settings `audio_llm_base_url`, `audio_llm_model`,
+  `audio_llm_api_key`, falling back to `llm_*`; e.g. llama-server with Gemma 4
+  E2B/E4B or Ultravox) and bolo's TTS speaks the answer. `speech-to-speech`
+  hands turns to a speech-to-speech model through a backend interface
+  (`bolo/s2s.py`); the first backend is llama-server's WebSocket
+  `/v1/realtime` (LFM3-Audio 2B, English, tool calls; LFM Open License, so
+  never a default), either one the operator runs (`s2s_server_url`,
+  `s2s_server_api_key`) or one bolo starts for `s2s_model` (default
+  `lfm3-audio-2b-llamacpp`; `s2s_parallel`, `s2s_server_args`) with the
+  tts-server engine's process handling. bolo keeps auth, codecs and resampling,
+  turn detection, barge-in (`response.cancel` upstream), items, tool-call
+  items, user transcripts (`realtime_transcribe_user`) and traces.
+  `capabilities.realtime.pipelines` in `GET /api/v1/info`. Tested against
+  scripted fake upstream servers only. `websockets` is now a direct dependency.
+- Catalog: `f5-tts-v1-base` (SWivid F5-TTS v1, CC-BY-NC-4.0, bolo-torch
+  `f5-original` extra), `indic-speak` (Bodhan AI, gated, Indic Open Model
+  License, bolo-torch `indic-speak` extra), `indextts-2.5-audiocpp` (bilibili
+  licence, audio.cpp); `mira-tts-audiocpp` (CC-BY-NC-SA) is `pending` (no
+  audio.cpp package published); `spark-tts-0.5b`, `maskgct` and
+  `diarizen-wavlm-large-s80-md-v2` (non-commercial) are listed with a note on
+  what is missing, as bolo-torch kinds that are not implemented (no runtime
+  bolo can use yet). All `validated: untested`.
+- **External TTS servers** (engine `tts-server`): text-to-speech forwarded to
+  llama.cpp's `llama-server` (`POST /tts`, streamed PCM16) or audio.cpp's
+  `audiocpp_server` (`POST /v1/audio/speech`). bolo either connects to a server
+  the operator runs (new setting `tts_servers`, `"<model id or runtime>=<url>"`,
+  and `tts_server_api_key`; nothing is downloaded) or starts one per loaded
+  model on a loopback port, waits for `/health`, stops it when the model is
+  unloaded and restarts it after a crash with the plugin host's back-off
+  (settings `llama_server_bin`, `audiocpp_server_bin`, `tts_server_args`,
+  `tts_server_start_timeout_s`, `tts_server_timeout_s`). Audio is resampled to
+  the catalog rate; `/v1/audio/speech`, SSE, the TTS WebSocket and voice
+  listings work as for any voice. A missing binary is `424 component_missing`,
+  an unreachable or crashed server `503 engine_unavailable`.
+- 51 catalog entries on those servers (`catalog/tts-server.yaml`): Chatterbox
+  Multilingual V3 (Hindi), Chatterbox Turbo, Qwen3-TTS, Pocket TTS (six
+  languages), LFM3-Audio on llama-server; VoxCPM2, Magpie, Chatterbox,
+  CosyVoice3, Maya1 and 34 more audio.cpp families. Every entry states
+  licence, `commercial_use` and `gated` (non-commercial models are included and
+  marked); `options.hardware` (GPU advice and approximate memory) is returned as
+  `hardware` by the catalog API. Soprano and Fish Drama 3 on llama-server are
+  `pending`. `pocket-tts-en-llamacpp` was run on CPU: RTF 0.72, first audio
+  0.77 s, round-trip WER 0 (2 threads, shared 4-vCPU Xeon).
+- **Voice cloning** on `/v1/audio/speech`: `reference_audio` (base64 or data
+  URL) and `reference_text`, for models with the `voice-cloning` feature;
+  others answer 400. Engines opt in with `TTSModel.accepts_extras` /
+  `supports_cloning` and receive `SynthesisExtras` (language, reference).
+- Components `llama-server` (MIT) and `audio.cpp` (Apache-2.0), `kind:
+  "tts-server"`: `bolo components install llama-server` /
+  `POST /api/v1/components/llama-server/install` download the pinned upstream
+  release (llama.cpp b12375, audio.cpp v0.9.4), check its SHA-256, unpack it
+  into `<data_dir>/components/` and check that the binary starts (the audio.cpp
+  Linux release needs glibc 2.43).
+
+- **Diarization-conditioned recognition** (speaker-conditioned STT models).
+  With such a model a diarized transcription is no longer cut at speaker
+  turns: bolo diarizes, then the model transcribes the whole recording once
+  per speaker, told frame by frame who is talking, so overlapping speech is
+  transcribed for each speaker. The first such models are BUT-FIT's DiCoW
+  v3.3 (`dicow-v3.3`, CC-BY-4.0) and SE-DiCoW (`se-dicow`, Apache-2.0) in
+  the bolo-torch plugin; they use `nemotron-3-diarization`
+  unless the request names another diarizer, and are conditioned on the
+  diarizer's speaker turns (a clustering diarizer works too). On 24 AMI
+  far-field excerpts cpWER fell from 69.4 % (bolo's default,
+  pyannote + whisper-base) to 26.0 %, on 44 synthetic two-voice mixes
+  from 55.4 to 6.6 % (SE-DiCoW: 25.3 and 7.9 %), at RTF 0.45 instead of
+  0.25 on a 4-vCPU CPU at 2 threads (bfloat16 with AMX; docs/models.md, "Diarization-conditioned
+  recognition"). `separate_overlaps` cannot be combined with it.
+- Plugin protocol: the `speakers` request (audio plus per-frame speaker
+  activity, one result per speaker), sent only to models whose `load` reply
+  announces `info.speaker_conditioned`; the protocol stays at version 1.
+  Engines implement `STTModel.transcribe_speakers(SpeakerRequest)`.
+- `GET /api/v1/info` lists speaker-conditioned models under
+  `capabilities.diarization.speaker_conditioned_models`.
+- **DiCoW without PyTorch** (`dicow-v3.3-onnx`, catalog entry pending until
+  the export is hosted). A core engine runs DiCoW v3.3 in ONNX Runtime with
+  NumPy (`bolo/engines/dicow_onnx.py`): Whisper's 128-band log-mel, the STNO
+  masks and transformers' long-form greedy decoding as DiCoW's own code
+  changes it, reproduced step by step. `server/tools/export_dicow_onnx.py`
+  makes the graphs (encoder with the FDDT conditioning, decoder with a
+  key/value cache; fp32 and int8). `bolo pull ./dir` registers an export as a
+  speaker-conditioned model with `nemotron-3-diarization` as its diarizer.
+  On 24 AMI excerpts the int8 graphs scored the same cpWER as the plugin
+  (26.0 %), on 40 English synthetic mixes 6.0 against 5.5 %; the fp32 graphs
+  gave the plugin's float32 transcripts word for word on two reference
+  excerpts. RTF 0.7-1.0 on a shared 4-vCPU machine, no PyTorch needed
+  (docs/models.md, "DiCoW without PyTorch"; docs/measurements/dicow-onnx.json).
+- `whisper_log_mel` takes `n_mels` (128 for Whisper large-v3 derivatives) and
+  computes long recordings block by block.
+- `capabilities.diarization.speaker_conditioned_models` leaves out pending
+  catalog entries; `bolo pull ./dir` gives a directory of a known kind its
+  catalog features and options (`custom.KIND_DEFAULTS`).
 - **Nemotron-3-Diarization as a second diarizer** (`nemotron-3-diarization`,
   opt-in). NVIDIA's end-to-end diarization model (OpenMDW-1.1, up to 8
   speakers, overlap-aware) runs in ONNX Runtime without PyTorch: NeMo's
