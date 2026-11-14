@@ -100,7 +100,7 @@ class Phonemizer:
 
     def voice_codepoints(self, text: str, language: str, profile: str, improved: bool = False) -> list[list[int]]:
         """Codepoints per sentence for ``GenerationConfig.phoneme_codepoints``."""
-        return self.codepoints(text, language)
+        return self.codepoints(strip_overrides(text), language)
 
     def version(self) -> str | None:
         return None
@@ -117,6 +117,7 @@ class Phonemizer:
         """
         from bolo.text.segment import split_sentences
 
+        text = strip_overrides(text)
         sentences: list[str] = []
         for sentence in split_sentences(text):
             m = _FINAL.search(sentence)
@@ -250,16 +251,47 @@ class UccharanPhonemizer(Phonemizer):
 
     def clause(self, text: str, voice: str) -> str:
         lang = uccharan_language("piper", voice) or voice
-        return str(self.module.phonemize(text, lang, "espeak-ipa", punctuation=False))
+        return str(self.module.phonemize(strip_overrides(text), lang, "espeak-ipa", punctuation=False))
 
     def phonemize(self, text: str, voice: str) -> list[str]:
         lang = uccharan_language("piper", voice) or voice
-        return list(self.module.phonemize(text, lang, "piper"))
+        return list(self.module.phonemize(strip_overrides(text), lang, "piper"))
 
     def voice_codepoints(self, text: str, language: str, profile: str, improved: bool = False) -> list[list[int]]:
         lang = uccharan_language(profile, language)
         if lang is None:
             raise EngineUnavailable(f"uccharan has no {profile!r} front end for language '{language}'")
+        overrides = OVERRIDE.findall(text)
+        if overrides:
+            if not hasattr(self.module, "phonemize_wordlists"):
+                text = strip_overrides(text)
+            else:
+                # Pronunciation overrides ([word](/ipa/), from word lists, SSML or the request): the
+                # entry's IPA replaces uccharan's reading, in the voice's phone set.
+                seen: dict[str, str] = {}
+                for word, ipa in overrides:
+                    seen.setdefault(word, ipa)
+                wl = self.module.WordList.from_entries(
+                    [{"word": w, "ipa": ipa, "match": "case"} for w, ipa in seen.items()]
+                )
+                plain = strip_overrides(text)
+                if profile == "piper":
+                    cps = self.module.phonemize_wordlists(
+                        plain, lang, profile="sherpa-onnx", improved=improved, wordlists=[wl]
+                    )
+                    return [list(s) for s in cps]
+                result: list[list[int]] = []
+                for sentence in _sentences(plain):
+                    phones = str(
+                        self.module.phonemize_wordlists(
+                            sentence, lang, profile=profile, improved=improved, wordlists=[wl]
+                        )
+                    ).strip()
+                    if profile == "kitten":
+                        phones = " ".join(_KITTEN_TOKEN.findall(phones))
+                    if phones:
+                        result.append([ord(c) for c in phones])
+                return result
         if profile == "piper":
             return [list(s) for s in self.module.phonemize(text, lang, "sherpa-onnx", improved=improved)]
         out: list[list[int]] = []
@@ -274,6 +306,13 @@ class UccharanPhonemizer(Phonemizer):
 
 
 _KITTEN_TOKEN = re.compile(r"\w+|[^\w\s]")
+#: Kokoro-style pronunciation override ``[word](/phonemes/)``
+OVERRIDE = re.compile(r"\[([^\[\]]+)\]\(/([^/()]+)/\)")
+
+
+def strip_overrides(text: str) -> str:
+    """``[word](/phonemes/)`` -> ``word`` (for phonemisers that cannot take the phonemes)."""
+    return OVERRIDE.sub(r"\1", text)
 
 
 def _sentences(text: str) -> list[str]:

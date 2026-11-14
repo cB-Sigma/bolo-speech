@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
@@ -16,6 +16,7 @@ from bolo.api.common import get_core, parse_bool, sse
 from bolo.bench import run_bench
 from bolo.errors import BoloError, InvalidRequest, ModelNotFound
 from bolo.obs.metrics import render_metrics
+from bolo.text.wordlists import check_name as check_wordlist_name
 
 router = APIRouter(prefix="/api/v1")
 root_router = APIRouter()
@@ -85,6 +86,15 @@ class ModelSettingsRequest(BaseModel):
         default=None,
         description="Pin the phonemiser of a voice: auto, uccharan, uccharan:improved or espeak-ng; null removes the pin.",
     )
+    text_normalizer: Literal["uccharan", "light", "model", "none"] | None = Field(
+        default=None,
+        description="Pin the text normaliser of a voice that reads text: uccharan (default), light (bolo's own), "
+        "model (the model's own) or none; null removes the pin.",
+    )
+    wordlists: list[str] | None = Field(
+        default=None,
+        description="Pin pronunciation word lists to the model, highest priority first; null removes the pin.",
+    )
 
 
 @router.get("/models/{model_id:path}/settings", tags=["native"], summary="Settings pinned for one model")
@@ -94,13 +104,19 @@ async def get_model_settings(request: Request, model_id: str) -> JSONResponse:
     return JSONResponse({"model": spec.id, "settings": core.store.model_settings(spec.id)})
 
 
-@router.put("/models/{model_id:path}/settings", tags=["native"], summary="Pin settings for one model (phonemiser)")
+@router.put(
+    "/models/{model_id:path}/settings",
+    tags=["native"],
+    summary="Pin settings for one model (phonemiser, text normaliser, word lists)",
+)
 async def put_model_settings(request: Request, model_id: str, body: ModelSettingsRequest) -> JSONResponse:
     core = get_core(request)
     spec = core.manager.resolve(model_id)
     values = body.model_dump(exclude_unset=True)
     if values.get("phonemizer"):
         core.components.validate_pin(spec, values["phonemizer"])
+    for name in values.get("wordlists") or []:
+        check_wordlist_name(name)
     settings = core.store.set_model_settings(spec.id, values)
     core.events.publish("model", {"id": spec.id, "event": "settings", "settings": settings})
     return JSONResponse({"model": spec.id, "settings": settings})

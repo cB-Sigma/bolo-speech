@@ -58,7 +58,7 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `GET` | `/api/v1/jobs/{job_id}` | Poll a background job |
 | `GET` | `/api/v1/jobs` | List background jobs |
 | `GET` | `/api/v1/models/{model_id}/settings` | Settings pinned for one model |
-| `PUT` | `/api/v1/models/{model_id}/settings` | Pin settings for one model (phonemiser) |
+| `PUT` | `/api/v1/models/{model_id}/settings` | Pin settings for one model (phonemiser, text normaliser, word lists) |
 | `POST` | `/api/v1/models/{model_id}/load` | Load a model into memory |
 | `POST` | `/api/v1/models/{model_id}/unload` | Unload a model from memory |
 | `DELETE` | `/api/v1/models/{model_id}` | Delete an installed model |
@@ -73,6 +73,12 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `POST` | `/api/v1/bench` | Start a concurrency sweep |
 | `GET` | `/api/v1/samples` | Built-in audio and text samples |
 | `GET` | `/api/v1/samples/{name}` | Download a built-in audio sample |
+| `GET` | `/api/v1/wordlists` | List pronunciation word lists |
+| `GET` | `/api/v1/wordlists/{name}` | One word list (JSON entries, TSV or PLS) |
+| `PUT` | `/api/v1/wordlists/{name}` | Create or replace a word list (TSV, PLS or JSON body) |
+| `DELETE` | `/api/v1/wordlists/{name}` | Delete a word list |
+| `POST` | `/api/v1/wordlists/{name}/preview` | What each voice would receive |
+| `GET` | `/api/v1/text-input/{model_id}` | How a model's voices take text |
 
 **operations**
 
@@ -203,7 +209,10 @@ JSON body.
 | `instructions` | - | accepted and ignored |
 | `sample_rate` | model's | extension: resample the output (8000 to 48000) |
 | `language` | voice's | extension: language for text normalisation |
-| `normalize` | `true` | extension: `false` sends the text to the voice untouched |
+| `normalize` | `true` | extension: `true` uses the voice's default normaliser (see "Text preparation" below); `"uccharan"`, `"light"` (bolo's own), `"model"` (leave numbers to the model) or `false` / `"none"` (word lists still apply) |
+| `input_format` | `text` | extension: `ssml` accepts the SSML subset below; `markdown` is the same as `text`. In every format, Kokoro-style `[word](/ipa/)` sets the pronunciation of that word |
+| `wordlists` | model pins, then `default` | extension: names of pronunciation word lists (`/api/v1/wordlists`), highest priority first. `[]` applies none. An unknown name → `404 wordlist_not_found` |
+| `pronunciations` | - | extension: inline entries `[{"word", "ipa"?, "say"?, "lang"?, "match"?}]`, applied before any list |
 | `phonemizer` | voice's pin, else the server's `phonemizer` setting | extension, for voices that read phonemes: `auto`, `uccharan` (= `uccharan:compatible`), `uccharan:improved`, `espeak-ng`. `424 component_missing` when the chosen one is not installed, `400` (`param: "phonemizer"`) when uccharan does not cover the voice's language. Ignored for voices that read characters or a lexicon. See models.md, "Phonemisers" |
 | `reference_audio` | - | extension, for models that clone voices (`features` contains `voice-cloning`, today the `tts-server` models): a recording of the voice to imitate, plain base64 or a `data:audio/…;base64,` URL (WAV, FLAC, MP3, … whatever bolo can decode). Up to 30 s are used; it is sent to the server as mono 16-bit WAV. `400` (`param: "reference_audio"`) for a model that cannot clone, an empty, undecodable or shorter-than-0.5 s recording. It takes precedence over `voice` |
 | `reference_text` | - | extension: what is said in `reference_audio`; some cloning models (audio.cpp CosyVoice3, IndexTTS-2, …) use it |
@@ -217,9 +226,17 @@ of roughly one second through libsndfile otherwise, in which case prefer
 `pcm` or `mp3` when time-to-first-audio matters. A streamed `wav` has a header that declares an
 unknown length, as is usual for streams.
 
-Text normalisation (on by default): Unicode NFC, Markdown emphasis, links and
-emoji removed, numbers spelled out for English and Hindi. Code-mixed text is
-passed through as written.
+Text normalisation (on by default) depends on how the voice takes text; see
+"Text preparation" below. Voices that read text themselves (the `tts-server`
+models, including Orpheus-family voices on llama.cpp, and plugin voices) get
+uccharan's normalise-only mode when the `uccharan` package is installed: numbers,
+money (`₹`, `Rs.`, lakh/crore), dates, times, phone numbers, units, abbreviations,
+URLs and email addresses written out in words, in English, Hindi and the other
+Indian languages uccharan reads; Latin-script English inside Indic text is kept.
+Every other voice, and every voice when uccharan is missing, gets bolo's light
+normaliser: Unicode NFC, Markdown emphasis, links and emoji removed, URLs read out
+("w w w dot example dot com"), numbers spelled out for English and Hindi.
+Code-mixed text is passed through as written.
 
 Voices that read characters from a closed set (the Coqui-format VITS voices:
 `coqui-*`, the SYSPIN voices) would silently skip anything they have no
@@ -253,6 +270,38 @@ first audio arrives after about 5 frames (0.4 s of speech) have been generated.
 omitted; another name → `400`, `param: "voice"`); `speed` must be 1.0 and
 `reference_audio` is refused (`400`). Without onnxruntime installed the model
 answers `424 component_missing` (`pip install "bolo[orpheus]"`).
+
+#### Text preparation, SSML and pronunciation word lists
+
+Each voice has a **text-input record** (`GET /api/v1/text-input/{model}`) that decides what it
+receives:
+
+| `reads` | Voices | Normaliser by default | A word-list entry becomes |
+| --- | --- | --- | --- |
+| `phonemes` | Piper, Kokoro, Kitten, Matcha (sherpa-onnx) | `light` (the phonemiser reads numbers itself) | its IPA, converted to the voice's phone set by uccharan (`pronunciation: "phonemes"`) |
+| `text` | `tts-server` models, Orpheus on llama.cpp, plugin voices | `uccharan` | its `say` form, or a respelling uccharan derives from its IPA; a voice with `text_markup: kokoro` gets `[word](/ipa/)` (`pronunciation: "respelling"` or `"markup"`) |
+| `characters` | closed character sets (Coqui VITS, SYSPIN, MMS) | `light`, then the voice's own fitting | its `say` form |
+
+The record's other fields: `latin` (`keep` or `transliterate` Latin words), `respell`
+(`native`, `latin-hyphen`, `latin-plain`), `digits` (which language reads digits) and
+`wordlists` (pinned lists). They come from the catalog entry's options and the model's pinned
+settings (configuration.md, "Per-model options").
+
+Pronunciation sources, the first match wins for any stretch of text: SSML `<phoneme>` and
+`[word](/ipa/)` in the input, `pronunciations`, `wordlists` in the order given, lists pinned to
+the model, then the list named `default`. Inside one list the longest match wins; a match in an
+earlier source wins even over a longer one in a later source. Word lists apply before number
+reading, so entries such as `2G` or `MH12` win over the normaliser. Entries that a voice cannot
+use are skipped, not errors (an IPA-only entry on a voice without a respelling for its script).
+The trace of each request (`GET /api/v1/requests/{id}`) records `normalizer`, `normalized_text`
+and `pronunciations_applied`.
+
+SSML subset (`input_format: "ssml"`; the `<speak>` wrapper is optional): `<sub alias>`,
+`<phoneme alphabet="ipa" ph>`, `<say-as interpret-as>` with `characters` / `spell-out`,
+`cardinal`, `ordinal`, `digits` / `telephone`, `date` (`format` `dmy`, `mdy`, `ymd`), `time`,
+`currency`; `<break>`, `<p>`, `<s>`, `<lang>`, and `<emphasis>` / `<prosody>` (text kept, styling
+ignored). Malformed SSML → `400` with the line and column; another element → `400`; DOCTYPE
+and entity declarations are refused.
 
 ### `GET /v1/models`, `GET /v1/models/{id}`
 
@@ -370,6 +419,36 @@ one answers `404 model_not_published`.
 
 Pulling an installed model yields a job that is already `done`. Pulling a
 gated model without a token yields a job in state `error` that says what to do.
+
+### Pronunciation word lists
+
+Named lists in `<data_dir>/wordlists/<name>.tsv` (names `[a-z0-9_-]`, at most 64 characters),
+in uccharan's format: tab-separated `word`, `lang`, `ipa`, `say`, `match`, `note`, where `match`
+is `word` (whole words, any case; the default), `case`, `exact` (any substring) or `regex`, and
+`lang` is a language tag or `*` (see uccharan's docs/wordlists.md). Parsing and matching need the
+`uccharan` package (`424 component_missing` otherwise; listing and deleting still work). Limits:
+10,000 entries and 1 MB per list, 8 lists and 500 inline entries per request.
+
+- `GET /api/v1/wordlists` → `{"wordlists": [{"name", "entries", "languages", "bytes", "updated"}], "available"}`.
+- `GET /api/v1/wordlists/{name}` → `{"name", …, "entries": [{"word", "lang", "ipa", "say", "match", "note", "line"}]}`;
+  `?format=tsv` or `Accept: text/tab-separated-values` gives the file, `?format=pls&lang=hi` or
+  `Accept: application/pls+xml` a W3C PLS 1.0 lexicon for one language (plus the entries for any language).
+- `PUT /api/v1/wordlists/{name}` with a TSV, PLS (`alphabet="ipa"`) or JSON (`[…]` or
+  `{"entries": […]}`) body replaces the list (stored as TSV) and answers its summary plus
+  `warnings` (`[{"line", "message"}]`, e.g. an entry with neither `ipa` nor `say`). A parse error
+  → `400` naming the line. Publishes a `wordlist` event.
+- `DELETE /api/v1/wordlists/{name}` → `{"deleted": name}`; `404 wordlist_not_found` for an unknown list.
+- `POST /api/v1/wordlists/{name}/preview` with `{"text", "models": [up to 8 TTS ids], "language"?,
+  "voice"?, "input_format"?, "normalize"?}` → `{"previews": [{"model", "voice", "language",
+  "text_input", "normalizer", "text", "applied", "phonemes"?}]}`: exactly the text each voice would
+  receive (with `[word](/ipa/)` overrides for phoneme voices), the entries applied, and for phoneme
+  voices the phonemes (one line per sentence) when a phonemiser is available. `name` `-` previews
+  with the pinned and `default` lists only. Nothing is synthesised; send the same text to
+  `/v1/audio/speech` with `wordlists` to hear it.
+- `GET /api/v1/text-input/{model}?voice=` → `{"model", "voice", "text_input": {"reads", "normalizer",
+  "markup", "latin", "respell", "digits", "wordlists", "pronunciation"}}`.
+- `PUT /api/v1/models/{id}/settings` also takes `text_normalizer` (`uccharan`, `light`, `model`,
+  `none`) and `wordlists` (a list of names, pinned in that order); `null` removes a pin.
 
 ### `GET /api/v1/stats`
 
@@ -531,7 +610,10 @@ A connection produces one trace in `/api/v1/requests` (`request_id`), with
 
 Streaming synthesis with text that may arrive in pieces. Query parameters:
 `model`, `voice`, `format` (`pcm_s16le` default, `pcm_f32le`, `mulaw`, `alaw`,
-`wav`, `mp3`, `opus`, `flac`, `aac`), `sample_rate`, `speed`, `language`.
+`wav`, `mp3`, `opus`, `flac`, `aac`), `sample_rate`, `speed`, `language`,
+`phonemizer`, `normalize` (`uccharan`, `light`, `model`, `none`/`false`) and
+`wordlists` (comma-separated names; an empty value applies none), as for
+`/v1/audio/speech`.
 
 Client → server (JSON): `{"type":"text","text":"…"}` (optionally
 `"flush": true`), `{"type":"flush"}`, `{"type":"stop"}`, `{"type":"ping"}`.

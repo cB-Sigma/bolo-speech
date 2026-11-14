@@ -168,7 +168,9 @@ async def tts_stream(ws: WebSocket) -> None:
 
     Query: ``model``, ``voice``, ``format`` (pcm_s16le | pcm_f32le | mulaw |
     alaw | wav | mp3 | opus | flac | aac), ``sample_rate``, ``speed``,
-    ``phonemizer`` (auto | uccharan | uccharan:improved | espeak-ng; bolo extension).
+    ``phonemizer`` (auto | uccharan | uccharan:improved | espeak-ng; bolo extension),
+    ``wordlists`` (comma-separated word-list names; empty applies none) and ``normalize``
+    (uccharan | light | model | none).
     Client sends JSON ``{"type":"text","text":…}`` (incrementally),
     ``flush`` and ``stop``; the server answers with binary audio frames and
     JSON ``ready`` / ``chunk`` / ``metrics`` / ``done`` / ``error``.
@@ -191,6 +193,11 @@ async def tts_stream(ws: WebSocket) -> None:
         voice = params.get("voice") or None
         phonemizer = params.get("phonemizer") or None
         language = params.get("language") or None
+        wordlists = [n for n in params["wordlists"].split(",") if n.strip()] if "wordlists" in params else None
+        raw_norm = (params.get("normalize") or "").lower()
+        normalize: bool | str = (
+            True if raw_norm in ("", "true", "1") else False if raw_norm in ("false", "0", "off") else raw_norm
+        )
         async with core.manager.use(spec.id) as entry:
             model_rate = entry.model.sample_rate
             core.active_streams += 1
@@ -230,6 +237,8 @@ async def tts_stream(ws: WebSocket) -> None:
                             speed=speed,
                             language=language,
                             phonemizer=phonemizer,
+                            wordlists=wordlists,
+                            normalize=normalize,
                         )
                         first = True
                         try:

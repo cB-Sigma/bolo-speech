@@ -864,7 +864,7 @@ recordings made by joining six excerpts of one meeting):
 | offline probabilities, our own int8 export (same tool) | PyTorch fp32 | 0.0014; 99.9 % |
 | live loop, 1.04 s mode, audio fed in 0.1 s pieces (2 recordings) | transformers' streaming loop | 0.0008; 99.95 % |
 
-(The research note `docs/_research-overlap-v2.md` measured 0.014 and 98.7 %
+(An earlier measurement gave 0.014 and 98.7 %
 for the int8 graph: that was each excerpt in one ONNX pass, without the chunk
 loop, against the chunked reference; repeated here, 0.015 and 98.8 %. With
 the same chunking the two agree to 0.0009.)
@@ -1074,10 +1074,9 @@ Reading:
   (`pyannote-3.0-eres2net`'s turns) reached 47.6 % (-31 %, 23 of 24 better,
   none worse), Nemotron's turns 26.0 %. On the synthetic mixes it removes
   the cases neither diarizer fixed: 8 kHz μ-law and same-gender voices end
-  at 3.5-7.9 %. The research note (`docs/_research-overlap-v2.md`, section 6)
-  has the control for the bigger recogniser alone (the same weights run
-  turn by turn without conditioning): -15 %, not significant, on four of
-  these excerpts.
+  at 3.5-7.9 %. The control for the bigger recogniser alone (the same
+  weights run turn by turn without conditioning) gave -15 %, not
+  significant, on four of these excerpts.
 * **Hindi:** one synthetic pair (2 files per rate), 14.8 / 26.1 % against
   23.9 / 59.1 % (`language=hi`); the model was not trained on Hindi
   multi-talker speech. Too small to rely on.

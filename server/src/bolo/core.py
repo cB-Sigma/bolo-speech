@@ -79,7 +79,8 @@ from bolo.separate import separate as run_separation
 from bolo.store import HubClient, ModelStore
 from bolo.streaming.vad import EnergyVad, FallbackVad, detect_segments, merge_segments
 from bolo.text import phonemize
-from bolo.text.normalize import normalize_for_tts
+from bolo.text.phonemize import strip_overrides
+from bolo.text.prepare import prepare as prepare_text
 from bolo.text.segment import chunk_text
 
 log = logging.getLogger("bolo")
@@ -1121,11 +1122,14 @@ class Bolo:
         voice: str | None = None,
         speed: float = 1.0,
         language: str | None = None,
-        normalize: bool = True,
+        normalize: bool | str = True,
         trace: Trace | None = None,
         phonemizer: str | None = None,
         reference_audio: bytes | None = None,
         reference_text: str | None = None,
+        wordlists: list[str] | None = None,
+        pronunciations: list[dict[str, Any]] | None = None,
+        input_format: str = "text",
     ) -> AsyncGenerator[SynthChunk, None]:
         """Synthesise ``text`` sentence by sentence, yielding audio as soon as it exists.
 
@@ -1172,7 +1176,13 @@ class Bolo:
                         reference_text=reference_text,
                     )
                 with trace.phase("normalize"):
-                    clean = normalize_for_tts(text, lang) if normalize else text
+                    # normaliser, word lists, SSML and pronunciation overrides for this voice (bolo.text.prepare)
+                    prepared = prepare_text(
+                        self, spec, chosen.id if chosen else voice, text, lang, normalize=normalize,
+                        wordlists=wordlists, pronunciations=pronunciations, input_format=input_format,
+                    )  # fmt: skip
+                    trace.extra.update(prepared.trace_extra())
+                    clean = prepared.text
                     clean = tts.fit_text(clean, lang)  # closed character sets: spell digits out, or refuse
                     # a slow voice gets a shorter first chunk (catalog option first_chunk_chars), so audio starts early
                     first = int(spec.options.get("first_chunk_chars", 120))
@@ -1205,7 +1215,8 @@ class Bolo:
                             if first_audio_at is None:
                                 first_audio_at = trace.now()
                             total_samples += len(chunk)
-                            yield SynthChunk(chunk, sample_rate, seq, piece if first_of_text else "", first_of_text)
+                            shown = strip_overrides(piece) if first_of_text else ""
+                            yield SynthChunk(chunk, sample_rate, seq, shown, first_of_text)
                             seq += 1
                             first_of_text = False
                         _n, info = await job

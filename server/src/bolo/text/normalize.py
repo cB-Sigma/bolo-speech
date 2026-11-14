@@ -20,9 +20,17 @@ _EMOJI = re.compile(
     "[\U0001f000-\U0001faff\U00002600-\U000027bf\U0001f1e6-\U0001f1ff\U0000fe0f\U0000200d]+", flags=re.UNICODE
 )
 _MD_EMPHASIS = re.compile(r"(\*\*|__|\*|_|~~|`)(?=\S)(.+?)(?<=\S)\1")
-_MD_LINK = re.compile(r"\[([^\]]+)\]\((?:[^)]+)\)")
+_MD_LINK = re.compile(r"\[([^\]]+)\]\((?!/[^)]*/\))(?:[^)]+)\)")
+#: Kokoro (misaki) pronunciation markup ``[word](/phonemes/)``: kept by :func:`strip_markup`
+OVERRIDE = re.compile(r"\[([^\[\]]+)\]\(/([^/()]+)/\)")
 _MD_HEADING = re.compile(r"^\s{0,3}#{1,6}\s+", flags=re.MULTILINE)
-_URL = re.compile(r"https?://\S+")
+_URL = re.compile(r"(?:https?://|www\.)[^\s<>\"]+")
+_URL_SEPARATORS = {
+    "en": {".": "dot", "/": "slash", "-": "dash", "_": "underscore", "@": "at", ":": "colon", "?": "question mark",
+           "=": "equals", "&": "and", "#": "hash"},
+    "hi": {".": "डॉट", "/": "स्लैश", "-": "डैश", "_": "अंडरस्कोर", "@": "ऐट द रेट", ":": "कोलन", "?": "क्वेश्चन मार्क",
+           "=": "इक्वल्स", "&": "ऐंड", "#": "हैश"},
+}  # fmt: skip
 _WS = re.compile(r"[ \t ]+")
 
 _DEVANAGARI_DIGITS = str.maketrans("०१२३४५६७८९", "0123456789")
@@ -223,6 +231,36 @@ def _expand_numbers(text: str, lang: str) -> str:
     return _NUMBER.sub(repl, text)
 
 
+def speak_url(url: str, language: str | None = None) -> str:
+    """A URL as it is read aloud: "https://www.example.com/a" -> "w w w dot example dot com slash a"."""
+    lang = (language or "en").split("-")[0].split("_")[0].lower()
+    words = _URL_SEPARATORS["hi" if lang in ("hi", "mr", "ne", "bho", "mai") else "en"]
+    body = re.sub(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", "", url).rstrip("/")
+    out: list[str] = []
+    for part in re.split(r"([./\-_@:?=&#])", body):
+        if not part:
+            continue
+        if part in words:
+            out.append(words[part])
+        elif part.isalpha() and not re.search(r"[aeiouyAEIOUY]", part):
+            out.append(" ".join(part.lower()))  # www, bbc: letter by letter
+        else:
+            out.append(part)
+    return " ".join(out)
+
+
+def _read_urls(text: str, lang: str) -> str:
+    def repl(m: re.Match[str]) -> str:
+        url = m.group(0)
+        tail = ""
+        while url and url[-1] in ".,;:!?)]'\"":
+            tail = url[-1] + tail
+            url = url[:-1]
+        return speak_url(url, lang) + tail
+
+    return _URL.sub(repl, text)
+
+
 def strip_markup(text: str) -> str:
     text = _MD_LINK.sub(r"\1", text)
     text = _MD_HEADING.sub("", text)
@@ -236,7 +274,7 @@ def normalize_for_tts(text: str, language: str | None = None, *, expand_numbers:
     lang = (language or "en").split("-")[0].split("_")[0].lower()
     text = unicodedata.normalize("NFC", text)
     text = strip_markup(text)
-    text = _URL.sub(" ", text)
+    text = _read_urls(text, lang)
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = "\n".join(_WS.sub(" ", line).strip() for line in text.split("\n"))
     text = re.sub(r"\n{3,}", "\n\n", text).strip()

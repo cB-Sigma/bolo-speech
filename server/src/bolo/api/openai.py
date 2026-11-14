@@ -13,7 +13,7 @@ import binascii
 import contextlib
 import time
 from collections.abc import AsyncGenerator, AsyncIterator, Coroutine
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 
 import numpy as np
 from fastapi import APIRouter, Request
@@ -489,7 +489,26 @@ class SpeechRequest(BaseModel):
     stream_format: str = "audio"
     sample_rate: int | None = Field(default=None, ge=8000, le=48000, description="Extension: resample the output.")
     language: str | None = Field(default=None, description="Extension: language hint for text normalisation.")
-    normalize: bool = Field(default=True, description="Extension: set false to skip text normalisation.")
+    normalize: bool | Literal["uccharan", "light", "model", "none"] = Field(
+        default=True,
+        description="Extension: text normalisation. true: the voice's default (uccharan's normalise-only mode for voices "
+        "that read text, when installed); `uccharan`, `light` (bolo's own), `model` (leave it to the model) or "
+        "false/`none`.",
+    )
+    input_format: Literal["text", "ssml", "markdown"] = Field(
+        default="text",
+        description='Extension: `ssml` accepts <speak>, <sub alias>, <phoneme alphabet="ipa" ph>, <say-as>, <break>, '
+        "<lang>, <p>, <s>. In every format, Kokoro-style [word](/ipa/) sets a word's pronunciation.",
+    )
+    wordlists: list[str] | None = Field(
+        default=None,
+        description="Extension: pronunciation word lists to apply, highest priority first (names from "
+        "/api/v1/wordlists). Default: the lists pinned to the model, then `default`; [] applies none.",
+    )
+    pronunciations: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="Extension: inline word-list entries [{word, ipa?, say?, lang?, match?}], applied before any list.",
+    )
     phonemizer: str | None = Field(
         default=None,
         description="Extension: who turns text into phonemes for voices that read phonemes: auto, uccharan "
@@ -590,6 +609,7 @@ async def create_speech(request: Request, body: SpeechRequest) -> Response:
         core, trace, encoder,
         text=body.input, model=spec.id, voice=voice, speed=body.speed, language=body.language, normalize=body.normalize,
         phonemizer=body.phonemizer, reference_audio=reference, reference_text=body.reference_text,
+        wordlists=body.wordlists, pronunciations=body.pronunciations, input_format=body.input_format,
     )  # fmt: skip
     chunks = stream.chunks()
     try:

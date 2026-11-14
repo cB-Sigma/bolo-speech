@@ -15,6 +15,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from bolo import __version__
 from bolo.api import chat, native, openai, realtime, speaches, static, ws
+from bolo.api import wordlists as wordlists_api
 from bolo.api.common import check_auth, error_body, error_response
 from bolo.config import Settings
 from bolo.core import Bolo
@@ -111,6 +112,7 @@ def create_app(settings: Settings | None = None, core: Bolo | None = None) -> Fa
     app.include_router(openai.router, dependencies=protected)
     app.include_router(speaches.router, dependencies=protected)
     app.include_router(native.router, dependencies=protected)
+    app.include_router(wordlists_api.router, dependencies=protected)
     app.include_router(native.root_router)
     app.include_router(chat.router, dependencies=protected)
     app.include_router(ws.router)

@@ -694,7 +694,7 @@
     "tags": [
      "native"
     ],
-    "summary": "Pin settings for one model (phonemiser)",
+    "summary": "Pin settings for one model (phonemiser, text normaliser, word lists)",
     "operationId": "put_model_settings_api_v1_models__model_id__settings_put",
     "parameters": [
      {
@@ -1231,6 +1231,280 @@
     }
    }
   },
+  "/api/v1/wordlists": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "List pronunciation word lists",
+    "operationId": "list_wordlists_api_v1_wordlists_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/wordlists/{name}": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "One word list (JSON entries, TSV or PLS)",
+    "operationId": "get_wordlist_api_v1_wordlists__name__get",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Name"
+      }
+     },
+     {
+      "name": "format",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Format"
+      }
+     },
+     {
+      "name": "lang",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Lang"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Create or replace a word list (TSV, PLS or JSON body)",
+    "operationId": "put_wordlist_api_v1_wordlists__name__put",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Name"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Delete a word list",
+    "operationId": "delete_wordlist_api_v1_wordlists__name__delete",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Name"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/wordlists/{name}/preview": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "What each voice would receive",
+    "description": "Render ``text`` with this word list (``-`` for none beyond the pinned and default lists)\nfor each model: the capability record, the text or phonemes the voice would receive, and the\nentries applied.",
+    "operationId": "preview_api_v1_wordlists__name__preview_post",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Name"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PreviewRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/text-input/{model_id}": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "How a model's voices take text",
+    "operationId": "model_text_input_api_v1_text_input__model_id__get",
+    "parameters": [
+     {
+      "name": "model_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Model Id"
+      }
+     },
+     {
+      "name": "voice",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Voice"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/metrics": {
    "get": {
     "tags": [
@@ -1509,11 +1783,112 @@
       ],
       "title": "Phonemizer",
       "description": "Pin the phonemiser of a voice: auto, uccharan, uccharan:improved or espeak-ng; null removes the pin."
+     },
+     "text_normalizer": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "uccharan",
+         "light",
+         "model",
+         "none"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Text Normalizer",
+      "description": "Pin the text normaliser of a voice that reads text: uccharan (default), light (bolo's own), model (the model's own) or none; null removes the pin."
+     },
+     "wordlists": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Wordlists",
+      "description": "Pin pronunciation word lists to the model, highest priority first; null removes the pin."
      }
     },
     "additionalProperties": false,
     "type": "object",
     "title": "ModelSettingsRequest"
+   },
+   "PreviewRequest": {
+    "properties": {
+     "text": {
+      "type": "string",
+      "title": "Text",
+      "description": "Text to render."
+     },
+     "models": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 8,
+      "minItems": 1,
+      "title": "Models",
+      "description": "TTS model ids (up to eight)."
+     },
+     "language": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Language",
+      "description": "Language of the text (default: each model's)."
+     },
+     "voice": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Voice",
+      "description": "Voice id, for models whose voices differ."
+     },
+     "input_format": {
+      "type": "string",
+      "title": "Input Format",
+      "description": "text, ssml or markdown.",
+      "default": "text"
+     },
+     "normalize": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Normalize",
+      "default": true
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "text",
+     "models"
+    ],
+    "title": "PreviewRequest"
    },
    "PullRequest": {
     "properties": {
@@ -1638,10 +2013,65 @@
       "description": "Extension: language hint for text normalisation."
      },
      "normalize": {
-      "type": "boolean",
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "string",
+        "enum": [
+         "uccharan",
+         "light",
+         "model",
+         "none"
+        ]
+       }
+      ],
       "title": "Normalize",
-      "description": "Extension: set false to skip text normalisation.",
+      "description": "Extension: text normalisation. true: the voice's default (uccharan's normalise-only mode for voices that read text, when installed); `uccharan`, `light` (bolo's own), `model` (leave it to the model) or false/`none`.",
       "default": true
+     },
+     "input_format": {
+      "type": "string",
+      "enum": [
+       "text",
+       "ssml",
+       "markdown"
+      ],
+      "title": "Input Format",
+      "description": "Extension: `ssml` accepts <speak>, <sub alias>, <phoneme alphabet=\"ipa\" ph>, <say-as>, <break>, <lang>, <p>, <s>. In every format, Kokoro-style [word](/ipa/) sets a word's pronunciation.",
+      "default": "text"
+     },
+     "wordlists": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Wordlists",
+      "description": "Extension: pronunciation word lists to apply, highest priority first (names from /api/v1/wordlists). Default: the lists pinned to the model, then `default`; [] applies none."
+     },
+     "pronunciations": {
+      "anyOf": [
+       {
+        "items": {
+         "additionalProperties": true,
+         "type": "object"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Pronunciations",
+      "description": "Extension: inline word-list entries [{word, ipa?, say?, lang?, match?}], applied before any list."
      },
      "phonemizer": {
       "anyOf": [

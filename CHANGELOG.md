@@ -8,6 +8,26 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **uccharan's normalise-only mode for voices that read text** (`tts-server` models,
+  Orpheus-family voices on llama.cpp, plugin voices), on by default: numbers, money with
+  lakh/crore, dates, times, phone numbers, units, abbreviations, URLs and email addresses written
+  out in English, Hindi and the other Indian languages uccharan reads, Latin-script English kept
+  inside Indic text. Per-model catalog option and pin `text_normalizer` (`uccharan`, `light`,
+  `model`, `none`); `normalize` on `/v1/audio/speech` also takes these names. bolo's own
+  normaliser stays the fallback when uccharan is not installed.
+- **Pronunciation word lists** (`<data_dir>/wordlists/<name>.tsv`, uccharan's TSV format, PLS
+  and JSON import, PLS export): `GET/PUT/DELETE /api/v1/wordlists/{name}`, `GET /api/v1/wordlists`,
+  `POST /api/v1/wordlists/{name}/preview` (what each chosen voice would receive). Applied by
+  priority: SSML and inline `[word](/ipa/)`, request `pronunciations`, request `wordlists`, lists
+  pinned to the model, the `default` list. Phoneme voices get the entry's IPA in their phone set,
+  text voices its spoken form or a respelling, voices with `text_markup: kokoro` the markup.
+  `GET /api/v1/text-input/{model}` shows each voice's record. Traces record the normaliser, the
+  normalised text and the entries applied.
+- **SSML subset** on `/v1/audio/speech` (`input_format: "ssml"`): `<sub>`, `<phoneme>`,
+  `<say-as>` (characters, cardinal, ordinal, digits/telephone, date with format), `<break>`,
+  `<p>`, `<s>`, `<lang>`, `<emphasis>`, `<prosody>`. `WS /api/v1/tts/stream` takes `normalize` and
+  `wordlists` query parameters.
+
 - **Orpheus-family voices without PyTorch** (kind `orpheus-llamacpp` of the
   `tts-server` engine, `bolo/engines/orpheus_llamacpp.py`): llama.cpp's
   `llama-server` runs the language model from a GGUF; bolo builds the prompt
@@ -328,6 +348,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - Overlap separation was evaluated on synthetic two-voice mixes made with
   bolo's own voices and on 24 AMI meeting excerpts; not on real telephone
   calls, and not with more than one recogniser per language.
+
+### Fixed
+
+- Kokoro-style `[word](/phonemes/)` overrides were removed with other Markdown links before they
+  reached the voice; they now set the word's pronunciation (for every voice).
+- URLs were deleted from text before synthesis; they are now read out ("w w w dot example dot
+  com slash docs").
 
 ## [0.1.0]
 

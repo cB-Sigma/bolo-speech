@@ -165,6 +165,25 @@ A catalog entry (or a custom entry in `<data_dir>/custom.yaml`) may carry
 `workers`, `max_batch`, `max_chunk_s`, and engine-specific keys such as
 `beam_size` or `compute_type` for faster-whisper.
 
+Text handling (see api.md, "Text preparation, SSML and pronunciation word lists"):
+`text_normalizer` (`uccharan`, the default for voices that read text; `light`,
+bolo's own; `model`, numbers left to the model; `none`), `text_markup` (`kokoro`
+when the voice's front end takes `[word](/ipa/)` markup; default `none`),
+`text_latin` (`keep` Latin-script words in Indic text, the default, or
+`transliterate` them into the voice's script), `text_respell` (`native`,
+`latin-hyphen` or `latin-plain` respellings of word-list entries that only have
+IPA; `latin-plain` when the entry also sets `lowercases: true`), `numbers` (the
+language that reads digits, e.g. `hi`; default: the request language, English
+next to English words) and `wordlists` (lists applied to every request for the
+model). `text_normalizer` and `wordlists` can also be pinned at run time with
+`PUT /api/v1/models/{id}/settings`, which wins over the catalog.
+
+Pronunciation word lists are files in `<data_dir>/wordlists/<name>.tsv`
+(uccharan's TSV format; manage them with `/api/v1/wordlists`); the list named
+`default` applies to every request that does not choose its own lists. They need
+the `uccharan` package, which is also what enables the normalise-only mode; without
+it bolo uses its light normaliser.
+
 Orpheus-family voices on llama.cpp (`kind: orpheus-llamacpp`; see models.md,
 "Orpheus-family voices on llama.cpp") read: `prompt_format` (`svara`, `veena`
 or `orpheus`), `temperature`, `top_p`, `repetition_penalty` (defaults: the
