@@ -106,9 +106,41 @@ def _core(args: argparse.Namespace) -> Any:
     return Bolo(settings)
 
 
+def _pull_pack(core: Any, args: argparse.Namespace) -> int | None:
+    """``bolo pull uccharan-<pack>``: one of uccharan's language packs (None: the name is not a pack)."""
+    from bolo.text import packs
+
+    name = packs.pack_of(args.model)
+    if name is None:
+        return None
+    pack = packs.info(name)
+    assert pack is not None
+    if core.components.is_installed(args.model):
+        print(f"{args.model} is already installed")
+        return 0
+    if pack.share_alike and not args.accept_license:
+        print(
+            f"error: uccharan's pack '{name}' is licensed {pack.license} (it is built from share-alike data). "
+            "Re-run with --accept-license to download it.",
+            file=sys.stderr,
+        )
+        return 1
+    print(f"downloading uccharan language pack '{name}' ({packs.human_size(pack.size)}, {pack.license})")
+    error = core.components.install_blocking(component=args.model)
+    if error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    where = packs.cache_dir() or "uccharan's cache"
+    print(f"installed {args.model} (SHA-256 checked) into {where}")
+    return 0
+
+
 def cmd_pull(args: argparse.Namespace) -> int:
     core = _core(args)
     name = args.model
+    pulled = _pull_pack(core, args)
+    if pulled is not None:
+        return pulled
     if name.startswith("hf:"):
         from bolo.custom import register_hf_model
 
@@ -798,13 +830,14 @@ def cmd_components(args: argparse.Namespace) -> int:
             state = f"installed ({c['source']}, {c['version']})" if c["installed"] else "not installed"
             print(f"{c['id']:<12} {state:<40} {c['license']:<18} needed by {c['required_by_count']} catalog models")
             if not c["installed"] and c.get("kind") in ("phonemizer", "language-pack"):
-                flag = " --accept-license" if c["id"] == "espeak-ng" or c.get("kind") == "language-pack" else ""
+                flag = " --accept-license" if c["license"] not in ("Apache-2.0",) else ""
                 print(f"             install: bolo components install {c['id']}{flag}   (or: {c['manual_command']})")
             elif not c["installed"]:
                 print(f"             install: {c['manual_command']}")
         return 0
-    packs = tuple(c["id"] for c in manager.pack_status())
-    installable = ("espeak-ng", "uccharan", "llama-server", "audio.cpp", *packs)
+    listed = manager.pack_status()
+    packs = tuple(c["id"] for c in listed if c["license"] != "Apache-2.0")
+    installable = ("espeak-ng", "uccharan", "llama-server", "audio.cpp", *(c["id"] for c in listed))
     if args.component not in installable:
         print(f"error: unknown component '{args.component}' (installable: {', '.join(installable)})", file=sys.stderr)
         return 1
@@ -820,8 +853,8 @@ def cmd_components(args: argparse.Namespace) -> int:
         return 1
     if args.component in packs and not args.accept_license:
         print(
-            "error: uccharan's romanised-text packs are licensed CC BY-SA 4.0 (they are built from share-alike "
-            "data). Re-run with --accept-license to download this one.",
+            "error: this uccharan pack is licensed CC BY-SA 4.0 (it is built from share-alike data). Re-run with "
+            "--accept-license to download it.",
             file=sys.stderr,
         )
         return 1
@@ -834,8 +867,11 @@ def cmd_components(args: argparse.Namespace) -> int:
     if error:
         print(f"error: {error}", file=sys.stderr)
         return 1
-    if args.component in packs:
+    if args.component.startswith("uccharan-xlit-"):
         print(f"installed {args.component}; romanised text for this language can now be converted")
+        return 0
+    if args.component.startswith("uccharan-"):
+        print(f"installed {args.component} (SHA-256 checked)")
         return 0
     print(f"installed {args.component}; voices that need it are now available")
     return 0
@@ -1244,13 +1280,32 @@ def _doctor_llm(settings: Settings) -> None:
     print(f"language model: {check['base_url']} reachable; model {model}: {found}")
 
 
+def _doctor_packs(settings: Any) -> None:
+    """uccharan's language packs: each with its size, licence and whether it is on this machine."""
+    from bolo.text import packs
+
+    listed = packs.all_packs()
+    if not listed:
+        return
+    automatic = "on" if settings.uccharan_auto_download and os.environ.get("UCCHARAN_OFFLINE") != "1" else "off"
+    print(
+        f"  language packs ({len(listed)}; cache {packs.cache_dir() or 'unknown'}; uccharan_auto_download {automatic}):"
+    )
+    for pack in listed:
+        state = "installed" if packs.installed(pack.name) else "not installed"
+        if pack.name in packs.BUILT_IN:
+            state = "built in"
+        note = "  (on request only)" if pack.share_alike else ""
+        print(f"    {pack.component:<24} {packs.human_size(pack.size):>8}  {pack.license:<13} {state}{note}")
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     import platform
 
     from bolo.audio import decode, encode
     from bolo.audio.resample import HAVE_SOXR
     from bolo.engines import EngineRegistry
-    from bolo.text.phonemize import get_phonemizer, get_uccharan
+    from bolo.text.phonemize import UCCHARAN_LANGUAGES, get_phonemizer, get_uccharan
 
     settings = _settings(args)
     print(
@@ -1286,10 +1341,14 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     )
     uc = get_uccharan()
     if uc:
-        print(f"uccharan: found (version {uc.version() or 'unknown'}) - phonemiser for English and Hindi voices")
+        print(
+            f"uccharan: found (version {uc.version() or 'unknown'}) - phonemiser and text normaliser for voices in "
+            f"{len(UCCHARAN_LANGUAGES)} language tags"
+        )
+        _doctor_packs(settings)
     else:
         print(
-            "uccharan: not installed (Piper, Kitten and Kokoro voices in English and Hindi need it or espeak-ng: "
+            "uccharan: not installed (Piper, Kitten and Kokoro voices in its languages need it or espeak-ng: "
             "`pip install 'bolo-speech[uccharan]'`)"
         )
     print(f"phonemizer setting: {settings.phonemizer}")
@@ -1433,6 +1492,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--name", help="local models: the id to register the directory under (default: local-<dirname>)")
     s.add_argument("--language", help="local models: language code(s), comma separated")
     s.add_argument("--option", action="append", help="local models: loader option key=value (repeatable)")
+    s.add_argument(
+        "--accept-license",
+        dest="accept_license",
+        action="store_true",
+        help="uccharan's CC BY-SA 4.0 packs (uccharan-xlit-*, uccharan-wikipron-*): accept the licence",
+    )
     s.set_defaults(func=cmd_pull)
 
     def _remote(s: argparse.ArgumentParser) -> None:

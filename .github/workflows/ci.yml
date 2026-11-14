@@ -71,15 +71,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Image extras (uccharan only once it is on PyPI)
+      - name: Image extras (uccharan 0.6 is on PyPI; the extra pins it)
         id: extras
-        run: |
-          if python3 -m pip download --no-deps --quiet --dest /tmp/probe uccharan >/dev/null 2>&1; then
-            echo "extras=sherpa,faster-whisper,moonshine,av,wyoming,uccharan" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::uccharan is not on PyPI yet: building the image without it"
-            echo "extras=sherpa,faster-whisper,moonshine,av,wyoming" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo "extras=sherpa,faster-whisper,moonshine,av,wyoming,uccharan" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v4
       - name: Build the CPU image
         uses: docker/build-push-action@v7

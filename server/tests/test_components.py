@@ -55,8 +55,8 @@ def no_espeak(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
     return state
 
 
-def add_piper_like(core: Bolo, model_id: str = "needs-espeak", language: str = "de-DE") -> None:
-    """A voice that reads phonemes, in a language only espeak-ng covers (German) unless told otherwise."""
+def add_piper_like(core: Bolo, model_id: str = "needs-espeak", language: str = "ru-RU") -> None:
+    """A voice that reads phonemes, in a language only espeak-ng covers (Russian) unless told otherwise."""
     core.catalog.add(
         ModelSpec.from_dict(
             {
@@ -95,10 +95,11 @@ def test_component_listing_shape(live: LiveServer, no_espeak) -> None:  # type: 
     assert c["manual_command"] == "pip install 'bolo-speech[espeak]'" and c["license_url"].startswith("https://")
     u = components["uccharan"]
     assert u["license"] == "Apache-2.0" and u["installed"] is False and u["installable"] is True
-    assert u["manual_command"] == "pip install 'bolo-speech[uccharan]'" and 20 <= u["required_by_count"] < 40
-    assert set(u["languages"]) == {"en-us", "en-gb", "hi"}
+    assert u["manual_command"] == "pip install 'bolo-speech[uccharan]'" and 60 <= u["required_by_count"] < 100
+    assert {"en-us", "en-gb", "hi", "es", "de", "fr-be", "da", "pt-br", "ur", "nb"} <= set(u["languages"])
+    assert len(u["languages"]) == len(phonemize.UCCHARAN_LANGUAGES) == 41
     assert httpx.get(live.url + "/api/v1/info").json()["components"] == doc["components"]
-    # English and Hindi Piper voices: uccharan first, espeak-ng as the alternative
+    # Piper voices in uccharan's languages: uccharan first, espeak-ng as the alternative
     piper = httpx.get(live.url + "/api/v1/models/piper-en-us-amy-low").json()
     assert piper["requires"] == ["uccharan"] and piper["available"] is False
     assert [o["id"] for o in piper["phonemizers"]] == ["uccharan", "uccharan:improved", "espeak-ng"]
@@ -107,17 +108,20 @@ def test_component_listing_shape(live: LiveServer, no_espeak) -> None:  # type: 
     rohan = httpx.get(live.url + "/api/v1/models/piper-hi-in-rohan-medium").json()
     assert rohan["requires"] == ["uccharan"]
     german = httpx.get(live.url + "/api/v1/models/piper-de-de-thorsten-medium").json()
-    assert german["requires"] == ["espeak-ng"]
-    assert [(o["id"], o["available"], o["default"]) for o in german["phonemizers"]] == [
+    assert german["requires"] == ["uccharan"]
+    russian = httpx.get(live.url + "/api/v1/models/piper-ru-ru-irina-medium").json()
+    assert russian["requires"] == ["espeak-ng"]
+    assert [(o["id"], o["available"], o["default"]) for o in russian["phonemizers"]] == [
         ("uccharan", False, False),
         ("espeak-ng", False, True),
     ]
-    assert "does not cover 'de-DE'" in german["phonemizers"][0]["note"]
+    assert "does not cover 'ru-RU'" in russian["phonemizers"][0]["note"]
     kokoro = httpx.get(live.url + "/api/v1/models/kokoro-v1.0-int8").json()
     assert kokoro["requires"] == [] and kokoro["available"] is True and kokoro["phonemizers"] == []
     voices = {v["id"]: v for v in kokoro["voices"]}
     assert [o["id"] for o in voices["hf_alpha"]["phonemizers"]] == ["uccharan", "uccharan:improved", "espeak-ng"]
-    assert [o["id"] for o in voices["ef_dora"]["phonemizers"]] == ["uccharan", "espeak-ng"]
+    assert [o["id"] for o in voices["ef_dora"]["phonemizers"]] == ["uccharan", "uccharan:improved", "espeak-ng"]
+    assert [o["id"] for o in voices["jf_alpha"]["phonemizers"]] == ["uccharan", "espeak-ng"]  # no Japanese
     assert "phonemizers" not in voices["zf_xiaobei"]
     for m in httpx.get(live.url + "/api/v1/catalog").json()["models"]:
         assert {"gated", "commercial_use", "requires", "available", "license"} <= set(m), m["id"]
@@ -236,9 +240,9 @@ def test_cli_components(
     assert "espeak-ng: found (python-package" in capsys.readouterr().out
 
 
-def test_uccharan_component_covers_english_and_hindi_only(live: LiveServer, no_espeak) -> None:  # type: ignore[no-untyped-def]
+def test_uccharan_component_covers_its_languages_only(live: LiveServer, no_espeak) -> None:  # type: ignore[no-untyped-def]
     add_piper_like(live.core, "needs-en", "en-US")
-    add_piper_like(live.core, "needs-de", "de-DE")
+    add_piper_like(live.core, "needs-ru", "ru-RU")
     live.core.components.run_installer = no_espeak["installer"]
     r = httpx.post(
         live.url + "/v1/audio/speech", json={"model": "needs-en", "input": "Hello.", "response_format": "pcm"}
@@ -250,14 +254,14 @@ def test_uccharan_component_covers_english_and_hindi_only(live: LiveServer, no_e
     assert no_espeak["commands"][0][-1].startswith("uccharan")
     en = httpx.get(live.url + "/api/v1/models/needs-en").json()
     assert en["available"] is True and en["requires"] == ["uccharan"]
-    de = httpx.get(live.url + "/api/v1/models/needs-de").json()
-    assert de["available"] is False and de["requires"] == ["espeak-ng"]
+    ru = httpx.get(live.url + "/api/v1/models/needs-ru").json()
+    assert ru["available"] is False and ru["requires"] == ["espeak-ng"]
     ok = httpx.post(
         live.url + "/v1/audio/speech", json={"model": "needs-en", "input": "Hello.", "response_format": "pcm"}
     )
     assert ok.status_code == 200
     r = httpx.post(
-        live.url + "/v1/audio/speech", json={"model": "needs-de", "input": "Hallo.", "response_format": "pcm"}
+        live.url + "/v1/audio/speech", json={"model": "needs-ru", "input": "Привет.", "response_format": "pcm"}
     )
     assert r.status_code == 424 and "espeak-ng" in r.json()["error"]["message"]
 
@@ -266,13 +270,14 @@ def test_phonemizer_preference(no_espeak) -> None:  # type: ignore[no-untyped-de
     no_espeak["installed"] = no_espeak["uccharan"] = True
     try:
         assert phonemize.select("piper", "en-us").component == "uccharan"  # type: ignore[union-attr]
-        assert phonemize.select("piper", "de").component == "espeak-ng"  # type: ignore[union-attr]
+        assert phonemize.select("piper", "ru").component == "espeak-ng"  # type: ignore[union-attr]
+        assert phonemize.select("piper", "de").component == "uccharan"  # type: ignore[union-attr]
         assert phonemize.select("kitten", "en-gb").component == "espeak-ng"  # type: ignore[union-attr]
         phonemize.set_preference("espeak-ng")
         assert phonemize.select("piper", "en-us").component == "espeak-ng"  # type: ignore[union-attr]
         phonemize.set_preference("uccharan")
-        assert phonemize.select("piper", "de") is None
-        assert "phonemizer = 'auto'" in phonemize.missing_hint("piper", "de")
+        assert phonemize.select("piper", "ru") is None
+        assert "phonemizer = 'auto'" in phonemize.missing_hint("piper", "ru")
         with pytest.raises(ValueError):
             phonemize.set_preference("festival")
     finally:
@@ -283,7 +288,7 @@ def test_phonemizer_preference(no_espeak) -> None:  # type: ignore[no-untyped-de
 
 def test_choosing_the_phonemizer_per_request_and_per_voice(live: LiveServer, no_espeak) -> None:  # type: ignore[no-untyped-def]
     add_piper_like(live.core, "needs-en", "en-US")
-    add_piper_like(live.core, "needs-de", "de-DE")
+    add_piper_like(live.core, "needs-ru", "ru-RU")
     url = live.url + "/v1/audio/speech"
 
     def speak(model: str, phonemizer: str | None) -> httpx.Response:
@@ -295,7 +300,7 @@ def test_choosing_the_phonemizer_per_request_and_per_voice(live: LiveServer, no_
     assert speak("needs-en", "uccharan:improved").status_code == 200
     r = speak("needs-en", "espeak-ng")  # chosen but not installed
     assert r.status_code == 424 and r.json()["error"]["code"] == "component_missing"
-    r = speak("needs-de", "uccharan")  # uccharan does not speak German
+    r = speak("needs-ru", "uccharan")  # uccharan does not speak Russian
     assert (
         r.status_code == 400 and "en-us" in r.json()["error"]["message"] and r.json()["error"]["param"] == "phonemizer"
     )
@@ -310,7 +315,7 @@ def test_choosing_the_phonemizer_per_request_and_per_voice(live: LiveServer, no_
     assert speak("needs-en", "uccharan").status_code == 200  # the request still wins
     no_espeak["installed"] = True
     assert speak("needs-en", None).status_code == 200
-    assert httpx.put(live.url + "/api/v1/models/needs-de/settings", json={"phonemizer": "uccharan"}).status_code == 400
+    assert httpx.put(live.url + "/api/v1/models/needs-ru/settings", json={"phonemizer": "uccharan"}).status_code == 400
     assert httpx.put(live.url + "/api/v1/models/fake-tts/settings", json={"phonemizer": "uccharan"}).status_code == 400
     assert httpx.put(live.url + "/api/v1/models/needs-en/settings", json={"phonemizer": None}).json()["settings"] == {}
     assert httpx.get(live.url + "/api/v1/models/needs-en/settings").json() == {"model": "needs-en", "settings": {}}
@@ -321,7 +326,7 @@ def test_cli_models_config(monkeypatch: pytest.MonkeyPatch, tmp_path, capsys: py
     monkeypatch.setenv("BOLO_DATA_DIR", str(tmp_path))
     assert main(["models", "config", "piper-en-us-amy-low", "--phonemizer", "espeak-ng"]) == 0
     assert '"phonemizer": "espeak-ng"' in capsys.readouterr().out
-    assert main(["models", "config", "piper-de-de-thorsten-medium", "--phonemizer", "uccharan"]) == 1
+    assert main(["models", "config", "piper-ru-ru-irina-medium", "--phonemizer", "uccharan"]) == 1
     assert "does not cover" in capsys.readouterr().err
     assert main(["models", "config", "piper-en-us-amy-low", "--clear"]) == 0
     assert '"settings": {}' in capsys.readouterr().out

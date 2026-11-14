@@ -7,9 +7,14 @@ expects phonemes from the caller. Two phonemisers can provide them:
 
 * **uccharan** (Apache-2.0, ``pip install 'bolo-speech[uccharan]'``, part of
   ``bolo-speech[all]``): the default where it covers the voice's language and
-  output profile, see :data:`UCCHARAN_SUPPORT` (English US and British, Hindi;
-  for Kokoro English it is a port of misaki, the front end Kokoro was trained
-  with). Runs in process, no GPL code or data.
+  output profile, see :func:`uccharan_language` (since uccharan 0.6: English US
+  and British, Hindi and the other Indian languages, Urdu, Sindhi, and Spanish,
+  German, Dutch, French with Belgian and Swiss French, Italian, Portuguese
+  (Brazil, Portugal), Polish, Turkish, Czech, Swedish, Catalan, Romanian,
+  Hungarian, Finnish, Norwegian Bokmål and Danish; for Kokoro English it is a
+  port of misaki, the front end Kokoro was trained with). Runs in process, no
+  GPL code or data. Languages other than American English and Hindi need a
+  language pack, which bolo downloads on first use (:mod:`bolo.text.packs`).
 * **espeak-ng** (GPL-3.0-or-later), every other language.
 
 The ``phonemizer`` setting chooses: ``auto`` (uccharan where it covers the
@@ -63,15 +68,42 @@ INSTALL_HINT = (
 #: Output profile a voice family was trained on, by catalog ``kind``.
 PROFILE_BY_KIND = {"vits": "piper", "kokoro": "kokoro", "kitten": "kitten", "matcha": "matcha"}
 
-#: What uccharan covers: profile -> {language tag (lower case, as voices and the catalog write it) -> uccharan
-#: language}. Everything else needs espeak-ng. Extend this table when uccharan gains a language.
-UCCHARAN_SUPPORT: dict[str, dict[str, str]] = {
-    "piper": {"en-us": "en-us", "en-gb": "en-gb", "en-gb-x-rp": "en-gb", "en-gb-scotland": "en-gb", "hi": "hi"},
-    "kokoro": {"en-us": "en-us", "en-gb": "en-gb", "hi": "hi"},
-    "kitten": {"en-us": "en-us"},
-    "matcha": {"en-us": "en-us"},
+#: The language tags uccharan 0.6 phonemises (``uccharan.LANGUAGES``). An older uccharan that lacks one of them is
+#: not used for it (:meth:`UccharanPhonemizer.supports`).
+UCCHARAN_LANGUAGES: tuple[str, ...] = (
+    "en-us", "en-gb", "hi", "bn", "mr", "te", "ne", "kn", "ta", "ml", "as", "gu", "bho", "mai", "pa", "or", "kok",
+    "si", "sa", "ur", "sd", "mag", "es", "de", "nl", "fr", "it", "pt-br", "pt", "pl", "tr", "cs", "sv", "ca", "ro",
+    "hu", "fi", "nb", "da", "fr-be", "fr-ch",
+)  # fmt: skip
+#: Tags of a voice (espeak-ng voice names as Piper and Kokoro write them, BCP-47 tags as the catalog writes them)
+#: that are not uccharan's own spelling of the language.
+UCCHARAN_ALIASES: dict[str, str] = {
+    "en": "en-us", "en-uk": "en-gb", "en-gb-x-rp": "en-gb", "en-gb-scotland": "en-gb", "fr-fr": "fr",
+    "es-es": "es", "pt-pt": "pt", "no": "nb", "nb-no": "nb", "no-no": "nb", "nl-nl": "nl",
+    # Piper's Flemish voices were trained on espeak-ng's Dutch phonemes ("nl"), which is what uccharan's nl gives
+    "nl-be": "nl",
+}  # fmt: skip
+#: Languages whose regions read differently: only the listed regions map to a uccharan language. Spanish outside
+#: Spain (espeak-ng's es-419, Piper's es_MX and es_AR voices) and Canadian French are not uccharan's.
+_REGIONAL: dict[str, dict[str, str]] = {
+    "en": {"us": "en-us", "gb": "en-gb", "uk": "en-gb"},
+    "es": {"es": "es"},
+    "fr": {"fr": "fr", "be": "fr-be", "ch": "fr-ch", "lu": "fr"},
+    "pt": {"br": "pt-br", "pt": "pt"},
+    "nl": {"nl": "nl", "be": "nl"},
 }
+#: profile -> uccharan languages it has a front end for (Kokoro: the languages Kokoro speaks that uccharan covers)
+_PROFILE_LANGUAGES: dict[str, tuple[str, ...]] = {
+    "piper": UCCHARAN_LANGUAGES,
+    "kokoro": ("en-us", "en-gb", "es", "fr", "it", "pt-br", "hi"),
+    "kitten": ("en-us",),
+    "matcha": ("en-us",),
+}
+#: What uccharan covers: profile -> {uccharan language -> uccharan language}. Everything else needs espeak-ng.
+UCCHARAN_SUPPORT: dict[str, dict[str, str]] = {p: {t: t for t in langs} for p, langs in _PROFILE_LANGUAGES.items()}
 UCCHARAN = "uccharan"
+#: the uccharan releases this bolo is written for (the ``uccharan`` extra)
+UCCHARAN_REQUIREMENT = "uccharan>=0.6,<0.7"
 ESPEAK = "espeak-ng"
 PREFERENCES = ("auto", UCCHARAN, ESPEAK)
 
@@ -83,9 +115,26 @@ def normalise_language(tag: str) -> str:
     return base if base in ("hi",) else t
 
 
+def uccharan_tag(language: str | None) -> str | None:
+    """uccharan's tag for a voice's or request's language (``es``, ``pt-BR``, ``fr-fr``, ``nb``, ``de-DE``,
+    ``ur-PK``), or None when uccharan has no such language (``cmn``, ``ru``, ``es-419``)."""
+    t = (language or "").strip().lower().replace("_", "-")
+    if not t:
+        return None
+    if t in UCCHARAN_ALIASES:
+        return UCCHARAN_ALIASES[t]
+    if t in UCCHARAN_LANGUAGES:
+        return t
+    base, _, region = t.partition("-")
+    if base in _REGIONAL:
+        return _REGIONAL[base].get(region) if region else uccharan_tag(base)
+    return base if base in UCCHARAN_LANGUAGES else None
+
+
 def uccharan_language(profile: str, language: str) -> str | None:
     """The uccharan language for a voice, or None when uccharan does not cover it."""
-    return UCCHARAN_SUPPORT.get(profile, {}).get(normalise_language(language))
+    tag = uccharan_tag(language)
+    return tag if tag is not None and tag in UCCHARAN_SUPPORT.get(profile, {}) else None
 
 
 class Phonemizer:
@@ -234,7 +283,7 @@ class EspeakLibrary(Phonemizer):
 
 
 class UccharanPhonemizer(Phonemizer):
-    """uccharan (Apache-2.0), in process."""
+    """uccharan (Apache-2.0), in process. A language's pack is fetched before its first use (bolo.text.packs)."""
 
     name = "uccharan"
     component = UCCHARAN
@@ -242,25 +291,58 @@ class UccharanPhonemizer(Phonemizer):
 
     def __init__(self, module: Any) -> None:
         self.module = module
+        known = getattr(module, "LANGUAGES", None)
+        #: the languages the installed uccharan has (None: it does not say, so every one bolo knows is tried)
+        self.languages: frozenset[str] | None = frozenset(str(x) for x in known) if known else None
 
     def version(self) -> str | None:
         return str(getattr(self.module, "__version__", "") or "") or None
 
+    def has_language(self, tag: str) -> bool:
+        return self.languages is None or tag in self.languages
+
     def supports(self, profile: str, language: str) -> bool:
-        return uccharan_language(profile, language) is not None
+        tag = uccharan_language(profile, language)
+        return tag is not None and self.has_language(tag)
+
+    def _lang(self, profile: str, language: str, text: str) -> str:
+        """uccharan's tag for the voice, with the packs it needs loaded (downloaded on first use)."""
+        from bolo.text import packs
+
+        tag = uccharan_language(profile, language) or uccharan_tag(language)
+        if tag is None or not self.has_language(tag):
+            raise EngineUnavailable(f"uccharan has no {profile!r} front end for language '{language}'")
+        packs.ensure(tag, profile, text)
+        return tag
+
+    def _call(self, fn: Any, *args: Any, **kwargs: Any) -> Any:
+        """Call uccharan; a pack it could not have (``PackError``) becomes a 424 that names the pack."""
+        from bolo.text import packs
+
+        try:
+            return fn(*args, **kwargs)
+        except Exception as exc:
+            if type(exc).__name__ != "PackError":
+                raise
+            raise packs.PackMissing(f"uccharan is missing a language pack: {exc}") from exc
 
     def clause(self, text: str, voice: str) -> str:
-        lang = uccharan_language("piper", voice) or voice
-        return str(self.module.phonemize(strip_overrides(text), lang, "espeak-ipa", punctuation=False))
+        plain = strip_overrides(text)
+        lang = self._lang("piper", voice, plain)
+        return str(self._call(self.module.phonemize, plain, lang, "espeak-ipa", punctuation=False))
 
     def phonemize(self, text: str, voice: str) -> list[str]:
-        lang = uccharan_language("piper", voice) or voice
-        return list(self.module.phonemize(strip_overrides(text), lang, "piper"))
+        plain = strip_overrides(text)
+        lang = self._lang("piper", voice, plain)
+        return list(self._call(self.module.phonemize, plain, lang, "piper"))
 
     def voice_codepoints(self, text: str, language: str, profile: str, improved: bool = False) -> list[list[int]]:
-        lang = uccharan_language(profile, language)
-        if lang is None:
+        if uccharan_language(profile, language) is None:
             raise EngineUnavailable(f"uccharan has no {profile!r} front end for language '{language}'")
+        lang = self._lang(profile, language, strip_overrides(text))
+        return list(self._call(self._codepoints, text, lang, profile, improved))
+
+    def _codepoints(self, text: str, lang: str, profile: str, improved: bool) -> list[list[int]]:
         overrides = OVERRIDE.findall(text)
         if overrides:
             if not hasattr(self.module, "phonemize_wordlists"):
@@ -468,7 +550,7 @@ def resolve(profile: str, language: str, choice: str | None = None) -> tuple[Pho
                 param="phonemizer",
             )
         ph = get_uccharan()
-        if ph is None:
+        if ph is None or not ph.supports(profile, language):
             raise ComponentMissing(missing_hint(profile, language))
         return ph, improved
     ph = get_phonemizer()
@@ -485,6 +567,13 @@ def missing_hint(profile: str, language: str) -> str:
             f"language '{language}' ({profile}); set phonemizer = 'auto' to use eSpeak NG for it"
         )
     if wanted[0] == UCCHARAN:
+        ph = get_uccharan()
+        if ph is not None and not ph.supports(profile, language):
+            return (
+                f"this voice needs a phonemiser: the installed uccharan {ph.version() or ''} does not have language "
+                f"'{language}'; upgrade it with `pip install -U '{UCCHARAN_REQUIREMENT}'`"
+                + ("" if len(wanted) == 1 else "; eSpeak NG (`bolo components install espeak-ng`) works too")
+            )
         return (
             "this voice needs a phonemiser: install uccharan (Apache-2.0) with `pip install 'bolo-speech[uccharan]'` or "
             "`bolo components install uccharan`"

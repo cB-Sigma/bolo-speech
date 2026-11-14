@@ -3231,7 +3231,7 @@
      "id": {
       "type": "string",
       "title": "Id",
-      "description": "Catalog id or alias, `hf:<repo>` for any compatible Hugging Face model, or `piper:<voice>` (for example `piper:te_IN-venkatesh-medium`) for any voice of the Piper project."
+      "description": "Catalog id or alias, `hf:<repo>` for any compatible Hugging Face model, `piper:<voice>` (for example `piper:te_IN-venkatesh-medium`) for any voice of the Piper project, or `uccharan-<pack>` (for example `uccharan-de`) for one of uccharan's language packs."
      },
      "kind": {
       "anyOf": [
@@ -3255,6 +3255,12 @@
        }
       ],
       "title": "Task"
+     },
+     "accept_license": {
+      "type": "boolean",
+      "title": "Accept License",
+      "description": "Only for uccharan's CC BY-SA 4.0 packs (`uccharan-xlit-*`, `uccharan-wikipron-*`): accept the licence.",
+      "default": false
      }
     },
     "type": "object",

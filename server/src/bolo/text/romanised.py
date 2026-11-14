@@ -186,9 +186,7 @@ def pack_file(language: str | None, found: Api | None = None) -> Path | None:
     found = found or _api
     name = pack_name(language)
     places: list[Path] = []
-    data_dir = os.environ.get("UCCHARAN_DATA_DIR")
-    if data_dir:
-        places.append(Path(data_dir))
+    places += [Path(d) for d in os.environ.get("UCCHARAN_DATA_DIR", "").split(os.pathsep) if d]
     packs = getattr(found.module, "packs", None)
     cache_dir = getattr(packs, "cache_dir", None)
     if callable(cache_dir):
@@ -260,7 +258,7 @@ def install_hint(language: str | None) -> str:
 
 def manual_command(language: str | None) -> str:
     """The one-line command that fetches the pack into uccharan's cache without bolo."""
-    return f"python -c \"import uccharan; uccharan.load_pack('{pack_name(language)}')\""
+    return f"python -m uccharan.packs {pack_name(language)}"
 
 
 def install_pack(language: str | None) -> str | None:
@@ -272,10 +270,15 @@ def install_pack(language: str | None) -> str | None:
     name = pack_name(language)
     if name not in (_pack_table(found.module) or {}):
         return f"the installed uccharan has no pack '{name}'"
+    from bolo.text import packs
+
     try:
-        found.module.load_pack(name)
+        if found.module is packs.module():
+            packs.install(name)  # bolo downloads it (checked against uccharan's SHA-256), uccharan loads it
+        else:
+            found.module.load_pack(name)
     except Exception as exc:
-        return f"pack '{name}' could not be installed: {exc}"
+        return f"pack '{name}' could not be installed: {getattr(exc, 'message', exc)}"
     with _lock:
         _loaded.add(name)
     return None

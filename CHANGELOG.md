@@ -88,11 +88,35 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   - **Console**: a "Loaded models" panel on the Models page: each loaded model with its size, CPU/GPU split, VRAM
     share, a countdown to unloading, and Unload / Keep loaded buttons, plus CPU, RAM and GPU totals.
 
+- **Phonemes and text normalisation through uccharan 0.6 in its 39 languages** (models.md, "Phonemisers").
+  Piper, Mimic 3 and Kokoro voices in Spanish, German, Dutch, French (also Belgian and Swiss), Italian,
+  Portuguese (Brazil, Portugal), Polish, Turkish, Czech, Swedish, Catalan, Romanian, Hungarian, Finnish,
+  Norwegian Bokmål, Danish, Urdu, Sindhi and the South Asian languages (Bengali, Marathi, Telugu, Nepali, Tamil,
+  Malayalam, Gujarati and the rest) now get their phonemes from uccharan (Apache-2.0) instead of espeak-ng: 69
+  catalog voices work without the GPL component (26 before), plus Kokoro's Spanish, French, Italian and
+  Portuguese voices. A voice's espeak-ng voice name or language tag is mapped to uccharan's (`fr-fr` to `fr`,
+  `no` to `nb`, `pt-BR` to `pt-br`, `en-gb-x-rp` to `en-gb`); languages uccharan does not have (Mandarin,
+  Russian, Latin American Spanish `es-419` and others) still go to espeak-ng when it is installed, or fail with
+  `424` as before. Text voices get uccharan's normalise-only mode in the languages where it reads numbers in
+  the language itself (English, Hindi, the South Asian languages, Urdu, Sindhi); in uccharan 0.6 it reads digits
+  in English for the other Latin-script languages, so those keep bolo's light normaliser until it does.
+- **uccharan's language packs are downloaded on first use** and are components. The word tables of languages
+  other than American English and Hindi, British English and Kokoro's English dictionaries are packs on
+  uccharan's release: bolo fetches one the first time a voice needs it, as a `pull` job with events and a log
+  line, checked against the SHA-256 the installed uccharan lists (and again by uccharan when it loads it). New
+  setting `uccharan_auto_download` (default `true`; `UCCHARAN_OFFLINE=1` also turns it off): when off, or when the
+  release cannot be reached, the request fails with `424 component_missing` naming the pack and the command
+  that fetches it. All 35 packs are listed as components `uccharan-<pack>` with size and licence (`bolo
+  components list`, `bolo doctor`, `GET /api/v1/components`) and can be fetched with `bolo pull uccharan-de`,
+  `bolo components install uccharan-de` or `POST /api/v1/models/pull` (`{"id": "uccharan-de"}`). The CC BY-SA
+  4.0 packs (`wikipron-*`, `xlit-*`) are never downloaded automatically, only when installed with the licence
+  accepted (`--accept-license`, `"accept_license": true`).
 - `GET /api/v1/recommendations` without `task` answers an overview of every task (each with its default, its
   recommendations and its first `limit` results, 3 by default) instead of `400`.
 
 ### Changed
 
+- The `uccharan` extra (and `all`) asks for `uccharan>=0.6,<0.7` (was `>=0.4`).
 - The `model` event of `/api/v1/events` for a load carries `processor` (and `notice` when the model is not all on
   the accelerator); the unload answer carries `unloaded` (false when the model was not loaded).
 

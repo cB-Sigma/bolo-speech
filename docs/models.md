@@ -412,9 +412,9 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `piper-hi-in-pratham-medium` | hi | realtime | - | 63 MB | See dataset licence: http://creativecommons.org/licenses/… ⚠ · phonemes: uccharan | **CPU** · RTF 0.152 · first audio 238 ms |
 | `piper-hi-in-priyamvada-medium` | hi | realtime | - | 63 MB | See dataset licence: http://creativecommons.org/licenses/… ⚠ · phonemes: uccharan | **CPU** · RTF 0.056 · first audio 96 ms |
 | `piper-hi-in-rohan-medium` | hi | realtime | - | 63 MB | See dataset licence: https://www.iitm.ac.in/donlab/indict… · phonemes: uccharan | **CPU** · RTF 0.092 · first audio 164 ms |
-| `piper-ne-np-google-medium` | ne | realtime | - | 77 MB | Voice: CC-BY-SA-4.0 International · needs espeak-ng | **CPU** · RTF 0.040 · first audio 88 ms |
-| `piper-ne-np-google-x-low` | ne | realtime | - | 28 MB | Voice: CC-BY-SA-4.0 International · needs espeak-ng | untested |
-| `piper-ur-pk-fasih-medium` | ur | realtime | - | 64 MB | See voice card · needs espeak-ng | **CPU** · RTF 0.090 · first audio 191 ms |
+| `piper-ne-np-google-medium` | ne | realtime | - | 77 MB | Voice: CC-BY-SA-4.0 International · phonemes: uccharan | **CPU** · RTF 0.040 · first audio 88 ms |
+| `piper-ne-np-google-x-low` | ne | realtime | - | 28 MB | Voice: CC-BY-SA-4.0 International · phonemes: uccharan | untested |
+| `piper-ur-pk-fasih-medium` | ur | realtime | - | 64 MB | See voice card · phonemes: uccharan | **CPU** · RTF 0.090 · first audio 191 ms |
 | `piper-en-us-lessac-medium` | en | realtime | - | 63 MB | See dataset licence: https://www.cstr.ed.ac.uk/projects/b… ⚠ · phonemes: uccharan | **CPU** · RTF 0.126 · first audio 325 ms · round-trip WER 5.0% |
 | `piper-en-us-lessac-low` | en | realtime | - | 63 MB | See dataset licence: https://www.cstr.ed.ac.uk/projects/b… ⚠ · phonemes: uccharan | untested |
 | `piper-en-us-amy-low` | en | realtime | - | 63 MB | See dataset licence: https://github.com/MycroftAI/mimic3-… · phonemes: uccharan | **CPU** · RTF 0.049 · first audio 189 ms · round-trip WER 0.0% |
@@ -433,49 +433,49 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `piper-en-gb-jenny-dioco-medium` | en | realtime | - | 63 MB | See dataset licence: https://github.com/dioco-group/jenny… · phonemes: uccharan | untested |
 | `piper-en-gb-northern-english-male-medium` | en | realtime | - | 63 MB | Voice: CC-BY-SA 4.0 International · phonemes: uccharan | untested |
 | `piper-en-gb-southern-english-female-medium` | en | realtime | - | 77 MB | See voice card · phonemes: uccharan | untested |
-| `piper-de-de-thorsten-medium` | de | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | **CPU** · RTF 0.251 · first audio 187 ms |
-| `piper-de-de-thorsten-high` | de | realtime | - | 114 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
-| `piper-de-de-kerstin-low` | de | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
-| `piper-es-es-davefx-medium` | es | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | **CPU** · RTF 0.173 · first audio 191 ms |
-| `piper-es-es-sharvard-medium` | es | realtime | - | 77 MB | See dataset licence: http://creativecommons.org/licenses/… · needs espeak-ng | untested |
+| `piper-de-de-thorsten-medium` | de | realtime | - | 63 MB | Voice: CC0-1.0 · phonemes: uccharan | **CPU** · RTF 0.251 · first audio 187 ms |
+| `piper-de-de-thorsten-high` | de | realtime | - | 114 MB | Voice: CC0-1.0 · phonemes: uccharan | untested |
+| `piper-de-de-kerstin-low` | de | realtime | - | 63 MB | Voice: CC0-1.0 · phonemes: uccharan | untested |
+| `piper-es-es-davefx-medium` | es | realtime | - | 63 MB | Voice: CC0-1.0 · phonemes: uccharan | **CPU** · RTF 0.173 · first audio 191 ms |
+| `piper-es-es-sharvard-medium` | es | realtime | - | 77 MB | See dataset licence: http://creativecommons.org/licenses/… · phonemes: uccharan | untested |
 | `piper-es-mx-ald-medium` | es | realtime | - | 63 MB | See dataset licence: http://unlicense.org · needs espeak-ng | untested |
 | `piper-es-ar-daniela-high` | es | realtime | - | 114 MB | Voice: Attribution-ShareAlike 4.0 International · needs espeak-ng | untested |
-| `piper-fr-fr-siwis-medium` | fr | realtime | - | 63 MB | Voice: CC-BY 4.0 · needs espeak-ng | **CPU** · RTF 0.132 · first audio 225 ms |
-| `piper-fr-fr-upmc-medium` | fr | realtime | - | 77 MB | See dataset licence: http://creativecommons.org/licenses/… · needs espeak-ng | untested |
-| `piper-fr-fr-tom-medium` | fr | realtime | - | 64 MB | Voice: AGPLv3 · needs espeak-ng | untested |
-| `piper-it-it-paola-medium` | it | realtime | - | 64 MB | See dataset licence: https://huggingface.co/datasets/paol… · needs espeak-ng | **CPU** · RTF 0.173 · first audio 300 ms |
-| `piper-it-it-riccardo-x-low` | it | realtime | - | 28 MB | See dataset licence: https://www.caito.de/2019/01/03/the-… · needs espeak-ng | untested |
-| `piper-pt-br-faber-medium` | pt | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | **CPU** · RTF 0.181 · first audio 287 ms |
-| `piper-pt-pt-tugao-medium` | pt | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
-| `piper-nl-nl-mls-medium` | nl | realtime | - | 77 MB | Voice: CC-BY 4.0 · needs espeak-ng | untested |
-| `piper-nl-be-nathalie-medium` | nl | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
-| `piper-pl-pl-gosia-medium` | pl | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
-| `piper-pl-pl-darkman-medium` | pl | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
+| `piper-fr-fr-siwis-medium` | fr | realtime | - | 63 MB | Voice: CC-BY 4.0 · phonemes: uccharan | **CPU** · RTF 0.132 · first audio 225 ms |
+| `piper-fr-fr-upmc-medium` | fr | realtime | - | 77 MB | See dataset licence: http://creativecommons.org/licenses/… · phonemes: uccharan | untested |
+| `piper-fr-fr-tom-medium` | fr | realtime | - | 64 MB | Voice: AGPLv3 · phonemes: uccharan | untested |
+| `piper-it-it-paola-medium` | it | realtime | - | 64 MB | See dataset licence: https://huggingface.co/datasets/paol… · phonemes: uccharan | **CPU** · RTF 0.173 · first audio 300 ms |
+| `piper-it-it-riccardo-x-low` | it | realtime | - | 28 MB | See dataset licence: https://www.caito.de/2019/01/03/the-… · phonemes: uccharan | untested |
+| `piper-pt-br-faber-medium` | pt | realtime | - | 63 MB | Voice: CC0-1.0 · phonemes: uccharan | **CPU** · RTF 0.181 · first audio 287 ms |
+| `piper-pt-pt-tugao-medium` | pt | realtime | - | 63 MB | Voice: CC0-1.0 · phonemes: uccharan | untested |
+| `piper-nl-nl-mls-medium` | nl | realtime | - | 77 MB | Voice: CC-BY 4.0 · phonemes: uccharan | untested |
+| `piper-nl-be-nathalie-medium` | nl | realtime | - | 63 MB | Voice: CC0-1.0 · phonemes: uccharan | untested |
+| `piper-pl-pl-gosia-medium` | pl | realtime | - | 63 MB | Voice: CC0-1.0 · phonemes: uccharan | untested |
+| `piper-pl-pl-darkman-medium` | pl | realtime | - | 63 MB | Voice: CC0-1.0 · phonemes: uccharan | untested |
 | `piper-ru-ru-irina-medium` | ru | realtime | - | 63 MB | Voice: Unknown · needs espeak-ng | **CPU** · RTF 0.233 · first audio 381 ms |
 | `piper-ru-ru-denis-medium` | ru | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
 | `piper-ru-ru-dmitri-medium` | ru | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
 | `piper-ru-ru-ruslan-medium` | ru | realtime | - | 63 MB | See dataset licence: https://creativecommons.org/licenses… ⚠ · needs espeak-ng | untested |
 | `piper-uk-ua-ukrainian-tts-medium` | uk | realtime | - | 77 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
-| `piper-tr-tr-dfki-medium` | tr | realtime | - | 63 MB | See dataset licence: https://creativecommons.org/licenses… ⚠ · needs espeak-ng | untested |
-| `piper-tr-tr-fahrettin-medium` | tr | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
+| `piper-tr-tr-dfki-medium` | tr | realtime | - | 63 MB | See dataset licence: https://creativecommons.org/licenses… ⚠ · phonemes: uccharan | untested |
+| `piper-tr-tr-fahrettin-medium` | tr | realtime | - | 63 MB | Voice: CC0-1.0 · phonemes: uccharan | untested |
 | `piper-ar-jo-kareem-medium` | ar | realtime | - | 63 MB | See dataset licence: https://github.com/AliMokhammad/arab… · needs espeak-ng | untested |
 | `piper-fa-ir-amir-medium` | fa | realtime | - | 64 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
 | `piper-fa-ir-gyro-medium` | fa | realtime | - | 63 MB | See dataset licence: https://github.com/gyroing · needs espeak-ng | untested |
 | `piper-zh-cn-huayan-medium` | zh | realtime | - | 63 MB | Voice: Unknown · needs espeak-ng | **CPU** · RTF 0.047 · first audio 160 ms |
 | `piper-vi-vn-vais1000-medium` | vi | realtime | - | 63 MB | See dataset licence: https://creativecommons.org/licenses… · needs espeak-ng | untested |
 | `piper-id-id-news-tts-medium` | id | realtime | - | 63 MB | See dataset licence: https://www.kaggle.com/code/mpwolke/… · needs espeak-ng | untested |
-| `piper-sv-se-nst-medium` | sv | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
-| `piper-da-dk-talesyntese-medium` | da | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
-| `piper-no-no-talesyntese-medium` | no | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
-| `piper-fi-fi-harri-medium` | fi | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
-| `piper-cs-cz-jirka-medium` | cs | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
+| `piper-sv-se-nst-medium` | sv | realtime | - | 63 MB | Voice: CC0-1.0 · phonemes: uccharan | untested |
+| `piper-da-dk-talesyntese-medium` | da | realtime | - | 63 MB | Voice: CC0-1.0 · phonemes: uccharan | untested |
+| `piper-no-no-talesyntese-medium` | no | realtime | - | 63 MB | Voice: CC0-1.0 · phonemes: uccharan | untested |
+| `piper-fi-fi-harri-medium` | fi | realtime | - | 63 MB | Voice: CC0-1.0 · phonemes: uccharan | untested |
+| `piper-cs-cz-jirka-medium` | cs | realtime | - | 63 MB | Voice: CC0-1.0 · phonemes: uccharan | untested |
 | `piper-el-gr-rapunzelina-low` | el | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
-| `piper-hu-hu-anna-medium` | hu | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
-| `piper-ro-ro-mihai-medium` | ro | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
+| `piper-hu-hu-anna-medium` | hu | realtime | - | 63 MB | Voice: CC0-1.0 · phonemes: uccharan | untested |
+| `piper-ro-ro-mihai-medium` | ro | realtime | - | 63 MB | Voice: CC0-1.0 · phonemes: uccharan | untested |
 | `piper-sk-sk-lili-medium` | sk | realtime | - | 63 MB | Voice: CC0-1.0 · needs espeak-ng | untested |
 | `piper-sr-rs-serbski-institut-medium` | sr | realtime | - | 77 MB | See dataset licence: https://creativecommons.org/licenses… ⚠ · needs espeak-ng | untested |
 | `piper-sl-si-artur-medium` | sl | realtime | - | 63 MB | See dataset licence: https://creativecommons.org/licenses… · needs espeak-ng | untested |
-| `piper-ca-es-upc-ona-medium` | ca | realtime | - | 63 MB | Voice: CC BY-SA 3.0 ES · needs espeak-ng | untested |
+| `piper-ca-es-upc-ona-medium` | ca | realtime | - | 63 MB | Voice: CC BY-SA 3.0 ES · phonemes: uccharan | untested |
 | `piper-cy-gb-gwryw-gogleddol-medium` | cy | realtime | - | 64 MB | See dataset licence: https://git.techiaith.bangor.ac.uk/d… · needs espeak-ng | untested |
 | `piper-is-is-bui-medium` | is | realtime | - | 77 MB | See dataset licence: http://hdl.handle.net/20.500.12537/104 · needs espeak-ng | untested |
 | `piper-ka-ge-natia-medium` | ka | realtime | - | 63 MB | See LICENSE file · needs espeak-ng | untested |
@@ -483,17 +483,17 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `piper-lb-lu-marylux-medium` | lb | realtime | - | 63 MB | See dataset licence: http://creativecommons.org/licenses/… ⚠ · needs espeak-ng | untested |
 | `piper-lv-lv-aivars-medium` | lv | realtime | - | 64 MB | Voice: CC0 1.0 Universal · needs espeak-ng | untested |
 | `piper-sw-cd-lanfrica-medium` | sw | realtime | - | 63 MB | See dataset licence: https://lanfrica.com/record/kiswahil… · needs espeak-ng | untested |
-| `piper-ne-np-chitwan-medium` | ne | realtime | - | 63 MB | Voice: CC0-1.0 (dataset, per the voice card) · needs espeak-ng | **CPU** · RTF 0.070 · first audio 402 ms · round-trip WER 46.2% · round-trip CER 9.3% |
-| `piper-te-in-padmavathi-medium` | te | realtime | - | 64 MB | Voice: CC-BY-4.0 (IndicVoices-R, per the voice card) · needs espeak-ng | **CPU** · RTF 0.179 · first audio 1294 ms · round-trip WER 15.4% · round-trip CER 2.6% |
-| `piper-te-in-venkatesh-medium` | te | realtime | - | 64 MB | Voice: CC-BY-4.0 (IndicVoices-R, per the voice card) · needs espeak-ng | **CPU** · RTF 0.211 · first audio 1240 ms · round-trip WER 23.1% · round-trip CER 3.8% |
-| `piper-te-in-maya-medium` | te | realtime | - | 63 MB | See dataset licence: https://www.iitm.ac.in/donlab/indict… · needs espeak-ng | **CPU** · RTF 0.097 · first audio 596 ms · round-trip WER 7.7% · round-trip CER 1.3% |
-| `piper-ml-in-arjun-medium` | ml | realtime | - | 63 MB | See dataset licence (IndicTTS Malayalam corpus; the voice… · needs espeak-ng | **CPU** · RTF 0.191 · first audio 1642 ms · round-trip WER 10.0% · round-trip CER 2.2% |
-| `piper-ml-in-meera-medium` | ml | realtime | - | 63 MB | See dataset licence (IndicTTS Malayalam corpus; the voice… · needs espeak-ng | **CPU** · RTF 0.194 · first audio 1221 ms · round-trip WER 10.0% · round-trip CER 6.7% |
-| `piper-mr-in-google-medium` | mr | realtime | - | 77 MB | Voice: CC-BY-SA-4.0 (OpenSLR 64) · needs espeak-ng | **CPU** · RTF 0.131 · first audio 932 ms · round-trip WER 33.3% · round-trip CER 6.1% |
-| `piper-bn-bd-google-medium` | bn | realtime | - | 77 MB | Voice: CC-BY-SA-4.0 (OpenSLR 37) and the CMU Indic licence · needs espeak-ng | **CPU** · RTF 0.215 · first audio 1012 ms · round-trip WER 33.3% · round-trip CER 6.0% |
-| `piper-ur-pk-aegis-female-medium` | ur | realtime | - | 64 MB | Voice: MIT (per the voice card) · needs espeak-ng | **CPU** · RTF 0.137 · first audio 866 ms · round-trip WER 27.8% · round-trip CER 2.8% |
-| `piper-ta-in-rasa-female-medium` | ta | realtime | - | 64 MB | Voice: CC-BY-4.0 (AI4Bharat Rasa data; third-party voice … · needs espeak-ng | **CPU** · RTF 0.110 · first audio 487 ms · round-trip WER 0.0% · round-trip CER 0.0% |
-| `piper-ta-in-rasa-male-medium` | ta | realtime | - | 64 MB | Voice: CC-BY-4.0 (AI4Bharat Rasa data; third-party voice … · needs espeak-ng | **CPU** · RTF 0.147 · first audio 563 ms · round-trip WER 10.0% · round-trip CER 3.1% |
+| `piper-ne-np-chitwan-medium` | ne | realtime | - | 63 MB | Voice: CC0-1.0 (dataset, per the voice card) · phonemes: uccharan | **CPU** · RTF 0.070 · first audio 402 ms · round-trip WER 46.2% · round-trip CER 9.3% |
+| `piper-te-in-padmavathi-medium` | te | realtime | - | 64 MB | Voice: CC-BY-4.0 (IndicVoices-R, per the voice card) · phonemes: uccharan | **CPU** · RTF 0.179 · first audio 1294 ms · round-trip WER 15.4% · round-trip CER 2.6% |
+| `piper-te-in-venkatesh-medium` | te | realtime | - | 64 MB | Voice: CC-BY-4.0 (IndicVoices-R, per the voice card) · phonemes: uccharan | **CPU** · RTF 0.211 · first audio 1240 ms · round-trip WER 23.1% · round-trip CER 3.8% |
+| `piper-te-in-maya-medium` | te | realtime | - | 63 MB | See dataset licence: https://www.iitm.ac.in/donlab/indict… · phonemes: uccharan | **CPU** · RTF 0.097 · first audio 596 ms · round-trip WER 7.7% · round-trip CER 1.3% |
+| `piper-ml-in-arjun-medium` | ml | realtime | - | 63 MB | See dataset licence (IndicTTS Malayalam corpus; the voice… · phonemes: uccharan | **CPU** · RTF 0.191 · first audio 1642 ms · round-trip WER 10.0% · round-trip CER 2.2% |
+| `piper-ml-in-meera-medium` | ml | realtime | - | 63 MB | See dataset licence (IndicTTS Malayalam corpus; the voice… · phonemes: uccharan | **CPU** · RTF 0.194 · first audio 1221 ms · round-trip WER 10.0% · round-trip CER 6.7% |
+| `piper-mr-in-google-medium` | mr | realtime | - | 77 MB | Voice: CC-BY-SA-4.0 (OpenSLR 64) · phonemes: uccharan | **CPU** · RTF 0.131 · first audio 932 ms · round-trip WER 33.3% · round-trip CER 6.1% |
+| `piper-bn-bd-google-medium` | bn | realtime | - | 77 MB | Voice: CC-BY-SA-4.0 (OpenSLR 37) and the CMU Indic licence · phonemes: uccharan | **CPU** · RTF 0.215 · first audio 1012 ms · round-trip WER 33.3% · round-trip CER 6.0% |
+| `piper-ur-pk-aegis-female-medium` | ur | realtime | - | 64 MB | Voice: MIT (per the voice card) · phonemes: uccharan | **CPU** · RTF 0.137 · first audio 866 ms · round-trip WER 27.8% · round-trip CER 2.8% |
+| `piper-ta-in-rasa-female-medium` | ta | realtime | - | 64 MB | Voice: CC-BY-4.0 (AI4Bharat Rasa data; third-party voice … · phonemes: uccharan | **CPU** · RTF 0.110 · first audio 487 ms · round-trip WER 0.0% · round-trip CER 0.0% |
+| `piper-ta-in-rasa-male-medium` | ta | realtime | - | 64 MB | Voice: CC-BY-4.0 (AI4Bharat Rasa data; third-party voice … · phonemes: uccharan | **CPU** · RTF 0.147 · first audio 563 ms · round-trip WER 10.0% · round-trip CER 3.1% |
 
 #### External TTS server: llama-server
 
@@ -592,9 +592,9 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `coqui-bn-female` | bn | balanced | - | 114 MB | Apache-2.0 | **CPU** · RTF 0.574 · first audio 1119 ms |
-| `mimic3-gu-cmu-indic` | gu | balanced | - | 76 MB | See voice card (CMU Indic dataset) · needs espeak-ng | **CPU** · RTF 0.046 · first audio 82 ms |
-| `mimic3-bn-multi` | bn | balanced | - | 76 MB | See voice card (OpenSLR Bengali, CC-BY-SA-4.0) · needs espeak-ng | **CPU** · RTF 0.139 · first audio 282 ms |
-| `mimic3-ne-google` | ne | balanced | - | 76 MB | See voice card (OpenSLR Nepali, CC-BY-SA-4.0) · needs espeak-ng | **CPU** · RTF 0.147 · first audio 248 ms |
+| `mimic3-gu-cmu-indic` | gu | balanced | - | 76 MB | See voice card (CMU Indic dataset) · phonemes: uccharan | **CPU** · RTF 0.046 · first audio 82 ms |
+| `mimic3-bn-multi` | bn | balanced | - | 76 MB | See voice card (OpenSLR Bengali, CC-BY-SA-4.0) · phonemes: uccharan | **CPU** · RTF 0.139 · first audio 282 ms |
+| `mimic3-ne-google` | ne | balanced | - | 76 MB | See voice card (OpenSLR Nepali, CC-BY-SA-4.0) · phonemes: uccharan | **CPU** · RTF 0.147 · first audio 248 ms |
 | `syspin-mai-female` | mai | balanced | - | 114 MB | MIT (weights, IISc SYSPIN); training data SYSPIN corpus, … | untested |
 | `syspin-mai-male` | mai | balanced | - | 114 MB | MIT (weights, IISc SYSPIN); training data SYSPIN corpus, … | untested |
 | `syspin-bho-female` | bho | balanced | - | 114 MB | MIT (weights, IISc SYSPIN); training data SYSPIN corpus, … | untested |
@@ -1814,15 +1814,57 @@ sherpa-onnx 2.x expects the caller to supply them. bolo has two phonemisers:
 
 | Phonemiser | Licence | Covers | How it gets there |
 | --- | --- | --- | --- |
-| **uccharan** (default) | Apache-2.0 | Piper and Kokoro voices in English (US, British) and Hindi; Kitten and Matcha (US English). For Kokoro English it is a port of misaki, the front end Kokoro was trained with, with misaki's dictionaries built in | `bolo-speech[uccharan]`, part of `bolo-speech[all]` and the Docker image; `bolo components install uccharan` |
+| **uccharan** (default) | Apache-2.0 | Piper and Mimic 3 voices in uccharan's 39 languages (below); Kokoro voices in English (US, British), Spanish, French, Italian, Brazilian Portuguese and Hindi; Kitten and Matcha (US English). For Kokoro English it is a port of misaki, the front end Kokoro was trained with, with misaki's dictionaries | `bolo-speech[uccharan]` (uccharan 0.6), part of `bolo-speech[all]` and the Docker image; `bolo components install uccharan` |
 | **espeak-ng** | GPL-3.0-or-later | every language espeak-ng has | optional component, never installed by default (next section) |
 
+uccharan 0.6 phonemises **English** (US `en-us`, British `en-gb`), **Hindi** and the other South Asian
+languages (Bengali, Marathi, Telugu, Nepali, Kannada, Tamil, Malayalam, Assamese, Gujarati,
+Bhojpuri, Maithili, Magahi, Punjabi, Odia, Konkani, Sinhala, Sanskrit), **Urdu** and **Sindhi**, and
+**Spanish** (Spain), **German**, **Dutch**, **French** (also Belgian `fr-be` and Swiss `fr-ch`),
+**Italian**, **Portuguese** (Brazil `pt-br`, Portugal `pt`), **Polish**, **Turkish**, **Czech**,
+**Swedish**, **Catalan**, **Romanian**, **Hungarian**, **Finnish**, **Norwegian Bokmål** and
+**Danish**. A voice's language is matched by its espeak-ng voice name or its language tag: `es`
+and `es-ES` are `es`; `pt-br` / `pt-BR` are `pt-br`; `fr-fr` is `fr`; `no` and `nb` are `nb`;
+`en-gb-x-rp` is `en-gb`; Piper's Flemish voices (espeak-ng `nl`) are `nl`. Spanish outside Spain
+(espeak-ng `es-419`, Piper's `es_MX` and `es_AR` voices), Canadian French, Mandarin (`cmn`),
+Russian and the rest stay with espeak-ng.
+
 With the default setting (`phonemizer = "auto"`) a voice uses uccharan when uccharan covers its
-language, and espeak-ng otherwise. That makes **26 catalog voices work out of the box** (15 US
-English and 6 British English Piper voices, 3 Hindi Piper voices, the 4 KittenTTS models, Matcha
-English) plus Kokoro's English and Hindi voices; the other 67 phoneme-based voices (Piper voices
-in other languages, Mimic 3 voices) still need espeak-ng. The coverage table is data
-(`UCCHARAN_SUPPORT` in `server/src/bolo/text/phonemize.py`); it grows when uccharan gains a language.
+language, and espeak-ng otherwise. That makes **69 catalog voices work without espeak-ng** (all
+Piper voices in the languages above: 12 US English, 6 British English, 3 each Hindi, German, French,
+Nepali and Telugu, 2 each Spanish, Italian, Polish, Turkish, Urdu, Malayalam and Tamil, and Danish,
+Dutch, Flemish, Norwegian, Swedish, Finnish, Czech, Hungarian, Romanian, Catalan, Brazilian and
+European Portuguese, Marathi and Bengali; the Mimic 3 voices in Bengali, Gujarati and Nepali; the 4
+KittenTTS models; Matcha English) plus Kokoro's English, Spanish, French, Italian, Portuguese and Hindi
+voices. The other 24 phoneme-based voices (Piper voices in Russian, Ukrainian, Arabic, Persian, Greek,
+Mexican and Argentinian Spanish, Mandarin and others, and Kokoro Japanese) need espeak-ng. The table is
+code (`uccharan_tag` and `UCCHARAN_SUPPORT` in `server/src/bolo/text/phonemize.py`); a uccharan older
+than 0.6 is used only for the languages it has.
+
+**Language packs.** uccharan's wheel carries American English and Hindi. The word table of every
+other language, British English and Kokoro's English dictionaries are packs (`de.ucd`, `en-gb.ucd`,
+`kokoro-en-us.ucd` …, 46 KB to 2.1 MB) attached to uccharan's GitHub release. **bolo downloads a pack
+the first time a voice needs it**: the download shows as a `pull` job (`GET /api/v1/jobs`, the
+events stream) and in the log, is checked against the SHA-256 the installed uccharan lists for it,
+and lands in uccharan's cache (`~/.cache/uccharan/<version>/`, or `$XDG_CACHE_HOME/uccharan/…`),
+where uccharan checks it again when it loads it. Each download happens once per machine.
+
+* `uccharan_auto_download = false` (configuration.md), or `UCCHARAN_OFFLINE=1` in bolo's
+  environment, turns this off: a voice whose pack is missing answers `424 component_missing` with
+  the pack's name and the command that fetches it.
+* Fetch packs yourself with `bolo pull uccharan-de` (or `bolo components install uccharan-de`,
+  `POST /api/v1/models/pull` with `{"id": "uccharan-de"}`, the console's Components screen) or with
+  uccharan's own `python -m uccharan.packs de fr ur` (`--all` for every Apache-2.0 pack).
+* Offline machines: `python -m uccharan.packs --dir DIR de fr` on a machine with network (or take the
+  files from the release page), copy `DIR` over and name it in `UCCHARAN_DATA_DIR`.
+* Every pack is listed as a component, `uccharan-<pack>`, with its size and licence
+  (`bolo components list`, `bolo doctor`, `GET /api/v1/components`): 35 in uccharan 0.6.
+* The **CC BY-SA 4.0** packs, `uccharan-wikipron-*` (Wiktionary pronunciations for improved mode)
+  and `uccharan-xlit-*` (romanised text, below), are never downloaded automatically, only when you
+  install them with `--accept-license` (`"accept_license": true` over HTTP).
+
+While bolo runs it sets `UCCHARAN_OFFLINE=1` in its own process, so uccharan never downloads
+anything behind bolo's back; the packs bolo fetched are the ones uccharan reads.
 
 You can choose, at three levels (a request beats a pin, a pin beats the server setting):
 
@@ -1845,7 +1887,13 @@ its voice in `phonemizers` (`[{id, available, default, note}]`; for Kokoro per v
 uccharan is also bolo's text normaliser, apart from phonemes. For voices that read text themselves
 (`tts-server` models, Orpheus-family voices on llama.cpp, plugin voices) its normalise-only mode
 writes numbers, money, dates, times, phone numbers, units, abbreviations, URLs and email addresses
-out in words in the voice's language, and pronunciation word lists (`/api/v1/wordlists`) set how
+out in words in the voice's language. In uccharan 0.6 that is English, Hindi and the other South
+Asian languages, Urdu and Sindhi; in the Latin-script languages other than English its
+normalise-only mode reads digits in English, so bolo gives those text voices its own light
+normaliser (digits left for the voice) until a uccharan release reads them in the language (bolo
+asks the installed uccharan, so a newer one is used as soon as it does). Voices that read phonemes
+are not affected: uccharan's phonemiser reads numbers, dates and money in every one of its
+languages. Pronunciation word lists (`/api/v1/wordlists`) set how
 names, brands and jargon are said for every kind of voice: as phonemes, as `[word](/ipa/)` markup
 or as a respelling, whichever the voice can take. Each voice's text-input record says which
 (`GET /api/v1/text-input/{model}`; api.md, "Text preparation, SSML and pronunciation word lists").
@@ -1859,8 +1907,8 @@ kind of voice (phonemes, text, characters) because it runs first.
 | --- | --- |
 | Modes | `off` (the default), `auto` (when the voice speaks an Indian language and at least 60 % of the letters are Latin), `on` |
 | Where it is set | per request (`romanised` in `/v1/audio/speech`, `?romanised=` on the TTS WebSocket, `session.audio.output.romanised`, `audio.romanised` in chat completions, `romanised` on a telephony agent, `bolo speak --romanised`); per model (`PUT /api/v1/models/{id}/settings` with `{"romanised": "auto"}`, or the catalog option `romanised`); server-wide (the `romanised` setting) |
-| What it needs | uccharan 0.4 or later (0.3.0 and older have no transliterator) and the language's pack |
-| Packs | `xlit-<language>`; uccharan lists Hindi, Marathi, Bengali, Tamil, Telugu, Gujarati, Punjabi, Kannada and Malayalam. **CC BY-SA 4.0** (built from the Dakshina and Aksharantar word lists), unlike uccharan itself (Apache-2.0), so a pack is only installed on request: `bolo components install uccharan-xlit-hi --accept-license`, the console's Components screen, or `python -c "import uccharan; uccharan.load_pack('xlit-hi')"` |
+| What it needs | uccharan with its transliterator (bolo asks for 0.6) and the language's pack |
+| Packs | `xlit-<language>`; uccharan lists Hindi, Marathi, Bengali, Tamil, Telugu, Gujarati, Punjabi, Kannada and Malayalam. **CC BY-SA 4.0** (built from the Dakshina and Aksharantar word lists), unlike uccharan itself (Apache-2.0), so a pack is only installed on request: `bolo components install uccharan-xlit-hi --accept-license`, the console's Components screen, `bolo pull uccharan-xlit-hi --accept-license`, or `python -m uccharan.packs xlit-hi` |
 | When something is missing | the text is spoken as written and the request's trace says what is missing and how to install it; only a request that itself says `"romanised": "on"` is refused (`424 component_missing`) |
 
 Not converted: words that have a pronunciation of their own (word lists, inline
@@ -2021,8 +2069,8 @@ to turn text into those phonemes at run time. What we found:
 `--build-arg WITH_ESPEAK=1`. It is an *optional component*, installed only
 when you ask for it. Voices that read phonemes have `requires: ["phonemizer"]`
 in the catalog files; in the API their `requires` names the phonemiser they
-would use here (`["uccharan"]` for English and Hindi, `["espeak-ng"]` for the
-67 others, marked "needs espeak-ng" in the tables above), and they show as
+would use here (`["uccharan"]` for the 69 in uccharan's languages, `["espeak-ng"]` for the
+24 others, marked "needs espeak-ng" in the tables above), and they show as
 unavailable until it is installed; using one answers `424 component_missing`
 with the install instructions instead of producing silence.
 

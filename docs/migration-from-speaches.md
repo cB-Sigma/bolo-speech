@@ -102,8 +102,10 @@ different ports.
   audio. Set `options: {beam_size: 5}` on a model to change it.
 * **Piper voices** run through sherpa-onnx, not the GPL `piper-tts` package
   that speaches depends on (see
-  [models.md](models.md#licences-and-the-espeak-ng-question)). English and
-  Hindi voices get their phonemes from uccharan; other languages need
+  [models.md](models.md#licences-and-the-espeak-ng-question)). Voices in
+  uccharan's 39 languages (English, Hindi and the South Asian languages, Urdu,
+  and Spanish, German, French, Italian, Portuguese, Dutch, Polish and the other
+  European ones) get their phonemes from uccharan; other languages need
   espeak-ng.
 * **Concurrency.** Requests for the same model are queued and micro-batched
   instead of each taking a model handle; when the queue is full bolo answers
@@ -112,13 +114,14 @@ different ports.
   Diarization uses pyannote's segmentation model exported to ONNX with a
   separate speaker-embedding model, not the `pyannote.audio` pipeline, so
   results will differ from speaches'.
-* **Piper voices outside English and Hindi need a component speaches bundles.**
+* **Piper voices outside uccharan's languages need a component speaches bundles.**
   speaches installs the GPL `piper-tts` package, which contains espeak-ng.
   bolo does not ship espeak-ng: install it once (console button, `bolo
   components install espeak-ng --accept-license`, or `pip install
   'bolo-speech[espeak]'`) if you use such voices. Until then they answer `424
-  component_missing`. English and Hindi Piper voices use uccharan
-  (`bolo-speech[all]`).
+  component_missing`. Piper voices in uccharan's languages use uccharan
+  (`bolo-speech[all]`); its word table for a language is downloaded the first
+  time a voice needs it.
 
 ## Checking a migration
 

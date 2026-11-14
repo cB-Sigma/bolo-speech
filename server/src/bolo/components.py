@@ -1,7 +1,10 @@
 """Optional third-party components that bolo can use but does not require.
 
 * **uccharan** (Apache-2.0): the phonemiser for Piper, Kitten, Matcha and Kokoro voices in the
-  languages it covers (English US and British, Hindi). Part of ``bolo-speech[all]``; installable here.
+  languages it covers (39 since uccharan 0.6: English, Hindi and the other Indian languages, Urdu, Sindhi and
+  nineteen European languages, see bolo.text.phonemize). Part of ``bolo-speech[all]``; installable here.
+* **uccharan's language packs** (``uccharan-<pack>``): the word tables of the languages that are not in uccharan's
+  wheel, downloaded on first use (bolo.text.packs), and the CC BY-SA 4.0 packs, installed only on request.
 * **eSpeak NG** (GPL-3.0-or-later): the phonemiser for every other language. Never shipped or
   installed by default: only when the operator asks for it (console, ``bolo components install
   espeak-ng``, the ``espeak`` extra, or the system package manager).
@@ -28,9 +31,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from bolo import tts_runtimes
-from bolo.errors import InvalidRequest, ModelNotFound
+from bolo.errors import BoloError, InvalidRequest, ModelNotFound
 from bolo.jobs import Job
-from bolo.text import phonemize, romanised
+from bolo.text import packs, phonemize, romanised
 
 if TYPE_CHECKING:
     from bolo.catalog import ModelSpec
@@ -39,12 +42,14 @@ if TYPE_CHECKING:
 ESPEAK = phonemize.ESPEAK
 UCCHARAN = phonemize.UCCHARAN
 ESPEAK_PACKAGE = "espeakng-loader>=0.2.4"
-UCCHARAN_PACKAGE = "uccharan>=0.4"
+UCCHARAN_PACKAGE = phonemize.UCCHARAN_REQUIREMENT
 PACKAGES = {ESPEAK: ESPEAK_PACKAGE, UCCHARAN: UCCHARAN_PACKAGE}
 LOOPBACK = ("127.0.0.1", "localhost", "::1")
 PLUGIN_PREFIX = "plugin:"
 #: uccharan's romanised-text packs as components: "uccharan-xlit-hi" (bolo.text.romanised)
 XLIT_PREFIX = romanised.COMPONENT_PREFIX + romanised.PACK_PREFIX
+#: every other uccharan pack as a component: "uccharan-de" (bolo.text.packs)
+PACK_PREFIX = packs.COMPONENT_PREFIX
 #: Kokoro voice-name prefix -> phonemiser language (Mandarin "z" reads from its lexicon)
 KOKORO_LANGUAGES = {"a": "en-us", "b": "en-gb", "e": "es", "f": "fr-fr", "h": "hi", "i": "it", "p": "pt-br", "j": "ja"}
 
@@ -314,6 +319,9 @@ class ComponentManager:
     def is_installed(self, component: str) -> bool:
         if component.startswith(XLIT_PREFIX):
             return romanised.pack_present(component[len(XLIT_PREFIX) :])
+        name = packs.pack_of(component)
+        if name is not None:
+            return packs.installed(name)
         if component == ESPEAK:
             return espeak_status()[0]
         if component == UCCHARAN:
@@ -349,9 +357,13 @@ class ComponentManager:
                 "manual_command": manual_command(UCCHARAN),
                 "languages": sorted({lang for table in phonemize.UCCHARAN_SUPPORT.values() for lang in table.values()}),
                 "description": (
-                    "Text-to-phoneme front end (Apache-2.0) for Piper-format, KittenTTS, Matcha-TTS and Kokoro "
-                    "voices in English (US, British) and Hindi; for Kokoro English a port of misaki, the front end "
-                    "Kokoro was trained with. Part of bolo-speech[all]. Voices in other languages need eSpeak NG."
+                    "Text-to-phoneme front end and text normaliser (Apache-2.0) for Piper-format, KittenTTS, "
+                    "Matcha-TTS and Kokoro voices in 39 languages: English (US, British), Hindi and the other Indian "
+                    "languages, Urdu, Sindhi, and Spanish, German, Dutch, French (also Belgian and Swiss), Italian, "
+                    "Portuguese (Brazil, Portugal), Polish, Turkish, Czech, Swedish, Catalan, Romanian, Hungarian, "
+                    "Finnish, Norwegian Bokmål and Danish; for Kokoro English a port of misaki, the front end Kokoro "
+                    "was trained with. Languages other than American English and Hindi need a language pack, "
+                    "downloaded on first use. Part of bolo-speech[all]. Voices in other languages need eSpeak NG."
                 ),
             }
         )
@@ -422,10 +434,12 @@ class ComponentManager:
         return None
 
     def pack_status(self) -> list[dict[str, Any]]:
-        """One component per pack the installed uccharan lists; none when it has no transliterator."""
+        """One component per pack the installed uccharan lists: its language packs (bolo.text.packs) and, when it
+        has a transliterator, its romanised-text packs (bolo.text.romanised)."""
         blocked = self.pack_blocked_reason()
+        out = self.language_pack_status(blocked)
         version = romanised.api().version
-        out: list[dict[str, Any]] = []
+        sizes = {name: size for name, (_sha, size) in packs.table().items()}
         for language in romanised.pack_languages():
             installed = romanised.pack_present(language)
             out.append(
@@ -442,6 +456,8 @@ class ComponentManager:
                     "installable": blocked is None and not installed,
                     "install_blocked_reason": None if installed else blocked,
                     "manual_command": romanised.manual_command(language),
+                    "size_bytes": sizes.get(romanised.pack_name(language)),
+                    "auto_download": False,
                     "languages": [language],
                     "description": (
                         f"Data for the `romanised` option of text-to-speech: '{language}' text typed in Latin letters "
@@ -449,6 +465,59 @@ class ComponentManager:
                         "checked against its SHA-256 and kept in uccharan's cache. Licensed CC BY-SA 4.0 (it is "
                         "built from share-alike data), so it is installed only on request."
                     ),
+                }
+            )
+        return out
+
+    def pack_users(self) -> dict[str, int]:
+        """How many catalog models need each uccharan pack (through uccharan, as this installation phonemises)."""
+        counts: dict[str, int] = {}
+        for spec in self.core.catalog.all():
+            if spec.status == "pending":
+                continue
+            targets = [spec.phoneme_target()] if spec.needs_phonemes else [
+                self.phoneme_target(spec, str(v["id"])) for v in spec.voices
+            ]  # fmt: skip
+            names: set[str] = set()
+            for target in targets:
+                if target is None or UCCHARAN not in phonemize.candidates(*target):
+                    continue
+                tag = phonemize.uccharan_language(*target)
+                if tag is not None:
+                    names.update(packs.static_needs(tag, target[0]))
+            for name in names:
+                counts[name] = counts.get(name, 0) + 1
+        return counts
+
+    def language_pack_status(self, blocked: str | None) -> list[dict[str, Any]]:
+        """uccharan's packs other than the romanised-text ones (those are listed by :meth:`pack_status`)."""
+        version = packs.version()
+        users = self.pack_users() if packs.table() else {}
+        out: list[dict[str, Any]] = []
+        for pack in packs.all_packs():
+            if pack.name.startswith(romanised.PACK_PREFIX):
+                continue
+            installed = packs.installed(pack.name)
+            language = packs.LANGUAGE_NAMES.get(pack.language, pack.language)
+            out.append(
+                {
+                    "id": pack.component,
+                    "name": f"uccharan language pack '{pack.name}' ({language})",
+                    "kind": "language-pack",
+                    "installed": installed,
+                    "source": "uccharan" if installed else None,
+                    "version": version if installed else None,
+                    "license": pack.license,
+                    "license_url": packs.LICENSE_URL,
+                    "size_bytes": pack.size,
+                    "sha256": pack.sha256,
+                    "required_by_count": users.get(pack.name, 0),
+                    "installable": blocked is None and not installed,
+                    "install_blocked_reason": None if installed else blocked,
+                    "manual_command": packs.manual_command(pack.name),
+                    "auto_download": not pack.share_alike and pack.name not in packs.BUILT_IN and packs.auto_download(),
+                    "languages": [pack.language],
+                    "description": pack.description,
                 }
             )
         return out
@@ -562,6 +631,8 @@ class ComponentManager:
             return job
         if component.startswith(XLIT_PREFIX):
             return self._start_pack_install(component, accept_license)
+        if packs.pack_of(component) is not None:
+            return self._start_language_pack_install(component, accept_license)
         if component not in PACKAGES:
             if component.startswith(PLUGIN_PREFIX):
                 raise InvalidRequest(f"engine plugins are installed as packages, not from the API ({component})")
@@ -608,12 +679,56 @@ class ComponentManager:
         task.add_done_callback(lambda t: self.core._tasks.remove(t) if t in self.core._tasks else None)
         return job
 
+    def _start_language_pack_install(self, component: str, accept_license: bool) -> Job:
+        name = packs.pack_of(component)
+        assert name is not None
+        if packs.is_share_alike(name) and accept_license is not True:
+            raise InvalidRequest(
+                f"uccharan's pack '{name}' is licensed {packs.SHARE_ALIKE}; send {{\"accept_license\": true}} to "
+                "install it",
+                param="accept_license",
+            )
+        blocked = self.pack_blocked_reason()
+        if blocked:
+            raise InvalidRequest(f"cannot install {component}: {blocked}. Manual route: {packs.manual_command(name)}")
+        job = self.core.jobs.create("install", component)
+        if self.is_installed(component):
+            job.state, job.progress = "done", 1.0
+            return job
+        task = asyncio.create_task(self._install(job), name=f"bolo-install-{component}")
+        self.core._tasks.append(task)
+        task.add_done_callback(lambda t: self.core._tasks.remove(t) if t in self.core._tasks else None)
+        return job
+
+    def install_pack_blocking(self, name: str, job: Job | None = None) -> str | None:
+        """Download one uccharan pack (checked against its SHA-256) and load it. Returns an error, or None."""
+        pack = packs.info(name)
+        if pack is None:
+            return f"the installed uccharan has no pack '{name}'"
+
+        def progress(n: int) -> None:
+            if job is not None:
+                job.bytes_done += n
+                job.bytes_total = pack.size
+                job.progress = min(0.95, job.bytes_done / max(1, pack.size))
+
+        try:
+            packs.install(name, progress)
+        except BoloError as exc:
+            return exc.message
+        if name.startswith(romanised.PACK_PREFIX):
+            romanised.refresh()
+        return None
+
     def install_blocking(self, job: Job | None = None, component: str = ESPEAK) -> str | None:
         """Install the component's package and activate it. Returns an error message, or None on success."""
         if component in tts_runtimes.RUNTIMES:
             return self.install_runtime_blocking(component, job)
         if component.startswith(XLIT_PREFIX):
             return romanised.install_pack(component[len(XLIT_PREFIX) :])
+        name = packs.pack_of(component)
+        if name is not None:
+            return self.install_pack_blocking(name, job)
         cmd = installer_command()
         if cmd is None:
             return "neither pip nor uv is available in this environment"
@@ -623,6 +738,7 @@ class ComponentManager:
             return f"the installer exited with {code}: {tail}"
         importlib.invalidate_caches()
         phonemize.reset_phonemizer()
+        packs.reset()
         romanised.refresh()  # a newer uccharan may bring the transliterator
         if not self.is_installed(component):
             return f"the package was installed but {component} could not be loaded"

@@ -11,9 +11,8 @@
 
 Building behind a proxy or with a registry mirror: `--build-arg PYTHON_IMAGE=mirror.gcr.io/library/python:3.12-slim`
 replaces the base image. Wheels placed in `deploy/wheels/` are installed in preference to the package index (for a
-package that is not published yet, or an offline build). Until uccharan is on PyPI, put its wheel there
-(`maturin build --release` in uccharan's `bindings/python`), or build with
-`--build-arg EXTRAS=sherpa,faster-whisper,moonshine,av,wyoming` (English and Hindi Piper voices then need eSpeak NG).
+package that is not published yet, or an offline build). uccharan 0.6 comes from PyPI; build with
+`--build-arg EXTRAS=sherpa,faster-whisper,moonshine,av,wyoming` to leave it out (Piper voices then need eSpeak NG).
 
 All of them keep models in a volume (`BOLO_DATA_DIR`) and bind the HTTP port.
 Set `BOLO_API_KEY` before exposing the port to anything but localhost, and
@@ -31,7 +30,10 @@ location / {
 }
 ```
 
-uccharan (Apache-2.0) is in the CPU image: English and Hindi Piper, Kitten and Kokoro voices work as they are.
+uccharan (Apache-2.0) is in the CPU image: Piper, Kitten and Kokoro voices in its 39 languages work as they are; a
+language's word table is downloaded from uccharan's release the first time a voice needs it (set
+`BOLO_UCCHARAN_AUTO_DOWNLOAD=false` to refuse, and mount packs fetched with `python -m uccharan.packs --dir` at a path
+named in `UCCHARAN_DATA_DIR` for an offline host).
 eSpeak NG (GPL-3.0-or-later) is not in the images by default; voices in other languages need it. Build with
 `--build-arg WITH_ESPEAK=1` to include it (you then have to meet the GPL's
 terms for that component if you pass the image on), or install it into a

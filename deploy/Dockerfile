@@ -15,7 +15,9 @@ ARG EXTRAS="sherpa,faster-whisper,moonshine,av,wyoming,uccharan"
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libgomp1 \
     && rm -rf /var/lib/apt/lists/*
-# uccharan (Apache-2.0) is the phonemiser for Piper, Kitten, Matcha and Kokoro voices in English and Hindi.
+# uccharan (Apache-2.0) is the phonemiser for Piper, Kitten, Matcha and Kokoro voices in its 39 languages; the
+# word tables of languages other than American English and Hindi are downloaded on first use into uccharan's
+# cache (or read from UCCHARAN_DATA_DIR; see docs/models.md#phonemisers).
 # eSpeak NG (GPL-3.0-or-later) is NOT in the image by default; phoneme-based voices in other languages need it.
 # Character- and lexicon-based voices (MMS-TTS, SYSPIN, MeloTTS, Kokoro Mandarin) need neither.
 # Add it at build time with:   docker build --build-arg WITH_ESPEAK=1 ...

@@ -51,9 +51,10 @@ whispercpp = ["pywhispercpp>=1.3"]
 # kokoro-onnx itself is MIT but depends on `phonemizer` (GPL-3.0-or-later).
 # It is deliberately NOT part of `all`; Kokoro runs through sherpa-onnx by default.
 kokoro-onnx = ["kokoro-onnx>=0.4"]
-# uccharan (Apache-2.0): phonemes for Piper, Kitten, Matcha and Kokoro voices, pronunciation word lists (0.2 and
-# later) and romanised text into native script (0.4 and later).
-uccharan = ["uccharan>=0.4"]
+# uccharan (Apache-2.0): phonemes and text normalisation for Piper, Kitten, Matcha and Kokoro voices in 39
+# languages, pronunciation word lists and romanised text into native script. 0.6 is the release bolo's language
+# table and pack handling are written for (bolo.text.phonemize, bolo.text.packs).
+uccharan = ["uccharan>=0.6,<0.7"]
 # eSpeak NG (GPL-3.0-or-later) as a prebuilt shared library with its data. Optional, never part of `all`:
 # phoneme-based voices in languages uccharan does not cover need it; everything else does not.
 espeak = ["espeakng-loader>=0.2.4"]
@@ -78,7 +79,7 @@ nvidia = ["nvidia-ml-py>=12"]
 onnx-split = ["onnx>=1.16"]
 all = [
   "sherpa-onnx>=2.0,<3",
-  "uccharan>=0.4",
+  "uccharan>=0.6,<0.7",
   "faster-whisper>=1.1",
   "av>=12",
   "wyoming>=1.6",

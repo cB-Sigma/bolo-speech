@@ -148,17 +148,27 @@ async def recommendations_setup(
 class PullRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(
-        description="Catalog id or alias, `hf:<repo>` for any compatible Hugging Face model, or `piper:<voice>` "
-        "(for example `piper:te_IN-venkatesh-medium`) for any voice of the Piper project."
+        description="Catalog id or alias, `hf:<repo>` for any compatible Hugging Face model, `piper:<voice>` "
+        "(for example `piper:te_IN-venkatesh-medium`) for any voice of the Piper project, or `uccharan-<pack>` "
+        "(for example `uccharan-de`) for one of uccharan's language packs."
     )
     kind: str | None = Field(default=None, description="Only for `hf:` pulls: loader kind when it cannot be detected.")
     task: str | None = None
+    accept_license: bool = Field(
+        default=False,
+        description="Only for uccharan's CC BY-SA 4.0 packs (`uccharan-xlit-*`, `uccharan-wikipron-*`): accept the "
+        "licence.",
+    )
 
 
 @router.post("/models/pull", status_code=202, tags=["native"], summary="Start downloading a model")
 async def pull(request: Request, body: PullRequest) -> JSONResponse:
     core = get_core(request)
     name = body.id
+    from bolo.text.packs import pack_of
+
+    if pack_of(name) is not None:  # one of uccharan's language packs (`uccharan-de`): a component
+        return JSONResponse({"job_id": core.components.start_install(name, body.accept_license).id}, status_code=202)
     if name.startswith("hf:"):
         from bolo.custom import register_hf_model
 

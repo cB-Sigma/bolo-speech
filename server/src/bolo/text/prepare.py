@@ -119,14 +119,36 @@ def uccharan_language(language: str | None) -> str | None:
     mod = wl.uccharan_module()
     if mod is None:
         return None
-    t = (language or "en").strip().lower().replace("_", "-")
-    if t in ("en", "en-us"):
-        return "en-us"
-    if t.startswith("en-"):
-        return "en-gb"
-    base = t.split("-")[0]
+    from bolo.text.phonemize import uccharan_tag
+
+    tag = uccharan_tag(language or "en")
     langs = getattr(mod, "LANGUAGES", ())
-    return base if base in langs else None
+    return tag if tag is not None and (not langs or tag in langs) else None
+
+
+#: uccharan language -> whether its normalise-only mode reads numbers in that language (see normalizes_numbers)
+_reads_numbers: dict[str, bool] = {}
+
+
+def normalizes_numbers(tag: str) -> bool:
+    """Whether uccharan's normalise-only mode writes numbers out in the language itself.
+
+    uccharan 0.6 reads them in English, Hindi and the other South Asian languages, but in the Latin-script
+    languages other than English (Spanish, German, French …) its normalise-only mode reads digits in English or
+    Hindi, while its phonemiser reads them in the language. Those languages get bolo's light normaliser for text
+    voices until uccharan reads them; the probe below finds out which case the installed uccharan is in."""
+    from bolo.text.packs import LATIN_SCRIPT
+
+    if tag in ("en-us", "en-gb") or tag not in LATIN_SCRIPT:
+        return True
+    if tag not in _reads_numbers:
+        mod = wl.uccharan_module()
+        try:
+            out = str(mod.normalize("7", tag, digits="request").text).strip().lower() if mod is not None else ""
+        except Exception:
+            out = ""
+        _reads_numbers[tag] = bool(out) and out not in ("7", "seven", "सात")
+    return _reads_numbers[tag]
 
 
 @dataclass
@@ -300,8 +322,8 @@ def _normalise(
         if mode not in NORMALIZERS:
             raise InvalidRequest(f"normalize must be true, false or one of {', '.join(NORMALIZERS)}", param="normalize")
     ulang = uccharan_language(language)
-    if mode == "uccharan" and ulang is None:
-        mode = "light"  # uccharan is not installed, or does not read this language
+    if mode == "uccharan" and (ulang is None or not normalizes_numbers(ulang)):
+        mode = "light"  # uccharan is not installed, or does not read this language's numbers
 
     if cap.reads == "text" and mode == "uccharan":
         mod = wl.require_uccharan()

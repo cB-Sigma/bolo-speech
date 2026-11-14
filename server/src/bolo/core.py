@@ -87,7 +87,7 @@ from bolo.separate import separate as run_separation
 from bolo.store import HubClient, ModelStore
 from bolo.streaming.vad import EnergyVad, FallbackVad, detect_segments, merge_segments
 from bolo.telephony.manager import TelephonyManager
-from bolo.text import phonemize
+from bolo.text import packs, phonemize
 from bolo.text.phonemize import strip_overrides
 from bolo.text.prepare import prepare as prepare_text
 from bolo.text.romanised import status as romanised_status
@@ -156,6 +156,8 @@ class Bolo:
         self._fallback_warned: set[tuple[str, str]] = set()
         self.components = ComponentManager(self)
         phonemize.set_preference(s.phonemizer)
+        # uccharan's language packs: downloaded by bolo, on first use, as a pull job (bolo.text.packs)
+        packs.configure(s.uccharan_auto_download, reporter=self)
         self.llm = LLMClient(s)
         self.audio_llm = AudioLLMClient(s)
         #: the backend of the Realtime speech-to-speech pipeline (built on first use)
@@ -230,6 +232,59 @@ class Bolo:
             await self.s2s.close()
         await self.manager.close()
         await asyncio.get_running_loop().run_in_executor(None, self.engines.shutdown)
+
+    def pack_download(self, pack: Any, reason: str, run: Any) -> None:
+        """Run one uccharan pack download as a ``pull`` job (bolo.text.packs calls this from a worker thread)."""
+        from bolo.text.packs import human_size
+
+        job = self.jobs.create("pull", pack.component)
+        job.state, job.bytes_total = "running", pack.size
+        self.events.publish_threadsafe("job", {"job": job.to_dict()})
+        self.log(
+            "info",
+            f"downloading uccharan language pack '{pack.name}' ({human_size(pack.size)}, {pack.license}) for {reason}; "
+            "uccharan_auto_download = false turns this off",
+        )
+
+        def progress(n: int) -> None:
+            job.bytes_done += n
+            job.progress = min(0.99, job.bytes_done / max(1, pack.size))
+
+        try:
+            run(progress)
+        except BoloError as exc:
+            job.state, job.error = "error", exc.message
+            self.events.publish_threadsafe("job", {"job": job.to_dict()})
+            self.log("error", f"uccharan language pack '{pack.name}' was not downloaded: {exc.message}")
+            raise
+        job.state, job.progress = "done", 1.0
+        self.events.publish_threadsafe("job", {"job": job.to_dict()})
+        self.events.publish_threadsafe("component", {"id": pack.component, "event": "installed"})
+        self.log("info", f"uccharan language pack '{pack.name}' is installed (SHA-256 checked)")
+
+    def ensure_language_packs(
+        self, spec: ModelSpec, voice_id: str | None, language: str | None, text: str, phonemizer: str | None = None
+    ) -> None:
+        """Before a voice speaks: the uccharan packs its phonemes (424 when one cannot be had) or its text
+        normalisation (best effort) need. Blocking: called in a worker thread."""
+        if not packs.table():
+            return
+        target = self.components.phoneme_target(spec, voice_id)
+        if target is not None:
+            profile, voice_language = target
+            try:
+                ph, _improved = phonemize.resolve(profile, voice_language, phonemizer)
+            except BoloError:
+                return  # no phonemiser: require_components / the engine say so
+            tag = phonemize.uccharan_language(profile, voice_language)
+            if ph.component == phonemize.UCCHARAN and tag is not None:
+                packs.ensure(tag, profile, text)
+            return
+        from bolo.text.prepare import normalizes_numbers, uccharan_language
+
+        tag = uccharan_language(language)
+        if tag is not None and normalizes_numbers(tag):
+            packs.ensure(tag, "espeak-ipa", text, required=False)
 
     def log(self, level: str, message: str) -> None:
         getattr(log, level if level in ("debug", "info", "warning", "error") else "info")(message)
@@ -1727,6 +1782,11 @@ class Bolo:
                         usage=Usage() if spec.cloud else None,
                     )
                 with trace.phase("normalize"):
+                    # uccharan's language packs for this voice, downloaded on first use (bolo.text.packs)
+                    if packs.table():
+                        await asyncio.to_thread(
+                            self.ensure_language_packs, spec, chosen.id if chosen else voice, lang, text, phonemizer
+                        )
                     # normaliser, word lists, SSML and pronunciation overrides for this voice (bolo.text.prepare)
                     prepared = prepare_text(
                         self, spec, chosen.id if chosen else voice, text, lang, normalize=normalize,

@@ -51,6 +51,10 @@ class Settings:
     #: voice's script when the voice speaks an Indian language and the text is mostly Latin) or "on". Needs
     #: uccharan's transliterator and the language's pack; without them text is passed on unchanged with a notice
     romanised: str = "off"
+    #: download a uccharan language pack (Apache-2.0: a language's word table, British English, Kokoro's English
+    #: dictionaries) the first time a voice needs it. false: such a voice fails with a message that names the pack
+    #: and the command that fetches it. The CC BY-SA 4.0 packs are never downloaded automatically.
+    uccharan_auto_download: bool = True
     # Install optional components (uccharan, espeak-ng) from the API. Unset: allowed on a loopback bind or with an API key.
     allow_component_install: bool | None = None
     #: STUN/TURN URLs offered to WebRTC peers (e.g. "stun:stun.example.org:3478"). Empty: none is contacted,

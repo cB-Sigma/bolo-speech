@@ -278,7 +278,11 @@ models, including Orpheus-family voices on llama.cpp, and plugin voices) get
 uccharan's normalise-only mode when the `uccharan` package is installed: numbers,
 money (`₹`, `Rs.`, lakh/crore), dates, times, phone numbers, units, abbreviations,
 URLs and email addresses written out in words, in English, Hindi and the other
-Indian languages uccharan reads; Latin-script English inside Indic text is kept.
+South Asian languages uccharan reads, Urdu and Sindhi; Latin-script English inside
+Indic text is kept. (uccharan 0.6's normalise-only mode reads digits in English for
+its other Latin-script languages, so Spanish, German, French … text voices get the
+light normaliser below; voices that read phonemes get numbers read in their
+language by uccharan's phonemiser.)
 Every other voice, and every voice when uccharan is missing, gets bolo's light
 normaliser: Unicode NFC, Markdown emphasis, links and emoji removed, URLs read out
 ("w w w dot example dot com"), numbers spelled out for English and Hindi.
@@ -364,8 +368,8 @@ normaliser and the word lists.
 It needs two optional pieces, and bolo never fails a request because one is missing unless that
 request itself said `"on"`:
 
-* uccharan 0.4 or later (`uccharan.transliterate`). uccharan 0.3.0 and older have no
-  transliterator; `capabilities.romanised.available` in `GET /api/v1/info` says what is installed;
+* uccharan with its transliterator (`uccharan.transliterate`; bolo asks for uccharan 0.6;
+  0.3.0 and older have none); `capabilities.romanised.available` in `GET /api/v1/info` says what is installed;
 * the language's pack, `xlit-<language>` (uccharan lists Hindi, Marathi, Bengali, Tamil, Telugu,
   Gujarati, Punjabi, Kannada and Malayalam; the installed release decides, see
   `capabilities.romanised.languages`). The packs are **CC BY-SA 4.0**, not Apache-2.0 (they are
@@ -1413,23 +1417,33 @@ The operator's API:
 ## Optional components
 
 Pieces bolo can use but does not require: two phonemisers, **uccharan**
-(Apache-2.0, part of `bolo-speech[all]`; English US/GB and Hindi) and **eSpeak NG**
-(GPL-3.0-or-later, never installed by default; every other language), and
+(Apache-2.0, part of `bolo-speech[all]`; its 39 languages, see
+[models.md](models.md#phonemisers)) and **eSpeak NG**
+(GPL-3.0-or-later, never installed by default; every other language), uccharan's
+language packs, and
 engine plugins (`plugin:<name>`, [plugins.md](plugins.md)), which are listed so
 that a client can say what a model needs but are installed as packages.
 Find items by `id`; `kind` is `phonemizer`, `language-pack`, `engine-plugin` or `tts-server`.
 `POST /api/v1/components/uccharan/install` needs no licence acceptance.
 
-The `language-pack` components are uccharan's romanised-text packs, one per language the
-installed uccharan lists: `uccharan-xlit-hi`, `uccharan-xlit-mr`, … (none when uccharan has no
-transliterator). They are data for the `romanised` option of text-to-speech, licensed
-CC BY-SA 4.0, so `POST /api/v1/components/uccharan-xlit-hi/install` needs
-`{"accept_license": true}` like eSpeak NG, and `bolo components install uccharan-xlit-hi
---accept-license` does the same from the shell. The pack is downloaded by uccharan from its
-release, checked against the SHA-256 that is part of the installed uccharan, kept in uccharan's
-cache (`~/.cache/uccharan/<version>/`, or `$UCCHARAN_DATA_DIR` for machines without network
-access) and used without a restart. Without bolo:
-`python -c "import uccharan; uccharan.load_pack('xlit-hi')"`.
+The `language-pack` components are uccharan's packs, one per pack the installed uccharan lists
+(35 in uccharan 0.6): `uccharan-de`, `uccharan-en-gb`, `uccharan-kokoro-en-us`, …,
+`uccharan-wikipron-hi`, `uccharan-xlit-hi`. Their items add `size_bytes`, `languages` and
+`auto_download` (whether bolo fetches the pack by itself the first time a voice needs it: true
+for the Apache-2.0 word tables while the `uccharan_auto_download` setting is on). Such a download
+is a `pull` job (`model`: the component id) with the usual `job` events, a `component` event
+`installed` and a log line. A pack is downloaded from uccharan's release, checked against the
+SHA-256 that is part of the installed uccharan, kept in uccharan's cache
+(`~/.cache/uccharan/<version>/`; `$UCCHARAN_DATA_DIR` for machines without network access) and
+used without a restart. Install one ahead of time with
+`POST /api/v1/components/uccharan-de/install`, `POST /api/v1/models/pull` with
+`{"id": "uccharan-de"}`, `bolo pull uccharan-de` or `bolo components install uccharan-de`; without
+bolo, `python -m uccharan.packs de`.
+
+The `wikipron-*` packs (Wiktionary pronunciations for uccharan's improved mode) and the
+`xlit-*` packs (data for the `romanised` option of text-to-speech) are licensed CC BY-SA 4.0:
+bolo never downloads them on its own, and installing one needs `{"accept_license": true}`
+(`--accept-license` on the command line) like eSpeak NG.
 
 The `tts-server` components are the speech servers of the `tts-server` engine:
 `llama-server` (llama.cpp, MIT) and `audio.cpp` (`audiocpp_server`,
