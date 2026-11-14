@@ -2,14 +2,16 @@ import { describe, expect, it } from 'vitest'
 import spec from '../../../scripts/voices/voices.json'
 import fixtures from './fixtures/sherpa-tokens.json'
 import { asciiDigits, expandNumbers, numberToWords } from './numbers'
-import { shortFirstChunk } from './session'
+import { shortFirstChunk, synthesisChunks } from './session'
 import { scaleSilence } from './silence'
 import {
   coquiIds,
+  mergeShortChunks,
   multilingualClean,
   piperIds,
   prepareText,
   splitSentences,
+  withLeadIn,
   type CoquiVoiceConfig,
   type VoiceConfig,
 } from './text'
@@ -144,6 +146,63 @@ describe('sentences', () => {
     const first = `${'x'.repeat(40)}, ${'y'.repeat(80)}.`
     expect(shortFirstChunk([first, 'Next.'])).toEqual([`${'x'.repeat(40)},`, `${'y'.repeat(80)}.`, 'Next.'])
     expect(shortFirstChunk(['Short, fine.'])).toEqual(['Short, fine.'])
+  })
+  it('never synthesises a one-word sentence by itself: it joins the next one', () => {
+    expect(mergeShortChunks(splitSentences('नमस्ते! आप कैसे हैं? आज मौसम बहुत अच्छा है।'))).toEqual([
+      'नमस्ते! आप कैसे हैं?',
+      'आज मौसम बहुत अच्छा है।',
+    ])
+    // Every sample sentence of the demo opens with a one-word greeting; no character voice is given it alone.
+    for (const v of BROWSER_VOICES) {
+      const chunks = synthesisChunks(splitSentences(v.sample), v.kind)
+      expect(chunks.length, v.id).toBeGreaterThan(1)
+      expect(chunks.join(' ')).toBe(v.sample)
+      if (v.kind === 'coqui') expect(chunks.every((c) => c.length >= 12)).toBe(true)
+    }
+  })
+  it('keeps the sentences of a Piper voice apart: it says a short one well, and the first is heard sooner', () => {
+    const sentences = ['Hello!', 'This voice runs entirely in your browser.']
+    expect(synthesisChunks(sentences, 'piper')).toEqual(sentences)
+    expect(synthesisChunks(sentences, 'coqui')).toEqual(['Hello! This voice runs entirely in your browser.'])
+  })
+  it('joins a short last sentence to the one before it, and several short ones in a row', () => {
+    expect(mergeShortChunks(['The weather is lovely.', 'Thanks!'])).toEqual(['The weather is lovely. Thanks!'])
+    expect(mergeShortChunks(['Yes.', 'No.', 'Maybe.', 'A sentence of ordinary length.'])).toEqual([
+      'Yes. No. Maybe.',
+      'A sentence of ordinary length.',
+    ])
+    expect(mergeShortChunks(['Hi.'])).toEqual(['Hi.'])
+    expect(mergeShortChunks([])).toEqual([])
+  })
+  it('leaves sentences of ordinary length alone and never joins past the size limit', () => {
+    const two = ['आप कैसे हैं? ठीक हूँ।', 'आज मौसम बहुत अच्छा है।']
+    expect(mergeShortChunks(two)).toEqual(two)
+    const long = 'x'.repeat(215)
+    expect(mergeShortChunks(['Hello!', long])).toEqual(['Hello!', long])
+    expect(mergeShortChunks([long, 'Goodbye!'])).toEqual([long, 'Goodbye!'])
+  })
+  it('a merged opening is still cut at a comma when it is long', () => {
+    const next = `${'x'.repeat(40)}, ${'y'.repeat(80)}.`
+    expect(shortFirstChunk(mergeShortChunks(['Hello!', next, 'Next sentence here.']))).toEqual([
+      `Hello! ${'x'.repeat(40)},`,
+      `${'y'.repeat(80)}.`,
+      'Next sentence here.',
+    ])
+  })
+})
+
+describe('lead-in for character voices', () => {
+  it('puts one space in front of the model input, when the voice has a space', () => {
+    const cfg = { symbols: { a: 1, ' ': 2 } }
+    expect(withLeadIn(cfg, 'a a')).toBe(' a a')
+    expect(withLeadIn(cfg, ' a')).toBe(' a')
+    expect(withLeadIn(cfg, '')).toBe('')
+    expect(withLeadIn({ symbols: { a: 1 } }, 'a')).toBe('a')
+  })
+  it('becomes a space id between blanks at the start of the ids', () => {
+    const cfg = coqui({ a: 1, ' ': 2 })
+    if (cfg.kind !== 'coqui') throw new Error('expected a character voice')
+    expect(coquiIds(cfg, withLeadIn(cfg, 'a'))).toEqual([99, 2, 99, 1, 99])
   })
 })
 

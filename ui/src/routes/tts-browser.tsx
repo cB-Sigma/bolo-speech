@@ -32,7 +32,7 @@ import {
 } from '@/lib/browser-tts/voices'
 import { fmtBytes, fmtMs, fmtRtf, fmtSeconds, fmtSpeed } from '@/lib/format'
 import { wordErrorRate } from '@/lib/latency/wer'
-import { prefs, setPref } from '@/lib/prefs'
+import { prefs } from '@/lib/prefs'
 import { Store } from '@/lib/store'
 import { emptyTts, type TtsState } from '@/lib/tts/session'
 import { cn } from '@/lib/utils'
@@ -239,10 +239,8 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
         if (check()) return
         const off = s.store.subscribe(() => check() && off())
       })
-      if (stt.store.get().model.id !== rt.model) {
-        stt.setModel(rt.model)
-        setPref('browserModel', rt.model)
-      }
+      // Borrow the recogniser for this check only: the model chosen on the speech-to-text screen stays chosen.
+      if (stt.store.get().model.id !== rt.model) stt.setModel(rt.model)
       const st = s.store.get()
       const audio = s.audio()
       const rate = st.sampleRate ?? 22050
@@ -489,8 +487,9 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
               </>
             ) : (
               <p className="mt-3 text-xs text-muted-foreground">
-                The text is synthesised one sentence at a time. Each sentence starts playing as soon as it is ready
-                while the next one is being made; if playback ever catches up, the gap is counted as an underrun.
+                The text is synthesised one sentence at a time (a very short one together with its neighbour). Each
+                piece starts playing as soon as it is ready while the next one is being made; if playback ever catches
+                up, the gap is counted as an underrun.
               </p>
             )}
           </Panel>
@@ -529,7 +528,7 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
                     label="Audio"
                     value={state.audioSeconds.toFixed(2)}
                     unit="s"
-                    hint={`${state.chunks.length} sentence${state.chunks.length === 1 ? '' : 's'}`}
+                    hint={`in ${state.chunks.length} piece${state.chunks.length === 1 ? '' : 's'}`}
                   />
                   <Readout
                     label="Voice ready after"
@@ -558,7 +557,7 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
 
           <Panel title="Reading the numbers" bodyClassName="grid gap-2.5 text-[13px] leading-5 text-muted-foreground">
             <p>
-              <span className="text-foreground">Time to first audio</span> is how long the first sentence took to
+              <span className="text-foreground">Time to first audio</span> is how long the first piece took to
               synthesise. It does not include the one-time download, which is shown separately.
             </p>
             <p>

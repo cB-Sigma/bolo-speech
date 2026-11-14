@@ -21,7 +21,7 @@ import { percentile } from '@/lib/latency/stats'
 import longUrl from '../mock/assets/en-ask-not.wav?url'
 import shortUrl from '../mock/assets/en-fellow-americans.wav?url'
 import hindiUrl from './assets/hi-short.wav?url'
-import { prefs, setPref } from '@/lib/prefs'
+import { pickBrowserModel, prefs } from '@/lib/prefs'
 import snapshot from './catalog-snapshot.json'
 
 /**
@@ -251,7 +251,7 @@ export class DemoBackend {
   /** Make `id` the model the in-browser recogniser runs (it holds one at a time). */
   private use(id: string): void {
     sharedEngine().setModel(id)
-    if (prefs.get().browserModel !== id) setPref('browserModel', id)
+    if (prefs.get().browserModel !== id || !prefs.get().browserModelPicked) pickBrowserModel(id)
   }
 
   /** Download and compile the browser model, reported as a pull job. */

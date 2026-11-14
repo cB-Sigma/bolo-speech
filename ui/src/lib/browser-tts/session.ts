@@ -3,7 +3,7 @@ import { concatFloat } from '@/lib/audio/pcm'
 import { Store } from '@/lib/store'
 import { emptyTts, type TtsChunk, type TtsState } from '@/lib/tts/session'
 import type { BrowserTtsEngine } from './engine'
-import { prepareText, type PreparedText } from './text'
+import { mergeShortChunks, prepareText, type PreparedText } from './text'
 import type { BrowserVoice } from './voices'
 
 /**
@@ -16,6 +16,17 @@ export function shortFirstChunk(chunks: string[], over = 90): string[] {
   const comma = first.indexOf(', ', 25)
   if (comma < 0 || comma > over) return chunks
   return [first.slice(0, comma + 1), first.slice(comma + 2), ...chunks.slice(1)]
+}
+
+/**
+ * The pieces a voice is given, one model call each. A character voice garbles
+ * a one-word sentence by itself, so short sentences first join a neighbour;
+ * then a long opening is cut. A Piper voice says a short sentence well (and
+ * its phonemiser makes one model call per sentence whatever it is handed), so
+ * its sentences stay apart and the first one is heard as early as possible.
+ */
+export function synthesisChunks(sentences: string[], kind: 'coqui' | 'piper'): string[] {
+  return shortFirstChunk(kind === 'coqui' ? mergeShortChunks(sentences) : sentences)
 }
 
 /** Extra measurements that only exist when the voice runs in the page. */
@@ -33,8 +44,9 @@ export interface BrowserTtsExtra {
 
 /**
  * One synthesis in the page: prepares the text, synthesises it sentence by
- * sentence in the worker, and plays each sentence as soon as it is ready, so
- * the first one is heard while the rest are still being made. The state has
+ * sentence in the worker (a very short sentence together with its neighbour),
+ * and plays each piece as soon as it is ready, so the first one is heard
+ * while the rest are still being made. The state has
  * the same shape as a server session's, so the same panels show it.
  *
  * Time to first audio is measured from the moment the voice is ready, so that
@@ -100,7 +112,7 @@ export class BrowserTtsSession {
       return
     }
     const prepared = prepareText(this.text, cfg, this.voice.numbers)
-    prepared.chunks = shortFirstChunk(prepared.chunks)
+    prepared.chunks = synthesisChunks(prepared.chunks, cfg.kind)
     this.sentAt = performance.now()
     this.extra.patch({ prepared, loadWaitMs: this.sentAt - pressed > 50 ? this.sentAt - pressed : 0 })
     if (prepared.chunks.length === 0) {

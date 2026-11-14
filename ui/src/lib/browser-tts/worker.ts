@@ -11,7 +11,7 @@ import type { FetchRecord, FileProgress, LoadStage } from '@/lib/browser-stt/mod
 import { VOICE_CACHE, type TtsWorkerRequest, type TtsWorkerResponse } from './protocol'
 import type * as UccharanModule from '@/vendor/uccharan/index.js'
 import { scaleSilence } from './silence'
-import { coquiIds, piperIds, type VoiceConfig } from './text'
+import { coquiIds, piperIds, withLeadIn, type VoiceConfig } from './text'
 
 /**
  * Runs one voice with ONNX Runtime Web (WebAssembly). The VITS graph is called
@@ -161,7 +161,7 @@ async function synth(req: Extract<TtsWorkerRequest, { type: 'synth' }>): Promise
   let phonemes: string | undefined
   const missing: string[] = []
   if (config.kind === 'coqui') {
-    ids = [coquiIds(config, req.text)]
+    ids = [coquiIds(config, withLeadIn(config, req.text))]
   } else {
     if (!uccharan) throw new Error('The phonemiser is not loaded')
     const sentences = uccharan.phonemizeSync(req.text, { lang: config.phoneme_language, profile: 'piper' })

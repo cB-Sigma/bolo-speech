@@ -117,6 +117,43 @@ export function splitSentences(text: string, max = 220): string[] {
   return out
 }
 
+/** Sentences shorter than this (characters) are not synthesised by themselves; the server's chunker uses the same number. */
+export const MIN_CHUNK_CHARS = 12
+
+/**
+ * Join very short pieces to a neighbour. A VITS voice given one or two words
+ * by themselves has too little context: the timing is erratic and consonants
+ * go missing ("नमस्ते!" alone came out as "दास्ते", "बस्ती"; together with the
+ * next sentence it did not). A short piece joins the one after it; a short
+ * last piece joins the one before it. Nothing is joined past `max` characters.
+ */
+export function mergeShortChunks(chunks: string[], min = MIN_CHUNK_CHARS, max = 220): string[] {
+  const out: string[] = []
+  for (const piece of chunks) {
+    const last = out[out.length - 1]
+    if (last != null && last.length < min && last.length + 1 + piece.length <= max)
+      out[out.length - 1] = `${last} ${piece}`
+    else out.push(piece)
+  }
+  const tail = out[out.length - 1]
+  const before = out[out.length - 2]
+  if (tail != null && before != null && tail.length < min && before.length + 1 + tail.length <= max)
+    out.splice(-2, 2, `${before} ${tail}`)
+  return out
+}
+
+/**
+ * Model input for one piece of a character voice. The piece is given a space
+ * in front: these voices swallow or blur the first consonant of an input that
+ * starts straight on a letter (measured on the Hindi, Maithili, Bhojpuri and
+ * Kannada voices, with the original weights as well as the shrunk ones), and
+ * with a leading space the first word comes out as it does mid-sentence. It
+ * costs a few hundredths of a second of audio at most.
+ */
+export function withLeadIn(cfg: Pick<CoquiVoiceConfig, 'symbols'>, cleaned: string): string {
+  return cfg.symbols[' '] != null && cleaned && !cleaned.startsWith(' ') ? ` ${cleaned}` : cleaned
+}
+
 const PUNCTUATION_FALLBACK: [string, string][] = [
   ['।', '.'],
   ['॥', '.'],

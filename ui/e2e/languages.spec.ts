@@ -64,7 +64,7 @@ test.describe('Indian languages', () => {
       await expect(note).toContainText('Expect mistakes')
       await expect(note).toContainText('word error rate 40%')
       await expect(note).toContainText('bolo server runs much better models for Indian languages')
-      await expect(note).toContainText('pipx install')
+      await expect(note).toContainText('uv tool install')
 
       // The transcript comes out in Devanagari, set in a font the page ships (no empty boxes).
       await page.getByTestId('model-chip').first().click()
@@ -89,7 +89,14 @@ test.describe('Indian languages', () => {
 
   test('in-browser: the multilingual models say plainly that they are not usable for Hindi', async ({ page }) => {
     await open(page, '/stt', {
-      storage: { ...fake, 'bolo.prefs': JSON.stringify({ browserModel: 'whisper-base-q8', browserLanguage: 'hi' }) },
+      storage: {
+        ...fake,
+        'bolo.prefs': JSON.stringify({
+          browserModel: 'whisper-base-q8',
+          browserModelPicked: true,
+          browserLanguage: 'hi',
+        }),
+      },
     })
     await page.getByTestId('mode-browser').click()
     await expect(page.getByTestId('browser-model-picker')).toContainText('Whisper Base')

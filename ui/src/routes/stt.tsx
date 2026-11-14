@@ -61,7 +61,7 @@ import { decodeAudio } from '@/lib/audio/wav'
 import { fmtBytes, fmtMs, fmtRtf, fmtSeconds, fmtSpeed, languageName } from '@/lib/format'
 import { breakdown, summarize } from '@/lib/latency/stats'
 import { utteranceLatency, type Utterance } from '@/lib/latency/timeline'
-import { prefs, setPref } from '@/lib/prefs'
+import { pickBrowserModel, prefs, setPref } from '@/lib/prefs'
 import { Store } from '@/lib/store'
 import { emptyTranscript, transcriptText, type Transcriber, type TranscriptState } from '@/lib/stt/transcriber'
 import { cn } from '@/lib/utils'
@@ -293,7 +293,7 @@ export default function SttPage() {
   }
   const chooseBrowserModel = (id: string) => {
     engine.setModel(id)
-    setPref('browserModel', id)
+    pickBrowserModel(id)
   }
 
   const audioSamples = (samples.data?.samples ?? []).filter((s) => s.kind === 'audio' && s.url)

@@ -38,6 +38,21 @@ export class GaplessPlayer {
     this.analyser.fftSize = 1024
     this.analyser.smoothingTimeConstant = 0.6
     this.analyser.connect(this.ctx.destination)
+    // A player is made in the tap that asks for audio, and audio often arrives much later (a voice has to
+    // load). Start the clock now, while the tap still counts as a user gesture, so that the first buffer is
+    // scheduled on a context that is already running and its opening is not lost to the start-up.
+    this.wake()
+  }
+
+  /** Ask a context that is not running (suspended, or interrupted on iOS) to run. Never throws. */
+  private wake(): void {
+    const ctx = this.ctx
+    if (ctx.state === 'running' || ctx.state === 'closed') return
+    try {
+      void ctx.resume().catch(() => undefined)
+    } catch {
+      // not allowed yet: the next enqueue asks again
+    }
   }
 
   /** Seconds of headroom kept ahead of the playhead when (re)starting. */
@@ -45,7 +60,7 @@ export class GaplessPlayer {
 
   enqueue(samples: Float32Array, sampleRate: number): ScheduledChunk {
     const ctx = this.ctx
-    if (ctx.state === 'suspended') void ctx.resume()
+    this.wake()
     const buffer = ctx.createBuffer(1, Math.max(1, samples.length), sampleRate)
     buffer.getChannelData(0).set(samples)
     const src = ctx.createBufferSource()
