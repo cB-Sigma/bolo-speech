@@ -481,13 +481,69 @@ export interface ModelStats {
   requests: number
   latency_ms: ModelLatency
   rtf: { p50: number; p95: number } | null
+  /* Placement and keep-alive (servers from bolo 0.5; absent before, and in the browser demo). */
+  /** Of `memory_bytes`, the part in accelerator memory. */
+  size_vram_bytes?: number
+  ram_bytes?: number
+  vram_measured?: boolean
+  /** Ollama's PROCESSOR column: "100% GPU", "100% CPU", "35%/65% CPU/GPU". */
+  processor?: string
+  /** Where it runs: "cpu", "cuda:0", "coreml", "remote", "cloud". */
+  device?: string
+  placement?: ModelPlacement
+  /** Seconds it stays loaded once idle; -1: until unloaded. */
+  keep_alive_s?: number | null
+  /** Seconds until it is unloaded for being idle (counted from now while in use); null: never. */
+  expires_in_s?: number | null
+  expires_at?: string | null
+  stopping?: boolean
+}
+
+export interface ModelPlacement {
+  device: string
+  requested: string
+  split: 'whole' | 'layers' | 'graphs' | 'device_map'
+  gpu_bytes: number
+  cpu_bytes: number
+  processor: string
+  notice: string | null
+  gpu_layers?: number | null
+  total_layers?: number | null
+  graphs?: Record<string, string>
+}
+
+export interface GpuMemory {
+  index: number
+  vendor: string
+  name: string | null
+  backend: string
+  total_bytes: number | null
+  free_bytes: number | null
+  used_bytes: number | null
+  /** The GPU shares the machine's memory (Apple Silicon). */
+  unified: boolean
+  /** Percent busy over the last sample, when the driver says. */
+  utilization: number | null
+  /** Accelerator memory held by bolo and the servers it started; null when it cannot be told. */
+  process_bytes: number | null
+  source: string
 }
 
 export interface Stats {
   uptime_s: number
   active_streams: number
   queue_depth: number
-  system: { cpu_percent: number; rss_bytes: number; threads: number }
+  system: {
+    cpu_percent: number
+    rss_bytes: number
+    threads: number
+    ram_total_bytes?: number
+    ram_available_bytes?: number
+    gpus?: GpuMemory[]
+    accelerator_source?: string | null
+    models_vram_bytes?: number
+    models_ram_bytes?: number
+  }
   totals: { requests: number; errors: number; audio_seconds_in: number; audio_seconds_out: number }
   models: ModelStats[]
 }

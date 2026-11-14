@@ -57,6 +57,7 @@ edge cases live in local storage:
 ```js
 localStorage.setItem('bolo.mock', JSON.stringify({ auth: true })) // require the key "bolo-demo"
 localStorage.setItem('bolo.mock', JSON.stringify({ offline: true })) // server unreachable
+localStorage.setItem('bolo.mock', JSON.stringify({ gpu: true })) // a 12 GB NVIDIA GPU: Models > Loaded models shows GPU and split placement
 ```
 
 The application code is identical in both modes; only the transport in `src/lib/api/config.ts` is

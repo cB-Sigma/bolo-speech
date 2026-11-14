@@ -6,6 +6,7 @@ import type {
   FitWarning,
   HardwareInfo,
   Job,
+  GpuMemory,
   ModelStats,
   Percentiles,
   Phase,
@@ -90,6 +91,8 @@ export interface MockFlags {
   offline?: boolean
   /** Freeze traffic (for stable test snapshots). */
   quiet?: boolean
+  /** Pretend the server has a 12 GB NVIDIA GPU: models placed on it, the largest split between GPU and CPU. */
+  gpu?: boolean
 }
 
 export const MOCK_KEY = 'bolo-demo'
@@ -109,6 +112,8 @@ export class MockServer {
   private reqSeq = 4200
   private totals = { requests: 18230, errors: 41, audio_seconds_in: 96412.5, audio_seconds_out: 20311.2 }
   private perModel = new Map<string, { requests: number; lastUsed: number; active: number }>()
+  /** Keep-alive per loaded model, seconds (-1: kept loaded), as a load with `keep_alive` sets it. */
+  private keepAlive = new Map<string, number>()
   private timers: ReturnType<typeof setInterval>[] = []
   private pendingTimeouts = new Set<ReturnType<typeof setTimeout>>()
   liveStreams = 0
@@ -515,13 +520,37 @@ export class MockServer {
           ? 0
           : Math.max(0, Math.round(load * 3 * (m.tier === 'realtime' ? 1.2 : 0.5) + this.rand() - 0.5))
       if (pm) pm.active = active
+      const memory = Math.round(m.size_bytes * 1.35 + 40e6)
+      const idle = active > 0 ? 0 : Math.round(((now - (pm?.lastUsed ?? now)) / 1000) * 10) / 10
+      const keepAlive = this.keepAliveOf(m)
+      // The mock machine has no GPU (see mock/hardware.ts): everything runs on the CPU, as on a server without one,
+      // unless the `gpu` flag pretends there is one (see placeOnGpu).
+      const placed = this.flags.gpu ? this.placeOnGpu(m, memory, loaded) : null
       return {
         id: m.id,
         task: m.task,
         loaded: true,
-        memory_bytes: Math.round(m.size_bytes * 1.35 + 40e6),
-        idle_s: active > 0 ? 0 : Math.round(((now - (pm?.lastUsed ?? now)) / 1000) * 10) / 10,
-        ttl_s: m.task === 'vad' ? null : 300,
+        memory_bytes: memory,
+        idle_s: idle,
+        ttl_s: keepAlive,
+        size_vram_bytes: 0,
+        ram_bytes: memory,
+        vram_measured: false,
+        processor: '100% CPU',
+        device: 'cpu',
+        placement: {
+          device: 'cpu',
+          requested: 'cpu',
+          split: 'whole',
+          gpu_bytes: 0,
+          cpu_bytes: memory,
+          processor: '100% CPU',
+          notice: null,
+        },
+        keep_alive_s: keepAlive,
+        expires_in_s: keepAlive < 0 ? null : Math.max(0, Math.round((keepAlive - idle) * 10) / 10),
+        stopping: false,
+        ...placed,
         active,
         requests: pm?.requests ?? 0,
         latency_ms: {
@@ -541,6 +570,12 @@ export class MockServer {
         cpu_percent: Math.round(Math.min(100 * 4, 28 + load * 190 + this.rand() * 18) * 10) / 10,
         rss_bytes: Math.round(310e6 + models.reduce((a, m) => a + m.memory_bytes, 0) + load * 60e6),
         threads: 14 + active,
+        ram_total_bytes: 16 * 1024 ** 3,
+        ram_available_bytes: Math.round(11.2 * 1024 ** 3 - models.reduce((a, m) => a + m.memory_bytes, 0)),
+        gpus: this.flags.gpu ? [this.mockGpu(models, load)] : [],
+        accelerator_source: this.flags.gpu ? 'nvml' : null,
+        models_vram_bytes: models.reduce((a, m) => a + (m.size_vram_bytes ?? 0), 0),
+        models_ram_bytes: models.reduce((a, m) => a + m.memory_bytes, 0),
       },
       totals: {
         ...this.totals,
@@ -552,7 +587,61 @@ export class MockServer {
   }
 
   private tick(): void {
-    this.emit({ type: 'stats', ...this.stats() })
+    const stats = this.stats()
+    // keep-alive: a model idle for longer than its keep-alive is unloaded, as the server's reaper does
+    for (const m of stats.models) {
+      if (m.expires_in_s === 0 && m.active === 0) this.unloadModel(m.id)
+    }
+    this.emit({ type: 'stats', ...stats })
+  }
+
+  /** With the `gpu` flag: VAD on the CPU, the largest model split 35%/65% CPU/GPU, the rest whole on the GPU. */
+  private placeOnGpu(m: CatalogModel, memory: number, loaded: CatalogModel[]): Partial<ModelStats> {
+    if (m.task === 'vad') return {}
+    const largest = loaded.filter((x) => x.task !== 'vad').sort((a, b) => b.size_bytes - a.size_bytes)[0]
+    const split = largest?.id === m.id && loaded.length > 2
+    const vram = split ? Math.round(memory * 0.65) : memory
+    const processor = split ? '35%/65% CPU/GPU' : '100% GPU'
+    return {
+      size_vram_bytes: vram,
+      ram_bytes: memory - vram,
+      vram_measured: true,
+      processor,
+      device: 'cuda:0',
+      placement: {
+        device: 'cuda:0',
+        requested: 'cuda',
+        split: split ? 'layers' : 'whole',
+        gpu_bytes: vram,
+        cpu_bytes: memory - vram,
+        processor,
+        notice: split ? `'${m.id}': 19 of 29 layers on cuda:0; the rest on the CPU` : null,
+        ...(split ? { gpu_layers: 19, total_layers: 29 } : {}),
+      },
+    }
+  }
+
+  private mockGpu(models: ModelStats[], load: number): GpuMemory {
+    const ours = models.reduce((a, m) => a + (m.size_vram_bytes ?? 0), 0)
+    const total = 12 * 1024 ** 3
+    const others = 0.6 * 1024 ** 3
+    return {
+      index: 0,
+      vendor: 'nvidia',
+      name: 'NVIDIA GeForce RTX 3060',
+      backend: 'cuda',
+      total_bytes: total,
+      used_bytes: Math.round(ours + others),
+      free_bytes: Math.round(total - ours - others),
+      unified: false,
+      utilization: Math.round(Math.min(100, load * 70)),
+      process_bytes: ours,
+      source: 'nvml',
+    }
+  }
+
+  private keepAliveOf(m: CatalogModel): number {
+    return this.keepAlive.get(m.id) ?? (m.task === 'vad' ? -1 : 300)
   }
 
   // ---- optional components ----------------------------------------------
@@ -658,12 +747,18 @@ export class MockServer {
     return job
   }
 
-  async loadModel(id: string): Promise<void> {
+  async loadModel(id: string, keepAlive?: number): Promise<void> {
     const m = this.model(id)
     if (!m) throw new HttpError(404, `Unknown model: ${id}`)
     if (!m.installed) throw new HttpError(409, `${m.id} is not installed. Pull it first.`)
     if (m.available === false)
       throw new HttpError(409, `${m.id} needs eSpeak NG, which is not installed.`, 'component_missing')
+    if (keepAlive !== undefined) {
+      this.keepAlive.set(m.id, keepAlive)
+      const pm = this.perModel.get(m.id)
+      if (pm) pm.lastUsed = Date.now()
+    }
+    if (m.loaded) return
     await sleep(350 + Math.min(2200, m.size_bytes / 6e5))
     m.loaded = true
     this.emit({ type: 'model', id: m.id, event: 'loaded' })
@@ -673,6 +768,7 @@ export class MockServer {
     const m = this.model(id)
     if (!m) throw new HttpError(404, `Unknown model: ${id}`)
     m.loaded = false
+    this.keepAlive.delete(m.id)
     this.emit({ type: 'model', id: m.id, event: 'unloaded' })
   }
 

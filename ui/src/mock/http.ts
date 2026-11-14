@@ -89,6 +89,17 @@ function speechResponse(server: MockServer, model: CatalogModel, input: string):
 }
 
 /** Answers API requests the way the real server would. Returns null for non-API URLs. */
+/** Seconds from a keep_alive value ("10m", 300, -1), null when it cannot be read (the server answers 400). */
+export function mockKeepAlive(raw: unknown): number | null {
+  if (typeof raw === 'number') return raw < 0 ? -1 : raw
+  const text = String(raw).trim().toLowerCase()
+  if (/^-?\d+(\.\d+)?$/.test(text)) return Number(text) < 0 ? -1 : Number(text)
+  const m = /^(-?)(\d+(?:\.\d+)?)(ms|s|m|h)$/.exec(text)
+  if (!m) return null
+  const unit = { ms: 0.001, s: 1, m: 60, h: 3600 }[m[3] as 'ms' | 's' | 'm' | 'h']
+  return m[1] ? -1 : Number(m[2]) * unit
+}
+
 export async function handleRequest(
   server: MockServer,
   input: RequestInfo | URL,
@@ -237,10 +248,39 @@ export async function handleRequest(
     const action = /^\/api\/v1\/models\/([^/]+)\/(load|unload)$/.exec(path)
     if (action && method === 'POST') {
       const id = decodeURIComponent(action[1] as string)
-      if (action[2] === 'load') await server.loadModel(id)
-      else server.unloadModel(id)
+      if (action[2] === 'load') {
+        const raw = (JSON.parse(String(init?.body || '{}')) as { keep_alive?: unknown }).keep_alive
+        const keepAlive = raw === undefined || raw === null ? undefined : mockKeepAlive(raw)
+        if (keepAlive === null) return json({ error: { message: `bad keep_alive ${String(raw)}` } }, 400)
+        if (keepAlive === 0) {
+          server.unloadModel(id)
+          return json({ id, loaded: false })
+        }
+        await server.loadModel(id, keepAlive)
+      } else server.unloadModel(id)
       const warnings = action[2] === 'load' ? server.warnings(id) : []
-      return json({ id, loaded: action[2] === 'load', ...(warnings.length ? { warnings } : {}) })
+      const row = action[2] === 'load' ? server.stats().models.find((m) => m.id === id) : undefined
+      const placed = row ? { processor: row.processor ?? '100% CPU', device: row.device ?? 'cpu' } : {}
+      return json({ id, loaded: action[2] === 'load', ...placed, ...(warnings.length ? { warnings } : {}) })
+    }
+    if (path === '/api/v1/ps') {
+      const stats = server.stats()
+      return json({
+        models: stats.models.map((m) => ({
+          name: m.id,
+          model: m.id,
+          task: m.task,
+          size: m.memory_bytes,
+          size_vram: 0,
+          processor: m.processor,
+          device: m.device,
+          expires_in_s: m.expires_in_s,
+          expires_at: m.expires_in_s == null ? null : new Date(Date.now() + m.expires_in_s * 1000).toISOString(),
+          active: m.active,
+          requests: m.requests,
+        })),
+        system: stats.system,
+      })
     }
     const del = /^\/api\/v1\/models\/([^/]+)$/.exec(path)
     if (del && method === 'DELETE') {

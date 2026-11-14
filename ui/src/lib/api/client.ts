@@ -135,8 +135,12 @@ export const api = {
     json<{ job_id: string; warnings?: FitWarning[] }>('api/v1/models/pull', { method: 'POST', json: { id } }),
   job: <R = unknown>(jobId: string, signal?: AbortSignal) =>
     json<Job<R>>(`api/v1/jobs/${encodeURIComponent(jobId)}`, { signal }),
-  load: (id: string) =>
-    json<{ warnings?: FitWarning[] } | undefined>(`api/v1/models/${encodeURIComponent(id)}/load`, { method: 'POST' }),
+  /** `keepAlive`: seconds or a duration ("10m"); -1 keeps the model loaded until it is unloaded. */
+  load: (id: string, keepAlive?: number | string) =>
+    json<{ warnings?: FitWarning[]; processor?: string; notice?: string } | undefined>(
+      `api/v1/models/${encodeURIComponent(id)}/load`,
+      { method: 'POST', ...(keepAlive === undefined ? {} : { json: { keep_alive: keepAlive } }) },
+    ),
   /** This machine as the server sees it; `refresh` looks again and runs the slower probes too. */
   hardware: (refresh = false, signal?: AbortSignal) =>
     json<HardwareInfo>('api/v1/hardware', { query: { refresh: refresh || undefined }, signal }),

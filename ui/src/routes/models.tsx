@@ -61,6 +61,7 @@ import {
   NeedsComponentMark,
 } from '@/components/component-install'
 import { FirstRunPick, FitLine, FitSection, HardwareCard, PickForMe, RecommendedBadge } from '@/components/fit-bits'
+import { LoadedModelsPanel } from '@/components/loaded-models'
 import { ModelSettingsSection } from '@/components/model-settings'
 import {
   cloudNotice,
@@ -1038,6 +1039,7 @@ export default function ModelsPage() {
         />
       )}
       {!isDemo && <HardwareCard className="mb-4" onPick={() => setPicking(true)} />}
+      <LoadedModelsPanel className="mb-4" />
       <ComponentsCard className="mb-5" />
 
       {catalog.isLoading ? (

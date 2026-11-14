@@ -31,6 +31,42 @@ afterEach(() => {
 })
 
 describe('mock HTTP API', () => {
+  it('pretends a GPU with the gpu flag: placement, a split model and VRAM totals', async () => {
+    server.dispose()
+    install({ gpu: true })
+    const stats = await api.stats()
+    const [gpu] = stats.system.gpus ?? []
+    expect(gpu).toMatchObject({ name: 'NVIDIA GeForce RTX 3060', total_bytes: 12 * 1024 ** 3, unified: false })
+    const loaded = stats.models.filter((m) => m.loaded && m.task !== 'vad')
+    expect(loaded.some((m) => m.processor === '100% GPU')).toBe(true)
+    if (loaded.length > 2) expect(loaded.some((m) => m.processor === '35%/65% CPU/GPU')).toBe(true)
+    expect(gpu?.process_bytes).toBe(stats.models.reduce((a, m) => a + (m.size_vram_bytes ?? 0), 0))
+  })
+
+  it('places, keeps alive and lists loaded models like the server', async () => {
+    const stats = await api.stats()
+    const loaded = stats.models.filter((m) => m.loaded)
+    expect(loaded.length).toBeGreaterThan(0)
+    for (const m of loaded) {
+      expect(m).toMatchObject({ processor: '100% CPU', device: 'cpu', size_vram_bytes: 0, stopping: false })
+    }
+    expect(stats.system).toMatchObject({ gpus: [], ram_total_bytes: 16 * 1024 ** 3 })
+    const id = (loaded.find((m) => m.task !== 'vad') ?? loaded[0])!.id
+    const res = await api.load(id, -1)
+    expect(res).toMatchObject({ processor: '100% CPU' })
+    const after = (await api.stats()).models.find((m) => m.id === id)
+    expect(after).toMatchObject({ keep_alive_s: -1, expires_in_s: null })
+    await api.load(id, '10m')
+    expect((await api.stats()).models.find((m) => m.id === id)?.keep_alive_s).toBe(600)
+    const ps = (await (await handleRequest(server, 'http://bolo.test/api/v1/ps')).json()) as {
+      models: { name: string; processor: string }[]
+    }
+    expect(ps.models.map((m) => m.name)).toContain(id)
+    await expect(api.load(id, 'soon')).rejects.toBeInstanceOf(ApiError)
+    await api.load(id, 0) // Ollama's way to unload
+    expect((await api.stats()).models.some((m) => m.id === id)).toBe(false)
+  })
+
   it('serves info, catalog and samples in the contract shape', async () => {
     const info = await api.info()
     expect(info).toMatchObject({ name: 'bolo', auth_required: false })
