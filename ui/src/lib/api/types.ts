@@ -512,6 +512,8 @@ export interface ModelPlacement {
   gpu_layers?: number | null
   total_layers?: number | null
   graphs?: Record<string, string>
+  /** CUDA GPUs the weights are on: several for a llama.cpp model spread with --tensor-split. */
+  gpus?: number[]
 }
 
 export interface GpuMemory {
@@ -529,6 +531,10 @@ export interface GpuMemory {
   /** Accelerator memory held by bolo and the servers it started; null when it cannot be told. */
   process_bytes: number | null
   source: string
+  /** NVIDIA: the `gpus` setting lets bolo use it (absent: older servers, Apple). */
+  allowed?: boolean
+  /** What bolo's loaded models hold on this GPU. */
+  models_vram_bytes?: number
 }
 
 export interface Stats {

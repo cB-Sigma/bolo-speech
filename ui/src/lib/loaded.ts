@@ -20,6 +20,8 @@ export interface LoadedRow {
   notice: string | null
   /** The GPU the model's memory is on, when one is reported. */
   gpu: GpuMemory | null
+  /** CUDA numbers of the GPUs it is on (several when a llama.cpp model is spread over them). */
+  gpuIndexes: number[]
   /** Seconds since its last request. */
   idle: number
   /** `size` is an estimate (the browser demo). */
@@ -63,6 +65,7 @@ export function loadedRows(stats: Stats | null): LoadedRow[] {
         requests: m.requests,
         notice: m.placement?.notice ?? null,
         gpu: gpuFor(device, gpus),
+        gpuIndexes: m.placement?.gpus ?? [],
         idle: m.idle_s,
         estimated: m.memory_estimated ?? false,
       }
@@ -114,7 +117,11 @@ export interface MachineTotals {
   ramUsed: number | null
   ramTotal: number | null
   gpus: {
+    /** Its number, when the machine has several GPUs. */
+    index: number
     label: string
+    /** false: the `gpus` setting leaves it out. */
+    allowed: boolean
     used: number | null
     total: number | null
     bolo: number | null
@@ -132,8 +139,11 @@ export function machineTotals(stats: Stats | null): MachineTotals | null {
     rss: sys.rss_bytes,
     ramTotal: total,
     ramUsed: total != null && sys.ram_available_bytes != null ? total - sys.ram_available_bytes : null,
-    gpus: (sys.gpus ?? []).map((g) => ({
-      label: g.name ?? `${g.vendor} GPU ${g.index}`,
+    gpus: (sys.gpus ?? []).map((g, _, all) => ({
+      index: g.index,
+      // several GPUs (often the same model twice): say which is which
+      label: all.length > 1 ? `GPU ${g.index} · ${g.name ?? g.vendor}` : (g.name ?? `${g.vendor} GPU ${g.index}`),
+      allowed: g.allowed !== false,
       used: g.used_bytes,
       total: g.total_bytes,
       bolo: g.process_bytes,

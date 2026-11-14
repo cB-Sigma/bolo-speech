@@ -258,11 +258,12 @@ export function LoadedModelsPanel({ className }: { className?: string }) {
               <Meter value={totals.ramUsed ?? totals.rss} max={totals.ramTotal} part={totals.rss} label="Memory use" />
             </div>
             {totals.gpus.map((g) => (
-              <div key={g.label} className="min-w-0" data-testid="gpu-total">
+              <div key={`${g.index}-${g.label}`} className="min-w-0" data-testid="gpu-total">
                 <div className="mb-1 flex items-center justify-between gap-2 text-muted-foreground">
                   <span className="truncate" title={g.label}>
                     {g.label}
                     {g.busy != null && <span className="num"> · {g.busy.toFixed(0)}% busy</span>}
+                    {!g.allowed && <span> · not used by bolo</span>}
                   </span>
                   <span className="shrink-0 num text-foreground">
                     {g.total ? `${fmtBytes(g.used)} of ${fmtBytes(g.total)}` : 'memory unknown'}
@@ -322,6 +323,7 @@ export function LoadedModelsPanel({ className }: { className?: string }) {
                       {row.onGpu &&
                         (isDemo ? <> · WebGPU {fmtBytes(row.vram)}</> : <> · VRAM {fmtBytes(row.vram)}</>)}{' '}
                       · {row.device}
+                      {row.gpuIndexes.length > 1 && <> · GPUs {row.gpuIndexes.join(', ')}</>}
                     </span>
                   </div>
                   <SplitBar row={row} />

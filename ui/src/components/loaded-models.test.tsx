@@ -126,7 +126,7 @@ describe('loaded-model helpers', () => {
   it('sums up the machine', () => {
     const t = machineTotals(stats)
     expect(t).toMatchObject({ cpuPercent: 23.4, ramUsed: 12 * GB, ramTotal: 32 * GB })
-    expect(t?.gpus).toEqual([
+    expect(t?.gpus).toMatchObject([
       { label: 'NVIDIA GeForce RTX 3060', used: 6 * GB, total: 12 * GB, bolo: 5 * GB, busy: 41, unified: false },
     ])
   })
