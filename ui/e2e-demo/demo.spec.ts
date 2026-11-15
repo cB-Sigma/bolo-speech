@@ -680,6 +680,43 @@ test.describe('text to speech in the page', () => {
     if (!VOICES) await expect(page.getByTestId('voices-missing')).toBeVisible()
   })
 
+  test('the text front end in Maithili and German: numbers in the language’s own words', async ({ page }) => {
+    // uccharan's data files, served from the vendored copy on another origin (as a voices mirror would).
+    const data = path.resolve(import.meta.dirname, '../src/vendor/uccharan/data')
+    const asked: string[] = []
+    await page.context().route('http://uccharan.test/uccharan/*', async (route) => {
+      const name = new URL(route.request().url()).pathname.split('/').pop() as string
+      asked.push(name)
+      const headers = { 'access-control-allow-origin': '*', 'cross-origin-resource-policy': 'cross-origin' }
+      if (!/^[a-z-]+\.ucd$/.test(name) || name.startsWith('xlit-')) return route.fulfill({ status: 404, headers })
+      await route.fulfill({ path: path.join(data, name), headers, contentType: 'application/octet-stream' })
+    })
+    await open(page, 'tts')
+    await page.evaluate(() =>
+      localStorage.setItem('bolo.browserTts', JSON.stringify({ voicesBase: 'http://uccharan.test/' })),
+    )
+    const playground = page.getByTestId('uccharan-playground')
+    await playground.getByTestId('playground-language').click()
+    await expect(page.getByRole('option')).toHaveCount(41)
+    await page.getByRole('option', { name: 'मैथिली · Maithili' }).click()
+    await expect(page.getByTestId('playground-text')).toHaveValue('प्रणाम! अहाँ केहन छी? काल्हि 10 बजे बैसक अछि।')
+    await page.getByTestId('playground-run').click()
+    await expect(page.getByTestId('playground-normalised')).toContainText('दस बजे', { timeout: 60_000 })
+    await expect(page.getByTestId('playground-phonemes')).toContainText('ˈ')
+    // Maithili is read with the Hindi data: there is no mai.ucd to ask for.
+    expect(asked).toContain('hi.ucd')
+    expect(asked).not.toContain('mai.ucd')
+
+    await playground.getByTestId('playground-language').click()
+    await page.getByRole('option', { name: 'Deutsch · German' }).click()
+    await expect(page.getByTestId('playground-text')).toHaveValue('Herr Nguyen zahlt 25 € für 3,5 kg Äpfel.')
+    await page.getByTestId('playground-run').click()
+    await expect(page.getByTestId('playground-normalised')).toContainText('fünfundzwanzig Euro', { timeout: 60_000 })
+    await expect(page.getByTestId('playground-normalised')).toContainText('drei Komma fünf')
+    await expect(page.getByTestId('playground-normalised')).not.toContainText('twenty')
+    expect(asked).toContain('de.ucd')
+  })
+
   test.describe('with the voices published', () => {
     test.skip(!VOICES || !MIRROR, 'set BOLO_E2E_VOICE_DIR (voices) and BOLO_E2E_MODEL_DIR (runtime mirror) to run')
 

@@ -311,7 +311,7 @@ mode for speech synthesis). Nothing in it needs the server.
   voice has no symbol for are listed under the text box instead of vanishing silently; a missing
   danda (the Bhojpuri voices have none) becomes a full stop.
 - **Piper voice** (US English "amy", low): phonemes come from uccharan (Apache-2.0, vendored in
-  `ui/src/vendor/uccharan`, WebAssembly module 254 KiB plus 2.0 MiB of English data), `piper`
+  `ui/src/vendor/uccharan`, WebAssembly module 1.7 MiB plus 0.7 MB of English data), `piper`
   profile, ids `^ _ p _ … $`. No eSpeak NG build is used anywhere.
 - Text is split into sentences (a long first sentence at its first comma); each one is
   synthesised and scheduled on the Web Audio clock as soon as it is ready, so the first plays while
@@ -393,7 +393,7 @@ host to `connect-src`.
 | `syspin-mr-female` | मराठी Marathi | 36.5 MB | MIT / CC-BY-4.0 | SYSPIN, SPIRE Lab, IISc |
 | `syspin-kn-female` | ಕನ್ನಡ Kannada | 36.5 MB | MIT / CC-BY-4.0 | SYSPIN, SPIRE Lab, IISc |
 | `syspin-en-female` | English (India) | 36.5 MB | MIT / CC-BY-4.0 | SYSPIN, SPIRE Lab, IISc |
-| `piper-en-us-amy-low` | English (US) | 27.1 MB (25.0 MB voice + 2.1 MB uccharan data) | MIT (piper-voices) / Amy dataset, mimic3-voices (licence not stated per voice) | Rhasspy / Piper |
+| `piper-en-us-amy-low` | English (US) | 25.7 MB (25.0 MB voice + 0.7 MB uccharan data) | MIT (piper-voices) / Amy dataset, mimic3-voices (licence not stated per voice) | Rhasspy / Piper |
 
 Original fp32 sizes: 114 MB per SYSPIN voice, 63 MB for amy. Plus, once, the ONNX Runtime binary
 from jsDelivr (about 12 MB, shared with the recogniser).
