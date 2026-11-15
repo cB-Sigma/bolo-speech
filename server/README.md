@@ -3,7 +3,7 @@
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/cB-Sigma/bolo/main/docs/assets/brand/banner-dark.png">
       <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/cB-Sigma/bolo/main/docs/assets/brand/banner-light.png">
-      <img src="https://raw.githubusercontent.com/cB-Sigma/bolo/main/docs/assets/brand/banner-dark.png" alt="bolo: Ollama for speech. Pull a model, serve it over the APIs you already use, and watch every millisecond." width="100%">
+      <img src="https://raw.githubusercontent.com/cB-Sigma/bolo/main/docs/assets/brand/banner-dark.png" alt="bolo: Ollama for speech. Speech-to-text, text-to-speech and voice agents on your own machine." width="100%">
     </picture>
   </a>
 </p>
