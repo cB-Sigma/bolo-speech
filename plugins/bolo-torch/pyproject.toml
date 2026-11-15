@@ -28,7 +28,7 @@ classifiers = [
 # torch comes from PyPI by default (the CUDA build on Linux). For the much smaller CPU-only build install torch
 # first from https://download.pytorch.org/whl/cpu (see README.md).
 dependencies = [
-  "bolo-speech>=0.2,<0.5",
+  "bolo-speech>=0.2,<0.6",
   "torch>=2.4",
   "numpy>=1.26",
   "huggingface-hub>=0.23",

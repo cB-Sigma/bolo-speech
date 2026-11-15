@@ -231,7 +231,7 @@ def test_an_older_uccharan_is_not_used_for_languages_it_lacks(fake: Any, monkeyp
     old = phonemize.UccharanPhonemizer(fake)
     monkeypatch.setattr(phonemize, "get_uccharan", lambda: old)
     assert phonemize.select("piper", "en-us") is old and phonemize.select("piper", "de") is None
-    with pytest.raises(ComponentMissing, match=r"uccharan>=0\.6,<0\.7"):
+    with pytest.raises(ComponentMissing, match=r"uccharan>=0\.6\.1,<0\.7"):
         phonemize.resolve("piper", "de", "uccharan")
 
 
@@ -430,6 +430,23 @@ def test_installed_uccharan_spanish_needs_no_pack() -> None:
     assert packs.needed("es", "piper") == []
     text = "".join(map(chr, ph.voice_codepoints("El niño come.", "es-ES", "piper")[0]))
     assert "ɲ" in text
+
+
+def _uccharan_061() -> Any:
+    real = _real_uccharan()
+    version = tuple(int(x) for x in str(getattr(real, "__version__", "0")).split(".")[:3] if x.isdigit())
+    return real if real is not None and version >= (0, 6, 1) else None
+
+
+@pytest.mark.skipif(_uccharan_061() is None, reason="needs uccharan 0.6.1 or later")
+def test_installed_uccharan_reads_numbers_in_the_latin_languages(monkeypatch: pytest.MonkeyPatch) -> None:
+    """uccharan 0.6.1 reads digits in German, Spanish, French … itself, so text voices get its normaliser."""
+    monkeypatch.setattr(prepare, "_reads_numbers", {})
+    for tag in ("de", "es", "fr", "it", "nl", "pt-br", "fr-ch"):
+        assert prepare.normalizes_numbers(tag), tag
+    real = _uccharan_061()
+    assert "fünfundzwanzig Euro" in real.normalize("25 €", "de", digits="request").text
+    assert "tres coma cinco" in real.normalize("3,5 kg", "es", digits="request").text
 
 
 @needs_uccharan_06

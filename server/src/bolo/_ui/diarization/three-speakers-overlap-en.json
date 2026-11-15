@@ -1,0 +1,72 @@
+{
+ "id": "three-speakers-overlap-en",
+ "title": "Three speakers, English, with overlaps and interruptions",
+ "language": "en",
+ "seconds": 25.68,
+ "speakers": [
+  "A",
+  "B",
+  "C"
+ ],
+ "turns": [
+  {
+   "speaker": "A",
+   "start": 0.0,
+   "end": 3.744,
+   "text": "Let us start with the budget. We are about ten percent over this quarter."
+  },
+  {
+   "speaker": "B",
+   "start": 4.244,
+   "end": 7.212,
+   "text": "Most of that is the new servers. We had to buy them early."
+  },
+  {
+   "speaker": "C",
+   "start": 6.312,
+   "end": 9.889,
+   "text": "Sorry, can I jump in? The servers were planned for next year."
+  },
+  {
+   "speaker": "B",
+   "start": 10.189,
+   "end": 12.91,
+   "text": "They were, but the old ones failed in March."
+  },
+  {
+   "speaker": "A",
+   "start": 12.31,
+   "end": 15.048,
+   "text": "Right, and that is in the report I sent on Friday."
+  },
+  {
+   "speaker": "C",
+   "start": 15.648,
+   "end": 18.925,
+   "text": "Okay. Then we should move some of next year's money forward."
+  },
+  {
+   "speaker": "A",
+   "start": 18.525,
+   "end": 19.732,
+   "text": "Agreed."
+  },
+  {
+   "speaker": "B",
+   "start": 20.232,
+   "end": 22.932,
+   "text": "I can prepare the numbers by tomorrow afternoon."
+  },
+  {
+   "speaker": "C",
+   "start": 23.532,
+   "end": 25.184,
+   "text": "Great, send them to both of us."
+  }
+ ],
+ "credits": [
+  "Kokoro-82M by hexgrad (Apache-2.0), onnx-community ONNX export; phonemes by uccharan (Apache-2.0)",
+  "SYSPIN voices by IISc / SPIRE Lab (models MIT; SYSPIN corpus CC BY 4.0), as published with the bolo demo"
+ ],
+ "made_with": "ui/scripts/diarization/make_examples.py"
+}

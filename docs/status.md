@@ -16,7 +16,11 @@ the number.
 - **GPUs.** No GPU was available. `device = "cuda"` is passed to faster-whisper and sherpa-onnx, the torch plugin
   takes `BOLO_TORCH_DEVICE`, and there is a `Dockerfile.gpu`, but none of it has been run and **no number in the
   documentation was measured on a GPU**. The hardware recommendations for GPU machines are estimates from formulas, not
-  measurements ([recommendations.md](recommendations.md#how-uncertain-this-is)).
+  measurements ([recommendations.md](recommendations.md#how-uncertain-this-is)). GPU/CPU placement, keep-alive
+  eviction of GPU-resident models, several GPUs, llama.cpp `-ngl` and `--tensor-split`, the ONNX graph cut and
+  bolo-torch's `device_map` splits are tested with a fake NVML of made-up GPUs and llama-server command lines that
+  are built but not run; the cut graph was run with both halves on the CPU
+  ([configuration.md](configuration.md#gpu-and-cpu-placement)).
 - **Apple Silicon and macOS, Linux arm64, Windows.** Not run. The dependencies publish wheels for macOS and arm64,
   so it should work there; Windows is unknown.
 - **Python 3.10 and 3.11.** The package targets 3.10 and newer; the test-suite was run on 3.12, 3.13 and 3.14.
@@ -30,6 +34,9 @@ the number.
   against stand-ins written from the same documentation
   ([providers.md](providers.md#what-was-verified-and-what-was-not)). Cost estimates use prices you enter; none
   are shipped.
+- **The live demo on real devices.** The demo's end-to-end tests run in headless Chromium on a desktop CPU (the
+  storage crash was reproduced and fixed in WebKit). WebGPU, the GPU/CPU split of a model, and the limits for phones
+  and small devices are tested with a faked device; nothing was run on a GPU, an iPhone or an Android phone.
 - **Home Assistant and browsers.** The Wyoming flows Home Assistant uses were run with the official `wyoming`
   client against a real server with real models, not with Home Assistant itself. The WebRTC transport of the
   Realtime API is tested with the aiortc library (also with real models), not with Chrome, Firefox or Safari, and

@@ -1,0 +1,52 @@
+{
+ "id": "two-speakers-hi",
+ "title": "Two speakers, Hindi",
+ "language": "hi",
+ "seconds": 24.62,
+ "speakers": [
+  "A",
+  "B"
+ ],
+ "turns": [
+  {
+   "speaker": "A",
+   "start": 0.0,
+   "end": 2.786,
+   "text": "नमस्ते, क्या आप कल की बैठक में आ रहे हैं?"
+  },
+  {
+   "speaker": "B",
+   "start": 3.486,
+   "end": 7.171,
+   "text": "हाँ, मैं आऊँगा। बैठक कितने बजे शुरू होगी?"
+  },
+  {
+   "speaker": "A",
+   "start": 7.771,
+   "end": 12.026,
+   "text": "सुबह दस बजे। सबसे पहले हम नए दफ़्तर के बारे में बात करेंगे।"
+  },
+  {
+   "speaker": "B",
+   "start": 12.726,
+   "end": 16.183,
+   "text": "ठीक है। क्या मुझे कुछ साथ लाना होगा?"
+  },
+  {
+   "speaker": "A",
+   "start": 16.683,
+   "end": 19.195,
+   "text": "बस पिछले महीने की रिपोर्ट ले आइए।"
+  },
+  {
+   "speaker": "B",
+   "start": 19.895,
+   "end": 24.119,
+   "text": "ज़रूर, मैं आज शाम तक उसे तैयार कर लूँगा। धन्यवाद।"
+  }
+ ],
+ "credits": [
+  "SYSPIN voices by IISc / SPIRE Lab (models MIT; SYSPIN corpus CC BY 4.0), as published with the bolo demo"
+ ],
+ "made_with": "ui/scripts/diarization/make_examples.py"
+}

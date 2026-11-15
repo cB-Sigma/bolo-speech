@@ -133,10 +133,11 @@ _reads_numbers: dict[str, bool] = {}
 def normalizes_numbers(tag: str) -> bool:
     """Whether uccharan's normalise-only mode writes numbers out in the language itself.
 
-    uccharan 0.6 reads them in English, Hindi and the other South Asian languages, but in the Latin-script
-    languages other than English (Spanish, German, French …) its normalise-only mode reads digits in English or
-    Hindi, while its phonemiser reads them in the language. Those languages get bolo's light normaliser for text
-    voices until uccharan reads them; the probe below finds out which case the installed uccharan is in."""
+    English, Hindi and the other South Asian languages always are. In the Latin-script languages other than English
+    (Spanish, German, French …) uccharan 0.6.0's normalise-only mode reads digits in English, while its phonemiser
+    reads them in the language; 0.6.1 (the extra's minimum) reads them in the language. With an uccharan that does
+    not, those languages get bolo's light normaliser for text voices; the probe below finds out which case the
+    installed uccharan is in."""
     from bolo.text.packs import LATIN_SCRIPT
 
     if tag in ("en-us", "en-gb") or tag not in LATIN_SCRIPT:

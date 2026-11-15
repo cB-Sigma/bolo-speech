@@ -1,0 +1,58 @@
+{
+ "id": "two-speakers-en",
+ "title": "Two speakers, English, taking turns",
+ "language": "en",
+ "seconds": 27.15,
+ "speakers": [
+  "A",
+  "B"
+ ],
+ "turns": [
+  {
+   "speaker": "A",
+   "start": 0.0,
+   "end": 3.596,
+   "text": "Good morning. Did you get a chance to look at the delivery schedule?"
+  },
+  {
+   "speaker": "B",
+   "start": 4.296,
+   "end": 7.609,
+   "text": "I did. The first shipment leaves on Monday, and the second one on Thursday."
+  },
+  {
+   "speaker": "A",
+   "start": 8.209,
+   "end": 11.929,
+   "text": "That works for us. Can the second one include the spare parts as well?"
+  },
+  {
+   "speaker": "B",
+   "start": 12.729,
+   "end": 16.331,
+   "text": "Yes, I will add them to the order today and send you the updated invoice."
+  },
+  {
+   "speaker": "A",
+   "start": 16.931,
+   "end": 20.14,
+   "text": "Perfect. Please copy the warehouse team on that email."
+  },
+  {
+   "speaker": "B",
+   "start": 20.84,
+   "end": 23.378,
+   "text": "Will do. Anything else before we close?"
+  },
+  {
+   "speaker": "A",
+   "start": 23.978,
+   "end": 26.655,
+   "text": "No, that is everything. Thank you for your help."
+  }
+ ],
+ "credits": [
+  "SYSPIN voices by IISc / SPIRE Lab (models MIT; SYSPIN corpus CC BY 4.0), as published with the bolo demo"
+ ],
+ "made_with": "ui/scripts/diarization/make_examples.py"
+}

@@ -209,7 +209,7 @@ Two things to know before relying on it: the quality of a conversation is the qu
 
 Voices differ in what they read: phonemes, plain text or a fixed character set. bolo keeps a record per voice and prepares text accordingly:
 
-- **Normalisation.** Numbers, money with lakh and crore, dates, times, phone numbers, units, abbreviations, URLs and email addresses are written out in words in the voice's language: by uccharan's phonemiser for voices that read phonemes (all its languages), and by its normalise-only mode for voices that read text (English, Hindi and the other South Asian languages, Urdu, Sindhi; bolo's own small normaliser for the rest, and without uccharan).
+- **Normalisation.** Numbers, money with lakh and crore, dates, times, phone numbers, units, abbreviations, URLs and email addresses are written out in words in the voice's language: by uccharan's phonemiser for voices that read phonemes (all its languages), and by its normalise-only mode for voices that read text (all its languages since uccharan 0.6.1; bolo's own small normaliser for other languages, and without uccharan).
 - **Pronunciation word lists.** Named lists (TSV, PLS or JSON) say how names, brands and jargon are spoken; each voice gets the entry as phonemes, markup or a respelling, whichever it can take. Per request, pinned per model, or for everything.
 - **SSML.** A subset: `<sub>`, `<phoneme>`, `<say-as>`, `<break>`, `<p>`, `<s>`, `<lang>`. Kokoro-style `[word](/ipa/)` works in every format.
 - **Romanised input.** With `"romanised": "auto"`, Hindi typed in Latin letters is written in Devanagari before a Hindi voice reads it, and English words are left alone. This needs uccharan and the language's pack (CC BY-SA 4.0, installed on request); without them the text is spoken as written and the request's trace says what is missing. Off by default.
@@ -301,7 +301,8 @@ All tables, the method and what batching does and does not buy on CPU: [docs/per
 
 ## What has not been validated
 
-- **GPUs, Apple Silicon, arm64, Windows.** Nothing was run on them. Device settings and a GPU Dockerfile exist; no number in the documentation comes from a GPU.
+- **GPUs, Apple Silicon, arm64, Windows.** Nothing was run on them. Device settings and a GPU Dockerfile exist; no number in the documentation comes from a GPU. GPU/CPU placement, several GPUs, llama.cpp offload and tensor splits, the ONNX graph cut and bolo-torch's `device_map` splits are tested only with fake NVML readings, made-up memory figures and command lines that are built but not run (the cut graph with both halves on the CPU).
+- **The live demo on real devices.** Its tests run in headless Chromium on a desktop CPU; WebGPU, the GPU/CPU split and phone limits are tested with a faked device, not on a GPU, an iPhone or an Android phone.
 - **Phone providers.** No real call was made and no provider account was used: Twilio, Plivo, Telnyx and Exotel are implemented from their documentation and tested against fake providers; SIP against the test-suite's own user agent.
 - **Cloud providers.** Nothing was run against OpenAI, Sarvam, ElevenLabs or Deepgram; the adapters follow their documentation and are tested against stand-ins.
 - **Most of the catalog.** About two thirds of the entries are marked untested: their files were checked and a sibling of the same architecture was run.

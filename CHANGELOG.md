@@ -6,6 +6,15 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-15
+
+Ollama-style model handling: each model is placed on the GPU or the CPU (or split between them) when it loads,
+unloaded after a keep-alive, listed by `bolo ps`, `/api/v1/ps` and the console's Loaded models panel, spread over
+several GPUs, and managed with `show`, `rm`, `cp` and `logs`. Every ONNX Runtime engine follows the `device`
+setting. uccharan 0.6.1 gives phonemes and number reading in its 39 languages, with language packs downloaded on
+first use. The live demo gains 28 recognisers, 100 voices, a Speakers page and a voice conversation in the page.
+Everything on the GPU side is tested with fakes only: no GPU was used.
+
 ### Added
 
 - **More of Ollama's model handling.** GPU-side behaviour is tested with a fake NVML of several made-up GPUs and
@@ -86,7 +95,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
     the request and latency columns. New **`bolo load <model> --keep-alive 10m`** (also `bolo run`) and
     **`bolo stop <model>`**. `POST /api/v1/models/{id}/load` takes `keep_alive` and says where the model went.
   - **Console**: a "Loaded models" panel on the Models page: each loaded model with its size, CPU/GPU split, VRAM
-    share, a countdown to unloading, and Unload / Keep loaded buttons, plus CPU, RAM and GPU totals.
+    share, a countdown to unloading, and Unload / Keep loaded buttons, plus CPU, RAM and GPU totals. GPUs are
+    numbered as `gpus` numbers them, ones bolo may not use are marked, and a model spread over several lists them.
 
 - **Phonemes and text normalisation through uccharan 0.6 in its 39 languages** (models.md, "Phonemisers").
   Piper, Mimic 3 and Kokoro voices in Spanish, German, Dutch, French (also Belgian and Swiss), Italian,
@@ -98,8 +108,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   `no` to `nb`, `pt-BR` to `pt-br`, `en-gb-x-rp` to `en-gb`); languages uccharan does not have (Mandarin,
   Russian, Latin American Spanish `es-419` and others) still go to espeak-ng when it is installed, or fail with
   `424` as before. Text voices get uccharan's normalise-only mode in the languages where it reads numbers in
-  the language itself (English, Hindi, the South Asian languages, Urdu, Sindhi); in uccharan 0.6 it reads digits
-  in English for the other Latin-script languages, so those keep bolo's light normaliser until it does.
+  the language itself: English, Hindi, the South Asian languages, Urdu, Sindhi and, with uccharan 0.6.1, the
+  Latin-script languages (Spanish, German, French …). bolo asks the installed uccharan; with 0.6.0, which reads
+  digits in English in those languages, they keep bolo's light normaliser.
 - **uccharan's language packs are downloaded on first use** and are components. The word tables of languages
   other than American English and Hindi, British English and Kokoro's English dictionaries are packs on
   uccharan's release: bolo fetches one the first time a voice needs it, as a `pull` job with events and a log
@@ -113,10 +124,29 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   accepted (`--accept-license`, `"accept_license": true`).
 - `GET /api/v1/recommendations` without `task` answers an overview of every task (each with its default, its
   recommendations and its first `limit` results, 3 by default) instead of `400`.
+- **Homebrew**: `brew install cb-sigma/tap/bolo` (macOS 14 or later, Linux), then `brew services start bolo`. The
+  formula lives in [cB-Sigma/homebrew-tap](https://github.com/cB-Sigma/homebrew-tap), installs `all` and follows
+  new releases by itself.
+- **Live demo** (<https://cb-sigma.github.io/bolo/>, everything in the visitor's browser; tested in headless
+  Chromium on a CPU, with WebGPU and phones faked):
+  - **Speech to text: 28 models** (Moonshine, Whisper Tiny to Large v3 Turbo, Distil-Whisper, Hindi and Hinglish
+    Whisper fine-tunes, IndicWav2Vec Hindi, Moonshine for Arabic, Chinese, Japanese, Korean, Ukrainian, Vietnamese
+    and French), grouped by language with size, licence and needs. Moonshine is the default recogniser.
+  - **Text to speech: 100 voices**: the 22 SYSPIN voices (8-bit, and the original 32-bit export), 42 Piper voices
+    in 31 languages and Kokoro-82M in 8, 16 or 32 bits, with phonemes from uccharan 0.6.1 in the page, and a text
+    playground for uccharan in all its languages (romanised text into native script, spoken form, phonemes).
+  - **Device warnings**: a probe of memory, WebGPU and its limits, threads and storage gives each model a verdict
+    in the pickers and before a download; a model not expected to work asks first and can free space.
+  - **GPU/CPU placement per model** (Auto, GPU, CPU), WebGPU for the voices, and a voice cut in two at build time
+    (front on WebGPU, back on the CPU); a "Loaded models" panel with an in-browser keep-alive.
+  - **Speakers**: who spoke when, in the page (pyannote segmentation with WeSpeaker or CAM++ embeddings), with
+    example conversations, their reference and the DER.
+  - **Voice conversation**: microphone, recogniser, a small language model (in the page or your own endpoint) and
+    a voice, with latencies and barge-in.
 
 ### Changed
 
-- The `uccharan` extra (and `all`) asks for `uccharan>=0.6,<0.7` (was `>=0.4`).
+- The `uccharan` extra (and `all`) asks for `uccharan>=0.6.1,<0.7` (was `>=0.4`).
 - The `model` event of `/api/v1/events` for a load carries `processor` (and `notice` when the model is not all on
   the accelerator); the unload answer carries `unloaded` (false when the model was not loaded).
 
@@ -129,6 +159,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   has it, and fall back to the CPU with one warning when it does not. sherpa-onnx models also
   accept `coreml` (`mps` and `metal` mean the same). New value `auto`: the first accelerator found.
   Still untested on a GPU.
+- **Live demo**: the page no longer crashes once several models are downloaded (WebKit read every cached model
+  into memory at start-up; iPhones closed the page): downloads are listed in local storage, with a panel to delete
+  them, clear all and set a storage limit. The browser voices no longer garble the first word, and the first piece
+  of audio is not lost on iOS. Maithili, Bhojpuri and Magahi in the text playground no longer ask uccharan for
+  data files that do not exist.
 
 ## [0.4.0] - 2026-11-14
 
