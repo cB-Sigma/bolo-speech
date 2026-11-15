@@ -6,6 +6,18 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Changed
+
+- **Text voices trust uccharan's normaliser only where it writes numbers as words.** bolo now asks the installed
+  uccharan to write out a few numbers in each language (once per language, cached) and uses its normalise-only mode
+  for that language's text voices only when the results are words of the language's script: no digits, no
+  characters of another script, not the English reading, and not the same letters for 25 and 52 and for 13 and 31
+  (digits spelled one by one). uccharan 0.6.1 wrote Sinhala and Sindhi numbers as internal lookup keys ("25" was
+  ණගඡ, ڙتج), which the old check let through; with such a release those voices now get bolo's light normaliser
+  (digits left for the voice). The check used to cover only the Latin-script languages.
+- The `uccharan` extra (and `all`) asks for `uccharan>=0.6.2,<0.7` (was `>=0.6.1`): 0.6.2 writes Sinhala and
+  Sindhi numbers as words.
+
 ## [0.5.0] - 2026-11-15
 
 Ollama-style model handling: each model is placed on the GPU or the CPU (or split between them) when it loads,

@@ -279,12 +279,17 @@ uccharan's normalise-only mode when the `uccharan` package is installed: numbers
 money (`₹`, `Rs.`, lakh/crore), dates, times, phone numbers, units, abbreviations,
 URLs and email addresses written out in words, in English, Hindi and the other
 South Asian languages uccharan reads, Urdu and Sindhi; Latin-script English inside
-Indic text is kept. Since uccharan 0.6.1 (the minimum the extra asks for) the same
+Indic text is kept. Since uccharan 0.6.1 the same
 holds for its Latin-script languages (Spanish, German, French …): `25 €` is read
-"fünfundzwanzig Euro" for a German voice. (uccharan 0.6.0 read digits in English in
-those languages; bolo asks the installed uccharan, and with such a release those
-text voices get the light normaliser below. Voices that read phonemes get numbers read
-in their language by uccharan's phonemiser either way.)
+"fünfundzwanzig Euro" for a German voice; since 0.6.2 (the minimum the extra asks for)
+Sinhala and Sindhi numbers are words too. (uccharan 0.6.0 read digits in English in
+the Latin-script languages and 0.6.1 wrote Sinhala and Sindhi numbers as lookup keys
+that are no words. bolo asks the installed uccharan to write out a few numbers in the
+language, once per language, and uses its normaliser only when they come back as words
+of the language's script: no digits, no characters of another script, not English, not
+the digits spelled one by one. Otherwise those text voices get the light normaliser
+below. Voices that read phonemes get numbers read in their language by uccharan's
+phonemiser either way.)
 Every other voice, and every voice when uccharan is missing, gets bolo's light
 normaliser: Unicode NFC, Markdown emphasis, links and emoji removed, URLs read out
 ("w w w dot example dot com"), numbers spelled out for English and Hindi.

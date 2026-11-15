@@ -128,28 +128,78 @@ def uccharan_language(language: str | None) -> str | None:
 
 #: uccharan language -> whether its normalise-only mode reads numbers in that language (see normalizes_numbers)
 _reads_numbers: dict[str, bool] = {}
+#: the numbers normalizes_numbers asks uccharan to write out: two pairs with the same digits in turn
+_PROBES = ("25", "52", "13", "31")
+#: what an uccharan that reads a language's digits in English writes for the probe
+_ENGLISH_PROBE = ("twenty-five", "twenty five")
+#: Unicode ranges of the letters a language's number words are written in (Latin for the languages not listed)
+_LATIN_LETTERS = ((0x41, 0x5A), (0x61, 0x7A), (0xC0, 0x24F))
+_ARABIC_LETTERS = ((0x0600, 0x06FF), (0x0750, 0x077F), (0xFB50, 0xFDFF), (0xFE70, 0xFEFF))
+_SCRIPTS: dict[str, tuple[tuple[int, int], ...]] = {
+    **dict.fromkeys(("hi", "mr", "ne", "kok", "sa", "bho", "mai", "mag"), ((0x0900, 0x097F),)),
+    **dict.fromkeys(("bn", "as"), ((0x0980, 0x09FF),)),
+    "pa": ((0x0A00, 0x0A7F),),
+    "gu": ((0x0A80, 0x0AFF),),
+    "or": ((0x0B00, 0x0B7F),),
+    "ta": ((0x0B80, 0x0BFF),),
+    "te": ((0x0C00, 0x0C7F),),
+    "kn": ((0x0C80, 0x0CFF),),
+    "ml": ((0x0D00, 0x0D7F),),
+    "si": ((0x0D80, 0x0DFF),),
+    **dict.fromkeys(("ur", "sd"), _ARABIC_LETTERS),
+}
+#: characters that may stand between or inside number words in any script (space, ZWNJ, ZWJ, hyphens, apostrophes)
+_JOINERS = frozenset(" \u200c\u200d-\u2010\u2011'\u2019")
 
 
 def normalizes_numbers(tag: str) -> bool:
-    """Whether uccharan's normalise-only mode writes numbers out in the language itself.
+    """Whether uccharan's normalise-only mode writes numbers out in words of the language itself.
 
-    English, Hindi and the other South Asian languages always are. In the Latin-script languages other than English
-    (Spanish, German, French …) uccharan 0.6.0's normalise-only mode reads digits in English, while its phonemiser
-    reads them in the language; 0.6.1 (the extra's minimum) reads them in the language. With an uccharan that does
-    not, those languages get bolo's light normaliser for text voices; the probe below finds out which case the
-    installed uccharan is in."""
-    from bolo.text.packs import LATIN_SCRIPT
-
-    if tag in ("en-us", "en-gb") or tag not in LATIN_SCRIPT:
-        return True
+    Not every uccharan does: 0.6.0 reads digits in English in the Latin-script languages other than English, and
+    0.6.1 writes Sinhala and Sindhi numbers as internal lookup keys, letters of the right script that spell the
+    digits one by one and are no words ("25" -> ණගඡ). So bolo asks the installed uccharan to write out a few
+    numbers in the language, once per language, and uses its normaliser only when the results are words in the
+    language's script: no digits, no characters of another script, not the English reading, and not the same
+    letters for 25 and 52 and for 13 and 31 (digits spelled one by one, which is what the lookup keys are).
+    Otherwise text voices in that language get bolo's light normaliser."""
     if tag not in _reads_numbers:
-        mod = wl.uccharan_module()
-        try:
-            out = str(mod.normalize("7", tag, digits="request").text).strip().lower() if mod is not None else ""
-        except Exception:
-            out = ""
-        _reads_numbers[tag] = bool(out) and out not in ("7", "seven", "सात")
+        _reads_numbers[tag] = _probe_numbers(tag)
     return _reads_numbers[tag]
+
+
+def _probe_numbers(tag: str) -> bool:
+    mod = wl.uccharan_module()
+    if mod is None:
+        return False
+    try:
+        out = [str(mod.normalize(p, tag, digits="request").text).strip() for p in _PROBES]
+    except Exception:
+        return False
+    if not all(number_words_ok(tag, words) for words in out):
+        return False
+    if tag not in ("en-us", "en-gb") and out[0].lower() in _ENGLISH_PROBE:
+        return False
+    return not (_same_letters(out[0], out[1]) and _same_letters(out[2], out[3]))
+
+
+def number_words_ok(tag: str, words: str) -> bool:
+    """True when ``words`` (a number written out in language ``tag``) is letters of the language's script only,
+    with no digits of any script and no characters of another script."""
+    ranges = _SCRIPTS.get(tag, _LATIN_LETTERS)
+    letters = 0
+    for c in words:
+        if c in _JOINERS:
+            continue
+        if unicodedata.category(c).startswith("N"):
+            return False
+        if not any(lo <= ord(c) <= hi for lo, hi in ranges):
+            return False
+        letters += 1
+    return letters > 0
+
+
+def _same_letters(a: str, b: str) -> bool:
+    return sorted(c for c in a if c not in _JOINERS) == sorted(c for c in b if c not in _JOINERS)
 
 
 @dataclass

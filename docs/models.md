@@ -1814,7 +1814,7 @@ sherpa-onnx 2.x expects the caller to supply them. bolo has two phonemisers:
 
 | Phonemiser | Licence | Covers | How it gets there |
 | --- | --- | --- | --- |
-| **uccharan** (default) | Apache-2.0 | Piper and Mimic 3 voices in uccharan's 39 languages (below); Kokoro voices in English (US, British), Spanish, French, Italian, Brazilian Portuguese and Hindi; Kitten and Matcha (US English). For Kokoro English it is a port of misaki, the front end Kokoro was trained with, with misaki's dictionaries | `bolo-speech[uccharan]` (uccharan 0.6.1 or a later 0.6 release), part of `bolo-speech[all]` and the Docker image; `bolo components install uccharan` |
+| **uccharan** (default) | Apache-2.0 | Piper and Mimic 3 voices in uccharan's 39 languages (below); Kokoro voices in English (US, British), Spanish, French, Italian, Brazilian Portuguese and Hindi; Kitten and Matcha (US English). For Kokoro English it is a port of misaki, the front end Kokoro was trained with, with misaki's dictionaries | `bolo-speech[uccharan]` (uccharan 0.6.2 or a later 0.6 release), part of `bolo-speech[all]` and the Docker image; `bolo components install uccharan` |
 | **espeak-ng** | GPL-3.0-or-later | every language espeak-ng has | optional component, never installed by default (next section) |
 
 uccharan 0.6 phonemises **English** (US `en-us`, British `en-gb`), **Hindi** and the other South Asian
@@ -1888,11 +1888,13 @@ uccharan is also bolo's text normaliser, apart from phonemes. For voices that re
 (`tts-server` models, Orpheus-family voices on llama.cpp, plugin voices) its normalise-only mode
 writes numbers, money, dates, times, phone numbers, units, abbreviations, URLs and email addresses
 out in words in the voice's language: English, Hindi and the other South Asian languages, Urdu,
-Sindhi and, since uccharan 0.6.1 (the minimum `bolo-speech[uccharan]` asks for), its Latin-script
+Sindhi and, since uccharan 0.6.1, its Latin-script
 languages too (Spanish, German, French, …; also currency signs, the decimal comma and letters of
-foreign names). uccharan 0.6.0 read digits in English in those languages; bolo asks the installed
-uccharan, and with such a release gives those text voices its own light normaliser (digits left
-for the voice). Voices that read phonemes
+foreign names). uccharan 0.6.0 read digits in English in those languages and 0.6.1 wrote Sinhala
+and Sindhi numbers as lookup keys that are no words (0.6.2, the minimum `bolo-speech[uccharan]`
+asks for, writes words); bolo asks the installed uccharan to write out a few numbers in the
+language and, when they do not come back as words of the language's script, gives those text
+voices its own light normaliser (digits left for the voice). Voices that read phonemes
 are not affected: uccharan's phonemiser reads numbers, dates and money in every one of its
 languages. Pronunciation word lists (`/api/v1/wordlists`) set how
 names, brands and jargon are said for every kind of voice: as phonemes, as `[word](/ipa/)` markup

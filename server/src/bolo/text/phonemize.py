@@ -103,7 +103,7 @@ _PROFILE_LANGUAGES: dict[str, tuple[str, ...]] = {
 UCCHARAN_SUPPORT: dict[str, dict[str, str]] = {p: {t: t for t in langs} for p, langs in _PROFILE_LANGUAGES.items()}
 UCCHARAN = "uccharan"
 #: the uccharan releases this bolo is written for (the ``uccharan`` extra)
-UCCHARAN_REQUIREMENT = "uccharan>=0.6.1,<0.7"
+UCCHARAN_REQUIREMENT = "uccharan>=0.6.2,<0.7"
 ESPEAK = "espeak-ng"
 PREFERENCES = ("auto", UCCHARAN, ESPEAK)
 

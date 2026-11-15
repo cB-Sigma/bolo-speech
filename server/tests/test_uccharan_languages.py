@@ -231,16 +231,25 @@ def test_an_older_uccharan_is_not_used_for_languages_it_lacks(fake: Any, monkeyp
     old = phonemize.UccharanPhonemizer(fake)
     monkeypatch.setattr(phonemize, "get_uccharan", lambda: old)
     assert phonemize.select("piper", "en-us") is old and phonemize.select("piper", "de") is None
-    with pytest.raises(ComponentMissing, match=r"uccharan>=0\.6\.1,<0\.7"):
+    with pytest.raises(ComponentMissing, match=r"uccharan>=0\.6\.2,<0\.7"):
         phonemize.resolve("piper", "de", "uccharan")
+
+
+#: the probe numbers in English
+ENGLISH = {"25": "twenty-five", "52": "fifty-two", "13": "thirteen", "31": "thirty-one"}
 
 
 def test_text_normalisation_language(fake: Any, monkeypatch: pytest.MonkeyPatch) -> None:
     from bolo.text import wordlists
 
-    readings = {"es": "siete", "de": "seven"}
+    readings = {
+        "es": {"25": "veinticinco", "52": "cincuenta y dos", "13": "trece", "31": "treinta y uno"},
+        "de": ENGLISH,  # uccharan 0.6.0 read German digits in English
+        "ur": {"25": "پچیس", "52": "باون", "13": "تیرہ", "31": "اکتیس"},
+        "en-gb": ENGLISH,
+    }
     fake.WordList = object
-    fake.normalize = lambda text, lang, **kw: types.SimpleNamespace(text=readings.get(lang, "सात"))
+    fake.normalize = lambda text, lang, **kw: types.SimpleNamespace(text=readings[lang][text])
     monkeypatch.setattr(wordlists, "uccharan_module", lambda: fake)
     tags = {t: prepare.uccharan_language(t) for t in ("pt-BR", "fr-BE", "nb-NO", "ur-PK", "es-MX", "ru", None)}
     assert tags == {"pt-BR": "pt-br", "fr-BE": "fr-be", "nb-NO": "nb", "ur-PK": "ur", "es-MX": None, "ru": None,
@@ -249,6 +258,84 @@ def test_text_normalisation_language(fake: Any, monkeypatch: pytest.MonkeyPatch)
     assert prepare.normalizes_numbers("es") is True
     assert prepare.normalizes_numbers("de") is False  # read in English: bolo's light normaliser instead
     assert prepare.normalizes_numbers("ur") is True and prepare.normalizes_numbers("en-gb") is True
+
+
+#: what an uccharan writes for the probe numbers, by language: words, and the ways a normaliser can go wrong
+WRITTEN = {
+    "si": {"25": "විසිපහ", "52": "පනස්දෙක", "13": "දහතුන", "31": "තිස්එක"},
+    "sd": {"25": "پنجويهه", "52": "ٻاونجاهه", "13": "تيرهن", "31": "ايڪٽيهه"},
+    "hi": {"25": "पच्चीस", "52": "बावन", "13": "तेरह", "31": "इकतीस"},
+    "fi": {"25": "kaksikymmentäviisi", "52": "viisikymmentäkaksi", "13": "kolmetoista", "31": "kolmekymmentäyksi"},
+}
+GARBLED = {
+    # uccharan 0.6.1: lookup keys of its word table, letters of the right script that spell the digits
+    "si": {"25": "ණගඡ", "52": "ණඡග", "13": "ණඛඝ", "31": "ණඝඛ"},
+    "sd": {"25": "ڙتج", "52": "ڙجت", "13": "ڙپٹ", "31": "ڙٹپ"},
+    # digits left in, letters of another block, English, digits read one by one
+    "hi": {"25": "25", "52": "बावन", "13": "तेरह", "31": "इकतीस"},
+    "bn": {"25": "पच्चीस", "52": "বাহান্ন", "13": "তেরো", "31": "একত্রিশ"},
+    "ta": {"25": "twenty-five", "52": "fifty-two", "13": "thirteen", "31": "thirty-one"},
+    "te": {"25": "రెండు ఐదు", "52": "ఐదు రెండు", "13": "ఒకటి మూడు", "31": "మూడు ఒకటి"},
+    "ur": {"25": "پچیس", "52": "باون", "13": "تیرہ ١٣", "31": "اکتیس"},
+    "de": {"25": "fünfundzwanzig", "52": "zweiundfünfzig", "13": "drei\u0441ehn", "31": "einunddreißig"},
+}
+
+
+def _normaliser(monkeypatch: pytest.MonkeyPatch, written: dict[str, dict[str, str]]) -> list[tuple[str, str]]:
+    """A uccharan whose normalise-only mode writes ``written[lang][text]`` (the text itself when not listed) and
+    marks it ``[uccharan]``; returns its calls."""
+    from bolo.text import wordlists
+
+    calls: list[tuple[str, str]] = []
+
+    def normalize(text: str, lang: str, **_: Any) -> Any:
+        calls.append((text, lang))
+        return types.SimpleNamespace(text=written.get(lang, {}).get(text, f"[uccharan] {text}"), spans=[])
+
+    mod = types.ModuleType("uccharan")
+    mod.WordList = object  # type: ignore[attr-defined]
+    mod.LANGUAGES = phonemize.UCCHARAN_LANGUAGES  # type: ignore[attr-defined]
+    mod.normalize = normalize  # type: ignore[attr-defined]
+    monkeypatch.setattr(wordlists, "uccharan_module", lambda: mod)
+    monkeypatch.setattr(prepare, "_reads_numbers", {})
+    return calls
+
+
+@pytest.mark.parametrize("tag", sorted(WRITTEN))
+def test_number_words_are_trusted(monkeypatch: pytest.MonkeyPatch, tag: str) -> None:
+    calls = _normaliser(monkeypatch, WRITTEN)
+    assert prepare.normalizes_numbers(tag) is True
+    assert prepare.normalizes_numbers(tag) is True
+    assert len(calls) == 4  # probed once, then cached
+
+
+@pytest.mark.parametrize("tag", sorted(GARBLED))
+def test_garbled_number_words_are_not(monkeypatch: pytest.MonkeyPatch, tag: str) -> None:
+    calls = _normaliser(monkeypatch, GARBLED)
+    assert prepare.normalizes_numbers(tag) is False
+    assert prepare.normalizes_numbers(tag) is False
+    assert len(calls) == 4
+
+
+def test_number_words_ok() -> None:
+    ok = prepare.number_words_ok
+    assert ok("si", "විසිපහ") and ok("sd", "پنجويهه") and ok("fr", "vingt-cinq") and ok("ro", "douăzeci și cinci")
+    assert ok("ml", "ഇരുപത്തിയഞ്ച്") and ok("hi", "पच्चीस") and ok("en-us", "twenty-five")
+    assert not ok("si", "25") and not ok("hi", "२५") and not ok("ur", "۲۵") and not ok("si", "")
+    assert not ok("bn", "पच्चीस") and not ok("ur", "पच्चीस") and not ok("sd", "twenty five") and not ok("de", "ಐದು")
+
+
+@pytest.mark.parametrize("language", ["si", "sd"])
+def test_garbled_digits_fall_back_to_the_light_normaliser(monkeypatch: pytest.MonkeyPatch, language: str) -> None:
+    """A text voice in a language whose uccharan writes digits as lookup keys gets bolo's light normaliser."""
+    _normaliser(monkeypatch, GARBLED)
+    cap = prepare.TextInput(reads="text", normalizer="uccharan")
+    out = prepare._normalise(None, cap, "Room 25.", language, [], True)  # type: ignore[arg-type]
+    assert out.normalizer == "light" and out.text == "Room 25."
+    # with an uccharan that writes words, its normaliser is used
+    _normaliser(monkeypatch, WRITTEN)
+    out = prepare._normalise(None, cap, "Room 25.", language, [], True)  # type: ignore[arg-type]
+    assert out.normalizer == "uccharan" and out.text == "[uccharan] Room 25."
 
 
 # -- packs ----------------------------------------------------------------------------------------------------------
@@ -432,10 +519,10 @@ def test_installed_uccharan_spanish_needs_no_pack() -> None:
     assert "ɲ" in text
 
 
-def _uccharan_061() -> Any:
+def _uccharan_061(minimum: tuple[int, ...] = (0, 6, 1)) -> Any:
     real = _real_uccharan()
     version = tuple(int(x) for x in str(getattr(real, "__version__", "0")).split(".")[:3] if x.isdigit())
-    return real if real is not None and version >= (0, 6, 1) else None
+    return real if real is not None and version >= minimum else None
 
 
 @pytest.mark.skipif(_uccharan_061() is None, reason="needs uccharan 0.6.1 or later")
@@ -447,6 +534,17 @@ def test_installed_uccharan_reads_numbers_in_the_latin_languages(monkeypatch: py
     real = _uccharan_061()
     assert "fünfundzwanzig Euro" in real.normalize("25 €", "de", digits="request").text
     assert "tres coma cinco" in real.normalize("3,5 kg", "es", digits="request").text
+
+
+@pytest.mark.skipif(_uccharan_061((0, 6, 2)) is None, reason="needs uccharan 0.6.2 or later")
+def test_installed_uccharan_writes_numbers_as_words_in_every_language(monkeypatch: pytest.MonkeyPatch) -> None:
+    """uccharan 0.6.2 writes numbers as words in all its languages (0.6.1: lookup keys in Sinhala and Sindhi)."""
+    monkeypatch.setattr(prepare, "_reads_numbers", {})
+    for tag in phonemize.UCCHARAN_LANGUAGES:
+        assert prepare.normalizes_numbers(tag), tag
+    real = _uccharan_061((0, 6, 2))
+    assert real.normalize("25", "si", digits="request").text == "විසිපහ"
+    assert real.normalize("25", "sd", digits="request").text == "پنجويهه"
 
 
 @needs_uccharan_06
