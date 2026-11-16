@@ -1,4 +1,5 @@
 import type { FetchRecord, FileProgress, LoadStage } from '@/lib/browser-stt/models'
+import type { GpuPower } from '@/lib/webgpu'
 import type { VoiceConfig } from './text'
 
 export type TtsWorkerRequest =
@@ -30,6 +31,8 @@ export type TtsWorkerRequest =
       plainRuntimeLoad: boolean
       /** Maximum of the runtime's WebAssembly memory, in 64 KiB pages. */
       memoryPages: number
+      /** Which GPU WebGPU asks for (the device panel's choice); high performance when absent. */
+      power?: GpuPower
     }
   | {
       type: 'synth'

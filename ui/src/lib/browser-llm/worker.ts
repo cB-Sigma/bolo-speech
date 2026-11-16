@@ -6,6 +6,7 @@ import {
   InterruptableStoppingCriteria,
   TextStreamer,
 } from '@huggingface/transformers'
+import { setOrtGpuPower } from '@/lib/webgpu'
 import type { LlmWorkerRequest, LlmWorkerResponse } from './models'
 
 /** Runs one language model in a worker with transformers.js and streams the reply, token by token. */
@@ -24,6 +25,7 @@ async function load(req: Extract<LlmWorkerRequest, { type: 'load' }>): Promise<v
   env.allowLocalModels = false
   const host = (req.modelHost ?? 'https://huggingface.co/').replace(/\/?$/, '/')
   env.remoteHost = host
+  setOrtGpuPower(env.backends.onnx as Parameters<typeof setOrtGpuPower>[0], req.power)
   const wasm = env.backends.onnx.wasm as { numThreads?: number } | undefined
   if (wasm) wasm.numThreads = req.threads
   const files = new Map<string, { file: string; loaded: number; total: number }>()

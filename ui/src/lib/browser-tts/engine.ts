@@ -24,6 +24,7 @@ import {
 import { readBrowserSttConfig, type BrowserDevice, type FileProgress, type LoadStage } from '@/lib/browser-stt/models'
 import { Store } from '@/lib/store'
 import { detectSupport } from '@/lib/support'
+import { readGpuPower } from '@/lib/webgpu'
 import { VOICE_CACHE, type TtsWorkerRequest, type TtsWorkerResponse } from './protocol'
 import type { VoiceConfig } from './text'
 import {
@@ -488,6 +489,7 @@ export class BrowserTtsEngine {
         ortWasmBase: readBrowserSttConfig().ortWasmBase,
         plainRuntimeLoad: safe,
         memoryPages: TTS_MEMORY_PAGES,
+        power: readGpuPower(),
       }
       worker.postMessage(req)
     })

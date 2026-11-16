@@ -1,4 +1,5 @@
 import type { PlaceableModel } from '@/lib/placement'
+import type { GpuPower } from '@/lib/webgpu'
 
 /**
  * Models the in-browser mode can run, fetched from the Hugging Face Hub on first use.
@@ -471,6 +472,8 @@ export type WorkerRequest =
       /** Leave fetching the runtime binary entirely to the library (no progress reporting). */
       plainRuntimeLoad: boolean
       config: BrowserSttConfig
+      /** Which GPU WebGPU asks for (the device panel's choice); high performance when absent. */
+      power?: GpuPower
     }
   | {
       type: 'transcribe'

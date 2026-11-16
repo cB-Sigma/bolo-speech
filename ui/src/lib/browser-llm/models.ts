@@ -4,6 +4,9 @@
  * weights with 16-bit activations on WebGPU when the GPU has shader-f16; the
  * 4-bit fp32 file on the CPU otherwise (bigger and slow: labelled).
  */
+
+import type { GpuPower } from '@/lib/webgpu'
+
 export interface LlmModel {
   id: string
   label: string
@@ -103,6 +106,8 @@ export type LlmWorkerRequest =
       device: 'webgpu' | 'wasm'
       threads: number
       modelHost?: string
+      /** Which GPU WebGPU asks for (the device panel's choice); high performance when absent. */
+      power?: GpuPower
     }
   | { type: 'generate'; id: number; messages: ChatMessage[]; maxTokens: number }
   | { type: 'stop' }

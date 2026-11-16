@@ -8,6 +8,7 @@ import {
   runtimeMemoryBytes,
 } from '@/lib/browser-runtime'
 import type { FetchRecord, FileProgress, LoadStage } from '@/lib/browser-stt/models'
+import { setOrtGpuPower } from '@/lib/webgpu'
 import { VOICE_CACHE, type TtsWorkerRequest, type TtsWorkerResponse } from './protocol'
 import type * as UccharanModule from '@/vendor/uccharan/index.js'
 import { scaleSilence } from './silence'
@@ -68,6 +69,7 @@ async function loadRuntime(req: Extract<TtsWorkerRequest, { type: 'load' }>): Pr
   const wasm = ort.env.wasm
   wasm.numThreads = req.threads
   wasm.proxy = false
+  if (gpu) setOrtGpuPower(ort.env as Parameters<typeof setOrtGpuPower>[0], req.power)
   const base = req.ortWasmBase?.replace(/\/?$/, '/') ?? ortCdnBase(ort.env.versions.web ?? '')
   // The WebGPU build needs the asyncify variant of the WebAssembly runtime.
   const variant = gpu ? 'ort-wasm-simd-threaded.asyncify' : 'ort-wasm-simd-threaded'

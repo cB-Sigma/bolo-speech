@@ -19,6 +19,7 @@ import {
 } from '@/lib/downloads'
 import { Store } from '@/lib/store'
 import { detectSupport } from '@/lib/support'
+import { readGpuPower } from '@/lib/webgpu'
 import { cloneDownloadId, cloneModel, DEFAULT_CLONE_MODEL, type CloneModel } from './models'
 import type {
   CloneWorkerRequest,
@@ -269,6 +270,7 @@ export class BrowserCloner {
         modelHost: cfg.modelHost,
         ortWasmBase: cfg.ortWasmBase,
         memoryPages: model.memoryPages ?? 16_384,
+        power: readGpuPower(),
       })
     })
   }

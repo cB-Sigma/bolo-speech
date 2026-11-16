@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
 import { env, pipeline, Tensor } from '@huggingface/transformers'
+import { setOrtGpuPower } from '@/lib/webgpu'
 import type { FetchRecord, FileProgress, LoadStage, WorkerRequest, WorkerResponse } from './models'
 
 type AsrOptions = Record<string, unknown>
@@ -124,6 +125,7 @@ async function load(req: Extract<WorkerRequest, { type: 'load' }>): Promise<void
   env.allowLocalModels = false
   if (req.config.modelHost) env.remoteHost = req.config.modelHost.replace(/\/?$/, '/')
   instrumentFetch()
+  setOrtGpuPower(env.backends.onnx as Parameters<typeof setOrtGpuPower>[0], req.power)
   const wasm = env.backends.onnx.wasm as
     { numThreads?: number; wasmPaths?: unknown; wasmBinary?: ArrayBuffer } | undefined
   if (wasm) {

@@ -2,6 +2,16 @@ import { isPhoneLike, isWebKit } from '@/lib/browser-runtime'
 import { storageUse } from '@/lib/downloads'
 import { Store } from '@/lib/store'
 import { detectSupport } from '@/lib/support'
+import {
+  adapterDetails,
+  adapterLabel,
+  navigatorGpu,
+  readGpuPower,
+  requestGpuAdapter,
+  type AdapterDetails,
+  type AdapterInfoLike,
+  type GpuPower,
+} from '@/lib/webgpu'
 
 /**
  * What this device and browser offer the in-page models, and a verdict per
@@ -23,6 +33,10 @@ export interface DeviceInfo {
     maxBufferSize: number | null
     maxStorageBufferBindingSize: number | null
     adapter: string | null
+    /** What the browser says about the adapter it gave (vendor, architecture, description, integrated or not). */
+    details?: AdapterDetails
+    /** The power preference the adapter was asked for. */
+    power?: GpuPower
   } | null
   /** SharedArrayBuffer, i.e. WebAssembly threads. */
   threads: boolean
@@ -68,45 +82,45 @@ export function quickDevice(nav: Nav | undefined = globalThis.navigator): Device
 interface GpuAdapterLike {
   features: { has(name: string): boolean }
   limits: { maxBufferSize?: number; maxStorageBufferBindingSize?: number }
-  info?: { vendor?: string; architecture?: string; description?: string }
+  info?: AdapterInfoLike
+  isFallbackAdapter?: boolean
 }
 
-/** The whole probe: asks for a WebGPU adapter and the storage figures. */
-export async function probeDevice(nav: Nav | undefined = globalThis.navigator): Promise<DeviceInfo> {
+const NO_WEBGPU = {
+  available: false,
+  f16: false,
+  maxBufferSize: null,
+  maxStorageBufferBindingSize: null,
+  adapter: null,
+}
+
+/** The whole probe: asks for a WebGPU adapter (of the chosen power preference) and the storage figures. */
+export async function probeDevice(
+  nav: Nav | undefined = globalThis.navigator,
+  power: GpuPower = readGpuPower(),
+): Promise<DeviceInfo> {
   const info = quickDevice(nav)
   try {
-    const gpu = (nav as (Nav & { gpu?: { requestAdapter(): Promise<GpuAdapterLike | null> } }) | undefined)?.gpu
-    if (gpu) {
-      const adapter = await gpu.requestAdapter()
-      info.webgpu = adapter
-        ? {
-            available: true,
-            f16: adapter.features.has('shader-f16'),
-            maxBufferSize: adapter.limits.maxBufferSize ?? null,
-            maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize ?? null,
-            adapter:
-              [adapter.info?.vendor, adapter.info?.architecture || adapter.info?.description]
-                .filter(Boolean)
-                .join(' ') || null,
-          }
-        : { available: false, f16: false, maxBufferSize: null, maxStorageBufferBindingSize: null, adapter: null }
-    } else {
+    const adapter = await requestGpuAdapter(navigatorGpu<GpuAdapterLike>(nav), power)
+    if (adapter) {
+      const details = adapterDetails(
+        adapter.info,
+        Boolean(adapter.isFallbackAdapter ?? adapter.info?.isFallbackAdapter),
+      )
       info.webgpu = {
-        available: false,
-        f16: false,
-        maxBufferSize: null,
-        maxStorageBufferBindingSize: null,
-        adapter: null,
+        available: true,
+        f16: adapter.features.has('shader-f16'),
+        maxBufferSize: adapter.limits.maxBufferSize ?? null,
+        maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize ?? null,
+        adapter: adapterLabel(details),
+        details,
+        power,
       }
+    } else {
+      info.webgpu = { ...NO_WEBGPU }
     }
   } catch {
-    info.webgpu = {
-      available: false,
-      f16: false,
-      maxBufferSize: null,
-      maxStorageBufferBindingSize: null,
-      adapter: null,
-    }
+    info.webgpu = { ...NO_WEBGPU }
   }
   info.storage = await storageUse()
   return info
@@ -131,6 +145,12 @@ export function ensureDeviceProbe(): Promise<void> {
     .then((d) => device.set({ ...d, ...fakeDevice() }))
     .catch(() => undefined)
   return probing
+}
+
+/** Probe again (after the GPU preference changed). */
+export function reprobeDevice(): Promise<void> {
+  probing = null
+  return ensureDeviceProbe()
 }
 
 /** Refresh the storage figures (after downloads change). */

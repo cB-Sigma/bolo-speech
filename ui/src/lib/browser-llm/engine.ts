@@ -19,6 +19,7 @@ import {
 } from '@/lib/downloads'
 import { Store } from '@/lib/store'
 import { detectSupport } from '@/lib/support'
+import { readGpuPower } from '@/lib/webgpu'
 import {
   DEFAULT_LLM,
   llmModel,
@@ -190,6 +191,7 @@ export class BrowserLlm implements ChatBackend {
         device: onGpu ? 'webgpu' : 'wasm',
         threads,
         modelHost: readBrowserSttConfig().modelHost,
+        power: readGpuPower(),
       })
     })
   }

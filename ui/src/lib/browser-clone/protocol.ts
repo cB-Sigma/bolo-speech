@@ -1,4 +1,5 @@
 import type { FileProgress } from '@/lib/browser-stt/models'
+import type { GpuPower } from '@/lib/webgpu'
 import type { CloneModel } from './models'
 
 /** Sample rate of every reference and every output on the page. */
@@ -26,6 +27,8 @@ export type CloneWorkerRequest =
       modelHost?: string
       ortWasmBase?: string
       memoryPages: number
+      /** Which GPU WebGPU asks for (the device panel's choice); high performance when absent. */
+      power?: GpuPower
     }
   /** Take in a reference (24 kHz mono) under `key`; generate calls name the key. */
   | { type: 'voice'; id: number; key: string; audio: Float32Array }

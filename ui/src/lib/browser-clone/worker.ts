@@ -8,6 +8,7 @@ import {
   runtimeMemoryBytes,
 } from '@/lib/browser-runtime'
 import type { FileProgress } from '@/lib/browser-stt/models'
+import { navigatorGpu, requestGpuAdapter, setOrtGpuPower, type GpuPower } from '@/lib/webgpu'
 import { chatterboxFiles, MOSS_FILES, pocketFiles } from './models'
 import { MossTts, type MossCodecMeta, type MossManifest, type MossTtsMeta } from './moss'
 import type { MakeTensor, OrtSession } from './ort-types'
@@ -64,6 +65,7 @@ async function loadOrt(req: Load): Promise<typeof Ort> {
   const wasm = ort.env.wasm
   wasm.numThreads = req.threads
   wasm.proxy = false
+  if (gpu) setOrtGpuPower(ort.env as Parameters<typeof setOrtGpuPower>[0], req.power)
   const base = req.ortWasmBase?.replace(/\/?$/, '/') ?? ortCdnBase(ort.env.versions.web ?? '')
   const variant = gpu ? 'ort-wasm-simd-threaded.asyncify' : 'ort-wasm-simd-threaded'
   const paths = { mjs: `${base}${variant}.mjs`, wasm: `${base}${variant}.wasm` }
@@ -321,10 +323,9 @@ async function loadMoss(
   return { engine, keys, bytes, device }
 }
 
-async function hasShaderF16(): Promise<boolean> {
+async function hasShaderF16(power: GpuPower | undefined): Promise<boolean> {
   try {
-    const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<{ features: Set<string> } | null> } }).gpu
-    const adapter = await gpu?.requestAdapter()
+    const adapter = await requestGpuAdapter<{ features: Set<string> }>(navigatorGpu(), power)
     return adapter?.features.has('shader-f16') ?? false
   } catch {
     return false
@@ -351,6 +352,7 @@ async function loadChatterbox(
   env.allowLocalModels = false
   const host = (req.modelHost ?? 'https://huggingface.co/').replace(/\/?$/, '/')
   env.remoteHost = host
+  setOrtGpuPower(env.backends.onnx as Parameters<typeof setOrtGpuPower>[0], req.power)
   const wasm = env.backends.onnx.wasm as { numThreads?: number; wasmPaths?: unknown } | undefined
   if (wasm) {
     wasm.numThreads = req.threads
@@ -370,7 +372,7 @@ async function loadChatterbox(
   post({ type: 'stage', stage: 'model' })
   let device = req.device
   // 16-bit weights and activations need the GPU's shader-f16; without it the 4-bit file with 32-bit activations.
-  const f16 = device === 'webgpu' && (await hasShaderF16())
+  const f16 = device === 'webgpu' && (await hasShaderF16(req.power))
   const dtype = (device === 'webgpu' && !f16 ? m.dtype?.wasm : m.dtype?.[device]) ?? 'q4'
   const open = (dev: 'webgpu' | 'wasm', dt: string): Promise<Opened> =>
     Promise.all([

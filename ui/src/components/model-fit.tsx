@@ -1,5 +1,5 @@
 import { Cpu, HardDrive, TriangleAlert } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Panel } from '@/components/panel'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useStore } from '@/hooks/use-store'
 import { oneRuntimeAtATime } from '@/lib/browser-runtime'
 import {
@@ -18,6 +19,7 @@ import {
   ensureDeviceProbe,
   platformLabel,
   refreshDeviceStorage,
+  reprobeDevice,
   VERDICT_TEXT,
   verdictFor,
   type ModelNeeds,
@@ -26,6 +28,7 @@ import {
 import { downloads, freeSpaceFor } from '@/lib/downloads'
 import { fmtBytes } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { readGpuPower, writeGpuPower, type GpuPower } from '@/lib/webgpu'
 
 /** The device probe, run once and kept up to date as downloads change. */
 export function useDevice() {
@@ -164,9 +167,10 @@ export function DevicePanel({ className }: { className?: string }) {
       gpu == null
         ? 'checking…'
         : gpu.available
-          ? `yes${gpu.adapter ? ` (${gpu.adapter})` : ''}; 16-bit shaders ${gpu.f16 ? 'yes' : 'no'}; largest buffer ${MB(gpu.maxBufferSize)}`
+          ? `yes; 16-bit shaders ${gpu.f16 ? 'yes' : 'no'}; largest buffer ${MB(gpu.maxBufferSize)}`
           : 'no: models run on the CPU (WebAssembly)',
     ],
+    ...(gpu?.available ? ([['GPU', gpuText(gpu.adapter, gpu.details)]] as [string, string][]) : []),
     ['WebAssembly threads', d.threads ? 'yes' : 'no (one thread): slower'],
     [
       'Storage',
@@ -199,10 +203,83 @@ export function DevicePanel({ className }: { className?: string }) {
           </div>
         ))}
       </dl>
+      {gpu?.available && <GpuChoice integrated={Boolean(gpu.details?.integrated)} windows={isWindows()} />}
       <p className="mt-2 text-xs text-muted-foreground">
         Pickers mark models that are heavy or unlikely to work here. These are estimates; every model stays available,
         and after a model has run once its real load time and memory on this device are remembered.
       </p>
     </Panel>
+  )
+}
+
+function gpuText(label: string | null, details: { integrated: boolean; fallback: boolean } | undefined): string {
+  const what = label ?? 'not named by this browser'
+  if (details?.fallback) return `${what} (the browser's software fallback, no GPU)`
+  return details?.integrated ? `${what} (integrated graphics)` : what
+}
+
+function isWindows(): boolean {
+  return /Windows/.test(globalThis.navigator?.userAgent ?? '')
+}
+
+/**
+ * Which GPU the models ask for, and what to do when the browser gave the integrated one: on a laptop with two
+ * GPUs, Windows (or the NVIDIA driver) decides per application, whatever the page asks.
+ */
+function GpuChoice({ integrated, windows }: { integrated: boolean; windows: boolean }) {
+  const [power, setPower] = useState<GpuPower>(readGpuPower)
+  const choose = (v: string) => {
+    if (v !== 'high-performance' && v !== 'low-power') return
+    setPower(v)
+    writeGpuPower(v)
+    void reprobeDevice()
+  }
+  return (
+    <div className="mt-2 grid gap-2" data-testid="gpu-choice">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-muted-foreground">GPU to ask for</span>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          value={power}
+          onValueChange={choose}
+          aria-label="GPU to ask for"
+          className="flex-wrap justify-start"
+        >
+          <ToggleGroupItem value="high-performance" className="px-3 text-xs" data-testid="gpu-high-performance">
+            High performance
+          </ToggleGroupItem>
+          <ToggleGroupItem value="low-power" className="px-3 text-xs" data-testid="gpu-low-power">
+            Power saving
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Kept in this browser. Models loaded from now on use it; reload the page to move a model that is already loaded.
+      </p>
+      {integrated && power === 'high-performance' && (
+        <p
+          className="flex items-start gap-1.5 rounded-md border border-warning/50 p-2 text-xs leading-5"
+          data-testid="gpu-integrated-warning"
+        >
+          <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning-text" aria-hidden />
+          <span>
+            The browser gave the integrated GPU although the page asked for the high-performance one. If this computer
+            also has a dedicated GPU (NVIDIA, or AMD Radeon RX), the system chooses for the browser:
+            {windows ? (
+              <>
+                {' '}
+                in Windows, open Settings &gt; System &gt; Display &gt; Graphics, choose this browser, set it to High
+                performance and restart the browser; or, in the NVIDIA Control Panel, Manage 3D settings &gt; Program
+                Settings, give the browser the high-performance NVIDIA processor.
+              </>
+            ) : (
+              <> set this browser to use the dedicated GPU in the system&apos;s graphics settings, then restart it.</>
+            )}
+          </span>
+        </p>
+      )}
+    </div>
   )
 }

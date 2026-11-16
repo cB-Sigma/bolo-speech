@@ -21,6 +21,7 @@ import {
 } from '@/lib/downloads'
 import { recordBrowserTrace } from './traces'
 import { detectSupport } from '@/lib/support'
+import { readGpuPower } from '@/lib/webgpu'
 import {
   bytesByModule,
   describeDevices,
@@ -426,6 +427,7 @@ export class BrowserSttEngine {
         threads,
         plainRuntimeLoad: safe,
         config,
+        power: readGpuPower(),
       }
       worker.postMessage(req)
     })

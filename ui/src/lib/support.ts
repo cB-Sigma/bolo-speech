@@ -1,5 +1,7 @@
 /** Browser capability detection for the features the console depends on. */
 
+import { requestGpuAdapter } from '@/lib/webgpu'
+
 export interface BrowserSupport {
   secureContext: boolean
   getUserMedia: boolean
@@ -52,9 +54,7 @@ export function detectSupport(): BrowserSupport {
 /** True when a WebGPU adapter can actually be obtained (the API existing is not enough). */
 export async function probeWebGpu(): Promise<boolean> {
   try {
-    const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu
-    if (!gpu) return false
-    return (await gpu.requestAdapter()) != null
+    return (await requestGpuAdapter()) != null
   } catch {
     return false
   }
