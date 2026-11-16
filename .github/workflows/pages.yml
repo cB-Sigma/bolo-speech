@@ -16,6 +16,7 @@ on:
     paths:
       - "ui/**"
       - ".github/workflows/pages.yml"
+      - "server/src/bolo/__init__.py"   # the version the demo's footer shows
   workflow_dispatch:
   # Rebuild when new voices have been published.
   workflow_run:
