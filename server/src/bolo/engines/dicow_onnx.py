@@ -245,6 +245,30 @@ class Network(Protocol):
         ...
 
 
+#: ONNX Runtime session option that makes int8 matrix products exact on x86 CPUs without VNNI (below)
+X64_QUANT_PRECISION = "session.x64quantprecision"
+
+
+def session_options(threads: int) -> Any:
+    """ONNX Runtime session options for both graphs.
+
+    The int8 graphs multiply dynamically quantized activations (uint8) by int8 weights. On x86 CPUs with AVX2 but
+    without VNNI (AVX-512 VNNI or AVX-VNNI: most AMD Ryzen before Zen 4, Intel before Ice Lake / Alder Lake),
+    ONNX Runtime's uint8 x int8 kernel adds pairs of products in 16 bits, which saturate: a pair can reach
+    2 x 255 x 127 = 64770 > 32767. That corrupted the graphs' outputs enough that every speaker came back with
+    empty text on such machines. ``session.x64quantprecision`` makes ONNX Runtime convert those int8 weights to
+    uint8 at load time on these CPUs (uint8 x uint8 has no such overflow); on CPUs with VNNI, and on other
+    architectures, it changes nothing."""
+    import onnxruntime as ort
+
+    o = ort.SessionOptions()
+    o.intra_op_num_threads = max(1, threads)
+    o.inter_op_num_threads = 1
+    o.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    o.add_session_config_entry(X64_QUANT_PRECISION, "1")
+    return o
+
+
 class OnnxNetwork:
     def __init__(
         self,
@@ -255,16 +279,10 @@ class OnnxNetwork:
         decoder_device: str | None = None,
         split: dict[str, int] | None = None,
     ) -> None:
-        import onnxruntime as ort
-
         from bolo.onnx_split import make_session
 
         def options() -> Any:
-            o = ort.SessionOptions()
-            o.intra_op_num_threads = max(1, threads)
-            o.inter_op_num_threads = 1
-            o.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-            return o
+            return session_options(threads)
 
         def session(path: Path, on: str, role: str) -> Any:
             budget = (split or {}).get(role)

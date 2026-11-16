@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -338,3 +339,81 @@ def test_load_options_reach_the_model(tmp_path: Path, monkeypatch: pytest.Monkey
     assert seen == [("encoder.onnx", "decoder.int8.onnx", 3)] and model.batch == 2
     with pytest.raises(FileNotFoundError):
         d.DiCoWOnnx.from_dir(tmp_path, {}, LoadOptions())
+
+
+# -- int8 products on x86 CPUs without VNNI --------------------------------------------------------------
+
+
+def test_sessions_ask_for_exact_int8_products_on_cpus_without_vnni() -> None:
+    pytest.importorskip("onnxruntime")
+    options = d.session_options(3)
+    assert options.get_session_config_entry(d.X64_QUANT_PRECISION) == "1"
+    assert options.intra_op_num_threads == 3 and options.inter_op_num_threads == 1
+
+
+def test_onnx_network_builds_both_sessions_with_those_options(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ort = pytest.importorskip("onnxruntime")
+    seen: list[str] = []
+
+    class Input:
+        def __init__(self, name: str, shape: list[Any]) -> None:
+            self.name, self.shape = name, shape
+
+    class Session:
+        def __init__(self, path: str, sess_options: Any, providers: Any) -> None:
+            seen.append(sess_options.get_session_config_entry(d.X64_QUANT_PRECISION))
+
+        def get_inputs(self) -> list[Input]:
+            cache = [4, "batch", 20, "length", 64]
+            names = ("input_ids", "self_k", "self_v", "cross_k", "cross_v")
+            return [Input(n, cache if n == "self_k" else []) for n in names]
+
+    monkeypatch.setattr(ort, "InferenceSession", Session)
+    net = d.OnnxNetwork(tmp_path / "encoder.int8.onnx", tmp_path / "decoder.int8.onnx", 2)
+    assert seen == ["1", "1"] and (net.layers, net.heads, net.head_dim) == (4, 20, 64)
+
+
+def test_dynamically_quantized_products_do_not_saturate() -> None:
+    """The int8 graphs' pattern (DynamicQuantizeLinear, MatMulInteger with per-channel int8 weights) with
+    activations that quantize near 255 and full-range weights: with uint8 x int8 pairs added in 16 bits (AVX2
+    without VNNI) about a third of the products overflow. With the engine's options the result is the exact
+    product of the quantized operands on every CPU."""
+    onnx = pytest.importorskip("onnx")
+    ort = pytest.importorskip("onnxruntime")
+    from onnx import TensorProto, helper, numpy_helper
+
+    k, n = 512, 64
+    rng = np.random.default_rng(0)
+    w = rng.normal(size=(k, n)).astype(np.float32)
+    w_scale = (np.abs(w).max(axis=0) / 127).astype(np.float32)
+    w_q = np.round(w / w_scale).astype(np.int8)
+    nodes = [
+        helper.make_node("DynamicQuantizeLinear", ["x"], ["xq", "xs", "xz"]),
+        helper.make_node("MatMulInteger", ["xq", "w", "xz", "wz"], ["y32"]),
+        helper.make_node("Cast", ["y32"], ["yf"], to=TensorProto.FLOAT),
+        helper.make_node("Mul", ["xs", "ws"], ["s"]),
+        helper.make_node("Mul", ["yf", "s"], ["y"]),
+    ]
+    graph = helper.make_graph(
+        nodes,
+        "int8",
+        [helper.make_tensor_value_info("x", TensorProto.FLOAT, [8, k])],
+        [helper.make_tensor_value_info("y", TensorProto.FLOAT, [8, n])],
+        [
+            numpy_helper.from_array(w_q, "w"),
+            numpy_helper.from_array(np.zeros(n, np.int8), "wz"),
+            numpy_helper.from_array(w_scale, "ws"),
+        ],
+    )
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)])
+    model.ir_version = 8
+    onnx.checker.check_model(model)
+    x = (rng.normal(size=(8, k)) + 3.0).astype(np.float32)  # mostly positive: quantized activations near 255
+    session = ort.InferenceSession(model.SerializeToString(), d.session_options(1), providers=["CPUExecutionProvider"])
+    (y,) = session.run(None, {"x": x})
+    lo, hi = min(0.0, float(x.min())), max(0.0, float(x.max()))
+    x_scale = np.float32((hi - lo) / 255)
+    x_zero = np.clip(np.round(-lo / x_scale), 0, 255)
+    x_q = np.clip(np.round(x / x_scale) + x_zero, 0, 255)
+    exact = ((x_q - x_zero) @ w_q.astype(np.float64)) * (np.float64(x_scale) * w_scale)
+    np.testing.assert_allclose(y, exact, rtol=1e-4, atol=1e-3 * float(np.abs(exact).max()))

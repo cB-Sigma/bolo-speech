@@ -106,6 +106,16 @@ Found on a Windows 11 laptop; the first fix applies everywhere.
 - `bolo recommend` no longer suggests sherpa-onnx models for the GPU on Windows (its CUDA wheel bundles its own
   `onnxruntime.dll`, which fails with Error 1114 once `onnxruntime` is loaded, and the catalog's int8 sherpa models
   gain nothing on CUDA); faster-whisper on CUDA, measured 6-19x faster than on the CPU on that laptop, is.
+- **`dicow-v3.3-onnx` returned empty text for every speaker on x86 CPUs without VNNI** (AVX2 only: AMD Ryzen
+  before Zen 4, such as the Ryzen 7 5800H of the Windows test laptop, and Intel before Ice Lake / Alder Lake), on
+  Windows and Linux alike. The int8 graphs multiply uint8 activations by int8 weights, and ONNX Runtime's kernel
+  for that on such CPUs adds pairs of products in 16 bits, which overflow (up to 2 x 255 x 127) and corrupt the
+  encoder's and decoder's outputs. The machine the export was measured on has AVX-512 VNNI, where this does not
+  happen. Both DiCoW sessions now set `session.x64quantprecision`, so ONNX Runtime turns the weights into uint8 at
+  load time on those CPUs (no overflow); elsewhere nothing changes, the output on the measurement machine is
+  identical. New unit tests (the int8 product is exact, the option reaches both sessions) and a real-model test
+  (diarized transcription of the demo's two-voice dialogue, text for each speaker).
+
 ## [0.6.1] - 2026-11-16
 
 ### Fixed

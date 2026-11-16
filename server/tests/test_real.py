@@ -1091,3 +1091,42 @@ async def test_lfm3_audio_onnx_speech_to_speech() -> None:
         assert rate == 24000 and word_error_rate("The weather is lovely today.", heard.text, "en") <= 0.34
     finally:
         await core.stop()
+
+
+async def test_dicow_onnx_large_transcribes_each_speaker(core: Bolo) -> None:
+    """Diarized transcription with the core DiCoW ONNX engine (int8, 1.5 GB) and its Nemotron diarizer on the
+    demo's two-voice dialogue, cut to 20.8 s. Every speaker gets text of their own, close to what they said.
+    On x86 CPUs without VNNI both speakers came back empty before the engine asked ONNX Runtime for exact int8
+    products (``session.x64quantprecision``)."""
+    pytest.importorskip("onnxruntime")
+    import itertools
+
+    import bolo
+    from bolo.diarize import DiarizeOptions
+
+    example = Path(bolo.__file__).parent / "_ui" / "diarization"
+    audio, rate = decode_audio((example / "two-speakers-en.mp3").read_bytes(), filename="two-speakers-en.mp3")
+    audio = audio[: int(20.8 * rate)]
+    turns = json.loads((example / "two-speakers-en.json").read_text(encoding="utf-8"))["turns"]
+    said: dict[str, list[str]] = {}
+    for turn in turns:
+        if turn["end"] <= 20.8:
+            said.setdefault(turn["speaker"], []).append(turn["text"])
+    trace = Trace("stt", "test", "dicow-v3.3-onnx")
+    result = await core.transcribe(
+        audio, rate, model="dicow-v3.3-onnx", language="en", diarize=DiarizeOptions(), trace=trace
+    )
+    heard: dict[str | None, list[str]] = {}
+    for seg in result.segments:
+        heard.setdefault(seg.speaker, []).append(seg.text)
+    print("\n" + "\n".join(f"{k}: {' '.join(v)}" for k, v in heard.items()), trace.extra)
+    assert trace.extra.get("conditioning") == "turns"  # the conditioned path, not cut-at-turns decoding
+    assert len(heard) == 2 and all(" ".join(v).strip() for v in heard.values())
+    refs = [" ".join(v) for v in said.values()]
+    hyps = [" ".join(v) for v in heard.values()]
+    # each speaker's words against the reference speaker they match best (cpWER's assignment)
+    best = min(itertools.permutations(hyps), key=lambda p: sum(word_error_rate(r, h, "en") for r, h in zip(refs, p)))
+    rates = [word_error_rate(r, h, "en") for r, h in zip(refs, best)]
+    print("per-speaker WER", [round(x, 3) for x in rates])
+    # Nemotron hears the first sentence for both voices, so one stream may carry it twice: a loose bound
+    assert all(x <= 0.5 for x in rates) and sum(rates) / len(rates) <= 0.35
