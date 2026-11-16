@@ -67,7 +67,6 @@ const pocket = (
   languages: [language],
   bytes: big ? 394_054_000 : 165_233_000,
   peakBytes: big ? 1_150e6 : 520e6,
-  prefersWebGpu: big || undefined,
   memoryPages: big ? 65_536 : 32_768,
   group: big ? 'Medium: a laptop' : 'Small: phones too',
   license: 'CC-BY-4.0',
@@ -77,7 +76,7 @@ const pocket = (
   streams: true,
   source: 'https://huggingface.co/kyutai/pocket-tts',
   blurb: big
-    ? '24-layer version: closer to the voice, about four times the work per frame.'
+    ? '24-layer version: about four times the work per frame of the small ones, slower than real time on most CPUs.'
     : 'Kyutai’s 100M-parameter model, 8-bit. Starts speaking within a second and plays as it goes.',
   ...extra,
 })
@@ -89,7 +88,8 @@ export const CLONE_MODELS: CloneModel[] = [
   pocket('pocket-it', 'Pocket TTS · Italian', 'italian', 'it', false),
   pocket('pocket-pt', 'Pocket TTS · Portuguese', 'portuguese', 'pt', false),
   pocket('pocket-fr-24l', 'Pocket TTS · French (24 layers)', 'french_24l', 'fr', true, {
-    blurb: 'French comes only as the 24-layer model: about four times the work per frame of the small ones.',
+    blurb:
+      'French comes only as the 24-layer model: about four times the work per frame of the small ones, slower than real time on most CPUs.',
   }),
   {
     id: 'chatterbox-turbo',
