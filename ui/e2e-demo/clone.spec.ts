@@ -187,6 +187,32 @@ test.describe('clone a voice in the page', () => {
     await expect(page.getByTestId('loaded-models')).toContainText('clone-moss-tts-nano')
   })
 
+  test('choosing an example voice fills in its sentence only when the text box is empty or untouched', async ({
+    page,
+  }) => {
+    await open(page)
+    await page.getByTestId('clone-model-select').click()
+    await page.getByTestId('clone-model-chatterbox-multilingual').click()
+    const box = page.getByTestId('clone-text')
+    await expect(box).toHaveValue(/^Thanks for calling/)
+    // The English default is untouched: the Hindi example puts its own sentence in.
+    await page.getByTestId('clone-example-syspin-hi-male').click()
+    await expect(page.getByTestId('clone-chosen')).toBeVisible()
+    await expect(box).toHaveValue(/^नमस्ते/)
+    // Typed text stays, whichever example comes next.
+    await box.fill('My own words, please keep them.')
+    await page.getByTestId('clone-example-syspin-en-female').click()
+    await expect(page.getByTestId('clone-chosen')).toContainText('Indian English')
+    await expect(box).toHaveValue('My own words, please keep them.')
+    await page.getByTestId('clone-example-syspin-hi-male').click()
+    await expect(page.getByTestId('clone-ref-seconds')).toContainText('Hindi')
+    await expect(box).toHaveValue('My own words, please keep them.')
+    // An emptied box gets the example's sentence again.
+    await box.fill('')
+    await page.getByTestId('clone-example-syspin-en-female').click()
+    await expect(box).toHaveValue(/^Thanks for calling/)
+  })
+
   test('out of memory: unloads the rest and retries on one CPU thread', async ({ page }) => {
     await open(page, { fake: 'oom' })
     await page.getByTestId('clone-example-syspin-en-female').click()

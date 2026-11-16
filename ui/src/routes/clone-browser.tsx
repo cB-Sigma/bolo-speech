@@ -112,6 +112,9 @@ const DEFAULT_TEXT: Record<string, string> = {
 
 const RECOGNISED = ['en', 'hi', 'de', 'es', 'fr', 'it', 'pt']
 
+/** Text the visitor has not changed: empty, or one of the default sentences. */
+const untouched = (text: string) => !text.trim() || Object.values(DEFAULT_TEXT).includes(text.trim())
+
 let freshKey = 0
 const newKey = (prefix: string) => `${prefix}-${Date.now()}-${++freshKey}`
 
@@ -277,7 +280,8 @@ export default function CloneBrowserPage() {
       )
       if (model.languages.includes(ex.language)) {
         setLanguage(ex.language)
-        setText(DEFAULT_TEXT[ex.language] ?? text)
+        // The example's sentence only replaces an empty box or another default sentence, never typed text.
+        setText((t) => (untouched(t) ? (DEFAULT_TEXT[ex.language] ?? t) : t))
       }
     } catch (err) {
       toast.error('Could not load the example', { description: err instanceof Error ? err.message : String(err) })
