@@ -356,8 +356,9 @@ async def test_llama_server_cuda_errors_move_it_to_the_cpu(
         assert entry.placement.device == "cuda:0" and proc.gpu and "-ngl" in proc.argv
         assert "--device" not in proc.argv
         assert "CUDA_VISIBLE_DEVICES" not in json.loads(env_file.read_text(encoding="utf-8"))
-        # a request makes it print llama.cpp's CUDA error: the GPU counts as lost, and the model moves
-        out = await asyncio.to_thread(lambda: list(entry.model.synthesize("cuda error now")))
+        # a request makes it print llama.cpp's CUDA error: the GPU counts as lost, and the model moves once that
+        # request is answered (through bolo, which counts it as in flight; calling the model directly raced the move)
+        out = [chunk async for chunk in core.synthesize("cuda error now", model="svara", normalize=False)]
         assert out
         await until(lambda: core.manager.gpu.health.moved == ["svara"], timeout=40)
         health = core.manager.gpu.health

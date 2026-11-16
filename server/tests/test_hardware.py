@@ -415,6 +415,21 @@ def test_server_binary_from_settings(tmp_path: Path) -> None:
     assert found["gpu"] is True and found["gpu_devices"] == ["CUDA0: RTX 4090"]
 
 
+def test_doctor_names_the_gpus_a_server_build_found() -> None:
+    """bolo doctor prints the devices llama-server --list-devices found, and a GPU build that found none says so
+    instead of passing for a CPU build (a Vulkan build on a laptop listed no devices and read "CPU build")."""
+    from bolo.cli import _server_build
+
+    vk = {"installed": True, "flavour": "vulkan", "gpu": True, "gpu_devices": ["Vulkan0: NVIDIA GeForce RTX 3060"]}
+    assert _server_build(vk) == "GPU build: Vulkan0: NVIDIA GeForce RTX 3060"
+    assert _server_build({**vk, "gpu": False, "gpu_devices": []}) == "vulkan build, but it found no GPU"
+    assert _server_build({"flavour": "cpu", "gpu": False, "gpu_devices": []}) == "CPU build"
+    assert _server_build({"gpu": None, "gpu_devices": None}) == "GPU support unknown"
+    assert hw._DEVICE_LINE.match("  Vulkan0: AMD Radeon(TM) Graphics (512 MiB, 400 MiB free)")
+    assert not hw._DEVICE_LINE.match("ggml_vulkan: Found 2 Vulkan devices:")
+    assert not hw._DEVICE_LINE.match("Available devices:")
+
+
 def test_detection_never_raises(tmp_path: Path) -> None:
     class Broken(FakeHost):
         def read(self, path: str) -> str | None:

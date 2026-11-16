@@ -16,6 +16,7 @@ import json
 import math
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -897,15 +898,14 @@ def _server_runtime(host: Host, settings: Settings | None, runtime: str, deep: b
                     )
                 out["probe_error"] = f"`{path.name} --list-devices` {why}{hint}"
             if devices is not None:
-                names = [
-                    ln.strip()
-                    for ln in devices.splitlines()
-                    if any(k in ln for k in ("CUDA", "Vulkan", "Metal", "SYCL", "ROCm", "OpenCL"))
-                ]
+                names = [ln.strip() for ln in devices.splitlines() if _DEVICE_LINE.match(ln)]
                 out["gpu_devices"] = names
                 out["gpu"] = bool(names)
     return out
 
+
+#: a device line of ``llama-server --list-devices`` (``  Vulkan0: NVIDIA GeForce RTX 3060 (6144 MiB, 5120 MiB free)``)
+_DEVICE_LINE = re.compile(r"^\s*(CUDA|Vulkan|Metal|MTL|SYCL|ROCm|HIP|OpenCL|BLAS|RPC)\d*\s*:", re.IGNORECASE)
 
 #: how long ``llama-server --list-devices`` may take (it starts every GPU backend of the build)
 LIST_DEVICES_TIMEOUT_S = 20.0

@@ -1191,6 +1191,18 @@ def _cores(value: float | None) -> str:
     return "unknown" if value is None else f"{value:g}"
 
 
+def _server_build(entry: dict[str, Any]) -> str:
+    """What ``bolo doctor`` says about a llama-server / audio.cpp build: the GPUs its ``--list-devices`` found (a
+    GPU build that found none says so, rather than passing for a CPU build), else what bolo knows of the build."""
+    devices = entry.get("gpu_devices")
+    flavour = entry.get("flavour")
+    if devices:
+        return "GPU build: " + "; ".join(devices)
+    if devices is not None and flavour in ("cuda", "vulkan"):
+        return f"{flavour} build, but it found no GPU"
+    return {True: "GPU build", False: "CPU build", None: "GPU support unknown"}[entry.get("gpu")]
+
+
 def _hardware_lines(hw: dict[str, Any]) -> list[str]:
     """This machine, as lines of text. What could not be read is printed as "unknown"."""
     from bolo.hardware import gigabytes
@@ -1255,8 +1267,7 @@ def _hardware_lines(hw: dict[str, Any]) -> list[str]:
     for name in ("llama-server", "audio.cpp"):
         entry = rt.get(name, {})
         if entry.get("installed"):
-            gpu = {True: "GPU build", False: "CPU build", None: "GPU support unknown"}[entry.get("gpu")]
-            parts.append(f"{name} {entry.get('version') or ''} ({gpu})".replace("  ", " "))
+            parts.append(f"{name} {entry.get('version') or ''} ({_server_build(entry)})".replace("  ", " "))
         else:
             parts.append(f"{name} not installed")
     lines.append("runtimes: " + "; ".join(parts))

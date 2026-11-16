@@ -69,6 +69,12 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   every output is identical with the option. sherpa-onnx brings its own ONNX Runtime and takes no
   session option from bolo; docs/measurements/int8-without-vnni.json records what its int8 models do on such CPUs.
   New unit test: every engine's session carries the option.
+- A request running when its model was unloaded (bolo stop, keep_alive, or a model moved off a lost GPU) could wait
+  forever: closing the model's queue failed the queued requests but not the running one. The queue now lets running
+  requests finish for up to 10 s, then fails them with a clear error; a model moved off a lost GPU waits for the
+  requests using it (up to 30 s) before it is unloaded.
+- `bolo doctor` names the GPUs llama-server's `--list-devices` found (`GPU build: Vulkan0: ...`), and a CUDA or
+  Vulkan build that found none says so instead of reading "CPU build".
 - `bolo components install llama-server` / `audio.cpp` with a GPU `device` that has no prebuilt build on this
   platform (CUDA on Linux, where neither project publishes one) installed the CPU build and reported a plain install.
   It now says that the CPU build is what runs, and names the way to the GPU (the Vulkan build, or a build of your own

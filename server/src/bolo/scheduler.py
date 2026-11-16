@@ -42,7 +42,7 @@ class JobInfo:
     finished: float
 
 
-@dataclass
+@dataclass(eq=False)  # each job is itself (in sets, and for deque.remove)
 class _Job:
     kind: str
     payload: Any
@@ -97,6 +97,8 @@ class ModelQueue:
         self._executor = ThreadPoolExecutor(max_workers=self._workers_n, thread_name_prefix=f"bolo-{name}")
         self._closed = False
         self.inflight = 0
+        #: the jobs a worker is running now (closing the queue answers any it has to abandon)
+        self._running: set[_Job] = set()
         self.stats = QueueStats()
 
     # -- introspection ----------------------------------------------------
@@ -130,17 +132,28 @@ class ModelQueue:
             ]
         return self._cond
 
-    async def close(self) -> None:
+    async def close(self, drain_s: float = 10.0) -> None:
+        """Stop taking jobs; let the running ones finish for up to ``drain_s`` seconds, then cancel the workers. A
+        job still running then, or still queued, fails (``Overloaded``) instead of waiting forever."""
         self._closed = True
+        # queued jobs fail now (a worker must not start them while the running ones finish)
+        for job in self._pending:
+            if not job.future.done():
+                job.future.set_exception(Overloaded(f"model '{self.name}' was unloaded"))
+        self._pending.clear()
+        deadline = time.monotonic() + max(0.0, drain_s)
+        while self._running and time.monotonic() < deadline:  # noqa: ASYNC110 (a deadline, not a condition)
+            await asyncio.sleep(0.02)
+        abandoned = list(self._running)  # cancelling a worker takes its jobs out of _running
         for t in self._tasks:
             t.cancel()
         for t in self._tasks:
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await t
-        for job in self._pending:
+        for job in abandoned:
             if not job.future.done():
-                job.future.set_exception(Overloaded(f"model '{self.name}' was unloaded"))
-        self._pending.clear()
+                job.future.set_exception(Overloaded(f"model '{self.name}' was unloaded while this request ran"))
+        self._running.clear()
         self._executor.shutdown(wait=False, cancel_futures=True)
 
     # -- submission -------------------------------------------------------
@@ -246,6 +259,7 @@ class ModelQueue:
         handler = self._handlers[batch[0].kind]
         started = self._clock()
         self.inflight += len(batch)
+        self._running.update(batch)
         try:
             try:
                 results = await loop.run_in_executor(self._executor, handler, [j.payload for j in batch])
@@ -269,6 +283,7 @@ class ModelQueue:
             finished = self._clock()
         finally:
             self.inflight -= len(batch)
+            self._running.difference_update(batch)
         st = self.stats
         st.batches += 1
         st.batched_jobs += len(batch)

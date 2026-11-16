@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
+from typing import Any
 
 import pytest
 
@@ -194,3 +195,27 @@ async def test_close_fails_pending_jobs() -> None:
     running.cancel()
     with pytest.raises(Overloaded):
         await q.submit("batch", 2)
+
+
+async def test_closing_answers_a_running_job_instead_of_leaving_it_waiting() -> None:
+    """A model unloaded (or moved off a lost GPU) while a request runs: the queue lets it finish for a while, then
+    fails it, rather than leave the caller waiting on a future no worker will ever resolve."""
+    release = threading.Event()
+
+    def slow(payloads: list[Any]) -> list[Any]:
+        release.wait(5)
+        return payloads
+
+    q = ModelQueue("m", {"x": slow}, workers=1)
+    job = asyncio.create_task(q.submit("x", 1))
+    while not q.inflight:
+        await asyncio.sleep(0.01)
+    await q.close(drain_s=0.1)
+    with pytest.raises(Overloaded, match="unloaded while this request ran"):
+        await asyncio.wait_for(job, 2)
+    release.set()
+
+    # finished in time: answered normally
+    q2 = ModelQueue("m2", {"x": lambda p: p}, workers=1)
+    assert (await q2.submit("x", 7))[0] == 7
+    await q2.close()

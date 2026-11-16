@@ -206,6 +206,10 @@ def _stream_handler(model: STTModel) -> Handler:
     return run
 
 
+#: how long a model moving off a lost GPU waits for the requests using it
+MOVE_WAIT_S = 30.0
+
+
 class ModelManager:
     def __init__(
         self,
@@ -360,6 +364,11 @@ class ModelManager:
     async def _move_to_cpu(self, entry: LoadedModel, health: gpu_health.GpuHealth) -> None:
         keep = entry.keep_alive_s
         try:
+            # let the requests using it finish first (on a GPU that is gone they may fail; one stuck in the driver
+            # is given up on after MOVE_WAIT_S, and the queue then fails it rather than leave it waiting)
+            deadline = time.monotonic() + MOVE_WAIT_S
+            while entry.active > 0 and time.monotonic() < deadline:  # noqa: ASYNC110 (a deadline)
+                await asyncio.sleep(0.05)
             if self.loaded.get(entry.id) is entry:
                 await self.unload(entry.id, reason="GPU lost")
             moved = await self.load(entry.id)
