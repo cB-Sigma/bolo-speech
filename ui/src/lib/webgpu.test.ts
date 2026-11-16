@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { probeDevice } from './device'
+import { probeDevice, timeouts } from './device'
 import {
   adapterDetails,
   adapterLabel,
@@ -74,6 +74,20 @@ describe('one way to ask for a WebGPU adapter', () => {
     const low = await probeDevice(nav(radeon).nav, 'low-power')
     expect(low.webgpu?.details?.integrated).toBe(true)
     expect(low.webgpu?.power).toBe('low-power')
+  })
+})
+
+describe('a probe the browser never answers', () => {
+  it('gives up on the adapter request instead of staying on "checking"', async () => {
+    const saved = { ...timeouts }
+    timeouts.adapterMs = 20
+    try {
+      const n = { ...nav(rtx).nav, gpu: { requestAdapter: vi.fn(() => new Promise<never>(() => {})) } }
+      const d = await probeDevice(n)
+      expect(d.webgpu).toMatchObject({ available: false, noAnswer: true })
+    } finally {
+      Object.assign(timeouts, saved)
+    }
   })
 })
 

@@ -6,6 +6,15 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- Live demo and console, "Your device": a WebGPU adapter request or storage estimate the browser never answered (seen
+  on the speech-to-text page while a model was starting) left "GPU in use" on "checking…" for good. The probe now
+  gives up after 5 s (3 s for storage) and says the browser did not answer.
+- The live demo is rebuilt when bolo's version changes, so its footer shows the released version (it said 0.6.1
+  after 0.6.2 was out).
+- README: `--refresh` for `uv tool upgrade` right after a release (uv offered the previous version from its cache).
+
 ## [0.6.2] - 2026-11-16
 
 ### Added

@@ -167,17 +167,21 @@ export function DevicePanel({ className }: { className?: string }) {
       'WebGPU',
       gpu == null
         ? 'checking…'
-        : gpu.available
-          ? `yes; 16-bit shaders ${gpu.f16 ? 'yes' : 'no'}; largest buffer ${MB(gpu.maxBufferSize)}`
-          : 'no: models run on the CPU (WebAssembly)',
+        : gpu.noAnswer
+          ? 'no answer from the browser yet (busy or stuck); reload to check again'
+          : gpu.available
+            ? `yes; 16-bit shaders ${gpu.f16 ? 'yes' : 'no'}; largest buffer ${MB(gpu.maxBufferSize)}`
+            : 'no: models run on the CPU (WebAssembly)',
     ],
     [
       'GPU in use',
       gpu == null
         ? 'checking…'
-        : gpu.available
-          ? gpuText(gpu.adapter, gpu.details)
-          : 'none (no WebGPU adapter in this browser)',
+        : gpu.noAnswer
+          ? 'unknown: the browser did not answer within 5 s'
+          : gpu.available
+            ? gpuText(gpu.adapter, gpu.details)
+            : 'none (no WebGPU adapter in this browser)',
       'gpu-in-use',
     ],
     ['WebAssembly threads', d.threads ? 'yes' : 'no (one thread): slower'],

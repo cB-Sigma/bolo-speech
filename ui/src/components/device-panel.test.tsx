@@ -102,3 +102,20 @@ describe('Your device: "GPU in use" is always there', () => {
     expect(screen.getByTestId('gpu-in-use')).toHaveTextContent('GPU in usenone (no WebGPU adapter in this browser)')
   })
 })
+
+describe('Your device: a WebGPU probe that never answered', () => {
+  it('says so instead of "checking…"', () => {
+    device.patch({
+      webgpu: {
+        available: false,
+        f16: false,
+        maxBufferSize: null,
+        maxStorageBufferBindingSize: null,
+        adapter: null,
+        noAnswer: true,
+      },
+    })
+    render(<DevicePanel />)
+    expect(screen.getByTestId('gpu-in-use')).toHaveTextContent('the browser did not answer within 5 s')
+  })
+})

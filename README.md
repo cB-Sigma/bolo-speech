@@ -50,6 +50,7 @@ bolo serve
 
 The double quotes work in bash, zsh, PowerShell and cmd (cmd.exe does not treat single quotes as quotes).
 
+- Upgrading: `uv tool upgrade bolo-speech`. Right after a release uv may still offer the previous version from its cache: add `--refresh`.
 - Run it once without installing: `uvx --from "bolo-speech[all]" bolo serve`.
 - Without uv: `pipx install "bolo-speech[all]"`, or `pip install "bolo-speech[all]"` into a virtual environment.
 - With Homebrew (macOS 14 or later, Linux): `brew install cb-sigma/tap/bolo`, then `brew services start bolo` to run it in the background (console at http://127.0.0.1:8000/). It installs `all`; the [tap's README](https://github.com/cB-Sigma/homebrew-tap#bolo) shows how to add the opt-in extras.

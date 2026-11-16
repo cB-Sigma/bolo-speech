@@ -37,6 +37,8 @@ export interface DeviceInfo {
     details?: AdapterDetails
     /** The power preference the adapter was asked for. */
     power?: GpuPower
+    /** The browser did not answer the adapter request in time (busy, or stuck in the driver). */
+    noAnswer?: boolean
   } | null
   /** SharedArrayBuffer, i.e. WebAssembly threads. */
   threads: boolean
@@ -101,8 +103,10 @@ export async function probeDevice(
 ): Promise<DeviceInfo> {
   const info = quickDevice(nav)
   try {
-    const adapter = await requestGpuAdapter(navigatorGpu<GpuAdapterLike>(nav), power)
-    if (adapter) {
+    const adapter = await withTimeout(requestGpuAdapter(navigatorGpu<GpuAdapterLike>(nav), power), timeouts.adapterMs)
+    if (adapter === TIMED_OUT) {
+      info.webgpu = { ...NO_WEBGPU, noAnswer: true }
+    } else if (adapter) {
       const details = adapterDetails(
         adapter.info,
         Boolean(adapter.isFallbackAdapter ?? adapter.info?.isFallbackAdapter),
@@ -122,8 +126,31 @@ export async function probeDevice(
   } catch {
     info.webgpu = { ...NO_WEBGPU }
   }
-  info.storage = await storageUse()
+  const storage = await withTimeout(storageUse(), timeouts.storageMs)
+  info.storage = storage === TIMED_OUT ? { usage: null, quota: null, persisted: null } : storage
   return info
+}
+
+/** How long the probe waits for the browser: a WebGPU adapter request or a storage estimate that never answers
+ * (seen while a model's worker was starting WebGPU) must not leave "Your device" on "checking…" for good. */
+export const timeouts = { adapterMs: 5000, storageMs: 3000 }
+
+const TIMED_OUT = Symbol('timed out')
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => resolve(TIMED_OUT), ms)
+    p.then(
+      (v) => {
+        clearTimeout(t)
+        resolve(v)
+      },
+      (e: unknown) => {
+        clearTimeout(t)
+        reject(e instanceof Error ? e : new Error(String(e)))
+      },
+    )
+  })
 }
 
 /** Test and debugging override, read from local storage (`bolo.fakeDevice`): any DeviceInfo fields. */
