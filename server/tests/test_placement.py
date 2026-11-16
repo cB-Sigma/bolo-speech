@@ -285,6 +285,34 @@ def test_nvml_readings() -> None:
     assert nv.inits == 1  # NVML is initialised once
 
 
+def test_directml_adapters_on_windows() -> None:
+    """With device = "dml" on Windows the DXGI adapters are DirectML devices: free memory is this process's budget
+    minus its use (integrated graphics: none, it is the machine's memory)."""
+    from bolo.winhw import Adapter
+
+    adapters = [
+        Adapter(0, "NVIDIA GeForce RTX 3060 Laptop GPU", 0x10DE, 6 * GB, 8 * GB, False, 5 * GB, 1 * GB),
+        Adapter(1, "Intel(R) UHD Graphics", 0x8086, 128 * MB, 8 * GB, False, 3 * GB, 0),
+    ]
+    acc = Accelerators(nvml=None, which=lambda _: None, system="windows", adapters=lambda: adapters, max_age_s=0)
+    acc._nvml_tried = True
+    rtx, uhd = acc.devices()
+    assert (rtx.backend, rtx.index, rtx.total_bytes, rtx.free_bytes, rtx.process_bytes) == (
+        "dml",
+        0,
+        6 * GB,
+        4 * GB,
+        GB,
+    )
+    assert uhd.unified and uhd.free_bytes is None and uhd.vendor == "intel" and acc.source == "dxgi"
+    assert acc.device("dml:1") is not None and acc.device("dml") == rtx and acc.device("directml:0") == rtx
+    assert acc.default_device() is None and acc.cuda_devices() == []  # "auto" never picks DirectML
+    # without device = "dml" nothing asks DXGI
+    plain = Accelerators(nvml=None, which=lambda _: None, system="windows")
+    plain._nvml_tried = True
+    assert plain.devices() == []
+
+
 def test_nvidia_smi_readings() -> None:
     calls: list[list[str]] = []
 

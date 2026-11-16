@@ -354,12 +354,12 @@ class VoiceStore:
         path = self._dir(vid)
         if not _ID_RE.match(vid) or not (path / METADATA).is_file():
             raise VoiceNotFound(f"no saved voice '{voice_id}'")
-        meta = json.loads((path / METADATA).read_text())
+        meta = json.loads((path / METADATA).read_text(encoding="utf-8"))
         return SavedVoice(vid, meta, path)
 
     def _write_meta(self, path: Path, meta: dict[str, Any]) -> None:
         tmp = path / (METADATA + ".tmp")
-        tmp.write_text(json.dumps(meta, indent=2, ensure_ascii=False))
+        tmp.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
         tmp.replace(path / METADATA)
 
     def create(

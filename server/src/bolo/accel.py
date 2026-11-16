@@ -6,6 +6,10 @@ server (and the processes it started) holds.
 * Apple Silicon: the GPU shares the machine's memory. "Free" is the memory the system calls available and
   per-process GPU memory cannot be told apart from ordinary memory; the figures say so (``unified: true``,
   ``process_bytes: null``).
+* Windows, DirectML (``device = "dml:N"``, read only when ``device`` is ``dml``): every hardware graphics adapter DXGI lists, numbered as DirectML numbers
+  them. "Free" is the local video memory budget Windows gives this process minus what it uses
+  (``IDXGIAdapter3::QueryVideoMemoryInfo``); ``process_bytes`` is this process's own use, which is where DirectML
+  runs (ONNX Runtime in bolo's process). Integrated graphics report no free memory (it is the machine's).
 * Anything else: nothing is reported, and the scheduler treats free accelerator memory as unknown.
 
 NVIDIA devices are numbered as CUDA numbers them in this process: when ``CUDA_VISIBLE_DEVICES`` is set (indices or
@@ -40,14 +44,14 @@ Runner = Callable[[list[str]], "str | None"]
 @dataclass
 class DeviceMemory:
     index: int
-    vendor: str  # nvidia | apple
+    vendor: str  # nvidia | apple | amd | intel | ... (DirectML adapters)
     name: str | None = None
     total_bytes: int | None = None
     free_bytes: int | None = None
     used_bytes: int | None = None
     #: the GPU shares the machine's memory (Apple Silicon): "used" and "free" are the machine's
     unified: bool = False
-    #: "cuda" or "metal": the ``device`` family that reaches it
+    #: "cuda", "metal" or "dml": the ``device`` family that reaches it
     backend: str = "cuda"
     #: percent of time the GPU was busy over the last sample period, when the driver says
     utilization: float | None = None
@@ -83,6 +87,8 @@ def _family(device: str) -> str:
         return "cuda"
     if name in ("coreml", "mps", "metal"):
         return "metal"
+    if name == "directml":
+        return "dml"
     return name
 
 
@@ -125,6 +131,8 @@ class Accelerators:
         max_age_s: float = 2.0,
         which: Callable[[str], str | None] | None = None,
         environ: dict[str, str] | None = None,
+        adapters: Callable[[], list[Any] | None] | None = None,
+        directml: bool = False,
     ) -> None:
         self._nvml = nvml
         self._nvml_tried = nvml is not None
@@ -135,6 +143,9 @@ class Accelerators:
         self._machine = (machine or platform.machine()).lower()
         self._pids = pids or our_pids
         self._vm = virtual_memory or psutil.virtual_memory
+        self._adapters = adapters
+        #: also list DirectML devices (Windows; on when ``device`` is ``dml``, or when ``adapters`` is given)
+        self.directml = directml or adapters is not None
         self.max_age_s = max_age_s
         self._cache: tuple[float, list[DeviceMemory]] | None = None
         env = os.environ if environ is None else environ
@@ -145,7 +156,7 @@ class Accelerators:
             else None
         )
         self._lock = threading.Lock()
-        #: where the last reading came from: "nvml", "nvidia-smi", "unified", or "" (nothing to ask)
+        #: where the last reading came from: "nvml", "nvidia-smi", "unified", "dxgi", or "" (nothing to ask)
         self.source = ""
 
     # -- public ---------------------------------------------------------------------------------------------
@@ -215,19 +226,52 @@ class Accelerators:
         return out
 
     def _read(self) -> list[DeviceMemory]:
+        dml = self._from_dxgi() if self.directml and (self._system == "windows" or self._adapters) else []
         found = self._from_nvml()
         if found is not None:
             self.source = "nvml"
-            return self._visible(found)
+            return self._visible(found) + dml
         found = self._from_smi()
         if found is not None:
             self.source = "nvidia-smi"
-            return self._visible(found)
+            return self._visible(found) + dml
         if self._system == "darwin" and self._machine in ("arm64", "aarch64"):
             self.source = "unified"
             return [self._apple()]
-        self.source = ""
-        return []
+        self.source = "dxgi" if dml else ""
+        return dml
+
+    def _from_dxgi(self) -> list[DeviceMemory]:
+        """DirectML devices (Windows): the hardware adapters DXGI lists, with this process's memory budget."""
+        if self._adapters is None:
+            from bolo import winhw
+
+            self._adapters = winhw.dxgi_adapters
+        try:
+            adapters = self._adapters() or []
+        except Exception as exc:
+            log.debug("DXGI query failed: %s", exc)
+            return []
+        out: list[DeviceMemory] = []
+        for a in adapters:
+            integrated = a.vendor == "intel" or a.dedicated_bytes <= 512 * 1024 * 1024
+            free = None
+            if a.budget_bytes is not None and not integrated:
+                free = max(0, a.budget_bytes - (a.usage_bytes or 0))
+            out.append(
+                DeviceMemory(
+                    index=a.index,
+                    vendor=a.vendor,
+                    name=a.name,
+                    total_bytes=a.dedicated_bytes or None,
+                    free_bytes=free,
+                    unified=integrated,
+                    backend="dml",
+                    process_bytes=a.usage_bytes,
+                    source="dxgi",
+                )
+            )
+        return out
 
     def _load_nvml(self) -> Any | None:
         if not self._nvml_tried:

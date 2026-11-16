@@ -80,3 +80,20 @@ def test_engines_hand_the_device_to_onnx_runtime(monkeypatch: pytest.MonkeyPatch
     with pytest.raises(Built):
         dicow_onnx.OnnxNetwork(model, model, 1, "cuda")
     assert seen == [[CUDA, CPU]] * 3
+
+
+def test_doctor_warns_about_onnxruntime_packages() -> None:
+    from bolo.ort_providers import installed_ort_packages, ort_problems, sherpa_provider
+
+    assert installed_ort_packages({"onnxruntime": "1.32.0", "onnxruntime-gpu": None}) == {"onnxruntime": "1.32.0"}
+    both = {"onnxruntime": "1.32.0", "onnxruntime-directml": "1.24.4"}
+    (problem,) = ort_problems("cpu", both, ["CPUExecutionProvider"])
+    assert "several ONNX Runtime packages" in problem and "onnxruntime-directml 1.24.4" in problem
+    problems = ort_problems("dml:1", {"onnxruntime": "1.32.0"}, ["CPUExecutionProvider"])
+    assert len(problems) == 1 and "pip install onnxruntime-directml" in problems[0]
+    assert (
+        ort_problems("dml", {"onnxruntime-directml": "1.24.4"}, ["DmlExecutionProvider", "CPUExecutionProvider"]) == []
+    )
+    assert "onnxruntime-gpu" in ort_problems("cuda", {"onnxruntime": "1.32.0"}, ["CPUExecutionProvider"])[0]
+    assert ort_problems("cpu", {}, None) == []
+    assert sherpa_provider("dml:0") == "cpu" and sherpa_provider("cuda:1") == "cuda"

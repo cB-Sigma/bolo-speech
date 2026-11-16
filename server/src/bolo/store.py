@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import shutil
+import stat
 import tarfile
 import threading
 import time
@@ -36,6 +37,72 @@ import httpx
 from bolo.errors import DownloadError, GatedModel, ModelNotFound
 
 log = logging.getLogger("bolo.store")
+
+
+# -- folder links (a local model folder registered in the store) ------------------------------------------------
+def is_dir_link(path: Path) -> bool:
+    """A symbolic link or, on Windows, a directory junction (which ``Path.is_symlink`` does not report)."""
+    if path.is_symlink():
+        return True
+    isjunction = getattr(os.path, "isjunction", None)  # Python 3.12+
+    if isjunction is not None:
+        return bool(isjunction(path))
+    try:
+        tag = getattr(os.lstat(path), "st_reparse_tag", 0)
+    except OSError:
+        return False
+    return bool(tag) and tag == getattr(stat, "IO_REPARSE_TAG_MOUNT_POINT", -1)
+
+
+def remove_dir_link(path: Path) -> None:
+    """Remove a folder link (symlink or junction), never what it points to."""
+    try:
+        path.unlink()
+    except OSError:
+        path.rmdir()  # a junction or a Windows directory symlink
+
+
+def _create_junction(target: Path, link: Path) -> None:
+    """A Windows directory junction: unlike a directory symlink it needs neither Developer Mode nor administrator
+    rights (local folders only)."""
+    try:
+        import _winapi
+
+        _winapi.CreateJunction(str(target), str(link))  # type: ignore[attr-defined,unused-ignore]
+    except (ImportError, AttributeError):
+        import subprocess
+
+        subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(link), str(target)], check=True, capture_output=True, timeout=30
+        )
+
+
+def link_dir(target: Path, link: Path) -> str:
+    """Make ``link`` show the folder ``target``: a directory symlink, else on Windows a junction, else a copy (with a
+    notice). Returns which: ``"symlink"``, ``"junction"`` or ``"copy"``.
+
+    On Windows a directory symlink needs Developer Mode or administrator rights (WinError 1314 otherwise)."""
+    reason: BaseException
+    try:
+        link.symlink_to(target, target_is_directory=True)
+        return "symlink"
+    except OSError as exc:
+        reason = exc
+    if os.name == "nt":
+        try:
+            _create_junction(target, link)
+            return "junction"
+        except Exception as exc:
+            reason = exc
+    log.warning(
+        "could not link %s to %s (%s); copying the folder instead (it takes the disk space twice, and later changes "
+        "to %s are not seen)",
+        link, target, reason, target,
+    )  # fmt: skip
+    shutil.copytree(target, link, symlinks=False)
+    return "copy"
+
+
 ProgressFn = Callable[[int, int], None]
 CHUNK = 1 << 20
 
@@ -324,7 +391,7 @@ class ModelStore:
         if not path.is_file():
             return None
         try:
-            data: dict[str, Any] = json.loads(path.read_text())
+            data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             return None
         return data
@@ -341,7 +408,7 @@ class ModelStore:
             mf = d / "manifest.json"
             if mf.is_file():
                 with contextlib.suppress(OSError, json.JSONDecodeError):
-                    data = json.loads(mf.read_text())
+                    data = json.loads(mf.read_text(encoding="utf-8"))
                     if data.get("complete"):
                         out.append(data)
         return out
@@ -503,8 +570,8 @@ class ModelStore:
             if not path.is_dir():
                 raise DownloadError(f"the model directory {source.local} does not exist any more")
             mdir = self.model_dir(model_id)
-            if mdir.is_symlink() and mdir.resolve() != path.resolve():
-                mdir.unlink()
+            if is_dir_link(mdir) and mdir.resolve() != path.resolve():
+                remove_dir_link(mdir)
             registered = self.register_local(model_id, path, meta)
             if progress:
                 progress(registered["size_bytes"], registered["size_bytes"])
@@ -570,7 +637,7 @@ class ModelStore:
             if meta:
                 manifest["meta"] = meta
             tmp = mdir / "manifest.json.tmp"
-            tmp.write_text(json.dumps(manifest, indent=2))
+            tmp.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
             tmp.replace(mdir / "manifest.json")
             return manifest
 
@@ -579,9 +646,10 @@ class ModelStore:
         mdir = self.model_dir(model_id)
         mdir.parent.mkdir(parents=True, exist_ok=True)
         if mdir.resolve() != path.resolve():
-            if mdir.exists() or mdir.is_symlink():
+            if mdir.exists() or is_dir_link(mdir):
                 raise DownloadError(f"model '{model_id}' already exists in the store")
-            mdir.symlink_to(path.resolve(), target_is_directory=True)
+            if link_dir(path.resolve(), mdir) == "junction":
+                log.info("%s: linked %s to %s with a directory junction", model_id, mdir, path)
         entries: list[dict[str, Any]] = [
             {"path": str(p.relative_to(path)), "size": p.stat().st_size}
             for p in sorted(path.rglob("*"))
@@ -596,7 +664,7 @@ class ModelStore:
             "complete": True,
             "meta": meta or {},
         }
-        (path / "manifest.json").write_text(json.dumps(manifest, indent=2))
+        (mdir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
         return manifest
 
     # -- removal ----------------------------------------------------------
@@ -604,11 +672,11 @@ class ModelStore:
         if model_id in self.links:
             return False  # a preset has no files of its own
         mdir = self.model_dir(model_id)
-        if not (mdir.exists() or mdir.is_symlink()):
+        if not (mdir.exists() or is_dir_link(mdir)):
             return False
-        if mdir.is_symlink():
+        if is_dir_link(mdir):
             target = mdir.resolve()
-            mdir.unlink()
+            remove_dir_link(mdir)
             (target / "manifest.json").unlink(missing_ok=True)
         else:
             shutil.rmtree(mdir)

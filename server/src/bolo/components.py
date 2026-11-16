@@ -535,8 +535,11 @@ class ComponentManager:
                 return f"{info.name} runs on Linux only (this is {tts_runtimes.platform_key()})"
             if shutil.which("git") is None:
                 return "git is not installed (it fetches the pinned source)"
-        elif tts_runtimes.platform_key() not in info.releases:
-            return f"no prebuilt release is pinned for this platform ({tts_runtimes.platform_key()})"
+        elif tts_runtimes.release_for(runtime, s.device) is None:
+            return (
+                f"no prebuilt release is pinned for this platform ({tts_runtimes.platform_key()}); build "
+                f"{info.binary} from {info.homepage} and set {info.setting} to its full path"
+            )
         target = tts_runtimes.components_dir(s)
         probe = target if target.exists() else Path(s.data_dir)
         while not probe.exists() and probe != probe.parent:
@@ -598,27 +601,31 @@ class ComponentManager:
         info = tts_runtimes.RUNTIME_INFO[runtime]
         if info.git is not None:
             return self._install_checkout(runtime)
-        release = info.releases.get(tts_runtimes.platform_key())
+        release = tts_runtimes.release_for(runtime, self.core.settings.device)
         if release is None:
             return f"no prebuilt {info.name} release is pinned for {tts_runtimes.platform_key()}"
+        archives = [release, *release.extras]
+        total = sum(a.size or 0 for a in archives) if all(a.size for a in archives) else 0
 
         def progress(n: int) -> None:
-            if job is not None and release.size:
+            if job is not None and total:
                 job.bytes_done += n
-                job.bytes_total = release.size
-                job.progress = min(0.95, job.bytes_done / release.size)
+                job.bytes_total = total
+                job.progress = min(0.95, job.bytes_done / total)
 
         target = tts_runtimes.install_dir(self.core.settings, runtime)
         tmp = target.with_name(target.name + ".partial")
         try:
-            blob, _ = self.core.store.fetch_blob(
-                RemoteFile(release.url.rsplit("/", 1)[-1], release.url, release.size, release.sha256), on_bytes=progress
-            )
             shutil.rmtree(tmp, ignore_errors=True)
-            tts_runtimes.extract_release(blob, tmp)
+            for archive in archives:
+                name = archive.url.rsplit("/", 1)[-1]
+                blob, _ = self.core.store.fetch_blob(
+                    RemoteFile(name, archive.url, archive.size, archive.sha256), on_bytes=progress
+                )
+                tts_runtimes.extract_release(blob, tmp)
+                blob.unlink(missing_ok=True)
             shutil.rmtree(target, ignore_errors=True)
             tmp.rename(target)
-            blob.unlink(missing_ok=True)
         except Exception as exc:
             shutil.rmtree(tmp, ignore_errors=True)
             return f"{type(exc).__name__}: {exc}"

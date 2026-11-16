@@ -162,16 +162,15 @@ def test_phonemizer_keeps_punctuation_and_sentences() -> None:
 
 def test_espeak_executable_route(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     """The licence-clean route: phonemes come from an `espeak-ng` program run as a separate process."""
-    import stat
-
     from bolo.text import phonemize
+    from fakebin import fake_program
 
-    fake = tmp_path / "espeak-ng"
     # Stands in for the real program: echoes the voice and the text it was asked to phonemise.
-    fake.write_text(
-        '#!/bin/sh\n[ "$1" = "-q" ] && [ "$2" = "--ipa" ] && [ "$3" = "-v" ] || exit 2\nshift 3; v="$1"; shift 2\nprintf " %s:%s\\n" "$v" "$1"\n'
+    fake_program(
+        tmp_path / "espeak-ng",
+        "import sys\nargs = sys.argv[1:]\nif args[:3] != ['-q', '--ipa', '-v']:\n    sys.exit(2)\n"
+        "sys.stdout.write(f' {args[3]}:{args[5]}\\n')\n",
     )
-    fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
     monkeypatch.setenv("PATH", str(tmp_path))
     monkeypatch.setenv("BOLO_ESPEAK", "executable")
     phonemize.reset_phonemizer()

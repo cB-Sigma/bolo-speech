@@ -5,11 +5,12 @@ from __future__ import annotations
 import base64
 import io
 import os
-import sys
 import tarfile
 import time
+import zipfile
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import httpx
 import numpy as np
@@ -25,6 +26,7 @@ from bolo.engines.tts_server import ServerProcess, ServerTTS, TTSServerEngine
 from bolo.errors import ComponentMissing, EngineUnavailable, InvalidRequest
 from conftest import LiveServer, wav_bytes
 from fake_tts_server import FakeTTSServer
+from fakebin import fake_program, printing_program
 
 HERE = Path(__file__).parent
 
@@ -224,12 +226,8 @@ def test_cloning_refused_by_models_that_cannot(llama: FakeTTSServer) -> None:
 
 # -- managed mode: bolo starts the binary ---------------------------------------------------------------------
 def fake_binary(tmp_path: Path, name: str) -> Path:
-    path = tmp_path / "bin" / name
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"#!{sys.executable}\nimport sys\nsys.path.insert(0, {str(HERE)!r})\n"
-                    "from fake_tts_server import main\nmain(sys.argv[1:])\n")  # fmt: skip
-    path.chmod(0o755)
-    return path
+    return fake_program(tmp_path / "bin" / name, f"import sys\nsys.path.insert(0, {str(HERE)!r})\n"
+                        "from fake_tts_server import main\nmain(sys.argv[1:])\n")  # fmt: skip
 
 
 def test_managed_llama_server_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -288,7 +286,7 @@ def test_managed_audiocpp_writes_its_config(tmp_path: Path) -> None:
     try:
         import json
 
-        config = json.loads((tmp_path / "data" / "run" / "tts-server" / "pocket.json").read_text())
+        config = json.loads((tmp_path / "data" / "run" / "tts-server" / "pocket.json").read_text(encoding="utf-8"))
         assert config["backend"] == "cpu" and config["threads"] == 3 and config["host"] == "127.0.0.1"
         assert config["models"] == [
             {"id": "pocket", "family": "pocket_tts", "path": str(model_dir / "voice.gguf"), "task": "tts",
@@ -299,10 +297,23 @@ def test_managed_audiocpp_writes_its_config(tmp_path: Path) -> None:
         engine.shutdown()
 
 
+def test_audiocpp_backend_names(tmp_path: Path) -> None:
+    """audio.cpp knows cpu, cuda, hip, vulkan and metal and refuses anything else, so dml runs it on the CPU."""
+    (tmp_path / "voice.gguf").write_bytes(b"GGUF")
+    spec = {"model_file": "voice.gguf", "family": "pocket_tts"}
+    for device, backend in (
+        ("cuda:1", "cuda"),
+        ("rocm", "hip"),
+        ("coreml", "metal"),
+        ("dml:0", "cpu"),
+        ("auto", "cpu"),
+    ):
+        config = TTSServerEngine._audiocpp_config("v", tmp_path, spec, LoadOptions(threads=1, device=device), 1)
+        assert config["backend"] == backend, device
+
+
 def test_server_that_never_starts(tmp_path: Path) -> None:
-    script = tmp_path / "broken"
-    script.write_text("#!/bin/sh\necho 'error: unknown model architecture' >&2\nexit 2\n")
-    script.chmod(0o755)
+    script = printing_program(tmp_path / "broken", stderr="error: unknown model architecture\n", code=2)
     proc = ServerProcess("broken", [str(script)], 1, start_timeout_s=5)
     with pytest.raises(EngineUnavailable, match="unknown model architecture"):
         proc.ensure_started()
@@ -324,10 +335,9 @@ def test_settings_and_binary_discovery(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
         tts_runtimes.parse_server_setting("no-url")
     assert tts_runtimes.find_binary(Settings(data_dir=tmp_path), "audio.cpp")[0] is None or os.environ.get("PATH")
-    installed = tts_runtimes.install_dir(s, "llama-server") / "llama-b1" / "llama-server"
-    installed.parent.mkdir(parents=True)
-    installed.write_text("#!/bin/sh\necho 'version: 1 (abc)'\n")
-    installed.chmod(0o755)
+    installed = printing_program(
+        tts_runtimes.install_dir(s, "llama-server") / "llama-b1" / "llama-server", "version: 1 (abc)\n"
+    )
     path, source = tts_runtimes.find_binary(Settings(data_dir=tmp_path), "llama-server")
     assert path == installed and source == "bolo"
     assert tts_runtimes.binary_version(installed) == "1 (abc)"
@@ -360,18 +370,43 @@ def test_release_archive_extraction(tmp_path: Path) -> None:
             tts_runtimes.extract_release(bad, tmp_path / "bad")
 
 
+def fake_release(kind: str) -> bytes:
+    """A release archive holding a llama-server that prints its version: a tarball with an executable script, or
+    on Windows (and for ``kind="zip"``) a flat zip like llama.cpp's Windows builds."""
+    data = b"#!/bin/sh\necho 'version: 9'\n"
+    name = "llama-server"
+    if os.name == "nt":
+        data, name = b"@echo version: 9\r\n", "llama-server.cmd"
+    archive = io.BytesIO()
+    if kind == "zip" or os.name == "nt":
+        with zipfile.ZipFile(archive, "w") as zf:
+            info = zipfile.ZipInfo(name)
+            info.external_attr = 0o755 << 16
+            zf.writestr(info, data)
+            zf.writestr("ggml-base.dll", b"MZ")
+    else:
+        with tarfile.open(fileobj=archive, mode="w:gz") as tf:
+            info = tarfile.TarInfo(f"llama-b9/{name}")
+            info.size, info.mode = len(data), 0o755
+            tf.addfile(info, io.BytesIO(data))
+    return archive.getvalue()
+
+
+async def wait_for(job: Any) -> None:
+    import asyncio
+
+    for _ in range(200):
+        if job.state in ("done", "error"):
+            return
+        await asyncio.sleep(0.05)
+
+
 async def test_installing_a_runtime_checks_the_checksum(
     core: Bolo, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import hashlib
 
-    archive = io.BytesIO()
-    with tarfile.open(fileobj=archive, mode="w:gz") as tf:
-        data = b"#!/bin/sh\necho 'version: 9'\n"
-        info = tarfile.TarInfo("llama-b9/llama-server")
-        info.size, info.mode = len(data), 0o755
-        tf.addfile(info, io.BytesIO(data))
-    payload = archive.getvalue()
+    payload = fake_release("tar")
     served = FakeArchive(payload).start()
     try:
         key = tts_runtimes.platform_key()
@@ -383,12 +418,7 @@ async def test_installing_a_runtime_checks_the_checksum(
         assert error and "checksum mismatch" in error and not core.components.is_installed("llama-server")
         monkeypatch.setitem(runtime.releases, key, release)
         job = core.components.start_install("llama-server", accept_license=False)
-        for _ in range(100):
-            if job.state in ("done", "error"):
-                break
-            import asyncio
-
-            await asyncio.sleep(0.05)
+        await wait_for(job)
         assert job.state == "done", job.error
         assert core.components.is_installed("llama-server")
         listing = {c["id"]: c for c in core.components.status()}
@@ -397,8 +427,84 @@ async def test_installing_a_runtime_checks_the_checksum(
         served.stop()
 
 
+async def test_installing_the_cuda_build_with_its_runtime(
+    core: Bolo, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """device = "cuda" picks the CUDA build where one is pinned (Windows), and its CUDA runtime archive is unpacked
+    next to it."""
+    import hashlib
+
+    main = fake_release("zip")
+    cudart = io.BytesIO()
+    with zipfile.ZipFile(cudart, "w") as zf:
+        zf.writestr("cudart64_12.dll", b"MZ cudart")
+    extra = cudart.getvalue()
+    served = {"/main.zip": main, "/cudart.zip": extra}
+    server = FakeArchive(served).start()
+    try:
+        key = "testos-x86_64"  # a platform without real pins, so that only these releases exist
+        monkeypatch.setattr(tts_runtimes, "platform_key", lambda: key)
+        runtime = tts_runtimes.RUNTIME_INFO["llama-server"]
+        cpu = tts_runtimes.Release(server.url + "/cpu.zip", "0" * 64, 1)
+        cuda = tts_runtimes.Release(
+            server.url + "/main.zip", hashlib.sha256(main).hexdigest(), len(main),
+            extras=(tts_runtimes.Release(server.url + "/cudart.zip", hashlib.sha256(extra).hexdigest(), len(extra)),),
+        )  # fmt: skip
+        monkeypatch.setitem(runtime.releases, key, cpu)
+        monkeypatch.setitem(runtime.releases, key + "-cuda", cuda)
+        assert tts_runtimes.release_for("llama-server", "cpu") is cpu
+        assert tts_runtimes.release_for("llama-server", "cuda:1") is cuda
+        assert tts_runtimes.release_for("llama-server", "vulkan") is cpu  # no Vulkan build pinned here
+        monkeypatch.setenv("PATH", "/nonexistent")
+        core.settings.device = "cuda"
+        job = core.components.start_install("llama-server", accept_license=False)
+        await wait_for(job)
+        assert job.state == "done", job.error
+        folder = tts_runtimes.install_dir(core.settings, "llama-server")
+        assert (folder / "cudart64_12.dll").read_bytes() == b"MZ cudart" and (folder / "ggml-base.dll").is_file()
+        path, source = tts_runtimes.find_binary(core.settings, "llama-server")
+        assert source == "bolo" and path is not None and path.parent == folder
+        assert tts_runtimes.binary_version(path) == "9"
+    finally:
+        server.stop()
+
+
+def test_windows_release_pins() -> None:
+    """The Windows builds are pinned for the same llama.cpp and audio.cpp releases as Linux and macOS."""
+    for runtime in ("llama-server", "audio.cpp"):
+        info = tts_runtimes.RUNTIME_INFO[runtime]
+        for flavour in ("windows-x86_64", "windows-x86_64-cuda", "windows-x86_64-vulkan"):
+            release = info.releases[flavour]
+            assert info.version in release.url and release.url.endswith(".zip") and len(release.sha256) == 64
+        cuda = info.releases["windows-x86_64-cuda"]
+        assert "12.4" in cuda.url and len(cuda.extras) == 1 and "cudart" in cuda.extras[0].url
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(tts_runtimes, "platform_key", lambda: "windows-x86_64")
+        assert "win-cuda-12.4" in str(tts_runtimes.release_for("llama-server", "cuda").url)  # type: ignore[union-attr]
+        assert "win-vulkan" in str(tts_runtimes.release_for("llama-server", "vulkan").url)  # type: ignore[union-attr]
+        assert "win-cpu-x64" in str(tts_runtimes.release_for("llama-server", "dml").url)  # type: ignore[union-attr]
+        assert "cpu-portable" in str(tts_runtimes.release_for("audio.cpp", "cpu").url)  # type: ignore[union-attr]
+
+
+def test_windows_binary_names(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """On Windows the components folder and the setting find llama-server.exe for "llama-server" (PATHEXT)."""
+    monkeypatch.setattr(tts_runtimes, "_windows", lambda: True)
+    monkeypatch.setenv("PATHEXT", ".COM;.EXE;.BAT;.CMD")
+    settings = Settings(data_dir=tmp_path)
+    folder = tts_runtimes.install_dir(settings, "llama-server")
+    folder.mkdir(parents=True)
+    (folder / "llama-server-impl.dll").write_bytes(b"MZ")
+    (folder / "llama-server.exe").write_bytes(b"MZ")
+    monkeypatch.setenv("PATH", "")
+    assert tts_runtimes.find_binary(settings, "llama-server") == (folder / "llama-server.exe", "bolo")
+    assert tts_runtimes.executable_names("audiocpp_server")[:2] == ["audiocpp_server.com", "audiocpp_server.exe"]
+    configured = Settings(data_dir=tmp_path, llama_server_bin=str(folder / "llama-server"))
+    assert tts_runtimes.find_binary(configured, "llama-server") == (folder / "llama-server.exe", "settings")
+    assert not tts_runtimes.is_executable(folder / "llama-server-impl.dll")
+
+
 class FakeArchive:
-    def __init__(self, payload: bytes) -> None:
+    def __init__(self, payload: bytes | dict[str, bytes]) -> None:
         import threading
         from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -407,10 +513,14 @@ class FakeArchive:
                 pass
 
             def do_GET(self) -> None:
+                body = payload if isinstance(payload, bytes) else payload.get(self.path)
+                if body is None:
+                    self.send_error(404)
+                    return
                 self.send_response(200)
-                self.send_header("Content-Length", str(len(payload)))
+                self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
-                self.wfile.write(payload)
+                self.wfile.write(body)
 
         self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.url = f"http://127.0.0.1:{self.httpd.server_address[1]}"
@@ -502,7 +612,7 @@ def test_managed_tontaube_runs_uv_with_the_downloaded_weights(tmp_path: Path, mo
         assert argv[7:9] == ["tontaube", "serve"] and model.process.health_path == "/readyz"
         import json
 
-        env = json.loads((tmp_path / "env.json").read_text())
+        env = json.loads((tmp_path / "env.json").read_text(encoding="utf-8"))
         assert env["MODEL_PATH"] == str(weights) and env["LITE_DEVICE"] == "cpu" and env["LITE_CPU_THREADS"] == "3"
         assert env["REQUIRE_API_KEY"] == "1" and env["TTS_API_KEY"] == model.process.api_key
         assert len(np.concatenate(list(model.synthesize("Hello.", "marcus")))) == int(24000 * 0.05 * 6)

@@ -38,7 +38,7 @@ KEEP = (
 def main(paths: list[str]) -> int:
     report: dict[str, Any] = {}
     for p in paths:
-        report.update(json.loads(Path(p).read_text()))
+        report.update(json.loads(Path(p).read_text(encoding="utf-8")))
     done = 0
     for path in sorted(CATALOG.glob("*.yaml")):
         text = path.read_text(encoding="utf-8")

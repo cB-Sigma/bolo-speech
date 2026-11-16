@@ -54,7 +54,7 @@ def pick(out: str, want_speakers: int = 16, per: int = 5) -> None:
             name = Path(m.name).name
             Path(out, name).write_bytes(f.read())
             kept[spk].append(name)
-    Path(out, "meta.json").write_text(json.dumps({"kept": kept, "texts": texts}))
+    Path(out, "meta.json").write_text(json.dumps({"kept": kept, "texts": texts}), encoding="utf-8")
 
 
 def stats(values: list[float]) -> dict[str, float]:
@@ -67,7 +67,7 @@ def stats(values: list[float]) -> dict[str, float]:
 
 
 async def score(root: str) -> dict[str, object]:
-    meta = json.loads(Path(root, "meta.json").read_text())
+    meta = json.loads(Path(root, "meta.json").read_text(encoding="utf-8"))
     core = Bolo(Settings(data_dir=Path(os.environ["BOLO_DATA_DIR"]), auto_pull=False))
     await core.start()
     try:

@@ -69,7 +69,9 @@ class LoadedModel:
     memory_bytes: int
     load_ms: float
     loaded_at: float = field(default_factory=time.monotonic)
-    last_used: float = field(default_factory=time.monotonic)
+    #: ``time.perf_counter()`` of the last use: the least recently used model is unloaded first, and Windows'
+    #: ``time.monotonic()`` ticks only every 15.6 ms, too coarse to order uses close together
+    last_used: float = field(default_factory=time.perf_counter)
     active: int = 0
     requests: int = 0
     #: of ``memory_bytes``, the part in accelerator memory
@@ -105,7 +107,7 @@ class LoadedModel:
         return p.processor()
 
     def idle_s(self) -> float:
-        return 0.0 if self.active else time.monotonic() - self.last_used
+        return 0.0 if self.active else time.perf_counter() - self.last_used
 
 
 def _tts_handler(model: TTSModel) -> Handler:
@@ -158,7 +160,7 @@ class ModelManager:
         #: models being unloaded (shown as "Stopping..." by ps)
         self.stopping: dict[str, LoadedModel] = {}
         #: accelerator memory (NVML, nvidia-smi, unified memory); tests pass a fake
-        self.accel = accel or Accelerators()
+        self.accel = accel or Accelerators(directml=str(settings.device).lower().startswith(("dml", "directml")))
         self.gpu_evictions = 0
         self._locks: dict[str, asyncio.Lock] = {}
         self._reaper: asyncio.Task[None] | None = None
@@ -718,7 +720,7 @@ class ModelManager:
         manifest["probed"] = engine_version
         path = self.store.model_dir(spec.id) / "manifest.json"
         with contextlib.suppress(OSError):
-            path.write_text(json.dumps(manifest, indent=2))
+            path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     async def _make_room(self, spec: ModelSpec, need: int | None = None) -> None:
         s = self.settings
@@ -825,12 +827,12 @@ class ModelManager:
                 entry.keep_alive_s = ka.seconds
         entry.active += 1
         entry.requests += 1
-        entry.last_used = time.monotonic()
+        entry.last_used = time.perf_counter()
         try:
             yield entry
         finally:
             entry.active -= 1
-            entry.last_used = time.monotonic()
+            entry.last_used = time.perf_counter()
             if entry.active == 0 and entry.keep_alive_s == 0 and self.loaded.get(entry.id) is entry:
                 with contextlib.suppress(Exception):
                     await self.unload(entry.id, reason="keep_alive 0")
@@ -842,7 +844,7 @@ class ModelManager:
             if entry is None:
                 continue
             entry.keep_alive_s = seconds
-            entry.last_used = time.monotonic()
+            entry.last_used = time.perf_counter()
             if seconds == 0 and entry.active == 0:
                 with contextlib.suppress(Exception):
                     await self.unload(model_id, reason="keep_alive 0")
@@ -852,7 +854,7 @@ class ModelManager:
         if seconds is None:
             return
         entry.keep_alive_s = seconds
-        entry.last_used = time.monotonic()
+        entry.last_used = time.perf_counter()
         self._ensure_reaper()
 
     # -- idle unloading ---------------------------------------------------

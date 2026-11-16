@@ -8,6 +8,7 @@ import hashlib
 import http.server
 import io
 import json
+import sys
 import tarfile
 import threading
 import zipfile
@@ -205,7 +206,7 @@ async def test_a_local_directory_is_registered_in_place(core: Bolo, tmp_path: Pa
     voice = tmp_path / "My Voice"
     voice.mkdir()
     (voice / "model.onnx").write_bytes(b"M" * 100)
-    (voice / "tokens.txt").write_text("a 1\n")
+    (voice / "tokens.txt").write_bytes(b"a 1\n")
     with pytest.raises(InvalidRequest, match="Pass --kind"):
         register_local_model(core, str(voice))
     spec = register_local_model(core, str(voice), "vits", languages=["mai"], options={"numbers": "hi"})
@@ -214,12 +215,47 @@ async def test_a_local_directory_is_registered_in_place(core: Bolo, tmp_path: Pa
     assert register_local_model(core, str(voice), "vits") is spec
     manifest = core.store.pull(spec.id, spec.source)
     assert core.store.is_installed(spec.id) and manifest["size_bytes"] == 104
-    assert (core.store.model_dir(spec.id) / "tokens.txt").read_text() == "a 1\n"
+    assert (core.store.model_dir(spec.id) / "tokens.txt").read_text(encoding="utf-8") == "a 1\n"
     # it survives a restart (custom.yaml) and removing it leaves the user's files alone
     assert Catalog.load(core.settings.data_dir).resolve("local-my-voice").source.local == str(voice)  # type: ignore[union-attr]
     assert await core.remove(spec.id) and (voice / "model.onnx").is_file()
     with pytest.raises(InvalidRequest, match="not a directory"):
         register_local_model(core, str(tmp_path / "nope"), "vits")
+
+
+@pytest.mark.parametrize("junction_works", [True, False])
+async def test_a_local_directory_without_symlink_rights(
+    core: Bolo, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, junction_works: bool
+) -> None:
+    """Windows without Developer Mode or administrator rights cannot make directory symlinks (WinError 1314): bolo
+    falls back to a directory junction there, and to a copy when that fails too (or on other systems)."""
+    from bolo import store
+
+    if junction_works and sys.platform != "win32":
+        pytest.skip("directory junctions exist on Windows only")
+    voice = tmp_path / "Voice"
+    voice.mkdir()
+    (voice / "model.onnx").write_bytes(b"M" * 100)
+    (voice / "tokens.txt").write_bytes(b"a 1\n")
+
+    def no_symlink(self: Path, *args: object, **kwargs: object) -> None:
+        raise OSError(1314, "A required privilege is not held by the client")
+
+    monkeypatch.setattr(Path, "symlink_to", no_symlink)
+    if not junction_works:
+
+        def no_junction(target: Path, link: Path) -> None:
+            raise OSError("no junctions here")
+
+        monkeypatch.setattr(store, "_create_junction", no_junction)
+    spec = register_local_model(core, str(voice), "vits")
+    manifest = core.store.pull(spec.id, spec.source)
+    mdir = core.store.model_dir(spec.id)
+    assert manifest["size_bytes"] == 104 and (mdir / "tokens.txt").read_bytes() == b"a 1\n"
+    assert store.is_dir_link(mdir) is junction_works
+    if junction_works:
+        assert mdir.resolve() == voice.resolve()
+    assert await core.remove(spec.id) and not mdir.exists() and (voice / "model.onnx").is_file()
 
 
 # -- upstream Piper voices ----------------------------------------------------

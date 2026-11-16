@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 from pathlib import Path
@@ -236,6 +237,41 @@ def test_file_logging_rotates_and_is_followed(tmp_path: Path) -> None:
         logs.ACTIVE_LOG_FILE = None
 
 
+def test_a_blocked_log_rotation_copies_and_truncates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Windows cannot rename a log file another program holds open: the handler copies and empties it instead, and
+    when even that fails it keeps writing and tries again later (no "--- Logging error ---" per record)."""
+    path = tmp_path / "server.log"
+    handler = logs.RotatingFileHandler(path, maxBytes=2000, backupCount=2, encoding="utf-8")
+    errors: list[logging.LogRecord] = []
+    monkeypatch.setattr(handler, "handleError", errors.append)
+
+    def blocked(*args: object) -> None:
+        raise PermissionError(32, "The process cannot access the file because it is being used by another process")
+
+    monkeypatch.setattr(os, "rename", blocked)
+    monkeypatch.setattr(os, "replace", blocked)
+
+    def record(i: int) -> logging.LogRecord:
+        return logging.LogRecord("bolo.test", logging.INFO, __file__, 1, "line %d " + "x" * 90, (i,), None)
+
+    try:
+        for i in range(40):  # about 4 KB: two rollovers
+            handler.emit(record(i))
+        assert not errors
+        assert path.stat().st_size <= 2000 and (tmp_path / "server.log.1").is_file()
+        assert "line 39" in path.read_text(encoding="utf-8")
+        monkeypatch.setattr(logs.shutil, "copyfile", blocked)
+        before = path.stat().st_size
+        for i in range(40, 80):
+            handler.emit(record(i))
+        assert not errors and path.stat().st_size > before  # kept writing to the one file
+        assert capsys.readouterr().err.count("could not rotate the log file") == 1  # then waits before retrying
+    finally:
+        handler.close()
+
+
 def test_cli_logs_and_doctor(
     cli_env: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -275,6 +311,6 @@ def test_every_setting_is_documented() -> None:
     """Each setting has a BOLO_* variable (automatic) and a row in docs/configuration.md."""
     from dataclasses import fields
 
-    docs = (Path(__file__).resolve().parents[2] / "docs" / "configuration.md").read_text()
+    docs = (Path(__file__).resolve().parents[2] / "docs" / "configuration.md").read_text(encoding="utf-8")
     missing = [f.name for f in fields(Settings) if f"`{f.name}`" not in docs]
     assert not missing, f"settings missing from docs/configuration.md: {missing}"

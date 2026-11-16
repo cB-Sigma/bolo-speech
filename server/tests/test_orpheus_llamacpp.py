@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import hashlib
 import io
-import sys
 import time
 from collections.abc import Iterator
 from pathlib import Path
@@ -24,6 +23,7 @@ from bolo.engines.tts_server import TTSServerEngine
 from bolo.errors import EngineUnavailable, InvalidRequest
 from conftest import LiveServer
 from fake_orpheus_server import AUDIO_OFFSET, END_OF_SPEECH, FakeOrpheusServer, frame_tokens
+from fakebin import fake_program
 
 HERE = Path(__file__).parent
 SPF = orph.SAMPLES_PER_FRAME
@@ -351,12 +351,8 @@ def test_speech_through_an_operator_run_server(
 
 
 def fake_binary(tmp_path: Path) -> Path:
-    path = tmp_path / "bin" / "llama-server"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"#!{sys.executable}\nimport sys\nsys.path.insert(0, {str(HERE)!r})\n"
-                    "from fake_orpheus_server import main\nmain(sys.argv[1:])\n")  # fmt: skip
-    path.chmod(0o755)
-    return path
+    return fake_program(tmp_path / "bin" / "llama-server", f"import sys\nsys.path.insert(0, {str(HERE)!r})\n"
+                        "from fake_orpheus_server import main\nmain(sys.argv[1:])\n")  # fmt: skip
 
 
 def test_managed_llama_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_onnx: list[FakeSnac]) -> None:
@@ -378,7 +374,7 @@ def test_managed_llama_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, f
     try:
         import json
 
-        argv = json.loads(argv_log.read_text())
+        argv = json.loads(argv_log.read_text(encoding="utf-8"))
         assert argv[argv.index("-m") + 1] == str(model_dir / "m.gguf")
         assert argv[argv.index("-c") + 1] == "4096" and "--api-key" in argv and "-mm" not in argv
         assert proc.running and proc.api_key

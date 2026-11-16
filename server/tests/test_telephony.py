@@ -12,6 +12,7 @@ import base64
 import json
 import os
 import re
+import sys
 import time
 from collections.abc import Iterator
 from pathlib import Path
@@ -841,9 +842,10 @@ def test_agents_and_numbers_through_the_api(phone: Phone, settings: Settings) ->
     numbers = httpx.get(api + "/numbers").json()
     assert {"number": "+1 415 555 0199", "agent": "pizza", "source": "stored", "editable": True} in numbers["numbers"]
     assert numbers["default_agent"] == "desk"
-    stored = json.loads((settings.data_dir / "telephony.json").read_text())
+    stored = json.loads((settings.data_dir / "telephony.json").read_text(encoding="utf-8"))
     assert stored["numbers"] == {"+1 415 555 0199": "pizza"} and stored["agents"]["pizza"]["greeting"] == "Pizza!"
-    assert (settings.data_dir / "telephony.json").stat().st_mode & 0o777 == 0o600
+    mode = (settings.data_dir / "telephony.json").stat().st_mode & 0o777
+    assert sys.platform == "win32" or mode == 0o600  # Windows has no mode bits
     # a restart reads them back
     again = TelephonyConfig(settings)
     found = again.agent_for("14155550199")

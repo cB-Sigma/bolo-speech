@@ -10,6 +10,7 @@ import io
 import json
 import logging
 import stat
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -679,8 +680,9 @@ def test_providers_api(settings: Settings, cloud: FakeProviders) -> None:
             "terms_url": None,
         }  # fmt: skip
         stored = settings.data_dir / "providers.json"
-        assert json.loads(stored.read_text())["openai"]["api_key"] == KEY
-        assert stat.S_IMODE(stored.stat().st_mode) == 0o600
+        assert json.loads(stored.read_text(encoding="utf-8"))["openai"]["api_key"] == KEY
+        # owner-only on POSIX; Windows has no mode bits (the file inherits the folder's ACL, the user's profile)
+        assert sys.platform == "win32" or stat.S_IMODE(stored.stat().st_mode) == 0o600
         assert KEY not in httpx.get(api).text and KEY not in httpx.get(f"{api}/openai").text
         assert httpx.get(f"{server.url}/api/v1/info").json()["providers"] == [
             {"name": "sarvam", "kind": "sarvam", "configured": True},
@@ -708,7 +710,7 @@ def test_providers_api(settings: Settings, cloud: FakeProviders) -> None:
         assert httpx.delete(f"{api}/sarvam").status_code == 400 and httpx.delete(f"{api}/ghost").status_code == 404
         assert httpx.post(f"{api}/ghost/test").status_code == 404
         assert httpx.delete(f"{api}/openai").status_code == 204
-        assert "openai" not in json.loads(stored.read_text())
+        assert "openai" not in json.loads(stored.read_text(encoding="utf-8"))
         assert httpx.get(f"{server.url}/api/v1/models/openai-whisper-1").json()["installed"] is False
     finally:
         server.stop()

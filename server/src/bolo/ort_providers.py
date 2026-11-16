@@ -88,10 +88,71 @@ def providers_for(device: str | None, available: list[str] | None = None) -> lis
 
 
 def sherpa_provider(device: str | None) -> str:
-    """sherpa-onnx's ``provider`` string for ``device`` (it knows ``cpu``, ``cuda`` and ``coreml``)."""
+    """sherpa-onnx's ``provider`` string for ``device`` (bolo uses ``cpu``, ``cuda`` and ``coreml``).
+
+    sherpa-onnx knows a ``directml`` provider only when it was built with DirectML, and its wheels on PyPI are not
+    (asked for it, they fall back to the CPU saying "DirectML is for Windows only"), so ``device = "dml"`` runs
+    sherpa-onnx engines on the CPU, with one notice."""
     name = (device or "cpu").strip().lower().partition(":")[0]
     if name in ("cuda", "gpu"):
         return "cuda"
     if name in ("coreml", "mps", "metal"):
         return "coreml"
+    if name in ("dml", "directml"):
+        _warn_once(
+            "sherpa-dml",
+            "device 'dml': sherpa-onnx's wheels have no DirectML provider, so its engines (most speech recognition "
+            "and voices) run on the CPU; DirectML serves the engines that use ONNX Runtime directly",
+        )
     return "cpu"
+
+
+#: the PyPI distributions that each install the same ``onnxruntime`` module
+ORT_PACKAGES = (
+    "onnxruntime", "onnxruntime-gpu", "onnxruntime-directml", "onnxruntime-openvino", "onnxruntime-qnn",
+    "onnxruntime-rocm", "onnxruntime-silicon",
+)  # fmt: skip
+
+DIRECTML_RECIPE = (
+    "pip uninstall -y onnxruntime onnxruntime-gpu onnxruntime-directml, then pip install onnxruntime-directml "
+    "(after bolo and its extras: installing faster-whisper again brings plain onnxruntime back)"
+)
+
+
+def installed_ort_packages(versions: dict[str, str | None] | None = None) -> dict[str, str]:
+    """The ONNX Runtime distributions installed here, with their versions."""
+    if versions is None:
+        from importlib import metadata
+
+        versions = {}
+        for name in ORT_PACKAGES:
+            try:
+                versions[name] = metadata.version(name)
+            except metadata.PackageNotFoundError:
+                versions[name] = None
+    return {name: v for name, v in versions.items() if v}
+
+
+def ort_problems(device: str | None, packages: dict[str, str], providers: list[str] | None) -> list[str]:
+    """What ``bolo doctor`` warns about: several ONNX Runtime packages sharing the one module, and a device whose
+    provider this ONNX Runtime lacks (``dml`` without onnxruntime-directml, ``cuda`` without onnxruntime-gpu)."""
+    out: list[str] = []
+    if len(packages) > 1:
+        listed = ", ".join(f"{name} {version}" for name, version in sorted(packages.items()))
+        out.append(
+            f"several ONNX Runtime packages are installed ({listed}); they all install the same `onnxruntime` "
+            "module and overwrite each other's files: keep one (uninstall all of them, then install the one you want)"
+        )
+    name = (device or "cpu").strip().lower().partition(":")[0]
+    wanted = PROVIDER_BY_DEVICE.get(name)
+    if wanted and providers is not None and wanted not in providers and packages:
+        if wanted == "DmlExecutionProvider":
+            out.append(f"device {device!r} needs DirectML in ONNX Runtime, which this one lacks: {DIRECTML_RECIPE}")
+        elif wanted == "CUDAExecutionProvider":
+            out.append(
+                f"device {device!r}: this ONNX Runtime has no CUDA provider; pip uninstall -y onnxruntime, then "
+                "pip install onnxruntime-gpu (faster-whisper and sherpa-onnx bring their own CUDA support)"
+            )
+        else:
+            out.append(f"device {device!r}: this ONNX Runtime has no {wanted}")
+    return out

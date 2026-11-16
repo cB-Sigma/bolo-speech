@@ -383,7 +383,7 @@ def main() -> None:
             for name in ("encoder.onnx", "encoder.onnx.data", "decoder.onnx", "decoder.onnx.data"):
                 (args.out_dir / name).unlink(missing_ok=True)
     finish(args.model_dir, args.out_dir)
-    print(json.dumps(json.loads((args.out_dir / "dicow_onnx.json").read_text())["files"], indent=1))
+    print(json.dumps(json.loads((args.out_dir / "dicow_onnx.json").read_text(encoding="utf-8"))["files"], indent=1))
 
 
 if __name__ == "__main__":

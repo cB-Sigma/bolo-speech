@@ -458,6 +458,7 @@ class _NativeProcessor(_Processor):
         self.stream: STTStream = stt.create_stream(session.cfg.language)
         self.base = 0  # stream position where the current utterance began
         self.speech_start: int | None = None  # where the VAD heard speech begin in this utterance
+        self.speech_end: int | None = None  # where the VAD heard it end (the final's t1, however late it was seen)
         self.kept: list[FloatArray] = []  # the utterance's audio, kept only when speakers are labelled
         self.stability = PrefixStability()
         self.last_text = ""
@@ -472,17 +473,34 @@ class _NativeProcessor(_Processor):
         return result, bool(endpoint)
 
     async def audio(self, samples: FloatArray, recv_t: float) -> None:
+        # Audio that queued up while the model was busy arrives here in one piece, possibly with one utterance's end
+        # and the next one's start in it. Fed whole, the two would come out as one final: the piece is cut where
+        # the VAD heard the next utterance start, and the part before it ends the first utterance.
+        first = self.pos  # the stream position of samples[0]
+        done = 0
+        ended = False
+        for ev in self.run_vad(samples):
+            await self.s.send_vad(ev.kind, ev.sample)
+            if ev.kind == "speech_end":
+                ended = True
+                self.speech_end = ev.sample
+            elif ev.kind == "speech_start":
+                if ended:
+                    cut = min(len(samples), max(done, ev.sample - first))
+                    await self._feed(samples[done:cut], recv_t, vad_end=True)
+                    done, ended = cut, False
+                self.speech_start = max(self.base, ev.sample)
+        if ended or done == 0 or done < len(samples):
+            await self._feed(samples[done:], recv_t, vad_end=ended)
+
+    def _accept(self, samples: FloatArray) -> None:
         self.stream.accept(samples)
         self.pos += len(samples)
         if self.s.cfg.diarize:
             self.kept.append(samples)
-        vad_end = False
-        for ev in self.run_vad(samples):
-            await self.s.send_vad(ev.kind, ev.sample)
-            if ev.kind == "speech_start":
-                self.speech_start = max(self.base, ev.sample)
-            elif ev.kind == "speech_end":
-                vad_end = True
+
+    async def _feed(self, samples: FloatArray, recv_t: float, vad_end: bool) -> None:
+        self._accept(samples)
         result, endpoint = await self._step()
         text = result.text.strip()
         if text and text != self.last_text and self.s.cfg.interim and not (endpoint or vad_end):
@@ -509,11 +527,15 @@ class _NativeProcessor(_Processor):
                 audio = np.concatenate(self.kept)
                 if self.speech_start is not None:  # drop the silence before the speaker started
                     audio = audio[max(0, self.speech_start - self.base) :]
-            await self.s.send_final(text, self._t0(), self.pos / SR, recv_t, words, None, audio)
+            end = (
+                self.speech_end if self.speech_end is not None and self.base < self.speech_end < self.pos else self.pos
+            )
+            await self.s.send_final(text, self._t0(), end / SR, recv_t, words, None, audio)
         self.kept = []
         self.stream.reset()
         self.base = self.pos
         self.speech_start = None
+        self.speech_end = None
         self.last_text = ""
         self.stability.reset()
         self.first_partial_pending = True

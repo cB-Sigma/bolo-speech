@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -79,9 +80,10 @@ def cmd_serve(args: argparse.Namespace) -> int:
          "ui", "default_stt", "default_tts", "default_realtime_stt", "memory_budget_mb", "batch_wait_ms", "max_queue",
          "llm_base_url", "llm_model", "llm_api_key", "num_parallel", "gpus", "gpu_spread", "log_file"),
     )  # fmt: skip
-    from bolo import logs
+    from bolo import logs, procs
 
     log_file = logs.configure(settings)
+    procs.install_hooks()  # from the main thread: children are stopped at exit and on SIGHUP
     app = create_app(settings)
     where = f"http://{settings.host}:{settings.port}"
     print(f"bolo {__version__} listening on {where}  (console: {where}/  API docs: {where}/docs)", file=sys.stderr)
@@ -1421,6 +1423,28 @@ def _doctor_packs(settings: Any) -> None:
         print(f"    {pack.component:<24} {packs.human_size(pack.size):>8}  {pack.license:<13} {state}{note}")
 
 
+def _doctor_onnxruntime(settings: Settings) -> None:
+    from bolo import ort_providers
+
+    packages = ort_providers.installed_ort_packages()
+    providers: list[str] | None = None
+    if packages:
+        try:
+            import onnxruntime
+
+            providers = list(onnxruntime.get_available_providers())
+        except Exception as exc:
+            print(f"onnxruntime: installed but cannot be loaded ({type(exc).__name__}: {exc})")
+    if providers is not None:
+        listed = ", ".join(f"{n} {v}" for n, v in sorted(packages.items()))
+        print(f"onnxruntime: {listed}; providers {', '.join(p.removesuffix('ExecutionProvider') for p in providers)}")
+    elif not packages:
+        print("onnxruntime: not installed (Nemotron diarization, DiCoW, Orpheus-family voices and the end-of-turn "
+              "model need it: pip install 'bolo-speech[turn]')")  # fmt: skip
+    for problem in ort_providers.ort_problems(settings.device, packages, providers):
+        print(f"  warning: {problem}")
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     import platform
 
@@ -1483,6 +1507,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             "not cover need it: `bolo components install espeak-ng --accept-license`)"
         )
     print(f"logs: {_log_where(settings)}")
+    _doctor_onnxruntime(settings)
     _doctor_llm(settings)
     _doctor_providers(settings)
     _doctor_hardware(args)
@@ -1828,7 +1853,19 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def utf8_stdio() -> None:
+    """Read and write UTF-8 on standard input, output and error on every platform. Python on Windows otherwise uses
+    the legacy code page for a pipe or a file redirect (cp1252, cp437, ...), which cannot write Devanagari or other
+    non-Latin text (``UnicodeEncodeError``). A Windows console is unaffected (Python writes it as UTF-16)."""
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None and str(getattr(stream, "encoding", "")).lower().replace("-", "") != "utf8":
+            with contextlib.suppress(Exception):  # a replaced stream (pytest's capture, an IDE) keeps its own
+                reconfigure(encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
+    utf8_stdio()
     parser = build_parser()
     args = parser.parse_args(argv)
     if not getattr(args, "func", None):

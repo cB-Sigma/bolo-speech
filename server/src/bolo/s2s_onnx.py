@@ -121,7 +121,7 @@ class FeatureSettings:
 
     @classmethod
     def from_dir(cls, path: Path) -> FeatureSettings:
-        doc = json.loads((path / "preprocessor_config.json").read_text())
+        doc = json.loads((path / "preprocessor_config.json").read_text(encoding="utf-8"))
         return cls(
             sample_rate=int(doc.get("sampling_rate", 16000)),
             n_mels=int(doc.get("feature_size", 128)),
@@ -162,7 +162,7 @@ class CodecSettings:
 
     @classmethod
     def from_dir(cls, path: Path) -> CodecSettings:
-        doc = json.loads((path / "audio_tokenizer" / "config.json").read_text())
+        doc = json.loads((path / "audio_tokenizer" / "config.json").read_text(encoding="utf-8"))
         return cls(
             sample_rate=int(doc.get("sampling_rate", 24000)),
             n_fft=int(doc.get("stft_n_fft", 1280)),
@@ -203,9 +203,9 @@ class GenerationSettings:
 
     @classmethod
     def from_dir(cls, path: Path) -> GenerationSettings:
-        config = json.loads((path / "config.json").read_text())
+        config = json.loads((path / "config.json").read_text(encoding="utf-8"))
         gen = (
-            json.loads((path / "generation_config.json").read_text())
+            json.loads((path / "generation_config.json").read_text(encoding="utf-8"))
             if (path / "generation_config.json").exists()
             else {}
         )

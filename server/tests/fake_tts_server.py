@@ -223,9 +223,9 @@ def main(argv: list[str]) -> None:
             load_delay_s=float(os.environ.get("FAKE_LOAD_DELAY", "0")),
         )  # fmt: skip
         if os.environ.get("FAKE_ENV_FILE"):  # what the server was started with, for the test to read
-            Path(os.environ["FAKE_ENV_FILE"]).write_text(json.dumps(dict(os.environ)))
+            Path(os.environ["FAKE_ENV_FILE"]).write_text(json.dumps(dict(os.environ)), encoding="utf-8")
     elif "--config" in argv:
-        config = json.loads(Path(argv[argv.index("--config") + 1]).read_text())
+        config = json.loads(Path(argv[argv.index("--config") + 1]).read_text(encoding="utf-8"))
         model = config["models"][0]
         server = FakeTTSServer(
             "audiocpp", rate=int(os.environ.get("FAKE_RATE", "16000")), port=int(config["port"]),

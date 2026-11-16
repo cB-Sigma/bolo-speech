@@ -223,7 +223,7 @@ async def test_band_limited_telephone_audio_is_detected_and_finalised(live: Live
             live.ws_url + f"/api/v1/stt/stream?model={model}&encoding=mulaw&sample_rate=8000"
         ) as ws:
             await ws.recv()
-            await stream_audio(ws, payload, 160, delay=0.002)
+            await stream_audio(ws, payload, 160, delay=0)
             await ws.send(json.dumps({"type": "stop"}))
             messages = await collect(ws)
         vad = [m["event"] for m in messages if m["type"] == "vad"]

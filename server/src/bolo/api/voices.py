@@ -335,7 +335,7 @@ def _read_consent(core: Bolo, consent_id: str) -> dict[str, Any]:
     path = _consent_dir(core) / consent_id / "consent.json"
     if not path.is_file():
         raise VoiceNotFound(f"no voice consent '{consent_id}'")
-    meta: dict[str, Any] = json.loads(path.read_text())
+    meta: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
     return meta
 
 
@@ -368,7 +368,7 @@ async def create_voice_consent(request: Request) -> JSONResponse:
         "id": cid, "created_at": int(time.time()), "name": name.strip(), "language": language.strip(),
         "by": created_by(request), "at": now_iso(),
     }  # fmt: skip
-    (path / "consent.json").write_text(json.dumps(meta, indent=2))
+    (path / "consent.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     return JSONResponse(_consent_object(meta))
 
 
@@ -380,7 +380,7 @@ async def list_voice_consents(request: Request) -> JSONResponse:
     if root.is_dir():
         for p in sorted(root.iterdir()):
             with contextlib.suppress(OSError, ValueError, KeyError):
-                items.append(_consent_object(json.loads((p / "consent.json").read_text())))
+                items.append(_consent_object(json.loads((p / "consent.json").read_text(encoding="utf-8"))))
     items.sort(key=lambda m: m["created_at"], reverse=True)
     return JSONResponse({"object": "list", "data": items, "has_more": False})
 
@@ -400,7 +400,7 @@ async def update_voice_consent(request: Request, consent_id: str, body: ConsentP
     core = get_core(request)
     meta = _read_consent(core, consent_id)
     meta["name"] = body.name.strip() or meta["name"]
-    (_consent_dir(core) / consent_id / "consent.json").write_text(json.dumps(meta, indent=2))
+    (_consent_dir(core) / consent_id / "consent.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     return JSONResponse(_consent_object(meta))
 
 

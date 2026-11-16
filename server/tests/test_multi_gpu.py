@@ -24,6 +24,7 @@ from bolo.core import Bolo
 from bolo.engines.base import LoadOptions
 from bolo.llama_args import check_tuning, gpu_args, parallel_args, resolve_tuning, tuning_args
 from bolo.placement import LayerInfo, best_gpu, plan_spread, spread_layers
+from fakebin import printing_program
 
 MB = 1024 * 1024
 GB = 1024 * MB
@@ -198,9 +199,7 @@ def test_the_tts_server_command_line(tmp_path: Path) -> None:
     """What bolo would start: the GPUs, parallel slots and tuning arguments, the operator's arguments last."""
     from bolo.engines.tts_server import TTSServerEngine
 
-    binary = tmp_path / "llama-server"
-    binary.write_text("#!/bin/sh\n")
-    binary.chmod(0o755)
+    binary = printing_program(tmp_path / "llama-server")
     engine = TTSServerEngine()
     engine.configure(Settings(data_dir=tmp_path, llama_server_bin=str(binary), llama_kv_cache_type="q8_0",
                               tts_server_args=["-c", "1024"]))  # fmt: skip

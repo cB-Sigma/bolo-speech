@@ -18,6 +18,7 @@ import os
 import platform
 import shutil
 import subprocess
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -143,6 +144,18 @@ class Host:
     def logical_cores(self) -> int | None:
         return os.cpu_count()
 
+    def windows_cpu(self) -> tuple[str | None, list[str] | None]:
+        """Windows: the CPU's name (registry) and instruction sets (IsProcessorFeaturePresent)."""
+        from bolo import winhw
+
+        return winhw.cpu_name(), winhw.cpu_features(self.machine())
+
+    def windows_adapters(self) -> list[Any] | None:
+        """Windows: the hardware graphics adapters DXGI lists (bolo.winhw.Adapter), None when it cannot be asked."""
+        from bolo import winhw
+
+        return winhw.dxgi_adapters()
+
     def physical_cores(self) -> int | None:
         try:
             import psutil
@@ -153,6 +166,8 @@ class Host:
 
     def affinity(self) -> int | None:
         """How many CPUs this process may run on (taskset, cpuset), where the system says."""
+        if sys.platform in ("win32", "darwin"):  # no sched_getaffinity
+            return None
         try:
             return len(os.sched_getaffinity(0))
         except (AttributeError, OSError):
@@ -248,9 +263,9 @@ class Gpu:
     driver: str | None = None
     #: the GPU shares the machine's memory (Apple Silicon, integrated graphics)
     unified_memory: bool = False
-    #: how inference runtimes reach it: "cuda", "metal", or None when no runtime bolo uses can
+    #: how inference runtimes reach it: "cuda", "metal", "dml" (DirectML), or None when no runtime bolo uses can
     backend: str | None = None
-    source: str = ""  # nvidia-smi | pynvml | sysfs | platform
+    source: str = ""  # nvidia-smi | pynvml | sysfs | platform | dxgi
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -476,6 +491,14 @@ def detect_cpu(host: Host) -> tuple[Cpu, bool]:
         hypervisor = _linux_cpu(host, cpu)
     elif system == "darwin":
         _mac_cpu(host, cpu)
+    elif system == "windows":
+        name, features = host.windows_cpu()
+        cpu.model = name or cpu.model
+        if features is not None:
+            cpu.features = features
+        if name:
+            lowered = name.lower()
+            cpu.vendor = "GenuineIntel" if "intel" in lowered else "AuthenticAMD" if "amd" in lowered else None
     if cpu.model is None:
         cpu.model = host.processor()
     if cpu.physical_cores is None:
@@ -699,7 +722,45 @@ def detect_gpus(host: Host, cpu: Cpu, memory: Memory) -> tuple[list[Gpu], bool]:
                 )
             )
         return gpus, True
+    if system == "windows":
+        adapters = host.windows_adapters()
+        if adapters is None:
+            return gpus, nvidia is not None
+        gpus += _dxgi_gpus(host, adapters, have_nvidia=bool(nvidia))
+        return gpus, True
     return gpus, nvidia is not None
+
+
+def _dxgi_gpus(host: Host, adapters: list[Any], have_nvidia: bool) -> list[Gpu]:
+    """Windows graphics adapters as DXGI lists them: what DirectML (``device = "dml:N"``) can use when the
+    DirectML build of ONNX Runtime is installed. NVIDIA cards already read through NVML/nvidia-smi are not listed
+    twice."""
+    ort = host.module("onnxruntime")
+    dml = False
+    if ort is not None:
+        with contextlib.suppress(Exception):
+            dml = "DmlExecutionProvider" in ort.get_available_providers()
+    gpus: list[Gpu] = []
+    for a in adapters:
+        if a.vendor == "nvidia" and have_nvidia:
+            continue
+        integrated = a.vendor == "intel" or a.dedicated_bytes <= 512 * 1024 * 1024
+        gpus.append(
+            Gpu(
+                vendor=a.vendor if a.vendor in ("nvidia", "amd", "intel") else "unknown",
+                name=f"{a.name} (dml:{a.index})",
+                vram_total_bytes=a.dedicated_bytes or None,
+                vram_free_bytes=(
+                    max(0, a.budget_bytes - (a.usage_bytes or 0))
+                    if a.budget_bytes is not None and not integrated
+                    else None
+                ),
+                unified_memory=integrated,
+                backend="dml" if dml else None,
+                source="dxgi",
+            )
+        )
+    return gpus
 
 
 # -- runtimes ---------------------------------------------------------------------------------------------------
@@ -908,10 +969,12 @@ def detect(settings: Settings | None = None, host: Host | None = None, deep: boo
             f"the CPU quota allows about {_num(quota)} core(s) but bolo uses {hw.threads} inference threads; "
             f"`threads = {max(1, math.floor(quota))}` avoids throttling"
         )
-    if hw.best_gpu() is not None and hw.device == "cpu":
+    best = hw.best_gpu()
+    if best is not None and hw.device == "cpu":
+        example = "dml" if best.backend == "dml" else "cuda"
         hw.notes.append(
             'a GPU was found but the `device` setting is "cpu": the built-in engines run on the CPU until it is '
-            'set (for example device = "cuda"); the torch plugin picks its own device'
+            f'set (for example device = "{example}"); the torch plugin picks its own device'
         )
     return hw
 

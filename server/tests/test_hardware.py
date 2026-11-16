@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import platform
+import sys
 import types
 from pathlib import Path
 from typing import Any
@@ -11,6 +13,7 @@ import pytest
 
 from bolo import hardware as hw
 from bolo.config import Settings
+from fakebin import printing_program
 
 GB = 1024**3
 
@@ -64,8 +67,11 @@ class FakeHost(hw.Host):
         affinity: int | None = None,
         memory: tuple[int | None, int | None] = (None, None),
         env: dict[str, str] | None = None,
+        windows_cpu: tuple[str | None, list[str] | None] = (None, None),
+        adapters: list[Any] | None = None,
     ) -> None:
         super().__init__("/nonexistent-root", env or {})
+        self._windows_cpu, self._adapters = windows_cpu, adapters
         self._system, self._machine = system, machine
         self.files = files or {}
         self.commands = commands or {}
@@ -117,6 +123,12 @@ class FakeHost(hw.Host):
 
     def disk(self, path: Path) -> tuple[int | None, int | None]:
         return 500 * GB, 120 * GB
+
+    def windows_cpu(self) -> tuple[str | None, list[str] | None]:
+        return self._windows_cpu
+
+    def windows_adapters(self) -> list[Any] | None:
+        return self._adapters
 
 
 def settings(tmp_path: Path, **kw: Any) -> Settings:
@@ -377,9 +389,7 @@ def test_runtimes(tmp_path: Path) -> None:
 
 
 def test_server_binary_from_settings(tmp_path: Path) -> None:
-    binary = tmp_path / "llama-server"
-    binary.write_text("#!/bin/sh\n")
-    binary.chmod(0o755)
+    binary = printing_program(tmp_path / "llama-server")
     host = FakeHost(
         files={"/proc/cpuinfo": cpuinfo(X86_AVX2, 8)},
         commands={f"{binary} --version": "version: 6123 (abc)\n", f"{binary} --list-devices": "Available devices:\n  CUDA0: RTX 4090\n"},
@@ -422,6 +432,52 @@ def test_detection_never_raises(tmp_path: Path) -> None:
     empty = hw.detect(None, FakeHost(system="windows", machine="AMD64"))
     assert empty.cpu.architecture == "x86_64" and empty.cpu.features is None and empty.disk.path is None
     assert empty.gpus_known is False and empty.memory.total_bytes is None
+
+
+def test_windows_cpu_features_and_directml_adapters(tmp_path: Path) -> None:
+    from bolo.winhw import Adapter
+
+    class Ort:
+        @staticmethod
+        def get_available_providers() -> list[str]:
+            return ["DmlExecutionProvider", "CPUExecutionProvider"]
+
+    adapters = [
+        Adapter(0, "NVIDIA GeForce RTX 3060 Laptop GPU", 0x10DE, 6 * GB, 8 * GB, False, 5 * GB, 1 * GB),
+        Adapter(1, "AMD Radeon(TM) Graphics", 0x1002, 512 * 1024 * 1024, 8 * GB, False, 400 * 1024 * 1024, 0),
+    ]
+    host = FakeHost(
+        system="windows", machine="AMD64", cores=16, memory=(16 * GB, 9 * GB), modules={"onnxruntime": Ort()},
+        windows_cpu=("AMD Ryzen 7 5800H with Radeon Graphics", ["sse4.2", "avx", "avx2"]), adapters=adapters,
+    )  # fmt: skip
+    found = hw.detect(settings(tmp_path), host)
+    assert found.cpu.model == "AMD Ryzen 7 5800H with Radeon Graphics" and found.cpu.vendor == "AuthenticAMD"
+    assert found.cpu.features == ["sse4.2", "avx", "avx2"] and "AVX2" in found.summary()
+    assert found.gpus_known
+    nvidia, amd = found.gpus
+    assert nvidia.name == "NVIDIA GeForce RTX 3060 Laptop GPU (dml:0)" and nvidia.backend == "dml"
+    assert nvidia.vram_total_bytes == 6 * GB and nvidia.vram_free_bytes == 4 * GB and nvidia.source == "dxgi"
+    assert amd.vendor == "amd" and amd.backend == "dml" and amd.unified_memory and amd.vram_free_bytes is None
+    assert found.best_gpu() is nvidia and any('device = "dml"' in n for n in found.notes)
+    # without the DirectML build of ONNX Runtime the adapters are listed but nothing bolo runs can use them
+    plain = hw.detect(settings(tmp_path), FakeHost(system="windows", machine="AMD64", adapters=adapters[1:]))
+    assert plain.gpus[0].backend is None and plain.best_gpu() is None and plain.gpus_known
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="asks Windows itself (IsProcessorFeaturePresent, DXGI)")
+def test_windows_probes_on_windows() -> None:
+    from bolo import winhw
+
+    features = winhw.cpu_features(platform.machine())
+    assert features is not None and ("sse4.2" in features or "neon" in features)
+    assert winhw.cpu_name()
+    adapters = winhw.dxgi_adapters(include_software=True)
+    assert adapters, "every Windows lists at least the Microsoft Basic Render Driver"
+    assert all(a.name and a.index >= 0 for a in adapters)
+    assert any(a.software for a in adapters) or any(a.dedicated_bytes for a in adapters)
+    assert all(not a.software for a in winhw.dxgi_adapters() or [])
+    found = hw.detect(None)
+    assert found.cpu.features and found.gpus_known
 
 
 def test_real_host_detects_without_raising(tmp_path: Path) -> None:

@@ -438,7 +438,7 @@ def test_benchmark_is_stored_and_used(settings: Settings, monkeypatch: pytest.Mo
             "usable_cores": SMALL.cpu.usable_cores}  # fmt: skip
     monkeypatch.setattr("bolo.hardware.run_benchmark", lambda hw: dict(fake))
     assert core.advisor.benchmark()["speed"] == 4.0
-    assert json.loads((settings.data_dir / "hardware-benchmark.json").read_text())["speed"] == 4.0
+    assert json.loads((settings.data_dir / "hardware-benchmark.json").read_text(encoding="utf-8"))["speed"] == 4.0
     speed = core.advisor.speed()
     assert speed.source == "benchmark" and speed.factor == 4.0
     after = core.advisor.fit(core.manager.resolve("whisper-base"))

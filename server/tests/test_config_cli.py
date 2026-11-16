@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -153,3 +155,14 @@ def test_cli_ps_against_live_server(live, capsys: pytest.CaptureFixture[str]) ->
     assert main(["ps", "--url", live.url]) == 0
     out = capsys.readouterr().out
     assert "fake-tts" in out and "PROCESSOR" in out and "100% CPU" in out
+
+
+def test_the_command_line_writes_utf8_to_pipes() -> None:
+    """Windows gives a pipe or a file the legacy code page (cp1252 here, as there): bolo writes UTF-8 anyway."""
+    import subprocess
+
+    src = str(Path(__file__).resolve().parents[1] / "src")
+    code = f"import sys; sys.path.insert(0, {src!r}); from bolo import cli; cli.utf8_stdio(); print('नमस्ते दुनिया')"
+    env = {**os.environ, "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"}
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, env=env, check=True).stdout
+    assert out.decode("utf-8").strip() == "नमस्ते दुनिया"

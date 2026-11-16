@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
-import sys
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -18,6 +17,7 @@ from bolo.config import Settings
 from bolo.s2s import AudioDelta, LlamaRealtimeBackend, ResponseEnd, S2SConfig, TextDelta, ToolCall, realtime_url
 from conftest import LiveServer
 from fake_realtime_server import FakeRealtimeServer
+from fakebin import fake_program
 from test_realtime import b64_pcm24
 
 HERE = Path(__file__).parent
@@ -231,12 +231,8 @@ async def test_backend_refuses_a_voice(upstream: FakeRealtimeServer) -> None:
 
 
 def fake_llama_server(tmp_path: Path) -> Path:
-    path = tmp_path / "bin" / "llama-server"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"#!{sys.executable}\nimport sys\nsys.path.insert(0, {str(HERE)!r})\n"
-                    "from fake_realtime_server import main\nmain(sys.argv[1:])\n")  # fmt: skip
-    path.chmod(0o755)
-    return path
+    return fake_program(tmp_path / "bin" / "llama-server", f"import sys\nsys.path.insert(0, {str(HERE)!r})\n"
+                        "from fake_realtime_server import main\nmain(sys.argv[1:])\n")  # fmt: skip
 
 
 async def test_managed_server(tmp_path: Path) -> None:

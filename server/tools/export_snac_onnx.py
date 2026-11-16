@@ -239,7 +239,7 @@ def load_sequences(files: list[Path], seed: int) -> dict[str, list[list[int]]]:
         levels = [rng.integers(0, CODEBOOK, n * t).tolist() for n in (1, 2, 4)]
         out[f"random-{t}-frames"] = levels
     for f in files:
-        doc = json.loads(f.read_text())
+        doc = json.loads(f.read_text(encoding="utf-8"))
         tokens = doc["tokens"] if isinstance(doc, dict) else doc
         levels = codes_from_tokens([int(x) for x in tokens])
         if levels[0]:
@@ -330,11 +330,13 @@ def main() -> None:
         "files": {p.name: {"size": p.stat().st_size, "sha256": sha256(p)} for p in files},
         "verification": report,
     }
-    (out / "snac_onnx.json").write_text(json.dumps(doc, indent=2) + "\n")
+    (out / "snac_onnx.json").write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
     rows = "\n".join(
         f"| `{p.name}` | {'fp16' if 'fp16' in p.name else 'fp32'} | {p.stat().st_size / 1e6:.1f} MB |" for p in files
     )
-    (out / "README.md").write_text(README.format(repo=SOURCE_REPO, revision=SOURCE_REVISION, rows=rows))
+    (out / "README.md").write_text(
+        README.format(repo=SOURCE_REPO, revision=SOURCE_REVISION, rows=rows), encoding="utf-8"
+    )
     print(json.dumps(doc, indent=2))
 
 

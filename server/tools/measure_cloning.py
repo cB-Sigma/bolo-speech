@@ -47,7 +47,7 @@ VOICES = ("2277", "84")  # LibriSpeech dev-clean speakers that become the saved 
 
 def cpu_name() -> str:
     with contextlib.suppress(OSError):
-        for line in Path("/proc/cpuinfo").read_text().splitlines():
+        for line in Path("/proc/cpuinfo").read_text(encoding="utf-8").splitlines():
             if line.startswith("model name"):
                 return line.split(":", 1)[1].strip()
     return platform.processor() or platform.platform()
@@ -89,7 +89,7 @@ async def speak(core: Bolo, text: str, model: str, voice: str | None, custom: bo
 
 
 async def run(args: argparse.Namespace) -> dict[str, Any]:
-    meta = json.loads(Path(args.refs, "meta.json").read_text())
+    meta = json.loads(Path(args.refs, "meta.json").read_text(encoding="utf-8"))
     core = Bolo(load_settings(None, {"auto_pull": False, "threads": args.threads}))  # BOLO_* variables apply
     await core.start()
     results: dict[str, Any] = {
@@ -162,7 +162,7 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
                 await core.manager.unload(spec.id)
             results["models"][spec.id] = entry
             if args.out:
-                Path(args.out).write_text(json.dumps(results, indent=2, ensure_ascii=False) + "\n")
+                Path(args.out).write_text(json.dumps(results, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     finally:
         await core.stop()
     return results

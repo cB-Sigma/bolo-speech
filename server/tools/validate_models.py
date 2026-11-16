@@ -60,7 +60,7 @@ SENTENCES = {
 def hardware() -> str:
     model = ""
     try:
-        for line in Path("/proc/cpuinfo").read_text().splitlines():
+        for line in Path("/proc/cpuinfo").read_text(encoding="utf-8").splitlines():
             if line.startswith("model name"):
                 model = line.split(":", 1)[1].strip()
                 break
@@ -209,7 +209,7 @@ async def main_async(args: argparse.Namespace) -> None:
     core = Bolo(settings)
     await core.start()
     out_path = Path(args.out)
-    report: dict[str, Any] = json.loads(out_path.read_text()) if out_path.exists() else {}
+    report: dict[str, Any] = json.loads(out_path.read_text(encoding="utf-8")) if out_path.exists() else {}
     cache = settings.data_dir / "validation"
     synth: dict[str, Any] = {}
     hw = hardware()
@@ -250,7 +250,7 @@ async def main_async(args: argparse.Namespace) -> None:
                 entry["error"] = f"{type(exc).__name__}: {exc}"[:300]
             entry["took_s"] = round(time.perf_counter() - t0, 1)
             report[spec.id] = entry
-            out_path.write_text(json.dumps(report, indent=1, ensure_ascii=False))
+            out_path.write_text(json.dumps(report, indent=1, ensure_ascii=False), encoding="utf-8")
             print(f"{spec.id}: {json.dumps(entry, ensure_ascii=False)}", flush=True)
             for other in list(core.manager.loaded):
                 if other != args.stt:

@@ -61,6 +61,8 @@ class Release:
     url: str
     sha256: str
     size: int | None = None
+    #: more archives unpacked into the same folder (the CUDA runtime DLLs of the Windows CUDA builds)
+    extras: tuple[Release, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -117,13 +119,42 @@ RUNTIME_INFO: dict[str, Runtime] = {
                 "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-macos-x64.tar.gz",
                 "e61d5511936adc349db7af0dd5dec2134a3fde108fb3759782a133bfa0106365",
             ),
+            # the Windows CPU build loads the best of its CPU back ends (SSE4.2 to AVX-512) at start-up
+            "windows-x86_64": Release(
+                "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-win-cpu-x64.zip",
+                "3aa7046f1b310c404418625d4e7e7b057c2d0e0eef5557925561381373d8f026",
+                25116305,
+            ),
+            "windows-x86_64-cuda": Release(
+                "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-win-cuda-12.4-x64.zip",
+                "8b7bf8f3b5269531cbf00c52e4ee5d8b0c77cb4ea7af694ed3da3a34e47a7099",
+                319401248,
+                extras=(
+                    Release(
+                        "https://github.com/ggml-org/llama.cpp/releases/download/b12375/cudart-llama-bin-win-cuda-12.4-x64.zip",
+                        "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6",
+                        391443627,
+                    ),
+                ),
+            ),
+            "windows-x86_64-vulkan": Release(
+                "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-win-vulkan-x64.zip",
+                "8990615f25d4fa12a7f1d8fc9da995538ce739fec01838f003fa9ff099d643f0",
+                38113510,
+            ),
+            "windows-arm64": Release(
+                "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-win-cpu-arm64.zip",
+                "dcbbd1217956893f91714e58bba95fe87dda272a3e72aabe46513a1ce9113cac",
+                13459532,
+            ),
         },
         setting="llama_server_bin",
         description=(
             "llama.cpp's HTTP server, which speaks text-to-speech for Chatterbox, Qwen3-TTS, Pocket TTS, Soprano, "
             "LFM3-Audio and Fish Drama 3 GGUF models. bolo starts it on a loopback port for the model in use, or "
-            "connects to one you run (setting tts_servers). The prebuilt release is the CPU build; for a GPU point "
-            "llama_server_bin at a CUDA/Vulkan/Metal build."
+            "connects to one you run (setting tts_servers). The prebuilt release is the CPU build (Metal on Apple "
+            "Silicon); on Windows, device = cuda or vulkan installs the CUDA 12 or Vulkan build. Elsewhere, for a GPU "
+            "point llama_server_bin at a CUDA/Vulkan build."
         ),
     ),
     AUDIOCPP: Runtime(
@@ -145,6 +176,29 @@ RUNTIME_INFO: dict[str, Runtime] = {
                 "https://github.com/0xShug0/audio.cpp/releases/download/v0.9.4/audio-v0.9.4-bin-macos-arm64-metal.tar.gz",
                 "5722c4f33e56114345965c0dee472a9239218f7499ace6393bba6a951a41b86a",
             ),
+            # the portable Windows builds bring the Visual C++ runtime DLLs they need
+            "windows-x86_64": Release(
+                "https://github.com/0xShug0/audio.cpp/releases/download/v0.9.4/audio-v0.9.4-bin-windows-x64-cpu-portable.zip",
+                "9c11a03b7ea21979792fde05f2f355ea1fc0da26ccd8f675dd61c628250ae76f",
+                32190461,
+            ),
+            "windows-x86_64-cuda": Release(
+                "https://github.com/0xShug0/audio.cpp/releases/download/v0.9.4/audio-v0.9.4-bin-windows-x64-cuda12.4.zip",
+                "e85d829e121a424a960d9ad293536b7ada74ea845b1c12fcf2991ec09a224d1e",
+                467800419,
+                extras=(
+                    Release(
+                        "https://github.com/0xShug0/audio.cpp/releases/download/v0.9.4/audio-v0.9.4-cudart-windows-x64-cuda12.4.zip",
+                        "efb58667b95bcb32e89ddf87811664e6ffdced3fe7015ddcc077599ed5f44bb2",
+                        607273675,
+                    ),
+                ),
+            ),
+            "windows-x86_64-vulkan": Release(
+                "https://github.com/0xShug0/audio.cpp/releases/download/v0.9.4/audio-v0.9.4-bin-windows-x64-vulkan.zip",
+                "804f70cf47c7b8450ef37e76fc04ecee71728345061f6e749a412932dd7db7a7",
+                84083745,
+            ),
         },
         setting="audiocpp_server_bin",
         description=(
@@ -152,7 +206,8 @@ RUNTIME_INFO: dict[str, Runtime] = {
             "Chatterbox, CosyVoice3, Maya1, Qwen3-TTS, …) behind an OpenAI-style /v1/audio/speech. bolo writes "
             "its config, starts it on a loopback port for the model in use, or connects to one you run (setting "
             "tts_servers). The prebuilt Linux release is the CPU build; audio.cpp is fastest on CUDA, so for a GPU "
-            "point audiocpp_server_bin at a CUDA build."
+            "point audiocpp_server_bin at a CUDA build. On Windows, device = cuda or vulkan installs the CUDA 12 or "
+            "Vulkan build."
         ),
     ),
     TONTAUBE: Runtime(
@@ -202,9 +257,66 @@ def is_checkout(path: Path) -> bool:
     return (path / "pyproject.toml").is_file()
 
 
+def _flavour(device: str | None) -> str | None:
+    """The build a GPU device asks for (``cuda:1`` → ``cuda``), when a platform has one; None: the default build."""
+    kind = (device or "").split(":", 1)[0].strip().lower()
+    return kind if kind in ("cuda", "vulkan") else None
+
+
+def release_for(runtime: str, device: str | None = None) -> Release | None:
+    """The pinned release archive for this platform, preferring the build for ``device`` (the CUDA or Vulkan build
+    where one is pinned, such as on Windows), else the platform's default build."""
+    info = RUNTIME_INFO[runtime]
+    key = platform_key()
+    flavour = _flavour(device)
+    if flavour and f"{key}-{flavour}" in info.releases:
+        return info.releases[f"{key}-{flavour}"]
+    return info.releases.get(key)
+
+
+def _windows() -> bool:
+    return os.name == "nt"
+
+
+def _pathext() -> list[str]:
+    return [e.lower() for e in os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";") if e]
+
+
+def executable_names(binary: str) -> list[str]:
+    """The file names ``binary`` may have here: itself, and on Windows with each extension in ``PATHEXT``
+    (``llama-server.exe``), as ``shutil.which`` looks for it."""
+    if not _windows():
+        return [binary]
+    exts = _pathext()
+    names = [binary + ext for ext in exts]
+    if Path(binary).suffix.lower() in exts:
+        names.insert(0, binary)
+    return names
+
+
+def is_executable(path: Path) -> bool:
+    """A file this system can run: the executable bit on POSIX, an extension in ``PATHEXT`` on Windows."""
+    if not path.is_file():
+        return False
+    if _windows():
+        return path.suffix.lower() in _pathext()
+    return os.access(path, os.X_OK)
+
+
+def _configured_binary(value: str) -> Path | None:
+    path = Path(value).expanduser()
+    for name in executable_names(path.name):
+        candidate = path.with_name(name)
+        if is_executable(candidate):
+            return candidate
+    found = shutil.which(value)
+    return Path(found) if found else None
+
+
 def find_binary(settings: Settings, runtime: str) -> tuple[Path | None, str | None]:
     """``(path, source)`` of the server binary for ``runtime``: the setting, bolo's components folder, then PATH.
-    For a runtime run from source (Tontaube) the path is the checkout folder."""
+    For a runtime run from source (Tontaube) the path is the checkout folder. On Windows a name without an
+    extension also finds ``<name>.exe`` (and the other ``PATHEXT`` extensions), as on ``PATH``."""
     info = RUNTIME_INFO[runtime]
     if info.git is not None:
         configured = getattr(settings, info.setting, None)
@@ -215,16 +327,14 @@ def find_binary(settings: Settings, runtime: str) -> tuple[Path | None, str | No
         return (local, "bolo") if is_checkout(local) else (None, None)
     configured = getattr(settings, info.setting, None)
     if configured:
-        path = Path(str(configured)).expanduser()
-        if path.is_file() and os.access(path, os.X_OK):
-            return path, "settings"
-        found = shutil.which(str(configured))
-        return (Path(found), "settings") if found else (None, None)
+        found_path = _configured_binary(str(configured))
+        return (found_path, "settings") if found_path else (None, None)
     local = install_dir(settings, runtime)
     if local.is_dir():
-        for candidate in sorted(local.rglob(info.binary)):
-            if candidate.is_file() and os.access(candidate, os.X_OK):
-                return candidate, "bolo"
+        for name in executable_names(info.binary):
+            for candidate in sorted(local.rglob(name)):
+                if is_executable(candidate):
+                    return candidate, "bolo"
     found = shutil.which(info.binary)
     return (Path(found), "path") if found else (None, None)
 
@@ -371,9 +481,8 @@ def extract_release(archive: Path, dest: Path) -> list[str]:
 
 def install_status(settings: Settings, runtime: str) -> dict[str, Any]:
     """What the components page shows for one runtime (without running anything slow)."""
-    info = RUNTIME_INFO[runtime]
     path, source = find_binary(settings, runtime)
-    release = info.releases.get(platform_key())
+    release = release_for(runtime, settings.device)
     urls: list[str] = []
     for item in settings.tts_servers:
         with contextlib.suppress(ValueError):

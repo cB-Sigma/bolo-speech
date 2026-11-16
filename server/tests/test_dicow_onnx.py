@@ -281,7 +281,7 @@ def test_settings_from_the_model_directory(tmp_path: Path) -> None:
     path = write_model_dir(tmp_path / "m")
     gen = d.GenerationSettings.from_dir(path)
     assert gen.lang_to_id == {"en": 50259} and gen.suppress == [1, 2] and gen.timestamp_begin == 50365
-    data = json.loads((path / "generation_config.json").read_text())
+    data = json.loads((path / "generation_config.json").read_text(encoding="utf-8"))
     data["ctc_weight"] = 0.3
     (path / "generation_config.json").write_text(json.dumps(data))
     with pytest.raises(ValueError, match="CTC"):

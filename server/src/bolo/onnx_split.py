@@ -401,7 +401,7 @@ def split_model(
     # the cut points of this model file were found before: choose among them without loading the model
     with contextlib.suppress(OSError, ValueError, KeyError, TypeError):
         for meta_file in sorted(root.glob(f"{sha}-*/split.json")):
-            meta = json.loads(meta_file.read_text())
+            meta = json.loads(meta_file.read_text(encoding="utf-8"))
             if meta.get("source") == path.name:
                 points = [CutPoint(**c) for c in meta["candidates"]]
                 break
@@ -427,7 +427,8 @@ def split_model(
     _save(front, d / "front.onnx")
     _save(back, d / "back.onnx")
     (d / "split.json").write_text(
-        json.dumps({"source": path.name, "cut": cut.to_dict(), "candidates": [p.to_dict() for p in points]}, indent=1)
+        json.dumps({"source": path.name, "cut": cut.to_dict(), "candidates": [p.to_dict() for p in points]}, indent=1),
+        encoding="utf-8",
     )
     log.info(
         "split %s at node %d: %d MB in front, %d MB behind, %d tensors cross",

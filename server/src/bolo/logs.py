@@ -8,6 +8,11 @@ container). With ``log_file`` it also writes a file, rotated at ``log_max_mb`` w
 * ``log_file = "off"``: no file;
 * unset (the default): no file, except when ``bolo serve`` runs as a service (systemd sets ``INVOCATION_ID``,
   launchd sets ``XPC_SERVICE_NAME`` to the job's label), where it means ``auto``.
+
+Windows cannot rename a file another program holds open without ``FILE_SHARE_DELETE``. ``bolo logs -f`` opens the
+log with that share mode, so it does not stop a rotation; when another program (an editor) blocks the rename, the
+handler copies the file to the first backup and empties it instead (copy-truncate), and tries again a minute later
+if even that fails, rather than printing "--- Logging error ---" for every record.
 """
 
 from __future__ import annotations
@@ -15,6 +20,7 @@ from __future__ import annotations
 import logging
 import logging.handlers
 import os
+import shutil
 import sys
 import time
 from collections import deque
@@ -75,6 +81,43 @@ def resolve_log_file(
     return Path(text).expanduser()
 
 
+class RotatingFileHandler(logging.handlers.RotatingFileHandler):
+    """:class:`logging.handlers.RotatingFileHandler` that survives a rotation another process blocks (Windows)."""
+
+    retry_s = 60.0
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._blocked_until = 0.0
+
+    def shouldRollover(self, record: logging.LogRecord) -> bool:
+        if time.monotonic() < self._blocked_until:
+            return False
+        return bool(super().shouldRollover(record))
+
+    def doRollover(self) -> None:
+        try:
+            super().doRollover()
+            return
+        except OSError as exc:  # PermissionError on Windows: the file (or a backup) is open in another program
+            reason = exc
+        if self.stream is not None:
+            self.stream.close()
+            self.stream = None  # type: ignore[assignment]
+        try:
+            if self.backupCount > 0:
+                shutil.copyfile(self.baseFilename, self.rotation_filename(self.baseFilename + ".1"))
+            with open(self.baseFilename, "r+b") as fh:  # noqa: PTH123 - the handler works with str paths
+                fh.truncate(0)
+        except OSError as exc:
+            self._blocked_until = time.monotonic() + self.retry_s
+            sys.stderr.write(
+                f"bolo: could not rotate the log file {self.baseFilename} ({reason}; {exc}); trying again in "
+                f"{self.retry_s:.0f} s\n"
+            )
+        self.stream = self._open()
+
+
 def configure(settings: Any, environ: Mapping[str, str] | None = None) -> Path | None:
     """Set up the root logger for ``bolo serve``: standard error, and the log file when there is one. Returns the
     file. A file that cannot be opened is reported and skipped: logging must never stop the server starting."""
@@ -88,7 +131,7 @@ def configure(settings: Any, environ: Mapping[str, str] | None = None) -> Path |
         return None
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        handler = logging.handlers.RotatingFileHandler(
+        handler = RotatingFileHandler(
             path, maxBytes=max(1, int(settings.log_max_mb)) * 1024 * 1024, backupCount=max(0, int(settings.log_backups)),
             encoding="utf-8",
         )  # fmt: skip
@@ -129,6 +172,31 @@ def tail(path: Path, lines: int) -> list[str]:
         return [line.rstrip("\n") for line in deque(fh, maxlen=lines)]
 
 
+def open_shared(path: Path) -> Any:
+    """Open a text file for reading so that the writer may still rename or delete it: on Windows with
+    ``FILE_SHARE_DELETE`` (Python's ``open`` leaves it out, so a log rotation would fail while the file is open);
+    elsewhere a plain ``open``."""
+    if sys.platform != "win32":
+        return path.open("r", encoding="utf-8", errors="replace")
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes
+
+    generic_read, share_all, open_existing, normal = 0x80000000, 0x7, 3, 0x80
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.CreateFileW.argtypes = [
+        wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD,
+        wintypes.HANDLE,
+    ]  # fmt: skip
+    k32.CreateFileW.restype = wintypes.HANDLE
+    handle = k32.CreateFileW(str(path), generic_read, share_all, None, open_existing, normal, None)
+    if handle in (None, wintypes.HANDLE(-1).value):
+        error = ctypes.get_last_error()
+        raise OSError(0, ctypes.FormatError(error), str(path), error)
+    fd = msvcrt.open_osfhandle(handle, os.O_RDONLY)
+    return open(fd, encoding="utf-8", errors="replace")  # noqa: PTH123 - a file descriptor
+
+
 def follow(path: Path, poll_s: float = 0.5, stop: Any = None) -> Iterator[str]:
     """New lines of a log file as they are written, across rotations (``tail -F``). ``stop()`` ends it (tests)."""
     fh = None
@@ -137,7 +205,7 @@ def follow(path: Path, poll_s: float = 0.5, stop: Any = None) -> Iterator[str]:
         while stop is None or not stop():
             if fh is None:
                 try:
-                    fh = path.open("r", encoding="utf-8", errors="replace")
+                    fh = open_shared(path)
                     inode = os.fstat(fh.fileno()).st_ino
                     fh.seek(0, os.SEEK_END)
                 except OSError:
@@ -155,7 +223,7 @@ def follow(path: Path, poll_s: float = 0.5, stop: Any = None) -> Iterator[str]:
             if rotated:  # the file was rotated or truncated: read the new one from its start
                 fh.close()
                 try:
-                    fh = path.open("r", encoding="utf-8", errors="replace")
+                    fh = open_shared(path)
                     inode = os.fstat(fh.fileno()).st_ino
                 except OSError:
                     fh = None

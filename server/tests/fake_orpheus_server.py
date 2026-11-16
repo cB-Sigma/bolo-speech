@@ -136,7 +136,7 @@ class FakeOrpheusServer:
                             time.sleep(outer.delay_s)
                     self._chunk(f"data: {json.dumps({'content': '', 'tokens': [], 'stop': True})}\n\n")
                     self.wfile.write(b"0\r\n\r\n")
-                except (BrokenPipeError, ConnectionResetError):
+                except ConnectionError:  # BrokenPipe, ConnectionReset, ConnectionAborted (Windows)
                     outer.disconnects += 1
 
             def _chunk(self, text: str) -> None:

@@ -1063,7 +1063,7 @@ class Bolo:
             )
             if usable:
                 entry = await self.manager.load(spec.id)
-                entry.last_used = time.monotonic()
+                entry.last_used = time.perf_counter()
                 assert isinstance(entry.model, VADModel)
                 detector = entry.model.create_detector(params)
                 return (FallbackVad(detector, params) if fallback else detector), spec.id

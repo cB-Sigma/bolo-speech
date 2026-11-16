@@ -332,9 +332,7 @@ async def test_websocket_finals_carry_speaker_labels(live: LiveServer, model: st
         assert ready["diarization"] == "fake-diarization"
         for off in range(0, len(pcm), 3200):
             await ws.send(pcm[off : off + 3200])
-            import asyncio
-
-            await asyncio.sleep(0.01)
+        # all at once: audio that queues up while the model works must still end each utterance on its own
         await ws.send(json.dumps({"type": "stop"}))
         messages = [json.loads(x) async for x in ws]
         finals = [m for m in messages if m["type"] == "final"]

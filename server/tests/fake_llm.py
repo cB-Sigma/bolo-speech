@@ -114,7 +114,7 @@ class FakeLLM:
                         )
                     self.wfile.write(b"data: [DONE]\n\n")
                     self.wfile.flush()
-                except (BrokenPipeError, ConnectionResetError):
+                except ConnectionError:  # BrokenPipe, ConnectionReset, ConnectionAborted (Windows)
                     pass  # the client cancelled the response
 
         self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
