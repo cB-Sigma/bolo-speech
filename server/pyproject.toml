@@ -20,6 +20,7 @@ classifiers = [
   "Intended Audience :: Developers",
   "Operating System :: POSIX :: Linux",
   "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
@@ -127,7 +128,11 @@ target-version = "py310"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF", "PL", "ASYNC", "PTH", "T20"]
+# PLW1514 (open, read_text and write_text without an encoding: the Windows code page otherwise) is a preview rule,
+# enabled on its own
+preview = true
+explicit-preview-rules = true
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF", "PL", "ASYNC", "PTH", "T20", "PLW1514"]
 ignore = [
   "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR2004", "PLW0603", "PLC0415",
   "RUF001", "RUF002", "RUF003",  # Indic and typographic characters are intentional

@@ -4,6 +4,12 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Added
+
+- CI runs the fast tests on Windows (`windows-latest`, CPU torch); the package declares
+  `Operating System :: Microsoft :: Windows`. With bolo's next release the worker runs in a Windows Job Object:
+  `plugin_nice` and `plugin_memory_limit_mb` apply there too, and the worker ends with bolo.
+
 ## [0.1.3] - 2026-11-15
 
 Placement protocol: bolo 0.5 can ask for a GPU/CPU split with `device_map` placement. Installs with bolo 0.5.
