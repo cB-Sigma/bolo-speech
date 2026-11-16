@@ -14,6 +14,30 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - The live demo is rebuilt when bolo's version changes, so its footer shows the released version (it said 0.6.1
   after 0.6.2 was out).
 - README: `--refresh` for `uv tool upgrade` right after a release (uv offered the previous version from its cache).
+- **Live transcription: no stray letter or token before the first word, and quiet input no worse than before** (found
+  on a Windows laptop, the samples sent over `/api/v1/stt/stream` in 100 ms pieces: `zipformer-en-20m-streaming` gave
+  "o good morning...", "s speech servers..." and, with a burst of noise before the speech, "s good morning"; Moonshine
+  "16. Speech servers..."; at -40 dB, "ular" and "When my order will arise."). The search 0.6.2 added for a quiet
+  first word the VAD missed (8ccf736) took any sound above the room for that word and raised it up to 24 dB: a burst
+  of noise 0.3 s before the speech, or the hiss that starts "Speech", became a letter or a number. Its room was the
+  quietest tenth of the frames that were not digital silence, so after a file's silent lead-in, or in a recording
+  quiet throughout, the room was the speech itself. Now a stretch of sound counts only from the first one with 40 ms
+  of voiced (periodic) frames in it, digital silence counts as a very quiet room, the margin over the room is 6 dB
+  rather than 9, and the gain is judged on the voiced frames of the part raised. Two older causes, from the streaming
+  pre-roll and gain (a6104c8, also 0.6.2): the utterance's gain was judged on everything heard after the VAD's start,
+  which after a click can be mostly silence (a 24 dB gain that clipped en-short into "ular arrive"); it is now judged
+  on the frames that sound. And the 20M Zipformer writes the first sound of a fresh stream twice when it starts
+  abruptly (digital silence, then speech): a lone letter other than "a" and "I" at the start of an utterance on a
+  VAD-gated stream is dropped. Measured with `server/tools/measure_stream_onset.py` (252 takes per model: the laptop's
+  cases as files, as they are and over a -70 and -60 dBFS room, and 8ccf736's simulated microphone takes with four
+  sets of room noise), first word right / takes with a stray token / word error rate, a6104c8 -> 8ccf736 (0.6.2) ->
+  now. Zipformer: the samples as they are, trimmed and with the burst 20/36, 9, 0.096 -> 20/36, 3, 0.106 -> 29/36, 0,
+  0.061; 30 dB down 5/12 -> 6/12 -> 7/12, WER 0.184 -> 0.164 -> 0.163; 40 dB down 1/12 -> 2/12 -> 1/12, WER 0.694 ->
+  0.659 -> 0.684; a quiet first word, then a pause 13/96 -> 33/96 -> 42/96; only the first 300 ms quieter 18/96 ->
+  32/96 -> 38/96; stray tokens over all takes 24 -> 18 -> 0. Moonshine: the samples 36/36 throughout; 30 dB down 9/12
+  throughout; 40 dB down 2/12 throughout (WER 0.688 -> 0.660 -> 0.658); a quiet first word 34/96 -> 63/96 -> 68/96;
+  the first 300 ms quieter 42/96 -> 70/96 -> 73/96; stray tokens 2 -> 5 -> 2 (left: "At the early nightfall" for
+  "After early nightfall" twice). At 40 dB down Silero hears little or nothing of the speech in any version.
 
 ## [0.6.2] - 2026-11-16
 

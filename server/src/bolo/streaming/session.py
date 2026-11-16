@@ -27,12 +27,14 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import re
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+from numpy.typing import NDArray
 
 from bolo.audio.codecs import decode_frame
 from bolo.audio.resample import StreamResampler
@@ -71,10 +73,17 @@ FRAME = 320  # 20 ms
 # A VAD reports a start once it has heard enough confident speech; a quiet first word, or one followed by a breath,
 # is not that, and the start lands on the next word (Silero on simulated microphone takes: up to 0.8 s late). The
 # speech before it is found again in the audio held back: louder than the room by ONSET_MARGIN_DB, through pauses
-# shorter than ONSET_GAP_S, at most ONSET_LOOKBACK_S before the reported start.
+# shorter than ONSET_GAP_S, at most ONSET_LOOKBACK_S before the reported start, and starting with a stretch that has
+# ONSET_VOICED_S of voiced frames in it (a burst of noise, a click or a fricative's hiss on its own is not a word).
 ONSET_LOOKBACK_S = 1.2
 ONSET_GAP_S = 0.4
-ONSET_MARGIN_DB = 9.0
+# 9 dB missed quiet words only 6-10 dB above the room: on simulated microphone takes with a quiet first word, the
+# 20M Zipformer had it right in 43 of 96 with 6 dB, 37 with 9
+ONSET_MARGIN_DB = 6.0
+ONSET_FLOOR_DB = -70.0  # quieter than this is never taken for speech
+DIGITAL_SILENCE_DB = -90.0  # quieter frames count as this level: a file's silent lead-in is a very quiet room
+ONSET_VOICED_S = 0.04  # voiced frames a stretch of sound before the reported start needs to be taken for speech
+VOICED_R = 0.5  # normalised autocorrelation at the pitch period that makes a frame voiced
 
 
 @dataclass
@@ -475,6 +484,30 @@ def speech_level(samples: FloatArray) -> float:
     return float(np.percentile(rms, 90)) if len(rms) else 0.0
 
 
+def room_level(samples: FloatArray) -> float:
+    """The level of the room in ``samples`` (dBFS): the quietest tenth of its 20 ms frames, digital silence counted as
+    ``DIGITAL_SILENCE_DB`` (a file's silent lead-in, a microphone that has just opened); ``DIGITAL_SILENCE_DB`` for
+    less than a frame."""
+    rms = frame_rms(samples)
+    if len(rms) == 0:
+        return DIGITAL_SILENCE_DB
+    return float(np.percentile(np.maximum(20.0 * np.log10(rms + 1e-9), DIGITAL_SILENCE_DB), 10))
+
+
+def sounding(samples: FloatArray, room_db: float) -> FloatArray:
+    """The 20 ms frames of ``samples`` louder than the room (``room_db``) by ``ONSET_MARGIN_DB``, joined; nothing when
+    there is less than 0.1 s of them. What a gain is judged on: right after the VAD reports a start, much of what it
+    heard can be silence (a click or a burst it took for speech, then a pause), and the 90th percentile of that made
+    a 24 dB gain that clipped the speech that followed ("ular arrive" from the 20M Zipformer for en-short)."""
+    n = len(samples) // FRAME
+    frames = np.asarray(samples[: n * FRAME], dtype=np.float32).reshape(n, FRAME)
+    loud = 20.0 * np.log10(frame_rms(samples) + 1e-9) > max(room_db + ONSET_MARGIN_DB, ONSET_FLOOR_DB)
+    if int(np.sum(loud)) * FRAME < int(0.1 * SR):
+        return np.zeros(0, dtype=np.float32)
+    out: FloatArray = frames[loud].reshape(-1)
+    return out
+
+
 def speech_gain(samples: FloatArray, target_dbfs: float, max_gain_db: float = MAX_GAIN_DB) -> float:
     """The gain that brings speech in ``samples`` up to ``target_dbfs``: 1 for speech already that loud, at most
     ``max_gain_db``."""
@@ -484,12 +517,40 @@ def speech_gain(samples: FloatArray, target_dbfs: float, max_gain_db: float = MA
     return float(min(max(10.0 ** (target_dbfs / 20.0) / level, 1.0), 10.0 ** (max_gain_db / 20.0)))
 
 
+def voiced(samples: FloatArray) -> NDArray[np.bool_]:
+    """Whether each whole 20 ms frame of ``samples`` is voiced: periodic at a speaking pitch (60-400 Hz), judged on
+    40 ms from its start (from 20 ms before it for the last frame). A vowel is; room noise, a click or a burst of noise
+    is not. Under 40 ms of audio, nothing is."""
+    n = len(samples) // FRAME
+    out = np.zeros(n, dtype=bool)
+    x = np.asarray(samples, dtype=np.float64)
+    lo, hi = SR // 400, SR // 60
+    for k in range(n):
+        a = max(0, min(k * FRAME, n * FRAME - 2 * FRAME))
+        w = x[a : a + 2 * FRAME]
+        w = w - w.mean()
+        if len(w) <= hi + FRAME // 2 or not np.any(w):
+            continue
+        spec = np.fft.rfft(w, 2 * len(w))
+        ac = np.fft.irfft(spec * np.conj(spec))[: hi + 1]
+        if ac[0] <= 0:
+            continue
+        # unbiased: the overlap shrinks with the lag
+        r = ac[lo : hi + 1] / ac[0] * len(w) / (len(w) - np.arange(lo, hi + 1))
+        out[k] = float(np.max(r)) > VOICED_R
+    return out
+
+
 def speech_onset(audio: FloatArray, at: int) -> int:
     """Where the speech a VAD reports starting at ``audio[at]`` begins: earlier when the VAD missed its first word.
 
-    Steps back from ``at`` a 20 ms frame at a time while frames are louder than the room (the quietest tenth of the
-    frames before ``at``) by ``ONSET_MARGIN_DB``, across pauses shorter than ``ONSET_GAP_S``, at most
-    ``ONSET_LOOKBACK_S``; the result is the first loud frame found, or ``at``."""
+    Steps back from ``at`` a 20 ms frame at a time while frames are louder than the room by ``ONSET_MARGIN_DB``,
+    across pauses shorter than ``ONSET_GAP_S``, at most ``ONSET_LOOKBACK_S``. The room is the quietest tenth of the
+    frames held before ``at``, digital silence counted as such, so a file's silent lead-in, or a recording quiet
+    throughout, is not taken for a room as loud as its speech. The sound found is then trimmed from its start to the
+    first stretch with voiced frames in it (``ONSET_VOICED_S``): a burst of noise, a click, a breath or the hiss of
+    a fricative on its own is not a word the VAD missed, and raising it made the recogniser write a letter ("s",
+    "o") or a number before the first word."""
     at = min(at, len(audio))
     if at <= 0:
         return at
@@ -497,35 +558,68 @@ def speech_onset(audio: FloatArray, at: int) -> int:
     rms = frame_rms(audio[first:at])
     if len(rms) < 5:  # too little held to tell the room from speech
         return at
-    db = 20.0 * np.log10(rms + 1e-9)
-    room = db[db > -85.0]  # not digital silence (a microphone that has just opened)
-    if len(room) == 0:
-        return at
-    threshold = max(float(np.percentile(room, 10)) + ONSET_MARGIN_DB, -70.0)
-    onset, quiet = at, 0
+    db = np.maximum(20.0 * np.log10(rms + 1e-9), DIGITAL_SILENCE_DB)
+    threshold = max(room_level(audio[first:at]) + ONSET_MARGIN_DB, ONSET_FLOOR_DB)
     lowest = max(0, len(db) - int(ONSET_LOOKBACK_S * SR) // FRAME)
+    stretches: list[list[int]] = []  # [first, last] frames of each stretch of sound, the latest first
+    quiet = 0
     for k in range(len(db) - 1, lowest - 1, -1):
         if db[k] > threshold:
-            onset, quiet = first + k * FRAME, 0
+            if quiet or not stretches:
+                stretches.append([k, k])
+            stretches[-1][0] = k
+            quiet = 0
         else:
             quiet += FRAME
             if quiet >= ONSET_GAP_S * SR:
                 break
-    return onset
+    need = int(ONSET_VOICED_S * SR) // FRAME
+    while stretches:
+        a, b = stretches[-1]
+        seg = audio[first + a * FRAME : first + (b + 1) * FRAME]
+        if int(np.sum(voiced(seg))) >= need:
+            return first + a * FRAME
+        stretches.pop()
+    return at
 
 
 def lift_onset(audio: FloatArray, a: int, b: int, heard: FloatArray) -> FloatArray:
     """``audio`` with the speech in ``audio[a:b]`` (what the VAD missed) raised to the level of ``heard`` (the speech
     it heard): one gain, at most ``MAX_GAIN_DB``, never below 1. A quiet first word is otherwise left far below the rest
-    of the utterance, where the recogniser makes it into a fragment ("t can you") or drops it."""
+    of the utterance, where the recogniser makes it into a fragment ("t can you") or drops it.
+
+    The level of ``audio[a:b]`` is that of its voiced frames, its vowels: a part with none is left alone, and a hiss
+    or a breath before a vowel that is already loud is not raised to the vowel's level ("16. Speech servers")."""
+    b = min(b, len(audio))
     if b - a < FRAME or len(heard) < int(0.1 * SR):
         return audio
-    gain = speech_gain(audio[a:b], 20.0 * np.log10(max(speech_level(heard), 1e-9)))
-    if gain <= 1.0:
+    part = audio[a:b]
+    vowels = voiced(part)
+    if not np.any(vowels):
+        return audio
+    level = float(np.max(frame_rms(part)[vowels]))
+    gain = min(10.0 ** (MAX_GAIN_DB / 20.0), speech_level(heard) / max(level, 1e-9))
+    if gain <= 10.0 ** (2.0 / 20.0):  # as loud already: one frame against the 90th percentile of many
         return audio
     out = np.array(audio, dtype=np.float32)
     out[a:b] = np.clip(out[a:b] * gain, -1.0, 1.0)
     return out
+
+
+# One letter on its own where an utterance starts, other than the words "a" and "I" ("'s" included): what a small
+# streaming transducer makes of the first sound of a fresh stream when it hears it twice ("o good morning",
+# "s speech servers", "t after early nightfall").
+STRAY_LETTER = re.compile(r"^'?[b-hj-z]$", re.IGNORECASE)
+
+
+def without_stray_letter(text: str, words: list[Word]) -> tuple[str, list[Word]]:
+    """``text`` and its ``words`` without a stray letter at the start (:data:`STRAY_LETTER`)."""
+    head, _, rest = text.partition(" ")
+    if not STRAY_LETTER.match(head):
+        return text, words
+    if words and STRAY_LETTER.match(words[0].w.strip()):
+        words = words[1:]
+    return rest.strip(), words
 
 
 class PreRoll:
@@ -646,14 +740,15 @@ class _NativeProcessor(_Processor):
         hundred milliseconds after it, so there is some)."""
         pre = self.preroll
         assert pre is not None
+        room = room_level(pre.buf[: max(0, speech_at - pre.start)])
         onset = pre.start + speech_onset(pre.buf, speech_at - pre.start)
         audio, start = pre.take(since=onset - self.preroll_n)
         self.stream.restart()
         self.base = self.fed = start
         self.listening = True
-        heard = np.concatenate([audio[max(0, speech_at - start) :], ahead])
+        heard = sounding(np.concatenate([audio[max(0, speech_at - start) :], ahead]), room)
         audio = lift_onset(audio, max(0, onset - start), max(0, speech_at - start), heard)
-        if self.target_dbfs is not None and len(heard) >= int(0.1 * SR):
+        if self.target_dbfs is not None:
             self.gain = speech_gain(heard, self.target_dbfs)
         self._accept(audio)
 
@@ -673,6 +768,8 @@ class _NativeProcessor(_Processor):
         if self.gated:
             endpoint = False  # the VAD ends utterances; the model's endpointing would cut one short mid-word
         text = result.text.strip()
+        if self.gated:
+            text, _ = without_stray_letter(text, [])
         if text and text != self.last_text and self.s.cfg.interim and not (endpoint or vad_end):
             self.last_text = text
             stable = self.stability.update(text)
@@ -689,9 +786,11 @@ class _NativeProcessor(_Processor):
         else:
             result = self.stream.result()
         text = result.text.strip()
+        base = self.base / SR
+        words = [Word(w.w, w.t0 + base, w.t1 + base) for w in result.words] if self.s.cfg.word_timestamps else []
+        if self.gated:
+            text, words = without_stray_letter(text, words)
         if text:
-            base = self.base / SR
-            words = [Word(w.w, w.t0 + base, w.t1 + base) for w in result.words] if self.s.cfg.word_timestamps else []
             audio = None
             if self.s.cfg.diarize and self.kept:
                 audio = np.concatenate(self.kept)
@@ -779,7 +878,8 @@ class _PseudoProcessor(_Processor):
                 onset = floor + speech_onset(self._slice(floor, at), at - floor) if at > floor else at
                 if onset < at:
                     a, b = onset - self.buf_start, at - self.buf_start
-                    self.buf[a:b] = lift_onset(self.buf[a:b], 0, b - a, self._slice(at, self.pos))
+                    heard = sounding(self._slice(at, self.pos), room_level(self._slice(floor, at)))
+                    self.buf[a:b] = lift_onset(self.buf[a:b], 0, b - a, heard)
                 # padded at both ends, two utterances close together would share audio, and a word on the seam
                 # would be in both finals
                 start = max(self.buf_start, self.final_end, onset - int(ONSET_PAD_S * SR))

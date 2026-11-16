@@ -9,7 +9,8 @@ import pytest
 
 from bolo.catalog import ModelSpec
 from bolo.core import Bolo
-from bolo.engines.base import FloatArray, VadDetector, VadEvent, VadParams
+from bolo.engines import fake
+from bolo.engines.base import FloatArray, StreamResult, VadDetector, VadEvent, VadParams, Word
 from bolo.engines.fake import FakeStreamingSTT
 from bolo.streaming.session import (
     SR,
@@ -17,9 +18,13 @@ from bolo.streaming.session import (
     SessionConfig,
     STTSession,
     lift_onset,
+    room_level,
+    sounding,
     speech_gain,
     speech_level,
     speech_onset,
+    voiced,
+    without_stray_letter,
 )
 from bolo.streaming.vad import EnergyVad
 from conftest import speechlike
@@ -266,3 +271,104 @@ async def test_pseudo_streaming_decodes_the_quiet_first_word_the_vad_missed(core
     finals = [m for m in messages if m["type"] == "final"]
     assert len(finals) == 1
     assert finals[0]["t0"] == pytest.approx(QUIET_WORD_AT - 0.25, abs=0.03)
+
+
+# -- what is not a word the VAD missed (found with the samples on a Windows laptop, bolo 0.6.2) ------------------------
+
+
+def noise(seconds: float, dbfs: float, seed: int = 0) -> np.ndarray:
+    return (np.random.default_rng(seed).standard_normal(int(seconds * SR)) * 10 ** (dbfs / 20)).astype(np.float32)
+
+
+def test_voiced_tells_a_vowel_from_noise() -> None:
+    assert voiced(speechlike(0.2) * 0.01).all()  # a 220 Hz tone, even at -53 dBFS
+    assert not voiced(noise(0.2, -30.0)).any()  # a burst of noise, a click, a fricative's hiss
+    assert not voiced(np.zeros(3200, dtype=np.float32)).any()
+
+
+def test_a_burst_of_noise_before_the_speech_is_not_taken_for_a_quiet_word() -> None:
+    """An 80 ms burst 0.3 s before the speech: the search crossed the pause to it and raised it 24 dB, which the 20M
+    Zipformer wrote as "s good morning"."""
+    room = noise(1.5, -70.0)
+    room[int(1.12 * SR) : int(1.20 * SR)] += noise(0.08, -30.0, seed=1)
+    audio = np.concatenate([room, speechlike(1.0)])
+    at = int(1.5 * SR)
+    assert speech_onset(audio, at) == at
+    # a quiet word in the same place is still found
+    word = room.copy()
+    word[int(0.9 * SR) : int(1.2 * SR)] = speechlike(0.3) * 0.03
+    assert speech_onset(np.concatenate([word, speechlike(1.0)]), at) / SR == pytest.approx(0.9, abs=0.03)
+
+
+def test_the_hiss_that_starts_a_word_is_not_raised() -> None:
+    """A fricative's hiss ("S" of "Speech") just before where the VAD placed the start was raised to the level of
+    the vowel after it: "s speech servers" (Zipformer), "16. Speech servers" (Moonshine)."""
+    audio = np.concatenate([np.zeros(int(0.5 * SR), dtype=np.float32), noise(0.08, -30.0), speechlike(1.0)])
+    at = int(0.58 * SR)  # where the vowel begins
+    assert speech_onset(audio, at) == at
+    # placed 20 ms into the vowel, the hiss is found with it, and left as it is: the vowel sets the gain
+    at = int(0.60 * SR)
+    assert np.array_equal(lift_onset(audio, speech_onset(audio, at), at, audio[at:]), audio)
+
+
+def test_a_recording_quiet_throughout_still_finds_its_start() -> None:
+    """The whole clip 40 dB down after digital silence: the room was taken from the quiet speech itself (nothing
+    else was louder than digital silence), so the start the VAD placed late, on a later word, stood."""
+    quiet = 10 ** (-40 / 20)
+    words = np.concatenate([speechlike(0.6), np.zeros(int(0.2 * SR), dtype=np.float32), speechlike(1.5)]) * quiet
+    audio = np.concatenate([np.zeros(int(1.0 * SR), dtype=np.float32), words]).astype(np.float32)
+    at = int(1.9 * SR)  # the VAD heard the second word only
+    assert speech_onset(audio, at) / SR == pytest.approx(1.0, abs=0.03)
+    # the same over a faint room
+    roomy = audio + noise(len(audio) / SR, -80.0)
+    assert speech_onset(roomy, at) / SR == pytest.approx(1.0, abs=0.03)
+
+
+def test_a_stray_letter_at_the_start_is_dropped() -> None:
+    words = [Word("o", 0.0, 0.1), Word("good", 0.1, 0.3), Word("morning", 0.3, 0.6)]
+    assert without_stray_letter("o good morning", words) == ("good morning", words[1:])
+    assert without_stray_letter("'s speech servers", [])[0] == "speech servers"
+    assert without_stray_letter("t", [])[0] == ""
+    for text in ("a good one", "i think so", "good morning", "ul my fellow", ""):
+        assert without_stray_letter(text, words) == (text, words)
+
+
+async def test_a_gated_stream_drops_a_stray_letter_before_the_first_word(
+    core: Bolo, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The 20M Zipformer wrote "o good morning" for the en-short sample, from bolo 0.6.1 on: a fresh stream heard
+    the start of the first word twice."""
+    original = fake._FakeStream.result
+
+    def with_stray(self: fake._FakeStream) -> StreamResult:
+        r = original(self)
+        return StreamResult(f"o {r.text}".strip(), [Word("o", 0.0, 0.05), *r.words]) if r.text else r
+
+    monkeypatch.setattr(fake._FakeStream, "result", with_stray)
+    add(core, "t-stray", step_delay_s=0.005, preroll_s=0.4)
+    await core.manager.load("t-stray")
+    audio = utterances(("room", 1.0), ("speech", 1.6), ("room", 1.5))
+    messages, _ = await run_stream(core, "t-stray", audio, pace=0.1)
+    finals = [m for m in messages if m["type"] == "final"]
+    partials = [m for m in messages if m["type"] == "partial"]
+    assert len(finals) == 1 and finals[0]["text"] and not finals[0]["text"].startswith("o ")
+    assert finals[0]["words"][0]["w"] != "o"
+    assert partials and not any(p["text"] == "o" or p["text"].startswith("o ") for p in partials)
+
+
+def test_the_gain_is_judged_on_sound_not_on_the_silence_after_a_click() -> None:
+    """A burst of noise in a near-silent file: the VAD reported a start at its end, and what it had heard by then was
+    0.3 s of near silence and 40 ms of the first word. The 90th percentile of that made a 24 dB gain, and the speech
+    that followed was clipped into "ular arrive" (20M Zipformer, en-short)."""
+    hush = noise(1.3, -80.0)
+    heard = np.concatenate([hush[: int(0.3 * SR)], speechlike(0.04) * 0.1])
+    assert speech_gain(heard, -20.0) > 10.0  # what it was: over 20 dB
+    room = room_level(hush[int(0.3 * SR) :])
+    assert room == pytest.approx(-80.0, abs=1.0)
+    assert len(sounding(heard, room)) == 0  # too little sound to judge
+    assert speech_gain(sounding(heard, room), -20.0) == 1.0
+    # speech that was heard is judged on its own frames, the pauses in it left out
+    quiet = utterances(("speech", 0.6), ("room", 0.5), ("speech", 0.6)) * 10 ** (-20 / 20)
+    room = room_level(utterances(("room", 1.0)) * 10 ** (-20 / 20))
+    expected = speech_gain(quiet[: int(0.6 * SR)], -20.0)
+    assert speech_gain(sounding(quiet, room), -20.0) == pytest.approx(expected, rel=0.1)
