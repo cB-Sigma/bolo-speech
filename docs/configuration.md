@@ -96,7 +96,7 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `agreement` | `2` | | hypotheses that must agree before a word is shown as stable |
 | `wyoming` | `false` | `--wyoming` | serve the Wyoming protocol |
 | `wyoming_host`, `wyoming_port` | `127.0.0.1`, `10300` | `--wyoming-host`, `--wyoming-port` | Wyoming bind address |
-| `device` | `cpu` | | where models run (per model, as placed by the scheduler: see "GPU and CPU placement" below; a model can pin its own with `PUT /api/v1/models/{id}/settings` `{"device": "cpu"}` or a catalog `options.device`): `cpu`, `cuda` (or `cuda:1`), `coreml` (also `mps`, `metal`), `rocm`, `dml`, `openvino`, or `auto` (the first accelerator found). sherpa-onnx models use `cuda` or `coreml`; faster-whisper uses `cuda`; the ONNX Runtime engines (Nemotron diarization, DiCoW ONNX, the Orpheus-family decoder, the end-of-turn model, in-process speech-to-speech) use the matching execution provider when the installed `onnxruntime` has it (for `cuda`, install `onnxruntime-gpu`), and otherwise run on the CPU with one warning; llama-server gets `-ngl N`, the layers that fit in the free accelerator memory (all of them when everything fits; none when nothing does), unless you set `-ngl` yourself in `tts_server_args`, `s2s_server_args` or the entry's `server_args`; audio.cpp gets the device as its backend. **Untested on a GPU** |
+| `device` | `cpu` | | where models run (per model, as placed by the scheduler: see "GPU and CPU placement" below; a model can pin its own with `PUT /api/v1/models/{id}/settings` `{"device": "cpu"}` or a catalog `options.device`): `cpu`, `cuda` (or `cuda:1`), `coreml` (also `mps`, `metal`), `rocm`, `dml`, `openvino`, or `auto` (the first accelerator found). sherpa-onnx models use `cuda` or `coreml`; faster-whisper uses `cuda`; the ONNX Runtime engines (Nemotron diarization, DiCoW ONNX, the Orpheus-family decoder, the end-of-turn model, in-process speech-to-speech) use the matching execution provider when the installed `onnxruntime` has it (for `cuda`, install `onnxruntime-gpu`), and otherwise run on the CPU with one warning; llama-server gets `-ngl N`, the layers that fit in the free accelerator memory (all of them when everything fits; none when nothing does), unless you set `-ngl` yourself in `tts_server_args`, `s2s_server_args` or the entry's `server_args`; audio.cpp gets the device as its backend (`cuda`, `hip` for `rocm`, `vulkan`, `metal` for `coreml`; the CPU for `dml` and `openvino`, which it does not have). With `dml` (Windows, DirectML) only the ONNX Runtime engines use the GPU; sherpa-onnx and faster-whisper run on the CPU (see "Windows" below). **Untested on a GPU** |
 | `log_level` | `info` | `--log-level` | `debug`, `info`, `warning`, `error` |
 | `log_file` | unset (off, except under systemd or launchd) | `--log-file` | also write the server's log to a file: `auto` (the platform's place, see "Logs"), a path, or `off`. Unset: no file, unless `bolo serve` runs as a service |
 | `log_max_mb` | `10` | | rotate the log file at this size |
@@ -105,7 +105,7 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `fake_engine` | `false` | `--fake-engine` | add deterministic test models (development) |
 | `tts_servers` | `[]` | | external TTS servers the operator runs, as `"<model id or runtime>=<url>"`, e.g. `"llama-server=http://127.0.0.1:8080"` (every llama-server model goes there) or `"voxcpm2-audiocpp=http://gpu-box:8080"` (one model). A model id or alias wins over a runtime name. Such a model needs no download and no binary; for audio.cpp the server's config must declare the model under the id in the entry's `options.server_model` (the catalog id). See models.md, "External TTS servers" |
 | `tts_server_api_key` | unset | | sent as `Authorization: Bearer …` to the servers in `tts_servers` (llama-server `--api-key`) |
-| `llama_server_bin`, `audiocpp_server_bin` | unset | | the binary bolo starts for a model whose runtime has no URL in `tts_servers`. Unset: the one `bolo components install llama-server` / `audio.cpp` put in `<data_dir>/components/`, then `llama-server` / `audiocpp_server` on `PATH`. Point it at a CUDA/Vulkan/Metal build to use a GPU |
+| `llama_server_bin`, `audiocpp_server_bin` | unset | | the binary bolo starts for a model whose runtime has no URL in `tts_servers`. Unset: the one `bolo components install llama-server` / `audio.cpp` put in `<data_dir>/components/`, then `llama-server` / `audiocpp_server` on `PATH` (on Windows `llama-server.exe` / `audiocpp_server.exe`: a name without an extension finds the `.exe`, as `PATH` does). Point it at a CUDA/Vulkan/Metal build to use a GPU; on Windows `bolo components install` itself installs the CUDA 12 build with `device = "cuda"` and the Vulkan build with `device = "vulkan"` |
 | `tts_server_args` | `[]` | | extra command-line arguments for every server bolo starts (e.g. `["-ngl", "20"]` for llama-server, which bolo then leaves alone; without one bolo adds `-ngl N` itself when `device` is not `cpu`, N being the layers that fit in free accelerator memory) |
 | `tts_server_start_timeout_s` | `300` | | how long a started server may take to answer `GET /health` (loading its model) |
 | `tontaube_dir` | unset | | a checkout of [craitech/tontaube](https://github.com/craitech/tontaube) (release v1.1.0) that bolo runs with `uv run --python 3.12 --frozen tontaube serve` for the Tontaube models. Unset: the one `bolo components install tontaube` cloned into `<data_dir>/components/`. `uv` must be on `PATH` |
@@ -363,7 +363,7 @@ share the cores, so `num_parallel` × `threads` should stay near the number of c
 | --- | --- |
 | Linux, `bolo serve` in a terminal | the terminal; with `log_file = "auto"`: `$XDG_STATE_HOME/bolo/logs/server.log` (`~/.local/state/bolo/logs/server.log`) |
 | macOS | the terminal; with `log_file = "auto"`: `~/Library/Logs/bolo/server.log` (Console.app shows it) |
-| Windows | the console; with `log_file = "auto"`: `%LOCALAPPDATA%\bolo\logs\server.log`. Run as a Windows service (NSSM, Task Scheduler), set `BOLO_LOG_FILE=auto`: bolo cannot tell it is a service there |
+| Windows | the console; with `log_file = "auto"`: `%LOCALAPPDATA%\bolo\logs\server.log`. Run at log-on or as a service (Task Scheduler, NSSM, WinSW: [deploy/README.md](../deploy/README.md#windows-at-log-on-at-start-up-or-as-a-service)), set `BOLO_LOG_FILE=auto`: bolo cannot tell it is a service there |
 | the systemd unit (`deploy/systemd/bolo.service`) | `journalctl -u bolo`, and `/var/lib/bolo/logs/server.log` (the unit sets `BOLO_LOG_FILE`; without it, a service writes the `auto` place of its user) |
 | launchd (macOS) | the job's `StandardErrorPath`, and `~/Library/Logs/bolo/server.log` |
 | Docker (`deploy/Dockerfile`) | `docker logs <container>`; no file unless you set `BOLO_LOG_FILE=/data/logs/server.log` (in the `/data` volume) |
@@ -375,6 +375,50 @@ Unset, `log_file` is off, except when `bolo serve` runs under systemd (it sets `
 rotations). It asks the running server (`--url`, default `$BOLO_URL` or `http://127.0.0.1:8000`) which file it
 writes (`GET /api/v1/info` has `log_file`), else uses the settings, else the platform's place when a file is there.
 `bolo doctor` says where the logs are.
+
+## Windows
+
+What differs on Windows (CI runs the server's tests on `windows-latest`; GPU paths are untested there):
+
+| | |
+| --- | --- |
+| install | PowerShell or cmd: `uv tool install "bolo-speech[all]"` (double quotes: cmd.exe does not treat single quotes as quotes) |
+| models (`data_dir`) | `%USERPROFILE%\.cache\bolo` (`C:\Users\<you>\.cache\bolo`), the same place as on Linux and macOS, not `%LOCALAPPDATA%`: bolo keeps it so that existing installs never lose their models. To keep models elsewhere set `BOLO_DATA_DIR` (for example `%LOCALAPPDATA%\bolo`), after moving the folder there if you want to keep what you downloaded. `XDG_CACHE_HOME` is honoured too |
+| settings file | `.\bolo.toml`, else `%USERPROFILE%\.config\bolo\config.toml` (or `--config`, `BOLO_CONFIG`) |
+| log file | `log_file = "auto"`: `%LOCALAPPDATA%\bolo\logs\server.log`. `bolo logs -f` opens it so that the rotation can still rename it; when another program blocks the rename, bolo copies the file to `server.log.1` and empties it instead |
+| uccharan's language packs | `%USERPROFILE%\.cache\uccharan\<version>\` (uccharan's own cache) |
+| environment variables | PowerShell: `$env:BOLO_DEVICE = "dml"` (this session), `[Environment]::SetEnvironmentVariable("BOLO_DEVICE", "dml", "User")` (from the next start on); cmd: `set BOLO_DEVICE=dml` |
+| text output | `bolo` writes UTF-8 to pipes and files, so Hindi and other scripts survive `bolo transcribe x.wav > out.txt`. Windows PowerShell 5.1 decodes a program's output with the console's code page: set `[Console]::OutputEncoding = [Text.Encoding]::UTF8` before piping `bolo` into another PowerShell command (PowerShell 7 and files written by `>` from cmd are fine) |
+| local model folders | `bolo pull <folder>` / `file:` link the folder into the store: a directory symlink where allowed (Developer Mode or administrator), else a directory junction (no rights needed, same volume or not, local disks only), else a copy, with a notice |
+| `llama-server`, `audio.cpp` | `bolo components install llama-server` / `audio.cpp` install the pinned Windows release: the CPU build (with every CPU back end, from SSE4.2 to AVX-512, chosen at start-up), the CUDA 12.4 build with its CUDA runtime DLLs for `device = "cuda"`, the Vulkan build for `device = "vulkan"`. Tontaube is Linux only |
+| servers bolo starts | llama-server, audio.cpp and plugin workers each run in a Job Object that Windows closes when bolo ends, however it ends (Task Manager, closing the console, a service stop), which ends them and whatever they started. bolo stops one by sending it `CTRL_BREAK_EVENT` and ends the Job Object 10 s later (at once when bolo has no console, as a service). `plugin_nice` > 0 means `BELOW_NORMAL_PRIORITY_CLASS`; `plugin_memory_limit_mb` limits each worker's committed memory (POSIX limits its address space) |
+
+**DirectML** (`device = "dml"`, or `dml:1` for the second adapter in DXGI's order: `bolo doctor` and
+`GET /api/v1/hardware` list them as `... (dml:N)`). Only the engines that open ONNX Runtime sessions themselves use
+it: Nemotron diarization, DiCoW ONNX, the SNAC decoder of the Orpheus-family voices, the end-of-turn model and
+in-process speech-to-speech (`lfm3-audio-2b-onnx`). sherpa-onnx's wheels have no DirectML provider and CTranslate2
+(faster-whisper) has none at all, so those models stay on the CPU (bolo says so once); llama-server and audio.cpp
+have no DirectML back end (use `cuda` or `vulkan` for them). DirectML needs the `onnxruntime-directml` package in
+place of `onnxruntime`. All the ONNX Runtime packages install the same `onnxruntime` module and overwrite each other,
+and faster-whisper (in `all`) asks for plain `onnxruntime`, so install DirectML last, and again after any later
+`pip install` or `uv tool upgrade` that brings `onnxruntime` back:
+
+```powershell
+uv tool install "bolo-speech[all,turn]"
+$py = "$(uv tool dir)\bolo-speech\Scripts\python.exe"     # the Python of uv's bolo-speech tool
+uv pip uninstall --python $py onnxruntime onnxruntime-gpu onnxruntime-directml
+uv pip install --python $py onnxruntime-directml
+bolo doctor        # "onnxruntime: onnxruntime-directml 1.24.4; providers Dml, CPU"
+```
+
+In a plain virtual environment: `pip uninstall -y onnxruntime onnxruntime-gpu onnxruntime-directml`, then
+`pip install onnxruntime-directml`. (This recipe has not been run on Windows by the maintainers yet.) `bolo doctor` warns when more than one of these packages is installed, and when
+`device` asks for a provider the installed ONNX Runtime lacks. There is no `directml` extra: pip and uv cannot
+replace a dependency's `onnxruntime` with `onnxruntime-directml`, so an extra would install both. On 2026-11-16
+`onnxruntime-directml` was at 1.24.4 while `onnxruntime` was at 1.32.0; the in-process speech-to-speech model needs
+1.20 or newer, which 1.24.4 is. With DirectML, free GPU memory comes from DXGI (the budget Windows gives bolo's
+process, minus what it uses), so placement and `bolo ps` have a figure for dedicated GPUs; for integrated graphics
+the free memory is unknown and `bolo ps` shows the plan.
 
 ## Coming from Ollama
 

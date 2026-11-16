@@ -406,12 +406,17 @@ visitor's browser; it shows none of this.
 
 ## Limits
 
-* Windows: CPU model, cores and memory only (through `psutil`); no
-  instruction sets, no container detection.
+* Windows: the CPU's name (registry), cores and memory; instruction sets
+  through `IsProcessorFeaturePresent` (SSE4.2, AVX, AVX2, AVX-512F; NEON,
+  dot product and SVE on ARM64), so AVX-512 extensions such as VNNI and AMX
+  are not seen; no container detection. Graphics adapters through DXGI
+  (name, dedicated memory, `dml:N`), counted on when the DirectML build of
+  ONNX Runtime is installed.
 * Intel Macs: no GPU detection (it would need `system_profiler`, which is
   slow).
-* Intel and AMD GPUs are listed but never counted on; Vulkan, ROCm, OpenVINO
-  and DirectML builds of the runtimes are not detected.
+* Intel and AMD GPUs are listed but never counted on (except through
+  DirectML on Windows); Vulkan, ROCm and OpenVINO builds of the runtimes are
+  not detected.
 * Several NVIDIA GPUs: the one with the most memory is used for the fit;
   models are not spread over GPUs.
 * Free memory and free VRAM are read when the hardware is detected, not

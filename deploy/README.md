@@ -7,6 +7,7 @@
 | `Dockerfile.gpu` | NVIDIA CUDA 12 image | **untested** - no GPU was available during development |
 | `docker-compose.yml` | one service, a named volume for models | **run** with the image above: started, reported `healthy`, answered `/healthz` |
 | `systemd/bolo.service` | hardened unit for a virtualenv install | `systemd-analyze verify` passes (apart from the missing virtualenv); not run under systemd (no systemd in the build machine) |
+| Windows (below) | Task Scheduler, NSSM and WinSW recipes | **not run**; CI runs the tests and `bolo serve` on `windows-latest` |
 | `kubernetes/bolo.yaml` | PVC + Deployment + Service with probes | example; not applied to a cluster (none available) |
 
 Building behind a proxy or with a registry mirror: `--build-arg PYTHON_IMAGE=mirror.gcr.io/library/python:3.12-slim`
@@ -45,3 +46,73 @@ replaced). See `docs/models.md` for which voices need it.
 For voice agents (`/v1/realtime` conversations, audio in `/v1/chat/completions`)
 point bolo at a language model: `BOLO_LLM_BASE_URL=http://ollama:11434/v1` and
 `BOLO_LLM_MODEL=llama3.2`. See `docs/voice-agents.md`.
+
+## Windows: at log-on, at start-up or as a service
+
+bolo has no Windows installer and needs none: `uv tool install "bolo-speech[all]"` puts `bolo.exe` in
+`%USERPROFILE%\.local\bin` (`(Get-Command bolo).Source` prints where). None of the recipes below was run by the
+maintainers; CI runs bolo's tests and `bolo serve` on `windows-latest`, nothing more.
+
+Logs: a background bolo has no console, so give it a file: set `BOLO_LOG_FILE=auto` (bolo cannot tell it runs as a
+Windows service). The file is `%LOCALAPPDATA%\bolo\logs\server.log` of the account it runs as (for `LocalSystem`,
+`C:\Windows\System32\config\systemprofile\AppData\Local\bolo\logs\server.log`); `bolo logs -f` follows it, and the
+rotation (10 MB, 3 old files) works while it is open. Models are in `%USERPROFILE%\.cache\bolo` of that account
+unless `BOLO_DATA_DIR` says otherwise ([docs/configuration.md](../docs/configuration.md#windows)).
+
+**Task Scheduler** (no extra software; runs as you, with your models and settings). In PowerShell:
+
+```powershell
+[Environment]::SetEnvironmentVariable("BOLO_LOG_FILE", "auto", "User")   # read by tasks started after this
+$action   = New-ScheduledTaskAction -Execute (Get-Command bolo).Source -Argument "serve"
+$trigger  = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME        # or: -AtStartup (then see below)
+$settings = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) `
+  -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+Register-ScheduledTask -TaskName "bolo" -Action $action -Trigger $trigger -Settings $settings `
+  -Description "bolo speech server"
+Start-ScheduledTask -TaskName "bolo"          # now, without logging off and on
+```
+
+`-ExecutionTimeLimit ([TimeSpan]::Zero)` keeps Task Scheduler from stopping it after three days; `-RestartCount`
+and `-RestartInterval` start it again when it exits with an error. To run it at start-up before anyone logs on,
+use `-AtStartup` and register it with your account and password (`-User $env:USERNAME -Password ...`, "run whether
+user is logged on or not"), which needs an administrator PowerShell. `Stop-ScheduledTask bolo` stops it (the
+servers bolo started stop with it), `Unregister-ScheduledTask bolo` removes it.
+
+**A real service, with [NSSM](https://nssm.cc/)** (administrator PowerShell; the service runs as `LocalSystem`
+unless you set `ObjectName`):
+
+```powershell
+nssm install bolo (Get-Command bolo).Source serve
+nssm set bolo AppEnvironmentExtra BOLO_LOG_FILE=auto BOLO_DATA_DIR=C:\ProgramData\bolo
+nssm set bolo AppExit Default Restart
+nssm set bolo AppStopMethodSkip 6        # stop with Ctrl+C's console event, as a terminal would
+nssm start bolo
+```
+
+**Or with [WinSW](https://github.com/winsw/winsw)**: put `WinSW-x64.exe` next to this `bolo-service.xml`, rename
+both to `bolo-service.exe` / `bolo-service.xml`, then `.\bolo-service.exe install` and `.\bolo-service.exe start`:
+
+```xml
+<service>
+  <id>bolo</id>
+  <name>bolo speech server</name>
+  <executable>C:\Users\you\.local\bin\bolo.exe</executable>
+  <arguments>serve</arguments>
+  <env name="BOLO_LOG_FILE" value="auto"/>
+  <env name="BOLO_DATA_DIR" value="C:\ProgramData\bolo"/>
+  <onfailure action="restart" delay="10 sec"/>
+  <log mode="roll-by-size"><sizeThreshold>10240</sizeThreshold><keepFiles>3</keepFiles></log>
+</service>
+```
+
+A service that runs as `LocalSystem` does not see your user's `.cache\bolo`: point `BOLO_DATA_DIR` at a folder it
+can write (as above) and pull the models again there, or run it as your account. Each child server bolo starts
+(llama-server, audio.cpp, plugin workers) is in a Job Object, so stopping the service or the task stops them too.
+
+**Firewall.** `bolo serve` listens on `127.0.0.1` by default and Windows asks nothing. With `--host 0.0.0.0`,
+Windows Defender Firewall asks the first time (or silently blocks it in a service); allow the port explicitly, and
+set `BOLO_API_KEY` before you do:
+
+```powershell
+New-NetFirewallRule -DisplayName "bolo" -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow -Profile Private
+```

@@ -37,7 +37,7 @@
   <sub>The speech-to-text playground, live against a real server on a 4-core CPU. Lighter text is still changing; solid text is final.</sub>
 </p>
 
-> **Status: alpha.** Developed and measured on Linux x86-64, CPU only. GPUs, Apple Silicon, arm64 and Windows are untested; the phone and cloud integrations have not met a real account. [What has not been validated](#what-has-not-been-validated) says so plainly.
+> **Status: alpha.** Developed and measured on Linux x86-64, CPU only; CI also runs the test suite on Windows (CPU). GPUs, Apple Silicon and arm64 are untested, and so is anything on Windows beyond the tests; the phone and cloud integrations have not met a real account. [What has not been validated](#what-has-not-been-validated) says so plainly.
 
 ## Install
 
@@ -49,6 +49,7 @@ bolo serve
 - Run it once without installing: `uvx --from 'bolo-speech[all]' bolo serve`.
 - Without uv: `pipx install 'bolo-speech[all]'`, or `pip install 'bolo-speech[all]'` into a virtual environment.
 - With Homebrew (macOS 14 or later, Linux): `brew install cb-sigma/tap/bolo`, then `brew services start bolo` to run it in the background (console at http://127.0.0.1:8000/). It installs `all`; the [tap's README](https://github.com/cB-Sigma/homebrew-tap#bolo) shows how to add the opt-in extras.
+- On Windows (PowerShell or cmd), with double quotes, which cmd.exe needs: `uv tool install "bolo-speech[all]"`. Models go to `%USERPROFILE%\.cache\bolo`; DirectML, services and the other differences: [docs/configuration.md](docs/configuration.md#windows).
 - As a container (CPU image): `docker run -p 8000:8000 -v bolo-data:/data ghcr.io/cb-sigma/bolo:latest`. Compose, systemd and Kubernetes examples, and what was run of each: [deploy/README.md](deploy/README.md).
 
 The PyPI distribution is `bolo-speech`; the command and the Python package are `bolo`. Python 3.10 or newer.
@@ -67,6 +68,17 @@ curl http://127.0.0.1:8000/v1/audio/transcriptions -F file=@recording.wav -F mod
 curl http://127.0.0.1:8000/v1/audio/speech -H 'Content-Type: application/json' \
   -d '{"model": "tts-1", "voice": "af_heart", "input": "Hello from bolo."}' -o hello.mp3
 ```
+
+In PowerShell (in Windows PowerShell 5.1 `curl` is `Invoke-WebRequest`, so call `curl.exe`):
+
+```powershell
+curl.exe http://127.0.0.1:8000/v1/audio/transcriptions -F file=@recording.wav -F model=whisper-1
+$body = @{ model = "tts-1"; voice = "af_heart"; input = "Hello from bolo." } | ConvertTo-Json
+Invoke-RestMethod http://127.0.0.1:8000/v1/audio/speech -Method Post -ContentType "application/json; charset=utf-8" `
+  -Body ([Text.Encoding]::UTF8.GetBytes($body)) -OutFile hello.mp3      # UTF-8 bytes: any language's text survives
+```
+
+In cmd, JSON needs escaped double quotes: `curl.exe ... -H "Content-Type: application/json" -d "{\"model\": \"tts-1\", \"voice\": \"af_heart\", \"input\": \"Hello from bolo.\"}" -o hello.mp3`. Environment variables are `$env:BOLO_DEVICE = "cuda"` in PowerShell and `set BOLO_DEVICE=cuda` in cmd.
 
 With the official OpenAI SDK, only the base URL changes:
 
@@ -303,7 +315,7 @@ All tables, the method and what batching does and does not buy on CPU: [docs/per
 
 ## What has not been validated
 
-- **GPUs, Apple Silicon, arm64, Windows.** Nothing was run on them. Device settings and a GPU Dockerfile exist; no number in the documentation comes from a GPU. GPU/CPU placement, several GPUs, llama.cpp offload and tensor splits, the ONNX graph cut and bolo-torch's `device_map` splits are tested only with fake NVML readings, made-up memory figures and command lines that are built but not run (the cut graph with both halves on the CPU).
+- **GPUs, Apple Silicon, arm64, Windows.** Nothing was run on them, except that CI runs the server's and the bolo-torch plugin's tests on `windows-latest` (CPU, Python 3.12) and starts `bolo serve` there; no model was measured on Windows and its GPU paths (CUDA, DirectML, the Windows llama.cpp builds) are untested. Device settings and a GPU Dockerfile exist; no number in the documentation comes from a GPU. GPU/CPU placement, several GPUs, llama.cpp offload and tensor splits, the ONNX graph cut and bolo-torch's `device_map` splits are tested only with fake NVML readings, made-up memory figures and command lines that are built but not run (the cut graph with both halves on the CPU).
 - **The live demo on real devices.** Its tests run in headless Chromium on a desktop CPU; WebGPU, the GPU/CPU split and phone limits are tested with a faked device, not on a GPU, an iPhone or an Android phone.
 - **Phone providers.** No real call was made and no provider account was used: Twilio, Plivo, Telnyx and Exotel are implemented from their documentation and tested against fake providers; SIP against the test-suite's own user agent.
 - **Cloud providers.** Nothing was run against OpenAI, Sarvam, ElevenLabs or Deepgram; the adapters follow their documentation and are tested against stand-ins.

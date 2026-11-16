@@ -21,8 +21,14 @@ the number.
   bolo-torch's `device_map` splits are tested with a fake NVML of made-up GPUs and llama-server command lines that
   are built but not run; the cut graph was run with both halves on the CPU
   ([configuration.md](configuration.md#gpu-and-cpu-placement)).
-- **Apple Silicon and macOS, Linux arm64, Windows.** Not run. The dependencies publish wheels for macOS and arm64,
-  so it should work there; Windows is unknown.
+- **Apple Silicon and macOS, Linux arm64.** Not run. The dependencies publish wheels for macOS and arm64,
+  so it should work there.
+- **Windows: CI runs the server tests on windows-latest; GPU paths untested.** The server's test suite, the
+  bolo-torch plugin's fast tests, `bolo doctor` and `bolo serve` (answering `/healthz`) run on every push on
+  `windows-latest` (CPU, Python 3.12, the win_amd64 wheels of sherpa-onnx, CTranslate2/faster-whisper, PyAV,
+  soundfile and uccharan). No model was measured on Windows, and CUDA, DirectML, the pinned Windows llama.cpp and
+  audio.cpp builds, the Task Scheduler/NSSM/WinSW recipes and the junction fallback for local model folders on a
+  machine without Developer Mode have not been run there (docs/configuration.md, "Windows").
 - **Python 3.10 and 3.11.** The package targets 3.10 and newer; the test-suite was run on 3.12, 3.13 and 3.14.
 - **A phone network.** No real call was made and no telephony account was used. Twilio, Plivo, Telnyx and Exotel
   are implemented from the providers' documentation as read on 2026-11-14 and tested against fake providers that

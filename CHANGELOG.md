@@ -8,6 +8,26 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Windows.** CI runs the server's test suite, the bolo-torch plugin's fast tests, `bolo doctor` and `bolo serve`
+  on `windows-latest` (CPU, Python 3.12), and the package declares `Operating System :: Microsoft :: Windows`. GPU
+  paths on Windows are untested. What differs there: docs/configuration.md, "Windows"; running bolo at log-on or as
+  a service (Task Scheduler, NSSM, WinSW, the firewall): deploy/README.md.
+- `bolo components install llama-server` and `audio.cpp` on Windows x64: the pinned releases (llama.cpp b12375,
+  audio.cpp v0.9.4) now include the Windows builds, the CPU build by default, the CUDA 12.4 build with its CUDA
+  runtime archive for `device = "cuda"` and the Vulkan build for `device = "vulkan"` (llama.cpp also Windows on ARM),
+  each checked against its SHA-256.
+- Servers bolo starts are tied to its lifetime (bolo.procs): on Windows each llama-server, audio.cpp and plugin
+  worker runs in a Job Object that ends it (and whatever it started) when bolo ends, however it ends; on Linux the
+  child asks for `SIGTERM` when bolo dies (`PR_SET_PDEATHSIG`, also after `kill -9`); everywhere the children still
+  running are stopped at exit and on `SIGHUP`. Stopping one asks first (`SIGTERM`; `CTRL_BREAK_EVENT` on Windows)
+  and kills it 10 s later. On Windows `plugin_nice` lowers the worker's priority class and `plugin_memory_limit_mb`
+  limits its committed memory through the Job Object.
+- Hardware detection on Windows: the CPU's name and instruction sets (SSE4.2, AVX, AVX2, AVX-512F; NEON, dot
+  product and SVE on ARM64) and the graphics adapters DXGI lists (name, dedicated memory, `dml:N`); with
+  `device = "dml"`, free GPU memory for placement and `bolo ps` from DXGI's per-process budget.
+- `bolo doctor` shows the installed ONNX Runtime packages and providers, and warns when several ONNX Runtime packages
+  share the one `onnxruntime` module or when `device` asks for a provider (DirectML, CUDA) the installed one lacks.
+- PowerShell and cmd variants of the install and curl commands in the README.
 - **Saved voices (a voice library) for the models that clone voices** ([docs/voices.md](docs/voices.md)).
   `POST /api/v1/voices` (multipart: recordings, name, transcript, language, description, default model) stores a
   cleaned reference (mono 24 kHz, silence trimmed, pauses shortened, loudness normalised, 2 to 60 s) and warns when
@@ -35,6 +55,29 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- Windows: `bolo` writes UTF-8 to pipes and files (Hindi or any non-Latin text printed by `bolo transcribe` to a
+  pipe or a redirect failed with `UnicodeEncodeError` under the legacy code page), and every JSON and text file bolo
+  reads or writes names UTF-8 (the LFM3-Audio configuration, the ONNX graph cut's `split.json`, manifests, saved
+  voices' metadata, consents); ruff's `PLW1514` now enforces it.
+- Windows: the components folder finds `llama-server.exe` and `audiocpp_server.exe`, and `llama_server_bin` /
+  `audiocpp_server_bin` without an extension find the `.exe` (`PATHEXT`), as `PATH` does.
+- Windows: registering a local model folder (`bolo pull <folder>`, `file:`) no longer needs Developer Mode or
+  administrator rights: without the right to make a directory symlink bolo makes a directory junction, else copies
+  the folder (with a notice). Removing such a model removes the link, never the folder.
+- Windows: log rotation works while `bolo logs -f` follows the file (it opens the file with `FILE_SHARE_DELETE`);
+  when another program blocks the rename, the handler copies and empties the file instead and retries a minute
+  later rather than printing "--- Logging error ---" for every record.
+- audio.cpp servers bolo starts get a backend audio.cpp knows: `rocm` becomes `hip`, `coreml`/`mps` become `metal`,
+  and `dml` or `openvino` run it on the CPU (audio.cpp refused to start with "unsupported server backend").
+- `device = "dml"`: sherpa-onnx engines say once that they run on the CPU (its wheels have no DirectML provider).
+- Live transcription with a streaming model no longer merges two utterances into one final when audio queued up
+  while the model was busy (a slow machine, a client sending faster than real time): the queued audio is cut where
+  the VAD heard the next utterance start, and a final ends where the VAD heard speech end rather than where the
+  audio that carried that news ended. Found on Windows, where it happened in the tests.
+- The least recently used model is unloaded first on Windows too: model use is timed with `perf_counter` (Windows'
+  `monotonic` clock ticks every 15.6 ms, so two uses close together looked simultaneous).
+- Windows: a plugin command with a Windows path (`plugins = ["torch=C:\\...\\python.exe -m bolo_torch"]`) keeps
+  its backslashes (they were read as POSIX escapes, so the plugin was "not found").
 - `chatterbox-multilingual-v3-llamacpp` sets a 4096-token context: llama-server's default reserved about 13 GB and was
   killed on a 15 GB machine.
 - `xtts-v2-audiocpp` names its GPT GGUF (audio.cpp refuses a folder with two) and no longer sends `reference_text`,
