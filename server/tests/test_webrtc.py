@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import time
 from fractions import Fraction
@@ -92,7 +93,11 @@ class Peer:
     async def close(self) -> None:
         if self._listener:
             self._listener.cancel()
-        await asyncio.wait_for(self.pc.close(), 20)  # a failing test, not a hung suite
+        # On Windows (ProactorEventLoop), aiortc's close() of an offer that was never answered can wait for ever
+        # for its UDP sockets (seen in CI: test_client_secrets_... hangs in this client's close, not in bolo, whose
+        # own close is bounded by bolo.webrtc.PC_CLOSE_TIMEOUT_S). The browser stand-in is let go after 5 s.
+        with contextlib.suppress(asyncio.TimeoutError):
+            await asyncio.wait_for(self.pc.close(), 5)
 
 
 async def post_offer(url: str, sdp: str, **kw: Any) -> httpx.Response:
