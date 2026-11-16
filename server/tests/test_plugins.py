@@ -205,3 +205,11 @@ def test_gated_entries_explain_what_to_do(live: LiveServer) -> None:
     assert job["state"] == "error" and "accept its terms" in job["error"].lower()
     parler = httpx.get(live.url + "/api/v1/models/indic-parler-tts").json()
     assert parler["gated"] is True and parler["requires"] == ["plugin:torch"] and parler["available"] is False
+
+
+def test_plugin_commands_keep_windows_paths() -> None:
+    from bolo.plugin.host import split_command
+
+    windows = split_command(r'C:\Python312\python.exe -m bolo_torch "C:\Program Files\x"', windows=True)
+    assert windows == [r"C:\Python312\python.exe", "-m", "bolo_torch", r"C:\Program Files\x"]
+    assert split_command("python -m x 'a b'", windows=False) == ["python", "-m", "x", "a b"]

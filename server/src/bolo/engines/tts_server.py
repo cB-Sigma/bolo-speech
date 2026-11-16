@@ -57,6 +57,7 @@ from typing import TYPE_CHECKING, Any
 import httpx
 import numpy as np
 
+from bolo import procs
 from bolo.audio.resample import StreamResampler
 from bolo.engines.base import (
     Engine,
@@ -99,6 +100,14 @@ def free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         return int(s.getsockname()[1])
+
+
+#: bolo ``device`` families and the audio.cpp backend each one means (its server knows cpu, cuda, hip, vulkan and
+#: metal); anything else (dml, openvino) runs audio.cpp on the CPU
+AUDIOCPP_BACKENDS = {
+    "cuda": "cuda", "gpu": "cuda", "rocm": "hip", "hip": "hip", "vulkan": "vulkan",
+    "metal": "metal", "coreml": "metal", "mps": "metal",
+}  # fmt: skip
 
 
 class ServerProcess:
@@ -179,7 +188,7 @@ class ServerProcess:
             self._tail.clear()
             env = {**os.environ, **self.env}
             try:
-                proc = subprocess.Popen(
+                proc = procs.spawn(
                     self.argv,
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.PIPE,
@@ -229,14 +238,8 @@ class ServerProcess:
 
     @staticmethod
     def _terminate(proc: subprocess.Popen[bytes]) -> None:
-        if proc.poll() is not None:
-            return
-        proc.terminate()
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
+        """Ask the server to stop (SIGTERM; CTRL_BREAK_EVENT on Windows), then kill it after 10 s."""
+        procs.stop(proc, timeout=10.0)
 
     def stop(self) -> None:
         with self._lock:
@@ -764,7 +767,7 @@ class TTSServerEngine(Engine):
             run_dir = Path(s.data_dir) / "run" / "tts-server"
             run_dir.mkdir(parents=True, exist_ok=True)
             config_path = run_dir / f"{name}.json"
-            config_path.write_text(json.dumps(config, indent=2))
+            config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
             argv = [str(binary), "--config", str(config_path), "--no-ui"]
         process = ServerProcess(
             f"{runtime}:{name}", argv + extra, port, start_timeout_s=timeout, env=env, health_path=health, api_key=key
@@ -827,7 +830,11 @@ class TTSServerEngine(Engine):
         for key in ("load_options", "session_options", "default_request_options"):
             if spec.get(key):
                 entry[key] = {str(k): v for k, v in dict(spec[key]).items()}
-        backend = "cpu" if opts.device in ("cpu", "", "auto") else opts.device.split(":")[0]
+        kind = (opts.device or "cpu").split(":")[0].lower()
+        backend = AUDIOCPP_BACKENDS.get(kind, "cpu")
+        if kind not in AUDIOCPP_BACKENDS and kind not in ("cpu", "", "auto"):
+            # audio.cpp refuses to start with a backend it does not know ("unsupported server backend: dml")
+            log.warning("model '%s': audio.cpp has no %s backend; it runs on the CPU", name, kind)
         return {
             "host": "127.0.0.1", "port": port, "backend": backend, "threads": max(1, opts.threads),
             "lazy_load": False, "max_loaded_models": 1, "models": [entry],

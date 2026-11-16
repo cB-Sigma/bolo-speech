@@ -12,8 +12,11 @@ Process lifecycle (:class:`PluginProcess`):
   process after a back-off (1 s, doubling up to 60 s while crashes keep coming) and loads the
   models again transparently;
 * stopped when no model has been loaded on it for ``plugin_idle_s`` seconds;
-* optional address-space limit (``plugin_memory_limit_mb``, POSIX ``RLIMIT_AS``) and lower
-  scheduling priority (``plugin_nice``).
+* optional memory limit (``plugin_memory_limit_mb``: the address space, ``RLIMIT_AS``, on POSIX; committed
+  memory through the process's Job Object on Windows) and lower scheduling priority (``plugin_nice``; on Windows
+  any positive value means ``BELOW_NORMAL_PRIORITY_CLASS``);
+* tied to bolo's lifetime and stopped with bolo (bolo.procs: a Job Object on Windows, the parent-death signal on
+  Linux).
 """
 
 from __future__ import annotations
@@ -34,6 +37,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from bolo import procs
 from bolo.engines.base import (
     Engine,
     EngineStatus,
@@ -83,7 +87,16 @@ def parse_plugin_setting(item: str) -> tuple[str, list[str]]:
     name, sep, command = item.partition("=")
     if not sep or not name.strip() or not command.strip():
         raise ValueError(f"a plugin is configured as 'name=command', got {item!r}")
-    return name.strip(), shlex.split(command)
+    return name.strip(), split_command(command)
+
+
+def split_command(command: str, windows: bool | None = None) -> list[str]:
+    """A command line as an argument list. On Windows backslashes are path separators, not escapes, so
+    ``C:\\Python312\\python.exe -m x`` keeps its backslashes ("quoted parts" may hold spaces)."""
+    if not (os.name == "nt" if windows is None else windows):
+        return shlex.split(command)
+    parts = shlex.split(command, posix=False)
+    return [p[1:-1] if len(p) >= 2 and p[0] == p[-1] and p[0] in "\"'" else p for p in parts]
 
 
 def discover_entry_points() -> dict[str, list[str]]:
@@ -138,15 +151,6 @@ class PluginProcess:
     def running(self) -> bool:
         return self._proc is not None and self._proc.poll() is None
 
-    def _preexec(self) -> None:  # pragma: no cover - runs in the child
-        if self.config.nice:
-            os.nice(self.config.nice)
-        if self.config.memory_limit_mb:
-            import resource
-
-            limit = self.config.memory_limit_mb * 1024 * 1024
-            resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
-
     def ensure_started(self) -> None:
         with self._lock:
             if self.running:
@@ -158,13 +162,13 @@ class PluginProcess:
                 )
             env = {**os.environ, **self.config.env, "PYTHONUNBUFFERED": "1"}
             try:
-                self._proc = subprocess.Popen(
+                self._proc = procs.spawn(
                     self.config.command,
+                    limits=procs.Limits(self.config.nice, self.config.memory_limit_mb),
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     env=env,
-                    preexec_fn=self._preexec if os.name == "posix" else None,  # noqa: PLW1509
                 )
             except OSError as exc:
                 self.last_error = str(exc)
@@ -234,11 +238,11 @@ class PluginProcess:
             with self._write_lock:
                 write_message(proc.stdin, {"id": "0", "op": "shutdown"})
             proc.stdin.close()
-        try:
+        # the shutdown message is the graceful step; a worker still running after 5 s is killed (on Windows with
+        # its Job Object, so whatever it started ends too)
+        with contextlib.suppress(subprocess.TimeoutExpired):
             proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
+        procs.stop(proc, timeout=0, graceful=False)
 
     # -- requests -------------------------------------------------------------
     def _send(self, message: dict[str, Any], payload: bytes | None = None) -> tuple[str, _Call]:
