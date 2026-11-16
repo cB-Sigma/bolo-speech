@@ -329,9 +329,16 @@ def test_engine_loads_a_cut_graph_and_answers_the_same(tmp_path: Path) -> None:
     assert cut.probability(audio) == pytest.approx(whole_model.probability(audio), abs=1e-6)
 
 
-async def test_the_manager_cuts_a_model_that_does_not_fit_the_gpu(tmp_path: Path) -> None:
+async def test_the_manager_cuts_a_model_that_does_not_fit_the_gpu(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """End to end with a fake NVML: the placement asks for a split, the engine builds it, ps reports it."""
+    from bolo import cuda_libs
     from bolo.accel import Accelerators
+
+    # this ONNX Runtime has no CUDA provider, so the front half really runs on the CPU and the load would (rightly)
+    # move the placement to the CPU (bolo.cuda_libs, tests/test_cuda_libs.py): here only the split's plumbing counts
+    monkeypatch.setattr(cuda_libs, "record", lambda *args, **kwargs: None)
     from bolo.catalog import ModelSpec
     from bolo.config import Settings
     from bolo.core import Bolo
