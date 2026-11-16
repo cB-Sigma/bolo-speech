@@ -125,12 +125,13 @@ Found on a Windows 11 laptop; the first fix applies everywhere.
 - **`dicow-v3.3-onnx` returned empty text for every speaker on x86 CPUs without VNNI** (AVX2 only: AMD Ryzen
   before Zen 4, such as the Ryzen 7 5800H of the Windows test laptop, and Intel before Ice Lake / Alder Lake), on
   Windows and Linux alike. The int8 graphs multiply uint8 activations by int8 weights, and ONNX Runtime's kernel
-  for that on such CPUs adds pairs of products in 16 bits, which overflow (up to 2 x 255 x 127) and corrupt the
-  encoder's and decoder's outputs. The machine the export was measured on has AVX-512 VNNI, where this does not
+  for that on such CPUs adds pairs of products in 16 bits, which overflow (up to 2 x 255 x 127); the decoder then
+  produced no text tokens at all, up to its 448-token limit (checked under emulation of such a CPU). The machine the export was measured on has AVX-512 VNNI, where this does not
   happen. Both DiCoW sessions now set `session.x64quantprecision`, so ONNX Runtime turns the weights into uint8 at
   load time on those CPUs (no overflow); elsewhere nothing changes, the output on the measurement machine is
   identical. New unit tests (the int8 product is exact, the option reaches both sessions) and a real-model test
-  (diarized transcription of the demo's two-voice dialogue, text for each speaker).
+  (diarized transcription of the demo's two-voice dialogue, text for each speaker); docs/measurements/dicow-onnx.json
+  (`cpu_without_vnni`).
 - **The Vulkan build of llama-server hung on a laptop with AMD and NVIDIA graphics** (Windows 11, AMD Radeon
   integrated graphics and an RTX 3060 Laptop GPU): `llama-server --list-devices` never answered and Windows logged
   `RADAR_PRE_LEAK_64` for `llama-server.exe`, because of AMD's switchable-graphics Vulkan layer. When bolo starts

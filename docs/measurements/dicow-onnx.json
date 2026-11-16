@@ -900,5 +900,22 @@
   "GPU",
   "whole meetings",
   "SE-DiCoW (not exported)"
- ]
+ ],
+ "cpu_without_vnni": {
+  "date": "2026-11-16",
+  "finding": "On x86 CPUs with AVX2 but without VNNI (AMD Zen 3 and older, Intel before Ice Lake / Alder Lake; the Windows test laptop's Ryzen 7 5800H) the int8 graphs gave empty text for every speaker: ONNX Runtime's uint8 x int8 kernel there adds pairs of products in 16 bits, which saturate (2 x 255 x 127 > 32767). The measurements above were made on a CPU with AVX-512 VNNI and AMX, where the kernel is exact. Fixed in bolo.engines.dicow_onnx by the session option session.x64quantprecision=1 (ONNX Runtime turns the int8 weights into uint8 on such CPUs); on the measurement machine the output with the option is identical, so the numbers above stand.",
+  "clip": "the demo's two-speakers-en dialogue (SYSPIN voices) cut to 20.8 s: 5 turns, 65 words, speakers A and B; language en; onnxruntime 1.31.1",
+  "how_without_vnni_was_checked": "qemu-x86_64 8.2 -cpu Haswell (AVX2, no VNNI) on the measurement machine. A single MatMulInteger with uint8 255 x int8 127 operands: max error 49 % of the result without the option, exact natively. The DiCoW decoder graph (int8) run under emulation on the clip's encoder output (computed natively), ground-truth turns: without the option both speakers decode 445 tokens up to the 448-token limit, none of them text, so both come back empty; with it, the native result token for token. The whole pipeline under emulation (encoder included) did not finish within 2 hours and was stopped.",
+  "results": {
+   "native_avx512_vnni": {
+    "before_fix": "A and B transcribed, cpWER 6.2 % (4/65 words, in-process diarized transcription with Nemotron turns)",
+    "after_fix": "identical text, cpWER 6.2 %"
+   },
+   "emulated_avx2_without_vnni_decoder": {
+    "before_fix": "A: '' B: '' (cpWER 100 %)",
+    "after_fix": "identical to native (cpWER 6.2 %)"
+   }
+  },
+  "note": "Through the HTTP API (bolo serve --threads 4) the Nemotron turns of one run also gave B the first sentence, which B's stream then repeated: cpWER 26.2 % there; a diarizer difference between runs, not this bug. The 27.2 s full dialogue through the API: cpWER 22.2 % with the same repetition."
+ }
 }
