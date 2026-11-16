@@ -1,9 +1,11 @@
-"""A stand-in for llama-server and audiocpp_server in tests: the HTTP surface the tts-server engine uses.
+"""A stand-in for llama-server, audiocpp_server and the Tontaube server in tests: the HTTP surface the tts-server
+engine uses.
 
 Run in a thread (``FakeTTSServer(...).start()``) or as a process with the command line of the real binaries::
 
     fake_tts_server.py -m model.gguf -mm mmproj.gguf --host 127.0.0.1 --port N --api-key K -t 2   (llama-server)
     fake_tts_server.py --config server.json --no-ui                                              (audiocpp_server)
+    fake_tts_server.py run --python 3.12 --frozen --directory D tontaube serve --host H --port N      (as uv: Tontaube)
 
 Audio is a tone whose length follows the text (0.05 s per character) at ``rate``. The text "crash now" makes the
 process exit (to test restarts); "bad request" answers 400 the way the real servers do.
@@ -77,7 +79,14 @@ class FakeTTSServer:
                 self._json(code, {"error": {"code": code, "message": message, "type": "invalid_request_error"}})
 
             def do_GET(self) -> None:
-                if self.path.startswith("/health"):
+                if self.path.startswith("/readyz"):
+                    if time.monotonic() - outer.started < outer.load_delay_s:
+                        self._json(503, {"status": "loading"})
+                    else:
+                        self._json(200, {"status": "ready"})
+                elif self.path.startswith("/controls"):
+                    self._json(200, {"controls": [{"name": "rate", "bins": 5}]})
+                elif self.path.startswith("/health"):
                     if time.monotonic() - outer.started < outer.load_delay_s:
                         self._error(503, "Loading model")
                     else:
@@ -90,6 +99,9 @@ class FakeTTSServer:
                     self._error(404, "not found")
 
             def do_POST(self) -> None:
+                if outer.runtime == "tontaube":
+                    self._tontaube()
+                    return
                 if outer.api_key and self.headers.get("Authorization") != f"Bearer {outer.api_key}":
                     self._json(
                         401, {"error": {"code": 401, "message": "Invalid API Key", "type": "authentication_error"}}
@@ -156,6 +168,25 @@ class FakeTTSServer:
                 else:
                     self._wav(x)
 
+            def _tontaube(self) -> None:
+                if outer.api_key and self.headers.get("x-api-key") != outer.api_key:
+                    self._json(401, {"error": "unauthorized"})
+                    return
+                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+                outer.requests.append({"path": self.path, "body": body})
+                if self.path != "/predict":
+                    self._error(404, "not found")
+                    return
+                if body.get("tag") not in ("audiobook", "conversational", "agentic"):
+                    self._json(422, {"detail": [{"msg": "unsupported tag"}]})
+                    return
+                if body.get("voice_audio_b64"):
+                    base64.b64decode(body["voice_audio_b64"], validate=True)
+                buf = io.BytesIO()
+                sf.write(buf, tone(str(body.get("text", "")), 24000), 24000, format="WAV", subtype="PCM_16")
+                self._json(200, {"audio_b64": base64.b64encode(buf.getvalue()).decode(), "mime_type": "audio/wav",
+                                 "sample_rate": 24000})  # fmt: skip
+
             def _audiocpp(self, body: dict[str, Any], text: str) -> None:
                 ref = body.get("voice_ref")
                 if ref is not None and not (isinstance(ref, dict) and ref.get("type") == "base64"):
@@ -183,7 +214,17 @@ class FakeTTSServer:
 
 def main(argv: list[str]) -> None:
     args = dict(zip(argv[::2], argv[1::2])) if "--config" not in argv else {}
-    if "--config" in argv:
+    if argv[:1] == ["run"]:  # as uv, starting the Tontaube server
+        if not Path(os.environ.get("MODEL_PATH", ""), "cb0").is_dir():
+            print("MODEL_PATH has no cb0/", flush=True)
+            sys.exit(2)
+        server = FakeTTSServer(
+            "tontaube", rate=24000, port=int(argv[argv.index("--port") + 1]), api_key=os.environ.get("TTS_API_KEY"),
+            load_delay_s=float(os.environ.get("FAKE_LOAD_DELAY", "0")),
+        )  # fmt: skip
+        if os.environ.get("FAKE_ENV_FILE"):  # what the server was started with, for the test to read
+            Path(os.environ["FAKE_ENV_FILE"]).write_text(json.dumps(dict(os.environ)))
+    elif "--config" in argv:
         config = json.loads(Path(argv[argv.index("--config") + 1]).read_text())
         model = config["models"][0]
         server = FakeTTSServer(

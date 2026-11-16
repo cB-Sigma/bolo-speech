@@ -110,6 +110,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | **Phone calls** | Twilio Media Streams, Plivo audio streams, Telnyx media streaming and the Exotel Voicebot applet connected to named agents; an experimental inbound SIP endpoint. Greeting, barge-in, key presses, hang-up and transfer, outbound calls with voicemail handling, signed webhooks, call records with a latency breakdown, a call simulator | [telephony.md](docs/telephony.md) |
 | **Cloud providers next to local models** | OpenAI, Sarvam, ElevenLabs, Deepgram or any OpenAI-compatible server behind the same routes, with bolo's diarization, word lists, telephony formats, traces and cost estimates on top, and **fallback** between local and cloud models in either direction. Audio leaves the server only when you name such a model | [providers.md](docs/providers.md) |
 | **Who said what** | speaker diarization without PyTorch (pyannote segmentation with speaker embeddings, or NVIDIA's overlap-aware Nemotron), as `diarized_json`, in subtitles, on words and on live transcripts; known speakers named from reference recordings. **Speaker-attributed recognition**: DiCoW transcribes each speaker of a conversation separately, overlaps included, in the core (`dicow-v3.3-onnx`) or through the torch plugin | [models.md](docs/models.md#speaker-diarization-1) |
+| **Voice cloning with a voice library** | save a person's voice once (cleaned, checked, **consent required** and recorded), then name it as the `voice` of any cloning model, OpenAI's custom-voice shape included; cloned speech is labelled; a speaker-similarity score, calibrated on real speech, says how alike the clone is; Tontaube, Chatterbox, Qwen3-TTS, Pocket TTS and more | [voices.md](docs/voices.md) |
 | **A model catalog** | pull by name, with licences and gating on every entry and what was actually measured; `hf:owner/repo`, any Piper voice by name, local directories and URLs for everything else | [models.md](docs/models.md), [below](#models-and-licences) |
 | **Hardware-aware recommendations** | bolo looks at the machine and rates every model for it; it recommends and warns, and never hides or refuses a model | [recommendations.md](docs/recommendations.md) |
 | **Text preparation** | numbers, dates, money, units and URLs read out in the voice's language; pronunciation word lists for names and jargon; an SSML subset; romanised input ("mujhe kal jana hai") written in the voice's script; phonemes without the GPL through [uccharan](https://github.com/cb-Sigma/uccharan) | [api.md](docs/api.md#text-preparation-ssml-and-pronunciation-word-lists), [models.md](docs/models.md#phonemisers) |
@@ -163,8 +164,9 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | TTS | MMS-TTS | 25 | as, awa, bgc, bn, de, doi, en, es +17 | 1 | 0.196 (`mms-tts-eng`) |
 | TTS | Orpheus family on llama.cpp (SNAC in onnxruntime) | 6 | as, bho, bn, brx, doi, en, gu, hi +11 | 0 | - |
 | TTS | Piper | 85 | ar, bn, ca, cs, cy, da, de, el +35 | 28 | 0.040 (`piper-ne-np-google-medium`) |
-| TTS | External TTS server: llama-server | 10 | ar, da, de, el, en, es, fi, fr +15 | 1 | 0.716 (`pocket-tts-en-llamacpp`) |
+| TTS | External TTS server: llama-server | 10 | ar, da, de, el, en, es, fi, fr +15 | 8 | 0.397 (`pocket-tts-it-llamacpp`) |
 | TTS | External TTS server: audio.cpp | 40 | ar, be, bg, bn, cs, da, de, el +41 | 0 | - |
+| TTS | External TTS server: tontaube | 2 | de, en, es, fr, it, nl, pt | 0 | - |
 | TTS | Kokoro | 2 | en, es, fr, hi, it, ja, pt, zh | 2 | 0.759 (`kokoro-v1.0`) |
 | TTS | KittenTTS | 4 | en | 4 | 0.107 (`kitten-nano-0.8`) |
 | TTS | Matcha-TTS | 2 | en, zh | 1 | 0.205 (`matcha-en-ljspeech`) |
@@ -173,7 +175,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | TURN | Smart Turn | 1 | ar, bn, da, de, en, es, fi, fr +15 | 0 | - |
 | VAD | Silero VAD | 2 | - | 2 | 0.006 (`silero-vad-v5`) |
 
-**342 models in the catalog, 120 validated on CPU, 222 untested**, plus 20 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**344 models in the catalog, 127 validated on CPU, 217 untested**, plus 20 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

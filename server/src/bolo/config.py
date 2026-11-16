@@ -77,6 +77,8 @@ class Settings:
     default_realtime_tts: str = "piper-en-us-amy-low"
     default_vad: str = "silero-vad"
     default_diarization: str = "pyannote-3.0-eres2net"
+    #: diarization model whose speaker embeddings score cloned voices (speaker similarity); unset: default_diarization
+    voice_similarity_model: str | None = None
     #: after clustering, a "speaker" with less speech than this (seconds) is folded into the most similar one,
     #: and two speakers whose voice prints are at least this similar are merged; 0 switches a repair off
     diarization_min_speaker_s: float = 3.0
@@ -174,6 +176,9 @@ class Settings:
     tts_server_api_key: str | None = None  # sent as "Authorization: Bearer …" to operator-run servers
     llama_server_bin: str | None = None  # llama-server binary for managed models (else bolo's component, then PATH)
     audiocpp_server_bin: str | None = None  # audiocpp_server binary for managed models
+    tontaube_dir: str | None = None  # a checkout of github.com/craitech/tontaube (else bolo's component)
+    #: how long a managed Tontaube server may take to start: its first start installs PyTorch and more
+    tontaube_start_timeout_s: float = 3600.0
     tts_server_args: list[str] = field(default_factory=list)  # extra command-line arguments for managed servers
     tts_server_start_timeout_s: float = 300.0  # how long a managed server may take to load its model
     tts_server_timeout_s: float = 300.0  # longest wait for the next bytes of a synthesis response

@@ -1,6 +1,6 @@
 """External speech-synthesis servers that the ``tts-server`` engine forwards to.
 
-Two runtimes are known:
+Three runtimes are known:
 
 * **llama-server** from llama.cpp (MIT, https://github.com/ggml-org/llama.cpp): ``POST /tts`` with
   ``input``, ``lang``, ``voice``, ``speaker_ref_b64``, ``response_format`` (``wav`` | ``pcm`` | ``pcm16``) and
@@ -11,6 +11,13 @@ Two runtimes are known:
   (``{"type": "base64", "data": …}``), ``reference_text``, ``speed`` and ``options``; WAV by default, raw PCM16
   with ``stream_format: "audio"`` for models configured with ``mode: "streaming"``. Models are declared in a
   JSON config (``--config``).
+* **tontaube** from craitech/tontaube (Apache-2.0, https://github.com/craitech/tontaube): ``POST /predict`` with
+  ``text``, ``language``, ``tag`` (audiobook | conversational | agentic), ``voice_audio_b64`` or ``voice_path``,
+  ``controls`` (the style sliders) and ``format``, answering ``{"audio_b64", "mime_type", "sample_rate"}``;
+  ``GET /controls`` lists the sliders and ``GET /readyz`` is 503 while the model loads. Not a binary but a
+  Python application: bolo clones the pinned tag and runs ``uv run --python 3.12 --frozen tontaube serve``
+  (``uv`` must be on PATH), pointing ``MODEL_PATH`` at the weights bolo downloaded. Its first start installs its
+  own dependencies (PyTorch and more, several GB) into the checkout.
 
 bolo either *connects* to such a server (setting ``tts_servers``: ``"<model id or runtime>=<url>"``) or
 *manages* one: it starts the binary on a loopback port when the model is loaded and stops it when the model is
@@ -42,7 +49,8 @@ if TYPE_CHECKING:
 
 LLAMA = "llama-server"
 AUDIOCPP = "audio.cpp"
-RUNTIMES = (LLAMA, AUDIOCPP)
+TONTAUBE = "tontaube"
+RUNTIMES = (LLAMA, AUDIOCPP, TONTAUBE)
 ENGINE_ID = "tts-server"
 
 
@@ -53,6 +61,16 @@ class Release:
     url: str
     sha256: str
     size: int | None = None
+
+
+@dataclass(frozen=True)
+class GitSource:
+    """A pinned source checkout (an application run from source rather than a release binary)."""
+
+    url: str
+    tag: str
+    commit: str
+    platforms: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -67,6 +85,7 @@ class Runtime:
     releases: dict[str, Release]
     setting: str  # the setting that names an operator-provided binary
     description: str
+    git: GitSource | None = None
 
 
 RUNTIME_INFO: dict[str, Runtime] = {
@@ -136,6 +155,30 @@ RUNTIME_INFO: dict[str, Runtime] = {
             "point audiocpp_server_bin at a CUDA build."
         ),
     ),
+    TONTAUBE: Runtime(
+        id=TONTAUBE,
+        name="Tontaube inference server (tontaube serve)",
+        binary="tontaube",
+        license="Apache-2.0 (inference code; the model weights have their own licence)",
+        license_url="https://github.com/craitech/tontaube/blob/v1.1.0/LICENSE",
+        homepage="https://github.com/craitech/tontaube",
+        version="v1.1.0",
+        releases={},
+        setting="tontaube_dir",
+        description=(
+            "The Tontaube inference server, the only runtime for TontaubeV1.1 (expressive voice cloning, English "
+            "and German first). bolo clones the pinned release and starts `uv run --python 3.12 --frozen tontaube "
+            "serve` for the model in use; its first start installs PyTorch and the server's other dependencies "
+            "(several GB). Linux only: an NVIDIA GPU (Ampere or newer for bf16), or an x86-64 CPU with AVX2, FMA "
+            "and F16C and a C++ compiler. Or run it yourself and set tts_servers."
+        ),
+        git=GitSource(
+            "https://github.com/craitech/tontaube.git",
+            "v1.1.0",
+            "ef254ca3d7dcbf536e83b04fd38798aea6b5e759",
+            ("linux-x86_64", "linux-aarch64"),
+        ),
+    ),
 }
 
 
@@ -155,9 +198,21 @@ def install_dir(settings: Settings, runtime: str) -> Path:
     return components_dir(settings) / runtime / info.version
 
 
+def is_checkout(path: Path) -> bool:
+    return (path / "pyproject.toml").is_file()
+
+
 def find_binary(settings: Settings, runtime: str) -> tuple[Path | None, str | None]:
-    """``(path, source)`` of the server binary for ``runtime``: the setting, bolo's components folder, then PATH."""
+    """``(path, source)`` of the server binary for ``runtime``: the setting, bolo's components folder, then PATH.
+    For a runtime run from source (Tontaube) the path is the checkout folder."""
     info = RUNTIME_INFO[runtime]
+    if info.git is not None:
+        configured = getattr(settings, info.setting, None)
+        if configured:
+            path = Path(str(configured)).expanduser()
+            return (path, "settings") if is_checkout(path) else (None, None)
+        local = install_dir(settings, runtime) / info.binary
+        return (local, "bolo") if is_checkout(local) else (None, None)
     configured = getattr(settings, info.setting, None)
     if configured:
         path = Path(str(configured)).expanduser()

@@ -25,7 +25,7 @@
   gated: false
   features: [voice-cloning]
   description: Resemble AI Chatterbox Multilingual V3 (0.5 B, 23 languages including Hindi) as converted by ggml-org, on
-    llama.cpp. Clones a voice from reference audio. Outputs carry Resemble's Perth watermark. llama.cpp notes that llama-server
+    llama.cpp. Clones a voice from reference audio. No Perth watermark (Resemble's Python package adds it after generation and llama.cpp does not; Resemble's detector found none in Chatterbox Turbo's output on llama.cpp, docs/measurements/voice-cloning-cpu.json). Made for a GPU; on the 4-vCPU test machine a 1.2 s sentence took about 5 minutes. llama.cpp notes that llama-server
     does not run this variant's classifier-free guidance yet (llama-tts does), so quality through the server may be below
     the reference. Runs in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting
     tts_servers).
@@ -42,6 +42,9 @@
     cloning: true
     send_language: true
     hardware: {gpu: recommended, vram_gb: 2.0, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+    # llama-server's default context for this GGUF reserved 13 GB of KV cache on a 15 GB machine and was killed
+    # (2026-11-16); 4096 tokens loads in 2.3 GB and is far more than a sentence needs
+    context_size: 4096
     mmproj_file: mmproj-chatterbox-F16.gguf
   voices:
   - {id: default, name: Model default, server_voice: ''}
@@ -63,10 +66,21 @@
   gated: false
   features: [voice-cloning]
   description: Resemble AI Chatterbox Turbo (English) as converted by ggml-org, on llama.cpp. Clones a voice from reference
-    audio; outputs carry Resemble's Perth watermark. Runs in a llama-server that bolo starts (bolo components install llama-server)
+    audio. No Perth watermark (Resemble's Python package adds it after generation and llama.cpp does not; Resemble's detector found none in this entry's output, docs/measurements/voice-cloning-cpu.json). Runs in a llama-server that bolo starts (bolo components install llama-server)
     or one you run (setting tts_servers).
   source_url: https://huggingface.co/ResembleAI/chatterbox-turbo
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 3.063
+    ttfa_ms: 17765
+    audio_s: 5.8
+    round_trip_wer: 0.026
+    speaker_similarity: 0.714
+    threads: 4
+    engine: llama.cpp b12375 llama-server (upstream release build, CPU), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-16'
+    note: 'server/tools/measure_cloning.py (docs/measurements/voice-cloning-cpu.json): cloned two LibriSpeech dev-clean speakers (CC BY 4.0, about 15 s each, saved voices) and spoke one test sentence in en: libri-2277 similarity 0.732 (others at most 0.367, its stock voice 0.226); libri-84 similarity 0.697 (others at most 0.513, its stock voice 0.06). Round trip by moonshine-tiny-en. One run after a warm-up, the faster voice''s RTF; the machine was shared.'
   requires: [llama-server]
   source:
     repo: ggml-org/chatterbox-turbo-GGUF
@@ -101,7 +115,18 @@
     recommends always giving a speaker reference, so every voice here is a reference clip (or send reference_audio). No
     Hindi. Runs in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).
   source_url: https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 2.316
+    ttfa_ms: 12043
+    audio_s: 5.2
+    round_trip_wer: 0.0
+    speaker_similarity: 0.622
+    threads: 4
+    engine: llama.cpp b12375 llama-server (upstream release build, CPU), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-16'
+    note: 'server/tools/measure_cloning.py (docs/measurements/voice-cloning-cpu.json): cloned two LibriSpeech dev-clean speakers (CC BY 4.0, about 15 s each, saved voices) and spoke one test sentence in en: libri-2277 similarity 0.552 (others at most 0.334, its stock voice 0.205); libri-84 similarity 0.692 (others at most 0.398, its stock voice 0.236). Round trip by moonshine-tiny-en. One run after a warm-up, the faster voice''s RTF; the machine was shared.'
   requires: [llama-server]
   source:
     repo: ggml-org/Qwen3-TTS-12Hz-1.7B-Base-GGUF
@@ -153,6 +178,7 @@
   - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
   - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
   measured:
+    speaker_similarity: 0.569
     rtf: 0.716
     ttfa_ms: 774
     audio_s: 4.48
@@ -161,7 +187,7 @@
     engine: llama.cpp b12375 llama-server (upstream release build, CPU), started by bolo
     hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
     date: '2026-11-14'
-    note: 'tests/test_real.py::test_pocket_tts_on_a_managed_llama_server, voice heart (3 s reference clip), best of three
+    note: 'Cloning (server/tools/measure_cloning.py, docs/measurements/voice-cloning-cpu.json): two LibriSpeech speakers, similarity 0.482, 0.655, round trip exact. Earlier run: tests/test_real.py::test_pocket_tts_on_a_managed_llama_server, voice heart (3 s reference clip), best of three
       runs; two sentences (93 characters), transcribed back word for word by moonshine-tiny-en. The machine was shared (load
       average 5-7 from other work). Voice michael (11.8 s reference clip): RTF 1.7-2.3, first audio 2.4-3.4 s, because llama-server
       encodes the reference again for every sentence. With 4 threads on the busy machine RTF was about 12: give the server
@@ -185,7 +211,18 @@
     so its voices are bolo''s synthetic reference clips (or send reference_audio). Attribution required (CC-BY-4.0). Runs
     in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).'
   source_url: https://huggingface.co/kyutai/pocket-tts
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 0.447
+    ttfa_ms: 1439
+    audio_s: 4.64
+    round_trip_wer: 0.088
+    speaker_similarity: 0.363
+    threads: 4
+    engine: llama.cpp b12375 llama-server (upstream release build, CPU), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-16'
+    note: 'server/tools/measure_cloning.py (docs/measurements/voice-cloning-cpu.json): cloned two LibriSpeech dev-clean speakers (CC BY 4.0, about 15 s each, saved voices) and spoke one test sentence in de: libri-2277 similarity 0.271 (others at most 0.289, its stock voice 0.018); libri-84 similarity 0.455 (others at most 0.283, its stock voice 0.178). Round trip by whisper-base. One run after a warm-up, the faster voice''s RTF; the machine was shared.'
   requires: [llama-server]
   source:
     repo: EryriLabs/pocket-tts-GGUF
@@ -221,7 +258,18 @@
     so its voices are bolo''s synthetic reference clips (or send reference_audio). Attribution required (CC-BY-4.0). Runs
     in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).'
   source_url: https://huggingface.co/kyutai/pocket-tts
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 0.463
+    ttfa_ms: 1578
+    audio_s: 5.44
+    round_trip_wer: 0.579
+    speaker_similarity: 0.329
+    threads: 4
+    engine: llama.cpp b12375 llama-server (upstream release build, CPU), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-16'
+    note: 'server/tools/measure_cloning.py (docs/measurements/voice-cloning-cpu.json): cloned two LibriSpeech dev-clean speakers (CC BY 4.0, about 15 s each, saved voices) and spoke one test sentence in es: libri-2277 similarity 0.218 (others at most 0.265, its stock voice 0.074); libri-84 similarity 0.439 (others at most 0.326, its stock voice 0.158). Round trip by whisper-base. One run after a warm-up, the faster voice''s RTF; the machine was shared.'
   requires: [llama-server]
   source:
     repo: EryriLabs/pocket-tts-GGUF
@@ -257,7 +305,18 @@
     one), so its voices are bolo''s synthetic reference clips (or send reference_audio). Attribution required (CC-BY-4.0).
     Runs in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).'
   source_url: https://huggingface.co/kyutai/pocket-tts
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 0.657
+    ttfa_ms: 1864
+    audio_s: 6.48
+    round_trip_wer: 0.5
+    speaker_similarity: 0.378
+    threads: 4
+    engine: llama.cpp b12375 llama-server (upstream release build, CPU), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-16'
+    note: 'server/tools/measure_cloning.py (docs/measurements/voice-cloning-cpu.json): cloned two LibriSpeech dev-clean speakers (CC BY 4.0, about 15 s each, saved voices) and spoke one test sentence in fr: libri-2277 similarity 0.317 (others at most 0.335, its stock voice -0.017); libri-84 similarity 0.439 (others at most 0.209, its stock voice 0.179). Round trip by whisper-base. One run after a warm-up, the faster voice''s RTF; the machine was shared.'
   requires: [llama-server]
   source:
     repo: EryriLabs/pocket-tts-GGUF
@@ -293,7 +352,18 @@
     so its voices are bolo''s synthetic reference clips (or send reference_audio). Attribution required (CC-BY-4.0). Runs
     in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).'
   source_url: https://huggingface.co/kyutai/pocket-tts
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 0.397
+    ttfa_ms: 1327
+    audio_s: 5.2
+    round_trip_wer: 0.389
+    speaker_similarity: 0.38
+    threads: 4
+    engine: llama.cpp b12375 llama-server (upstream release build, CPU), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-16'
+    note: 'server/tools/measure_cloning.py (docs/measurements/voice-cloning-cpu.json): cloned two LibriSpeech dev-clean speakers (CC BY 4.0, about 15 s each, saved voices) and spoke one test sentence in it: libri-2277 similarity 0.388 (others at most 0.377, its stock voice 0.124); libri-84 similarity 0.371 (others at most 0.301, its stock voice 0.32). Round trip by whisper-base. One run after a warm-up, the faster voice''s RTF; the machine was shared.'
   requires: [llama-server]
   source:
     repo: EryriLabs/pocket-tts-GGUF
@@ -329,7 +399,18 @@
     one), so its voices are bolo''s synthetic reference clips (or send reference_audio). Attribution required (CC-BY-4.0).
     Runs in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).'
   source_url: https://huggingface.co/kyutai/pocket-tts
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 0.631
+    ttfa_ms: 2262
+    audio_s: 4.64
+    round_trip_wer: 0.417
+    speaker_similarity: 0.317
+    threads: 4
+    engine: llama.cpp b12375 llama-server (upstream release build, CPU), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-16'
+    note: 'server/tools/measure_cloning.py (docs/measurements/voice-cloning-cpu.json): cloned two LibriSpeech dev-clean speakers (CC BY 4.0, about 15 s each, saved voices) and spoke one test sentence in pt: libri-2277 similarity 0.244 (others at most 0.311, its stock voice 0.001); libri-84 similarity 0.389 (others at most 0.281, its stock voice 0.318). Round trip by whisper-base. One run after a warm-up, the faster voice''s RTF; the machine was shared.'
   requires: [llama-server]
   source:
     repo: EryriLabs/pocket-tts-GGUF
@@ -465,7 +546,8 @@
   features: [voice-cloning]
   description: 'Chatterbox Multilingual (V3 talker) on audio.cpp (chatterbox, supported there). Languages: ar, da, de, el,
     en, es, fi, fr, hi, it, ko, ms, nl, no, pl, pt, sv, sw, tr. Clones a voice from reference audio (reference_audio, or
-    the reference-clip voices). | 2026-09-21 Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp)
+    the reference-clip voices). No Perth watermark: audio.cpp has no watermarker (Resemble''s Python package adds
+    it after generation). | 2026-09-21 Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp)
     or one you run (setting tts_servers). GPU recommended, about 3.2 GB.'
   source_url: https://huggingface.co/ResembleAI/chatterbox
   validated: untested
@@ -1956,3 +2038,169 @@
   voices:
   - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
   - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+# TontaubeV1.1 (Cremer & Cremer Technologies): runs only in its own inference server (craitech/tontaube v1.1.0,
+# Apache-2.0), the runtime "tontaube". Read 2026-11-15: the model cards, LICENSE and COVERED_FILES.md on Hugging Face
+# (tag v1.1.0) and the server's README, app/main.py and voices/manifest.json. Voices are the server's bundled
+# references (MIT), sent as voice_path; their style is the default for the request option "style".
+- id: tontaube-v1.1-int4
+  aliases: [tontaube]
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: TontaubeV1.1
+  languages: [en, de, es, fr, it, nl, pt]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 1792597319
+  license: Tontaube Community Model License 1.0
+  license_url: https://huggingface.co/TontaubeAI/TontaubeV1.1-int4/blob/main/LICENSE
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'TontaubeV1.1 in 4 bits (GPTQ), the default model of the Tontaube inference server: expressive voice
+    cloning from 5 to 60 s of speech, English and German first, also Spanish, French, Italian, Dutch and Portuguese.
+    Three speaking styles (request option style: audiobook, conversational, agentic) and five sliders (options rate
+    0-4, pause 0-4, pitch_range 0-5, pitch_level 0-4, legato 0-2). Licence: Tontaube Community Model License 1.0 (in short: research, noncommercial use and testing are free; commercial use is free while the group''s revenue is below EUR 200,000, with the attribution "Powered by TontaubeV1"; offering the model to others as a speech-generation service always needs a commercial licence, whatever the revenue; fine-tunes and other derivatives that are distributed carry the same licence). commercial_use is false here
+    because serving speech to others needs that licence. Runs in the Tontaube server that bolo starts (bolo components
+    install tontaube; uv on PATH; the first start installs PyTorch and more, several GB) or one you run (setting
+    tts_servers). NVIDIA GPU (about 4 GiB, peaks at about 6.5 GiB) or an x86-64 Linux CPU with AVX2, FMA and F16C
+    (about real time on a 12-core desktop, by the card).'
+  source_url: https://huggingface.co/TontaubeAI/TontaubeV1.1-int4
+  validated: untested
+  requires: [tontaube]
+  source:
+    repo: TontaubeAI/TontaubeV1.1-int4
+    revision: 2cff8331a357cdd50b05c823f5172eaa3ac6c121
+    include: [cb0/*, cb1/*, cb2/*, cb3/*, int4/*, vibevoice_adapter.pt, LICENSE, COVERED_FILES.md, THIRD_PARTY_NOTICES.md,
+      THIRD_PARTY_LICENSES/*]
+  options:
+    runtime: tontaube
+    backend: lite
+    cloning: true
+    hardware: {gpu: recommended, vram_gb: 6.5, note: 'peaks at about 6.5 GiB (card); CPU: Linux x86-64 with AVX2, FMA
+        and F16C'}
+  voices:
+  - {id: marcus, name: Marcus (en), language: en, server_voice: samples/Marcus.mp3}
+  - {id: adam, name: Adam (fr, audiobook), language: fr, server_voice: samples/Adam.mp3, style: audiobook}
+  - {id: andrea, name: Andrea (it, audiobook), language: it, server_voice: samples/Andrea.mp3, style: audiobook}
+  - {id: arthur, name: Arthur (en, agentic), language: en, server_voice: samples/Arthur.mp3, style: agentic}
+  - {id: clara, name: Clara (en, agentic), language: en, server_voice: samples/Clara.wav, style: agentic}
+  - {id: daniel, name: Daniel (en, agentic), language: en, server_voice: samples/Daniel.mp3, style: agentic}
+  - {id: dante, name: Dante (it, audiobook), language: it, server_voice: samples/Dante.mp3, style: audiobook}
+  - {id: diego, name: Diego (es, agentic), language: es, server_voice: samples/Diego.mp3, style: agentic}
+  - {id: eleanor, name: Eleanor (en, agentic), language: en, server_voice: samples/Eleanor.mp3, style: agentic}
+  - {id: elias, name: Elias (en), language: en, server_voice: samples/Elias.mp3}
+  - {id: fernando, name: Fernando (es, audiobook), language: es, server_voice: samples/Fernando.mp3, style: audiobook}
+  - {id: frederick, name: Frederick (en, audiobook), language: en, server_voice: samples/Frederick.mp3, style: audiobook}
+  - {id: glenn, name: Glenn (en, audiobook), language: en, server_voice: samples/Glenn.mp3, style: audiobook}
+  - {id: graham, name: Graham (en, conversational), language: en, server_voice: samples/Graham.mp3, style: conversational}
+  - {id: hannah, name: Hannah (en, conversational), language: en, server_voice: samples/Hannah.mp3, style: conversational}
+  - {id: henry, name: Henry (en, agentic), language: en, server_voice: samples/Henry.wav, style: agentic}
+  - {id: hugo, name: Hugo (fr, agentic), language: fr, server_voice: samples/Hugo.mp3, style: agentic}
+  - {id: john, name: John (en, agentic), language: en, server_voice: samples/John.wav, style: agentic}
+  - {id: josie, name: Josie (en, agentic), language: en, server_voice: samples/Josie.wav, style: agentic}
+  - {id: julian, name: Julian (en, agentic), language: en, server_voice: samples/Julian.mp3, style: agentic}
+  - {id: juri, name: Juri (de, audiobook), language: de, server_voice: samples/Juri.mp3, style: audiobook}
+  - {id: keith, name: Keith (en, conversational), language: en, server_voice: samples/Keith.mp3, style: conversational}
+  - {id: lars, name: Lars (nl, agentic), language: nl, server_voice: samples/Lars.mp3, style: agentic}
+  - {id: lotte, name: Lotte (nl, agentic), language: nl, server_voice: samples/Lotte.mp3, style: agentic}
+  - {id: lucas, name: Lucas (en, agentic), language: en, server_voice: samples/Lucas.mp3, style: agentic}
+  - {id: luis, name: Luis (es, agentic), language: es, server_voice: samples/Luis.mp3, style: agentic}
+  - {id: madeline, name: Madeline (en, audiobook), language: en, server_voice: samples/Madeline.mp3, style: audiobook}
+  - {id: martim, name: Martim (pt, agentic), language: pt, server_voice: samples/Martim.mp3, style: agentic}
+  - {id: michael, name: Michael (en, agentic), language: en, server_voice: samples/Michael.mp3, style: agentic}
+  - {id: miles, name: Miles (en, audiobook), language: en, server_voice: samples/Miles.wav, style: audiobook}
+  - {id: nicolas, name: Nicolas (en, audiobook), language: en, server_voice: samples/Nicolas.mp3, style: audiobook}
+  - {id: nora, name: Nora (en, agentic), language: en, server_voice: samples/Nora.mp3, style: agentic}
+  - {id: oskar, name: Oskar (de, audiobook), language: de, server_voice: samples/Oskar.mp3, style: audiobook}
+  - {id: penelope, name: Penelope (en, audiobook), language: en, server_voice: samples/Penelope.mp3, style: audiobook}
+  - {id: riley, name: Riley (en, conversational), language: en, server_voice: samples/Riley.wav, style: conversational}
+  - {id: roberto, name: Roberto (it, agentic), language: it, server_voice: samples/Roberto.mp3, style: agentic}
+  - {id: simon, name: Simon (en, audiobook), language: en, server_voice: samples/Simon.mp3, style: audiobook}
+  - {id: sofia, name: Sofia (en, agentic), language: en, server_voice: samples/Sofia.mp3, style: agentic}
+  - {id: stella, name: Stella (en, conversational), language: en, server_voice: samples/Stella.mp3, style: conversational}
+  - {id: thijs, name: Thijs (nl, audiobook), language: nl, server_voice: samples/Thijs.mp3, style: audiobook}
+  - {id: tiago, name: Tiago (pt, audiobook), language: pt, server_voice: samples/Tiago.mp3, style: audiobook}
+  - {id: timothy, name: Timothy (en, agentic), language: en, server_voice: samples/Timothy.mp3, style: agentic}
+  - {id: tony, name: Tony (en, audiobook), language: en, server_voice: samples/Tony.mp3, style: audiobook}
+  - {id: victoria, name: Victoria (en, audiobook), language: en, server_voice: samples/Victoria.mp3, style: audiobook}
+  - {id: vivian, name: Vivian (en, agentic), language: en, server_voice: samples/Vivian.wav, style: agentic}
+  - {id: william, name: William (en, agentic), language: en, server_voice: samples/William.mp3, style: agentic}
+- id: tontaube-v1.1
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: TontaubeV1.1
+  languages: [en, de, es, fr, it, nl, pt]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 6403338734
+  license: Tontaube Community Model License 1.0
+  license_url: https://huggingface.co/TontaubeAI/TontaubeV1.1/blob/main/LICENSE
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'TontaubeV1.1 in full precision, served by the Tontaube server''s vLLM backend, which needs an NVIDIA GPU
+    with at least 24 GiB (TontaubeV1.1-int4 is the model for smaller GPUs and CPUs). Same voices, styles and sliders as
+    tontaube-v1.1-int4. Licence: Tontaube Community Model License 1.0 (in short: research, noncommercial use and testing are free; commercial use is free while the group''s revenue is below EUR 200,000, with the attribution "Powered by TontaubeV1"; offering the model to others as a speech-generation service always needs a commercial licence, whatever the revenue; fine-tunes and other derivatives that are distributed carry the same licence). commercial_use is false here because serving speech to others needs that
+    licence.'
+  source_url: https://huggingface.co/TontaubeAI/TontaubeV1.1
+  validated: untested
+  requires: [tontaube]
+  source:
+    repo: TontaubeAI/TontaubeV1.1
+    revision: 17f84a5b586e23c209da72e42a6fb09b56d21cea
+    include: [cb0/*, cb1/*, cb2/*, cb3/*, vibevoice_adapter.pt, LICENSE, COVERED_FILES.md, THIRD_PARTY_NOTICES.md,
+      THIRD_PARTY_LICENSES/*]
+  options:
+    runtime: tontaube
+    backend: vllm
+    cloning: true
+    hardware: {gpu: required, vram_gb: 24, note: 'vLLM backend: 24 GiB or more (card)'}
+  voices:
+  - {id: marcus, name: Marcus (en), language: en, server_voice: samples/Marcus.mp3}
+  - {id: adam, name: Adam (fr, audiobook), language: fr, server_voice: samples/Adam.mp3, style: audiobook}
+  - {id: andrea, name: Andrea (it, audiobook), language: it, server_voice: samples/Andrea.mp3, style: audiobook}
+  - {id: arthur, name: Arthur (en, agentic), language: en, server_voice: samples/Arthur.mp3, style: agentic}
+  - {id: clara, name: Clara (en, agentic), language: en, server_voice: samples/Clara.wav, style: agentic}
+  - {id: daniel, name: Daniel (en, agentic), language: en, server_voice: samples/Daniel.mp3, style: agentic}
+  - {id: dante, name: Dante (it, audiobook), language: it, server_voice: samples/Dante.mp3, style: audiobook}
+  - {id: diego, name: Diego (es, agentic), language: es, server_voice: samples/Diego.mp3, style: agentic}
+  - {id: eleanor, name: Eleanor (en, agentic), language: en, server_voice: samples/Eleanor.mp3, style: agentic}
+  - {id: elias, name: Elias (en), language: en, server_voice: samples/Elias.mp3}
+  - {id: fernando, name: Fernando (es, audiobook), language: es, server_voice: samples/Fernando.mp3, style: audiobook}
+  - {id: frederick, name: Frederick (en, audiobook), language: en, server_voice: samples/Frederick.mp3, style: audiobook}
+  - {id: glenn, name: Glenn (en, audiobook), language: en, server_voice: samples/Glenn.mp3, style: audiobook}
+  - {id: graham, name: Graham (en, conversational), language: en, server_voice: samples/Graham.mp3, style: conversational}
+  - {id: hannah, name: Hannah (en, conversational), language: en, server_voice: samples/Hannah.mp3, style: conversational}
+  - {id: henry, name: Henry (en, agentic), language: en, server_voice: samples/Henry.wav, style: agentic}
+  - {id: hugo, name: Hugo (fr, agentic), language: fr, server_voice: samples/Hugo.mp3, style: agentic}
+  - {id: john, name: John (en, agentic), language: en, server_voice: samples/John.wav, style: agentic}
+  - {id: josie, name: Josie (en, agentic), language: en, server_voice: samples/Josie.wav, style: agentic}
+  - {id: julian, name: Julian (en, agentic), language: en, server_voice: samples/Julian.mp3, style: agentic}
+  - {id: juri, name: Juri (de, audiobook), language: de, server_voice: samples/Juri.mp3, style: audiobook}
+  - {id: keith, name: Keith (en, conversational), language: en, server_voice: samples/Keith.mp3, style: conversational}
+  - {id: lars, name: Lars (nl, agentic), language: nl, server_voice: samples/Lars.mp3, style: agentic}
+  - {id: lotte, name: Lotte (nl, agentic), language: nl, server_voice: samples/Lotte.mp3, style: agentic}
+  - {id: lucas, name: Lucas (en, agentic), language: en, server_voice: samples/Lucas.mp3, style: agentic}
+  - {id: luis, name: Luis (es, agentic), language: es, server_voice: samples/Luis.mp3, style: agentic}
+  - {id: madeline, name: Madeline (en, audiobook), language: en, server_voice: samples/Madeline.mp3, style: audiobook}
+  - {id: martim, name: Martim (pt, agentic), language: pt, server_voice: samples/Martim.mp3, style: agentic}
+  - {id: michael, name: Michael (en, agentic), language: en, server_voice: samples/Michael.mp3, style: agentic}
+  - {id: miles, name: Miles (en, audiobook), language: en, server_voice: samples/Miles.wav, style: audiobook}
+  - {id: nicolas, name: Nicolas (en, audiobook), language: en, server_voice: samples/Nicolas.mp3, style: audiobook}
+  - {id: nora, name: Nora (en, agentic), language: en, server_voice: samples/Nora.mp3, style: agentic}
+  - {id: oskar, name: Oskar (de, audiobook), language: de, server_voice: samples/Oskar.mp3, style: audiobook}
+  - {id: penelope, name: Penelope (en, audiobook), language: en, server_voice: samples/Penelope.mp3, style: audiobook}
+  - {id: riley, name: Riley (en, conversational), language: en, server_voice: samples/Riley.wav, style: conversational}
+  - {id: roberto, name: Roberto (it, agentic), language: it, server_voice: samples/Roberto.mp3, style: agentic}
+  - {id: simon, name: Simon (en, audiobook), language: en, server_voice: samples/Simon.mp3, style: audiobook}
+  - {id: sofia, name: Sofia (en, agentic), language: en, server_voice: samples/Sofia.mp3, style: agentic}
+  - {id: stella, name: Stella (en, conversational), language: en, server_voice: samples/Stella.mp3, style: conversational}
+  - {id: thijs, name: Thijs (nl, audiobook), language: nl, server_voice: samples/Thijs.mp3, style: audiobook}
+  - {id: tiago, name: Tiago (pt, audiobook), language: pt, server_voice: samples/Tiago.mp3, style: audiobook}
+  - {id: timothy, name: Timothy (en, agentic), language: en, server_voice: samples/Timothy.mp3, style: agentic}
+  - {id: tony, name: Tony (en, audiobook), language: en, server_voice: samples/Tony.mp3, style: audiobook}
+  - {id: victoria, name: Victoria (en, audiobook), language: en, server_voice: samples/Victoria.mp3, style: audiobook}
+  - {id: vivian, name: Vivian (en, agentic), language: en, server_voice: samples/Vivian.wav, style: agentic}
+  - {id: william, name: William (en, agentic), language: en, server_voice: samples/William.mp3, style: agentic}

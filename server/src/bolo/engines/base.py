@@ -205,6 +205,8 @@ class SynthesisExtras:
     reference_text: str | None = None
     #: filled by cloud voices with what the request cost there (:class:`bolo.providers.Usage`)
     usage: Any = None
+    #: model-specific request options (the request's ``options``), e.g. Tontaube's style and sliders
+    options: dict[str, Any] = field(default_factory=dict)
 
 
 class TTSModel(Model):
@@ -216,6 +218,8 @@ class TTSModel(Model):
     accepts_extras: bool = False
     #: True when the model can imitate a voice from ``SynthesisExtras.reference_audio``
     supports_cloning: bool = False
+    #: names of the request options (``SynthesisExtras.options``) the model reads; ``("*",)``: any
+    request_options: tuple[str, ...] = ()
 
     @abc.abstractmethod
     def synthesize(

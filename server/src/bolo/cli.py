@@ -1,5 +1,5 @@
 """Command-line interface: ``bolo serve``, ``pull``, ``rm``, ``cp``, ``list``, ``ps``, ``load``/``run``, ``stop``,
-``show``, ``models``, ``logs``, ``transcribe``, ``speak``, ``bench``, ``recommend`` and ``doctor``."""
+``show``, ``models``, ``logs``, ``transcribe``, ``speak``, ``bench``, ``voices``, ``recommend`` and ``doctor``."""
 
 from __future__ import annotations
 
@@ -800,6 +800,15 @@ def cmd_bench(args: argparse.Namespace) -> int:
             q(p["ttfa_ms"], "p50"), q(p["ttfa_ms"], "p95"), f"{rtf['p50']:.3f}" if rtf else "-",
             f"{p['throughput_x_realtime']:.1f}", str(p.get("mean_batch", "-")),
         ])  # fmt: skip
+    sim = result.get("speaker_similarity")
+    if isinstance(sim, dict):
+        if sim.get("similarity") is not None:
+            print(
+                f"speaker similarity {sim['similarity']:.3f} ({sim.get('verdict')}) against {sim.get('reference')}, "
+                f"by {sim.get('embedding_model')}"
+            )
+        else:
+            print(f"speaker similarity: not measured ({sim.get('note')})")
     print(
         _table(
             rows,
@@ -819,6 +828,119 @@ def cmd_bench(args: argparse.Namespace) -> int:
             ],
         )
     )
+    return 0
+
+
+def cmd_voices(args: argparse.Namespace) -> int:
+    """``bolo voices list|add|show|rm|export|import|score``: the saved voices in the data directory (a running
+    server sees changes at once: it reads the same folder)."""
+    import getpass
+    import socket
+
+    from bolo.audio import decode_audio
+    from bolo.voices import clean_reference, store_for
+
+    settings = _settings(args)
+    store = store_for(Path(settings.data_dir))
+    who = {"auth": "cli", "name": getpass.getuser(), "client": socket.gethostname()}
+    action = "list" if args.action == "ls" else args.action
+    if action == "list":
+        voices = store.all()
+        if args.json:
+            print(json.dumps([v.to_dict() for v in voices], indent=2, ensure_ascii=False))
+            return 0
+        if not voices:
+            print("no saved voices (bolo voices add <name> <file> --consent self|permission)")
+            return 0
+        rows = [
+            [
+                v.id, v.name, v.language or "-", f"{v.meta.get('reference', {}).get('duration_s', 0):.1f}s",
+                str((v.meta.get("consent") or {}).get("basis", "-")), v.default_model or "-",
+                _ago(v.meta.get("created_at")),
+            ]
+            for v in voices
+        ]  # fmt: skip
+        print(_table(rows, ["ID", "NAME", "LANGUAGE", "REFERENCE", "CONSENT", "DEFAULT MODEL", "CREATED"]))
+        return 0
+    if action == "add":
+        if not args.name or not args.files:
+            print("usage: bolo voices add <name> <file> [<file> ...] --consent self|permission", file=sys.stderr)
+            return 2
+        if not args.consent:
+            print(
+                "error: creating a voice needs explicit consent: --consent self (this is my voice) or --consent "
+                "permission (I have the speaker's permission)",
+                file=sys.stderr,
+            )
+            return 2
+        clips = [decode_audio(Path(f).read_bytes(), filename=Path(f).name) for f in args.files]
+        cleaned = clean_reference(clips)
+        default_model = None
+        if args.default_model:
+            from bolo.catalog import Catalog
+
+            spec = Catalog.load(Path(settings.data_dir)).resolve(args.default_model)
+            if spec is None or "voice-cloning" not in spec.features:
+                print(f"error: '{args.default_model}' is not a model that clones voices", file=sys.stderr)
+                return 1
+            default_model = spec.id
+        voice = store.create(
+            name=args.name, cleaned=cleaned, consent=args.consent, created_by=who, voice_id=args.id,
+            transcript=args.transcript, language=args.language, description=args.description,
+            default_model=default_model, source="cli",
+        )  # fmt: skip
+        ref = voice.meta.get("reference", {})
+        print(f"saved voice {voice.id} ({ref.get('duration_s')} s of reference, consent: {args.consent})")
+        for w in voice.meta.get("warnings") or []:
+            print(f"warning: {w}")
+        print(f'use it: {{"model": "<a model that clones voices>", "voice": "{voice.id}", "input": "..."}}')
+        return 0
+    if action in ("show", "rm", "score") and not args.name:
+        print(f"usage: bolo voices {action} <id>", file=sys.stderr)
+        return 2
+    if action == "show":
+        print(json.dumps(store.get(args.name).to_dict(), indent=2, ensure_ascii=False))
+        return 0
+    if action == "rm":
+        store.delete(args.name)
+        print(f"removed voice {args.name}")
+        return 0
+    if action == "export":
+        ids = ([args.name] if args.name else []) + list(args.files or [])
+        out = Path(args.output or "bolo-voices.zip")
+        out.write_bytes(store.export_zip(ids or None))
+        print(f"wrote {out}")
+        return 0
+    if action == "import":
+        if not args.name:
+            print("usage: bolo voices import <file.zip> [--consent ...] [--replace]", file=sys.stderr)
+            return 2
+        added = store.import_zip(Path(args.name).read_bytes(), imported_by=who, consent=args.consent,
+                                 replace=args.replace)  # fmt: skip
+        print(f"imported {len(added)} voice(s): {', '.join(added) or '-'}")
+        return 0
+    # score: speak a test sentence with a model, in process, and compare speakers
+    from bolo import similarity
+
+    core = _core(args)
+
+    async def run() -> dict[str, Any]:
+        await core.start()
+        try:
+            return await similarity.score_voice(core, args.name, args.model, args.text)
+        finally:
+            await core.stop()
+
+    result = asyncio.run(run())
+    if args.json:
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+    else:
+        print(
+            f"{result['voice']} with {result['model']}: speaker similarity {result['similarity']:.3f} "
+            f"({result['verdict']}; {result['embedding_model']}), RTF {result['rtf']}, first audio "
+            f"{result['ttfa_ms']} ms"
+        )
+    store.record_score(args.name, result["model"], {k: v for k, v in result.items() if k not in ("voice", "text")})
     return 0
 
 
@@ -1618,6 +1740,30 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--voice")
     s.add_argument("--json", action="store_true")
     s.set_defaults(func=cmd_bench)
+
+    s = sub.add_parser(
+        "voices",
+        help="saved voices for models that clone voices: list, add, show, rm, export, import, score",
+        description="Saved voices live in <data_dir>/voices. Creating one needs --consent: self (this is my voice) "
+        "or permission (I have the speaker's permission).",
+    )
+    _common(s)
+    s.add_argument("action", choices=["list", "ls", "add", "show", "rm", "export", "import", "score"])
+    s.add_argument("name", nargs="?", help="add: the voice's name; show/rm/score: its id; import: the .zip")
+    s.add_argument("files", nargs="*", help="add: recordings of the person; export: more ids")
+    s.add_argument("--consent", choices=["self", "permission"],
+                   help="required for add: self = this is my voice; permission = I have the speaker's permission")  # fmt: skip
+    s.add_argument("--transcript", help="what is said in the recording (some models use it)")
+    s.add_argument("--language", help="language of the voice (a code such as en)")
+    s.add_argument("--description")
+    s.add_argument("--default-model", dest="default_model", help="model used when a request names no model")
+    s.add_argument("--id", help="add: the id (default: from the name)")
+    s.add_argument("--output", "-o", help="export: the .zip to write (default bolo-voices.zip)")
+    s.add_argument("--replace", action="store_true", help="import: overwrite voices with the same id")
+    s.add_argument("--model", "-m", help="score: the model that speaks (default: the voice's default model)")
+    s.add_argument("--text", help="score: what to say (default: a test sentence in the voice's language)")
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(func=cmd_voices)
 
     s = sub.add_parser(
         "components",

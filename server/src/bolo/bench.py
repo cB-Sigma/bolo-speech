@@ -11,7 +11,11 @@ Two modes for speech-to-text:
   and throughput cannot exceed the number of clients.
 
 Text-to-speech has one mode: clients synthesise the sample text
-back-to-back; ``ttfa_ms`` is time to the first audio chunk.
+back-to-back; ``ttfa_ms`` is time to the first audio chunk. For a model
+that clones voices the result also has ``speaker_similarity``: one more
+synthesis, after the sweep, compared with the voice's reference (a saved
+voice, or the reference clip of a catalog voice) by the speaker-embedding
+model (bolo.similarity), when that model is installed.
 """
 
 from __future__ import annotations
@@ -227,7 +231,7 @@ async def run_bench(
             job.progress = (i + 1) / len(concurrency)
             job.result = {"points": list(points)}
             core.events.publish("job", {"job": job.to_dict()})
-    return {
+    out: dict[str, Any] = {
         "kind": kind,
         "model": spec.id,
         "mode": mode if kind == "stt" else "batch",
@@ -235,3 +239,45 @@ async def run_bench(
         "duration_s": duration_s,
         "points": points,
     }
+    if kind == "tts" and "voice-cloning" in spec.features:
+        out["speaker_similarity"] = await speaker_similarity(core, spec.id, text, voice)
+    return out
+
+
+async def speaker_similarity(core: Bolo, model: str, text: str, voice: str | None) -> dict[str, Any]:
+    """How much a cloning model's output sounds like the voice's reference (None with ``note`` when it cannot
+    be measured: no reference for that voice, or no speaker-embedding model installed)."""
+    from bolo import similarity
+
+    spec = core.resolve(model, "tts")
+    saved = core.voices.find(voice) if voice else None
+    reference: tuple[FloatArray, int] | None = None
+    label = ""
+    if saved is not None:
+        from bolo.audio import decode_audio
+
+        reference = decode_audio(saved.reference_bytes())
+        label = f"saved voice {saved.id}"
+    else:
+        wanted = (voice or (str(spec.voices[0]["id"]) if spec.voices else "")).lower()
+        entry = next((v for v in spec.voices if str(v.get("id", "")).lower() == wanted), None)
+        if entry and entry.get("reference"):
+            audio, rate, _meta = builtin_samples.load_audio(str(entry["reference"]))
+            reference = (audio, rate)
+            label = f"voice {entry['id']} (bolo sample {entry['reference']})"
+    if reference is None:
+        return {"similarity": None, "note": "the voice has no reference recording to compare with; bench a saved voice"}
+    name = similarity.embedding_model(core)
+    try:
+        if not core.manager.is_installed(core.resolve(name, "diarization")):
+            return {
+                "similarity": None,
+                "note": f"the speaker-embedding model {name} is not installed (bolo pull {name})",
+            }
+        audio, rate = await core.synthesize_all(
+            text, model=spec.id, voice=saved.id if saved else voice, custom_voice=saved is not None
+        )
+        result = await similarity.score(core, reference[0], reference[1], audio, rate)
+    except BoloError as exc:
+        return {"similarity": None, "note": exc.message}
+    return {**result, "reference": label}

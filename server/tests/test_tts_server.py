@@ -423,3 +423,115 @@ class FakeArchive:
     def stop(self) -> None:
         self.httpd.shutdown()
         self.httpd.server_close()
+
+
+# -- Tontaube ---------------------------------------------------------------------------------------------------
+def tontaube_spec(**extra: object) -> dict[str, object]:
+    return {
+        "runtime": "tontaube", "cloning": True, "sample_rate": 24000, "model_id": "tontaube-test",
+        "voices": [
+            {"id": "marcus", "name": "Marcus", "language": "en", "server_voice": "samples/Marcus.mp3"},
+            {"id": "juri", "name": "Juri", "language": "de", "server_voice": "samples/Juri.mp3", "style": "audiobook"},
+        ],
+        **extra,
+    }  # fmt: skip
+
+
+def test_tontaube_requests_voices_styles_and_sliders() -> None:
+    server = FakeTTSServer("tontaube", api_key="k").start()
+    try:
+        model = ServerTTS("tontaube", "tontaube-test", tontaube_spec(), base_url=server.url, api_key="k")
+        model.connect()  # GET /readyz
+        assert model.request_options[0] == "style" and model.supports_cloning
+        out = np.concatenate(list(model.synthesize("Hello there.", "marcus")))
+        assert len(out) == int(24000 * 0.05 * 12)
+        assert server.requests[-1]["body"] == {
+            "text": "Hello there.", "language": "en", "tag": "conversational", "format": "wav",
+            "voice_path": "samples/Marcus.mp3",
+        }  # fmt: skip
+        # a voice's own style and language; sliders, temperature and seed from the request options
+        extras = SynthesisExtras(options={"rate": 1, "pitch_range": 5, "legato": 0, "seed": 7})
+        list(model.synthesize("Guten Tag.", "juri", extras=extras))
+        body = server.requests[-1]["body"]
+        assert body["tag"] == "audiobook" and body["language"] == "de" and body["seed"] == 7
+        assert body["controls"] == {"rate": 1, "pitch_range": 5, "legato": 0}
+        # a reference recording replaces the bundled voice; style chosen per request
+        extras = SynthesisExtras(language="nl", reference_audio=wav_bytes(2.0), options={"style": "agentic"})
+        list(model.synthesize("Hallo.", None, extras=extras))
+        body = server.requests[-1]["body"]
+        assert body["voice_audio_b64"] and "voice_path" not in body and body["tag"] == "agentic"
+        assert body["language"] == "nl"
+        for bad, match in (
+            (SynthesisExtras(options={"rate": 9}), "rate is a step from 0 to 4"),
+            (SynthesisExtras(options={"style": "shouting"}), "style must be one of"),
+            (SynthesisExtras(language="hi"), "not 'hi'"),
+        ):
+            with pytest.raises(InvalidRequest, match=match):
+                list(model.synthesize("Hi.", "marcus", extras=bad))
+        with pytest.raises(InvalidRequest, match="option rate"):
+            list(model.synthesize("Hi.", "marcus", 1.5))
+        model.close()
+        # a wrong key: the server's 401 is engine_unavailable with a hint
+        wrong = ServerTTS("tontaube", "tontaube-test", tontaube_spec(), base_url=server.url, api_key="nope")
+        with pytest.raises(EngineUnavailable, match="credentials"):
+            list(wrong.synthesize("Hi.", "marcus"))
+        wrong.close()
+    finally:
+        server.stop()
+
+
+def test_managed_tontaube_runs_uv_with_the_downloaded_weights(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    bin_dir = fake_binary(tmp_path, "uv").parent
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setenv("FAKE_ENV_FILE", str(tmp_path / "env.json"))
+    monkeypatch.setenv("FAKE_LOAD_DELAY", "0.4")  # /readyz answers 503 while the model loads
+    checkout = tmp_path / "tontaube"
+    checkout.mkdir()
+    (checkout / "pyproject.toml").write_text("[project]\nname = 'tontaube-inference'\n")
+    settings = Settings(data_dir=tmp_path / "data", tontaube_dir=str(checkout))
+    assert tts_runtimes.find_binary(settings, "tontaube") == (checkout, "settings")
+    engine = TTSServerEngine()
+    engine.configure(settings)
+    weights = tmp_path / "weights"
+    (weights / "cb0").mkdir(parents=True)
+    model = engine.load("tts-server", "tts", weights, tontaube_spec(), LoadOptions(threads=3, device="cpu"))
+    try:
+        assert isinstance(model, ServerTTS) and model.process is not None
+        argv = model.process.argv
+        assert argv[1:6] == ["run", "--python", "3.12", "--frozen", "--directory"] and argv[6] == str(checkout)
+        assert argv[7:9] == ["tontaube", "serve"] and model.process.health_path == "/readyz"
+        import json
+
+        env = json.loads((tmp_path / "env.json").read_text())
+        assert env["MODEL_PATH"] == str(weights) and env["LITE_DEVICE"] == "cpu" and env["LITE_CPU_THREADS"] == "3"
+        assert env["REQUIRE_API_KEY"] == "1" and env["TTS_API_KEY"] == model.process.api_key
+        assert len(np.concatenate(list(model.synthesize("Hello.", "marcus")))) == int(24000 * 0.05 * 6)
+    finally:
+        engine.shutdown()
+
+
+def test_tontaube_component_is_a_pinned_checkout(tmp_path: Path, core: Bolo, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[list[str]] = []
+    commit = tts_runtimes.RUNTIME_INFO["tontaube"].git.commit  # type: ignore[union-attr]
+
+    def fake_run(cmd: list[str]) -> tuple[int, str]:
+        calls.append(cmd)
+        if cmd[1] == "clone":
+            Path(cmd[-1]).mkdir(parents=True)
+            (Path(cmd[-1]) / "pyproject.toml").write_text("")
+            return 0, ""
+        return 0, commit + "\n"
+
+    monkeypatch.setattr(core.components, "_run", fake_run)
+    status = {c["id"]: c for c in core.components.runtime_status()}["tontaube"]
+    assert not status["installed"] and status["release"]["commit"] == commit
+    assert core.components.install_runtime_blocking("tontaube") is None
+    assert calls[0][:6] == ["git", "clone", "--quiet", "--depth", "1", "--branch"] and "v1.1.0" in calls[0]
+    assert core.components.is_installed("tontaube")
+    # another commit behind the tag is refused
+    monkeypatch.setattr(core.components, "_run", lambda cmd: (0, "") if cmd[1] == "clone" else (0, "0" * 40))
+    import shutil
+
+    shutil.rmtree(tts_runtimes.install_dir(core.settings, "tontaube"))
+    assert "not the pinned commit" in str(core.components.install_runtime_blocking("tontaube"))
+    assert not core.components.is_installed("tontaube")

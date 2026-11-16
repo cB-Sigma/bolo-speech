@@ -30,6 +30,13 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `POST` | `/v1/audio/transcriptions` | Transcribe audio |
 | `POST` | `/v1/audio/translations` | Translate audio to English |
 | `POST` | `/v1/audio/speech` | Synthesise speech |
+| `POST` | `/v1/audio/voices` | Create a custom voice from an audio sample |
+| `GET` | `/v1/audio/voice_consents` | List consent recordings |
+| `POST` | `/v1/audio/voice_consents` | Upload a consent recording |
+| `GET` | `/v1/audio/voice_consents/{consent_id}` | One consent recording |
+| `POST` | `/v1/audio/voice_consents/{consent_id}` | Rename a consent recording |
+| `DELETE` | `/v1/audio/voice_consents/{consent_id}` | Delete a consent recording |
+| `DELETE` | `/v1/audio/voices/{voice_id}` | Delete a custom voice |
 | `POST` | `/v1/chat/completions` | Chat completions with audio in and out (speech front end to your LLM) |
 | `POST` | `/v1/realtime/client_secrets` | Create an ephemeral key for Realtime sessions |
 | `POST` | `/v1/realtime/calls` | Start a Realtime session over WebRTC (SDP offer/answer) |
@@ -247,7 +254,7 @@ JSON body.
 | --- | --- | --- |
 | `input` | required | text. Split into sentences and synthesised one at a time |
 | `model` | optional | see model names |
-| `voice` | optional | a voice id of the model (`GET /api/v1/models/{id}`), or `{"id": …}`. OpenAI voice names (`alloy`, `echo`, `nova`, …) are mapped onto the model's voices so stock clients work |
+| `voice` | optional | a voice id of the model (`GET /api/v1/models/{id}`), or a **saved voice** ([voices.md](voices.md)) for a model that clones voices: `"priya"`, or OpenAI's custom-voice object `{"id": "priya"}`. A string is the model's own voice when it has one of that name, else the saved voice; the object prefers the saved voice. A saved voice with a model that cannot clone → `400` naming the cloning models installed. Without `model`, a saved voice's `default_model` answers. OpenAI voice names (`alloy`, `echo`, `nova`, …) are mapped onto the model's voices so stock clients work |
 | `response_format` | `mp3` | `mp3`, `opus` (Ogg), `aac` (ADTS; needs `bolo-speech[av]` or ffmpeg), `flac`, `wav`, `pcm` (16-bit little-endian mono at the model's rate), and the telephony extensions `mulaw` / `alaw` (raw 8 kHz G.711) |
 | `speed` | `1.0` | 0.25 to 4.0 |
 | `stream_format` | `audio` | `sse` wraps the audio in `speech.audio.delta` events (base64) followed by `speech.audio.done` |
@@ -262,6 +269,12 @@ JSON body.
 | `phonemizer` | voice's pin, else the server's `phonemizer` setting | extension, for voices that read phonemes: `auto`, `uccharan` (= `uccharan:compatible`), `uccharan:improved`, `espeak-ng`. `424 component_missing` when the chosen one is not installed, `400` (`param: "phonemizer"`) when uccharan does not cover the voice's language. Ignored for voices that read characters or a lexicon. See models.md, "Phonemisers" |
 | `reference_audio` | - | extension, for models that clone voices (`features` contains `voice-cloning`, today the `tts-server` models): a recording of the voice to imitate, plain base64 or a `data:audio/…;base64,` URL (WAV, FLAC, MP3, … whatever bolo can decode). Up to 30 s are used; it is sent to the server as mono 16-bit WAV. `400` (`param: "reference_audio"`) for a model that cannot clone, an empty, undecodable or shorter-than-0.5 s recording. It takes precedence over `voice` |
 | `reference_text` | - | extension: what is said in `reference_audio`; some cloning models (audio.cpp CosyVoice3, IndexTTS-2, …) use it |
+| `options` | - | extension: model-specific request options. Tontaube: `style` (`audiobook`, `conversational`, `agentic`), the sliders `rate` (0-4), `pause` (0-4), `pitch_range` (0-5), `pitch_level` (0-4), `legato` (0-2), `temperature`, `seed`. audio.cpp models: passed through as the server's `options`. `400` (`param: "options"`) for an option the model does not read |
+
+Speech in a cloned voice (a saved voice, or `reference_audio`) carries the
+response headers `x-bolo-cloned: true` and, for a saved voice, `x-bolo-voice:
+<id>`; the request's trace (`GET /api/v1/requests/{id}`) has `extra.voice`
+(`{"saved": "priya", "cloned": true, "consent": "self"}`).
 
 The body is streamed (chunked transfer) while synthesis is still running:
 the first sentence is audible while the rest is being generated. `pcm`,
@@ -994,6 +1007,73 @@ The job's `result`, updated after each concurrency level:
 
 The load is generated inside the server process, so it measures the engine
 and the scheduler, not HTTP parsing or your network.
+
+For a model that clones voices, the result also has `speaker_similarity`: one
+more synthesis after the sweep, compared with the voice's reference by the
+speaker-embedding model (`voice` a saved voice, or a catalog voice with a
+reference clip), when that model is installed:
+`{"similarity": 0.62, "verdict": "same speaker", "embedding_model":
+"pyannote-3.0-eres2net", "calibrated": true, "reference": "saved voice priya"}`,
+or `{"similarity": null, "note": "…"}`.
+
+### Saved voices: `/api/v1/voices`
+
+A library of cleaned reference recordings for the models that clone voices;
+[voices.md](voices.md) explains the workflow, the consent rule and the
+similarity score.
+
+| Route | |
+| --- | --- |
+| `POST /api/v1/voices` | multipart: `file` (one or more recordings of the same person, also `files[]`), `name`, **`consent`** (required: `self` = "this is my voice", `permission` = "I have the speaker's permission"; anything else → `400 consent_required`), optional `id`, `transcript` (else transcribed by the default STT model when it is installed; `transcribe=false` skips that), `language`, `description`, `default_model` (a cloning model), `created_by` (a name to record), `score_model` (speak a test sentence with it and return `score`; default: `default_model`), `score_audio=true` (include the test clip). → `201` with the voice. `409 voice_exists` for an id that is taken; the id comes from the name (`"Priya S."` → `priya-s`), and OpenAI's voice names are reserved |
+| `GET /api/v1/voices` | `{"voices": [...], "cloning_models": [...], "consent": {...}, "similarity": {thresholds, calibration}}` |
+| `GET /api/v1/voices/{id}` | one voice |
+| `PATCH /api/v1/voices/{id}` | JSON: `name`, `description`, `language`, `transcript`, `default_model` (`""` clears it) |
+| `DELETE /api/v1/voices/{id}` | removes the voice and its recording |
+| `GET /api/v1/voices/{id}/audio` | the cleaned reference (WAV, 24 kHz mono) |
+| `GET /api/v1/voices/{id}/score?model=&text=&audio=` | speaks `text` (default: a test sentence in the voice's language) with `model` (default: the voice's default model, else the default TTS model) and compares it with the reference: `similarity`, `verdict`, `embedding_model`, `calibrated`, `rtf`, `ttfa_ms`, `audio_s`, and with `audio=true` the clip as a data URL. Kept in the voice's `scores` |
+| `GET /api/v1/voices/export?ids=a,b` | a .zip of `manifest.json` and `<id>/voice.json` + `<id>/reference.wav` (all voices without `ids`) |
+| `POST /api/v1/voices/import` | multipart `file` (an export), `consent` (for voices whose metadata has none; refused otherwise), `replace=true` |
+
+A voice:
+
+```jsonc
+{"id": "priya", "object": "voice", "name": "Priya", "language": "en", "description": null,
+ "transcript": "the words of the recording", "transcript_source": "auto", "default_model": "pocket-tts-en-llamacpp",
+ "created_at": "2026-11-15T23:40:58Z",
+ "consent": {"basis": "self", "statement": "This is my voice.",
+             "by": {"auth": "api_key", "name": "asha", "client": "10.0.0.4"}, "at": "2026-11-15T23:40:58Z"},
+ "reference": {"sample_rate": 24000, "duration_s": 14.2, "speech_s": 12.9, "input_s": 18.0, "clips": 1,
+               "snr_db": 38.5, "level_dbfs": -24.1, "gain_db": 4.1, "speaker_consistency": 0.71},
+ "warnings": [],                                  // short, noisy, clipped, several people, cut to 60 s
+ "scores": {"pocket-tts-en-llamacpp": {"similarity": 0.66, "verdict": "same speaker", "rtf": 0.47, ...}},
+ "audio_url": "/api/v1/voices/priya/audio"}
+```
+
+`by.auth` is `api_key` when the server has an API key (bolo has one key, so
+the name is what the client sends in `created_by`), `none` otherwise, `cli`
+for `bolo voices add`.
+
+#### OpenAI's custom voices
+
+As in the OpenAI API reference (the openai-python SDK's `client.audio.voices`
+and `client.audio.voice_consents`):
+
+| Route | |
+| --- | --- |
+| `POST /v1/audio/voice_consents` | multipart `recording` (the speaker reading a consent statement, up to 10 MiB), `name`, `language` (BCP 47) → `{"id": "cons_…", "object": "audio.voice_consent", "created_at", "name", "language"}`. bolo stores the recording; it does not check what is said |
+| `GET /v1/audio/voice_consents`, `GET`/`POST`/`DELETE /v1/audio/voice_consents/{id}` | list, retrieve, rename (`{"name"}`), delete |
+| `POST /v1/audio/voices` | multipart `audio_sample`, `name`, `consent` (a consent recording id, or bolo's `self` / `permission`) → `{"id", "object": "audio.voice", "created_at", "name", "type": "audio_sample"}`. Voices from a text prompt (`type: prompt`) are refused |
+| `DELETE /v1/audio/voices/{id}` | removes the voice |
+
+```python
+consent = client.audio.voice_consents.create(name="Priya", language="en-US", recording=open("consent.wav", "rb"))
+voice = client.audio.voices.create(name="Priya", consent=consent.id, audio_sample=open("priya.wav", "rb"))
+client.audio.speech.create(model="pocket-tts-en-llamacpp", voice={"id": voice.id}, input="Hello.")
+```
+
+bolo has no ElevenLabs-compatible server routes (ElevenLabs is one of its
+cloud providers, not a surface it imitates), so there is no ElevenLabs-style
+voice creation route.
 
 ### `GET /api/v1/samples`, `GET /api/v1/samples/{file}`
 

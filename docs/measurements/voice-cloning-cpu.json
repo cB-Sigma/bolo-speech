@@ -1,0 +1,284 @@
+{
+  "what": "Voice cloning on CPU through bolo (core.synthesize with a saved voice), server/tools/measure_cloning.py",
+  "date": "2026-11-15/16",
+  "machine": "4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, 15 GB RAM, shared with other jobs (a browser benchmark and test suites ran at the same time, so speeds are pessimistic)",
+  "runtime": "llama.cpp b12375 llama-server (upstream release, CPU build), started by bolo",
+  "threads": 4,
+  "references": "LibriSpeech dev-clean (CC BY 4.0) speakers 2277 and 84, three utterances each (about 15 s), with their transcripts, cleaned as POST /api/v1/voices does",
+  "fields": {
+    "similarity": "speaker similarity of the output to the reference (pyannote-3.0-eres2net; same real person scores 0.45-0.93, median 0.80; 0.50+ = same speaker)",
+    "impostor": "highest similarity of the output to any of the 14 other LibriSpeech speakers (5 clips each)",
+    "stock_similarity": "the model's first catalog voice (no cloning of this reference) against the reference",
+    "rtf": "wall time / audio, one run after a warm-up",
+    "ttfa_ms": "time to the first audio chunk",
+    "wer": "round trip: moonshine-tiny-en (English) or whisper-base (other languages) against the text"
+  },
+  "models": {
+    "pocket-tts-en-llamacpp": {
+      "language": "en",
+      "text": "The quick brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+      "asr": "moonshine-tiny-en",
+      "voices": {
+        "libri-2277": {
+          "similarity": 0.482,
+          "impostor": 0.383,
+          "rtf": 0.432,
+          "ttfa_ms": 1382,
+          "audio_s": 4.8,
+          "wer": 0.0,
+          "heard": "The quick brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+          "stock_voice": "heart",
+          "stock_similarity": 0.178
+        },
+        "libri-84": {
+          "similarity": 0.655,
+          "impostor": 0.449,
+          "rtf": 0.475,
+          "ttfa_ms": 1577,
+          "audio_s": 4.96,
+          "wer": 0.0,
+          "heard": "The quick brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+          "stock_voice": "heart",
+          "stock_similarity": 0.106
+        }
+      },
+      "cloned": false,
+      "similarity_mean": 0.569
+    },
+    "pocket-tts-de-llamacpp": {
+      "language": "de",
+      "text": "Der schnelle braune Fuchs springt über den faulen Hund und läuft nach Hause, bevor der Regen beginnt.",
+      "asr": "whisper-base",
+      "voices": {
+        "libri-2277": {
+          "similarity": 0.271,
+          "impostor": 0.289,
+          "rtf": 0.447,
+          "ttfa_ms": 1439,
+          "audio_s": 4.64,
+          "wer": 0.176,
+          "heard": "schnelle braune fuchspringt über den faulen hund und läuft nach Hause bevor der regen beginnt",
+          "stock_voice": "heart",
+          "stock_similarity": 0.018
+        },
+        "libri-84": {
+          "similarity": 0.455,
+          "impostor": 0.283,
+          "rtf": 0.489,
+          "ttfa_ms": 1567,
+          "audio_s": 4.64,
+          "wer": 0.0,
+          "heard": "der schnelle braune Fuchs springt über den faulen Hund und läuft nach Hause bevor der Regen beginnt.",
+          "stock_voice": "heart",
+          "stock_similarity": 0.178
+        }
+      },
+      "cloned": false,
+      "similarity_mean": 0.363
+    },
+    "pocket-tts-es-llamacpp": {
+      "language": "es",
+      "text": "El rápido zorro marrón salta sobre el perro perezoso y vuelve a casa antes de que empiece a llover.",
+      "asr": "whisper-base",
+      "voices": {
+        "libri-2277": {
+          "similarity": 0.218,
+          "impostor": 0.265,
+          "rtf": 0.466,
+          "ttfa_ms": 1407,
+          "audio_s": 4.88,
+          "wer": 0.789,
+          "heard": "en la revé de un roma ron saltado sobre el perropebre. Si vuelve a casantes de que empiece",
+          "stock_voice": "heart",
+          "stock_similarity": 0.074
+        },
+        "libri-84": {
+          "similarity": 0.439,
+          "impostor": 0.326,
+          "rtf": 0.463,
+          "ttfa_ms": 1578,
+          "audio_s": 5.44,
+          "wer": 0.368,
+          "heard": "Reoto sorromarron salta sobre el perropereso si vuelve a casa antes de que empiece a llover.",
+          "stock_voice": "heart",
+          "stock_similarity": 0.158
+        }
+      },
+      "cloned": false,
+      "similarity_mean": 0.329
+    },
+    "pocket-tts-fr-llamacpp": {
+      "language": "fr",
+      "text": "Le renard brun rapide saute par-dessus le chien paresseux, puis il rentre avant que la pluie commence.",
+      "asr": "whisper-base",
+      "voices": {
+        "libri-2277": {
+          "similarity": 0.317,
+          "impostor": 0.335,
+          "rtf": 0.657,
+          "ttfa_ms": 1864,
+          "audio_s": 6.48,
+          "wer": 0.5,
+          "heard": "Le renabre un rapide s'autre pas de solution paraissue, puis rentre avant que la pluie commence.",
+          "stock_voice": "heart",
+          "stock_similarity": -0.017
+        },
+        "libri-84": {
+          "similarity": 0.439,
+          "impostor": 0.209,
+          "rtf": 0.69,
+          "ttfa_ms": 2108,
+          "audio_s": 6.24,
+          "wer": 0.5,
+          "heard": "Le Bernard Brown rapide s'autre part de celui-le-chien paraît seu, puis rentre avant que la pluie commence.",
+          "stock_voice": "heart",
+          "stock_similarity": 0.179
+        }
+      },
+      "cloned": false,
+      "similarity_mean": 0.378
+    },
+    "pocket-tts-it-llamacpp": {
+      "language": "it",
+      "text": "La veloce volpe marrone salta sopra il cane pigro e torna a casa prima che cominci a piovere.",
+      "asr": "whisper-base",
+      "voices": {
+        "libri-2277": {
+          "similarity": 0.388,
+          "impostor": 0.377,
+          "rtf": 0.397,
+          "ttfa_ms": 1327,
+          "audio_s": 5.2,
+          "wer": 0.5,
+          "heard": "E allora ce volete marrone, salta sopra il cane e pigretto orna a casa prima che comincia a piuvere.",
+          "stock_voice": "heart",
+          "stock_similarity": 0.124
+        },
+        "libri-84": {
+          "similarity": 0.371,
+          "impostor": 0.301,
+          "rtf": 0.444,
+          "ttfa_ms": 1618,
+          "audio_s": 5.52,
+          "wer": 0.278,
+          "heard": "La veloce volpe marrone salta su prelcane pigro e torna a casa prima che comincia a piuvere.",
+          "stock_voice": "heart",
+          "stock_similarity": 0.32
+        }
+      },
+      "cloned": false,
+      "similarity_mean": 0.38
+    },
+    "pocket-tts-pt-llamacpp": {
+      "language": "pt",
+      "text": "A rápida raposa marrom pula sobre o cão preguiçoso e volta para casa antes que comece a chover.",
+      "asr": "whisper-base",
+      "voices": {
+        "libri-2277": {
+          "similarity": 0.244,
+          "impostor": 0.311,
+          "rtf": 0.682,
+          "ttfa_ms": 2116,
+          "audio_s": 5.44,
+          "wer": 0.278,
+          "heard": "rapada raposa Marrompua sobre o Cão Preguiçoso e volta para casa antes que começa a chover.",
+          "stock_voice": "heart",
+          "stock_similarity": 0.001
+        },
+        "libri-84": {
+          "similarity": 0.389,
+          "impostor": 0.281,
+          "rtf": 0.631,
+          "ttfa_ms": 2262,
+          "audio_s": 4.64,
+          "wer": 0.556,
+          "heard": "A raposa Marrompula sobre o campo e o preguiçoso volta para casantes que começam a chover",
+          "stock_voice": "heart",
+          "stock_similarity": 0.318
+        }
+      },
+      "cloned": false,
+      "similarity_mean": 0.317
+    },
+    "chatterbox-turbo-llamacpp": {
+      "language": "en",
+      "text": "The quick brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+      "asr": "moonshine-tiny-en",
+      "voices": {
+        "libri-2277": {
+          "similarity": 0.732,
+          "impostor": 0.367,
+          "rtf": 3.632,
+          "ttfa_ms": 20335,
+          "audio_s": 5.6,
+          "wer": 0.053,
+          "heard": "The quit-brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+          "stock_voice": "default",
+          "stock_similarity": 0.226
+        },
+        "libri-84": {
+          "similarity": 0.697,
+          "impostor": 0.513,
+          "rtf": 3.063,
+          "ttfa_ms": 17765,
+          "audio_s": 5.8,
+          "wer": 0.0,
+          "heard": "The quick brown fox jumps over the lazy dog and then it runs back home before the rain starts.",
+          "stock_voice": "default",
+          "stock_similarity": 0.06
+        }
+      },
+      "cloned": true,
+      "similarity_mean": 0.714
+    },
+    "qwen3-tts-1.7b-base-llamacpp": {
+      "language": "en",
+      "text": "The quick brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+      "asr": "moonshine-tiny-en",
+      "voices": {
+        "libri-2277": {
+          "similarity": 0.552,
+          "impostor": 0.334,
+          "rtf": 2.316,
+          "ttfa_ms": 12043,
+          "audio_s": 5.2,
+          "wer": 0.0,
+          "heard": "The quick brown fox jumps over the lazy dog and then it runs back home before the rain starts.",
+          "stock_voice": "heart",
+          "stock_similarity": 0.205
+        },
+        "libri-84": {
+          "similarity": 0.692,
+          "impostor": 0.398,
+          "rtf": 2.427,
+          "ttfa_ms": 11754,
+          "audio_s": 6.64,
+          "wer": 0.0,
+          "heard": "The quick brown fox jumps over the lazy dog and then it runs back home before the rain starts.",
+          "stock_voice": "heart",
+          "stock_similarity": 0.236
+        }
+      },
+      "cloned": true,
+      "similarity_mean": 0.622
+    }
+  },
+  "not_run": {
+    "chatterbox-multilingual-v3-llamacpp": "llama-server's default context reserved about 13 GB and was killed for lack of memory (fixed: context_size 4096 in the entry, 2.3 GB). With it, 'Hello there.' (1.2 s, a reference clip of bolo's) took 306 s straight to llama-server: transcribed back exactly, similarity 0.53 to the clip, but far too slow to measure the test sentences on this CPU; bolo's 300 s read timeout (tts_server_timeout_s) ended the run through bolo."
+  },
+  "watermark_check": {
+    "what": "Is Resemble's Perth watermark in Chatterbox output through bolo?",
+    "tool": "resemble-perth 1.0.1 (PerthImplicitWatermarker, CPU PyTorch), get_watermark on the WAV bolo wrote (bolo speak, voice libri-84); positive control: the same clip after apply_watermark",
+    "results": {
+      "chatterbox-turbo-llamacpp": {
+        "raw": 0.0,
+        "after_perth_embeds": 1.0
+      },
+      "pocket-tts-en-llamacpp (control, never watermarked)": {
+        "raw": 0.0,
+        "after_perth_embeds": 1.0
+      }
+    },
+    "conclusion": "llama.cpp's Chatterbox does not watermark; the catalog no longer says it does."
+  }
+}

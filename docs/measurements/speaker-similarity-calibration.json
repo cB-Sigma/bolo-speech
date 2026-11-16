@@ -1,0 +1,30 @@
+{
+  "what": "Cosine similarity of speaker embeddings for pairs of real recordings: different utterances by the same person, and utterances by different people. Sets the thresholds of bolo.similarity (SAME_SPEAKER 0.50, SIMILAR 0.30) and the multi-speaker warning of bolo.voices (MULTI_SPEAKER_SIMILARITY 0.40).",
+  "embedding_model": "pyannote-3.0-eres2net (3D-Speaker ERes2Net, VoxCeleb, run by sherpa-onnx 2.0.1)",
+  "data": "LibriSpeech dev-clean (CC BY 4.0, https://www.openslr.org/12): the first 16 speakers of the archive, 5 utterances each between 4 and 15 s (80 clips, 16 kHz read speech)",
+  "date": "2026-11-15",
+  "hardware": "4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU",
+  "pairs": {
+    "same_speaker": {"n": 160, "min": 0.451, "p5": 0.652, "median": 0.797, "p95": 0.896, "max": 0.929},
+    "different_speaker": {"n": 3000, "min": -0.296, "p5": -0.042, "median": 0.114, "p95": 0.356, "max": 0.53}
+  },
+  "share_at_or_above": {
+    "0.30": {"same_speaker": 1.0, "different_speaker": 0.101},
+    "0.40": {"same_speaker": 1.0, "different_speaker": 0.024},
+    "0.45": {"same_speaker": 1.0, "different_speaker": 0.007},
+    "0.50": {"same_speaker": 0.994, "different_speaker": 0.001},
+    "0.55": {"same_speaker": 0.981, "different_speaker": 0.0},
+    "0.60": {"same_speaker": 0.975, "different_speaker": 0.0}
+  },
+  "window_consistency": {
+    "what": "Two utterances joined and cut into 3 s windows; the lowest similarity of a window to the mean of the others. One speaker: two utterances of the same person. Two speakers: one utterance each of two people.",
+    "one_speaker": {"n": 16, "min": 0.475, "p5": 0.516, "median": 0.685, "p95": 0.785, "max": 0.785},
+    "two_speakers": {"n": 16, "min": -0.184, "p5": -0.05, "median": 0.227, "p95": 0.459, "max": 0.566}
+  },
+  "caveats": [
+    "Real read speech by native English speakers. Synthesised speech, other languages, telephone audio and noisy rooms were not part of this set; scores of cloned speech are compared with these real-pair numbers, which is a rule of thumb, not proof.",
+    "Another embedding model (voice_similarity_model) has another scale: the verdicts are only marked calibrated for this one.",
+    "16 speakers is a small set: the tails (min/max) are rough."
+  ],
+  "script": "server/tools/calibrate_similarity.py"
+}

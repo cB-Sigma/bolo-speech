@@ -486,7 +486,11 @@ class SpeechRequest(BaseModel):
 
     model: str | None = None
     input: str
-    voice: str | dict[str, Any] | None = None
+    voice: str | dict[str, Any] | None = Field(
+        default=None,
+        description="A voice of the model, or a saved voice (/api/v1/voices) for a model that clones voices: by "
+        'id (`"priya"`) or as OpenAI\'s custom-voice object (`{"id": "priya"}`, which prefers the saved voice).',
+    )
     instructions: str | None = Field(default=None, description="Accepted for compatibility; ignored.")
     response_format: str = "mp3"
     speed: float = 1.0
@@ -540,6 +544,12 @@ class SpeechRequest(BaseModel):
     )
     reference_text: str | None = Field(
         default=None, description="Extension: the transcript of `reference_audio` (some cloning models use it)."
+    )
+    options: dict[str, Any] | None = Field(
+        default=None,
+        description="Extension: model-specific request options, for example Tontaube's `style` (audiobook, "
+        "conversational, agentic) and sliders (`rate`, `pause`, `pitch_range`, `pitch_level`, `legato`). A model "
+        "answers 400 for an option it does not read.",
     )
 
 
@@ -613,10 +623,14 @@ async def create_speech(request: Request, body: SpeechRequest) -> Response:
         fmt = normalize_format(body.response_format)
         if body.stream_format not in ("audio", "sse"):
             raise InvalidRequest("stream_format must be 'audio' or 'sse'", param="stream_format")
-        voice = body.voice.get("id") if isinstance(body.voice, dict) else body.voice
+        voice, custom_voice = speech_voice(body.voice)
         request_keep_alive(body.keep_alive, ("tts",))
         reference = decode_reference(body.reference_audio) if body.reference_audio else None
-        spec = core.resolve(body.model, "tts")
+        model = body.model
+        saved = core.voices.find(voice) if voice and reference is None and model is None else None
+        if saved is not None and saved.default_model:
+            model = saved.default_model  # the saved voice's own model (synthesize decides the same way)
+        spec = core.resolve(model, "tts")
         trace.model = spec.id
         encoder = StreamEncoder(fmt, spec.sample_rate, body.sample_rate)
     except BoloError as exc:
@@ -629,7 +643,7 @@ async def create_speech(request: Request, body: SpeechRequest) -> Response:
         text=body.input, model=spec.id, voice=voice, speed=body.speed, language=body.language, normalize=body.normalize,
         phonemizer=body.phonemizer, reference_audio=reference, reference_text=body.reference_text,
         wordlists=body.wordlists, pronunciations=body.pronunciations, input_format=body.input_format,
-        romanised=body.romanised,
+        romanised=body.romanised, custom_voice=custom_voice, options=body.options,
     )  # fmt: skip
     chunks = stream.chunks()
     try:
@@ -689,6 +703,16 @@ async def create_speech(request: Request, body: SpeechRequest) -> Response:
     }
     media = "text/event-stream" if as_sse else encoder.media_type
     return StreamingResponse(gen(), media_type=media, headers=headers)
+
+
+def speech_voice(value: str | dict[str, Any] | None) -> tuple[str | None, bool]:
+    """``voice`` of a speech request: ``(name, custom)``; ``custom`` for OpenAI's ``{"id": ...}`` object."""
+    if isinstance(value, dict):
+        vid = value.get("id")
+        if not isinstance(vid, str) or not vid.strip():
+            raise InvalidRequest('a voice object needs an "id"', param="voice")
+        return vid.strip(), True
+    return value, False
 
 
 def decode_reference(value: str) -> bytes:

@@ -12,6 +12,7 @@ proportional to the text. Neither is meant to resemble speech.
 
 from __future__ import annotations
 
+import io
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -39,6 +40,7 @@ from bolo.engines.base import (
     STTRequest,
     STTResult,
     STTStream,
+    SynthesisExtras,
     TTSModel,
     TurnModel,
     VadDetector,
@@ -237,6 +239,20 @@ class FakeTTS(TTSModel):
         self.seconds_per_char = float(opts.get("seconds_per_char", 0.06))
         self.pieces = int(opts.get("pieces", 2))
         self.calls: list[str] = []
+        #: option ``cloning``: "clones" a reference by speaking at its dominant pitch
+        self.supports_cloning = bool(opts.get("cloning"))
+        self.accepts_extras = self.supports_cloning
+        self.request_options = ("pitch",) if self.supports_cloning else ()
+        self.extras: list[SynthesisExtras | None] = []
+
+    @staticmethod
+    def _pitch_of(wav: bytes) -> float:
+        import soundfile as sf
+
+        x, rate = sf.read(io.BytesIO(wav), dtype="float32", always_2d=True)
+        mono = x.mean(axis=1)[: rate * 4]
+        spectrum = np.abs(np.fft.rfft(mono * np.hanning(len(mono))))
+        return float(max(80.0, np.argmax(spectrum) * rate / len(mono)))
 
     def synthesize(
         self,
@@ -244,10 +260,16 @@ class FakeTTS(TTSModel):
         voice: str | None = None,
         speed: float = 1.0,
         cancelled: Callable[[], bool] | None = None,
+        extras: SynthesisExtras | None = None,
     ) -> Iterator[FloatArray]:
         self.calls.append(text)
+        self.extras.append(extras)
         v = self.find_voice(voice)
         freq = 220.0 * (1 + (v.sid if v else 0) * 0.25)
+        if extras is not None and extras.reference_audio is not None:
+            freq = self._pitch_of(extras.reference_audio)
+        if extras is not None and "pitch" in extras.options:
+            freq = float(extras.options["pitch"])
         total = max(1, int(len(text) * self.seconds_per_char / max(speed, 0.1) * self.sample_rate))
         delay = self.first_delay_s + self.delay_per_char_s * len(text)
         per_piece = total // self.pieces

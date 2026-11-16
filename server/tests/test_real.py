@@ -749,6 +749,41 @@ async def test_pocket_tts_on_a_managed_llama_server() -> None:
         await core.stop()
 
 
+async def test_saved_voice_clone_and_speaker_similarity() -> None:
+    """A saved voice made from one of bolo's reference clips (Kokoro's michael, not a real person), cloned by Pocket
+    TTS on a managed llama-server and scored with the speaker-embedding model: the clone must be closer to its own
+    reference than to a different voice, and be understood. Uses pocket-tts-en-llamacpp, pyannote-3.0-eres2net and
+    moonshine-tiny-en (pulled when missing)."""
+    from bolo import samples, similarity
+    from bolo.tts_runtimes import find_binary
+    from bolo.voices import clean_reference
+
+    settings = _llama_server_settings()
+    if find_binary(settings, "llama-server")[0] is None:
+        pytest.skip("needs llama-server: bolo components install llama-server, or BOLO_LLAMA_SERVER_BIN")
+    core = Bolo(settings)
+    await core.start()
+    try:
+        audio, rate, _meta = samples.load_audio("en-long")
+        if core.voices.find("real-test-michael") is None:
+            core.voices.create(
+                name="real-test-michael", cleaned=clean_reference([(audio, rate)]), consent="permission",
+                created_by={"name": "test_real"}, language="en",
+            )  # fmt: skip
+        result = await similarity.score_voice(core, "real-test-michael", "pocket-tts-en-llamacpp", EN_TEXT, True)
+        other, other_rate, _ = samples.load_audio("en-short")  # Kokoro's heart: another voice
+        versus = await similarity.score(core, other, other_rate, result["samples"], result["sample_rate"])
+        heard = await core.transcribe(result["samples"], result["sample_rate"], model="moonshine-tiny-en")
+        wer = word_error_rate(EN_TEXT, heard.text, "en")
+        print(
+            f"\nclone similarity {result['similarity']:.3f} vs another voice {versus['similarity']:.3f}, WER {wer:.3f}"
+        )
+        assert result["similarity"] > versus["similarity"] and wer <= 0.3
+        core.voices.delete("real-test-michael")
+    finally:
+        await core.stop()
+
+
 async def test_orpheus_family_on_llama_server_with_snac_onnx() -> None:
     """orpheus-llamacpp kind: Svara or Veena on a managed llama-server, SNAC decoded in onnxruntime, Hindi round trip.
 

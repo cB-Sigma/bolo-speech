@@ -6,6 +6,43 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Added
+
+- **Saved voices (a voice library) for the models that clone voices** ([docs/voices.md](docs/voices.md)).
+  `POST /api/v1/voices` (multipart: recordings, name, transcript, language, description, default model) stores a
+  cleaned reference (mono 24 kHz, silence trimmed, pauses shortened, loudness normalised, 2 to 60 s) and warns when
+  it is short, noisy, clipped or sounds like more than one person; list, get, change, delete, the reference audio,
+  export and import (.zip). `voice="priya"` or OpenAI's `voice={"id": "priya"}` in `/v1/audio/speech` (and every
+  other place a voice is named) speaks from it with any model that clones voices; a model that cannot answers 400
+  naming the installed ones that can; a voice's default model answers when the request names none. OpenAI's
+  custom-voice routes as in openai-python 3.x: `POST /v1/audio/voices`, `DELETE /v1/audio/voices/{id}` and
+  `/v1/audio/voice_consents`. `bolo voices list|add|show|rm|export|import|score`.
+- **Consent and labelling.** Creating a voice requires a consent statement (`self`: "this is my voice", or
+  `permission`: "I have the speaker's permission"; refused otherwise with `400 consent_required`), stored with the
+  time and who made it. Cloned speech carries the headers `x-bolo-cloned: true` and `x-bolo-voice`, and the trace
+  records the voice and its consent. A short "Voice cloning responsibly" section in docs/voices.md; no bolo-side
+  watermark yet (AudioSeal needs PyTorch; documented as a follow-up).
+- **Speaker similarity** (`bolo.similarity`): the cosine similarity of the speaker embeddings (the diarization
+  model's ERes2Net) of a reference and a clone, with thresholds calibrated on LibriSpeech dev-clean (same person:
+  0.45 to 0.93, median 0.80; different people: median 0.11, 95th percentile 0.36; "same speaker" from 0.50,
+  docs/measurements/speaker-similarity-calibration.json). Shown when a voice is created with a score model, by
+  `GET /api/v1/voices/{id}/score`, `bolo voices score`, and as `speaker_similarity` in `bolo bench` / `POST
+  /api/v1/bench` for models that clone voices. Setting `voice_similarity_model`.
+- **Cloning measured on CPU** for the llama-server models that run here (docs/voices.md, "Measured: cloning on
+  CPU"; `server/tools/measure_cloning.py`).
+- **Tontaube** (`tontaube-v1.1-int4`, alias `tontaube`, and `tontaube-v1.1`): a new tts-server runtime `tontaube`
+  for the Tontaube inference server (craitech/tontaube v1.1.0), operator-run (`tts_servers`) or started by bolo
+  (`bolo components install tontaube` clones the pinned tag; `uv run --python 3.12 --frozen tontaube serve` with
+  the downloaded weights). Saved voices and `reference_audio` go to `voice_audio_b64`, its bundled voices to
+  `voice_path`, and the new request field `options` carries its style (audiobook, conversational, agentic) and its
+  five sliders. Licence: Tontaube Community Model License 1.0 (a speech-generation service always needs a
+  commercial licence), labelled in the catalog. Not run here. Settings `tontaube_dir`, `tontaube_start_timeout_s`.
+- `/v1/audio/speech` takes `options`, model-specific request options (audio.cpp: passed through to the server);
+  a model answers 400 for an option it does not read.
+- Console: a "Saved voices" panel on Text to speech (play the reference, use a voice in the playground, score it
+  with the current model, save a new one from an upload or a recording with a consent checkbox, delete, export),
+  saved voices in the voice picker of cloning models, and "Save as a voice" in the clone panel.
+
 ### Changed
 
 - **Text voices trust uccharan's normaliser only where it writes numbers as words.** bolo now asks the installed

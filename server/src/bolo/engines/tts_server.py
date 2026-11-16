@@ -17,6 +17,12 @@ request after a back-off (1 s, doubling up to 60 s while crashes keep coming), a
 Audio comes back as PCM16 (streamed where the runtime streams) or WAV, and is resampled to the catalog's
 ``sample_rate`` with bolo's resampler, so the rest of bolo sees an ordinary :class:`TTSModel`.
 
+The runtime ``tontaube`` (TontaubeV1.1) is a Python server: ``POST /predict`` answers base64 audio in JSON. Its
+request options (``SynthesisExtras.options``): ``style`` (audiobook, conversational, agentic; else the voice's
+style), the sliders ``rate`` (0-4), ``pause`` (0-4), ``pitch_range`` (0-5), ``pitch_level`` (0-4), ``legato``
+(0-2), and ``temperature`` and ``seed``. Catalog voices name a bundled reference (``server_voice``, sent as
+``voice_path``) and its ``style``.
+
 The kind ``orpheus-llamacpp`` (Orpheus, Veena, Svara, snorTTS) uses the same llama-server management but its
 own client, :mod:`bolo.engines.orpheus_llamacpp`: bolo builds the prompt, streams token ids from ``/completion``
 and decodes the SNAC codes with onnxruntime.
@@ -62,7 +68,7 @@ from bolo.engines.base import (
     Voice,
 )
 from bolo.errors import ComponentMissing, EngineUnavailable, InvalidRequest
-from bolo.tts_runtimes import ENGINE_ID, LLAMA, RUNTIME_INFO, RUNTIMES, find_binary, url_for
+from bolo.tts_runtimes import ENGINE_ID, LLAMA, RUNTIME_INFO, RUNTIMES, TONTAUBE, find_binary, url_for
 
 if TYPE_CHECKING:
     from bolo.config import Settings
@@ -80,6 +86,10 @@ LANGUAGE_NAMES = {
     "yue": "Cantonese", "zh": "Chinese",
 }  # fmt: skip
 _RATE_RE = re.compile(r"rate=(\d+)")
+#: Tontaube: its styles, its five sliders (highest step of each) and the languages it reads
+TONTAUBE_STYLES = ("audiobook", "conversational", "agentic")
+TONTAUBE_SLIDERS = {"rate": 4, "pause": 4, "pitch_range": 5, "pitch_level": 4, "legato": 2}
+TONTAUBE_LANGUAGES = {"en", "de", "es", "fr", "it", "nl", "pt"}
 #: shortest piece of audio handed on while streaming (seconds); smaller network reads are joined
 MIN_CHUNK_S = 0.08
 
@@ -297,9 +307,16 @@ class ServerTTS(TTSModel):
         self.server_model = server_model or str(spec.get("server_model") or spec.get("model_id") or name)
         self.sample_rate = int(spec.get("sample_rate") or 24000)
         self.supports_cloning = bool(spec.get("cloning"))
-        self.stream = bool(spec.get("stream", runtime == LLAMA))
+        self.stream = bool(spec.get("stream", runtime == LLAMA)) and runtime != TONTAUBE
+        if runtime == TONTAUBE:
+            self.request_options = ("style", *TONTAUBE_SLIDERS, "temperature", "seed")
+        elif runtime != LLAMA:
+            self.request_options = ("*",)  # audio.cpp: model options, passed through
         api_key = api_key or (process.api_key if process is not None else None)
-        headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+        if runtime == TONTAUBE:
+            headers = {"x-api-key": api_key} if api_key else {}
+        else:
+            headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
         self._client = httpx.Client(
             headers=headers,
             timeout=httpx.Timeout(timeout_s, connect=10.0),
@@ -325,7 +342,9 @@ class ServerTTS(TTSModel):
         if self.process is not None:
             self.process.ensure_started()
         try:
-            resp = self._client.get(self.base_url + "/health", timeout=10.0)
+            resp = self._client.get(
+                self.base_url + ("/readyz" if self.runtime == TONTAUBE else "/health"), timeout=10.0
+            )
         except httpx.HTTPError as exc:
             raise EngineUnavailable(self._unreachable(exc)) from exc
         if resp.status_code == 503:
@@ -336,6 +355,8 @@ class ServerTTS(TTSModel):
             self._add_server_voices(self._list_server_voices())
 
     def _list_server_voices(self) -> list[str]:
+        if self.runtime == TONTAUBE:
+            return []  # its bundled voices are files on the server; the catalog lists them
         if self.runtime == LLAMA:
             props = self._client.get(self.base_url + "/props", timeout=10.0).json()
             return [str(v) for v in props.get("voices") or []]
@@ -383,10 +404,54 @@ class ServerTTS(TTSModel):
             return LANGUAGE_NAMES.get(code, code)
         return code
 
+    def _tontaube_request(
+        self, text: str, voice: str | None, speed: float, extras: SynthesisExtras, ref_audio: bytes | None
+    ) -> dict[str, Any]:
+        info = self._voice_info.get((voice or "").lower(), {})
+        options = dict(extras.options)
+        language = _language_code(extras.language) or _language_code(str(info.get("language") or "")) or "en"
+        if language not in TONTAUBE_LANGUAGES:
+            raise InvalidRequest(
+                f"model '{self.name}' speaks {', '.join(sorted(TONTAUBE_LANGUAGES))}, not {language!r}",
+                param="language",
+            )
+        style = str(options.pop("style", None) or info.get("style") or self.spec.get("style") or "conversational")
+        if style not in TONTAUBE_STYLES:
+            raise InvalidRequest(f"style must be one of {', '.join(TONTAUBE_STYLES)}", param="options")
+        if speed != 1.0:
+            raise InvalidRequest(
+                f"model '{self.name}' has no speed setting; use the option rate (0 much slower .. 4 much faster)",
+                param="speed",
+            )
+        body: dict[str, Any] = {"text": text, "language": language, "tag": style, "format": "wav"}
+        controls: dict[str, int] = {}
+        for name, top in TONTAUBE_SLIDERS.items():
+            if name in options:
+                value = options.pop(name)
+                if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= top:
+                    raise InvalidRequest(f"option {name} is a step from 0 to {top}", param="options")
+                controls[name] = value
+        if controls:
+            body["controls"] = controls
+        if "temperature" in options:
+            body["temperature"] = float(options.pop("temperature"))
+        if "seed" in options:
+            body["seed"] = int(options.pop("seed"))
+        if ref_audio is not None:
+            body["voice_audio_b64"] = base64.b64encode(ref_audio).decode()
+        elif info.get("server_voice"):
+            body["voice_path"] = str(info["server_voice"])
+        body.update(dict(self.spec.get("request") or {}))
+        return body
+
     def build_request(
         self, text: str, voice: str | None, speed: float, extras: SynthesisExtras | None
     ) -> dict[str, Any]:
         extras = extras or SynthesisExtras()
+        if self.runtime == TONTAUBE:
+            if extras.reference_audio is not None and not self.supports_cloning:
+                raise InvalidRequest(f"model '{self.name}' cannot imitate a voice from reference audio", param="voice")
+            return self._tontaube_request(text, voice, speed, extras, extras.reference_audio)
         ref_audio, ref_text = extras.reference_audio, extras.reference_text
         info = self._voice_info.get((voice or "").lower(), {})
         send_voice: str | None = None
@@ -439,6 +504,7 @@ class ServerTTS(TTSModel):
         if language and self.spec.get("language_option"):
             # families that declare a "language" request option read it there, not from the top-level field
             extra_fields.setdefault("language", language)
+        extra_fields.update(extras.options)
         if extra_fields:
             body["options"] = {str(k): v for k, v in extra_fields.items()}
         return body
@@ -455,6 +521,9 @@ class ServerTTS(TTSModel):
         body = self.build_request(text, voice, speed, extras)
         if self.process is not None:
             self.process.ensure_started()
+        if self.runtime == TONTAUBE:
+            yield from self._predict(body)
+            return
         path = "/tts" if self.runtime == LLAMA else "/v1/audio/speech"
         for attempt in (1, 2):
             started = False
@@ -479,6 +548,24 @@ class ServerTTS(TTSModel):
                 if self.process is not None:
                     self.process.check()
                 raise EngineUnavailable(self._unreachable(exc)) from exc
+
+    def _predict(self, body: dict[str, Any]) -> Iterator[FloatArray]:
+        """Tontaube: one POST /predict, base64 audio in JSON."""
+        try:
+            resp = self._client.post(self.base_url + "/predict", json=body)
+        except httpx.HTTPError as exc:
+            if self.process is not None:
+                self.process.check()
+            raise EngineUnavailable(self._unreachable(exc)) from exc
+        if resp.status_code == 503:
+            raise EngineUnavailable(f"the Tontaube server at {self.base_url} is still loading its model")
+        if resp.status_code >= 400:
+            self._raise_for(resp)
+        try:
+            data = base64.b64decode(resp.json()["audio_b64"])
+        except (ValueError, KeyError, TypeError) as exc:
+            raise EngineUnavailable(f"the Tontaube server at {self.base_url} answered without audio") from exc
+        yield from self._split(self._decode_whole(data))
 
     def _raise_for(self, resp: httpx.Response) -> None:
         message = _error_message(resp)
@@ -651,6 +738,17 @@ class TTSServerEngine(Engine):
         }
         extra = [str(a) for a in spec.get("server_args") or []] + list(s.tts_server_args)
         key: str | None = None
+        health = "/health"
+        timeout = s.tts_server_start_timeout_s
+        if runtime == TONTAUBE:
+            argv, env, key = self._tontaube_argv(binary, path, spec, opts, port)
+            process = ServerProcess(
+                f"{runtime}:{name}", argv, port, start_timeout_s=max(timeout, s.tontaube_start_timeout_s), env=env,
+                health_path="/readyz", api_key=key,
+            )  # fmt: skip
+            self._processes = [p for p in self._processes if p.running or p.crashes]
+            self._processes.append(process)
+            return process
         if runtime == LLAMA:
             model_file = path / str(spec.get("model_file") or "")
             if not spec.get("model_file") or not model_file.is_file():
@@ -668,11 +766,50 @@ class TTSServerEngine(Engine):
             config_path.write_text(json.dumps(config, indent=2))
             argv = [str(binary), "--config", str(config_path), "--no-ui"]
         process = ServerProcess(
-            f"{runtime}:{name}", argv + extra, port, start_timeout_s=s.tts_server_start_timeout_s, env=env, api_key=key
+            f"{runtime}:{name}", argv + extra, port, start_timeout_s=timeout, env=env, health_path=health, api_key=key
         )
         self._processes = [p for p in self._processes if p.running or p.crashes]
         self._processes.append(process)
         return process
+
+    @staticmethod
+    def _tontaube_argv(
+        checkout: Path, path: Path, spec: dict[str, Any], opts: LoadOptions, port: int
+    ) -> tuple[list[str], dict[str, str], str]:
+        """``uv run --python 3.12 --frozen tontaube serve`` in the checkout, with the weights bolo downloaded
+        (``MODEL_PATH``), a random API key and the device: ``LITE_DEVICE=cpu`` on the CPU, else the GPU."""
+        import shutil
+
+        uv = shutil.which("uv")
+        if uv is None:
+            raise ComponentMissing(
+                "the Tontaube server is started with uv, which is not on PATH (https://docs.astral.sh/uv/)"
+            )
+        if not (path / "cb0").is_dir():
+            raise EngineUnavailable(f"{path} has no cb0/ folder; pull the model again")
+        key = secrets.token_hex(16)
+        env = {
+            "MODEL_PATH": str(path),
+            "TTS_BACKEND": str(spec.get("backend") or "lite"),
+            "REQUIRE_API_KEY": "1",
+            "TTS_API_KEY": key,
+            "ENABLE_VERBALIZATION": "0",
+        }
+        device = opts.device or "auto"
+        if device == "cpu":
+            env["LITE_DEVICE"] = "cpu"
+            env["LITE_CPU_THREADS"] = str(max(1, opts.threads))
+        elif device.startswith("cuda"):
+            env["LITE_DEVICE"] = "cuda"
+            if ":" in device:
+                env["CUDA_VISIBLE_DEVICES"] = device.split(":", 1)[1]
+        for k, v in dict(spec.get("env") or {}).items():
+            env[str(k)] = str(v)
+        argv = [
+            uv, "run", "--python", "3.12", "--frozen", "--directory", str(checkout), "tontaube", "serve",
+            "--host", "127.0.0.1", "--port", str(port),
+        ]  # fmt: skip
+        return argv, env, key
 
     @staticmethod
     def _audiocpp_config(name: str, path: Path, spec: dict[str, Any], opts: LoadOptions, port: int) -> dict[str, Any]:

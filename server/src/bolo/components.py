@@ -529,7 +529,13 @@ class ComponentManager:
             return "installing components is never allowed on a non-loopback address without an API key"
         if s.allow_component_install is False:
             return "the operator disabled component installation (allow_component_install = false)"
-        if tts_runtimes.platform_key() not in tts_runtimes.RUNTIME_INFO[runtime].releases:
+        info = tts_runtimes.RUNTIME_INFO[runtime]
+        if info.git is not None:
+            if tts_runtimes.platform_key() not in info.git.platforms:
+                return f"{info.name} runs on Linux only (this is {tts_runtimes.platform_key()})"
+            if shutil.which("git") is None:
+                return "git is not installed (it fetches the pinned source)"
+        elif tts_runtimes.platform_key() not in info.releases:
             return f"no prebuilt release is pinned for this platform ({tts_runtimes.platform_key()})"
         target = tts_runtimes.components_dir(s)
         probe = target if target.exists() else Path(s.data_dir)
@@ -547,11 +553,15 @@ class ComponentManager:
             installed = state["path"] is not None
             blocked = self.runtime_blocked_reason(runtime)
             release = state["release"]
-            manual = (
-                f"bolo components install {runtime}"
-                if release
-                else f"build {info.binary} from {info.homepage} and set {info.setting}"
-            )
+            if info.git is not None:
+                manual = (
+                    f"bolo components install {runtime} (or git clone --branch {info.git.tag} {info.git.url} and set "
+                    f"{info.setting}); uv must be on PATH"
+                )
+            elif release:
+                manual = f"bolo components install {runtime}"
+            else:
+                manual = f"build {info.binary} from {info.homepage} and set {info.setting}"
             out.append(
                 {
                     "id": runtime,
@@ -571,7 +581,11 @@ class ComponentManager:
                     "servers": state["urls"],
                     "release": {"version": info.version, "url": release.url, "sha256": release.sha256}
                     if release
-                    else None,
+                    else (
+                        {"version": info.version, "url": info.git.url, "commit": info.git.commit}
+                        if info.git is not None
+                        else None
+                    ),
                     "description": info.description,
                 }
             )
@@ -582,6 +596,8 @@ class ComponentManager:
         from bolo.store import RemoteFile
 
         info = tts_runtimes.RUNTIME_INFO[runtime]
+        if info.git is not None:
+            return self._install_checkout(runtime)
         release = info.releases.get(tts_runtimes.platform_key())
         if release is None:
             return f"no prebuilt {info.name} release is pinned for {tts_runtimes.platform_key()}"
@@ -613,6 +629,27 @@ class ComponentManager:
         if problem:
             shutil.rmtree(target, ignore_errors=True)
             return f"{info.binary} {info.version} does not run here: {problem}"
+        return None
+
+    def _install_checkout(self, runtime: str) -> str | None:
+        """Clone a runtime's pinned tag (shallow) and check that it is the pinned commit."""
+        info = tts_runtimes.RUNTIME_INFO[runtime]
+        git = info.git
+        assert git is not None
+        target = tts_runtimes.install_dir(self.core.settings, runtime) / info.binary
+        tmp = target.with_name(target.name + ".partial")
+        shutil.rmtree(tmp, ignore_errors=True)
+        tmp.parent.mkdir(parents=True, exist_ok=True)
+        code, output = self._run(["git", "clone", "--quiet", "--depth", "1", "--branch", git.tag, git.url, str(tmp)])
+        if code != 0:
+            shutil.rmtree(tmp, ignore_errors=True)
+            return f"git clone failed ({code}): {' | '.join(output.strip().splitlines()[-3:])}"
+        code, head = self._run(["git", "-C", str(tmp), "rev-parse", "HEAD"])
+        if code != 0 or head.strip() != git.commit:
+            shutil.rmtree(tmp, ignore_errors=True)
+            return f"{git.url} {git.tag} is not the pinned commit {git.commit} (got {head.strip()[:40]})"
+        shutil.rmtree(target, ignore_errors=True)
+        tmp.rename(target)
         return None
 
     # -- install ----------------------------------------------------------

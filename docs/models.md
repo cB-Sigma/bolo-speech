@@ -64,7 +64,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-342 models: 120 validated on CPU by the maintainers, 222 untested. 20 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
+344 models: 127 validated on CPU by the maintainers, 217 untested. 20 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
 
 ### Speech to text
 
@@ -500,14 +500,14 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `chatterbox-multilingual-v3-llamacpp` (Chatterbox Multilingual V3) | en, ar, da, de, el, es +17 | accuracy | - | 1.2 GB | MIT · runs on llama-server · GPU recommended | untested |
-| `chatterbox-turbo-llamacpp` (Chatterbox Turbo) | en | accuracy | - | 1.0 GB | MIT · runs on llama-server · GPU recommended | untested |
-| `qwen3-tts-1.7b-base-llamacpp` (Qwen3-TTS 1.7B Base) | en, de, es, fr, it, ja +4 | accuracy | - | 1.5 GB | Apache-2.0 · runs on llama-server · GPU recommended | untested |
-| `pocket-tts-en-llamacpp` (Kyutai Pocket TTS (English)) | en | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | **CPU** · RTF 0.716 · first audio 774 ms · round-trip WER 0.0% |
-| `pocket-tts-de-llamacpp` (Kyutai Pocket TTS (German)) | de | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | untested |
-| `pocket-tts-es-llamacpp` (Kyutai Pocket TTS (Spanish)) | es | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | untested |
-| `pocket-tts-fr-llamacpp` (Kyutai Pocket TTS (French)) | fr | balanced | - | 673 MB | CC-BY-4.0 · runs on llama-server | untested |
-| `pocket-tts-it-llamacpp` (Kyutai Pocket TTS (Italian)) | it | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | untested |
-| `pocket-tts-pt-llamacpp` (Kyutai Pocket TTS (Portuguese)) | pt | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | untested |
+| `chatterbox-turbo-llamacpp` (Chatterbox Turbo) | en | accuracy | - | 1.0 GB | MIT · runs on llama-server · GPU recommended | **CPU** · RTF 3.063 · first audio 17765 ms · round-trip WER 2.6% · cloned voice: speaker similarity 0.71 |
+| `qwen3-tts-1.7b-base-llamacpp` (Qwen3-TTS 1.7B Base) | en, de, es, fr, it, ja +4 | accuracy | - | 1.5 GB | Apache-2.0 · runs on llama-server · GPU recommended | **CPU** · RTF 2.316 · first audio 12043 ms · round-trip WER 0.0% · cloned voice: speaker similarity 0.62 |
+| `pocket-tts-en-llamacpp` (Kyutai Pocket TTS (English)) | en | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | **CPU** · RTF 0.716 · first audio 774 ms · round-trip WER 0.0% · cloned voice: speaker similarity 0.57 |
+| `pocket-tts-de-llamacpp` (Kyutai Pocket TTS (German)) | de | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | **CPU** · RTF 0.447 · first audio 1439 ms · round-trip WER 8.8% · cloned voice: speaker similarity 0.36 |
+| `pocket-tts-es-llamacpp` (Kyutai Pocket TTS (Spanish)) | es | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | **CPU** · RTF 0.463 · first audio 1578 ms · round-trip WER 57.9% · cloned voice: speaker similarity 0.33 |
+| `pocket-tts-fr-llamacpp` (Kyutai Pocket TTS (French)) | fr | balanced | - | 673 MB | CC-BY-4.0 · runs on llama-server | **CPU** · RTF 0.657 · first audio 1864 ms · round-trip WER 50.0% · cloned voice: speaker similarity 0.38 |
+| `pocket-tts-it-llamacpp` (Kyutai Pocket TTS (Italian)) | it | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | **CPU** · RTF 0.397 · first audio 1327 ms · round-trip WER 38.9% · cloned voice: speaker similarity 0.38 |
+| `pocket-tts-pt-llamacpp` (Kyutai Pocket TTS (Portuguese)) | pt | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | **CPU** · RTF 0.631 · first audio 2262 ms · round-trip WER 41.7% · cloned voice: speaker similarity 0.32 |
 | `lfm3-audio-2b-llamacpp` (LFM3-Audio 2B) | en, ar, da, de, el, es +12 | accuracy | - | 1.4 GB | LFM Open License v1.0 ⚠ · runs on llama-server · GPU recommended | untested |
 | `soprano-1.1-80m-llamacpp` (Soprano 1.1 80M) | en | balanced | - | 0 MB | Apache-2.0 · runs on llama-server | not yet published |
 | `fish-drama-3-llamacpp` (Fish Audio Drama 3) | - | accuracy | - | 22.5 GB | Fish Audio Community License 1.0 ⚠ · runs on llama-server · GPU required | not yet published |
@@ -557,6 +557,13 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `lfm3-audio-2b-audiocpp` (LFM3-Audio 2B) | en, ar, da, de, el, es +12 | accuracy | - | 2.2 GB | LFM Open License v1.0 ⚠ · runs on audio.cpp · GPU recommended | untested |
 | `indextts-2.5-audiocpp` (IndexTTS-2.5) | en, ar, es, ja, zh | accuracy | - | 3.5 GB | bilibili Model Use License ⚠ · runs on audio.cpp · GPU recommended | untested |
 | `mira-tts-audiocpp` (MiraTTS) | en | accuracy | - | 1.6 GB | CC-BY-NC-SA-4.0 ⚠ · runs on audio.cpp · GPU recommended | not yet published |
+
+#### External TTS server: tontaube
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `tontaube-v1.1-int4` (TontaubeV1.1) | en, de, es, fr, it, nl +1 | accuracy | - | 1.8 GB | Tontaube Community Model License 1.0 ⚠ · runs on tontaube · GPU recommended | untested |
+| `tontaube-v1.1` (TontaubeV1.1) | en, de, es, fr, it, nl +1 | accuracy | - | 6.4 GB | Tontaube Community Model License 1.0 ⚠ · runs on tontaube · GPU required | untested |
 
 #### Kokoro
 
@@ -1526,6 +1533,13 @@ in-process. Two ggml runtimes do, and both have an HTTP server:
   model-specific `options`; WAV by default, raw PCM16 with `stream_format:
   "audio"` for models configured with `mode: "streaming"`. `GET
   /v1/audio/voices?model=` lists voices. About 60 speech-generation families.
+* **The Tontaube inference server** (`tontaube serve`, Apache-2.0, v1.1.0), the
+  only runtime for TontaubeV1.1. `POST /predict` with `text`, `language`, `tag`
+  (style), `voice_audio_b64` or `voice_path`, `controls` (five sliders) and
+  `format`, answering base64 audio in JSON; `GET /readyz` is 503 while it
+  loads. A Python application rather than a binary: bolo clones the pinned tag
+  (`bolo components install tontaube`) and runs `uv run --python 3.12 --frozen
+  tontaube serve`. See [voices.md](voices.md#tontaube).
 
 bolo talks to both through one engine, **`tts-server`**
 (`server/src/bolo/engines/tts_server.py`). Every catalog entry names its
@@ -1596,7 +1610,9 @@ message.
 
 ### Voices and cloning
 
-* Entries of models that clone voices have `features: ["voice-cloning"]`.
+* Entries of models that clone voices have `features: ["voice-cloning"]`. A
+  **saved voice** ([voices.md](voices.md)) can be named as their `voice`; it is
+  sent as the reference below.
   `POST /v1/audio/speech` takes `reference_audio` (base64 or a data URL, up to
   30 s are used) and optionally `reference_text`; bolo decodes it, makes it
   mono 16-bit WAV and sends it as `speaker_ref_b64` (llama-server) or
@@ -1635,8 +1651,8 @@ each.
 
 ### What is catalogued
 
-51 entries (`server/src/bolo/catalog/tts-server.yaml`): 12 for llama-server,
-39 for audio.cpp. Licences never exclude a model; each entry states
+53 entries (`server/src/bolo/catalog/tts-server.yaml`): 12 for llama-server,
+39 for audio.cpp, 2 for Tontaube. Licences never exclude a model; each entry states
 `license`, `commercial_use` and `gated`, and `options.hardware` gives the GPU
 advice (`optional`, `recommended`, `required`) and an approximate memory need
 (weights x 1.3 + 0.5 GB, an estimate, not a measurement). The catalog API
@@ -1645,6 +1661,7 @@ returns it as `hardware`.
 | Runtime | Entries | Licences (commercial use) |
 | --- | --- | --- |
 | llama-server | Chatterbox Multilingual V3 (23 languages incl. **Hindi**), Chatterbox Turbo, Qwen3-TTS 1.7B Base, Pocket TTS (en, de, es, fr, it, pt), LFM3-Audio 2B; *pending*: Soprano 1.1 (no GGUF + mmproj pair published: convert it with llama.cpp's converter), Fish Drama 3 (the only GGUF was made with a llama.cpp branch) | MIT, Apache-2.0, CC-BY-4.0 (yes); LFM Open License (only under USD 10M revenue), Fish Audio Community License (revenue threshold) - marked `commercial_use: false` |
+| tontaube | TontaubeV1.1 int4 (GPU or x86-64 CPU) and full precision (vLLM, 24 GiB GPU); en, de first, es, fr, it, nl, pt | Tontaube Community Model License 1.0: free below EUR 200,000 group revenue with "Powered by TontaubeV1", research and testing free, a speech-generation service always needs a commercial licence - marked `commercial_use: false` |
 | audio.cpp | **Hindi**: Chatterbox Multilingual (V3 talker), VoxCPM2, NVIDIA Magpie Multilingual 357M, MOSS-TTS Local v1.5, FireRedTTS3, Kitten TTS 2, Supertonic 3, sanoTTS (Hindi voice), XTTS v2, Voxtral TTS; and CosyVoice3, Maya1, Qwen3-TTS (0.6B Base, 1.7B CustomVoice), Pocket TTS, Soprano 1.1, Chatterbox Turbo, MOSS-TTS Nano, OmniVoice, Fish Audio S2 Pro, Fish Drama 3, Higgs TTS 3, IndexTTS-2, VibeVoice 1.5B, OuteTTS 1.0, NeuTTS 2E, Ming 3.0 TTS, BreezeTTS 2, KugelAudio, ZONOS3-Mini, dots.tts, Irodori-TTS, MioTTS, Gradium Phonon, Audio8 TTS, Confucius4-TTS, Plapre 3, Echo-TTS, LFM3-Audio | per audio.cpp's `docs/model_licenses.md`: MIT, Apache-2.0, CC-BY-4.0, NVIDIA Open Model License, OpenRAIL-M, GPL-3.0 (yes); CC-BY-NC(-SA), Fish, Boson, BreezeBlue, Coqui (no); bilibili, Stellon, NeuTTS, LFM (conditional, marked `false`) |
 
 Sizes run from 6 MB (sanoTTS) to 25 GB (Drama 3); the table in "The catalog"
@@ -1656,8 +1673,13 @@ resamples to; audio.cpp's WAV carries the model's real rate.
 **What was run**: `pocket-tts-en-llamacpp` on the upstream llama-server b12375
 release, started by bolo (`bolo components install llama-server`), on the
 shared 4-vCPU Xeon with 2 threads: RTF 0.72, first audio 0.77 s, two English
-sentences transcribed back word for word by `moonshine-tiny-en`; cloning from
-an uploaded recording and SSE streaming through `/v1/audio/speech` worked.
+sentences transcribed back word for word by `moonshine-tiny-en`. Cloning from
+saved voices (two LibriSpeech speakers) was then measured for all six Pocket TTS
+languages, Chatterbox Turbo and Qwen3-TTS 1.7B Base, which are now
+`validated: cpu`, with the speaker similarity of each clone: see
+[voices.md, "Measured: cloning on CPU"](voices.md#measured-cloning-on-cpu).
+Chatterbox Multilingual V3 needed a smaller context to load (now set) and then
+took about 5 minutes per short sentence on this CPU, so it stays untested.
 Everything else is `validated: untested`: the request fields come from each
 project's documentation and server source (read 2026-11-14), and the engine is
 tested against fake servers. The audio.cpp release binary does not start on

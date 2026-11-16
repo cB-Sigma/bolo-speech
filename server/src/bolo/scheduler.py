@@ -108,6 +108,10 @@ class ModelQueue:
     def workers(self) -> int:
         return self._workers_n
 
+    def handles(self, kind: str) -> bool:
+        """True when this model's queue runs jobs of ``kind`` (``embed``: a diarizer with a speaker embedder)."""
+        return kind in self._handlers
+
     @property
     def max_queue(self) -> int:
         return self._max_queue

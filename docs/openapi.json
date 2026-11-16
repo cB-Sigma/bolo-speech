@@ -2,7 +2,7 @@
  "openapi": "3.1.0",
  "info": {
   "title": "bolo",
-  "description": "\nbolo serves speech-to-text, text-to-speech and voice-activity detection.\n\n* **openai** - drop-in `/v1/audio/*` and `/v1/models`\n* **speaches** - model-management routes compatible with speaches\n* **native** - `/api/v1/*`: catalog, pulls, cloud providers, stats, request traces, events, benchmark\n* WebSockets (not shown by OpenAPI): `/api/v1/stt/stream`, `/api/v1/tts/stream` - see docs/api.md\n",
+  "description": "\nbolo serves speech-to-text, text-to-speech and voice-activity detection.\n\n* **openai** - drop-in `/v1/audio/*` and `/v1/models`\n* **speaches** - model-management routes compatible with speaches\n* **native** - `/api/v1/*`: catalog, pulls, cloud providers, stats, request traces, events, benchmark\n* **voices** - `/api/v1/voices`: saved voices for the models that clone voices (consent required)\n* WebSockets (not shown by OpenAPI): `/api/v1/stt/stream`, `/api/v1/tts/stream` - see docs/api.md\n",
   "license": {
    "name": "Apache-2.0",
    "url": "https://www.apache.org/licenses/LICENSE-2.0"
@@ -326,6 +326,24 @@
     ],
     "summary": "List voices of installed text-to-speech models",
     "operationId": "audio_voices_v1_audio_voices_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "openai"
+    ],
+    "summary": "Create a custom voice from an audio sample",
+    "description": "OpenAI's shape: ``audio_sample`` (file), ``name`` and ``consent``: the id of a consent recording\n(``/v1/audio/voice_consents``), or bolo's statements ``self`` / ``permission``. Voices from a text prompt\n(``type: prompt``) are not supported. The voice's id is made from its name; use it as ``voice`` (or\n``{\"id\": ...}``) in ``/v1/audio/speech`` with a model that clones voices.",
+    "operationId": "create_openai_voice_v1_audio_voices_post",
     "responses": {
      "200": {
       "description": "Successful Response",
@@ -2118,6 +2136,568 @@
     }
    }
   },
+  "/api/v1/voices": {
+   "get": {
+    "tags": [
+     "voices"
+    ],
+    "summary": "List saved voices",
+    "operationId": "list_voices_api_v1_voices_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "voices"
+    ],
+    "summary": "Create a saved voice (multipart)",
+    "description": "Fields: ``file`` (one or more recordings of the same person; ``files[]`` also works), ``name``,\n``consent`` (required: ``self`` = \"this is my voice\", ``permission`` = \"I have the speaker's permission\"),\noptional ``id``, ``transcript`` (else transcribed by the default STT model when installed; ``transcribe=false``\nskips that), ``language``, ``description``, ``default_model``, ``created_by`` (a name to record) and\n``score_model`` (speak a test sentence with that model and return the speaker similarity; default: the\nvoice's ``default_model``). The reference is cleaned (silence trimmed, loudness normalised, 24 kHz, 2 to\n60 s) and checked; ``warnings`` says when it is short, noisy, clipped or sounds like several people.",
+    "operationId": "post_voice_api_v1_voices_post",
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/voices/export": {
+   "get": {
+    "tags": [
+     "voices"
+    ],
+    "summary": "Export saved voices as a .zip",
+    "operationId": "export_voices_api_v1_voices_export_get",
+    "parameters": [
+     {
+      "name": "ids",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Ids"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/voices/import": {
+   "post": {
+    "tags": [
+     "voices"
+    ],
+    "summary": "Import saved voices from a .zip export",
+    "description": "``file``: an export; ``consent`` (for voices whose metadata has no consent record); ``replace=true``\noverwrites voices of the same id (they are skipped otherwise).",
+    "operationId": "import_voices_api_v1_voices_import_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/voices/{voice_id}": {
+   "get": {
+    "tags": [
+     "voices"
+    ],
+    "summary": "One saved voice",
+    "operationId": "get_voice_api_v1_voices__voice_id__get",
+    "parameters": [
+     {
+      "name": "voice_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Voice Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "voices"
+    ],
+    "summary": "Change a saved voice's details",
+    "operationId": "patch_voice_api_v1_voices__voice_id__patch",
+    "parameters": [
+     {
+      "name": "voice_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Voice Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VoicePatch"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "voices"
+    ],
+    "summary": "Delete a saved voice",
+    "operationId": "delete_voice_api_v1_voices__voice_id__delete",
+    "parameters": [
+     {
+      "name": "voice_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Voice Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/voices/{voice_id}/audio": {
+   "get": {
+    "tags": [
+     "voices"
+    ],
+    "summary": "The cleaned reference recording (WAV)",
+    "operationId": "voice_audio_api_v1_voices__voice_id__audio_get",
+    "parameters": [
+     {
+      "name": "voice_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Voice Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/voices/{voice_id}/score": {
+   "get": {
+    "tags": [
+     "voices"
+    ],
+    "summary": "Speaker similarity of a model's clone",
+    "description": "Speaks a test sentence (``text``, else one in the voice's language) in this voice with ``model`` (default:\nthe voice's default model, else the default TTS model) and compares the speaker of the result with the\nreference: cosine similarity of speaker embeddings (``similarity``), the ``verdict`` from the calibrated\nthresholds, and the synthesis speed. ``audio=true`` also returns the clip as a data URL. The score is kept in\nthe voice's ``scores``.",
+    "operationId": "voice_score_api_v1_voices__voice_id__score_get",
+    "parameters": [
+     {
+      "name": "voice_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Voice Id"
+      }
+     },
+     {
+      "name": "model",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Model"
+      }
+     },
+     {
+      "name": "text",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Text"
+      }
+     },
+     {
+      "name": "audio",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Audio"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio/voice_consents": {
+   "get": {
+    "tags": [
+     "openai"
+    ],
+    "summary": "List consent recordings",
+    "operationId": "list_voice_consents_v1_audio_voice_consents_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "openai"
+    ],
+    "summary": "Upload a consent recording",
+    "description": "OpenAI's consent recording: ``recording`` (the speaker reading a consent statement), ``name`` and\n``language`` (BCP 47). Its id is then the ``consent`` of ``POST /v1/audio/voices``. bolo stores the\nrecording with the voice library; it does not check what is said in it.",
+    "operationId": "create_voice_consent_v1_audio_voice_consents_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio/voice_consents/{consent_id}": {
+   "get": {
+    "tags": [
+     "openai"
+    ],
+    "summary": "One consent recording",
+    "operationId": "get_voice_consent_v1_audio_voice_consents__consent_id__get",
+    "parameters": [
+     {
+      "name": "consent_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Consent Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "openai"
+    ],
+    "summary": "Rename a consent recording",
+    "operationId": "update_voice_consent_v1_audio_voice_consents__consent_id__post",
+    "parameters": [
+     {
+      "name": "consent_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Consent Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ConsentPatch"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "openai"
+    ],
+    "summary": "Delete a consent recording",
+    "operationId": "delete_voice_consent_v1_audio_voice_consents__consent_id__delete",
+    "parameters": [
+     {
+      "name": "consent_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Consent Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio/voices/{voice_id}": {
+   "delete": {
+    "tags": [
+     "openai"
+    ],
+    "summary": "Delete a custom voice",
+    "operationId": "delete_openai_voice_v1_audio_voices__voice_id__delete",
+    "parameters": [
+     {
+      "name": "voice_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Voice Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/metrics": {
    "get": {
     "tags": [
@@ -2827,6 +3407,19 @@
     "type": "object",
     "title": "BenchRequest"
    },
+   "ConsentPatch": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "title": "Name"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "title": "ConsentPatch"
+   },
    "CopyRequest": {
     "properties": {
      "source": {
@@ -3299,7 +3892,8 @@
         "type": "null"
        }
       ],
-      "title": "Voice"
+      "title": "Voice",
+      "description": "A voice of the model, or a saved voice (/api/v1/voices) for a model that clones voices: by id (`\"priya\"`) or as OpenAI's custom-voice object (`{\"id\": \"priya\"}`, which prefers the saved voice)."
      },
      "instructions": {
       "anyOf": [
@@ -3485,6 +4079,19 @@
       ],
       "title": "Reference Text",
       "description": "Extension: the transcript of `reference_audio` (some cloning models use it)."
+     },
+     "options": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Options",
+      "description": "Extension: model-specific request options, for example Tontaube's `style` (audiobook, conversational, agentic) and sliders (`rate`, `pause`, `pitch_range`, `pitch_level`, `legato`). A model answers 400 for an option it does not read."
      }
     },
     "type": "object",
@@ -3532,6 +4139,69 @@
      "type"
     ],
     "title": "ValidationError"
+   },
+   "VoicePatch": {
+    "properties": {
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "language": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Language"
+     },
+     "transcript": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Transcript"
+     },
+     "default_model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Default Model",
+      "description": "A model that clones voices; empty string clears it."
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "VoicePatch"
    }
   }
  }

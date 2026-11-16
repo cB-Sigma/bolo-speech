@@ -90,6 +90,8 @@ def measured(spec: ModelSpec) -> str:
         bits.append(f"round-trip WER {100 * m['round_trip_wer']:.1f}%")
     if "round_trip_cer" in m:
         bits.append(f"round-trip CER {100 * m['round_trip_cer']:.1f}%")
+    if "speaker_similarity" in m:
+        bits.append(f"cloned voice: speaker similarity {m['speaker_similarity']:.2f}")
     return "**CPU** · " + " · ".join(bits)
 
 

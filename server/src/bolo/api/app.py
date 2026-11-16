@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from bolo import __version__
-from bolo.api import chat, native, openai, realtime, speaches, static, telephony, ws
+from bolo.api import chat, native, openai, realtime, speaches, static, telephony, voices, ws
 from bolo.api import wordlists as wordlists_api
 from bolo.api.common import check_auth, error_body, error_response
 from bolo.config import Settings
@@ -29,6 +29,7 @@ bolo serves speech-to-text, text-to-speech and voice-activity detection.
 * **openai** - drop-in `/v1/audio/*` and `/v1/models`
 * **speaches** - model-management routes compatible with speaches
 * **native** - `/api/v1/*`: catalog, pulls, cloud providers, stats, request traces, events, benchmark
+* **voices** - `/api/v1/voices`: saved voices for the models that clone voices (consent required)
 * WebSockets (not shown by OpenAPI): `/api/v1/stt/stream`, `/api/v1/tts/stream` - see docs/api.md
 """
 
@@ -98,6 +99,8 @@ def create_app(settings: Settings | None = None, core: Bolo | None = None) -> Fa
                 "x-bolo-fallback",
                 "x-bolo-estimated-cost",
                 "x-bolo-separation",
+                "x-bolo-voice",
+                "x-bolo-cloned",
             ],
         )
 
@@ -135,6 +138,7 @@ def create_app(settings: Settings | None = None, core: Bolo | None = None) -> Fa
     app.include_router(speaches.router, dependencies=protected)
     app.include_router(native.router, dependencies=protected)
     app.include_router(wordlists_api.router, dependencies=protected)
+    app.include_router(voices.router, dependencies=protected)
     app.include_router(native.root_router)
     app.include_router(chat.router, dependencies=protected)
     app.include_router(ws.router)

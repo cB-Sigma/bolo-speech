@@ -93,6 +93,7 @@ from bolo.text.prepare import prepare as prepare_text
 from bolo.text.romanised import status as romanised_status
 from bolo.text.segment import chunk_text
 from bolo.text.wordlists import MAX_LISTS_PER_REQUEST
+from bolo.voices import SavedVoice, VoiceStore
 
 log = logging.getLogger("bolo")
 
@@ -155,6 +156,8 @@ class Bolo:
         self._fallbacks = parse_fallbacks(s.fallbacks)
         self._fallback_warned: set[tuple[str, str]] = set()
         self.components = ComponentManager(self)
+        #: saved voices (the voice library): cleaned references for the models that clone voices (bolo.voices)
+        self.voices = VoiceStore(s.data_dir)
         phonemize.set_preference(s.phonemizer)
         # uccharan's language packs: downloaded by bolo, on first use, as a pull job (bolo.text.packs)
         packs.configure(s.uccharan_auto_download, reporter=self)
@@ -393,6 +396,13 @@ class Bolo:
                 ],
             },
             "separation": self._separation_capability(),
+            "voices": {
+                "endpoint": "/api/v1/voices",
+                "openai": ["/v1/audio/voices", "/v1/audio/voice_consents"],
+                "consent": ["self", "permission"],
+                "cloning_models": self.cloning_models(),
+                "similarity_model": self.settings.voice_similarity_model or self.settings.default_diarization,
+            },
             "realtime": {
                 "endpoint": "/v1/realtime",
                 "transcription_sessions": True,
@@ -1647,6 +1657,27 @@ class Bolo:
         names = ", ".join(v.id for v in tts.voices[:12]) + (", …" if len(tts.voices) > 12 else "")
         raise InvalidRequest(f"voice '{voice}' is not available for model '{spec.id}'. Voices: {names}", param="voice")
 
+    def cloning_models(self, installed_only: bool = True) -> list[str]:
+        """Text-to-speech models that clone voices (``features`` has ``voice-cloning``), installed ones by
+        default (a model on an operator-run server counts as installed)."""
+        out = []
+        for spec in self.catalog.all():
+            if spec.task != "tts" or "voice-cloning" not in spec.features or spec.status == "pending":
+                continue
+            if not installed_only or self.manager.is_installed(spec):
+                out.append(spec.id)
+        return out
+
+    def no_cloning_message(self, spec: ModelSpec, voice_id: str) -> str:
+        installed = self.cloning_models()
+        where = (
+            f"Installed models that clone voices: {', '.join(installed)}"
+            if installed
+            else "No model that clones voices is installed; pull one (for example `bolo pull pocket-tts-en-llamacpp`, "
+            "or see `bolo list --all` for models with voice-cloning)"
+        )
+        return f"'{voice_id}' is a saved voice, and model '{spec.id}' cannot clone voices. {where}."
+
     def require_components(self, spec: ModelSpec, phonemizer: str | None = None) -> None:
         """Fail fast when a model needs an optional component that is not installed."""
         reason = self.components.missing_reason(spec, phonemizer)
@@ -1671,8 +1702,16 @@ class Bolo:
         input_format: str = "text",
         romanised: bool | str | None = None,
         romanised_strict: bool = True,
+        custom_voice: bool = False,
+        options: dict[str, Any] | None = None,
     ) -> AsyncGenerator[SynthChunk, None]:
         """Synthesise ``text`` sentence by sentence, yielding audio as soon as it exists.
+
+        A ``voice`` that names a saved voice (:mod:`bolo.voices`) and is not one of the model's own voices is
+        spoken from the saved reference by a model that clones voices; ``custom_voice`` (OpenAI's
+        ``voice: {"id": ...}``) prefers the saved voice even over a model voice of that name. Without ``model``
+        the saved voice's default model answers. ``options`` are model-specific request options
+        (``SynthesisExtras.options``).
 
         ``romanised`` (``off`` / ``auto`` / ``on``; None: the voice's default) writes an Indian language typed in
         Latin letters in the voice's script first (bolo.text.romanised). With ``romanised_strict`` false (sessions,
@@ -1687,8 +1726,20 @@ class Bolo:
         own_trace = trace is None
         if trace is None:
             trace = Trace("tts", "internal", model or self.settings.default_tts)
+        saved = self.voices.find(voice) if reference_audio is None and voice else None
+        if saved is not None and model is None and saved.default_model:
+            model = saved.default_model
         spec = self.resolve(model, "tts")
+        if (
+            saved is not None
+            and not custom_voice
+            and any(str(v.get("id", "")).lower() == str(voice).lower() for v in spec.voices)
+        ):
+            saved = None  # the model has a voice of that name: it wins over the library (send {"id": ...} for that)
         chain = [spec, *self.fallback_chain(spec, "tts")]
+        if saved is not None or reference_audio is not None:
+            # a cloned voice must stay the same person: only models that clone voices can stand in
+            chain = [spec, *(c for c in chain[1:] if "voice-cloning" in c.features)]
         try:
             for i, candidate in enumerate(chain):
                 more = i + 1 < len(chain)
@@ -1698,7 +1749,7 @@ class Bolo:
                     voice=voice, speed=speed, language=language, normalize=normalize, phonemizer=phonemizer,
                     reference_audio=reference_audio, reference_text=reference_text, wordlists=wordlists,
                     pronunciations=pronunciations, input_format=input_format, romanised=romanised,
-                    romanised_strict=romanised_strict,
+                    romanised_strict=romanised_strict, saved=saved, custom_voice=custom_voice, options=options,
                 )  # fmt: skip
                 try:
                     async for chunk in attempt:
@@ -1738,6 +1789,9 @@ class Bolo:
         input_format: str,
         romanised: bool | str | None,
         romanised_strict: bool,
+        saved: SavedVoice | None = None,
+        custom_voice: bool = False,
+        options: dict[str, Any] | None = None,
     ) -> AsyncGenerator[SynthChunk, None]:
         """One model's attempt at :meth:`synthesize`. ``own_voice`` is false for a fallback model: a voice it
         does not have is replaced by its default instead of refused."""
@@ -1757,6 +1811,19 @@ class Bolo:
                 tts = entry.model
                 assert isinstance(tts, TTSModel)
                 sample_rate = tts.sample_rate
+                if saved is not None and not custom_voice and tts.find_voice(voice) is not None:
+                    saved = None  # a voice the server reported, of the same name
+                if saved is not None:
+                    if not tts.supports_cloning:
+                        raise InvalidRequest(self.no_cloning_message(spec, saved.id), param="voice")
+                    reference_audio = saved.reference_bytes()
+                    reference_text = reference_text or saved.transcript
+                    language = language or saved.language
+                    voice = None
+                    consent = saved.meta.get("consent") or {}
+                    trace.extra["voice"] = {"saved": saved.id, "cloned": True, "consent": consent.get("basis")}
+                elif reference_audio is not None:
+                    trace.extra["voice"] = {"saved": None, "cloned": True}
                 try:
                     chosen = self.pick_voice(tts, voice, spec)
                 except InvalidRequest:
@@ -1774,12 +1841,22 @@ class Bolo:
                     raise InvalidRequest(
                         f"model '{spec.id}' cannot imitate a voice from reference audio", param="reference_audio"
                     )
+                if options:
+                    accepted = tts.request_options if tts.accepts_extras else ()
+                    unknown = sorted(k for k in options if "*" not in accepted and k not in accepted)
+                    if unknown:
+                        known = f" (it reads: {', '.join(accepted)})" if accepted else ""
+                        raise InvalidRequest(
+                            f"model '{spec.id}' does not take the option(s) {', '.join(unknown)}{known}",
+                            param="options",
+                        )
                 if tts.accepts_extras:
                     extras = SynthesisExtras(
                         language=language or (chosen.language if chosen and chosen.language else None),
                         reference_audio=reference_wav(reference_audio) if reference_audio is not None else None,
                         reference_text=reference_text,
                         usage=Usage() if spec.cloud else None,
+                        options=dict(options or {}),
                     )
                 with trace.phase("normalize"):
                     # uccharan's language packs for this voice, downloaded on first use (bolo.text.packs)
@@ -1919,6 +1996,11 @@ def fallback_headers(trace: Trace) -> dict[str, str]:
     """Response headers that say which model answered: ``x-bolo-model`` always, ``x-bolo-fallback`` when it was
     not the one asked for, ``x-bolo-estimated-cost`` when the provider's price table knows the model."""
     headers = {"x-bolo-model": trace.model}
+    cloned = trace.extra.get("voice")
+    if isinstance(cloned, dict) and cloned.get("cloned"):
+        headers["x-bolo-cloned"] = "true"
+        if cloned.get("saved"):
+            headers["x-bolo-voice"] = str(cloned["saved"])
     record = trace.extra.get("fallback")
     if isinstance(record, dict) and record.get("attempts"):
         first = record["attempts"][0]
