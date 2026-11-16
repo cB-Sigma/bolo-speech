@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 import threading
 import time
 from pathlib import Path
@@ -356,7 +357,9 @@ def test_cli_logs_and_doctor(
 ) -> None:
     assert cli.main(["logs"]) == 1
     err = capsys.readouterr().err
-    assert "no log file is configured" in err and "journalctl -u bolo" in err and "docker logs" in err
+    assert "no log file is configured" in err and 'Set log_file = "auto"' in err  # each platform's text: below
+    if sys.platform.startswith("linux"):
+        assert "journalctl -u bolo" in err and "docker logs" in err
     log_file = cli_env / "bolo.log"
     log_file.write_text("".join(f"line {i}\n" for i in range(10)))
     monkeypatch.setenv("BOLO_LOG_FILE", str(log_file))
