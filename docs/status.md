@@ -13,22 +13,24 @@ the number.
 
 ## Not run at all
 
-- **GPUs.** No GPU was available. `device = "cuda"` is passed to faster-whisper and sherpa-onnx, the torch plugin
-  takes `BOLO_TORCH_DEVICE`, and there is a `Dockerfile.gpu`, but none of it has been run and **no number in the
-  documentation was measured on a GPU**. The hardware recommendations for GPU machines are estimates from formulas, not
-  measurements ([recommendations.md](recommendations.md#how-uncertain-this-is)). GPU/CPU placement, keep-alive
-  eviction of GPU-resident models, several GPUs, llama.cpp `-ngl` and `--tensor-split`, the ONNX graph cut and
-  bolo-torch's `device_map` splits are tested with a fake NVML of made-up GPUs and llama-server command lines that
-  are built but not run; the cut graph was run with both halves on the CPU
+- **GPUs other than one laptop's.** One GPU was used: the RTX 3060 Laptop GPU of a Windows 11 laptop (Ryzen 7
+  5800H), natively (CPU-only and CUDA: faster-whisper, ONNX Runtime's CUDA provider, the Windows llama.cpp CUDA
+  build) and under WSL2; the GPU figures in the documentation come from it. The torch plugin on a GPU,
+  `Dockerfile.gpu`, ROCm, Metal and several GPUs have not been run. The hardware recommendations for GPU machines are
+  estimates from formulas, not measurements ([recommendations.md](recommendations.md#how-uncertain-this-is)).
+  GPU/CPU placement, keep-alive eviction of GPU-resident models, several GPUs, llama.cpp `-ngl` and
+  `--tensor-split`, the ONNX graph cut and bolo-torch's `device_map` splits are tested with a fake NVML of made-up
+  GPUs and llama-server command lines that are built but not run; the cut graph was run with both halves on the CPU
   ([configuration.md](configuration.md#gpu-and-cpu-placement)).
 - **Apple Silicon and macOS, Linux arm64.** Not run. The dependencies publish wheels for macOS and arm64,
   so it should work there.
-- **Windows: CI runs the server tests on windows-latest; GPU paths untested.** The server's test suite, the
-  bolo-torch plugin's fast tests, `bolo doctor` and `bolo serve` (answering `/healthz`) run on every push on
-  `windows-latest` (CPU, Python 3.12, the win_amd64 wheels of sherpa-onnx, CTranslate2/faster-whisper, PyAV,
-  soundfile and uccharan). No model was measured on Windows, and CUDA, DirectML, the pinned Windows llama.cpp and
-  audio.cpp builds, the Task Scheduler/NSSM/WinSW recipes and the junction fallback for local model folders on a
-  machine without Developer Mode have not been run there (docs/configuration.md, "Windows").
+- **Windows: one laptop, plus CI.** Windows 11 was run natively on a laptop (Ryzen 7 5800H, RTX 3060 Laptop
+  GPU), CPU-only and with CUDA ([configuration.md](configuration.md#cuda-on-windows)), and WSL2 on the same laptop.
+  The server's test suite, the bolo-torch plugin's fast tests, `bolo doctor` and `bolo serve` (answering `/healthz`)
+  run on every push on `windows-latest` (CPU, Python 3.12, the win_amd64 wheels of sherpa-onnx,
+  CTranslate2/faster-whisper, PyAV, soundfile and uccharan). DirectML, the pinned Windows audio.cpp builds, the
+  restart and service recipes (PowerShell loop, NSSM, WinSW) and the junction fallback for local model folders on a
+  machine without Developer Mode have not been run (docs/configuration.md, "Windows").
 - **Python 3.10 and 3.11.** The package targets 3.10 and newer; the test-suite was run on 3.12, 3.13 and 3.14.
 - **A phone network.** No real call was made and no telephony account was used. Twilio, Plivo, Telnyx and Exotel
   are implemented from the providers' documentation as read on 2026-11-14 and tested against fake providers that

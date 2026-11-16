@@ -37,7 +37,9 @@
   <sub>The speech-to-text playground, live against a real server on a 4-core CPU. Lighter text is still changing; solid text is final.</sub>
 </p>
 
-> **Status: alpha.** Developed and measured on Linux x86-64, CPU only; CI also runs the test suite on Windows (CPU). GPUs, Apple Silicon and arm64 are untested, and so is anything on Windows beyond the tests; the phone and cloud integrations have not met a real account. [What has not been validated](#what-has-not-been-validated) says so plainly.
+> **Status: alpha.** Developed and measured on Linux x86-64, CPU only; CI also runs the test suite on Windows (CPU). Other GPUs, DirectML, Apple Silicon and arm64 are untested; the phone and cloud integrations have not met a real account.
+>
+> **Validated on:** Linux x86-64; Windows 11 natively on real hardware (a laptop with an RTX 3060 Laptop GPU), CPU-only and with CUDA; WSL2 on the same laptop. [What has not been validated](#what-has-not-been-validated) says so plainly.
 
 ## Install
 
@@ -51,7 +53,7 @@ The double quotes work in bash, zsh, PowerShell and cmd (cmd.exe does not treat 
 - Run it once without installing: `uvx --from "bolo-speech[all]" bolo serve`.
 - Without uv: `pipx install "bolo-speech[all]"`, or `pip install "bolo-speech[all]"` into a virtual environment.
 - With Homebrew (macOS 14 or later, Linux): `brew install cb-sigma/tap/bolo`, then `brew services start bolo` to run it in the background (console at http://127.0.0.1:8000/). It installs `all`; the [tap's README](https://github.com/cB-Sigma/homebrew-tap#bolo) shows how to add the opt-in extras.
-- On Windows (PowerShell or cmd), the same command. Models go to `%USERPROFILE%\.cache\bolo`; DirectML, services and the other differences: [docs/configuration.md](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md#windows).
+- On Windows (PowerShell or cmd), the same command. Models go to `%USERPROFILE%\.cache\bolo`; DirectML, services and the other differences: [docs/configuration.md](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md#windows). On Windows, install natively. With an NVIDIA GPU, add the CUDA wheels (see [CUDA on Windows](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md#cuda-on-windows)): speech-to-text runs on the GPU natively as fast as under WSL2. Use WSL2 only for Tontaube and other Linux-only runtimes.
 - With an NVIDIA GPU on Windows: `uv tool install "bolo-speech[all,cuda]"`, then swap `onnxruntime` for `onnxruntime-gpu[cuda,cudnn]` in the tool's environment (`uv pip uninstall --python <tool python> onnxruntime`, then `uv pip install --python <tool python> "onnxruntime-gpu[cuda,cudnn]" nvidia-cublas-cu12 "nvidia-cudnn-cu12>=9,<10"`, about 2.5 GB for CUDA 12 and 13) and set `BOLO_DEVICE=cuda`; `bolo doctor` loads both CUDA runtimes and names what is missing. faster-whisper is the GPU route for speech-to-text there (sherpa-onnx's CUDA build cannot run inside bolo on Windows). The recipe: [CUDA on Windows](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md#cuda-on-windows).
 - As a container (CPU image): `docker run -p 8000:8000 -v bolo-data:/data ghcr.io/cb-sigma/bolo:latest`. Compose, systemd and Kubernetes examples, and what was run of each: [deploy/README.md](https://github.com/cB-Sigma/bolo/blob/main/deploy/README.md).
 
@@ -318,7 +320,7 @@ All tables, the method and what batching does and does not buy on CPU: [docs/per
 
 ## What has not been validated
 
-- **GPUs, Apple Silicon, arm64, Windows.** Nothing was run on them, except that CI runs the server's and the bolo-torch plugin's tests on `windows-latest` (CPU, Python 3.12) and starts `bolo serve` there; no model was measured on Windows and its GPU paths (CUDA, DirectML, the Windows llama.cpp builds) are untested. Device settings and a GPU Dockerfile exist; no number in the documentation comes from a GPU. GPU/CPU placement, several GPUs, llama.cpp offload and tensor splits, the ONNX graph cut and bolo-torch's `device_map` splits are tested only with fake NVML readings, made-up memory figures and command lines that are built but not run (the cut graph with both halves on the CPU).
+- **GPUs, Apple Silicon, arm64, Windows.** One GPU machine was used: a Windows 11 laptop with an RTX 3060 Laptop GPU, natively (CPU-only and CUDA: faster-whisper, ONNX Runtime and the Windows llama.cpp CUDA build) and under WSL2; the GPU figures in the documentation come from it. Other GPUs, DirectML, Apple Silicon and arm64 were not run; CI runs the server's and the bolo-torch plugin's tests on `windows-latest` (CPU, Python 3.12) and starts `bolo serve` there. A GPU Dockerfile exists and was not built. GPU/CPU placement, several GPUs, llama.cpp offload and tensor splits, the ONNX graph cut and bolo-torch's `device_map` splits are tested only with fake NVML readings, made-up memory figures and command lines that are built but not run (the cut graph with both halves on the CPU).
 - **The live demo on real devices.** Its tests run in headless Chromium on a desktop CPU; WebGPU, the GPU/CPU split and phone limits are tested with a faked device, not on a GPU, an iPhone or an Android phone.
 - **Voice cloning beyond 14 models on CPU.** Cloning was measured on CPU for 14 models (Pocket TTS, Chatterbox Turbo, Qwen3-TTS, MOSS-TTS Nano, XTTS v2, Plapre 3, OmniVoice) with two LibriSpeech speakers; the other cloning entries and Tontaube were not run, nothing was cloned on a GPU, and the speaker-similarity thresholds are calibrated on read English speech only.
 - **Phone providers.** No real call was made and no provider account was used: Twilio, Plivo, Telnyx and Exotel are implemented from their documentation and tested against fake providers; SIP against the test-suite's own user agent.

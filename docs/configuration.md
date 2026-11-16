@@ -393,7 +393,7 @@ share the cores, so `num_parallel` × `threads` should stay near the number of c
 | --- | --- |
 | Linux, `bolo serve` in a terminal | the terminal; with `log_file = "auto"`: `$XDG_STATE_HOME/bolo/logs/server.log` (`~/.local/state/bolo/logs/server.log`) |
 | macOS | the terminal; with `log_file = "auto"`: `~/Library/Logs/bolo/server.log` (Console.app shows it) |
-| Windows | the console; with `log_file = "auto"`: `%LOCALAPPDATA%\bolo\logs\server.log`. Run at log-on or as a service (Task Scheduler, NSSM, WinSW: [deploy/README.md](../deploy/README.md#windows-at-log-on-at-start-up-or-as-a-service)), set `BOLO_LOG_FILE=auto`: bolo cannot tell it is a service there |
+| Windows | the console; with `log_file = "auto"`: `%LOCALAPPDATA%\bolo\logs\server.log`. Run at log-on or as a service (Task Scheduler, NSSM, WinSW: [deploy/README.md](../deploy/README.md#windows-at-log-on-at-start-up-or-as-a-service); restarted after a crash: [below](#at-log-on-restarted-after-a-crash)), set `BOLO_LOG_FILE=auto`: bolo cannot tell it is a service there |
 | the systemd unit (`deploy/systemd/bolo.service`) | `journalctl -u bolo`, and `/var/lib/bolo/logs/server.log` (the unit sets `BOLO_LOG_FILE`; without it, a service writes the `auto` place of its user) |
 | launchd (macOS) | the job's `StandardErrorPath`, and `~/Library/Logs/bolo/server.log` |
 | Docker (`deploy/Dockerfile`) | `docker logs <container>`; no file unless you set `BOLO_LOG_FILE=/data/logs/server.log` (in the `/data` volume) |
@@ -408,7 +408,7 @@ writes (`GET /api/v1/info` has `log_file`), else uses the settings, else the pla
 
 ## Windows
 
-What differs on Windows (CI runs the server's tests on `windows-latest`; GPU paths are untested there):
+What differs on Windows (CI runs the server's tests on `windows-latest`; the CPU and CUDA notes below were found on a Windows 11 laptop with an RTX 3060 Laptop GPU; DirectML is untested):
 
 | | |
 | --- | --- |
@@ -418,7 +418,7 @@ What differs on Windows (CI runs the server's tests on `windows-latest`; GPU pat
 | log file | `log_file = "auto"`: `%LOCALAPPDATA%\bolo\logs\server.log`. `bolo logs -f` opens it so that the rotation can still rename it; when another program blocks the rename, bolo copies the file to `server.log.1` and empties it instead |
 | uccharan's language packs | `%USERPROFILE%\.cache\uccharan\<version>\` (uccharan's own cache) |
 | environment variables | PowerShell: `$env:BOLO_DEVICE = "dml"` (this session), `[Environment]::SetEnvironmentVariable("BOLO_DEVICE", "dml", "User")` (from the next start on); cmd: `set BOLO_DEVICE=dml` |
-| text output | `bolo` writes UTF-8 to pipes and files, so Hindi and other scripts survive `bolo transcribe x.wav > out.txt`. Windows PowerShell 5.1 decodes a program's output with the console's code page: set `[Console]::OutputEncoding = [Text.Encoding]::UTF8` before piping `bolo` (or `curl.exe`) into another PowerShell command (PowerShell 7 and files written by `>` from cmd are fine) |
+| text output | `bolo` reads and writes UTF-8 on pipes and files, so Hindi and other scripts survive `bolo transcribe x.wav > out.txt` and `bolo speak - -o out.wav < text.txt`. Windows PowerShell 5.1 uses other encodings at both ends of a pipe: it decodes what a program writes with `[Console]::OutputEncoding` (the console's code page) and encodes what it pipes into a program with `$OutputEncoding` (ASCII). Before piping text out of `bolo` (or `curl.exe`) into another PowerShell command, or into `bolo` (`"नमस्ते" \| bolo speak - -o out.wav`), set both, once per session or in your profile: `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` and `$OutputEncoding = [System.Text.Encoding]::UTF8`. cmd and PowerShell 7 need nothing |
 | `curl.exe` and JSON | Windows PowerShell 5.1 drops the double quotes inside an argument it passes to a program, so `curl.exe -d '{"model": "tts-1"}'` sends `{model: tts-1}` and the server answers 400. In 5.1 escape them (`-d '{\"model\": \"tts-1\"}'`), put the JSON in a file (`-d "@body.json"`), or use `Invoke-RestMethod` as in the README. PowerShell 7.3 and later pass them as written; cmd needs `-d "{\"model\": \"tts-1\"}"` |
 | firewall | with `--host 0.0.0.0` the Windows Defender Firewall prompt names `python.exe` ("Python"), not `bolo.exe`: uv's `bolo.exe` is a launcher that starts uv's Python interpreter, which is what listens. Prefer a rule for the port ([deploy/README.md](../deploy/README.md#windows-at-log-on-at-start-up-or-as-a-service)) to one for that interpreter, whose path changes when uv installs another Python |
 | local model folders | `bolo pull <folder>` / `file:` link the folder into the store: a directory symlink where allowed (Developer Mode or administrator), else a directory junction (no rights needed, same volume or not, local disks only), else a copy, with a notice |
@@ -596,6 +596,86 @@ display or power-source change can make the driver lose it; only a reboot brings
 trying when it happens again: run on mains power, and in the NVIDIA Control Panel set "Power management mode" to
 "Prefer maximum performance" for the program (`python.exe` of bolo's environment and `llama-server.exe`), or
 globally.
+
+### At log-on, restarted after a crash
+
+Task Scheduler starts bolo at log-on but does not start it again when it crashes. Its "If the task fails, restart
+every ..." setting (`-RestartCount` and `-RestartInterval` of `New-ScheduledTaskSettingsSet`) applies only when the
+task fails to start: the program cannot be found, the account cannot log on, and the like. Once `bolo.exe` has
+started, the task counts as having run; when bolo later exits, whatever its exit code (an unhandled error, "End
+task" in Task Manager, a lost GPU taking the process down), Task Scheduler records the code as the "Last Run Result"
+and does nothing more. Keep those settings for the start-up case, but something else has to watch the process.
+
+**A PowerShell loop started by the task** (no extra software; runs as you, with your models and settings). Save
+this as `%USERPROFILE%\bolo\run-bolo.ps1`:
+
+```powershell
+# Starts `bolo serve` and starts it again whenever it exits, waiting longer after quick repeated exits.
+$env:BOLO_LOG_FILE = "auto"                                   # %LOCALAPPDATA%\bolo\logs\server.log
+$bolo  = "$env:USERPROFILE\.local\bin\bolo.exe"               # (Get-Command bolo).Source
+$log   = "$env:LOCALAPPDATA\bolo\logs\restarts.log"
+New-Item -ItemType Directory -Force -Path (Split-Path $log) | Out-Null
+$delay = 5
+while ($true) {
+    $started = Get-Date
+    & $bolo serve
+    $code = $LASTEXITCODE
+    "$(Get-Date -Format s) bolo exited with code $code; starting it again in $delay s" | Add-Content -Path $log
+    Start-Sleep -Seconds $delay
+    # a run that lasted 10 minutes was not a crash loop: start over at 5 s; otherwise back off up to 5 minutes
+    $delay = if (((Get-Date) - $started).TotalMinutes -ge 10) { 5 } else { [Math]::Min($delay * 2, 300) }
+}
+```
+
+Register it to run at log-on (in a normal PowerShell, as yourself):
+
+```powershell
+$script   = "$env:USERPROFILE\bolo\run-bolo.ps1"
+$action   = New-ScheduledTaskAction -Execute "powershell.exe" `
+  -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$script`""
+$trigger  = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+$settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) `
+  -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) `
+  -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+Register-ScheduledTask -TaskName "bolo" -Action $action -Trigger $trigger -Settings $settings `
+  -Description "bolo speech server, restarted when it exits"
+Start-ScheduledTask -TaskName "bolo"          # now, without logging off and on
+```
+
+`-ExecutionTimeLimit ([TimeSpan]::Zero)` keeps Task Scheduler from ending the task after its default three days;
+the restart settings cover only a failed start of `powershell.exe`, as above. `-WindowStyle Hidden` hides the
+PowerShell window, which may still flash at log-on. The task ends when you log off. The loop also starts bolo again
+after it exits cleanly, so to stop bolo, stop the task first and then bolo:
+
+```powershell
+Stop-ScheduledTask -TaskName "bolo"
+Get-Process bolo -ErrorAction SilentlyContinue | Stop-Process     # if it outlived the loop
+Unregister-ScheduledTask -TaskName "bolo" -Confirm:$false        # to remove it for good
+```
+
+To try it, end `bolo.exe` in Task Manager: `restarts.log` gets a line and `bolo serve` is back after 5 s.
+
+**As a service: NSSM or WinSW.** Both run bolo as a Windows service and start it again when it exits
+(`nssm set bolo AppExit Default Restart`, WinSW's `<onfailure action="restart" .../>`); the commands are in
+[deploy/README.md](../deploy/README.md#windows-at-log-on-at-start-up-or-as-a-service). A service runs before anyone
+logs on and needs no window. On top of that, `sc.exe failure` tells Windows' service manager what to do when the
+wrapper itself (`nssm.exe` or the WinSW executable) dies: start it again after 10 s, twice, then after a minute,
+and count afresh after a day without failures:
+
+```powershell
+sc.exe failure bolo reset= 86400 actions= restart/10000/restart/10000/restart/60000
+sc.exe qfailure bolo        # shows what is set
+```
+
+`sc.exe` alone cannot run bolo as a service: `sc.exe create bolo binPath= "...\bolo.exe serve"` registers it, but
+`bolo.exe` is an ordinary program, not a service, so it never reports to the service manager, which gives up on it
+after 30 s (error 1053, "The service did not respond to the start or control request in a timely fashion"). Use
+NSSM or WinSW as the service, and `sc.exe` for its recovery settings.
+
+**What was run.** What Task Scheduler's restart setting does, as described above, follows Microsoft's documentation
+of the setting and was seen on a Windows 11 laptop: a crashed `bolo serve` was not started again. The PowerShell
+loop, the task that starts it, the NSSM and WinSW services and the `sc.exe failure` settings have not been run by
+the maintainers yet.
 
 ## Coming from Ollama
 

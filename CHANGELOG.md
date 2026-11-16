@@ -8,6 +8,14 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- Docs: "At log-on, restarted after a crash" (docs/configuration.md, Windows). Task Scheduler's "restart on failure"
+  settings apply only when the task fails to start, not when bolo exits later; the section gives a PowerShell loop
+  started at log-on by a scheduled task, and NSSM/WinSW with `sc.exe failure` recovery settings for a service
+  (`sc.exe` alone cannot run bolo as a service).
+- Docs: Windows PowerShell 5.1 needs `[Console]::OutputEncoding` and `$OutputEncoding` set to UTF-8 to pipe text out
+  of and into `bolo`; cmd and PowerShell 7 need nothing.
+- README: validated on Windows 11 natively (RTX 3060 Laptop GPU, CPU-only and CUDA) and under WSL2; on Windows,
+  install natively and add the CUDA wheels for an NVIDIA GPU, WSL2 only for Linux-only runtimes such as Tontaube.
 - llama-server: the Vulkan build for Linux x86-64 (llama.cpp b12375's `ubuntu-vulkan-x64`) is pinned, so
   `BOLO_DEVICE=vulkan bolo components install llama-server` (or `--flavour vulkan`) installs it on Linux too, as on
   Windows. It needs the Vulkan loader and a Vulkan driver.
