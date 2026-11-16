@@ -130,6 +130,8 @@ def test_speech_streams_audio_before_synthesis_finishes(client: openai.OpenAI, l
     import time
 
     text = "One sentence here. " * 8
+    # load the voice and the text pipeline first: the first request's set-up (0.2 s here) is not what is measured
+    client.audio.speech.create(model="fake-tts", voice="alpha", input="Warm up.", response_format="pcm")
     t0 = time.perf_counter()
     first_at = None
     total = 0
