@@ -13,6 +13,7 @@ import { chatterboxFiles, MOSS_FILES, pocketFiles } from './models'
 import { MossTts, type MossCodecMeta, type MossManifest, type MossTtsMeta } from './moss'
 import type { MakeTensor, OrtSession } from './ort-types'
 import { freeDimension } from './onnx-patch'
+import { failOnRuntimeError } from './runtime-errors'
 import { PocketTts, type PocketMeta, type PocketVoice } from './pocket'
 import type { CloneWorkerRequest, CloneWorkerResponse, GenerateOptions } from './protocol'
 import { chunkForChatterbox, chatterboxTokenBudget } from './text'
@@ -40,6 +41,23 @@ let engine: Engine | null = null
 let chain: Promise<void> = Promise.resolve()
 const cancelled = new Set<number>()
 let interrupt: (() => void) | null = null
+/** The voice or generate request being worked on, for errors that escape it. */
+let active: number | null = null
+
+/** Tell the page that request `id` is still moving (at most once a second): its stall watchdog listens. */
+let lastTick = 0
+function tick(id: number): void {
+  const now = performance.now()
+  if (now - lastTick < 1000) return
+  lastTick = now
+  post({ type: 'tick', id })
+}
+
+// Errors that escape a request (a rejected promise nobody awaited, an exception in a callback) still reach the page.
+scope.addEventListener('unhandledrejection', (e: PromiseRejectionEvent) => {
+  const r: unknown = e.reason
+  post({ type: 'error', id: active ?? undefined, message: r instanceof Error ? r.message : String(r) })
+})
 
 function progressTracker() {
   const files = new Map<string, FileProgress>()
@@ -406,7 +424,10 @@ async function loadChatterbox(
   const engine: Engine = {
     async voice(key, audio) {
       voices.clear()
-      voices.set(key, await model.encode_speech(new Tensor('float32', audio, [1, audio.length])))
+      voices.set(
+        key,
+        await failOnRuntimeError(() => model.encode_speech(new Tensor('float32', audio, [1, audio.length]))),
+      )
     },
     async generate(key, text, options, id) {
       const speech = voices.get(key)
@@ -416,18 +437,27 @@ async function loadChatterbox(
         if (cancelled.has(id)) break
         const prompt = m.languageTag ? `[${options.language}]${chunk}` : chunk
         const enc = tokenizer(prompt) as unknown as { input_ids: unknown; attention_mask: unknown }
-        const stop = new InterruptableStoppingCriteria()
+        // Interruptible, and a pulse per language-model step for the page's stall watchdog.
+        class Steps extends InterruptableStoppingCriteria {
+          _call(inputIds: number[][], scores: unknown) {
+            tick(id)
+            return super._call(inputIds, scores as never)
+          }
+        }
+        const stop = new Steps()
         interrupt = () => stop.interrupt()
-        const wav = (await model.generate({
-          input_ids: enc.input_ids,
-          attention_mask: enc.attention_mask,
-          ...speech,
-          ...(m.languageTag ? { exaggeration: options.exaggeration } : {}),
-          max_new_tokens: chatterboxTokenBudget(chunk),
-          do_sample: false,
-          repetition_penalty: 1.2,
-          stopping_criteria: [stop],
-        } as never)) as unknown as { data: Float32Array }
+        const wav = (await failOnRuntimeError(() =>
+          model.generate({
+            input_ids: enc.input_ids,
+            attention_mask: enc.attention_mask,
+            ...speech,
+            ...(m.languageTag ? { exaggeration: options.exaggeration } : {}),
+            max_new_tokens: chatterboxTokenBudget(chunk),
+            do_sample: false,
+            repetition_penalty: 1.2,
+            stopping_criteria: [stop],
+          } as never),
+        )) as unknown as { data: Float32Array }
         interrupt = null
         if (cancelled.has(id)) break
         const a = Float32Array.from(wav.data)
@@ -473,6 +503,7 @@ scope.onmessage = (e: MessageEvent<CloneWorkerRequest>) => {
       if (req.type === 'load') return load(req)
       if (!engine) throw new Error('The cloning model is not loaded')
       const started = performance.now()
+      active = req.id
       if (req.type === 'voice') {
         await engine.voice(req.key, req.audio)
         post({ type: 'voice', id: req.id, ms: performance.now() - started })
@@ -489,4 +520,7 @@ scope.onmessage = (e: MessageEvent<CloneWorkerRequest>) => {
         message: err instanceof Error ? err.message : String(err),
       }),
     )
+    .finally(() => {
+      active = null
+    })
 }

@@ -48,13 +48,33 @@ describe('GPU/CPU placement in the browser', () => {
   })
 
   it('Auto: CPU without WebGPU, WebGPU with it, split when a graph is larger than the largest buffer', () => {
-    const whisper = placeableStt(browserModel('whisper-base-q8'))
+    const whisper = placeableStt(browserModel('whisper-small'))
     expect(resolvePlacement(whisper, 'auto', noGpu).placement).toBe('wasm')
     expect(resolvePlacement(whisper, 'auto', gpu()).placement).toBe('webgpu')
     rememberModuleBytes(whisper.id, { encoder_model: 30e6, decoder_model_merged: 160e6 })
     const small = resolvePlacement(whisper, 'auto', gpu({ maxStorageBufferBindingSize: 128 * 2 ** 20 }))
     expect(small.placement).toBe('split')
     expect(small.why).toMatch(/decoder_model_merged .* larger than this GPU's largest buffer/)
+  })
+
+  it('Auto starts small recognisers on the CPU, even with WebGPU; WebGPU stays a choice', () => {
+    for (const id of ['moonshine-tiny', 'moonshine-base', 'whisper-base-en', 'whisper-tiny-q8']) {
+      const m = placeableStt(browserModel(id))
+      const r = resolvePlacement(m, 'auto', { ...gpu(), threads: true })
+      expect(r.placement, id).toBe('wasm')
+      expect(r.why).toMatch(/small recogniser: faster on the CPU than on WebGPU/)
+      expect(r.why).not.toMatch(/one thread/)
+      expect(placementOptions(m)).toContain('webgpu')
+      expect(resolvePlacement(m, 'webgpu', gpu()).placement).toBe('webgpu')
+    }
+    // Without cross-origin isolation the CPU has one thread, and the reason says so.
+    const tiny = placeableStt(browserModel('moonshine-tiny'))
+    expect(resolvePlacement(tiny, 'auto', { ...gpu(), threads: false }).why).toMatch(/one thread here/)
+    // Bigger ones, and 16-bit ones, still start on WebGPU.
+    expect(resolvePlacement(placeableStt(browserModel('whisper-small-en')), 'auto', gpu()).placement).toBe('webgpu')
+    expect(resolvePlacement(placeableStt(browserModel('whisper-large-v3-turbo-f16')), 'auto', gpu()).placement).toBe(
+      'webgpu',
+    )
   })
 
   it('Auto follows the speeds measured on this device', () => {

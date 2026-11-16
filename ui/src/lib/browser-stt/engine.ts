@@ -350,7 +350,15 @@ export class BrowserSttEngine {
     }
     this.worker = worker
     await new Promise<void>((resolve, reject) => {
-      worker.onerror = (e) => reject(new Error(e.message || 'The speech worker failed to start'))
+      worker.onerror = (e) => {
+        const message = e.message || 'The speech worker failed'
+        reject(new Error(message))
+        // After the model is ready, an uncaught error in the worker fails what was waiting on it instead of
+        // leaving it waiting forever.
+        const waiting = [...this.pending.values()]
+        this.pending.clear()
+        for (const p of waiting) p.reject(new Error(message))
+      }
       worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
         const msg = e.data
         if (msg.type === 'progress') {

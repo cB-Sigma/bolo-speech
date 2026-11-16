@@ -2,6 +2,7 @@ import { BROWSER_MODELS } from '@/lib/browser-stt/models'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { Catalog, RequestTrace, ServerInfo, Stats } from '@/lib/api/types'
 import { clearBrowserTraces, recordBrowserTrace } from '@/lib/browser-stt/traces'
+import { BOLO_VERSION } from '@/lib/version'
 import { DemoBackend, isApiUrl } from './backend'
 
 let backend: DemoBackend
@@ -28,6 +29,9 @@ describe('demo backend', () => {
     const { body } = await get<ServerInfo>('api/v1/info')
     expect(body.device).toBe('browser')
     expect(body.version).toMatch(/demo$/)
+    // The footer shows this: the version of the bolo release, from the server package, not a fixed string.
+    expect(BOLO_VERSION).toMatch(/^\d+\.\d+\.\d+/)
+    expect(body.version).toBe(`${BOLO_VERSION} demo`)
     expect(body.auth_required).toBe(false)
   })
 

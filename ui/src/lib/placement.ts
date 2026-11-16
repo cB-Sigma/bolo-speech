@@ -36,6 +36,8 @@ export interface PlaceableModel {
   requiresWebGpu?: boolean
   /** Faster on WebGPU as a rule (Auto starts there when nothing was measured). */
   gpuFirst: boolean
+  /** Why Auto starts on the CPU when `gpuFirst` is false (shown next to the picker). */
+  cpuWhy?: string
   /** One graph cut in two at build time: front on WebGPU, back on the CPU. */
   cutHalves?: boolean
   /** How the split is placed, in words. */
@@ -204,7 +206,10 @@ export function resolvePlacement(m: PlaceableModel, choice: PlacementChoice, d: 
   const small = d.platform !== 'desktop' || (d.memoryGb != null && d.memoryGb <= 4)
   if (small && m.peakBytes > tabMemoryBudget(d).bytes * 0.5)
     return pick('wasm', 'little memory, shared with the GPU: the CPU avoids a second copy while loading')
-  return m.gpuFirst ? pick('webgpu', 'WebGPU is available') : pick('wasm', 'small enough to be fastest on the CPU')
+  if (m.gpuFirst) return pick('webgpu', 'WebGPU is available')
+  const why = m.cpuWhy ?? 'small enough to be fastest on the CPU'
+  // WebAssembly threads need a cross-origin-isolated page; say so when this one has a single thread.
+  return pick('wasm', d.threads ? why : `${why} (one thread here: the page is not cross-origin isolated)`)
 }
 
 /** "encoder_model on WebGPU, decoder_model_merged on the CPU" */

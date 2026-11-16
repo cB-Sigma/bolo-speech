@@ -7,6 +7,7 @@ import { TooltipProvider } from './components/ui/tooltip'
 import { ThemeProvider } from './hooks/use-theme'
 import './index.css'
 import { installErrorCapture } from './lib/diagnostics'
+import { releaseModelsOnPageHide } from './lib/downloads'
 import { live } from './lib/live'
 
 async function installFakeStt() {
@@ -20,6 +21,7 @@ async function installFakeStt() {
 
 async function boot() {
   installErrorCapture()
+  releaseModelsOnPageHide()
   if (import.meta.env.VITE_BOLO_DEMO === '1') {
     const [{ ensureIsolation }, { installDemo }] = await Promise.all([import('./demo/isolation'), import('./demo')])
     if (await ensureIsolation()) return // reloading to become cross-origin isolated

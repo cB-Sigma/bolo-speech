@@ -61,6 +61,7 @@ import {
   NeedsComponentMark,
 } from '@/components/component-install'
 import { FirstRunPick, FitLine, FitSection, HardwareCard, PickForMe, RecommendedBadge } from '@/components/fit-bits'
+import { DownloadsPanel } from '@/components/downloads-panel'
 import { LoadedModelsPanel } from '@/components/loaded-models'
 import { ModelSettingsSection } from '@/components/model-settings'
 import {
@@ -1040,6 +1041,8 @@ export default function ModelsPage() {
       )}
       {!isDemo && <HardwareCard className="mb-4" onPick={() => setPicking(true)} />}
       <LoadedModelsPanel className="mb-4" />
+      {/* The demo's models are downloaded into this browser: the same manager as on the screens that use them. */}
+      {isDemo && <DownloadsPanel className="mb-4" />}
       <ComponentsCard className="mb-5" />
 
       {catalog.isLoading ? (

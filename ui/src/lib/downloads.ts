@@ -146,6 +146,17 @@ export function releaseAllModels(): void {
   for (const h of holders.values()) h.release()
 }
 
+/**
+ * Terminate the model workers when the page is going away for good (reload, another site, closing the tab), so
+ * their WebAssembly memory and WebGPU devices are handed back right then instead of whenever the browser tears
+ * the old page down. A page kept in the back/forward cache (`persisted`) keeps its models.
+ */
+export function releaseModelsOnPageHide(target: Pick<Window, 'addEventListener'> | undefined = globalThis): void {
+  target?.addEventListener('pagehide', (e) => {
+    if (!(e as PageTransitionEvent).persisted) releaseAllModels()
+  })
+}
+
 const lastActive = new Map<string, number>()
 
 /** A model was just used (or finished loading): its idle time starts again. */

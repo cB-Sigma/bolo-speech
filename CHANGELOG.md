@@ -39,6 +39,20 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   nvidia-smi said "GPU is lost. Reboot the system to recover this GPU", while bolo went on serving and `bolo ps`
   said `cuda:0`. docs/configuration.md, "A lost GPU", has the Windows laptop notes.
 
+### Changed
+
+- Live demo: **Auto runs the small speech recognisers on the CPU** (WebAssembly, multi-threaded when the page is
+  cross-origin isolated) instead of WebGPU: Moonshine Tiny and Base, Whisper Tiny and Base and the other
+  recognisers up to 100 M parameters. Measured in Chrome and Edge on a Windows laptop (Ryzen 7 5800H, RTX 3060
+  Laptop GPU; 2.7 s of English; real-time factor on WebAssembly vs WebGPU): Moonshine Tiny 0.097 vs 0.94, Moonshine
+  Base 0.17 vs 1.55 (loading 1.4 s vs 11.4 s), Whisper Base (English) 0.99 vs 1.92 (1.9 s vs 12.3 s), with the same
+  transcripts; with the RTX 3060 forced, Moonshine Tiny on WebGPU was still 0.87 to 0.90. The picker says why
+  ("a small recogniser: faster on the CPU than on WebGPU"), and that the CPU has one thread when the page is not
+  cross-origin isolated. WebGPU stays selectable by hand, larger and 16-bit models still start there, and once a
+  model has run on two placements Auto follows the faster one measured on that device.
+- Live demo: the Models screen has the downloaded-models manager (size, last use, delete, storage limit), as the
+  screens that use the models do; `downloads-panel` was not on `#/models` at all.
+
 ### Fixed
 
 - `bolo components install llama-server` / `audio.cpp` with a GPU `device` that has no prebuilt build on this
@@ -169,6 +183,37 @@ Found on a Windows 11 laptop; the first fix applies everywhere.
   `bolo doctor`'s `--list-devices` question uses the same environment, gives up after 20 s with a warning that
   says so (it used to print "GPU support unknown" without a word), and a managed Vulkan server that never becomes
   ready names the variable in its error.
+- **Live demo: Chatterbox Turbo on the clone page failed silently on WebGPU** (Chrome and Edge on Windows: "ready
+  on WebGPU", then Generate produced nothing for more than six minutes, while the console showed `failed to call
+  OrtRun() ... webgpu/buffer_manager.cc:643 BufferManager::Download` from the decoder). Worker and ONNX Runtime
+  errors now reach the page: a run failure that transformers.js only logs fails the request at once, an error the
+  worker cannot catch fails whatever was waiting on it, and a stall watchdog (no sign of life for 60 s on WebGPU,
+  180 s on the CPU; the language model reports each step) ends a generation that never comes back. After a failure
+  on WebGPU the model is loaded again on the CPU (WebAssembly) and the clip made once more, with a visible note
+  ("Generation failed on WebGPU: ... Made on the CPU instead"); the worker is replaced, because transformers.js
+  keeps a failed run at the head of its queue and every later run in that worker fails too. Auto then keeps that
+  model on the CPU in this browser. If the CPU fails as well, the page shows both errors. Stop lets go of a worker
+  that does not answer within 5 s. The in-page recogniser also fails a pending transcription when its worker
+  crashes after loading, instead of waiting forever.
+- **Live demo: "Your device" and the GPU request on Windows.** 0.6.1 asked WebGPU for
+  `powerPreference: "high-performance"` and assumed that picked the discrete GPU; Chrome and Edge on Windows ignore
+  the option (the console says so; https://crbug.com/369219127) and Windows decides which GPU the browser gets. The
+  request stays, but "Your device" now says which adapter WebGPU actually got ("GPU in use": vendor, architecture
+  and description from `adapter.info`), that the request is only a hint those browsers ignore, and, when it is an
+  integrated GPU on Windows: "Windows picks the GPU for the browser: Settings > System > Display > Graphics >
+  (browser) > High performance". An AMD `gcn-5` adapter with no description (what Chrome reports for a Ryzen
+  processor's Radeon graphics by default) counts as most likely integrated.
+- Live demo: the footer said "bolo 0.1.0 demo" (the version of the server the catalog snapshot was exported from).
+  The build now takes bolo's version from the server package (`server/src/bolo/__init__.py`, the version hatch
+  builds from), so it reads "bolo 0.6.1 demo" and follows each release.
+- Live demo, memory across reloads (private memory of the browser profile grew by about 10 MB per reload in
+  Chrome on Windows). In the page: the model workers are now terminated on `pagehide` (not when the page goes into
+  the back/forward cache), so their WebAssembly memory and WebGPU devices are handed back before the next page
+  loads; the recogniser's worker no longer leaves the cached ONNX Runtime binary's response body (14 to 27 MB)
+  unread when it only checks that the file is cached; the clone page revokes its last clip's object URL when it is
+  left, not only when the next clip replaces it. Nothing else in the page outlives a reload (listeners, timers and
+  IndexedDB connections belong to the page); growth that remains is the browser's own (code and shader caches,
+  the service worker process) and was not chased.
 
 ## [0.6.1] - 2026-11-16
 

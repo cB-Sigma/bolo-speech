@@ -418,6 +418,19 @@ export function sttModules(m: Pick<BrowserModel, 'family'>): string[] {
   return m.family === 'Wav2Vec2' ? ['model'] : ['encoder_model', 'decoder_model_merged']
 }
 
+/**
+ * Recognisers up to this size start on the CPU on Auto. Measured on a Windows laptop (Ryzen 7 5800H, RTX 3060
+ * Laptop GPU, Chrome and Edge, 2.7 s of English, WebAssembly with threads vs WebGPU, real-time factor):
+ * Moonshine Tiny 0.097 vs 0.94, Moonshine Base 0.17 vs 1.55, Whisper Base (English) 0.99 vs 1.92, with the same
+ * transcripts; loading took 1.4 to 1.9 s on the CPU and 11 to 12 s on WebGPU. These models are too small to keep
+ * a GPU busy: each decoding step is a round trip. WebGPU stays one choice away in the picker.
+ */
+export const SMALL_RECOGNISER_PARAMS = 100_000_000
+
+export function isSmallRecogniser(m: Pick<BrowserModel, 'params' | 'requiresWebGpu' | 'prefersWebGpu'>): boolean {
+  return m.params <= SMALL_RECOGNISER_PARAMS && !m.requiresWebGpu && !m.prefersWebGpu
+}
+
 /** A recogniser in the terms of lib/placement.ts. */
 export function placeableStt(m: BrowserModel): PlaceableModel {
   return {
@@ -426,7 +439,9 @@ export function placeableStt(m: BrowserModel): PlaceableModel {
     bytes: m.approxBytes,
     peakBytes: m.peakBytes,
     requiresWebGpu: m.requiresWebGpu,
-    gpuFirst: true,
+    gpuFirst: !isSmallRecogniser(m),
+    cpuWhy:
+      'a small recogniser: faster on the CPU than on WebGPU (measured on a laptop: Moonshine Tiny 0.10 vs 0.94 real-time factor)',
     splitText: m.family === 'Wav2Vec2' ? undefined : 'encoder on WebGPU, decoder on the CPU',
   }
 }

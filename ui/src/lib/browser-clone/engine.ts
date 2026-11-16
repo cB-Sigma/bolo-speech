@@ -51,6 +51,8 @@ export interface ClonerState {
   error: string | null
   /** The last error was the browser running out of memory. */
   outOfMemory: boolean
+  /** Something the visitor should know about the last generation (WebGPU failed and the CPU took over). */
+  notice: string | null
 }
 
 export interface GenerateResult {
@@ -65,6 +67,8 @@ export interface GenerateResult {
   /** Real-time factor: generation time / audio length. */
   rtf: number
   cancelled: boolean
+  /** Set when WebGPU failed and this result came from the CPU: what failed. */
+  fallback?: string
 }
 
 export interface WorkerLike<Req, Res> {
@@ -86,16 +90,59 @@ export function setCloneWorkerFactories(clone: (() => CloneWorker) | null, embed
   embedFactory = embed
 }
 
+const GPU_FAILED_KEY = 'bolo.clone.gpuFailed'
+
+/** Models whose generation failed on WebGPU in this browser, with what failed (Auto then starts on the CPU). */
+export function gpuFailures(): Record<string, string> {
+  try {
+    const raw = globalThis.localStorage?.getItem(GPU_FAILED_KEY)
+    return raw ? (JSON.parse(raw) as Record<string, string>) : {}
+  } catch {
+    return {}
+  }
+}
+
+function rememberGpuFailure(modelId: string, message: string | null): void {
+  try {
+    const all = gpuFailures()
+    if (message == null) {
+      if (!(modelId in all)) return
+      delete all[modelId]
+    } else all[modelId] = message.slice(0, 300)
+    if (Object.keys(all).length) globalThis.localStorage?.setItem(GPU_FAILED_KEY, JSON.stringify(all))
+    else globalThis.localStorage?.removeItem(GPU_FAILED_KEY)
+  } catch {
+    // storage blocked: this visit only
+  }
+}
+
 /**
- * Where to run a model. Auto: Chatterbox on WebGPU when there is an adapter; Pocket TTS and MOSS-TTS-Nano on the
- * CPU, where their frame loops (small steps with large state tensors passed back each time) are quicker than a
- * round trip to the GPU. MOSS-TTS-Nano runs at about real time on four CPU cores.
+ * Where to run a model. Auto: Chatterbox on WebGPU when there is an adapter, unless generating on WebGPU already
+ * failed in this browser; Pocket TTS and MOSS-TTS-Nano on the CPU, where their frame loops (small steps with
+ * large state tensors passed back each time) are quicker than a round trip to the GPU. MOSS-TTS-Nano runs at
+ * about real time on four CPU cores.
  */
-export function chooseDevice(placement: Placement, model: CloneModel): 'webgpu' | 'wasm' {
+export function chooseDevice(
+  placement: Placement,
+  model: CloneModel,
+  failedOnGpu: boolean = model.id in gpuFailures(),
+): 'webgpu' | 'wasm' {
   if (placement !== 'auto') return placement
   const gpu = deviceStore.get().webgpu?.available ?? false
-  return gpu && model.family === 'chatterbox' ? 'webgpu' : 'wasm'
+  return gpu && model.family === 'chatterbox' && !failedOnGpu ? 'webgpu' : 'wasm'
 }
+
+/** How long a generation may go without any sign of life from the worker before it counts as stalled, ms. */
+export const STALL_MS = { webgpu: 60_000, wasm: 180_000 }
+
+export interface ClonerOptions {
+  /** Stall limits per device (tests shorten them). */
+  stallMs?: Partial<typeof STALL_MS>
+  /** After Stop, how long to wait for the worker before it is terminated, ms. */
+  cancelGraceMs?: number
+}
+
+const STOPPED = 'Stopped'
 
 /**
  * Owns the worker that runs one voice-cloning model. Switching models
@@ -117,6 +164,7 @@ export class BrowserCloner {
     busy: false,
     error: null,
     outOfMemory: false,
+    notice: null,
   })
   private worker: CloneWorker | null = null
   private loading: Promise<void> | null = null
@@ -125,8 +173,18 @@ export class BrowserCloner {
   private voiceKey: string | null = null
   private pending = new Map<number, (msg: CloneWorkerResponse) => void>()
   private activeId: number | null = null
+  /** The device the loaded (or loading) model runs on. */
+  private runDevice: 'webgpu' | 'wasm' | null = null
+  /** Generation failed on WebGPU in this visit: the CPU until the model or the placement changes. */
+  private gpuFailed = false
+  /** When the worker last said anything (the stall watchdog). */
+  private lastActivity = 0
+  private readonly stallMs: typeof STALL_MS
+  private readonly cancelGraceMs: number
 
-  constructor() {
+  constructor(opts: ClonerOptions = {}) {
+    this.stallMs = { ...STALL_MS, ...opts.stallMs }
+    this.cancelGraceMs = opts.cancelGraceMs ?? 5000
     registerHolder('clone', {
       current: () => (this.store.get().status === 'idle' ? null : cloneDownloadId(this.store.get().model)),
       release: () => this.dispose(),
@@ -158,13 +216,15 @@ export class BrowserCloner {
     if (m.id === this.store.get().model.id) return
     this.dispose()
     this.safe = false
-    this.store.patch({ model: m, error: null, loadMs: null, outOfMemory: false })
+    this.gpuFailed = false
+    this.store.patch({ model: m, error: null, loadMs: null, outOfMemory: false, notice: null })
   }
 
   setPlacement(p: Placement): void {
     if (p === this.store.get().placement) return
     this.dispose()
-    this.store.patch({ placement: p })
+    this.gpuFailed = false
+    this.store.patch({ placement: p, notice: null })
   }
 
   load(): Promise<void> {
@@ -172,7 +232,8 @@ export class BrowserCloner {
     const generation = ++this.generation
     const support = detectSupport()
     const threads = support.wasmThreads && !this.safe ? Math.max(1, Math.min(4, support.hardwareConcurrency)) : 1
-    const first = this.safe ? 'wasm' : chooseDevice(this.store.get().placement, this.store.get().model)
+    const first =
+      this.safe || this.gpuFailed ? 'wasm' : chooseDevice(this.store.get().placement, this.store.get().model)
     this.loading = this.doLoad(threads, first, generation)
       .catch(async (err: unknown) => {
         if (generation !== this.generation) throw err
@@ -207,8 +268,15 @@ export class BrowserCloner {
     this.worker?.terminate()
     this.worker = null
     this.voiceKey = null
-    for (const resolve of this.pending.values()) resolve({ type: 'error', message: 'Unloaded' })
+    this.runDevice = null
+    this.failPending('Unloaded')
+  }
+
+  /** Fail every request waiting on the worker (it crashed, stalled or was unloaded). */
+  private failPending(message: string): void {
+    const waiting = [...this.pending.values()]
     this.pending.clear()
+    for (const settle of waiting) settle({ type: 'error', message })
   }
 
   private async doLoad(threads: number, device: 'webgpu' | 'wasm', generation: number): Promise<void> {
@@ -226,6 +294,7 @@ export class BrowserCloner {
     claimRuntime('clone', () => this.dispose())
     markLoading('clone', id)
     diag.event('clone', `loading ${model.id} on ${device}, ${threads} thread${threads === 1 ? '' : 's'}`)
+    this.runDevice = device
     const worker =
       cloneFactory?.() ??
       (new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }) as unknown as CloneWorker)
@@ -235,10 +304,20 @@ export class BrowserCloner {
     }
     this.worker = worker
     const cfg = readBrowserSttConfig()
+    let ready = false
     await new Promise<void>((resolve, reject) => {
-      worker.onerror = (e) => reject(new Error(e.message || 'The cloning worker failed to start'))
+      // An error the worker could not catch: before it is ready the load fails, afterwards whatever was waiting
+      // on it does (it used to wait forever).
+      worker.onerror = (e) => {
+        e.preventDefault?.()
+        const message = e.message || (ready ? 'The cloning worker failed' : 'The cloning worker failed to start')
+        diag.error('clone', message)
+        if (ready) this.failPending(message)
+        else reject(new Error(message))
+      }
       worker.onmessage = (e) => {
         const msg = e.data
+        this.lastActivity = performance.now()
         if (msg.type === 'progress') {
           const total = msg.files.reduce((a, f) => a + f.total, 0)
           const loaded = msg.files.reduce((a, f) => a + f.loaded, 0)
@@ -257,10 +336,14 @@ export class BrowserCloner {
           })
           void pageMemoryBytes().then((memoryBytes) => rememberMeasured(id, { loadMs: msg.loadMs, memoryBytes }))
           diag.event('clone', `ready after ${Math.round(msg.loadMs)} ms on ${msg.device}`)
+          this.runDevice = msg.device
+          ready = true
           this.store.patch({ status: 'ready', stage: null, progress: 1, loadMs: msg.loadMs, device: msg.device })
           resolve()
-        } else if (msg.type === 'error' && msg.id == null) reject(new Error(msg.message))
-        else if ('id' in msg && msg.id != null) this.pending.get(msg.id)?.(msg)
+        } else if (msg.type === 'error' && msg.id == null) {
+          if (ready) this.failPending(msg.message)
+          else reject(new Error(msg.message))
+        } else if ('id' in msg && msg.id != null) this.pending.get(msg.id)?.(msg)
       }
       worker.postMessage({
         type: 'load',
@@ -289,6 +372,7 @@ export class BrowserCloner {
       done: new Promise<Extract<CloneWorkerResponse, { type: 'voice' | 'done' }>>((resolve, reject) => {
         this.pending.set(id, (msg) => {
           if (msg.type === 'audio') return onAudio?.(msg.samples)
+          if (msg.type === 'tick') return
           this.pending.delete(id)
           if (msg.type === 'voice' || msg.type === 'done') resolve(msg)
           else if (msg.type === 'error') reject(new Error(msg.message))
@@ -310,10 +394,36 @@ export class BrowserCloner {
     options: GenerateOptions,
     onAudio: (a: Float32Array) => void,
   ): Promise<GenerateResult> {
+    const model = this.store.get().model
+    let device: 'webgpu' | 'wasm' | null = null
     try {
-      return await this.generateOnce(key, reference, text, options, onAudio)
+      const r = await this.generateOnce(key, reference, text, options, onAudio, (d) => (device = d))
+      if (device === 'webgpu' && !r.cancelled) rememberGpuFailure(model.id, null)
+      return r
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
+      if (device === 'webgpu' && !isOom(message) && message !== 'Unloaded' && message !== STOPPED) {
+        // WebGPU failed while generating (an ONNX Runtime run, a lost device, a stall). The worker is not
+        // reusable after that (transformers.js keeps the failed run at the head of its queue), so load the model
+        // again on the CPU and generate once more, and say so.
+        const failure = `generation failed on WebGPU: ${message}`
+        diag.error('clone', `${failure}; trying again on the CPU`)
+        this.dispose()
+        this.gpuFailed = true
+        if (this.store.get().placement === 'auto') rememberGpuFailure(model.id, message)
+        this.store.patch({ notice: `${capitalise(failure)}. Trying again on the CPU (WebAssembly)…` })
+        try {
+          const r = await this.generateOnce(key, reference, text, options, onAudio)
+          this.store.patch({
+            notice: `${capitalise(failure)}. Made on the CPU instead; ${model.label} stays on the CPU here until you choose where it runs again.`,
+          })
+          return { ...r, fallback: failure }
+        } catch (again) {
+          const second = again instanceof Error ? again.message : String(again)
+          this.store.patch({ notice: `${capitalise(failure)}. On the CPU it failed too: ${second}` })
+          throw new Error(`${failure}; on the CPU: ${second}`, { cause: again })
+        }
+      }
       if (!isOom(message) || this.safe) throw err
       // Out of memory while generating: unload everything else in the page, then load this model again on one
       // CPU thread and try once more.
@@ -338,29 +448,20 @@ export class BrowserCloner {
     text: string,
     options: GenerateOptions,
     onAudio: (a: Float32Array) => void,
+    onDevice?: (d: 'webgpu' | 'wasm') => void,
   ): Promise<GenerateResult> {
     await this.load()
+    const device = this.runDevice ?? 'wasm'
+    onDevice?.(device)
     const id = cloneDownloadId(this.store.get().model)
     touchDownload(id)
     this.store.patch({ busy: true })
     const started = performance.now()
     let voiceMs = 0
-    try {
-      if (this.voiceKey !== key) {
-        await this.call({ type: 'voice', key, audio: reference.slice() }).done
-        voiceMs = performance.now() - started
-        this.voiceKey = key
-      }
-      const genStart = performance.now()
-      let first: number | null = null
-      const parts: Float32Array[] = []
-      const c = this.call({ type: 'generate', key, text, options }, (a) => {
-        first ??= performance.now() - started
-        parts.push(a)
-        onAudio(a)
-      })
-      this.activeId = c.id
-      await c.done
+    let genStart = started
+    let first: number | null = null
+    const parts: Float32Array[] = []
+    const result = (cancelled: boolean): GenerateResult => {
       const ms = performance.now() - genStart
       const n = parts.reduce((a, p) => a + p.length, 0)
       const audio = new Float32Array(n)
@@ -369,24 +470,54 @@ export class BrowserCloner {
         audio.set(p, o)
         o += p.length
       }
-      const wasCancelled = this.cancelledIds.has(this.activeId ?? -1)
-      return {
-        audio,
-        firstAudioMs: first,
-        voiceMs,
-        ms,
-        rtf: n ? ms / 1000 / (n / CLONE_RATE) : 0,
-        cancelled: wasCancelled,
+      return { audio, firstAudioMs: first, voiceMs, ms, rtf: n ? ms / 1000 / (n / CLONE_RATE) : 0, cancelled }
+    }
+    // Stall watchdog: a run that never comes back (seen with WebGPU) fails the request instead of waiting forever.
+    const limit = this.stallMs[device]
+    let stalled = false
+    this.lastActivity = performance.now()
+    const watchdog = setInterval(
+      () => {
+        const quiet = performance.now() - this.lastActivity
+        if (quiet < limit || this.pending.size === 0) return
+        stalled = true
+        this.failPending(`stalled: no progress for ${Math.round(quiet / 1000)} s`)
+      },
+      Math.max(10, Math.min(1000, limit / 4)),
+    )
+    try {
+      if (this.voiceKey !== key) {
+        await this.call({ type: 'voice', key, audio: reference.slice() }).done
+        voiceMs = performance.now() - started
+        this.voiceKey = key
       }
+      genStart = performance.now()
+      const c = this.call({ type: 'generate', key, text, options }, (a) => {
+        first ??= performance.now() - started
+        parts.push(a)
+        onAudio(a)
+      })
+      this.activeId = c.id
+      await c.done
+      return result(this.cancelledIds.has(this.activeId ?? -1))
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
+      if (message === STOPPED) {
+        // Stop was pressed and the worker did not answer: it was let go, and what was made so far is kept.
+        this.dispose()
+        return result(true)
+      }
       if (isOom(message)) {
         // The worker is in an unknown state after this: unload so the next attempt starts clean.
         this.dispose()
         this.store.patch({ status: 'error', error: message, outOfMemory: true })
+      } else if (stalled) {
+        // A stuck worker cannot be talked to any more.
+        this.dispose()
       }
       throw err
     } finally {
+      clearInterval(watchdog)
       this.activeId = null
       noteActivity(id)
       this.store.patch({ busy: false })
@@ -397,9 +528,14 @@ export class BrowserCloner {
 
   /** Stop the generation under way (what was made so far is kept). */
   cancel(): void {
-    if (this.activeId == null) return
-    this.cancelledIds.add(this.activeId)
-    this.worker?.postMessage({ type: 'cancel', id: this.activeId })
+    const id = this.activeId
+    if (id == null) return
+    this.cancelledIds.add(id)
+    this.worker?.postMessage({ type: 'cancel', id })
+    // A worker stuck in a run cannot see the request: after a grace period it is let go.
+    setTimeout(() => {
+      if (this.activeId === id) this.failPending(STOPPED)
+    }, this.cancelGraceMs)
   }
 
   dispose(): void {
@@ -411,6 +547,8 @@ export class BrowserCloner {
     this.store.patch({ status: 'idle', stage: null, files: [], progress: 0, busy: false, device: null, error: null })
   }
 }
+
+const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 export interface ScorerState {
   status: 'idle' | 'loading' | 'ready' | 'error'

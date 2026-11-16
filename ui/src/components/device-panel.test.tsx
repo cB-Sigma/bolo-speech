@@ -48,9 +48,25 @@ describe('Your device: which GPU', () => {
     expect(screen.getByTestId('device-panel')).toHaveTextContent('AMD Radeon(TM) Graphics (integrated graphics)')
     expect(device.get().webgpu?.details?.integrated).toBe(true)
     const warning = screen.getByTestId('gpu-integrated-warning')
-    expect(warning).toHaveTextContent('integrated GPU although the page asked for the high-performance one')
-    expect(warning).toHaveTextContent('Settings > System > Display > Graphics, choose this browser, set it to High')
+    expect(warning).toHaveTextContent('WebGPU got the integrated GPU')
+    expect(warning).toHaveTextContent(
+      'Windows picks the GPU for the browser: Settings > System > Display > Graphics > (browser) > High performance',
+    )
     expect(warning).toHaveTextContent('NVIDIA Control Panel')
+    // The page does not claim the request worked: on Windows the browser ignores it.
+    expect(screen.getByTestId('gpu-choice-note')).toHaveTextContent('Chrome and Edge on Windows ignore the hint')
+  })
+
+  it('what Chrome on Windows really reports (no description): a Ryzen gcn-5 adapter reads as integrated', async () => {
+    fakeGpu(() => ({ vendor: 'amd', architecture: 'gcn-5', description: '' }))
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/157.0 Safari/537.36',
+    )
+    await reprobeDevice()
+    render(<DevicePanel />)
+    expect(screen.getByTestId('device-panel')).toHaveTextContent('GPU in use')
+    expect(screen.getByTestId('device-panel')).toHaveTextContent('amd · gcn-5 (most likely integrated graphics)')
+    expect(screen.getByTestId('gpu-integrated-warning')).toHaveTextContent('Windows picks the GPU for the browser')
   })
 
   it('lets the visitor choose power saving, kept per browser', async () => {

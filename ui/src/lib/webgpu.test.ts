@@ -90,6 +90,13 @@ describe('integrated or not', () => {
     expect(adapterDetails({ vendor: 'amd', description: 'AMD Radeon RX 6800M' }).integrated).toBe(false)
     expect(adapterDetails({ vendor: 'nvidia', architecture: 'ampere' }).integrated).toBe(false)
     expect(adapterDetails(undefined)).toMatchObject({ vendor: null, integrated: false })
+    // Chrome's default adapter info has no description: Vega (gcn-5) is a Ryzen processor's graphics, a guess.
+    expect(adapterDetails({ vendor: 'amd', architecture: 'gcn-5', description: '' })).toMatchObject({
+      integrated: true,
+      guessed: true,
+    })
+    expect(adapterDetails({ vendor: 'amd', architecture: 'rdna-2', description: '' }).integrated).toBe(false)
+    expect(adapterDetails(radeon.info).guessed).toBe(false)
   })
   it('labels the adapter with what is known', () => {
     expect(adapterLabel(adapterDetails({ vendor: 'amd', architecture: 'gcn-5', description: '' }))).toBe('amd · gcn-5')

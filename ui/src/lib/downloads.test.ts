@@ -14,6 +14,7 @@ import {
   markSettled,
   recordDownload,
   registerHolder,
+  releaseModelsOnPageHide,
   reloadInterrupted,
   interrupted,
   setStorageCap,
@@ -195,5 +196,24 @@ describe('no listing of Cache Storage', () => {
       /(\bcache\w*|caches\.open\([^)]*\)\))\.keys\(\)/.test(readFileSync(f, 'utf8')),
     )
     expect(offenders.map((f) => path.relative(root, f))).toEqual([])
+  })
+})
+
+describe('leaving the page', () => {
+  it('terminates the model workers on a real unload, not when the page goes into the back/forward cache', () => {
+    const release = vi.fn()
+    registerHolder('test-pagehide', { current: () => 'm', release })
+    const target = new EventTarget()
+    releaseModelsOnPageHide(target as unknown as Window)
+    const hide = (persisted: boolean) => {
+      const e = new Event('pagehide')
+      Object.defineProperty(e, 'persisted', { value: persisted })
+      target.dispatchEvent(e)
+    }
+    hide(true)
+    expect(release).not.toHaveBeenCalled()
+    hide(false)
+    expect(release).toHaveBeenCalledTimes(1)
+    registerHolder('test-pagehide', { current: () => null, release: () => undefined })
   })
 })

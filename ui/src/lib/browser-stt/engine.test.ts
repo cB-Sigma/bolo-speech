@@ -103,6 +103,31 @@ describe('BrowserSttEngine with a scripted worker', () => {
     ).toContain('ready after')
   })
 
+  it('a worker that crashes after loading fails the transcription instead of leaving it waiting', async () => {
+    let worker: FakeSpeechWorker | null = null
+    setSpeechWorkerFactory(() => {
+      worker = new FakeSpeechWorker({ loadMs: 200 })
+      const post = worker.postMessage.bind(worker)
+      // The transcription request is swallowed and the worker dies instead.
+      worker.postMessage = (req) => {
+        if (req.type === 'transcribe')
+          setTimeout(() => worker?.onerror?.({ message: 'Uncaught RuntimeError: unreachable' } as ErrorEvent), 10)
+        else post(req)
+      }
+      return worker
+    })
+    const engine = new BrowserSttEngine()
+    const loaded = engine.load()
+    await vi.advanceTimersByTimeAsync(300)
+    await loaded
+    const heard = engine.transcribe(new Float32Array(16000))
+    const outcome = expect(heard).rejects.toThrow('Uncaught RuntimeError: unreachable')
+    await vi.advanceTimersByTimeAsync(20)
+    await outcome
+    expect(engine.pendingCount).toBe(0)
+    engine.dispose()
+  })
+
   it('flags a load that stops moving, and the single-threaded retry clears it', async () => {
     localStorage.setItem('bolo.browserStt', JSON.stringify({ stallSeconds: 3 }))
     setSpeechWorkerFactory(() => new FakeSpeechWorker({ loadMs: 1000, stall: true }))

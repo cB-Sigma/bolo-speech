@@ -39,7 +39,12 @@ async function prefetchRuntime(url: string): Promise<void> {
   if (typeof caches === 'undefined') return
   const cacheName = (env as unknown as { cacheKey?: string }).cacheKey ?? 'transformers-cache'
   const cache = await caches.open(cacheName)
-  if (await cache.match(url)) return
+  const hit = await cache.match(url)
+  if (hit) {
+    // Only its presence matters: let go of the body (the runtime binary, 14 to 27 MB) instead of leaving it to GC.
+    void hit.body?.cancel().catch(() => undefined)
+    return
+  }
   const started = performance.now()
   const record: FetchRecord = { url, status: 0, bytes: null, ms: 0 }
   try {

@@ -28,6 +28,20 @@ function dropOrtWasm(): Plugin {
   }
 }
 
+/**
+ * bolo's version, read from the server package (the version hatch builds from, server/src/bolo/__init__.py), so
+ * the console and the live demo show the release they belong to. Null when the server sources are not next to
+ * the console.
+ */
+export function boloVersion(): string | null {
+  try {
+    const init = readFileSync(path.resolve(import.meta.dirname, '../server/src/bolo/__init__.py'), 'utf8')
+    return /^__version__\s*=\s*["']([^"']+)["']/m.exec(init)?.[1] ?? null
+  } catch {
+    return null
+  }
+}
+
 /** Where the live demo is published; used for absolute social-preview URLs. */
 const DEMO_URL = 'https://cb-sigma.github.io/bolo/'
 
@@ -79,11 +93,14 @@ export default defineConfig(({ mode }) => {
     base: './',
     plugins: [react(), tailwindcss(), dropOrtWasm(), ...(demo ? [demoSite()] : [])],
     resolve: { alias: { '@': path.resolve(import.meta.dirname, './src') } },
-    define: mock
-      ? { 'import.meta.env.VITE_BOLO_MOCK': JSON.stringify('1') }
-      : demo
-        ? { 'import.meta.env.VITE_BOLO_DEMO': JSON.stringify('1') }
-        : {},
+    define: {
+      'import.meta.env.VITE_BOLO_VERSION': JSON.stringify(boloVersion()),
+      ...(mock
+        ? { 'import.meta.env.VITE_BOLO_MOCK': JSON.stringify('1') }
+        : demo
+          ? { 'import.meta.env.VITE_BOLO_DEMO': JSON.stringify('1') }
+          : {}),
+    },
     worker: { format: 'es' as const, plugins: () => [dropOrtWasm()] },
     server: { host: '127.0.0.1', headers: isolation, proxy: mock || demo ? undefined : proxy },
     preview: { host: '127.0.0.1', headers: isolation },

@@ -183,8 +183,12 @@ e2e-demo/           Playwright specs for the live demo build
 The playground can run a small model in the page (English by default; Hindi and multilingual
 Whisper models can be chosen), with no server round trip, and compare it with the server on the
 same audio. The runtime (`@huggingface/transformers` with ONNX Runtime Web)
-lives in a web worker that is only fetched when the mode is first used. It prefers WebGPU and falls
-back to WebAssembly with SIMD; WebAssembly threads need a cross-origin-isolated page. The model
+lives in a web worker that is only fetched when the mode is first used. On Auto, the small recognisers
+(up to 100 M parameters: Moonshine, Whisper Tiny and Base) run on the CPU with WebAssembly (SIMD, and
+threads when the page is cross-origin isolated): measured on a laptop with an RTX 3060, they were 2 to 10
+times faster there than on WebGPU and loaded in under 2 s instead of 11 to 12. Larger ones start on WebGPU when the
+browser has it, and every model can be moved by hand ("Run on"). Once a model has run on two placements,
+Auto follows the faster one measured on that device. The model
 weights and the ONNX Runtime binary are downloaded on first use and cached by the browser. Details,
 licences, the headers the server should send and how to self-host the files are in
 [`../docs/ui-server-notes.md`](../docs/ui-server-notes.md).

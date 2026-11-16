@@ -170,7 +170,7 @@ export function DevicePanel({ className }: { className?: string }) {
           ? `yes; 16-bit shaders ${gpu.f16 ? 'yes' : 'no'}; largest buffer ${MB(gpu.maxBufferSize)}`
           : 'no: models run on the CPU (WebAssembly)',
     ],
-    ...(gpu?.available ? ([['GPU', gpuText(gpu.adapter, gpu.details)]] as [string, string][]) : []),
+    ...(gpu?.available ? ([['GPU in use', gpuText(gpu.adapter, gpu.details)]] as [string, string][]) : []),
     ['WebAssembly threads', d.threads ? 'yes' : 'no (one thread): slower'],
     [
       'Storage',
@@ -212,10 +212,14 @@ export function DevicePanel({ className }: { className?: string }) {
   )
 }
 
-function gpuText(label: string | null, details: { integrated: boolean; fallback: boolean } | undefined): string {
+function gpuText(
+  label: string | null,
+  details: { integrated: boolean; guessed?: boolean; fallback: boolean } | undefined,
+): string {
   const what = label ?? 'not named by this browser'
   if (details?.fallback) return `${what} (the browser's software fallback, no GPU)`
-  return details?.integrated ? `${what} (integrated graphics)` : what
+  if (!details?.integrated) return what
+  return details.guessed ? `${what} (most likely integrated graphics)` : `${what} (integrated graphics)`
 }
 
 function isWindows(): boolean {
@@ -223,8 +227,9 @@ function isWindows(): boolean {
 }
 
 /**
- * Which GPU the models ask for, and what to do when the browser gave the integrated one: on a laptop with two
- * GPUs, Windows (or the NVIDIA driver) decides per application, whatever the page asks.
+ * Which GPU the models ask for, and what to do when WebGPU got the integrated one. The request is a hint: Chrome
+ * and Edge on Windows ignore it (crbug.com/369219127), and on a laptop with two GPUs Windows (or the NVIDIA
+ * driver) decides per application, whatever the page asks.
  */
 function GpuChoice({ integrated, windows }: { integrated: boolean; windows: boolean }) {
   const [power, setPower] = useState<GpuPower>(readGpuPower)
@@ -255,8 +260,13 @@ function GpuChoice({ integrated, windows }: { integrated: boolean; windows: bool
           </ToggleGroupItem>
         </ToggleGroup>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Kept in this browser. Models loaded from now on use it; reload the page to move a model that is already loaded.
+      <p className="text-xs text-muted-foreground" data-testid="gpu-choice-note">
+        Kept in this browser and passed to the browser as a hint; &ldquo;GPU in use&rdquo; above is what it actually
+        gave.{' '}
+        {windows && (
+          <>Chrome and Edge on Windows ignore the hint (crbug.com/369219127): Windows decides which GPU they get. </>
+        )}
+        Models loaded from now on use it; reload the page to move a model that is already loaded.
       </p>
       {integrated && power === 'high-performance' && (
         <p
@@ -264,20 +274,20 @@ function GpuChoice({ integrated, windows }: { integrated: boolean; windows: bool
           data-testid="gpu-integrated-warning"
         >
           <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning-text" aria-hidden />
-          <span>
-            The browser gave the integrated GPU although the page asked for the high-performance one. If this computer
-            also has a dedicated GPU (NVIDIA, or AMD Radeon RX), the system chooses for the browser:
-            {windows ? (
-              <>
-                {' '}
-                in Windows, open Settings &gt; System &gt; Display &gt; Graphics, choose this browser, set it to High
-                performance and restart the browser; or, in the NVIDIA Control Panel, Manage 3D settings &gt; Program
-                Settings, give the browser the high-performance NVIDIA processor.
-              </>
-            ) : (
-              <> set this browser to use the dedicated GPU in the system&apos;s graphics settings, then restart it.</>
-            )}
-          </span>
+          {windows ? (
+            <span>
+              WebGPU got the integrated GPU. Windows picks the GPU for the browser: Settings &gt; System &gt; Display
+              &gt; Graphics &gt; (browser) &gt; High performance, then restart the browser. That helps when this
+              computer also has a dedicated GPU (NVIDIA, or AMD Radeon RX); with an NVIDIA card, the NVIDIA Control
+              Panel (Manage 3D settings &gt; Program Settings) can do the same.
+            </span>
+          ) : (
+            <span>
+              WebGPU got the integrated GPU although the page asked for the high-performance one. If this computer also
+              has a dedicated GPU, the system chooses for the browser: set this browser to use the dedicated GPU in the
+              system&apos;s graphics settings, then restart it.
+            </span>
+          )}
         </p>
       )}
     </div>

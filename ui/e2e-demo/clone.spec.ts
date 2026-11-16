@@ -309,6 +309,39 @@ test.describe('clone a voice in the page', () => {
     await expect(page.getByTestId('clone-status')).toContainText('downloads on first use')
   })
 
+  test('Chatterbox Turbo: a failed WebGPU run is shown and the clip is made on the CPU instead', async ({ page }) => {
+    // A desktop with WebGPU, so Auto puts Chatterbox there; the scripted worker fails every WebGPU generation the
+    // way Chrome on Windows did (ONNX Runtime's BufferManager::Download error from the decoder).
+    await page.addInitScript(() =>
+      localStorage.setItem(
+        'bolo.fakeDevice',
+        JSON.stringify({
+          platform: 'desktop',
+          memoryGb: 16,
+          webgpu: {
+            available: true,
+            f16: true,
+            maxBufferSize: 2 ** 31,
+            maxStorageBufferBindingSize: 2 ** 30,
+            adapter: 'amd · gcn-5',
+          },
+        }),
+      ),
+    )
+    await open(page, { fake: 'gpu-fail' })
+    await page.getByTestId('clone-model-select').click()
+    await page.getByTestId('clone-model-chatterbox-turbo').click()
+    await page.getByTestId('clone-example-kokoro-am-michael').click()
+    await page.getByTestId('clone-generate').click()
+    await expect(page.getByTestId('clone-output')).toBeVisible()
+    await expect(page.getByTestId('clone-notice')).toContainText('Generation failed on WebGPU: failed to call OrtRun()')
+    await expect(page.getByTestId('clone-notice')).toContainText('Made on the CPU instead')
+    await expect(page.getByTestId('clone-status')).toContainText('ready on the CPU')
+    await expect(page.getByTestId('clone-error')).toHaveCount(0)
+    await noSideScroll(page)
+    await axe(page)
+  })
+
   test('light theme at phone width: no side scroll, accessible', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 900 })
     await open(page, { theme: 'light' })

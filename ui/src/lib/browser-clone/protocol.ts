@@ -49,6 +49,8 @@ export type CloneWorkerResponse =
     }
   | { type: 'voice'; id: number; ms: number }
   | { type: 'audio'; id: number; samples: Float32Array }
+  /** Still working on request `id` (a language-model step, at most about once a second): the stall watchdog's pulse. */
+  | { type: 'tick'; id: number }
   | { type: 'done'; id: number; ms: number; samples: number }
   | { type: 'error'; id?: number; message: string }
 

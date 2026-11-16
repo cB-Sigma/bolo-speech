@@ -25,6 +25,7 @@ import hindiUrl from './assets/hi-short.wav?url'
 import { deleteDownload, idleSeconds, residentModels, type Resident } from '@/lib/downloads'
 import { keepAliveSeconds, keepLoaded, unloadModel } from '@/lib/keepalive'
 import { pickBrowserModel, prefs } from '@/lib/prefs'
+import { BOLO_VERSION } from '@/lib/version'
 import snapshot from './catalog-snapshot.json'
 
 /**
@@ -162,7 +163,8 @@ export class DemoBackend {
   info(): ServerInfo {
     return {
       name: 'bolo',
-      version: `${snapshot.server_version} demo`,
+      // The release this demo was built from (not the catalog snapshot's server, which can be older).
+      version: `${BOLO_VERSION ?? snapshot.server_version} demo`,
       engines: [{ id: 'onnxruntime-web', version: null, available: typeof WebAssembly === 'object', reason: null }],
       device: 'browser',
       cpu_count: navigator.hardwareConcurrency ?? 1,

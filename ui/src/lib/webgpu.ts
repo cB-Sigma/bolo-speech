@@ -2,11 +2,11 @@
  * Which GPU the in-page models run on. Every WebGPU adapter the page asks for, and every WebGPU session ONNX
  * Runtime (directly or through transformers.js) creates, goes through here, so they all ask for the same one.
  *
- * Without options `navigator.gpu.requestAdapter()` gives the default adapter, which on a laptop with two GPUs
- * is the power-saving, integrated one: Chrome and Edge on a Windows laptop with a Radeon or Intel GPU in the
- * processor and an NVIDIA card would run every model on the integrated GPU. bolo asks for
- * `powerPreference: 'high-performance'` unless the visitor chose power saving. Browsers may ignore the hint
- * (Windows then decides per application), so the device panel says which adapter came back.
+ * bolo asks for `powerPreference: 'high-performance'` unless the visitor chose power saving. The hint is only a
+ * hint: Chrome and Edge on Windows ignore it (the console says "The powerPreference option is currently ignored
+ * when calling requestAdapter() on Windows", https://crbug.com/369219127), and Windows decides which GPU the
+ * browser gets (Settings > System > Display > Graphics). On a laptop with integrated graphics and an NVIDIA card
+ * that is usually the integrated GPU. So the device panel shows which adapter WebGPU actually got.
  */
 
 export type GpuPower = 'high-performance' | 'low-power'
@@ -86,6 +86,12 @@ export interface AdapterDetails {
   fallback: boolean
   /** It looks like integrated graphics (the adapter type or description says so, or the name is an iGPU's). */
   integrated: boolean
+  /**
+   * `integrated` is a guess from the vendor and architecture alone (Chrome leaves the description empty unless
+   * its WebGPU developer features are on): an AMD `gcn-5` adapter is almost always the Radeon (Vega) graphics of
+   * a Ryzen processor.
+   */
+  guessed: boolean
 }
 
 const INTEGRATED_NAME =
@@ -97,12 +103,15 @@ export function adapterDetails(info: AdapterInfoLike | undefined, fallback = fal
   const architecture = clean(info?.architecture)
   const description = clean(info?.description)
   const type = clean(info?.type)
+  // AMD's Vega generation (gcn-5) is, in practice, the graphics of a Ryzen processor (2000 to 5000 series APUs).
+  const guessed = !type && !description && vendor === 'amd' && architecture === 'gcn-5'
   const integrated = type
     ? /integrated/i.test(type)
     : INTEGRATED_NAME.test(description ?? '') ||
+      guessed ||
       // Intel GPUs other than the discrete Arc cards (Xe-HPG) are part of the processor
       (vendor === 'intel' && architecture != null && !/hpg/i.test(architecture))
-  return { vendor, architecture, description, type, fallback, integrated }
+  return { vendor, architecture, description, type, fallback, integrated, guessed }
 }
 
 /** "nvidia · ampere · NVIDIA GeForce RTX 3060 Laptop GPU", or null when the browser says nothing. */

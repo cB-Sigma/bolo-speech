@@ -203,9 +203,22 @@ export default function CloneBrowserPage() {
   const [language, setLanguage] = useState('en')
   const [text, setText] = useState(DEFAULT_TEXT.en as string)
   const [output, setOutput] = useState<Output | null>(null)
+  // The last clip's object URL is let go when the page is left, not only when the next clip replaces it.
+  const outputUrl = useRef<string | null>(null)
+  useEffect(() => {
+    outputUrl.current = output?.url ?? null
+  }, [output])
+  useEffect(
+    () => () => {
+      if (outputUrl.current) URL.revokeObjectURL(outputUrl.current)
+    },
+    [],
+  )
   const [scoreAuto, setScoreAuto] = useState(() => !isPhoneLike())
   const [risk, setRisk] = useState(false)
   const [preparing, setPreparing] = useState(false)
+  /** Why the last generation failed, shown under the button (a toast alone is easy to miss). */
+  const [genError, setGenError] = useState<string | null>(null)
   const playerRef = useRef<GaplessPlayer | null>(null)
   const model = s.model
   const verdict = verdictFor(needsFor(model), d)
@@ -401,6 +414,7 @@ export default function CloneBrowserPage() {
     playerRef.current = player
     if (output) URL.revokeObjectURL(output.url)
     setOutput(null)
+    setGenError(null)
     const typed = text.trim()
     const language = textLanguage
     setPreparing(true)
@@ -423,7 +437,10 @@ export default function CloneBrowserPage() {
     } catch (err) {
       player.end()
       const message = err instanceof Error ? err.message : String(err)
-      if (message !== 'Unloaded') toast.error('Could not generate', { description: message })
+      if (message !== 'Unloaded') {
+        setGenError(message)
+        toast.error('Could not generate', { description: message })
+      }
     }
   }
 
@@ -704,6 +721,17 @@ export default function CloneBrowserPage() {
                           ? `Could not load: ${s.error}`
                           : `${model.label} downloads on first use (${fmtBytes(model.bytes)}).`}
               </p>
+              {s.notice && (
+                <p className="flex items-start gap-1.5 text-xs text-warning-text" data-testid="clone-notice">
+                  <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden />
+                  <span className="min-w-0 break-words">{s.notice}</span>
+                </p>
+              )}
+              {genError && !s.busy && (
+                <p className="text-xs break-words text-destructive" role="alert" data-testid="clone-error">
+                  Could not generate: {genError}
+                </p>
+              )}
               {s.status === 'error' && s.outOfMemory && (
                 <Alert variant="destructive" data-testid="clone-oom">
                   <TriangleAlert />
