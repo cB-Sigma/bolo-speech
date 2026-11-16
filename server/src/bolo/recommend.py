@@ -782,17 +782,24 @@ class Advisor:
         self._generation = 0
         self._refreshing = False
         self._warned: set[str] = set()
+        #: the slow probes' answers (nvidia-smi, --list-devices, ...), reused for TTL_S by a refresh
+        self.probes = hwmod.ProbeCache(self.TTL_S)
 
     # -- hardware and speed
-    def hardware(self, refresh: bool = False, deep: bool = False) -> Hardware:
+    def hardware(self, refresh: bool = False, deep: bool = False, force: bool = False) -> Hardware:
+        """What this machine is, detected once and kept. ``refresh`` detects again, reusing the slow probes'
+        answers from the last :attr:`TTL_S` seconds (:class:`bolo.hardware.ProbeCache`); ``force`` runs those
+        again too."""
+        if force:
+            self.probes.clear()
         with self._lock:
-            if self._hardware is not None and not refresh:
+            if self._hardware is not None and not (refresh or force):
                 return self._hardware
         # detection can take seconds (nvidia-smi, the torch plugin's doctor): never while holding the lock,
         # which catalog requests wait on
-        found = hwmod.detect(self.core.settings, deep=deep)
+        found = hwmod.detect(self.core.settings, deep=deep, cache=self.probes)
         with self._lock:
-            if self._hardware is None or refresh:
+            if self._hardware is None or refresh or force:
                 self._hardware = found
                 self._speed = None
                 self._drop_fits()
@@ -827,9 +834,19 @@ class Advisor:
             self._drop_fits()
         return result
 
-    def hardware_api(self, refresh: bool = False) -> dict[str, Any]:
-        hw = self.hardware(refresh=refresh, deep=refresh)
+    def hardware_api(self, refresh: bool = False, force: bool = False) -> dict[str, Any]:
+        hw = self.hardware(refresh=refresh, deep=refresh or force, force=force)
         return {**hw.to_dict(), "summary": hw.summary(), "speed": self.speed().to_dict()}
+
+    def components_changed(self) -> None:
+        """A runtime was installed or removed: probe it again on the next request, and detect the runtimes again
+        (in the background) so that plain requests see it too."""
+        self.probes.clear()
+        with self._lock:
+            deep = self._hardware.deep if self._hardware is not None else False
+        threading.Thread(
+            target=lambda: self.hardware(refresh=True, deep=deep), name="bolo-hardware-components", daemon=True
+        ).start()
 
     # -- fits
     def _engine_ok(self, cache: dict[str, bool], engine: str) -> bool:

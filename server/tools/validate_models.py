@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import datetime as dt
 import json
 import os
@@ -37,6 +38,7 @@ import numpy as np
 from bolo.audio import decode_audio
 from bolo.config import load_settings
 from bolo.core import Bolo
+from bolo.errors import BoloError
 from bolo.obs.trace import Trace
 from bolo.text.normalize import word_error_rate
 
@@ -57,16 +59,50 @@ SENTENCES = {
 }
 
 
-def hardware() -> str:
-    model = ""
-    try:
-        for line in Path("/proc/cpuinfo").read_text(encoding="utf-8").splitlines():
-            if line.startswith("model name"):
-                model = line.split(":", 1)[1].strip()
-                break
-    except OSError:
-        pass
-    return f"{os.cpu_count()} vCPU {platform.machine()} ({model or platform.processor() or 'unknown CPU'}), no GPU"
+def hardware(hw: Any = None, settings: Any = None) -> str:
+    """The machine, for the report: "16 vCPU x86_64 (AMD Ryzen 7 5800H with Radeon Graphics), no GPU". The CPU's name
+    comes from bolo.hardware (on Windows from the registry, not /proc/cpuinfo); a GPU that was found is named, with
+    the ``device`` the models ran on."""
+    if hw is None:
+        from bolo import hardware as hwmod
+
+        hw = hwmod.detect(settings)
+    cpu = hw.cpu
+    cores = cpu.logical_cores or os.cpu_count()
+    arch = cpu.architecture or platform.machine()
+    text = f"{cores} vCPU {arch} ({cpu.model or platform.processor() or 'unknown CPU'})"
+    gpus = [g.name or f"{g.vendor} GPU" for g in hw.gpus if not g.integrated]
+    if not gpus:
+        return f"{text}, no GPU"
+    device = str(getattr(hw, "device", "") or "cpu")
+    used = "not used" if device == "cpu" else f"device {device}"
+    return f"{text}, GPU {', '.join(gpus)} ({used})"
+
+
+def sample_speech(synth: dict[str, Any], lang: str = "en") -> tuple[np.ndarray, int, str, str]:
+    """Speech made by an installed voice for the validators that need some: ``lang``'s, else any. A run without
+    any (no ``--en-voice`` installed) cannot check those models and says how to fix it."""
+    if lang in synth:
+        return synth[lang]  # type: ignore[no-any-return]
+    if synth:
+        return next(iter(synth.values()))  # type: ignore[no-any-return]
+    raise RuntimeError(
+        "no test speech: no voice to make it is installed (pull the --en-voice model, kokoro-v1.0-int8 by default, "
+        "or name an installed English voice with --en-voice)"
+    )
+
+
+def pick_en_voice(core: Bolo, wanted: str | None) -> str | None:
+    """The English voice that makes test speech: ``wanted`` when it is installed, else the first installed English
+    text-to-speech model, else None (the models that need speech are then skipped with a reason)."""
+    if wanted:
+        spec = core.catalog.resolve(wanted)
+        if spec is not None and core.manager.is_installed(spec):
+            return spec.id
+    for spec in core.catalog.all():
+        if spec.task == "tts" and "en" in spec.languages and not spec.cloud and core.manager.is_installed(spec):
+            return spec.id
+    return None
 
 
 def fetch_test_wavs(core: Bolo, repo: str, revision: str, cache: Path) -> list[tuple[Path, str | None]]:
@@ -184,7 +220,7 @@ async def validate_vad(core: Bolo, spec: Any, synth: dict[str, Any]) -> dict[str
     from bolo.audio.resample import resample
     from bolo.streaming.vad import detect_segments
 
-    audio, rate, _text, _voice = synth["en"]
+    audio, rate, _text, _voice = sample_speech(synth)
     speech = resample(audio, rate, 16000)
     gap = np.zeros(16000, dtype=np.float32)
     clip = np.concatenate([gap, speech, gap, speech, gap])
@@ -203,6 +239,96 @@ async def validate_vad(core: Bolo, spec: Any, synth: dict[str, Any]) -> dict[str
     }
 
 
+async def validate_diarization(core: Bolo, spec: Any, synth: dict[str, Any]) -> dict[str, Any]:
+    """Speech from the test voices (two languages when there are two: two voices) with pauses: speaker turns come
+    back, and the real-time factor of the whole pipeline is recorded."""
+    from bolo.audio.resample import resample
+    from bolo.diarize import DiarizeOptions
+
+    clips = [resample(audio, rate, 16000) for audio, rate, _text, _voice in synth.values()] or [
+        resample(*sample_speech(synth)[:2], 16000)
+    ]
+    gap = np.zeros(16000, dtype=np.float32)
+    parts: list[np.ndarray] = [gap]
+    for clip in clips * 2:
+        parts += [clip, gap]
+    audio16 = np.concatenate(parts)
+    await core.diarize(audio16, 16000, DiarizeOptions(model=spec.id))  # warm-up (includes loading)
+    best = float("inf")
+    turns: list[Any] = []
+    for _ in range(3):
+        t0 = time.perf_counter()
+        turns = await core.diarize(audio16, 16000, DiarizeOptions(model=spec.id))
+        best = min(best, time.perf_counter() - t0)
+    if not turns:
+        raise RuntimeError("the model found no speaker turns in speech")
+    seconds = len(audio16) / 16000
+    return {
+        "rtf": round(best / seconds, 4),
+        "audio_s": round(seconds, 1),
+        "turns": len(turns),
+        "speakers": len({t.speaker for t in turns}),
+    }
+
+
+async def validate_turn(core: Bolo, spec: Any, synth: dict[str, Any]) -> dict[str, Any]:
+    """The end-of-turn model on a finished sentence: a probability comes back; its time per call is recorded."""
+    from bolo.audio.resample import resample
+
+    audio, rate, _text, _voice = sample_speech(synth)
+    speech = np.ascontiguousarray(resample(audio, rate, 16000)[-8 * 16000 :], dtype=np.float32)
+    async with core.manager.use(spec.id) as entry:
+        await entry.queue.submit("turn", speech)  # warm-up
+        best = float("inf")
+        probability = 0.0
+        for _ in range(3):
+            t0 = time.perf_counter()
+            probability, _ = await entry.queue.submit("turn", speech)
+            best = min(best, time.perf_counter() - t0)
+    if not 0.0 <= float(probability) <= 1.0:
+        raise RuntimeError(f"expected a probability, got {probability!r}")
+    seconds = len(speech) / 16000
+    return {
+        "rtf": round(best / seconds, 5),
+        "audio_s": round(seconds, 1),
+        "ms": round(best * 1000, 1),
+        "probability": round(float(probability), 3),
+    }
+
+
+#: which validator checks a model of each task
+VALIDATORS = {"stt": "stt", "tts": "tts", "vad": "vad", "diarization": "diarization", "turn": "turn"}
+
+
+async def validate(
+    core: Bolo, spec: Any, args: argparse.Namespace, cache: Path, synth: dict[str, Any]
+) -> dict[str, Any]:
+    kind = VALIDATORS.get(spec.task)
+    if kind == "stt":
+        return await validate_stt(core, spec, cache, synth)
+    if kind == "tts":
+        return await validate_tts(core, spec, args.stt)
+    if kind == "vad":
+        return await validate_vad(core, spec, synth)
+    if kind == "diarization":
+        return await validate_diarization(core, spec, synth)
+    if kind == "turn":
+        return await validate_turn(core, spec, synth)
+    raise RuntimeError(f"no validation for {spec.task} models yet")
+
+
+async def cleanup(core: Bolo, model_id: str) -> str | None:
+    """Remove a model pulled for the run. A folder Windows will not let go (an antivirus scanner holding a file
+    that was just written: WinError 32) is recorded and the run goes on; None when it was removed."""
+    try:
+        await core.remove(model_id)
+    except OSError as exc:
+        return f"{type(exc).__name__}: {exc}"[:300]
+    except BoloError as exc:
+        return exc.message[:300]
+    return None
+
+
 async def main_async(args: argparse.Namespace) -> None:
     settings = load_settings(overrides={"threads": args.threads} if args.threads else None)
     settings.stt_ttl_s = settings.tts_ttl_s = -1
@@ -212,9 +338,15 @@ async def main_async(args: argparse.Namespace) -> None:
     report: dict[str, Any] = json.loads(out_path.read_text(encoding="utf-8")) if out_path.exists() else {}
     cache = settings.data_dir / "validation"
     synth: dict[str, Any] = {}
-    hw = hardware()
+    hw = hardware(settings=settings)
     try:
-        for lang, voice_model in (("en", args.en_voice), ("hi", args.hi_voice)):
+        en_voice = pick_en_voice(core, args.en_voice)
+        if en_voice is None:
+            print("note: no English voice is installed: STT models without test wavs, VAD, diarization and turn models "
+                  "are skipped (pull kokoro-v1.0-int8, or name one with --en-voice)", flush=True)  # fmt: skip
+        elif en_voice != args.en_voice:
+            print(f"note: --en-voice {args.en_voice} is not installed; test speech comes from {en_voice}", flush=True)
+        for lang, voice_model in (("en", en_voice), ("hi", args.hi_voice)):
             if voice_model and core.manager.is_installed(core.manager.resolve(voice_model)):
                 audio, rate = await core.synthesize_all(SENTENCES[lang], model=voice_model)
                 synth[lang] = (audio, rate, SENTENCES[lang], voice_model)
@@ -234,12 +366,7 @@ async def main_async(args: argparse.Namespace) -> None:
                 job = await core.pull_and_wait(spec.id)
                 if job.state != "done":
                     raise RuntimeError(job.error or "pull failed")
-                if spec.task == "stt":
-                    entry.update(await validate_stt(core, spec, cache, synth))
-                elif spec.task == "tts":
-                    entry.update(await validate_tts(core, spec, args.stt))
-                else:
-                    entry.update(await validate_vad(core, spec, synth))
+                entry.update(await validate(core, spec, args, cache, synth))
                 loaded = core.manager.loaded.get(spec.id)
                 if loaded:
                     entry["load_s"] = round(loaded.load_ms / 1000.0, 2)
@@ -249,14 +376,17 @@ async def main_async(args: argparse.Namespace) -> None:
             except Exception as exc:
                 entry["error"] = f"{type(exc).__name__}: {exc}"[:300]
             entry["took_s"] = round(time.perf_counter() - t0, 1)
+            for other in list(core.manager.loaded):
+                if other != args.stt:
+                    with contextlib.suppress(Exception):
+                        await core.manager.unload(other)
+            if not was_installed and not args.keep:
+                problem = await cleanup(core, spec.id)
+                if problem:
+                    entry["cleanup_error"] = problem
             report[spec.id] = entry
             out_path.write_text(json.dumps(report, indent=1, ensure_ascii=False), encoding="utf-8")
             print(f"{spec.id}: {json.dumps(entry, ensure_ascii=False)}", flush=True)
-            for other in list(core.manager.loaded):
-                if other != args.stt:
-                    await core.manager.unload(other)
-            if not was_installed and not args.keep:
-                await core.remove(spec.id)
     finally:
         await core.stop()
 
@@ -269,7 +399,11 @@ def main() -> None:
     p.add_argument("--force", action="store_true", help="re-run models already in the report")
     p.add_argument("--threads", type=int, default=0)
     p.add_argument("--stt", default="moonshine-tiny-en", help="installed STT model for the TTS round-trip check")
-    p.add_argument("--en-voice", default="kokoro-v1.0-int8", help="installed English voice used to make test speech")
+    p.add_argument(
+        "--en-voice",
+        default="kokoro-v1.0-int8",
+        help="installed English voice used to make test speech (else the first installed English voice)",
+    )
     p.add_argument("--hi-voice", default="piper-hi-in-rohan-medium")
     p.add_argument("--min-free-gb", type=float, default=2.0)
     asyncio.run(main_async(p.parse_args()))

@@ -415,14 +415,14 @@ What differs on Windows (CI runs the server's tests on `windows-latest`; the CPU
 | install | PowerShell or cmd: `uv tool install "bolo-speech[all]"` (double quotes: cmd.exe does not treat single quotes as quotes) |
 | models (`data_dir`) | `%USERPROFILE%\.cache\bolo` (`C:\Users\<you>\.cache\bolo`), the same place as on Linux and macOS, not `%LOCALAPPDATA%`: bolo keeps it so that existing installs never lose their models. To keep models elsewhere set `BOLO_DATA_DIR` (for example `%LOCALAPPDATA%\bolo`), after moving the folder there if you want to keep what you downloaded. `XDG_CACHE_HOME` is honoured too |
 | settings file | `.\bolo.toml`, else `%USERPROFILE%\.config\bolo\config.toml` (or `--config`, `BOLO_CONFIG`). Write Windows paths in single quotes (`data_dir = 'C:\Users\you\bolo'`, a TOML literal string) or with forward slashes (`"C:/Users/you/bolo"`): in double quotes a backslash starts an escape, so `"C:\Users\..."` is an error and `"C:\temp"` holds a tab |
-| log file | `log_file = "auto"`: `%LOCALAPPDATA%\bolo\logs\server.log`. `bolo logs -f` opens it so that the rotation can still rename it; when another program blocks the rename, bolo copies the file to `server.log.1` and empties it instead |
+| log file | `log_file = "auto"`: `%LOCALAPPDATA%\bolo\logs\server.log`. `bolo logs -f` opens it so that the rotation can still rename it; when another program blocks the rename, bolo copies the file to `server.log.1` and empties it instead, and `bolo logs -f` follows that too (the lines written before the copy are read from `server.log.1`, then the emptied file from its start) |
 | uccharan's language packs | `%USERPROFILE%\.cache\uccharan\<version>\` (uccharan's own cache) |
 | environment variables | PowerShell: `$env:BOLO_DEVICE = "dml"` (this session), `[Environment]::SetEnvironmentVariable("BOLO_DEVICE", "dml", "User")` (from the next start on); cmd: `set BOLO_DEVICE=dml` |
 | text output | `bolo` reads and writes UTF-8 on pipes and files, so Hindi and other scripts survive `bolo transcribe x.wav > out.txt` and `bolo speak - -o out.wav < text.txt`. Windows PowerShell 5.1 uses other encodings at both ends of a pipe: it decodes what a program writes with `[Console]::OutputEncoding` (the console's code page) and encodes what it pipes into a program with `$OutputEncoding` (ASCII). Before piping text out of `bolo` (or `curl.exe`) into another PowerShell command, or into `bolo` (`"नमस्ते" \| bolo speak - -o out.wav`), set both, once per session or in your profile: `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` and `$OutputEncoding = [System.Text.Encoding]::UTF8`. cmd and PowerShell 7 need nothing |
 | `curl.exe` and JSON | Windows PowerShell 5.1 drops the double quotes inside an argument it passes to a program, so `curl.exe -d '{"model": "tts-1"}'` sends `{model: tts-1}` and the server answers 400. In 5.1 escape them (`-d '{\"model\": \"tts-1\"}'`), put the JSON in a file (`-d "@body.json"`), or use `Invoke-RestMethod` as in the README. PowerShell 7.3 and later pass them as written; cmd needs `-d "{\"model\": \"tts-1\"}"` |
 | firewall | with `--host 0.0.0.0` the Windows Defender Firewall prompt names `python.exe` ("Python"), not `bolo.exe`: uv's `bolo.exe` is a launcher that starts uv's Python interpreter, which is what listens. Prefer a rule for the port ([deploy/README.md](../deploy/README.md#windows-at-log-on-at-start-up-or-as-a-service)) to one for that interpreter, whose path changes when uv installs another Python |
 | local model folders | `bolo pull <folder>` / `file:` link the folder into the store: a directory symlink where allowed (Developer Mode or administrator), else a directory junction (no rights needed, same volume or not, local disks only), else a copy, with a notice |
-| `llama-server`, `audio.cpp` | `bolo components install llama-server` / `audio.cpp` install the pinned Windows release: the CPU build (with every CPU back end, from SSE4.2 to AVX-512, chosen at start-up), the CUDA 12.4 build with its CUDA runtime DLLs for `device = "cuda"`, the Vulkan build for `device = "vulkan"`. Each build goes in its own folder, so `BOLO_DEVICE=cuda bolo components install llama-server` after the CPU build installs the CUDA build next to it (`--flavour cpu\|cuda\|vulkan` picks one explicitly); bolo starts the build matching `device` (with `auto`, a GPU build when one is installed), and `bolo components list` shows which one runs. Tontaube is Linux only |
+| `llama-server`, `audio.cpp` | `bolo components install llama-server` / `audio.cpp` install the pinned Windows release: the CPU build (with every CPU back end, from SSE4.2 to AVX-512, chosen at start-up), the CUDA 12.4 build with its CUDA runtime DLLs for `device = "cuda"`, the Vulkan build for `device = "vulkan"`. Each build goes in its own folder, so `BOLO_DEVICE=cuda bolo components install llama-server` after the CPU build installs the CUDA build next to it (`--flavour cpu\|cuda\|vulkan` picks one explicitly); bolo starts the build matching `device` (with `auto`, a GPU build when one is installed), and `bolo components list` shows which one runs. Tontaube is Linux only: `components list` shows it as unavailable with the reason, and `components install tontaube` says "Linux only (use WSL2)"; run bolo in WSL2, or run `tontaube serve` there and set `tts_servers` |
 | Vulkan build on AMD + NVIDIA laptops | on a laptop with AMD graphics (Radeon integrated graphics next to an NVIDIA GPU) the Vulkan build of llama-server hung while it listed the GPUs (`llama-server --list-devices` never answered; Windows logged `RADAR_PRE_LEAK_64` for `llama-server.exe`): AMD's switchable-graphics Vulkan layer, which the Vulkan loader loads into every Vulkan program, is the cause. When bolo starts a Vulkan build of llama-server or audio.cpp on Windows and DXGI lists an AMD adapter, it sets `DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1=1` in that server's environment (logged at start), unless you set that variable yourself (any value: set `0` to keep the layer). `bolo doctor`'s `--list-devices` question gets the same environment and gives up after 20 s with a warning that names the variable, and a managed server that never answers `GET /health` says the same when it is a Vulkan build. Running `llama-server.exe` yourself: `set DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1=1` (cmd) or `$env:DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1 = "1"` (PowerShell) first |
 | servers bolo starts | llama-server, audio.cpp and plugin workers each run in a Job Object that Windows closes when bolo ends, however it ends (Task Manager, closing the console, a service stop), which ends them and whatever they started. bolo stops one by sending it `CTRL_BREAK_EVENT` and ends the Job Object 10 s later (at once when bolo has no console, as a service). `plugin_nice` > 0 means `BELOW_NORMAL_PRIORITY_CLASS`; `plugin_memory_limit_mb` limits each worker's committed memory (POSIX limits its address space) |
 
@@ -503,9 +503,30 @@ them again after any `uv tool upgrade` or `pip install` that brings `onnxruntime
 `nvidia-cudnn-cu13` that `onnxruntime-gpu[cudnn]` brings put the same cuDNN 9 files in `nvidia\cudnn\bin`; the one
 installed last stays, and `bolo doctor` tests both runtimes with it.
 
+**Upgrading drops CUDA.** `uv tool upgrade bolo-speech` and `uv tool install --force "bolo-speech[...]"` resolve
+bolo's dependencies again, and faster-whisper asks for plain `onnxruntime`: it is installed over `onnxruntime-gpu`,
+and the ONNX Runtime engines quietly run on the CPU. bolo says so: with `device = "cuda"`, or `auto` on a machine
+with an NVIDIA GPU (`nvidia-smi` on `PATH`), when the installed ONNX Runtime has no CUDA provider, the server logs
+one warning at start and `bolo doctor` prints a `WARNING:` line, each naming the installed package
+(`onnxruntime 1.32.0 (the CPU build)`) and the fix. Either run the swap above again after every upgrade, or install
+the tool so that plain `onnxruntime` is never part of it: uv's `--excludes` takes a requirements file whose
+packages are left out of the resolution, and uv keeps it (with the `--with` packages) in the tool's receipt, so a
+later `uv tool upgrade bolo-speech` keeps `onnxruntime-gpu` (checked with uv 0.11):
+
+```powershell
+Set-Content -Path "$env:TEMP\no-onnxruntime.txt" -Value "onnxruntime"
+uv tool install --force "bolo-speech[all,cuda]" --with "onnxruntime-gpu[cuda,cudnn]" --excludes "$env:TEMP\no-onnxruntime.txt"
+uv tool upgrade bolo-speech     # later: keeps onnxruntime-gpu and leaves onnxruntime out
+```
+
+`uv tool upgrade` has no `--with` of its own; it reuses what the install recorded. A later `uv tool install --force`
+replaces that record, so give it `--with` and `--excludes` again (without them it brings plain `onnxruntime` back,
+and the warning says so).
+
 `bolo doctor` with `device = "cuda"` (or `auto` on a machine with an NVIDIA GPU) opens a tiny graph on ONNX
 Runtime's CUDA provider and runs it, asks CTranslate2 for its CUDA devices and loads CUDA 12's cuBLAS and cuDNN, and
-names each library that is missing with the command that installs it. On Linux the same wheels work: bolo calls
+names each library that is missing with the command that installs it; an ONNX Runtime without a CUDA provider is
+named by its package (`onnxruntime-directml 1.24.4 (the DirectML build)`), with the command that swaps it. On Linux the same wheels work: bolo calls
 `preload_dlls()` for ONNX Runtime and loads CTranslate2's cuBLAS and cuDNN from NVIDIA's wheels when they are not
 on the library path.
 

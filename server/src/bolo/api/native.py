@@ -43,13 +43,16 @@ async def catalog(
 
 @router.get("/hardware", tags=["native"], summary="This machine: CPU, memory, disk, GPUs, runtimes, container limits")
 async def hardware(request: Request, refresh: str | None = None) -> JSONResponse:
-    """What bolo detected, best effort: a value it could not read is ``null`` (unknown). ``refresh=true`` looks
-    again and also runs the slower probes (the torch plugin's device, server binaries). ``speed`` says how fast
-    this machine is against the one the catalog was measured on, and whether that was measured (the
-    micro-benchmark) or estimated. Nothing here restricts what can be pulled or loaded."""
+    """What bolo detected, best effort: a value it could not read is ``null`` (unknown). Detected once and kept;
+    ``refresh=true`` looks again and also runs the slower probes (the torch plugin's device, server binaries'
+    versions, ``llama-server --list-devices``, nvidia-smi), whose answers are reused for 60 s and forgotten when a
+    component is installed; ``refresh=force`` runs them again at once. ``speed`` says how fast this machine is
+    against the one the catalog was measured on, and whether that was measured (the micro-benchmark) or estimated.
+    Nothing here restricts what can be pulled or loaded."""
     core = get_core(request)
-    again = parse_bool(refresh) if refresh not in (None, "") else False
-    return JSONResponse(await asyncio.to_thread(core.advisor.hardware_api, again))
+    force = (refresh or "").strip().lower() == "force"
+    again = force or (parse_bool(refresh) if refresh not in (None, "") else False)
+    return JSONResponse(await asyncio.to_thread(core.advisor.hardware_api, again, force))
 
 
 @router.post("/hardware/benchmark", tags=["native"], summary="Run the micro-benchmark (a few seconds of CPU)")

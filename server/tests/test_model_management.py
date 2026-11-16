@@ -352,6 +352,50 @@ def test_a_blocked_log_rotation_copies_and_truncates(
         handler.close()
 
 
+def test_follow_survives_copy_truncate_and_rename(tmp_path: Path) -> None:
+    """`bolo logs -f` loses no line when the log is copied and emptied (Windows, a blocked rename) and written past
+    the position reached before it is read again, when it is emptied and stays short, nor when it is renamed."""
+    path, backup = tmp_path / "server.log", tmp_path / "server.log.1"
+
+    def write(numbers: range) -> None:
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write("".join(f"2026-11-16 10:00:{n % 60:02d} INFO    bolo: line {n}\n" for n in numbers))
+
+    def take(gen: object, n: int) -> list[int]:
+        return [int(next(gen).rsplit(" ", 1)[1]) for _ in range(n)]  # type: ignore[call-overload]
+
+    def copy_truncate() -> None:
+        import shutil
+
+        shutil.copyfile(path, backup)
+        with path.open("r+b") as fh:
+            fh.truncate(0)
+
+    write(range(5))
+    gen = logs.follow(path, 0.001, from_start=True)
+    try:
+        assert take(gen, 5) == list(range(5))
+        write(range(5, 10))  # written, not read yet, when the file is copied and emptied
+        copy_truncate()
+        write(range(10, 60))  # and written again past the position reached
+        assert take(gen, 55) == list(range(5, 60))
+        write(range(60, 62))
+        copy_truncate()  # emptied and still shorter than the position reached
+        write(range(62, 63))
+        assert take(gen, 3) == [60, 61, 62]
+        write(range(63, 66))
+        Path(path).replace(backup)  # the normal rotation: renamed while open
+        write(range(66, 70))
+        assert take(gen, 7) == list(range(63, 70))
+        with path.open("a", encoding="utf-8") as fh:  # half a line, then the rest: one line
+            fh.write("2026-11-16 10:01:00 INFO    bolo: line ")
+            fh.flush()
+            fh.write("70\n")
+        assert take(gen, 1) == [70]
+    finally:
+        gen.close()
+
+
 def test_cli_logs_and_doctor(
     cli_env: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:

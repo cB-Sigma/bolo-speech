@@ -659,7 +659,7 @@ def cli_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("BOLO_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.delenv("BOLO_CONFIG", raising=False)
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr("bolo.hardware.detect", lambda settings=None, host=None, deep=False: SMALL)
+    monkeypatch.setattr("bolo.hardware.detect", lambda settings=None, host=None, deep=False, cache=None: SMALL)
     return tmp_path
 
 

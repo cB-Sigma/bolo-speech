@@ -17,7 +17,7 @@ from typing import Any
 
 from bolo import __version__
 from bolo.config import Settings, load_settings
-from bolo.errors import BoloError
+from bolo.errors import BoloError, FilesInUse
 
 _SETTING_FLAGS: list[tuple[str, str, dict[str, Any]]] = [
     ("--data-dir", "data_dir", {"help": "where models are stored (default: ~/.cache/bolo)"}),
@@ -303,7 +303,13 @@ def cmd_rm(args: argparse.Namespace) -> int:
                 print(f"error: {_error_of(r)}", file=sys.stderr)
                 code = 1
                 continue
-        if not asyncio.run(core.remove(spec.id)):
+        try:
+            removed = asyncio.run(core.remove(spec.id))
+        except FilesInUse as exc:  # Windows: a file still open in another program after a few seconds of tries
+            print(f"error: {exc.message}", file=sys.stderr)
+            code = 1
+            continue
+        if not removed:
             print(f"{name}: not installed", file=sys.stderr)
             code = 1
             continue
@@ -1027,31 +1033,39 @@ def cmd_components(args: argparse.Namespace) -> int:
             build = f", {c['flavour']} build" if c.get("flavour") else ""
             state = f"installed ({c['source']}, {c['version']}{build})" if c["installed"] else "not installed"
             print(f"{c['id']:<12} {state:<40} {c['license']:<18} needed by {c['required_by_count']} catalog models")
-            if not c["installed"] and c.get("kind") in ("phonemizer", "language-pack"):
+            if c.get("available") is False:
+                print(f"             unavailable here: {c['unavailable_reason']}")
+            elif not c["installed"] and c.get("kind") in ("phonemizer", "language-pack"):
                 flag = " --accept-license" if c["license"] not in ("Apache-2.0",) else ""
                 print(f"             install: bolo components install {c['id']}{flag}   (or: {c['manual_command']})")
             elif not c["installed"]:
                 print(f"             install: {c['manual_command']}")
         return 0
+    from bolo import tts_runtimes
+
     listed = manager.pack_status()
     packs = tuple(c["id"] for c in listed if c["license"] != "Apache-2.0")
-    installable = ("espeak-ng", "uccharan", "llama-server", "audio.cpp", *(c["id"] for c in listed))
+    installable = ("espeak-ng", "uccharan", *tts_runtimes.RUNTIMES, *(c["id"] for c in listed))
     if args.component not in installable:
         print(f"error: unknown component '{args.component}' (installable: {', '.join(installable)})", file=sys.stderr)
         return 1
-    runtime = args.component in ("llama-server", "audio.cpp")
-    if args.flavour and not runtime:
+    runtime = args.component in tts_runtimes.RUNTIMES
+    unsupported = tts_runtimes.unsupported_reason(args.component) if runtime else None
+    if unsupported:
+        print(f"error: cannot install {args.component}: {unsupported}", file=sys.stderr)
+        return 1
+    built = args.component in ("llama-server", "audio.cpp")
+    if args.flavour and not built:
         print(f"error: --flavour is for llama-server and audio.cpp, not {args.component}", file=sys.stderr)
         return 1
-    if runtime and args.flavour is None:
-        from bolo import tts_runtimes
-
+    if built and args.flavour is None:
         note = tts_runtimes.missing_build_note(args.component, manager.core.settings.device)
         if note:
             print(f"note: {note}", file=sys.stderr)
     if runtime and not manager.runtime_needs_install(args.component, args.flavour):
-        from bolo import tts_runtimes
-
+        if not built:
+            print(f"{args.component} is already installed")
+            return 0
         build = args.flavour or tts_runtimes.flavour_for(args.component, manager.core.settings.device)
         print(f"{args.component} ({build} build) is already installed")
         return 0
@@ -1551,7 +1565,11 @@ def _doctor_onnxruntime(settings: Settings) -> None:
     elif not packages:
         print("onnxruntime: not installed (Nemotron diarization, DiCoW, Orpheus-family voices and the end-of-turn "
               "model need it: pip install 'bolo-speech[turn]')")  # fmt: skip
-    for problem in ort_providers.ort_problems(settings.device, packages, providers):
+    # an NVIDIA machine whose ONNX Runtime lost CUDA (uv tool upgrade put plain onnxruntime back): one loud line
+    dropped = ort_providers.cuda_dropped(settings.device, shutil.which("nvidia-smi") is not None, packages, providers)
+    if dropped:
+        print(f"  WARNING: {dropped}")
+    for problem in ort_providers.ort_problems(None if dropped else settings.device, packages, providers):
         print(f"  warning: {problem}")
 
 

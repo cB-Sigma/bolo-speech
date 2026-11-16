@@ -63,6 +63,44 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- `bolo doctor`'s CUDA section names the ONNX Runtime package that is installed when it has no CUDA provider
+  (`onnxruntime-directml 1.24.4 (the DirectML build)`, with `pip uninstall -y onnxruntime-directml`), instead of
+  calling every such build "the CPU build" and telling it to uninstall `onnxruntime`.
+- A lost CUDA provider is said out loud: with `device = "cuda"`, or `auto` on a machine with an NVIDIA GPU, an ONNX
+  Runtime without a CUDA provider (`uv tool upgrade` and `uv tool install --force` put plain `onnxruntime` back over
+  `onnxruntime-gpu`) gets one warning line in the server's log at start and a `WARNING:` line in `bolo doctor`, each
+  naming the package and the fix. docs/configuration.md, "CUDA on Windows", has the upgrade path
+  (`uv tool install ... --with "onnxruntime-gpu[cuda,cudnn]" --excludes <file naming onnxruntime>`, which
+  `uv tool upgrade` keeps).
+- `bolo logs -f` no longer skips lines when the log is copied and emptied (the rotation's fallback on Windows when
+  another program blocks the rename): the emptied file is told by its size or by its first line having changed,
+  even when it has already grown past the position read; the lines written before the copy are read from
+  `server.log.1`, then the new file from its start. On Windows 328 of 4200 lines had been skipped.
+- `GET /api/v1/hardware?refresh=1` no longer runs the slow probes every time (about 3 s per call on a Windows
+  laptop): the answers of nvidia-smi, the server binaries' `--version` and `--list-devices`, the torch plugin's
+  `doctor` and CTranslate2's CUDA device count are reused for 60 s, and forgotten when a component is installed;
+  `refresh=force` runs them again at once.
+- `bolo components install tontaube` said "unknown component" (the command's own list left it out, on every
+  platform). On Windows and macOS `components list` now shows Tontaube as unavailable with the reason, and installing
+  it says it is Linux only (on Windows: "use WSL2"); the API's `components` entries have `available` and
+  `unavailable_reason`.
+- audio.cpp models: a voice that is neither the catalog's nor one the server lists is refused with 400 and the
+  voices there are, instead of being passed on (audio.cpp takes it for a file path and answered 500).
+- `GET /v1/audio/voices?model=<id>` lists that model's voices only (it listed every model's); an unknown model is 404.
+- Removing a model (`bolo rm`, `DELETE /api/v1/models/{id}`) waits out a Windows sharing violation (WinError 32 or
+  5: an antivirus scanner holding a file that was just written) with a few growing pauses (about 3 s in all). When
+  the folder is still in use after that, the error (409 `files_in_use`) names the folder and the file instead of a
+  traceback; the manifest goes first, so a folder only partly deleted is not taken for an installed model. bolo
+  itself holds no handle on a model's `manifest.json` (it reads and writes it whole).
+- tools/validate_models.py: the CPU's name comes from bolo.hardware (on Windows it read `/proc/cpuinfo`), and a GPU
+  that is there is named; without the `--en-voice` model it takes the first installed English voice, and with none
+  the models that need test speech fail with a reason instead of a `KeyError: 'en'`; diarization and end-of-turn
+  models get checks of their own instead of the VAD check; a model whose removal fails (WinError 32 on Windows) is
+  recorded with `cleanup_error` and the run goes on.
+- Saved voices: the "sounds noisy" warning no longer fires on clean synthetic speech whose DC offset comes and goes
+  with the voice (bolo's own reference clips among them): the offset is removed with a 0.1 s moving average instead
+  of the clip's mean, which had turned digital silence into a background 27 dB under the speech. Noise 10 dB under
+  the speech still earns the warning.
 - **The end-of-turn model (`smart-turn-v3`, `semantic_vad`) gave wrong probabilities on x86 CPUs without VNNI**
   (AVX2 only: AMD Ryzen before Zen 4, Intel before Ice Lake / Alder Lake), the same ONNX Runtime kernel that emptied
   DiCoW's transcripts: its int8 graph (QuantizeLinear / DequantizeLinear pairs, which ONNX Runtime fuses into uint8 x

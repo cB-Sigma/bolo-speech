@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import importlib
 import logging
 import os
@@ -528,14 +529,15 @@ class ComponentManager:
     # -- TTS server runtimes ------------------------------------------------
     def runtime_blocked_reason(self, runtime: str, flavour: str | None = None) -> str | None:
         s = self.core.settings
+        unsupported = tts_runtimes.unsupported_reason(runtime)
+        if unsupported:
+            return unsupported
         if s.host not in LOOPBACK and not s.api_key:
             return "installing components is never allowed on a non-loopback address without an API key"
         if s.allow_component_install is False:
             return "the operator disabled component installation (allow_component_install = false)"
         info = tts_runtimes.RUNTIME_INFO[runtime]
         if info.git is not None:
-            if tts_runtimes.platform_key() not in info.git.platforms:
-                return f"{info.name} runs on Linux only (this is {tts_runtimes.platform_key()})"
             if shutil.which("git") is None:
                 return "git is not installed (it fetches the pinned source)"
         elif flavour is not None and flavour not in tts_runtimes.pinned_flavours(runtime):
@@ -573,6 +575,7 @@ class ComponentManager:
             state = tts_runtimes.install_status(self.core.settings, runtime)
             installed = state["path"] is not None
             blocked = self.runtime_blocked_reason(runtime)
+            unsupported = tts_runtimes.unsupported_reason(runtime)
             release = state["release"]
             if info.git is not None:
                 manual = (
@@ -596,6 +599,9 @@ class ComponentManager:
                     "required_by_count": self.required_by(runtime),
                     "installable": blocked is None and self.runtime_needs_install(runtime),
                     "install_blocked_reason": None if installed else blocked,
+                    # False where the runtime cannot run at all (Tontaube off Linux), with the reason
+                    "available": unsupported is None,
+                    "unavailable_reason": unsupported,
                     # the build that runs (from bolo's components folder): cpu, cuda or vulkan
                     "flavour": state["flavour"],
                     "flavours": state["flavours"],
@@ -837,6 +843,8 @@ class ComponentManager:
             core.log("error", f"installing {job.model} failed: {error}")
         else:
             job.state, job.progress = "done", 1.0
+            with contextlib.suppress(Exception):  # the hardware report probes the new runtime afresh
+                core.advisor.components_changed()
             core.events.publish("component", {"id": job.model, "event": "installed"})
             core.log("info", f"installed component {job.model}; voices that need it are now available")
         core.events.publish("job", {"job": job.to_dict()})

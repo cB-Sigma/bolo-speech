@@ -51,10 +51,19 @@ async def audio_models(request: Request) -> JSONResponse:
 
 
 @router.get("/v1/audio/voices", tags=["speaches"], summary="List voices of installed text-to-speech models")
-async def audio_voices(request: Request) -> JSONResponse:
+async def audio_voices(request: Request, model: str | None = None) -> JSONResponse:
+    """The voices of the installed text-to-speech models; ``model`` (an id or alias): that model's voices only."""
     core = get_core(request)
     voices: list[dict[str, Any]] = []
-    for m in core.catalog_api(task="tts", installed=True):
+    wanted: str | None = None
+    if model:
+        spec = core.catalog.resolve(model)
+        if spec is None or spec.task != "tts":
+            raise ModelNotFound(f"no text-to-speech model '{model}'", param="model")
+        wanted = spec.id
+    for m in core.catalog_api(task="tts", installed=None if wanted else True):
+        if wanted is not None and m["id"] != wanted:
+            continue
         for v in _model_object(m)["voices"]:
             voices.append({**v, "model_id": m["id"]})
     return JSONResponse({"object": "list", "voices": voices})

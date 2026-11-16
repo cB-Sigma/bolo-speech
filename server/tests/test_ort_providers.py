@@ -153,3 +153,90 @@ def test_every_engine_session_asks_for_exact_int8_products(monkeypatch: pytest.M
         with pytest.raises(Built):
             build()
     assert seen == ["1"] * len(builds)
+
+
+DML = "DmlExecutionProvider"
+
+
+def test_a_build_without_cuda_is_named_by_its_package(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`bolo doctor`'s CUDA section names the package that is installed (onnxruntime-directml here), not "the CPU
+    build" and `pip uninstall -y onnxruntime` whatever it is."""
+    from bolo import cuda_libs
+    from bolo.ort_providers import no_cuda_provider
+
+    dml = {"onnxruntime-directml": "1.24.4"}
+    text = no_cuda_provider(dml)
+    assert (
+        "onnxruntime-directml 1.24.4 (the DirectML build)" in text and "pip uninstall -y onnxruntime-directml" in text
+    )
+    assert "CPU build" not in text and 'device = "dml"' in text
+    text = no_cuda_provider({"onnxruntime": "1.32.0"})
+    assert "onnxruntime 1.32.0 (the CPU build)" in text and "pip uninstall -y onnxruntime," in text
+    text = no_cuda_provider({"onnxruntime": "1.32.0", "onnxruntime-gpu": "1.32.0"})
+    assert "pip uninstall -y onnxruntime onnxruntime-gpu," in text and "overwrite each other" in text
+    ort = pytest.importorskip("onnxruntime")
+    monkeypatch.setattr(ort, "get_available_providers", lambda: [DML, CPU])
+    ok, text = cuda_libs.check_ort_cuda(dml)
+    assert not ok and "onnxruntime-directml" in text and "CPU build" not in text
+    lines = cuda_libs.doctor_lines(ort_check=lambda: cuda_libs.check_ort_cuda(dml), have_ort=True, have_ct2=False)
+    assert lines[1].startswith("  -- onnxruntime") and "pip uninstall -y onnxruntime-directml" in lines[1]
+
+
+@pytest.mark.parametrize(
+    ("device", "nvidia", "packages", "providers", "warned"),
+    [
+        ("cuda", True, {"onnxruntime": "1.32.0"}, [CPU], True),  # uv tool upgrade put plain onnxruntime back
+        ("auto", True, {"onnxruntime": "1.32.0"}, [CPU], True),
+        ("cuda:1", False, {"onnxruntime": "1.32.0"}, [CPU], True),  # asked for CUDA: no GPU check needed
+        ("auto", False, {"onnxruntime": "1.32.0"}, [CPU], False),  # no NVIDIA GPU: nothing lost
+        ("auto", True, {"onnxruntime-directml": "1.24.4"}, [DML, CPU], False),  # auto runs on DirectML
+        ("cuda", True, {"onnxruntime-directml": "1.24.4"}, [DML, CPU], True),
+        ("cuda", True, {"onnxruntime-gpu": "1.32.0"}, [CUDA, CPU], False),
+        ("cpu", True, {"onnxruntime": "1.32.0"}, [CPU], False),
+        ("cuda", True, {}, None, False),  # no ONNX Runtime at all
+    ],
+)
+def test_cuda_dropped_warning(
+    device: str, nvidia: bool, packages: dict[str, str], providers: list[str] | None, warned: bool
+) -> None:
+    message = ort_providers.cuda_dropped(device, nvidia, packages, providers)
+    assert bool(message) is warned
+    if message:
+        assert "\n" not in message and "NVIDIA GPU" in message and "pip install" in message
+        assert next(iter(packages)) in message and "uv tool upgrade" in message
+
+
+def test_doctor_and_server_warn_once_when_cuda_was_dropped(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path, caplog: Any
+) -> None:
+    import asyncio
+    import shutil
+
+    from bolo import cli
+    from bolo.config import Settings
+    from bolo.core import Bolo
+
+    monkeypatch.setattr(ort_providers, "installed_ort_packages", lambda: {"onnxruntime": "1.32.0"})
+    monkeypatch.setattr(shutil, "which", lambda name, *a, **k: "/x/nvidia-smi" if name == "nvidia-smi" else None)
+    ort = pytest.importorskip("onnxruntime")
+    monkeypatch.setattr(ort, "get_available_providers", lambda: [CPU])
+    cli._doctor_onnxruntime(Settings(device="auto"))
+    out = capsys.readouterr().out
+    assert out.count("WARNING:") == 1 and "onnxruntime 1.32.0 (the CPU build)" in out
+    cli._doctor_onnxruntime(Settings(device="cuda"))  # one line, not the same thing twice
+    out = capsys.readouterr().out
+    assert out.count("no CUDA provider") == 1
+    core = Bolo(Settings(data_dir=tmp_path, device="auto"))
+    assert core.ort_cuda_warning(nvidia_gpu=False, providers=[CPU]) is None
+
+    async def start() -> None:
+        await core.start()
+        for _ in range(200):
+            if any("no CUDA provider" in r.getMessage() for r in caplog.records):
+                break
+            await asyncio.sleep(0.01)
+        await core.stop()
+
+    with caplog.at_level(logging.WARNING, logger="bolo.core"):
+        asyncio.run(start())
+    assert sum("no CUDA provider" in r.getMessage() for r in caplog.records) == 1

@@ -435,3 +435,91 @@ def test_catalog_sources_resolve_on_the_hub() -> None:
         except Exception as exc:
             failures.append(f"{spec.id}: {exc}")
     assert not failures, "\n".join(failures)
+
+
+def _installed(tmp_path: Path, model_id: str = "m") -> tuple[ModelStore, Path]:
+    store = ModelStore(tmp_path)
+    mdir = store.model_dir(model_id)
+    mdir.mkdir(parents=True)
+    (mdir / "weights.bin").write_bytes(b"x" * 10)
+    (mdir / "manifest.json").write_text(json.dumps({"id": model_id, "complete": True, "files": []}), encoding="utf-8")
+    return store, mdir
+
+
+def _in_use(path: Path) -> PermissionError:
+    exc = PermissionError(13, "The process cannot access the file because it is being used by another process")
+    exc.filename = str(path / "manifest.json")
+    exc.winerror = 32  # type: ignore[attr-defined]  # what Windows sets; patched in so this runs everywhere
+    return exc
+
+
+def test_removal_waits_out_a_sharing_violation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Windows: an antivirus scanner holds a just-written manifest.json for a moment (WinError 32). bolo rm tries
+    again with a growing pause, and deletes the folder once the file is let go."""
+    import shutil
+
+    from bolo import store as store_mod
+
+    store, mdir = _installed(tmp_path)
+    tries: list[Path] = []
+
+    def remover(path: Path) -> None:
+        tries.append(path)
+        if len(tries) < 3:
+            raise _in_use(path)
+        shutil.rmtree(path)
+
+    pauses: list[float] = []
+    monkeypatch.setattr(store_mod.time, "sleep", pauses.append)
+    store.remover = remover
+    assert store.remove("m") is True
+    assert len(tries) == 3 and pauses == list(store_mod.REMOVE_BACKOFF_S[:2]) and not mdir.exists()
+
+
+def test_removal_that_stays_blocked_names_the_folder(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from bolo import store as store_mod
+    from bolo.errors import FilesInUse
+
+    store, mdir = _installed(tmp_path)
+    pauses: list[float] = []
+    monkeypatch.setattr(store_mod.time, "sleep", pauses.append)
+
+    def remover(path: Path) -> None:
+        raise _in_use(path)
+
+    store.remover = remover
+    with pytest.raises(FilesInUse) as info:
+        store.remove("m")
+    assert str(mdir) in info.value.message and "WinError 32" in info.value.message and info.value.status == 409
+    assert pauses == list(store_mod.REMOVE_BACKOFF_S) and sum(pauses) < 5
+    # any other error is not waited for
+    pauses.clear()
+
+    def denied(path: Path) -> None:
+        raise PermissionError(13, "Permission denied", str(path))
+
+    store.remover = denied
+    with pytest.raises(PermissionError):
+        store.remove("m")
+    assert pauses == []
+
+
+def test_default_removal_drops_the_manifest_first(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A folder only partly deleted is not taken for an installed model any more."""
+    import shutil
+
+    from bolo import store as store_mod
+
+    store, mdir = _installed(tmp_path)
+    monkeypatch.setattr(store_mod.time, "sleep", lambda s: None)
+    real = shutil.rmtree
+
+    def stuck(path: object, *a: object, **k: object) -> None:
+        raise _in_use(Path(str(path)))
+
+    monkeypatch.setattr(store_mod.shutil, "rmtree", stuck)
+    with pytest.raises(store_mod.FilesInUse):
+        store.remove("m")
+    assert not store.is_installed("m") and (mdir / "weights.bin").exists()
+    monkeypatch.setattr(store_mod.shutil, "rmtree", real)
+    assert store.remove("m") is True and not mdir.exists()

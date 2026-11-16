@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import platform
 import sys
+import time
 import types
 from pathlib import Path
 from typing import Any
@@ -413,6 +414,73 @@ def test_server_binary_from_settings(tmp_path: Path) -> None:
     found = hw.detect(settings(tmp_path, llama_server_bin=str(binary)), host, deep=True).runtimes["llama-server"]
     assert found["installed"] is True and found["source"] == "settings" and found["version"] == "version: 6123 (abc)"
     assert found["gpu"] is True and found["gpu_devices"] == ["CUDA0: RTX 4090"]
+
+
+def test_slow_probes_are_reused_for_a_minute(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """GET /api/v1/hardware?refresh=1 took about 3 s per call on a Windows laptop: nvidia-smi, --version and
+    --list-devices ran every time. Their answers are reused for the cache's TTL, per binary."""
+    binary = printing_program(tmp_path / "llama-server")
+    now = [0.0]
+    cache = hw.ProbeCache(60.0, clock=lambda: now[0])
+    host = FakeHost(
+        files={"/proc/cpuinfo": cpuinfo(X86_AVX2, 8)},
+        commands={
+            f"{binary} --version": "version: 6123 (abc)\n", f"{binary} --list-devices": "  CUDA0: RTX 3060\n",
+            "/usr/bin/nvidia-smi --query-gpu=name,memory.total,memory.free,driver_version": "RTX 3060, 6144, 5000, 621\n",
+        },
+        binaries={"nvidia-smi": "/usr/bin/nvidia-smi"},
+        cores=8,
+    )  # fmt: skip
+    host.cache = cache
+    conf = settings(tmp_path, llama_server_bin=str(binary))
+    first = hw.detect(conf, host, deep=True)
+    assert len(host.ran) == 3 and first.gpus[0].name == "RTX 3060"  # nvidia-smi, --version, --list-devices
+    again = hw.detect(conf, host, deep=True)
+    assert len(host.ran) == 3 and again.runtimes["llama-server"]["gpu_devices"] == ["CUDA0: RTX 3060"]
+    now[0] = 61.0  # stale: asked again
+    hw.detect(conf, host, deep=True)
+    assert len(host.ran) == 6
+    cache.clear()  # a component was installed
+    hw.detect(conf, host, deep=True)
+    assert len(host.ran) == 9
+    host.cache = None  # no cache: every time, as before
+    hw.detect(conf, host, deep=True)
+    assert len(host.ran) == 12
+
+
+def test_the_hardware_route_reuses_slow_probes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The server's view: ?refresh=1 detects again with the probes' answers from the last minute, ?refresh=force runs
+    them again, and an installed component makes them run again."""
+    from fastapi.testclient import TestClient
+
+    from bolo.api.app import create_app
+
+    calls: list[str] = []
+
+    def slow(self: hw.Host, argv: list[str], timeout: float = 4.0) -> str | None:
+        calls.append(" ".join(argv[1:2]))
+        return "RTX 3060, 6144, 5000, 621\n" if "nvidia-smi" in argv[0] else None
+
+    monkeypatch.setattr(hw.Host, "run", slow)
+    monkeypatch.setattr(hw.Host, "which", lambda self, name: "/x/nvidia-smi" if name == "nvidia-smi" else None)
+    app = create_app(settings(tmp_path))
+    with TestClient(app) as client:
+        core = app.state.core
+        deadline = time.monotonic() + 10
+        while core.advisor._refreshing and time.monotonic() < deadline:  # the start-up detection, in the background
+            time.sleep(0.01)
+        assert client.get("/api/v1/hardware?refresh=1").json()["gpus"][0]["name"] == "RTX 3060"
+        seen = len(calls)
+        assert seen >= 1
+        for _ in range(3):
+            assert client.get("/api/v1/hardware?refresh=1").status_code == 200
+            assert client.get("/api/v1/hardware").status_code == 200
+        assert len(calls) == seen
+        assert client.get("/api/v1/hardware?refresh=force").status_code == 200
+        assert len(calls) == seen + 1
+        core.advisor.probes.clear()  # what an installed component does (Advisor.components_changed)
+        assert client.get("/api/v1/hardware?refresh=1").status_code == 200
+        assert len(calls) == seen + 2
 
 
 def test_doctor_names_the_gpus_a_server_build_found() -> None:

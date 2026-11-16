@@ -251,6 +251,22 @@ def platform_key() -> str:
     return f"{system}-{machine}"
 
 
+def unsupported_reason(runtime: str, key: str | None = None) -> str | None:
+    """Why ``runtime`` cannot run on this platform at all (``key``: :func:`platform_key`), or None. Tontaube runs on
+    Linux only: on Windows it can run under WSL2."""
+    info = RUNTIME_INFO[runtime]
+    key = key or platform_key()
+    if info.git is None or key in info.git.platforms:
+        return None
+    short = info.name.split(" ", 1)[0]
+    if key.startswith("windows"):
+        return (
+            f"{short} is Linux only (use WSL2): this is {key}; run bolo inside WSL2, or run `{info.binary} serve` "
+            f'there and set tts_servers = ["{runtime}=http://host:port"]'
+        )
+    return f"{short} is Linux only: this is {key}; run `{info.binary} serve` on Linux and set tts_servers"
+
+
 def components_dir(settings: Settings) -> Path:
     return Path(settings.data_dir) / "components"
 

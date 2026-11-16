@@ -13,6 +13,7 @@ import importlib.util
 import logging
 import os
 import platform
+import shutil
 import threading
 import time
 from collections.abc import AsyncGenerator, Awaitable, Callable
@@ -23,7 +24,7 @@ from typing import Any
 import numpy as np
 import psutil
 
-from bolo import __version__, logs
+from bolo import __version__, logs, ort_providers
 from bolo.audio.decode import decode_audio
 from bolo.audio.encode import encode_audio
 from bolo.audio.resample import resample
@@ -197,8 +198,31 @@ class Bolo:
         self.ready = True
         # look at the machine off the event loop, so the first catalog request does not wait for it
         self.advisor.refresh_soon()
+        self._tasks.append(asyncio.create_task(self._check_ort_cuda(), name="bolo-ort-cuda"))
         if self.settings.preload:
             self._tasks.append(asyncio.create_task(self._preload(), name="bolo-preload"))
+
+    async def _check_ort_cuda(self) -> None:
+        """Say once, at start, when ``device`` wants CUDA on a machine with an NVIDIA GPU but the installed ONNX
+        Runtime has no CUDA provider (``uv tool upgrade`` put plain onnxruntime back over onnxruntime-gpu)."""
+        with contextlib.suppress(Exception):
+            message = await asyncio.get_running_loop().run_in_executor(None, self.ort_cuda_warning)
+            if message:
+                self.log("warning", message)
+
+    def ort_cuda_warning(self, nvidia_gpu: bool | None = None, providers: list[str] | None = None) -> str | None:
+        """The warning :meth:`_check_ort_cuda` logs (bolo.ort_providers.cuda_dropped), or None."""
+        name = str(self.settings.device or "cpu").strip().lower().partition(":")[0]
+        if name not in ("cuda", "gpu", "auto"):
+            return None
+        packages = ort_providers.installed_ort_packages()
+        if not packages:
+            return None
+        if nvidia_gpu is None:
+            nvidia_gpu = shutil.which("nvidia-smi") is not None
+        if providers is None:
+            providers = ort_providers.available_providers()
+        return ort_providers.cuda_dropped(self.settings.device, nvidia_gpu, packages, providers)
 
     def _on_model_loaded(self, spec: ModelSpec) -> None:
         """Say once, in the log, when a model that was just loaded is unlikely to suit this machine."""

@@ -157,6 +157,9 @@ def cuda_hint(have: list[str]) -> str:
             'this is onnxruntime-directml: device = "dml" (or "auto") runs them on the GPU through DirectML; for CUDA '
             'instead: pip uninstall -y onnxruntime-directml, then pip install "onnxruntime-gpu[cuda,cudnn]"'
         )
+    packages = installed_ort_packages()
+    if packages:
+        return no_cuda_provider(packages)
     from bolo import cuda_libs
 
     return cuda_libs.ORT_CUDA_RECIPE
@@ -361,6 +364,59 @@ def installed_ort_packages(versions: dict[str, str | None] | None = None) -> dic
     return {name: v for name, v in versions.items() if v}
 
 
+#: what each ONNX Runtime distribution is, for messages that name it
+_BUILD = {
+    "onnxruntime": "the CPU build", "onnxruntime-directml": "the DirectML build",
+    "onnxruntime-openvino": "the OpenVINO build", "onnxruntime-qnn": "the Qualcomm QNN build",
+    "onnxruntime-rocm": "the ROCm build", "onnxruntime-silicon": "the Apple silicon build",
+}  # fmt: skip
+
+
+def no_cuda_provider(packages: dict[str, str]) -> str:
+    """Why this ONNX Runtime has no CUDA provider, naming the installed distribution, and how to get one."""
+    gpu = 'pip install "onnxruntime-gpu[cuda,cudnn]"'
+    if len(packages) > 1 or "onnxruntime-gpu" in packages:
+        listed = ", ".join(f"{name} {version}" for name, version in sorted(packages.items()))
+        names = " ".join(sorted(packages))
+        return (
+            f"the installed ONNX Runtime ({listed}) has no CUDA provider (these packages overwrite each other's "
+            f"files): pip uninstall -y {names}, then {gpu}"
+        )
+    if not packages:
+        return f"onnxruntime is not installed: {gpu}"
+    name, version = next(iter(packages.items()))
+    what = f"{name} {version} ({_BUILD.get(name, 'not a CUDA build')})"
+    if name == "onnxruntime-directml":
+        return (
+            f'this ONNX Runtime is {what}, which has no CUDA provider; device = "dml" (or "auto") runs the ONNX '
+            f"Runtime engines on the GPU through DirectML, or for CUDA: pip uninstall -y {name}, then {gpu}"
+        )
+    return f"this ONNX Runtime is {what}, which has no CUDA provider: pip uninstall -y {name}, then {gpu}"
+
+
+def cuda_dropped(
+    device: str | None, nvidia_gpu: bool, packages: dict[str, str], providers: list[str] | None
+) -> str | None:
+    """The one-line warning for an NVIDIA machine whose ONNX Runtime lost its CUDA provider: ``device`` is ``cuda``
+    (``gpu``), or ``auto`` with an NVIDIA GPU and no other accelerator in this ONNX Runtime (with
+    onnxruntime-directml, ``auto`` runs on DirectML, which is not a loss). That happens when ``uv tool upgrade`` or
+    ``uv tool install --force`` reinstalls plain onnxruntime over onnxruntime-gpu. None when there is nothing to
+    say (no ONNX Runtime at all, or one with CUDA)."""
+    name = (device or "cpu").strip().lower().partition(":")[0]
+    if not packages or providers is None or "CUDAExecutionProvider" in providers:
+        return None
+    if name == "auto":
+        if not nvidia_gpu or auto_device("cuda:0", providers) != "cpu":
+            return None
+    elif name not in ("cuda", "gpu"):
+        return None
+    return (
+        f"device {device!r} on a machine with an NVIDIA GPU, but {no_cuda_provider(packages)}; until then the ONNX "
+        "Runtime engines run on the CPU (`uv tool upgrade` and `uv tool install --force` put plain onnxruntime back: "
+        'docs/configuration.md, "CUDA on Windows")'
+    )
+
+
 def ort_problems(device: str | None, packages: dict[str, str], providers: list[str] | None) -> list[str]:
     """What ``bolo doctor`` warns about: several ONNX Runtime packages sharing the one module, and a device whose
     provider this ONNX Runtime lacks (``dml`` without onnxruntime-directml, ``cuda`` without onnxruntime-gpu)."""
@@ -376,17 +432,8 @@ def ort_problems(device: str | None, packages: dict[str, str], providers: list[s
     if wanted and providers is not None and wanted not in providers and packages:
         if wanted == "DmlExecutionProvider":
             out.append(f"device {device!r} needs DirectML in ONNX Runtime, which this one lacks: {DIRECTML_RECIPE}")
-        elif wanted == "CUDAExecutionProvider" and "onnxruntime-directml" in packages:
-            out.append(
-                f"device {device!r}: this ONNX Runtime is onnxruntime-directml, which has no CUDA provider; "
-                'device = "dml" (or "auto") runs the ONNX Runtime engines on the GPU through DirectML, or for CUDA: '
-                "pip uninstall -y onnxruntime-directml, then pip install onnxruntime-gpu"
-            )
         elif wanted == "CUDAExecutionProvider":
-            out.append(
-                f"device {device!r}: this ONNX Runtime has no CUDA provider; pip uninstall -y onnxruntime, then "
-                "pip install onnxruntime-gpu (faster-whisper brings its own CUDA support)"
-            )
+            out.append(f"device {device!r}: {no_cuda_provider(packages)} (faster-whisper brings its own CUDA support)")
         else:
             out.append(f"device {device!r}: this ONNX Runtime has no {wanted}")
     return out

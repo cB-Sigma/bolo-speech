@@ -358,3 +358,36 @@ def test_show_names_the_phonemiser_used_here(settings: Settings, no_espeak) -> N
     core.store.set_model_settings("piper-en-us-amy-low", {"phonemizer": "uccharan"})  # pinned, not installed
     assert phonemes("piper-en-us-amy-low").startswith("uccharan (pinned), which is not installed")
     assert "phonemes" not in format_show(core.show_api(core.manager.resolve("fake-tts")))
+
+
+def test_tontaube_is_linux_only_and_says_so(
+    monkeypatch: pytest.MonkeyPatch, tmp_path, capsys: pytest.CaptureFixture[str]
+) -> None:  # type: ignore[no-untyped-def]
+    """On Windows `components list` shows Tontaube as unavailable with the reason, and `components install
+    tontaube` says "Linux only (use WSL2)" rather than "unknown component" (the CLI's list once left it out)."""
+    from bolo import tts_runtimes
+    from bolo.errors import InvalidRequest
+
+    monkeypatch.setenv("BOLO_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(tts_runtimes, "platform_key", lambda: "windows-x86_64")
+    assert main(["components", "list"]) == 0
+    out = capsys.readouterr().out
+    line = next(ln for ln in out.splitlines() if "unavailable here" in ln)
+    assert "Tontaube is Linux only (use WSL2)" in line
+    assert main(["components", "install", "tontaube"]) == 1
+    err = capsys.readouterr().err
+    assert "Linux only (use WSL2)" in err and "unknown component" not in err
+    core = Bolo(Settings(data_dir=tmp_path))
+    entry = by_id(core.components.status())["tontaube"]
+    assert entry["available"] is False and "WSL2" in entry["unavailable_reason"] and not entry["installable"]
+    with pytest.raises(InvalidRequest, match="Linux only"):
+        core.components.start_install("tontaube", False)
+    monkeypatch.setattr(tts_runtimes, "platform_key", lambda: "linux-x86_64")
+    assert by_id(core.components.status())["tontaube"]["available"] is True
+    assert tts_runtimes.unsupported_reason("tontaube", "darwin-arm64") == (
+        "Tontaube is Linux only: this is darwin-arm64; run `tontaube serve` on Linux and set tts_servers"
+    )
+    monkeypatch.setattr("shutil.which", lambda name: None)  # Linux without git: a reason, not "unknown component"
+    assert main(["components", "install", "tontaube"]) == 1
+    err = capsys.readouterr().err
+    assert "git is not installed" in err and "unknown component" not in err

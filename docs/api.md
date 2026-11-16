@@ -741,10 +741,13 @@ REQUESTS, P50 MS, RTF P50 and IDLE, and the placement notices; `--json` prints t
 Full description: [recommendations.md](recommendations.md). These routes
 describe and advise; none of them restricts anything.
 
-`GET /api/v1/hardware[?refresh=true]`: what bolo detected. A value it could
-not read is `null`, which means "unknown", never "none". `refresh=true` looks
-again and also runs the slower probes (the torch plugin's device, the server
-binaries' versions).
+`GET /api/v1/hardware[?refresh=true|force]`: what bolo detected. A value it could
+not read is `null`, which means "unknown", never "none". It is detected once
+and kept, so a plain request answers at once. `refresh=true` looks again and
+also runs the slower probes (the torch plugin's device, the server binaries'
+versions, `llama-server --list-devices`, nvidia-smi); their answers are reused
+for 60 s and forgotten when a component is installed, so repeating it is fast.
+`refresh=force` runs the slow probes again at once.
 
 ```jsonc
 {

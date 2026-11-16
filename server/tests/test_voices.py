@@ -122,6 +122,37 @@ def test_cleaning_trims_normalises_and_warns() -> None:
     assert long.analysis["duration_s"] <= 60.0 and any("longer than 60 s" in w for w in long.warnings)
 
 
+def test_the_noise_warning_spares_clean_synthetic_speech() -> None:
+    """A clean synthetic reference, whose DC offset comes and goes with the voice (as in bolo's own sample clips),
+    was reported as noisy: removing one mean for the whole clip turned its digital silence into a "background" 27
+    dB under the speech. Real noise 10 dB under the speech still earns the warning."""
+    rate = 16000
+    t = np.arange(rate * 8) / rate
+    voice = 0.3 * np.sin(2 * np.pi * 180 * t) * (1 + 0.5 * np.sin(2 * np.pi * 4 * t))
+    voice += 0.25 * np.sin(2 * np.pi * 540 * t) * (0.5 + 0.5 * np.sin(2 * np.pi * 3 * t))
+    words = (np.sin(2 * np.pi * 1.3 * t) > -0.3).astype(np.float64)  # words and short pauses between them
+    for start in (2.0, 5.0):
+        words[int(start * rate) : int((start + 0.5) * rate)] = 0.0
+    clean = ((voice + 0.06) * words).astype(np.float32)  # an offset only while speaking, digital silence between
+    cleaned = clean_reference([(clean, rate)])
+    assert not any("noisy" in w for w in cleaned.warnings), cleaned.analysis
+    assert cleaned.analysis["snr_db"] > 30
+    speech_rms = float(np.sqrt(np.mean(clean[words > 0] ** 2)))
+    noise = np.random.default_rng(3).standard_normal(len(clean)) * speech_rms * 10 ** (-10 / 20)
+    noisy = clean_reference([((clean + noise).astype(np.float32), rate)])
+    assert any("noisy" in w for w in noisy.warnings) and noisy.analysis["snr_db"] < 16
+    quieter = np.random.default_rng(4).standard_normal(len(clean)) * speech_rms * 10 ** (-30 / 20)
+    assert not any("noisy" in w for w in clean_reference([((clean + quieter).astype(np.float32), rate)]).warnings)
+
+
+def test_bundled_reference_clips_are_not_called_noisy() -> None:
+    from bolo import samples
+
+    entry = samples.get("en-long")
+    audio, rate = decode_audio(samples.read_file(str(entry["file"])), filename="en-long.wav")
+    assert not any("noisy" in w for w in clean_reference([(audio, rate)]).warnings)
+
+
 def test_consent_is_required_and_recorded(tmp_path: Path) -> None:
     assert parse_consent("self") == "self" and parse_consent("Permission") == "permission"
     for missing in (None, "", "yes", "true", False, "maybe"):

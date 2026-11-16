@@ -378,14 +378,19 @@ def record(fallback: ProviderFallback | None = None, accelerated: bool = False) 
 
 
 # -- bolo doctor ------------------------------------------------------------------------------------------------
-def check_ort_cuda() -> tuple[bool, str]:
-    """Open a tiny in-memory graph on ONNX Runtime's CUDA provider and run it once. ``(ok, what happened)``."""
+def check_ort_cuda(packages: dict[str, str] | None = None) -> tuple[bool, str]:
+    """Open a tiny in-memory graph on ONNX Runtime's CUDA provider and run it once. ``(ok, what happened)``.
+    ``packages``: the ONNX Runtime distributions installed (:func:`bolo.ort_providers.installed_ort_packages`), which
+    a build without a CUDA provider is named by."""
     try:
         import onnxruntime as ort
     except Exception as exc:
         return False, f"onnxruntime cannot be imported ({type(exc).__name__}: {exc})"
     if "CUDAExecutionProvider" not in ort.get_available_providers():
-        return False, f"this ONNX Runtime has no CUDA provider (it is the CPU build): {ORT_CUDA_RECIPE}"
+        from bolo import ort_providers
+
+        found = ort_providers.installed_ort_packages() if packages is None else packages
+        return False, ort_providers.no_cuda_provider(found)
     import numpy as np
 
     from bolo.hardware import benchmark_model

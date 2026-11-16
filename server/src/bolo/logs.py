@@ -17,6 +17,7 @@ if even that fails, rather than printing "--- Logging error ---" for every recor
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import logging.handlers
 import os
@@ -172,12 +173,12 @@ def tail(path: Path, lines: int) -> list[str]:
         return [line.rstrip("\n") for line in deque(fh, maxlen=lines)]
 
 
-def open_shared(path: Path) -> Any:
-    """Open a text file for reading so that the writer may still rename or delete it: on Windows with
+def open_shared(path: Path, binary: bool = False) -> Any:
+    """Open a file for reading so that the writer may still rename or delete it: on Windows with
     ``FILE_SHARE_DELETE`` (Python's ``open`` leaves it out, so a log rotation would fail while the file is open);
-    elsewhere a plain ``open``."""
+    elsewhere a plain ``open``. Text (UTF-8) unless ``binary``."""
     if sys.platform != "win32":
-        return path.open("r", encoding="utf-8", errors="replace")
+        return path.open("rb") if binary else path.open("r", encoding="utf-8", errors="replace")
     import ctypes
     import msvcrt
     from ctypes import wintypes
@@ -194,41 +195,107 @@ def open_shared(path: Path) -> Any:
         error = ctypes.get_last_error()
         raise OSError(0, ctypes.FormatError(error), str(path), error)
     fd = msvcrt.open_osfhandle(handle, os.O_RDONLY)
+    if binary:
+        return open(fd, "rb")  # noqa: PTH123 - a file descriptor
     return open(fd, encoding="utf-8", errors="replace")  # noqa: PTH123 - a file descriptor
 
 
-def follow(path: Path, poll_s: float = 0.5, stop: Any = None) -> Iterator[str]:
-    """New lines of a log file as they are written, across rotations (``tail -F``). ``stop()`` ends it (tests)."""
-    fh = None
-    inode = None
+#: at most this much of the followed file's first line identifies it (log lines start with a timestamp)
+_HEAD = 4096
+
+
+def _text(raw: bytes) -> str:
+    return raw.decode("utf-8", errors="replace").rstrip("\r\n")
+
+
+def _first_line(handle: Any) -> bytes:
+    handle.seek(0)
+    line: bytes = handle.readline(_HEAD)
+    return line
+
+
+def follow(
+    path: Path, poll_s: float = 0.5, stop: Any = None, backup: Path | None = None, from_start: bool = False
+) -> Iterator[str]:
+    """New lines of a log file as they are written, across rotations (``tail -F``). ``stop()`` ends it (tests).
+
+    Both kinds of rotation are followed without losing lines:
+
+    * rename (the normal one): the file at ``path`` is a new file. What was written to the old one since the last
+      read is read from the still-open handle first, then the new file from its start.
+    * copy-truncate (:class:`RotatingFileHandler` on Windows when another program blocks the rename): the file is
+      copied to ``backup`` (``path.1``) and emptied in place, then written again, possibly past the position
+      reached before it is next read. It is told by the file being shorter than that position, or by its first
+      line having changed. The lines written before the copy that were not read yet are read from ``backup`` (when
+      its first line is that of the file followed), then the emptied file from its start.
+
+    ``from_start``: read the file from its start rather than from its end."""
+    backup = backup or path.with_name(path.name + ".1")
+    fh: Any = None
+    inode = 0
+    pos = 0  # bytes of the current file read (complete lines only)
+    head = b""  # its first line (or as much of it as there was)
+    at_start = from_start  # after a rotation the new file is read from its start, however late it is opened
+
+    def lines_from(handle: Any, offset: int) -> list[str]:
+        handle.seek(offset)
+        return [_text(raw) for raw in handle.read().splitlines(keepends=True)]
+
+    def emptied() -> bool:
+        """The file was emptied (and maybe written again) since ``head`` was read."""
+        if not head:
+            return False
+        return bool(_first_line(fh)[: len(head)] != head)
+
     try:
         while stop is None or not stop():
             if fh is None:
                 try:
-                    fh = open_shared(path)
+                    fh = open_shared(path, binary=True)
                     inode = os.fstat(fh.fileno()).st_ino
-                    fh.seek(0, os.SEEK_END)
-                except OSError:
-                    time.sleep(poll_s)
-                    continue
-            line = fh.readline()
-            if line:
-                yield line.rstrip("\n")
-                continue
-            try:
-                st = path.stat()
-                rotated = st.st_ino != inode or st.st_size < fh.tell()
-            except OSError:
-                rotated = True
-            if rotated:  # the file was rotated or truncated: read the new one from its start
-                fh.close()
-                try:
-                    fh = open_shared(path)
-                    inode = os.fstat(fh.fileno()).st_ino
+                    head = _first_line(fh)
+                    pos = 0 if at_start else fh.seek(0, os.SEEK_END)
                 except OSError:
                     fh = None
+                    time.sleep(poll_s)
+                    continue
+            renamed = truncated = False
+            try:
+                fh.seek(pos)
+                data = fh.read()
+                end = data.rfind(b"\n") + 1  # complete lines only: the writer may be in the middle of one
+                if end and not emptied():
+                    pos += end
+                    if not head.endswith(b"\n"):
+                        head = _first_line(fh)
+                    yield from (_text(raw) for raw in data[:end].splitlines(keepends=True))
+                    continue
+                st = path.stat()
+                renamed = bool(st.st_ino and inode and st.st_ino != inode)
+                truncated = not renamed and (st.st_size < pos or emptied())
+            except OSError:
+                renamed = True
+            if not (renamed or truncated):
+                time.sleep(poll_s)
                 continue
-            time.sleep(poll_s)
+            # rotated: first what was written before the rotation and not read yet, then the new file from its start
+            missed: list[str] = []
+            if renamed:  # the open handle is the old file (now the backup)
+                with contextlib.suppress(OSError):
+                    missed = lines_from(fh, pos)
+            else:  # emptied in place: the rest is in the copy, when it is a copy of this file
+                with contextlib.suppress(OSError), open_shared(backup, binary=True) as old:
+                    if head and _first_line(old)[: len(head)] == head:
+                        missed = lines_from(old, pos)
+            fh.close()
+            fh, at_start = None, True
+            yield from missed
+            try:
+                fh = open_shared(path, binary=True)
+                inode = os.fstat(fh.fileno()).st_ino
+                head, pos = _first_line(fh), 0
+            except OSError:
+                fh = None
     finally:
         if fh is not None:
             fh.close()

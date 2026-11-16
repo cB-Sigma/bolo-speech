@@ -20,6 +20,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -86,12 +87,65 @@ _ORT_GPU_PROVIDERS = (
 )  # fmt: skip
 
 
+class ProbeCache:
+    """The answers of the slow probes (``nvidia-smi``, ``llama-server --version`` and ``--list-devices``, the torch
+    plugin's ``doctor``, CTranslate2's CUDA device count), kept for ``ttl_s`` so that asking for the hardware again
+    (``GET /api/v1/hardware?refresh=1``) does not run them every time: on a Windows laptop they took about 3 s per
+    request. :meth:`clear` forgets them (a component was installed, or ``refresh=force``)."""
+
+    def __init__(self, ttl_s: float = 60.0, clock: Any = time.monotonic) -> None:
+        self.ttl_s = ttl_s
+        self._clock = clock
+        self._entries: dict[tuple[Any, ...], tuple[float, Any]] = {}
+        self._lock = threading.Lock()
+        #: how many probes really ran (tests)
+        self.misses = 0
+
+    def get(self, key: tuple[Any, ...], compute: Any) -> Any:
+        now = self._clock()
+        with self._lock:
+            hit = self._entries.get(key)
+            if hit is not None and now - hit[0] < self.ttl_s:
+                return hit[1]
+        value = compute()  # not under the lock: a probe can take seconds
+        with self._lock:
+            self._entries[key] = (self._clock(), value)
+            self.misses += 1
+        return value
+
+    def clear(self) -> None:
+        with self._lock:
+            self._entries.clear()
+
+
+def _stamp(path: str | os.PathLike[str] | None) -> tuple[Any, ...]:
+    """What identifies a binary for :class:`ProbeCache`: its path, size and modification time (a new build at the
+    same path is probed afresh)."""
+    if not path:
+        return (None,)
+    try:
+        st = Path(path).stat()
+    except OSError:
+        return (str(path),)
+    return (str(path), st.st_size, st.st_mtime_ns)
+
+
 class Host:
     """The machine as detection sees it. Tests subclass this; every method may return None for "cannot tell"."""
 
-    def __init__(self, root: str | os.PathLike[str] = "/", env: dict[str, str] | None = None) -> None:
+    #: the slow probes' answers, when detection may reuse them (:class:`ProbeCache`); None asks every time
+    cache: ProbeCache | None = None
+
+    def __init__(
+        self, root: str | os.PathLike[str] = "/", env: dict[str, str] | None = None, cache: ProbeCache | None = None
+    ) -> None:
         self.root = Path(root)
         self.env = dict(os.environ) if env is None else dict(env)
+        self.cache = cache
+
+    def cached(self, key: tuple[Any, ...], compute: Any) -> Any:
+        """``compute()``, or its answer from :attr:`cache` while that is fresh."""
+        return compute() if self.cache is None else self.cache.get(key, compute)
 
     def system(self) -> str:
         return platform.system().lower()
@@ -650,10 +704,8 @@ def _nvidia_smi(host: Host) -> list[Gpu] | None:
     exe = host.which("nvidia-smi")
     if not exe:
         return None
-    out = host.run(
-        [exe, "--query-gpu=name,memory.total,memory.free,driver_version", "--format=csv,noheader,nounits"],
-        timeout=6.0,
-    )
+    argv = [exe, "--query-gpu=name,memory.total,memory.free,driver_version", "--format=csv,noheader,nounits"]
+    out = host.cached(("nvidia-smi", *_stamp(exe)), lambda: host.run(argv, timeout=6.0))
     if out is None:
         return None
     gpus: list[Gpu] = []
@@ -881,13 +933,16 @@ def _server_runtime(host: Host, settings: Settings | None, runtime: str, deep: b
         metal = host.system() == "darwin" and _arch(host.machine()) == "arm64"
         out["gpu"] = metal or out["flavour"] in ("cuda", "vulkan")
     if deep:
-        version = host.run([str(path), "--version"], timeout=15.0)
+        version = host.cached(("version", *_stamp(path)), lambda: host.run([str(path), "--version"], timeout=15.0))
         if version and version.strip():
             out["version"] = version.strip().splitlines()[0][:80]
         if runtime == tts_runtimes.LLAMA:
             flavour = out.get("flavour") or tts_runtimes.flavour_of(settings, runtime, path)
             env = tts_runtimes.child_env(flavour) if host.system() == "windows" else {}
-            devices, why = host.probe([str(path), "--list-devices"], timeout=LIST_DEVICES_TIMEOUT_S, env=env or None)
+            devices, why = host.cached(
+                ("list-devices", *_stamp(path), tuple(sorted((env or {}).items()))),
+                lambda: host.probe([str(path), "--list-devices"], timeout=LIST_DEVICES_TIMEOUT_S, env=env or None),
+            )
             if why is not None:
                 hint = ""
                 if flavour == "vulkan":
@@ -936,7 +991,7 @@ def _torch_plugin(host: Host, settings: Settings | None, deep: bool) -> dict[str
     if forced:
         out["device"] = forced.strip().lower()
     if deep and cli:
-        text = host.run([cli, "doctor"], timeout=45.0)
+        text = host.cached(("bolo-torch doctor", *_stamp(cli)), lambda: host.run([cli, "doctor"], timeout=45.0))
         try:
             doc = json.loads(text) if text else None
         except ValueError:
@@ -985,7 +1040,7 @@ def detect_runtimes(host: Host, settings: Settings | None = None, deep: bool = F
     cuda_devices: int | None = None
     if ct2 is not None:
         try:
-            cuda_devices = int(ct2.get_cuda_device_count())
+            cuda_devices = int(host.cached(("ctranslate2 cuda",), ct2.get_cuda_device_count))
         except Exception:
             cuda_devices = None
     out["ctranslate2"] = {
@@ -1008,13 +1063,16 @@ def detect_runtimes(host: Host, settings: Settings | None = None, deep: bool = F
 
 
 # -- everything -------------------------------------------------------------------------------------------------
-def detect(settings: Settings | None = None, host: Host | None = None, deep: bool = False) -> Hardware:
+def detect(
+    settings: Settings | None = None, host: Host | None = None, deep: bool = False, cache: ProbeCache | None = None
+) -> Hardware:
     """Describe this machine. Never raises; what cannot be read stays None.
 
     ``deep`` also runs the slow probes (the torch plugin's ``doctor``, the server binaries' ``--version``); the
-    server skips them at start-up and runs them when asked (``GET /api/v1/hardware?refresh=true``).
+    server skips them at start-up and runs them when asked (``GET /api/v1/hardware?refresh=true``). ``cache``: the
+    answers of slow probes that may be reused (:class:`ProbeCache`; the server keeps one).
     """
-    host = host or Host()
+    host = host or Host(cache=cache)
     hw = Hardware(detected_at=dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), deep=deep)
     with contextlib.suppress(Exception):
         hw.system = {"darwin": "macos"}.get(host.system(), host.system()) or None

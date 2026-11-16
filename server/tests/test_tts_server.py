@@ -819,3 +819,53 @@ async def test_a_gpu_device_without_a_pinned_gpu_build_says_so(core: Bolo, monke
         assert tts_runtimes.installed_flavours(core.settings, "llama-server").keys() == {"cpu"}
     finally:
         server.stop()
+
+
+def test_an_unknown_audiocpp_voice_is_a_400_with_the_voices(settings: Settings, audiocpp: FakeTTSServer) -> None:
+    """audio.cpp takes a voice it does not know for a file path on its machine and answered 500: bolo refuses it
+    first, naming the voices there are. GET /v1/audio/voices?model= lists that model's voices only."""
+    settings.tts_servers = [f"remote-ac={audiocpp.url}", f"remote-llama={audiocpp.url}"]
+    srv = LiveServer(settings)
+    srv.core.catalog.add(ModelSpec.from_dict(entry("remote-ac", "audio.cpp", server_model="ac-model")))
+    other = entry("remote-llama")
+    other["voices"] = [{"id": "other-voice", "name": "Another model's voice", "server_voice": "x"}]
+    srv.core.catalog.add(ModelSpec.from_dict(other))
+    srv.start()
+    try:
+        before = len(audiocpp.requests)
+        r = httpx.post(
+            f"{srv.url}/v1/audio/speech", json={"model": "remote-ac", "input": "Hi.", "voice": "nobody"}, timeout=30
+        )
+        assert r.status_code == 400, r.text
+        error = r.json()["error"]
+        assert error["param"] == "voice" and "'nobody'" in error["message"]
+        assert "default" in error["message"] and "narrator" in error["message"]  # the catalog's and the server's
+        assert not [q for q in audiocpp.requests[before:] if q["path"] == "/v1/audio/speech"]  # never sent
+        r = httpx.post(
+            f"{srv.url}/v1/audio/speech", json={"model": "remote-ac", "input": "Hi.", "voice": "narrator"}, timeout=30
+        )
+        assert r.status_code == 200 and audiocpp.requests[-1]["body"]["voice"] == "narrator"
+        r = httpx.post(f"{srv.url}/v1/audio/speech", json={"model": "remote-ac", "input": "Hi.", "voice": "alloy"})
+        assert r.status_code == 200  # a stock OpenAI name is still dropped, not refused
+
+        listed = httpx.get(f"{srv.url}/v1/audio/voices", params={"model": "remote-ac"}).json()["voices"]
+        assert listed and {v["model_id"] for v in listed} == {"remote-ac"}
+        assert "other-voice" not in {v["id"] for v in listed}
+        listed = httpx.get(f"{srv.url}/v1/audio/voices", params={"model": "remote-llama"}).json()["voices"]
+        assert {v["id"] for v in listed} == {"other-voice"}
+        everything = httpx.get(f"{srv.url}/v1/audio/voices").json()["voices"]
+        assert {"remote-ac", "remote-llama"} <= {v["model_id"] for v in everything}
+        r = httpx.get(f"{srv.url}/v1/audio/voices", params={"model": "no-such-model"})
+        assert r.status_code == 404
+    finally:
+        srv.stop()
+
+
+def test_check_voice_without_named_voices() -> None:
+    model = ServerTTS("audio.cpp", "ac", {"runtime": "audio.cpp", "model_id": "ac"}, base_url="http://127.0.0.1:9")
+    try:
+        with pytest.raises(InvalidRequest, match="no named voices"):
+            model.build_request("Hi.", "C:/voices/me.wav", 1.0, None)
+        assert "voice" not in model.build_request("Hi.", None, 1.0, None)
+    finally:
+        model.close()

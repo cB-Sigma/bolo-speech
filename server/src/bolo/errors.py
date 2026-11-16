@@ -136,6 +136,15 @@ class UnsupportedCharacters(InvalidRequest):
     code = "unsupported_characters"
 
 
+class FilesInUse(BoloError):
+    """A model's folder could not be deleted: another program holds one of its files open (Windows: an antivirus
+    scanner or an editor). What is left is named in the message."""
+
+    status = 409
+    code = "files_in_use"
+    type = "server_error"
+
+
 class DownloadError(BoloError):
     status = 502
     code = "download_failed"

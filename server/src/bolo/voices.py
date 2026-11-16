@@ -148,6 +148,23 @@ def _frames_db(x: FloatArray, frame: int) -> FloatArray:
     return (20 * np.log10(rms + 1e-9)).astype(np.float32)
 
 
+def _remove_dc(x: FloatArray, rate: int) -> FloatArray:
+    """``x`` without its DC offset, taken as the 0.1 s moving average (a high-pass well below speech) rather than
+    the clip's mean: in synthetic speech the offset can come and go with the voice, and subtracting one mean then
+    turns digital silence into a steady "background" 27 dB under the speech, which the noise estimate reported as
+    a noisy recording."""
+    n = len(x)
+    win = max(1, int(rate * 0.1))
+    if n < 2 * win:
+        return (x - float(np.mean(x))).astype(np.float32) if n else x
+    half = win // 2
+    padded = np.pad(np.asarray(x, dtype=np.float64), (half, win - 1 - half), mode="reflect")
+    sums = np.concatenate([[0.0], np.cumsum(padded)])
+    average = (sums[win:] - sums[:-win]) / win
+    out: FloatArray = (x - average).astype(np.float32)
+    return out
+
+
 def _voiced(db: FloatArray) -> np.ndarray:
     """Frames that hold speech: within 35 dB of the loud frames and well above the quietest ones."""
     loud = float(np.percentile(db, 95))
@@ -161,7 +178,7 @@ def _voiced(db: FloatArray) -> np.ndarray:
 def clean_reference(clips: list[tuple[FloatArray, int]]) -> Cleaned:
     """Trim, normalise and check reference clips; join several with a short pause.
 
-    Steps: mono float at 24 kHz, DC removed; leading and trailing silence trimmed (25 ms frames, energy relative
+    Steps: mono float at 24 kHz, DC removed (:func:`_remove_dc`); leading and trailing silence trimmed (25 ms frames, energy relative
     to the clip's loud frames) keeping 0.15 s; pauses longer than 0.4 s shortened to 0.4 s; voiced frames brought
     to ``TARGET_DBFS`` with peaks under -1 dBFS; at most ``MAX_S`` seconds (cut at a pause). Raises when less than
     ``MIN_SPEECH_S`` seconds of speech remain. Warnings: short, noisy, clipped, cut to 60 s."""
@@ -183,7 +200,7 @@ def clean_reference(clips: list[tuple[FloatArray, int]]) -> Cleaned:
         total_in += len(x) / sr if sr else 0.0
         clipped += int(np.sum(np.abs(x) >= 0.999))
         x = resample(x, sr, rate) if sr != rate else x
-        x = (x - float(np.mean(x))).astype(np.float32) if len(x) else x
+        x = _remove_dc(x, rate)
         db = _frames_db(x, frame)
         voiced = _voiced(db)
         if not voiced.any():

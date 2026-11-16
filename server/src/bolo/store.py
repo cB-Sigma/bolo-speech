@@ -34,9 +34,60 @@ from urllib.parse import quote
 
 import httpx
 
-from bolo.errors import DownloadError, GatedModel, ModelNotFound
+from bolo.errors import DownloadError, FilesInUse, GatedModel, ModelNotFound
 
 log = logging.getLogger("bolo.store")
+
+
+# -- removal that waits out Windows sharing violations ---------------------------------------------------------
+#: Windows errors that mean another program has the file open for a moment (ERROR_ACCESS_DENIED,
+#: ERROR_SHARING_VIOLATION): an antivirus scanner looking at files that were just written, an indexer, an editor
+_SHARING_ERRORS = (5, 32)
+#: how long :func:`remove_tree` waits between tries (about 3 s in all)
+REMOVE_BACKOFF_S = (0.1, 0.2, 0.4, 0.8, 1.5)
+
+
+def sharing_violation(exc: BaseException) -> bool:
+    """A Windows "in use by another process" error (WinError 32, or 5 for a file being deleted or scanned)."""
+    return isinstance(exc, OSError) and getattr(exc, "winerror", None) in _SHARING_ERRORS
+
+
+def _remove_model_dir(path: Path) -> None:
+    """The manifest first, so that a folder only partly deleted is no longer taken for an installed model."""
+    (path / "manifest.json").unlink(missing_ok=True)
+    shutil.rmtree(path)
+
+
+def remove_tree(
+    path: Path,
+    remover: Callable[[Path], None] | None = None,
+    sleep: Callable[[float], None] | None = None,
+    backoff: tuple[float, ...] = REMOVE_BACKOFF_S,
+) -> None:
+    """Delete a folder, trying again with a growing pause while Windows says a file in it is in use by another
+    process (antivirus scanners hold newly written files for a moment). Raises :class:`FilesInUse`, naming the
+    folder and the file, when it is still in use after the last try; other errors as they are."""
+    remove = remover or _remove_model_dir
+    wait = sleep or time.sleep
+    for pause in (*backoff, None):
+        try:
+            remove(path)
+            return
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            if not sharing_violation(exc):
+                raise
+            if pause is None:
+                culprit = getattr(exc, "filename", None) or path
+                raise FilesInUse(
+                    f"could not delete {path}: {culprit} is in use by another program (WinError "
+                    f"{getattr(exc, 'winerror', '?')}; an "
+                    "antivirus scan or an open editor). What is left of the folder can be deleted by hand once it is "
+                    "closed, or with `bolo rm` again"
+                ) from exc
+            log.debug("deleting %s: %s in use, trying again in %.1f s", path, exc.filename, pause)
+            wait(pause)
 
 
 # -- folder links (a local model folder registered in the store) ------------------------------------------------
@@ -342,6 +393,8 @@ class ModelStore:
         self._guard = threading.Lock()
         #: presets (``bolo cp``): preset id -> the model whose files it uses
         self.links: dict[str, str] = {}
+        #: what deletes a model's folder (tests); None: the manifest, then the folder (:func:`remove_tree`)
+        self.remover: Callable[[Path], None] | None = None
         #: model-settings.json as last read or written, keyed by the file's stamp (see ``_file_stamp``)
         self._settings_cache: tuple[tuple[int, int, int] | None, dict[str, Any]] | None = None
 
@@ -695,7 +748,7 @@ class ModelStore:
             remove_dir_link(mdir)
             (target / "manifest.json").unlink(missing_ok=True)
         else:
-            shutil.rmtree(mdir)
+            remove_tree(mdir, self.remover)
         self.gc()
         return True
 
@@ -710,6 +763,11 @@ class ModelStore:
         for blob in self.blobs.glob("sha256-*"):
             digest = blob.name.removeprefix("sha256-")
             if digest not in referenced:
-                freed += blob.stat().st_size
-                blob.unlink()
+                try:
+                    size = blob.stat().st_size
+                    blob.unlink()
+                except OSError as exc:  # in use (Windows) or gone: the next gc tries again
+                    log.debug("could not delete the blob %s: %s", blob.name, exc)
+                    continue
+                freed += size
         return freed

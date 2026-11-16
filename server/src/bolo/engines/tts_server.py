@@ -72,6 +72,7 @@ from bolo.engines.base import (
 from bolo.errors import ComponentMissing, EngineUnavailable, InvalidRequest
 from bolo.llama_args import has_flag
 from bolo.tts_runtimes import (
+    AUDIOCPP,
     CPU_FLAVOUR,
     ENGINE_ID,
     LLAMA,
@@ -439,6 +440,16 @@ class ServerTTS(TTSModel):
         self._client.close()
 
     # -- request building -------------------------------------------------------------------------------------
+    def _check_voice(self, voice: str) -> None:
+        """audio.cpp takes a voice it does not know for the path of a reference file on its own machine and answers
+        500 when there is none: a voice that is neither the catalog's nor one the server listed is refused here,
+        with the voices there are."""
+        if voice.lower() in self._server_voices or voice.lower() in self._voice_info:
+            return
+        names = [v.id for v in self.voices]
+        listed = f"its voices: {', '.join(names)}" if names else "it has no named voices (leave voice out)"
+        raise InvalidRequest(f"model '{self.name}' has no voice {voice!r}; {listed}", param="voice")
+
     def _reference(self, sample_id: str) -> tuple[bytes, str]:
         if sample_id not in self._references:
             from bolo import samples
@@ -522,6 +533,8 @@ class ServerTTS(TTSModel):
                 and send_voice.lower() not in self._server_voices
             ):
                 send_voice = None  # a stock OpenAI name the server would not know
+            elif not info and send_voice and self.runtime == AUDIOCPP:
+                self._check_voice(send_voice)
         if ref_audio is not None and not self.supports_cloning:
             raise InvalidRequest(f"model '{self.name}' cannot imitate a voice from reference audio", param="voice")
         language = self._language(extras.language) if self.spec.get("send_language") else None
