@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { MAX_SECONDS, prepareReference, fromInt16, toInt16 } from './audio'
-import { CLONE_MODELS, chatterboxFiles, cloneModel, pocketFiles } from './models'
+import {
+  CLONE_MODELS,
+  chatterboxFiles,
+  cloneModel,
+  LANGUAGE_NAMES,
+  MOSS_FILES,
+  NOT_OFFERED,
+  pocketFiles,
+} from './models'
 import { freeDimension } from './onnx-patch'
 import { memoryBackend, SavedVoices, type SavedVoice, type VoiceBackend } from './saved-voices'
 import { cosine, DIFFERENT_SPEAKER, forEmbedding, SAME_SPEAKER, verdictFor } from './similarity'
@@ -32,6 +40,20 @@ describe('voice-cloning catalogue', () => {
     const multi = chatterboxFiles(cloneModel('chatterbox-multilingual'), 'fp32')
     expect(multi).toContain('onnx/language_model.onnx')
     expect(multi.some((f) => f.endsWith('_data'))).toBe(false)
+  })
+
+  it('pins both MOSS-TTS-Nano repositories and adds up its download', () => {
+    const moss = cloneModel('moss-tts-nano')
+    expect(moss.family).toBe('moss')
+    expect(moss.languages).toHaveLength(20)
+    for (const l of moss.languages) expect(LANGUAGE_NAMES[l]).toBeTruthy()
+    for (const f of MOSS_FILES) expect(f.revision).toMatch(/^[0-9a-f]{40}$/)
+    expect(new Set(MOSS_FILES.map((f) => f.repo))).toEqual(
+      new Set(['OpenMOSS-Team/MOSS-TTS-Nano-100M-ONNX', 'OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano-ONNX']),
+    )
+    expect(moss.bytes).toBe(MOSS_FILES.reduce((a, f) => a + f.bytes, 0))
+    expect(moss.streams).toBe(true)
+    expect(NOT_OFFERED.some((m) => m.label.includes('MOSS'))).toBe(false)
   })
 })
 

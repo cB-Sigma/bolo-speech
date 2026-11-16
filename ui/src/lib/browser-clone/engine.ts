@@ -86,8 +86,9 @@ export function setCloneWorkerFactories(clone: (() => CloneWorker) | null, embed
 }
 
 /**
- * Where to run a model. Auto: Chatterbox on WebGPU when there is an adapter; Pocket TTS on the CPU, where its
- * frame loop (small steps with large state tensors passed back each time) is quicker than a round trip to the GPU.
+ * Where to run a model. Auto: Chatterbox on WebGPU when there is an adapter; Pocket TTS and MOSS-TTS-Nano on the
+ * CPU, where their frame loops (small steps with large state tensors passed back each time) are quicker than a
+ * round trip to the GPU. MOSS-TTS-Nano runs at about real time on four CPU cores.
  */
 export function chooseDevice(placement: Placement, model: CloneModel): 'webgpu' | 'wasm' {
   if (placement !== 'auto') return placement

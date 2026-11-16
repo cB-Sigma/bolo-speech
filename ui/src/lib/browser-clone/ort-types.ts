@@ -10,6 +10,8 @@ export interface OrtTensor {
   readonly type: string
   readonly data: TensorData
   readonly dims: readonly number[]
+  /** `gpu-buffer` for a tensor left on the GPU (WebGPU), which is then freed with `dispose`. */
+  readonly location?: string
   dispose?: () => void
 }
 
@@ -20,7 +22,11 @@ export interface OrtSession {
   release?: () => Promise<void>
 }
 
-export type MakeTensor = (type: 'float32' | 'int64' | 'bool', data: TensorData, dims: readonly number[]) => OrtTensor
+export type MakeTensor = (
+  type: 'float32' | 'int64' | 'int32' | 'bool',
+  data: TensorData,
+  dims: readonly number[],
+) => OrtTensor
 
 /** A seeded random source (mulberry32) with normal draws, so a run can be repeated. */
 export class Random {

@@ -144,6 +144,16 @@ Web console: speech synthesis in the browser
     Each voice directory carries its licence and attribution files. The
     voices are not part of the bolo package or of the git repository.
 
+    The live demo's "Clone a voice" page downloads its models from Hugging
+    Face at pinned revisions in the visitor's browser; none is distributed
+    with bolo. Among them, MOSS-TTS-Nano 100M and MOSS-Audio-Tokenizer-Nano
+    by the OpenMOSS team and MOSI.AI (Apache-2.0,
+    https://github.com/OpenMOSS/MOSS-TTS-Nano), in their official ONNX
+    exports. ui/src/lib/browser-clone/moss.ts and moss-text.ts follow that
+    project's Apache-2.0 reference code (ort_cpu_runtime.py,
+    onnx_tts_runtime.py and tts_robust_normalizer_single_script.py at
+    commit 8b7bcc93), and moss-text.test.ts uses test cases from the latter.
+
 Built-in audio samples
     The files in server/src/bolo/samples/*.wav were synthesised with bolo
     using the models named in server/src/bolo/samples/index.json. The live

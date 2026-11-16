@@ -93,5 +93,6 @@ describe('voice-cloning engine (scripted workers)', () => {
     expect(chooseDevice('webgpu', cloneModel('pocket-en'))).toBe('webgpu')
     // jsdom has no WebGPU adapter.
     expect(chooseDevice('auto', cloneModel('chatterbox-turbo'))).toBe('wasm')
+    expect(chooseDevice('auto', cloneModel('moss-tts-nano'))).toBe('wasm')
   })
 })

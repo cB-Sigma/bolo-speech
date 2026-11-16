@@ -4,7 +4,7 @@
  * Licences as their authors state them on the model cards.
  */
 
-export type CloneFamily = 'pocket' | 'chatterbox'
+export type CloneFamily = 'pocket' | 'chatterbox' | 'moss'
 
 export type CloneGroup = 'Small: phones too' | 'Medium: a laptop' | 'Large: a desktop, WebGPU advised'
 
@@ -41,6 +41,10 @@ export interface CloneModel {
   watermark?: string
   /** Plays while it is still generating. */
   streams: boolean
+  /** Takes only the first this many seconds of the reference. */
+  maxReferenceSeconds?: number
+  /** What it needs, when the default wording (WebGPU advised, or quick on the CPU) does not fit. */
+  needs?: string
   source: string
   blurb: string
 }
@@ -80,6 +84,45 @@ const pocket = (
     : 'Kyutai’s 100M-parameter model, 8-bit. Starts speaking within a second and plays as it goes.',
   ...extra,
 })
+
+const MOSS_REPO = 'OpenMOSS-Team/MOSS-TTS-Nano-100M-ONNX'
+const MOSS_REV = 'f52645cb467506d8e18e746ddd59482685b74e58'
+const MOSS_CODEC_REPO = 'OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano-ONNX'
+const MOSS_CODEC_REV = 'ceff0d0749bfb3fa2d61149794ec6feef0d1e1ae'
+
+/** A file of the MOSS-TTS-Nano bundle: the language model's repository or the codec's. */
+export interface MossFile {
+  name: string
+  repo: string
+  revision: string
+  path: string
+  bytes: number
+}
+
+const mossFile = (name: string, codec: boolean, path: string, bytes: number): MossFile => ({
+  name,
+  repo: codec ? MOSS_CODEC_REPO : MOSS_REPO,
+  revision: codec ? MOSS_CODEC_REV : MOSS_REV,
+  path,
+  bytes,
+})
+
+/** What the page fetches for MOSS-TTS-Nano (sizes as the Hub lists them at the pinned revisions). */
+export const MOSS_FILES: MossFile[] = [
+  mossFile('manifest', false, 'browser_poc_manifest.json', 503_354),
+  mossFile('meta', false, 'tts_browser_onnx_meta.json', 4_487),
+  mossFile('tokenizer', false, 'tokenizer.model', 470_897),
+  mossFile('prefill', false, 'moss_tts_prefill.onnx', 283_305),
+  mossFile('decode', false, 'moss_tts_decode_step.onnx', 291_483),
+  mossFile('frame', false, 'moss_tts_local_fixed_sampled_frame.onnx', 471_262),
+  mossFile('globalData', false, 'moss_tts_global_shared.data', 440_813_568),
+  mossFile('localData', false, 'moss_tts_local_shared.data', 229_678_080),
+  mossFile('codecMeta', true, 'codec_browser_onnx_meta.json', 17_036),
+  mossFile('encoder', true, 'moss_audio_tokenizer_encode.onnx', 815_775),
+  mossFile('encoderData', true, 'moss_audio_tokenizer_encode.data', 44_507_136),
+  mossFile('codecDecoder', true, 'moss_audio_tokenizer_decode_step.onnx', 351_400),
+  mossFile('codecDecoderData', true, 'moss_audio_tokenizer_decode_shared.data', 44_198_912),
+]
 
 export const CLONE_MODELS: CloneModel[] = [
   pocket('pocket-en', 'Pocket TTS · English', 'english_2026-04', 'en', false),
@@ -163,6 +206,53 @@ export const CLONE_MODELS: CloneModel[] = [
     blurb:
       'Resemble AI’s 500M-parameter multilingual model, 4-bit: Hindi and 22 more languages. Very slow without WebGPU. Japanese, Chinese and Hebrew need text preparation this page does not do yet.',
   },
+  {
+    id: 'moss-tts-nano',
+    label: 'MOSS-TTS-Nano 100M · 20 languages',
+    family: 'moss',
+    repo: MOSS_REPO,
+    revision: MOSS_REV,
+    languages: [
+      'ar',
+      'cs',
+      'da',
+      'de',
+      'el',
+      'en',
+      'es',
+      'fa',
+      'fr',
+      'he',
+      'hu',
+      'it',
+      'ja',
+      'ko',
+      'pl',
+      'pt',
+      'ru',
+      'sv',
+      'tr',
+      'zh',
+    ],
+    bytes: MOSS_FILES.reduce((a, f) => a + f.bytes, 0),
+    // Measured in Chromium: 1.3 GB of WebAssembly memory once loaded, 2.5 GB after taking in a 12 s voice.
+    peakBytes: 2_600e6,
+    memoryPages: 65_536,
+    group: 'Medium: a laptop',
+    license: 'Apache-2.0',
+    licenseNote:
+      'MOSS-TTS-Nano and MOSS-Audio-Tokenizer-Nano by the OpenMOSS team and MOSI.AI (Apache-2.0), their official ONNX exports; this page’s driver is written from their Apache-2.0 reference code.',
+    reference:
+      'The recording goes through the model’s own audio codec (MOSS-Audio-Tokenizer-Nano, 48 kHz): 16 codes per 80 ms become the voice prompt. It takes the first 12 s (its encoder’s memory grows with the square of the length). No transcript needed.',
+    needsTranscript: false,
+    maxReferenceSeconds: 12,
+    streams: true,
+    needs:
+      'a laptop or desktop with memory to spare (about 2.5 GB); on four CPU cores it takes 1.1 to 1.2 s per second of speech in Chromium, so long text may pause now and then',
+    source: 'https://huggingface.co/OpenMOSS-Team/MOSS-TTS-Nano',
+    blurb:
+      'OpenMOSS’s 100M-parameter model in full precision with its 48 kHz codec (played here at 24 kHz, like the other models): closer to the voice than Pocket TTS, and plays as it goes. Numbers are read as written: the reference’s number-to-words step (WeTextProcessing) has no browser version.',
+  },
 ]
 
 export const CLONE_GROUPS: CloneGroup[] = ['Small: phones too', 'Medium: a laptop', 'Large: a desktop, WebGPU advised']
@@ -205,15 +295,18 @@ export function chatterboxFiles(m: CloneModel, dtype: string): string[] {
 /** Languages by name, for the pickers. */
 export const LANGUAGE_NAMES: Record<string, string> = {
   ar: 'Arabic',
+  cs: 'Czech',
   da: 'Danish',
   de: 'German',
   el: 'Greek',
   en: 'English',
   es: 'Spanish',
+  fa: 'Persian',
   fi: 'Finnish',
   fr: 'French',
   he: 'Hebrew',
   hi: 'Hindi',
+  hu: 'Hungarian',
   it: 'Italian',
   ja: 'Japanese',
   ko: 'Korean',
@@ -231,12 +324,6 @@ export const LANGUAGE_NAMES: Record<string, string> = {
 
 /** Models from the brief that the page does not run, and why. */
 export const NOT_OFFERED = [
-  {
-    label: 'MOSS-TTS-Nano 100M (OpenMOSS)',
-    license: 'Apache-2.0',
-    size: '670 MB plus a 90 MB audio codec (fp32 ONNX)',
-    why: 'It runs in browsers (its authors publish a reader app built on these ONNX files), but its frame-by-frame driver (16 codebooks sampled per frame, a streaming codec) is not in this page yet.',
-  },
   {
     label: 'NeuTTS Air (Neuphonic)',
     license: 'Apache-2.0',

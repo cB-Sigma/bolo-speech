@@ -6,7 +6,8 @@ import { expect, test, type Page } from '@playwright/test'
  * The "Clone a voice" page of the live demo. Scripted workers stand in for the models
  * (`bolo.mock.clone`; see src/lib/browser-clone/fake-workers.ts) and a scripted recogniser fills in the
  * transcript (`bolo.mock.browserStt`), so these run without downloads. With BOLO_E2E_MODEL_DIR pointing at a
- * mirror holding Pocket TTS (English), CAM++ and Moonshine Tiny, one test runs the real models.
+ * mirror holding Pocket TTS (English), MOSS-TTS-Nano with its codec, CAM++ and Moonshine Tiny, two tests run the
+ * real models.
  */
 
 const MIRROR = Boolean(process.env.BOLO_E2E_MODEL_DIR)
@@ -153,6 +154,39 @@ test.describe('clone a voice in the page', () => {
     await expect(page.getByTestId('clone-status')).toContainText('downloads on first use')
   })
 
+  test('MOSS-TTS-Nano: picker entry and facts, 20 languages, long reference cut, streamed clip, WAV; listed', async ({
+    page,
+  }) => {
+    await open(page)
+    await expect(page.getByTestId('clone-not-offered')).not.toContainText('MOSS')
+    await page.getByTestId('clone-model-select').click()
+    const entry = page.getByTestId('clone-model-moss-tts-nano')
+    await expect(entry).toContainText('Apache-2.0')
+    await expect(entry).toContainText('20 languages')
+    await entry.click()
+    const facts = page.getByTestId('clone-model-facts')
+    await expect(facts).toContainText('OpenMOSS')
+    await expect(facts).toContainText('Persian')
+    await expect(facts).toContainText('No transcript needed')
+    await expect(page.getByTestId('clone-status')).toContainText('downloads on first use')
+    // A 15 s example: the model takes its first 12 s, and says so.
+    await page.getByTestId('clone-example-syspin-hi-male').click()
+    await expect(page.getByTestId('clone-ref-cut')).toContainText('first 12 s')
+    await page.getByTestId('clone-language').click()
+    await page.getByRole('option', { name: 'Chinese' }).click()
+    await page.getByTestId('clone-text').fill('欢迎关注模思智能。')
+    await page.getByTestId('clone-generate').click()
+    await expect(page.getByTestId('clone-output')).toBeVisible()
+    await expect(page.getByTestId('clone-output')).toContainText('Played as it was made')
+    await expect(page.getByTestId('clone-rtf')).toHaveAttribute('data-rtf', /\d/)
+    const download = page.waitForEvent('download')
+    await page.getByTestId('clone-download').click()
+    expect((await download).suggestedFilename()).toBe('bolo-clone-moss-tts-nano.wav')
+    await expect(page.getByTestId('downloads-panel')).toContainText('MOSS-TTS-Nano')
+    await page.goto('./#/models')
+    await expect(page.getByTestId('loaded-models')).toContainText('clone-moss-tts-nano')
+  })
+
   test('out of memory: unloads the rest and retries on one CPU thread', async ({ page }) => {
     await open(page, { fake: 'oom' })
     await page.getByTestId('clone-example-syspin-en-female').click()
@@ -175,7 +209,10 @@ test.describe('clone a voice in the page', () => {
   })
 
   test.describe('with the models available', () => {
-    test.skip(!MIRROR, 'set BOLO_E2E_MODEL_DIR to a mirror with Pocket TTS, CAM++ and Moonshine Tiny to run')
+    test.skip(
+      !MIRROR,
+      'set BOLO_E2E_MODEL_DIR to a mirror with Pocket TTS, MOSS-TTS-Nano, CAM++ and Moonshine Tiny to run',
+    )
     test('real Pocket TTS: intelligible, and close to the example voice', async ({ page }) => {
       test.setTimeout(600_000)
       await open(page, { fake: null })
@@ -191,6 +228,28 @@ test.describe('clone a voice in the page', () => {
       const wer = Number(await page.getByTestId('clone-roundtrip').getAttribute('data-wer'))
       console.log(`[clone] pocket-en: similarity ${score.toFixed(3)}, WER ${(100 * wer).toFixed(1)}%`)
       expect(score).toBeGreaterThan(0.5)
+      expect(wer).toBeLessThan(0.2)
+    })
+
+    test('real MOSS-TTS-Nano: intelligible, and close to the example voice', async ({ page }) => {
+      test.setTimeout(900_000)
+      await open(page, { fake: null })
+      await page.getByTestId('clone-model-select').click()
+      await page.getByTestId('clone-model-moss-tts-nano').click()
+      await page.getByTestId('clone-placement').click()
+      await page.getByRole('option', { name: 'CPU' }).click()
+      await page.getByTestId('clone-example-kokoro-am-michael').click()
+      await page.getByTestId('clone-generate').click()
+      await expect(page.getByTestId('clone-output')).toBeVisible({ timeout: 600_000 })
+      await expect(page.getByTestId('similarity')).toHaveAttribute('data-score', /\d/, { timeout: 120_000 })
+      const score = Number(await page.getByTestId('similarity').getAttribute('data-score'))
+      const rtf = Number(await page.getByTestId('clone-rtf').getAttribute('data-rtf'))
+      await page.getByTestId('clone-check').click()
+      await expect(page.getByTestId('clone-roundtrip')).toHaveAttribute('data-wer', /\d/, { timeout: 300_000 })
+      const wer = Number(await page.getByTestId('clone-roundtrip').getAttribute('data-wer'))
+      console.log(`[clone] moss-tts-nano: similarity ${score.toFixed(3)}, WER ${(100 * wer).toFixed(1)}%, RTF ${rtf}`)
+      expect(score).toBeGreaterThan(0.5)
+      // Moonshine Tiny writes "ten" as "10": one word of 22.
       expect(wer).toBeLessThan(0.2)
     })
   })

@@ -18,6 +18,12 @@ export interface SpmModel {
   unkId: number
   addDummyPrefix: boolean
   byteFallback: boolean
+  /** 1 unigram, 2 BPE (TrainerSpec.model_type). */
+  modelType: number
+  /** NormalizerSpec.remove_extra_whitespaces. */
+  removeExtraWhitespaces: boolean
+  /** NormalizerSpec.name, e.g. `identity` or `nmt_nfkc`. */
+  normalizer: string
 }
 
 class Reader {
@@ -91,10 +97,18 @@ function scan(
   }
 }
 
-/** Parse a SentencePiece `tokenizer.model`. */
-export function parseSpmModel(data: ArrayBuffer | Uint8Array): SpmModel {
+/** Parse a SentencePiece `tokenizer.model` (unigram unless `opts.bpe` allows BPE too). */
+export function parseSpmModel(data: ArrayBuffer | Uint8Array, opts: { bpe?: boolean } = {}): SpmModel {
   const buf = data instanceof Uint8Array ? data : new Uint8Array(data)
-  const model: SpmModel = { pieces: [], unkId: 0, addDummyPrefix: true, byteFallback: false }
+  const model: SpmModel = {
+    pieces: [],
+    unkId: 0,
+    addDummyPrefix: true,
+    byteFallback: false,
+    modelType: 1,
+    removeExtraWhitespaces: true,
+    normalizer: 'identity',
+  }
   scan(buf, 0, buf.length, (field, wire, value, at) => {
     if (wire !== 2) return
     if (field === 1) model.pieces.push(readPiece(buf, at, at + value))
@@ -104,12 +118,17 @@ export function parseSpmModel(data: ArrayBuffer | Uint8Array): SpmModel {
         if (w !== 0) return
         if (f === 40) model.unkId = v
         if (f === 35) model.byteFallback = v !== 0
-        if (f === 3 && v !== 1) throw new Error('Only unigram SentencePiece models are supported')
+        if (f === 3) {
+          if (v !== 1 && !(opts.bpe && v === 2)) throw new Error('Only unigram SentencePiece models are supported')
+          model.modelType = v
+        }
       })
     else if (field === 3)
-      // NormalizerSpec: add_dummy_prefix = 3
-      scan(buf, at, at + value, (f, w, v) => {
+      // NormalizerSpec: name = 1, add_dummy_prefix = 3, remove_extra_whitespaces = 4
+      scan(buf, at, at + value, (f, w, v, start) => {
         if (w === 0 && f === 3) model.addDummyPrefix = v !== 0
+        if (w === 0 && f === 4) model.removeExtraWhitespaces = v !== 0
+        if (w === 2 && f === 1) model.normalizer = utf8.decode(buf.subarray(start, start + v))
       })
   })
   if (!model.pieces.length) throw new Error('No pieces in the SentencePiece model')

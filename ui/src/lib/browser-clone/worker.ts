@@ -1,19 +1,28 @@
 /// <reference lib="webworker" />
 import type * as Ort from 'onnxruntime-web/wasm'
-import { cachedDownload, lowerMemoryMaximum, ortCdnBase, RUNTIME_CACHE } from '@/lib/browser-runtime'
+import {
+  cachedDownload,
+  lowerMemoryMaximum,
+  ortCdnBase,
+  RUNTIME_CACHE,
+  runtimeMemoryBytes,
+} from '@/lib/browser-runtime'
 import type { FileProgress } from '@/lib/browser-stt/models'
-import { chatterboxFiles, pocketFiles } from './models'
+import { chatterboxFiles, MOSS_FILES, pocketFiles } from './models'
+import { MossTts, type MossCodecMeta, type MossManifest, type MossTtsMeta } from './moss'
 import type { MakeTensor, OrtSession } from './ort-types'
 import { freeDimension } from './onnx-patch'
 import { PocketTts, type PocketMeta, type PocketVoice } from './pocket'
 import type { CloneWorkerRequest, CloneWorkerResponse, GenerateOptions } from './protocol'
 import { chunkForChatterbox, chatterboxTokenBudget } from './text'
 import { SpmTokenizer } from './spm'
+import { SpmBpeTokenizer } from './spm-bpe'
 
 /**
  * Runs one voice-cloning model in a worker. Pocket TTS: five ONNX Runtime Web
- * sessions driven by ./pocket.ts. Chatterbox: transformers.js's
- * ChatterboxModel (speech encoder, embeddings, language model, decoder).
+ * sessions driven by ./pocket.ts. MOSS-TTS-Nano: five sessions driven by
+ * ./moss.ts. Chatterbox: transformers.js's ChatterboxModel (speech encoder,
+ * embeddings, language model, decoder).
  */
 
 const scope = self as unknown as DedicatedWorkerGlobalScope
@@ -196,6 +205,122 @@ async function loadPocket(
   return { engine, keys, bytes, device }
 }
 
+async function loadMoss(
+  req: Load,
+): Promise<{ engine: Engine; keys: string[]; bytes: number; device: 'webgpu' | 'wasm' }> {
+  const ort = await loadOrt(req)
+  const host = (req.modelHost ?? 'https://huggingface.co/').replace(/\/?$/, '/')
+  const track = progressTracker()
+  for (const f of MOSS_FILES) track.files.set(f.path, { file: f.path, loaded: 0, total: f.bytes })
+  post({ type: 'stage', stage: 'model' })
+  const keys: string[] = []
+  const fetchFile = async (name: string): Promise<ArrayBuffer> => {
+    const f = MOSS_FILES.find((x) => x.name === name)
+    if (!f) throw new Error(`MOSS-TTS-Nano: no file ${name}`)
+    const url = `${host}${f.repo}/resolve/${f.revision}/${f.path}`
+    keys.push(url)
+    const r = await cachedDownload(url, RUNTIME_CACHE, { progress: (l, t) => track.set(f.path, l, t || f.bytes) })
+    track.set(f.path, r.data.byteLength, r.data.byteLength)
+    return r.data
+  }
+  const json = async <T>(name: string): Promise<T> => JSON.parse(new TextDecoder().decode(await fetchFile(name))) as T
+  // The small files together, then the weights one by one: each big file is handed to its sessions and let go
+  // before the next arrives, so the page never holds two copies of all of them.
+  const [manifest, meta, codecMeta, tokenizer, graphs] = await Promise.all([
+    json<MossManifest>('manifest'),
+    json<MossTtsMeta>('meta'),
+    json<MossCodecMeta>('codecMeta'),
+    fetchFile('tokenizer'),
+    Promise.all(['prefill', 'decode', 'frame', 'encoder', 'codecDecoder'].map(fetchFile)),
+  ])
+  const [prefillGraph, decodeGraph, frameGraph, encoderGraph, codecGraph] = graphs as ArrayBuffer[]
+  let device = req.device
+  // On WebGPU the transformer's key/value cache stays on the GPU from one step to the next.
+  const onGpu = Object.fromEntries(
+    meta.onnx.decode_output_names.slice(1).map((n) => [n, 'gpu-buffer'] as const),
+  ) as Ort.InferenceSession.SessionOptions['preferredOutputLocation']
+  const create = async (
+    graph: ArrayBuffer,
+    dataName: string,
+    data: Uint8Array,
+    gpu: boolean,
+    cache = false,
+  ): Promise<OrtSession> => {
+    const opts = (providers: string[]): Ort.InferenceSession.SessionOptions => ({
+      executionProviders: providers,
+      graphOptimizationLevel: 'all',
+      externalData: [{ path: dataName, data }],
+      logSeverityLevel: 3,
+      ...(cache && providers[0] === 'webgpu' ? { preferredOutputLocation: onGpu } : {}),
+    })
+    if (gpu && device === 'webgpu')
+      try {
+        return (await ort.InferenceSession.create(
+          new Uint8Array(graph),
+          opts(['webgpu', 'wasm']),
+        )) as unknown as OrtSession
+      } catch (err) {
+        post({
+          type: 'note',
+          text: `WebGPU failed (${err instanceof Error ? err.message : String(err)}); using the CPU`,
+        })
+        device = 'wasm'
+      }
+    return (await ort.InferenceSession.create(new Uint8Array(graph), opts(['wasm']))) as unknown as OrtSession
+  }
+  const gpu = req.device === 'webgpu'
+  let data = new Uint8Array(await fetchFile('globalData'))
+  post({ type: 'stage', stage: 'compiling' })
+  const prefill = await create(prefillGraph as ArrayBuffer, 'moss_tts_global_shared.data', data, gpu, true)
+  const decode = await create(decodeGraph as ArrayBuffer, 'moss_tts_global_shared.data', data, gpu, true)
+  data = new Uint8Array(await fetchFile('localData'))
+  const frame = await create(frameGraph as ArrayBuffer, 'moss_tts_local_shared.data', data, gpu)
+  // The codec stays on the CPU: one encoder pass per voice, and a streaming decoder with many small states.
+  data = new Uint8Array(await fetchFile('encoderData'))
+  const encoder = await create(encoderGraph as ArrayBuffer, 'moss_audio_tokenizer_encode.data', data, false)
+  data = new Uint8Array(await fetchFile('codecDecoderData'))
+  const codecDecoder = await create(codecGraph as ArrayBuffer, 'moss_audio_tokenizer_decode_shared.data', data, false)
+  const tok = SpmBpeTokenizer.fromModel(tokenizer)
+  const tensor: MakeTensor = (type, d, dims) =>
+    new ort.Tensor(type, d as Float32Array, dims as number[]) as unknown as ReturnType<MakeTensor>
+  const tts = new MossTts(
+    manifest,
+    meta,
+    codecMeta,
+    { encode: (t) => tok.encode(t), count: (t) => tok.count(t) },
+    { prefill, decode, frame, encoder, codecDecoder },
+    tensor,
+  )
+  post({ type: 'stage', stage: 'warmup' })
+  // Warm up: a second of near-silence as the voice and two frames of one word.
+  tts.setVoice(await tts.encodeVoice(new Float32Array(24_000).map((_, i) => Math.sin(i / 9) * 0.01)))
+  await tts.generate('Hi.', { seed: 1, maxFrames: 2 }, () => undefined)
+  const wasmBytes = runtimeMemoryBytes()
+  if (wasmBytes != null)
+    post({ type: 'note', text: `WebAssembly memory after loading: ${Math.round(wasmBytes / 1e6)} MB` })
+  let current: string | null = null
+  const engine: Engine = {
+    async voice(key, audio) {
+      tts.setVoice(await tts.encodeVoice(audio))
+      current = key
+      const bytes = runtimeMemoryBytes()
+      if (bytes != null)
+        post({ type: 'note', text: `WebAssembly memory after taking in the voice: ${Math.round(bytes / 1e6)} MB` })
+    },
+    async generate(key, text, options, id) {
+      if (current !== key) throw new Error('No reference voice taken in yet')
+      let samples = 0
+      await tts.generate(text, { seed: options.seed, cancelled: () => cancelled.has(id) }, (a) => {
+        samples += a.length
+        post({ type: 'audio', id, samples: a }, [a.buffer])
+      })
+      return samples
+    },
+  }
+  const bytes = MOSS_FILES.reduce((a, f) => a + f.bytes, 0)
+  return { engine, keys, bytes, device }
+}
+
 async function hasShaderF16(): Promise<boolean> {
   try {
     const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<{ features: Set<string> } | null> } }).gpu
@@ -317,7 +442,12 @@ async function loadChatterbox(
 async function load(req: Load): Promise<void> {
   const started = performance.now()
   engine = null
-  const r = req.model.family === 'pocket' ? await loadPocket(req) : await loadChatterbox(req)
+  const r =
+    req.model.family === 'pocket'
+      ? await loadPocket(req)
+      : req.model.family === 'moss'
+        ? await loadMoss(req)
+        : await loadChatterbox(req)
   engine = r.engine
   post({
     type: 'ready',

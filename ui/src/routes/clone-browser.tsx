@@ -586,6 +586,11 @@ export default function CloneBrowserPage() {
                       <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden /> {n}
                     </p>
                   ))}
+                  {model.maxReferenceSeconds != null && ref.seconds > model.maxReferenceSeconds && (
+                    <p className="text-xs text-muted-foreground" data-testid="clone-ref-cut">
+                      {model.label} uses the first {model.maxReferenceSeconds} s of it.
+                    </p>
+                  )}
                   <label className="grid gap-1 text-xs">
                     <span className="flex flex-wrap items-center gap-2">
                       <span className="font-medium">What is said in the recording</span>
@@ -808,9 +813,10 @@ export default function CloneBrowserPage() {
                 </Fact>
                 <Fact k="Languages">{model.languages.map((l) => LANGUAGE_NAMES[l] ?? l).join(', ')}</Fact>
                 <Fact k="Needs">
-                  {model.prefersWebGpu
-                    ? 'WebGPU for usable speed (a laptop or desktop); it runs on the CPU, many times slower than real time'
-                    : 'any recent browser; quick on the CPU, phones included'}
+                  {model.needs ??
+                    (model.prefersWebGpu
+                      ? 'WebGPU for usable speed (a laptop or desktop); it runs on the CPU, many times slower than real time'
+                      : 'any recent browser; quick on the CPU, phones included')}
                 </Fact>
                 <Fact k="The voice">{model.reference}</Fact>
                 {model.watermark && <Fact k="Watermark">{model.watermark}</Fact>}
