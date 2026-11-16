@@ -1,6 +1,7 @@
 import type { WorkerLike } from './engine'
 import {
   CLONE_RATE,
+  WEBGPU_LOAD_FAILED,
   type CloneWorkerRequest,
   type CloneWorkerResponse,
   type EmbedWorkerRequest,
@@ -14,7 +15,8 @@ import {
  * to itself and far from silence. `bolo.mock.clone = "oom"` fails the first load with an out-of-memory error.
  * Failures on WebGPU, as seen with Chatterbox Turbo in Chrome on Windows (generation on the CPU still works):
  * `"gpu-fail"` answers a generation with ONNX Runtime's error, `"gpu-hang"` never answers it, `"gpu-crash"`
- * raises an error the worker cannot catch. `"hang"` never answers on any device and ignores Stop.
+ * raises an error the worker cannot catch, `"gpu-load-fail"` fails loading on WebGPU. `"hang"` never answers on any
+ * device and ignores Stop.
  */
 export const FAKE_CLONE_KEY = 'bolo.mock.clone'
 
@@ -52,6 +54,10 @@ export class FakeCloneWorker implements WorkerLike<CloneWorkerRequest, CloneWork
           },
           50,
         )
+        return
+      }
+      if (this.mode === 'gpu-load-fail' && req.device === 'webgpu') {
+        emit({ type: 'error', message: `${WEBGPU_LOAD_FAILED}: ${WEBGPU_RUN_ERROR}` }, 30)
         return
       }
       this.device = req.device

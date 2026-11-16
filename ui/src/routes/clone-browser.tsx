@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { DownloadsPanel, InterruptedLoadNotice } from '@/components/downloads-panel'
 import { Page } from '@/components/layout/app-shell'
-import { RiskDialog, useDevice, VerdictBadge, VerdictLine } from '@/components/model-fit'
+import { DevicePanel, RiskDialog, useDevice, VerdictBadge, VerdictLine } from '@/components/model-fit'
 import { Panel } from '@/components/panel'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -49,10 +49,17 @@ import {
   type CloneExample,
   type Recorder,
 } from '@/lib/browser-clone/audio'
-import { sharedCloner, sharedScorer, type GenerateResult, type Placement } from '@/lib/browser-clone/engine'
+import {
+  chooseDevice,
+  sharedCloner,
+  sharedScorer,
+  type GenerateResult,
+  type Placement,
+} from '@/lib/browser-clone/engine'
 import {
   CLONE_GROUPS,
   CLONE_MODELS,
+  cloneBytes,
   cloneDownloadId,
   LANGUAGE_NAMES,
   NOT_OFFERED,
@@ -123,10 +130,10 @@ const untouched = (text: string) => !text.trim() || Object.values(DEFAULT_TEXT).
 let freshKey = 0
 const newKey = (prefix: string) => `${prefix}-${Date.now()}-${++freshKey}`
 
-function needsFor(m: CloneModel) {
+function needsFor(m: CloneModel, bytes = m.bytes) {
   const id = cloneDownloadId(m)
   return {
-    bytes: m.bytes,
+    bytes,
     peakBytes: peakFor(id, m.peakBytes),
     prefersWebGpu: m.prefersWebGpu,
     downloaded: isDownloaded(id),
@@ -142,7 +149,8 @@ function ModelOption({ m, d }: { m: CloneModel; d: DeviceInfo }) {
         <VerdictBadge verdict={v} />
       </span>
       <span className="text-[11px] whitespace-normal text-muted-foreground">
-        {fmtBytes(m.bytes)} · {m.license} ·{' '}
+        {fmtBytes(m.bytes)}
+        {m.gpuBytes ? ` (${fmtBytes(m.gpuBytes)} on WebGPU)` : ''} · {m.license} ·{' '}
         {m.languages.length > 3
           ? `${m.languages.length} languages`
           : m.languages.map((l) => LANGUAGE_NAMES[l] ?? l).join(', ')}
@@ -221,7 +229,10 @@ export default function CloneBrowserPage() {
   const [genError, setGenError] = useState<string | null>(null)
   const playerRef = useRef<GaplessPlayer | null>(null)
   const model = s.model
-  const verdict = verdictFor(needsFor(model), d)
+  // Where it runs (or would run now), and so which files it downloads: Chatterbox Turbo's CPU files differ.
+  const runsOn = s.device ?? chooseDevice(s.placement, model)
+  const bytesHere = cloneBytes(model, runsOn, d.webgpu?.f16 ?? true)
+  const verdict = verdictFor(needsFor(model, bytesHere), d)
 
   useEffect(() => {
     void saved.load()
@@ -719,7 +730,7 @@ export default function CloneBrowserPage() {
                         ? `${model.label} ready on ${s.device === 'webgpu' ? 'WebGPU' : 'the CPU'} (loaded in ${((s.loadMs ?? 0) / 1000).toFixed(1)} s)`
                         : s.status === 'error'
                           ? `Could not load: ${s.error}`
-                          : `${model.label} downloads on first use (${fmtBytes(model.bytes)}).`}
+                          : `${model.label} downloads on first use (${fmtBytes(bytesHere)} for ${runsOn === 'webgpu' ? 'WebGPU' : 'the CPU'}).`}
               </p>
               {s.notice && (
                 <p className="flex items-start gap-1.5 text-xs text-warning-text" data-testid="clone-notice">
@@ -841,10 +852,15 @@ export default function CloneBrowserPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <VerdictLine verdict={verdict} bytes={model.bytes} />
+              <VerdictLine verdict={verdict} bytes={bytesHere} />
               <dl className="grid gap-1.5" data-testid="clone-model-facts">
                 <Fact k="Size">
-                  {fmtBytes(model.bytes)} download, about {fmtBytes(model.peakBytes)} in memory
+                  <span data-testid="clone-size">
+                    {model.gpuBytes
+                      ? `${fmtBytes(model.bytes)} download on the CPU, ${fmtBytes(model.gpuBytes)} on WebGPU (different files, each fetched once)`
+                      : `${fmtBytes(model.bytes)} download`}
+                    , about {fmtBytes(model.peakBytes)} in memory
+                  </span>
                 </Fact>
                 <Fact k="Licence">
                   <a
@@ -928,12 +944,13 @@ export default function CloneBrowserPage() {
             </ul>
           </Panel>
           <DownloadsPanel />
+          <DevicePanel />
         </div>
       </div>
       <RiskDialog
         open={risk}
         label={model.label}
-        bytes={model.bytes}
+        bytes={bytesHere}
         verdict={verdict}
         onCancel={() => setRisk(false)}
         onConfirm={() => {

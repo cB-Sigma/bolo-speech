@@ -22,8 +22,10 @@ export interface CloneModel {
   languageTag?: boolean
   /** Languages it speaks (ISO 639-1). */
   languages: string[]
-  /** Bytes downloaded the first time. */
+  /** Bytes downloaded the first time (on the CPU, for a model whose WebGPU files differ). */
   bytes: number
+  /** Bytes downloaded the first time on WebGPU with 16-bit shaders, when those files are not the CPU's. */
+  gpuBytes?: number
   /** Estimated memory while it runs. */
   peakBytes: number
   /** Runs on the CPU but is meant for WebGPU (several times slower than real time without it). */
@@ -142,7 +144,9 @@ export const CLONE_MODELS: CloneModel[] = [
     revision: 'd21799bd0354adb85e348b8a0442a8405110a2cf',
     dtype: { wasm: 'q4', webgpu: 'q4f16' },
     languages: ['en'],
-    bytes: 717_700_000,
+    // config, tokenizer and the four graphs: q4 (the CPU, or WebGPU without shader-f16) and q4f16 at this revision.
+    bytes: 724_900_000,
+    gpuBytes: 565_400_000,
     peakBytes: 1_700e6,
     prefersWebGpu: true,
     group: 'Large: a desktop, WebGPU advised',
@@ -279,6 +283,31 @@ export function pocketFiles(m: CloneModel): { name: string; path: string }[] {
     ['flow', 'flow_lm_flow_int8.onnx'],
     ['decoder', 'mimi_decoder_int8.onnx'],
   ].map(([name, file]) => ({ name: name as string, path: dir + file }))
+}
+
+/**
+ * The ONNX Runtime Web WebAssembly build a device needs. WebGPU needs the asyncify build; the CPU must have the
+ * plain one: the asyncify build's CPU kernels lack GatherBlockQuantized (com.microsoft), which every 4- and 8-bit
+ * Chatterbox Turbo graph uses ("Could not find an implementation for GatherBlockQuantized(1) node with name
+ * '/text_emb/Gather_Quant'"), while the plain build has it. transformers.js picks the asyncify build for every
+ * device unless told otherwise.
+ */
+export function ortWasmBuild(device: 'webgpu' | 'wasm'): 'ort-wasm-simd-threaded' | 'ort-wasm-simd-threaded.asyncify' {
+  return device === 'webgpu' ? 'ort-wasm-simd-threaded.asyncify' : 'ort-wasm-simd-threaded'
+}
+
+/**
+ * transformers.js dtype of a Chatterbox model on a device. The CPU always gets the CPU dtype (never the
+ * WebGPU-only 16-bit graph); WebGPU without 16-bit shaders gets the CPU dtype too.
+ */
+export function chatterboxDtype(m: CloneModel, device: 'webgpu' | 'wasm', f16 = true): string {
+  const d = m.dtype ?? { wasm: 'q4', webgpu: 'q4' }
+  return device === 'webgpu' && f16 ? d.webgpu : d.wasm
+}
+
+/** Bytes a model downloads the first time on a device (16-bit shaders assumed on WebGPU). */
+export function cloneBytes(m: CloneModel, device: 'webgpu' | 'wasm' | null, f16 = true): number {
+  return device === 'webgpu' && f16 && m.gpuBytes ? m.gpuBytes : m.bytes
 }
 
 /** Chatterbox files transformers.js fetches for a dtype (used for the download list's keys). */

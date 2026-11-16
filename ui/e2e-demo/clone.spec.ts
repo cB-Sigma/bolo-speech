@@ -331,6 +331,13 @@ test.describe('clone a voice in the page', () => {
     await open(page, { fake: 'gpu-fail' })
     await page.getByTestId('clone-model-select').click()
     await page.getByTestId('clone-model-chatterbox-turbo').click()
+    // Both downloads are stated before anything is fetched: the CPU's files are not the WebGPU ones.
+    await expect(page.getByTestId('clone-size')).toContainText('725 MB download on the CPU, 565 MB on WebGPU')
+    await expect(page.getByTestId('clone-status')).toContainText('565 MB for WebGPU')
+    // Your device is on this page too, with the GPU the browser gave.
+    await expect(page.getByTestId('device-panel')).toBeVisible()
+    await expect(page.getByTestId('gpu-in-use')).toContainText('GPU in use')
+    await expect(page.getByTestId('gpu-in-use')).toContainText('amd · gcn-5')
     await page.getByTestId('clone-example-kokoro-am-michael').click()
     await page.getByTestId('clone-generate').click()
     await expect(page.getByTestId('clone-output')).toBeVisible()

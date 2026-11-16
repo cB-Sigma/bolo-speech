@@ -5,6 +5,9 @@ import type { CloneModel } from './models'
 /** Sample rate of every reference and every output on the page. */
 export const CLONE_RATE = 24_000
 
+/** Start of a load error that means: loading on WebGPU failed; load again in a new worker on the CPU. */
+export const WEBGPU_LOAD_FAILED = 'Loading on WebGPU failed'
+
 export interface GenerateOptions {
   /** Language of the text (multilingual models). */
   language: string

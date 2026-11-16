@@ -8,6 +8,7 @@ import {
 import { readBrowserSttConfig, type FileProgress } from '@/lib/browser-stt/models'
 import { device as deviceStore, pageMemoryBytes, peakFor, rememberMeasured } from '@/lib/device'
 import { diag } from '@/lib/diagnostics'
+import { fmtBytes } from '@/lib/format'
 import {
   markLoading,
   markSettled,
@@ -20,7 +21,7 @@ import {
 import { Store } from '@/lib/store'
 import { detectSupport } from '@/lib/support'
 import { readGpuPower } from '@/lib/webgpu'
-import { cloneDownloadId, cloneModel, DEFAULT_CLONE_MODEL, type CloneModel } from './models'
+import { cloneBytes, cloneDownloadId, cloneModel, DEFAULT_CLONE_MODEL, type CloneModel } from './models'
 import type {
   CloneWorkerRequest,
   CloneWorkerResponse,
@@ -28,7 +29,7 @@ import type {
   EmbedWorkerResponse,
   GenerateOptions,
 } from './protocol'
-import { CLONE_RATE } from './protocol'
+import { CLONE_RATE, WEBGPU_LOAD_FAILED } from './protocol'
 import { SIMILARITY_DOWNLOAD_ID, SIMILARITY_MODEL } from './similarity'
 
 export type Placement = 'auto' | 'webgpu' | 'wasm'
@@ -238,6 +239,19 @@ export class BrowserCloner {
       .catch(async (err: unknown) => {
         if (generation !== this.generation) throw err
         const message = err instanceof Error ? err.message : String(err)
+        if (first !== 'webgpu' || isOom(message) || !message.startsWith(WEBGPU_LOAD_FAILED)) throw err
+        // The model would not load on WebGPU. That worker's runtime is the WebGPU build, which cannot run these
+        // graphs on the CPU, so a new worker loads it on the CPU build (the CPU's own files, a separate download).
+        const model = this.store.get().model
+        diag.error('clone', `${message}; loading on the CPU`)
+        this.terminate()
+        this.gpuFailed = true
+        this.store.patch({ notice: `${message}. Loading on the CPU (WebAssembly) instead: ${cpuDownload(model)}.` })
+        return this.doLoad(threads, 'wasm', generation)
+      })
+      .catch(async (err: unknown) => {
+        if (generation !== this.generation) throw err
+        const message = err instanceof Error ? err.message : String(err)
         if (!isOom(message)) throw err
         // Out of memory: let the other in-page models go, keep one runtime at a time, retry on one thread.
         this.terminate()
@@ -411,7 +425,9 @@ export class BrowserCloner {
         this.dispose()
         this.gpuFailed = true
         if (this.store.get().placement === 'auto') rememberGpuFailure(model.id, message)
-        this.store.patch({ notice: `${capitalise(failure)}. Trying again on the CPU (WebAssembly)…` })
+        this.store.patch({
+          notice: `${capitalise(failure)}. Trying again on the CPU (WebAssembly): ${cpuDownload(model)}…`,
+        })
         try {
           const r = await this.generateOnce(key, reference, text, options, onAudio)
           this.store.patch({
@@ -549,6 +565,15 @@ export class BrowserCloner {
 }
 
 const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+/** What the CPU retry downloads, said before it starts (a model whose CPU files differ from its WebGPU ones). */
+function cpuDownload(model: CloneModel): string {
+  const bytes = cloneBytes(model, 'wasm')
+  const onGpu = cloneBytes(model, 'webgpu', deviceStore.get().webgpu?.f16 ?? true)
+  return onGpu !== bytes
+    ? `its CPU files are a separate ${fmtBytes(bytes)} download the first time`
+    : `the same ${fmtBytes(bytes)} of files as on WebGPU`
+}
 
 export interface ScorerState {
   status: 'idle' | 'loading' | 'ready' | 'error'

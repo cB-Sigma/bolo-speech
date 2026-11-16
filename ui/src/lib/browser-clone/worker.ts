@@ -9,13 +9,13 @@ import {
 } from '@/lib/browser-runtime'
 import type { FileProgress } from '@/lib/browser-stt/models'
 import { navigatorGpu, requestGpuAdapter, setOrtGpuPower, type GpuPower } from '@/lib/webgpu'
-import { chatterboxFiles, MOSS_FILES, pocketFiles } from './models'
+import { chatterboxDtype, chatterboxFiles, MOSS_FILES, ortWasmBuild, pocketFiles } from './models'
 import { MossTts, type MossCodecMeta, type MossManifest, type MossTtsMeta } from './moss'
 import type { MakeTensor, OrtSession } from './ort-types'
 import { freeDimension } from './onnx-patch'
 import { failOnRuntimeError } from './runtime-errors'
 import { PocketTts, type PocketMeta, type PocketVoice } from './pocket'
-import type { CloneWorkerRequest, CloneWorkerResponse, GenerateOptions } from './protocol'
+import { WEBGPU_LOAD_FAILED, type CloneWorkerRequest, type CloneWorkerResponse, type GenerateOptions } from './protocol'
 import { chunkForChatterbox, chatterboxTokenBudget } from './text'
 import { SpmTokenizer } from './spm'
 import { SpmBpeTokenizer } from './spm-bpe'
@@ -371,13 +371,21 @@ async function loadChatterbox(
   const host = (req.modelHost ?? 'https://huggingface.co/').replace(/\/?$/, '/')
   env.remoteHost = host
   setOrtGpuPower(env.backends.onnx as Parameters<typeof setOrtGpuPower>[0], req.power)
-  const wasm = env.backends.onnx.wasm as { numThreads?: number; wasmPaths?: unknown } | undefined
+  const onnx = env.backends.onnx as { versions?: { web?: string }; wasm?: { numThreads?: number; wasmPaths?: unknown } }
+  const wasm = onnx.wasm
   if (wasm) {
     wasm.numThreads = req.threads
-    if (req.ortWasmBase) {
-      const base = req.ortWasmBase.replace(/\/?$/, '/')
-      const variant = req.device === 'webgpu' ? 'ort-wasm-simd-threaded.asyncify' : 'ort-wasm-simd-threaded'
-      wasm.wasmPaths = { mjs: `${base}${variant}.mjs`, wasm: `${base}${variant}.wasm` }
+    // transformers.js points every device at the asyncify build; the CPU needs the plain one (see ortWasmBuild).
+    const current = wasm.wasmPaths as { mjs?: string } | string | undefined
+    const fallbackBase = typeof current === 'string' ? current : current?.mjs?.replace(/[^/]*$/, '')
+    const base = req.ortWasmBase
+      ? req.ortWasmBase.replace(/\/?$/, '/')
+      : onnx.versions?.web
+        ? ortCdnBase(onnx.versions.web)
+        : fallbackBase
+    if (base) {
+      const build = ortWasmBuild(req.device)
+      wasm.wasmPaths = { mjs: `${base}${build}.mjs`, wasm: `${base}${build}.wasm` }
     }
   }
   const track = progressTracker()
@@ -388,32 +396,28 @@ async function loadChatterbox(
     else if (info.status === 'done' && prev) track.set(info.file, prev.total, prev.total)
   }
   post({ type: 'stage', stage: 'model' })
-  let device = req.device
+  const device = req.device
   // 16-bit weights and activations need the GPU's shader-f16; without it the 4-bit file with 32-bit activations.
   const f16 = device === 'webgpu' && (await hasShaderF16(req.power))
-  const dtype = (device === 'webgpu' && !f16 ? m.dtype?.wasm : m.dtype?.[device]) ?? 'q4'
-  const open = (dev: 'webgpu' | 'wasm', dt: string): Promise<Opened> =>
-    Promise.all([
+  const usedDtype = chatterboxDtype(m, device, f16)
+  let model: InstanceType<typeof ChatterboxModel>
+  let tokenizer: Awaited<ReturnType<typeof AutoTokenizer.from_pretrained>>
+  try {
+    ;[model, tokenizer] = (await Promise.all([
       ChatterboxModel.from_pretrained(m.repo, {
         revision: m.revision,
-        dtype: dt,
-        device: dev,
+        dtype: usedDtype,
+        device,
         progress_callback: progress,
       } as never),
       AutoTokenizer.from_pretrained(m.repo, { revision: m.revision, progress_callback: progress } as never),
-    ]) as unknown as Promise<Opened>
-  let model: InstanceType<typeof ChatterboxModel>
-  let tokenizer: Awaited<ReturnType<typeof AutoTokenizer.from_pretrained>>
-  type Opened = [InstanceType<typeof ChatterboxModel>, typeof tokenizer]
-  let usedDtype = dtype
-  try {
-    ;[model, tokenizer] = await open(device, dtype)
+    ])) as unknown as [InstanceType<typeof ChatterboxModel>, typeof tokenizer]
   } catch (err) {
-    if (device !== 'webgpu') throw err
-    post({ type: 'note', text: `WebGPU failed (${err instanceof Error ? err.message : String(err)}); using the CPU` })
-    device = 'wasm'
-    usedDtype = m.dtype?.wasm ?? 'q4'
-    ;[model, tokenizer] = await open(device, usedDtype)
+    // This worker's runtime is the WebGPU build, whose CPU kernels cannot run these graphs: the page loads the
+    // model again in a new worker on the CPU build.
+    if (device === 'webgpu')
+      throw new Error(`${WEBGPU_LOAD_FAILED}: ${err instanceof Error ? err.message : String(err)}`, { cause: err })
+    throw err
   }
   const keys = chatterboxFiles(m, usedDtype).map(
     (f) => `${host.replace(/\/$/, '')}/${m.repo}/resolve/${m.revision}/${f}`,

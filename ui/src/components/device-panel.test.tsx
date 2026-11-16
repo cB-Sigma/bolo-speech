@@ -81,3 +81,24 @@ describe('Your device: which GPU', () => {
     expect(screen.queryByTestId('gpu-integrated-warning')).toBeNull()
   })
 })
+
+describe('Your device: "GPU in use" is always there', () => {
+  it('says checking before the probe answers, then the adapter, under stable test ids', async () => {
+    device.patch({ webgpu: null })
+    render(<DevicePanel />)
+    expect(screen.getByTestId('device-panel')).toHaveTextContent('Your device')
+    expect(screen.getByTestId('gpu-in-use')).toHaveTextContent('GPU in use')
+    expect(screen.getByTestId('gpu-in-use')).toHaveTextContent('checking…')
+    fakeGpu(() => RTX)
+    await reprobeDevice()
+    await waitFor(() =>
+      expect(screen.getByTestId('gpu-in-use')).toHaveTextContent('NVIDIA GeForce RTX 3060 Laptop GPU'),
+    )
+  })
+
+  it('says none when the browser has no WebGPU adapter', async () => {
+    await reprobeDevice()
+    render(<DevicePanel />)
+    expect(screen.getByTestId('gpu-in-use')).toHaveTextContent('GPU in usenone (no WebGPU adapter in this browser)')
+  })
+})

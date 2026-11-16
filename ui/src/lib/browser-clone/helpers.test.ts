@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { MAX_SECONDS, prepareReference, fromInt16, toInt16 } from './audio'
 import {
   CLONE_MODELS,
+  chatterboxDtype,
   chatterboxFiles,
+  cloneBytes,
   cloneModel,
   LANGUAGE_NAMES,
   MOSS_FILES,
   NOT_OFFERED,
+  ortWasmBuild,
   pocketFiles,
 } from './models'
 import { freeDimension } from './onnx-patch'
@@ -54,6 +57,37 @@ describe('voice-cloning catalogue', () => {
     expect(moss.bytes).toBe(MOSS_FILES.reduce((a, f) => a + f.bytes, 0))
     expect(moss.streams).toBe(true)
     expect(NOT_OFFERED.some((m) => m.label.includes('MOSS'))).toBe(false)
+  })
+})
+
+describe('Chatterbox on the CPU', () => {
+  const turbo = cloneModel('chatterbox-turbo')
+  it('never gets the WebGPU-only 16-bit graph, and runs on the plain WebAssembly build', () => {
+    // The WebGPU (asyncify) build of ONNX Runtime Web lacks GatherBlockQuantized on the CPU; the plain build has it.
+    expect(ortWasmBuild('wasm')).toBe('ort-wasm-simd-threaded')
+    expect(ortWasmBuild('webgpu')).toBe('ort-wasm-simd-threaded.asyncify')
+    for (const m of CLONE_MODELS.filter((x) => x.family === 'chatterbox')) {
+      const cpu = chatterboxDtype(m, 'wasm')
+      expect(cpu).not.toMatch(/f16/)
+      expect(['q4', 'q8', 'fp32', 'quantized', 'int8', 'uint8']).toContain(cpu)
+      expect(
+        chatterboxFiles(m, cpu)
+          .filter((f) => f.endsWith('.onnx'))
+          .join(),
+      ).not.toMatch(/f16/)
+    }
+    expect(chatterboxDtype(turbo, 'wasm')).toBe('q4')
+    expect(chatterboxDtype(turbo, 'webgpu')).toBe('q4f16')
+    // WebGPU without 16-bit shaders takes the CPU's files.
+    expect(chatterboxDtype(turbo, 'webgpu', false)).toBe('q4')
+  })
+
+  it('states the download of each variant', () => {
+    expect(cloneBytes(turbo, 'wasm')).toBe(724_900_000)
+    expect(cloneBytes(turbo, 'webgpu')).toBe(565_400_000)
+    expect(cloneBytes(turbo, 'webgpu', false)).toBe(724_900_000)
+    const multi = cloneModel('chatterbox-multilingual')
+    expect(cloneBytes(multi, 'webgpu')).toBe(cloneBytes(multi, 'wasm'))
   })
 })
 

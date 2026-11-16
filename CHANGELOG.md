@@ -101,6 +101,20 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   with the voice (bolo's own reference clips among them): the offset is removed with a 0.1 s moving average instead
   of the clip's mean, which had turned digital silence into a background 27 dB under the speech. Noise 10 dB under
   the speech still earns the warning.
+- Live demo: **Chatterbox Turbo would not load on the CPU**, neither chosen by hand nor as the retry after a WebGPU
+  failure: "Could not find an implementation for GatherBlockQuantized(1) node with name '/text_emb/Gather_Quant'"
+  (Chrome and Edge 157 on Windows). transformers.js points every device at ONNX Runtime Web's asyncify build (the
+  one WebGPU needs), whose CPU kernels lack `GatherBlockQuantized`; every 4- and 8-bit Turbo graph uses it (q4,
+  q4f16 and quantized alike; fp16 and fp32 do not). The plain WebAssembly build has it: with onnxruntime-web
+  1.31.0-dev.20260914 all four q4 graphs open on the plain build and none on the asyncify one. The cloning worker
+  now picks the build per device (plain on the CPU), the CPU always gets the CPU's files (q4, never the WebGPU-only
+  q4f16 graph), and a model that fails to load on WebGPU is loaded again in a new worker on the CPU build (a worker
+  cannot change builds). In headless Chromium, Turbo then loads on the CPU in 21 s and speaks. The clone page states
+  both downloads before anything is fetched (725 MB on the CPU, 565 MB on WebGPU, different files), and the note
+  for the CPU retry says its files are a separate 725 MB download. Unit tests for the dtype and build per device.
+- Live demo, Your device: "GPU in use" is always listed (`data-testid="gpu-in-use"`): "checking…" until the WebGPU
+  probe answers, then the adapter, or "none" without one; it used to appear only once an adapter was found. The
+  panel (`data-testid="device-panel"`) is also on the Clone page now, besides Speech to text and Text to speech.
 - **The end-of-turn model (`smart-turn-v3`, `semantic_vad`) gave wrong probabilities on x86 CPUs without VNNI**
   (AVX2 only: AMD Ryzen before Zen 4, Intel before Ice Lake / Alder Lake), the same ONNX Runtime kernel that emptied
   DiCoW's transcripts: its int8 graph (QuantizeLinear / DequantizeLinear pairs, which ONNX Runtime fuses into uint8 x

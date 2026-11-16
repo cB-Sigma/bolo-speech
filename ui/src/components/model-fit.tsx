@@ -155,7 +155,8 @@ const MB = (b: number | null | undefined) => (b == null ? 'not reported' : fmtBy
 export function DevicePanel({ className }: { className?: string }) {
   const d = useDevice()
   const gpu = d.webgpu
-  const rows: [string, string][] = [
+  // [label, value, test id]. "GPU in use" is always there (scripts look for it): checking until the probe answers.
+  const rows: [string, string, string?][] = [
     ['Device', `${platformLabel(d.platform)} · ${d.browser}`],
     [
       'Memory',
@@ -170,7 +171,15 @@ export function DevicePanel({ className }: { className?: string }) {
           ? `yes; 16-bit shaders ${gpu.f16 ? 'yes' : 'no'}; largest buffer ${MB(gpu.maxBufferSize)}`
           : 'no: models run on the CPU (WebAssembly)',
     ],
-    ...(gpu?.available ? ([['GPU in use', gpuText(gpu.adapter, gpu.details)]] as [string, string][]) : []),
+    [
+      'GPU in use',
+      gpu == null
+        ? 'checking…'
+        : gpu.available
+          ? gpuText(gpu.adapter, gpu.details)
+          : 'none (no WebGPU adapter in this browser)',
+      'gpu-in-use',
+    ],
     ['WebAssembly threads', d.threads ? 'yes' : 'no (one thread): slower'],
     [
       'Storage',
@@ -189,8 +198,8 @@ export function DevicePanel({ className }: { className?: string }) {
       bodyClassName="text-[13px] leading-5"
     >
       <dl className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5">
-        {rows.map(([k, v]) => (
-          <div key={k} className="contents">
+        {rows.map(([k, v, testId]) => (
+          <div key={k} className="contents" data-testid={testId}>
             <dt className="flex items-center gap-1.5 text-muted-foreground">
               {k === 'Storage' ? (
                 <HardDrive className="size-3.5" aria-hidden />

@@ -70,6 +70,19 @@ describe('voice cloning: errors reach the page, WebGPU falls back to the CPU', (
     c.dispose()
   })
 
+  it('a model that will not load on WebGPU is loaded again in a new worker on the CPU, its download size said first', async () => {
+    const { c, created } = cloner('gpu-load-fail')
+    const r = await c.generate('k', voice, 'Hello there.', OPTS, () => undefined)
+    expect(created.map((x) => x.device)).toEqual(['webgpu', 'wasm'])
+    // The WebGPU worker (whose runtime is the WebGPU build) was let go, not reused for the CPU.
+    expect(created[0]!.worker.onmessage).toBeNull()
+    expect(created[1]!.worker).not.toBe(created[0]!.worker)
+    expect(r.audio.length).toBeGreaterThan(0)
+    expect(c.store.get().device).toBe('wasm')
+    expect(c.store.get().notice).toMatch(/^Loading on WebGPU failed: .*separate 725 MB download/)
+    c.dispose()
+  })
+
   it('an error the worker cannot catch fails the request instead of leaving it waiting', async () => {
     const { c, created } = cloner('gpu-crash')
     const r = await c.generate('k', voice, 'Hello there.', OPTS, () => undefined)
