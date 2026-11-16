@@ -600,7 +600,7 @@ was used by name and is not a curated entry.
 | `POST /api/v1/models/pull` `{"id": "…"}` | `202 {"job_id": "j_1"}`. `id` may be `hf:<owner>/<repo>[@rev]` with optional `"kind"`, `"task"`, or `piper:<voice>` (for example `piper:te_IN-venkatesh-medium`) for any voice of the Piper project, which is converted for sherpa-onnx after the download. Local directories are registered from the command line only (`bolo pull ./dir`) |
 | `GET /api/v1/jobs/{job_id}` | `{"id","kind":"pull"\|"bench"\|"install","model","state":"queued"\|"running"\|"done"\|"error","progress":0..1,"bytes_done","bytes_total","error"}` (+ `result` for bench jobs) |
 | `GET /api/v1/jobs` | all recent jobs, newest first |
-| `POST /api/v1/models/{id}/load` | `200 {"id","loaded":true,"memory_bytes","load_ms","size_vram_bytes","processor","device","placement","keep_alive_s"}` (+ `notice` when the model is not all on the accelerator that was asked for). Optional body `{"keep_alive": "10m"}` or `?keep_alive=`: how long it stays loaded once idle (`-1`: until unloaded; `0`: load and unload at once, answering `"loaded": false`, Ollama's way to unload). CLI: `bolo load <id> --keep-alive 10m` (also `bolo run`) |
+| `POST /api/v1/models/{id}/load` | `200 {"id","loaded":true,"memory_bytes","load_ms","size_vram_bytes","vram_measured","vram_source","processor","device","placement","keep_alive_s"}` (+ `notice` when the model is not all on the accelerator that was asked for). Optional body `{"keep_alive": "10m"}` or `?keep_alive=`: how long it stays loaded once idle (`-1`: until unloaded; `0`: load and unload at once, answering `"loaded": false`, Ollama's way to unload). CLI: `bolo load <id> --keep-alive 10m` (also `bolo run`) |
 | `POST /api/v1/models/{id}/unload` | `200 {"id","loaded":false,"unloaded":true\|false}` (`false`: it was not loaded). A request still using the model finishes first. CLI: `bolo stop <id>…` |
 | `GET /api/v1/ps` | loaded models, Ollama style: see "Loaded models" below. CLI: `bolo ps` |
 | `DELETE /api/v1/models/{id}` | `204`; unloads first. A preset: its entry and pinned settings go, the files stay. CLI: `bolo rm <id>…`, which refuses a model the running server has loaded unless `--force` (it unloads first). `bolo rm` and `bolo cp` go through the server at `--url` only when its `data_dir` (`GET /api/v1/info`) is the CLI's own; otherwise they change the CLI's data directory and say so |
@@ -674,6 +674,7 @@ Like Ollama's `/api/ps` (bolo's `/api/ps` is speaches' route, which lists model 
    "running": 0, "queued": 0,             // requests running and waiting in its queue
    "num_parallel": 1, "max_queue": 64,    // its queue's limits (configuration.md, "Parallel requests and queues")
    "vram_measured": true,                 // false: the accelerator share is the plan, not a measurement
+   "vram_source": "process",              // process | dxgi | device | plugin | unified | plan (unknown, e.g. WDDM) | null (CPU)
    "latency_ms": {…}, "rtf": {…},         // as in /api/v1/stats
    "placement": {"device": "cuda:0", "requested": "cuda", "split": "whole", "gpu_bytes": 1610612736,
                  "cpu_bytes": 0, "processor": "100% GPU", "notice": null, "free_memory_known": true},
@@ -692,6 +693,8 @@ Like Ollama's `/api/ps` (bolo's `/api/ps` is speaches' route, which lists model 
                       "source": "nvml",               // nvml | nvidia-smi | unified (Apple Silicon) ; [] when unknown
                       "physical_index": 0,            // NVML's number; "index" is CUDA's (after CUDA_VISIBLE_DEVICES)
                       "uuid": "GPU-5f0c…",
+                      "driver_model": null,           // Windows: "WDDM" (process_bytes null), "TCC", "MCDM"
+                      "own_bytes": null,              // Windows: bolo's own process's use, as DXGI says
                       "allowed": true,                // in the gpus setting (NVIDIA only)
                       "models_vram_bytes": 1610612736}],   // what bolo's loaded models hold on this GPU
             "accelerator_source": "nvml", "gpu_spread": false,
@@ -704,7 +707,10 @@ Like Ollama's `/api/ps` (bolo's `/api/ps` is speaches' route, which lists model 
 
 `processor` says where the weights are: a model placed whole on the accelerator reads `100% GPU` even though its
 runtime holds some host memory too (that is in `size`). On Apple Silicon the GPU shares the machine's memory:
-`unified` is true, `process_bytes` is null and `size_vram` is the plan. How models are placed: configuration.md,
+`unified` is true, `process_bytes` is null and `size_vram` is the plan. On Windows under WDDM the driver reports no
+per-process memory: a load is measured by bolo's own DXGI use or the GPU's growth, and when neither works
+`vram_source` is `"plan"` and `processor` still says where bolo placed the model (configuration.md, "Windows and
+WDDM"). How models are placed: configuration.md,
 "GPU and CPU placement".
 
 `bolo ps` prints the same as a table:

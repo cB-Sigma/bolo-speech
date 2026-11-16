@@ -6,6 +6,12 @@ recently used first) when that makes it fit; otherwise split (llama.cpp layers, 
 plugin's device map) or on the CPU, with a notice. Then it makes room in RAM (``memory_budget_mb``,
 ``max_loaded_models``), loads, and measures what the load took: the growth of this process and the processes it
 started (RSS), and of the accelerator memory they hold (:mod:`bolo.accel`).
+
+Where the driver keeps no per-process figure (Windows under WDDM), a load is measured by this process's own use
+as DXGI reports it (runtimes in bolo's process) or else by the growth of the device's used memory, with such loads
+serialised so that two of them are not counted together; when neither grows the accelerator share is the plan.
+Either way a model placed on the accelerator reads as on it (``processor``): memory that cannot be measured is
+"unknown" (``vram_measured`` false, ``vram_source`` "plan"), never a reason to say "100% CPU".
 """
 
 from __future__ import annotations
@@ -16,6 +22,7 @@ import json
 import logging
 import subprocess
 import sys
+import threading
 import time
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
@@ -76,8 +83,12 @@ class LoadedModel:
     requests: int = 0
     #: of ``memory_bytes``, the part in accelerator memory
     vram_bytes: int = 0
-    #: ``vram_bytes`` was measured (NVML, nvidia-smi, the plugin's report), not taken from the plan
+    #: ``vram_bytes`` was measured (NVML, nvidia-smi, DXGI, the device's growth, the plugin's report), not the plan
     vram_measured: bool = False
+    #: where ``vram_bytes`` comes from: "process" (per-process figures: NVML, nvidia-smi, DXGI for DirectML),
+    #: "dxgi" (this process's use under WDDM), "device" (the device's used memory, before and after), "plugin",
+    #: "unified" (Apple Silicon: the plan), "plan" (could not be measured) or "" (on the CPU)
+    vram_source: str = ""
     placement: Placement = field(default_factory=Placement)
     #: set by a request's or a load's ``keep_alive`` (seconds; -1: forever); None: the settings decide
     keep_alive_s: float | None = None
@@ -94,11 +105,15 @@ class LoadedModel:
     def processor(self) -> str:
         """Where the weights are, as Ollama's PROCESSOR column says it. A model placed whole on one side reads
         "100% GPU" / "100% CPU" (the runtime's own host memory of a GPU model is in SIZE, not here); a split model
-        reads by bytes: measured when the accelerator memory was measured, else as planned."""
+        reads by bytes: measured when the accelerator memory was measured, else as planned. A model placed on the
+        accelerator reads as on it when its memory could not be measured (Windows under WDDM, unified memory);
+        only a measurement that found nothing there (the runtime fell back to the CPU) makes it "100% CPU"."""
         p = self.placement
         if p.device in ("remote", "cloud"):
             return p.device
-        if p.gpu_bytes <= 0 or self.vram_bytes <= 0:
+        if family(p.device) == "cpu" or (p.gpu_bytes <= 0 and p.cpu_bytes > 0):
+            return "100% CPU"
+        if self.vram_measured and self.vram_bytes <= 0:
             return "100% CPU"
         if p.cpu_bytes <= 0:
             return "100% GPU"
@@ -106,8 +121,52 @@ class LoadedModel:
             return processor(self.vram_bytes, self.memory_bytes)
         return p.processor()
 
+    @property
+    def vram_unknown(self) -> bool:
+        """On an accelerator whose memory use could not be measured (not unified memory, where that is known)."""
+        return self.vram_source == "plan"
+
     def idle_s(self) -> float:
         return 0.0 if self.active else time.perf_counter() - self.last_used
+
+
+@dataclass
+class VramReading:
+    """Accelerator memory on a model's GPUs at one moment (bolo.accel), each figure None when unknown."""
+
+    #: held by this server and the processes it started, from per-process figures (None under WDDM)
+    process: int | None = None
+    #: this process's own use as DXGI reports it (Windows)
+    own: int | None = None
+    #: the devices' used memory, whoever holds it
+    device: int | None = None
+    unified: bool = False
+    #: the GPUs were found
+    ok: bool = False
+
+
+def _add(total: int | None, value: int | None) -> int | None:
+    return None if total is None or value is None else total + value
+
+
+def attribute_vram(
+    before: VramReading, after: VramReading, in_process: bool, place: Placement
+) -> tuple[int, bool, str]:
+    """What a load put in accelerator memory: (bytes, measured, source). Per-process figures when the driver
+    keeps them; else this process's own DXGI use when the runtime is in bolo's process and it grew; else the
+    devices' used memory when it grew; else the plan (not measured)."""
+    planned = place.gpu_bytes if family(place.device) not in ("cpu", "remote", "cloud") else 0
+    if not before.ok or not after.ok:
+        return planned, False, "plan" if planned else ""
+    if before.unified:
+        return planned, False, "unified"
+    if before.process is not None and after.process is not None:
+        return max(0, after.process - before.process), True, "process"
+    if in_process and before.own is not None and after.own is not None and after.own > before.own:
+        return after.own - before.own, True, "dxgi"
+    if before.device is not None and after.device is not None and after.device > before.device:
+        return after.device - before.device, True, "device"
+    return planned, False, "plan"
 
 
 def _tts_handler(model: TTSModel) -> Handler:
@@ -163,6 +222,8 @@ class ModelManager:
         self.accel = accel or Accelerators(directml=str(settings.device).lower().startswith(("dml", "directml")))
         self.gpu_evictions = 0
         self._locks: dict[str, asyncio.Lock] = {}
+        #: loads measured by the device's used memory go one at a time (two at once would be counted together)
+        self._device_measure = threading.Lock()
         self._reaper: asyncio.Task[None] | None = None
         self._ensure_installed = ensure_installed
         self.evictions = 0
@@ -591,29 +652,28 @@ class ModelManager:
                 total += psutil.Process(pid).memory_info().rss
         return total
 
-    def _vram(self, place: Placement) -> tuple[int | None, bool]:
-        """(accelerator memory held now on the placement's GPUs, by this server where that can be told else on the
-        whole device; unified)."""
+    def _vram(self, place: Placement) -> VramReading:
+        """Accelerator memory on the placement's GPUs now: held by this server where the driver tells it per
+        process, this process's own use (DXGI), and the devices' used memory."""
         device = place.device
         if family(device) in ("cpu", "remote", "cloud"):
-            return None, False
+            return VramReading()
         names = [f"cuda:{i}" for i in place.gpus] if family(device) == "cuda" and len(place.gpus) > 1 else [device]
-        total = 0
+        reading = VramReading(process=0, own=0, device=0, ok=True)
         for name in names:
             found = self.accel.device(name, fresh=True)
             if found is None:
-                return None, False
+                return VramReading()
             if found.unified:
-                return None, True
-            held = found.process_bytes if found.process_bytes is not None else found.used_bytes
-            if held is None:
-                return None, False
-            total += held
-        return total, False
+                return VramReading(unified=True, ok=True)
+            reading.process = _add(reading.process, found.process_bytes)
+            reading.own = _add(reading.own, found.own_bytes)
+            reading.device = _add(reading.device, found.used_bytes)
+        return reading
 
     def _load_blocking(
         self, spec: ModelSpec, placement: Placement | None = None
-    ) -> tuple[Model, int, float, int, bool]:
+    ) -> tuple[Model, int, float, int, bool, str]:
         engine = self.engines.get(spec.engine)
         if engine is None:
             raise EngineUnavailable(f"model '{spec.id}' needs the unknown engine '{spec.engine}'")
@@ -626,7 +686,37 @@ class ModelManager:
         place = placement or Placement(device=self.settings.device)
         device = place.device if place.device not in ("remote", "cloud") else self.settings.device
         before = self._rss()
-        vram_before, unified = self._vram(place)
+        vram_before = self._vram(place)
+        serial = contextlib.ExitStack()
+        if vram_before.ok and vram_before.process is None and not vram_before.unified:
+            # no per-process figure: the device's growth may be what is measured, one load at a time
+            serial.enter_context(self._device_measure)
+            vram_before = self._vram(place)
+        try:
+            model, load_ms, vram_after = self._load_measured(spec, engine, place, device)
+        finally:
+            serial.close()
+        grown = max(0, self._rss() - before)
+        in_process = not (spec.engine.startswith("plugin:") or spec.engine in ("tts-server", "remote"))
+        vram, measured, source = attribute_vram(vram_before, vram_after, in_process, place)
+        report = getattr(model, "placement_report", None)
+        if isinstance(report, dict) and report.get("gpu_bytes") is not None:
+            # a plugin that split the model says how (accelerate's device map); more precise than a delta
+            with contextlib.suppress(TypeError, ValueError):
+                vram, measured, source = int(report["gpu_bytes"]), True, "plugin"
+                place.gpu_bytes, place.cpu_bytes = vram, int(report.get("cpu_bytes") or 0)
+        # An estimate. RSS growth during the load reads low, sometimes zero, when the allocator reuses memory
+        # that an unloaded model gave back, so it is never taken to be less than the model's files on disk.
+        ram = grown if vram_before.unified else grown + vram
+        memory = max(ram, self.store.size_on_disk(spec.id), vram)
+        if isinstance(report, dict) and report.get("gpu_bytes") is not None:
+            memory = max(memory, place.gpu_bytes + place.cpu_bytes)
+        return model, memory, load_ms, min(vram, memory), measured, source
+
+    def _load_measured(
+        self, spec: ModelSpec, engine: Any, place: Placement, device: str
+    ) -> tuple[Model, float, VramReading]:
+        """Load the model; (model, load time in ms, accelerator memory right after)."""
         t0 = time.perf_counter()
         opts = LoadOptions(
             threads=int(spec.options.get("threads", self.settings.resolved_threads())),
@@ -667,26 +757,7 @@ class ModelManager:
         if isinstance(model, TTSModel):
             model.warm_up()
         load_ms = (time.perf_counter() - t0) * 1000.0
-        grown = max(0, self._rss() - before)
-        vram_after, _ = self._vram(place)
-        measured = vram_before is not None and vram_after is not None
-        if measured:
-            vram = max(0, int(vram_after or 0) - int(vram_before or 0))
-        else:  # unified memory (it is in the RSS growth already) or nothing to ask: what was planned
-            vram = place.gpu_bytes if place.device not in ("cpu", "remote", "cloud") else 0
-        report = getattr(model, "placement_report", None)
-        if isinstance(report, dict) and report.get("gpu_bytes") is not None:
-            # a plugin that split the model says how (accelerate's device map); more precise than a delta
-            with contextlib.suppress(TypeError, ValueError):
-                vram, measured = int(report["gpu_bytes"]), True
-                place.gpu_bytes, place.cpu_bytes = vram, int(report.get("cpu_bytes") or 0)
-        # An estimate. RSS growth during the load reads low, sometimes zero, when the allocator reuses memory
-        # that an unloaded model gave back, so it is never taken to be less than the model's files on disk.
-        ram = grown if unified else grown + vram
-        memory = max(ram, self.store.size_on_disk(spec.id), vram)
-        if isinstance(report, dict) and report.get("gpu_bytes") is not None:
-            memory = max(memory, place.gpu_bytes + place.cpu_bytes)
-        return model, memory, load_ms, min(vram, memory), measured
+        return model, load_ms, self._vram(place)
 
     def _probe(self, spec: ModelSpec) -> None:
         """First load of an installed model happens in a child process (see ``bolo._probe``)."""
@@ -774,15 +845,17 @@ class ModelManager:
                 need_ram = int(need_ram * placement.cpu_bytes / (placement.gpu_bytes + placement.cpu_bytes))
             await self._make_room(spec, need_ram)
             loop = asyncio.get_running_loop()
-            model, memory, load_ms, vram, measured = await loop.run_in_executor(
+            model, memory, load_ms, vram, measured, source = await loop.run_in_executor(
                 None, self._load_blocking, spec, placement
             )
             entry = LoadedModel(spec, model, self._build_queue(spec, model), memory, load_ms)
             entry.vram_bytes, entry.vram_measured, entry.placement = vram, measured, placement
+            entry.vram_source = source
             self.loaded[spec.id] = entry
             log.info(
-                "loaded %s in %.0f ms (~%.0f MB, %s on %s)",
+                "loaded %s in %.0f ms (~%.0f MB, %s on %s%s)",
                 spec.id, load_ms, memory / 1e6, entry.processor(), placement.device,
+                ", accelerator memory not measured" if entry.vram_unknown else "",
             )  # fmt: skip
             event: dict[str, Any] = {"id": spec.id, "event": "loaded", "processor": entry.processor()}
             if placement.notice:

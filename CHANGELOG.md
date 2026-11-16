@@ -39,6 +39,17 @@ Found on a Windows 11 laptop; the first fix applies everywhere.
   `python.exe` (uv's interpreter), not `bolo.exe`, that Windows PowerShell 5.1 needs
   `[Console]::OutputEncoding = [Text.Encoding]::UTF8` to pipe UTF-8 output, and that 5.1 drops the double quotes
   inside a JSON argument to `curl.exe`.
+- **Windows: every model on an NVIDIA GPU read as "100% CPU"** in the log, `bolo ps` and `/api/v1/ps` (seen on an
+  RTX 3060 Laptop GPU, Windows 11, driver 621.24). Under the WDDM driver model the driver keeps no per-process GPU
+  memory: NVML reports `NVML_VALUE_NOT_AVAILABLE` (or 0) and nvidia-smi "N/A", which bolo counted as 0, so each load
+  measured 0 bytes on the GPU. Such figures are now unknown, never 0 (`process_bytes` null, the GPU's new
+  `driver_model` is "WDDM"). A load is then measured by what DXGI says bolo's own process uses on that GPU (the
+  adapter with the GPU's LUID; runtimes in bolo's process), else by the growth of the GPU's used memory, with such
+  loads made one at a time; when neither grows the memory is unknown. A model placed on the GPU always shows as on
+  it: `processor` follows the placement, and when the memory is unknown `vram_measured` is false, the new
+  `vram_source` is "plan", `bolo ps` prints `100% GPU ?` with an "unknown VRAM" note and the console's Loaded
+  models panel says "VRAM unknown". The same holds for Apple Silicon's unified memory (`vram_source` "unified").
+- `mypy` failed with `nvidia-ml-py` installed (`pynvml` has no type information).
 
 ## [0.6.1] - 2026-11-16
 

@@ -316,18 +316,33 @@ export function LoadedModelsPanel({ className }: { className?: string }) {
                   <div className="mb-1 flex items-center justify-between gap-2">
                     <span className="num text-foreground" data-testid="processor">
                       {row.processor}
+                      {row.vramUnknown && (
+                        <span
+                          className="text-muted-foreground"
+                          title="Placed on the GPU; how much memory it took could not be measured (the driver does not report it, as on Windows under WDDM)"
+                        >
+                          {' '}
+                          ?
+                        </span>
+                      )}
                     </span>
                     <span className="num text-muted-foreground" data-testid="model-memory">
                       {fmtBytes(row.size)}
                       {row.estimated && ' (estimate)'}
                       {row.onGpu &&
-                        (isDemo ? <> · WebGPU {fmtBytes(row.vram)}</> : <> · VRAM {fmtBytes(row.vram)}</>)}{' '}
+                        (isDemo ? (
+                          <> · WebGPU {fmtBytes(row.vram)}</>
+                        ) : row.vramUnknown ? (
+                          <> · VRAM unknown</>
+                        ) : (
+                          <> · VRAM {fmtBytes(row.vram)}</>
+                        ))}{' '}
                       · {row.device}
                       {row.gpuIndexes.length > 1 && <> · GPUs {row.gpuIndexes.join(', ')}</>}
                     </span>
                   </div>
                   <SplitBar row={row} />
-                  {row.onGpu && row.gpu?.total_bytes ? (
+                  {row.onGpu && !row.vramUnknown && row.gpu?.total_bytes ? (
                     <Meter
                       className="mt-1"
                       value={row.vram}

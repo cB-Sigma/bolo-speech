@@ -11,6 +11,8 @@ export interface LoadedRow {
   processor: string
   device: string
   onGpu: boolean
+  /** On the GPU, but how much memory it took could not be measured (Windows under WDDM): `vram` is the plan. */
+  vramUnknown: boolean
   /** Seconds left when the stats were sampled; null: kept loaded. */
   expiresIn: number | null
   keepAlive: number | null
@@ -57,7 +59,8 @@ export function loadedRows(stats: Stats | null): LoadedRow[] {
         ram: m.ram_bytes ?? Math.max(0, m.memory_bytes - vram),
         processor: m.processor ?? '100% CPU',
         device,
-        onGpu: vram > 0,
+        onGpu: vram > 0 || m.vram_source === 'plan',
+        vramUnknown: m.vram_source === 'plan',
         expiresIn,
         keepAlive: ttl ?? null,
         stopping: m.stopping ?? false,

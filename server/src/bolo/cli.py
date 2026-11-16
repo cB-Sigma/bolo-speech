@@ -594,6 +594,8 @@ def format_ps(doc: dict[str, Any], verbose: bool = False) -> str:
             mem = f"vram {_gb_pair(g.get('used_bytes'), g.get('total_bytes'))}"
             if g.get("process_bytes") is not None:
                 mem += f" (bolo {_human(g['process_bytes'])})"
+            elif g.get("own_bytes") is not None:  # Windows under WDDM: bolo's own process, as DXGI says
+                mem += f" (bolo process {_human(g['own_bytes'])})"
         util = f" {g['utilization']:.0f}% busy" if g.get("utilization") is not None else ""
         skipped = " (not used: gpus setting)" if g.get("allowed") is False else ""
         head.append(f"gpu{g.get('index', 0)} {label} {mem}{util}{skipped}")
@@ -602,8 +604,11 @@ def format_ps(doc: dict[str, Any], verbose: bool = False) -> str:
     rows = []
     for m in doc.get("models") or []:
         gpus = m.get("gpus") or (m.get("placement") or {}).get("gpus") or []
+        proc = m.get("processor", "100% CPU")
+        if m.get("vram_source") == "plan" and "GPU" in proc:
+            proc += " ?"  # placed on the GPU; how much memory it took could not be measured
         row = [
-            m["name"], m.get("task", ""), _human(m.get("size")), m.get("processor", "100% CPU"),
+            m["name"], m.get("task", ""), _human(m.get("size")), proc,
             m.get("device", "cpu"), ",".join(str(g) for g in gpus) or "-", m.get("until", ""),
         ]  # fmt: skip
         if verbose:
@@ -619,6 +624,11 @@ def format_ps(doc: dict[str, Any], verbose: bool = False) -> str:
         headers += ["ACTIVE", "QUEUED", "PARALLEL", "REQUESTS", "P50 MS", "RTF P50", "IDLE"]
     lines = ["  ".join(head)]
     lines.append(_table(rows, headers) if rows else "no models loaded")
+    if any(m.get("vram_source") == "plan" for m in doc.get("models") or []):
+        lines.append(
+            "? unknown VRAM: placed on the GPU, but its memory use could not be measured"
+            " (the driver does not report it, as on Windows under WDDM)"
+        )
     notices = [
         f"{m['name']}: {m['placement']['notice']}"
         for m in doc.get("models") or []

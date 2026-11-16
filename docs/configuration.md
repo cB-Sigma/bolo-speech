@@ -267,6 +267,20 @@ load took: the growth of its own resident memory and that of the processes it st
 plugins), and the growth of their accelerator memory (NVML's per-process figures, else the whole device's). On Apple
 Silicon the accelerator's share cannot be told apart from ordinary memory; it is reported as planned.
 
+**Windows and WDDM.** On Windows a GeForce card (and most others) runs under the WDDM driver model, where the NVIDIA
+driver keeps no per-process memory figures: NVML reports them as not available (or 0) and `nvidia-smi` as "N/A".
+bolo takes that as unknown, never as 0. It measures a load instead by what DXGI says bolo's own process uses on that
+GPU (`QueryVideoMemoryInfo`, for runtimes in bolo's process: ONNX Runtime, sherpa-onnx, CTranslate2), else by the
+growth of the GPU's used memory before and after the load (llama-server and other server processes), with such
+loads made one at a time so two are not counted together; a program outside bolo that takes GPU memory during a
+load is counted in that load. When neither grows, the memory is unknown. Either way a model placed on the GPU
+shows as on it: `processor` follows the placement, `vram_measured` is false, `vram_source` is `"plan"`, `size_vram`
+is the planned figure, and `bolo ps` prints `100% GPU ?` with a note ("unknown VRAM"); the console's Loaded models
+panel shows "VRAM unknown". Only a measurement that found nothing on the GPU (a runtime that fell back to the CPU)
+reads "100% CPU". `/api/v1/ps` gives each GPU's `driver_model` ("WDDM", "TCC") and, under WDDM, `process_bytes` is
+null and `own_bytes` is bolo's own process's use. A card in TCC mode (`nvidia-smi -dm 1`, not GeForce) reports
+per-process figures as on Linux.
+
 **Cutting a graph in two** (`onnx_split`, `bolo/onnx_split.py`). ONNX graphs list their nodes in order, so any
 point in the list divides a graph into a front and a back. bolo picks a layer boundary (a point where few tensors
 cross, typically the hidden state and what every layer shares) that puts the most weights in the front within the

@@ -430,7 +430,8 @@ async def load(request: Request, model_id: str, keep_alive: str | None = None) -
         return JSONResponse({"id": entry.id, "loaded": False, "load_ms": round(entry.load_ms, 1)})
     out: dict[str, Any] = {
         "id": entry.id, "loaded": True, "memory_bytes": entry.memory_bytes, "load_ms": round(entry.load_ms, 1),
-        "size_vram_bytes": entry.vram_bytes, "processor": entry.processor(), "device": entry.placement.device,
+        "size_vram_bytes": entry.vram_bytes, "vram_measured": entry.vram_measured,
+        "vram_source": entry.vram_source or None, "processor": entry.processor(), "device": entry.placement.device,
         "placement": entry.placement.to_dict(), "keep_alive_s": core.manager.ttl_for(entry.spec, entry),
     }  # fmt: skip
     if entry.placement.notice:

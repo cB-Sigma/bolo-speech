@@ -3,6 +3,12 @@ server (and the processes it started) holds.
 
 * NVIDIA: NVML through ``pynvml`` (the ``nvidia-ml-py`` package, optional), else ``nvidia-smi``. Both report
   per-process usage, so the memory of llama-server, audio.cpp and plugin processes bolo started is counted too.
+  Except on Windows under the WDDM driver model (every GeForce card, and most others on Windows): there the driver
+  does not account memory per process, NVML reports ``NVML_VALUE_NOT_AVAILABLE`` (or 0) and nvidia-smi "N/A".
+  Such a figure is unknown, never 0: ``process_bytes`` is None, ``driver_model`` says "WDDM", and on Windows
+  ``own_bytes`` carries what DXGI says this process uses on the matching adapter (``IDXGIAdapter3::
+  QueryVideoMemoryInfo``, the local segment's ``CurrentUsage``). bolo.lifecycle then measures a load by this
+  process's DXGI usage (in-process runtimes) or by the device's used memory, loads serialised.
 * Apple Silicon: the GPU shares the machine's memory. "Free" is the memory the system calls available and
   per-process GPU memory cannot be told apart from ordinary memory; the figures say so (``unified: true``,
   ``process_bytes: null``).
@@ -27,6 +33,7 @@ import contextlib
 import logging
 import os
 import platform
+import re
 import shutil
 import subprocess
 import threading
@@ -62,6 +69,12 @@ class DeviceMemory:
     #: the number NVML and nvidia-smi give the GPU (differs from ``index`` under CUDA_VISIBLE_DEVICES)
     physical_index: int | None = None
     uuid: str | None = None
+    #: Windows: "WDDM", "TCC" or "MCDM" (NVML's driver model); None elsewhere or when not told
+    driver_model: str | None = None
+    #: this process's own use of the GPU as DXGI reports it (Windows; not the processes it started)
+    own_bytes: int | None = None
+    #: the PCI bus id NVML or nvidia-smi gives ("00000000:01:00.0"), used to find the DXGI adapter
+    pci_bus_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -78,6 +91,8 @@ class DeviceMemory:
             "source": self.source,
             "physical_index": self.physical_index if self.physical_index is not None else self.index,
             "uuid": self.uuid,
+            "driver_model": self.driver_model,
+            "own_bytes": self.own_bytes,
         }
 
 
@@ -134,6 +149,7 @@ class Accelerators:
         environ: dict[str, str] | None = None,
         adapters: Callable[[], list[Any] | None] | None = None,
         directml: bool = False,
+        cuda_luids: Callable[[], dict[tuple[int, int, int, int], int] | None] | None = None,
     ) -> None:
         self._nvml = nvml
         self._nvml_tried = nvml is not None
@@ -145,6 +161,8 @@ class Accelerators:
         self._pids = pids or our_pids
         self._vm = virtual_memory or psutil.virtual_memory
         self._adapters = adapters
+        #: Windows: the CUDA driver's LUID per PCI address, to find the DXGI adapter an NVIDIA GPU is
+        self._cuda_luids = cuda_luids
         #: DirectML's adapter for ``dml`` with no number, from the last DXGI reading
         self._dml_default: int | None = None
         #: also list DirectML devices (Windows; on when ``device`` is ``dml``, or when ``adapters`` is given)
@@ -238,32 +256,59 @@ class Accelerators:
         return out
 
     def _read(self) -> list[DeviceMemory]:
-        dml = self._from_dxgi() if self.directml and (self._system == "windows" or self._adapters) else []
-        found = self._from_nvml()
-        if found is not None:
+        windows = self._system == "windows"
+        want_dml = self.directml and (windows or self._adapters is not None)
+        nvidia = self._from_nvml()
+        if nvidia is not None:
             self.source = "nvml"
-            return self._visible(found) + dml
-        found = self._from_smi()
-        if found is not None:
-            self.source = "nvidia-smi"
-            return self._visible(found) + dml
+        else:
+            nvidia = self._from_smi()
+            self.source = "nvidia-smi" if nvidia is not None else ""
+        # Windows under WDDM: the driver keeps no per-process figure; DXGI says what this process uses
+        need_own = windows and any(d.process_bytes is None for d in nvidia or [])
+        adapters = self._dxgi_list() if want_dml or need_own else []
+        if need_own and adapters:
+            self._attach_own(nvidia or [], adapters)
+        dml = self._from_dxgi(adapters) if want_dml else []
+        if nvidia is not None:
+            return self._visible(nvidia) + dml
         if self._system == "darwin" and self._machine in ("arm64", "aarch64"):
             self.source = "unified"
             return [self._apple()]
         self.source = "dxgi" if dml else ""
         return dml
 
-    def _from_dxgi(self) -> list[DeviceMemory]:
-        """DirectML devices (Windows): the hardware adapters DXGI lists, with this process's memory budget."""
+    def _dxgi_list(self) -> list[Any]:
         if self._adapters is None:
             from bolo import winhw
 
             self._adapters = winhw.dxgi_adapters
         try:
-            adapters = self._adapters() or []
+            return list(self._adapters() or [])
         except Exception as exc:
             log.debug("DXGI query failed: %s", exc)
             return []
+
+    def _attach_own(self, nvidia: list[DeviceMemory], adapters: list[Any]) -> None:
+        """Give each NVIDIA GPU this process's own use of it as DXGI reports it (``own_bytes``), through the
+        adapter with the same LUID (the CUDA driver says which LUID a PCI address has), else the only NVIDIA
+        adapter with the same name or memory."""
+        luids: dict[tuple[int, int, int, int], int] | None = None
+        if any(d.pci_bus_id for d in nvidia):
+            if self._cuda_luids is None:
+                from bolo import winhw
+
+                self._cuda_luids = winhw.cuda_luids
+            with contextlib.suppress(Exception):
+                luids = self._cuda_luids()
+        cards = [a for a in adapters if getattr(a, "vendor", "") == "nvidia" and not getattr(a, "software", False)]
+        for d in nvidia:
+            a = match_adapter(d, cards, luids or {}, len(nvidia))
+            if a is not None and getattr(a, "usage_bytes", None) is not None:
+                d.own_bytes = int(a.usage_bytes)
+
+    def _from_dxgi(self, adapters: list[Any]) -> list[DeviceMemory]:
+        """DirectML devices (Windows): the hardware adapters DXGI lists, with this process's memory budget."""
         from bolo.winhw import is_integrated, preferred_index
 
         self._dml_default = preferred_index(adapters)
@@ -292,7 +337,7 @@ class Accelerators:
         if not self._nvml_tried:
             self._nvml_tried = True
             try:
-                import pynvml  # type: ignore[import-not-found]
+                import pynvml  # type: ignore[import-not-found,import-untyped]
 
                 self._nvml = pynvml
             except Exception:
@@ -322,13 +367,18 @@ class Accelerators:
                 util: float | None = None
                 with contextlib.suppress(Exception):
                     util = float(nv.nvmlDeviceGetUtilizationRates(handle).gpu)
-                ours: int | None = None
+                model: str | None = None
                 with contextlib.suppress(Exception):
-                    procs = nv.nvmlDeviceGetComputeRunningProcesses(handle)
-                    ours = sum(int(p.usedGpuMemory or 0) for p in procs if int(p.pid) in pids)
+                    current = nv.nvmlDeviceGetDriverModel(handle)
+                    if isinstance(current, (list, tuple)):  # pynvml answers [current, pending]
+                        current = current[0]
+                    model = DRIVER_MODELS.get(int(current))
                 uuid: str | None = None
                 with contextlib.suppress(Exception):
                     uuid = _text(nv.nvmlDeviceGetUUID(handle))
+                bus: str | None = None
+                with contextlib.suppress(Exception):
+                    bus = _text(nv.nvmlDeviceGetPciInfo(handle).busId) or None
                 out.append(
                     DeviceMemory(
                         index=i,
@@ -338,9 +388,11 @@ class Accelerators:
                         free_bytes=int(mem.free),
                         used_bytes=int(mem.used),
                         utilization=util,
-                        process_bytes=ours,
+                        process_bytes=_nvml_process_bytes(nv, handle, pids, model),
                         source="nvml",
                         uuid=uuid,
+                        driver_model=model,
+                        pci_bus_id=bus,
                     )
                 )
         except Exception as exc:
@@ -352,13 +404,11 @@ class Accelerators:
         exe = self._which("nvidia-smi")
         if not exe:
             return None
-        out = self._runner(
-            [
-                exe,
-                "--query-gpu=index,uuid,name,memory.total,memory.free,memory.used,utilization.gpu",
-                "--format=csv,noheader,nounits",
-            ]
-        )
+        fields = "index,uuid,name,memory.total,memory.free,memory.used,utilization.gpu"
+        windows = self._system == "windows"
+        if windows:  # driver_model is a Windows field; pci.bus_id finds the DXGI adapter
+            fields += ",driver_model.current,pci.bus_id"
+        out = self._runner([exe, f"--query-gpu={fields}", "--format=csv,noheader,nounits"])
         if out is None:
             return None
         mib = 1024 * 1024
@@ -368,6 +418,8 @@ class Accelerators:
             cells = [c.strip() for c in line.split(",")]
             if len(cells) < 7 or not cells[0].isdigit():
                 continue
+            model = cells[7].upper() if windows and len(cells) > 7 else None
+            model = model if model in DRIVER_MODELS.values() else None
             d = DeviceMemory(
                 index=int(cells[0]),
                 vendor="nvidia",
@@ -378,22 +430,23 @@ class Accelerators:
                 utilization=_float(cells[6]),
                 source="nvidia-smi",
                 uuid=cells[1] or None,
+                driver_model=model,
+                pci_bus_id=(cells[8] or None) if windows and len(cells) > 8 else None,
             )
             devices.append(d)
             uuids[cells[1]] = d
         apps = self._runner([exe, "--query-compute-apps=pid,gpu_uuid,used_memory", "--format=csv,noheader,nounits"])
         if apps is not None:
             pids = self._pids()
-            for d in devices:
-                d.process_bytes = 0
+            held: dict[str, list[int | None]] = {}
             for line in apps.splitlines():
                 cells = [c.strip() for c in line.split(",")]
-                if len(cells) < 3 or not cells[0].isdigit():
+                if len(cells) < 3 or not cells[0].isdigit() or int(cells[0]) not in pids or cells[1] not in uuids:
                     continue
-                d_or_none = uuids.get(cells[1])
-                used = _float(cells[2])
-                if d_or_none is not None and int(cells[0]) in pids and used is not None:
-                    d_or_none.process_bytes = (d_or_none.process_bytes or 0) + int(used * mib)
+                used = _float(cells[2])  # "[N/A]" under WDDM
+                held.setdefault(cells[1], []).append(int(used * mib) if used is not None else None)
+            for key, d in uuids.items():
+                d.process_bytes = _process_total(held.get(key, []), d.driver_model)
         return devices
 
     def _apple(self) -> DeviceMemory:
@@ -425,3 +478,84 @@ def _float(text: str) -> float | None:
 def _mib(text: str) -> int | None:
     value = _float(text)
     return int(value * 1024 * 1024) if value is not None else None
+
+
+#: NVML's nvmlDriverModel_t: WDDM (a display driver; Windows does the memory accounting), WDM (TCC), MCDM
+DRIVER_MODELS = {0: "WDDM", 1: "TCC", 2: "MCDM"}
+#: driver models under which the driver keeps no per-process memory figures (NVML: N/A or 0; nvidia-smi: N/A)
+_NO_PROCESS_MEMORY = frozenset({"WDDM", "MCDM"})
+#: NVML_VALUE_NOT_AVAILABLE as an unsigned long long: what usedGpuMemory holds when the driver cannot tell
+NVML_VALUE_NOT_AVAILABLE = 2**64 - 1
+
+
+def _nvml_used(value: Any, driver_model: str | None) -> int | None:
+    """One process's ``usedGpuMemory``: None when NVML could not tell (``NVML_VALUE_NOT_AVAILABLE``, None, which
+    pynvml turns it into, or 0 under WDDM, where the driver keeps no per-process figure)."""
+    if value is None:
+        return None
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return None
+    if n < 0 or n >= NVML_VALUE_NOT_AVAILABLE:
+        return None
+    if n == 0 and driver_model in _NO_PROCESS_MEMORY:
+        return None
+    return n
+
+
+def _process_total(values: list[int | None], driver_model: str | None) -> int | None:
+    """What this server's processes hold on one GPU, from their per-process figures: None when any of them is
+    unknown, and under WDDM unless one of them is a real figure (the driver lists processes but not their memory,
+    so even "none listed" says nothing)."""
+    if any(v is None for v in values):
+        return None
+    if driver_model in _NO_PROCESS_MEMORY and not any(values):
+        return None
+    return sum(v or 0 for v in values)
+
+
+def _nvml_process_bytes(nv: Any, handle: Any, pids: set[int], driver_model: str | None) -> int | None:
+    """Per-process memory of this server's processes on one GPU: compute processes (CUDA) and graphics processes
+    (under WDDM a CUDA process may be listed as a graphics one); None when it cannot be told."""
+    try:
+        procs = list(nv.nvmlDeviceGetComputeRunningProcesses(handle))
+    except Exception:
+        return None
+    with contextlib.suppress(Exception):
+        procs += list(nv.nvmlDeviceGetGraphicsRunningProcesses(handle))
+    by_pid: dict[int, list[int | None]] = {}
+    for p in procs:
+        with contextlib.suppress(Exception):
+            if int(p.pid) in pids:
+                by_pid.setdefault(int(p.pid), []).append(_nvml_used(getattr(p, "usedGpuMemory", None), driver_model))
+    # a process listed twice (compute and graphics) counts once: its larger known figure
+    values = [max((v for v in vs if v is not None), default=None) for vs in by_pid.values()]
+    return _process_total(values, driver_model)
+
+
+def bus_key(text: str | None) -> tuple[int, int, int, int] | None:
+    """A PCI address as (domain, bus, device, function): NVML writes "00000000:01:00.0", CUDA "0000:01:00.0"."""
+    m = re.search(r"([0-9a-fA-F]+):([0-9a-fA-F]+):([0-9a-fA-F]+)\.([0-9a-fA-F]+)", text or "")
+    if m is None:
+        return None
+    domain, bus, dev, fn = (int(x, 16) for x in m.groups())
+    return domain, bus, dev, fn
+
+
+def match_adapter(d: DeviceMemory, cards: list[Any], luids: dict[tuple[int, int, int, int], int], gpus: int) -> Any:
+    """The DXGI adapter (bolo.winhw.Adapter) an NVIDIA GPU is, or None when it cannot be told for sure: by LUID
+    when the CUDA driver gave one for the GPU's PCI address, else the only NVIDIA adapter with its name, else the
+    only one with its memory (within 10%), else the only NVIDIA adapter when there is one GPU."""
+    key = bus_key(d.pci_bus_id)
+    if key is not None and key in luids:
+        return next((a for a in cards if getattr(a, "luid", 0) == luids[key]), None)
+    name = " ".join((d.name or "").split()).lower()
+    same = [a for a in cards if " ".join(str(a.name).split()).lower() == name] if name else []
+    if len(same) == 1:
+        return same[0]
+    total = d.total_bytes or 0
+    close = [a for a in cards if total and a.dedicated_bytes and abs(total - a.dedicated_bytes) <= 0.1 * total]
+    if len(close) == 1:
+        return close[0]
+    return cards[0] if len(cards) == 1 and gpus == 1 else None

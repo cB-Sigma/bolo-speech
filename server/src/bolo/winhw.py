@@ -7,6 +7,8 @@
   video memory, and with ``IDXGIAdapter3::QueryVideoMemoryInfo`` the local memory budget the system gives this
   process and what this process uses of it. The adapter's position in that list is DirectML's ``device_id``
   (``device = "dml:N"``), as ONNX Runtime documents it.
+* NVIDIA GPUs' LUIDs: the CUDA driver (``nvcuda.dll``: ``cuDeviceGetLuid``, ``cuDeviceGetPCIBusId``), so that
+  bolo.accel can find the DXGI adapter an NVML device is and read this process's use of it (NVML has no LUID).
 
 Every function returns None when it cannot ask (another system, an old Windows, an error) and never raises.
 """
@@ -302,3 +304,52 @@ def _high_performance_luid(factory: Any, desc_type: Any) -> int | None:
         return None
     finally:
         _release(factory6)
+
+
+_cuda_luids: tuple[dict[tuple[int, int, int, int], int] | None] | None = None
+
+
+def cuda_luids() -> dict[tuple[int, int, int, int], int] | None:
+    """The LUID of each GPU the CUDA driver lists, by PCI address (domain, bus, device, function), asked once per
+    process; None off Windows or when the driver cannot be asked. ``cuInit`` creates no context (no GPU memory)."""
+    global _cuda_luids
+    if _cuda_luids is None:
+        found: dict[tuple[int, int, int, int], int] | None = None
+        if sys.platform == "win32":
+            with contextlib.suppress(Exception):
+                found = _ask_cuda_luids()
+        _cuda_luids = (found,)
+    return _cuda_luids[0]
+
+
+def _ask_cuda_luids() -> dict[tuple[int, int, int, int], int] | None:
+    import ctypes
+
+    from bolo.accel import bus_key
+
+    cuda = ctypes.WinDLL("nvcuda")  # type: ignore[attr-defined,unused-ignore]
+    if cuda.cuInit(0) != 0:
+        return None
+    count = ctypes.c_int()
+    if cuda.cuDeviceGetCount(ctypes.byref(count)) != 0:
+        return None
+    out: dict[tuple[int, int, int, int], int] = {}
+    for ordinal in range(count.value):
+        device = ctypes.c_int()
+        if cuda.cuDeviceGet(ctypes.byref(device), ordinal) != 0:
+            continue
+        luid = (ctypes.c_ubyte * 8)()
+        mask = ctypes.c_uint()
+        bus = ctypes.create_string_buffer(64)
+        if cuda.cuDeviceGetLuid(luid, ctypes.byref(mask), device) != 0:
+            continue
+        if cuda.cuDeviceGetPCIBusId(bus, 64, device) != 0:
+            continue
+        key = bus_key(bus.value.decode(errors="replace"))
+        if key is None:
+            continue
+        raw = bytes(luid)
+        low = int.from_bytes(raw[:4], "little")
+        high = int.from_bytes(raw[4:], "little", signed=True)  # LUID.HighPart is a LONG
+        out[key] = (high << 32) | low
+    return out

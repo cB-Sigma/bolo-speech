@@ -494,6 +494,9 @@ export interface ModelStats {
   size_vram_bytes?: number
   ram_bytes?: number
   vram_measured?: boolean
+  /** Where `size_vram_bytes` comes from: "process", "dxgi", "device", "plugin", "unified", or "plan" (it could not
+   * be measured, as on Windows under WDDM: the figure is the plan and the model is still on the GPU). */
+  vram_source?: string | null
   /** Ollama's PROCESSOR column: "100% GPU", "100% CPU", "35%/65% CPU/GPU". */
   processor?: string
   /** Where it runs: "cpu", "cuda:0", "coreml", "remote", "cloud". */
@@ -539,6 +542,10 @@ export interface GpuMemory {
   /** Accelerator memory held by bolo and the servers it started; null when it cannot be told. */
   process_bytes: number | null
   source: string
+  /** Windows: "WDDM", "TCC" or "MCDM" (under WDDM `process_bytes` is null: the driver does not report it). */
+  driver_model?: string | null
+  /** Windows: what bolo's own process uses on this GPU, as DXGI says. */
+  own_bytes?: number | null
   /** NVIDIA: the `gpus` setting lets bolo use it (absent: older servers, Apple). */
   allowed?: boolean
   /** What bolo's loaded models hold on this GPU. */

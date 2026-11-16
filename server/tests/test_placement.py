@@ -16,15 +16,17 @@ import httpx
 import pytest
 
 from bolo import cli
-from bolo.accel import Accelerators
+from bolo.accel import NVML_VALUE_NOT_AVAILABLE, Accelerators, bus_key
 from bolo.catalog import ModelSpec
 from bolo.config import Settings, load_settings
 from bolo.core import Bolo
 from bolo.engines.base import LoadOptions
 from bolo.engines.tts_server import gpu_layer_args
 from bolo.keepalive import REQUEST_KEEP_ALIVE, RequestKeepAlive, format_keep_alive, humanize_until, parse_keep_alive
+from bolo.lifecycle import LoadedModel, VramReading, attribute_vram
 from bolo.placement import (
     LayerInfo,
+    Placement,
     assign_graphs,
     gguf_block_count,
     layer_split,
@@ -513,6 +515,236 @@ async def test_split_reported_from_a_plugin_and_unified_memory(settings: Setting
         assert m.processor() == "100% GPU" and not m.vram_measured and m.placement.device == "mps"
     finally:
         await mac.stop()
+
+
+# -- Windows under WDDM: no per-process memory -------------------------------------------------------------------
+class WddmNvml(FakeNvml):
+    """A GeForce card on Windows: the driver model is WDDM and NVML lists processes without their memory."""
+
+    def __init__(self, na: Any = NVML_VALUE_NOT_AVAILABLE, model: int = 0, **kw: Any) -> None:
+        super().__init__(**kw)
+        self.na, self.model = na, model
+
+    def nvmlDeviceGetDriverModel(self, h: int) -> list[int]:
+        return [self.model, self.model]
+
+    def nvmlDeviceGetPciInfo(self, h: int) -> Any:
+        return SimpleNamespace(busId=b"00000000:01:00.0")
+
+    def nvmlDeviceGetComputeRunningProcesses(self, h: int) -> list[Any]:
+        if not self.ours:
+            return []
+        return [SimpleNamespace(pid=os.getpid(), usedGpuMemory=self.na), SimpleNamespace(pid=1, usedGpuMemory=self.na)]
+
+    def nvmlDeviceGetGraphicsRunningProcesses(self, h: int) -> list[Any]:
+        return [SimpleNamespace(pid=os.getpid(), usedGpuMemory=self.na)] if self.ours else []
+
+
+def rtx_adapter(usage: int, luid: int = 0x1234, index: int = 1) -> Any:
+    from bolo.winhw import Adapter
+
+    return Adapter(index, "NVIDIA GeForce RTX 3060 Laptop GPU", 0x10DE, 6 * GB, 8 * GB, False, 5 * GB, usage, luid)
+
+
+@pytest.mark.parametrize("na", [NVML_VALUE_NOT_AVAILABLE, None, 0])
+def test_wddm_per_process_memory_is_unknown_not_zero(na: Any) -> None:
+    nv = WddmNvml(na=na, ours=300 * MB, name="NVIDIA GeForce RTX 3060 Laptop GPU", total=6 * GB)
+    acc = Accelerators(nvml=nv, which=lambda _: None, system="linux", max_age_s=0)
+    (d,) = acc.devices()
+    assert d.driver_model == "WDDM" and d.process_bytes is None and d.own_bytes is None
+    assert d.used_bytes == 1 * GB + 300 * MB  # the device-level figure still reads
+    nv.ours = 0  # nothing of ours listed: under WDDM that says nothing either
+    assert acc.devices()[0].process_bytes is None
+    assert acc.devices()[0].to_dict()["driver_model"] == "WDDM"
+
+
+def test_tcc_and_linux_per_process_memory() -> None:
+    nv = WddmNvml(na=500 * MB, model=1, ours=500 * MB)  # TCC: the driver keeps per-process figures
+    acc = Accelerators(nvml=nv, which=lambda _: None, max_age_s=0)
+    (d,) = acc.devices()
+    assert d.driver_model == "TCC" and d.process_bytes == 500 * MB  # listed as compute and graphics: counted once
+    linux = Accelerators(nvml=FakeNvml(ours=0), which=lambda _: None, max_age_s=0)
+    assert linux.devices()[0].process_bytes == 0 and linux.devices()[0].driver_model is None  # a real 0
+    na = FakeNvml(ours=1)
+    na.nvmlDeviceGetComputeRunningProcesses = lambda h: [  # type: ignore[method-assign]
+        SimpleNamespace(pid=os.getpid(), usedGpuMemory=NVML_VALUE_NOT_AVAILABLE)
+    ]
+    assert Accelerators(nvml=na, which=lambda _: None).devices()[0].process_bytes is None  # never 2**64-1
+
+
+def test_wddm_dxgi_usage_of_this_process() -> None:
+    """On Windows the NVIDIA GPU's DXGI adapter (found by LUID, else by name) gives this process's own use."""
+    nv = WddmNvml(ours=300 * MB, name="NVIDIA GeForce RTX 3060 Laptop GPU", total=6 * GB)
+    from bolo.winhw import Adapter
+
+    radeon = Adapter(0, "AMD Radeon(TM) Graphics", 0x1002, 512 * MB, 8 * GB, False, 400 * MB, 50 * MB, 0x99)
+    acc = Accelerators(nvml=nv, which=lambda _: None, system="windows", max_age_s=0,
+                       adapters=lambda: [radeon, rtx_adapter(700 * MB)], cuda_luids=lambda: {(0, 1, 0, 0): 0x1234})  # fmt: skip
+    acc.directml = False  # device = "cuda": no DirectML devices listed, DXGI read for the NVIDIA card only
+    (d,) = acc.devices()
+    assert d.process_bytes is None and d.own_bytes == 700 * MB
+    # no LUID from the CUDA driver: the one NVIDIA adapter with the GPU's name
+    acc2 = Accelerators(nvml=nv, which=lambda _: None, system="windows", max_age_s=0,
+                        adapters=lambda: [radeon, rtx_adapter(200 * MB)], cuda_luids=lambda: None)  # fmt: skip
+    acc2.directml = False
+    assert acc2.devices()[0].own_bytes == 200 * MB
+    # a LUID that matches no adapter: not guessed
+    acc3 = Accelerators(nvml=nv, which=lambda _: None, system="windows", max_age_s=0,
+                        adapters=lambda: [rtx_adapter(200 * MB)], cuda_luids=lambda: {(0, 1, 0, 0): 0x777})  # fmt: skip
+    acc3.directml = False
+    assert acc3.devices()[0].own_bytes is None
+    assert bus_key("0000:01:00.0") == bus_key("00000000:01:00.0") == (0, 1, 0, 0) and bus_key("n/a") is None
+
+
+def test_nvidia_smi_under_wddm() -> None:
+    def run(argv: list[str]) -> str | None:
+        if any(a.startswith("--query-gpu") for a in argv):
+            assert "driver_model.current" in argv[1]
+            return "0, GPU-aaa, NVIDIA GeForce RTX 3060 Laptop GPU, 6144, 4000, 2144, 12, WDDM, 00000000:01:00.0\n"
+        return f"{os.getpid()}, GPU-aaa, [N/A]\n"
+
+    acc = Accelerators(nvml=None, runner=run, which=lambda name: "nvidia-smi", system="windows",
+                       adapters=lambda: [rtx_adapter(1 * GB)], cuda_luids=lambda: None)  # fmt: skip
+    acc._nvml_tried = True
+    acc.directml = False
+    (d,) = acc.devices()
+    assert d.driver_model == "WDDM" and d.process_bytes is None and d.own_bytes == 1 * GB
+    assert d.pci_bus_id == "00000000:01:00.0"
+
+
+def test_attribute_vram() -> None:
+    place = Placement(device="cuda:0", gpu_bytes=100 * MB)
+    r = VramReading
+    assert attribute_vram(r(process=0, own=0, device=GB, ok=True), r(process=80 * MB, own=0, device=GB, ok=True),
+                          True, place) == (80 * MB, True, "process")  # fmt: skip
+    assert attribute_vram(r(own=10 * MB, device=GB, ok=True), r(own=90 * MB, device=GB + 95 * MB, ok=True),
+                          True, place) == (80 * MB, True, "dxgi")  # fmt: skip
+    # a server process (llama-server): DXGI sees only bolo's own process; the device's growth counts
+    assert attribute_vram(r(own=10 * MB, device=GB, ok=True), r(own=10 * MB, device=GB + 95 * MB, ok=True),
+                          False, place) == (95 * MB, True, "device")  # fmt: skip
+    assert attribute_vram(r(device=GB, ok=True), r(device=GB, ok=True), True, place) == (100 * MB, False, "plan")
+    assert attribute_vram(r(unified=True, ok=True), r(unified=True, ok=True), True, place) == (
+        100 * MB,
+        False,
+        "unified",
+    )
+
+
+def test_processor_follows_the_placement_when_memory_is_unknown() -> None:
+    def entry(place: Placement, vram: int, measured: bool, source: str) -> LoadedModel:
+        m = LoadedModel(spec=None, model=None, queue=None, memory_bytes=GB, load_ms=1.0)  # type: ignore[arg-type]
+        m.placement, m.vram_bytes, m.vram_measured, m.vram_source = place, vram, measured, source
+        return m
+
+    whole = Placement(device="cuda:0", requested="cuda", gpu_bytes=GB)
+    assert entry(whole, 0, False, "plan").processor() == "100% GPU"  # WDDM, nothing measured
+    assert entry(whole, GB, False, "plan").vram_unknown
+    assert entry(whole, 0, True, "process").processor() == "100% CPU"  # measured: nothing went to the GPU
+    layers = Placement(device="cuda:0", split="layers", gpu_bytes=650 * MB, cpu_bytes=350 * MB)
+    assert entry(layers, 650 * MB, False, "plan").processor() == "35%/65% CPU/GPU"  # as planned
+    assert entry(Placement(device="cpu", cpu_bytes=GB), 0, False, "").processor() == "100% CPU"
+    mac = Placement(device="coreml", gpu_bytes=GB)
+    assert (
+        entry(mac, GB, False, "unified").processor() == "100% GPU" and not entry(mac, GB, False, "unified").vram_unknown
+    )
+
+
+async def wddm_core(settings: Settings, nv: FakeNvml, **kw: Any) -> Bolo:
+    settings.device = "cuda"
+    core = Bolo(settings)
+    core.manager.accel = Accelerators(nvml=nv, which=lambda _: None, max_age_s=0, **kw)
+    core.manager.accel.directml = False
+    await core.start()
+    return core
+
+
+@pytest.fixture
+def wddm(monkeypatch: pytest.MonkeyPatch, gpu: FakeNvml) -> WddmNvml:
+    """The gpu fixture's loads (a fake model takes ``gpu_mb`` on the GPU) on a WDDM card."""
+    nv = WddmNvml(total=6 * GB, used=1 * GB, name="NVIDIA GeForce RTX 3060 Laptop GPU")
+    # the gpu fixture's loader adds to gpu.ours: mirror it on this card
+    monkeypatch.setattr(WddmNvml, "ours", property(lambda self: gpu.ours, lambda self, v: None), raising=False)
+    return nv
+
+
+async def test_wddm_load_measured_by_the_device(settings: Settings, wddm: WddmNvml) -> None:
+    core = await wddm_core(settings, wddm)
+    try:
+        add(core, "a", gpu_mb=300)
+        a = await core.manager.load("a")
+        assert a.model.seen_device == "cuda:0"  # type: ignore[attr-defined]
+        assert a.processor() == "100% GPU" and a.vram_measured and a.vram_source == "device"
+        assert a.vram_bytes == 300 * MB
+        (row,) = core.ps()["models"]
+        assert row["processor"] == "100% GPU" and row["vram_source"] == "device" and row["size_vram"] == 300 * MB
+        assert core.ps()["system"]["gpus"][0]["process_bytes"] is None
+    finally:
+        await core.stop()
+
+
+async def test_wddm_concurrent_loads_are_measured_one_at_a_time(
+    settings: Settings, wddm: WddmNvml, gpu: FakeNvml, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import time as _time
+
+    from bolo.engines.fake import FakeEngine
+
+    real = FakeEngine.load
+
+    def slow(self: FakeEngine, kind: str, task: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Any:
+        before = gpu.ours
+        model = real(self, kind, task, path, spec, opts)
+        took = gpu.ours - before
+        gpu.ours = before  # allocate in two halves with a pause between: overlapping loads would mix
+        gpu.ours += took // 2
+        _time.sleep(0.05)
+        gpu.ours += took - took // 2
+        return model
+
+    monkeypatch.setattr(FakeEngine, "load", slow)
+    core = await wddm_core(settings, wddm)
+    try:
+        add(core, "a", gpu_mb=200)
+        add(core, "b", gpu_mb=400)
+        a, b = await asyncio.gather(core.manager.load("a"), core.manager.load("b"))
+        assert (a.vram_bytes, b.vram_bytes) == (200 * MB, 400 * MB)
+        assert a.vram_source == b.vram_source == "device"
+    finally:
+        await core.stop()
+
+
+async def test_wddm_load_measured_by_dxgi(settings: Settings, wddm: WddmNvml, gpu: FakeNvml) -> None:
+    """bolo's own process (an in-process runtime) uses what DXGI says; the device also grew by 50 MB another
+    program took meanwhile, which the device-level figure would have counted."""
+    memory = wddm.nvmlDeviceGetMemoryInfo
+    wddm.nvmlDeviceGetMemoryInfo = lambda h: SimpleNamespace(  # type: ignore[method-assign]
+        total=memory(h).total, used=memory(h).used + (50 * MB if gpu.ours else 0), free=memory(h).free
+    )
+    core = await wddm_core(
+        settings, wddm, system="windows", adapters=lambda: [rtx_adapter(gpu.ours)], cuda_luids=lambda: None
+    )
+    try:
+        add(core, "a", gpu_mb=250)
+        a = await core.manager.load("a")
+        assert a.vram_source == "dxgi" and a.vram_bytes == 250 * MB and a.processor() == "100% GPU"
+    finally:
+        await core.stop()
+
+
+async def test_wddm_unmeasurable_load_reads_gpu_with_unknown_vram(settings: Settings, wddm: WddmNvml) -> None:
+    core = await wddm_core(settings, wddm)
+    try:
+        add(core, "a", gpu_mb=0)  # the device's memory does not move (or moves the wrong way): not measured
+        a = await core.manager.load("a")
+        assert a.processor() == "100% GPU" and not a.vram_measured and a.vram_unknown
+        assert a.vram_bytes == a.placement.gpu_bytes > 0  # the plan, for the GPU accounting
+        doc = core.ps()
+        (row,) = doc["models"]
+        assert row["processor"] == "100% GPU" and row["vram_measured"] is False and row["vram_source"] == "plan"
+        text = cli.format_ps(doc)
+        assert "100% GPU ?" in text and "unknown VRAM" in text and "100% CPU" not in text
+    finally:
+        await core.stop()
 
 
 # -- keep-alive in the lifecycle manager ---------------------------------------------------------------------------

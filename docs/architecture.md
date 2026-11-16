@@ -180,6 +180,18 @@ wins. On Apple Silicon the accelerator share is the plan, since unified memory
 cannot be told apart. `memory_budget_mb` counts each model's RAM side,
 `gpu_memory_budget_mb` its accelerator side.
 
+On Windows under the WDDM driver model the NVIDIA driver keeps no per-process
+figures (NVML: `NVML_VALUE_NOT_AVAILABLE` or 0; nvidia-smi: "N/A"; NVML's
+`nvmlDeviceGetDriverModel` says WDDM). `accel.py` reads that as unknown
+(`process_bytes` None) and adds this process's own use from DXGI
+(`own_bytes`: `QueryVideoMemoryInfo` on the adapter whose LUID the CUDA driver
+gives for the GPU's PCI address, else the one NVIDIA adapter of that name).
+`lifecycle.attribute_vram` then takes, in order: per-process growth; this
+process's DXGI growth (runtimes in bolo's process); the device's used-memory
+growth, with such loads serialised by a lock; else the plan, not measured
+(`vram_source = "plan"`). `LoadedModel.processor` follows the placement for a
+model placed on the accelerator unless a measurement found nothing there.
+
 `GET /api/v1/ps`, `bolo ps` and the console's "Loaded models" panel show the
 result: size, `size_vram`, `PROCESSOR` ("100% GPU", "100% CPU",
 "35%/65% CPU/GPU"), device and time until unload.
@@ -215,7 +227,10 @@ whole graph on small built graphs, and on Smart Turn and Nemotron where cached).
 Several GPUs (`gpus`, `gpu_spread`, `CUDA_VISIBLE_DEVICES`, `--tensor-split`)
 are tested with a fake NVML of several made-up GPUs, and the llama-server
 arguments for GPUs, flash attention, the KV cache type and parallel slots by
-the command lines bolo builds, without running llama-server.
+the command lines bolo builds, without running llama-server. The WDDM path
+(per-process N/A, DXGI usage, device-level growth) is tested with a fake NVML
+and fake DXGI adapters; the CUDA-driver LUID lookup (`winhw.cuda_luids`) has
+not run in CI.
 
 ## The model store
 

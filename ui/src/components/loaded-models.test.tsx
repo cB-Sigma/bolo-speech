@@ -106,6 +106,21 @@ describe('loaded-model helpers', () => {
     expect(rows[2]).toMatchObject({ processor: '100% CPU', onGpu: false, expiresIn: null, gpu: null })
     expect(loadedRows(null)).toEqual([])
   })
+  it('keeps a model placed on the GPU there when its memory could not be measured (Windows WDDM)', () => {
+    const wddm = model({
+      id: 'kokoro',
+      memory_bytes: 400 * MB,
+      size_vram_bytes: 300 * MB,
+      vram_measured: false,
+      vram_source: 'plan',
+      processor: '100% GPU',
+      device: 'cuda:0',
+    })
+    const [row] = loadedRows({ ...stats, models: [wddm] })
+    expect(row).toMatchObject({ processor: '100% GPU', onGpu: true, vramUnknown: true })
+    const [measured] = loadedRows({ ...stats, models: [{ ...wddm, vram_measured: true, vram_source: 'device' }] })
+    expect(measured).toMatchObject({ vramUnknown: false, onGpu: true })
+  })
   it('reads older servers and the demo, which send no placement', () => {
     const [row] = loadedRows({ ...stats, system: { cpu_percent: 1, rss_bytes: 1, threads: 1 }, models: [model({})] })
     expect(row).toMatchObject({ processor: '100% CPU', device: 'cpu', expiresIn: 290, vram: 0 })
@@ -154,6 +169,32 @@ describe('LoadedModelsPanel', () => {
     expect(screen.getByTestId('gpu-total')).toHaveTextContent('NVIDIA GeForce RTX 3060 · 41% busy')
     // a model already kept loaded has nothing to keep
     expect(within(rows[2]!).getByRole('button', { name: 'Keep loaded: silero-vad' })).toBeDisabled()
+  })
+
+  it('marks a GPU model whose memory could not be measured instead of calling it CPU', () => {
+    const wddm = {
+      ...stats,
+      models: [
+        model({
+          id: 'kokoro',
+          memory_bytes: 400 * MB,
+          size_vram_bytes: 300 * MB,
+          vram_measured: false,
+          vram_source: 'plan',
+          processor: '100% GPU',
+          device: 'cuda:0',
+        }),
+      ],
+    }
+    live.store.patch({ stats: wddm, history: [{ t: Date.now(), stats: wddm }] })
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <LoadedModelsPanel />
+      </QueryClientProvider>,
+    )
+    const [row] = screen.getAllByTestId('loaded-model')
+    expect(within(row!).getByTestId('processor')).toHaveTextContent('100% GPU ?')
+    expect(within(row!).getByTestId('model-memory')).toHaveTextContent('VRAM unknown')
   })
 
   it('ticks the countdown down between samples', () => {

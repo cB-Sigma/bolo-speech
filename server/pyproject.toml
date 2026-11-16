@@ -155,7 +155,7 @@ warn_unused_ignores = false
 module = [
   "sherpa_onnx.*", "faster_whisper.*", "ctranslate2.*", "soundfile.*", "soxr.*", "av.*",
   "moonshine_onnx.*", "kokoro_onnx.*", "pywhispercpp.*", "wyoming.*", "whisper_normalizer.*",
-  "onnxruntime.*", "tomli.*", "aiortc.*", "uccharan.*", "tokenizers.*", "sipmessage.*", "onnx.*",
+  "onnxruntime.*", "tomli.*", "aiortc.*", "uccharan.*", "tokenizers.*", "sipmessage.*", "onnx.*", "pynvml.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"
