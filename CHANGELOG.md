@@ -6,6 +6,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-16
+
 ### Fixed
 
 - A preset made with `bolo cp` (or `POST /api/v1/models/copy`) could come back with empty settings on Windows, and
