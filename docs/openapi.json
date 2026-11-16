@@ -7,7 +7,7 @@
    "name": "Apache-2.0",
    "url": "https://www.apache.org/licenses/LICENSE-2.0"
   },
-  "version": "0.6.1"
+  "version": "0.6.2"
  },
  "paths": {
   "/v1/models": {
@@ -325,13 +325,42 @@
      "speaches"
     ],
     "summary": "List voices of installed text-to-speech models",
+    "description": "The voices of the installed text-to-speech models; ``model`` (an id or alias): that model's voices only.",
     "operationId": "audio_voices_v1_audio_voices_get",
+    "parameters": [
+     {
+      "name": "model",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Model"
+      }
+     }
+    ],
     "responses": {
      "200": {
       "description": "Successful Response",
       "content": {
        "application/json": {
         "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
        }
       }
      }
@@ -577,7 +606,7 @@
      "native"
     ],
     "summary": "This machine: CPU, memory, disk, GPUs, runtimes, container limits",
-    "description": "What bolo detected, best effort: a value it could not read is ``null`` (unknown). ``refresh=true`` looks\nagain and also runs the slower probes (the torch plugin's device, server binaries). ``speed`` says how fast\nthis machine is against the one the catalog was measured on, and whether that was measured (the\nmicro-benchmark) or estimated. Nothing here restricts what can be pulled or loaded.",
+    "description": "What bolo detected, best effort: a value it could not read is ``null`` (unknown). Detected once and kept;\n``refresh=true`` looks again and also runs the slower probes (the torch plugin's device, server binaries'\nversions, ``llama-server --list-devices``, nvidia-smi), whose answers are reused for 60 s and forgotten when a\ncomponent is installed; ``refresh=force`` runs them again at once. ``speed`` says how fast this machine is\nagainst the one the catalog was measured on, and whether that was measured (the micro-benchmark) or estimated.\nNothing here restricts what can be pulled or loaded.",
     "operationId": "hardware_api_v1_hardware_get",
     "parameters": [
      {
@@ -2723,6 +2752,7 @@
      "operations"
     ],
     "summary": "Liveness",
+    "description": "Always 200 while the server runs (a restart cannot bring a lost GPU back). ``status`` is \"degraded\" with\na ``gpu`` object while the GPU is lost (bolo.gpu_health).",
     "operationId": "healthz_healthz_get",
     "responses": {
      "200": {
@@ -3460,6 +3490,18 @@
       "type": "boolean",
       "title": "Accept License",
       "default": false
+     },
+     "flavour": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Flavour",
+      "description": "llama-server, audio.cpp: the build, `cpu`, `cuda` or `vulkan` (default: `device`'s)"
      }
     },
     "type": "object",

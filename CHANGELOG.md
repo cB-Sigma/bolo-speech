@@ -6,6 +6,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-11-16
+
 ### Added
 
 - Docs: "At log-on, restarted after a crash" (docs/configuration.md, Windows). Task Scheduler's "restart on failure"
