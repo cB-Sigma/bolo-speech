@@ -19,6 +19,7 @@ import type {
   ProviderUpdate,
   RequestTrace,
   Sample,
+  SavedVoice,
   ServerInfo,
   SetupPlan,
   SetupUse,
@@ -28,6 +29,8 @@ import type {
   Task,
   TelephonyOverview,
   TextInput,
+  VoiceList,
+  VoiceScore,
   WordList,
   WordListPreview,
   WordListPutResult,
@@ -256,6 +259,32 @@ export const api = {
       { query: { voice }, signal },
     ),
   samples: (signal?: AbortSignal) => json<{ samples: Sample[] }>('api/v1/samples', { signal }),
+  /** Saved voices. Servers without them answer 404, which `useVoices` reads as "not offered". */
+  voices: (signal?: AbortSignal) => json<VoiceList>('api/v1/voices', { signal }),
+  /** Creates a saved voice (multipart). `consent` is required by the server; see `NewVoice`. */
+  createVoice: (voice: NewVoice, signal?: AbortSignal) =>
+    json<SavedVoice>('api/v1/voices', { method: 'POST', body: newVoiceForm(voice), signal }),
+  updateVoice: (
+    id: string,
+    changes: Partial<Pick<SavedVoice, 'name' | 'description' | 'language' | 'transcript' | 'default_model'>>,
+  ) => json<SavedVoice>(`api/v1/voices/${encodeURIComponent(id)}`, { method: 'PATCH', json: changes }),
+  deleteVoice: (id: string) =>
+    json<{ id: string; deleted: boolean }>(`api/v1/voices/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  /** The cleaned reference recording (WAV). */
+  async voiceAudio(id: string, signal?: AbortSignal): Promise<Blob> {
+    const res = await request(`api/v1/voices/${encodeURIComponent(id)}/audio`, { signal })
+    return res.blob()
+  },
+  /** Speaks a test sentence in the voice with `model` and compares it with the reference. */
+  voiceScore: (id: string, model: string, opts: { text?: string; audio?: boolean } = {}, signal?: AbortSignal) =>
+    json<VoiceScore>(`api/v1/voices/${encodeURIComponent(id)}/score`, {
+      query: { model, text: opts.text, audio: opts.audio || undefined },
+      signal,
+    }),
+  async exportVoices(ids?: string[]): Promise<Blob> {
+    const res = await request('api/v1/voices/export', { query: { ids: ids?.length ? ids.join(',') : undefined } })
+    return res.blob()
+  },
   bench: (req: BenchRequest) => json<{ job_id: string }>('api/v1/bench', { method: 'POST', json: req }),
   benchJob: (jobId: string, signal?: AbortSignal) => api.job<BenchResult>(jobId, signal),
 
@@ -318,6 +347,36 @@ export const api = {
   },
 }
 
+/** What `POST /api/v1/voices` takes. */
+export interface NewVoice {
+  name: string
+  /** One or more recordings of the same person. */
+  files: { blob: Blob; name: string }[]
+  /** Required: `self` ("this is my voice") or `permission` ("I have the speaker's permission"). */
+  consent: 'self' | 'permission'
+  transcript?: string
+  language?: string
+  description?: string
+  defaultModel?: string
+  /** Speak a test sentence with this model and return the speaker similarity. */
+  scoreModel?: string
+  scoreAudio?: boolean
+}
+
+export function newVoiceForm(v: NewVoice): FormData {
+  const form = new FormData()
+  form.set('name', v.name)
+  form.set('consent', v.consent)
+  for (const f of v.files) form.append('file', f.blob, f.name)
+  if (v.transcript) form.set('transcript', v.transcript)
+  if (v.language) form.set('language', v.language)
+  if (v.description) form.set('description', v.description)
+  if (v.defaultModel) form.set('default_model', v.defaultModel)
+  if (v.scoreModel) form.set('score_model', v.scoreModel)
+  if (v.scoreAudio) form.set('score_audio', 'true')
+  return form
+}
+
 /** Body of `POST /v1/audio/speech`, with the bolo extensions the console uses. */
 export interface SpeechBody {
   model: string
@@ -328,6 +387,8 @@ export interface SpeechBody {
   phonemizer?: string
   /** Base64 or `data:audio/…;base64,` recording of the voice to imitate (models with `voice-cloning`). */
   reference_audio?: string
+  /** Model-specific options (Tontaube: `style`, `rate`, `pause`, `pitch_range`, `pitch_level`, `legato`). */
+  options?: Record<string, string | number>
   reference_text?: string
   /** `text` (default), `ssml` or `markdown`. */
   input_format?: string

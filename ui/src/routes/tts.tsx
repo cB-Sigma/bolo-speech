@@ -20,7 +20,16 @@ import { ChunkTimeline } from '@/components/tts/chunk-timeline'
 import { PlaybackWave } from '@/components/tts/playback-wave'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -54,6 +63,9 @@ import { isDemo } from '@/lib/api/config'
 import { detectSupport } from '@/lib/support'
 import { BrowserTts } from './tts-browser'
 import { VoiceClonePanel, type CloneReference } from '@/components/tts/voice-clone'
+import { dataUrlToBlob, type VoiceSource } from '@/components/voices/new-voice-dialog'
+import { useVoices } from '@/components/voices/use-voices'
+import { VoiceLibrary } from '@/components/voices/voice-library'
 import {
   canClone,
   cloudNotice,
@@ -136,6 +148,10 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
   const [lists, setLists] = useState<string[]>([])
   const [romanised, setRomanised] = useState('')
   const wordLists = useWordLists()
+  // Saved voices (the server's library): one can stand in for the model's voice when the model clones voices.
+  const library = useVoices()
+  const [savedId, setSavedId] = useState<string | null>(null)
+  const [toSave, setToSave] = useState<VoiceSource | null>(null)
   const listNames = (wordLists.data?.wordlists ?? []).map((l) => l.name)
   const chosenLists = lists.filter((n) => listNames.includes(n))
   const languages = useMemo(() => (model?.languages ?? []).filter((l) => l !== 'multi'), [model])
@@ -152,7 +168,8 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
   const romanisedDefault = romanisedPin ?? romanisedCap?.default ?? 'off'
   const romanisedNote = romanisedCap ? romanisedBlocked(info.data, voiceLanguage) : null
   const roman = romanisedCap && ROMANISED_MODES.includes(romanised as RomanisedMode) ? romanised : ''
-  const clone = canClone(model) && cloning
+  const saved = canClone(model) && savedId ? (library.data?.voices.find((v) => v.id === savedId) ?? null) : null
+  const clone = canClone(model) && cloning && !saved
   const cloneReady = !clone || reference != null
   const requestOptions = {
     language: lang || undefined,
@@ -179,7 +196,13 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
   const speak = (): TtsSession | null => {
     if (!model || !text.trim()) return null
     void previewRef.current?.dispose()
-    const s = new TtsSession({ model: model.id, voice: voice?.id, text: text.trim(), transport, ...requestOptions })
+    const s = new TtsSession({
+      model: model.id,
+      voice: saved ? saved.id : voice?.id,
+      text: text.trim(),
+      transport,
+      ...requestOptions,
+    })
     setSession(s)
     setTrip(null)
     s.start()
@@ -251,6 +274,7 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
   }
 
   const hasAudio = state.audioSeconds > 0 && state.totalMs != null
+  const savedChoices = canClone(model) ? (library.data?.voices ?? []) : []
   const components = useComponents().data?.components
   // Known up front from the catalog, or learnt the hard way from a `component_missing` error.
   const missing =
@@ -272,9 +296,16 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
       />
       <div className="flex items-center gap-1">
         <Select
-          value={voice?.id ?? undefined}
-          onValueChange={(v) => setPref('ttsVoice', v)}
-          disabled={busy || voices.length === 0 || clone}
+          value={saved ? `saved:${saved.id}` : (voice?.id ?? undefined)}
+          onValueChange={(v) => {
+            if (v.startsWith('saved:')) {
+              setSavedId(v.slice(6))
+              return
+            }
+            setSavedId(null)
+            setPref('ttsVoice', v)
+          }}
+          disabled={busy || (voices.length === 0 && !savedChoices.length) || clone}
         >
           <SelectTrigger className="h-8 w-48" aria-label="Voice" data-testid="voice-picker">
             <SelectValue placeholder={voices.length ? 'Voice' : 'Default voice'} />
@@ -289,6 +320,18 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
                 </span>
               </SelectItem>
             ))}
+            {savedChoices.length > 0 && (
+              <SelectGroup>
+                {voices.length > 0 && <SelectSeparator />}
+                <SelectLabel className="text-xs">Saved voices (cloned)</SelectLabel>
+                {savedChoices.map((v) => (
+                  <SelectItem key={v.id} value={`saved:${v.id}`}>
+                    {v.name}
+                    <span className="ml-2 num text-xs text-muted-foreground">{v.language ?? 'saved'}</span>
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            )}
           </SelectContent>
         </Select>
         <Tooltip>
@@ -297,7 +340,7 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
               variant="outline"
               size="icon"
               onClick={preview}
-              disabled={!voice || busy || model?.available === false}
+              disabled={!voice || busy || model?.available === false || saved != null}
               aria-label="Preview this voice"
             >
               <Volume2 />
@@ -544,9 +587,38 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
           {canClone(model) && (
             <VoiceClonePanel
               enabled={cloning}
-              onEnabledChange={setCloning}
+              onEnabledChange={(on) => {
+                setCloning(on)
+                if (on) setSavedId(null)
+              }}
               reference={reference}
               onReferenceChange={setReference}
+              onSave={
+                library.offered
+                  ? (r) =>
+                      setToSave({
+                        blob: dataUrlToBlob(r.dataUrl),
+                        name: r.label.includes('.') ? r.label : 'recording.wav',
+                        seconds: r.seconds,
+                        transcript: r.text,
+                      })
+                  : undefined
+              }
+              disabled={busy}
+            />
+          )}
+
+          {library.offered && (
+            <VoiceLibrary
+              model={model?.id ?? null}
+              canUse={canClone(model) && model?.installed === true}
+              selected={saved?.id ?? null}
+              onSelect={(id) => {
+                setSavedId(id)
+                if (id) setCloning(false)
+              }}
+              pending={toSave}
+              onPendingClear={() => setToSave(null)}
               disabled={busy}
             />
           )}

@@ -1,4 +1,4 @@
-import { Mic, Square, Trash2, Upload, Volume2 } from 'lucide-react'
+import { BookmarkPlus, Mic, Square, Trash2, Upload, Volume2 } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Panel } from '@/components/panel'
@@ -32,12 +32,15 @@ export function bytesToDataUrl(bytes: Uint8Array, type: string): string {
 /**
  * Reference recording for models that clone voices: upload a file or record
  * one here (the microphone is asked for at the tap), plus what is said in it.
+ * With `onSave` (a server that keeps saved voices) the reference can be kept
+ * as a saved voice.
  */
 export function VoiceClonePanel({
   enabled,
   onEnabledChange,
   reference,
   onReferenceChange,
+  onSave,
   disabled,
   className,
 }: {
@@ -45,6 +48,8 @@ export function VoiceClonePanel({
   onEnabledChange: (on: boolean) => void
   reference: CloneReference | null
   onReferenceChange: (r: CloneReference | null) => void
+  /** Keep the reference as a saved voice (opens the save dialog). */
+  onSave?: (r: CloneReference) => void
   disabled?: boolean
   className?: string
 }) {
@@ -157,7 +162,7 @@ export function VoiceClonePanel({
       <div className="grid gap-3">
         <p className="text-[13px] leading-5 text-muted-foreground">
           Give a few seconds (up to 30) of clear speech from one person. It is sent with each request and replaces the
-          chosen voice. Only clone voices you have permission to use.
+          chosen voice. Only clone voices you have permission to use: your own, or one whose speaker agreed.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -205,6 +210,18 @@ export function VoiceClonePanel({
               <Button size="icon-sm" variant="ghost" onClick={play} aria-label="Play the reference recording">
                 <Volume2 />
               </Button>
+              {onSave && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7"
+                  onClick={() => onSave(reference)}
+                  disabled={disabled || recording}
+                  data-testid="clone-save"
+                >
+                  <BookmarkPlus /> Save as a voice
+                </Button>
+              )}
               <Button
                 size="icon-sm"
                 variant="ghost"

@@ -81,6 +81,14 @@ export interface Capabilities {
     cost_estimates?: boolean
     [k: string]: unknown
   }
+  /** Saved voices for the models that clone voices (`/api/v1/voices`). */
+  voices?: {
+    endpoint?: string
+    consent?: string[]
+    cloning_models?: string[]
+    similarity_model?: string
+    [k: string]: unknown
+  }
   /** Phone calls: telephony providers connected to voice agents. */
   telephony?: {
     endpoint?: string
@@ -1037,4 +1045,71 @@ export interface SimulationReport {
   outcome: string | null
   latency: CallLatency | null
   record: CallRecord | null
+}
+
+/** How a saved voice's maker stated consent: `self` = "this is my voice", `permission` = the speaker's permission. */
+export type ConsentBasis = 'self' | 'permission' | 'recording'
+
+/** Speaker similarity of one model's clone of a saved voice (`GET /api/v1/voices/{id}/score`). */
+export interface VoiceScore {
+  voice?: string
+  model: string
+  /** Cosine similarity of speaker embeddings, -1 to 1. */
+  similarity?: number
+  verdict?: 'same speaker' | 'similar' | 'different' | null
+  embedding_model?: string
+  /** Whether the verdict's thresholds were measured with this embedding model. */
+  calibrated?: boolean
+  text?: string
+  audio_s?: number
+  rtf?: number | null
+  ttfa_ms?: number | null
+  at?: string
+  /** `data:audio/wav;base64,…` when asked for (`audio=true`). */
+  audio?: string
+  /** Set instead of a score when scoring failed (creation still succeeded). */
+  error?: string
+}
+
+/** A saved voice: a cleaned reference recording plus what is known about it. */
+export interface SavedVoice {
+  id: string
+  object: 'voice'
+  name: string
+  description: string | null
+  language: string | null
+  transcript: string | null
+  transcript_source?: 'auto'
+  default_model: string | null
+  created_at: string
+  consent: {
+    basis: ConsentBasis
+    statement: string
+    by: { auth?: string; name?: string | null; client?: string | null }
+    at: string
+    recording?: string
+  }
+  reference: {
+    sample_rate: number
+    duration_s: number
+    speech_s?: number
+    input_s?: number
+    clips?: number
+    snr_db?: number | null
+    level_dbfs?: number
+    gain_db?: number | null
+    speaker_consistency?: number
+  }
+  warnings: string[]
+  scores: Record<string, VoiceScore>
+  audio_url: string
+  /** Only in the answer to `POST /api/v1/voices` with a score model. */
+  score?: VoiceScore
+}
+
+export interface VoiceList {
+  voices: SavedVoice[]
+  cloning_models: string[]
+  consent: Record<string, string>
+  similarity: { embedding_model: string; same_speaker: number; similar: number; calibration?: Record<string, unknown> }
 }
