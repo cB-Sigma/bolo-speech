@@ -14,7 +14,6 @@ URLs with an optional checksum in the catalog.
 
 from __future__ import annotations
 
-import contextlib
 import fnmatch
 import hashlib
 import json
@@ -34,6 +33,7 @@ from urllib.parse import quote
 
 import httpx
 
+from bolo import logs
 from bolo.errors import DownloadError, FilesInUse, GatedModel, ModelNotFound
 
 log = logging.getLogger("bolo.store")
@@ -81,10 +81,9 @@ def remove_tree(
             if pause is None:
                 culprit = getattr(exc, "filename", None) or path
                 raise FilesInUse(
-                    f"could not delete {path}: {culprit} is in use by another program (WinError "
-                    f"{getattr(exc, 'winerror', '?')}; an "
-                    "antivirus scan or an open editor). What is left of the folder can be deleted by hand once it is "
-                    "closed, or with `bolo rm` again"
+                    f"a file is in use by another program (WinError {getattr(exc, 'winerror', '?')}: an antivirus "
+                    f"scan or an open editor), so the model's folder could not be deleted: {culprit}. What is left "
+                    f"of {path} can be deleted by hand once it is closed, or with `bolo rm` again"
                 ) from exc
             log.debug("deleting %s: %s in use, trying again in %.1f s", path, exc.filename, pause)
             wait(pause)
@@ -395,6 +394,11 @@ class ModelStore:
         self.links: dict[str, str] = {}
         #: what deletes a model's folder (tests); None: the manifest, then the folder (:func:`remove_tree`)
         self.remover: Callable[[Path], None] | None = None
+        #: held while a model's folder is deleted, and by every manifest read. A read from another thread (the
+        #: hardware advisor's background refresh reads every manifest right after a request, so right after a load
+        #: that failed with ComponentMissing) had the file open at the moment of the deletion: Windows refused it
+        #: (WinError 32 on manifest.json), where a new process removed the folder fine
+        self._removing = threading.RLock()
         #: model-settings.json as last read or written, keyed by the file's stamp (see ``_file_stamp``)
         self._settings_cache: tuple[tuple[int, int, int] | None, dict[str, Any]] | None = None
 
@@ -455,15 +459,22 @@ class ModelStore:
     def model_dir(self, model_id: str) -> Path:
         return self.models / safe_id(self.links.get(model_id, model_id))
 
+    def _read_manifest(self, path: Path) -> dict[str, Any] | None:
+        """A manifest, read whole and closed at once, never while a model's folder is being deleted
+        (:attr:`_removing`), and on Windows opened so that a deletion is not refused because of it."""
+        with self._removing:
+            if not path.is_file():
+                return None
+            try:
+                with logs.open_shared(path, binary=True) as fh:
+                    raw = fh.read()
+                data = json.loads(raw.decode("utf-8"))
+            except (OSError, ValueError):
+                return None
+        return data if isinstance(data, dict) else None
+
     def manifest(self, model_id: str) -> dict[str, Any] | None:
-        path = self.model_dir(model_id) / "manifest.json"
-        if not path.is_file():
-            return None
-        try:
-            data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return None
-        return data
+        return self._read_manifest(self.model_dir(model_id) / "manifest.json")
 
     def is_installed(self, model_id: str) -> bool:
         m = self.manifest(model_id)
@@ -474,12 +485,9 @@ class ModelStore:
         if not self.models.is_dir():
             return out
         for d in sorted(self.models.iterdir()):
-            mf = d / "manifest.json"
-            if mf.is_file():
-                with contextlib.suppress(OSError, json.JSONDecodeError):
-                    data = json.loads(mf.read_text(encoding="utf-8"))
-                    if data.get("complete"):
-                        out.append(data)
+            data = self._read_manifest(d / "manifest.json")
+            if data is not None and data.get("complete"):
+                out.append(data)
         return out
 
     def size_on_disk(self, model_id: str) -> int:
@@ -743,12 +751,13 @@ class ModelStore:
         mdir = self.model_dir(model_id)
         if not (mdir.exists() or is_dir_link(mdir)):
             return False
-        if is_dir_link(mdir):
-            target = mdir.resolve()
-            remove_dir_link(mdir)
-            (target / "manifest.json").unlink(missing_ok=True)
-        else:
-            remove_tree(mdir, self.remover)
+        with self._removing:
+            if is_dir_link(mdir):
+                target = mdir.resolve()
+                remove_dir_link(mdir)
+                (target / "manifest.json").unlink(missing_ok=True)
+            else:
+                remove_tree(mdir, self.remover)
         self.gc()
         return True
 

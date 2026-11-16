@@ -323,9 +323,9 @@ async def cleanup(core: Bolo, model_id: str) -> str | None:
     try:
         await core.remove(model_id)
     except OSError as exc:
-        return f"{type(exc).__name__}: {exc}"[:300]
+        return f"{type(exc).__name__}: {exc}"[:1000]
     except BoloError as exc:
-        return exc.message[:300]
+        return exc.message[:1000]  # long: it names the folder that is left, and Windows paths are long
     return None
 
 

@@ -90,8 +90,12 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - Removing a model (`bolo rm`, `DELETE /api/v1/models/{id}`) waits out a Windows sharing violation (WinError 32 or
   5: an antivirus scanner holding a file that was just written) with a few growing pauses (about 3 s in all). When
   the folder is still in use after that, the error (409 `files_in_use`) names the folder and the file instead of a
-  traceback; the manifest goes first, so a folder only partly deleted is not taken for an installed model. bolo
-  itself holds no handle on a model's `manifest.json` (it reads and writes it whole).
+  traceback; the manifest goes first, so a folder only partly deleted is not taken for an installed model.
+- The cause of that WinError 32 on the laptop (3 of 3 times right after a load failed with ComponentMissing, never
+  after one that loaded): the request had started the hardware advisor's background refresh, which reads every
+  installed model's `manifest.json`, and the removal that followed at once met the file open in that thread.
+  Manifest reads and a model's removal now take turns (a lock in the store), and on Windows a manifest is read
+  with `FILE_SHARE_DELETE`, so a read never makes a deletion fail.
 - tools/validate_models.py: the CPU's name comes from bolo.hardware (on Windows it read `/proc/cpuinfo`), and a GPU
   that is there is named; without the `--en-voice` model it takes the first installed English voice, and with none
   the models that need test speech fail with a reason instead of a `KeyError: 'en'`; diarization and end-of-turn

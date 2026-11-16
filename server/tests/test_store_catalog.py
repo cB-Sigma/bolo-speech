@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import http.server
 import json
@@ -523,3 +524,123 @@ def test_default_removal_drops_the_manifest_first(tmp_path: Path, monkeypatch: p
     assert not store.is_installed("m") and (mdir / "weights.bin").exists()
     monkeypatch.setattr(store_mod.shutil, "rmtree", real)
     assert store.remove("m") is True and not mdir.exists()
+
+
+class _CountingFile:
+    """A file whose open handles are counted (the manifest reads of a store)."""
+
+    open_now = 0
+
+    def __init__(self, fh: object) -> None:
+        self._fh = fh
+        _CountingFile.open_now += 1
+
+    def read(self, *a: object) -> bytes:
+        return self._fh.read(*a)  # type: ignore[attr-defined,no-any-return]
+
+    def __enter__(self) -> _CountingFile:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self._fh.close()  # type: ignore[attr-defined]
+        _CountingFile.open_now -= 1
+
+
+def test_a_manifest_read_in_another_thread_does_not_block_removal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The laptop's WinError 32: right after a load failed with ComponentMissing, the hardware advisor's background
+    refresh was reading every manifest while the model was removed. Removal and manifest reads now take turns, so a
+    deletion never meets an open manifest (which Windows refuses)."""
+    import time as _time
+
+    from bolo import logs
+    from bolo import store as store_mod
+
+    store, mdir = _installed(tmp_path)
+    real_open = logs.open_shared
+    reading = threading.Event()
+
+    def slow_open(path: Path, binary: bool = False) -> _CountingFile:
+        handle = _CountingFile(real_open(path, binary))
+        if "manifest" in str(path):
+            reading.set()
+            _time.sleep(0.3)  # a slow disk, or an antivirus scan of the read
+        return handle
+
+    def remover(path: Path) -> None:
+        if _CountingFile.open_now:  # what Windows does when the file is open without FILE_SHARE_DELETE
+            raise _in_use(path)
+        shutil.rmtree(path)
+
+    import shutil
+
+    monkeypatch.setattr(logs, "open_shared", slow_open)
+    monkeypatch.setattr(store_mod.time, "sleep", lambda s: None)  # tries again at once: no luck from waiting
+    store.remover = remover
+    reader = threading.Thread(target=store.manifest, args=("m",))
+    reader.start()
+    assert reading.wait(5)
+    assert store.remove("m") is True and not mdir.exists()
+    reader.join(5)
+    assert _CountingFile.open_now == 0
+
+
+async def test_no_manifest_stays_open_after_a_component_missing_load(
+    settings: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A model that fails with ComponentMissing leaves no handle on its manifest.json, and can be removed at once
+    (tools/validate_models.py removes what it pulled right after the failure)."""
+    import contextlib
+
+    from bolo import logs
+    from bolo.core import Bolo
+    from bolo.errors import ComponentMissing
+    from bolo.text import phonemize
+
+    monkeypatch.setattr(phonemize, "get_phonemizer", lambda: None)
+    monkeypatch.setattr(phonemize, "get_uccharan", lambda: None)
+    real_open = logs.open_shared
+    handles: list[object] = []
+
+    def tracking(path: Path, binary: bool = False) -> object:
+        fh = real_open(path, binary)
+        if path.name == "manifest.json":
+            handles.append(fh)
+        return fh
+
+    monkeypatch.setattr(logs, "open_shared", tracking)
+    core = Bolo(settings)  # type: ignore[arg-type]
+    await core.start()
+    try:
+        core.catalog.add(
+            ModelSpec.from_dict(
+                {
+                    "id": "needs-espeak", "task": "tts", "engine": "fake", "kind": "fake-tts", "family": "Piper",
+                    "languages": ["ru"], "license": "MIT", "sample_rate": 24000, "requires": ["phonemizer"],
+                    "options": {"language": "ru-RU"}, "source": {"local": "/nonexistent"},
+                }
+            )
+        )  # fmt: skip
+        mdir = core.store.model_dir("needs-espeak")
+        mdir.mkdir(parents=True)
+        (mdir / "manifest.json").write_text('{"id": "needs-espeak", "complete": true, "files": []}', "utf-8")
+        assert core.store.is_installed("needs-espeak")  # read once here, maybe again by the refresh
+        core.advisor.invalidate()  # as after a pull: the next request starts the background refresh
+        with pytest.raises(ComponentMissing):
+            await core.synthesize_all("Hello.", model="needs-espeak")
+        assert await core.remove("needs-espeak") is True and not mdir.exists()
+        for _ in range(100):
+            if not core.advisor._refreshing:
+                break
+            await asyncio.sleep(0.02)
+        assert handles and all(fh.closed for fh in handles)  # type: ignore[attr-defined]
+        fds = Path("/proc/self/fd")
+        if fds.is_dir():  # Linux: no descriptor of this process is the manifest
+            held: list[str] = []
+            for fd in fds.iterdir():
+                with contextlib.suppress(OSError):  # the listing's own descriptor is gone by now
+                    held.append(str(fd.readlink()))
+            assert not [p for p in held if p.endswith("manifest.json")]
+    finally:
+        await core.stop()
