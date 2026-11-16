@@ -601,11 +601,16 @@ def format_ps(doc: dict[str, Any], verbose: bool = False) -> str:
         head.append(f"gpu{g.get('index', 0)} {label} {mem}{util}{skipped}")
     if not gpus:
         head.append("no GPU memory readings" if system.get("device", "cpu") != "cpu" else "device cpu")
+    health = system.get("gpu_health") or {}
+    if health.get("lost"):
+        head.append("GPU LOST")
     rows = []
     for m in doc.get("models") or []:
         gpus = m.get("gpus") or (m.get("placement") or {}).get("gpus") or []
         proc = m.get("processor", "100% CPU")
-        if m.get("vram_source") == "plan" and "GPU" in proc:
+        if m.get("degraded"):
+            proc = "GPU LOST"  # still placed on the lost GPU: being moved to the CPU, or failing (fallback "fail")
+        elif m.get("vram_source") == "plan" and "GPU" in proc:
             proc += " ?"  # placed on the GPU; how much memory it took could not be measured
         row = [
             m["name"], m.get("task", ""), _human(m.get("size")), proc,
@@ -624,6 +629,10 @@ def format_ps(doc: dict[str, Any], verbose: bool = False) -> str:
         headers += ["ACTIVE", "QUEUED", "PARALLEL", "REQUESTS", "P50 MS", "RTF P50", "IDLE"]
     lines = ["  ".join(head)]
     lines.append(_table(rows, headers) if rows else "no models loaded")
+    if health.get("lost"):
+        lines.append(health.get("notice") or "GPU LOST: reboot to recover; bolo is using the CPU")
+        if health.get("moved_to_cpu"):
+            lines.append("moved to the CPU: " + ", ".join(health["moved_to_cpu"]))
     if any(m.get("vram_source") == "plan" for m in doc.get("models") or []):
         lines.append(
             "? unknown VRAM: placed on the GPU, but its memory use could not be measured"
@@ -1243,6 +1252,9 @@ def _hardware_lines(hw: dict[str, Any]) -> list[str]:
         else:
             parts.append(f"{name} not installed")
     lines.append("runtimes: " + "; ".join(parts))
+    for name in ("llama-server", "audio.cpp"):
+        if rt.get(name, {}).get("probe_error"):
+            lines.append(f"warning: {name}: {rt[name]['probe_error']}")
     where = []
     if box["detected"] is None:
         where.append("container: unknown")
@@ -1534,6 +1546,35 @@ def _doctor_cuda(settings: Settings) -> None:
             print(line)
 
 
+def _doctor_gpu_health(settings: Settings, which: Any = None, checker: Any = None) -> None:
+    """Is the NVIDIA GPU still there (bolo.gpu_health)? Asked where NVIDIA's driver tools are installed."""
+    import importlib.util
+
+    from bolo import gpu_health
+
+    found_smi = (which or shutil.which)("nvidia-smi") is not None
+    if not found_smi and importlib.util.find_spec("pynvml") is None:
+        return
+    device = str(settings.device or "cpu").lower().split(":", 1)[0]
+    health = (checker or gpu_health.check)(expect_gpu=device in ("cuda", "gpu", "auto"))
+    if health.state == "unknown" and not found_smi:
+        return  # NVML's Python module without a driver: nothing to say
+    health.fallback = str(settings.gpu_lost_fallback).lower()
+    source = {"nvml": "NVML", "nvidia-smi": "nvidia-smi"}.get(health.source or "", health.source or "")
+    if health.lost:
+        print(f"gpu health: {health.notice()}")
+        print(
+            "  the NVIDIA driver lost the GPU (laptops can drop it on a lid, display or power change under load); "
+            'only a reboot brings it back. docs/configuration.md, "A lost GPU"'
+        )
+    elif health.state == "ok":
+        print(f"gpu health: ok ({source}: {health.gpus} NVIDIA GPU{'s' if (health.gpus or 0) != 1 else ''} answer)")
+    elif health.state == "none":
+        print(f"gpu health: no NVIDIA GPU found ({health.reason})")
+    else:
+        print(f"gpu health: unknown ({health.reason})")
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     import platform
 
@@ -1597,6 +1638,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         )
     print(f"logs: {_log_where(settings)}")
     _doctor_onnxruntime(settings)
+    _doctor_gpu_health(settings)
     _doctor_cuda(settings)
     _doctor_llm(settings)
     _doctor_providers(settings)

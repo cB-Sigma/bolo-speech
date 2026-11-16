@@ -197,6 +197,32 @@ describe('LoadedModelsPanel', () => {
     expect(within(row!).getByTestId('model-memory')).toHaveTextContent('VRAM unknown')
   })
 
+  it('says when the GPU was lost, and which models are still on it', () => {
+    const notice = 'GPU LOST (nvidia-smi: No devices were found): reboot to recover; bolo is using the CPU'
+    const lost: Stats = {
+      ...stats,
+      system: {
+        ...stats.system,
+        gpus: [],
+        gpu_health: { state: 'lost', lost: true, reason: 'nvidia-smi: No devices were found', notice },
+      },
+      models: [
+        model({ id: 'svara', processor: '100% GPU', device: 'cuda:0', degraded: 'the GPU was lost' }),
+        model({ id: 'whisper', processor: '100% CPU', device: 'cpu' }),
+      ],
+    }
+    live.store.patch({ stats: lost, history: [{ t: Date.now(), stats: lost }] })
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <LoadedModelsPanel />
+      </QueryClientProvider>,
+    )
+    expect(screen.getByTestId('gpu-lost')).toHaveTextContent(notice)
+    const [svara, whisper] = screen.getAllByTestId('loaded-model')
+    expect(within(svara!).getByTestId('processor')).toHaveTextContent('GPU LOST')
+    expect(within(whisper!).getByTestId('processor')).toHaveTextContent('100% CPU')
+  })
+
   it('ticks the countdown down between samples', () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'Date'] })
     show()

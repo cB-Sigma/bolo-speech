@@ -132,6 +132,31 @@ class Host:
             return None
         return proc.stdout.decode(errors="replace")
 
+    def probe(
+        self, argv: list[str], timeout: float, env: dict[str, str] | None = None
+    ) -> tuple[str | None, str | None]:
+        """``(output, None)`` of a command that asks a runtime about the machine (``llama-server
+        --list-devices``), or ``(None, why)``: it is missing, failed, or did not answer within ``timeout`` (then
+        it is killed, and not waited for beyond a few seconds: a process stuck in a driver may not die at once)."""
+        try:
+            proc = subprocess.Popen(
+                argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                env={**os.environ, **env} if env else None,
+            )  # fmt: skip
+        except (OSError, ValueError) as exc:
+            return None, f"{type(exc).__name__}: {exc}"
+        try:
+            out, err = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            with contextlib.suppress(Exception):
+                proc.communicate(timeout=5.0)
+            return None, f"did not answer within {timeout:.0f} s"
+        if proc.returncode != 0:
+            tail = (err or out or b"").decode(errors="replace").strip().splitlines()[-1:]
+            return None, f"exit code {proc.returncode}" + (f": {tail[0][:200]}" if tail else "")
+        return out.decode(errors="replace"), None
+
     def which(self, name: str) -> str | None:
         return shutil.which(name)
 
@@ -848,7 +873,18 @@ def _server_runtime(host: Host, settings: Settings | None, runtime: str, deep: b
         if version and version.strip():
             out["version"] = version.strip().splitlines()[0][:80]
         if runtime == tts_runtimes.LLAMA:
-            devices = host.run([str(path), "--list-devices"], timeout=15.0)
+            flavour = out.get("flavour") or tts_runtimes.flavour_of(settings, runtime, path)
+            env = tts_runtimes.child_env(flavour) if host.system() == "windows" else {}
+            devices, why = host.probe([str(path), "--list-devices"], timeout=LIST_DEVICES_TIMEOUT_S, env=env or None)
+            if why is not None:
+                hint = ""
+                if flavour == "vulkan":
+                    hint = (
+                        "; a Vulkan build that hangs here: on a laptop with AMD and NVIDIA graphics set "
+                        "DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1=1 (bolo sets it for the servers it starts when "
+                        "it sees an AMD adapter), or use the CPU or CUDA build"
+                    )
+                out["probe_error"] = f"`{path.name} --list-devices` {why}{hint}"
             if devices is not None:
                 names = [
                     ln.strip()
@@ -858,6 +894,10 @@ def _server_runtime(host: Host, settings: Settings | None, runtime: str, deep: b
                 out["gpu_devices"] = names
                 out["gpu"] = bool(names)
     return out
+
+
+#: how long ``llama-server --list-devices`` may take (it starts every GPU backend of the build)
+LIST_DEVICES_TIMEOUT_S = 20.0
 
 
 def _torch_plugin(host: Host, settings: Settings | None, deep: bool) -> dict[str, Any]:

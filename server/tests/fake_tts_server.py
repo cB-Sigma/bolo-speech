@@ -8,7 +8,9 @@ Run in a thread (``FakeTTSServer(...).start()``) or as a process with the comman
     fake_tts_server.py run --python 3.12 --frozen --directory D tontaube serve --host H --port N      (as uv: Tontaube)
 
 Audio is a tone whose length follows the text (0.05 s per character) at ``rate``. The text "crash now" makes the
-process exit (to test restarts); "bad request" answers 400 the way the real servers do.
+process exit (to test restarts); "bad request" answers 400 the way the real servers do; "cuda error now" prints
+llama.cpp's CUDA error lines on the console (to test bolo.gpu_health) and answers as usual. With ``FAKE_ENV_FILE``
+set, the process writes the environment it was started with to that file.
 """
 
 from __future__ import annotations
@@ -116,6 +118,10 @@ class FakeTTSServer:
                     self.close_connection = True
                     self.connection.close()
                     return
+                if text == "cuda error now":
+                    print("CUDA error: unspecified launch failure", flush=True)
+                    print("  current device: 0, in function ggml_cuda_compute_forward at ggml-cuda.cu:2519", flush=True)
+                    text = "ok"
                 if text == "bad request":
                     self._error(400, "voice 'nobody' is not a voice of this model")
                     return
@@ -222,8 +228,6 @@ def main(argv: list[str]) -> None:
             "tontaube", rate=24000, port=int(argv[argv.index("--port") + 1]), api_key=os.environ.get("TTS_API_KEY"),
             load_delay_s=float(os.environ.get("FAKE_LOAD_DELAY", "0")),
         )  # fmt: skip
-        if os.environ.get("FAKE_ENV_FILE"):  # what the server was started with, for the test to read
-            Path(os.environ["FAKE_ENV_FILE"]).write_text(json.dumps(dict(os.environ)), encoding="utf-8")
     elif "--config" in argv:
         config = json.loads(Path(argv[argv.index("--config") + 1]).read_text(encoding="utf-8"))
         model = config["models"][0]
@@ -237,6 +241,9 @@ def main(argv: list[str]) -> None:
             port=int(args["--port"]), load_delay_s=float(os.environ.get("FAKE_LOAD_DELAY", "0")), exit_on_crash=True,
             voices=[v for v in os.environ.get("FAKE_VOICES", "").split(",") if v],
         )  # fmt: skip
+    if os.environ.get("FAKE_ENV_FILE"):  # what the server was started with, for the test to read
+        Path(os.environ["FAKE_ENV_FILE"]).write_text(json.dumps(dict(os.environ)), encoding="utf-8")
+    print("ggml_cuda_init: found 1 CUDA devices:", flush=True)  # every start prints this: not an error
     print(f"fake server listening on {server.port} ({' '.join(argv)})", flush=True)
     server.httpd.serve_forever()
 

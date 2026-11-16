@@ -115,6 +115,46 @@ def default_dml_index() -> int | None:
     return _default_index[0]
 
 
+#: AMD's switchable-graphics Vulkan implicit layer (amdvlk / the Radeon driver on hybrid AMD + NVIDIA laptops): with
+#: it loaded, a Vulkan llama-server hung in device enumeration (``--list-devices`` never answered and Windows logged
+#: RADAR_PRE_LEAK_64). Setting this variable to 1 keeps the Vulkan loader from loading that layer.
+AMD_SWITCHABLE_LAYER_VAR = "DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1"
+
+
+def _windows() -> bool:
+    return sys.platform == "win32"
+
+
+def has_amd_adapter(adapters: list[Adapter] | None) -> bool:
+    return any(a.vendor == "amd" and not a.software for a in adapters or [])
+
+
+def vulkan_child_env(
+    flavour: str | None,
+    *,
+    windows: bool | None = None,
+    adapters: Any = None,
+    environ: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """What a Vulkan build of llama-server or audio.cpp that bolo starts needs in its environment on this machine:
+    on Windows with an AMD graphics adapter (DXGI's list; ``adapters`` may be the list or a function returning
+    it), ``DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1=1``, unless the operator set that variable (to anything) in
+    bolo's own environment. Empty for other builds and elsewhere."""
+    import os
+
+    if flavour != "vulkan":
+        return {}
+    if not (_windows() if windows is None else windows):
+        return {}
+    env = os.environ if environ is None else environ
+    if any(k.upper() == AMD_SWITCHABLE_LAYER_VAR for k in env):
+        return {}
+    found = adapters() if callable(adapters) else adapters
+    if adapters is None:
+        found = dxgi_adapters()
+    return {AMD_SWITCHABLE_LAYER_VAR: "1"} if has_amd_adapter(found) else {}
+
+
 def cpu_features(machine: str) -> list[str] | None:
     """Instruction sets Windows reports for this CPU, named as bolo.hardware names them."""
     if sys.platform != "win32":

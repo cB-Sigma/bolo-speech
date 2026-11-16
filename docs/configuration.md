@@ -97,6 +97,8 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `wyoming` | `false` | `--wyoming` | serve the Wyoming protocol |
 | `wyoming_host`, `wyoming_port` | `127.0.0.1`, `10300` | `--wyoming-host`, `--wyoming-port` | Wyoming bind address |
 | `device` | `cpu` | | where models run (per model, as placed by the scheduler: see "GPU and CPU placement" below; a model can pin its own with `PUT /api/v1/models/{id}/settings` `{"device": "cpu"}` or a catalog `options.device`): `cpu`, `cuda` (or `cuda:1`), `coreml` (also `mps`, `metal`), `rocm`, `dml`, `openvino`, or `auto` (the first accelerator found). sherpa-onnx models use `cuda` or `coreml`; faster-whisper uses `cuda`; the ONNX Runtime engines (Nemotron diarization, DiCoW ONNX, the Orpheus-family decoder, the end-of-turn model, in-process speech-to-speech) use the matching execution provider when the installed `onnxruntime` has it (for `cuda`, install `onnxruntime-gpu`; on Windows also its CUDA libraries, see "CUDA on Windows"), and otherwise run on the CPU with one warning; llama-server gets `-ngl N`, the layers that fit in the free accelerator memory (all of them when everything fits; none when nothing does), unless you set `-ngl` yourself in `tts_server_args`, `s2s_server_args` or the entry's `server_args`; audio.cpp gets the device as its backend (`cuda`, `hip` for `rocm`, `vulkan`, `metal` for `coreml`; the CPU for `dml` and `openvino`, which it does not have). With `dml` (Windows, DirectML) only the ONNX Runtime engines use the GPU; sherpa-onnx and faster-whisper run on the CPU (see "Windows" below). **Untested on a GPU** |
+| `gpu_health_interval_s` | `30` | | while models are on a GPU, ask the driver this often whether the GPU is still there (NVML, else nvidia-smi), and also right after a request whose real-time factor is more than twice that model's recent median. `0`: no such checks; a CUDA or Vulkan error printed by a llama-server or audio.cpp bolo started still counts. See "A lost GPU" |
+| `gpu_lost_fallback` | `cpu` | | what happens to the models on a GPU that was lost: `cpu` loads them again on the CPU (the CPU build of llama-server and audio.cpp, every GPU hidden) and places later loads there; `fail` leaves them in place and fails their requests (and later GPU loads) with `engine_unavailable`, for a deployment that would rather fail than run many times slower. See "A lost GPU" |
 | `log_level` | `info` | `--log-level` | `debug`, `info`, `warning`, `error` |
 | `log_file` | unset (off, except under systemd or launchd) | `--log-file` | also write the server's log to a file: `auto` (the platform's place, see "Logs"), a path, or `off`. Unset: no file, unless `bolo serve` runs as a service |
 | `log_max_mb` | `10` | | rotate the log file at this size |
@@ -414,6 +416,7 @@ What differs on Windows (CI runs the server's tests on `windows-latest`; GPU pat
 | firewall | with `--host 0.0.0.0` the Windows Defender Firewall prompt names `python.exe` ("Python"), not `bolo.exe`: uv's `bolo.exe` is a launcher that starts uv's Python interpreter, which is what listens. Prefer a rule for the port ([deploy/README.md](../deploy/README.md#windows-at-log-on-at-start-up-or-as-a-service)) to one for that interpreter, whose path changes when uv installs another Python |
 | local model folders | `bolo pull <folder>` / `file:` link the folder into the store: a directory symlink where allowed (Developer Mode or administrator), else a directory junction (no rights needed, same volume or not, local disks only), else a copy, with a notice |
 | `llama-server`, `audio.cpp` | `bolo components install llama-server` / `audio.cpp` install the pinned Windows release: the CPU build (with every CPU back end, from SSE4.2 to AVX-512, chosen at start-up), the CUDA 12.4 build with its CUDA runtime DLLs for `device = "cuda"`, the Vulkan build for `device = "vulkan"`. Each build goes in its own folder, so `BOLO_DEVICE=cuda bolo components install llama-server` after the CPU build installs the CUDA build next to it (`--flavour cpu\|cuda\|vulkan` picks one explicitly); bolo starts the build matching `device` (with `auto`, a GPU build when one is installed), and `bolo components list` shows which one runs. Tontaube is Linux only |
+| Vulkan build on AMD + NVIDIA laptops | on a laptop with AMD graphics (Radeon integrated graphics next to an NVIDIA GPU) the Vulkan build of llama-server hung while it listed the GPUs (`llama-server --list-devices` never answered; Windows logged `RADAR_PRE_LEAK_64` for `llama-server.exe`): AMD's switchable-graphics Vulkan layer, which the Vulkan loader loads into every Vulkan program, is the cause. When bolo starts a Vulkan build of llama-server or audio.cpp on Windows and DXGI lists an AMD adapter, it sets `DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1=1` in that server's environment (logged at start), unless you set that variable yourself (any value: set `0` to keep the layer). `bolo doctor`'s `--list-devices` question gets the same environment and gives up after 20 s with a warning that names the variable, and a managed server that never answers `GET /health` says the same when it is a Vulkan build. Running `llama-server.exe` yourself: `set DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1=1` (cmd) or `$env:DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1 = "1"` (PowerShell) first |
 | servers bolo starts | llama-server, audio.cpp and plugin workers each run in a Job Object that Windows closes when bolo ends, however it ends (Task Manager, closing the console, a service stop), which ends them and whatever they started. bolo stops one by sending it `CTRL_BREAK_EVENT` and ends the Job Object 10 s later (at once when bolo has no console, as a service). `plugin_nice` > 0 means `BELOW_NORMAL_PRIORITY_CLASS`; `plugin_memory_limit_mb` limits each worker's committed memory (POSIX limits its address space) |
 
 **DirectML** (`device = "dml"`, or `dml:N` to pin adapter N in DXGI's order: `bolo doctor` and
@@ -500,6 +503,48 @@ sherpa-onnx's CUDA wheel cannot be used inside bolo on Windows: it brings its ow
 load (Error 1114) once `onnxruntime` has been imported, as bolo does; and the catalog's int8 sherpa-onnx models gain
 nothing on CUDA. With `device = "cuda"` on Windows they run on the CPU, and `bolo recommend` suggests faster-whisper
 models for the GPU.
+
+### A lost GPU
+
+Found on an RTX 3060 Laptop GPU next to AMD Radeon integrated graphics (Windows 11, driver 621.24): during a long
+CUDA llama-server run, requests became slower and slower (real-time factor 11.8, then 18.9, then 29.4; the CPU
+build managed 4.69), llama-server used a CPU core flat out, and then `nvidia-smi` said `Unable to determine the
+device handle for GPU0: 0000:01:00.0: GPU is lost. Reboot the system to recover this GPU`, later `No devices were
+found`. llama-server kept answering, and until this check `bolo ps` kept saying `cuda:0`.
+
+While models are on a GPU, bolo checks every `gpu_health_interval_s` seconds (30) and right after a request far
+slower than that model's recent median:
+
+- NVML (`nvidia-ml-py`): `nvmlDeviceGetHandleByIndex` or `nvmlDeviceGetMemoryInfo` failing with
+  `NVML_ERROR_GPU_IS_LOST`, or no GPU at all; else
+- `nvidia-smi`: "GPU is lost", "Unable to determine the device handle" or "No devices were found";
+- and a llama-server or audio.cpp bolo started for a GPU printing a CUDA or Vulkan device error (`CUDA error: ...`,
+  `cudaErrorDevicesUnavailable`, `ggml_cuda_...: ... failed`, `ErrorDeviceLost`; not `out of memory`).
+
+When the GPU is lost, bolo logs `GPU LOST (<what was seen>): reboot to recover; bolo is using the CPU`, marks the
+models on a GPU as degraded, and with `gpu_lost_fallback = "cpu"` (the default) loads each one again on the CPU once
+its requests in flight have finished: llama-server and audio.cpp restart on their CPU build (`bolo components
+install llama-server --flavour cpu` installs it; without it the GPU build starts with `--device none` and
+`CUDA_VISIBLE_DEVICES=-1`), ONNX Runtime and CTranslate2 models load with the CPU provider. Models loaded later go
+on the CPU too. With `gpu_lost_fallback = "fail"` the models stay where they are and their requests fail. Where it
+shows:
+
+- `bolo ps`: `GPU LOST` in the first line, the notice under the table, a model still on the lost GPU has `GPU LOST`
+  as its processor, the ones moved are listed;
+- `GET /api/v1/ps` and `/api/v1/stats`: `system.gpu_health` (`state` "lost", `reason`, `source`, `lost_at`,
+  `moved_to_cpu`, `degraded`, `notice`), and `degraded` on each model;
+- `GET /healthz`: still 200 (restarting bolo does not bring the GPU back), with `"status": "degraded"`, `gpu` and
+  `notice`; `GET /api/v1/info`: `health`;
+- the console's Loaded models panel: a red notice;
+- `bolo doctor`: a `gpu health:` line wherever NVIDIA's tools are installed.
+
+The loss lasts until bolo restarts: once the GPU is back (after a reboot), start bolo again.
+
+Laptops with NVIDIA Optimus (or AMD switchable graphics) power the discrete GPU up and down, and under load a lid,
+display or power-source change can make the driver lose it; only a reboot brings it back. Not verified, but worth
+trying when it happens again: run on mains power, and in the NVIDIA Control Panel set "Power management mode" to
+"Prefer maximum performance" for the program (`python.exe` of bolo's environment and `llama-server.exe`), or
+globally.
 
 ## Coming from Ollama
 

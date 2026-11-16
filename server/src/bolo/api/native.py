@@ -722,7 +722,13 @@ async def metrics(request: Request) -> Response:
 
 
 @root_router.get("/healthz", tags=["operations"], summary="Liveness")
-async def healthz() -> JSONResponse:
+async def healthz(request: Request) -> JSONResponse:
+    """Always 200 while the server runs (a restart cannot bring a lost GPU back). ``status`` is "degraded" with
+    a ``gpu`` object while the GPU is lost (bolo.gpu_health)."""
+    core = get_core(request)
+    gpu = core.manager.gpu.health
+    if gpu.lost:
+        return JSONResponse({"status": "degraded", "gpu": gpu.to_dict(), "notice": gpu.notice()})
     return JSONResponse({"status": "ok"})
 
 

@@ -237,6 +237,12 @@ class Settings:
     #: "auto": an ONNX Runtime graph that does not fit in free accelerator memory is cut in two at a layer boundary,
     #: the front on the accelerator, the back on the CPU (needs the onnx package); "off": it runs on the CPU
     onnx_split: str = "auto"
+    #: while models are on a GPU, ask the driver every this many seconds whether it is still there (also right
+    #: after a request far slower than the model's recent median); 0: only a managed server's GPU errors count
+    gpu_health_interval_s: float = 30.0
+    #: when the GPU is lost (bolo.gpu_health): "cpu" loads the models that were on it again on the CPU (managed
+    #: llama-server / audio.cpp on their CPU build); "fail" leaves them where they are and fails their requests
+    gpu_lost_fallback: str = "cpu"
     #: attach a notice (API responses, traces, the command line, the console) when a model that is pulled or
     #: loaded is unlikely to fit this machine or to run in real time. Notices only: nothing is ever refused.
     hardware_warnings: bool = True
@@ -529,6 +535,10 @@ def load_settings(
 
     if str(settings.onnx_split).lower() not in ("auto", "off"):
         raise ValueError(f"onnx_split: expected auto or off, got {settings.onnx_split!r}")
+    if str(settings.gpu_lost_fallback).lower() not in ("cpu", "fail"):
+        raise ValueError(f"gpu_lost_fallback: expected cpu or fail, got {settings.gpu_lost_fallback!r}")
+    if settings.gpu_health_interval_s < 0:
+        raise ValueError("gpu_health_interval_s must be >= 0")
     try:
         parse_keep_alive(settings.keep_alive)
     except ValueError as exc:

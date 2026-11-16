@@ -295,6 +295,10 @@ class Bolo:
 
     def _on_trace(self, trace: Trace) -> None:
         self.events.publish_threadsafe("request", {"request": trace.to_dict()})
+        entry = self.manager.loaded.get(trace.model)
+        if entry is not None and trace.status == "ok" and self.manager.on_gpu(entry):
+            # far slower than this model's recent median: is the GPU still there? (bolo.gpu_health)
+            self.manager.gpu.note_rtf(trace.model, trace.rtf)
 
     async def _stats_ticker(self) -> None:
         while True:
@@ -337,7 +341,16 @@ class Bolo:
             },
             # the file this server also writes its log to (null: standard error only); `bolo logs` reads it
             "log_file": str(logs.ACTIVE_LOG_FILE) if logs.ACTIVE_LOG_FILE else None,
+            "health": self.health(),
         }  # fmt: skip
+
+    def health(self) -> dict[str, Any]:
+        """Health details (``/healthz``, ``GET /api/v1/info``): "degraded" while the GPU is lost (bolo.gpu_health)."""
+        gpu = self.manager.gpu.health
+        return {
+            "status": "degraded" if gpu.lost else "ok",
+            "gpu": {**gpu.to_dict(), "interval_s": self.manager.gpu.interval_s, "checks": self.manager.gpu.checks},
+        }
 
     def capabilities(self) -> dict[str, Any]:
         """What this server can do beyond plain STT/TTS, for clients that want to adapt their UI."""
@@ -639,6 +652,7 @@ class Bolo:
         out["accelerator_source"] = self.manager.accel.source or None
         out["models_vram_bytes"] = self.manager.gpu_in_use()
         out["models_ram_bytes"] = self.manager.memory_in_use()
+        out["gpu_health"] = self.manager.gpu.health.to_dict()
         return out
 
     def _placement_fields(self, entry: Any) -> dict[str, Any]:
@@ -656,6 +670,8 @@ class Bolo:
             "expires_in_s": None if expires_in is None else round(expires_in, 1),
             "expires_at": None if expires_in is None else _iso(time.time() + expires_in),
             "stopping": entry.stopping,
+            # on a GPU that was lost (bolo.gpu_health): why; null otherwise
+            "degraded": entry.degraded,
         }
 
     def ps(self) -> dict[str, Any]:
@@ -681,7 +697,7 @@ class Bolo:
                 "load_ms": round(entry.load_ms, 1), "vram_measured": entry.vram_measured,
                 "vram_source": entry.vram_source or None,
                 "latency_ms": st.latency_summary() if st else None, "rtf": st.rtf_summary() if st else None,
-                "placement": fields["placement"],
+                "placement": fields["placement"], "degraded": entry.degraded,
                 "details": {"engine": entry.spec.engine, "kind": entry.spec.kind, "family": entry.spec.family},
             })  # fmt: skip
         mem = self._proc.memory_info()

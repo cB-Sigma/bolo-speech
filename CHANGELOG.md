@@ -17,6 +17,22 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   recipe ("CUDA on Windows").
 - `bolo components install llama-server --flavour cpu|cuda|vulkan` (also audio.cpp, and `{"flavour": ...}` in
   `POST /api/v1/components/{id}/install`) picks the build; `bolo components list` names the build that runs.
+- **A lost GPU is noticed** (`bolo.gpu_health`). While models are on a GPU, bolo asks the NVIDIA driver every
+  `gpu_health_interval_s` seconds (30) whether the GPU is still there, and right after a request whose real-time
+  factor is more than twice that model's recent median: NVML's `NVML_ERROR_GPU_IS_LOST` (or no GPU), else
+  nvidia-smi's "GPU is lost" / "Unable to determine the device handle" / "No devices were found". A CUDA or Vulkan
+  device error printed by a llama-server or audio.cpp bolo started for a GPU (`CUDA error`, `cudaError...`,
+  `ggml_cuda_...: ... failed`, `ErrorDeviceLost`; not `out of memory`) counts the same. Then the models on the GPU
+  are marked degraded and, with the new `gpu_lost_fallback = "cpu"` (the default), loaded again on the CPU (managed
+  servers on their CPU build, or with `--device none` and `CUDA_VISIBLE_DEVICES=-1`), and later loads go there
+  too; `"fail"` fails their requests instead. The notice ("GPU LOST (...): reboot to recover; bolo is using the
+  CPU") is in the log, `bolo ps` (`GPU LOST` in its first line, as the processor of a model still on the lost GPU,
+  and the models moved), `GET /api/v1/ps` and `/api/v1/stats` (`system.gpu_health`, `degraded` per model),
+  `GET /healthz` (still 200, `"status": "degraded"`), `GET /api/v1/info` (`health`), the console's Loaded models
+  panel and `bolo doctor` (`gpu health:`). Found on an RTX 3060 Laptop GPU (Windows 11, driver 621.24): during a
+  CUDA llama-server run, requests slowed from a real-time factor of 11.8 to 29.4 (the CPU build: 4.69) until
+  nvidia-smi said "GPU is lost. Reboot the system to recover this GPU", while bolo went on serving and `bolo ps`
+  said `cuda:0`. docs/configuration.md, "A lost GPU", has the Windows laptop notes.
 
 ### Fixed
 
@@ -115,6 +131,14 @@ Found on a Windows 11 laptop; the first fix applies everywhere.
   load time on those CPUs (no overflow); elsewhere nothing changes, the output on the measurement machine is
   identical. New unit tests (the int8 product is exact, the option reaches both sessions) and a real-model test
   (diarized transcription of the demo's two-voice dialogue, text for each speaker).
+- **The Vulkan build of llama-server hung on a laptop with AMD and NVIDIA graphics** (Windows 11, AMD Radeon
+  integrated graphics and an RTX 3060 Laptop GPU): `llama-server --list-devices` never answered and Windows logged
+  `RADAR_PRE_LEAK_64` for `llama-server.exe`, because of AMD's switchable-graphics Vulkan layer. When bolo starts
+  a Vulkan build of llama-server or audio.cpp on Windows and DXGI lists an AMD adapter, it now sets
+  `DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1=1` in the server's environment (unless the variable is set in bolo's).
+  `bolo doctor`'s `--list-devices` question uses the same environment, gives up after 20 s with a warning that
+  says so (it used to print "GPU support unknown" without a word), and a managed Vulkan server that never becomes
+  ready names the variable in its error.
 
 ## [0.6.1] - 2026-11-16
 

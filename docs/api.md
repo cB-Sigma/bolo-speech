@@ -467,6 +467,10 @@ For clients written against speaches; details and differences are in
  "wyoming": {"enabled": false, "host": "127.0.0.1", "port": 10300},
  "scheduler": {"workers": 1, "num_parallel": 1, "threads": 4, "max_batch": 8, "batch_wait_ms": 0.0, "max_queue": 64},
  "log_file": "/home/u/.local/state/bolo/logs/server.log",   // the file the server also logs to; null: stderr only
+ "health": {"status": "ok",              // "degraded" while the GPU is lost (configuration.md, "A lost GPU")
+            "gpu": {"state": "ok", "lost": false, "reason": null, "source": "nvml", "gpus": 1, "checked_at": 1794833083.9,
+                    "lost_at": null, "fallback": null, "moved_to_cpu": [], "degraded": [], "notice": null,
+                    "interval_s": 30.0, "checks": 12}},   // state: unchecked (no GPU model yet) | ok | lost | none | unknown
  "components": [ … the list from GET /api/v1/components … ],
  "capabilities": {
    "wordlists": {"available": true,          // false without uccharan; "install" then says how to add it
@@ -685,6 +689,7 @@ Like Ollama's `/api/ps` (bolo's `/api/ps` is speaches' route, which lists model 
                  // the runtime did not start the GPU (a CUDA DLL missing): "device": "cpu", a "notice", and
                  // "provider_fallback": [{"runtime": "onnxruntime", "requested": "CUDAExecutionProvider",
                  //   "missing": ["cublasLt64_13.dll"], "message": "...", ...}]
+   "degraded": null,                      // on a GPU that was lost: why (it is being moved to the CPU, or fails)
    "details": {"engine": "sherpa-onnx", "kind": "whisper", "family": "Whisper"}
  }],
  "system": {"cpu_percent": 12.5, "rss_bytes": 2147483648, "device": "cuda",
@@ -701,7 +706,8 @@ Like Ollama's `/api/ps` (bolo's `/api/ps` is speaches' route, which lists model 
                       "allowed": true,                // in the gpus setting (NVIDIA only)
                       "models_vram_bytes": 1610612736}],   // what bolo's loaded models hold on this GPU
             "accelerator_source": "nvml", "gpu_spread": false,
-            "models_vram_bytes": 1610612736, "models_ram_bytes": 107374182},
+            "models_vram_bytes": 1610612736, "models_ram_bytes": 107374182,
+            "gpu_health": {"state": "ok", "lost": false, …}},   // as "health.gpu" in GET /api/v1/info; also in /api/v1/stats
  "budgets": {"memory_budget_bytes": null, "gpu_memory_budget_bytes": null, "gpu_reserve_bytes": 536870912,
              "gpus": null, "gpu_spread": false, "max_loaded_models": null, "keep_alive": "5m"},
  "speech_to_speech": {"model": "lfm3-audio-2b-llamacpp", "placement": {…}}   // once its llama-server started
@@ -1646,7 +1652,7 @@ against a real server with real models
 
 | Endpoint | |
 | --- | --- |
-| `GET /healthz` | `200 {"status":"ok"}` as soon as the process serves requests |
+| `GET /healthz` | `200 {"status":"ok"}` as soon as the process serves requests. While the GPU is lost (configuration.md, "A lost GPU") still 200, with `{"status":"degraded","gpu":{...},"notice":"GPU LOST (...): reboot to recover; bolo is using the CPU"}` |
 | `GET /readyz` | `200 {"status":"ready"}` once every `preload` model is in memory, else `503 {"status":"starting","loading":[…]}` |
 | `GET /metrics` | Prometheus text: `bolo_requests_total`, `bolo_request_errors_total`, `bolo_audio_seconds_total{direction}`, `bolo_active_streams`, `bolo_queue_depth`, `bolo_process_*`, and per model `bolo_model_loaded`, `bolo_model_memory_bytes`, `bolo_model_requests_total`, `bolo_latency_ms{metric,quantile}`, `bolo_real_time_factor{quantile}`, `bolo_model_queue_depth`, `bolo_model_mean_batch_size`, `bolo_queue_time_ms{quantile}`, `bolo_model_queue_rejected_total` |
 | `GET /` | the web console (single-page app; unknown paths fall back to it). Served with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: credentialless` so its in-browser recogniser can use WebAssembly threads; turn off with `cross_origin_isolation = false` |

@@ -28,6 +28,8 @@ export interface LoadedRow {
   idle: number
   /** `size` is an estimate (the browser demo). */
   estimated: boolean
+  /** On a GPU that was lost: why. */
+  degraded: string | null
 }
 
 function gpuFor(device: string, gpus: GpuMemory[]): GpuMemory | null {
@@ -71,6 +73,7 @@ export function loadedRows(stats: Stats | null): LoadedRow[] {
         gpuIndexes: m.placement?.gpus ?? [],
         idle: m.idle_s,
         estimated: m.memory_estimated ?? false,
+        degraded: m.degraded ?? null,
       }
     })
     .sort((a, b) => b.size - a.size || a.id.localeCompare(b.id))
@@ -115,6 +118,8 @@ export function split(row: Pick<LoadedRow, 'vram' | 'size' | 'processor'>): { gp
 }
 
 export interface MachineTotals {
+  /** The GPU was lost: the notice to show ("GPU LOST (...): reboot to recover; bolo is using the CPU"). */
+  gpuLost: string | null
   cpuPercent: number
   rss: number
   ramUsed: number | null
@@ -138,6 +143,7 @@ export function machineTotals(stats: Stats | null): MachineTotals | null {
   const sys = stats.system
   const total = sys.ram_total_bytes ?? null
   return {
+    gpuLost: sys.gpu_health?.lost ? (sys.gpu_health.notice ?? 'GPU LOST: reboot to recover') : null,
     cpuPercent: sys.cpu_percent,
     rss: sys.rss_bytes,
     ramTotal: total,

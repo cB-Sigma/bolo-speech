@@ -510,6 +510,19 @@ export interface ModelStats {
   stopping?: boolean
   /** `memory_bytes` is an estimate, not a measurement (the browser demo: a page cannot measure one model). */
   memory_estimated?: boolean
+  /** On a GPU that was lost: why (it is being moved to the CPU, or its requests fail). */
+  degraded?: string | null
+}
+
+/** Is the GPU still there (`system.gpu_health`; absent from older servers). */
+export interface GpuHealth {
+  state: 'unchecked' | 'ok' | 'lost' | 'none' | 'unknown'
+  lost: boolean
+  reason: string | null
+  /** "GPU LOST (...): reboot to recover; bolo is using the CPU" while lost, else null. */
+  notice: string | null
+  moved_to_cpu?: string[]
+  degraded?: string[]
 }
 
 export interface ModelPlacement {
@@ -566,6 +579,7 @@ export interface Stats {
     accelerator_source?: string | null
     models_vram_bytes?: number
     models_ram_bytes?: number
+    gpu_health?: GpuHealth
   }
   totals: { requests: number; errors: number; audio_seconds_in: number; audio_seconds_out: number }
   models: ModelStats[]

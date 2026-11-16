@@ -226,6 +226,15 @@ export function LoadedModelsPanel({ className }: { className?: string }) {
       data-testid="loaded-models"
       bodyClassName="p-0"
     >
+      {totals?.gpuLost && (
+        <p
+          role="alert"
+          className="border-b border-border bg-destructive/10 px-4 py-2 text-xs text-destructive"
+          data-testid="gpu-lost"
+        >
+          {totals.gpuLost}
+        </p>
+      )}
       {isDemo ? (
         <BrowserTotals rows={rows} />
       ) : (
@@ -315,7 +324,7 @@ export function LoadedModelsPanel({ className }: { className?: string }) {
                 <div className="min-w-0">
                   <div className="mb-1 flex items-center justify-between gap-2">
                     <span className="num text-foreground" data-testid="processor">
-                      {row.processor}
+                      {row.degraded ? <span className="text-destructive">GPU LOST</span> : row.processor}
                       {row.vramUnknown && (
                         <span
                           className="text-muted-foreground"

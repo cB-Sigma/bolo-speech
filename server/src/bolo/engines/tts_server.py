@@ -57,7 +57,7 @@ from typing import TYPE_CHECKING, Any
 import httpx
 import numpy as np
 
-from bolo import procs
+from bolo import gpu_health, procs
 from bolo.audio.resample import StreamResampler
 from bolo.engines.base import (
     Engine,
@@ -70,7 +70,18 @@ from bolo.engines.base import (
     Voice,
 )
 from bolo.errors import ComponentMissing, EngineUnavailable, InvalidRequest
-from bolo.tts_runtimes import ENGINE_ID, LLAMA, RUNTIME_INFO, RUNTIMES, TONTAUBE, find_binary, url_for
+from bolo.llama_args import has_flag
+from bolo.tts_runtimes import (
+    CPU_FLAVOUR,
+    ENGINE_ID,
+    LLAMA,
+    RUNTIME_INFO,
+    RUNTIMES,
+    TONTAUBE,
+    find_binary,
+    flavour_of,
+    url_for,
+)
 
 if TYPE_CHECKING:
     from bolo.config import Settings
@@ -94,6 +105,28 @@ TONTAUBE_SLIDERS = {"rate": 4, "pause": 4, "pitch_range": 5, "pitch_level": 4, "
 TONTAUBE_LANGUAGES = {"en", "de", "es", "fr", "it", "nl", "pt"}
 #: shortest piece of audio handed on while streaming (seconds); smaller network reads are joined
 MIN_CHUNK_S = 0.08
+
+
+def server_env(binary: Path, flavour: str | None, *, gpu_lost: bool = False) -> dict[str, str]:
+    """The variables a server bolo starts gets on top of bolo's environment: its folder on ``LD_LIBRARY_PATH``
+    (the shared libraries next to it), what its build needs here (:func:`bolo.tts_runtimes.child_env`: no AMD
+    switchable-graphics layer for a Vulkan build on a Windows machine with AMD graphics), and after the GPU was
+    lost every CUDA GPU hidden (``CUDA_VISIBLE_DEVICES=-1``), so that a GPU build bolo has to fall back on runs on
+    the CPU instead of touching the lost GPU."""
+    from bolo.tts_runtimes import child_env
+
+    env = {
+        "LD_LIBRARY_PATH": os.pathsep.join(p for p in (str(binary.parent), os.environ.get("LD_LIBRARY_PATH", "")) if p)
+    }
+    added = child_env(flavour)
+    if added:
+        log.info(
+            "starting the %s build of %s with %s", flavour, binary.name, ", ".join(f"{k}={v}" for k, v in added.items())
+        )
+    env.update(added)
+    if gpu_lost:
+        env["CUDA_VISIBLE_DEVICES"] = "-1"
+    return env
 
 
 def free_port() -> int:
@@ -123,8 +156,16 @@ class ServerProcess:
         env: dict[str, str] | None = None,
         health_path: str = "/health",
         api_key: str | None = None,
+        gpu: bool = False,
+        flavour: str | None = None,
     ) -> None:
         self.name = name
+        #: started for a GPU: a CUDA or Vulkan error on its console means the GPU stopped working (bolo.gpu_health)
+        self.gpu = gpu
+        #: the build (cpu, cuda, vulkan), for the advice when it does not start
+        self.flavour = flavour
+        #: the first GPU error line it printed since it started
+        self.gpu_error: str | None = None
         self.api_key = api_key
         self.argv = argv
         self.port = port
@@ -154,6 +195,9 @@ class ServerProcess:
             if line:
                 self._tail.append(line)
                 log.debug("[%s] %s", self.name, line)
+                if self.gpu and self.gpu_error is None and gpu_health.gpu_error_line(line):
+                    self.gpu_error = line
+                    gpu_health.report_gpu_error(self.name, line)
 
     def tail(self, n: int = 6) -> str:
         return " | ".join(list(self._tail)[-n:])
@@ -186,6 +230,7 @@ class ServerProcess:
                 )
             self._stopping = False
             self._tail.clear()
+            self.gpu_error = None
             env = {**os.environ, **self.env}
             try:
                 proc = procs.spawn(
@@ -232,6 +277,11 @@ class ServerProcess:
                     reason = f"not ready after {self.start_timeout_s:.0f} s" + (
                         f": {self.tail()}" if self._tail else ""
                     )
+                    if self.flavour == "vulkan":
+                        reason += (
+                            " (a Vulkan build can hang while it lists the GPUs: on a laptop with AMD and NVIDIA "
+                            'graphics see docs/configuration.md, "Windows"; or use the CPU or CUDA build)'
+                        )
                     self._crashed(reason)
                     raise EngineUnavailable(f"TTS server '{self.name}' did not start ({reason})")
                 time.sleep(0.2)
@@ -252,7 +302,7 @@ class ServerProcess:
         return {
             "name": self.name, "running": self.running, "pid": self._proc.pid if self._proc else None,
             "port": self.port, "starts": self.starts, "crashes": self.crashes, "restarts": self.restarts,
-            "last_error": self.last_error,
+            "last_error": self.last_error, "flavour": self.flavour, "gpu_error": self.gpu_error,
         }  # fmt: skip
 
 
@@ -726,7 +776,9 @@ class TTSServerEngine(Engine):
 
     def _process(self, runtime: str, name: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> ServerProcess:
         s = self._settings()
-        binary, _source = find_binary(s, runtime)
+        gpu_lost = bool(opts.options.get("gpu_lost"))
+        # after the GPU was lost: the CPU build when it is installed
+        binary, _source = find_binary(s, runtime, device="cpu" if gpu_lost else None)
         info = RUNTIME_INFO[runtime]
         if binary is None:
             raise ComponentMissing(
@@ -735,11 +787,15 @@ class TTSServerEngine(Engine):
                 f'(tts_servers = ["{name}=http://host:port"])'
             )
         port = free_port()
-        env = {
-            "LD_LIBRARY_PATH": os.pathsep.join(
-                p for p in (str(binary.parent), os.environ.get("LD_LIBRARY_PATH", "")) if p
-            )
-        }
+        flavour = flavour_of(s, runtime, binary) if runtime != TONTAUBE else None
+        if gpu_lost and flavour not in (None, CPU_FLAVOUR):
+            log.warning(
+                "model '%s': the GPU was lost and the CPU build of %s is not installed (`bolo components install %s "
+                "--flavour cpu`); starting the %s build with every GPU hidden",
+                name, info.name, runtime, flavour,
+            )  # fmt: skip
+        env = server_env(binary, flavour, gpu_lost=gpu_lost)
+        on_gpu = (opts.device or "cpu").split(":", 1)[0].lower() not in ("cpu", "", "auto")
         extra = [str(a) for a in spec.get("server_args") or []] + list(s.tts_server_args)
         key: str | None = None
         health = "/health"
@@ -762,6 +818,8 @@ class TTSServerEngine(Engine):
             if spec.get("mmproj_file"):
                 argv += ["-mm", str(path / str(spec["mmproj_file"]))]
             argv += llama_server_args(s, spec, opts, extra)
+            if gpu_lost and not has_flag(extra, ("-dev", "--device")):
+                argv += ["--device", "none"]  # no GPU at all, whatever the build
         else:
             config = self._audiocpp_config(name, path, spec, opts, port)
             run_dir = Path(s.data_dir) / "run" / "tts-server"
@@ -770,8 +828,9 @@ class TTSServerEngine(Engine):
             config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
             argv = [str(binary), "--config", str(config_path), "--no-ui"]
         process = ServerProcess(
-            f"{runtime}:{name}", argv + extra, port, start_timeout_s=timeout, env=env, health_path=health, api_key=key
-        )
+            f"{runtime}:{name}", argv + extra, port, start_timeout_s=timeout, env=env, health_path=health, api_key=key,
+            gpu=on_gpu, flavour=flavour,
+        )  # fmt: skip
         self._processes = [p for p in self._processes if p.running or p.crashes]
         self._processes.append(process)
         return process

@@ -81,6 +81,9 @@ class FakeHost(hw.Host):
         self.modules = modules or {}
         self._cores, self._affinity, self._memory = cores, affinity, memory
         self.ran: list[list[str]] = []
+        self.probed: list[tuple[list[str], dict[str, str] | None]] = []
+        #: commands (their first two words) that never answer
+        self.hangs: set[str] = set()
 
     def system(self) -> str:
         return self._system
@@ -104,6 +107,16 @@ class FakeHost(hw.Host):
     def run(self, argv: list[str], timeout: float = 4.0) -> str | None:
         self.ran.append(argv)
         return self.commands.get(" ".join(argv[:3])) or self.commands.get(" ".join(argv[:2]))
+
+    def probe(
+        self, argv: list[str], timeout: float, env: dict[str, str] | None = None
+    ) -> tuple[str | None, str | None]:
+        self.probed.append((argv, env))
+        key = " ".join(argv[:2])
+        if key in self.hangs:
+            return None, f"did not answer within {timeout:.0f} s"
+        out = self.run(argv, timeout)
+        return (out, None) if out is not None else (None, "exit code 1")
 
     def which(self, name: str) -> str | None:
         return self.binaries.get(name)

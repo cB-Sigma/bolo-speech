@@ -30,7 +30,7 @@ from typing import Any
 
 import psutil
 
-from bolo import cuda_libs
+from bolo import cuda_libs, gpu_health
 from bolo.accel import Accelerators, our_pids
 from bolo.catalog import Catalog, ModelSpec
 from bolo.config import Settings
@@ -68,6 +68,9 @@ from bolo.store import ModelStore
 
 log = logging.getLogger("bolo.lifecycle")
 
+#: device families that are a GPU, which bolo.gpu_health watches and a lost GPU takes away
+GPU_FAMILIES = frozenset({"cuda", "vulkan", "dml", "rocm", "hip"})
+
 
 @dataclass
 class LoadedModel:
@@ -94,6 +97,8 @@ class LoadedModel:
     #: set by a request's or a load's ``keep_alive`` (seconds; -1: forever); None: the settings decide
     keep_alive_s: float | None = None
     stopping: bool = False
+    #: the GPU the model is on was lost (bolo.gpu_health): why; the model is slow or broken until it is moved
+    degraded: str | None = None
 
     @property
     def id(self) -> str:
@@ -232,6 +237,13 @@ class ModelManager:
         self.providers: ProviderRegistry | None = None
         #: called with the spec after a model was loaded (the core logs a hardware notice; it cannot stop the load)
         self.on_loaded: Callable[[ModelSpec], None] | None = None
+        #: is the GPU still there? Checked while models are on one (bolo.gpu_health)
+        self.gpu = gpu_health.GpuMonitor(
+            interval_s=float(settings.gpu_health_interval_s),
+            has_gpu_models=self.has_gpu_models,
+            on_lost=self.on_gpu_lost,
+            fallback=self.gpu_lost_fallback,
+        )
 
     # -- helpers ----------------------------------------------------------
     def resolve(self, name: str) -> ModelSpec:
@@ -304,6 +316,62 @@ class ModelManager:
 
     def gpu_in_use(self) -> int:
         return sum(m.vram_bytes for m in self.loaded.values())
+
+    # -- a lost GPU (bolo.gpu_health) --------------------------------------
+    @property
+    def gpu_lost_fallback(self) -> str:
+        """``gpu_lost_fallback``: "cpu" (load the models again on the CPU) or "fail" (their requests fail)."""
+        return "fail" if str(getattr(self.settings, "gpu_lost_fallback", "cpu")).lower() == "fail" else "cpu"
+
+    @staticmethod
+    def on_gpu(entry: LoadedModel) -> bool:
+        return family(entry.placement.device) in GPU_FAMILIES
+
+    def has_gpu_models(self) -> bool:
+        return any(self.on_gpu(e) for e in self.loaded.values())
+
+    def _gpu_lost_notice(self, model_id: str) -> str:
+        health = self.gpu.health
+        reason = health.reason or "the driver lost it"
+        return f"the GPU was lost ({reason}): '{model_id}' runs on the CPU; {gpu_health.REBOOT} the GPU"
+
+    async def on_gpu_lost(self, health: gpu_health.GpuHealth) -> None:
+        """The GPU is gone: mark the models on it as degraded, say so, and (``gpu_lost_fallback = "cpu"``) load
+        them again on the CPU, one task per model; a request in flight on the GPU is let finish first."""
+        victims = [e for e in self.loaded.values() if self.on_gpu(e)]
+        for e in victims:
+            e.degraded = f"the GPU was lost ({health.reason or 'the driver lost it'}); {gpu_health.REBOOT}"
+            e.placement.notice = f"{e.placement.notice}; {e.degraded}" if e.placement.notice else e.degraded
+            self.events.publish("model", {"id": e.id, "event": "degraded", "notice": e.degraded})
+        health.degraded = [e.id for e in victims]
+        self.events.publish("gpu", health.to_dict())
+        if not victims:
+            return
+        if self.gpu_lost_fallback == "fail":
+            log.error(
+                "gpu_lost_fallback = fail: requests to %s fail until bolo is restarted after a reboot",
+                ", ".join(e.id for e in victims),
+            )
+            return
+        log.warning("loading %s again on the CPU", ", ".join(e.id for e in victims))
+        await asyncio.gather(*(self._move_to_cpu(e, health) for e in victims))
+
+    async def _move_to_cpu(self, entry: LoadedModel, health: gpu_health.GpuHealth) -> None:
+        keep = entry.keep_alive_s
+        try:
+            if self.loaded.get(entry.id) is entry:
+                await self.unload(entry.id, reason="GPU lost")
+            moved = await self.load(entry.id)
+            if keep is not None:
+                moved.keep_alive_s = keep
+            health.moved.append(entry.id)
+            log.warning("%s now runs on %s (the GPU was lost)", entry.id, moved.placement.device)
+        except Exception as exc:
+            log.error("could not load %s again on the CPU after the GPU was lost: %s", entry.id, exc)
+        finally:
+            with contextlib.suppress(ValueError):
+                health.degraded.remove(entry.id)
+            self.events.publish("gpu", health.to_dict())
 
     # -- placement ----------------------------------------------------------
     def requested_device(self, spec: ModelSpec) -> str:
@@ -512,6 +580,13 @@ class ModelManager:
         device = self.resolve_device(requested)
         if family(device) == "cpu" or spec.cloud or spec.engine == "remote":
             return self._plan(spec, None)
+        if self.gpu.lost and family(device) in GPU_FAMILIES:
+            if self.gpu_lost_fallback == "fail":
+                raise EngineUnavailable(
+                    f"model '{spec.id}' is placed on {device}, but {self.gpu.health.notice()} "
+                    '(set gpu_lost_fallback = "cpu" to run it on the CPU)'
+                )
+            return self._on_cpu(spec, requested, self._gpu_lost_notice(spec.id))
         while True:
             p = self._place_gpus(spec, device, {})
             whole = p.device not in ("cpu",) and p.cpu_bytes == 0
@@ -535,6 +610,10 @@ class ModelManager:
         device = self.resolve_device(requested)
         layers = self._layers(path, options)
         size = (layers.file_bytes + layers.extra_bytes) if layers else 0
+        if self.gpu.lost and family(device) in GPU_FAMILIES:
+            p = Placement(device="cpu", requested=requested, cpu_bytes=size, notice=self._gpu_lost_notice(name))
+            log.warning("%s", p.notice)
+            return p
 
         def one(dev: str) -> Placement:
             return self._finish(plan(
@@ -725,6 +804,8 @@ class ModelManager:
             options={
                 "endpoint_silence_s": self.settings.endpoint_silence_ms / 1000.0,
                 "max_utterance_s": self.settings.max_utterance_s,
+                # the GPU was lost: managed servers start their CPU build with every GPU hidden
+                **({"gpu_lost": True} if self.gpu.lost and family(device) == "cpu" else {}),
             },
             gpu_layers=place.gpu_layers if place.split == "layers" and not place.operator_layers else None,
             graph_devices=dict(place.graphs),
@@ -869,6 +950,8 @@ class ModelManager:
                 with contextlib.suppress(Exception):
                     self.on_loaded(spec)
             self._ensure_reaper()
+            if self.on_gpu(entry) or self.gpu.pending:
+                self.gpu.ensure_running()
             return entry
 
     async def unload(self, name: str, reason: str = "requested") -> bool:
@@ -876,6 +959,7 @@ class ModelManager:
         if spec is None or spec.id not in self.loaded:
             return False
         entry = self.loaded.pop(spec.id)
+        self.gpu.forget(spec.id)
         entry.stopping = True
         self.stopping[spec.id] = entry
         try:
@@ -896,6 +980,8 @@ class ModelManager:
         the model's task, becomes the model's keep-alive; ``0`` unloads the model when the last request using it
         ends (for sessions: when the session ends, see :meth:`apply_keep_alive`)."""
         entry = await self.load(name)
+        if entry.degraded and self.gpu_lost_fallback == "fail":
+            raise EngineUnavailable(f"model '{entry.id}': {entry.degraded} (gpu_lost_fallback = fail)")
         ka = REQUEST_KEEP_ALIVE.get()
         if ka is not None and ka.applies(entry.spec.task):
             ka.used.add(entry.id)
@@ -955,6 +1041,7 @@ class ModelManager:
                 await self.reap_once()
 
     async def close(self) -> None:
+        await self.gpu.close()
         if self._reaper:
             self._reaper.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):

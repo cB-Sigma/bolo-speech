@@ -408,12 +408,15 @@ def _configured_binary(value: str) -> Path | None:
     return Path(found) if found else None
 
 
-def find_binary(settings: Settings, runtime: str, flavour: str | None = None) -> tuple[Path | None, str | None]:
+def find_binary(
+    settings: Settings, runtime: str, flavour: str | None = None, device: str | None = None
+) -> tuple[Path | None, str | None]:
     """``(path, source)`` of the server binary for ``runtime``: the setting, bolo's components folder, then PATH.
     For a runtime run from source (Tontaube) the path is the checkout folder. On Windows a name without an
     extension also finds ``<name>.exe`` (and the other ``PATHEXT`` extensions), as on ``PATH``. Of the builds in
     the components folder, the one ``flavour`` names (only that one), else the one ``device`` asks for, else
-    another one that is installed (see :func:`_preference`)."""
+    another one that is installed (see :func:`_preference`). ``device`` replaces the setting's in that choice (a
+    model moved to the CPU after its GPU was lost starts the CPU build when there is one)."""
     info = RUNTIME_INFO[runtime]
     if info.git is not None:
         configured = getattr(settings, info.setting, None)
@@ -429,11 +432,44 @@ def find_binary(settings: Settings, runtime: str, flavour: str | None = None) ->
     builds = installed_flavours(settings, runtime)
     if flavour is not None:
         return (builds[flavour], "bolo") if flavour in builds else (None, None)
-    for wanted in _preference(runtime, getattr(settings, "device", None)):
+    for wanted in _preference(runtime, device or getattr(settings, "device", None)):
         if wanted in builds:
             return builds[wanted], "bolo"
     found = shutil.which(info.binary)
     return (Path(found), "path") if found else (None, None)
+
+
+def flavour_of(settings: Settings | None, runtime: str, binary: Path) -> str:
+    """The build ``binary`` is: the folder bolo installed it in, else what the libraries next to it show
+    (``ggml-vulkan.dll``, ``ggml-cuda.dll``, ...)."""
+    if settings is not None:
+        with contextlib.suppress(Exception):
+            for flavour, path in installed_flavours(settings, runtime).items():
+                if path == binary:
+                    return flavour
+    with contextlib.suppress(OSError):
+        names = " ".join(p.name.lower() for p in binary.parent.iterdir() if p.is_file())
+        if "cuda" in names or "cublas" in names:
+            return "cuda"
+        if "vulkan" in names:
+            return "vulkan"
+    return CPU_FLAVOUR
+
+
+def child_env(flavour: str | None) -> dict[str, str]:
+    """Variables a server binary of this build needs on this machine, besides bolo's own environment: the Vulkan
+    build on a Windows machine with AMD graphics runs without AMD's switchable-graphics layer
+    (:func:`bolo.winhw.vulkan_child_env`)."""
+    from bolo import winhw
+
+    return winhw.vulkan_child_env(flavour)
+
+
+def run_env(path: Path, settings: Settings | None = None, runtime: str = LLAMA) -> dict[str, str] | None:
+    """The environment to run ``path`` in for a quick question (``--help``, ``--version``, ``--list-devices``):
+    None (bolo's own) unless its build needs something more (:func:`child_env`)."""
+    extra = child_env(flavour_of(settings, runtime, path))
+    return {**os.environ, **extra} if extra else None
 
 
 def parse_server_setting(item: str) -> tuple[str, str]:
@@ -468,7 +504,9 @@ def remote_url(settings: Settings | None, spec: ModelSpec) -> str | None:
 def check_runs(path: Path) -> str | None:
     """None when the binary starts on this machine (``--help``), else why not (e.g. a too old C library)."""
     try:
-        proc = subprocess.run([str(path), "--help"], capture_output=True, timeout=30, check=False)
+        proc = subprocess.run([str(path), "--help"], capture_output=True, timeout=30, check=False, env=run_env(path))
+    except subprocess.TimeoutExpired:
+        return f"`{path.name} --help` did not answer within 30 s" + _hang_hint(path)
     except (OSError, subprocess.SubprocessError) as exc:
         return f"{type(exc).__name__}: {exc}"
     text = (proc.stdout + proc.stderr).decode(errors="replace")
@@ -483,10 +521,20 @@ def check_runs(path: Path) -> str | None:
     return None
 
 
+def _hang_hint(path: Path) -> str:
+    """What to try when a Vulkan build hangs on start."""
+    if flavour_of(None, LLAMA, path) != "vulkan":
+        return ""
+    return (
+        " (a Vulkan build that hangs while it lists the GPUs: on a laptop with AMD and NVIDIA graphics try the CPU "
+        'or CUDA build, or set DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1=1; docs/configuration.md, "Windows")'
+    )
+
+
 def binary_version(path: Path) -> str | None:
     """What ``<binary> --version`` prints first (llama-server prints ``version: …``)."""
     try:
-        proc = subprocess.run([str(path), "--version"], capture_output=True, timeout=15, check=False)
+        proc = subprocess.run([str(path), "--version"], capture_output=True, timeout=15, check=False, env=run_env(path))
     except (OSError, subprocess.SubprocessError):
         return None
     text = (proc.stdout + proc.stderr).decode(errors="replace")

@@ -647,11 +647,10 @@ class S2SManager:
         return backend
 
     def _process(self, name: str, path: Path, options: dict[str, Any]) -> ServerProcess:
-        import os
 
         from bolo.engines.base import LoadOptions
-        from bolo.engines.tts_server import ServerProcess, free_port, llama_server_args
-        from bolo.tts_runtimes import LLAMA, RUNTIME_INFO, find_binary
+        from bolo.engines.tts_server import ServerProcess, free_port, llama_server_args, server_env
+        from bolo.tts_runtimes import LLAMA, RUNTIME_INFO, find_binary, flavour_of
 
         s = self.core.settings
         binary, _source = find_binary(s, LLAMA)
@@ -680,14 +679,12 @@ class S2SManager:
         # flash attention, KV cache type, context and batch size: pinned for the model, its catalog options, settings
         tuning = {**options, **self.core.store.model_settings(name)}
         argv += llama_server_args(s, tuning, opts, extra, parallel=max(1, s.s2s_parallel))
-        env = {
-            "LD_LIBRARY_PATH": os.pathsep.join(
-                p for p in (str(binary.parent), os.environ.get("LD_LIBRARY_PATH", "")) if p
-            )
-        }
+        flavour = flavour_of(s, LLAMA, binary)
+        env = server_env(binary, flavour)
         return ServerProcess(
-            f"s2s:{name}", argv + extra, port, start_timeout_s=s.tts_server_start_timeout_s, env=env, api_key=key
-        )
+            f"s2s:{name}", argv + extra, port, start_timeout_s=s.tts_server_start_timeout_s, env=env, api_key=key,
+            gpu=p.device.split(":", 1)[0] != "cpu", flavour=flavour,
+        )  # fmt: skip
 
     async def close(self) -> None:
         backend, self._backend = self._backend, None
