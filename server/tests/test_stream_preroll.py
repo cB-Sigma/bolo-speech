@@ -9,8 +9,19 @@ import pytest
 
 from bolo.catalog import ModelSpec
 from bolo.core import Bolo
+from bolo.engines.base import FloatArray, VadDetector, VadEvent, VadParams
 from bolo.engines.fake import FakeStreamingSTT
-from bolo.streaming.session import SR, PreRoll, SessionConfig, STTSession, speech_gain
+from bolo.streaming.session import (
+    SR,
+    PreRoll,
+    SessionConfig,
+    STTSession,
+    lift_onset,
+    speech_gain,
+    speech_level,
+    speech_onset,
+)
+from bolo.streaming.vad import EnergyVad
 from conftest import speechlike
 
 
@@ -149,3 +160,109 @@ async def test_without_a_pre_roll_the_recogniser_hears_everything(core: Bolo) ->
     messages, _ = await run_stream(core, "t-open", audio, pace=0.1)
     assert [m["type"] for m in messages].count("final") == 1
     assert model.heard >= len(audio)
+
+
+# -- a quiet first word the VAD does not hear -------------------------------------------------------------------------
+
+QUIET_WORD_AT = 2.0  # seconds: a quiet word, a breath, then the rest of the utterance at full level
+SPEECH_AT = 2.5
+VAD_LATE_S = 0.8  # where the VAD reports the start: on the loud part, as Silero did on microphone takes
+
+
+def quiet_first_word() -> np.ndarray:
+    """A room, a quiet first word (0.3 s, 20 dB below the rest), a 0.2 s breath, then 1.5 s of speech."""
+    return utterances(
+        ("room", QUIET_WORD_AT),
+        ("speech", 0.3),
+        ("room", SPEECH_AT - QUIET_WORD_AT - 0.3),
+        ("speech", 1.5),
+        ("room", 1.5),
+    ) * np.concatenate([np.ones(int(QUIET_WORD_AT * SR)), np.full(int(0.3 * SR), 0.1), np.ones(int(3.2 * SR) + 1)])[
+        : int(5.5 * SR)
+    ].astype(np.float32)
+
+
+class LateVad(VadDetector):
+    """Reports speech starting ``VAD_LATE_S`` after it did, as Silero does when the first word is quiet: it starts
+    counting at the first word loud enough for it."""
+
+    def __init__(self, params: VadParams) -> None:
+        self.inner = EnergyVad(params)
+        self.pos = 0
+        self.pending: VadEvent | None = None
+
+    @property
+    def in_speech(self) -> bool:
+        return self.inner.in_speech and self.pending is None
+
+    def accept(self, samples: FloatArray) -> list[VadEvent]:
+        out: list[VadEvent] = []
+        for ev in self.inner.accept(samples):
+            if ev.kind == "speech_start":
+                self.pending = VadEvent("speech_start", ev.sample + int(VAD_LATE_S * SR))
+            else:
+                out.append(ev)
+        self.pos += len(samples)
+        if self.pending is not None and self.pos >= self.pending.sample + int(0.3 * SR):
+            out.insert(0, self.pending)
+            self.pending = None
+        return out
+
+    def flush(self) -> list[VadEvent]:
+        return self.inner.flush()
+
+
+@pytest.fixture
+def late_vad(core: Bolo, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def detector(params: VadParams | None = None, model: str | None = None, fallback: bool = False):  # type: ignore[no-untyped-def]
+        return LateVad(params or VadParams()), "late"
+
+    monkeypatch.setattr(core, "vad_detector", detector)
+
+
+def test_speech_onset_finds_a_quiet_word_before_the_reported_start() -> None:
+    audio = quiet_first_word()
+    reported = int((QUIET_WORD_AT + VAD_LATE_S) * SR)
+    assert speech_onset(audio, reported) / SR == pytest.approx(QUIET_WORD_AT, abs=0.03)
+    # a start the VAD placed right is left there: the room before it is not speech
+    assert speech_onset(audio, int(QUIET_WORD_AT * SR)) / SR == pytest.approx(QUIET_WORD_AT, abs=0.03)
+    # too little held to tell the room from speech, or nothing at all: the reported start
+    assert speech_onset(audio[:1000], 1000) == 1000
+    assert speech_onset(audio, 0) == 0
+
+
+def test_lift_onset_raises_the_quiet_word_to_the_level_of_the_rest() -> None:
+    audio = quiet_first_word()
+    a, b = int(QUIET_WORD_AT * SR), int((QUIET_WORD_AT + 0.3) * SR)
+    rest = audio[int(SPEECH_AT * SR) : int((SPEECH_AT + 1.5) * SR)]
+    lifted = lift_onset(audio, a, b, rest)
+    assert speech_level(lifted[a:b]) == pytest.approx(speech_level(rest), rel=0.05)
+    assert np.array_equal(lifted[:a], audio[:a]) and np.array_equal(lifted[b:], audio[b:])
+    assert np.array_equal(lift_onset(audio, a, b, rest[:100]), audio)  # too little heard to go by: left alone
+
+
+@pytest.mark.usefixtures("late_vad")
+async def test_a_gated_stream_hears_the_quiet_first_word_the_vad_missed(core: Bolo) -> None:
+    """Found on a Windows laptop: "t can you tell me" from the 20M Zipformer for "<word> can you tell me". The
+    pre-roll was counted from where the VAD reported the start, which was on the second word."""
+    add(core, "t-late", step_delay_s=0.005, preroll_s=0.4, speech_dbfs=-20.0)
+    entry = await core.manager.load("t-late")
+    model = entry.model
+    assert isinstance(model, FakeStreamingSTT)
+    messages, _ = await run_stream(core, "t-late", quiet_first_word(), pace=0.1)
+    vad = [m for m in messages if m["type"] == "vad"]
+    finals = [m for m in messages if m["type"] == "final"]
+    assert vad[0]["event"] == "speech_start" and vad[0]["t"] > SPEECH_AT  # on the loud part
+    assert len(finals) == 1
+    # the recogniser's stream began the pre-roll before the quiet word, not before where the VAD heard speech
+    assert finals[0]["words"][0]["t0"] == pytest.approx(QUIET_WORD_AT - 0.4, abs=0.03)
+
+
+@pytest.mark.usefixtures("late_vad")
+async def test_pseudo_streaming_decodes_the_quiet_first_word_the_vad_missed(core: Bolo) -> None:
+    """Moonshine gave "Can you tell me" for "<word> can you tell me": the utterance began 0.25 s before where the
+    VAD reported it, on the second word."""
+    messages, _ = await run_stream(core, "fake-stt", quiet_first_word(), pace=0.1)
+    finals = [m for m in messages if m["type"] == "final"]
+    assert len(finals) == 1
+    assert finals[0]["t0"] == pytest.approx(QUIET_WORD_AT - 0.25, abs=0.03)

@@ -68,6 +68,13 @@ TAIL_PAD_S = 0.5
 VAD_LAG_S = 2.0  # how far back a VAD may place a start it reports (the energy fallback's patience, and some)
 MAX_GAIN_DB = 24.0  # most a streaming model's quiet speech is raised by
 FRAME = 320  # 20 ms
+# A VAD reports a start once it has heard enough confident speech; a quiet first word, or one followed by a breath,
+# is not that, and the start lands on the next word (Silero on simulated microphone takes: up to 0.8 s late). The
+# speech before it is found again in the audio held back: louder than the room by ONSET_MARGIN_DB, through pauses
+# shorter than ONSET_GAP_S, at most ONSET_LOOKBACK_S before the reported start.
+ONSET_LOOKBACK_S = 1.2
+ONSET_GAP_S = 0.4
+ONSET_MARGIN_DB = 9.0
 
 
 @dataclass
@@ -453,17 +460,72 @@ class _Processor:
         return events
 
 
+def frame_rms(samples: FloatArray) -> FloatArray:
+    """The RMS level of each whole 20 ms frame of ``samples``."""
+    n = len(samples) // FRAME
+    frames = np.asarray(samples[: n * FRAME], dtype=np.float64).reshape(n, FRAME)
+    rms: FloatArray = np.sqrt(np.mean(np.square(frames), axis=1))
+    return rms
+
+
+def speech_level(samples: FloatArray) -> float:
+    """The level of the speech in ``samples`` (RMS, 0 for less than a frame): the 90th percentile of the 20 ms frame
+    levels, so pauses do not count."""
+    rms = frame_rms(samples)
+    return float(np.percentile(rms, 90)) if len(rms) else 0.0
+
+
 def speech_gain(samples: FloatArray, target_dbfs: float, max_gain_db: float = MAX_GAIN_DB) -> float:
     """The gain that brings speech in ``samples`` up to ``target_dbfs``: 1 for speech already that loud, at most
-    ``max_gain_db``. The speech level is the 90th percentile of the 20 ms frame levels, so pauses do not count."""
-    n = len(samples) // FRAME
-    if n == 0:
-        return 1.0
-    frames = np.asarray(samples[: n * FRAME], dtype=np.float64).reshape(n, FRAME)
-    level = float(np.percentile(np.sqrt(np.mean(np.square(frames), axis=1)), 90))
+    ``max_gain_db``."""
+    level = speech_level(samples)
     if level <= 1e-6:
         return 1.0
     return float(min(max(10.0 ** (target_dbfs / 20.0) / level, 1.0), 10.0 ** (max_gain_db / 20.0)))
+
+
+def speech_onset(audio: FloatArray, at: int) -> int:
+    """Where the speech a VAD reports starting at ``audio[at]`` begins: earlier when the VAD missed its first word.
+
+    Steps back from ``at`` a 20 ms frame at a time while frames are louder than the room (the quietest tenth of the
+    frames before ``at``) by ``ONSET_MARGIN_DB``, across pauses shorter than ``ONSET_GAP_S``, at most
+    ``ONSET_LOOKBACK_S``; the result is the first loud frame found, or ``at``."""
+    at = min(at, len(audio))
+    if at <= 0:
+        return at
+    first = at % FRAME  # frames end at ``at``
+    rms = frame_rms(audio[first:at])
+    if len(rms) < 5:  # too little held to tell the room from speech
+        return at
+    db = 20.0 * np.log10(rms + 1e-9)
+    room = db[db > -85.0]  # not digital silence (a microphone that has just opened)
+    if len(room) == 0:
+        return at
+    threshold = max(float(np.percentile(room, 10)) + ONSET_MARGIN_DB, -70.0)
+    onset, quiet = at, 0
+    lowest = max(0, len(db) - int(ONSET_LOOKBACK_S * SR) // FRAME)
+    for k in range(len(db) - 1, lowest - 1, -1):
+        if db[k] > threshold:
+            onset, quiet = first + k * FRAME, 0
+        else:
+            quiet += FRAME
+            if quiet >= ONSET_GAP_S * SR:
+                break
+    return onset
+
+
+def lift_onset(audio: FloatArray, a: int, b: int, heard: FloatArray) -> FloatArray:
+    """``audio`` with the speech in ``audio[a:b]`` (what the VAD missed) raised to the level of ``heard`` (the speech
+    it heard): one gain, at most ``MAX_GAIN_DB``, never below 1. A quiet first word is otherwise left far below the rest
+    of the utterance, where the recogniser makes it into a fragment ("t can you") or drops it."""
+    if b - a < FRAME or len(heard) < int(0.1 * SR):
+        return audio
+    gain = speech_gain(audio[a:b], 20.0 * np.log10(max(speech_level(heard), 1e-9)))
+    if gain <= 1.0:
+        return audio
+    out = np.array(audio, dtype=np.float32)
+    out[a:b] = np.clip(out[a:b] * gain, -1.0, 1.0)
+    return out
 
 
 class PreRoll:
@@ -576,19 +638,23 @@ class _NativeProcessor(_Processor):
         self.preroll.push(samples, end)
 
     def _listen(self, speech_at: int, ahead: FloatArray) -> None:
-        """The VAD heard speech start at ``speech_at``: a fresh stream hears the pre-roll before it.
+        """The VAD heard speech start at ``speech_at``: a fresh stream hears the pre-roll before the speech.
 
-        ``ahead`` is the audio received after the pre-roll; with the speech heard so far it sets the utterance's
-        gain (the detector reports a start a few hundred milliseconds after it, so there is some)."""
-        assert self.preroll is not None
-        audio, start = self.preroll.take(since=speech_at - self.preroll_n)
+        The speech may have begun before ``speech_at`` (a quiet first word the VAD missed): the pre-roll is counted
+        from where it began, and that word is raised to the level of the rest. ``ahead`` is the audio received after
+        the pre-roll; with the speech heard so far it sets the utterance's gain (the detector reports a start a few
+        hundred milliseconds after it, so there is some)."""
+        pre = self.preroll
+        assert pre is not None
+        onset = pre.start + speech_onset(pre.buf, speech_at - pre.start)
+        audio, start = pre.take(since=onset - self.preroll_n)
         self.stream.restart()
         self.base = self.fed = start
         self.listening = True
-        if self.target_dbfs is not None:
-            heard = np.concatenate([audio[max(0, speech_at - start) :], ahead])
-            if len(heard) >= int(0.1 * SR):
-                self.gain = speech_gain(heard, self.target_dbfs)
+        heard = np.concatenate([audio[max(0, speech_at - start) :], ahead])
+        audio = lift_onset(audio, max(0, onset - start), max(0, speech_at - start), heard)
+        if self.target_dbfs is not None and len(heard) >= int(0.1 * SR):
+            self.gain = speech_gain(heard, self.target_dbfs)
         self._accept(audio)
 
     def _accept(self, samples: FloatArray) -> None:
@@ -706,9 +772,17 @@ class _PseudoProcessor(_Processor):
         self.pos += len(samples)
         for ev in self.run_vad(samples):
             if ev.kind == "speech_start":
+                # a quiet first word the VAD missed is found again before its start, and raised to the level of the
+                # speech it heard (Moonshine left it out: "Can you tell me" for "So can you tell me")
+                at = min(ev.sample, self.pos)
+                floor = max(self.buf_start, self.final_end)
+                onset = floor + speech_onset(self._slice(floor, at), at - floor) if at > floor else at
+                if onset < at:
+                    a, b = onset - self.buf_start, at - self.buf_start
+                    self.buf[a:b] = lift_onset(self.buf[a:b], 0, b - a, self._slice(at, self.pos))
                 # padded at both ends, two utterances close together would share audio, and a word on the seam
                 # would be in both finals
-                start = max(self.buf_start, self.final_end, min(ev.sample, self.pos) - int(ONSET_PAD_S * SR))
+                start = max(self.buf_start, self.final_end, onset - int(ONSET_PAD_S * SR))
                 self.utt_start = start
                 self.last_partial_pos = start
                 self.last_partial_at = 0.0

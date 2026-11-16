@@ -119,6 +119,21 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - Live demo, Your device: "GPU in use" is always listed (`data-testid="gpu-in-use"`): "checking…" until the WebGPU
   probe answers, then the adapter, or "none" without one; it used to appear only once an adapter was found. The
   panel (`data-testid="device-panel"`) is also on the Clone page now, besides Speech to text and Text to speech.
+- **Live transcription from a microphone still lost the first word when it was quiet** (Edge and Chrome on Windows:
+  `zipformer-en-20m-streaming` gave "t can you tell me...", Moonshine "Can you tell me..." for a sentence with a word
+  before "Can"). Silero reports a start once it has heard a quarter second of confident speech; a quiet first word
+  (a browser's gain control and noise suppression still settling, or a soft voice), or one followed by a breath, is
+  not that, and the start landed on the next word, 0.4-0.8 s late in simulated takes. The streaming pre-roll (0.5 s)
+  and the pseudo-streaming pad (0.25 s) were both counted from that start, so the recogniser got the end of the word
+  or none of it. Nothing else dropped audio: the console holds the microphone's 20 ms blocks until the stream is
+  ready and sends them all, the server queues them, its resampler and the gain keep every sample. Now the speech
+  before a reported start is looked for in the audio held back (frames 9 dB above the room, through pauses shorter
+  than 0.4 s, at most 1.2 s back); the pre-roll and pad are counted from where it began, and that part is raised to
+  the level of the speech the VAD heard (one gain, at most 24 dB). Simulated microphone takes (real and synthetic
+  speech at -26 to -36 dBFS, the first word 14-24 dB quieter and then a pause, 0.4-1.5 s of room before, 100 and
+  250 ms sends, some after a burst of held audio, the console's resampler), first word right in N of 24, two sets of
+  room noise: Zipformer 1 and 2 before, 14 and 9 after; Moonshine 3 and 4 before, 18 and 19 after. Takes whose first
+  300 ms only are quieter (no pause after it): Zipformer 12 before, 13 after; Moonshine 20 before, 21 after.
 - **The end-of-turn model (`smart-turn-v3`, `semantic_vad`) gave wrong probabilities on x86 CPUs without VNNI**
   (AVX2 only: AMD Ryzen before Zen 4, Intel before Ice Lake / Alder Lake), the same ONNX Runtime kernel that emptied
   DiCoW's transcripts: its int8 graph (QuantizeLinear / DequantizeLinear pairs, which ONNX Runtime fuses into uint8 x
