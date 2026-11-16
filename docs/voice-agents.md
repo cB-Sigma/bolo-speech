@@ -290,7 +290,7 @@ one upstream session (one llama-server slot).
 or run the model **in bolo's own process**, without llama-server:
 
 ```sh
-pip install 'bolo-speech[s2s]'          # onnxruntime and tokenizers
+pip install "bolo-speech[s2s]"          # onnxruntime and tokenizers
 bolo pull lfm3-audio-2b-onnx     # 2.7 GB, every file pinned by SHA-256
 bolo serve                       # with s2s_model = "lfm3-audio-2b-onnx" and realtime_pipeline = "speech-to-speech"
 ```
@@ -360,7 +360,7 @@ llama-server, **not against a real LFM3-Audio model.**
 ### Browsers: WebRTC and ephemeral keys
 
 `POST /v1/realtime/calls` is the WebRTC transport of the same sessions
-(`pip install 'bolo-speech[webrtc]'`, which brings
+(`pip install "bolo-speech[webrtc]"`, which brings
 [aiortc](https://github.com/aiortc/aiortc), BSD-3-Clause; without it the
 route answers `503 engine_unavailable` and everything else works). The body
 is the browser's SDP offer (`Content-Type: application/sdp`), or a multipart

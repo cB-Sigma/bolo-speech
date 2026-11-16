@@ -42,14 +42,16 @@
 ## Install
 
 ```bash
-uv tool install 'bolo-speech[all]'        # with uv (https://docs.astral.sh/uv/)
+uv tool install "bolo-speech[all]"        # with uv (https://docs.astral.sh/uv/)
 bolo serve
 ```
 
-- Run it once without installing: `uvx --from 'bolo-speech[all]' bolo serve`.
-- Without uv: `pipx install 'bolo-speech[all]'`, or `pip install 'bolo-speech[all]'` into a virtual environment.
+The double quotes work in bash, zsh, PowerShell and cmd (cmd.exe does not treat single quotes as quotes).
+
+- Run it once without installing: `uvx --from "bolo-speech[all]" bolo serve`.
+- Without uv: `pipx install "bolo-speech[all]"`, or `pip install "bolo-speech[all]"` into a virtual environment.
 - With Homebrew (macOS 14 or later, Linux): `brew install cb-sigma/tap/bolo`, then `brew services start bolo` to run it in the background (console at http://127.0.0.1:8000/). It installs `all`; the [tap's README](https://github.com/cB-Sigma/homebrew-tap#bolo) shows how to add the opt-in extras.
-- On Windows (PowerShell or cmd), with double quotes, which cmd.exe needs: `uv tool install "bolo-speech[all]"`. Models go to `%USERPROFILE%\.cache\bolo`; DirectML, services and the other differences: [docs/configuration.md](docs/configuration.md#windows).
+- On Windows (PowerShell or cmd), the same command. Models go to `%USERPROFILE%\.cache\bolo`; DirectML, services and the other differences: [docs/configuration.md](docs/configuration.md#windows).
 - As a container (CPU image): `docker run -p 8000:8000 -v bolo-data:/data ghcr.io/cb-sigma/bolo:latest`. Compose, systemd and Kubernetes examples, and what was run of each: [deploy/README.md](deploy/README.md).
 
 The PyPI distribution is `bolo-speech`; the command and the Python package are `bolo`. Python 3.10 or newer.
@@ -78,7 +80,7 @@ Invoke-RestMethod http://127.0.0.1:8000/v1/audio/speech -Method Post -ContentTyp
   -Body ([Text.Encoding]::UTF8.GetBytes($body)) -OutFile hello.mp3      # UTF-8 bytes: any language's text survives
 ```
 
-In cmd, JSON needs escaped double quotes: `curl.exe ... -H "Content-Type: application/json" -d "{\"model\": \"tts-1\", \"voice\": \"af_heart\", \"input\": \"Hello from bolo.\"}" -o hello.mp3`. Environment variables are `$env:BOLO_DEVICE = "cuda"` in PowerShell and `set BOLO_DEVICE=cuda` in cmd.
+Windows PowerShell 5.1 drops the double quotes inside an argument it passes to a program, so `curl.exe -d '{"model": ...}'` sends broken JSON there: use `Invoke-RestMethod` as above, or `curl.exe ... -d "@body.json"` (PowerShell 7.3 and later pass them as written). Piping a program's UTF-8 output on in 5.1 needs `[Console]::OutputEncoding = [Text.Encoding]::UTF8` first. In cmd, JSON needs escaped double quotes: `curl.exe ... -H "Content-Type: application/json" -d "{\"model\": \"tts-1\", \"voice\": \"af_heart\", \"input\": \"Hello from bolo.\"}" -o hello.mp3`. Environment variables are `$env:BOLO_DEVICE = "cuda"` in PowerShell and `set BOLO_DEVICE=cuda` in cmd.
 
 With the official OpenAI SDK, only the base URL changes:
 
@@ -353,7 +355,7 @@ bolo itself is [Apache-2.0](LICENSE). It contains no third-party source code; [N
 
 - **Engines**: sherpa-onnx (Apache-2.0), ONNX Runtime (MIT), faster-whisper and CTranslate2 (MIT). The optional `kokoro-onnx` plugin is MIT but pulls in the GPL `phonemizer` package, so it is not part of `all`.
 - **uccharan (Apache-2.0)** is a dependency of `bolo-speech[all]`, not part of bolo's code. Its language packs (word tables, Apache-2.0) are downloaded on first use unless `uccharan_auto_download = false`; its romanised-text and WikiPron packs are CC BY-SA 4.0 and are downloaded only when you install them.
-- **eSpeak NG (GPL-3.0-or-later) is a separate, optional component.** bolo's wheel does not contain it, the `all` extra does not install it, and the container image does not include it unless you build with `--build-arg WITH_ESPEAK=1`. It arrives only when you ask: the console's install button (which asks you to accept the licence), `bolo components install espeak-ng --accept-license`, `pip install 'bolo-speech[espeak]'`, or a system package. bolo's own code stays Apache-2.0 either way, but if you redistribute a bundle that contains eSpeak NG you must comply with the GPL for that component. [docs/models.md](docs/models.md#licences-and-the-espeak-ng-question).
+- **eSpeak NG (GPL-3.0-or-later) is a separate, optional component.** bolo's wheel does not contain it, the `all` extra does not install it, and the container image does not include it unless you build with `--build-arg WITH_ESPEAK=1`. It arrives only when you ask: the console's install button (which asks you to accept the licence), `bolo components install espeak-ng --accept-license`, `pip install "bolo-speech[espeak]"`, or a system package. bolo's own code stays Apache-2.0 either way, but if you redistribute a bundle that contains eSpeak NG you must comply with the GPL for that component. [docs/models.md](docs/models.md#licences-and-the-espeak-ng-question).
 - **Models** are downloaded from their publishers under their own licences, which the catalog records per model. Most are MIT, Apache-2.0 or CC-BY-4.0; some are non-commercial or have custom terms, and a few are gated. bolo never downloads a gated model without your own token.
 - **Cloud providers** are paid services under their own terms; bolo ships no keys and no prices.
 

@@ -710,7 +710,7 @@ Speech-to-speech: `s2s_model` (default `lfm3-audio-2b-llamacpp`, LFM Open Licens
 below USD 10M yearly revenue) is used only by the opt-in `speech-to-speech` Realtime pipeline
 ([voice-agents.md](voice-agents.md#pipelines-cascade-audio-in-language-model-speech-to-speech)).
 `lfm3-audio-2b-onnx` is the same model from Liquid's ONNX export, run in bolo's own process with ONNX
-Runtime (`pip install 'bolo-speech[s2s]'`, no llama-server; the same licence): name it as `s2s_model`, or use it
+Runtime (`pip install "bolo-speech[s2s]"`, no llama-server; the same licence): name it as `s2s_model`, or use it
 as a text-to-speech voice. Its files (2.7 GB) are pinned by SHA-256. On 4 shared CPU cores it generates
 speech at 0.4 to 0.5 times real time, so it wants a faster CPU or a GPU.
 
@@ -2108,7 +2108,7 @@ Ways to install it, any one of:
 | --- | --- |
 | the console (Models → Optional components, or the notice next to a voice) | asks you to accept the licence, then the same as the next row |
 | `bolo components install espeak-ng --accept-license`, or `POST /api/v1/components/espeak-ng/install` with `{"accept_license": true}` | `pip install espeakng-loader` (or `uv pip install`) into the server's own Python environment; a running server starts using it without a restart |
-| `pip install 'bolo-speech[espeak]'` | the same package, installed by you |
+| `pip install "bolo-speech[espeak]"` | the same package, installed by you |
 | `apt install espeak-ng` / `brew install espeak-ng` | the system executable |
 
 `bolo components list`, `bolo doctor` and `GET /api/v1/components` show

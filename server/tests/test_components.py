@@ -92,10 +92,10 @@ def test_component_listing_shape(live: LiveServer, no_espeak) -> None:  # type: 
     assert c["name"] == "eSpeak NG" and c["license"] == "GPL-3.0-or-later" and c["kind"] == "phonemizer"
     assert c["installed"] is False and c["source"] is None and c["version"] is None
     assert c["required_by_count"] >= 80 and c["installable"] is True and c["install_blocked_reason"] is None
-    assert c["manual_command"] == "pip install 'bolo-speech[espeak]'" and c["license_url"].startswith("https://")
+    assert c["manual_command"] == 'pip install "bolo-speech[espeak]"' and c["license_url"].startswith("https://")
     u = components["uccharan"]
     assert u["license"] == "Apache-2.0" and u["installed"] is False and u["installable"] is True
-    assert u["manual_command"] == "pip install 'bolo-speech[uccharan]'" and 60 <= u["required_by_count"] < 100
+    assert u["manual_command"] == 'pip install "bolo-speech[uccharan]"' and 60 <= u["required_by_count"] < 100
     assert {"en-us", "en-gb", "hi", "es", "de", "fr-be", "da", "pt-br", "ur", "nb"} <= set(u["languages"])
     assert len(u["languages"]) == len(phonemize.UCCHARAN_LANGUAGES) == 41
     assert httpx.get(live.url + "/api/v1/info").json()["components"] == doc["components"]
@@ -330,3 +330,31 @@ def test_cli_models_config(monkeypatch: pytest.MonkeyPatch, tmp_path, capsys: py
     assert "does not cover" in capsys.readouterr().err
     assert main(["models", "config", "piper-en-us-amy-low", "--clear"]) == 0
     assert '"settings": {}' in capsys.readouterr().out
+
+
+def test_show_names_the_phonemiser_used_here(settings: Settings, no_espeak) -> None:  # type: ignore[no-untyped-def]
+    """`bolo show` of a Piper voice: the phonemiser this installation uses for its language, not a fixed one."""
+    from bolo.cli import format_show
+
+    core = Bolo(settings)
+
+    def phonemes(model: str) -> str:
+        lines = [x.strip() for x in format_show(core.show_api(core.manager.resolve(model))).splitlines()]
+        return next(x for x in lines if x.startswith("phonemes ")).removeprefix("phonemes").strip()
+
+    no_espeak["uccharan"] = True  # uccharan only (what bolo-speech[all] installs), espeak-ng absent
+    line = phonemes("piper-en-us-amy-low")
+    assert line.startswith("uccharan, compatible mode") and "espeak" not in line
+    assert "espeak-ng" not in core.manager.resolve("piper-en-us-amy-low").description.split("else")[0]
+    assert "uccharan" in phonemes("piper-hi-in-pratham-medium")
+    russian = phonemes("piper-ru-ru-irina-medium")  # a language uccharan does not cover
+    assert russian.startswith("espeak-ng, which is not installed")
+    no_espeak["installed"] = True  # both
+    line = phonemes("piper-en-us-amy-low")
+    assert line.startswith("uccharan, compatible mode") and "also available: uccharan:improved, espeak-ng" in line
+    assert phonemes("piper-ru-ru-irina-medium").startswith("eSpeak NG")
+    no_espeak["uccharan"] = False  # espeak-ng only
+    assert phonemes("piper-en-us-amy-low").startswith("eSpeak NG")
+    core.store.set_model_settings("piper-en-us-amy-low", {"phonemizer": "uccharan"})  # pinned, not installed
+    assert phonemes("piper-en-us-amy-low").startswith("uccharan (pinned), which is not installed")
+    assert "phonemes" not in format_show(core.show_api(core.manager.resolve("fake-tts")))

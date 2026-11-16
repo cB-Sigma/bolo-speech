@@ -70,9 +70,10 @@ class FakeHost(hw.Host):
         env: dict[str, str] | None = None,
         windows_cpu: tuple[str | None, list[str] | None] = (None, None),
         adapters: list[Any] | None = None,
+        processor: str | None = None,
     ) -> None:
         super().__init__("/nonexistent-root", env or {})
-        self._windows_cpu, self._adapters = windows_cpu, adapters
+        self._windows_cpu, self._adapters, self._processor = windows_cpu, adapters, processor
         self._system, self._machine = system, machine
         self.files = files or {}
         self.commands = commands or {}
@@ -88,7 +89,7 @@ class FakeHost(hw.Host):
         return self._machine
 
     def processor(self) -> str | None:
-        return None
+        return self._processor
 
     def read(self, path: str) -> str | None:
         return self.files.get(path)
@@ -609,6 +610,50 @@ def test_benchmark_model_and_storage(tmp_path: Path) -> None:
     path.write_text("not json")
     assert hw.load_benchmark(tmp_path / "data", machine) is None
     assert hw.load_benchmark(tmp_path / "nowhere", machine) is None
+
+
+def test_a_benchmark_survives_the_windows_cpu_name_change(tmp_path: Path) -> None:
+    """bolo before 0.6 stored Windows's processor identifier as the CPU's name; 0.6 reads the marketing name. A
+    benchmark from then still counts (same processor identifier and cores); one from another CPU is not used, and
+    `bolo doctor` / `bolo recommend` say why instead of silently estimating."""
+    ident = "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD"
+
+    def windows(name: str | None, processor: str = ident, cores: int = 16) -> hw.Hardware:
+        host = FakeHost(system="windows", machine="AMD64", cores=cores, processor=processor,
+                        windows_cpu=(name, ["sse4.2", "avx", "avx2"]))  # fmt: skip
+        return hw.detect(settings(tmp_path), host)
+
+    machine = windows("AMD Ryzen 7 5800H with Radeon Graphics")
+    assert machine.cpu.model == "AMD Ryzen 7 5800H with Radeon Graphics" and machine.cpu.processor_id == ident
+    assert "processor_id" not in machine.cpu.to_dict()
+    data = tmp_path / "data"
+    old = {"version": hw.BENCHMARK_VERSION, "at": "2026-11-01T10:00:00Z", "cpu_model": ident, "threads": 4,
+           "logical_cores": 16, "usable_cores": 16.0, "workload": "onnxruntime", "ms": 2.0, "speed": 1.7}  # fmt: skip
+    hw.save_benchmark(data, old)
+    assert machine.cpu.usable_cores == 16.0
+    assert hw.benchmark_status(data, machine) == (old, None)
+    # a new benchmark records both, and still matches if the name is read differently again
+    new = hw.run_benchmark(machine, budget_s=0.05)
+    assert new["processor_id"] == ident
+    hw.save_benchmark(data, new)
+    assert hw.load_benchmark(data, windows("AMD Ryzen 7 5800H")) == new
+    # another CPU: not used, and the reason names it
+    doc, why = hw.benchmark_status(data, windows("Intel Core i7-12700H", "Intel64 Family 6 Model 154 Stepping 3"))
+    assert doc is None and why and "another CPU (AMD Ryzen 7 5800H with Radeon Graphics" in why
+    assert "bolo recommend --benchmark" in why
+    doc, why = hw.benchmark_status(data, windows("AMD Ryzen 7 5800H with Radeon Graphics", cores=8))
+    assert doc is None and why and "other cores" in why
+    # a processor identifier that only names the architecture (Linux) is not enough
+    hw.save_benchmark(data, {**old, "cpu_model": "x86_64"})
+    assert hw.load_benchmark(data, windows("Some CPU", processor="x86_64")) is None
+    assert hw.benchmark_status(tmp_path / "nowhere", machine) == (None, None)
+    # the advisor says so in the speed note (`bolo doctor`'s speed line)
+    from bolo.core import Bolo
+
+    advisor = Bolo(settings(tmp_path)).advisor
+    advisor.use_hardware(windows("Intel Core i7-12700H", "Intel64 Family 6 Model 154 Stepping 3"))
+    speed = advisor.speed()
+    assert speed.source == "heuristic" and "another CPU" in speed.note and "bolo recommend --benchmark" in speed.note
 
 
 @pytest.mark.parametrize(("threads", "expected"), [(4, 1.0), (8, 1.0), (2, 0.574), (1, 0.330)])

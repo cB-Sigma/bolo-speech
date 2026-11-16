@@ -110,8 +110,10 @@ can write (as above) and pull the models again there, or run it as your account.
 (llama-server, audio.cpp, plugin workers) is in a Job Object, so stopping the service or the task stops them too.
 
 **Firewall.** `bolo serve` listens on `127.0.0.1` by default and Windows asks nothing. With `--host 0.0.0.0`,
-Windows Defender Firewall asks the first time (or silently blocks it in a service); allow the port explicitly, and
-set `BOLO_API_KEY` before you do:
+Windows Defender Firewall asks the first time (or silently blocks it in a service). The prompt names `python.exe`
+("Python"), not `bolo.exe`: with uv, `bolo.exe` is a small launcher that starts uv's Python interpreter, and that
+is the program that listens. A rule made from the prompt is for that interpreter's path, which changes when uv
+installs another Python, so allow the port explicitly instead, and set `BOLO_API_KEY` before you do:
 
 ```powershell
 New-NetFirewallRule -DisplayName "bolo" -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow -Profile Private

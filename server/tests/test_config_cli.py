@@ -65,6 +65,34 @@ def test_config_errors(tmp_path: Path) -> None:
     assert Settings(api_key="x", hf_token="y").public_dict()["api_key"] == "***"
 
 
+def test_windows_paths_in_the_config_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A Windows path in a double-quoted TOML string: an error that names the file and says how to write it."""
+    cfg = tmp_path / "bolo.toml"
+    cfg.write_text('port = 9000\ndata_dir = "C:\\Users\\me\\bolo"\n', encoding="utf-8")
+    with pytest.raises(ValueError) as exc:
+        load_settings(cfg, env={})
+    msg = str(exc.value)
+    assert str(cfg) in msg and "line 2" in msg and "Invalid hex value" in msg
+    assert "single quotes" in msg and "data_dir = 'C:\\Users\\me\\bolo'" in msg and "forward slashes" in msg
+    assert main(["serve", "--config", str(cfg)]) == 1
+    err = capsys.readouterr().err
+    assert err.startswith(f"error: {cfg}: invalid TOML") and "single quotes" in err
+    # "C:\temp" parses (\t is a tab): caught too, not used as a path with a tab in it
+    cfg.write_text('data_dir = "C:\\temp\\bolo"\n', encoding="utf-8")
+    with pytest.raises(ValueError, match=r"control character.*single quotes"):
+        load_settings(cfg, env={})
+    # the ways that work, and a byte-order mark (Notepad)
+    cfg.write_bytes("\ufeffdata_dir = 'C:\\Users\\me\\bolo'\n".encode())
+    assert str(load_settings(cfg, env={}).data_dir) == "C:\\Users\\me\\bolo"
+    cfg.write_text('data_dir = "C:/Users/me/bolo"\n', encoding="utf-8")
+    assert load_settings(cfg, env={}).data_dir == Path("C:/Users/me/bolo")
+    # another syntax error: the file and line, without the paths hint
+    cfg.write_text("port = = 1\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="invalid TOML") as exc:
+        load_settings(cfg, env={})
+    assert "single quotes" not in str(exc.value)
+
+
 @pytest.fixture
 def cli_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("BOLO_DATA_DIR", str(tmp_path / "data"))

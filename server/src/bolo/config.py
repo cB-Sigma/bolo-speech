@@ -426,6 +426,37 @@ def _field_types() -> dict[str, Any]:
     return out
 
 
+_WINDOWS_PATHS_HINT = (
+    "In TOML a backslash in a double-quoted string starts an escape (\\U, \\t, ...): write Windows paths in "
+    "single quotes, data_dir = 'C:\\Users\\me\\bolo', or with forward slashes, data_dir = \"C:/Users/me/bolo\"."
+)
+
+
+def _read_toml(path: Path) -> dict[str, Any]:
+    """The configuration file, parsed; a syntax error names the file and the line, and an escape problem (a
+    Windows path such as "C:\\Users\\..." in double quotes) says how to write it instead."""
+    with path.open("rb") as fh:
+        raw = fh.read()
+    try:
+        doc: dict[str, Any] = tomllib.loads(raw.decode("utf-8-sig"))  # (Notepad may write a byte-order mark)
+        return doc
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"{path}: not UTF-8 text ({exc.reason}); save the configuration file as UTF-8") from None
+    except tomllib.TOMLDecodeError as exc:
+        msg = str(exc)
+        lineno = getattr(exc, "lineno", None)
+        if lineno is None:
+            import re
+
+            m = re.search(r"at line (\d+)", msg)
+            lineno = int(m.group(1)) if m else None
+        text = raw.decode("utf-8", "replace").splitlines()
+        where = f"\n  line {lineno}: {text[lineno - 1].strip()}" if lineno and 0 < lineno <= len(text) else ""
+        escape = any(k in msg.lower() for k in ("hex value", "escape", "unescaped", "\\"))
+        hint = f"\n  {_WINDOWS_PATHS_HINT}" if escape else ""
+        raise ValueError(f"{path}: invalid TOML: {msg}{where}{hint}") from None
+
+
 def load_settings(
     config_file: str | os.PathLike[str] | None = None,
     overrides: dict[str, Any] | None = None,
@@ -445,8 +476,7 @@ def load_settings(
     else:
         path = next((p for p in default_config_paths() if p.is_file()), None)
     if path is not None:
-        with path.open("rb") as fh:
-            doc = tomllib.load(fh)
+        doc = _read_toml(path)
         flat: dict[str, Any] = {}
         for key, val in doc.items():
             if key in ("providers", "telephony") and isinstance(val, dict):  # these tables stay nested
@@ -463,6 +493,12 @@ def load_settings(
             name = key.replace("-", "_")
             if name not in types:
                 raise ValueError(f"{path}: unknown setting {key!r}")
+            if types[name] is Path and isinstance(val, str) and any(c in val for c in "\b\t\n\f\r"):
+                # "C:\temp" or "C:\bolo" in a basic string: TOML reads \t as a tab, \b as a backspace
+                raise ValueError(
+                    f"{path}: {key} = {val!r} has a control character, from a backslash escape in a "
+                    f"double-quoted string. {_WINDOWS_PATHS_HINT}"
+                )
             values[name] = _coerce(name, val, types[name])
 
     # 2. environment (speaches names first so BOLO_* wins)

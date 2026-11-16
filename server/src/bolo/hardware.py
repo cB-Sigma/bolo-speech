@@ -208,6 +208,10 @@ class Cpu:
     usable_cores: float | None = None
     #: instruction sets that matter for inference speed, e.g. ["avx2", "avx512", "avx512_vnni", "amx"] or ["neon"]
     features: list[str] | None = None
+    #: the operating system's processor identifier (``platform.processor()``; on Windows "Intel64 Family 6 Model
+    #: 154 Stepping 3, GenuineIntel"): steadier than ``model``, whose source changed in bolo 0.6 on Windows.
+    #: Only for recognising a stored benchmark; not in :meth:`to_dict`
+    processor_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -511,8 +515,10 @@ def detect_cpu(host: Host) -> tuple[Cpu, bool]:
         if name:
             lowered = name.lower()
             cpu.vendor = "GenuineIntel" if "intel" in lowered else "AuthenticAMD" if "amd" in lowered else None
+    processor = host.processor()
+    cpu.processor_id = processor.strip() if processor else None
     if cpu.model is None:
-        cpu.model = host.processor()
+        cpu.model = processor
     if cpu.physical_cores is None:
         cpu.physical_cores = host.physical_cores()
     if cpu.features is None and cpu.architecture == "arm64":
@@ -1153,6 +1159,7 @@ def run_benchmark(
         "version": BENCHMARK_VERSION,
         "at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "cpu_model": hw.cpu.model,
+        "processor_id": hw.cpu.processor_id,
         "logical_cores": hw.cpu.logical_cores,
         "usable_cores": hw.cpu.usable_cores,
         "threads": threads,
@@ -1189,21 +1196,60 @@ def save_benchmark(data_dir: Path, result: dict[str, Any]) -> Path:
     return path
 
 
-def load_benchmark(data_dir: Path, hardware: Hardware | None = None) -> dict[str, Any] | None:
-    """The stored benchmark, or None when there is none, it cannot be read, or it is from another machine."""
+#: ``platform.processor()`` values that name an architecture, not a processor
+_VAGUE_PROCESSOR_IDS = {"", "x86_64", "amd64", "i386", "i686", "x86", "arm", "arm64", "aarch64", "arm64e"}
+
+
+def _same_cpu(doc: dict[str, Any], cpu: Cpu) -> bool:
+    """Whether a stored benchmark was taken on this CPU: the same name, or the same processor identifier. The
+    identifier lets a benchmark survive a change in how the name is read (bolo before 0.6 stored Windows's
+    processor identifier as the name; it now reads the marketing name from the registry)."""
+
+    def norm(value: Any) -> str:
+        return " ".join(str(value or "").split()).lower()
+
+    if norm(doc.get("cpu_model")) == norm(cpu.model) and cpu.model:
+        return True
+    ours = norm(cpu.processor_id)
+    if ours in _VAGUE_PROCESSOR_IDS:
+        return False
+    return ours in (norm(doc.get("processor_id")), norm(doc.get("cpu_model")))
+
+
+def benchmark_status(data_dir: Path, hardware: Hardware | None = None) -> tuple[dict[str, Any] | None, str | None]:
+    """``(benchmark, why_not)``: the stored benchmark when it applies to this machine; otherwise None and, when a
+    benchmark is stored but not used, why (for ``bolo doctor`` and ``bolo recommend``; None when there is none)."""
+    path = Path(data_dir) / BENCHMARK_FILE
     try:
-        doc = json.loads((Path(data_dir) / BENCHMARK_FILE).read_text(encoding="utf-8"))
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None, None
     except (OSError, ValueError):
-        return None
+        return None, f"the stored benchmark ({path}) cannot be read; run `bolo recommend --benchmark` again"
     if not isinstance(doc, dict) or doc.get("version") != BENCHMARK_VERSION:
-        return None
+        return None, "the stored benchmark is from another version of bolo; run `bolo recommend --benchmark` again"
     speed = doc.get("speed")
     if not isinstance(speed, (int, float)) or not speed > 0:
-        return None
-    if hardware is not None and (
-        doc.get("cpu_model") != hardware.cpu.model
-        or doc.get("logical_cores") != hardware.cpu.logical_cores
-        or doc.get("usable_cores") != hardware.cpu.usable_cores
-    ):
-        return None  # the data directory moved to another machine, or the container's CPU limit changed
-    return doc
+        return None, f"the stored benchmark ({path}) has no speed; run `bolo recommend --benchmark` again"
+    if hardware is not None:
+        if not _same_cpu(doc, hardware.cpu):
+            # the data directory moved to another machine, or the CPU's name is read differently now
+            return None, (
+                f"the stored benchmark was taken on another CPU ({doc.get('cpu_model') or 'unknown'}, here "
+                f"{hardware.cpu.model or 'unknown'}); run `bolo recommend --benchmark` again"
+            )
+        if (
+            doc.get("logical_cores") != hardware.cpu.logical_cores
+            or doc.get("usable_cores") != hardware.cpu.usable_cores
+        ):
+            return None, (
+                f"the stored benchmark was taken with other cores ({_num(doc.get('logical_cores'))} logical, "
+                f"{_num(doc.get('usable_cores'))} usable; here {_num(hardware.cpu.logical_cores)} and "
+                f"{_num(hardware.cpu.usable_cores)}); run `bolo recommend --benchmark` again"
+            )
+    return doc, None
+
+
+def load_benchmark(data_dir: Path, hardware: Hardware | None = None) -> dict[str, Any] | None:
+    """The stored benchmark, or None when there is none, it cannot be read, or it is from another machine."""
+    return benchmark_status(data_dir, hardware)[0]

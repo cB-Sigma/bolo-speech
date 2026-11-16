@@ -785,7 +785,10 @@ class Advisor:
         hw = self.hardware()
         with self._lock:
             if self._speed is None:
-                self._speed = speed_for(hw, hwmod.load_benchmark(self.core.settings.data_dir, hw))
+                stored, why_not = hwmod.benchmark_status(self.core.settings.data_dir, hw)
+                self._speed = speed_for(hw, stored)
+                if why_not and self._speed.source != "benchmark":  # say so, rather than silently estimate
+                    self._speed.note += f"; {why_not}"
             return self._speed
 
     def benchmark(self) -> dict[str, Any]:

@@ -6,6 +6,40 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Fixed
+
+Found on a Windows 11 laptop; the first fix applies everywhere.
+
+- `bolo rm` and `bolo cp` with a data directory (`--data-dir`, `BOLO_DATA_DIR`, the config file) other than the one
+  of the server at `--url` (`BOLO_URL`, default `http://127.0.0.1:8000`) asked that server to do it: the server
+  deleted (or copied) the model in its own store, the command printed "removed X", and the files in the CLI's data
+  directory stayed. They now go through the server only when its `data_dir` (`GET /api/v1/info`) is the CLI's
+  own, and otherwise change the CLI's data directory and say which (`note: the server at ... uses the data
+  directory A; this command changes B`). `bolo pull`, `show` and `voices` already act on the CLI's data directory.
+- A configuration file with a Windows path in double quotes (`data_dir = "C:\Users\..."`) stopped `bolo serve`
+  with only `error: Invalid hex value (at line 1, column 17)`. A TOML error now names the file and the line, and an
+  escape problem says to write the path in single quotes (`'C:\Users\...'`, a literal string) or with forward
+  slashes. A path that parsed into a control character (`"C:\temp"` holds a tab) is refused with the same advice
+  instead of being used, and a file saved with a byte-order mark (Notepad) is read.
+- `bolo doctor`'s "logs:" line spoke of journalctl and `docker logs` on every platform. On Windows it now gives the
+  log file (`%LOCALAPPDATA%\bolo\logs\server.log` with `log_file = "auto"`), `bolo logs -f` and the Task
+  Scheduler, NSSM and WinSW recipes in deploy/README.md; on macOS, launchd and `brew services`.
+- `bolo show` of a Piper voice said "phonemes come from espeak-ng" even where espeak-ng is absent and uccharan
+  phonemises it. The catalog's Piper descriptions no longer name one phonemiser, and `bolo show` has a "phonemes"
+  line with the one this installation uses for the voice's language (installed components and a pinned
+  `phonemizer` considered), and the others that are available.
+- A micro-benchmark stored before bolo read the CPU's name from the Windows registry was silently ignored (it had
+  recorded Windows's processor identifier as the name), and `bolo doctor` fell back to "estimated". A benchmark
+  now also records the processor identifier and matches on it, so such a benchmark counts again; one that is not
+  used (another CPU, other cores, another version) is named in the speed line with `run bolo recommend
+  --benchmark again`, instead of being dropped without a word.
+- Install commands in the README, the docs and `bolo components` (`manual_command`) use double quotes
+  (`uv tool install "bolo-speech[all]"`), which work in bash, zsh, PowerShell and cmd; with single quotes cmd
+  failed with "Failed to parse: `'bolo-speech[all]'`". The Windows docs also say that the firewall prompt names
+  `python.exe` (uv's interpreter), not `bolo.exe`, that Windows PowerShell 5.1 needs
+  `[Console]::OutputEncoding = [Text.Encoding]::UTF8` to pipe UTF-8 output, and that 5.1 drops the double quotes
+  inside a JSON argument to `curl.exe`.
+
 ## [0.6.1] - 2026-11-16
 
 ### Fixed

@@ -23,7 +23,7 @@
     language: hi-IN
     gender: ''
   description: 'Piper voice ''pratham'' (Hindi, hi-IN, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -78,7 +78,7 @@
     language: hi-IN
     gender: ''
   description: 'Piper voice ''priyamvada'' (Hindi, hi-IN, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -132,7 +132,7 @@
     language: hi-IN
     gender: ''
   description: 'Piper voice ''rohan'' (Hindi, hi-IN, medium quality), VITS in Piper format run by sherpa-onnx; phonemes
-    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+    from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
   measured:
@@ -182,7 +182,7 @@
   features:
   - multi-voice
   description: 'Piper voice ''google'' (Nepali, ne-NP, medium quality, 18 speakers), VITS in Piper format run by
-    sherpa-onnx; phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it
+    sherpa-onnx; phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it
     before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -232,7 +232,7 @@
   features:
   - multi-voice
   description: 'Piper voice ''google'' (Nepali, ne-NP, x_low quality, 18 speakers), VITS in Piper format run by
-    sherpa-onnx; phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it
+    sherpa-onnx; phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it
     before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -276,7 +276,7 @@
     language: ur-PK
     gender: ''
   description: 'Piper voice ''fasih'' (Urdu, ur-PK, medium quality), VITS in Piper format run by sherpa-onnx; phonemes
-    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+    from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
   measured:
@@ -330,7 +330,7 @@
     language: en-US
     gender: ''
   description: 'Piper voice ''lessac'' (English, en-US, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -386,7 +386,7 @@
     language: en-US
     gender: ''
   description: 'Piper voice ''lessac'' (English, en-US, low quality), VITS in Piper format run by sherpa-onnx; phonemes
-    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+    from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
   source:
@@ -428,7 +428,7 @@
     language: en-US
     gender: ''
   description: 'Piper voice ''amy'' (English, en-US, low quality), VITS in Piper format run by sherpa-onnx; phonemes
-    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+    from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
   measured:
@@ -483,7 +483,7 @@
     language: en-US
     gender: ''
   description: 'Piper voice ''amy'' (English, en-US, medium quality), VITS in Piper format run by sherpa-onnx; phonemes
-    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+    from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
   source:
@@ -527,7 +527,7 @@
     language: en-US
     gender: ''
   description: 'Piper voice ''ryan'' (English, en-US, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -584,7 +584,7 @@
     language: en-US
     gender: ''
   description: 'Piper voice ''ryan'' (English, en-US, high quality), VITS in Piper format run by sherpa-onnx; phonemes
-    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+    from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
   source:
@@ -628,7 +628,7 @@
     language: en-US
     gender: ''
   description: 'Piper voice ''hfc_female'' (English, en-US, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -673,7 +673,7 @@
     language: en-US
     gender: ''
   description: 'Piper voice ''hfc_male'' (English, en-US, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -714,7 +714,7 @@
   features:
   - multi-voice
   description: 'Piper voice ''libritts_r'' (English, en-US, medium quality, 904 speakers), VITS in Piper format
-    run by sherpa-onnx; phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check
+    run by sherpa-onnx; phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check
     it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -770,7 +770,7 @@
     language: en-US
     gender: ''
   description: 'Piper voice ''ljspeech'' (English, en-US, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -814,7 +814,7 @@
     language: en-US
     gender: ''
   description: 'Piper voice ''joe'' (English, en-US, medium quality), VITS in Piper format run by sherpa-onnx; phonemes
-    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+    from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
   source:
@@ -857,7 +857,7 @@
     language: en-US
     gender: ''
   description: 'Piper voice ''kristin'' (English, en-US, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -901,7 +901,7 @@
     language: en-GB
     gender: ''
   description: 'Piper voice ''alan'' (English, en-GB, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -945,7 +945,7 @@
     language: en-GB
     gender: ''
   description: 'Piper voice ''alba'' (English, en-GB, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -1001,7 +1001,7 @@
     language: en-GB
     gender: ''
   description: 'Piper voice ''cori'' (English, en-GB, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -1045,7 +1045,7 @@
     language: en-GB
     gender: ''
   description: 'Piper voice ''jenny_dioco'' (English, en-GB, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -1089,7 +1089,7 @@
     language: en-GB
     gender: ''
   description: 'Piper voice ''northern_english_male'' (English, en-GB, medium quality), VITS in Piper format run
-    by sherpa-onnx; phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check
+    by sherpa-onnx; phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check
     it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -1133,7 +1133,7 @@
     language: en-GB
     gender: ''
   description: 'Piper voice ''southern_english_female'' (English, en-GB, medium quality), VITS in Piper format run
-    by sherpa-onnx; phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check
+    by sherpa-onnx; phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check
     it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -1177,7 +1177,7 @@
     language: de-DE
     gender: ''
   description: 'Piper voice ''thorsten'' (German, de-DE, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -1231,7 +1231,7 @@
     language: de-DE
     gender: ''
   description: 'Piper voice ''thorsten'' (German, de-DE, high quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -1274,7 +1274,7 @@
     language: de-DE
     gender: ''
   description: 'Piper voice ''kerstin'' (German, de-DE, low quality), VITS in Piper format run by sherpa-onnx; phonemes
-    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+    from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
   source:
@@ -1317,7 +1317,7 @@
     language: es-ES
     gender: ''
   description: 'Piper voice ''davefx'' (Spanish, es-ES, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -1368,7 +1368,7 @@
   features:
   - multi-voice
   description: 'Piper voice ''sharvard'' (Spanish, es-ES, medium quality, 2 speakers), VITS in Piper format run
-    by sherpa-onnx; phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check
+    by sherpa-onnx; phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check
     it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -1412,7 +1412,7 @@
     language: es-MX
     gender: ''
   description: 'Piper voice ''ald'' (Spanish, es-MX, medium quality), VITS in Piper format run by sherpa-onnx; phonemes
-    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+    from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
   source:
@@ -1455,7 +1455,7 @@
     language: es-AR
     gender: ''
   description: 'Piper voice ''daniela'' (Spanish, es-AR, high quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -1499,7 +1499,7 @@
     language: fr-FR
     gender: ''
   description: 'Piper voice ''siwis'' (French, fr-FR, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -1550,7 +1550,7 @@
   features:
   - multi-voice
   description: 'Piper voice ''upmc'' (French, fr-FR, medium quality, 2 speakers), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -1594,7 +1594,7 @@
     language: fr-FR
     gender: ''
   description: 'Piper voice ''tom'' (French, fr-FR, medium quality), VITS in Piper format run by sherpa-onnx; phonemes
-    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+    from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
   source:
@@ -1637,7 +1637,7 @@
     language: it-IT
     gender: ''
   description: 'Piper voice ''paola'' (Italian, it-IT, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -1690,7 +1690,7 @@
     language: it-IT
     gender: ''
   description: 'Piper voice ''riccardo'' (Italian, it-IT, x_low quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -1734,7 +1734,7 @@
     language: pt-BR
     gender: ''
   description: 'Piper voice ''faber'' (Portuguese, pt-BR, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -1788,7 +1788,7 @@
     language: pt-PT
     gender: ''
   description: 'Piper voice ''tugao'' (Portuguese, pt-PT, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -1829,7 +1829,7 @@
   features:
   - multi-voice
   description: 'Piper voice ''mls'' (Dutch, nl-NL, medium quality, 52 speakers), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -1873,7 +1873,7 @@
     language: nl-BE
     gender: ''
   description: 'Piper voice ''nathalie'' (Dutch, nl-BE, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -1917,7 +1917,7 @@
     language: pl-PL
     gender: ''
   description: 'Piper voice ''gosia'' (Polish, pl-PL, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -1961,7 +1961,7 @@
     language: pl-PL
     gender: ''
   description: 'Piper voice ''darkman'' (Polish, pl-PL, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -2005,7 +2005,7 @@
     language: ru-RU
     gender: ''
   description: 'Piper voice ''irina'' (Russian, ru-RU, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -2059,7 +2059,7 @@
     language: ru-RU
     gender: ''
   description: 'Piper voice ''denis'' (Russian, ru-RU, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -2103,7 +2103,7 @@
     language: ru-RU
     gender: ''
   description: 'Piper voice ''dmitri'' (Russian, ru-RU, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -2148,7 +2148,7 @@
     language: ru-RU
     gender: ''
   description: 'Piper voice ''ruslan'' (Russian, ru-RU, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -2189,7 +2189,7 @@
   features:
   - multi-voice
   description: 'Piper voice ''ukrainian_tts'' (Ukrainian, uk-UA, medium quality, 3 speakers), VITS in Piper format
-    run by sherpa-onnx; phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check
+    run by sherpa-onnx; phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check
     it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -2234,7 +2234,7 @@
     language: tr-TR
     gender: ''
   description: 'Piper voice ''dfki'' (Turkish, tr-TR, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -2278,7 +2278,7 @@
     language: tr-TR
     gender: ''
   description: 'Piper voice ''fahrettin'' (Turkish, tr-TR, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -2322,7 +2322,7 @@
     language: ar-JO
     gender: ''
   description: 'Piper voice ''kareem'' (Arabic, ar-JO, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -2366,7 +2366,7 @@
     language: fa-IR
     gender: ''
   description: 'Piper voice ''amir'' (Persian, fa-IR, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -2410,7 +2410,7 @@
     language: fa-IR
     gender: ''
   description: 'Piper voice ''gyro'' (Persian, fa-IR, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -2454,7 +2454,7 @@
     language: zh-CN
     gender: ''
   description: 'Piper voice ''huayan'' (Mandarin, zh-CN, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -2508,7 +2508,7 @@
     language: vi-VN
     gender: ''
   description: 'Piper voice ''vais1000'' (Vietnamese, vi-VN, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -2552,7 +2552,7 @@
     language: id-ID
     gender: ''
   description: 'Piper voice ''news_tts'' (Indonesian, id-ID, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -2596,7 +2596,7 @@
     language: sv-SE
     gender: ''
   description: 'Piper voice ''nst'' (Swedish, sv-SE, medium quality), VITS in Piper format run by sherpa-onnx; phonemes
-    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+    from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
   source:
@@ -2639,7 +2639,7 @@
     language: da-DK
     gender: ''
   description: 'Piper voice ''talesyntese'' (Danish, da-DK, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -2683,7 +2683,7 @@
     language: no-NO
     gender: ''
   description: 'Piper voice ''talesyntese'' (Norwegian, no-NO, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -2727,7 +2727,7 @@
     language: fi-FI
     gender: ''
   description: 'Piper voice ''harri'' (Finnish, fi-FI, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -2771,7 +2771,7 @@
     language: cs-CZ
     gender: ''
   description: 'Piper voice ''jirka'' (Czech, cs-CZ, medium quality), VITS in Piper format run by sherpa-onnx; phonemes
-    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+    from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
   source:
@@ -2813,7 +2813,7 @@
     language: el-GR
     gender: ''
   description: 'Piper voice ''rapunzelina'' (Greek, el-GR, low quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -2857,7 +2857,7 @@
     language: hu-HU
     gender: ''
   description: 'Piper voice ''anna'' (Hungarian, hu-HU, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -2901,7 +2901,7 @@
     language: ro-RO
     gender: ''
   description: 'Piper voice ''mihai'' (Romanian, ro-RO, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -2945,7 +2945,7 @@
     language: sk-SK
     gender: ''
   description: 'Piper voice ''lili'' (Slovak, sk-SK, medium quality), VITS in Piper format run by sherpa-onnx; phonemes
-    come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
+    from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
   source:
@@ -2986,7 +2986,7 @@
   features:
   - multi-voice
   description: 'Piper voice ''serbski_institut'' (Serbian, sr-RS, medium quality, 2 speakers), VITS in Piper format
-    run by sherpa-onnx; phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check
+    run by sherpa-onnx; phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check
     it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -3030,7 +3030,7 @@
     language: sl-SI
     gender: ''
   description: 'Piper voice ''artur'' (Slovenian, sl-SI, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -3074,7 +3074,7 @@
     language: ca-ES
     gender: ''
   description: 'Piper voice ''upc_ona'' (Catalan, ca-ES, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -3118,7 +3118,7 @@
     language: cy-GB
     gender: ''
   description: 'Piper voice ''gwryw_gogleddol'' (Welsh, cy-GB, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -3162,7 +3162,7 @@
     language: is-IS
     gender: ''
   description: 'Piper voice ''bui'' (Icelandic, is-IS, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -3206,7 +3206,7 @@
     language: ka-GE
     gender: ''
   description: 'Piper voice ''natia'' (Georgian, ka-GE, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -3247,7 +3247,7 @@
   features:
   - multi-voice
   description: 'Piper voice ''issai'' (Kazakh, kk-KZ, high quality, 6 speakers), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -3292,7 +3292,7 @@
     language: lb-LU
     gender: ''
   description: 'Piper voice ''marylux'' (Luxembourgish, lb-LU, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -3336,7 +3336,7 @@
     language: lv-LV
     gender: ''
   description: 'Piper voice ''aivars'' (Latvian, lv-LV, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -3380,7 +3380,7 @@
     language: sw-CD
     gender: ''
   description: 'Piper voice ''lanfrica'' (Swahili, sw-CD, medium quality), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
+    phonemes from uccharan where it covers the language, else espeak-ng. The licence of a Piper voice follows its training data: check it before commercial
     use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: untested
@@ -3418,7 +3418,7 @@
   size_bytes: 62956503
   license: 'Voice: CC0-1.0 (dataset, per the voice card)'
   description: Piper voice 'chitwan' (Nepali, ne-NP, medium quality, one speaker), VITS in Piper format run by sherpa-onnx;
-    phonemes come from espeak-ng.
+    phonemes from uccharan where it covers the language, else espeak-ng.
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
   measured:
@@ -3470,7 +3470,7 @@
   size_bytes: 63521302
   license: 'Voice: CC-BY-4.0 (IndicVoices-R, per the voice card)'
   description: 'Piper voice ''padmavathi'' (Telugu, te-IN, medium quality, one speaker), taken from the Piper project
-    as published and converted for sherpa-onnx by bolo after the download; phonemes come from espeak-ng. The licence
+    as published and converted for sherpa-onnx by bolo after the download; phonemes from uccharan where it covers the language, else espeak-ng. The licence
     of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -3522,7 +3522,7 @@
   size_bytes: 63521300
   license: 'Voice: CC-BY-4.0 (IndicVoices-R, per the voice card)'
   description: 'Piper voice ''venkatesh'' (Telugu, te-IN, medium quality, one speaker), taken from the Piper project
-    as published and converted for sherpa-onnx by bolo after the download; phonemes come from espeak-ng. The licence
+    as published and converted for sherpa-onnx by bolo after the download; phonemes from uccharan where it covers the language, else espeak-ng. The licence
     of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -3574,7 +3574,7 @@
   size_bytes: 62955402
   license: 'See dataset licence: https://www.iitm.ac.in/donlab/indictts/downloads/license.pdf'
   description: 'Piper voice ''maya'' (Telugu, te-IN, medium quality, one speaker), taken from the Piper project
-    as published and converted for sherpa-onnx by bolo after the download; phonemes come from espeak-ng. The licence
+    as published and converted for sherpa-onnx by bolo after the download; phonemes from uccharan where it covers the language, else espeak-ng. The licence
     of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -3627,7 +3627,7 @@
   license: 'See dataset licence (IndicTTS Malayalam corpus; the voice card only links to it): check before commercial
     use'
   description: 'Piper voice ''arjun'' (Malayalam, ml-IN, medium quality, one speaker), taken from the Piper project
-    as published and converted for sherpa-onnx by bolo after the download; phonemes come from espeak-ng. The licence
+    as published and converted for sherpa-onnx by bolo after the download; phonemes from uccharan where it covers the language, else espeak-ng. The licence
     of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -3680,7 +3680,7 @@
   license: 'See dataset licence (IndicTTS Malayalam corpus; the voice card only links to it): check before commercial
     use'
   description: 'Piper voice ''meera'' (Malayalam, ml-IN, medium quality, one speaker), taken from the Piper project
-    as published and converted for sherpa-onnx by bolo after the download; phonemes come from espeak-ng. The licence
+    as published and converted for sherpa-onnx by bolo after the download; phonemes from uccharan where it covers the language, else espeak-ng. The licence
     of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -3734,7 +3734,7 @@
   features:
   - multi-voice
   description: 'Piper voice ''google'' (Marathi, mr-IN, medium quality, 9 speakers), taken from the Piper project
-    as published and converted for sherpa-onnx by bolo after the download; phonemes come from espeak-ng. The licence
+    as published and converted for sherpa-onnx by bolo after the download; phonemes from uccharan where it covers the language, else espeak-ng. The licence
     of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -3788,7 +3788,7 @@
   features:
   - multi-voice
   description: 'Piper voice ''google'' (Bengali, bn-BD, medium quality, 16 speakers), taken from the Piper project
-    as published and converted for sherpa-onnx by bolo after the download; phonemes come from espeak-ng. The licence
+    as published and converted for sherpa-onnx by bolo after the download; phonemes from uccharan where it covers the language, else espeak-ng. The licence
     of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -3840,7 +3840,7 @@
   size_bytes: 63521436
   license: 'Voice: MIT (per the voice card)'
   description: 'Piper voice ''aegis_female'' (Urdu, ur-PK, medium quality, one speaker), taken from the Piper project
-    as published and converted for sherpa-onnx by bolo after the download; phonemes come from espeak-ng. The licence
+    as published and converted for sherpa-onnx by bolo after the download; phonemes from uccharan where it covers the language, else espeak-ng. The licence
     of a Piper voice follows its training data: check it before commercial use.'
   source_url: https://huggingface.co/rhasspy/piper-voices
   validated: cpu
@@ -3892,7 +3892,7 @@
   size_bytes: 63518128
   license: 'Voice: CC-BY-4.0 (AI4Bharat Rasa data; third-party voice by tinisoft)'
   description: Third-party Piper voice 'rasa_female' (Tamil, ta-IN, medium quality, one speaker), converted for
-    sherpa-onnx by bolo after the download; phonemes come from espeak-ng. Not part of the Piper project's own voice
+    sherpa-onnx by bolo after the download; phonemes from uccharan where it covers the language, else espeak-ng. Not part of the Piper project's own voice
     collection.
   source_url: https://huggingface.co/tinisoft/piper-ta_IN-rasa_female-medium
   validated: cpu
@@ -3938,7 +3938,7 @@
   size_bytes: 63518126
   license: 'Voice: CC-BY-4.0 (AI4Bharat Rasa data; third-party voice by tinisoft)'
   description: Third-party Piper voice 'rasa_male' (Tamil, ta-IN, medium quality, one speaker), converted for sherpa-onnx
-    by bolo after the download; phonemes come from espeak-ng. Not part of the Piper project's own voice collection.
+    by bolo after the download; phonemes from uccharan where it covers the language, else espeak-ng. Not part of the Piper project's own voice collection.
   source_url: https://huggingface.co/tinisoft/piper-ta_IN-rasa_male-medium
   validated: cpu
   measured:

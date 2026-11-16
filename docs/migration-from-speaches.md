@@ -12,7 +12,7 @@ missing. It was written against the speaches source at commit `993994f`
 
 ```bash
 # speaches                                # bolo
-docker run -p 8000:8000 \                 pipx install 'bolo-speech[all]'   # or the container image
+docker run -p 8000:8000 \                 pipx install "bolo-speech[all]"   # or the container image
   ghcr.io/speaches-ai/speaches:latest     UVICORN_HOST=0.0.0.0 bolo serve
 ```
 
@@ -118,7 +118,7 @@ different ports.
   speaches installs the GPL `piper-tts` package, which contains espeak-ng.
   bolo does not ship espeak-ng: install it once (console button, `bolo
   components install espeak-ng --accept-license`, or `pip install
-  'bolo-speech[espeak]'`) if you use such voices. Until then they answer `424
+  "bolo-speech[espeak]"`) if you use such voices. Until then they answer `424
   component_missing`. Piper voices in uccharan's languages use uccharan
   (`bolo-speech[all]`); its word table for a language is downloaded the first
   time a voice needs it.

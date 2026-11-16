@@ -241,6 +241,35 @@ def _error_of(r: Any) -> str:
         return str(r.text)
 
 
+def _same_dir(a: str | os.PathLike[str], b: str | os.PathLike[str]) -> bool:
+    def norm(p: str | os.PathLike[str]) -> str:
+        return os.path.normcase(os.path.realpath(Path(p).expanduser()))
+
+    return norm(a) == norm(b)
+
+
+def _server_for_store(args: argparse.Namespace, data_dir: Path) -> bool:
+    """Whether the server at ``--url`` keeps its models in ``data_dir``, the data directory this command resolved
+    (``--data-dir``, ``BOLO_DATA_DIR``, the config file). Only then do ``rm`` and ``cp`` go through it: a server
+    on another data directory would change its own store, not this one. False when nothing answers; a server
+    whose /api/v1/info has no ``data_dir`` (an old one) is taken to share it."""
+    r = _server(args, "GET", "/api/v1/info")
+    if r is None or r.status_code != 200:
+        return False
+    try:
+        theirs = r.json().get("data_dir")
+    except ValueError:
+        return False
+    if theirs is None or _same_dir(theirs, data_dir):
+        return True
+    print(
+        f"note: the server at {args.url} uses the data directory {theirs}; this command changes {data_dir} "
+        "(--data-dir, BOLO_DATA_DIR or the config file), without the server",
+        file=sys.stderr,
+    )
+    return False
+
+
 def cmd_rm(args: argparse.Namespace) -> int:
     """``bolo rm <model>...``: delete a model's files (a preset: only the preset). A model the running server has
     loaded is refused unless ``--force``, which unloads it first."""
@@ -248,7 +277,7 @@ def cmd_rm(args: argparse.Namespace) -> int:
 
     core = _core(args)
     code = 0
-    ps = _server(args, "GET", "/api/v1/ps")
+    ps = _server(args, "GET", "/api/v1/ps") if _server_for_store(args, core.settings.data_dir) else None
     loaded = {m.get("name") for m in ps.json().get("models", [])} if ps is not None and ps.status_code == 200 else None
     for name in args.models:
         spec = core.catalog.resolve(name)
@@ -284,7 +313,9 @@ def cmd_rm(args: argparse.Namespace) -> int:
 
 def cmd_cp(args: argparse.Namespace) -> int:
     """``bolo cp <source> <destination>``: a preset, a new name with the source's files and its own settings."""
-    r = _server(args, "POST", "/api/v1/models/copy", {"source": args.source, "destination": args.destination})
+    r = None
+    if _server_for_store(args, Path(_settings(args).data_dir)):
+        r = _server(args, "POST", "/api/v1/models/copy", {"source": args.source, "destination": args.destination})
     if r is not None and r.status_code != 404:
         if r.status_code >= 400:
             print(f"error: {_error_of(r)}", file=sys.stderr)
@@ -353,6 +384,29 @@ def cmd_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def _phonemes_line(doc: dict[str, Any]) -> str | None:
+    """The phonemiser a voice that reads phonemes uses on this installation (what is installed, the language it
+    speaks, a pinned choice), and the other choices; None for a model that reads characters or a lexicon."""
+    options = doc.get("phonemizers") or []
+    if not options:
+        return None
+    chosen = next((o for o in options if o.get("default")), None)
+    if chosen is None:  # pinned to one that is not installed, while another is
+        pinned = (doc.get("settings") or {}).get("phonemizer")
+        return (
+            f"{pinned} (pinned), which is not installed: install it, or `bolo models config {doc['id']} --unset "
+            "phonemizer`"
+        )
+    if not chosen.get("available"):
+        line = f"{chosen['id']}, which is not installed ({chosen.get('note')})"
+    else:
+        line = str(chosen.get("note") or chosen["id"])
+    others = [str(o["id"]) for o in options if o is not chosen and o.get("available")]
+    if others:
+        line += f"; also available: {', '.join(others)} (`bolo models config {doc['id']} --phonemizer <name>`)"
+    return line
+
+
 def format_show(doc: dict[str, Any]) -> str:
     """``bolo show``: the parts of :meth:`bolo.core.Bolo.show_api` a person reads, in sections."""
     out: list[str] = []
@@ -376,7 +430,7 @@ def format_show(doc: dict[str, Any]) -> str:
         ("tier", doc.get("tier")), ("parameters", f"{doc['params']:,}" if doc.get("params") else None),
         ("sample rate", f"{doc.get('sample_rate')} Hz"), ("streaming", "yes" if doc.get("streaming") else "no"),
         ("aliases", ", ".join(doc.get("aliases") or [])), ("preset of", doc.get("preset_of")),
-        ("presets", ", ".join(doc.get("presets") or [])),
+        ("presets", ", ".join(doc.get("presets") or [])), ("phonemes", _phonemes_line(doc)),
     ])  # fmt: skip
     section("Licence", [
         ("licence", doc.get("license")), ("url", doc.get("license_url")),
@@ -1317,7 +1371,7 @@ def cmd_recommend(args: argparse.Namespace) -> int:
     for line in _hardware_lines(hw):
         print(f"  {line}")
     print(f"  {_speed_line(hw['speed'])}")
-    if hw["speed"]["source"] != "benchmark":
+    if hw["speed"]["source"] != "benchmark" and "stored benchmark" not in hw["speed"]["note"]:
         print("  (no benchmark stored: real-time factors below are rougher; run `bolo recommend --benchmark`)")
     print()
     if args.use:
@@ -1532,18 +1586,33 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 0
 
 
-def _log_where(settings: Settings) -> str:
-    """Where the server's log goes, for ``bolo doctor`` and ``bolo logs``."""
+def _log_where(settings: Settings, system: str | None = None, environ: dict[str, str] | None = None) -> str:
+    """Where the server's log goes, for ``bolo doctor`` and ``bolo logs``, in this platform's terms (``system``:
+    a ``sys.platform`` value, for tests)."""
     from bolo import logs
 
-    path = logs.resolve_log_file(settings.log_file, serving=False)
-    default = logs.default_log_path()
+    name = (system or sys.platform).lower()
+    path = logs.resolve_log_file(settings.log_file, environ=environ, serving=False, system=name)
+    default = logs.default_log_path(environ, name)
     if path is not None:
-        return f"{path} (log_file; rotated at {settings.log_max_mb} MB, {settings.log_backups} old files kept)"
+        follow = "; `bolo logs -f` follows it" if name.startswith("win") else ""
+        return f"{path} (log_file; rotated at {settings.log_max_mb} MB, {settings.log_backups} old files kept){follow}"
     found = f"; a service's log file is at {default}" if default.is_file() else ""
+    if name.startswith("win"):
+        return (
+            "standard error of `bolo serve` (the console window it runs in; a scheduled task or a service has none)"
+            f'{found}. Set log_file = "auto" (BOLO_LOG_FILE=auto) to also write {default}, which `bolo logs -f` '
+            "follows; deploy/README.md has Task Scheduler, NSSM and WinSW recipes that do"
+        )
+    if name == "darwin":
+        return (
+            "standard error of `bolo serve` (the terminal; under launchd or `brew services`, the job's "
+            f"StandardErrorPath, and bolo also writes {default} there by itself){found}. "
+            f'Set log_file = "auto" to always write {default}; `bolo logs -f` follows it'
+        )
     return (
-        "standard error of `bolo serve` (journalctl -u bolo under systemd, `docker logs` in a container)"
-        f'{found}. Set log_file = "auto" to also write {default}'
+        "standard error of `bolo serve` (journalctl -u bolo under systemd, which also gets "
+        f'{default}; `docker logs` in a container){found}. Set log_file = "auto" to also write {default}'
     )
 
 

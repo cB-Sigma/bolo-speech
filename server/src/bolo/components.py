@@ -94,7 +94,7 @@ def manual_command(component: str = ESPEAK) -> str:
         return f"pipx inject bolo-speech {package}"
     if "/uv/tools/" in prefix:
         return f"uv tool install --with {package} bolo-speech"
-    return f"pip install 'bolo-speech[{extra}]'"
+    return f'pip install "bolo-speech[{extra}]"'  # double quotes: cmd.exe does not take single ones
 
 
 class ComponentManager:

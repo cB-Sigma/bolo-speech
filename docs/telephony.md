@@ -549,7 +549,7 @@ behaves and how fast the server is, not how a real line sounds.
 For a SIP trunk or a PBX, bolo has a minimal inbound SIP endpoint.
 
 ```bash
-pip install 'bolo-speech[sip]'
+pip install "bolo-speech[sip]"
 ```
 
 ```toml

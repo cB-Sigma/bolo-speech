@@ -216,6 +216,40 @@ def test_cli_rm_refuses_a_loaded_model_unless_forced(settings: Settings, capsys:
         srv.stop()
 
 
+def test_cli_rm_and_cp_act_on_their_own_data_dir_not_the_servers(
+    settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A server on data directory A, the CLI on B: `bolo rm` and `bolo cp` change B and leave A alone."""
+    srv = LiveServer(settings)
+    install_local(srv.core)
+    srv.start()
+    try:
+        other = tmp_path / "other-data"
+        monkeypatch.setenv("BOLO_DATA_DIR", str(other))
+        monkeypatch.setenv("BOLO_URL", srv.url)
+        monkeypatch.setenv("BOLO_AUTO_PULL", "0")
+        local = Bolo(load_settings())
+        install_local(local)
+        assert cli.main(["cp", "local-voice", "my-copy"]) == 0
+        captured = capsys.readouterr()
+        assert "copied local-voice to my-copy" in captured.out and str(other) in captured.err
+        assert srv.core.catalog.resolve("my-copy") is None and Bolo(load_settings()).catalog.resolve("my-copy")
+        assert cli.main(["rm", "local-voice"]) == 0
+        captured = capsys.readouterr()
+        assert "removed local-voice" in captured.out
+        assert f"uses the data directory {settings.data_dir}" in captured.err and str(other) in captured.err
+        assert not Bolo(load_settings()).store.is_installed("local-voice")
+        assert srv.core.store.is_installed("local-voice")  # the server's store is untouched
+        # the same data directory (spelt differently): through the server, as before
+        monkeypatch.setenv("BOLO_DATA_DIR", str(settings.data_dir / ".." / "data"))
+        assert cli.main(["rm", "local-voice"]) == 0
+        captured = capsys.readouterr()
+        assert "removed local-voice" in captured.out and "note:" not in captured.err
+        assert not srv.core.store.is_installed("local-voice")
+    finally:
+        srv.stop()
+
+
 def test_ago() -> None:
     from datetime import datetime, timedelta, timezone
 
@@ -335,6 +369,22 @@ def test_cli_logs_and_doctor(
     monkeypatch.delenv("BOLO_LOG_FILE")
     assert cli.main(["doctor"]) == 0
     assert "logs: standard error of `bolo serve`" in capsys.readouterr().out
+
+
+def test_doctor_says_where_the_log_is_in_the_platforms_terms(tmp_path: Path) -> None:
+    env = {"HOME": str(tmp_path), "LOCALAPPDATA": str(tmp_path / "Local"), "XDG_STATE_HOME": str(tmp_path / "s")}
+    off = Settings(data_dir=tmp_path)
+    win = cli._log_where(off, "win32", env)
+    assert "journalctl" not in win and "docker logs" not in win
+    assert str(tmp_path / "Local" / "bolo" / "logs" / "server.log") in win and "`bolo logs -f`" in win
+    assert "deploy/README.md" in win and "NSSM" in win
+    on = cli._log_where(Settings(data_dir=tmp_path, log_file="auto"), "win32", env)
+    assert on.startswith(str(tmp_path / "Local" / "bolo" / "logs" / "server.log")) and "`bolo logs -f`" in on
+    mac = cli._log_where(off, "darwin", env)
+    assert "launchd" in mac and "brew services" in mac and "journalctl" not in mac
+    assert str(tmp_path / "Library" / "Logs" / "bolo" / "server.log") in mac
+    linux = cli._log_where(off, "linux", env)
+    assert "journalctl -u bolo" in linux and "docker logs" in linux and "NSSM" not in linux
 
 
 def test_logs_asks_the_running_server(settings: Settings, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

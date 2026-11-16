@@ -603,7 +603,7 @@ was used by name and is not a curated entry.
 | `POST /api/v1/models/{id}/load` | `200 {"id","loaded":true,"memory_bytes","load_ms","size_vram_bytes","processor","device","placement","keep_alive_s"}` (+ `notice` when the model is not all on the accelerator that was asked for). Optional body `{"keep_alive": "10m"}` or `?keep_alive=`: how long it stays loaded once idle (`-1`: until unloaded; `0`: load and unload at once, answering `"loaded": false`, Ollama's way to unload). CLI: `bolo load <id> --keep-alive 10m` (also `bolo run`) |
 | `POST /api/v1/models/{id}/unload` | `200 {"id","loaded":false,"unloaded":true\|false}` (`false`: it was not loaded). A request still using the model finishes first. CLI: `bolo stop <id>…` |
 | `GET /api/v1/ps` | loaded models, Ollama style: see "Loaded models" below. CLI: `bolo ps` |
-| `DELETE /api/v1/models/{id}` | `204`; unloads first. A preset: its entry and pinned settings go, the files stay. CLI: `bolo rm <id>…`, which refuses a model the running server has loaded unless `--force` (it unloads first) |
+| `DELETE /api/v1/models/{id}` | `204`; unloads first. A preset: its entry and pinned settings go, the files stay. CLI: `bolo rm <id>…`, which refuses a model the running server has loaded unless `--force` (it unloads first). `bolo rm` and `bolo cp` go through the server at `--url` only when its `data_dir` (`GET /api/v1/info`) is the CLI's own; otherwise they change the CLI's data directory and say so |
 | `GET /api/v1/models/{id}/show` | everything about one model, like Ollama's `/api/show`: the catalog entry plus `kind`, `source`, `options`, `path`, `files` (`[{"path","size","sha256"}]`), `modified_at`, `presets` (presets made from it), `effective` (`device`, `keep_alive_s`, `num_parallel`, `max_queue` and, for llama-server voices, `llama`: the flash attention, KV cache type, context and batch size it would start with), `speed` (`catalog`: the catalog's measurements; `server`: this server's requests, real-time factor and latency; `expected_rtf` here and its `rtf_basis`) and `loaded_placement`. `?license=true` adds `license_text`, the licence file shipped with the model (null without one). CLI: `bolo show <id>` (`--json`, `--license`) |
 | `POST /api/v1/models/copy` `{"source": "kokoro-v1.0-int8", "destination": "kokoro-fast"}` | `201` and the new entry: a **preset**, like Ollama's `/api/copy`. `kokoro-fast` uses `kokoro-v1.0-int8`'s files (nothing is copied or downloaded; pulling it pulls the source) and starts with its catalog options and pinned settings, which can then be changed for the preset alone (`PUT /api/v1/models/kokoro-fast/settings`). Kept in `<data_dir>/custom.yaml` with `preset_of`; a preset of a preset points at the model with the files. `400` when the name is taken or not a valid id (lowercase letters, digits, `.`, `_`, `-`); cloud models cannot be copied. CLI: `bolo cp <source> <destination>` |
 | `GET /api/v1/models/{id}/settings` | `{"model","settings":{…}}`: what the user pinned for that model (`{}` by default) |
@@ -1556,7 +1556,7 @@ server is exposed without an API key. A runtime is not needed for a model that
   "license_url": "https://github.com/espeak-ng/espeak-ng/blob/master/COPYING",
   "required_by_count": 82,              // catalog models that need it
   "installable": true, "install_blocked_reason": null,
-  "manual_command": "pip install 'bolo-speech[espeak]'",
+  "manual_command": "pip install \"bolo-speech[espeak]\"",
   "description": "…"}]}
 ```
 
