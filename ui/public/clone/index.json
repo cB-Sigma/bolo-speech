@@ -1,0 +1,32 @@
+[
+  {
+    "id": "syspin-en-female",
+    "title": "Indian English, female (SYSPIN)",
+    "language": "en",
+    "file": "syspin-en-female.mp3",
+    "seconds": 12.85,
+    "transcript": "Good morning, and thank you for calling. I am reading this short passage so that you can hear how my voice sounds. The weather has been pleasant all week, and we are hoping for a quiet weekend at home.",
+    "credit": "SYSPIN voice by IISc / SPIRE Lab (model MIT; SYSPIN corpus CC BY 4.0), as the bolo demo publishes it",
+    "synthetic": true
+  },
+  {
+    "id": "kokoro-am-michael",
+    "title": "American English, male (Kokoro)",
+    "language": "en",
+    "file": "kokoro-am-michael.mp3",
+    "seconds": 13.23,
+    "transcript": "Every morning I walk to the little bakery at the end of our street. The owner already knows my order, so it only takes a minute. On the way back I usually call my sister and tell her about my plans for the day.",
+    "credit": "Kokoro-82M by hexgrad (Apache-2.0), onnx-community ONNX export; phonemes by uccharan (Apache-2.0)",
+    "synthetic": true
+  },
+  {
+    "id": "syspin-hi-male",
+    "title": "Hindi, male (SYSPIN)",
+    "language": "hi",
+    "file": "syspin-hi-male.mp3",
+    "seconds": 15.43,
+    "transcript": "नमस्ते, आज मैं आपको अपने गाँव के बारे में बताना चाहता हूँ। हमारे गाँव में एक बड़ा तालाब है और उसके पास एक पुराना पेड़ है। शाम को बच्चे वहाँ खेलते हैं और बड़े लोग बातें करते हैं।",
+    "credit": "SYSPIN voice by IISc / SPIRE Lab (model MIT; SYSPIN corpus CC BY 4.0), as the bolo demo publishes it",
+    "synthetic": true
+  }
+]

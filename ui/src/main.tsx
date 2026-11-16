@@ -47,6 +47,17 @@ async function boot() {
         ])
         setLlmWorkerFactory(() => new FakeLlmWorker())
       }
+      const clone = localStorage.getItem('bolo.mock.clone')
+      if (clone) {
+        const [{ FakeCloneWorker, FakeEmbedWorker }, { setCloneWorkerFactories }] = await Promise.all([
+          import('./lib/browser-clone/fake-workers'),
+          import('./lib/browser-clone/engine'),
+        ])
+        setCloneWorkerFactories(
+          () => new FakeCloneWorker(clone),
+          () => new FakeEmbedWorker(),
+        )
+      }
     } catch {
       // storage blocked: the real diarizer
     }

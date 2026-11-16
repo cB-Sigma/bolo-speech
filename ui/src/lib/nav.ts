@@ -1,6 +1,7 @@
 import {
   Activity,
   AudioLines,
+  AudioWaveform,
   BookA,
   Boxes,
   Cloud,
@@ -134,6 +135,15 @@ export const NAV: NavItem[] = [
     short: 'Speakers',
     description: 'Who spoke when, in this browser: examples, your audio, a transcript per speaker',
     icon: Users,
+    group: 'Playground',
+    when: () => isDemo,
+  },
+  {
+    to: '/clone',
+    label: 'Clone a voice',
+    short: 'Clone',
+    description: 'Copy a voice from a short recording, in this browser: nothing is uploaded',
+    icon: AudioWaveform,
     group: 'Playground',
     when: () => isDemo,
   },
