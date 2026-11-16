@@ -56,7 +56,7 @@ from shrink import shrink  # noqa: E402
 UCCHARAN = HERE.parents[1] / "src" / "vendor" / "uccharan"
 # uccharan's transliteration packs (romanised text to native script) for the text playground: CC BY-SA 4.0,
 # from the uccharan release that matches the vendored copy, checked against these SHA-256 sums.
-XLIT_RELEASE = "https://github.com/cB-Sigma/uccharan/releases/download/v0.6.1/"
+XLIT_RELEASE = "https://github.com/cB-Sigma/uccharan/releases/download/v0.6.3/"
 XLIT = {
     "xlit-hi.ucd": "59e5dde0354e4d4c55530baedc3034d5ed7eff0a382056a1d269d012b0c9ca52",
     "xlit-mr.ucd": "623f1a488324d18819d84177f21f3a900bd47025904fb80d5f7dbda2efb4bec8",

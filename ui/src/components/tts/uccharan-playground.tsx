@@ -197,7 +197,7 @@ export function UccharanPlayground() {
         </dl>
       )}
       <p className="text-xs text-muted-foreground">
-        uccharan 0.6.1, Apache-2.0: {LANGS.length} languages and regional variants. Romanised text is turned into native
+        uccharan 0.6.3, Apache-2.0: {LANGS.length} languages and regional variants. Romanised text is turned into native
         script in {LANGS.filter((l) => l.xlit).length} of them with its transliteration packs (CC BY-SA 4.0, built from
         Dakshina, Aksharantar and other corpora; Maithili, Bhojpuri and Magahi use the Hindi pack); for the other
         languages and without a pack it falls back to its own rules.
