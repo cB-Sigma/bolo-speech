@@ -1,0 +1,26 @@
+{
+ "what": "Which ONNX graphs bolo runs are affected by ONNX Runtime's uint8 x int8 kernel on x86 CPUs with AVX2 but without VNNI (pairs of products added in 16 bits, which saturate), and whether session.x64quantprecision=1 fixes them",
+ "date": "2026-11-16",
+ "conditions": "onnxruntime 1.31.1 and sherpa-onnx 2.0.1 (Python 3.13); native: 4 vCPU x86_64 with AVX-512 VNNI and AVX-VNNI; without VNNI: qemu-x86_64 8.2 -cpu Haswell (AVX2, no VNNI) on the same machine; the catalog's files at the pinned revisions",
+ "graphs": [
+  {"engine": "smart-turn-v3 (onnx_turn)", "file": "smart-turn-v3.2-cpu.onnx", "integer_ops": "QDQ: 78 QuantizeLinear, 114 DequantizeLinear; int8 weights of 26 MatMul, 2 Conv, 3 Gemm (62 int8 and 78 uint8 initializers); ONNX Runtime fuses them into uint8 x int8 kernels",
+   "exposed": true,
+   "result": "34 windows of the bundled en-long, hi-short and en-short samples (1 s steps of 0.5 s, up to 12 s): without the option the probability moved by up to 0.572 (mean 0.123) and 4 of 34 decisions at 0.5 flipped (0.34 -> 0.68, 0.21 -> 0.76, 0.11 -> 0.53, 0.38 -> 0.96); with it, identical to native. Native with and without the option: identical."},
+  {"engine": "Nemotron-3-Diarization (nemotron)", "file": "onnx/model_quantized.onnx (+ .onnx_data)", "integer_ops": "127 MatMulNBits (bits 8, block 32, accuracy_level unset); 254 uint8 initializers; no MatMulInteger, ConvInteger, DynamicQuantizeLinear or QLinear operators",
+   "exposed": false,
+   "result": "speaker probabilities of 12 s of en-long: max difference to native 6.6e-7, with or without the option; native identical with the option"},
+  {"engine": "SNAC 24 kHz decoder (orpheus_llamacpp)", "file": "snac_24khz_decoder.onnx", "integer_ops": "none (float32)", "exposed": false, "result": "not run: no integer operators"},
+  {"engine": "LFM3-Audio-2B (s2s_onnx, precision q4, the files the catalog serves)", "file": "audio_encoder.onnx, codec_decoder.onnx, depth_decoder.onnx", "integer_ops": "none (float32)", "exposed": false, "result": "not run: no integer operators"},
+  {"engine": "LFM3-Audio-2B (s2s_onnx)", "file": "decoder_q4.onnx (+ .onnx_data, 1.7 GB)", "integer_ops": "154 MatMulNBits (126 with bits 4, 28 with bits 8; accuracy_level 4) and 1 GatherBlockQuantized; 308 uint8 initializers",
+   "exposed": "not by this kernel; the option does not touch MatMulNBits",
+   "result": "a 20-token chat prompt and 6 greedy tokens: the same text everywhere ('The capital of France is Paris'); under emulation the first logits differ from native by up to 1.12 (largest logit 20.5, correlation 0.998), identically with and without the option; native identical with the option"},
+  {"engine": "onnx_split halves", "file": "halves of the graphs above", "integer_ops": "those of the graph cut", "exposed": "as the graph cut", "result": "both halves are opened through bolo.ort_providers.create_session, so they carry the option"},
+  {"engine": "DiCoW ONNX (dicow_onnx)", "file": "encoder.int8.onnx, decoder.int8.onnx", "integer_ops": "MatMulInteger with DynamicQuantizeLinear", "exposed": true, "result": "fixed earlier: docs/measurements/dicow-onnx.json (cpu_without_vnni)"},
+  {"engine": "speaker embeddings for diarization and voice-clone similarity (sherpa-onnx)", "file": "3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx; pyannote segmentation-3.0 model.onnx", "integer_ops": "none (float32)", "exposed": false, "result": "not run: no integer operators"},
+  {"engine": "sherpa-onnx int8 models (whisper-tiny.en as the sample)", "file": "tiny.en-encoder.int8.onnx, tiny.en-decoder.int8.onnx", "integer_ops": "64 MatMulInteger, 41 DynamicQuantizeLinear; 128 int8 initializers",
+   "exposed": "in principle (uint8 x int8 MatMulInteger, in sherpa-onnx's own ONNX Runtime, which takes no session option from bolo)",
+   "result": "en-short (3 s) and en-long (first 25 s) under emulation: the same text as native, word for word"}
+ ],
+ "not_checked": "the other int8 sherpa-onnx models of the catalog (Whisper, Moonshine, Zipformer, Paraformer, NeMo, SenseVoice, Kokoro and KittenTTS int8 ...) were not run under emulation; faster-whisper quantizes with CTranslate2's own kernels, outside ONNX Runtime; the LFM3-Audio q8 graphs (not served by the catalog) were not downloaded",
+ "fix": "every session bolo opens itself sets session.x64quantprecision=1 (bolo.ort_providers.session_options, exact_int8 and create_session)"
+}

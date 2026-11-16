@@ -8,7 +8,8 @@ warning; the CPU is always last in the list, so operators a provider lacks still
 They open their sessions through :func:`create_session`, which readies CUDA's libraries first (bolo.cuda_libs) and
 then checks what the session got: ONNX Runtime falls back to the CPU on its own when a provider does not start (a
 CUDA DLL missing, say), with nothing but a line on standard error, so bolo logs it with the missing library and
-records it for the model's load (its notice, and its placement moved to the CPU).
+records it for the model's load (its notice, and its placement moved to the CPU). Every session it opens asks for
+exact int8 products on x86 CPUs without VNNI (:func:`exact_int8`).
 """
 
 from __future__ import annotations
@@ -165,12 +166,41 @@ def _name(provider: Any) -> str:
     return str(provider[0] if isinstance(provider, (tuple, list)) else provider)
 
 
+#: ONNX Runtime session option that makes int8 matrix products exact on x86 CPUs without VNNI (:func:`session_options`)
+X64_QUANT_PRECISION = "session.x64quantprecision"
+
+
+def exact_int8(options: Any) -> Any:
+    """``options`` with :data:`X64_QUANT_PRECISION` set, so int8 graphs give the same output on every x86 CPU.
+
+    Quantized graphs multiply uint8 activations by int8 weights (MatMulInteger, ConvInteger and their fused forms,
+    and the QLinear operators ONNX Runtime makes of QuantizeLinear / DequantizeLinear pairs). On x86 CPUs with AVX2
+    but without VNNI (AVX-512 VNNI or AVX-VNNI: most AMD Ryzen before Zen 4, Intel before Ice Lake / Alder Lake),
+    ONNX Runtime's uint8 x int8 kernel adds pairs of products in 16 bits, which saturate: a pair can reach
+    2 x 255 x 127 = 64770 > 32767. That emptied DiCoW's transcripts and moved the end-of-turn model's probabilities by
+    up to 0.57 on such CPUs. With this option ONNX Runtime converts the int8 weights to uint8 at load time there
+    (uint8 x uint8 has no such overflow); on CPUs with VNNI, on other architectures and for float graphs it changes
+    nothing. A stand-in without ``add_session_config_entry`` (tests) is returned as it is."""
+    add = getattr(options, "add_session_config_entry", None)
+    if add is not None:
+        add(X64_QUANT_PRECISION, "1")
+    return options
+
+
+def session_options() -> Any:
+    """New ``onnxruntime.SessionOptions`` for bolo's own sessions, with exact int8 products (:func:`exact_int8`)."""
+    import onnxruntime as ort
+
+    return exact_int8(ort.SessionOptions())
+
+
 def create_session(
     model: Any, sess_options: Any = None, providers: list[Any] | None = None, *, role: str | None = None
 ) -> Any:
     """``onnxruntime.InferenceSession(model, sess_options, providers)``, readied and checked.
 
-    Before a session that asks for CUDA, the CUDA libraries of NVIDIA's pip wheels are made loadable (once:
+    The options always ask for exact int8 products (:func:`exact_int8`; new options from :func:`session_options`
+    when none are given). Before a session that asks for CUDA, the CUDA libraries of NVIDIA's pip wheels are made loadable (once:
     :func:`bolo.cuda_libs.prepare_ort_cuda`). After it, an accelerator that was asked for and is not among the
     session's providers is a :class:`~bolo.cuda_libs.ProviderFallback`: logged once with the library ONNX Runtime
     said was missing, and recorded for the load in progress (:func:`bolo.cuda_libs.watch`)."""
@@ -178,6 +208,7 @@ def create_session(
 
     from bolo import cuda_libs
 
+    sess_options = session_options() if sess_options is None else exact_int8(sess_options)
     chosen = list(providers or [CPU])
     asked = [n for n in (_name(p) for p in chosen) if n != CPU]
     if not asked:

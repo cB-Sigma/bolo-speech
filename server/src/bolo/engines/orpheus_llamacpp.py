@@ -57,7 +57,7 @@ import numpy as np
 
 from bolo.engines.base import FloatArray, LoadOptions, SynthesisExtras, TTSModel, Voice
 from bolo.errors import ComponentMissing, EngineUnavailable, InvalidRequest
-from bolo.ort_providers import create_session, providers_for
+from bolo.ort_providers import create_session, providers_for, session_options
 
 if TYPE_CHECKING:
     from bolo.engines.tts_server import ServerProcess, TTSServerEngine
@@ -161,13 +161,13 @@ class SnacDecoder:
 
 def open_session(path: Path, threads: int, device: str = "cpu") -> OrtSession:
     try:
-        import onnxruntime as ort
+        import onnxruntime  # noqa: F401
     except ImportError as exc:
         raise ComponentMissing(
             "the Orpheus route decodes audio with onnxruntime, which is not installed: pip install onnxruntime "
             '(or pip install "bolo-speech[orpheus]")'
         ) from exc
-    opts = ort.SessionOptions()
+    opts = session_options()
     opts.intra_op_num_threads = max(1, threads)
     opts.inter_op_num_threads = 1
     opts.log_severity_level = 3

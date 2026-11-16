@@ -76,7 +76,7 @@ import numpy.typing as npt
 
 from bolo.engines.base import FloatArray, LoadOptions, SynthesisExtras, TTSModel, Voice
 from bolo.errors import ComponentMissing, EngineUnavailable
-from bolo.ort_providers import create_session, providers_for
+from bolo.ort_providers import create_session, providers_for, session_options
 from bolo.s2s import (
     AudioDelta,
     ResponseEnd,
@@ -380,7 +380,7 @@ class OnnxGraphs:
         graph_split: dict[str, int] | None = None,
     ) -> None:
         try:
-            import onnxruntime as ort
+            import onnxruntime  # noqa: F401
         except ImportError as exc:
             raise ComponentMissing(f"LFM3-Audio in ONNX needs onnxruntime: {INSTALL_HINT}") from exc
         if precision not in PRECISIONS:
@@ -401,7 +401,7 @@ class OnnxGraphs:
             return create_session(str(onnx_dir / name), options_for(n_threads), list(chosen), role=role)
 
         def options_for(n_threads: int) -> Any:
-            options = ort.SessionOptions()
+            options = session_options()
             options.intra_op_num_threads = max(1, n_threads)
             options.inter_op_num_threads = 1
             if not spinning:

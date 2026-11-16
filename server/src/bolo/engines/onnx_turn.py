@@ -20,7 +20,7 @@ from typing import Any
 import numpy as np
 
 from bolo.engines.base import Engine, EngineStatus, FloatArray, LoadOptions, Model, TurnModel
-from bolo.ort_providers import CPU, create_session, providers_for
+from bolo.ort_providers import CPU, create_session, providers_for, session_options
 from bolo.placement import CPU_ONLY_ON
 
 log = logging.getLogger(__name__)
@@ -75,9 +75,7 @@ class SmartTurn(TurnModel):
         self._lock = threading.Lock()
 
     def _options(self) -> Any:
-        import onnxruntime as ort
-
-        options = ort.SessionOptions()
+        options = session_options()
         options.intra_op_num_threads = self._threads
         options.inter_op_num_threads = 1
         return options

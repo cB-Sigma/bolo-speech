@@ -32,7 +32,7 @@ import numpy as np
 
 from bolo.audio.features import NEMO_MELS, NemoLogMel
 from bolo.engines.base import DiarizationModel, DiarizationResult, FloatArray, LoadOptions, SpeakerActivity, SpeakerTurn
-from bolo.ort_providers import create_session, providers_for
+from bolo.ort_providers import create_session, providers_for, session_options
 
 FRAME_S = 0.01  # one output frame per 10 ms mel frame
 SUBSAMPLING = 8  # mel frames per encoder frame
@@ -180,7 +180,7 @@ class _OnnxStep:
         from bolo.onnx_split import make_session
 
         def options() -> Any:
-            o = ort.SessionOptions()
+            o = session_options()
             o.intra_op_num_threads = max(1, threads)
             o.inter_op_num_threads = 1
             o.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL

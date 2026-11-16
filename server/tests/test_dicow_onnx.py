@@ -16,6 +16,7 @@ from bolo.custom import choose_files, detect_kind, register_local_model
 from bolo.diarize import DiarizeOptions, conditioning_activity
 from bolo.engines import dicow_onnx as d
 from bolo.engines.base import LoadOptions, SpeakerActivity, SpeakerRequest, SpeakerTurn, STTRequest
+from bolo.ort_providers import X64_QUANT_PRECISION
 from bolo.store import RemoteFile
 
 SR = 16000
@@ -347,7 +348,7 @@ def test_load_options_reach_the_model(tmp_path: Path, monkeypatch: pytest.Monkey
 def test_sessions_ask_for_exact_int8_products_on_cpus_without_vnni() -> None:
     pytest.importorskip("onnxruntime")
     options = d.session_options(3)
-    assert options.get_session_config_entry(d.X64_QUANT_PRECISION) == "1"
+    assert options.get_session_config_entry(X64_QUANT_PRECISION) == "1"
     assert options.intra_op_num_threads == 3 and options.inter_op_num_threads == 1
 
 
@@ -361,7 +362,7 @@ def test_onnx_network_builds_both_sessions_with_those_options(tmp_path: Path, mo
 
     class Session:
         def __init__(self, path: str, sess_options: Any, providers: Any) -> None:
-            seen.append(sess_options.get_session_config_entry(d.X64_QUANT_PRECISION))
+            seen.append(sess_options.get_session_config_entry(X64_QUANT_PRECISION))
 
         def get_inputs(self) -> list[Input]:
             cache = [4, "batch", 20, "length", 64]

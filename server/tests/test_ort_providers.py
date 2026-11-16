@@ -110,3 +110,46 @@ def test_dml_without_a_number_runs_on_the_high_performance_adapter(monkeypatch: 
     assert providers_for("dml:0", [dml, CPU]) == [(dml, {"device_id": 0}), CPU]
     monkeypatch.setattr(ort_providers, "default_dml_index", lambda: None)  # not Windows, or no adapter
     assert providers_for("dml", [dml, CPU]) == [dml, CPU]
+
+
+def test_every_engine_session_asks_for_exact_int8_products(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """On x86 CPUs with AVX2 but without VNNI, ONNX Runtime's uint8 x int8 kernel saturates (the end-of-turn model's
+    probabilities moved by up to 0.57, DiCoW lost all its text): every session bolo opens itself carries
+    ``session.x64quantprecision``, whichever engine builds its options."""
+    ort = pytest.importorskip("onnxruntime")
+
+    seen: list[str] = []
+
+    class Built(Exception):
+        pass
+
+    class FakeSession:
+        def __init__(self, path: str, sess_options: Any = None, providers: Any = None, **kwargs: Any) -> None:
+            seen.append(sess_options.get_session_config_entry(ort_providers.X64_QUANT_PRECISION))
+            raise Built  # stop here: the rest of each constructor needs a real graph
+
+    monkeypatch.setattr(ort, "InferenceSession", FakeSession)
+    model = tmp_path / "m.onnx"
+    model.write_bytes(b"")
+    onnx_dir = tmp_path / "lfm" / "onnx"
+    onnx_dir.mkdir(parents=True)
+    for name in ("decoder_q4.onnx", "audio_encoder.onnx", "codec_decoder.onnx", "depth_decoder.onnx"):
+        (onnx_dir / name).write_bytes(b"")
+
+    from bolo import s2s_onnx
+    from bolo.engines import dicow_onnx, nemotron, onnx_turn, orpheus_llamacpp
+    from bolo.engines.base import LoadOptions
+
+    builds = [
+        lambda: nemotron._OnnxStep(str(model), 1),
+        lambda: orpheus_llamacpp.open_session(model, 1),
+        lambda: dicow_onnx.OnnxNetwork(model, model, 1),
+        lambda: onnx_turn.SmartTurn(tmp_path, {}, LoadOptions()),
+        lambda: s2s_onnx.OnnxGraphs(tmp_path / "lfm"),
+        lambda: ort_providers.create_session(str(model)),  # no options given
+        lambda: ort_providers.create_session(str(model), ort.SessionOptions()),  # options made elsewhere
+    ]
+    for build in builds:
+        with pytest.raises(Built):
+            build()
+    assert seen == ["1"] * len(builds)

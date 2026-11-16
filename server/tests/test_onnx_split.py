@@ -227,13 +227,14 @@ def test_providers_reach_each_half(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     real = ort.InferenceSession
 
     def recording(p: str, sess_options: Any = None, providers: Any = None, **kw: Any) -> Any:
-        seen.append((Path(p).name, providers))
+        seen.append((Path(p).name, providers, sess_options.get_session_config_entry("session.x64quantprecision")))
         return real(p, sess_options=sess_options, providers=CPU)  # this machine only has the CPU
 
     monkeypatch.setattr(ort, "InferenceSession", recording)
     gpu = [("CUDAExecutionProvider", {"device_id": 0}), "CPUExecutionProvider"]
+    # options made without bolo.ort_providers: both halves still ask for exact int8 products
     make_session(path, gpu, ort.SessionOptions, split_budget=2 * layer_bytes() + D * 4)
-    assert seen == [("front.onnx", gpu), ("back.onnx", ["CPUExecutionProvider"])]
+    assert seen == [("front.onnx", gpu, "1"), ("back.onnx", ["CPUExecutionProvider"], "1")]
 
 
 REAL = {"smart-turn-v3": "*.onnx", "nemotron-3-diarization": "onnx/*.onnx"}

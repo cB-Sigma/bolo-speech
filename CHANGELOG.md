@@ -55,6 +55,20 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- **The end-of-turn model (`smart-turn-v3`, `semantic_vad`) gave wrong probabilities on x86 CPUs without VNNI**
+  (AVX2 only: AMD Ryzen before Zen 4, Intel before Ice Lake / Alder Lake), the same ONNX Runtime kernel that emptied
+  DiCoW's transcripts: its int8 graph (QuantizeLinear / DequantizeLinear pairs, which ONNX Runtime fuses into uint8 x
+  int8 kernels) saturates there. Under emulation of such a CPU, on 34 windows of the bundled samples, the
+  probability moved by up to 0.57 (mean 0.12) and 4 of the 34 end-of-turn decisions at 0.5 flipped; with the fix it
+  matches the native result exactly. Every ONNX Runtime session bolo opens itself (Nemotron diarization, DiCoW, the
+  SNAC decoder, smart-turn, in-process LFM3-Audio and the halves of split graphs) now sets
+  `session.x64quantprecision` through `bolo.ort_providers` (`session_options`, and `create_session` for options made
+  elsewhere). The other graphs were checked and were not affected (SNAC, the LFM3-Audio encoder, codec and depth
+  decoder are float; Nemotron and the LFM3-Audio decoder use MatMulNBits, which the option does not touch: under
+  emulation Nemotron's probabilities matched to 7e-7 and LFM3-Audio's greedy text was the same); on a CPU with VNNI
+  every output is identical with the option. sherpa-onnx brings its own ONNX Runtime and takes no
+  session option from bolo; docs/measurements/int8-without-vnni.json records what its int8 models do on such CPUs.
+  New unit test: every engine's session carries the option.
 - `bolo components install llama-server` / `audio.cpp` with a GPU `device` that has no prebuilt build on this
   platform (CUDA on Linux, where neither project publishes one) installed the CPU build and reported a plain install.
   It now says that the CPU build is what runs, and names the way to the GPU (the Vulkan build, or a build of your own

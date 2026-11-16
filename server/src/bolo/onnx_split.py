@@ -483,7 +483,6 @@ def open_split(
 ) -> SplitSession:
     """Split ``path`` (or reuse its cached halves) and open both halves."""
     import onnx
-    import onnxruntime as ort
 
     front_path, back_path, cut = split_model(path, front_budget, cache_root)
     whole = onnx.load(str(path), load_external_data=False)
@@ -492,9 +491,10 @@ def open_split(
     outputs = [o.name for o in whole.graph.output]
 
     def opts() -> Any:
-        return session_options() if session_options else ort.SessionOptions()
+        return session_options() if session_options else default_options()
 
     from bolo.ort_providers import create_session
+    from bolo.ort_providers import session_options as default_options
 
     front = create_session(str(front_path), opts(), front_providers)
     back = create_session(str(back_path), opts(), back_providers or ["CPUExecutionProvider"])
