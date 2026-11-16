@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
@@ -13,7 +14,23 @@ import { expect, test, type Page } from '@playwright/test'
 const MIRROR = Boolean(process.env.BOLO_E2E_MODEL_DIR)
 const CDN = 'http://127.0.0.1:4175'
 
+const UCCHARAN_DATA = path.resolve(import.meta.dirname, '../src/vendor/uccharan/data')
+
+/**
+ * uccharan's language data, as the Pages build publishes it under voices/uccharan/ (CI has no voices). On the
+ * context: the page's service worker (cross-origin isolation) makes the fetches.
+ */
+async function serveUccharanData(page: Page) {
+  await page.context().route('**/voices/uccharan/*.ucd', (route) => {
+    const file = path.join(UCCHARAN_DATA, path.basename(new URL(route.request().url()).pathname))
+    return existsSync(file)
+      ? route.fulfill({ body: readFileSync(file), contentType: 'application/octet-stream' })
+      : route.fulfill({ status: 404, body: 'not found' })
+  })
+}
+
 async function open(page: Page, opts: { fake?: string | null; theme?: 'dark' | 'light' } = {}) {
+  await serveUccharanData(page)
   await page.addInitScript(
     ([theme, cdn, fake]) => {
       localStorage.setItem('bolo.theme', theme as string)
@@ -211,6 +228,74 @@ test.describe('clone a voice in the page', () => {
     await box.fill('')
     await page.getByTestId('clone-example-syspin-en-female').click()
     await expect(box).toHaveValue(/^Thanks for calling/)
+  })
+
+  test('numbers are written out in words before the model reads them, and shown; not where uccharan has no normaliser', async ({
+    page,
+  }) => {
+    // The service worker precaches the whole bundle (uccharan's module included) in the background; the page
+    // itself asks for uccharan, and the service worker for its language data, only when a clip is generated.
+    const uccharanRequests: string[] = []
+    page.on('request', (r) => {
+      if (/uccharan/i.test(r.url())) uccharanRequests.push(r.url())
+    })
+    page.context().on('request', (r) => {
+      if (r.url().endsWith('.ucd')) uccharanRequests.push(r.url())
+    })
+    await open(page)
+    await expect(page.getByTestId('clone-numbers')).toContainText('written out in words by uccharan')
+    await page.getByTestId('clone-example-kokoro-am-michael').click()
+    await expect(page.getByTestId('clone-chosen')).toBeVisible()
+    expect(uccharanRequests).toEqual([])
+    await page.getByTestId('clone-text').fill('Your table for 4 is booked at 10:30 on 3 May; the deposit is $25.')
+    await page.getByTestId('clone-generate').click()
+    await expect(page.getByTestId('clone-output')).toBeVisible()
+    const spoken = 'Your table for four is booked at ten thirty on three May; the deposit is twenty five dollars.'
+    await expect(page.getByTestId('clone-spoken')).toContainText(`Spoken as: “${spoken}”`)
+    expect(await page.evaluate(() => (globalThis as { __boloCloneTexts?: string[] }).__boloCloneTexts)).toEqual([
+      spoken,
+    ])
+    expect(uccharanRequests.some((u) => u.endsWith('/voices/uccharan/en-us.ucd'))).toBe(true)
+    expect(uccharanRequests.some((u) => /\/voices\/uccharan\/(?!en-us)/.test(u))).toBe(false)
+    // German: its own word table (and the English one, for English words in German text).
+    await page.getByTestId('clone-model-select').click()
+    await page.getByTestId('clone-model-moss-tts-nano').click()
+    await expect(page.getByTestId('clone-numbers')).toContainText('Chinese they go to the model as written')
+    await page.getByTestId('clone-language').click()
+    await page.getByRole('option', { name: 'German' }).click()
+    await page.getByTestId('clone-text').fill('Ihr Termin am 3. Mai um 10:30 Uhr kostet 25 €.')
+    await page.getByTestId('clone-generate').click()
+    await expect(page.getByTestId('clone-spoken')).toHaveAttribute(
+      'data-spoken',
+      'Ihr Termin am dritten Mai um zehn dreißig Uhr kostet fünfundzwanzig Euro.',
+    )
+    expect(uccharanRequests.some((u) => u.endsWith('/voices/uccharan/de.ucd'))).toBe(true)
+    // Chinese: no normaliser, the digits go as written and the page says so.
+    await page.getByTestId('clone-language').click()
+    await page.getByRole('option', { name: 'Chinese' }).click()
+    await page.getByTestId('clone-text').fill('会议在10点30分开始。')
+    await page.getByTestId('clone-generate').click()
+    await expect(page.getByTestId('clone-spoken')).toHaveAttribute('data-skipped', 'language')
+    await expect(page.getByTestId('clone-spoken')).toContainText('no normaliser for Chinese')
+    expect(await page.evaluate(() => (globalThis as { __boloCloneTexts?: string[] }).__boloCloneTexts?.at(-1))).toBe(
+      '会议在10点30分开始。',
+    )
+    // Heard back: scored in words on both sides.
+    await page.getByTestId('clone-check').click()
+    await expect(page.getByTestId('clone-roundtrip')).toHaveAttribute('data-wer', /\d/)
+  })
+
+  test('if the language data cannot be fetched, the text goes as written and the page says so', async ({ page }) => {
+    await open(page)
+    await page.context().route('**/voices/uccharan/*.ucd', (route) => route.fulfill({ status: 404, body: 'not found' }))
+    await page.getByTestId('clone-example-kokoro-am-michael').click()
+    await page.getByTestId('clone-text').fill('See you at 10:30.')
+    await page.getByTestId('clone-generate').click()
+    await expect(page.getByTestId('clone-spoken')).toHaveAttribute('data-skipped', 'failed')
+    await expect(page.getByTestId('clone-spoken')).toContainText('went to the model as written')
+    expect(await page.evaluate(() => (globalThis as { __boloCloneTexts?: string[] }).__boloCloneTexts?.at(-1))).toBe(
+      'See you at 10:30.',
+    )
   })
 
   test('out of memory: unloads the rest and retries on one CPU thread', async ({ page }) => {

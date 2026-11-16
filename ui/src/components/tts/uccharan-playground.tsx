@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { voicesBase } from '@/lib/browser-tts/voices'
-import type * as Uccharan from '@/vendor/uccharan/index.js'
+import { loadUccharan } from '@/lib/uccharan'
 
 /**
  * Every language uccharan reads, with its code. Romanised input is turned into
@@ -71,16 +71,8 @@ interface Result {
   ms: number
 }
 
-let loaded: Promise<typeof Uccharan> | null = null
 const packs = new Set<string>()
-
-async function lib(): Promise<typeof Uccharan> {
-  loaded ??= import('@/vendor/uccharan/index.js').then(async (m) => {
-    await m.init({ dataBaseUrl: `${voicesBase()}uccharan/` })
-    return m
-  })
-  return loaded
-}
+const lib = loadUccharan
 
 /**
  * The text front end the Piper and Kokoro voices use, on its own: romanised

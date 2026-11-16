@@ -69,6 +69,7 @@ import {
   VERDICT_WORDS,
   verdictFor as similarityVerdict,
 } from '@/lib/browser-clone/similarity'
+import { hasNumbers, numbersFact, spokenText, type Spoken } from '@/lib/browser-clone/spoken'
 import { wordErrorRate } from '@/lib/browser-clone/text'
 import { recogniserFor } from '@/lib/browser-diarize/examples'
 import { isPhoneLike } from '@/lib/browser-runtime'
@@ -93,7 +94,11 @@ interface Reference {
 
 interface Output {
   result: GenerateResult
+  /** What was typed. */
   text: string
+  /** What the model was given: the text with numbers written out, where uccharan reads the language. */
+  spoken: Spoken
+  language: string
   model: CloneModel
   url: string
   similarity: { score: number; ms: number } | 'busy' | { error: string } | null
@@ -200,6 +205,7 @@ export default function CloneBrowserPage() {
   const [output, setOutput] = useState<Output | null>(null)
   const [scoreAuto, setScoreAuto] = useState(() => !isPhoneLike())
   const [risk, setRisk] = useState(false)
+  const [preparing, setPreparing] = useState(false)
   const playerRef = useRef<GaplessPlayer | null>(null)
   const model = s.model
   const verdict = verdictFor(needsFor(model), d)
@@ -370,13 +376,14 @@ export default function CloneBrowserPage() {
   const roundTrip = async (out: Output) => {
     setOutput((o) => (o && o.url === out.url ? { ...o, roundTrip: 'busy' } : o))
     try {
-      const heard = await transcribe(out.result.audio, textLanguage)
+      const heard = await transcribe(out.result.audio, out.language)
       const engineModel = browserModel(sharedEngine().store.get().model.id).label
-      setOutput((o) =>
-        o && o.url === out.url
-          ? { ...o, roundTrip: { text: heard, wer: wordErrorRate(out.text, heard), model: engineModel } }
-          : o,
-      )
+      // Scored in words on both sides: what the model was given against what was heard, written out the same
+      // way (a recogniser writes "ten thirty" as "10:30").
+      const wer = out.spoken.tag
+        ? wordErrorRate(out.spoken.text, (await spokenText(heard, out.language)).text)
+        : wordErrorRate(out.text, heard)
+      setOutput((o) => (o && o.url === out.url ? { ...o, roundTrip: { text: heard, wer, model: engineModel } } : o))
     } catch (err) {
       toast.error('Could not transcribe the result', { description: err instanceof Error ? err.message : String(err) })
       setOutput((o) => (o && o.url === out.url ? { ...o, roundTrip: null } : o))
@@ -394,19 +401,23 @@ export default function CloneBrowserPage() {
     playerRef.current = player
     if (output) URL.revokeObjectURL(output.url)
     setOutput(null)
+    const typed = text.trim()
+    const language = textLanguage
+    setPreparing(true)
+    const spoken = await spokenText(typed, language).finally(() => setPreparing(false))
     try {
       const result = await cloner.generate(
         ref.key,
         ref.audio,
-        text.trim(),
-        { language: textLanguage, temperature: 0.7, lsdSteps: 1, exaggeration: 0.5 },
+        spoken.text,
+        { language, temperature: 0.7, lsdSteps: 1, exaggeration: 0.5 },
         (a) => player.enqueue(a, CLONE_RATE),
       )
       player.end()
       const url = URL.createObjectURL(
         new Blob([encodeWav(result.audio, CLONE_RATE) as BlobPart], { type: 'audio/wav' }),
       )
-      const out: Output = { result, text: text.trim(), model, url, similarity: null, roundTrip: null }
+      const out: Output = { result, text: typed, spoken, language, model, url, similarity: null, roundTrip: null }
       setOutput(out)
       if (scoreAuto && result.audio.length > CLONE_RATE * 0.5) void score(out, ref)
     } catch (err) {
@@ -417,7 +428,7 @@ export default function CloneBrowserPage() {
   }
 
   const grouped = useMemo(() => CLONE_GROUPS.map((g) => ({ g, models: CLONE_MODELS.filter((m) => m.group === g) })), [])
-  const busy = s.busy || s.status === 'loading'
+  const busy = s.busy || s.status === 'loading' || preparing
   const canUseOwn = consent
 
   return (
@@ -681,15 +692,17 @@ export default function CloneBrowserPage() {
                 {!ref && <span className="text-xs text-muted-foreground">Choose a voice first.</span>}
               </div>
               <p className="text-xs text-muted-foreground" data-testid="clone-status" aria-live="polite">
-                {s.status === 'loading'
-                  ? `Loading ${model.label}: ${s.stage ?? 'downloading'} · ${Math.round(100 * s.progress)}%`
-                  : s.busy
-                    ? 'Generating…'
-                    : s.status === 'ready'
-                      ? `${model.label} ready on ${s.device === 'webgpu' ? 'WebGPU' : 'the CPU'} (loaded in ${((s.loadMs ?? 0) / 1000).toFixed(1)} s)`
-                      : s.status === 'error'
-                        ? `Could not load: ${s.error}`
-                        : `${model.label} downloads on first use (${fmtBytes(model.bytes)}).`}
+                {preparing
+                  ? 'Writing the numbers out…'
+                  : s.status === 'loading'
+                    ? `Loading ${model.label}: ${s.stage ?? 'downloading'} · ${Math.round(100 * s.progress)}%`
+                    : s.busy
+                      ? 'Generating…'
+                      : s.status === 'ready'
+                        ? `${model.label} ready on ${s.device === 'webgpu' ? 'WebGPU' : 'the CPU'} (loaded in ${((s.loadMs ?? 0) / 1000).toFixed(1)} s)`
+                        : s.status === 'error'
+                          ? `Could not load: ${s.error}`
+                          : `${model.label} downloads on first use (${fmtBytes(model.bytes)}).`}
               </p>
               {s.status === 'error' && s.outOfMemory && (
                 <Alert variant="destructive" data-testid="clone-oom">
@@ -704,6 +717,7 @@ export default function CloneBrowserPage() {
               {output && (
                 <div className="grid gap-2 rounded-lg border border-border p-3" data-testid="clone-output">
                   <audio controls src={output.url} className="h-8 w-full" aria-label="The generated speech" />
+                  <SpokenView output={output} />
                   <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4" data-testid="clone-metrics">
                     <div>
                       <dt className="text-muted-foreground">First audio</dt>
@@ -816,6 +830,9 @@ export default function CloneBrowserPage() {
                   {model.licenseNote ? ` · ${model.licenseNote}` : ''}
                 </Fact>
                 <Fact k="Languages">{model.languages.map((l) => LANGUAGE_NAMES[l] ?? l).join(', ')}</Fact>
+                <Fact k="Numbers">
+                  <span data-testid="clone-numbers">{numbersFact(model.languages)}</span>
+                </Fact>
                 <Fact k="Needs">
                   {model.needs ??
                     (model.prefersWebGpu
@@ -897,6 +914,30 @@ export default function CloneBrowserPage() {
         }}
       />
     </Page>
+  )
+}
+
+/** What the model was given, when it differs from what was typed. */
+function SpokenView({ output }: { output: Output }) {
+  const { spoken, text, language } = output
+  const name = LANGUAGE_NAMES[language] ?? language
+  if (spoken.skipped === 'failed')
+    return (
+      <p className="text-[11px] text-warning-text" data-testid="clone-spoken" data-skipped="failed">
+        Could not write the numbers out ({spoken.error}): the text went to the model as written.
+      </p>
+    )
+  if (spoken.skipped === 'language')
+    return hasNumbers(text) ? (
+      <p className="text-[11px] text-muted-foreground" data-testid="clone-spoken" data-skipped="language">
+        Numbers went to the model as written: uccharan has no normaliser for {name}.
+      </p>
+    ) : null
+  if (spoken.text === text) return null
+  return (
+    <p className="text-[11px] text-muted-foreground" data-testid="clone-spoken" data-spoken={spoken.text}>
+      <span className="font-medium">Spoken as:</span> “{spoken.text}”
+    </p>
   )
 }
 

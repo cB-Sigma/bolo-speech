@@ -251,7 +251,7 @@ export const CLONE_MODELS: CloneModel[] = [
       'a laptop or desktop with memory to spare (about 2.5 GB); on four CPU cores it takes 1.1 to 1.2 s per second of speech in Chromium, so long text may pause now and then',
     source: 'https://huggingface.co/OpenMOSS-Team/MOSS-TTS-Nano',
     blurb:
-      'OpenMOSS’s 100M-parameter model in full precision with its 48 kHz codec (played here at 24 kHz, like the other models): closer to the voice than Pocket TTS, and plays as it goes. Numbers are read as written: the reference’s number-to-words step (WeTextProcessing) has no browser version.',
+      'OpenMOSS’s 100M-parameter model in full precision with its 48 kHz codec (played here at 24 kHz, like the other models): closer to the voice than Pocket TTS, and plays as it goes. Its own number-to-words step (WeTextProcessing, Python) has no browser version, so this page writes numbers out with uccharan first, in the languages uccharan reads (see Numbers).',
   },
 ]
 

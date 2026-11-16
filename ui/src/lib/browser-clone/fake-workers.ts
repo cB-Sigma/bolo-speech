@@ -68,6 +68,9 @@ export class FakeCloneWorker implements WorkerLike<CloneWorkerRequest, CloneWork
     } else if (req.type === 'cancel') {
       this.cancelled.add(req.id)
     } else {
+      // The texts the "model" was given, for the tests to read.
+      const seen = globalThis as { __boloCloneTexts?: string[] }
+      ;(seen.__boloCloneTexts ??= []).push(req.text)
       const seconds = Math.min(4, 0.5 + req.text.length / 30)
       const n = Math.round(seconds * CLONE_RATE)
       const f = 120 + 400 * Math.min(1, this.level * 4)
