@@ -320,6 +320,17 @@ class HubClient:
         return files
 
 
+def _file_stamp(path: Path) -> tuple[int, int, int] | None:
+    """What a cached copy of ``path`` is checked against: its mtime, size and file id (``None`` if it is missing).
+    The mtime alone can stay the same across a rewrite on a coarse clock; the size and file id (a new file for
+    every ``os.replace``) catch most such rewrites by another process, and our own writes refresh the cache."""
+    try:
+        st = path.stat()
+    except OSError:
+        return None
+    return (st.st_mtime_ns, st.st_size, st.st_ino)
+
+
 class ModelStore:
     def __init__(self, data_dir: Path, hub: HubClient | None = None) -> None:
         self.data_dir = Path(data_dir)
@@ -331,6 +342,8 @@ class ModelStore:
         self._guard = threading.Lock()
         #: presets (``bolo cp``): preset id -> the model whose files it uses
         self.links: dict[str, str] = {}
+        #: model-settings.json as last read or written, keyed by the file's stamp (see ``_file_stamp``)
+        self._settings_cache: tuple[tuple[int, int, int] | None, dict[str, Any]] | None = None
 
     # -- per-model settings chosen by the user (model-settings.json) ------
     MODEL_SETTINGS = (
@@ -341,22 +354,20 @@ class ModelStore:
     def model_settings(self, model_id: str | None = None) -> dict[str, Any]:
         """Settings pinned for one model (or, without an id, for all of them)."""
         path = self.data_dir / "model-settings.json"
-        try:
-            stamp = path.stat().st_mtime_ns
-        except OSError:
-            stamp = None
-        cached = getattr(self, "_settings_cache", None)
+        stamp = _file_stamp(path)
+        cached = self._settings_cache
         if cached is not None and cached[0] == stamp:
-            data: dict[str, Any] = cached[1]
+            data = cached[1]
         else:
             try:
                 data = json.loads(path.read_text(encoding="utf-8")) if stamp is not None else {}
             except (OSError, json.JSONDecodeError):
                 data = {}
+            if not isinstance(data, dict):
+                data = {}
             self._settings_cache = (stamp, data)
-            data = dict(data)
         if model_id is None:
-            return dict(data)
+            return {k: dict(v) if isinstance(v, dict) else v for k, v in data.items()}
         entry = data.get(model_id)
         return dict(entry) if isinstance(entry, dict) else {}
 
@@ -377,10 +388,15 @@ class ModelStore:
             else:
                 data.pop(model_id, None)
             self.data_dir.mkdir(parents=True, exist_ok=True)
+            path = self.data_dir / "model-settings.json"
             tmp = self.data_dir / "model-settings.json.tmp"
             tmp.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
-            tmp.replace(self.data_dir / "model-settings.json")
-            return entry
+            tmp.replace(path)
+            # Our own write replaces the cache outright. Going by the file's stamp alone is not enough: on Windows
+            # a file's mtime comes from a coarse clock (about 16 ms), so a write right after a read can leave the
+            # file with the stamp the reader cached, and the next read would get the old settings back.
+            self._settings_cache = (_file_stamp(path), data)
+            return dict(entry)
 
     # -- queries ----------------------------------------------------------
     def model_dir(self, model_id: str) -> Path:

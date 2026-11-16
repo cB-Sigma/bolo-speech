@@ -6,6 +6,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- A preset made with `bolo cp` (or `POST /api/v1/models/copy`) could come back with empty settings on Windows, and
+  any settings change could read back stale there: the per-model settings (model-settings.json) were cached by the
+  file's mtime, which Windows takes from a coarse clock, so a write in the same tick as the read before it kept the
+  old copy. Our own writes now refresh the cache, and the check also compares the file's size and id.
+
 ## [0.6.0] - 2026-11-16
 
 Voice cloning and Windows. Saved voices with a consent statement, speaker similarity, OpenAI's custom-voice routes

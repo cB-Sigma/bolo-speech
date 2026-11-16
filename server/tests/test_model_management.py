@@ -91,6 +91,51 @@ async def test_a_preset_uses_its_models_files_and_has_its_own_settings(settings:
     assert await again.remove("local-voice") and not again.store.is_installed("local-voice")
 
 
+def test_model_settings_written_in_the_same_clock_tick_as_a_read_are_not_lost(
+    settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """On Windows a file's mtime comes from a coarse clock, so ``bolo cp`` could read model-settings.json (caching
+    it) and write the preset's settings within one tick, and the next read got the cached copy without them. Here
+    every write lands in the same tick, and the file looks unchanged to the stamp check: our own writes still show."""
+    import bolo.store
+    from bolo.store import ModelStore
+
+    monkeypatch.setattr(bolo.store, "_file_stamp", lambda path: (1, 1, 1) if path.exists() else None)
+    store = ModelStore(tmp_path / "data")
+    store.set_model_settings("a", {"keep_alive": "1m"})
+    assert store.model_settings("a") == {"keep_alive": "1m"}  # read and cached
+    store.set_model_settings("b", store.model_settings("a"))  # what copy_model does, in the same tick
+    assert store.model_settings("b") == {"keep_alive": "1m"} and store.model_settings("a") == {"keep_alive": "1m"}
+    store.set_model_settings("a", {"keep_alive": None, "num_parallel": 2})
+    assert store.model_settings() == {"a": {"num_parallel": 2}, "b": {"keep_alive": "1m"}}
+    # what a caller does with the returned dicts does not reach the cache
+    store.model_settings()["a"]["num_parallel"] = 9
+    store.model_settings("a")["num_parallel"] = 9
+    assert store.model_settings("a") == {"num_parallel": 2}
+
+    # the same through Bolo.copy_model (``bolo cp`` / POST /api/v1/models/copy)
+    core = Bolo(settings)
+    base = install_local(core)
+    core.store.set_model_settings(base.id, {"keep_alive": "1m"})
+    assert core.copy_model(base.id, "fast-voice").preset_of == base.id
+    assert core.store.model_settings("fast-voice") == {"keep_alive": "1m"}
+
+
+def test_model_settings_rewritten_by_another_process_in_the_same_tick_are_read(tmp_path: Path) -> None:
+    """Another process (``bolo`` on the command line while a server runs) rewrites the file within the mtime tick
+    of our last read: the size and file id tell the copies apart."""
+    from bolo.store import ModelStore
+
+    ours, theirs = ModelStore(tmp_path), ModelStore(tmp_path)
+    ours.set_model_settings("a", {"keep_alive": "1m"})
+    path = tmp_path / "model-settings.json"
+    tick = path.stat().st_mtime_ns
+    assert ours.model_settings("a") == {"keep_alive": "1m"}
+    theirs.set_model_settings("b", {"num_parallel": 2})
+    os.utime(path, ns=(tick, tick))  # as if both writes landed in one tick
+    assert ours.model_settings("b") == {"num_parallel": 2}
+
+
 def test_copy_show_and_delete_routes(settings: Settings) -> None:
     srv = LiveServer(settings)
     install_local(srv.core)
