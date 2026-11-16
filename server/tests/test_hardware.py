@@ -16,6 +16,7 @@ from bolo.config import Settings
 from fakebin import printing_program
 
 GB = 1024**3
+MB = 1024 * 1024
 
 X86_AVX2 = """processor\t: {n}
 vendor_id\t: GenuineIntel
@@ -464,6 +465,102 @@ def test_windows_cpu_features_and_directml_adapters(tmp_path: Path) -> None:
     assert plain.gpus[0].backend is None and plain.best_gpu() is None and plain.gpus_known
 
 
+class _DmlOrt:
+    @staticmethod
+    def get_available_providers() -> list[str]:
+        return ["DmlExecutionProvider", "CPUExecutionProvider"]
+
+
+_SMI = "C:/Windows/System32/nvidia-smi.exe"
+_SMI_QUERY = f"{_SMI} --query-gpu=name,memory.total,memory.free,driver_version --format=csv,noheader,nounits"
+
+
+def _windows(adapters: list[Any], nvidia_smi: str | None = None) -> FakeHost:
+    return FakeHost(
+        system="windows", machine="AMD64", cores=16, memory=(16 * GB, 9 * GB), modules={"onnxruntime": _DmlOrt()},
+        binaries={"nvidia-smi": _SMI} if nvidia_smi else {}, commands={_SMI_QUERY: nvidia_smi} if nvidia_smi else {},
+        adapters=adapters,
+    )  # fmt: skip
+
+
+def test_hybrid_laptop_integrated_first_then_nvidia(tmp_path: Path) -> None:
+    """The owner's laptop: DXGI lists the display's integrated Radeon first and the RTX 3060 second. One entry
+    per card: the NVIDIA card (CUDA through nvidia-smi) carries its DirectML number, and it is the best GPU."""
+    from bolo.winhw import Adapter, preferred_index
+
+    adapters = [
+        Adapter(0, "AMD Radeon(TM) Graphics", 0x1002, 512 * MB, 8 * GB, False, 400 * MB, 0),
+        Adapter(1, "NVIDIA GeForce RTX 3060 Laptop GPU", 0x10DE, 6 * GB, 8 * GB, False, 5 * GB, 0),
+    ]
+    assert preferred_index(adapters) == 1  # no IDXGIFactory6 answer: the most dedicated memory
+    smi = "NVIDIA GeForce RTX 3060 Laptop GPU, 6144, 5900, 560.94\n"
+    found = hw.detect(settings(tmp_path), _windows(adapters, smi))
+    nvidia, amd = found.gpus
+    assert (nvidia.name, nvidia.backend, nvidia.source) == ("NVIDIA GeForce RTX 3060 Laptop GPU", "cuda", "nvidia-smi")
+    assert nvidia.dml_index == 1 and nvidia.dml_preferred and not nvidia.integrated
+    assert amd.name == "AMD Radeon(TM) Graphics (dml:0)" and amd.integrated and not amd.dml_preferred
+    assert found.best_gpu() is nvidia and found.best_gpu("dml") is None
+    assert any('device = "cuda"' in n for n in found.notes) and not any("Radeon" in n for n in found.notes)
+    assert found.to_dict()["gpus"][0]["dml_index"] == 1
+    # without nvidia-smi or NVML both come from DXGI; "dml" (no number) is the NVIDIA card
+    dxgi_only = hw.detect(settings(tmp_path), _windows(adapters))
+    amd, nvidia = dxgi_only.gpus
+    assert nvidia.backend == "dml" and nvidia.dml_preferred and dxgi_only.best_gpu() is nvidia
+    assert any('device = "dml"' in n for n in dxgi_only.notes)
+    # Windows' own high-performance choice wins over the memory rule
+    adapters[0].high_performance = True
+    assert preferred_index(adapters) == 0
+    marked = hw.detect(settings(tmp_path), _windows(adapters))
+    assert marked.best_gpu() is marked.gpus[1] and any('device = "dml:1"' in n for n in marked.notes)
+    adapters[0].high_performance = False
+    # a device pinned to the integrated adapter is pointed at the discrete one
+    pinned = hw.detect(settings(tmp_path, device="dml:0"), _windows(adapters, smi))
+    assert any('device = "dml:0" is integrated graphics' in n and 'device = "cuda"' in n for n in pinned.notes)
+
+
+def test_nvidia_only_and_amd_discrete_only(tmp_path: Path) -> None:
+    from bolo.winhw import Adapter, preferred_index
+
+    nvidia_only = [Adapter(0, "NVIDIA GeForce RTX 4070", 0x10DE, 12 * GB, 16 * GB, False, 11 * GB, 0)]
+    found = hw.detect(settings(tmp_path), _windows(nvidia_only, "NVIDIA GeForce RTX 4070, 12282, 11800, 560.94\n"))
+    (gpu,) = found.gpus
+    assert gpu.backend == "cuda" and gpu.dml_index == 0 and found.best_gpu() is gpu
+    assert preferred_index(nvidia_only) == 0
+    amd_only = [Adapter(0, "AMD Radeon RX 6700 XT", 0x1002, 12 * GB, 16 * GB, False, 11 * GB, 0)]
+    found = hw.detect(settings(tmp_path), _windows(amd_only))
+    (gpu,) = found.gpus
+    assert gpu.backend == "dml" and not gpu.integrated and found.best_gpu() is gpu
+    assert any('device = "dml"' in n for n in found.notes)
+
+
+def test_intel_integrated_and_amd_discrete(tmp_path: Path) -> None:
+    from bolo.winhw import Adapter, preferred_index
+
+    adapters = [
+        Adapter(0, "Intel(R) UHD Graphics", 0x8086, 128 * MB, 8 * GB, False, 3 * GB, 0),
+        Adapter(1, "AMD Radeon RX 6600M", 0x1002, 8 * GB, 8 * GB, False, 7 * GB, 0),
+    ]
+    assert preferred_index(adapters) == 1
+    found = hw.detect(settings(tmp_path), _windows(adapters))
+    intel, amd = found.gpus
+    assert intel.integrated and not amd.integrated and amd.dml_preferred
+    assert found.best_gpu() is amd and any('device = "dml"' in n for n in found.notes)
+
+
+def test_integrated_graphics_never_become_the_best_gpu(tmp_path: Path) -> None:
+    from bolo.winhw import Adapter, is_integrated
+
+    # an APU whose BIOS carves out 2 GB still counts as integrated
+    apu = [Adapter(0, "AMD Radeon(TM) Graphics", 0x1002, 2 * GB, 8 * GB, False, 2 * GB, 0)]
+    found = hw.detect(settings(tmp_path), _windows(apu))
+    assert found.gpus[0].integrated and found.best_gpu() is None and not any("device =" in n for n in found.notes)
+    assert is_integrated("amd", "AMD Radeon 780M Graphics", 4 * GB)
+    assert is_integrated("intel", "Intel(R) Arc(TM) Graphics", 2 * GB)  # Meteor Lake's integrated Arc
+    assert not is_integrated("intel", "Intel(R) Arc(TM) A770 Graphics", 16 * GB)
+    assert not is_integrated("amd", "AMD Radeon RX 7600M XT", 8 * GB)
+    assert is_integrated("nvidia", "NVIDIA GeForce MX110", 256 * MB)
+
+
 @pytest.mark.skipif(sys.platform != "win32", reason="asks Windows itself (IsProcessorFeaturePresent, DXGI)")
 def test_windows_probes_on_windows() -> None:
     from bolo import winhw
@@ -476,6 +573,9 @@ def test_windows_probes_on_windows() -> None:
     assert all(a.name and a.index >= 0 for a in adapters)
     assert any(a.software for a in adapters) or any(a.dedicated_bytes for a in adapters)
     assert all(not a.software for a in winhw.dxgi_adapters() or [])
+    hardware = [a.index for a in adapters if not a.software]
+    assert winhw.preferred_index(adapters) in [*hardware, None] and winhw.default_dml_index() in [*hardware, None]
+    assert sum(a.high_performance for a in adapters) <= 1 and all(a.luid for a in adapters)
     found = hw.detect(None)
     assert found.cpu.features and found.gpus_known
 

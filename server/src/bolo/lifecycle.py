@@ -427,8 +427,7 @@ class ModelManager:
                 for i, b in p.gpu_bytes_by_gpu.items():
                     out[i] = out.get(i, 0) + int(m.vram_bytes * b / planned)
             else:
-                _, _, idx = p.device.partition(":")
-                i = p.gpus[0] if p.gpus else (int(idx) if idx.isdigit() else 0)
+                i = p.gpus[0] if p.gpus else self.accel.index_of(p.device)
                 out[i] = out.get(i, 0) + m.vram_bytes
         return out
 

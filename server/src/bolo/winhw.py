@@ -14,6 +14,7 @@ Every function returns None when it cannot ask (another system, an old Windows, 
 from __future__ import annotations
 
 import contextlib
+import re
 import sys
 import uuid
 from dataclasses import dataclass
@@ -35,9 +36,30 @@ _ARM_FEATURES = (
 
 IID_IDXGIFactory1 = "770aae78-f26f-4dba-a829-253c83d1b387"
 IID_IDXGIAdapter3 = "645967a4-1392-4310-a798-8053ce3e93fd"
+IID_IDXGIFactory6 = "c1b6694f-ff09-44a9-b03c-77900a0a1d17"
+IID_IDXGIAdapter1 = "29038f61-3839-4626-91fd-086879011a05"
+DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE = 2
 DXGI_ADAPTER_FLAG_SOFTWARE = 2
 DXGI_ERROR_NOT_FOUND = 0x887A0002
 PCI_VENDORS = {0x10DE: "nvidia", 0x1002: "amd", 0x1022: "amd", 0x8086: "intel", 0x1414: "microsoft", 0x5143: "qualcomm"}
+#: dedicated video memory at or below which an adapter is taken for integrated graphics (a BIOS carve-out)
+INTEGRATED_MAX_BYTES = 512 * 1024 * 1024
+#: AMD APU graphics: "AMD Radeon(TM) Graphics", "AMD Radeon 780M Graphics", "AMD Radeon(TM) Vega 8 Graphics"
+_AMD_APU = re.compile(r"^amd radeon(\(tm\))?( vega)?( \d{2,3}m| \d{1,2})? graphics$", re.IGNORECASE)
+#: Intel's discrete cards: "Intel(R) Arc(TM) A770 Graphics", "Intel(R) Arc(TM) B580 Graphics"; every other Intel
+#: adapter ("UHD", "Iris Xe", Meteor Lake's "Intel(R) Arc(TM) Graphics") is integrated
+_INTEL_DISCRETE = re.compile(r"\barc\b.*\b[ab]\d{3}m?\b", re.IGNORECASE)
+
+
+def is_integrated(vendor: str, name: str | None, dedicated_bytes: int | None) -> bool:
+    """Integrated graphics: little dedicated memory, an Intel GPU other than a discrete Arc, or an AMD APU's
+    Radeon. These never count as the machine's best GPU."""
+    text = " ".join((name or "").split())
+    if dedicated_bytes is not None and dedicated_bytes <= INTEGRATED_MAX_BYTES:
+        return True
+    if vendor == "intel":
+        return not _INTEL_DISCRETE.search(text)
+    return vendor == "amd" and bool(_AMD_APU.match(text))
 
 
 @dataclass
@@ -53,10 +75,42 @@ class Adapter:
     budget_bytes: int | None = None
     #: local video memory this process uses now
     usage_bytes: int | None = None
+    #: the adapter's locally unique id (DXGI_ADAPTER_DESC1.AdapterLuid), 0 when unknown
+    luid: int = 0
+    #: the adapter Windows names first for DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE (IDXGIFactory6)
+    high_performance: bool = False
 
     @property
     def vendor(self) -> str:
         return PCI_VENDORS.get(self.vendor_id, "unknown")
+
+    @property
+    def integrated(self) -> bool:
+        return is_integrated(self.vendor, self.name, self.dedicated_bytes)
+
+
+def preferred_index(adapters: list[Adapter] | None) -> int | None:
+    """DirectML's ``device_id`` for ``device = "dml"`` with no number: the adapter Windows calls high-performance,
+    else the hardware adapter with the most dedicated memory (a discrete card before integrated graphics), else
+    None (no adapter)."""
+    hardware = [a for a in adapters or [] if not a.software]
+    marked = next((a for a in hardware if a.high_performance), None)
+    if marked is not None:
+        return marked.index
+    if not hardware:
+        return None
+    return max(hardware, key=lambda a: (not a.integrated, a.dedicated_bytes, -a.index)).index
+
+
+_default_index: tuple[int | None] | None = None
+
+
+def default_dml_index() -> int | None:
+    """``preferred_index`` of this machine's adapters, asked once per process; None off Windows."""
+    global _default_index
+    if _default_index is None:
+        _default_index = (preferred_index(dxgi_adapters()),)
+    return _default_index[0]
 
 
 def cpu_features(machine: str) -> list[str] | None:
@@ -182,6 +236,7 @@ def _dxgi_adapters(include_software: bool) -> list[Adapter]:
                     dedicated_bytes=int(desc.DedicatedVideoMemory),
                     shared_bytes=int(desc.SharedSystemMemory),
                     software=software,
+                    luid=(int(desc.AdapterLuidHigh) << 32) | (int(desc.AdapterLuidLow) & 0xFFFFFFFF),
                 )
                 adapter3 = ctypes.c_void_p()
                 query_interface = _method(adapter, 0, hresult, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p))
@@ -199,6 +254,51 @@ def _dxgi_adapters(include_software: bool) -> list[Adapter]:
                 adapters.append(found)
             finally:
                 _release(adapter)
+        with contextlib.suppress(Exception):
+            luid = _high_performance_luid(factory, AdapterDesc1)
+            for a in adapters:
+                a.high_performance = luid is not None and a.luid == luid and not a.software
     finally:
         _release(factory)
     return adapters
+
+
+def _high_performance_luid(factory: Any, desc_type: Any) -> int | None:
+    """The LUID of the first adapter IDXGIFactory6::EnumAdapterByGpuPreference(HIGH_PERFORMANCE) gives, or None
+    (no IDXGIFactory6 before Windows 10 1803, or only a software adapter)."""
+    import ctypes
+    from ctypes import wintypes
+
+    hresult = ctypes.c_long
+    factory6 = ctypes.c_void_p()
+    query_interface = _method(factory, 0, hresult, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p))
+    if query_interface(ctypes.byref(_guid(IID_IDXGIFactory6)), ctypes.byref(factory6)) < 0 or not factory6:
+        return None
+    try:
+        # IDXGIFactory6's vtable: IUnknown (3), IDXGIObject (4), IDXGIFactory (5), IDXGIFactory1 (2),
+        # IDXGIFactory2 (11), IDXGIFactory3 (1), IDXGIFactory4 (2), IDXGIFactory5 (1): EnumAdapterByGpuPreference is 29
+        by_preference = _method(
+            factory6, 29, hresult, wintypes.UINT, ctypes.c_int, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p)
+        )
+        for position in range(16):
+            adapter = ctypes.c_void_p()
+            hr = by_preference(
+                position,
+                DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
+                ctypes.byref(_guid(IID_IDXGIAdapter1)),
+                ctypes.byref(adapter),
+            )
+            if hr < 0 or not adapter:
+                return None
+            try:
+                desc = desc_type()
+                if _method(adapter, 10, hresult, ctypes.POINTER(desc_type))(ctypes.byref(desc)) < 0:
+                    continue
+                if desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE:
+                    continue
+                return (int(desc.AdapterLuidHigh) << 32) | (int(desc.AdapterLuidLow) & 0xFFFFFFFF)
+            finally:
+                _release(adapter)
+        return None
+    finally:
+        _release(factory6)

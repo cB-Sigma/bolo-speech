@@ -313,6 +313,23 @@ def test_directml_adapters_on_windows() -> None:
     assert plain.devices() == []
 
 
+def test_directml_default_is_the_high_performance_adapter() -> None:
+    """A hybrid laptop: DXGI lists the integrated Radeon first. ``dml`` (no number) means the NVIDIA card, whose
+    memory placement and ``bolo ps`` read."""
+    from bolo.winhw import Adapter
+
+    adapters = [
+        Adapter(0, "AMD Radeon(TM) Graphics", 0x1002, 512 * MB, 8 * GB, False, 400 * MB, 0),
+        Adapter(1, "NVIDIA GeForce RTX 3060 Laptop GPU", 0x10DE, 6 * GB, 8 * GB, False, 5 * GB, 1 * GB),
+    ]
+    acc = Accelerators(nvml=None, which=lambda _: None, system="windows", adapters=lambda: adapters, max_age_s=0)
+    acc._nvml_tried = True
+    radeon, rtx = acc.devices()
+    assert radeon.unified and acc.device("dml") == rtx and acc.device("dml:0") == radeon
+    assert acc.index_of("dml") == 1 and acc.index_of("dml:0") == 0 and acc.index_of("cuda") == 0
+    assert acc.device("dml").free_bytes == 4 * GB  # type: ignore[union-attr]
+
+
 def test_nvidia_smi_readings() -> None:
     calls: list[list[str]] = []
 

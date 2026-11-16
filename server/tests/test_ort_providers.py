@@ -97,3 +97,16 @@ def test_doctor_warns_about_onnxruntime_packages() -> None:
     assert "onnxruntime-gpu" in ort_problems("cuda", {"onnxruntime": "1.32.0"}, ["CPUExecutionProvider"])[0]
     assert ort_problems("cpu", {}, None) == []
     assert sherpa_provider("dml:0") == "cpu" and sherpa_provider("cuda:1") == "cuda"
+
+
+def test_dml_without_a_number_runs_on_the_high_performance_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
+    """DirectML's own default is DXGI's adapter 0, the integrated GPU of a hybrid laptop: ``dml`` asks for
+    Windows' high-performance adapter instead, and ``dml:N`` pins one."""
+    dml = "DmlExecutionProvider"
+    monkeypatch.setattr(ort_providers, "default_dml_index", lambda: 1)
+    assert providers_for("dml", [dml, CPU]) == [(dml, {"device_id": 1}), CPU]
+    assert providers_for("directml", [dml, CPU]) == [(dml, {"device_id": 1}), CPU]
+    assert providers_for("auto", [dml, CPU]) == [(dml, {"device_id": 1}), CPU]
+    assert providers_for("dml:0", [dml, CPU]) == [(dml, {"device_id": 0}), CPU]
+    monkeypatch.setattr(ort_providers, "default_dml_index", lambda: None)  # not Windows, or no adapter
+    assert providers_for("dml", [dml, CPU]) == [dml, CPU]

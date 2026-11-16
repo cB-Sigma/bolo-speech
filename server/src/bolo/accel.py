@@ -7,7 +7,8 @@ server (and the processes it started) holds.
   per-process GPU memory cannot be told apart from ordinary memory; the figures say so (``unified: true``,
   ``process_bytes: null``).
 * Windows, DirectML (``device = "dml:N"``, read only when ``device`` is ``dml``): every hardware graphics adapter DXGI lists, numbered as DirectML numbers
-  them. "Free" is the local video memory budget Windows gives this process minus what it uses
+  them. ``dml`` with no number is Windows' high-performance adapter (bolo.winhw.preferred_index), the one
+  bolo.ort_providers runs it on, not adapter 0 (on a hybrid laptop, the integrated GPU). "Free" is the local video memory budget Windows gives this process minus what it uses
   (``IDXGIAdapter3::QueryVideoMemoryInfo``); ``process_bytes`` is this process's own use, which is where DirectML
   runs (ONNX Runtime in bolo's process). Integrated graphics report no free memory (it is the machine's).
 * Anything else: nothing is reported, and the scheduler treats free accelerator memory as unknown.
@@ -144,6 +145,8 @@ class Accelerators:
         self._pids = pids or our_pids
         self._vm = virtual_memory or psutil.virtual_memory
         self._adapters = adapters
+        #: DirectML's adapter for ``dml`` with no number, from the last DXGI reading
+        self._dml_default: int | None = None
         #: also list DirectML devices (Windows; on when ``device`` is ``dml``, or when ``adapters`` is given)
         self.directml = directml or adapters is not None
         self.max_age_s = max_age_s
@@ -170,13 +173,22 @@ class Accelerators:
             return list(found)
 
     def device(self, device: str, fresh: bool = False) -> DeviceMemory | None:
-        """The accelerator a ``device`` value names (``cuda:1``, ``coreml``, ...), or None when unknown."""
+        """The accelerator a ``device`` value names (``cuda:1``, ``coreml``, ``dml``, ...), or None when unknown."""
         family = _family(device)
-        wanted = _index(device)
-        for d in self.devices(fresh=fresh):
+        found = self.devices(fresh=fresh)
+        wanted = self.index_of(device)
+        for d in found:
             if d.backend == family and d.index == wanted:
                 return d
         return None
+
+    def index_of(self, device: str) -> int:
+        """The device number ``device`` means: its ``:N``, else 0, except ``dml`` with no number, which is the
+        high-performance adapter (the discrete GPU of a hybrid laptop, as bolo.ort_providers uses it)."""
+        _, _, idx = (device or "").partition(":")
+        if not idx.isdigit() and _family(device) == "dml" and self._dml_default is not None:
+            return self._dml_default
+        return _index(device)
 
     def default_device(self) -> str | None:
         """What ``device = "auto"`` means here: ``cuda:0``, ``coreml``, or None (no accelerator found)."""
@@ -252,9 +264,12 @@ class Accelerators:
         except Exception as exc:
             log.debug("DXGI query failed: %s", exc)
             return []
+        from bolo.winhw import is_integrated, preferred_index
+
+        self._dml_default = preferred_index(adapters)
         out: list[DeviceMemory] = []
         for a in adapters:
-            integrated = a.vendor == "intel" or a.dedicated_bytes <= 512 * 1024 * 1024
+            integrated = is_integrated(a.vendor, a.name, a.dedicated_bytes)
             free = None
             if a.budget_bytes is not None and not integrated:
                 free = max(0, a.budget_bytes - (a.usage_bytes or 0))

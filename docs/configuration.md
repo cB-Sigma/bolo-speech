@@ -393,8 +393,16 @@ What differs on Windows (CI runs the server's tests on `windows-latest`; GPU pat
 | `llama-server`, `audio.cpp` | `bolo components install llama-server` / `audio.cpp` install the pinned Windows release: the CPU build (with every CPU back end, from SSE4.2 to AVX-512, chosen at start-up), the CUDA 12.4 build with its CUDA runtime DLLs for `device = "cuda"`, the Vulkan build for `device = "vulkan"`. Tontaube is Linux only |
 | servers bolo starts | llama-server, audio.cpp and plugin workers each run in a Job Object that Windows closes when bolo ends, however it ends (Task Manager, closing the console, a service stop), which ends them and whatever they started. bolo stops one by sending it `CTRL_BREAK_EVENT` and ends the Job Object 10 s later (at once when bolo has no console, as a service). `plugin_nice` > 0 means `BELOW_NORMAL_PRIORITY_CLASS`; `plugin_memory_limit_mb` limits each worker's committed memory (POSIX limits its address space) |
 
-**DirectML** (`device = "dml"`, or `dml:1` for the second adapter in DXGI's order: `bolo doctor` and
-`GET /api/v1/hardware` list them as `... (dml:N)`). Only the engines that open ONNX Runtime sessions themselves use
+**DirectML** (`device = "dml"`, or `dml:N` to pin adapter N in DXGI's order: `bolo doctor` and
+`GET /api/v1/hardware` list them as `... (dml:N)`, and an NVIDIA card bolo reaches through CUDA shows its DirectML
+number as "DirectML adapter dml:N"). `dml` with no number runs on the adapter Windows calls high-performance
+(`IDXGIFactory6::EnumAdapterByGpuPreference`; without it, the adapter with the most dedicated memory), not on
+DXGI's first adapter, which is DirectML's own default: on a laptop with integrated graphics and a discrete GPU,
+Windows lists the integrated GPU (the one driving the display) first, so adapter 0 is the slow one. Placement and
+`bolo ps` read the memory of the same adapter. Integrated graphics (Intel UHD and Iris, an AMD APU's Radeon, or
+512 MB of dedicated memory or less) never count as the machine's best GPU: on a laptop with an NVIDIA card,
+`bolo doctor` and `bolo recommend` suggest `device = "cuda"`, and point out a `dml:N` that pins the integrated GPU.
+Only the engines that open ONNX Runtime sessions themselves use
 it: Nemotron diarization, DiCoW ONNX, the SNAC decoder of the Orpheus-family voices, the end-of-turn model and
 in-process speech-to-speech (`lfm3-audio-2b-onnx`). sherpa-onnx's wheels have no DirectML provider and CTranslate2
 (faster-whisper) has none at all, so those models stay on the CPU (bolo says so once); llama-server and audio.cpp

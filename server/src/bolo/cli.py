@@ -1126,6 +1126,10 @@ def _hardware_lines(hw: dict[str, Any]) -> list[str]:
                 f"{gigabytes(g['vram_free_bytes']) or 'unknown'} free"
             )
             use = f"usable through {g['backend']}" if g["backend"] else "no runtime bolo starts uses it"
+            if g.get("backend") not in (None, "dml") and g.get("dml_index") is not None:
+                use += f"; DirectML adapter dml:{g['dml_index']}"
+            if g.get("integrated"):
+                use += "; integrated graphics"
             driver = f", driver {g['driver']}" if g["driver"] else ""
             lines.append(f"gpu: {_unknown(g['name'])} ({memory}{driver}; {use})")
     else:

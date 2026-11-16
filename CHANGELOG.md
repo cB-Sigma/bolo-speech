@@ -12,6 +12,21 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   any settings change could read back stale there: the per-model settings (model-settings.json) were cached by the
   file's mtime, which Windows takes from a coarse clock, so a write in the same tick as the read before it kept the
   old copy. Our own writes now refresh the cache, and the check also compares the file's size and id.
+- **Hybrid laptops (integrated graphics and a discrete GPU) used the integrated GPU.** Seen on a Windows laptop with
+  a Ryzen 7 5800H (Radeon graphics, 0.5 GB) and an RTX 3060 Laptop GPU (6 GB):
+  - The live demo asked WebGPU for an adapter without options, and Chrome and Edge then give the power-saving one:
+    the "Your device" panel, the verdicts and the models themselves all ran on the Radeon. Every adapter request and
+    every WebGPU session (ONNX Runtime Web in the voice and voice-cloning workers, transformers.js in speech
+    recognition, the language model and Chatterbox) now asks for `powerPreference: "high-performance"` through one
+    helper. "Your device" names the adapter (vendor, architecture, description), says when the browser still gave
+    the integrated GPU, with the fix (Windows: Settings > System > Display > Graphics, the browser, High
+    performance; or the NVIDIA Control Panel), and lets the visitor choose power saving instead (kept per browser).
+  - The server: `device = "dml"` ran on DXGI's adapter 0, which on such a laptop is the integrated GPU. It now runs
+    on the adapter Windows calls high-performance (`IDXGIFactory6::EnumAdapterByGpuPreference`, else the one with
+    the most dedicated memory), and placement and `bolo ps` read that adapter's memory; `dml:N` still pins one. The
+    NVIDIA card is listed once, as CUDA with its DirectML number. Integrated graphics (Intel UHD and Iris, AMD APU
+    Radeon, 512 MB or less) never count as the best GPU, so `bolo doctor` and `bolo recommend` point at
+    `device = "cuda"` there, and warn when `dml:N` pins the integrated GPU.
 
 ## [0.6.0] - 2026-11-16
 

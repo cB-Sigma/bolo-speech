@@ -411,7 +411,9 @@ visitor's browser; it shows none of this.
   dot product and SVE on ARM64), so AVX-512 extensions such as VNNI and AMX
   are not seen; no container detection. Graphics adapters through DXGI
   (name, dedicated memory, `dml:N`), counted on when the DirectML build of
-  ONNX Runtime is installed.
+  ONNX Runtime is installed. An NVIDIA card read through NVML or nvidia-smi
+  is listed once (as CUDA, with its `dml:N`); integrated graphics are never
+  the best GPU, so a hybrid laptop is judged by its discrete card.
 * Intel Macs: no GPU detection (it would need `system_profiler`, which is
   slow).
 * Intel and AMD GPUs are listed but never counted on (except through

@@ -266,6 +266,13 @@ class Gpu:
     #: how inference runtimes reach it: "cuda", "metal", "dml" (DirectML), or None when no runtime bolo uses can
     backend: str | None = None
     source: str = ""  # nvidia-smi | pynvml | sysfs | platform | dxgi
+    #: integrated graphics in a PC (Intel UHD/Iris, an AMD APU's Radeon, <= 512 MB dedicated): never the best GPU
+    integrated: bool = False
+    #: Windows: DirectML's ``device_id`` for this card (``device = "dml:N"``), also for an NVIDIA card bolo reaches
+    #: through CUDA
+    dml_index: int | None = None
+    #: Windows: the adapter ``device = "dml"`` (no number) runs on, Windows' high-performance GPU
+    dml_preferred: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -277,6 +284,9 @@ class Gpu:
             "unified_memory": self.unified_memory,
             "backend": self.backend,
             "source": self.source,
+            "integrated": self.integrated,
+            "dml_index": self.dml_index,
+            "dml_preferred": self.dml_preferred,
         }
 
 
@@ -340,8 +350,10 @@ class Hardware:
         }
 
     def best_gpu(self, backend: str | None = None) -> Gpu | None:
-        """The GPU with the most memory that a runtime can reach (optionally through one backend)."""
-        usable = [g for g in self.gpus if g.backend and (backend is None or g.backend == backend)]
+        """The GPU with the most memory that a runtime can reach (optionally through one backend). Integrated
+        graphics never count: on a hybrid laptop the discrete card is the one to use, and an integrated GPU alone
+        is rarely faster than the CPU for bolo's models."""
+        usable = [g for g in self.gpus if g.backend and not g.integrated and (backend is None or g.backend == backend)]
         return max(usable, key=lambda g: g.vram_total_bytes or 0) if usable else None
 
     def summary(self) -> str:
@@ -726,25 +738,33 @@ def detect_gpus(host: Host, cpu: Cpu, memory: Memory) -> tuple[list[Gpu], bool]:
         adapters = host.windows_adapters()
         if adapters is None:
             return gpus, nvidia is not None
-        gpus += _dxgi_gpus(host, adapters, have_nvidia=bool(nvidia))
+        gpus += _dxgi_gpus(host, adapters, nvidia or [])
         return gpus, True
     return gpus, nvidia is not None
 
 
-def _dxgi_gpus(host: Host, adapters: list[Any], have_nvidia: bool) -> list[Gpu]:
+def _dxgi_gpus(host: Host, adapters: list[Any], nvidia: list[Gpu]) -> list[Gpu]:
     """Windows graphics adapters as DXGI lists them: what DirectML (``device = "dml:N"``) can use when the
-    DirectML build of ONNX Runtime is installed. NVIDIA cards already read through NVML/nvidia-smi are not listed
-    twice."""
+    DirectML build of ONNX Runtime is installed. One entry per card: an NVIDIA card already read through
+    NVML/nvidia-smi is not listed twice, it gets its DirectML number (``dml_index``) instead."""
+    from bolo.winhw import is_integrated, preferred_index
+
+    preferred = preferred_index(adapters)
     ort = host.module("onnxruntime")
     dml = False
     if ort is not None:
         with contextlib.suppress(Exception):
             dml = "DmlExecutionProvider" in ort.get_available_providers()
     gpus: list[Gpu] = []
+    unmatched = [g for g in nvidia if g.dml_index is None]
     for a in adapters:
-        if a.vendor == "nvidia" and have_nvidia:
-            continue
-        integrated = a.vendor == "intel" or a.dedicated_bytes <= 512 * 1024 * 1024
+        if a.vendor == "nvidia" and nvidia:
+            match = _same_card(a, unmatched)
+            if match is not None:
+                unmatched.remove(match)
+                match.dml_index, match.dml_preferred = a.index, a.index == preferred
+                continue
+        integrated = is_integrated(a.vendor, a.name, a.dedicated_bytes)
         gpus.append(
             Gpu(
                 vendor=a.vendor if a.vendor in ("nvidia", "amd", "intel") else "unknown",
@@ -758,9 +778,26 @@ def _dxgi_gpus(host: Host, adapters: list[Any], have_nvidia: bool) -> list[Gpu]:
                 unified_memory=integrated,
                 backend="dml" if dml else None,
                 source="dxgi",
+                integrated=integrated,
+                dml_index=a.index,
+                dml_preferred=a.index == preferred,
             )
         )
     return gpus
+
+
+def _same_card(adapter: Any, nvidia: list[Gpu]) -> Gpu | None:
+    """The NVIDIA GPU (from NVML/nvidia-smi) that a DXGI adapter is: the same name, else memory within 10%, else
+    the first one left (both list NVIDIA cards in PCI order)."""
+    name = " ".join(str(adapter.name).split()).lower()
+    for g in nvidia:
+        if g.name and " ".join(g.name.split()).lower() == name:
+            return g
+    for g in nvidia:
+        total = g.vram_total_bytes
+        if total and adapter.dedicated_bytes and abs(total - adapter.dedicated_bytes) <= 0.1 * total:
+            return g
+    return nvidia[0] if nvidia else None
 
 
 # -- runtimes ---------------------------------------------------------------------------------------------------
@@ -971,12 +1008,30 @@ def detect(settings: Settings | None = None, host: Host | None = None, deep: boo
         )
     best = hw.best_gpu()
     if best is not None and hw.device == "cpu":
-        example = "dml" if best.backend == "dml" else "cuda"
+        example = device_for(best)
         hw.notes.append(
             'a GPU was found but the `device` setting is "cpu": the built-in engines run on the CPU until it is '
             f'set (for example device = "{example}"); the torch plugin picks its own device'
         )
+    name, _, index = hw.device.strip().lower().partition(":")
+    if best is not None and name in ("dml", "directml") and index.isdigit():
+        pinned = next((g for g in hw.gpus if g.dml_index == int(index)), None)
+        if pinned is not None and pinned.integrated and pinned is not best:
+            hw.notes.append(
+                f'device = "{hw.device}" is integrated graphics ({pinned.name}); {best.name} is faster: '
+                f'device = "{device_for(best)}"'
+            )
     return hw
+
+
+def device_for(gpu: Gpu) -> str:
+    """The ``device`` value that reaches ``gpu``: ``cuda`` (NVIDIA through CUDA), ``coreml`` (Apple), ``dml`` when
+    it is the adapter ``dml`` picks (Windows' high-performance GPU), else ``dml:N``."""
+    if gpu.backend == "metal":
+        return "coreml"
+    if gpu.backend != "dml":
+        return "cuda"
+    return "dml" if gpu.dml_preferred or gpu.dml_index is None else f"dml:{gpu.dml_index}"
 
 
 # -- the micro-benchmark ----------------------------------------------------------------------------------------

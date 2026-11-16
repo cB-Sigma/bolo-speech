@@ -55,12 +55,25 @@ def _warn_once(key: str, message: str) -> None:
         log.warning(message)
 
 
+def default_dml_index() -> int | None:
+    """DirectML's ``device_id`` for ``dml`` with no number: Windows' high-performance adapter (bolo.winhw)."""
+    from bolo import winhw
+
+    return winhw.default_dml_index()
+
+
+def _dml(index: int | None) -> Any:
+    return ("DmlExecutionProvider", {"device_id": index}) if index is not None else "DmlExecutionProvider"
+
+
 def providers_for(device: str | None, available: list[str] | None = None) -> list[Any]:
     """The ``providers`` argument for ``onnxruntime.InferenceSession`` on ``device``.
 
     ``cpu`` (the default) gives the CPU only; ``cuda``, ``cuda:1``, ``rocm``, ``dml``, ``coreml``
     (also ``mps`` and ``metal``) or ``openvino`` give that provider first and the CPU after it;
-    ``auto`` takes the first accelerator this build has.
+    ``auto`` takes the first accelerator this build has. ``dml`` with no number runs on Windows'
+    high-performance adapter (the discrete GPU of a hybrid laptop), not on DXGI's first adapter, which
+    is DirectML's own default and on such a laptop the integrated GPU; ``dml:N`` pins adapter N.
     """
     kind = (device or "cpu").strip().lower()
     name, _, index = kind.partition(":")
@@ -69,6 +82,8 @@ def providers_for(device: str | None, available: list[str] | None = None) -> lis
         return [CPU]
     if name == "auto":
         chosen = next((p for p in AUTO_ORDER if p in have), None)
+        if chosen == "DmlExecutionProvider":
+            return [_dml(default_dml_index()), CPU]
         return [chosen, CPU] if chosen else [CPU]
     wanted = PROVIDER_BY_DEVICE.get(name)
     if wanted is None:
@@ -84,6 +99,8 @@ def providers_for(device: str | None, available: list[str] | None = None) -> lis
         return [CPU]
     if index.isdigit() and wanted in _WITH_DEVICE_ID:
         return [(wanted, {"device_id": int(index)}), CPU]
+    if wanted == "DmlExecutionProvider":
+        return [_dml(default_dml_index()), CPU]
     return [wanted, CPU]
 
 
