@@ -4,6 +4,8 @@ import asyncio
 import io
 import os
 import socket
+import socketserver
+import sys
 import threading
 import time
 from collections.abc import Iterator
@@ -18,6 +20,18 @@ from bolo.audio.encode import encode_audio
 from bolo.config import Settings
 from bolo.core import Bolo
 from fake_llm import FakeLLM
+
+_handle_error = socketserver.BaseServer.handle_error
+
+
+def _quiet_handle_error(self: socketserver.BaseServer, request: object, client_address: object) -> None:
+    """The fake HTTP servers: a client that hangs up (ConnectionResetError, WinError 10054 on Windows) is not news."""
+    if isinstance(sys.exc_info()[1], ConnectionError):
+        return
+    _handle_error(self, request, client_address)  # type: ignore[arg-type]
+
+
+socketserver.BaseServer.handle_error = _quiet_handle_error  # type: ignore[method-assign]
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:

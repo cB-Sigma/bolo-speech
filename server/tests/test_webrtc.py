@@ -92,7 +92,7 @@ class Peer:
     async def close(self) -> None:
         if self._listener:
             self._listener.cancel()
-        await self.pc.close()
+        await asyncio.wait_for(self.pc.close(), 20)  # a failing test, not a hung suite
 
 
 async def post_offer(url: str, sdp: str, **kw: Any) -> httpx.Response:
@@ -154,7 +154,7 @@ async def test_barge_in_clears_the_outgoing_audio(agent: LiveServer) -> None:
     try:
         session = {"type": "realtime", "audio": {"input": {"transcription": {"model": "fake-stt"},
                                                            "turn_detection": {"type": "server_vad", "silence_duration_ms": 300}}}}  # fmt: skip
-        client = openai.AsyncOpenAI(base_url=agent.url + "/v1", api_key="x", max_retries=0)
+        client = openai.AsyncOpenAI(base_url=agent.url + "/v1", api_key="x", max_retries=0, timeout=60)
         answer = await client.realtime.calls.create(
             sdp=await peer.offer(), session=session
         )  # multipart, as the SDK sends it
@@ -196,7 +196,7 @@ async def test_client_secrets_open_sessions_without_the_server_key(settings: Set
     try:
         url = srv.url + "/v1/realtime/client_secrets"
         assert httpx.post(url, json={}).status_code == 401  # minting needs the real key
-        client = openai.AsyncOpenAI(base_url=srv.url + "/v1", api_key="sekrit", max_retries=0)
+        client = openai.AsyncOpenAI(base_url=srv.url + "/v1", api_key="sekrit", max_retries=0, timeout=60)
         secret = await client.realtime.client_secrets.create(
             expires_after={"anchor": "created_at", "seconds": 60},
             session={"type": "realtime", "instructions": "Be brief.", "audio": {"output": {"voice": "beta"}}},

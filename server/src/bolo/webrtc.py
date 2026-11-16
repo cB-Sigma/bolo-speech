@@ -42,6 +42,9 @@ from bolo.realtime import RealtimeSession, new_id
 if TYPE_CHECKING:
     from bolo.core import Bolo
 
+#: seconds a peer connection may take to close before it is let go
+PC_CLOSE_TIMEOUT_S = 10.0
+
 log = logging.getLogger("bolo.webrtc")
 
 RATE = 48000  # what Opus carries
@@ -278,8 +281,8 @@ class Call:
         with contextlib.suppress(Exception):
             await self.session.close()
         self.out.stop()
-        with contextlib.suppress(Exception):
-            await self.pc.close()
+        with contextlib.suppress(Exception):  # TimeoutError: a peer connection that does not close is let go
+            await asyncio.wait_for(self.pc.close(), PC_CLOSE_TIMEOUT_S)
 
 
 async def create_call(

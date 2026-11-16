@@ -95,7 +95,7 @@ jobs:
       - name: Type-check (the Windows branches of the code)
         run: mypy
       - name: Test
-        run: pytest -q -ra --durations=10
+        run: pytest -v -ra --durations=10  # -v: a test that hangs is named before the timeout ends the run
       - name: Install into a clean environment and smoke-test it
         shell: pwsh
         run: |
