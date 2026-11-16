@@ -252,8 +252,14 @@ async def test_simulated_browser_microphone(live: LiveServer, model: str) -> Non
     assert len(finals) >= 2 and wer <= 0.2
     # each utterance starts with its first word
     assert texts[0].split()[0] == "and" and texts[-1].split()[0] == "after"
+    # no word repeated at a seam: heard twice from the same audio, it overlaps itself in time. The same word at the end
+    # of one utterance and the start of the next is not that ("...for you / you can do", the 20M Zipformer having
+    # lost "ask what"; it wrote "t you can do" before a stray letter at the start was dropped)
+    timed = [w for f in finals for w in f["words"]]
+    if timed:
+        assert not any(a["w"] == b["w"] and b["t0"] < a["t1"] for a, b in zip(timed, timed[1:]))
     words = " ".join(texts).split()
-    assert all(a != b for a, b in zip(words, words[1:]))  # no word repeated at a seam
+    assert all(a != b for a, b in zip(words, words[1:])) or timed
 
 
 async def test_kokoro_round_trip(core: Bolo) -> None:
