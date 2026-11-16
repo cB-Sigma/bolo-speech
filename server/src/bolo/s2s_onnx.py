@@ -76,7 +76,7 @@ import numpy.typing as npt
 
 from bolo.engines.base import FloatArray, LoadOptions, SynthesisExtras, TTSModel, Voice
 from bolo.errors import ComponentMissing, EngineUnavailable
-from bolo.ort_providers import providers_for
+from bolo.ort_providers import create_session, providers_for
 from bolo.s2s import (
     AudioDelta,
     ResponseEnd,
@@ -398,9 +398,7 @@ class OnnxGraphs:
                 from bolo.onnx_split import make_session
 
                 return make_session(onnx_dir / name, list(chosen), lambda: options_for(n_threads), budget)
-            return ort.InferenceSession(
-                str(onnx_dir / name), sess_options=options_for(n_threads), providers=list(chosen)
-            )
+            return create_session(str(onnx_dir / name), options_for(n_threads), list(chosen), role=role)
 
         def options_for(n_threads: int) -> Any:
             options = ort.SessionOptions()
@@ -1520,11 +1518,17 @@ class OnnxS2SBackend(S2SBackend):
         self._model = model
         self._load_lock = threading.Lock()
         self._conversations = 0
+        #: the accelerators asked for that did not start (bolo.cuda_libs.ProviderFallback.to_dict()), after the load
+        self.provider_fallback: list[dict[str, Any]] = []
 
     def model(self) -> Lfm3Model:
+        from bolo import cuda_libs
+
         with self._load_lock:
             if self._model is None:
-                self._model = shared_model(self.model_dir, self.options, self.threads, self.device)
+                with cuda_libs.watch() as watched:
+                    self._model = shared_model(self.model_dir, self.options, self.threads, self.device)
+                self.provider_fallback = [f.to_dict() for f in watched.fallbacks]
             return self._model
 
     def session_options(self) -> dict[str, Any]:
@@ -1548,6 +1552,7 @@ class OnnxS2SBackend(S2SBackend):
             "threads": self.threads,
             "loaded": self._model is not None,
             "conversations_opened": self._conversations,
+            **({"provider_fallback": self.provider_fallback} if self.provider_fallback else {}),
         }
 
     async def close(self) -> None:

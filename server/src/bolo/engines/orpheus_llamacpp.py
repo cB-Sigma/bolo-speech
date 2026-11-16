@@ -57,7 +57,7 @@ import numpy as np
 
 from bolo.engines.base import FloatArray, LoadOptions, SynthesisExtras, TTSModel, Voice
 from bolo.errors import ComponentMissing, EngineUnavailable, InvalidRequest
-from bolo.ort_providers import providers_for
+from bolo.ort_providers import create_session, providers_for
 
 if TYPE_CHECKING:
     from bolo.engines.tts_server import ServerProcess, TTSServerEngine
@@ -171,7 +171,7 @@ def open_session(path: Path, threads: int, device: str = "cpu") -> OrtSession:
     opts.intra_op_num_threads = max(1, threads)
     opts.inter_op_num_threads = 1
     opts.log_severity_level = 3
-    session: OrtSession = ort.InferenceSession(str(path), opts, providers=providers_for(device))
+    session: OrtSession = create_session(str(path), opts, providers_for(device), role="SNAC decoder")
     return session
 
 

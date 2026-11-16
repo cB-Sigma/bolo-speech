@@ -593,6 +593,9 @@ async def components(request: Request) -> JSONResponse:
 class InstallRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
     accept_license: bool = False
+    flavour: str | None = Field(
+        default=None, description="llama-server, audio.cpp: the build, `cpu`, `cuda` or `vulkan` (default: `device`'s)"
+    )
 
 
 @router.post(
@@ -602,7 +605,7 @@ async def install_component(request: Request, component_id: str, body: InstallRe
     """Installs the component and activates it without a restart. eSpeak NG (GPL-3.0-or-later) requires
     ``{"accept_license": true}``. ``llama-server`` and ``audio.cpp`` download a pinned upstream release (SHA-256
     checked) into the data directory."""
-    job = get_core(request).components.start_install(component_id, body.accept_license)
+    job = get_core(request).components.start_install(component_id, body.accept_license, body.flavour)
     return JSONResponse({"job_id": job.id}, status_code=202)
 
 

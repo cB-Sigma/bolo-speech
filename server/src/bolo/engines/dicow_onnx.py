@@ -53,7 +53,7 @@ from bolo.engines.base import (
     STTRequest,
     STTResult,
 )
-from bolo.ort_providers import providers_for
+from bolo.ort_providers import create_session, providers_for
 
 SR = 16000
 #: STNO mask frames per second (Whisper's 100 mel frames per second after the encoder's stride-2 convolution)
@@ -270,7 +270,7 @@ class OnnxNetwork:
             budget = (split or {}).get(role)
             if budget:  # this graph is cut in two: its front on ``on``, its back on the CPU (bolo.onnx_split)
                 return make_session(path, providers_for(on), options, budget)
-            return ort.InferenceSession(str(path), sess_options=options(), providers=providers_for(on))
+            return create_session(str(path), options(), providers_for(on), role=role)
 
         # the scheduler may place the two graphs apart (bolo.placement: the larger one on the GPU when only one fits)
         self.encoder = session(encoder, device, "encoder")

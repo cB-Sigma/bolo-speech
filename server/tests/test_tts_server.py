@@ -370,20 +370,20 @@ def test_release_archive_extraction(tmp_path: Path) -> None:
             tts_runtimes.extract_release(bad, tmp_path / "bad")
 
 
-def fake_release(kind: str) -> bytes:
+def fake_release(kind: str, version: str = "9", library: str = "ggml-base.dll") -> bytes:
     """A release archive holding a llama-server that prints its version: a tarball with an executable script, or
-    on Windows (and for ``kind="zip"``) a flat zip like llama.cpp's Windows builds."""
-    data = b"#!/bin/sh\necho 'version: 9'\n"
+    on Windows (and for ``kind="zip"``) a flat zip like llama.cpp's Windows builds, with ``library`` next to it."""
+    data = f"#!/bin/sh\necho 'version: {version}'\n".encode()
     name = "llama-server"
     if os.name == "nt":
-        data, name = b"@echo version: 9\r\n", "llama-server.cmd"
+        data, name = f"@echo version: {version}\r\n".encode(), "llama-server.cmd"
     archive = io.BytesIO()
     if kind == "zip" or os.name == "nt":
         with zipfile.ZipFile(archive, "w") as zf:
             info = zipfile.ZipInfo(name)
             info.external_attr = 0o755 << 16
             zf.writestr(info, data)
-            zf.writestr("ggml-base.dll", b"MZ")
+            zf.writestr(library, b"MZ")
     else:
         with tarfile.open(fileobj=archive, mode="w:gz") as tf:
             info = tarfile.TarInfo(f"llama-b9/{name}")
@@ -431,10 +431,10 @@ async def test_installing_the_cuda_build_with_its_runtime(
     core: Bolo, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """device = "cuda" picks the CUDA build where one is pinned (Windows), and its CUDA runtime archive is unpacked
-    next to it."""
+    next to it, in the CUDA build's own folder."""
     import hashlib
 
-    main = fake_release("zip")
+    main = fake_release("zip", library="ggml-cuda.dll")
     cudart = io.BytesIO()
     with zipfile.ZipFile(cudart, "w") as zf:
         zf.writestr("cudart64_12.dll", b"MZ cudart")
@@ -455,16 +455,137 @@ async def test_installing_the_cuda_build_with_its_runtime(
         assert tts_runtimes.release_for("llama-server", "cpu") is cpu
         assert tts_runtimes.release_for("llama-server", "cuda:1") is cuda
         assert tts_runtimes.release_for("llama-server", "vulkan") is cpu  # no Vulkan build pinned here
+        assert tts_runtimes.release_for("llama-server", "cpu", flavour="cuda") is cuda
+        assert tts_runtimes.pinned_flavours("llama-server") == ["cpu", "cuda"]
         monkeypatch.setenv("PATH", "/nonexistent")
         core.settings.device = "cuda"
         job = core.components.start_install("llama-server", accept_license=False)
         await wait_for(job)
         assert job.state == "done", job.error
-        folder = tts_runtimes.install_dir(core.settings, "llama-server")
-        assert (folder / "cudart64_12.dll").read_bytes() == b"MZ cudart" and (folder / "ggml-base.dll").is_file()
+        folder = tts_runtimes.install_dir(core.settings, "llama-server", "cuda")
+        assert (folder / "cudart64_12.dll").read_bytes() == b"MZ cudart" and (folder / "ggml-cuda.dll").is_file()
         path, source = tts_runtimes.find_binary(core.settings, "llama-server")
         assert source == "bolo" and path is not None and path.parent == folder
         assert tts_runtimes.binary_version(path) == "9"
+    finally:
+        server.stop()
+
+
+def _serve_builds(monkeypatch: pytest.MonkeyPatch, runtime_id: str = "llama-server") -> tuple[Any, dict[str, Any]]:
+    """Fake CPU, CUDA and Vulkan builds of ``runtime_id`` (each printing its own version) pinned for a test
+    platform."""
+    import hashlib
+
+    archives = {
+        "cpu": fake_release("zip", "cpu-1", "ggml-cpu.dll"),
+        "cuda": fake_release("zip", "cuda-1", "ggml-cuda.dll"),
+        "vulkan": fake_release("zip", "vulkan-1", "ggml-vulkan.dll"),
+    }
+    server = FakeArchive({f"/{k}.zip": v for k, v in archives.items()}).start()
+    key = "testos-x86_64"
+    monkeypatch.setattr(tts_runtimes, "platform_key", lambda: key)
+    runtime = tts_runtimes.RUNTIME_INFO[runtime_id]
+    for flavour, payload in archives.items():
+        release = tts_runtimes.Release(f"{server.url}/{flavour}.zip", hashlib.sha256(payload).hexdigest(), len(payload))
+        monkeypatch.setitem(runtime.releases, key if flavour == "cpu" else f"{key}-{flavour}", release)
+    monkeypatch.setenv("PATH", "/nonexistent")
+    return server, archives
+
+
+@pytest.mark.parametrize("runtime_id", ["llama-server", "audio.cpp"])
+async def test_each_build_in_its_own_folder(core: Bolo, monkeypatch: pytest.MonkeyPatch, runtime_id: str) -> None:
+    """The CPU build installed first does not make the CUDA build "already installed": each build has its own
+    folder, the one matching ``device`` is started, and ``flavour`` picks one explicitly."""
+    info = tts_runtimes.RUNTIME_INFO[runtime_id]
+    monkeypatch.setitem(  # the fake archives hold "llama-server": let audio.cpp's binary have that name here
+        tts_runtimes.RUNTIME_INFO, runtime_id, tts_runtimes.Runtime(**{**info.__dict__, "binary": "llama-server"})
+    )
+    server, _ = _serve_builds(monkeypatch, runtime_id)
+    try:
+        s = core.settings
+        s.device = "cpu"
+        assert core.components.runtime_needs_install(runtime_id)
+        assert core.components.install_blocking(component=runtime_id) is None
+        assert not core.components.runtime_needs_install(runtime_id)
+        s.device = "cuda:0"
+        assert core.components.runtime_needs_install(runtime_id)  # the CPU build is not the CUDA build
+        assert tts_runtimes.flavour_for(runtime_id, s.device) == "cuda"
+        path, _ = tts_runtimes.find_binary(s, runtime_id)  # until it is installed, the CPU build runs
+        assert path is not None and tts_runtimes.binary_version(path) == "cpu-1"
+        job = core.components.start_install(runtime_id, accept_license=False)
+        await wait_for(job)
+        assert job.state == "done", job.error
+        assert sorted(tts_runtimes.installed_flavours(s, runtime_id)) == ["cpu", "cuda"]
+        path, _ = tts_runtimes.find_binary(s, runtime_id)
+        assert path is not None and tts_runtimes.binary_version(path) == "cuda-1"
+        assert path.is_relative_to(tts_runtimes.install_dir(s, runtime_id, "cuda"))
+        s.device = "cpu"
+        path, _ = tts_runtimes.find_binary(s, runtime_id)
+        assert path is not None and tts_runtimes.binary_version(path) == "cpu-1"
+        s.device = "auto"  # the GPU build that was installed
+        assert tts_runtimes.binary_version(tts_runtimes.find_binary(s, runtime_id)[0]) == "cuda-1"  # type: ignore[arg-type]
+        s.device = "cpu"
+        with pytest.raises(InvalidRequest, match="unknown flavour"):
+            core.components.start_install(runtime_id, accept_license=False, flavour="metal")
+        job = core.components.start_install(runtime_id, accept_license=False, flavour="vulkan")
+        await wait_for(job)
+        assert job.state == "done", job.error
+        assert tts_runtimes.find_binary(s, runtime_id, "vulkan")[0] is not None
+        listing = {c["id"]: c for c in core.components.status()}[runtime_id]
+        assert listing["flavour"] == "cpu" and listing["flavours"] == ["cpu", "cuda", "vulkan"]
+        assert listing["wanted_flavour"] == "cpu" and not listing["installable"]
+    finally:
+        server.stop()
+
+
+def test_an_install_from_before_the_build_folders(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Files unpacked right in the version folder (bolo before the per-build folders) count as the build their
+    libraries show, and move into that build's folder before another build is installed."""
+    monkeypatch.setattr(tts_runtimes, "platform_key", lambda: "windows-x86_64")
+    monkeypatch.setenv("PATH", "")
+    settings = Settings(data_dir=tmp_path, device="cuda")
+    base = tts_runtimes.install_dir(settings, "llama-server")
+    binary = printing_program(base / "llama-server", "version: old\n")
+    (base / "ggml-cuda.dll").write_bytes(b"MZ")
+    assert tts_runtimes.installed_flavours(settings, "llama-server") == {"cuda": binary}
+    assert tts_runtimes.find_binary(settings, "llama-server") == (binary, "bolo")
+    tts_runtimes.migrate_legacy(settings, "llama-server")
+    moved = tts_runtimes.installed_flavours(settings, "llama-server")["cuda"]
+    assert moved.parent == base / "cuda" and (base / "cuda" / "ggml-cuda.dll").is_file()
+    assert tts_runtimes.binary_version(moved) == "old"
+    from bolo import hardware
+
+    state = hardware._server_runtime(hardware.Host(), settings, "llama-server", deep=False)
+    assert state["flavour"] == "cuda" and state["gpu"] is True  # bolo recommend counts it as a GPU build
+    other = Settings(data_dir=tmp_path / "plain", device="cpu")
+    printing_program(tts_runtimes.install_dir(other, "llama-server") / "llama-b1" / "llama-server", "version: 1\n")
+    assert list(tts_runtimes.installed_flavours(other, "llama-server")) == ["cpu"]
+
+
+def test_cli_installs_the_build_device_asks_for(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`BOLO_DEVICE=cuda bolo components install llama-server` after the CPU build installs the CUDA build;
+    `--flavour` overrides; `bolo components list` names the build."""
+    from bolo.cli import main
+
+    server, _ = _serve_builds(monkeypatch)
+    try:
+        monkeypatch.setenv("BOLO_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("BOLO_DEVICE", "cpu")
+        assert main(["components", "install", "llama-server"]) == 0
+        assert main(["components", "install", "llama-server"]) == 0
+        assert "llama-server (cpu build) is already installed" in capsys.readouterr().out
+        monkeypatch.setenv("BOLO_DEVICE", "cuda")
+        assert main(["components", "install", "llama-server"]) == 0
+        assert "already installed" not in capsys.readouterr().out
+        assert main(["components", "list"]) == 0
+        assert "cuda build" in capsys.readouterr().out
+        assert main(["components", "install", "llama-server", "--flavour", "vulkan"]) == 0
+        assert main(["components", "install", "espeak-ng", "--flavour", "cuda"]) == 1
+        assert "--flavour is for llama-server" in capsys.readouterr().err
+        data = Settings(data_dir=tmp_path)
+        assert sorted(tts_runtimes.installed_flavours(data, "llama-server")) == ["cpu", "cuda", "vulkan"]
     finally:
         server.stop()
 

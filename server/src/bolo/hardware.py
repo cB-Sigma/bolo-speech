@@ -836,9 +836,13 @@ def _server_runtime(host: Host, settings: Settings | None, runtime: str, deep: b
     if path is None:
         return out
     if source == "bolo":
-        # the release bolo installs: CPU builds on Linux, Metal on Apple Silicon (bolo.tts_runtimes)
+        # the release bolo installs: CPU builds on Linux, Metal on Apple Silicon, and on Windows the CPU, CUDA or
+        # Vulkan build, each in its own folder (bolo.tts_runtimes)
         out["version"] = info.version
-        out["gpu"] = host.system() == "darwin" and _arch(host.machine()) == "arm64"
+        builds = tts_runtimes.installed_flavours(settings, runtime) if settings is not None else {}
+        out["flavour"] = next((f for f, p in builds.items() if p == path), None)
+        metal = host.system() == "darwin" and _arch(host.machine()) == "arm64"
+        out["gpu"] = metal or out["flavour"] in ("cuda", "vulkan")
     if deep:
         version = host.run([str(path), "--version"], timeout=15.0)
         if version and version.strip():

@@ -52,11 +52,12 @@ The double quotes work in bash, zsh, PowerShell and cmd (cmd.exe does not treat 
 - Without uv: `pipx install "bolo-speech[all]"`, or `pip install "bolo-speech[all]"` into a virtual environment.
 - With Homebrew (macOS 14 or later, Linux): `brew install cb-sigma/tap/bolo`, then `brew services start bolo` to run it in the background (console at http://127.0.0.1:8000/). It installs `all`; the [tap's README](https://github.com/cB-Sigma/homebrew-tap#bolo) shows how to add the opt-in extras.
 - On Windows (PowerShell or cmd), the same command. Models go to `%USERPROFILE%\.cache\bolo`; DirectML, services and the other differences: [docs/configuration.md](docs/configuration.md#windows).
+- With an NVIDIA GPU on Windows: `uv tool install "bolo-speech[all,cuda]"`, then swap `onnxruntime` for `onnxruntime-gpu[cuda,cudnn]` in the tool's environment (`uv pip uninstall --python <tool python> onnxruntime`, then `uv pip install --python <tool python> "onnxruntime-gpu[cuda,cudnn]" nvidia-cublas-cu12 "nvidia-cudnn-cu12>=9,<10"`, about 2.5 GB for CUDA 12 and 13) and set `BOLO_DEVICE=cuda`; `bolo doctor` loads both CUDA runtimes and names what is missing. faster-whisper is the GPU route for speech-to-text there (sherpa-onnx's CUDA build cannot run inside bolo on Windows). The recipe: [CUDA on Windows](docs/configuration.md#cuda-on-windows).
 - As a container (CPU image): `docker run -p 8000:8000 -v bolo-data:/data ghcr.io/cb-sigma/bolo:latest`. Compose, systemd and Kubernetes examples, and what was run of each: [deploy/README.md](deploy/README.md).
 
 The PyPI distribution is `bolo-speech`; the command and the Python package are `bolo`. Python 3.10 or newer.
 
-The base install has no engine at all; extras add what you want. `all` is `sherpa` (most models), `faster-whisper`, `uccharan` (phonemes and text normalisation), `av` (M4A/WebM/AAC through bundled FFmpeg) and `wyoming`. Opt-in extras: `webrtc`, `turn` (end-of-turn model), `orpheus`, `s2s` (in-process speech-to-speech), `sip`, `moonshine`, `whispercpp`, and `espeak` (eSpeak NG, GPL-3.0-or-later, never part of `all`; see [Licences](#licences)).
+The base install has no engine at all; extras add what you want. `all` is `sherpa` (most models), `faster-whisper`, `uccharan` (phonemes and text normalisation), `av` (M4A/WebM/AAC through bundled FFmpeg) and `wyoming`. Opt-in extras: `webrtc`, `turn` (end-of-turn model), `orpheus`, `s2s` (in-process speech-to-speech), `sip`, `moonshine`, `whispercpp`, `cuda` (CUDA 12's cuBLAS and cuDNN for faster-whisper on an NVIDIA GPU, Windows and Linux), and `espeak` (eSpeak NG, GPL-3.0-or-later, never part of `all`; see [Licences](#licences)).
 
 ## Quick start
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +21,14 @@ from bolo.engines.base import (
     Word,
 )
 
+log = logging.getLogger(__name__)
+
+#: what CTranslate2 says when CUDA cannot be used at all here (a library missing, no driver, a build without CUDA),
+#: as opposed to a CUDA error of the model itself (out of memory), which is raised as it is
+_NO_CUDA = re.compile(
+    r"cublas|cudnn|cudart|nvrtc|cannot be loaded|is not found|CUDA driver|no CUDA-capable|compiled with CUDA", re.I
+)
+
 
 class FasterWhisperSTT(STTModel):
     max_chunk_s = 30.0
@@ -29,14 +39,18 @@ class FasterWhisperSTT(STTModel):
 
         device = "cuda" if opts.device.startswith("cuda") else "cpu"
         compute = str(spec.get("compute_type", "int8" if device == "cpu" else "float16"))
-        self.model = WhisperModel(
-            str(path),
-            device=device,
-            compute_type=compute,
-            cpu_threads=opts.threads,
-            num_workers=1,
-            device_index=int(opts.device.partition(":")[2] or 0) if device == "cuda" else 0,
-        )
+        index = int(opts.device.partition(":")[2] or 0) if device == "cuda" else 0
+
+        def build(on: str, compute_type: str) -> Any:
+            return WhisperModel(str(path), device=on, compute_type=compute_type, cpu_threads=opts.threads,
+                                num_workers=1, device_index=index if on == "cuda" else 0)  # fmt: skip
+
+        #: where the model runs: "cuda" or "cpu" (also after a CUDA load that fell back)
+        self.device = device
+        if device == "cuda":
+            self.model = self._on_cuda(build, compute, spec)
+        else:
+            self.model = build("cpu", compute)
         self.batched = BatchedInferencePipeline(self.model)
         self.max_batch = int(spec.get("max_batch", 8))
         self.beam_size = int(spec.get("beam_size", 1))
@@ -49,6 +63,33 @@ class FasterWhisperSTT(STTModel):
         #: (Bhojpuri fine-tunes decode as "hi"); requests for the model's own language use it
         self.decode_language: str | None = spec.get("decode_language")
         self.supports_translate = bool(self.model.model.is_multilingual)
+
+    def _on_cuda(self, build: Any, compute: str, spec: dict[str, Any]) -> Any:
+        """The model on CUDA, warmed up so that a CUDA library CTranslate2 loads late (cuBLAS, at the first matrix
+        product) is found missing now and not in a request. Missing, the model is loaded again on the CPU, with a
+        notice (bolo.cuda_libs.ProviderFallback): requests are served slower, not refused."""
+        from bolo import cuda_libs
+
+        cuda_libs.prepare_ct2_cuda()
+        try:
+            model = build("cuda", compute)
+            segments, _info = model.transcribe(
+                np.zeros(16000, dtype=np.float32), language="en", beam_size=1, without_timestamps=True,
+                condition_on_previous_text=False, vad_filter=False,
+            )  # fmt: skip
+            list(segments)
+            return model
+        except (RuntimeError, OSError, ValueError) as exc:
+            if not _NO_CUDA.search(str(exc)):
+                raise
+            error = f"{type(exc).__name__}: {exc}"
+        fallback = cuda_libs.ProviderFallback(
+            "ctranslate2", "cuda", "cpu", cuda_libs.missing_libraries(error), error, cuda_libs.CT2_CUDA_RECIPE
+        )
+        log.warning("faster-whisper: %s", fallback.message())
+        cuda_libs.record(fallback)
+        self.device = "cpu"
+        return build("cpu", str(spec.get("cpu_compute_type", "int8")))
 
     def _language(self, req: STTRequest) -> str | None:
         if self.decode_language:

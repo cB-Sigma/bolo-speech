@@ -127,6 +127,9 @@ class Placement:
     #: llama.cpp across several GPUs: each GPU's share of the layers (in ``gpus`` order) and the main GPU
     tensor_split: list[float] | None = None
     main_gpu: int | None = None
+    #: the accelerators the runtime was asked for and did not start (a CUDA library missing, ...): each one's
+    #: ``bolo.cuda_libs.ProviderFallback.to_dict()``; set after the load, see :meth:`fell_back`
+    provider_fallback: list[dict[str, Any]] | None = None
 
     @property
     def on_gpu(self) -> bool:
@@ -134,6 +137,21 @@ class Placement:
 
     def processor(self) -> str:
         return processor(self.gpu_bytes, self.gpu_bytes + self.cpu_bytes)
+
+    def fell_back(self, fallbacks: list[dict[str, Any]], notice: str | None, whole: bool) -> None:
+        """The load found that the runtime did not start the accelerator it was placed on, and runs (``whole``: all of
+        it) on the CPU: say so in the notice, keep what happened in ``provider_fallback``, and with ``whole`` move
+        the model to the CPU, so that ``device``, the processor and the memory figures say where it really is."""
+        self.provider_fallback = list(fallbacks)
+        if notice:
+            self.notice = f"{self.notice}; {notice}" if self.notice else notice
+        if whole:
+            self.device = "cpu"
+            self.cpu_bytes += self.gpu_bytes
+            self.gpu_bytes = 0
+            self.gpus, self.gpu_bytes_by_gpu = [], {}
+            self.graphs = dict.fromkeys(self.graphs, "cpu")
+            self.graph_split = {}
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -159,6 +177,8 @@ class Placement:
             out["gpu_bytes_by_gpu"] = {str(k): v for k, v in sorted(self.gpu_bytes_by_gpu.items())}
         if self.tensor_split is not None:
             out.update(tensor_split=list(self.tensor_split), main_gpu=self.main_gpu)
+        if self.provider_fallback:
+            out["provider_fallback"] = [dict(f) for f in self.provider_fallback]
         return out
 
 

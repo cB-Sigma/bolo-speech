@@ -1015,7 +1015,8 @@ def cmd_components(args: argparse.Namespace) -> int:
     manager = core.components
     if args.action == "list":
         for c in manager.status():
-            state = f"installed ({c['source']}, {c['version']})" if c["installed"] else "not installed"
+            build = f", {c['flavour']} build" if c.get("flavour") else ""
+            state = f"installed ({c['source']}, {c['version']}{build})" if c["installed"] else "not installed"
             print(f"{c['id']:<12} {state:<40} {c['license']:<18} needed by {c['required_by_count']} catalog models")
             if not c["installed"] and c.get("kind") in ("phonemizer", "language-pack"):
                 flag = " --accept-license" if c["license"] not in ("Apache-2.0",) else ""
@@ -1029,7 +1030,17 @@ def cmd_components(args: argparse.Namespace) -> int:
     if args.component not in installable:
         print(f"error: unknown component '{args.component}' (installable: {', '.join(installable)})", file=sys.stderr)
         return 1
-    if manager.is_installed(args.component):
+    runtime = args.component in ("llama-server", "audio.cpp")
+    if args.flavour and not runtime:
+        print(f"error: --flavour is for llama-server and audio.cpp, not {args.component}", file=sys.stderr)
+        return 1
+    if runtime and not manager.runtime_needs_install(args.component, args.flavour):
+        from bolo import tts_runtimes
+
+        build = args.flavour or tts_runtimes.flavour_for(args.component, manager.core.settings.device)
+        print(f"{args.component} ({build} build) is already installed")
+        return 0
+    if not runtime and manager.is_installed(args.component):
         print(f"{args.component} is already installed")
         return 0
     if args.component == "espeak-ng" and not args.accept_license:
@@ -1046,12 +1057,12 @@ def cmd_components(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 1
-    if args.component in ("llama-server", "audio.cpp"):
-        blocked = manager.runtime_blocked_reason(args.component)
+    if runtime:
+        blocked = manager.runtime_blocked_reason(args.component, args.flavour)
         if blocked:
             print(f"error: cannot install {args.component}: {blocked}", file=sys.stderr)
             return 1
-    error = manager.install_blocking(component=args.component)
+    error = manager.install_blocking(component=args.component, flavour=args.flavour)
     if error:
         print(f"error: {error}", file=sys.stderr)
         return 1
@@ -1513,6 +1524,16 @@ def _doctor_onnxruntime(settings: Settings) -> None:
         print(f"  warning: {problem}")
 
 
+def _doctor_cuda(settings: Settings) -> None:
+    """With ``device = "cuda"`` (or ``auto`` and an NVIDIA GPU): load ONNX Runtime's CUDA provider and CTranslate2's
+    CUDA libraries for real, and say what is missing (bolo.cuda_libs)."""
+    from bolo import cuda_libs
+
+    if cuda_libs.doctor_wants_cuda(settings.device, shutil.which("nvidia-smi") is not None):
+        for line in cuda_libs.doctor_lines():
+            print(line)
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     import platform
 
@@ -1576,6 +1597,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         )
     print(f"logs: {_log_where(settings)}")
     _doctor_onnxruntime(settings)
+    _doctor_cuda(settings)
     _doctor_llm(settings)
     _doctor_providers(settings)
     _doctor_hardware(args)
@@ -1885,6 +1907,13 @@ def build_parser() -> argparse.ArgumentParser:
         dest="accept_license",
         action="store_true",
         help="accept the component's licence (GPL-3.0-or-later)",
+    )
+    s.add_argument(
+        "--flavour",
+        choices=["cpu", "cuda", "vulkan"],
+        default=None,
+        help="llama-server, audio.cpp: the build to install (default: the one `device` asks for; each build has its "
+        "own folder, and the one matching `device` runs)",
     )
     s.set_defaults(func=cmd_components)
 

@@ -218,6 +218,25 @@ def test_fit_follows_the_machine() -> None:
     assert rec.assess(spec("x", rtf=0.8), machine(), rec.heuristic_speed(machine()), live=True).level == "slow"
 
 
+def test_windows_gpu_speech_to_text_is_faster_whisper() -> None:
+    """On Windows with device = "cuda", sherpa-onnx models are judged on the CPU (its CUDA wheel cannot run inside
+    bolo there) and faster-whisper on the GPU, where it was measured 6-19x faster than on the CPU."""
+    sherpa = spec("sherpa-en", rtf=0.3, tier="accuracy", family="Sherpa", options={"hardware": {"gpu": "recommended"}})
+    fw = spec("fw-en", tier="accuracy", family="Fw", engine="faster-whisper", kind="ct2-whisper", size_bytes=1500 * MB)
+    windows = machine(gpus=[nvidia(6)], device="cuda", system="windows")
+    assert rec.gpu_for(sherpa, windows) == (None, rec.SHERPA_WINDOWS_CUDA)
+    fit = rec.assess(sherpa, windows, rec.heuristic_speed(windows))
+    assert fit.device == "cpu" and rec.SHERPA_WINDOWS_CUDA in fit.notes
+    fit = rec.assess(fw, windows, rec.heuristic_speed(windows))
+    assert fit.device == "gpu" and fit.level == "comfortable" and "measured on an RTX 3060 Laptop" in fit.reason
+    out = run(rec.Query("stt", "en"), windows, [sherpa, fw])
+    assert "fw-en" in out["recommended"] and out["fits"]["fw-en"].device == "gpu"
+    linux = machine(gpus=[nvidia(6)], device="cuda")
+    assert rec.gpu_for(sherpa, linux)[0] is not None  # elsewhere sherpa-onnx's CUDA build works
+    no_ct2_cuda = machine(gpus=[nvidia(6)], device="cuda", system="windows", runtimes={"ctranslate2": {"gpu": False}})
+    assert rec.assess(fw, no_ct2_cuda, rec.heuristic_speed(no_ct2_cuda)).device == "cpu"
+
+
 def test_gpu_models() -> None:
     gpu_model = next(s for s in CATALOG if s.id == "gpu-en")
     # a GPU that bolo is not told to use: still the CPU verdict, with the remark

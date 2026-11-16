@@ -6,6 +6,18 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Added
+
+- `bolo doctor` with `device = "cuda"` (or `auto` and an NVIDIA GPU) loads both CUDA runtimes for real: it opens a
+  tiny graph on ONNX Runtime's CUDA provider and runs it, and asks CTranslate2 (faster-whisper) for its CUDA devices
+  and loads CUDA 12's cuBLAS and cuDNN, then names each missing library with the command that installs it.
+- `cuda` extra: CUDA 12's cuBLAS and cuDNN 9 from NVIDIA's wheels (`nvidia-cublas-cu12`, `nvidia-cudnn-cu12`;
+  Windows and Linux), for faster-whisper on an NVIDIA GPU. ONNX Runtime's CUDA build stays a manual swap
+  (`onnxruntime-gpu` must replace `onnxruntime`, which an extra cannot do). docs/configuration.md has the Windows
+  recipe ("CUDA on Windows").
+- `bolo components install llama-server --flavour cpu|cuda|vulkan` (also audio.cpp, and `{"flavour": ...}` in
+  `POST /api/v1/components/{id}/install`) picks the build; `bolo components list` names the build that runs.
+
 ### Fixed
 
 Found on a Windows 11 laptop; the first fix applies everywhere.
@@ -50,6 +62,30 @@ Found on a Windows 11 laptop; the first fix applies everywhere.
   `vram_source` is "plan", `bolo ps` prints `100% GPU ?` with an "unknown VRAM" note and the console's Loaded
   models panel says "VRAM unknown". The same holds for Apple Silicon's unified memory (`vram_source` "unified").
 - `mypy` failed with `nvidia-ml-py` installed (`pynvml` has no type information).
+- **A model placed on an NVIDIA GPU on Windows ran on the CPU without a word.** Found on an RTX 3060 Laptop GPU
+  (Windows 11, driver 621.24): `onnxruntime-gpu` 1.32.0 is built for CUDA 13 and cuDNN 9, and its CUDA provider did
+  not start (`... depends on "cublasLt64_13.dll" which is missing (Error 126)`), even with
+  `onnxruntime-gpu[cuda,cudnn]` installed, because nothing put NVIDIA's wheel folders (`site-packages\nvidia\...\bin`)
+  on the DLL search path; ONNX Runtime then ran the session on the CPU while placement and `bolo ps` said `cuda:0`.
+  Before its first CUDA session bolo now adds those folders (`os.add_dll_directory` and `PATH`) and calls
+  `onnxruntime.preload_dlls()` (Windows and Linux). After each session it compares the providers it got with the
+  ones it asked for (CUDA, DirectML, Core ML, ...) in all five engines that open ONNX Runtime sessions themselves;
+  a provider that did not start is logged with the library ONNX Runtime said was missing, becomes the model's notice
+  (log, "loaded" event, `bolo ps`), and moves the model's placement to the CPU (`device`, `processor`, and a new
+  `provider_fallback` field in the placement).
+- **faster-whisper on CUDA failed every request on Windows** (`Library cublas64_12.dll is not found or cannot be
+  loaded`: CTranslate2 4.9 needs CUDA 12). bolo now adds the folders of `nvidia-cublas-cu12` and
+  `nvidia-cudnn-cu12` before loading (on Linux it loads those libraries from NVIDIA's wheels when they are not on
+  the library path), warms the model up on the GPU, and when a CUDA library is still missing loads it on the CPU
+  with the same notice instead of failing requests.
+- `bolo components install llama-server` put the CPU, CUDA and Vulkan builds in one folder, so after the CPU build
+  `BOLO_DEVICE=cuda bolo components install llama-server` said "already installed" and kept it. Each build now has
+  its own folder (`components/llama-server/<version>/cpu|cuda|vulkan`; an install from before moves into the
+  folder of the build its libraries show), installing checks the build `device` asks for, and bolo starts the build
+  matching `device` (with `auto`, a GPU build when one is installed). The same for audio.cpp.
+- `bolo recommend` no longer suggests sherpa-onnx models for the GPU on Windows (its CUDA wheel bundles its own
+  `onnxruntime.dll`, which fails with Error 1114 once `onnxruntime` is loaded, and the catalog's int8 sherpa models
+  gain nothing on CUDA); faster-whisper on CUDA, measured 6-19x faster than on the CPU on that laptop, is.
 
 ## [0.6.1] - 2026-11-16
 

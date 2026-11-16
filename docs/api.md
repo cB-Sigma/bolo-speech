@@ -682,6 +682,9 @@ Like Ollama's `/api/ps` (bolo's `/api/ps` is speaches' route, which lists model 
                  // ONNX Runtime graphs: + "graphs": {"encoder": "cuda:0", "decoder": "cpu"}
                  // always: "gpus": [0], "gpu_bytes_by_gpu": {"0": 1610612736}
                  // spread over GPUs: "gpus": [0, 1], "tensor_split": [0.6, 0.4], "main_gpu": 0
+                 // the runtime did not start the GPU (a CUDA DLL missing): "device": "cpu", a "notice", and
+                 // "provider_fallback": [{"runtime": "onnxruntime", "requested": "CUDAExecutionProvider",
+                 //   "missing": ["cublasLt64_13.dll"], "message": "...", ...}]
    "details": {"engine": "sherpa-onnx", "kind": "whisper", "family": "Whisper"}
  }],
  "system": {"cpu_percent": 12.5, "rss_bytes": 2147483648, "device": "cuda",
@@ -1544,11 +1547,15 @@ The `tts-server` components are the speech servers of the `tts-server` engine:
 Apache-2.0). Their items add `path` (the binary bolo would start, or null),
 `servers` (URLs configured for that runtime in `tts_servers`) and `release`
 (`{"version","url","sha256"}` of the prebuilt upstream archive bolo installs on
-this platform, or null). `POST /api/v1/components/llama-server/install` (no
-licence acceptance needed) downloads that archive into
-`<data_dir>/components/<id>/<version>/`, checks its SHA-256, unpacks it and
+this platform, or null), `flavour` (the build that runs, from bolo's components
+folder: `cpu`, `cuda` or `vulkan`; null for a binary from the settings or
+`PATH`), `flavours` (the builds installed) and `wanted_flavour` (the one
+`device` asks for). `POST /api/v1/components/llama-server/install` (no
+licence acceptance needed; optional `{"flavour": "cuda"}`, else the build
+`device` asks for) downloads that archive into
+`<data_dir>/components/<id>/<version>/<flavour>/`, checks its SHA-256, unpacks it and
 checks that the binary starts here; the job and events are as below. `400` when
-no release is pinned for the platform, the operator disabled installs or the
+no release is pinned for the platform (or no build of that flavour), the operator disabled installs or the
 server is exposed without an API key. A runtime is not needed for a model that
 `tts_servers` points at a running server (its `requires` is then `[]`).
 

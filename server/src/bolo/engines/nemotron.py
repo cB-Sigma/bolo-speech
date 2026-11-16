@@ -32,7 +32,7 @@ import numpy as np
 
 from bolo.audio.features import NEMO_MELS, NemoLogMel
 from bolo.engines.base import DiarizationModel, DiarizationResult, FloatArray, LoadOptions, SpeakerActivity, SpeakerTurn
-from bolo.ort_providers import providers_for
+from bolo.ort_providers import create_session, providers_for
 
 FRAME_S = 0.01  # one output frame per 10 ms mel frame
 SUBSAMPLING = 8  # mel frames per encoder frame
@@ -189,7 +189,7 @@ class _OnnxStep:
         if split_budget:  # too large for the free GPU memory: the front on the GPU, the back on the CPU
             self.session = make_session(model_file, providers_for(device), options, split_budget)
         else:
-            self.session = ort.InferenceSession(model_file, sess_options=options(), providers=providers_for(device))
+            self.session = create_session(model_file, options(), providers_for(device))
         names = {i.name for i in self.session.get_inputs()}
         expected = {"input_features", "cached_embeds", "attention_mask"}
         if not expected <= names:

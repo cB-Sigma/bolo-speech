@@ -96,7 +96,7 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `agreement` | `2` | | hypotheses that must agree before a word is shown as stable |
 | `wyoming` | `false` | `--wyoming` | serve the Wyoming protocol |
 | `wyoming_host`, `wyoming_port` | `127.0.0.1`, `10300` | `--wyoming-host`, `--wyoming-port` | Wyoming bind address |
-| `device` | `cpu` | | where models run (per model, as placed by the scheduler: see "GPU and CPU placement" below; a model can pin its own with `PUT /api/v1/models/{id}/settings` `{"device": "cpu"}` or a catalog `options.device`): `cpu`, `cuda` (or `cuda:1`), `coreml` (also `mps`, `metal`), `rocm`, `dml`, `openvino`, or `auto` (the first accelerator found). sherpa-onnx models use `cuda` or `coreml`; faster-whisper uses `cuda`; the ONNX Runtime engines (Nemotron diarization, DiCoW ONNX, the Orpheus-family decoder, the end-of-turn model, in-process speech-to-speech) use the matching execution provider when the installed `onnxruntime` has it (for `cuda`, install `onnxruntime-gpu`), and otherwise run on the CPU with one warning; llama-server gets `-ngl N`, the layers that fit in the free accelerator memory (all of them when everything fits; none when nothing does), unless you set `-ngl` yourself in `tts_server_args`, `s2s_server_args` or the entry's `server_args`; audio.cpp gets the device as its backend (`cuda`, `hip` for `rocm`, `vulkan`, `metal` for `coreml`; the CPU for `dml` and `openvino`, which it does not have). With `dml` (Windows, DirectML) only the ONNX Runtime engines use the GPU; sherpa-onnx and faster-whisper run on the CPU (see "Windows" below). **Untested on a GPU** |
+| `device` | `cpu` | | where models run (per model, as placed by the scheduler: see "GPU and CPU placement" below; a model can pin its own with `PUT /api/v1/models/{id}/settings` `{"device": "cpu"}` or a catalog `options.device`): `cpu`, `cuda` (or `cuda:1`), `coreml` (also `mps`, `metal`), `rocm`, `dml`, `openvino`, or `auto` (the first accelerator found). sherpa-onnx models use `cuda` or `coreml`; faster-whisper uses `cuda`; the ONNX Runtime engines (Nemotron diarization, DiCoW ONNX, the Orpheus-family decoder, the end-of-turn model, in-process speech-to-speech) use the matching execution provider when the installed `onnxruntime` has it (for `cuda`, install `onnxruntime-gpu`; on Windows also its CUDA libraries, see "CUDA on Windows"), and otherwise run on the CPU with one warning; llama-server gets `-ngl N`, the layers that fit in the free accelerator memory (all of them when everything fits; none when nothing does), unless you set `-ngl` yourself in `tts_server_args`, `s2s_server_args` or the entry's `server_args`; audio.cpp gets the device as its backend (`cuda`, `hip` for `rocm`, `vulkan`, `metal` for `coreml`; the CPU for `dml` and `openvino`, which it does not have). With `dml` (Windows, DirectML) only the ONNX Runtime engines use the GPU; sherpa-onnx and faster-whisper run on the CPU (see "Windows" below). **Untested on a GPU** |
 | `log_level` | `info` | `--log-level` | `debug`, `info`, `warning`, `error` |
 | `log_file` | unset (off, except under systemd or launchd) | `--log-file` | also write the server's log to a file: `auto` (the platform's place, see "Logs"), a path, or `off`. Unset: no file, unless `bolo serve` runs as a service |
 | `log_max_mb` | `10` | | rotate the log file at this size |
@@ -105,7 +105,7 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `fake_engine` | `false` | `--fake-engine` | add deterministic test models (development) |
 | `tts_servers` | `[]` | | external TTS servers the operator runs, as `"<model id or runtime>=<url>"`, e.g. `"llama-server=http://127.0.0.1:8080"` (every llama-server model goes there) or `"voxcpm2-audiocpp=http://gpu-box:8080"` (one model). A model id or alias wins over a runtime name. Such a model needs no download and no binary; for audio.cpp the server's config must declare the model under the id in the entry's `options.server_model` (the catalog id). See models.md, "External TTS servers" |
 | `tts_server_api_key` | unset | | sent as `Authorization: Bearer …` to the servers in `tts_servers` (llama-server `--api-key`) |
-| `llama_server_bin`, `audiocpp_server_bin` | unset | | the binary bolo starts for a model whose runtime has no URL in `tts_servers`. Unset: the one `bolo components install llama-server` / `audio.cpp` put in `<data_dir>/components/`, then `llama-server` / `audiocpp_server` on `PATH` (on Windows `llama-server.exe` / `audiocpp_server.exe`: a name without an extension finds the `.exe`, as `PATH` does). Point it at a CUDA/Vulkan/Metal build to use a GPU; on Windows `bolo components install` itself installs the CUDA 12 build with `device = "cuda"` and the Vulkan build with `device = "vulkan"` |
+| `llama_server_bin`, `audiocpp_server_bin` | unset | | the binary bolo starts for a model whose runtime has no URL in `tts_servers`. Unset: the one `bolo components install llama-server` / `audio.cpp` put in `<data_dir>/components/`, then `llama-server` / `audiocpp_server` on `PATH` (on Windows `llama-server.exe` / `audiocpp_server.exe`: a name without an extension finds the `.exe`, as `PATH` does). Point it at a CUDA/Vulkan/Metal build to use a GPU; on Windows `bolo components install` itself installs the CUDA 12 build with `device = "cuda"` and the Vulkan build with `device = "vulkan"` (or the one `--flavour cpu\|cuda\|vulkan` names), each build in its own folder (`components/llama-server/<version>/cpu`, `.../cuda`, `.../vulkan`); the one matching `device` is started |
 | `tts_server_args` | `[]` | | extra command-line arguments for every server bolo starts (e.g. `["-ngl", "20"]` for llama-server, which bolo then leaves alone; without one bolo adds `-ngl N` itself when `device` is not `cpu`, N being the layers that fit in free accelerator memory) |
 | `tts_server_start_timeout_s` | `300` | | how long a started server may take to answer `GET /health` (loading its model) |
 | `tontaube_dir` | unset | | a checkout of [craitech/tontaube](https://github.com/craitech/tontaube) (release v1.1.0) that bolo runs with `uv run --python 3.12 --frozen tontaube serve` for the Tontaube models. Unset: the one `bolo components install tontaube` cloned into `<data_dir>/components/`. `uv` must be on `PATH` |
@@ -246,6 +246,13 @@ it goes, the way Ollama does:
 3. If the model fits, it goes on the accelerator. If it would fit after unloading idle GPU-resident models, those
    are unloaded first (least recently used first). Otherwise it is split where its runtime allows, or placed on
    the CPU, with a notice in the log, in the load answer and in `bolo ps`. Nothing is refused.
+4. After the load, bolo checks that the runtime really started the accelerator. ONNX Runtime falls back to the CPU
+   on its own when a provider does not start (a CUDA DLL not found, say) and says so only on standard error; bolo
+   compares each session's providers with the ones it asked for, and CTranslate2 (faster-whisper) is warmed up on
+   the GPU and loaded again on the CPU when a CUDA library is missing. Either way the model runs on the CPU: the log,
+   the model's notice, the "loaded" event and `bolo ps` say so with the missing library and the install command,
+   and its placement (`device`, `processor`, `provider_fallback` in `GET /api/v1/ps`) says CPU. `bolo doctor`
+   checks the same before anything is loaded (see "CUDA on Windows").
 
 How a model can be split depends on its runtime:
 
@@ -406,7 +413,7 @@ What differs on Windows (CI runs the server's tests on `windows-latest`; GPU pat
 | `curl.exe` and JSON | Windows PowerShell 5.1 drops the double quotes inside an argument it passes to a program, so `curl.exe -d '{"model": "tts-1"}'` sends `{model: tts-1}` and the server answers 400. In 5.1 escape them (`-d '{\"model\": \"tts-1\"}'`), put the JSON in a file (`-d "@body.json"`), or use `Invoke-RestMethod` as in the README. PowerShell 7.3 and later pass them as written; cmd needs `-d "{\"model\": \"tts-1\"}"` |
 | firewall | with `--host 0.0.0.0` the Windows Defender Firewall prompt names `python.exe` ("Python"), not `bolo.exe`: uv's `bolo.exe` is a launcher that starts uv's Python interpreter, which is what listens. Prefer a rule for the port ([deploy/README.md](../deploy/README.md#windows-at-log-on-at-start-up-or-as-a-service)) to one for that interpreter, whose path changes when uv installs another Python |
 | local model folders | `bolo pull <folder>` / `file:` link the folder into the store: a directory symlink where allowed (Developer Mode or administrator), else a directory junction (no rights needed, same volume or not, local disks only), else a copy, with a notice |
-| `llama-server`, `audio.cpp` | `bolo components install llama-server` / `audio.cpp` install the pinned Windows release: the CPU build (with every CPU back end, from SSE4.2 to AVX-512, chosen at start-up), the CUDA 12.4 build with its CUDA runtime DLLs for `device = "cuda"`, the Vulkan build for `device = "vulkan"`. Tontaube is Linux only |
+| `llama-server`, `audio.cpp` | `bolo components install llama-server` / `audio.cpp` install the pinned Windows release: the CPU build (with every CPU back end, from SSE4.2 to AVX-512, chosen at start-up), the CUDA 12.4 build with its CUDA runtime DLLs for `device = "cuda"`, the Vulkan build for `device = "vulkan"`. Each build goes in its own folder, so `BOLO_DEVICE=cuda bolo components install llama-server` after the CPU build installs the CUDA build next to it (`--flavour cpu\|cuda\|vulkan` picks one explicitly); bolo starts the build matching `device` (with `auto`, a GPU build when one is installed), and `bolo components list` shows which one runs. Tontaube is Linux only |
 | servers bolo starts | llama-server, audio.cpp and plugin workers each run in a Job Object that Windows closes when bolo ends, however it ends (Task Manager, closing the console, a service stop), which ends them and whatever they started. bolo stops one by sending it `CTRL_BREAK_EVENT` and ends the Job Object 10 s later (at once when bolo has no console, as a service). `plugin_nice` > 0 means `BELOW_NORMAL_PRIORITY_CLASS`; `plugin_memory_limit_mb` limits each worker's committed memory (POSIX limits its address space) |
 
 **DirectML** (`device = "dml"`, or `dml:N` to pin adapter N in DXGI's order: `bolo doctor` and
@@ -443,6 +450,56 @@ replace a dependency's `onnxruntime` with `onnxruntime-directml`, so an extra wo
 1.20 or newer, which 1.24.4 is. With DirectML, free GPU memory comes from DXGI (the budget Windows gives bolo's
 process, minus what it uses), so placement and `bolo ps` have a figure for dedicated GPUs; for integrated graphics
 the free memory is unknown and `bolo ps` shows the plan.
+
+### CUDA on Windows
+
+An NVIDIA GPU on Windows needs CUDA libraries for two runtimes, of two CUDA majors. Found on an RTX 3060 Laptop GPU
+(Windows 11, driver 621.24):
+
+- **ONNX Runtime** (Nemotron diarization, DiCoW ONNX, the Orpheus-family decoder, the end-of-turn model, in-process
+  speech-to-speech): `onnxruntime-gpu` 1.32.0 from PyPI is built for CUDA 13 and cuDNN 9. Without them its CUDA
+  provider does not start (`... depends on "cublasLt64_13.dll" which is missing (Error 126)`), and ONNX Runtime
+  quietly runs the model on the CPU. NVIDIA's wheels (`onnxruntime-gpu[cuda,cudnn]`) bring the DLLs, into
+  `site-packages\nvidia\cu13\bin\x86_64`, `nvidia\cudnn\bin` and others that Windows does not search; bolo adds
+  those folders and calls `onnxruntime.preload_dlls()` before its first CUDA session.
+- **faster-whisper** (CTranslate2 4.9): CUDA 12's cuBLAS and cuDNN 9 (`Library cublas64_12.dll is not found or
+  cannot be loaded`). `nvidia-cublas-cu12` and `nvidia-cudnn-cu12` bring them (`nvidia\cublas\bin`,
+  `nvidia\cudnn\bin`); bolo adds those folders too, and when CUDA still cannot be used it loads the model on the CPU
+  with a notice instead of failing requests. On that laptop faster-whisper ran 6-19x faster on the GPU than on the
+  CPU: on Windows it is the GPU route for speech-to-text.
+
+In bolo's environment (about 2.5 GB for the two CUDA majors):
+
+```powershell
+uv tool install "bolo-speech[all,cuda]"                      # `cuda`: nvidia-cublas-cu12 and nvidia-cudnn-cu12
+$py = "$(uv tool dir)\bolo-speech\Scripts\python.exe"        # the Python of uv's bolo-speech tool
+uv pip uninstall --python $py onnxruntime onnxruntime-gpu onnxruntime-directml
+uv pip install --python $py "onnxruntime-gpu[cuda,cudnn]" nvidia-cublas-cu12 "nvidia-cudnn-cu12>=9,<10"
+$env:BOLO_DEVICE = "cuda"
+bolo doctor        # "cuda:" with "ok onnxruntime ... CUDA provider loads and runs" and "ok faster-whisper ..."
+```
+
+In a plain virtual environment: `pip uninstall -y onnxruntime`, then
+`pip install "onnxruntime-gpu[cuda,cudnn]" nvidia-cublas-cu12 "nvidia-cudnn-cu12>=9,<10"`. `uv tool install
+"bolo-speech[all]" --with "onnxruntime-gpu[cuda,cudnn]" --with nvidia-cublas-cu12 --with "nvidia-cudnn-cu12>=9,<10"`
+installs everything in one go, but also keeps plain `onnxruntime` (faster-whisper asks for it): `onnxruntime` and
+`onnxruntime-gpu` install the same `onnxruntime` module and overwrite each other's files, so uninstall
+`onnxruntime` and install `onnxruntime-gpu` again afterwards, as above. For the same reason the `cuda` extra holds
+only faster-whisper's CUDA 12 libraries: an extra can add `onnxruntime-gpu` but not take `onnxruntime` away. Swap
+them again after any `uv tool upgrade` or `pip install` that brings `onnxruntime` back. `nvidia-cudnn-cu12` and the
+`nvidia-cudnn-cu13` that `onnxruntime-gpu[cudnn]` brings put the same cuDNN 9 files in `nvidia\cudnn\bin`; the one
+installed last stays, and `bolo doctor` tests both runtimes with it.
+
+`bolo doctor` with `device = "cuda"` (or `auto` on a machine with an NVIDIA GPU) opens a tiny graph on ONNX
+Runtime's CUDA provider and runs it, asks CTranslate2 for its CUDA devices and loads CUDA 12's cuBLAS and cuDNN, and
+names each library that is missing with the command that installs it. On Linux the same wheels work: bolo calls
+`preload_dlls()` for ONNX Runtime and loads CTranslate2's cuBLAS and cuDNN from NVIDIA's wheels when they are not
+on the library path.
+
+sherpa-onnx's CUDA wheel cannot be used inside bolo on Windows: it brings its own `onnxruntime.dll`, which fails to
+load (Error 1114) once `onnxruntime` has been imported, as bolo does; and the catalog's int8 sherpa-onnx models gain
+nothing on CUDA. With `device = "cuda"` on Windows they run on the CPU, and `bolo recommend` suggests faster-whisper
+models for the GPU.
 
 ## Coming from Ollama
 

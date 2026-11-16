@@ -494,10 +494,10 @@ def open_split(
     def opts() -> Any:
         return session_options() if session_options else ort.SessionOptions()
 
-    front = ort.InferenceSession(str(front_path), sess_options=opts(), providers=front_providers)
-    back = ort.InferenceSession(
-        str(back_path), sess_options=opts(), providers=back_providers or ["CPUExecutionProvider"]
-    )
+    from bolo.ort_providers import create_session
+
+    front = create_session(str(front_path), opts(), front_providers)
+    back = create_session(str(back_path), opts(), back_providers or ["CPUExecutionProvider"])
     return SplitSession(front, back, inputs, outputs, cut)
 
 
@@ -510,7 +510,7 @@ def make_session(
     """An ``InferenceSession`` for ``path``, or with ``split_budget`` (bytes of weights the accelerator takes) a
     :class:`SplitSession`: front on ``providers``, back on the CPU. A split that cannot be made or opened falls back
     to one whole session on the CPU, with a warning, so a placement decision never stops a model from loading."""
-    import onnxruntime as ort
+    from bolo.ort_providers import create_session
 
     if split_budget is not None and split_budget > 0:
         try:
@@ -518,4 +518,4 @@ def make_session(
         except Exception as exc:
             log.warning("%s: not split (%s); it runs whole on the CPU", Path(path).name, exc)
             providers = ["CPUExecutionProvider"]
-    return ort.InferenceSession(str(path), sess_options=session_options(), providers=providers)
+    return create_session(str(path), session_options(), providers)

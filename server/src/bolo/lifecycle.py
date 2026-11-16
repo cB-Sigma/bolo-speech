@@ -30,6 +30,7 @@ from typing import Any
 
 import psutil
 
+from bolo import cuda_libs
 from bolo.accel import Accelerators, our_pids
 from bolo.catalog import Catalog, ModelSpec
 from bolo.config import Settings
@@ -753,9 +754,12 @@ class ModelManager:
         if spec.engine == "tts-server":
             model_opts.setdefault("model_aliases", list(spec.aliases))
             model_opts.setdefault("sample_rate", spec.sample_rate)
-        model = engine.load(spec.kind, spec.task, self.store.model_dir(spec.id), model_opts, opts)
-        if isinstance(model, TTSModel):
-            model.warm_up()
+        with cuda_libs.watch() as watched:  # an accelerator the runtime did not start (bolo.cuda_libs)
+            model = engine.load(spec.kind, spec.task, self.store.model_dir(spec.id), model_opts, opts)
+            if isinstance(model, TTSModel):
+                model.warm_up()
+        if watched.fallbacks:
+            place.fell_back([f.to_dict() for f in watched.fallbacks], watched.notice(), watched.whole)
         load_ms = (time.perf_counter() - t0) * 1000.0
         return model, load_ms, self._vram(place)
 

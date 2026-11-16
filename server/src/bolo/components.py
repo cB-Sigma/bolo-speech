@@ -523,7 +523,7 @@ class ComponentManager:
         return out
 
     # -- TTS server runtimes ------------------------------------------------
-    def runtime_blocked_reason(self, runtime: str) -> str | None:
+    def runtime_blocked_reason(self, runtime: str, flavour: str | None = None) -> str | None:
         s = self.core.settings
         if s.host not in LOOPBACK and not s.api_key:
             return "installing components is never allowed on a non-loopback address without an API key"
@@ -535,6 +535,9 @@ class ComponentManager:
                 return f"{info.name} runs on Linux only (this is {tts_runtimes.platform_key()})"
             if shutil.which("git") is None:
                 return "git is not installed (it fetches the pinned source)"
+        elif flavour is not None and flavour not in tts_runtimes.pinned_flavours(runtime):
+            pinned = ", ".join(tts_runtimes.pinned_flavours(runtime)) or "none"
+            return f"no {flavour} build of {info.name} is pinned for {tts_runtimes.platform_key()} (pinned: {pinned})"
         elif tts_runtimes.release_for(runtime, s.device) is None:
             return (
                 f"no prebuilt release is pinned for this platform ({tts_runtimes.platform_key()}); build "
@@ -547,6 +550,18 @@ class ComponentManager:
         if not os.access(probe, os.W_OK):
             return f"the data directory is read-only ({probe})"
         return None
+
+    def runtime_needs_install(self, runtime: str, flavour: str | None = None) -> bool:
+        """Whether ``bolo components install <runtime>`` has something to do: the build ``flavour`` names (else the
+        one ``device`` asks for) is not in the components folder, and no binary is configured in the settings. A
+        binary on ``PATH`` does not count: the components folder comes before ``PATH``."""
+        info = tts_runtimes.RUNTIME_INFO[runtime]
+        if getattr(self.core.settings, info.setting, None):
+            return False
+        if info.git is not None:
+            return tts_runtimes.find_binary(self.core.settings, runtime)[0] is None
+        wanted = flavour or tts_runtimes.flavour_for(runtime, self.core.settings.device)
+        return wanted not in tts_runtimes.installed_flavours(self.core.settings, runtime)
 
     def runtime_status(self) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
@@ -576,8 +591,12 @@ class ComponentManager:
                     "license": info.license,
                     "license_url": info.license_url,
                     "required_by_count": self.required_by(runtime),
-                    "installable": blocked is None and not installed,
+                    "installable": blocked is None and self.runtime_needs_install(runtime),
                     "install_blocked_reason": None if installed else blocked,
+                    # the build that runs (from bolo's components folder): cpu, cuda or vulkan
+                    "flavour": state["flavour"],
+                    "flavours": state["flavours"],
+                    "wanted_flavour": state["wanted_flavour"] if info.git is None else None,
                     "manual_command": manual
                     + f'; or run the server yourself and set tts_servers = ["{runtime}=http://host:port"]',
                     "path": state["path"],
@@ -594,16 +613,19 @@ class ComponentManager:
             )
         return out
 
-    def install_runtime_blocking(self, runtime: str, job: Job | None = None) -> str | None:
-        """Download the pinned release archive for this platform, check its SHA-256 and unpack it."""
+    def install_runtime_blocking(self, runtime: str, job: Job | None = None, flavour: str | None = None) -> str | None:
+        """Download the pinned release archive for this platform, check its SHA-256 and unpack it into the folder of
+        its build (``flavour``, else the one ``device`` asks for: ``<runtime>/<version>/cpu|cuda|vulkan``)."""
         from bolo.store import RemoteFile
 
         info = tts_runtimes.RUNTIME_INFO[runtime]
         if info.git is not None:
             return self._install_checkout(runtime)
-        release = tts_runtimes.release_for(runtime, self.core.settings.device)
+        flavour = flavour or tts_runtimes.flavour_for(runtime, self.core.settings.device)
+        release = tts_runtimes.release_for(runtime, flavour=flavour)
         if release is None:
-            return f"no prebuilt {info.name} release is pinned for {tts_runtimes.platform_key()}"
+            return f"no prebuilt {flavour} {info.name} release is pinned for {tts_runtimes.platform_key()}"
+        tts_runtimes.migrate_legacy(self.core.settings, runtime)
         archives = [release, *release.extras]
         total = sum(a.size or 0 for a in archives) if all(a.size for a in archives) else 0
 
@@ -613,7 +635,7 @@ class ComponentManager:
                 job.bytes_total = total
                 job.progress = min(0.95, job.bytes_done / total)
 
-        target = tts_runtimes.install_dir(self.core.settings, runtime)
+        target = tts_runtimes.install_dir(self.core.settings, runtime, flavour)
         tmp = target.with_name(target.name + ".partial")
         try:
             shutil.rmtree(tmp, ignore_errors=True)
@@ -629,7 +651,7 @@ class ComponentManager:
         except Exception as exc:
             shutil.rmtree(tmp, ignore_errors=True)
             return f"{type(exc).__name__}: {exc}"
-        path = tts_runtimes.find_binary(self.core.settings, runtime)[0]
+        path = tts_runtimes.installed_flavours(self.core.settings, runtime).get(flavour)
         if path is None:
             return f"the release was unpacked but {info.binary} was not found in it"
         problem = tts_runtimes.check_runs(path) if path.is_relative_to(target) else None
@@ -660,16 +682,22 @@ class ComponentManager:
         return None
 
     # -- install ----------------------------------------------------------
-    def start_install(self, component: str, accept_license: bool) -> Job:
+    def start_install(self, component: str, accept_license: bool, flavour: str | None = None) -> Job:
+        """Start installing ``component``; ``flavour`` (``cpu``, ``cuda``, ``vulkan``) picks the build of
+        llama-server or audio.cpp, which is otherwise the one ``device`` asks for."""
+        if flavour is not None and component not in tts_runtimes.RUNTIMES:
+            raise InvalidRequest(f"{component} has no builds to choose from (flavour is for llama-server, audio.cpp)")
+        if flavour is not None and flavour not in tts_runtimes.FLAVOURS:
+            raise InvalidRequest(f"unknown flavour {flavour!r}: one of {', '.join(tts_runtimes.FLAVOURS)}")
         if component in tts_runtimes.RUNTIMES:
-            blocked = self.runtime_blocked_reason(component)
+            blocked = self.runtime_blocked_reason(component, flavour)
             if blocked:
                 raise InvalidRequest(f"cannot install {component}: {blocked}")
             job = self.core.jobs.create("install", component)
-            if self.is_installed(component):
+            if not self.runtime_needs_install(component, flavour):
                 job.state, job.progress = "done", 1.0
                 return job
-            task = asyncio.create_task(self._install(job), name=f"bolo-install-{component}")
+            task = asyncio.create_task(self._install(job, flavour), name=f"bolo-install-{component}")
             self.core._tasks.append(task)
             task.add_done_callback(lambda t: self.core._tasks.remove(t) if t in self.core._tasks else None)
             return job
@@ -764,10 +792,12 @@ class ComponentManager:
             romanised.refresh()
         return None
 
-    def install_blocking(self, job: Job | None = None, component: str = ESPEAK) -> str | None:
+    def install_blocking(
+        self, job: Job | None = None, component: str = ESPEAK, flavour: str | None = None
+    ) -> str | None:
         """Install the component's package and activate it. Returns an error message, or None on success."""
         if component in tts_runtimes.RUNTIMES:
-            return self.install_runtime_blocking(component, job)
+            return self.install_runtime_blocking(component, job, flavour)
         if component.startswith(XLIT_PREFIX):
             return romanised.install_pack(component[len(XLIT_PREFIX) :])
         name = packs.pack_of(component)
@@ -788,11 +818,11 @@ class ComponentManager:
             return f"the package was installed but {component} could not be loaded"
         return None
 
-    async def _install(self, job: Job) -> None:
+    async def _install(self, job: Job, flavour: str | None = None) -> None:
         core = self.core
         job.state, job.progress = "running", 0.1
         core.events.publish("job", {"job": job.to_dict()})
-        error = await asyncio.get_running_loop().run_in_executor(None, self.install_blocking, job, job.model)
+        error = await asyncio.get_running_loop().run_in_executor(None, self.install_blocking, job, job.model, flavour)
         if error:
             job.state, job.error = "error", error
             core.log("error", f"installing {job.model} failed: {error}")

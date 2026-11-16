@@ -248,13 +248,22 @@ def components_dir(settings: Settings) -> Path:
     return Path(settings.data_dir) / "components"
 
 
-def install_dir(settings: Settings, runtime: str) -> Path:
+def install_dir(settings: Settings, runtime: str, flavour: str | None = None) -> Path:
+    """Where bolo installs ``runtime``: ``<data_dir>/components/<runtime>/<version>``, and each build of a release
+    runtime in its own folder below that (``.../cpu``, ``.../cuda``, ``.../vulkan``), so that installing the CUDA
+    build does not find the CPU build "already installed" and the build matching ``device`` is the one started."""
     info = RUNTIME_INFO[runtime]
-    return components_dir(settings) / runtime / info.version
+    base = components_dir(settings) / runtime / info.version
+    return base / flavour if flavour else base
 
 
 def is_checkout(path: Path) -> bool:
     return (path / "pyproject.toml").is_file()
+
+
+#: the builds of a release runtime: "cpu" is the platform's default build (on Apple Silicon it has Metal)
+CPU_FLAVOUR = "cpu"
+FLAVOURS = (CPU_FLAVOUR, "cuda", "vulkan")
 
 
 def _flavour(device: str | None) -> str | None:
@@ -263,15 +272,101 @@ def _flavour(device: str | None) -> str | None:
     return kind if kind in ("cuda", "vulkan") else None
 
 
-def release_for(runtime: str, device: str | None = None) -> Release | None:
-    """The pinned release archive for this platform, preferring the build for ``device`` (the CUDA or Vulkan build
-    where one is pinned, such as on Windows), else the platform's default build."""
-    info = RUNTIME_INFO[runtime]
+def _release_key(flavour: str) -> str:
     key = platform_key()
-    flavour = _flavour(device)
-    if flavour and f"{key}-{flavour}" in info.releases:
-        return info.releases[f"{key}-{flavour}"]
-    return info.releases.get(key)
+    return key if flavour == CPU_FLAVOUR else f"{key}-{flavour}"
+
+
+def pinned_flavours(runtime: str) -> list[str]:
+    """The builds pinned for this platform."""
+    info = RUNTIME_INFO[runtime]
+    return [f for f in FLAVOURS if _release_key(f) in info.releases]
+
+
+def flavour_for(runtime: str, device: str | None = None) -> str:
+    """The build ``device`` asks for on this platform: ``cuda`` or ``vulkan`` where that build is pinned (Windows),
+    else ``cpu``, the platform's default build."""
+    wanted = _flavour(device)
+    return wanted if wanted and wanted in pinned_flavours(runtime) else CPU_FLAVOUR
+
+
+def release_for(runtime: str, device: str | None = None, flavour: str | None = None) -> Release | None:
+    """The pinned release archive for this platform: the build ``flavour`` names, else the one for ``device`` (the
+    CUDA or Vulkan build where one is pinned, such as on Windows), else the platform's default build."""
+    return RUNTIME_INFO[runtime].releases.get(_release_key(flavour or flavour_for(runtime, device)))
+
+
+def detect_flavour(folder: Path, skip: tuple[str, ...] = ()) -> str:
+    """The build unpacked in ``folder`` (not counting its subfolders named in ``skip``), from its libraries
+    (``ggml-cuda.dll``, ``cudart64_12.dll``, ``ggml-vulkan.dll``, ...): for installs made before each build had its
+    own folder."""
+    names = " ".join(
+        p.name.lower()
+        for p in folder.rglob("*")
+        if p.is_file() and not (skip and p.relative_to(folder).parts[0] in skip)
+    )
+    if "cuda" in names or "cublas" in names:
+        return "cuda"
+    if "vulkan" in names:
+        return "vulkan"
+    return CPU_FLAVOUR
+
+
+def _binary_in(folder: Path, binary: str, skip: tuple[str, ...] = ()) -> Path | None:
+    for name in executable_names(binary):
+        for candidate in sorted(folder.rglob(name)):
+            rel = candidate.relative_to(folder).parts
+            if skip and len(rel) > 1 and rel[0] in skip:
+                continue
+            if is_executable(candidate):
+                return candidate
+    return None
+
+
+def installed_flavours(settings: Settings, runtime: str) -> dict[str, Path]:
+    """The builds of a release runtime in bolo's components folder: flavour → binary. An install from before the
+    per-build folders (the files right in the version folder) counts as the build its libraries show."""
+    info = RUNTIME_INFO[runtime]
+    base = install_dir(settings, runtime)
+    out: dict[str, Path] = {}
+    if info.git is not None or not base.is_dir():
+        return out
+    for flavour in FLAVOURS:
+        if (base / flavour).is_dir():
+            found = _binary_in(base / flavour, info.binary)
+            if found is not None:
+                out[flavour] = found
+    legacy = _binary_in(base, info.binary, skip=FLAVOURS)
+    if legacy is not None:
+        out.setdefault(detect_flavour(base, skip=FLAVOURS), legacy)
+    return out
+
+
+def _preference(runtime: str, device: str | None) -> list[str]:
+    """The installed builds to start, best first: the one ``device`` asks for (with ``auto``, the GPU builds first:
+    whichever one was installed); then the others, so that a model still runs on the build that is there."""
+    if (device or "").strip().lower() == "auto":
+        return ["cuda", "vulkan", CPU_FLAVOUR]
+    wanted = flavour_for(runtime, device)
+    rest = ["vulkan", CPU_FLAVOUR] if wanted == "cuda" else [CPU_FLAVOUR, "vulkan", "cuda"]
+    return [wanted, *(f for f in rest if f != wanted)]
+
+
+def migrate_legacy(settings: Settings, runtime: str) -> None:
+    """Move an install from before the per-build folders into the folder of the build it is."""
+    info = RUNTIME_INFO[runtime]
+    base = install_dir(settings, runtime)
+    if info.git is not None or not base.is_dir():
+        return
+    loose = [p for p in base.iterdir() if p.name not in FLAVOURS and not p.name.endswith(".partial")]
+    if not loose or _binary_in(base, info.binary, skip=FLAVOURS) is None:
+        return
+    target = base / detect_flavour(base, skip=FLAVOURS)
+    if target.exists():
+        return
+    target.mkdir(parents=True)
+    for item in loose:
+        item.rename(target / item.name)
 
 
 def _windows() -> bool:
@@ -313,10 +408,12 @@ def _configured_binary(value: str) -> Path | None:
     return Path(found) if found else None
 
 
-def find_binary(settings: Settings, runtime: str) -> tuple[Path | None, str | None]:
+def find_binary(settings: Settings, runtime: str, flavour: str | None = None) -> tuple[Path | None, str | None]:
     """``(path, source)`` of the server binary for ``runtime``: the setting, bolo's components folder, then PATH.
     For a runtime run from source (Tontaube) the path is the checkout folder. On Windows a name without an
-    extension also finds ``<name>.exe`` (and the other ``PATHEXT`` extensions), as on ``PATH``."""
+    extension also finds ``<name>.exe`` (and the other ``PATHEXT`` extensions), as on ``PATH``. Of the builds in
+    the components folder, the one ``flavour`` names (only that one), else the one ``device`` asks for, else
+    another one that is installed (see :func:`_preference`)."""
     info = RUNTIME_INFO[runtime]
     if info.git is not None:
         configured = getattr(settings, info.setting, None)
@@ -329,12 +426,12 @@ def find_binary(settings: Settings, runtime: str) -> tuple[Path | None, str | No
     if configured:
         found_path = _configured_binary(str(configured))
         return (found_path, "settings") if found_path else (None, None)
-    local = install_dir(settings, runtime)
-    if local.is_dir():
-        for name in executable_names(info.binary):
-            for candidate in sorted(local.rglob(name)):
-                if is_executable(candidate):
-                    return candidate, "bolo"
+    builds = installed_flavours(settings, runtime)
+    if flavour is not None:
+        return (builds[flavour], "bolo") if flavour in builds else (None, None)
+    for wanted in _preference(runtime, getattr(settings, "device", None)):
+        if wanted in builds:
+            return builds[wanted], "bolo"
     found = shutil.which(info.binary)
     return (Path(found), "path") if found else (None, None)
 
@@ -483,10 +580,15 @@ def install_status(settings: Settings, runtime: str) -> dict[str, Any]:
     """What the components page shows for one runtime (without running anything slow)."""
     path, source = find_binary(settings, runtime)
     release = release_for(runtime, settings.device)
+    builds = installed_flavours(settings, runtime)
+    flavour = next((f for f, p in builds.items() if p == path), None) if source == "bolo" else None
     urls: list[str] = []
     for item in settings.tts_servers:
         with contextlib.suppress(ValueError):
             target, url = parse_server_setting(item)
             if target.lower() == runtime:
                 urls.append(url)
-    return {"path": str(path) if path else None, "source": source, "release": release, "urls": urls}
+    return {
+        "path": str(path) if path else None, "source": source, "release": release, "urls": urls,
+        "flavour": flavour, "flavours": sorted(builds), "wanted_flavour": flavour_for(runtime, settings.device),
+    }  # fmt: skip

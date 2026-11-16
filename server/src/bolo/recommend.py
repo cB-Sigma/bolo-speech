@@ -266,6 +266,19 @@ def vram_need(spec: ModelSpec) -> tuple[int | None, str | None]:
     return int(spec.size_bytes * 1.3 + 0.5 * 1024**3), "estimated"
 
 
+#: sherpa-onnx on Windows: its CUDA wheel brings its own onnxruntime.dll, which fails to load (error 1114) in a
+#: process that imported onnxruntime first, as bolo does; and the catalog's int8 sherpa models gain nothing on CUDA
+SHERPA_WINDOWS_CUDA = (
+    "sherpa-onnx's CUDA build cannot run inside bolo on Windows, so it runs on the CPU; "
+    "faster-whisper is the GPU route for speech-to-text there"
+)
+
+#: engines whose GPU speed was measured, and what was measured
+GPU_MEASURED = {
+    "faster-whisper": "6-19x faster than on the CPU, measured on an RTX 3060 Laptop GPU (Windows, CUDA)",
+}
+
+
 def gpu_for(spec: ModelSpec, hw: Hardware) -> tuple[Gpu | None, str | None]:
     """The GPU this model would run on with the current settings, and a remark when one is present but unused."""
     cuda, metal = hw.best_gpu("cuda"), hw.best_gpu("metal")
@@ -292,6 +305,8 @@ def gpu_for(spec: ModelSpec, hw: Hardware) -> tuple[Gpu | None, str | None]:
         if hw.runtimes.get(runtime, {}).get("gpu") is False:
             return None, f"the installed {runtime} is a CPU build"
         return any_gpu, None
+    if spec.engine == "sherpa-onnx" and hw.system == "windows" and device.startswith("cuda") and cuda is not None:
+        return None, SHERPA_WINDOWS_CUDA
     if spec.engine in ("sherpa-onnx", "onnxruntime"):
         return (cuda, None) if device.startswith("cuda") and cuda is not None else (None, None)
     return None, None
@@ -399,17 +414,19 @@ def _assess(spec: ModelSpec, hw: Hardware, speed: Speed, siblings: Siblings | No
                 f"{name} has {gigabytes(total)}."
             )
         return cpu
-    if wants not in ("recommended", "required") and cpu.level in ("comfortable", "usable"):
+    measured = GPU_MEASURED.get(spec.engine)
+    if wants not in ("recommended", "required") and cpu.level in ("comfortable", "usable") and not measured:
         cpu.notes.append(f"{name} can run it too; GPU speed was never measured by the maintainers")
         return cpu
-    fit = Fit("usable", "", device="gpu", memory_kind="vram", memory_basis=basis)
+    fit = Fit("comfortable" if measured else "usable", "", device="gpu", memory_kind="vram", memory_basis=basis)
     fit.memory_needed_bytes = need
     fit.memory_available_bytes = total
     size = f"about {gigabytes(need)} of {gigabytes(total)}" if need is not None and total is not None else "unknown"
     shared = " (memory shared with the system)" if gpu.unified_memory else ""
-    fit.reason = (
-        f"Should fit on {name}{shared}: needs {size} ({_basis_words(basis)}); "
-        "its speed on a GPU was never measured by the maintainers, so the level is a guess."
+    fit.reason = f"Should fit on {name}{shared}: needs {size} ({_basis_words(basis)}); " + (
+        f"{measured}."
+        if measured
+        else "its speed on a GPU was never measured by the maintainers, so the level is a guess."
     )
     if need is not None and gpu.vram_free_bytes is not None and need > gpu.vram_free_bytes:
         fit.notes.append(f"only {gigabytes(gpu.vram_free_bytes)} of GPU memory is free right now")

@@ -410,6 +410,51 @@ async def gpu_core(settings: Settings, nv: FakeNvml) -> Bolo:
     return core
 
 
+async def test_a_model_whose_runtime_fell_back_reads_as_on_the_cpu(
+    settings: Settings, gpu: FakeNvml, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Placed on the GPU, but the runtime did not start CUDA (a DLL missing) and runs on the CPU: the load says so,
+    and the placement, `bolo ps` and the "loaded" event say CPU, with the missing library."""
+    from bolo import cuda_libs
+    from bolo.engines.fake import FakeEngine
+
+    placed = FakeEngine.load
+
+    def load(self: FakeEngine, kind: str, task: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Any:
+        model = placed(self, kind, task, path, spec, opts)
+        if spec.get("falls_back"):
+            gpu.ours -= int(spec.get("gpu_mb", 100)) * MB  # nothing reached the GPU
+            cuda_libs.record(
+                cuda_libs.ProviderFallback("onnxruntime", "CUDAExecutionProvider", missing=["cublasLt64_13.dll"])
+            )
+        return model
+
+    monkeypatch.setattr(FakeEngine, "load", load)
+    core = await gpu_core(settings, gpu)
+    try:
+        published: list[dict[str, Any]] = []
+        real_publish = core.events.publish
+        monkeypatch.setattr(
+            core.events, "publish", lambda t, p=None: published.append({"type": t, **(p or {})}) or real_publish(t, p)
+        )
+        add(core, "lost", falls_back=True)
+        entry = await core.manager.load("lost")
+        assert entry.model.seen_device == "cuda:0"  # type: ignore[attr-defined]  # what it was given
+        p = entry.placement
+        assert p.device == "cpu" and p.gpu_bytes == 0 and entry.processor() == "100% CPU" and entry.vram_bytes == 0
+        assert "cublasLt64_13.dll is missing" in (p.notice or "") and "runs on the CPU" in (p.notice or "")
+        (fallback,) = p.to_dict()["provider_fallback"]
+        assert fallback["requested"] == "CUDAExecutionProvider" and fallback["missing"] == ["cublasLt64_13.dll"]
+        row = next(m for m in core.stats()["models"] if m["id"] == "lost")
+        assert row["device"] == "cpu" and row["processor"] == "100% CPU"
+        event = next(e for e in published if e["type"] == "model" and e.get("id") == "lost")
+        assert event["event"] == "loaded" and "cublasLt64_13.dll" in event["notice"]
+        add(core, "fine")
+        assert (await core.manager.load("fine")).placement.device == "cuda:0"
+    finally:
+        await core.stop()
+
+
 async def test_models_go_on_the_gpu_while_they_fit(settings: Settings, gpu: FakeNvml) -> None:
     settings.gpu_reserve_mb = 512
     core = await gpu_core(settings, gpu)

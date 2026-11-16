@@ -4,6 +4,11 @@ The engines that run ONNX graphs themselves (Nemotron diarization, DiCoW, the SN
 Orpheus-family voices, the end-of-turn model and in-process speech-to-speech) ask here which
 providers to use. A device this ONNX Runtime build cannot serve falls back to the CPU with one
 warning; the CPU is always last in the list, so operators a provider lacks still run.
+
+They open their sessions through :func:`create_session`, which readies CUDA's libraries first (bolo.cuda_libs) and
+then checks what the session got: ONNX Runtime falls back to the CPU on its own when a provider does not start (a
+CUDA DLL missing, say), with nothing but a line on standard error, so bolo logs it with the missing library and
+records it for the model's load (its notice, and its placement moved to the CPU).
 """
 
 from __future__ import annotations
@@ -96,12 +101,72 @@ def providers_for(device: str | None, available: list[str] | None = None) -> lis
             f"device {device!r} asks for {wanted}, which this ONNX Runtime build does not have "
             f"(it has {', '.join(have)}); the ONNX Runtime engines run on the CPU" + (f": {hint}" if hint else ""),
         )
+        from bolo import cuda_libs
+
+        recipe = {"CUDAExecutionProvider": cuda_libs.ORT_CUDA_RECIPE, "DmlExecutionProvider": DIRECTML_RECIPE}
+        cuda_libs.record(
+            cuda_libs.ProviderFallback(
+                "onnxruntime", wanted, CPU, [], f"this ONNX Runtime build has no {wanted}", recipe.get(wanted, "")
+            )
+        )
         return [CPU]
     if index.isdigit() and wanted in _WITH_DEVICE_ID:
         return [(wanted, {"device_id": int(index)}), CPU]
     if wanted == "DmlExecutionProvider":
         return [_dml(default_dml_index()), CPU]
     return [wanted, CPU]
+
+
+def _name(provider: Any) -> str:
+    return str(provider[0] if isinstance(provider, (tuple, list)) else provider)
+
+
+def create_session(
+    model: Any, sess_options: Any = None, providers: list[Any] | None = None, *, role: str | None = None
+) -> Any:
+    """``onnxruntime.InferenceSession(model, sess_options, providers)``, readied and checked.
+
+    Before a session that asks for CUDA, the CUDA libraries of NVIDIA's pip wheels are made loadable (once:
+    :func:`bolo.cuda_libs.prepare_ort_cuda`). After it, an accelerator that was asked for and is not among the
+    session's providers is a :class:`~bolo.cuda_libs.ProviderFallback`: logged once with the library ONNX Runtime
+    said was missing, and recorded for the load in progress (:func:`bolo.cuda_libs.watch`)."""
+    import onnxruntime as ort
+
+    from bolo import cuda_libs
+
+    chosen = list(providers or [CPU])
+    asked = [n for n in (_name(p) for p in chosen) if n != CPU]
+    if not asked:
+        return ort.InferenceSession(model, sess_options=sess_options, providers=chosen)
+    if "CUDAExecutionProvider" in asked:
+        cuda_libs.prepare_ort_cuda()
+    with cuda_libs.native_stderr() as said:
+        session = ort.InferenceSession(model, sess_options=sess_options, providers=chosen)
+    got = getattr(session, "get_providers", None)
+    if got is None:  # a stand-in
+        return session
+    running = [str(p) for p in got()]
+    lost = [p for p in asked if p not in running]
+    if not lost:
+        cuda_libs.record(accelerated=True)
+        return session
+    text = "".join(said)
+    for wanted in lost:
+        missing = cuda_libs.missing_libraries(text)
+        recipe = ""
+        if wanted == "CUDAExecutionProvider":
+            if not missing:
+                missing = cuda_libs.unloadable(cuda_libs.ort_cuda_libraries(cuda_libs.ort_cuda_major()))
+            recipe = cuda_libs.CUDA_RECIPE
+        elif wanted == "DmlExecutionProvider":
+            recipe = DIRECTML_RECIPE
+        lines = [ln for ln in text.splitlines() if wanted.removesuffix("ExecutionProvider") in ln or "rror" in ln]
+        fallback = cuda_libs.ProviderFallback(
+            "onnxruntime", wanted, running[0] if running else CPU, missing, "\n".join(lines[-3:]), recipe, role
+        )
+        _warn_once(f"fallback:{wanted}:{','.join(missing)}", fallback.message())
+        cuda_libs.record(fallback)
+    return session
 
 
 def sherpa_provider(device: str | None) -> str:
