@@ -219,7 +219,7 @@ written by `server/tools/gen_docs.py` from the catalog, with the heuristic
 speed factor (no benchmark) and every engine taken as installed:
 
 <!-- BEGIN GENERATED: example-machines -->
-**The reference machine: 4 x86-64 cores with AVX-512 and AMX, 16 GB, no GPU** (speed factor 1.00; of 367 entries: 204 comfortable, 62 usable, 59 slow, 16 unlikely to fit, 20 cloud, 6 not available yet)
+**The reference machine: 4 x86-64 cores with AVX-512 and AMX, 16 GB, no GPU** (speed factor 1.00; of 367 entries: 204 comfortable, 60 usable, 59 slow, 18 unlikely to fit, 20 cloud, 6 not available yet)
 
 | For | Default pick | Fit | Expected RTF (range) | Basis |
 | --- | --- | --- | --- | --- |
@@ -230,7 +230,7 @@ speed factor (no benchmark) and every engine taken as installed:
 | Text to speech, Hindi, voice-over | `kokoro-v1.0` | usable | 0.76 (0.38 to 1.52) | measured, scaled |
 | Speaker diarization | `nemotron-3-diarization` | comfortable | 0.039 (0.019 to 0.078) | measured, scaled |
 
-**A small board: 4 ARM cores with NEON only, 4 GB (Raspberry Pi 4 class)** (speed factor 0.30; of 367 entries: 80 comfortable, 108 usable, 100 slow, 53 unlikely to fit, 20 cloud, 6 not available yet)
+**A small board: 4 ARM cores with NEON only, 4 GB (Raspberry Pi 4 class)** (speed factor 0.30; of 367 entries: 80 comfortable, 107 usable, 97 slow, 57 unlikely to fit, 20 cloud, 6 not available yet)
 
 | For | Default pick | Fit | Expected RTF (range) | Basis |
 | --- | --- | --- | --- | --- |
@@ -241,7 +241,7 @@ speed factor (no benchmark) and every engine taken as installed:
 | Text to speech, Hindi, voice-over | `piper-hi-in-rohan-medium` | comfortable | 0.31 (0.15 to 0.61) | measured, scaled |
 | Speaker diarization | `nemotron-3-diarization` | comfortable | 0.13 (0.065 to 0.26) | measured, scaled |
 
-**A container: 1.5 cores of an AVX2 server, 2 GB memory limit** (speed factor 0.32; of 367 entries: 96 comfortable, 97 usable, 70 slow, 78 unlikely to fit, 20 cloud, 6 not available yet)
+**A container: 1.5 cores of an AVX2 server, 2 GB memory limit** (speed factor 0.32; of 367 entries: 96 comfortable, 96 usable, 70 slow, 79 unlikely to fit, 20 cloud, 6 not available yet)
 
 | For | Default pick | Fit | Expected RTF (range) | Basis |
 | --- | --- | --- | --- | --- |

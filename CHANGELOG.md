@@ -28,8 +28,20 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   docs/measurements/speaker-similarity-calibration.json). Shown when a voice is created with a score model, by
   `GET /api/v1/voices/{id}/score`, `bolo voices score`, and as `speaker_similarity` in `bolo bench` / `POST
   /api/v1/bench` for models that clone voices. Setting `voice_similarity_model`.
-- **Cloning measured on CPU** for the llama-server models that run here (docs/voices.md, "Measured: cloning on
-  CPU"; `server/tools/measure_cloning.py`).
+- **Cloning measured on CPU** (docs/voices.md, "Measured: cloning on CPU"; `server/tools/measure_cloning.py`): on
+  llama-server, Pocket TTS in its six languages, Chatterbox Turbo and Qwen3-TTS 1.7B Base; on audio.cpp v0.9.4 (built
+  from source), Pocket TTS, MOSS-TTS Nano, XTTS v2, Plapre 3, OmniVoice (ran, did not clone) and Qwen3-TTS 0.6B
+  Base. Those 14 entries are now `validated: cpu` with their speaker similarity.
+
+### Fixed
+
+- `chatterbox-multilingual-v3-llamacpp` sets a 4096-token context: llama-server's default reserved about 13 GB and was
+  killed on a 15 GB machine.
+- `xtts-v2-audiocpp` names its GPT GGUF (audio.cpp refuses a folder with two) and no longer sends `reference_text`,
+  which audio.cpp refuses for XTTS v2 (new entry option `reference_text: false`).
+- The Chatterbox entries no longer say their output carries Resemble's Perth watermark: llama.cpp and audio.cpp do
+  not run the watermarker, and Resemble's detector found none in Chatterbox Turbo's output.
+- `zonos3-mini-audiocpp` says that audio.cpp v0.9.4 has no zonos3 family.
 - **Tontaube** (`tontaube-v1.1-int4`, alias `tontaube`, and `tontaube-v1.1`): a new tts-server runtime `tontaube`
   for the Tontaube inference server (craitech/tontaube v1.1.0), operator-run (`tts_servers`) or started by bolo
   (`bolo components install tontaube` clones the pinned tag; `uv run --python 3.12 --frozen tontaube serve` with

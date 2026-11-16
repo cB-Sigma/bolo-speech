@@ -27,7 +27,8 @@ The kind ``orpheus-llamacpp`` (Orpheus, Veena, Svara, snorTTS) uses the same lla
 own client, :mod:`bolo.engines.orpheus_llamacpp`: bolo builds the prompt, streams token ids from ``/completion``
 and decodes the SNAC codes with onnxruntime.
 
-Other per-entry options: ``cloning`` (the model takes a reference recording), ``send_language`` (tell the server
+Other per-entry options: ``cloning`` (the model takes a reference recording), ``reference_text`` (false: never send
+the reference's transcript, for audio.cpp families that refuse it), ``send_language`` (tell the server
 the language of the text), ``language_option`` (audio.cpp: also as the model option ``language``),
 ``language_names`` (send English language names instead of codes), ``language_map``, ``speed`` (the
 server honours ``speed``), ``stream`` (ask for streamed audio), ``request`` (extra request fields), and voices
@@ -495,7 +496,7 @@ class ServerTTS(TTSModel):
             body["language"] = language
         if ref_audio is not None:
             body["voice_ref"] = {"type": "base64", "data": base64.b64encode(ref_audio).decode()}
-            if ref_text:
+            if ref_text and self.spec.get("reference_text", True):  # false: the family refuses the field (XTTS v2)
                 body["reference_text"] = ref_text
         elif send_voice:
             body["voice"] = send_voice

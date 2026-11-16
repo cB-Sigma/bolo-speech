@@ -161,30 +161,39 @@ Where the score appears:
 Every model that clones voices and could run on the test machine (4 vCPUs of
 a 2.1 GHz Xeon, no GPU, 15 GB RAM, **shared with other jobs**, so speeds are
 pessimistic), through bolo's own code path (a saved voice, `core.synthesize`,
-llama.cpp b12375's `llama-server` started by bolo, 4 threads), measured with
+a server started by bolo, 4 threads: llama.cpp b12375's `llama-server`, and
+audio.cpp v0.9.4's `audiocpp_server` built from source here because the
+prebuilt release needs glibc 2.43), measured with
 `server/tools/measure_cloning.py` on 2026-11-15/16. The voices: two LibriSpeech
 dev-clean speakers (CC BY 4.0; ids 2277 and 84), about 15 s each with
 transcripts. Each model spoke one test sentence in its language. Figures are
 "speaker 2277 / speaker 84"; raw data in
 [measurements/voice-cloning-cpu.json](measurements/voice-cloning-cpu.json).
 
-| Model | Language | Cloned | Similarity to the reference | Highest to 14 other people | Its stock voice vs the reference | RTF | First audio | Round-trip WER |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `pocket-tts-en-llamacpp` | en | partly | 0.48 / 0.66 | 0.38 / 0.45 | 0.18 / 0.11 | 0.43 / 0.47 | 1.4 / 1.6 s | 0 / 0 % |
-| `pocket-tts-de-llamacpp` | de | weakly | 0.27 / 0.46 | 0.29 / 0.28 | 0.02 / 0.18 | 0.45 / 0.49 | 1.4 / 1.6 s | 18 / 0 % |
-| `pocket-tts-es-llamacpp` | es | weakly | 0.22 / 0.44 | 0.27 / 0.33 | 0.07 / 0.16 | 0.47 / 0.46 | 1.4 / 1.6 s | 79 / 37 % |
-| `pocket-tts-fr-llamacpp` | fr | weakly | 0.32 / 0.44 | 0.34 / 0.21 | -0.02 / 0.18 | 0.66 / 0.69 | 1.9 / 2.1 s | 50 / 50 % |
-| `pocket-tts-it-llamacpp` | it | partly | 0.39 / 0.37 | 0.38 / 0.30 | 0.12 / 0.32 | 0.40 / 0.44 | 1.3 / 1.6 s | 50 / 28 % |
-| `pocket-tts-pt-llamacpp` | pt | weakly | 0.24 / 0.39 | 0.31 / 0.28 | 0.00 / 0.32 | 0.68 / 0.63 | 2.1 / 2.3 s | 28 / 56 % |
-| `chatterbox-turbo-llamacpp` | en | yes | 0.73 / 0.70 | 0.37 / 0.51 | 0.23 / 0.06 | 3.63 / 3.06 | 20.3 / 17.8 s | 5 / 0 % |
-| `qwen3-tts-1.7b-base-llamacpp` | en | yes | 0.55 / 0.69 | 0.33 / 0.40 | 0.20 / 0.24 | 2.32 / 2.43 | 12.0 / 11.8 s | 0 / 0 % |
+| Model | Runtime | Language | Cloned | Similarity to the reference | Highest to 14 other people | Its stock voice vs the reference | RTF | First audio | Round-trip WER |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `pocket-tts-en-llamacpp` | llama-server | en | partly | 0.48 / 0.66 | 0.38 / 0.45 | 0.18 / 0.11 | 0.43 / 0.47 | 1.4 / 1.6 s | 0 / 0 % |
+| `pocket-tts-de-llamacpp` | llama-server | de | weakly | 0.27 / 0.46 | 0.29 / 0.28 | 0.02 / 0.18 | 0.45 / 0.49 | 1.4 / 1.6 s | 18 / 0 % |
+| `pocket-tts-es-llamacpp` | llama-server | es | weakly | 0.22 / 0.44 | 0.27 / 0.33 | 0.07 / 0.16 | 0.47 / 0.46 | 1.4 / 1.6 s | 79 / 37 % |
+| `pocket-tts-fr-llamacpp` | llama-server | fr | weakly | 0.32 / 0.44 | 0.34 / 0.21 | -0.02 / 0.18 | 0.66 / 0.69 | 1.9 / 2.1 s | 50 / 50 % |
+| `pocket-tts-it-llamacpp` | llama-server | it | partly | 0.39 / 0.37 | 0.38 / 0.30 | 0.12 / 0.32 | 0.40 / 0.44 | 1.3 / 1.6 s | 50 / 28 % |
+| `pocket-tts-pt-llamacpp` | llama-server | pt | weakly | 0.24 / 0.39 | 0.31 / 0.28 | 0.00 / 0.32 | 0.68 / 0.63 | 2.1 / 2.3 s | 28 / 56 % |
+| `chatterbox-turbo-llamacpp` | llama-server | en | yes | 0.73 / 0.70 | 0.37 / 0.51 | 0.23 / 0.06 | 3.63 / 3.06 | 20.3 / 17.8 s | 5 / 0 % |
+| `qwen3-tts-1.7b-base-llamacpp` | llama-server | en | yes | 0.55 / 0.69 | 0.33 / 0.40 | 0.20 / 0.24 | 2.32 / 2.43 | 12.0 / 11.8 s | 0 / 0 % |
+| `pocket-tts-en-audiocpp` | audio.cpp | en | yes | 0.55 / 0.58 | 0.37 / 0.45 | 0.13 / 0.18 | 9.71 / 18.91 | 45.1 / 92.3 s | 0 / 0 % |
+| `moss-tts-nano-100m-audiocpp` | audio.cpp | en | yes | 0.59 / 0.71 | 0.32 / 0.62 | 0.09 / 0.05 | 1.05 / 1.47 | 6.0 / 9.4 s | 5 / 5 % |
+| `xtts-v2-audiocpp` | audio.cpp | en | yes | 0.52 / 0.71 | 0.44 / 0.49 | 0.17 / 0.30 | 1.36 / 1.67 | 6.3 / 11.4 s | 0 / 0 % |
+| `plapre-3-audiocpp` | audio.cpp | da | partly | 0.36 / 0.65 | 0.29 / 0.45 | 0.04 / 0.01 | 3.49 / 3.71 | 29.6 / 27.6 s | n/a (English text) |
+| `omnivoice-audiocpp` | audio.cpp | en | no | 0.09 / 0.15 | 0.25 / 0.21 | -0.04 / 0.33 | 45.09 / 37.85 | 229.1 / 210.4 s | 100 / 10 % |
+| `qwen3-tts-0.6b-base-audiocpp` | audio.cpp | en | yes | 0.71 / 0.73 | 0.32 / 0.46 | 0.16 / 0.23 | 3.24 / 4.34 | 17.6 / 20.1 s | 0 / 0 % |
 
 * **Cloned**: yes when both clones score 0.50 or more (what the same real
   person scores); partly when one does, or when both are closer to their own
-  reference than to any of the 14 other speakers; weakly otherwise (some
-  likeness: every clone is well above the model's stock voice, but not
-  clearly the person). Chatterbox Turbo and
-  Qwen3-TTS Base copy the voice best; Pocket TTS clones in English and less so
+  reference than to any of the 14 other speakers; no when neither is; weakly
+  otherwise (some likeness, above the model's stock voice, but not clearly
+  the person). Chatterbox Turbo and
+  Qwen3-TTS Base (both sizes), MOSS-TTS Nano and XTTS v2 copy the voice best;
+  OmniVoice on audio.cpp ran but did not clone; Pocket TTS clones in English and less so
   in its other languages, where the English references are spoken in German,
   Spanish, French, Italian or Portuguese.
 * **Round-trip WER**: `moonshine-tiny-en` for English, `whisper-base` for the
@@ -201,10 +210,21 @@ transcripts. Each model spoke one test sentence in its language. Figures are
   cloned ("Hello there." came back exactly, similarity 0.53 to one of bolo's
   reference clips) but took 306 s for 1.2 s of audio, past bolo's 300 s read
   timeout.
-* **Not run**: the audio.cpp models (the prebuilt release needs glibc 2.43;
-  this machine has 2.39), the bolo-torch models F5-TTS, Spark-TTS and MaskGCT
-  (PyTorch plugin, several GB, non-commercial licences) and Tontaube (below).
-  They stay `validated: untested`.
+* **audio.cpp fixes found by running it**: `xtts-v2-audiocpp` needed its GPT
+  GGUF named (`model_file`; the server refuses a folder with two GGUFs) and
+  must not be sent `reference_text` (audio.cpp answers 500 for it); both are now
+  in the entry. A source build has no compiled-in model specs, so these runs
+  passed `--model-spec-override <audio.cpp>/model_specs` (setting
+  `tts_server_args`); the release builds compile them in.
+  `zonos3-mini-audiocpp` cannot run on v0.9.4: that release has no zonos3
+  family. Plapre 3 is Danish and was given the English sentence, so its WER is
+  not a measure. audio.cpp on a CPU is slow (Pocket TTS ran at RTF 10 to 19
+  there against 0.4 to 0.5 on llama.cpp; OmniVoice at RTF 40); its authors
+  target CUDA.
+* **Not run**: the other 25 audio.cpp cloning entries (larger downloads and
+  slower on this CPU than the time allowed), the bolo-torch models F5-TTS,
+  Spark-TTS and MaskGCT (PyTorch plugin, several GB, non-commercial licences)
+  and Tontaube (below). They stay `validated: untested`.
 
 ## Tontaube
 
@@ -262,3 +282,13 @@ articulation), and `temperature` and `seed`:
 `speed` other than 1.0 is refused (use `rate`). The server answers each
 sentence whole (`POST /predict`), so the first audio comes when the first
 sentence is done.
+
+**Not run here.** The test machine (4 vCPUs with AVX2, FMA and F16C, so the
+CPU path would apply) had 8 to 14 GB of disk free and 15 GB of memory, both
+shared with other jobs. The first start needs the 1.8 GB weights, the
+server's locked dependencies (PyTorch 2.9.1 with its CUDA libraries, vLLM
+0.16, transformers and more: several GB), W2V-BERT 2.0 (2.3 GB) and, unless
+`ENABLE_VIBEVOICE=0`, VibeVoice-1.5B (5.4 GB), and loads W2V-BERT and the four
+codebook models into memory; other jobs on the machine were already being
+killed for lack of memory. Both entries stay `validated: untested`; the
+engine is tested against a fake Tontaube server, managed start included.

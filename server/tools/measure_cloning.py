@@ -37,7 +37,7 @@ import numpy as np
 
 from bolo import similarity
 from bolo.audio import decode_audio
-from bolo.config import Settings
+from bolo.config import load_settings
 from bolo.core import Bolo
 from bolo.obs.trace import Trace
 from bolo.voices import clean_reference
@@ -90,7 +90,7 @@ async def speak(core: Bolo, text: str, model: str, voice: str | None, custom: bo
 
 async def run(args: argparse.Namespace) -> dict[str, Any]:
     meta = json.loads(Path(args.refs, "meta.json").read_text())
-    core = Bolo(Settings(data_dir=Path(os.environ["BOLO_DATA_DIR"]), auto_pull=False, threads=args.threads))
+    core = Bolo(load_settings(None, {"auto_pull": False, "threads": args.threads}))  # BOLO_* variables apply
     await core.start()
     results: dict[str, Any] = {
         "date": time.strftime("%Y-%m-%d"),

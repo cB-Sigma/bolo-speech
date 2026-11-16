@@ -765,7 +765,18 @@
     audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU recommended,
     about 3.1 GB. audio.cpp also streams this family (stream: true in the catalog options, served with mode streaming).'
   source_url: https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 3.237
+    ttfa_ms: 17611
+    audio_s: 5.44
+    round_trip_wer: 0.0
+    speaker_similarity: 0.72
+    threads: 4
+    engine: audio.cpp v0.9.4 audiocpp_server built from source here (CPU, Release; the prebuilt release needs glibc 2.43), model specs from the source tree (--model-spec-override), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-16'
+    note: 'server/tools/measure_cloning.py (docs/measurements/voice-cloning-cpu.json): cloned two LibriSpeech dev-clean speakers (CC BY 4.0, about 15 s each, saved voices) and spoke one test sentence: libri-2277 similarity 0.714 (others at most 0.317, its stock voice 0.159); libri-84 similarity 0.726 (others at most 0.458, its stock voice 0.226). Round trip by moonshine-tiny-en. One run after a warm-up; the machine was shared.'
   requires: [audio.cpp]
   source:
     repo: audio-cpp/audio.cpp-gguf
@@ -838,7 +849,18 @@
     that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU optional, about 0.7 GB.
     audio.cpp also streams this family (stream: true in the catalog options, served with mode streaming).'
   source_url: https://huggingface.co/kyutai/pocket-tts
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 9.713
+    ttfa_ms: 45069
+    audio_s: 4.64
+    round_trip_wer: 0.0
+    speaker_similarity: 0.566
+    threads: 4
+    engine: audio.cpp v0.9.4 audiocpp_server built from source here (CPU, Release; the prebuilt release needs glibc 2.43), model specs from the source tree (--model-spec-override), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-16'
+    note: 'server/tools/measure_cloning.py (docs/measurements/voice-cloning-cpu.json): cloned two LibriSpeech dev-clean speakers (CC BY 4.0, about 15 s each, saved voices) and spoke one test sentence: libri-2277 similarity 0.551 (others at most 0.366, its stock voice 0.131); libri-84 similarity 0.581 (others at most 0.448, its stock voice 0.182). Round trip by moonshine-tiny-en. One run after a warm-up; the machine was shared.'
   requires: [audio.cpp]
   source:
     repo: audio-cpp/audio.cpp-gguf
@@ -1021,7 +1043,18 @@
     (setting tts_servers). GPU optional, about 0.8 GB. audio.cpp also streams this family (stream: true in the catalog options,
     served with mode streaming).'
   source_url: https://huggingface.co/OpenMOSS-Team/MOSS-TTS-Nano-100M
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 1.051
+    ttfa_ms: 5969
+    audio_s: 5.68
+    round_trip_wer: 0.053
+    speaker_similarity: 0.649
+    threads: 4
+    engine: audio.cpp v0.9.4 audiocpp_server built from source here (CPU, Release; the prebuilt release needs glibc 2.43), model specs from the source tree (--model-spec-override), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-16'
+    note: 'server/tools/measure_cloning.py (docs/measurements/voice-cloning-cpu.json): cloned two LibriSpeech dev-clean speakers (CC BY 4.0, about 15 s each, saved voices) and spoke one test sentence: libri-2277 similarity 0.587 (others at most 0.317, its stock voice 0.094); libri-84 similarity 0.712 (others at most 0.623, its stock voice 0.048). Round trip by moonshine-tiny-en. One run after a warm-up; the machine was shared.'
   requires: [audio.cpp]
   source:
     repo: audio-cpp/audio.cpp-gguf
@@ -1061,7 +1094,18 @@
     components install audio.cpp) or one you run (setting tts_servers). GPU recommended, about 2.3 GB. audio.cpp also streams
     this family (stream: true in the catalog options, served with mode streaming).'
   source_url: https://huggingface.co/k2-fsa/OmniVoice
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 37.849
+    ttfa_ms: 210438
+    audio_s: 5.56
+    round_trip_wer: 0.552
+    speaker_similarity: 0.121
+    threads: 4
+    engine: audio.cpp v0.9.4 audiocpp_server built from source here (CPU, Release; the prebuilt release needs glibc 2.43), model specs from the source tree (--model-spec-override), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-16'
+    note: 'server/tools/measure_cloning.py (docs/measurements/voice-cloning-cpu.json): cloned two LibriSpeech dev-clean speakers (CC BY 4.0, about 15 s each, saved voices) and spoke one test sentence: libri-2277 similarity 0.091 (others at most 0.247, its stock voice -0.037); libri-84 similarity 0.151 (others at most 0.207, its stock voice 0.328). Round trip by moonshine-tiny-en. One run after a warm-up; the machine was shared. It did not clone: the output was not closer to its reference than to other people.'
   requires: [audio.cpp]
   source:
     repo: audio-cpp/audio.cpp-gguf
@@ -1319,7 +1363,18 @@
     Non-commercial licence. Non-commercial use only. Runs in an audiocpp_server that bolo starts (bolo components install
     audio.cpp) or one you run (setting tts_servers). GPU recommended, about 1.2 GB.'
   source_url: https://huggingface.co/onicubag/xTTSv2-GGUF
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 1.356
+    ttfa_ms: 6348
+    audio_s: 4.68
+    round_trip_wer: 0.0
+    speaker_similarity: 0.614
+    threads: 4
+    engine: audio.cpp v0.9.4 audiocpp_server built from source here (CPU, Release; the prebuilt release needs glibc 2.43), model specs from the source tree (--model-spec-override), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-16'
+    note: 'server/tools/measure_cloning.py (docs/measurements/voice-cloning-cpu.json): cloned two LibriSpeech dev-clean speakers (CC BY 4.0, about 15 s each, saved voices) and spoke one test sentence: libri-2277 similarity 0.52 (others at most 0.437, its stock voice 0.169); libri-84 similarity 0.708 (others at most 0.487, its stock voice 0.302). Round trip by moonshine-tiny-en. One run after a warm-up; the machine was shared.'
   requires: [audio.cpp]
   source:
     repo: onicubag/xTTSv2-GGUF
@@ -1329,8 +1384,11 @@
   options:
     runtime: audio.cpp
     family: xtts_v2
+    # audio.cpp refuses a folder with two GGUFs; its docs say to pass the GPT GGUF (the vocoder is found next to it)
+    model_file: xtts-v2-gpt-q8_0.gguf
     server_model: xtts-v2-audiocpp
     cloning: true
+    reference_text: false  # audio.cpp v0.9.4 answers 500 "unknown XTTS v2 request option: reference_text"
     send_language: true
     hardware: {gpu: recommended, vram_gb: 1.2, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
     language_option: true
@@ -1609,7 +1667,7 @@
   commercial_use: true
   gated: false
   features: [voice-cloning]
-  description: 'ZONOS3-Mini on audio.cpp (zonos3, community there). Languages: en, fr, de, es, it, pt, ja, zh, ko. Clones
+  description: 'ZONOS3-Mini on audio.cpp (zonos3, community there). Not in audio.cpp v0.9.4 (the pinned release): its source has no zonos3 family and the server refused the model here (2026-11-16), so it needs a newer audio.cpp. Languages: en, fr, de, es, it, pt, ja, zh, ko. Clones
     a voice from reference audio (reference_audio, or the reference-clip voices). Runtime code ported from Zyphra/ZONOS3
     (MIT); optional zyphra-textnorm (MIT) is linked only with `AUDIOCPP_ZONOS3_TEXTNORM`. Runs in an audiocpp_server that
     bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU recommended, about 2.0 GB.
@@ -1875,7 +1933,17 @@
     you run (setting tts_servers). GPU recommended, about 2.0 GB. audio.cpp also streams this family (stream: true in the
     catalog options, served with mode streaming).'
   source_url: https://huggingface.co/syvai/plapre-3
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 3.487
+    ttfa_ms: 29568
+    audio_s: 8.48
+    speaker_similarity: 0.504
+    threads: 4
+    engine: audio.cpp v0.9.4 audiocpp_server built from source here (CPU, Release; the prebuilt release needs glibc 2.43), model specs from the source tree (--model-spec-override), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-16'
+    note: 'server/tools/measure_cloning.py (docs/measurements/voice-cloning-cpu.json): cloned two LibriSpeech dev-clean speakers (CC BY 4.0, about 15 s each, saved voices) and spoke one test sentence: libri-2277 similarity 0.356 (others at most 0.288, its stock voice 0.039); libri-84 similarity 0.652 (others at most 0.452, its stock voice 0.015). Round trip by whisper-base. One run after a warm-up; the machine was shared. The test sentence was English (this is a Danish model), so the round-trip WER says nothing.'
   requires: [audio.cpp]
   source:
     repo: audio-cpp/audio.cpp-gguf

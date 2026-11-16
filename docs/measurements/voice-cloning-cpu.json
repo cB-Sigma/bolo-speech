@@ -261,10 +261,197 @@
       },
       "cloned": true,
       "similarity_mean": 0.622
+    },
+    "pocket-tts-en-audiocpp": {
+      "language": "en",
+      "text": "The quick brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+      "asr": "moonshine-tiny-en",
+      "voices": {
+        "libri-2277": {
+          "similarity": 0.551,
+          "impostor": 0.366,
+          "rtf": 9.713,
+          "ttfa_ms": 45069,
+          "audio_s": 4.64,
+          "wer": 0.0,
+          "heard": "The quick brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+          "stock_voice": "alba",
+          "stock_similarity": 0.131
+        },
+        "libri-84": {
+          "similarity": 0.581,
+          "impostor": 0.448,
+          "rtf": 18.908,
+          "ttfa_ms": 92270,
+          "audio_s": 4.88,
+          "wer": 0.0,
+          "heard": "The quick brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+          "stock_voice": "alba",
+          "stock_similarity": 0.182
+        }
+      },
+      "cloned": true,
+      "similarity_mean": 0.566
+    },
+    "moss-tts-nano-100m-audiocpp": {
+      "language": "en",
+      "text": "The quick brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+      "asr": "moonshine-tiny-en",
+      "voices": {
+        "libri-2277": {
+          "similarity": 0.587,
+          "impostor": 0.317,
+          "rtf": 1.051,
+          "ttfa_ms": 5969,
+          "audio_s": 5.68,
+          "wer": 0.053,
+          "heard": "Like, quick brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+          "stock_voice": "default",
+          "stock_similarity": 0.094
+        },
+        "libri-84": {
+          "similarity": 0.712,
+          "impostor": 0.623,
+          "rtf": 1.465,
+          "ttfa_ms": 9377,
+          "audio_s": 6.4,
+          "wer": 0.053,
+          "heard": "The click brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+          "stock_voice": "default",
+          "stock_similarity": 0.048
+        }
+      },
+      "cloned": true,
+      "similarity_mean": 0.649
+    },
+    "xtts-v2-audiocpp": {
+      "language": "en",
+      "text": "The quick brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+      "asr": "moonshine-tiny-en",
+      "voices": {
+        "libri-2277": {
+          "similarity": 0.52,
+          "impostor": 0.437,
+          "rtf": 1.356,
+          "ttfa_ms": 6348,
+          "audio_s": 4.68,
+          "wer": 0.0,
+          "heard": "The quick brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+          "stock_voice": "heart",
+          "stock_similarity": 0.169
+        },
+        "libri-84": {
+          "similarity": 0.708,
+          "impostor": 0.487,
+          "rtf": 1.668,
+          "ttfa_ms": 11385,
+          "audio_s": 6.83,
+          "wer": 0.0,
+          "heard": "The quick brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+          "stock_voice": "heart",
+          "stock_similarity": 0.302
+        }
+      },
+      "cloned": true,
+      "similarity_mean": 0.614
+    },
+    "plapre-3-audiocpp": {
+      "language": "da",
+      "text": "The quick brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+      "asr": "whisper-base",
+      "voices": {
+        "libri-2277": {
+          "similarity": 0.356,
+          "impostor": 0.288,
+          "rtf": 3.487,
+          "ttfa_ms": 29568,
+          "audio_s": 8.48,
+          "wer": 0.895,
+          "heard": "Vækk er af vores fokshum over læsse dog, og så røn er rænende til at rænse.",
+          "stock_voice": "default",
+          "stock_similarity": 0.039
+        },
+        "libri-84": {
+          "similarity": 0.652,
+          "impostor": 0.452,
+          "rtf": 3.715,
+          "ttfa_ms": 27642,
+          "audio_s": 7.44,
+          "wer": 1.0,
+          "heard": "og den gælde frænende frænende frænende frænende frænende frænende frænende frænende frænende fræ",
+          "stock_voice": "default",
+          "stock_similarity": 0.015
+        }
+      },
+      "cloned": false,
+      "similarity_mean": 0.504
+    },
+    "omnivoice-audiocpp": {
+      "language": "en",
+      "text": "The quick brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+      "asr": "moonshine-tiny-en",
+      "voices": {
+        "libri-2277": {
+          "similarity": 0.091,
+          "impostor": 0.247,
+          "rtf": 45.091,
+          "ttfa_ms": 229063,
+          "audio_s": 5.08,
+          "wer": 1.0,
+          "heard": "",
+          "stock_voice": "default",
+          "stock_similarity": -0.037
+        },
+        "libri-84": {
+          "similarity": 0.151,
+          "impostor": 0.207,
+          "rtf": 37.849,
+          "ttfa_ms": 210438,
+          "audio_s": 5.56,
+          "wer": 0.105,
+          "heard": "The place down Fox jumps over the lazy dog and then it runs back home before the rain starts.",
+          "stock_voice": "default",
+          "stock_similarity": 0.328
+        }
+      },
+      "cloned": false,
+      "similarity_mean": 0.121
+    },
+    "qwen3-tts-0.6b-base-audiocpp": {
+      "language": "en",
+      "text": "The quick brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+      "asr": "moonshine-tiny-en",
+      "voices": {
+        "libri-2277": {
+          "similarity": 0.714,
+          "impostor": 0.317,
+          "rtf": 3.237,
+          "ttfa_ms": 17611,
+          "audio_s": 5.44,
+          "wer": 0.0,
+          "heard": "The quick brown fox jumps over the lazy dog and then it runs back home before the rain starts.",
+          "stock_voice": "heart",
+          "stock_similarity": 0.159
+        },
+        "libri-84": {
+          "similarity": 0.726,
+          "impostor": 0.458,
+          "rtf": 4.339,
+          "ttfa_ms": 20131,
+          "audio_s": 4.64,
+          "wer": 0.0,
+          "heard": "The quick brown fox jumps over the lazy dog, and then it runs back home before the rain starts.",
+          "stock_voice": "heart",
+          "stock_similarity": 0.226
+        }
+      },
+      "cloned": true,
+      "similarity_mean": 0.72
     }
   },
   "not_run": {
-    "chatterbox-multilingual-v3-llamacpp": "llama-server's default context reserved about 13 GB and was killed for lack of memory (fixed: context_size 4096 in the entry, 2.3 GB). With it, 'Hello there.' (1.2 s, a reference clip of bolo's) took 306 s straight to llama-server: transcribed back exactly, similarity 0.53 to the clip, but far too slow to measure the test sentences on this CPU; bolo's 300 s read timeout (tts_server_timeout_s) ended the run through bolo."
+    "chatterbox-multilingual-v3-llamacpp": "llama-server's default context reserved about 13 GB and was killed for lack of memory (fixed: context_size 4096 in the entry, 2.3 GB). With it, 'Hello there.' (1.2 s, a reference clip of bolo's) took 306 s straight to llama-server: transcribed back exactly, similarity 0.53 to the clip, but far too slow to measure the test sentences on this CPU; bolo's 300 s read timeout (tts_server_timeout_s) ended the run through bolo.",
+    "zonos3-mini-audiocpp": "audio.cpp v0.9.4 has no zonos3 family (no model spec, no source): the server refuses the model."
   },
   "watermark_check": {
     "what": "Is Resemble's Perth watermark in Chatterbox output through bolo?",
@@ -280,5 +467,10 @@
       }
     },
     "conclusion": "llama.cpp's Chatterbox does not watermark; the catalog no longer says it does."
+  },
+  "runtime_audiocpp": "audio.cpp v0.9.4 audiocpp_server built from source here (CPU, Release; the prebuilt release needs glibc 2.43), model specs from the source tree (--model-spec-override), started by bolo",
+  "notes": {
+    "plapre-3-audiocpp": "a Danish model given the English test sentence (no Danish sentence in the script then); its WER is not meaningful",
+    "omnivoice-audiocpp": "ran, but did not clone: its output is not closer to the reference than to other people"
   }
 }

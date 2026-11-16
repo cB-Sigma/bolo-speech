@@ -535,3 +535,14 @@ def test_tontaube_component_is_a_pinned_checkout(tmp_path: Path, core: Bolo, mon
     shutil.rmtree(tts_runtimes.install_dir(core.settings, "tontaube"))
     assert "not the pinned commit" in str(core.components.install_runtime_blocking("tontaube"))
     assert not core.components.is_installed("tontaube")
+
+
+def test_audiocpp_families_that_refuse_the_reference_text() -> None:
+    spec = {"cloning": True, "sample_rate": 24000, "reference_text": False, "model_id": "x"}
+    model = ServerTTS("audio.cpp", "x", spec, base_url="http://127.0.0.1:9")
+    extras = SynthesisExtras(reference_audio=wav_bytes(1.0), reference_text="the words")
+    body = model.build_request("Hi.", None, 1.0, extras)
+    assert body["voice_ref"]["type"] == "base64" and "reference_text" not in body
+    model.spec["reference_text"] = True
+    assert model.build_request("Hi.", None, 1.0, extras)["reference_text"] == "the words"
+    model.close()

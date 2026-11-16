@@ -64,7 +64,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-344 models: 127 validated on CPU by the maintainers, 217 untested. 20 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
+344 models: 133 validated on CPU by the maintainers, 211 untested. 20 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
 
 ### Speech to text
 
@@ -522,22 +522,22 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `voxcpm2-audiocpp` (VoxCPM2 2B) | en, ar, da, de, el, es +24 | accuracy | - | 3.0 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
 | `magpie-tts-multilingual-357m-audiocpp` (NVIDIA Magpie TTS Multilingual 357M) | en, ar, de, es, fr, hi +5 | accuracy | - | 1.6 GB | NVIDIA Open Model License · runs on audio.cpp · GPU recommended | untested |
 | `maya1-audiocpp` (Maya1 3B) | en | accuracy | - | 4.0 GB | Apache-2.0 AND MIT · runs on audio.cpp · GPU required | untested |
-| `qwen3-tts-0.6b-base-audiocpp` (Qwen3-TTS 0.6B Base) | en, de, es, fr, it, ja +4 | accuracy | - | 2.0 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
+| `qwen3-tts-0.6b-base-audiocpp` (Qwen3-TTS 0.6B Base) | en, de, es, fr, it, ja +4 | accuracy | - | 2.0 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | **CPU** · RTF 3.237 · first audio 17611 ms · round-trip WER 0.0% · cloned voice: speaker similarity 0.72 |
 | `qwen3-tts-1.7b-customvoice-audiocpp` (Qwen3-TTS 1.7B CustomVoice) | en, de, es, fr, it, ja +4 | accuracy | - | 2.8 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
-| `pocket-tts-en-audiocpp` (Kyutai Pocket TTS (English)) | en | balanced | - | 134 MB | CC-BY-4.0 · runs on audio.cpp | untested |
+| `pocket-tts-en-audiocpp` (Kyutai Pocket TTS (English)) | en | balanced | - | 134 MB | CC-BY-4.0 · runs on audio.cpp | **CPU** · RTF 9.713 · first audio 45069 ms · round-trip WER 0.0% · cloned voice: speaker similarity 0.57 |
 | `soprano-1.1-80m-audiocpp` (Soprano 1.1 80M) | en | balanced | - | 123 MB | Apache-2.0 · runs on audio.cpp | untested |
 | `supertonic-3-audiocpp` (Supertonic 3) | en, ar, bg, cs, da, de +25 | accuracy | - | 454 MB | BigScience OpenRAIL-M · runs on audio.cpp · GPU recommended | untested |
 | `kitten-tts-2-audiocpp` (Kitten TTS 2) | en, ar, de, es, fr, hi +10 | accuracy | - | 3.3 GB | Stellon Labs Community License ⚠ · runs on audio.cpp · GPU recommended | untested |
 | `moss-tts-local-v1.5-audiocpp` (MOSS-TTS Local Transformer v1.5) | en, ar, cs, da, de, el +25 | accuracy | - | 7.5 GB | Apache-2.0 · runs on audio.cpp · GPU required | untested |
-| `moss-tts-nano-100m-audiocpp` (MOSS-TTS Nano 100M) | en, ar, cs, da, de, el +13 | balanced | - | 193 MB | Apache-2.0 · runs on audio.cpp | untested |
-| `omnivoice-audiocpp` (OmniVoice) | - | accuracy | - | 1.4 GB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · GPU recommended | untested |
+| `moss-tts-nano-100m-audiocpp` (MOSS-TTS Nano 100M) | en, ar, cs, da, de, el +13 | balanced | - | 193 MB | Apache-2.0 · runs on audio.cpp | **CPU** · RTF 1.051 · first audio 5969 ms · round-trip WER 5.3% · cloned voice: speaker similarity 0.65 |
+| `omnivoice-audiocpp` (OmniVoice) | - | accuracy | - | 1.4 GB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · GPU recommended | **CPU** · RTF 37.849 · first audio 210438 ms · round-trip WER 55.2% · cloned voice: speaker similarity 0.12 |
 | `voxtral-4b-tts-audiocpp` (Voxtral 4B TTS) | en, ar, de, es, fr, hi +3 | accuracy | - | 8.0 GB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · GPU required | untested |
 | `fish-audio-s2-pro-audiocpp` (Fish Audio S2 Pro) | - | accuracy | - | 6.3 GB | Fish Audio Research License ⚠ · runs on audio.cpp · GPU required | untested |
 | `fish-drama-3-audiocpp` (Fish Audio Drama 3) | - | accuracy | - | 24.6 GB | Fish Audio Community License v1.0 ⚠ · runs on audio.cpp · GPU required | untested |
 | `higgs-tts-3-4b-audiocpp` (Higgs TTS 3 4B) | - | accuracy | - | 5.1 GB | Boson Higgs TTS 3 Research and Non-Commercial License ⚠ · runs on audio.cpp · GPU required | untested |
 | `indextts-2-audiocpp` (IndexTTS-2) | en, ar, es, ja, zh | accuracy | - | 3.6 GB | bilibili Model Use License ⚠ · runs on audio.cpp · GPU recommended | untested |
 | `vibevoice-1.5b-audiocpp` (VibeVoice 1.5B) | en, zh | accuracy | - | 3.2 GB | MIT · runs on audio.cpp · GPU recommended | untested |
-| `xtts-v2-audiocpp` (Coqui XTTS v2) | en, ar, cs, de, es, fr +11 | accuracy | - | 568 MB | Coqui Public Model License 1.0.0 ⚠ · runs on audio.cpp · GPU recommended | untested |
+| `xtts-v2-audiocpp` (Coqui XTTS v2) | en, ar, cs, de, es, fr +11 | accuracy | - | 568 MB | Coqui Public Model License 1.0.0 ⚠ · runs on audio.cpp · GPU recommended | **CPU** · RTF 1.356 · first audio 6348 ms · round-trip WER 0.0% · cloned voice: speaker similarity 0.61 |
 | `outetts-1.0-1b-audiocpp` (OuteTTS 1.0 1B) | en, ar, be, bn, de, es +17 | accuracy | - | 3.0 GB | CC-BY-NC-SA-4.0 ⚠ · runs on audio.cpp · GPU recommended | untested |
 | `neutts-2e-audiocpp` (NeuTTS 2E) | en | accuracy | - | 3.0 GB | NeuTTS Open License v1.0 ⚠ · runs on audio.cpp · GPU recommended | untested |
 | `sanotts-hi-audiocpp` (sanoTTS (Hindi voice)) | hi | balanced | - | 6 MB | GPL-3.0 · runs on audio.cpp | untested |
@@ -552,7 +552,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `gradium-phonon-31m-audiocpp` (Gradium Phonon 31M) | en | balanced | - | 85 MB | Apache-2.0 · runs on audio.cpp | untested |
 | `audio8-tts-0.6b-audiocpp` (Audio8 TTS Preview 0.6B) | en, de, es, fr, it, ja +5 | accuracy | - | 1.4 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
 | `confucius4-tts-audiocpp` (Confucius4-TTS) | en, de, es, fr, id, it +8 | accuracy | - | 8.2 GB | Apache-2.0 · runs on audio.cpp · GPU required | untested |
-| `plapre-3-audiocpp` (Plapre 3 (Danish)) | da | accuracy | - | 1.1 GB | CC-BY-4.0 · runs on audio.cpp · GPU recommended | untested |
+| `plapre-3-audiocpp` (Plapre 3 (Danish)) | da | accuracy | - | 1.1 GB | CC-BY-4.0 · runs on audio.cpp · GPU recommended | **CPU** · RTF 3.487 · first audio 29568 ms · cloned voice: speaker similarity 0.50 |
 | `echo-tts-audiocpp` (Echo-TTS) | en | accuracy | - | 3.0 GB | CC-BY-NC-SA-4.0 ⚠ · runs on audio.cpp · GPU recommended | untested |
 | `lfm3-audio-2b-audiocpp` (LFM3-Audio 2B) | en, ar, da, de, el, es +12 | accuracy | - | 2.2 GB | LFM Open License v1.0 ⚠ · runs on audio.cpp · GPU recommended | untested |
 | `indextts-2.5-audiocpp` (IndexTTS-2.5) | en, ar, es, ja, zh | accuracy | - | 3.5 GB | bilibili Model Use License ⚠ · runs on audio.cpp · GPU recommended | untested |
@@ -1680,10 +1680,13 @@ languages, Chatterbox Turbo and Qwen3-TTS 1.7B Base, which are now
 [voices.md, "Measured: cloning on CPU"](voices.md#measured-cloning-on-cpu).
 Chatterbox Multilingual V3 needed a smaller context to load (now set) and then
 took about 5 minutes per short sentence on this CPU, so it stays untested.
+On audio.cpp v0.9.4, built from source because the release binary needs
+glibc 2.43 (this machine has 2.39), Pocket TTS, MOSS-TTS Nano, XTTS v2, Plapre
+3, OmniVoice and Qwen3-TTS 0.6B Base ran (`validated: cpu`; OmniVoice did not
+clone); XTTS v2 needed two entry fixes, and ZONOS3-Mini is not in v0.9.4.
 Everything else is `validated: untested`: the request fields come from each
 project's documentation and server source (read 2026-11-14), and the engine is
-tested against fake servers. The audio.cpp release binary does not start on
-this machine (glibc 2.39), so no audio.cpp model was run here.
+tested against fake servers.
 
 ## Orpheus-family voices on llama.cpp (Svara, Veena, Orpheus, snorTTS)
 
