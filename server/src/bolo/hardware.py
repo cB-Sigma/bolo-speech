@@ -832,6 +832,17 @@ def _same_card(adapter: Any, nvidia: list[Gpu]) -> Gpu | None:
 
 
 # -- runtimes ---------------------------------------------------------------------------------------------------
+def _sherpa_gpu(mod: Any) -> bool | None:
+    """Whether the sherpa-onnx module is a CUDA build (None: cannot tell)."""
+    from bolo.ort_providers import sherpa_build
+
+    try:
+        where = getattr(mod, "__file__", None)
+        return sherpa_build(Path(where).parent if where else None, [_version(mod) or ""])
+    except Exception:
+        return None
+
+
 def _version(mod: Any) -> str | None:
     version = getattr(mod, "__version__", None)
     return str(version) if version else None
@@ -965,8 +976,9 @@ def detect_runtimes(host: Host, settings: Settings | None = None, deep: bool = F
     out["sherpa-onnx"] = {
         "installed": sherpa is not None,
         "version": _version(sherpa) if sherpa is not None else None,
-        # it carries its own ONNX Runtime; the wheel on PyPI is the CPU build, a CUDA wheel exists (not told apart)
-        "gpu": None if sherpa is not None else False,
+        # it carries its own ONNX Runtime; the wheel on PyPI is the CPU build, its CUDA build has ONNX Runtime's
+        # CUDA provider next to it (bolo.ort_providers.sherpa_build)
+        "gpu": _sherpa_gpu(sherpa) if sherpa is not None else False,
     }
 
     ct2 = host.module("ctranslate2")

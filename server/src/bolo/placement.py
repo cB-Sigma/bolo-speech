@@ -45,6 +45,14 @@ ENGINE_FAMILIES: dict[str, frozenset[str]] = {
     "tts-server": frozenset({"cuda", "metal", "rocm", "vulkan"}),
     "fake": frozenset({"cuda", "metal", "rocm", "vulkan", *_ORT}),
 }
+#: (engine, kind) -> device families that cannot run such a model although the engine can use them, and why: it is
+#: placed on the CPU with that reason as its notice (bolo.lifecycle.ModelManager.device_for)
+CPU_ONLY_ON: dict[tuple[str, str], dict[str, str]] = {
+    ("onnxruntime", "smart_turn"): {
+        "dml": "DirectML cannot run the end-of-turn model (ONNX Runtime fails in its Reshape node 'node_view_1' "
+        "with 8007023E, on every adapter); it is 8 MB and takes 13-39 ms on the CPU",
+    },
+}
 #: model kinds of the onnxruntime engine made of several graphs, placed graph by graph
 GRAPH_KINDS = ("dicow_onnx", "lfm3_audio_onnx")
 #: share of a llama.cpp model's size added for its KV cache and compute buffers when offloading layers

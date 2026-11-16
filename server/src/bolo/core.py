@@ -1112,6 +1112,9 @@ class Bolo:
         except BoloError as exc:
             log.warning("end-of-turn model unavailable (%s); falling back to silence only", exc.message)
             return None
+        except Exception as exc:  # a runtime error in the model: the session goes on, ending turns on silence
+            log.warning("end-of-turn model failed (%s: %s); falling back to silence only", type(exc).__name__, exc)
+            return None
 
     # ------------------------------------------------------------------
     # speech to text

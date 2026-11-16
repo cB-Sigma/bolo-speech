@@ -45,6 +45,26 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   platform (CUDA on Linux, where neither project publishes one) installed the CPU build and reported a plain install.
   It now says that the CPU build is what runs, and names the way to the GPU (the Vulkan build, or a build of your own
   in `llama_server_bin` / `audiocpp_server_bin`): on the command line, in the log and as a warning on the job.
+- **The end-of-turn model (`smart-turn-v3`) failed on DirectML**, on every adapter (ONNX Runtime: Reshape node
+  `node_view_1`, `MLOperatorAuthorImpl.cpp(2597)`, 8007023E), and the error ended realtime sessions with
+  `semantic_vad`. With `device = "dml"` it is now placed on the CPU (8 MB, 13-39 ms there), with a notice saying why;
+  its placement and `bolo ps` say `cpu`. An accelerated end-of-turn session that fails while running is replaced by
+  a CPU session once, the request is answered from it, and the model's placement moves to the CPU; any other error
+  of the end-of-turn model makes a session fall back to ending turns on silence instead of failing. Found on a
+  Windows 11 laptop (Radeon iGPU and RTX 3060 Laptop GPU, onnxruntime-directml 1.24.4).
+- **`device = "auto"` with onnxruntime-directml ran the ONNX Runtime engines on the CPU** on a machine with an
+  NVIDIA GPU: `auto` meant `cuda:0`, which onnxruntime-directml has no provider for, and the warning advised
+  installing onnxruntime-gpu. For the ONNX Runtime engines `auto` now means the first provider the installed
+  `onnxruntime` has (CUDA with an NVIDIA GPU, ROCm, DirectML on the high-performance adapter, Core ML; else the CPU);
+  faster-whisper keeps CUDA. Asked for `cuda`, onnxruntime-directml now says that `dml` (or `auto`) uses the GPU, and
+  how to swap it for onnxruntime-gpu; `bolo doctor` says the same.
+- **sherpa-onnx models were reported on the GPU while they ran on the CPU** (`whisper-base` with `device = "cuda"`:
+  "100% GPU", `cuda:0`, while sherpa-onnx said "Please compile with -DSHERPA_ONNX_ENABLE_GPU=ON ... Fallback to
+  cpu!"). bolo now tells a CUDA build of sherpa-onnx from a CPU build (ONNX Runtime's CUDA provider library in its
+  package's `lib` folder, or a `+cuda` version) and places a CPU build's models on the CPU, with one notice naming
+  why; a build it cannot tell apart that falls back at load time is recorded like ONNX Runtime's provider fallbacks
+  and moved to the CPU. `bolo doctor`, `bolo recommend` and `GET /api/v1/hardware` (`runtimes.sherpa-onnx.gpu`) say
+  whether the installed sherpa-onnx is a CPU or a GPU build.
 - **Live transcription from a microphone with a streaming model (`zipformer-en-20m-streaming`) gave no text, or lost
   its first words** ("Speech servers" came out as "ers"). Seen in the console in Edge and Chrome on Windows. The
   recogniser heard the room before anyone spoke, and its own endpointing reset the stream whenever it had decoded

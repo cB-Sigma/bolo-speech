@@ -13,7 +13,10 @@ records it for the model's load (its notice, and its placement moved to the CPU)
 
 from __future__ import annotations
 
+import contextlib
+import functools
 import logging
+from pathlib import Path
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -95,7 +98,7 @@ def providers_for(device: str | None, available: list[str] | None = None) -> lis
         _warn_once(kind, f"device {device!r} is not known to ONNX Runtime engines; they run on the CPU")
         return [CPU]
     if wanted not in have:
-        hint = "install onnxruntime-gpu in place of onnxruntime" if wanted == "CUDAExecutionProvider" else ""
+        hint = cuda_hint(have) if wanted == "CUDAExecutionProvider" else ""
         _warn_once(
             kind,
             f"device {device!r} asks for {wanted}, which this ONNX Runtime build does not have "
@@ -103,7 +106,7 @@ def providers_for(device: str | None, available: list[str] | None = None) -> lis
         )
         from bolo import cuda_libs
 
-        recipe = {"CUDAExecutionProvider": cuda_libs.ORT_CUDA_RECIPE, "DmlExecutionProvider": DIRECTML_RECIPE}
+        recipe = {"CUDAExecutionProvider": cuda_hint(have), "DmlExecutionProvider": DIRECTML_RECIPE}
         cuda_libs.record(
             cuda_libs.ProviderFallback(
                 "onnxruntime", wanted, CPU, [], f"this ONNX Runtime build has no {wanted}", recipe.get(wanted, "")
@@ -115,6 +118,47 @@ def providers_for(device: str | None, available: list[str] | None = None) -> lis
     if wanted == "DmlExecutionProvider":
         return [_dml(default_dml_index()), CPU]
     return [wanted, CPU]
+
+
+#: the ``device`` that reaches each provider of :data:`AUTO_ORDER`
+DEVICE_BY_PROVIDER = {
+    "CUDAExecutionProvider": "cuda",
+    "ROCMExecutionProvider": "rocm",
+    "DmlExecutionProvider": "dml",
+    "CoreMLExecutionProvider": "coreml",
+}
+
+
+def auto_device(found: str | None, available: list[str] | None = None) -> str:
+    """What ``device = "auto"`` means for the engines that open ONNX Runtime sessions themselves.
+
+    ``found`` is the accelerator bolo.accel found (``cuda:0``, ``coreml`` or None). The answer is the first provider
+    of :data:`AUTO_ORDER` this ONNX Runtime build has, as a ``device``: ``cuda`` only when an NVIDIA GPU was found
+    (onnxruntime-gpu on a machine without one accelerates nothing), ``dml`` for onnxruntime-directml (Windows'
+    high-performance adapter, as :func:`providers_for` runs ``dml``), ``rocm``, ``coreml``; ``cpu`` when the build
+    has none. So onnxruntime-directml on a laptop with an NVIDIA GPU runs on DirectML, not on the CPU for want of a
+    CUDA provider it does not have; engines with their own CUDA (faster-whisper, sherpa-onnx) still get ``cuda``."""
+    have = available if available is not None else available_providers()
+    for provider in AUTO_ORDER:
+        if provider not in have:
+            continue
+        if provider == "CUDAExecutionProvider" and not (found or "").startswith("cuda"):
+            continue
+        return DEVICE_BY_PROVIDER[provider]
+    return "cpu"
+
+
+def cuda_hint(have: list[str]) -> str:
+    """How to get ONNX Runtime's CUDA provider, given the providers this build has: onnxruntime-directml (it has
+    DirectML) is told that ``dml`` (or ``auto``) uses its GPU, and how to swap it for onnxruntime-gpu."""
+    if "DmlExecutionProvider" in have:
+        return (
+            'this is onnxruntime-directml: device = "dml" (or "auto") runs them on the GPU through DirectML; for CUDA '
+            'instead: pip uninstall -y onnxruntime-directml, then pip install "onnxruntime-gpu[cuda,cudnn]"'
+        )
+    from bolo import cuda_libs
+
+    return cuda_libs.ORT_CUDA_RECIPE
 
 
 def _name(provider: Any) -> str:
@@ -169,14 +213,85 @@ def create_session(
     return session
 
 
+#: how to get a sherpa-onnx that runs on CUDA
+SHERPA_CUDA_RECIPE = (
+    "install sherpa-onnx's CUDA build in place of the one from PyPI (https://k2-fsa.github.io/sherpa/onnx/cuda.html)"
+)
+
+
+def sherpa_build(package_dir: Path | None, versions: list[str] | None = None) -> bool | None:
+    """Whether a sherpa-onnx installation can use CUDA: True for a GPU build, False for a CPU build, None when it
+    cannot be told.
+
+    sherpa-onnx carries its own ONNX Runtime library in its package's ``lib`` folder (``onnxruntime.dll``,
+    ``libonnxruntime.so``); its CUDA builds have ONNX Runtime's CUDA provider next to it
+    (``onnxruntime_providers_cuda.dll``, ``libonnxruntime_providers_cuda.so``) and a version such as ``1.12.0+cuda``.
+    The wheels on PyPI are CPU builds: asked for ``cuda``, they say "Please compile with -DSHERPA_ONNX_ENABLE_GPU=ON"
+    and run on the CPU."""
+    if any("+cuda" in (v or "").lower() for v in versions or []):
+        return True
+    if package_dir is None:
+        return None
+    names: list[str] = []
+    for folder in (package_dir / "lib", package_dir, package_dir.parent / f"{package_dir.name}.libs"):
+        with contextlib.suppress(OSError):
+            if folder.is_dir():
+                names += [f.name.lower() for f in folder.iterdir()]
+    if any("onnxruntime_providers_cuda" in n for n in names):
+        return True
+    if any(n.startswith(("onnxruntime", "libonnxruntime")) for n in names):
+        return False
+    return None
+
+
+@functools.lru_cache(maxsize=1)
+def sherpa_gpu_build() -> bool | None:
+    """:func:`sherpa_build` for the installed sherpa-onnx (None when it is not installed or cannot be told). Read
+    from the files, without importing it."""
+    import importlib.util
+    from importlib import metadata
+
+    try:
+        spec = importlib.util.find_spec("sherpa_onnx")
+    except (ImportError, ValueError):
+        return None
+    if spec is None:
+        return None
+    origin = spec.origin or next(iter(spec.submodule_search_locations or []), None)
+    package_dir = (Path(origin).parent if spec.origin else Path(origin)) if origin else None
+    versions: list[str] = []
+    for dist in ("sherpa-onnx", "sherpa-onnx-core"):
+        with contextlib.suppress(metadata.PackageNotFoundError):
+            versions.append(metadata.version(dist))
+    return sherpa_build(package_dir, versions)
+
+
+def sherpa_cpu_notice(model_id: str | None = None) -> str:
+    """Why a sherpa-onnx model asked to run on CUDA runs on the CPU (a CPU build of sherpa-onnx)."""
+    from importlib import metadata
+
+    version = ""
+    with contextlib.suppress(metadata.PackageNotFoundError):
+        version = " " + metadata.version("sherpa-onnx")
+    who = f"'{model_id}' runs" if model_id else "its models run"
+    return (
+        f"the installed sherpa-onnx{version} is a CPU build (no CUDA provider in its package): {who} on the CPU; "
+        f"for CUDA, {SHERPA_CUDA_RECIPE}"
+    )
+
+
 def sherpa_provider(device: str | None) -> str:
     """sherpa-onnx's ``provider`` string for ``device`` (bolo uses ``cpu``, ``cuda`` and ``coreml``).
 
     sherpa-onnx knows a ``directml`` provider only when it was built with DirectML, and its wheels on PyPI are not
     (asked for it, they fall back to the CPU saying "DirectML is for Windows only"), so ``device = "dml"`` runs
-    sherpa-onnx engines on the CPU, with one notice."""
+    sherpa-onnx engines on the CPU, with one notice. ``cuda`` with a CPU build of sherpa-onnx (:func:`sherpa_gpu_build`,
+    the wheels on PyPI) is the CPU too, with one notice."""
     name = (device or "cpu").strip().lower().partition(":")[0]
     if name in ("cuda", "gpu"):
+        if sherpa_gpu_build() is False:
+            _warn_once("sherpa-cpu-build", sherpa_cpu_notice())
+            return "cpu"
         return "cuda"
     if name in ("coreml", "mps", "metal"):
         return "coreml"
@@ -230,10 +345,16 @@ def ort_problems(device: str | None, packages: dict[str, str], providers: list[s
     if wanted and providers is not None and wanted not in providers and packages:
         if wanted == "DmlExecutionProvider":
             out.append(f"device {device!r} needs DirectML in ONNX Runtime, which this one lacks: {DIRECTML_RECIPE}")
+        elif wanted == "CUDAExecutionProvider" and "onnxruntime-directml" in packages:
+            out.append(
+                f"device {device!r}: this ONNX Runtime is onnxruntime-directml, which has no CUDA provider; "
+                'device = "dml" (or "auto") runs the ONNX Runtime engines on the GPU through DirectML, or for CUDA: '
+                "pip uninstall -y onnxruntime-directml, then pip install onnxruntime-gpu"
+            )
         elif wanted == "CUDAExecutionProvider":
             out.append(
                 f"device {device!r}: this ONNX Runtime has no CUDA provider; pip uninstall -y onnxruntime, then "
-                "pip install onnxruntime-gpu (faster-whisper and sherpa-onnx bring their own CUDA support)"
+                "pip install onnxruntime-gpu (faster-whisper brings its own CUDA support)"
             )
         else:
             out.append(f"device {device!r}: this ONNX Runtime has no {wanted}")

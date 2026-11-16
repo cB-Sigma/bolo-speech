@@ -30,7 +30,7 @@ from typing import Any
 
 import psutil
 
-from bolo import cuda_libs, gpu_health
+from bolo import cuda_libs, gpu_health, ort_providers
 from bolo.accel import Accelerators, our_pids
 from bolo.catalog import Catalog, ModelSpec
 from bolo.config import Settings
@@ -50,6 +50,7 @@ from bolo.keepalive import REQUEST_KEEP_ALIVE, parse_keep_alive
 from bolo.llama_args import has_gpu_flags
 from bolo.obs.events import EventBus
 from bolo.placement import (
+    CPU_ONLY_ON,
     MB,
     LayerInfo,
     Placement,
@@ -380,13 +381,36 @@ class ModelManager:
         pinned = self.store.model_settings(spec.id).get("device") or spec.options.get("device")
         return str(pinned or self.settings.device or "cpu").strip().lower()
 
-    def resolve_device(self, requested: str) -> str:
+    def resolve_device(self, requested: str, engine: str | None = None) -> str:
         """``auto`` -> the accelerator found (``cuda`` when there are NVIDIA GPUs: one is picked per model; else
-        ``coreml``) or ``cpu``; anything else as it is."""
+        ``coreml``) or ``cpu``; anything else as it is.
+
+        For the ``onnxruntime`` engine ``auto`` is what the installed ONNX Runtime can reach
+        (:func:`bolo.ort_providers.auto_device`): with onnxruntime-directml that is ``dml`` (Windows' high-performance
+        adapter), not ``cuda`` it has no provider for."""
         if requested in ("", "auto"):
             found = self.accel.default_device()
+            if engine == "onnxruntime":
+                device = ort_providers.auto_device(found)
+                if device == "dml" and getattr(self.accel, "directml", True) is False:
+                    self.accel.directml = True  # read DirectML adapters' memory (DXGI) for placement and ps
+                return device
             return "cuda" if found and found.startswith("cuda") else (found or "cpu")
         return requested
+
+    def device_for(self, spec: ModelSpec, requested: str | None = None) -> tuple[str, str | None]:
+        """The device ``spec`` is placed on (``requested`` resolved, :meth:`resolve_device`), and why it is the CPU
+        when the model cannot use the accelerator asked for although its engine generally can: a model DirectML
+        cannot run (:data:`bolo.placement.CPU_ONLY_ON`), a CPU build of sherpa-onnx with ``cuda``."""
+        requested = self.requested_device(spec) if requested is None else requested
+        device = self.resolve_device(requested, spec.engine)
+        fam = family(device)
+        reason = CPU_ONLY_ON.get((spec.engine, spec.kind), {}).get(fam)
+        if reason:
+            return "cpu", f"'{spec.id}' runs on the CPU, not {device}: {reason}"
+        if spec.engine == "sherpa-onnx" and fam == "cuda" and ort_providers.sherpa_gpu_build() is False:
+            return "cpu", ort_providers.sherpa_cpu_notice(spec.id)
+        return device, None
 
     def allowed_gpus(self) -> list[int] | None:
         """NVIDIA GPUs bolo may use, as CUDA numbers them here: the ``gpus`` setting within the visible GPUs (all
@@ -453,7 +477,16 @@ class ModelManager:
             return Placement(device="cloud", requested=requested)
         if remote_url(self.settings, spec) is not None:
             return Placement(device="remote", requested=requested)
-        device = device or self.resolve_device(requested)
+        why = None
+        if device is None:
+            device, why = self.device_for(spec, requested)
+        if why:
+            p = plan(
+                model_id=spec.id, engine_id=spec.engine, requested=requested, device="cpu", split="whole",
+                need_bytes=self.estimate_bytes(spec), available_bytes=None,
+            )  # fmt: skip
+            p.notice = why
+            return p
         need = self.estimate_bytes(spec)
         split = split_mode(spec.engine, spec.kind, spec.options)
         path = self.store.model_dir(spec.id)
@@ -577,7 +610,7 @@ class ModelManager:
     async def place(self, spec: ModelSpec) -> Placement:
         """Decide where a model goes, unloading idle GPU-resident models (LRU) when that lets it fit whole."""
         requested = self.requested_device(spec)
-        device = self.resolve_device(requested)
+        device, _ = self.device_for(spec, requested)
         if family(device) == "cpu" or spec.cloud or spec.engine == "remote":
             return self._plan(spec, None)
         if self.gpu.lost and family(device) in GPU_FAMILIES:
@@ -936,6 +969,8 @@ class ModelManager:
             entry = LoadedModel(spec, model, self._build_queue(spec, model), memory, load_ms)
             entry.vram_bytes, entry.vram_measured, entry.placement = vram, measured, placement
             entry.vram_source = source
+            with contextlib.suppress(AttributeError):  # a model the runtime may move to the CPU says so here
+                model.on_fallback = lambda fallback, e=entry: self._fell_back(e, fallback)
             self.loaded[spec.id] = entry
             log.info(
                 "loaded %s in %.0f ms (~%.0f MB, %s on %s%s)",
@@ -953,6 +988,16 @@ class ModelManager:
             if self.on_gpu(entry) or self.gpu.pending:
                 self.gpu.ensure_running()
             return entry
+
+    def _fell_back(self, entry: LoadedModel, fallback: dict[str, Any]) -> None:
+        """A loaded model's runtime gave up its accelerator while serving and now runs on the CPU (the model said so
+        through ``on_fallback``, from a worker thread): its placement, ``bolo ps`` and the console say the CPU."""
+        entry.placement.fell_back(
+            [*(entry.placement.provider_fallback or []), fallback], str(fallback.get("message") or ""), True
+        )
+        entry.vram_bytes = 0
+        event = {"id": entry.id, "event": "fell_back", "processor": entry.processor(), "notice": entry.placement.notice}
+        self.events.publish_threadsafe("model", event)
 
     async def unload(self, name: str, reason: str = "requested") -> bool:
         spec = self.catalog.resolve(name)

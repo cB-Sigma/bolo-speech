@@ -96,7 +96,7 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `agreement` | `2` | | hypotheses that must agree before a word is shown as stable |
 | `wyoming` | `false` | `--wyoming` | serve the Wyoming protocol |
 | `wyoming_host`, `wyoming_port` | `127.0.0.1`, `10300` | `--wyoming-host`, `--wyoming-port` | Wyoming bind address |
-| `device` | `cpu` | | where models run (per model, as placed by the scheduler: see "GPU and CPU placement" below; a model can pin its own with `PUT /api/v1/models/{id}/settings` `{"device": "cpu"}` or a catalog `options.device`): `cpu`, `cuda` (or `cuda:1`), `coreml` (also `mps`, `metal`), `rocm`, `dml`, `openvino`, or `auto` (the first accelerator found). sherpa-onnx models use `cuda` or `coreml`; faster-whisper uses `cuda`; the ONNX Runtime engines (Nemotron diarization, DiCoW ONNX, the Orpheus-family decoder, the end-of-turn model, in-process speech-to-speech) use the matching execution provider when the installed `onnxruntime` has it (for `cuda`, install `onnxruntime-gpu`; on Windows also its CUDA libraries, see "CUDA on Windows"), and otherwise run on the CPU with one warning; llama-server gets `-ngl N`, the layers that fit in the free accelerator memory (all of them when everything fits; none when nothing does), unless you set `-ngl` yourself in `tts_server_args`, `s2s_server_args` or the entry's `server_args`; audio.cpp gets the device as its backend (`cuda`, `hip` for `rocm`, `vulkan`, `metal` for `coreml`; the CPU for `dml` and `openvino`, which it does not have). With `dml` (Windows, DirectML) only the ONNX Runtime engines use the GPU; sherpa-onnx and faster-whisper run on the CPU (see "Windows" below). **Untested on a GPU** |
+| `device` | `cpu` | | where models run (per model, as placed by the scheduler: see "GPU and CPU placement" below; a model can pin its own with `PUT /api/v1/models/{id}/settings` `{"device": "cpu"}` or a catalog `options.device`): `cpu`, `cuda` (or `cuda:1`), `coreml` (also `mps`, `metal`), `rocm`, `dml`, `openvino`, or `auto` (the first accelerator found; for the ONNX Runtime engines, the first one the installed `onnxruntime` has a provider for: see "GPU and CPU placement"). sherpa-onnx models use `cuda` (only with a CUDA build of sherpa-onnx: the wheels on PyPI are CPU builds, and their models are placed on the CPU with a notice) or `coreml`; faster-whisper uses `cuda`; the ONNX Runtime engines (Nemotron diarization, DiCoW ONNX, the Orpheus-family decoder, the end-of-turn model, in-process speech-to-speech) use the matching execution provider when the installed `onnxruntime` has it (for `cuda`, install `onnxruntime-gpu`; on Windows also its CUDA libraries, see "CUDA on Windows"), and otherwise run on the CPU with one warning; llama-server gets `-ngl N`, the layers that fit in the free accelerator memory (all of them when everything fits; none when nothing does), unless you set `-ngl` yourself in `tts_server_args`, `s2s_server_args` or the entry's `server_args`; audio.cpp gets the device as its backend (`cuda`, `hip` for `rocm`, `vulkan`, `metal` for `coreml`; the CPU for `dml` and `openvino`, which it does not have). With `dml` (Windows, DirectML) only the ONNX Runtime engines use the GPU; sherpa-onnx and faster-whisper run on the CPU (see "Windows" below). **Untested on a GPU** |
 | `gpu_health_interval_s` | `30` | | while models are on a GPU, ask the driver this often whether the GPU is still there (NVML, else nvidia-smi), and also right after a request whose real-time factor is more than twice that model's recent median. `0`: no such checks; a CUDA or Vulkan error printed by a llama-server or audio.cpp bolo started still counts. See "A lost GPU" |
 | `gpu_lost_fallback` | `cpu` | | what happens to the models on a GPU that was lost: `cpu` loads them again on the CPU (the CPU build of llama-server and audio.cpp, every GPU hidden) and places later loads there; `fail` leaves them in place and fails their requests (and later GPU loads) with `engine_unavailable`, for a deployment that would rather fail than run many times slower. See "A lost GPU" |
 | `log_level` | `info` | `--log-level` | `debug`, `info`, `warning`, `error` |
@@ -270,7 +270,14 @@ How a model can be split depends on its runtime:
 | kokoro-onnx, Moonshine, whisper.cpp, cloud and operator-run servers | the CPU (or wherever the operator's server runs) |
 
 `device = "auto"` means the accelerator bolo can read: the first NVIDIA GPU (NVML or nvidia-smi) or Apple Silicon's
-GPU, else the CPU; for ROCm, DirectML or OpenVINO name the device. When the free memory cannot be read (those, or a
+GPU, else the CPU; for ROCm, DirectML or OpenVINO name the device. The ONNX Runtime engines (Nemotron diarization,
+DiCoW ONNX, the end-of-turn model, in-process speech-to-speech) take `auto` as the first provider the installed
+`onnxruntime` has, in the order CUDA (with an NVIDIA GPU found), ROCm, DirectML, Core ML: with `onnxruntime-directml`
+that is `dml` on Windows' high-performance adapter (the discrete GPU of a laptop), even with an NVIDIA GPU, while
+faster-whisper and a CUDA build of sherpa-onnx still get `cuda`; with plain `onnxruntime` (no accelerator) they are
+placed on the CPU. A model placed on an accelerator its runtime does not start (a CUDA library missing, sherpa-onnx
+built without CUDA saying "Fallback to cpu!") is moved to the CPU after its load, with a notice: its placement and
+`bolo ps` say `cpu` and "100% CPU". When the free memory cannot be read (those, or a
 GPU without driver tools), a model goes on the device as before, and `bolo ps` shows the plan rather than a measurement. After each load bolo measures what the
 load took: the growth of its own resident memory and that of the processes it started (llama-server, audio.cpp,
 plugins), and the growth of their accelerator memory (NVML's per-process figures, else the whole device's). On Apple
@@ -430,7 +437,10 @@ Windows lists the integrated GPU (the one driving the display) first, so adapter
 `bolo doctor` and `bolo recommend` suggest `device = "cuda"`, and point out a `dml:N` that pins the integrated GPU.
 Only the engines that open ONNX Runtime sessions themselves use
 it: Nemotron diarization, DiCoW ONNX, the SNAC decoder of the Orpheus-family voices, the end-of-turn model and
-in-process speech-to-speech (`lfm3-audio-2b-onnx`). sherpa-onnx's wheels have no DirectML provider and CTranslate2
+in-process speech-to-speech (`lfm3-audio-2b-onnx`), except the end-of-turn model (`smart-turn-v3`): DirectML fails
+to run it on every adapter (its Reshape node `node_view_1`, error 8007023E), so with `dml` it is placed on the CPU,
+with a notice, where it takes 13-39 ms (8 MB). `device = "auto"` with `onnxruntime-directml` installed means `dml`
+for these engines. sherpa-onnx's wheels have no DirectML provider and CTranslate2
 (faster-whisper) has none at all, so those models stay on the CPU (bolo says so once); llama-server and audio.cpp
 have no DirectML back end (use `cuda` or `vulkan` for them). DirectML needs the `onnxruntime-directml` package in
 place of `onnxruntime`. All the ONNX Runtime packages install the same `onnxruntime` module and overwrite each other,

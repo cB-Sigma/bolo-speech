@@ -43,6 +43,15 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             item.add_marker(skip)
 
 
+@pytest.fixture(autouse=True)
+def _sherpa_build_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Which sherpa-onnx wheel this machine has (PyPI's CPU build, or none) must not move tests' sherpa-onnx models
+    to the CPU: tests that are about it say which build they mean."""
+    from bolo import ort_providers
+
+    monkeypatch.setattr(ort_providers, "sherpa_gpu_build", lambda: None)
+
+
 def speechlike(seconds: float, sample_rate: int = 16000, gap_at: tuple[float, ...] = ()) -> np.ndarray:
     """A loud modulated tone (the energy VAD treats it as speech) with optional 0.8 s gaps."""
     t = np.arange(int(seconds * sample_rate)) / sample_rate

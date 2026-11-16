@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import re
 import threading
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -24,6 +25,7 @@ from typing import Any
 
 import numpy as np
 
+from bolo import ort_providers
 from bolo.engines.base import (
     DiarizationModel,
     Engine,
@@ -875,6 +877,10 @@ class SherpaVoxLock(SeparationModel):
             self._extractors.pop(key, None)
 
 
+#: what sherpa-onnx says on standard error when it was asked for an accelerator it was not built with
+SHERPA_CPU_FALLBACK = re.compile(r"fallback to cpu|SHERPA_ONNX_ENABLE_GPU", re.IGNORECASE)
+
+
 class SherpaOnnxEngine(Engine):
     id = "sherpa-onnx"
     name = "sherpa-onnx"
@@ -893,6 +899,28 @@ class SherpaOnnxEngine(Engine):
             )
 
     def load(self, kind: str, task: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Model:
+        """The model; asked for ``cuda``, also whether sherpa-onnx started it there: a build without CUDA says
+        "Please compile with -DSHERPA_ONNX_ENABLE_GPU=ON ... Fallback to cpu!" on standard error and runs on the CPU,
+        which is recorded as a provider fallback (bolo.cuda_libs), so that the model's placement says the CPU."""
+        if sherpa_provider(opts.device) != "cuda":
+            return self._load(kind, path, spec, opts)
+        from bolo import cuda_libs
+
+        with cuda_libs.native_stderr() as said:
+            model = self._load(kind, path, spec, opts)
+        text = "".join(said)
+        if SHERPA_CPU_FALLBACK.search(text):
+            lines = [ln for ln in text.splitlines() if SHERPA_CPU_FALLBACK.search(ln) or "GPU" in ln]
+            cuda_libs.record(
+                cuda_libs.ProviderFallback(
+                    "sherpa-onnx", "cuda", "cpu", [], "\n".join(lines[-2:]), ort_providers.SHERPA_CUDA_RECIPE
+                )
+            )
+        else:
+            cuda_libs.record(accelerated=True)
+        return model
+
+    def _load(self, kind: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Model:
         if kind in OFFLINE_KINDS:
             return SherpaOfflineSTT(kind, path, spec, opts)
         if kind in ONLINE_KINDS:

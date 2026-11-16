@@ -305,6 +305,12 @@ def gpu_for(spec: ModelSpec, hw: Hardware) -> tuple[Gpu | None, str | None]:
         if hw.runtimes.get(runtime, {}).get("gpu") is False:
             return None, f"the installed {runtime} is a CPU build"
         return any_gpu, None
+    if (
+        spec.engine == "sherpa-onnx"
+        and device.startswith("cuda")
+        and hw.runtimes.get("sherpa-onnx", {}).get("gpu") is False
+    ):
+        return None, "the installed sherpa-onnx is a CPU build"
     if spec.engine == "sherpa-onnx" and hw.system == "windows" and device.startswith("cuda") and cuda is not None:
         return None, SHERPA_WINDOWS_CUDA
     if spec.engine in ("sherpa-onnx", "onnxruntime"):

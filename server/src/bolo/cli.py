@@ -1233,8 +1233,10 @@ def _hardware_lines(hw: dict[str, Any]) -> list[str]:
     else:
         parts.append("onnxruntime not installed")
     sherpa = rt.get("sherpa-onnx", {})
+    sherpa_gpu = sherpa.get("gpu")
+    sherpa_gpu = "GPU build" if sherpa_gpu is True else "CPU build" if sherpa_gpu is False else "GPU build: unknown"
     parts.append(
-        f"sherpa-onnx {sherpa.get('version') or ''} (GPU build: unknown)"
+        f"sherpa-onnx {sherpa.get('version') or ''} ({sherpa_gpu})"
         if sherpa.get("installed")
         else "sherpa-onnx not installed"
     )

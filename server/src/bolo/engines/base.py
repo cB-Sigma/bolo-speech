@@ -147,6 +147,10 @@ class STTStream(abc.ABC):
 class Model(abc.ABC):
     task: str = ""
     sample_rate: int = 16000
+    #: set by the model manager once the model is loaded: called (from a worker thread) with a
+    #: ``bolo.cuda_libs.ProviderFallback.to_dict()`` when the model's runtime gives up its accelerator while serving
+    #: and goes on on the CPU, so that its placement says so
+    on_fallback: Callable[[dict[str, Any]], None] | None = None
 
     def close(self) -> None:  # noqa: B027 - optional hook
         """Release native resources."""
