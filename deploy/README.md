@@ -72,8 +72,11 @@ Register-ScheduledTask -TaskName "bolo" -Action $action -Trigger $trigger -Setti
 Start-ScheduledTask -TaskName "bolo"          # now, without logging off and on
 ```
 
-`-ExecutionTimeLimit ([TimeSpan]::Zero)` keeps Task Scheduler from stopping it after three days; `-RestartCount`
-and `-RestartInterval` start it again when it exits with an error. To run it at start-up before anyone logs on,
+`-ExecutionTimeLimit ([TimeSpan]::Zero)` keeps Task Scheduler from stopping it after three days. `-RestartCount`
+and `-RestartInterval` only apply when the task fails to start: once bolo is running, a crash is recorded as the
+task's "Last Run Result" and nothing starts it again. To restart bolo after a crash, have the task run a small
+restart loop instead ([At log-on, restarted after a crash](../docs/configuration.md#at-log-on-restarted-after-a-crash)),
+or use a service manager below. To run it at start-up before anyone logs on,
 use `-AtStartup` and register it with your account and password (`-User $env:USERNAME -Password ...`, "run whether
 user is logged on or not"), which needs an administrator PowerShell. `Stop-ScheduledTask bolo` stops it (the
 servers bolo started stop with it), `Unregister-ScheduledTask bolo` removes it.
