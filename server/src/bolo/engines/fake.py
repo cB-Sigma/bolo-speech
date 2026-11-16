@@ -176,6 +176,8 @@ class _FakeStream(STTStream):
         self.finished = False
 
     def accept(self, samples: FloatArray) -> None:
+        self.model.heard += len(samples)
+        self.model.peak = max(self.model.peak, float(np.max(np.abs(samples), initial=0.0)))
         quiet = np.abs(samples) < 1e-3
         self.voiced_received += int((~quiet).sum())
         if quiet.all():
@@ -209,7 +211,12 @@ class FakeStreamingSTT(FakeSTT):
         super().__init__(opts)
         self.step_delay_s = float(opts.get("step_delay_s", 0.01))
         self.endpoint_silence_s = float(opts.get("endpoint_silence_s", 0.5))
+        self.stream_preroll_s = float(opts.get("preroll_s", 0.0))
+        level = opts.get("speech_dbfs")
+        self.stream_speech_dbfs = None if level is None else float(level)
         self.stream_calls: list[int] = []
+        self.heard = 0  # samples the streams were given
+        self.peak = 0.0  # loudest of them
 
     def create_stream(self, language: str | None = None) -> STTStream:
         return _FakeStream(self)

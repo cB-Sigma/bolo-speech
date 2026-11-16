@@ -65,6 +65,9 @@ PRE_ROLL_S = 1.5  # audio kept while idle, so an utterance can start before the 
 ONSET_PAD_S = 0.25  # neural VADs report the start a little late, more so on narrow-band audio
 MAX_BACKLOG_S = 30.0
 TAIL_PAD_S = 0.5
+VAD_LAG_S = 2.0  # how far back a VAD may place a start it reports (the energy fallback's patience, and some)
+MAX_GAIN_DB = 24.0  # most a streaming model's quiet speech is raised by
+FRAME = 320  # 20 ms
 
 
 @dataclass
@@ -450,13 +453,72 @@ class _Processor:
         return events
 
 
+def speech_gain(samples: FloatArray, target_dbfs: float, max_gain_db: float = MAX_GAIN_DB) -> float:
+    """The gain that brings speech in ``samples`` up to ``target_dbfs``: 1 for speech already that loud, at most
+    ``max_gain_db``. The speech level is the 90th percentile of the 20 ms frame levels, so pauses do not count."""
+    n = len(samples) // FRAME
+    if n == 0:
+        return 1.0
+    frames = np.asarray(samples[: n * FRAME], dtype=np.float64).reshape(n, FRAME)
+    level = float(np.percentile(np.sqrt(np.mean(np.square(frames), axis=1)), 90))
+    if level <= 1e-6:
+        return 1.0
+    return float(min(max(10.0 ** (target_dbfs / 20.0) / level, 1.0), 10.0 ** (max_gain_db / 20.0)))
+
+
+class PreRoll:
+    """The newest ``seconds`` of audio, with the stream position where it ends."""
+
+    def __init__(self, seconds: float) -> None:
+        self.size = max(0, int(seconds * SR))
+        self.buf = np.zeros(0, dtype=np.float32)
+        self.end = 0  # stream position just after the last sample held
+
+    def push(self, samples: FloatArray, end: int) -> None:
+        """Hold ``samples``, the audio that ends at stream position ``end``."""
+        self.end = end
+        if len(samples) >= self.size:
+            self.buf = np.array(samples[len(samples) - self.size :], dtype=np.float32)
+        elif len(samples):
+            self.buf = np.concatenate([self.buf[max(0, len(self.buf) + len(samples) - self.size) :], samples])
+
+    @property
+    def start(self) -> int:
+        return self.end - len(self.buf)
+
+    def take(self, since: int = 0) -> tuple[FloatArray, int]:
+        """Empty the buffer: the audio held from stream position ``since`` on, and where that audio starts."""
+        start = max(since, self.start)
+        audio = self.buf[start - self.start :]
+        self.buf = np.zeros(0, dtype=np.float32)
+        return audio, start
+
+
 class _NativeProcessor(_Processor):
-    """Incremental decoding with a streaming model."""
+    """Incremental decoding with a streaming model.
+
+    With a VAD and a model that asks for it (``stream_preroll_s``), the recogniser hears only speech: idle audio is
+    held back, the newest ``stream_preroll_s`` of it, and when the VAD hears speech start a fresh stream gets that
+    pre-roll and then the live audio, until the VAD hears speech end. A streaming encoder gives its first words
+    away when it starts on silence it has been fed for a long time, or when its own endpointing resets it mid-word
+    (the 20M Zipformer turned "Speech servers" into "ers", and quiet microphone speech into nothing at all).
+    Without a VAD, or for a model that wants every sample (a cloud provider's live socket), the recogniser hears
+    everything and its own endpointing ends utterances.
+    """
 
     def __init__(self, session: STTSession, entry: LoadedModel, stt: STTModel, detector: VadDetector | None) -> None:
         super().__init__(session, entry, stt, detector)
         self.stream: STTStream = stt.create_stream(session.cfg.language)
-        self.base = 0  # stream position where the current utterance began
+        self.gated = detector is not None and stt.stream_preroll_s > 0
+        self.preroll_n = int(stt.stream_preroll_s * SR)
+        # a VAD reports a start after it (a neural one by a few hundred milliseconds, the energy fallback by up to its
+        # patience), so more than the pre-roll is held
+        self.preroll = PreRoll(stt.stream_preroll_s + VAD_LAG_S) if self.gated else None
+        self.listening = not self.gated  # the recogniser is hearing the audio
+        self.target_dbfs = stt.stream_speech_dbfs if self.gated else None
+        self.gain = 1.0  # applied to what the recogniser hears in this utterance
+        self.fed = 0  # stream position just after the last sample the recogniser heard
+        self.base = 0  # stream position where the recogniser's current stream began
         self.speech_start: int | None = None  # where the VAD heard speech begin in this utterance
         self.speech_end: int | None = None  # where the VAD heard it end (the final's t1, however late it was seen)
         self.kept: list[FloatArray] = []  # the utterance's audio, kept only when speakers are labelled
@@ -477,38 +539,80 @@ class _NativeProcessor(_Processor):
         # and the next one's start in it. Fed whole, the two would come out as one final: the piece is cut where
         # the VAD heard the next utterance start, and the part before it ends the first utterance.
         first = self.pos  # the stream position of samples[0]
+        self.pos += len(samples)
         done = 0
         ended = False
         for ev in self.run_vad(samples):
             await self.s.send_vad(ev.kind, ev.sample)
+            cut = min(len(samples), max(done, ev.sample - first))
             if ev.kind == "speech_end":
-                ended = True
                 self.speech_end = ev.sample
+                if self.gated:
+                    if self.listening:  # the recogniser hears up to where the speech ended, then finishes
+                        await self._feed(samples[done:cut], recv_t, vad_end=True)
+                        self.listening = False
+                    else:
+                        self._hold(samples[done:cut], first + cut)
+                    done = cut
+                else:
+                    ended = True
             elif ev.kind == "speech_start":
-                if ended:
-                    cut = min(len(samples), max(done, ev.sample - first))
+                if self.gated:
+                    if not self.listening:
+                        self._hold(samples[done:cut], first + cut)
+                        done = cut
+                        self._listen(ev.sample, samples[done:])
+                elif ended:
                     await self._feed(samples[done:cut], recv_t, vad_end=True)
                     done, ended = cut, False
                 self.speech_start = max(self.base, ev.sample)
-        if ended or done == 0 or done < len(samples):
+        if not self.listening:
+            self._hold(samples[done:], self.pos)
+        elif ended or done == 0 or done < len(samples):
             await self._feed(samples[done:], recv_t, vad_end=ended)
 
+    def _hold(self, samples: FloatArray, end: int) -> None:
+        assert self.preroll is not None
+        self.preroll.push(samples, end)
+
+    def _listen(self, speech_at: int, ahead: FloatArray) -> None:
+        """The VAD heard speech start at ``speech_at``: a fresh stream hears the pre-roll before it.
+
+        ``ahead`` is the audio received after the pre-roll; with the speech heard so far it sets the utterance's
+        gain (the detector reports a start a few hundred milliseconds after it, so there is some)."""
+        assert self.preroll is not None
+        audio, start = self.preroll.take(since=speech_at - self.preroll_n)
+        self.stream.restart()
+        self.base = self.fed = start
+        self.listening = True
+        if self.target_dbfs is not None:
+            heard = np.concatenate([audio[max(0, speech_at - start) :], ahead])
+            if len(heard) >= int(0.1 * SR):
+                self.gain = speech_gain(heard, self.target_dbfs)
+        self._accept(audio)
+
     def _accept(self, samples: FloatArray) -> None:
+        if len(samples) == 0:
+            return
+        if self.gain != 1.0:
+            samples = np.clip(samples * self.gain, -1.0, 1.0).astype(np.float32)
         self.stream.accept(samples)
-        self.pos += len(samples)
+        self.fed += len(samples)
         if self.s.cfg.diarize:
             self.kept.append(samples)
 
     async def _feed(self, samples: FloatArray, recv_t: float, vad_end: bool) -> None:
         self._accept(samples)
         result, endpoint = await self._step()
+        if self.gated:
+            endpoint = False  # the VAD ends utterances; the model's endpointing would cut one short mid-word
         text = result.text.strip()
         if text and text != self.last_text and self.s.cfg.interim and not (endpoint or vad_end):
             self.last_text = text
             stable = self.stability.update(text)
-            await self.s.send_partial(text, self._t0(), self.pos / SR, recv_t, stable, self.first_partial_pending)
+            await self.s.send_partial(text, self._t0(), self.fed / SR, recv_t, stable, self.first_partial_pending)
             self.first_partial_pending = False
-        if (endpoint or vad_end) and (text or endpoint):
+        if (endpoint or vad_end) and (text or endpoint or self.gated):
             await self._finish_utterance(recv_t, pad=vad_end and not endpoint)
 
     async def _finish_utterance(self, recv_t: float, pad: bool) -> None:
@@ -528,12 +632,12 @@ class _NativeProcessor(_Processor):
                 if self.speech_start is not None:  # drop the silence before the speaker started
                     audio = audio[max(0, self.speech_start - self.base) :]
             end = (
-                self.speech_end if self.speech_end is not None and self.base < self.speech_end < self.pos else self.pos
+                self.speech_end if self.speech_end is not None and self.base < self.speech_end < self.fed else self.fed
             )
             await self.s.send_final(text, self._t0(), end / SR, recv_t, words, None, audio)
         self.kept = []
         self.stream.reset()
-        self.base = self.pos
+        self.base = self.fed
         self.speech_start = None
         self.speech_end = None
         self.last_text = ""
@@ -542,15 +646,18 @@ class _NativeProcessor(_Processor):
 
     async def finalize(self, recv_t: float, reason: str) -> None:
         if reason == "stop":
-            self.stream.accept(np.zeros(int(TAIL_PAD_S * SR), dtype=np.float32))
-            self.stream.finish()
-            await self._step()
-            await self._finish_utterance(recv_t, pad=False)
-        else:
+            if self.listening:
+                self.stream.accept(np.zeros(int(TAIL_PAD_S * SR), dtype=np.float32))
+                self.stream.finish()
+                await self._step()
+                await self._finish_utterance(recv_t, pad=False)
+        elif self.listening:
             await self._finish_utterance(recv_t, pad=True)
         if self.detector is not None:
             for ev in self.detector.flush():
                 await self.s.send_vad(ev.kind, ev.sample)
+        if self.gated:
+            self.listening = False
 
 
 class _PseudoProcessor(_Processor):
@@ -571,6 +678,7 @@ class _PseudoProcessor(_Processor):
         self.last_partial_pos = 0
         self.last_decode_s = 0.0
         self.language: str | None = None
+        self.final_end = 0  # where the audio of the last final ended: the next utterance starts no earlier
 
     def _slice(self, start: int, end: int) -> FloatArray:
         a = max(0, start - self.buf_start)
@@ -598,7 +706,9 @@ class _PseudoProcessor(_Processor):
         self.pos += len(samples)
         for ev in self.run_vad(samples):
             if ev.kind == "speech_start":
-                start = max(self.buf_start, min(ev.sample, self.pos) - int(ONSET_PAD_S * SR))
+                # padded at both ends, two utterances close together would share audio, and a word on the seam
+                # would be in both finals
+                start = max(self.buf_start, self.final_end, min(ev.sample, self.pos) - int(ONSET_PAD_S * SR))
                 self.utt_start = start
                 self.last_partial_pos = start
                 self.last_partial_at = 0.0
@@ -639,6 +749,7 @@ class _PseudoProcessor(_Processor):
     async def _final(self, end: int, recv_t: float) -> None:
         assert self.utt_start is not None
         start = self.utt_start
+        self.final_end = end
         self.agreement.reset()
         self.first_partial_pending = True
         if end - start < int(0.1 * SR):

@@ -139,6 +139,10 @@ class STTStream(abc.ABC):
     @abc.abstractmethod
     def reset(self) -> None: ...
 
+    def restart(self) -> None:
+        """Start over as if new: nothing heard before carries over (``reset`` may keep the encoder's context)."""
+        self.reset()
+
 
 class Model(abc.ABC):
     task: str = ""
@@ -159,6 +163,13 @@ class STTModel(Model):
     max_chunk_s: float = 30.0
     #: True for incremental (frame-synchronous) models
     streaming: bool = False
+    #: streaming models in a live session with a VAD: seconds of audio from before the VAD heard speech start that
+    #: a fresh stream is given when it does; the recogniser hears no idle audio. 0: it hears everything, idle audio
+    #: too, and its own endpointing resets it (a cloud recogniser's live connection wants audio all the time).
+    stream_preroll_s: float = 0.0
+    #: streaming models with a pre-roll: quieter speech is raised to about this level (dBFS) before the recogniser
+    #: hears it, one gain per utterance (the VAD hears it as received); None leaves the level alone
+    stream_speech_dbfs: float | None = None
     #: languages the model can be told to use; empty means fixed or automatic
     languages: tuple[str, ...] = ()
     supports_translate: bool = False

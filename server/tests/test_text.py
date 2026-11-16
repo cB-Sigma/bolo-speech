@@ -135,6 +135,36 @@ def test_local_agreement_ignores_case_and_punctuation() -> None:
     assert text == "hello world again"
 
 
+def test_local_agreement_does_not_repeat_a_word_when_a_redecode_shifts_the_words() -> None:
+    la = LocalAgreement(2)
+    la.update("a good one starts speaking before it has finished")
+    text, stable = la.update("a good one starts speaking before it has finished")
+    assert stable == len(text)
+    # the re-decode adds a word before the committed end: counting words off would show "finished finished"
+    text, _ = la.update("a good one starts speaking before it has, uh, finished reading")
+    assert text == "a good one starts speaking before it has finished reading"
+    # ... or merges two: counting off would drop "reading"
+    text, _ = la.update("a good one starts speaking before it's finished reading")
+    assert text == "a good one starts speaking before it has finished reading"
+    # and the new word is committed once two hypotheses agree on it, however their beginnings differ
+    text, stable = la.update("a good one starts speaking before it's finished reading, keeps")
+    assert text[:stable] == "a good one starts speaking before it has finished reading"
+    assert text == "a good one starts speaking before it has finished reading keeps"  # committed words keep their form
+    assert la.retractions == 3
+
+
+def test_local_agreement_follows_a_corrected_first_word() -> None:
+    la = LocalAgreement(2)
+    la.update("speak servers")
+    la.update("speak servers are")  # commits "speak servers"
+    text, stable = la.update("speech servers are judged")
+    assert text == "speak servers are judged" and stable == len("speak servers are")
+    text, stable = la.update("speech servers are judged by")
+    assert text == "speak servers are judged by" and stable == len("speak servers are judged")
+    # a hypothesis shorter than what is committed takes nothing back and adds nothing
+    assert la.update("speech") == ("speak servers are judged", len("speak servers are judged"))
+
+
 def test_prefix_stability() -> None:
     ps = PrefixStability()
     assert ps.update("hello") == 0

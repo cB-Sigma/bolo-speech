@@ -1853,6 +1853,8 @@
     - '*.mov'
     - '*.srt'
     - decoder*.int8.onnx
+  options:
+    decoding_method: modified_beam_search
 - id: zipformer-en-streaming
   task: stt
   engine: sherpa-onnx

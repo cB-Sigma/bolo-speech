@@ -184,6 +184,78 @@ async def test_pseudo_streaming_partials_are_stable(live: LiveServer) -> None:
     assert stable[-1]
 
 
+def browser_microphone(clips: list[np.ndarray], *, pause_s: float, speech_dbfs: float) -> list[bytes]:
+    """What the console sends for a microphone: 48 kHz capture in the worklet's 20 ms blocks, resampled to 16 kHz in
+    the page (an anti-alias FIR, then linear interpolation, as ui/src/lib/audio/resample.ts) and sent as 16-bit PCM.
+
+    The 48 kHz ``clips`` are spoken at ``speech_dbfs`` (browsers' automatic gain control leaves speech around
+    -30 dBFS, a quiet voice lower) in a quiet room, with ``pause_s`` of it before, between and after them."""
+    room = np.zeros(int(pause_s * 48000))
+    parts = [room]
+    for clip in clips:
+        x = clip.astype(np.float64)
+        parts += [x * 10 ** (speech_dbfs / 20) / np.sqrt(np.mean(x[np.abs(x) > 0.01 * np.abs(x).max()] ** 2)), room]
+    x = np.concatenate(parts)
+    x += np.random.default_rng(7).standard_normal(len(x)) * 10 ** (-62 / 20)
+    taps = 63
+    cutoff = 0.5 * 16000 * 0.92 / 48000
+    k = np.arange(taps) - (taps - 1) / 2
+    fir = np.where(k == 0, 2 * cutoff, np.sin(2 * np.pi * cutoff * k) / (np.pi * np.where(k == 0, 1, k)))
+    n = np.arange(taps) / (taps - 1)
+    fir *= 0.42 - 0.5 * np.cos(2 * np.pi * n) + 0.08 * np.cos(4 * np.pi * n)
+    fir /= fir.sum()
+    filtered = np.convolve(np.concatenate([np.zeros(taps - 1), x]), fir[::-1], mode="valid")
+    # output sample p interpolates input samples 3p - 1 and 3p at fraction 0: it is input sample 3p - 1
+    pcm = np.clip(np.concatenate([[0.0], filtered])[0 : len(filtered) : 3], -1, 1)
+    pcm = np.where(pcm < 0, np.round(pcm * 32768), np.round(pcm * 32767)).astype("<i2").tobytes()
+    return [pcm[off : off + 640] for off in range(0, len(pcm), 640)]  # 320 samples: one 20 ms block
+
+
+ASK_NOT = Path(__file__).parents[2] / "ui" / "src" / "mock" / "assets" / "en-ask-not.wav"  # J. F. Kennedy, 1961
+ASK_NOT_REF = "and so my fellow americans ask not what your country can do for you ask what you can do for your country"
+
+
+@pytest.mark.parametrize("model", ["zipformer-en-20m-streaming", "moonshine-tiny-en"])
+async def test_simulated_browser_microphone(live: LiveServer, model: str) -> None:
+    """The console's microphone path, end to end: two utterances at a microphone's level, each after a pause, sent
+    in 20 ms frames at real-time pace.
+
+    Found on a Windows laptop: the 20M Zipformer gave no text at all for microphone speech, and dropped the start
+    of what it did hear (its own endpointing reset the stream when it had decoded nothing for 2.4 s, mid-word)."""
+    clips = []
+    for samples, rate in (
+        decode_audio(ASK_NOT.read_bytes(), filename=ASK_NOT.name),
+        librispeech(live.core.settings.data_dir),
+    ):
+        clips.append(resample(samples, rate, 48000))
+    frames = browser_microphone(clips, pause_s=1.5, speech_dbfs=-30.0)
+    url = live.ws_url + f"/api/v1/stt/stream?model={model}&sample_rate=16000&encoding=pcm_s16le&interim=true&vad=true"
+    finals, vad = [], []
+    async with websockets.connect(url, open_timeout=120) as ws:
+        json.loads(await asyncio.wait_for(ws.recv(), 300))
+
+        async def send() -> None:
+            for frame in frames:
+                await ws.send(frame)
+                await asyncio.sleep(0.02)
+            await ws.send(json.dumps({"type": "stop"}))
+
+        task = asyncio.create_task(send())
+        async for message in ws:
+            msg = json.loads(message)
+            {"final": finals, "vad": vad}.get(msg["type"], []).append(msg)
+        await task
+    texts = [f["text"].lower().replace(",", "").replace(".", "") for f in finals]
+    wer = word_error_rate(f"{ASK_NOT_REF} {LIBRISPEECH_REF}", " ".join(texts), "en")
+    print(f"\n{model} from a simulated microphone: WER {wer:.3f} | " + " / ".join(texts))
+    assert vad and vad[0]["event"] == "speech_start" and 1.3 < vad[0]["t"] < 2.0
+    assert len(finals) >= 2 and wer <= 0.2
+    # each utterance starts with its first word
+    assert texts[0].split()[0] == "and" and texts[-1].split()[0] == "after"
+    words = " ".join(texts).split()
+    assert all(a != b for a, b in zip(words, words[1:]))  # no word repeated at a seam
+
+
 async def test_kokoro_round_trip(core: Bolo) -> None:
     trace = Trace("tts", "bench", "kokoro-v1.0-int8")
     parts, rate = [], 24000

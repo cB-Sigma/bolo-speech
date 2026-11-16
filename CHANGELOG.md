@@ -20,6 +20,26 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- **Live transcription from a microphone with a streaming model (`zipformer-en-20m-streaming`) gave no text, or lost
+  its first words** ("Speech servers" came out as "ers"). Seen in the console in Edge and Chrome on Windows. The
+  recogniser heard the room before anyone spoke, and its own endpointing reset the stream whenever it had decoded
+  nothing for 2.4 s, often mid-word; quiet speech (browsers' automatic gain control leaves it around -30 dBFS) was
+  decoded late enough for that to happen on every take. With a VAD, a streaming model now hears speech only: the idle
+  audio is held back, and when the VAD hears speech start a fresh stream gets the 0.5 s before it (the pre-roll) and
+  then the live audio until the VAD hears it end, which ends the utterance (the model's own endpointing no longer
+  does). Quiet speech is raised to about -20 dBFS for the recogniser, one gain per utterance (the VAD still hears it
+  as it arrived). The 20M Zipformer decodes with beam search (`modified_beam_search`, four paths), which keeps it from
+  dropping whole phrases where greedy search committed to blanks. A cloud recogniser's live connection, and every
+  session without a VAD, still hear everything. Simulated microphone takes (quiet speech after a pause, 20 ms frames,
+  the console's resampler) of six recordings at four levels and pauses: word error rate 0.37 before, 0.10 after;
+  the first word right in 3 of 24 takes before, 13 after (synthetic voices that start abruptly still lose it
+  often); two takes gave no text and one only "ul america" before, none after. A restarted stream starts on a second
+  of digital silence before the pre-roll. Model options `stream_preroll_s` (0.5; 0 turns this off) and
+  `stream_speech_dbfs` (-20; empty leaves the level alone) for sherpa-onnx streaming models.
+- Pseudo-streaming partials (Moonshine, Whisper, …) no longer repeat a word ("finished finished") or drop one when a
+  re-decode splits, merges or inserts a word before the end of the confirmed part: each new hypothesis is aligned with
+  the confirmed words (word-level edit distance) before its new tail is taken, instead of counting words off. Two
+  utterances close together no longer share audio either, so a word on the seam is not in both finals.
 Found on a Windows 11 laptop; the first fix applies everywhere.
 
 - `bolo rm` and `bolo cp` with a data directory (`--data-dir`, `BOLO_DATA_DIR`, the config file) other than the one
@@ -86,7 +106,6 @@ Found on a Windows 11 laptop; the first fix applies everywhere.
 - `bolo recommend` no longer suggests sherpa-onnx models for the GPU on Windows (its CUDA wheel bundles its own
   `onnxruntime.dll`, which fails with Error 1114 once `onnxruntime` is loaded, and the catalog's int8 sherpa models
   gain nothing on CUDA); faster-whisper on CUDA, measured 6-19x faster than on the CPU on that laptop, is.
-
 ## [0.6.1] - 2026-11-16
 
 ### Fixed

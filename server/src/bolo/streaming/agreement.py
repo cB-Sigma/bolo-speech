@@ -7,7 +7,8 @@ agree on it (Macháček et al., "Turning Whisper into Real-Time Transcription
 System", 2023); committed words are never taken back within an utterance.
 The partial that is sent is the committed prefix followed by the newest
 unconfirmed tail, with ``stable_chars`` marking where the committed part
-ends.
+ends. Each new hypothesis is aligned with the committed words before its new tail is
+taken, so a re-decode that splits or merges a word before that point does not repeat one.
 """
 
 from __future__ import annotations
@@ -21,12 +22,35 @@ def _key(word: str) -> str:
     return strip_punctuation(unicodedata.normalize("NFKC", word), "").lower()
 
 
+def _committed_end(committed: list[str], words: list[str]) -> tuple[int, int]:
+    """Where the committed words end in a new hypothesis, and how far that hypothesis strays from them.
+
+    A re-decode can split, merge, insert or drop words before the end of the committed part ("it has finished" can
+    come back as "it has, uh, finished reading"). Counting off ``len(committed)`` words would then repeat or skip a
+    word at the seam, so the committed keys are aligned with the hypothesis instead (word-level edit distance against
+    each of its prefixes). The best prefix wins; among equals the one that ends on the last committed word, then the
+    longer one. Returns ``(prefix length, edit distance)``.
+    """
+    if not committed:
+        return 0, 0
+    a = [_key(w) for w in committed]
+    b = [_key(w) for w in words]
+    prev = list(range(len(b) + 1))  # distance between a[:0] and b[:j]
+    for i, ka in enumerate(a, start=1):
+        cur = [i] + [0] * len(b)
+        for j, kb in enumerate(b, start=1):
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ka != kb))
+        prev = cur
+    best = min(range(len(b) + 1), key=lambda j: (prev[j], not (j and b[j - 1] == a[-1]), -j))
+    return best, prev[best]
+
+
 class LocalAgreement:
     def __init__(self, n: int = 2) -> None:
         self.n = max(1, n)
         self.committed: list[str] = []
         self._history: list[list[str]] = []
-        self.retractions = 0  # committed words the newest hypothesis disagreed with
+        self.retractions = 0  # hypotheses that disagreed with the committed words
 
     def reset(self) -> None:
         self.committed = []
@@ -38,20 +62,21 @@ class LocalAgreement:
         self._history.append(words)
         if len(self._history) > self.n:
             self._history.pop(0)
+        # each hypothesis, past the point where the committed words end in it
+        cut, distance = _committed_end(self.committed, words)
+        if distance:
+            self.retractions += 1
+        rest = words[cut:]
         if len(self._history) >= self.n:
+            rests = [h[_committed_end(self.committed, h)[0] :] for h in self._history[:-1]] + [rest]
             agreed = 0
-            shortest = min(len(h) for h in self._history)
-            while agreed < shortest and len({_key(h[agreed]) for h in self._history}) == 1:
+            shortest = min(len(r) for r in rests)
+            while agreed < shortest and len({_key(r[agreed]) for r in rests}) == 1:
                 agreed += 1
-            if agreed > len(self.committed):
-                self.committed.extend(words[len(self.committed) : agreed])
-        for i, w in enumerate(self.committed):
-            if i >= len(words) or _key(words[i]) != _key(w):
-                self.retractions += 1
-                break
-        tail = words[len(self.committed) :]
+            self.committed.extend(rest[:agreed])
+            rest = rest[agreed:]
         stable = " ".join(self.committed)
-        text = " ".join([*self.committed, *tail])
+        text = " ".join([*self.committed, *rest])
         return text, len(stable)
 
     def finalize(self, final_text: str) -> str:

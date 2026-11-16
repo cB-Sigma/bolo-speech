@@ -296,22 +296,36 @@ class SherpaOfflineSTT(STTModel):
 
 PRIME_S = 1.0
 _PRIME_NOISE = (np.random.default_rng(0).standard_normal(int(PRIME_S * 16000)) * 1e-4).astype(np.float32)
+_PRIME_SILENCE = np.zeros(int(PRIME_S * 16000), dtype=np.float32)
 
 
 class _SherpaStream(STTStream):
     def __init__(self, model: SherpaOnlineSTT, language: str | None = None) -> None:
         self.model = model
-        self.stream = model.recognizer.create_stream()
-        if language:  # must be set before any audio is accepted
-            try:
-                self.stream.set_option("language", language)
-            except (AttributeError, RuntimeError):  # an older sherpa-onnx: the model then detects the language
-                pass
+        self.language = language
         # Streaming encoders need some left context: without it the first words of audio that
         # starts abruptly (a file, a push-to-talk clip) are often dropped. A second of very
         # faint noise works where digital silence does not (measured on the 20M Zipformer).
+        self._open(_PRIME_NOISE)
+
+    def restart(self) -> None:
+        """A new native stream (sherpa-onnx's ``reset`` keeps the encoder's state and its view of the audio).
+
+        A live session restarts the stream for each utterance and gives it real audio from before the speech (the
+        pre-roll); with that, a second of digital silence ahead of it keeps more first words than faint noise
+        (simulated microphone takes on the 20M Zipformer: first word right in 13 of 24 rather than 8, word error
+        rate 0.10 rather than 0.14)."""
+        self._open(_PRIME_SILENCE)
+
+    def _open(self, prime: FloatArray) -> None:
+        self.stream = self.model.recognizer.create_stream()
+        if self.language:  # must be set before any audio is accepted
+            try:
+                self.stream.set_option("language", self.language)
+            except (AttributeError, RuntimeError):  # an older sherpa-onnx: the model then detects the language
+                pass
         self.offset = PRIME_S
-        self.stream.accept_waveform(model.sample_rate, _PRIME_NOISE)
+        self.stream.accept_waveform(self.model.sample_rate, prime)
 
     def accept(self, samples: FloatArray) -> None:
         self.stream.accept_waveform(self.model.sample_rate, samples)
@@ -361,6 +375,12 @@ class SherpaOnlineSTT(STTModel):
         self.lowercase = bool(spec.get("lowercase", True))
         #: prompt-conditioned models (Nemotron) take the language per stream; without it they detect it
         self.stream_language = bool(spec.get("stream_language", False))
+        # Live sessions with a VAD give the recogniser speech only, each utterance a fresh stream with this much of
+        # what came before; its own endpointing reset the stream mid-word when it had not decoded anything for 2.4 s.
+        self.stream_preroll_s = float(opts.options.get("stream_preroll_s", spec.get("stream_preroll_s", 0.5)))
+        # Browsers' automatic gain control leaves speech around -30 dBFS; these models were trained on louder audio.
+        level = opts.options.get("stream_speech_dbfs", spec.get("stream_speech_dbfs", -20.0))
+        self.stream_speech_dbfs = None if level is None else float(level)
         endpoint: dict[str, Any] = {
             "enable_endpoint_detection": True,
             "rule1_min_trailing_silence": 2.4,
@@ -376,11 +396,16 @@ class SherpaOnlineSTT(STTModel):
         }
         tokens = find_file(p, "tokens.txt")
         if kind == "online_transducer":
+            # Beam search keeps a transducer from losing whole phrases where greedy search commits to blanks early
+            # (the 20M Zipformer: "Speech servers" came out as "ers", "Good morning" as "in").
+            decoding = str(opts.options.get("decoding_method", spec.get("decoding_method", "greedy_search")))
             self.recognizer = so.OnlineRecognizer.from_transducer(
                 tokens=tokens,
                 encoder=find_file(p, "encoder*.onnx"),
                 decoder=find_file(p, "decoder*.onnx"),
                 joiner=find_file(p, "joiner*.onnx"),
+                decoding_method=decoding,
+                max_active_paths=int(opts.options.get("max_active_paths", spec.get("max_active_paths", 4))),
                 **common,
             )
         elif kind == "online_nemo_ctc":
