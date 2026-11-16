@@ -154,11 +154,13 @@ Parler-TTS here until it was pinned.
   with `BOLO_TORCH_DTYPE` or the option `dtype` (`float32`, `float16`, `bfloat16`).
 * For CUDA install the default torch wheel (`pip install torch`) or the one for your CUDA version from
   https://pytorch.org/get-started/locally/, then the plugin.
-* With bolo 0.5, when its scheduler finds less free GPU memory than a model needs, the load carries a `placement`
+* With bolo 0.5 or later, when its scheduler finds less free GPU memory than a model needs, the load carries a `placement`
   (`device_map="auto"` and a `max_memory`): the Orpheus SNAC loader lets accelerate put as many layers on the GPU as
   fit and the rest on the CPU, and reports the split back for `bolo ps`. Other loaders load whole on `device`.
 * **No GPU was used in testing.** The GPU, MPS and half-precision paths are untested; the placement protocol is
   tested on CPU torch and with fakes.
+* **Windows**: CI runs the fast tests on `windows-latest` with CPU torch. With bolo 0.6 the worker runs in a Job
+  Object, so it ends with bolo and `plugin_nice` / `plugin_memory_limit_mb` apply. CUDA on Windows is untested.
 
 ## Settings
 

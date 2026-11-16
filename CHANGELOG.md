@@ -6,6 +6,15 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-16
+
+Voice cloning and Windows. Saved voices with a consent statement, speaker similarity, OpenAI's custom-voice routes
+and `bolo voices`; cloning measured on CPU for 14 models (llama.cpp and audio.cpp), and the Tontaube server as a new
+runtime. Windows is supported: CI runs the server and plugin tests on `windows-latest`, the llama.cpp and audio.cpp
+release builds install there, and servers bolo starts end with it. GPU paths on Windows (CUDA, DirectML, Vulkan)
+are untested on real hardware. The live demo gains a Clone a voice page (Pocket TTS, MOSS-TTS-Nano, Chatterbox).
+uccharan 0.6.4 is the new minimum.
+
 ### Added
 
 - **Windows.** CI runs the server's test suite, the bolo-torch plugin's fast tests, `bolo doctor` and `bolo serve`
@@ -52,6 +61,38 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   llama-server, Pocket TTS in its six languages, Chatterbox Turbo and Qwen3-TTS 1.7B Base; on audio.cpp v0.9.4 (built
   from source), Pocket TTS, MOSS-TTS Nano, XTTS v2, Plapre 3, OmniVoice (ran, did not clone) and Qwen3-TTS 0.6B
   Base. Those 14 entries are now `validated: cpu` with their speaker similarity.
+- **Tontaube** (`tontaube-v1.1-int4`, alias `tontaube`, and `tontaube-v1.1`): a new tts-server runtime `tontaube`
+  for the Tontaube inference server (craitech/tontaube v1.1.0), operator-run (`tts_servers`) or started by bolo
+  (`bolo components install tontaube` clones the pinned tag; `uv run --python 3.12 --frozen tontaube serve` with
+  the downloaded weights). Saved voices and `reference_audio` go to `voice_audio_b64`, its bundled voices to
+  `voice_path`, and the new request field `options` carries its style (audiobook, conversational, agentic) and its
+  five sliders. Licence: Tontaube Community Model License 1.0 (a speech-generation service always needs a
+  commercial licence), labelled in the catalog. Not run here. Settings `tontaube_dir`, `tontaube_start_timeout_s`.
+- `/v1/audio/speech` takes `options`, model-specific request options (audio.cpp: passed through to the server);
+  a model answers 400 for an option it does not read.
+- Console: a "Saved voices" panel on Text to speech (play the reference, use a voice in the playground, score it
+  with the current model, save a new one from an upload or a recording with a consent checkbox, delete, export),
+  saved voices in the voice picker of cloning models, and "Save as a voice" in the clone panel.
+- **Brand**: the tagline under "Ollama for speech." is now "Speech-to-text, text-to-speech and voice agents on your
+  own machine." (banners, social preview, README, the console's share descriptions).
+- **Live demo: Clone a voice** (<https://cb-sigma.github.io/bolo/>, everything in the visitor's browser, nothing
+  uploaded; tested in headless Chromium on a CPU). Record (after a consent tick) or upload 5 to 30 s of speech, or
+  pick one of three synthetic example voices; the recogniser in the page fills in the transcript; the voice is spoken
+  back with streaming playback, time to first audio, real-time factor, a WAV download and a speaker-similarity score
+  (CAM++). Voices are kept in the browser (IndexedDB). Models, from the Hugging Face Hub at pinned revisions:
+  - **Pocket TTS 100M** (Kyutai, CC BY 4.0; 8-bit ONNX) in English, German, Spanish, Italian, Portuguese and French,
+    driven by our own loop with a SentencePiece tokenizer. The 24-layer French model runs on the CPU, slower than
+    real time.
+  - **MOSS-TTS-Nano 100M** (OpenMOSS, Apache-2.0, 20 languages) from its official ONNX exports, with our own port of
+    its reference runtime (tokenizer, text normaliser, chunking, voice-clone prompt, sampler, streaming codec); a
+    parity test against the reference gives equal codes in every run. No transcript needed.
+  - **Chatterbox Turbo** (English) and **Chatterbox Multilingual** (23 languages, Hindi included), MIT, through
+    transformers.js; WebGPU advised. No watermark is applied in the browser.
+  - **Numbers in words**: before generating, the page writes numbers, times, dates and money out in words with
+    uccharan for the chosen language (English, German, Spanish, French, Italian, Portuguese, Dutch, Polish, Czech,
+    Swedish, Danish, Norwegian, Finnish, Hungarian, Turkish, Hindi, Catalan, Romanian) and shows what the model was
+    given. Measured on a German sentence: word error rate 49 % to 8 % (Pocket TTS), 22 % to 10 % (MOSS-TTS-Nano).
+  - The demo's uccharan (WebAssembly) moves to 0.6.3, which reads ordinals and dates in the European languages.
 
 ### Fixed
 
@@ -85,18 +126,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - The Chatterbox entries no longer say their output carries Resemble's Perth watermark: llama.cpp and audio.cpp do
   not run the watermarker, and Resemble's detector found none in Chatterbox Turbo's output.
 - `zonos3-mini-audiocpp` says that audio.cpp v0.9.4 has no zonos3 family.
-- **Tontaube** (`tontaube-v1.1-int4`, alias `tontaube`, and `tontaube-v1.1`): a new tts-server runtime `tontaube`
-  for the Tontaube inference server (craitech/tontaube v1.1.0), operator-run (`tts_servers`) or started by bolo
-  (`bolo components install tontaube` clones the pinned tag; `uv run --python 3.12 --frozen tontaube serve` with
-  the downloaded weights). Saved voices and `reference_audio` go to `voice_audio_b64`, its bundled voices to
-  `voice_path`, and the new request field `options` carries its style (audiobook, conversational, agentic) and its
-  five sliders. Licence: Tontaube Community Model License 1.0 (a speech-generation service always needs a
-  commercial licence), labelled in the catalog. Not run here. Settings `tontaube_dir`, `tontaube_start_timeout_s`.
-- `/v1/audio/speech` takes `options`, model-specific request options (audio.cpp: passed through to the server);
-  a model answers 400 for an option it does not read.
-- Console: a "Saved voices" panel on Text to speech (play the reference, use a voice in the playground, score it
-  with the current model, save a new one from an upload or a recording with a consent checkbox, delete, export),
-  saved voices in the voice picker of cloning models, and "Save as a voice" in the clone panel.
+- A Realtime API call over WebRTC gets 10 s for its peer connection to close and is then let go, so a peer that
+  never finishes closing no longer keeps the call's close waiting for ever (seen on Windows).
+- Live demo: choosing an example voice no longer replaces text the visitor typed.
 
 ### Changed
 
@@ -107,8 +139,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   (digits spelled one by one). uccharan 0.6.1 wrote Sinhala and Sindhi numbers as internal lookup keys ("25" was
   ණගඡ, ڙتج), which the old check let through; with such a release those voices now get bolo's light normaliser
   (digits left for the voice). The check used to cover only the Latin-script languages.
-- The `uccharan` extra (and `all`) asks for `uccharan>=0.6.2,<0.7` (was `>=0.6.1`): 0.6.2 writes Sinhala and
-  Sindhi numbers as words.
+- The `uccharan` extra (and `all`) asks for `uccharan>=0.6.4,<0.7` (was `>=0.6.1`): 0.6.2 writes Sinhala and
+  Sindhi numbers as words; 0.6.3 and 0.6.4 read dates, ordinals and clock times in full ("10h30" is *dix heures
+  trente*, "10:30" *zehn Uhr dreißig*) and put currency words in the plural (*vingt-cinq euros*).
 
 ## [0.5.0] - 2026-11-15
 

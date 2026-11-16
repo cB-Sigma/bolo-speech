@@ -294,8 +294,9 @@ URLs and email addresses written out in words, in English, Hindi and the other
 South Asian languages uccharan reads, Urdu and Sindhi; Latin-script English inside
 Indic text is kept. Since uccharan 0.6.1 the same
 holds for its Latin-script languages (Spanish, German, French …): `25 €` is read
-"fünfundzwanzig Euro" for a German voice; since 0.6.2 (the minimum the extra asks for)
-Sinhala and Sindhi numbers are words too. (uccharan 0.6.0 read digits in English in
+"fünfundzwanzig Euro" for a German voice; since 0.6.2 Sinhala and Sindhi
+numbers are words too, and 0.6.4 (the minimum the extra asks for) reads clock times,
+ordinals and dates and puts currency words in the plural. (uccharan 0.6.0 read digits in English in
 the Latin-script languages and 0.6.1 wrote Sinhala and Sindhi numbers as lookup keys
 that are no words. bolo asks the installed uccharan to write out a few numbers in the
 language, once per language, and uses its normaliser only when they come back as words

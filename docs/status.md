@@ -78,6 +78,13 @@ the number.
   recognition (DiCoW): 24 AMI far-field meeting excerpts and 44 synthetic two-voice mixes
   ([models.md](models.md#speaker-diarization-1)). No telephone recordings, no noisy rooms; known-speaker naming was
   tested with synthetic voices only.
+- **Voice cloning: measured on CPU for 14 models.** Pocket TTS (six languages), Chatterbox Turbo and Qwen3-TTS 1.7B
+  Base on llama.cpp, and Pocket TTS, MOSS-TTS Nano, XTTS v2, Plapre 3, OmniVoice (ran, did not clone) and Qwen3-TTS
+  0.6B Base on audio.cpp (built from source) cloned two LibriSpeech speakers through bolo's own code path, scored
+  with the speaker-similarity model ([voices.md](voices.md#measured-cloning-on-cpu)). The other 25 audio.cpp
+  cloning entries, the torch plugin's cloning models, Chatterbox Multilingual (too slow here) and Tontaube were not
+  run. The similarity thresholds are calibrated on LibriSpeech read speech only, the voice checks (noise, clipping,
+  more than one person) were tuned on the same data, and no bolo-side watermark is applied.
 - **The torch plugin.** Indic Parler-TTS, IndicF5, the SepFormer and PixIT separators and DiCoW were run on CPU
   (all slower than real time except DiCoW with bfloat16); Veena and Svara were not run beyond their SNAC decoder;
   Indic-Speak, the original F5-TTS checkpoints and the other newly catalogued kinds are unit-tested with fakes

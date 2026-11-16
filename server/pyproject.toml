@@ -56,8 +56,9 @@ kokoro-onnx = ["kokoro-onnx>=0.4"]
 # languages, pronunciation word lists and romanised text into native script. 0.6 is the release bolo's language
 # table and pack handling are written for (bolo.text.phonemize, bolo.text.packs); 0.6.1 reads numbers in the
 # Latin-script languages other than English in the language itself (0.6.0 read them in English); 0.6.2 writes
-# Sinhala and Sindhi numbers as words (0.6.1 wrote lookup keys).
-uccharan = ["uccharan>=0.6.2,<0.7"]
+# Sinhala and Sindhi numbers as words (0.6.1 wrote lookup keys); 0.6.3 and 0.6.4 read dates, ordinals and clock
+# times in full and put currency words in the plural.
+uccharan = ["uccharan>=0.6.4,<0.7"]
 # eSpeak NG (GPL-3.0-or-later) as a prebuilt shared library with its data. Optional, never part of `all`:
 # phoneme-based voices in languages uccharan does not cover need it; everything else does not.
 espeak = ["espeakng-loader>=0.2.4"]
@@ -82,7 +83,7 @@ nvidia = ["nvidia-ml-py>=12"]
 onnx-split = ["onnx>=1.16"]
 all = [
   "sherpa-onnx>=2.0,<3",
-  "uccharan>=0.6.2,<0.7",
+  "uccharan>=0.6.4,<0.7",
   "faster-whisper>=1.1",
   "av>=12",
   "wyoming>=1.6",

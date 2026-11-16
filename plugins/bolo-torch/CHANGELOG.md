@@ -4,11 +4,20 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-11-16
+
+Windows: the fast tests run on Windows in CI. Installs with bolo 0.6.
+
 ### Added
 
 - CI runs the fast tests on Windows (`windows-latest`, CPU torch); the package declares
-  `Operating System :: Microsoft :: Windows`. With bolo's next release the worker runs in a Windows Job Object:
-  `plugin_nice` and `plugin_memory_limit_mb` apply there too, and the worker ends with bolo.
+  `Operating System :: Microsoft :: Windows`. With bolo 0.6 the worker runs in a Windows Job Object:
+  `plugin_nice` and `plugin_memory_limit_mb` apply there too, and the worker ends with bolo. GPU paths on Windows
+  are untested.
+
+### Changed
+
+- Installs with bolo 0.6 as well as 0.2 to 0.5 (`bolo-speech>=0.2,<0.7`).
 
 ## [0.1.3] - 2026-11-15
 
