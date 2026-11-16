@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import logging
 import os
 import shutil
 import subprocess
@@ -52,6 +53,8 @@ XLIT_PREFIX = romanised.COMPONENT_PREFIX + romanised.PACK_PREFIX
 PACK_PREFIX = packs.COMPONENT_PREFIX
 #: Kokoro voice-name prefix -> phonemiser language (Mandarin "z" reads from its lexicon)
 KOKORO_LANGUAGES = {"a": "en-us", "b": "en-gb", "e": "es", "f": "fr-fr", "h": "hi", "i": "it", "p": "pt-br", "j": "ja"}
+
+log = logging.getLogger(__name__)
 
 
 def espeak_status() -> tuple[bool, str | None, str | None]:
@@ -621,6 +624,12 @@ class ComponentManager:
         info = tts_runtimes.RUNTIME_INFO[runtime]
         if info.git is not None:
             return self._install_checkout(runtime)
+        if flavour is None:
+            note = tts_runtimes.missing_build_note(runtime, self.core.settings.device)
+            if note:
+                log.warning("%s", note)
+                if job is not None:
+                    job.warnings.append({"kind": "build", "message": note})
         flavour = flavour or tts_runtimes.flavour_for(runtime, self.core.settings.device)
         release = tts_runtimes.release_for(runtime, flavour=flavour)
         if release is None:

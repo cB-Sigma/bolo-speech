@@ -107,7 +107,7 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `fake_engine` | `false` | `--fake-engine` | add deterministic test models (development) |
 | `tts_servers` | `[]` | | external TTS servers the operator runs, as `"<model id or runtime>=<url>"`, e.g. `"llama-server=http://127.0.0.1:8080"` (every llama-server model goes there) or `"voxcpm2-audiocpp=http://gpu-box:8080"` (one model). A model id or alias wins over a runtime name. Such a model needs no download and no binary; for audio.cpp the server's config must declare the model under the id in the entry's `options.server_model` (the catalog id). See models.md, "External TTS servers" |
 | `tts_server_api_key` | unset | | sent as `Authorization: Bearer …` to the servers in `tts_servers` (llama-server `--api-key`) |
-| `llama_server_bin`, `audiocpp_server_bin` | unset | | the binary bolo starts for a model whose runtime has no URL in `tts_servers`. Unset: the one `bolo components install llama-server` / `audio.cpp` put in `<data_dir>/components/`, then `llama-server` / `audiocpp_server` on `PATH` (on Windows `llama-server.exe` / `audiocpp_server.exe`: a name without an extension finds the `.exe`, as `PATH` does). Point it at a CUDA/Vulkan/Metal build to use a GPU; on Windows `bolo components install` itself installs the CUDA 12 build with `device = "cuda"` and the Vulkan build with `device = "vulkan"` (or the one `--flavour cpu\|cuda\|vulkan` names), each build in its own folder (`components/llama-server/<version>/cpu`, `.../cuda`, `.../vulkan`); the one matching `device` is started |
+| `llama_server_bin`, `audiocpp_server_bin` | unset | | the binary bolo starts for a model whose runtime has no URL in `tts_servers`. Unset: the one `bolo components install llama-server` / `audio.cpp` put in `<data_dir>/components/`, then `llama-server` / `audiocpp_server` on `PATH` (on Windows `llama-server.exe` / `audiocpp_server.exe`: a name without an extension finds the `.exe`, as `PATH` does). Point it at a CUDA/Vulkan/Metal build to use a GPU; `bolo components install` itself installs the Vulkan build with `device = "vulkan"` on Linux x86-64 and Windows, and the CUDA 12 build with `device = "cuda"` on Windows. llama.cpp and audio.cpp publish no CUDA build for Linux: there `device = "cuda"` installs the CPU build and says so (`bolo components install` prints a note, the job carries it as a warning); use `--flavour vulkan` (llama-server; it needs the Vulkan loader, `libvulkan1`, and a Vulkan driver: Mesa for AMD and Intel, NVIDIA's own driver) or point this setting at a CUDA build of your own (or the one `--flavour cpu\|cuda\|vulkan` names), each build in its own folder (`components/llama-server/<version>/cpu`, `.../cuda`, `.../vulkan`); the one matching `device` is started |
 | `tts_server_args` | `[]` | | extra command-line arguments for every server bolo starts (e.g. `["-ngl", "20"]` for llama-server, which bolo then leaves alone; without one bolo adds `-ngl N` itself when `device` is not `cpu`, N being the layers that fit in free accelerator memory) |
 | `tts_server_start_timeout_s` | `300` | | how long a started server may take to answer `GET /health` (loading its model) |
 | `tontaube_dir` | unset | | a checkout of [craitech/tontaube](https://github.com/craitech/tontaube) (release v1.1.0) that bolo runs with `uv run --python 3.12 --frozen tontaube serve` for the Tontaube models. Unset: the one `bolo components install tontaube` cloned into `<data_dir>/components/`. `uv` must be on `PATH` |
@@ -503,6 +503,42 @@ sherpa-onnx's CUDA wheel cannot be used inside bolo on Windows: it brings its ow
 load (Error 1114) once `onnxruntime` has been imported, as bolo does; and the catalog's int8 sherpa-onnx models gain
 nothing on CUDA. With `device = "cuda"` on Windows they run on the CPU, and `bolo recommend` suggests faster-whisper
 models for the GPU.
+
+### A GPU build of llama-server on Linux
+
+`bolo components install llama-server` installs llama.cpp's prebuilt releases. For Linux x86-64 llama.cpp
+publishes a CPU build and a Vulkan build, but no CUDA build (it ships CUDA on Linux only as Docker images); neither
+does audio.cpp. So on Linux:
+
+**Vulkan (AMD, Intel and NVIDIA GPUs; nothing to compile).** Install the Vulkan loader and a driver, then the build:
+
+```sh
+sudo apt install libvulkan1 vulkan-tools mesa-vulkan-drivers   # NVIDIA cards: the NVIDIA driver brings its own
+vulkaninfo --summary                                           # your GPU should be listed
+BOLO_DEVICE=vulkan bolo components install llama-server        # or: bolo components install llama-server --flavour vulkan
+```
+
+and run bolo with `device = "vulkan"`. Under WSL2 Vulkan goes through a translation layer and is slow: use CUDA there.
+
+**CUDA (NVIDIA; usually the fastest).** Build llama-server once with the CUDA toolkit (12.x; under WSL2 install the
+toolkit only, the Windows driver serves the GPU) and point bolo at it:
+
+```sh
+sudo apt install build-essential cmake git
+nvcc --version                                                 # the CUDA toolkit is installed
+git clone --depth 1 --branch b12375 https://github.com/ggml-org/llama.cpp
+cd llama.cpp
+cmake -B build -DGGML_CUDA=ON -DLLAMA_CURL=OFF
+cmake --build build --config Release -j --target llama-server
+./build/bin/llama-server --list-devices                        # should list CUDA0
+```
+
+Then set `llama_server_bin = "/path/to/llama.cpp/build/bin/llama-server"` in the settings file (or
+`BOLO_LLAMA_SERVER_BIN=...`) and `device = "cuda"`; `bolo components list` shows it as your own binary and
+`bolo doctor` asks it for its devices. b12375 is the version bolo pins and tests; a newer tag usually works. The
+build takes several minutes; `-DCMAKE_CUDA_ARCHITECTURES=86` (your card's compute capability: 86 for RTX 30, 89 for
+RTX 40) makes it shorter. audio.cpp builds the same way (`-DGGML_CUDA=ON`; see its README) for
+`audiocpp_server_bin`.
 
 ### A lost GPU
 

@@ -8,6 +8,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- llama-server: the Vulkan build for Linux x86-64 (llama.cpp b12375's `ubuntu-vulkan-x64`) is pinned, so
+  `BOLO_DEVICE=vulkan bolo components install llama-server` (or `--flavour vulkan`) installs it on Linux too, as on
+  Windows. It needs the Vulkan loader and a Vulkan driver.
+- Docs: "A GPU build of llama-server on Linux": the Vulkan build, and building llama-server with CUDA (also under
+  WSL2) for `llama_server_bin`.
 - `bolo doctor` with `device = "cuda"` (or `auto` and an NVIDIA GPU) loads both CUDA runtimes for real: it opens a
   tiny graph on ONNX Runtime's CUDA provider and runs it, and asks CTranslate2 (faster-whisper) for its CUDA devices
   and loads CUDA 12's cuBLAS and cuDNN, then names each missing library with the command that installs it.
@@ -36,6 +41,10 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- `bolo components install llama-server` / `audio.cpp` with a GPU `device` that has no prebuilt build on this
+  platform (CUDA on Linux, where neither project publishes one) installed the CPU build and reported a plain install.
+  It now says that the CPU build is what runs, and names the way to the GPU (the Vulkan build, or a build of your own
+  in `llama_server_bin` / `audiocpp_server_bin`): on the command line, in the log and as a warning on the job.
 - **Live transcription from a microphone with a streaming model (`zipformer-en-20m-streaming`) gave no text, or lost
   its first words** ("Speech servers" came out as "ers"). Seen in the console in Edge and Chrome on Windows. The
   recogniser heard the room before anyone spoke, and its own endpointing reset the stream whenever it had decoded

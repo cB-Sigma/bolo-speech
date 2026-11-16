@@ -105,6 +105,12 @@ RUNTIME_INFO: dict[str, Runtime] = {
                 "89fdf5a4066170fa408a5ebe1510b50bd8a5bab750e49ae531bb1d4cdbae65e3",
                 23332809,
             ),
+            # the Vulkan build (AMD, Intel and NVIDIA GPUs); it needs the Vulkan loader (libvulkan1) and a driver
+            "linux-x86_64-vulkan": Release(
+                "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-ubuntu-vulkan-x64.tar.gz",
+                "e5144c8499399c115c7f5319421942252e9e84bf7d78b46f968cd5dbc769df72",
+                36187166,
+            ),
             "linux-aarch64": Release(
                 "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-ubuntu-arm64.tar.gz",
                 "122ae6ea1a24d713ca9a3e9094fcc1c766e6547373a7356f97668f24310daf13",
@@ -153,8 +159,9 @@ RUNTIME_INFO: dict[str, Runtime] = {
             "llama.cpp's HTTP server, which speaks text-to-speech for Chatterbox, Qwen3-TTS, Pocket TTS, Soprano, "
             "LFM3-Audio and Fish Drama 3 GGUF models. bolo starts it on a loopback port for the model in use, or "
             "connects to one you run (setting tts_servers). The prebuilt release is the CPU build (Metal on Apple "
-            "Silicon); on Windows, device = cuda or vulkan installs the CUDA 12 or Vulkan build. Elsewhere, for a GPU "
-            "point llama_server_bin at a CUDA/Vulkan build."
+            "Silicon); device = vulkan installs the Vulkan build on Linux x86-64 and Windows, device = cuda the CUDA 12 "
+            "build on Windows. llama.cpp publishes no CUDA build for Linux: there, use the Vulkan build or point "
+            "llama_server_bin at a CUDA build of your own."
         ),
     ),
     AUDIOCPP: Runtime(
@@ -283,9 +290,33 @@ def pinned_flavours(runtime: str) -> list[str]:
     return [f for f in FLAVOURS if _release_key(f) in info.releases]
 
 
+#: how to get a GPU build where none is published (Linux CUDA)
+GPU_BUILD_DOCS = "https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md#a-gpu-build-of-llama-server-on-linux"
+
+
+def missing_build_note(runtime: str, device: str | None = None) -> str | None:
+    """What to say when ``device`` asks for a GPU build that is not pinned for this platform, so that the CPU build
+    is what gets installed (and runs): the builds that are pinned here, and the setting for a build of your own."""
+    wanted = _flavour(device)
+    if not wanted or wanted in pinned_flavours(runtime):
+        return None
+    info = RUNTIME_INFO[runtime]
+    if info.git is not None or not info.releases:
+        return None
+    gpu = [f for f in pinned_flavours(runtime) if f != CPU_FLAVOUR]
+    other = f"install the {gpu[0]} build (--flavour {gpu[0]}), or " if gpu else ""
+    return (
+        f"device {device!r}: {info.name} {info.version} has no prebuilt {wanted} build for {platform_key()}, so the "
+        f"CPU build is installed and runs on the CPU; for the GPU, {other}build {info.binary} with "
+        f"{'CUDA' if wanted == 'cuda' else 'Vulkan'} and set {info.setting} to it: see "
+        f"{GPU_BUILD_DOCS}"
+    )
+
+
 def flavour_for(runtime: str, device: str | None = None) -> str:
-    """The build ``device`` asks for on this platform: ``cuda`` or ``vulkan`` where that build is pinned (Windows),
-    else ``cpu``, the platform's default build."""
+    """The build ``device`` asks for on this platform: ``cuda`` or ``vulkan`` where that build is pinned (CUDA on
+    Windows, Vulkan on Windows and Linux x86-64), else ``cpu``, the platform's default build
+    (:func:`missing_build_note` says so)."""
     wanted = _flavour(device)
     return wanted if wanted and wanted in pinned_flavours(runtime) else CPU_FLAVOUR
 

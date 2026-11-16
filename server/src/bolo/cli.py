@@ -1043,6 +1043,12 @@ def cmd_components(args: argparse.Namespace) -> int:
     if args.flavour and not runtime:
         print(f"error: --flavour is for llama-server and audio.cpp, not {args.component}", file=sys.stderr)
         return 1
+    if runtime and args.flavour is None:
+        from bolo import tts_runtimes
+
+        note = tts_runtimes.missing_build_note(args.component, manager.core.settings.device)
+        if note:
+            print(f"note: {note}", file=sys.stderr)
     if runtime and not manager.runtime_needs_install(args.component, args.flavour):
         from bolo import tts_runtimes
 

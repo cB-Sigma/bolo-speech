@@ -457,6 +457,10 @@ async def test_installing_the_cuda_build_with_its_runtime(
         assert tts_runtimes.release_for("llama-server", "vulkan") is cpu  # no Vulkan build pinned here
         assert tts_runtimes.release_for("llama-server", "cpu", flavour="cuda") is cuda
         assert tts_runtimes.pinned_flavours("llama-server") == ["cpu", "cuda"]
+        assert tts_runtimes.missing_build_note("llama-server", "cuda") is None
+        assert tts_runtimes.missing_build_note("llama-server", "cpu") is None
+        note = tts_runtimes.missing_build_note("llama-server", "vulkan")
+        assert note and "no prebuilt vulkan build" in note and "--flavour cuda" in note and "llama_server_bin" in note
         monkeypatch.setenv("PATH", "/nonexistent")
         core.settings.device = "cuda"
         job = core.components.start_install("llama-server", accept_license=False)
@@ -777,3 +781,41 @@ def test_audiocpp_families_that_refuse_the_reference_text() -> None:
     model.spec["reference_text"] = True
     assert model.build_request("Hi.", None, 1.0, extras)["reference_text"] == "the words"
     model.close()
+
+
+async def test_a_gpu_device_without_a_pinned_gpu_build_says_so(core: Bolo, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Linux has no prebuilt CUDA build of llama.cpp: device = "cuda" installs the CPU build, and says so (job
+    warning, log and command line) instead of reporting a plain install; the Vulkan build is named as the way to
+    the GPU."""
+    import hashlib
+
+    assert "linux-x86_64-vulkan" in tts_runtimes.RUNTIME_INFO["llama-server"].releases  # the real pin
+    payload = fake_release("zip", "cpu-1", "ggml-cpu.dll")
+    vk = fake_release("zip", "vulkan-1", "ggml-vulkan.dll")
+    server = FakeArchive({"/cpu.zip": payload, "/vulkan.zip": vk}).start()
+    try:
+        key = "testos-x86_64"
+        monkeypatch.setattr(tts_runtimes, "platform_key", lambda: key)
+        runtime = tts_runtimes.RUNTIME_INFO["llama-server"]
+        monkeypatch.setitem(
+            runtime.releases,
+            key,
+            tts_runtimes.Release(f"{server.url}/cpu.zip", hashlib.sha256(payload).hexdigest(), len(payload)),
+        )
+        monkeypatch.setitem(
+            runtime.releases,
+            key + "-vulkan",
+            tts_runtimes.Release(f"{server.url}/vulkan.zip", hashlib.sha256(vk).hexdigest(), len(vk)),
+        )
+        monkeypatch.setenv("PATH", "/nonexistent")
+        core.settings.device = "cuda"
+        assert tts_runtimes.flavour_for("llama-server", "cuda") == "cpu"
+        assert tts_runtimes.flavour_for("llama-server", "vulkan") == "vulkan"
+        job = core.components.start_install("llama-server", accept_license=False)
+        await wait_for(job)
+        assert job.state == "done", job.error
+        (warning,) = job.warnings
+        assert "no prebuilt cuda build" in warning["message"] and "--flavour vulkan" in warning["message"]
+        assert tts_runtimes.installed_flavours(core.settings, "llama-server").keys() == {"cpu"}
+    finally:
+        server.stop()
