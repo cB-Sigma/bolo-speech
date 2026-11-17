@@ -113,6 +113,16 @@ spark-tts = [
   "transformers>=4.46", "einops>=0.8", "einx>=0.3", "omegaconf>=2.3", "safetensors", "soundfile>=0.12.1", "soxr",
   "torchaudio>=2.1", "tqdm", "packaging",
 ]
+# MaskGCT (Amphion): the libraries of the authors' pipeline and its phoneme front end, which the plugin installs itself
+# from github.com/open-mmlab/Amphion at a pinned commit (`bolo-torch code install maskgct`). Its language-model layers
+# need transformers before 4.48 (the authors use 4.41.2). LangSegment 0.2.0 is the only release left on PyPI;
+# pyopenjtalk-plus has wheels where pyopenjtalk has none. The GPL-licensed parts of the front end (phonemizer with
+# espeak-ng, pykakasi, Unidecode) are not here: install them yourself (README.md).
+maskgct = [
+  "transformers>=4.41,<4.48", "safetensors", "librosa", "soundfile>=0.12.1", "einops", "json5", "ruamel.yaml", "six",
+  "tokenizers", "onnxruntime", "inflect", "jieba", "cn2an", "pypinyin", "LangSegment==0.2.0", "pyopenjtalk-plus",
+  "scipy", "tqdm",
+]
 dev = ["pytest>=8", "pytest-timeout>=2.3", "ruff>=0.8", "mypy>=1.13", "build", "twine"]
 
 [project.scripts]

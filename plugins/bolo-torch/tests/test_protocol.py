@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Iterator
+from fnmatch import fnmatch
 from pathlib import Path
 
 import numpy as np
@@ -24,6 +25,7 @@ from bolo.plugin.host import PluginConfig, PluginEngine
 
 from bolo_torch.engine import LOADERS, NOT_IMPLEMENTED, TorchEngine
 from bolo_torch.models.diarizen import COMMIT as DIARIZEN_COMMIT
+from bolo_torch.models.maskgct import WEIGHTS as MASKGCT_WEIGHTS
 from fakes import tone
 
 FAKE_PLUGIN = [sys.executable, str(Path(__file__).parent / "fake_plugin.py")]
@@ -146,6 +148,9 @@ def test_catalog_entries_use_kinds_the_plugin_knows() -> None:
     spark = next(s for s in entries if s.kind == "spark-tts")
     assert spark.runnable and "code install spark-tts" in str(spark.options["plugin_install"])
     assert {v["id"] for v in spark.voices} == {"female", "male", "heart", "michael"}
+    mask = next(s for s in entries if s.kind == "maskgct")
+    assert mask.runnable and "code install maskgct" in str(mask.options["plugin_install"])
+    assert not any(fnmatch(f, p) for p in mask.source.exclude for f in MASKGCT_WEIGHTS)  # every network downloads
     for spec in [*diarizers.values(), *(s for s in entries if s.id == "pixit-ami")]:
         # pinned pipeline and sub-models, with the hashes the plugin checks again before pyannote reads anything
         assert spec.gated and len(spec.source.revision or "") == 40, spec.id

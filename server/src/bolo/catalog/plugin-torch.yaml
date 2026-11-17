@@ -781,8 +781,6 @@
   - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
   - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
 - id: maskgct
-  runnable: false
-  not_runnable_reason: no ggml or ONNX runtime has this model, and its inference code is not packaged
   task: tts
   engine: plugin:torch
   kind: maskgct
@@ -797,18 +795,27 @@
   gated: false
   features: [voice-cloning]
   description: 'Amphion MaskGCT: non-autoregressive masked generative codec TTS (text-to-semantic and
-    semantic-to-acoustic models, 6.6 GB) with zero-shot voice cloning in six languages. Non-commercial weights.
-    Not runnable yet: no ggml or ONNX runtime has it, and its inference code lives in the Amphion repository (it also needs
-    facebook/w2v-bert-2.0 and an eSpeak-based phonemiser), which is not a package bolo-torch can depend on; the
-    maskgct package on PyPI is a third-party GPL-3.0 wrapper.'
+    semantic-to-acoustic models) with zero-shot voice cloning from a reference recording and its transcript, in six
+    languages (Chinese and English mixed). Voices are bolo''s reference clips (heart, michael) or voices_dir. Runs the
+    authors'' pipeline through the torch plugin: their code from github.com/open-mmlab/Amphion (MIT) at a pinned commit,
+    each file checked by sha256, with facebook/w2v-bert-2.0 (MIT, 2.3 GB, fetched at a pinned revision). Its phoneme
+    front end uses phonemizer with espeak-ng, pykakasi and Unidecode, which are GPL-licensed and installed separately.
+    Non-commercial weights. 6.6 GB plus w2v-bert: a GPU is recommended. Untested here (wiring tested with fakes; the
+    authors'' pipeline ran with tiny random networks).'
   source_url: https://huggingface.co/amphion/MaskGCT
   validated: untested
   source:
     repo: amphion/MaskGCT
     revision: 265c6cef07625665d0c28d2faafb1415562379dc
-    exclude: [s2a_model/s2a_model_1layer/*, .gitattributes]
+    exclude: [.gitattributes, README.md]
   options:
-    plugin_install: not supported by bolo-torch yet (no packaged inference code)
+    plugin_install: pip install "bolo-torch[maskgct]" phonemizer espeakng-loader pykakasi Unidecode (the bolo PyTorch
+      engine plugin, plugins/bolo-torch; the last four are GPL-licensed and not part of the extra), then bolo-torch code
+      install maskgct (github.com/open-mmlab/Amphion at a pinned commit; a load also installs it)
+    hardware: {gpu: recommended, vram_gb: 12.0, note: 'float32, as the authors run it: 6.6 GB of MaskGCT weights and 2.3 GB of w2v-bert-2.0'}
+  voices:
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
 - id: diarizen-wavlm-large-s80-md-v2
   aliases: [diarizen]
   task: diarization

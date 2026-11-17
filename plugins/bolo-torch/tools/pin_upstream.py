@@ -77,6 +77,34 @@ BUNDLES: dict[str, dict[str, Any]] = {
             },
         ],
     },  # fmt: skip
+    "maskgct": {
+        "about": "MaskGCT (Amphion): the text-to-semantic and semantic-to-acoustic models, the semantic (RepCodec) and "
+        "acoustic codecs, the inference pipeline (maskgct_utils.py), its configuration and wav2vec 2.0-BERT feature "
+        "statistics, and the grapheme-to-phoneme front end with its lexicons and Chinese polyphone model",
+        "extra": "maskgct",
+        "paths": [""],
+        "parts": [
+            {
+                "repo": "open-mmlab/Amphion", "commit": "26f6883110181f1dbfe95c70a7c7dbaf4de5f42a",
+                "license": "MIT (code; the MaskGCT weights are CC-BY-NC-4.0)",
+                "license_url": "https://github.com/open-mmlab/Amphion/blob/26f6883110181f1dbfe95c70a7c7dbaf4de5f42a/LICENSE",
+                "dest": "",
+                "include": [
+                    "LICENSE", "models/__init__.py", "models/codec/__init__.py", "models/codec/amphion_codec/codec.py",
+                    "models/codec/amphion_codec/vocos.py", "models/codec/amphion_codec/quantize/*.py",
+                    "models/codec/kmeans/repcodec_model.py", "models/codec/kmeans/vocos.py",
+                    "models/tts/maskgct/llama_nar.py", "models/tts/maskgct/maskgct_s2a.py",
+                    "models/tts/maskgct/maskgct_t2s.py", "models/tts/maskgct/maskgct_utils.py",
+                    "models/tts/maskgct/config/maskgct.json", "models/tts/maskgct/ckpt/wav2vec2bert_stats.pt",
+                    "models/tts/maskgct/g2p/g2p_generation.py", "models/tts/maskgct/g2p/g2p/*.py",
+                    "models/tts/maskgct/g2p/g2p/vocab.json", "models/tts/maskgct/g2p/utils/*.py",
+                    "models/tts/maskgct/g2p/utils/mls_en.json", "models/tts/maskgct/g2p/sources/*",
+                    "models/tts/maskgct/g2p/sources/g2p_chinese_model/*",
+                    "utils/__init__.py", "utils/hparam.py", "utils/util.py",
+                ],
+            },
+        ],
+    },  # fmt: skip
     "kimi-audio": {
         "about": "Kimi-Audio: kimia_infer (prompt format, Whisper features, the streaming flow-matching detokenizer "
         "and BigVGAN vocoder) with the GLM-4-Voice speech tokenizer it imports (a git submodule of Kimi-Audio)",

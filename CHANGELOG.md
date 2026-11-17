@@ -391,6 +391,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   created voices `female` and `male` (speed as the model's speed level) and cloned voices `heart` and `michael`
   (bolo's reference clips). Not run here (3.9 GB; wiring tested with fakes, the BiCodec code with random weights);
   licence labelled CC-BY-NC-SA-4.0, `commercial_use: false`.
+- MaskGCT runs: `maskgct` is a runnable text-to-speech model on the torch plugin (kind `maskgct`, extra `maskgct`),
+  the authors' pipeline from github.com/open-mmlab/Amphion at a pinned commit, cloning bolo's reference clips (`heart`,
+  `michael`) or `voices_dir`; its 1-layer semantic-to-acoustic model, which the pipeline needs, is now downloaded with
+  the rest (6.6 GB). The GPL-licensed packages of its phoneme front end are installed separately (`plugin_install`
+  names them). Not run here (wiring tested with fakes; the front end and the pipeline with tiny random networks ran);
+  licence labelled CC-BY-NC-4.0, `commercial_use: false`. With this, every catalog entry can be pulled and run, and a
+  test keeps it so.
 ### Fixed
 
 - `test_gated_entries_explain_what_to_do` failed whenever bolo-torch was installed next to the server: the test's

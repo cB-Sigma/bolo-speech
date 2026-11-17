@@ -400,7 +400,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `maskgct` | en, zh, ja, ko, fr, de | accuracy | - | 6.6 GB | CC-BY-NC-4.0 ⚠ · needs plugin torch | not runnable yet |
+| `maskgct` | en, zh, ja, ko, fr, de | accuracy | - | 6.6 GB | CC-BY-NC-4.0 ⚠ · needs plugin torch | untested |
 
 #### LFM3-Audio 2B
 
@@ -1072,7 +1072,7 @@ models below were checked against their model cards and licence files on 2026-11
 | `indic-speak` | Indic Open Model License v1.0, gated (conditional: hosting it as an API for others needs Bodhan AI's approval, size thresholds, use policy) | bolo-torch, `indic-speak` kind running the repository's own `inference.py` (`bolo-torch[indic-speak]`) | catalogued; the loader follows the model card, the gated code was not read |
 | `indextts-2.5-audiocpp` | bilibili Model Use License (conditional) | tts-server, audio.cpp `index_tts2` family, `IndexTTS2.5-GGUF` q8_0 | catalogued |
 | `spark-tts-0.5b` | CC-BY-NC-SA-4.0 (no) | bolo-torch, `spark-tts` kind: the authors' recipe, BiCodec code from github.com/SparkAudio/Spark-TTS at a pinned commit (bundle `spark-tts`) | runnable, untested (fakes; BiCodec code with random weights) |
-| `maskgct` | CC-BY-NC-4.0 (no) | none yet: Amphion's code is not packaged (the PyPI `maskgct` wrapper is a third-party GPL-3.0 project) | catalogued, not runnable |
+| `maskgct` | CC-BY-NC-4.0 (no) | bolo-torch, `maskgct` kind: Amphion's pipeline from github.com/open-mmlab/Amphion at a pinned commit (bundle `maskgct`); its phoneme front end needs GPL-licensed packages installed separately | runnable, untested (fakes; front end and pipeline with tiny random networks) |
 | `diarizen-wavlm-large-s80-md-v2` | CC-BY-NC-4.0, PLDA CC-BY-4.0 (no) | bolo-torch, `diarizen` kind: the authors' `DiariZenPipeline` and pyannote.audio fork from github.com/BUTSpeechFIT/DiariZen at a pinned commit (`bolo-torch[diarizen]`, own environment) | measured on CPU (DER 5.0 % on the demo dialogue, RTF 12.4) |
 | `mms-lid-126`, `mms-lid-4017` | CC-BY-NC-4.0 (no) | ONNX Runtime, `onnx_lid` kind on Xenova's int8 exports | runnable, not measured (978 MB); "Language identification" below |
 | `voxlect-indic-lid-mms-lid-256` | CC-BY-NC-4.0 (no) | bolo-torch, `voxlect-lid` kind (`bolo-torch[voxlect]`) | runnable, not measured (3.9 GB) |

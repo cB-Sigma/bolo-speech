@@ -20,6 +20,7 @@ the console, the OpenAI-compatible API) works as for bolo's own engines.
 | `veena` | TTS | Maya Research Veena, 3B Llama + SNAC, Hindi and English | `orpheus` | Apache-2.0 | no | **no** (only the SNAC decoder) |
 | `svara-tts-v1` | TTS | Kenpath Svara v1, 3B Llama + SNAC, 19 languages, 38 voices | `orpheus` | Apache-2.0 | no | **no** (only the SNAC decoder) |
 | `spark-tts-0.5b` | TTS | SparkAudio Spark-TTS 0.5B, English and Chinese, created voices (female, male) and voice cloning | `spark-tts` + the authors' BiCodec code (bundle `spark-tts`) | CC-BY-NC-SA-4.0 (non-commercial) | no | **no** (fakes; BiCodec code with random weights) |
+| `maskgct` | TTS | Amphion MaskGCT, voice cloning in English, Chinese, Japanese, Korean, French and German | `maskgct` + GPL front-end packages + the authors' code (bundle `maskgct`) | CC-BY-NC-4.0 (non-commercial) | no | **no** (fakes; the authors' pipeline with tiny random networks) |
 | `sepformer-whamr16k` | separation | SpeechBrain SepFormer, WHAMR!, 16 kHz, 2 speakers | `sepformer` | Apache-2.0 (WSJ0 data, see below) | no | CPU, see below |
 | `sepformer-whamr` | separation | SpeechBrain SepFormer, WHAMR!, 8 kHz, 2 speakers | `sepformer` | Apache-2.0 (WSJ0 data, see below) | no | CPU, see below |
 | `pixit-ami` | separation | pyannote PixIT `speech-separation-ami-1.0`, diarization + separation | `pyannote` | MIT | yes (two repositories) | CPU, see below |
@@ -54,6 +55,24 @@ commit (bundle `spark-tts`, see "Inference code from GitHub"). Two kinds of voic
 the model writes the voice tokens itself, and *cloned* voices (`heart`, `michael`: bolo's reference clips, or
 `voices_dir`), whose voice tokens come from the reference recording with its transcript. 16 kHz, one sentence at a
 time. Weights CC-BY-NC-SA-4.0: not for commercial use. Not run here (3.9 GB).
+
+MaskGCT (`maskgct`, kind `maskgct`) runs the authors' `MaskGCT_Inference_Pipeline` (github.com/open-mmlab/Amphion,
+MIT, bundle `maskgct`) as `maskgct_inference.py` does: w2v-bert-2.0 and the semantic codec turn the reference
+recording into semantic tokens, the text-to-semantic model writes the new text's (25 steps, guidance 2.5; the length
+follows the reference's speaking rate, divided by `speed`), the two semantic-to-acoustic models and the acoustic
+codec make 24 kHz audio. Every voice is a reference clip with its transcript (`heart`, `michael`, or `voices_dir`).
+Languages: Chinese and English (mixed in one sentence), Japanese and Korean (by script), French and German (by
+bolo's text-language guess, else the voice's `language`). What the pipeline's constructor would download (w2v-bert-2.0's latest
+revision) comes from a pinned revision instead; the statistics file loads with `weights_only`. The phoneme front end
+is Amphion's: `phonemizer` with espeak-ng, `pykakasi` and `Unidecode` are GPL-licensed, so they are not in the
+`maskgct` extra; install them yourself if their licences suit you (`pip install phonemizer espeakng-loader pykakasi
+Unidecode`; the loader points phonemizer at espeakng-loader's espeak-ng). LangSegment's only release on PyPI (0.2.0)
+cannot be imported as published (its `__init__` names functions it lacks); the loader loads its working module
+directly. pyopenjtalk downloads its dictionary (open_jtalk 1.11, 23 MB, from GitHub) on the first Japanese text. The
+code's top-level packages are `models` and `utils`, and its front end reads files relative to the working directory
+while it is imported (done under a lock, with the bundle as the working directory): give MaskGCT a plugin
+environment of its own. transformers must be older than 4.48 (Amphion's Llama layers call the attention the old
+way). Weights CC-BY-NC-4.0: not for commercial use. Not run here (6.6 GB plus 2.3 GB).
 
 DiariZen (`diarizen-wavlm-large-s80-md-v2`, kind `diarizen`) is a bolo `diarization` model too, run by the authors'
 own `DiariZenPipeline` (github.com/BUTSpeechFIT/DiariZen, MIT) on their fork of pyannote.audio 3.1.1 (in the same
@@ -250,7 +269,9 @@ package, which pins its own libraries: give it its own environment), `indic-spea
 `orpheus` (Veena, Svara), `sepformer`, `pyannote` (PixIT, pyannote speaker diarization),
 `dicow` (DiCoW, SE-DiCoW: transformers 4.55 and pandas), `diarizen` (DiariZen: toml, accelerate, scipy, torchaudio
 below 2.9; with the authors' two packages from GitHub, see above), `spark-tts` (Spark-TTS: transformers, einops, einx,
-omegaconf, soxr, torchaudio; the BiCodec code is the bundle `spark-tts`), `omni` (Qwen2.5-Omni and Qwen3-Omni: transformers 4.57
+omegaconf, soxr, torchaudio; the BiCodec code is the bundle `spark-tts`), `maskgct` (MaskGCT: transformers before 4.48,
+librosa, onnxruntime, jieba, cn2an, pypinyin, LangSegment, pyopenjtalk-plus and the rest of Amphion's front end
+except its GPL-licensed packages, see above), `omni` (Qwen2.5-Omni and Qwen3-Omni: transformers 4.57
 or later, accelerate, torchvision), `step-audio-2` (Step-Audio 2 mini: transformers 4.49.0, which the authors use, and
 token2wav's libraries: s3tokenizer, onnxruntime, hyperpyyaml, diffusers, torchaudio, librosa), `glm-4-voice` (GLM-4-Voice: transformers 4.44.1, diffusers 0.27.2 with huggingface-hub below 0.26, conformer,
 hyperpyyaml, hydra-core, lightning, tiktoken, bitsandbytes, as in the authors' requirements), `kimi-audio`
@@ -311,6 +332,7 @@ refused at load.
 | `step-audio-2` | stepfun-ai/Step-Audio2 @ `76e272b56c39` (`utils.py`, `token2wav.py`, `cosyvoice2/`, part of `flashcosyvoice/`, the two prompt voices) | Apache-2.0 |
 | `glm-4-voice` | THUDM/GLM-4-Voice @ `eb00ce9142e8` (`speech_tokenizer/`, `flow_inference.py`, `cosyvoice/`) and shivammehta25/Matcha-TTS @ `dd9105b34bf2` (`matcha/`, its submodule) | Apache-2.0; MIT |
 | `spark-tts` | SparkAudio/Spark-TTS @ `2f1ea9082400` (`sparktts/`: BiCodec, its modules and token maps) | Apache-2.0 |
+| `maskgct` | open-mmlab/Amphion @ `26f688311018` (MaskGCT's models and pipeline, the two codecs, `utils/`, the g2p front end with its lexicons and Chinese polyphone ONNX model, 46 files) | MIT |
 | `kimi-audio` | MoonshotAI/Kimi-Audio @ `349251e1d8f4` (`kimia_infer/`) and THUDM/GLM-4-Voice @ `eb00ce9142e8` (`speech_tokenizer/` in `kimia_infer/models/tokenizer/glm4`, its submodule) | MIT (stated in README and pyproject; no LICENSE file; Qwen-derived code Apache-2.0); Apache-2.0 |
 
 ## Speech-to-speech models on a Windows laptop with an NVIDIA GPU
@@ -411,9 +433,11 @@ text-to-speech for one, which needs a voice installed. The first request loads t
   flash-attn), `device 'cuda' was requested but this torch build sees no CUDA device` (install the CUDA torch wheel
   in the plugin's environment), out of memory (`quantization=int4` for GLM-4-Voice, or a smaller model).
 
-## Spark-TTS and DiariZen on a Windows laptop with an NVIDIA GPU
+## Spark-TTS, MaskGCT and DiariZen on a Windows laptop with an NVIDIA GPU
 
-DiariZen ran here on a CPU only; Spark-TTS was not run (3.9 GB). Steps to run both on the GPU, from a checkout:
+DiariZen ran here on a CPU only; Spark-TTS (3.9 GB) and MaskGCT (8.9 GB) were not run. Steps to run all three on the
+GPU, from a checkout. Spark-TTS needs about 4 GB of GPU memory, MaskGCT about 12 GB (float32, as its authors run it;
+an 8 GB laptop GPU will not hold it), DiariZen about 2 GB.
 
 **1. bolo**, as above (`git clone https://github.com/cB-Sigma/bolo C:\bolo-src`, `C:\bolo-env`).
 
@@ -424,6 +448,13 @@ py -3.12 -m venv C:\bolo-tts\spark
 C:\bolo-tts\spark\Scripts\pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
 C:\bolo-tts\spark\Scripts\pip install C:\bolo-src\server "C:\bolo-src\plugins\bolo-torch[spark-tts]"
 C:\bolo-tts\spark\Scripts\bolo-torch code install spark-tts      # sparktts at the pinned commit, sha256-checked
+
+py -3.12 -m venv C:\bolo-tts\maskgct
+C:\bolo-tts\maskgct\Scripts\pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+C:\bolo-tts\maskgct\Scripts\pip install C:\bolo-src\server "C:\bolo-src\plugins\bolo-torch[maskgct]"
+# the GPL-licensed parts of its phoneme front end (read their licences first):
+C:\bolo-tts\maskgct\Scripts\pip install phonemizer espeakng-loader pykakasi Unidecode
+C:\bolo-tts\maskgct\Scripts\bolo-torch code install maskgct        # Amphion's files at the pinned commit (80 MB)
 
 py -3.12 -m venv C:\bolo-tts\diarizen
 C:\bolo-tts\diarizen\Scripts\pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu126
@@ -438,9 +469,10 @@ C:\bolo-tts\diarizen\Scripts\bolo-torch doctor                  # cuda_available
 **3. Serve with one of them**, on the GPU:
 
 ```powershell
-$env:BOLO_PLUGINS = "torch=C:\bolo-tts\spark\Scripts\python.exe -m bolo_torch"   # or ...\diarizen\...
+$env:BOLO_PLUGINS = "torch=C:\bolo-tts\spark\Scripts\python.exe -m bolo_torch"   # or ...\maskgct\... / ...\diarizen\...
 $env:BOLO_DEVICE = "cuda"; $env:BOLO_TORCH_DEVICE = "cuda"
-C:\bolo-env\Scripts\bolo pull spark-tts-0.5b        # 3.9 GB; or: bolo pull diarizen (278 MB)
+C:\bolo-env\Scripts\bolo pull spark-tts-0.5b        # 3.9 GB; or: bolo pull maskgct (6.6 GB; the plugin adds
+                                                      # w2v-bert-2.0, 2.3 GB, on the first load), bolo pull diarizen
 C:\bolo-env\Scripts\bolo serve
 ```
 
@@ -454,6 +486,13 @@ curl.exe -s http://127.0.0.1:8000/v1/audio/speech -H "Content-Type: application/
   -d '{"model":"spark-tts-0.5b","voice":"male","speed":1.4,"input":"This one should be noticeably faster."}' -o male.wav
 curl.exe -s http://127.0.0.1:8000/v1/audio/speech -H "Content-Type: application/json" `
   -d '{"model":"spark-tts-0.5b","voice":"heart","input":"Cloned from bolo''s English reference clip."}' -o heart.wav
+# MaskGCT: English, then Chinese and English mixed, then French, cloning bolo's reference clip
+curl.exe -s http://127.0.0.1:8000/v1/audio/speech -H "Content-Type: application/json" `
+  -d '{"model":"maskgct","voice":"heart","input":"The quick brown fox jumps over the lazy dog."}' -o mask-en.wav
+curl.exe -s http://127.0.0.1:8000/v1/audio/speech -H "Content-Type: application/json" `
+  -d '{"model":"maskgct","voice":"michael","input":"我们明天 meet 一下吧。"}' -o mask-zh.wav
+curl.exe -s http://127.0.0.1:8000/v1/audio/speech -H "Content-Type: application/json" `
+  -d '{"model":"maskgct","voice":"heart","input":"Bonjour, comment allez-vous ?"}' -o mask-fr.wav
 # DiariZen: the demo dialogue (two voices taking turns)
 curl.exe -s http://127.0.0.1:8000/api/v1/diarize -F model=diarizen -F file=@C:\bolo-src\server\src\bolo\_ui\diarization\two-speakers-en.mp3
 ```
@@ -461,7 +500,11 @@ curl.exe -s http://127.0.0.1:8000/api/v1/diarize -F model=diarizen -F file=@C:\b
 **What to check.** Spark-TTS: each file speaks the text (`bolo transcribe -m whisper-base female.wav`), `female`
 and `male` differ, `heart` sounds like `C:\bolo-src\server\src\bolo\samples\en-short.wav`, and a Chinese sentence
 works; the log shows `spark-tts inference code: SparkAudio/Spark-TTS@2f1ea9082400`. Note the first-audio time and
-RTF that bolo logs, and `bolo ps` (on `cuda`, about 4 GB). DiariZen: speakers `A` and `B` taking seven turns, as on the
+RTF that bolo logs, and `bolo ps` (on `cuda`, about 4 GB). MaskGCT: each file speaks its text in the reference's
+voice (the timbre of `en-short.wav` / `en-long.wav`), the Chinese-English sentence switches language mid-sentence,
+`speed` 1.5 makes it shorter; the log shows `maskgct inference code: open-mmlab/Amphion@26f688311018` and no
+`component_missing` for the front end (if phonemizer cannot find espeak-ng, set `PHONEMIZER_ESPEAK_LIBRARY` to
+`libespeak-ng.dll`). DiariZen: speakers `A` and `B` taking seven turns, as on the
 CPU here (DER 5.0 % against the clip's script); the time should be well under the 27 s of audio (on the CPU it took
 337 s). Errors to expect: `component_missing` naming the commit (install the two DiariZen packages exactly as above),
 `device 'cuda' was requested but this torch build sees no CUDA device` (the CUDA torch wheel is missing in that
@@ -650,8 +693,14 @@ docs/measurements/dicow-conditioned.json.
   synthetic voice pair, and on single-speaker audio against plain Whisper large-v3-turbo; on CPUs without AMX /
   AVX512-BF16 only float32 speed was measured (forced on this machine). DiCoW gives no word timestamps.
 * Telephone (8 kHz) recordings with the 8 kHz SepFormer; real meeting audio with any separator.
-* `sravaani-1.0` and `indicconformer-600m-official`: not implemented. `maskgct` is catalogued but not implemented
-  (no packaged inference code).
+* `sravaani-1.0` and `indicconformer-600m-official`: not implemented.
+* `maskgct`: the weights (6.6 GB, plus 2.3 GB of w2v-bert-2.0) were not downloaded. Tested with fakes of the authors'
+  pipeline, builders and transformers' classes. Here, from the bundle (downloaded and matched to its pins): the
+  phoneme front end ran for real in all six languages (phonemizer with espeakng-loader's espeak-ng, transformers
+  4.47.1), and the whole pipeline (`text2semantic`, `extract_acoustic_code`, `semantic2acoustic`, the decoder) ran
+  through the plugin's backend with tiny random networks and the real codec configurations, giving 24 kHz audio of
+  the length the rule asks for. transformers 4.48 and later fail in Amphion's Llama layers (`position_embeddings`),
+  hence the pin. Speech quality and cloning were not heard.
 * `spark-tts-0.5b`: the weights (3.9 GB) were not downloaded. Tested with fakes of transformers' classes and of
   `BiCodecTokenizer`; the bundle was downloaded and matched its pins here, and the authors' BiCodec code from it ran
   with random weights through the plugin's `tokenize` / `detokenize` (32 voice tokens, 50 semantic tokens per
@@ -697,11 +746,12 @@ card before commercial use.
 | Kimi-Audio 7B Instruct | MIT | Per the model card; the model is built on Qwen2.5-7B (Apache-2.0). Its code repository has no LICENSE file: README and pyproject say MIT, Qwen-derived code Apache-2.0. Uses glm-4-voice-tokenizer, whose weights are under the glm-4-voice License (commercial use after registering with Zhipu): check that before commercial use. |
 | Step-Audio 2 mini | Apache-2.0 | Model and code (the model repository's remote code, the Step-Audio2 repository's token2wav) under Apache-2.0. |
 | Spark-TTS 0.5B | CC-BY-NC-SA-4.0 | **Not for commercial use**; derivatives share alike. Code (`sparktts`): Apache-2.0. The language model is fine-tuned from Qwen2.5-0.5B (Apache-2.0); the tokenizer uses `wav2vec2-large-xlsr-53` (Apache-2.0), shipped in the model repository. |
+| MaskGCT | CC-BY-NC-4.0 | **Not for commercial use.** Code (Amphion): MIT. Uses `facebook/w2v-bert-2.0` (MIT). Its phoneme front end needs GPL-licensed packages that are not in the extra: phonemizer (GPL-3.0) with espeak-ng (GPL-3.0-or-later), pykakasi (GPL-3.0-or-later), Unidecode (GPL-2.0-or-later); LangSegment is BSD, pyopenjtalk-plus MIT, jieba, cn2an and pypinyin MIT. |
 | DiariZen v2 (`BUT-FIT/diarizen-wavlm-large-s80-md-v2`) | CC-BY-NC-4.0 | **Not for commercial use** (the authors apply NC because some training sets forbid commercial use). The PLDA files are CC-BY-4.0. Code (DiariZen and its pyannote.audio fork): MIT. Downloads `pyannote/wespeaker-voxceleb-resnet34-LM` (CC-BY-4.0). |
 | PixIT `speech-separation-ami-1.0` | MIT | Gated (both repositories). Downloads `speechbrain/spkrec-ecapa-voxceleb` (Apache-2.0) and `microsoft/wavlm-large` (no licence stated on its model card; check before commercial use). |
 
-Apart from GLM-4-Voice (commercial use after registration), Spark-TTS and DiariZen (non-commercial), no model here
-is marked non-commercial by its publisher; the SepFormer training-data caveat above is the one to
+Apart from GLM-4-Voice (commercial use after registration), Spark-TTS, MaskGCT and DiariZen (non-commercial), no
+model here is marked non-commercial by its publisher; the SepFormer training-data caveat above is the one to
 weigh for commercial use. Nothing is downloaded unless you ask for that model.
 
 ## Development

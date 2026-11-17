@@ -213,6 +213,8 @@ def test_every_packaged_entry_is_well_formed() -> None:
     every = [ModelSpec.from_dict(e) for e in entries]
     ids = [s.id for s in every]
     assert len(ids) == len(set(ids))
+    # no catalog-only entries: everything listed can be pulled and run (docs/models-unsupported.md has the rest)
+    assert [s.id for s in every if not s.runnable or s.status == "pending"] == []
     # entries whose files are not published yet: described, but without checksums and never offered
     pending = [s for s in every if s.status == "pending"]
     # (a release asset of this repository, or a repository of the project's Hugging Face organisation)

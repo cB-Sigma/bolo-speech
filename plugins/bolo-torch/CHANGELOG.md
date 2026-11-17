@@ -6,6 +6,15 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ### Added
 
+- **MaskGCT** (kind `maskgct`, extra `maskgct`, code bundle `maskgct`): Amphion's `MaskGCT_Inference_Pipeline`
+  methods unchanged, as `maskgct_inference.py` runs them, with the networks' weights from the model folder,
+  w2v-bert-2.0 at a pinned revision and the feature statistics from the bundle (`weights_only`); github.com/open-
+  mmlab/Amphion at a pinned commit, 46 files sha256-pinned. Voice cloning from reference clips with their
+  transcripts; Chinese and English mixed, Japanese, Korean, French and German; `speed` scales the length rule. The
+  GPL-licensed parts of the phoneme front end (phonemizer with espeak-ng, pykakasi, Unidecode) are left out of the
+  extra and installed by the operator; phonemizer is pointed at espeakng-loader's espeak-ng; LangSegment 0.2.0's
+  broken package import is worked around. transformers is held below 4.48 (Amphion's Llama layers). The front end ran
+  here in all six languages and the pipeline with tiny random networks; the weights were not run. CC-BY-NC-4.0.
 - **Spark-TTS 0.5B** (kind `spark-tts`, extra `spark-tts`, code bundle `spark-tts`): the authors' recipe
   (`cli/SparkTTS.py`): the Qwen2.5-0.5B language model through transformers with their sampling, and the BiCodec
   tokenizer and decoder from github.com/SparkAudio/Spark-TTS at a pinned commit (20 files, sha256-pinned). Created
