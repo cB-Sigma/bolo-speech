@@ -196,7 +196,6 @@ definitions are in `server/src/bolo/plugin/protocol.py`.
 | `dicow-v3.3` (BUT-FIT DiCoW) | STT, diarization-conditioned (speaker request) | `dicow` | CC-BY-4.0 | no | RTF 0.45 with Nemotron diarization (bf16, AMX); AMI cpWER 69 → 26 % |
 | `se-dicow` (BUT-FIT SE-DiCoW) | STT, diarization-conditioned, self-enrolment | `dicow` | Apache-2.0 | no | RTF 0.59 with Nemotron diarization (bf16); AMI cpWER 69 → 25 % |
 | `demucs-dns48`, `demucs-dns64`, `demucs-master64`, `demucs-valentini-nc` (Facebook Research Demucs denoiser) | denoise (16 kHz) | `demucs-denoiser` | **CC-BY-NC-4.0, not for commercial use** | no | docs/models.md, "Denoising" |
-| `clearvoice-frcrn-se-16k`, `clearvoice-mossformer2-se-48k`, `clearvoice-mossformergan-se-16k`, `resemble-enhance` | denoise | - | Apache-2.0; MIT | no | not implemented in bolo-torch yet (catalogued with the reason) |
 | `qwen2.5-omni-3b-torch` | speech-to-speech (text and speech out) | `omni` | Qwen Research License (non-commercial) | no | not run (12 GB; fakes only) |
 | `qwen2.5-omni-7b-torch` | speech-to-speech | `omni` | Apache-2.0 | no | not run (22 GB; fakes only) |
 | `qwen3-omni-30b-a3b-instruct-torch` | speech-to-speech, speech out in 10 languages | `omni` | Apache-2.0 | no | not run (70 GB; fakes only) |

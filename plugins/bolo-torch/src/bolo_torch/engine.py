@@ -38,8 +38,6 @@ NOT_IMPLEMENTED = {
     "diarizen": "DiariZen diarization (no packaged inference code)",
     "spark-tts": "Spark-TTS (no packaged inference code)",
     "maskgct": "MaskGCT (no packaged inference code)",
-    "clearvoice": "ClearVoice speech enhancement (FRCRN, MossFormer2, MossFormerGAN)",
-    "resemble-enhance": "Resemble Enhance",
     "moshi": "Moshi (full-duplex: it listens and speaks at once, frame by frame, which the turn-based respond op "
     "cannot carry)",
     "glm-4-voice": "GLM-4-Voice (its speech tokenizer and decoder live in the GLM-4-Voice repository, not a package)",

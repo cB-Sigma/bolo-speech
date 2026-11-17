@@ -156,11 +156,9 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | STT | Soniox (cloud) | 2 | af, ar, az, be, bg, bn, bs, ca +52 | 0 | - |
 | DENOISE | GTCRN | 1 | - | 1 | 0.060 (`gtcrn-simple`) |
 | DENOISE | DPDFNet | 8 | - | 0 | - |
-| DENOISE | DeepFilterNet | 2 | - | 0 | - |
+| DENOISE | DeepFilterNet | 1 | - | 0 | - |
 | DENOISE | RNNoise | 1 | - | 0 | - |
 | DENOISE | Demucs denoiser | 4 | - | 0 | - |
-| DENOISE | ClearVoice | 3 | - | 0 | - |
-| DENOISE | Resemble Enhance | 1 | - | 0 | - |
 | DIARIZATION | pyannote + speaker embeddings | 3 | - | 1 | 0.106 (`pyannote-3.0-eres2net`) |
 | DIARIZATION | Nemotron diarization | 1 | - | 1 | 0.039 (`nemotron-3-diarization`) |
 | LID | VoxLingua107 ECAPA-TDNN | 2 | ab, af, am, ar, as, az, ba, be +99 | 2 | 0.106 (`voxlingua107-ecapa`) |
@@ -227,7 +225,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | VAD | WebRTC VAD | 2 | - | 2 | 0.000 (`webrtc-vad-aggressive`) |
 | VAD | Energy VAD | 1 | - | 1 | 0.000 (`energy-vad`) |
 
-**411 models in the catalog, 156 validated on CPU, 255 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**406 models in the catalog, 156 validated on CPU, 250 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

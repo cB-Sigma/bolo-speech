@@ -10,7 +10,6 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
   `demucs-master64` and `demucs-valentini-nc` from facebookresearch/denoiser as bolo `denoise` models, served through
   the protocol's new `denoise` op (needs a bolo that sends it). Code and weights are CC-BY-NC-4.0: not for commercial
   use. `pip install --no-deps denoiser julius` is enough (the package's other dependencies are for training).
-- `clearvoice` and `resemble-enhance` kinds are known and answer that they are not implemented yet.
 - **Qwen2.5-Omni and Qwen3-Omni as speech-to-speech models** (`kind: qwen-omni`, `omni` extra): the catalog's
   `qwen2.5-omni-3b-torch` (Qwen Research License, non-commercial), `qwen2.5-omni-7b-torch` and
   `qwen3-omni-30b-a3b-instruct-torch` (Apache-2.0), served through the protocol's new `respond` op (needs a bolo that

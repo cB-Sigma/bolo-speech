@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-411 models: 156 validated on CPU by the maintainers, 255 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
+406 models: 156 validated on CPU by the maintainers, 250 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
 
 ### Speech to text
 
@@ -796,7 +796,6 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `deepfilternet3` | - | balanced | - | 16 MB | MIT OR Apache-2.0 | untested |
-| `deepfilternet2` | - | balanced | - | 9 MB | MIT OR Apache-2.0 | not runnable yet |
 
 #### RNNoise
 
@@ -812,20 +811,6 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `demucs-dns64` | - | balanced | - | 134 MB | CC-BY-NC-4.0 ⚠ · needs plugin torch | untested |
 | `demucs-master64` | - | balanced | - | 134 MB | CC-BY-NC-4.0 ⚠ · needs plugin torch | untested |
 | `demucs-valentini-nc` | - | accuracy | - | 243 MB | CC-BY-NC-4.0 ⚠ · needs plugin torch | untested |
-
-#### ClearVoice
-
-| id | languages | tier | streaming | download | licence | validated |
-| --- | --- | --- | --- | --- | --- | --- |
-| `clearvoice-frcrn-se-16k` | - | balanced | - | 161 MB | Apache-2.0 · needs plugin torch | not runnable yet |
-| `clearvoice-mossformer2-se-48k` | - | accuracy | - | 222 MB | Apache-2.0 · needs plugin torch | not runnable yet |
-| `clearvoice-mossformergan-se-16k` | - | accuracy | - | 39 MB | Apache-2.0 · needs plugin torch | not runnable yet |
-
-#### Resemble Enhance
-
-| id | languages | tier | streaming | download | licence | validated |
-| --- | --- | --- | --- | --- | --- | --- |
-| `resemble-enhance` | - | accuracy | - | 713 MB | MIT · needs plugin torch | not runnable yet |
 
 ### Language identification
 

@@ -18,9 +18,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   platform, pinned by sha256 and called through ctypes, no new dependency), the **Demucs denoiser** (`demucs-dns48`,
   `demucs-dns64`, `demucs-master64`, `demucs-valentini-nc`; CC-BY-NC-4.0, not for commercial use; PyTorch, on the
   bolo-torch plugin, extra `demucs-denoiser`) and **ElevenLabs Voice Isolator** (`elevenlabs-voice-isolator`, cloud,
-  `POST /v1/audio-isolation`; not run against a real account). Catalogued, not runnable yet, each with its reason:
-  ClearVoice FRCRN, MossFormer2 (48 kHz) and MossFormerGAN (Apache-2.0), Resemble Enhance (MIT, 713 MB) and
-  DeepFilterNet 2's three-graph export. `gtcrn-simple` stays the default. Measured with the harness of the first
+  `POST /v1/audio-isolation`; not run against a real account). Every entry runs; the ones looked at and left out
+  (ClearVoice FRCRN, MossFormer2 and MossFormerGAN, Resemble Enhance, DeepFilterNet 2's three-graph export) are in
+  docs/models-unsupported.md with the reason. `gtcrn-simple` stays the default. Measured with the harness of the first
   denoiser (docs/measurements/denoise.json, docs/models.md, "Denoising").
 - **`denoise` on the live speech-to-text WebSocket** (`/api/v1/stt/stream`): query or `config` message, the same
   values as for transcriptions (`true`, `false`, a strength, a model id, `denoise_strength`), and the model's pin, its

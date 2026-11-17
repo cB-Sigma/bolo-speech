@@ -775,9 +775,9 @@ in a request or as `default_denoise`, and is pulled like any other model
 | Demucs denoiser | `demucs-dns48`, `demucs-dns64`, `demucs-master64`, `demucs-valentini-nc` | **CC-BY-NC-4.0** (not for commercial use) | PyTorch, bolo-torch plugin | 16 kHz |
 | ElevenLabs Voice Isolator | `elevenlabs-voice-isolator` | provider's terms (paid cloud API) | ElevenLabs | 16 kHz up |
 
-The catalog also lists ClearVoice (FRCRN, MossFormer2, MossFormerGAN),
-Resemble Enhance and DeepFilterNet 2, which cannot run yet; each entry says
-why. A denoiser runs at its own sample rate (the audio is resampled to it
+Denoisers that were looked at and cannot run yet (ClearVoice, Resemble
+Enhance, DeepFilterNet 2) are not in the catalog: models-unsupported.md
+says why. A denoiser runs at its own sample rate (the audio is resampled to it
 and back). models.md, "Denoising", compares them on noisy speech: word error
 rates with two recognisers and the CPU each needs.
 
