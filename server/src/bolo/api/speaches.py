@@ -4,9 +4,10 @@ The shapes were derived from the speaches route definitions (MIT licence,
 see NOTICE); no code was copied. Covered: model management
 (``/v1/models/{id}`` POST/DELETE, ``/v1/registry``, ``/v1/audio/models``,
 ``/v1/audio/voices``), loaded-model control (``/api/ps``), ``/health`` and
-voice-activity timestamps (``/v1/audio/speech/timestamps``).
-Not covered: ``/v1/chat/completions`` audio, ``/v1/realtime``, speaker
-embedding and diarization.
+voice-activity timestamps (``/v1/audio/speech/timestamps``) and speaker
+embeddings (``/v1/audio/speech/embedding``).
+``/v1/chat/completions`` audio and ``/v1/realtime`` live in their own modules;
+diarization has its own route (``/api/v1/diarize``).
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
+from bolo import similarity
 from bolo.api.common import get_core, read_upload
 from bolo.api.openai import _model_object
 from bolo.audio.resample import resample
@@ -172,3 +174,49 @@ async def speech_timestamps(request: Request) -> JSONResponse:
     finally:
         core.traces.record(trace)
     return JSONResponse([{"start": round(a / 16), "end": round(b / 16)} for a, b in segments])
+
+
+@router.post("/v1/audio/speech/embedding", tags=["speaches"], summary="Speaker embedding of a recording")
+async def speech_embedding(request: Request) -> JSONResponse:
+    """Multipart form: ``file`` and optional ``model``. Returns the speaker embedding in the shape of OpenAI's
+    embeddings response: ``{"object": "list", "data": [{"object": "embedding", "embedding": [...], "index": 0}],
+    "model": ..., "usage": {"prompt_tokens": n, "total_tokens": n}}`` (``n``: samples at 16 kHz, as speaches counts).
+
+    The embedder is the speaker-embedding model of a diarization pipeline, the one that scores cloned voices
+    (setting ``voice_similarity_model``, else ``default_diarization``). A ``model`` that is not in bolo's catalog
+    (speaches' ``pyannote/wespeaker-voxceleb-resnet34-LM``, for one) uses that default. The vector is unit length;
+    the cosine of two of them is the speaker similarity. Clips longer than 30 s use their first 30 s."""
+    core = get_core(request)
+    form = await request.form()
+    file = form.get("file")
+    if file is None or isinstance(file, str):
+        raise InvalidRequest("a multipart 'file' field with the audio is required", param="file")
+    model = str(form.get("model") or "") or None
+    if model and core.catalog.resolve(model) is None:
+        model = None  # speaches clients send its own embedding model's id
+    name = model or similarity.embedding_model(core)
+    spec = core.resolve(name, "diarization")
+    samples, rate = await read_upload(core, file)
+    trace = Trace("embedding", "http", spec.id)
+    trace.audio_seconds = len(samples) / rate if rate else 0.0
+    try:
+        with trace.phase("embed"):
+            vector = await similarity.embed(core, samples, rate, spec.id)
+        trace.finish("ok")
+    except Exception as exc:
+        trace.finish("error", str(exc))
+        raise
+    finally:
+        core.traces.record(trace)
+    used = min(
+        len(samples) * similarity.EMBEDDING_RATE // max(rate, 1),
+        int(similarity.MAX_EMBED_S * similarity.EMBEDDING_RATE),
+    )
+    return JSONResponse(
+        {
+            "object": "list",
+            "data": [{"object": "embedding", "embedding": [float(v) for v in vector], "index": 0}],
+            "model": spec.id,
+            "usage": {"prompt_tokens": used, "total_tokens": used},
+        }
+    )

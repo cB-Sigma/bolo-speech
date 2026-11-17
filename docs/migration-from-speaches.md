@@ -73,7 +73,7 @@ to the speaker name (`amy`).
 | `WS /v1/realtime` (OpenAI Realtime API) | yes | yes, over WebSocket, with the GA event names |
 | `POST /v1/realtime` (WebRTC) | yes | **different route**: OpenAI's current `POST /v1/realtime/calls` (SDP offer in, answer out; extra `webrtc`), plus `POST /v1/realtime/client_secrets`. Tested with a WebRTC library, not with browsers |
 | `POST /v1/audio/diarization` | yes (pyannote, needs PyTorch) | **different route**: `POST /api/v1/diarize`, or `diarize=true` / `diarized_json` on transcriptions (ONNX pipeline, no PyTorch) |
-| `POST /v1/audio/speech/embedding` | yes | **no** |
+| `POST /v1/audio/speech/embedding` | yes | yes; same form (`file`, `model`) and response. The embedder is bolo's (ERes2Net from its default diarization model, 192 numbers), not speaches' WeSpeaker ResNet34, so vectors from the two servers cannot be compared with each other; speaches' model id falls back to bolo's default |
 | Gradio UI at `/` | yes | replaced by bolo's web console |
 | OpenTelemetry export | yes | **no**; bolo has Prometheus `/metrics`, request traces and an SSE event stream instead |
 

@@ -55,6 +55,7 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `POST` | `/api/ps/{model_id}` | Load a model into memory |
 | `DELETE` | `/api/ps/{model_id}` | Unload a model from memory |
 | `POST` | `/v1/audio/speech/timestamps` | Voice-activity timestamps (milliseconds) |
+| `POST` | `/v1/audio/speech/embedding` | Speaker embedding of a recording |
 
 **native**
 
@@ -449,7 +450,42 @@ For clients written against speaches; details and differences are in
 | `GET /api/ps` | `{"models": [ids in memory]}` |
 | `POST /api/ps/{id}` / `DELETE /api/ps/{id}` | load (`201`, `409` if loaded) / unload (`200`, `404`, `409` if busy) |
 | `POST /v1/audio/speech/timestamps` | multipart `file` (+ `threshold`, `min_silence_duration_ms`, `min_speech_duration_ms`, `max_speech_duration_s`, `speech_pad_ms`) → `[{"start": ms, "end": ms}]` |
+| `POST /v1/audio/speech/embedding` | multipart `file` (+ `model`) → the speaker embedding, see below |
 | `GET /health` | `{"message": "OK"}` |
+
+### `POST /v1/audio/speech/embedding`
+
+The speaker embedding of a recording: a unit-length vector whose cosine with
+another recording's vector says how alike the two voices are. The response
+has the shape of OpenAI's embeddings response, as speaches answers:
+
+```json
+{"object": "list",
+ "data": [{"object": "embedding", "embedding": [0.031, -0.087, ...], "index": 0}],
+ "model": "pyannote-3.0-eres2net",
+ "usage": {"prompt_tokens": 48000, "total_tokens": 48000}}
+```
+
+* `file`: the audio (any format the transcription route takes; raw PCM as
+  `audio/pcm` too). At least half a second; a longer clip uses its first 30 s.
+* `model`: a diarization model in bolo's catalog, whose speaker-embedding
+  model is used. Default: the one that scores cloned voices
+  (`voice_similarity_model`, else `default_diarization`, which is
+  `pyannote-3.0-eres2net`: ERes2Net from 3D-Speaker, 192 numbers). A model id
+  bolo does not know, such as speaches'
+  `pyannote/wespeaker-voxceleb-resnet34-LM`, uses that default; `model` in
+  the response names the model that was used.
+* `usage` counts samples at 16 kHz, as speaches does.
+
+How to read a cosine: with the default model, recordings of the same person
+scored 0.45 to 0.93 and different people -0.30 to 0.53 on LibriSpeech
+(`docs/measurements/speaker-similarity-calibration.json`); 0.50 is the line
+bolo uses for "same speaker". Another embedding model has another scale. The
+request appears in the request traces as kind `embedding`.
+
+```bash
+curl -s localhost:8000/v1/audio/speech/embedding -F file=@a.wav | jq '.data[0].embedding | length'
+```
 
 ## Native API (`/api/v1`)
 

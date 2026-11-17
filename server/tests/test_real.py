@@ -904,6 +904,31 @@ async def test_saved_voice_clone_and_speaker_similarity() -> None:
         await core.stop()
 
 
+def test_speaker_embedding_endpoint_with_eres2net(live: LiveServer) -> None:
+    """POST /v1/audio/speech/embedding with the default embedder (pyannote-3.0-eres2net, pulled when missing): two
+    halves of one speaker's clip score above the calibrated same-speaker line, another voice below it."""
+    from bolo import samples, similarity
+    from bolo.audio.encode import encode_audio
+
+    audio, rate, _ = samples.load_audio("en-long")  # Kokoro's michael
+    other, other_rate, _ = samples.load_audio("en-short")  # Kokoro's heart
+
+    def vector(x: np.ndarray, r: int) -> np.ndarray:
+        files = {"file": ("a.wav", encode_audio(x, r, "wav"))}
+        resp = httpx.post(live.url + "/v1/audio/speech/embedding", files=files, timeout=600)
+        assert resp.status_code == 200, resp.text
+        doc = resp.json()
+        assert doc["model"] == "pyannote-3.0-eres2net" and doc["data"][0]["index"] == 0
+        return np.array(doc["data"][0]["embedding"], dtype=np.float32)
+
+    half = len(audio) // 2
+    first, second = vector(audio[:half], rate), vector(audio[half:], rate)
+    assert np.allclose(first, vector(audio[:half], rate), atol=1e-5)  # the same input gives the same vector
+    same, different = similarity.cosine(first, second), similarity.cosine(first, vector(other, other_rate))
+    print(f"\nembedding dim {len(first)}: same speaker {same:.3f}, different speakers {different:.3f}")
+    assert same >= similarity.SAME_SPEAKER > different
+
+
 async def test_orpheus_family_on_llama_server_with_snac_onnx() -> None:
     """orpheus-llamacpp kind: Svara or Veena on a managed llama-server, SNAC decoded in onnxruntime, Hindi round trip.
 

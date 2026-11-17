@@ -3,8 +3,25 @@
 from __future__ import annotations
 
 import httpx
+import numpy as np
+import pytest
 
+from bolo.audio.encode import encode_audio
 from conftest import LiveServer, wav_file
+
+
+def voice(freq: float, seconds: float = 2.0, rate: int = 16000) -> bytes:
+    """A tone with a slow wobble: the fake diarizer's "voice" is its pitch."""
+    t = np.arange(int(seconds * rate)) / rate
+    return encode_audio(
+        (0.3 * np.sin(2 * np.pi * freq * t) * (1 + 0.2 * np.sin(2 * np.pi * 5 * t))).astype(np.float32), rate, "wav"
+    )
+
+
+def embedding(live: LiveServer, audio: bytes, **data: str) -> dict:
+    r = httpx.post(live.url + "/v1/audio/speech/embedding", files={"file": ("a.wav", audio)}, data=data)
+    assert r.status_code == 200, r.text
+    return r.json()
 
 
 def test_registry_and_model_listing(live: LiveServer) -> None:
@@ -85,3 +102,41 @@ def test_speaches_environment_names_are_honoured() -> None:
     assert s.cors_origins == ["*"] and s.ui is False
     s = load_settings(env={"API_KEY": "old", "BOLO_API_KEY": "new"})
     assert s.api_key == "new"  # bolo's own names win
+
+
+def test_speaker_embedding_shape_and_default_model(live: LiveServer) -> None:
+    doc = embedding(live, voice(150))
+    assert doc["object"] == "list" and doc["model"] == "fake-diarization"  # voice cloning's embedder by default
+    (item,) = doc["data"]
+    assert item["object"] == "embedding" and item["index"] == 0
+    vector = np.array(item["embedding"])
+    assert vector.shape == (2,) and np.linalg.norm(vector) == pytest.approx(1.0, abs=1e-5)
+    assert doc["usage"] == {"prompt_tokens": 32000, "total_tokens": 32000}  # 2 s at 16 kHz, as speaches counts
+    # speaches' own embedding model id is not in the catalog: the default is used; a catalog id is honoured
+    assert embedding(live, voice(150), model="pyannote/wespeaker-voxceleb-resnet34-LM")["model"] == "fake-diarization"
+    assert embedding(live, voice(150), model="fake-diarization")["model"] == "fake-diarization"
+    trace = httpx.get(live.url + "/api/v1/requests", params={"kind": "embedding"}).json()
+    assert trace and "embed" in [p["name"] for p in (trace.get("requests") or trace)[0]["phases"]]
+
+
+def test_speaker_embedding_is_deterministic_and_tells_speakers_apart(live: LiveServer) -> None:
+    def vec(audio: bytes) -> np.ndarray:
+        return np.array(embedding(live, audio)["data"][0]["embedding"])
+
+    def cos(a: np.ndarray, b: np.ndarray) -> float:
+        return float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+    first = vec(voice(130))
+    assert np.array_equal(first, vec(voice(130)))
+    same = cos(first, vec(voice(140, seconds=3.0, rate=24000)))  # another clip of the same "speaker"
+    different = cos(first, vec(voice(420)))
+    assert same > 0.99 and different < 0.5
+
+
+def test_speaker_embedding_errors(live: LiveServer) -> None:
+    url = live.url + "/v1/audio/speech/embedding"
+    assert httpx.post(url, data={"model": "fake-diarization"}).status_code == 400
+    r = httpx.post(url, files={"file": ("a.wav", voice(150, seconds=0.2))})
+    assert r.status_code == 400 and "half a second" in r.json()["error"]["message"]
+    r = httpx.post(url, files={"file": ("a.wav", voice(150))}, data={"model": "fake-stt"})
+    assert r.status_code == 400 and r.json()["error"]["param"] == "model"

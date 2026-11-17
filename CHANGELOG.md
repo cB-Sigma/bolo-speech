@@ -6,6 +6,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Added
+
+- **`POST /v1/audio/speech/embedding`**, speaches' speaker-embedding route: multipart `file` (and `model`) in, the
+  speaker embedding out in the shape of OpenAI's embeddings response. The embedder is the one that scores cloned
+  voices (`voice_similarity_model`, else the default diarization model's ERes2Net, 192 numbers); speaches' own model
+  id falls back to it. With the real model, two halves of one speaker's clip scored 0.81 and another voice 0.09.
+
 ## [0.6.6] - 2026-11-17
 
 ### Fixed
