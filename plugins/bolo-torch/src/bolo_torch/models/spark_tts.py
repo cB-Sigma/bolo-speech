@@ -156,9 +156,9 @@ class SparkTTS(TTSModel):
                 return
             with self._lock:
                 prompt, fixed = self.prompt(sentence, entry, float(speed))
-                generated = self.backend.generate(prompt)
-                semantic = [int(t) for t in SEMANTIC.findall(generated)]
-                global_ids = fixed if fixed is not None else [int(t) for t in GLOBAL.findall(generated)]
+                written = self.backend.generate(prompt)
+                semantic = [int(t) for t in SEMANTIC.findall(written)]
+                global_ids = fixed if fixed is not None else [int(t) for t in GLOBAL.findall(written)]
                 if not semantic or not global_ids:
                     continue  # the model wrote no speech for this sentence
                 audio = np.asarray(self.backend.detokenize(global_ids, semantic), dtype=np.float32)
