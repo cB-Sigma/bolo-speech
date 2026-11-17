@@ -62,6 +62,7 @@ from bolo.streaming.agreement import LocalAgreement
 from bolo.stt_options import DEFAULT_MAX_REPEATS, RepeatGuard
 
 if TYPE_CHECKING:
+    from bolo.catalog import ModelSpec
     from bolo.core import Bolo
 
 log = logging.getLogger("bolo.realtime")
@@ -416,6 +417,12 @@ class RealtimeSession:
                         merged["vad_model"] = self.core.resolve(str(merged["vad_model"]), "vad").id
                     except BoloError as exc:
                         raise RealtimeError(exc.message, param="session.audio.input.turn_detection.vad_model") from exc
+                # bolo extension: the end-of-turn model semantic_vad asks (default: the default_turn setting)
+                if merged.get("turn_model") is not None:
+                    try:
+                        merged["turn_model"] = self.core.resolve(str(merged["turn_model"]), "turn").id
+                    except BoloError as exc:
+                        raise RealtimeError(exc.message, param="session.audio.input.turn_detection.turn_model") from exc
                 self.turn_detection = merged
             else:
                 raise RealtimeError(
@@ -638,9 +645,14 @@ class RealtimeSession:
         self._s2s_sent = self._pos
         self._s2s_pending = True
 
+    def _turn_spec(self) -> ModelSpec | None:
+        """The end-of-turn model of this session, if one can be used (None: a pause ends the turn)."""
+        name = (self.turn_detection or {}).get("turn_model")
+        return self.core.turn_model(str(name) if name else None)
+
     @property
     def _semantic(self) -> bool:
-        return (self.turn_detection or {}).get("type") == "semantic_vad" and self.core.turn_model() is not None
+        return (self.turn_detection or {}).get("type") == "semantic_vad" and self._turn_spec() is not None
 
     def _max_pause_s(self) -> float:
         """How long a pause the end-of-turn model called unfinished may last before the turn ends anyway."""
@@ -649,12 +661,37 @@ class RealtimeSession:
 
     async def _turn_complete(self, end: int) -> bool:
         started = time.perf_counter()
-        probability = await self.core.end_of_turn(self._slice(self._speech_start or 0, end))
+        spec = self._turn_spec()
+        audio = self._slice(self._speech_start or 0, end)
+        text: str | None = None
+        check: dict[str, Any] = {}
+        if spec is not None and self.core.turn_reads_text(spec):
+            # the model reads words: decode the utterance so far with the session's recogniser
+            text = await self._utterance_text(audio)
+            check["text"] = text
+            check["decode_ms"] = round((time.perf_counter() - started) * 1000.0, 1)
+        probability = await self.core.end_of_turn(audio, text=text, model=spec.id if spec else None)
         self._turn_checks.append(
             {"probability": None if probability is None else round(probability, 3),
-             "ms": round((time.perf_counter() - started) * 1000.0, 1)}
+             "ms": round((time.perf_counter() - started) * 1000.0, 1), **check}
         )  # fmt: skip
         return probability is None or probability >= SEMANTIC_THRESHOLD
+
+    async def _utterance_text(self, audio: FloatArray) -> str | None:
+        """The transcript of an utterance so far, for an end-of-turn model that reads text (None when the session's
+        recogniser should not be asked: a cloud model bills every decode, unless its catalog says otherwise)."""
+        cfg = self.transcription
+        try:
+            if not self.core.interim_decodes(self.core.resolve(cfg["model"], "stt")):
+                return None
+            result = await self.core.transcribe(
+                audio, SR, model=cfg["model"], language=cfg.get("language"), prompt=cfg.get("prompt"),
+                vad_filter=False, trace=Trace("stt", self.transport, ""), record=False, denoise=self.denoise,
+            )  # fmt: skip
+        except BoloError as exc:
+            log.debug("no transcript for the end-of-turn model: %s", exc.message)
+            return None
+        return result.text.strip() or None
 
     def _agent_trace(self) -> Trace:
         """A voice-agent trace that says which pipeline answers (or would answer) the turn."""
@@ -688,7 +725,12 @@ class RealtimeSession:
         await self.send("input_audio_buffer.speech_stopped", audio_end_ms=self._ms(end), item_id=item_id)
         trace = self._agent_trace()
         if self._turn_checks:
-            trace.extra["turn_detection"] = {"type": "semantic_vad", "checks": self._turn_checks}
+            spec = self._turn_spec()
+            trace.extra["turn_detection"] = {
+                "type": "semantic_vad",
+                "model": spec.id if spec else None,
+                "checks": self._turn_checks,
+            }
             self._turn_checks = []
         await self._commit(self._slice(self._speech_start or 0, end), item_id, trace)
         self._speech_start, self._pending_item, self._held_end = None, None, None

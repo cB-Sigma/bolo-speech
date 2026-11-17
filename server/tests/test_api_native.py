@@ -15,7 +15,7 @@ def _built_in() -> set[str]:
     """Catalog entries that need no download (bolo's own detectors; WebRTC VAD once its package is installed)."""
     import importlib.util
 
-    ids = {"energy-vad"}
+    ids = {"energy-vad", "silence-only"}
     if importlib.util.find_spec("webrtcvad") is not None:
         ids |= {"webrtc-vad", "webrtc-vad-aggressive"}
     return ids
@@ -60,6 +60,7 @@ def test_catalog_shape_and_filters(live: LiveServer) -> None:
         "fake-tts",
         "fake-vad",
         "fake-turn",
+        "fake-turn-text",
         "fake-diarization",
         "fake-diarization-overlap",
         "fake-separation",

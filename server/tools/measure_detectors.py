@@ -1,6 +1,7 @@
 """Measure voice-activity detectors, end-of-turn models and speaker embedders on the CPU (docs/measurements/).
 
     BOLO_DATA_DIR=... python tools/measure_detectors.py vad --out FILE MODEL [MODEL ...]
+    BOLO_DATA_DIR=... python tools/measure_detectors.py turn --out FILE MODEL [MODEL ...]
 
 Every model goes through bolo's own code path (``bolo pull``, the model manager, the same detector objects a
 Realtime session gets). ``--remove`` deletes each downloaded model after it was measured.
@@ -20,6 +21,17 @@ accuracy, speech recall (share of speech frames detected), false alarms (share o
 speech), the number of segments (the reference has six), and how long after the audio the start and the end of
 each clip were reported (median; the end includes the 0.3 s of silence the detector waits for). ``rtf`` is the
 detector's time over the stream's duration, clean condition.
+
+**turn**: the repository has no end-of-turn test data, so the set is scripted here: 20 English and 6 Hindi
+sentences a voice agent might hear, each with an unfinished beginning ("Can you book me a table for"). The audio is
+synthesised by an installed voice (``--voice-model``, Kokoro by default); the unfinished audio is the finished
+sentence cut at its quietest 20 ms frame near the beginning's share of the words, so it has mid-sentence prosody.
+Models that listen get the audio with 0.2 s of silence after it, as a Realtime session hands it over; models that
+read get the text, as written and with the final punctuation removed (recognisers differ in whether they write it).
+Reported: accuracy at 0.5, the share of each class called right, AUC (how well finished and unfinished are told
+apart at any threshold), median probabilities and milliseconds per call (``load_average`` says how busy the machine
+was).
+
 """
 
 from __future__ import annotations
@@ -249,6 +261,163 @@ async def measure_vad(core: Bolo, names: list[str], remove: bool) -> dict[str, A
     }
 
 
+# ---------------------------------------------------------------------------------------------------
+# end of turn
+# ---------------------------------------------------------------------------------------------------
+#: (finished sentence, an unfinished beginning of it)
+TURN_EN = [
+    ("Can you book me a table for two at seven tonight?", "Can you book me a table for"),
+    ("I'd like to change my delivery address.", "I'd like to change my"),
+    ("What's the weather going to be like tomorrow morning?", "What's the weather going to"),
+    ("Please send the invoice to my work email.", "Please send the invoice to"),
+    ("My order number is four five two nine.", "My order number is"),
+    ("I think that's everything I needed, thanks.", "I think that's everything I"),
+    ("How long does shipping usually take to Delhi?", "How long does shipping usually"),
+    ("Cancel my subscription starting next month.", "Cancel my subscription starting"),
+    ("Could you remind me to call my mother at six?", "Could you remind me to"),
+    ("The package arrived but the box was damaged.", "The package arrived but the"),
+    ("Is there a pharmacy open near me right now?", "Is there a pharmacy open near"),
+    ("I want to transfer five hundred rupees to Priya.", "I want to transfer five hundred"),
+    ("Turn off the lights in the living room.", "Turn off the lights in the"),
+    ("Yes, that works for me.", "Yes, that works for"),
+    ("No, I meant the blue one, not the red one.", "No, I meant the blue one, not the"),
+    ("Can you explain why my bill went up this month?", "Can you explain why my"),
+    ("Set an alarm for six thirty tomorrow.", "Set an alarm for"),
+    ("I'm calling about the job interview on Friday.", "I'm calling about the"),
+    ("Please read me the last message from Rahul.", "Please read me the last"),
+    ("That's all for now, goodbye.", "That's all for now, and"),
+]
+TURN_HI = [
+    ("क्या आप कल सुबह की ट्रेन का टिकट बुक कर सकते हैं?", "क्या आप कल सुबह की ट्रेन का"),
+    ("मेरा ऑर्डर अभी तक नहीं आया है।", "मेरा ऑर्डर अभी तक"),
+    ("बिजली का बिल इस महीने बहुत ज़्यादा आया है।", "बिजली का बिल इस महीने"),
+    ("मुझे अपना पता बदलना है।", "मुझे अपना पता"),
+    ("आज शाम को बारिश होगी क्या?", "आज शाम को"),
+    ("धन्यवाद, बस इतना ही चाहिए था।", "धन्यवाद, बस इतना ही चाहिए था और"),
+]
+TURN_VOICES = {"en": ["af_heart", "am_michael"], "hi": ["hf_alpha"]}
+
+
+def quiet_cut(audio: np.ndarray, share: float) -> int:
+    """The quietest 20 ms frame within 15 % (of the speech) around ``share`` of the way through the speech."""
+    frames = len(audio) // 320
+    rms = np.sqrt(np.mean(audio[: frames * 320].reshape(frames, 320).astype(np.float64) ** 2, axis=1))
+    loud = np.nonzero(rms > rms.max() * 0.03)[0]
+    first, last = int(loud[0]), int(loud[-1])
+    centre = first + share * (last - first)
+    lo, hi = int(centre - 0.15 * (last - first)), int(centre + 0.15 * (last - first))
+    k = lo + int(np.argmin(rms[lo:hi]))
+    return (k + 1) * 320
+
+
+async def turn_set(core: Bolo, voice_model: str) -> list[dict[str, Any]]:
+    """Finished and unfinished utterances: audio (16 kHz, 0.2 s of silence after, as a Realtime session hands
+    over) and text."""
+    items: list[dict[str, Any]] = []
+    tail = np.zeros(int(0.2 * SR), dtype=np.float32)
+    for lang, pairs in (("en", TURN_EN), ("hi", TURN_HI)):
+        voices = TURN_VOICES[lang]
+        for i, (full, part) in enumerate(pairs):
+            audio, rate = await core.synthesize_all(full, model=voice_model, voice=voices[i % len(voices)])
+            x = resample(np.asarray(audio, dtype=np.float32), rate, SR)
+            share = len(part.split()) / len(full.split())
+            cut = x[: quiet_cut(x, share)]
+            items.append({"lang": lang, "finished": True, "text": full, "audio": np.concatenate([x, tail])})
+            items.append({"lang": lang, "finished": False, "text": part, "audio": np.concatenate([cut, tail])})
+    return items
+
+
+def auc(pos: list[float], neg: list[float]) -> float:
+    wins = sum((p > n) + 0.5 * (p == n) for p in pos for n in neg)
+    return float(wins / (len(pos) * len(neg)))
+
+
+def turn_scores(items: list[dict[str, Any]], probs: list[float]) -> dict[str, Any]:
+    fin = [p for it, p in zip(items, probs, strict=True) if it["finished"]]
+    unf = [p for it, p in zip(items, probs, strict=True) if not it["finished"]]
+    correct = [(p >= 0.5) == it["finished"] for it, p in zip(items, probs, strict=True)]
+    return {
+        "accuracy": round(float(np.mean(correct)), 3),
+        "finished_called_finished": round(float(np.mean([p >= 0.5 for p in fin])), 3),
+        "unfinished_called_unfinished": round(float(np.mean([p < 0.5 for p in unf])), 3),
+        "auc": round(auc(fin, unf), 3),
+        "median_probability_finished": round(float(np.median(fin)), 3),
+        "median_probability_unfinished": round(float(np.median(unf)), 3),
+    }
+
+
+def strip_end(text: str) -> str:
+    return text.rstrip(" .?!।,")
+
+
+async def measure_turn(core: Bolo, names: list[str], remove: bool, voice_model: str) -> dict[str, Any]:
+    items = await turn_set(core, voice_model)
+    await core.manager.unload(voice_model)
+    out: dict[str, Any] = {}
+    for name in names:
+        spec = core.resolve(name, "turn")
+        if not spec.builtin and not core.store.is_installed(spec.id):
+            await core.pull_and_wait(spec.id)
+        hears = str(spec.options.get("input", "audio"))
+        result: dict[str, Any] = {"input": hears}
+        async with core.manager.use(spec.id) as entry:
+            loaded = core.manager.loaded.get(spec.id)
+            if loaded is not None:
+                result["load_s"] = round(loaded.load_ms / 1000, 2)
+                result["memory_mb"] = round(loaded.memory_bytes / 1e6)
+            op = "turn_text" if hears == "text" else "turn"
+
+            async def run(values: list[Any], entry: Any = entry, op: str = op) -> tuple[list[float], list[float]]:
+                probs, ms = [], []
+                await entry.queue.submit(op, values[0])  # warm-up
+                for v in values:
+                    t0 = time.perf_counter()
+                    p, _ = await entry.queue.submit(op, v)
+                    ms.append((time.perf_counter() - t0) * 1000)
+                    probs.append(float(p))
+                return probs, ms
+
+            for lang in ("en", "hi"):
+                subset = [it for it in items if it["lang"] == lang]
+                if lang not in spec.languages and spec.languages:
+                    continue
+                if hears == "text":
+                    probs, ms = await run([it["text"] for it in subset])
+                    bare, _ = await run([strip_end(it["text"]) for it in subset])
+                    result[lang] = {
+                        "as written (finished sentences end in . or ?)": turn_scores(subset, probs),
+                        "final punctuation removed": turn_scores(subset, bare),
+                        "median_ms": round(float(np.median(ms)), 1),
+                        "probabilities": [round(p, 3) for p in probs],
+                    }
+                else:
+                    probs, ms = await run([it["audio"] for it in subset])
+                    result[lang] = {
+                        **turn_scores(subset, probs),
+                        "median_ms": round(float(np.median(ms)), 1),
+                        "probabilities": [round(p, 3) for p in probs],
+                    }
+        print(spec.id, json.dumps(result, ensure_ascii=False)[:600], file=sys.stderr)
+        await core.manager.unload(spec.id)
+        if remove and not spec.builtin:
+            await core.remove(spec.id)
+        out[spec.id] = result
+    return {
+        "set": {
+            "en": f"{len(TURN_EN)} finished sentences and an unfinished beginning of each (scripted for this test)",
+            "hi": f"{len(TURN_HI)} finished Hindi sentences and an unfinished beginning of each",
+            "audio": f"synthesised by {voice_model} (voices {TURN_VOICES}); the unfinished audio is the finished "
+            "sentence cut at its quietest 20 ms frame near the beginning's share of the words; 0.2 s of silence "
+            "after each, as a Realtime session hands it over",
+            "text": "the sentence as written (finished ones end in . or ?, as recognisers write them) and with the "
+            "final punctuation removed",
+        },
+        "items": [{"lang": it["lang"], "finished": it["finished"], "text": it["text"]} for it in items],
+        "threshold": 0.5,
+        "models": out,
+    }
+
+
 def _rss() -> int:
     import psutil
 
@@ -257,24 +426,28 @@ def _rss() -> int:
 
 async def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("what", choices=["vad"])
+    ap.add_argument("what", choices=["vad", "turn"])
     ap.add_argument("models", nargs="+")
     ap.add_argument("--out", required=True)
     ap.add_argument("--remove", action="store_true", help="delete each model after measuring it")
     ap.add_argument("--threads", type=int, default=4)
+    ap.add_argument("--voice-model", default="kokoro-v1.0-int8", help="installed voice for the synthesised test speech")
     args = ap.parse_args()
     settings = load_settings()
     settings.threads = args.threads
     core = Bolo(settings)
     await core.start()
     try:
-        result = await measure_vad(core, args.models, args.remove)
+        if args.what == "vad":
+            result = await measure_vad(core, args.models, args.remove)
+        else:
+            result = await measure_turn(core, args.models, args.remove, args.voice_model)
     finally:
         await core.stop()
     import importlib.metadata as md
 
     versions = {}
-    for pkg in ("sherpa-onnx", "onnxruntime", "webrtcvad-wheels"):
+    for pkg in ("sherpa-onnx", "onnxruntime", "webrtcvad-wheels", "tokenizers"):
         with contextlib.suppress(md.PackageNotFoundError):
             versions[pkg] = md.version(pkg)
     result = {
@@ -283,6 +456,7 @@ async def main() -> None:
         "python": platform.python_version(),
         "packages": versions,
         "date": time.strftime("%Y-%m-%d"),
+        "load_average": round(os.getloadavg()[0], 1),
         **result,
     }
     path = Path(args.out)

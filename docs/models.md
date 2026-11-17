@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-375 models: 144 validated on CPU by the maintainers, 231 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
+385 models: 151 validated on CPU by the maintainers, 234 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
 
 ### Speech to text
 
@@ -711,7 +711,37 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `smart-turn-v3` | ar, bn, da, de, en, es +17 | realtime | - | 9 MB | BSD-2-Clause | untested |
+| `smart-turn-v3` | ar, bn, da, de, en, es +17 | realtime | - | 9 MB | BSD-2-Clause | **CPU** · RTF 0.059 |
+| `smart-turn-v3.1` | ar, bn, da, de, en, es +17 | realtime | - | 9 MB | BSD-2-Clause | **CPU** · RTF 0.070 |
+| `smart-turn-v3.0` | ar, bn, da, de, en, es +17 | realtime | - | 9 MB | BSD-2-Clause | **CPU** · RTF 0.043 |
+| `smart-turn-v3-fp32` | ar, bn, da, de, en, es +17 | realtime | - | 32 MB | BSD-2-Clause | **CPU** · RTF 0.064 |
+| `smart-turn-v2` | en, de, es, fr, hi, it +8 | balanced | - | 379 MB | BSD-2-Clause | untested |
+
+#### Namo Turn Detector
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `namo-turn-en` | en | realtime | - | 139 MB | Apache-2.0 | **CPU** · RTF 0.011 |
+| `namo-turn-multilingual` | ar, bn, da, de, en, es +17 | balanced | - | 343 MB | Apache-2.0 | **CPU** · RTF 0.024 |
+
+#### LiveKit turn detector
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `livekit-turn-detector` | en, es, fr, de, it, pt +8 | balanced | - | 408 MB | LiveKit Model License (use only together with the LiveKit… ⚠ | untested |
+| `livekit-turn-detector-en` | en | balanced | - | 169 MB | LiveKit Model License (use only together with the LiveKit… ⚠ | untested |
+
+#### TEN Turn Detection
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ten-turn-detection` | en, zh | accuracy | - | 15.2 GB | Apache-2.0 with Agora's additional conditions (not on end… ⚠ | untested |
+
+#### Silence only
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `silence-only` | - | realtime | - | 0 MB | Apache-2.0 | **CPU** · RTF 0.000 |
 
 ### Overlapped-speech separation
 
@@ -1680,6 +1710,49 @@ was tuned with; for noisy lines set `default_vad = "silero-vad-v5"` (or v6, or `
 latency does not matter). The test is small and synthetic (TTS voices, synthetic noise): it shows the direction,
 not the size, of the differences on real recordings.
 
+## End-of-turn detection
+
+Realtime sessions with `turn_detection: {"type": "semantic_vad"}` ask an end-of-turn model, at each pause the
+voice-activity detector finds, whether the speaker has finished ([voice-agents.md](voice-agents.md), "Semantic
+turn detection"). `default_turn` chooses it (default `smart-turn-v3`), a session's `turn_detection.turn_model`
+overrides it. Smart Turn listens to the last eight seconds of audio; the Namo models read the transcript, which
+the session decodes at the pause with its transcription model; `silence-only` is no model (the pause ends the
+turn). LiveKit's turn detector (licence: only with the LiveKit Agents framework), TEN Turn Detection (a 7.6 B
+language model, 15 GB) and Smart Turn v2 (PyTorch weights only) are in the catalog with `runnable: false` and
+the reason.
+
+**Measured** (docs/measurements/turn-detectors.json, `server/tools/measure_detectors.py turn`). The repository has
+no end-of-turn test data, so the set is scripted for this test: 20 English and 6 Hindi sentences a voice agent
+might hear ("Can you book me a table for two at seven tonight?"), each with an unfinished beginning ("Can you book
+me a table for"). Audio from Kokoro (two English voices, one Hindi); the unfinished audio is the whole sentence
+cut at its quietest 20 ms near the beginning's share of the words (so it has mid-sentence prosody), with 0.2 s of
+silence after every clip, as a session hands it over. The text models got the written sentences (finished ones
+end in "." or "?") and the same with the final punctuation removed. Accuracy at the 0.5 threshold sessions use,
+and AUC (how well the two classes are told apart at any threshold); 40 English and 12 Hindi clips:
+
+| model | judges | English: accuracy | finished / unfinished right | AUC | Hindi: accuracy | AUC | ms per call |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `silence-only` | - | 0.50 | 1.00 / 0.00 | 0.50 | 0.50 | 0.50 | 0 |
+| `smart-turn-v3` (v3.2, int8, default) | audio | 0.63 | 0.95 / 0.30 | 0.87 | 0.83 | 0.86 | 370 |
+| `smart-turn-v3.1` | audio | 0.65 | 0.85 / 0.45 | 0.83 | 0.75 | 0.83 | 330 |
+| `smart-turn-v3.0` | audio | 0.70 | 1.00 / 0.40 | 0.92 | 0.50 | 0.78 | 400 |
+| `smart-turn-v3-fp32` (v3.2, float32) | audio | 0.80 | 0.95 / 0.65 | 0.88 | 0.83 | 0.81 | 350 |
+| `namo-turn-en` | text, as written | **0.98** | 1.00 / 0.95 | 0.97 | - | - | 43 |
+| `namo-turn-en` | text, no final punctuation | 0.85 | 0.75 / 0.95 | 0.96 | - | - | 43 |
+| `namo-turn-multilingual` | text, as written | 0.48 | 0.45 / 0.50 | 0.46 | 0.42 | 0.44 | 79 |
+
+Milliseconds per call on two threads of the shared 4-vCPU Xeon with its load average at 12.6 (busy; on an idle
+machine Smart Turn took 160 to 260 ms, see voice-agents.md); a text model's time does not include the decode the
+session makes for it. What it says: every Smart Turn version separates finished from cut-off audio reasonably
+(AUC 0.78 to 0.92) but at 0.5 the int8 builds call most cut-off English clips finished; the float32 build was
+right on 65 % of them. The English Namo model read the scripted text almost perfectly and an order of magnitude
+faster, but it leans on punctuation: without the final "." or "?" a quarter of the finished sentences looked
+unfinished, and what a recogniser writes at a pause is neither of those clean cases. The multilingual Namo model
+was at chance on this set (its logits stayed close to zero; it reproduces the direction of its model card's four
+examples, weakly); do not use it without testing on your own data. The default stays `smart-turn-v3`: it hears
+any language without a decode, and the set is too small and too clean to justify a switch; `smart-turn-v3-fp32`
+(32 MB) or, for English agents, `namo-turn-en` are worth trying.
+
 ## Denoising
 
 `denoise` (configuration.md, "Denoising") runs a speech-enhancement model
@@ -2527,6 +2600,14 @@ copied when the entry was written. Things to watch:
   NVIDIA's .nemo checkpoint.
 * **WebRTC VAD** (`webrtc-vad`) is BSD-3-Clause code in an MIT-licensed binding (`webrtcvad-wheels`); nothing is
   downloaded.
+* **LiveKit's turn detector** (`livekit-turn-detector`, `livekit-turn-detector-en`) is under the LiveKit Model
+  License: use only together with the LiveKit Agents framework, not on its own or in another framework, and its
+  outputs may not be used to improve other models. bolo is another framework, so the entries are `runnable: false`
+  (the files can still be pulled, for use where the licence allows it).
+* **TEN Turn Detection** (`ten-turn-detection`): its Hugging Face card says Apache-2.0; the licence file of its
+  GitHub repository adds Agora's conditions (not on end-user devices; own applications only; nothing that competes
+  with Agora). Not runnable in bolo (a 7.6-billion-parameter model).
+* **Namo Turn Detector** (`namo-turn-en`, `namo-turn-multilingual`) is Apache-2.0.
 * **Gated** entries (`gated: true`: Indic Parler-TTS, IndicF5, SraVaani, AI4Bharat's official
   IndicConformer) are never downloaded without a Hugging Face token; using one without a token
   answers `401 model_gated` with the model page to accept the terms on. All four also need the

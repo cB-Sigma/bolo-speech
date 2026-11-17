@@ -129,7 +129,12 @@ Voices converted by this project
     (https://huggingface.co/pipecat-ai/smart-turn-v3, BSD-2-Clause),
     downloaded on request like any other model. bolo's Whisper-style
     feature computation (server/src/bolo/audio/features.py) is its own
-    implementation of the published algorithm.
+    implementation of the published algorithm. Other optional end-of-turn
+    models: VideoSDK's Namo Turn Detector v1 (Apache-2.0), run with the
+    tokenizers library (Apache-2.0). The catalog also describes LiveKit's
+    turn detector (LiveKit Model License: use only together with the
+    LiveKit Agents framework) and TEN Turn Detection (Apache-2.0 with
+    Agora's additional conditions); bolo does not run either.
 
 Web console: speech synthesis in the browser
     The console (and the live demo) can run text-to-speech voices in the

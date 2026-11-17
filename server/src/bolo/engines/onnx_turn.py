@@ -127,7 +127,8 @@ class OnnxRuntimeEngine(Engine):
     license = "MIT"
     url = "https://onnxruntime.ai"
     kinds = (
-        "smart_turn", "nemotron_diarization", "dicow_onnx", "lfm3_audio_onnx", "marblenet_vad", "deepfilternet3_stream",
+        "smart_turn", "text_turn", "nemotron_diarization", "dicow_onnx", "lfm3_audio_onnx", "marblenet_vad",
+        "deepfilternet3_stream",
     )  # fmt: skip
 
     def status(self) -> EngineStatus:
@@ -168,6 +169,10 @@ class OnnxRuntimeEngine(Engine):
             from bolo.s2s_onnx import Lfm3Tts
 
             return Lfm3Tts.from_dir(path, spec, opts)
+        if kind == "text_turn":
+            from bolo.engines.text_turn import TextTurn
+
+            return TextTurn(path, spec, opts)
         if kind == "marblenet_vad":
             from bolo.engines.frame_vad import MarbleNetVAD
 

@@ -1,4 +1,5 @@
-"""Voice-activity detectors chosen by name: frame-probability detectors, WebRTC, MarbleNet, the energy detector."""
+"""Detectors chosen by name: voice activity (frame-probability detectors, WebRTC, MarbleNet, the energy detector)
+and end of turn (silence only, models that read the transcript)."""
 
 from __future__ import annotations
 
@@ -169,5 +170,59 @@ async def test_a_realtime_session_chooses_its_detector(settings: Settings) -> No
         assert bad["error"]["param"] == "session.audio.input.turn_detection.vad_model"
         wrong = await session_update(live.url, {"type": "server_vad", "vad_model": "fake-stt"})
         assert wrong["type"] == "error" and "vad" in wrong["error"]["message"]
+    finally:
+        live.stop()
+
+
+# -- end of turn -------------------------------------------------------------------------------------
+async def test_silence_only_turns_semantic_vad_into_server_vad(core: Bolo) -> None:
+    core.settings.default_turn = "silence-only"
+    assert core.turn_model() is None  # no model: a pause ends the turn
+    chosen = core.turn_model("fake-turn")
+    assert chosen is not None and chosen.id == "fake-turn"
+    info = core.capabilities()["realtime"]["semantic_vad"]
+    assert info["model"] == "silence-only" and info["available"] is False
+
+
+async def test_a_text_turn_model_is_asked_about_the_transcript(core: Bolo) -> None:
+    probability = await core.end_of_turn(speechlike(1.0), text="I would like to", model="fake-turn-text")
+    assert probability is not None and probability < 0.5
+    probability = await core.end_of_turn(
+        speechlike(1.0), text="I would like a large coffee with oat milk, please.", model="fake-turn-text"
+    )
+    assert probability is not None and probability > 0.5
+    # without a transcript a text model cannot judge: the pause decides
+    assert await core.end_of_turn(speechlike(1.0), text=None, model="fake-turn-text") is None
+
+
+async def test_a_realtime_session_chooses_its_end_of_turn_model(settings: Settings) -> None:
+    live = LiveServer(settings)
+    live.start()
+    try:
+        ok = await session_update(live.url, {"type": "semantic_vad", "turn_model": "fake-turn-text"})
+        assert ok["type"] == "session.updated"
+        assert ok["session"]["audio"]["input"]["turn_detection"]["turn_model"] == "fake-turn-text"
+        bad = await session_update(live.url, {"type": "semantic_vad", "turn_model": "silero-vad"})
+        assert bad["type"] == "error" and bad["error"]["param"] == "session.audio.input.turn_detection.turn_model"
+    finally:
+        live.stop()
+
+
+async def test_semantic_vad_with_a_text_model_decodes_at_the_pause(settings: Settings) -> None:
+    from test_voices_and_turns import turns
+
+    live = LiveServer(settings)
+    live.start()
+    try:
+        silence = np.zeros(int(24000 * 0.8), dtype=np.float32)
+        audio = np.concatenate(
+            [speechlike(2.0, 24000), silence, speechlike(2.0, 24000), np.zeros(24000 * 2, dtype=np.float32)]
+        )
+        events = await turns(live.url, {"type": "semantic_vad", "turn_model": "fake-turn-text"}, audio)
+        types = [e["type"] for e in events]
+        # the fake recogniser's text of the first two seconds does not end a sentence; four seconds' does
+        assert types.count("input_audio_buffer.speech_stopped") == 1, types
+        model = live.core.manager.loaded["fake-turn-text"].model
+        assert model.texts and all(isinstance(t, str) and t for t in model.texts)  # type: ignore[attr-defined]
     finally:
         live.stop()

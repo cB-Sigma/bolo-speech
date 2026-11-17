@@ -1,0 +1,844 @@
+{
+ "what": "turn",
+ "hardware": "4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU",
+ "python": "3.12.3",
+ "packages": {
+  "sherpa-onnx": "2.0.1",
+  "onnxruntime": "1.32.0",
+  "webrtcvad-wheels": "2.0.14.post1",
+  "tokenizers": "0.23.3"
+ },
+ "date": "2026-11-17",
+ "load_average": 12.6,
+ "set": {
+  "en": "20 finished sentences and an unfinished beginning of each (scripted for this test)",
+  "hi": "6 finished Hindi sentences and an unfinished beginning of each",
+  "audio": "synthesised by kokoro-v1.0-int8 (voices {'en': ['af_heart', 'am_michael'], 'hi': ['hf_alpha']}); the unfinished audio is the finished sentence cut at its quietest 20 ms frame near the beginning's share of the words; 0.2 s of silence after each, as a Realtime session hands it over",
+  "text": "the sentence as written (finished ones end in . or ?, as recognisers write them) and with the final punctuation removed"
+ },
+ "items": [
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "Can you book me a table for two at seven tonight?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "Can you book me a table for"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "I'd like to change my delivery address."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "I'd like to change my"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "What's the weather going to be like tomorrow morning?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "What's the weather going to"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "Please send the invoice to my work email."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "Please send the invoice to"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "My order number is four five two nine."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "My order number is"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "I think that's everything I needed, thanks."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "I think that's everything I"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "How long does shipping usually take to Delhi?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "How long does shipping usually"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "Cancel my subscription starting next month."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "Cancel my subscription starting"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "Could you remind me to call my mother at six?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "Could you remind me to"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "The package arrived but the box was damaged."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "The package arrived but the"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "Is there a pharmacy open near me right now?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "Is there a pharmacy open near"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "I want to transfer five hundred rupees to Priya."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "I want to transfer five hundred"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "Turn off the lights in the living room."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "Turn off the lights in the"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "Yes, that works for me."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "Yes, that works for"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "No, I meant the blue one, not the red one."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "No, I meant the blue one, not the"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "Can you explain why my bill went up this month?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "Can you explain why my"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "Set an alarm for six thirty tomorrow."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "Set an alarm for"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "I'm calling about the job interview on Friday."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "I'm calling about the"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "Please read me the last message from Rahul."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "Please read me the last"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "text": "That's all for now, goodbye."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "text": "That's all for now, and"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "text": "क्या आप कल सुबह की ट्रेन का टिकट बुक कर सकते हैं?"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "text": "क्या आप कल सुबह की ट्रेन का"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "text": "मेरा ऑर्डर अभी तक नहीं आया है।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "text": "मेरा ऑर्डर अभी तक"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "text": "बिजली का बिल इस महीने बहुत ज़्यादा आया है।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "text": "बिजली का बिल इस महीने"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "text": "मुझे अपना पता बदलना है।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "text": "मुझे अपना पता"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "text": "आज शाम को बारिश होगी क्या?"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "text": "आज शाम को"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "text": "धन्यवाद, बस इतना ही चाहिए था।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "text": "धन्यवाद, बस इतना ही चाहिए था और"
+  }
+ ],
+ "threshold": 0.5,
+ "models": {
+  "silence-only": {
+   "input": "audio",
+   "load_s": 0.0,
+   "memory_mb": 0,
+   "en": {
+    "accuracy": 0.5,
+    "finished_called_finished": 1.0,
+    "unfinished_called_unfinished": 0.0,
+    "auc": 0.5,
+    "median_probability_finished": 1.0,
+    "median_probability_unfinished": 1.0,
+    "median_ms": 0.1,
+    "probabilities": [
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ]
+   },
+   "hi": {
+    "accuracy": 0.5,
+    "finished_called_finished": 1.0,
+    "unfinished_called_unfinished": 0.0,
+    "auc": 0.5,
+    "median_probability_finished": 1.0,
+    "median_probability_unfinished": 1.0,
+    "median_ms": 0.1,
+    "probabilities": [
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ]
+   }
+  },
+  "smart-turn-v3": {
+   "input": "audio",
+   "load_s": 0.26,
+   "memory_mb": 31,
+   "en": {
+    "accuracy": 0.625,
+    "finished_called_finished": 0.95,
+    "unfinished_called_unfinished": 0.3,
+    "auc": 0.869,
+    "median_probability_finished": 0.985,
+    "median_probability_unfinished": 0.728,
+    "median_ms": 370.7,
+    "probabilities": [
+     0.901,
+     0.989,
+     0.989,
+     0.897,
+     0.041,
+     0.026,
+     0.986,
+     0.72,
+     0.99,
+     0.313,
+     0.864,
+     0.634,
+     0.988,
+     0.89,
+     0.984,
+     0.878,
+     0.988,
+     0.956,
+     0.984,
+     0.736,
+     0.988,
+     0.038,
+     0.975,
+     0.53,
+     0.989,
+     0.313,
+     0.98,
+     0.811,
+     0.988,
+     0.644,
+     0.976,
+     0.839,
+     0.989,
+     0.264,
+     0.979,
+     0.183,
+     0.989,
+     0.977,
+     0.869,
+     0.973
+    ]
+   },
+   "hi": {
+    "accuracy": 0.833,
+    "finished_called_finished": 0.833,
+    "unfinished_called_unfinished": 0.833,
+    "auc": 0.861,
+    "median_probability_finished": 0.98,
+    "median_probability_unfinished": 0.115,
+    "median_ms": 323.6,
+    "probabilities": [
+     0.024,
+     0.016,
+     0.989,
+     0.089,
+     0.99,
+     0.304,
+     0.982,
+     0.14,
+     0.978,
+     0.009,
+     0.855,
+     0.908
+    ]
+   }
+  },
+  "smart-turn-v3.1": {
+   "input": "audio",
+   "load_s": 0.19,
+   "memory_mb": 18,
+   "en": {
+    "accuracy": 0.65,
+    "finished_called_finished": 0.85,
+    "unfinished_called_unfinished": 0.45,
+    "auc": 0.831,
+    "median_probability_finished": 0.975,
+    "median_probability_unfinished": 0.642,
+    "median_ms": 328.4,
+    "probabilities": [
+     0.302,
+     0.975,
+     0.984,
+     0.344,
+     0.02,
+     0.011,
+     0.984,
+     0.901,
+     0.987,
+     0.713,
+     0.837,
+     0.681,
+     0.985,
+     0.491,
+     0.988,
+     0.976,
+     0.983,
+     0.797,
+     0.972,
+     0.443,
+     0.983,
+     0.02,
+     0.959,
+     0.361,
+     0.979,
+     0.319,
+     0.954,
+     0.916,
+     0.965,
+     0.861,
+     0.966,
+     0.886,
+     0.987,
+     0.027,
+     0.932,
+     0.222,
+     0.986,
+     0.603,
+     0.353,
+     0.907
+    ]
+   },
+   "hi": {
+    "accuracy": 0.75,
+    "finished_called_finished": 0.833,
+    "unfinished_called_unfinished": 0.667,
+    "auc": 0.833,
+    "median_probability_finished": 0.982,
+    "median_probability_unfinished": 0.462,
+    "median_ms": 422.2,
+    "probabilities": [
+     0.169,
+     0.453,
+     0.986,
+     0.472,
+     0.988,
+     0.344,
+     0.985,
+     0.585,
+     0.971,
+     0.018,
+     0.979,
+     0.978
+    ]
+   }
+  },
+  "smart-turn-v3.0": {
+   "input": "audio",
+   "load_s": 0.27,
+   "memory_mb": 13,
+   "en": {
+    "accuracy": 0.7,
+    "finished_called_finished": 1.0,
+    "unfinished_called_unfinished": 0.4,
+    "auc": 0.922,
+    "median_probability_finished": 0.978,
+    "median_probability_unfinished": 0.796,
+    "median_ms": 397.2,
+    "probabilities": [
+     0.962,
+     0.962,
+     0.976,
+     0.369,
+     0.575,
+     0.015,
+     0.977,
+     0.249,
+     0.981,
+     0.829,
+     0.92,
+     0.944,
+     0.978,
+     0.361,
+     0.976,
+     0.726,
+     0.978,
+     0.764,
+     0.979,
+     0.281,
+     0.98,
+     0.013,
+     0.978,
+     0.92,
+     0.966,
+     0.847,
+     0.971,
+     0.962,
+     0.977,
+     0.895,
+     0.979,
+     0.966,
+     0.979,
+     0.099,
+     0.979,
+     0.219,
+     0.979,
+     0.901,
+     0.575,
+     0.91
+    ]
+   },
+   "hi": {
+    "accuracy": 0.5,
+    "finished_called_finished": 0.833,
+    "unfinished_called_unfinished": 0.167,
+    "auc": 0.778,
+    "median_probability_finished": 0.969,
+    "median_probability_unfinished": 0.879,
+    "median_ms": 376.2,
+    "probabilities": [
+     0.017,
+     0.787,
+     0.981,
+     0.923,
+     0.982,
+     0.92,
+     0.982,
+     0.838,
+     0.956,
+     0.019,
+     0.958,
+     0.971
+    ]
+   }
+  },
+  "smart-turn-v3-fp32": {
+   "input": "audio",
+   "load_s": 0.22,
+   "memory_mb": 47,
+   "en": {
+    "accuracy": 0.8,
+    "finished_called_finished": 0.95,
+    "unfinished_called_unfinished": 0.65,
+    "auc": 0.882,
+    "median_probability_finished": 0.989,
+    "median_probability_unfinished": 0.126,
+    "median_ms": 351.5,
+    "probabilities": [
+     0.898,
+     0.99,
+     0.991,
+     0.379,
+     0.009,
+     0.01,
+     0.991,
+     0.918,
+     0.99,
+     0.065,
+     0.709,
+     0.906,
+     0.991,
+     0.597,
+     0.989,
+     0.226,
+     0.989,
+     0.933,
+     0.984,
+     0.093,
+     0.991,
+     0.007,
+     0.973,
+     0.057,
+     0.991,
+     0.014,
+     0.989,
+     0.158,
+     0.99,
+     0.045,
+     0.978,
+     0.015,
+     0.99,
+     0.082,
+     0.985,
+     0.028,
+     0.99,
+     0.978,
+     0.674,
+     0.822
+    ]
+   },
+   "hi": {
+    "accuracy": 0.833,
+    "finished_called_finished": 0.833,
+    "unfinished_called_unfinished": 0.833,
+    "auc": 0.806,
+    "median_probability_finished": 0.982,
+    "median_probability_unfinished": 0.016,
+    "median_ms": 344.0,
+    "probabilities": [
+     0.008,
+     0.009,
+     0.99,
+     0.017,
+     0.99,
+     0.03,
+     0.985,
+     0.015,
+     0.941,
+     0.007,
+     0.98,
+     0.984
+    ]
+   }
+  },
+  "namo-turn-en": {
+   "input": "text",
+   "load_s": 1.21,
+   "memory_mb": 210,
+   "en": {
+    "as written (finished sentences end in . or ?)": {
+     "accuracy": 0.975,
+     "finished_called_finished": 1.0,
+     "unfinished_called_unfinished": 0.95,
+     "auc": 0.973,
+     "median_probability_finished": 1.0,
+     "median_probability_unfinished": 0.0
+    },
+    "final punctuation removed": {
+     "accuracy": 0.85,
+     "finished_called_finished": 0.75,
+     "unfinished_called_unfinished": 0.95,
+     "auc": 0.96,
+     "median_probability_finished": 1.0,
+     "median_probability_unfinished": 0.0
+    },
+    "median_ms": 42.6,
+    "probabilities": [
+     1.0,
+     0.0,
+     1.0,
+     0.0,
+     1.0,
+     0.0,
+     1.0,
+     0.0,
+     1.0,
+     0.0,
+     0.997,
+     0.0,
+     1.0,
+     0.0,
+     1.0,
+     1.0,
+     0.999,
+     0.0,
+     1.0,
+     0.0,
+     1.0,
+     0.0,
+     1.0,
+     0.0,
+     1.0,
+     0.0,
+     1.0,
+     0.0,
+     1.0,
+     0.0,
+     1.0,
+     0.0,
+     1.0,
+     0.0,
+     1.0,
+     0.0,
+     0.999,
+     0.0,
+     1.0,
+     0.0
+    ]
+   }
+  },
+  "namo-turn-multilingual": {
+   "input": "text",
+   "load_s": 4.77,
+   "memory_mb": 514,
+   "en": {
+    "as written (finished sentences end in . or ?)": {
+     "accuracy": 0.475,
+     "finished_called_finished": 0.45,
+     "unfinished_called_unfinished": 0.5,
+     "auc": 0.458,
+     "median_probability_finished": 0.461,
+     "median_probability_unfinished": 0.497
+    },
+    "final punctuation removed": {
+     "accuracy": 0.475,
+     "finished_called_finished": 0.45,
+     "unfinished_called_unfinished": 0.5,
+     "auc": 0.415,
+     "median_probability_finished": 0.432,
+     "median_probability_unfinished": 0.497
+    },
+    "median_ms": 79.1,
+    "probabilities": [
+     0.579,
+     0.683,
+     0.391,
+     0.381,
+     0.435,
+     0.49,
+     0.37,
+     0.593,
+     0.57,
+     0.641,
+     0.595,
+     0.379,
+     0.747,
+     0.787,
+     0.309,
+     0.337,
+     0.487,
+     0.777,
+     0.581,
+     0.663,
+     0.63,
+     0.628,
+     0.258,
+     0.21,
+     0.54,
+     0.65,
+     0.69,
+     0.716,
+     0.303,
+     0.305,
+     0.345,
+     0.503,
+     0.246,
+     0.186,
+     0.6,
+     0.309,
+     0.357,
+     0.384,
+     0.393,
+     0.247
+    ]
+   },
+   "hi": {
+    "as written (finished sentences end in . or ?)": {
+     "accuracy": 0.417,
+     "finished_called_finished": 0.667,
+     "unfinished_called_unfinished": 0.167,
+     "auc": 0.444,
+     "median_probability_finished": 0.627,
+     "median_probability_unfinished": 0.658
+    },
+    "final punctuation removed": {
+     "accuracy": 0.5,
+     "finished_called_finished": 0.833,
+     "unfinished_called_unfinished": 0.167,
+     "auc": 0.556,
+     "median_probability_finished": 0.663,
+     "median_probability_unfinished": 0.658
+    },
+    "median_ms": 77.7,
+    "probabilities": [
+     0.557,
+     0.367,
+     0.723,
+     0.83,
+     0.359,
+     0.616,
+     0.698,
+     0.707,
+     0.82,
+     0.699,
+     0.421,
+     0.502
+    ]
+   }
+  }
+ }
+}

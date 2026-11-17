@@ -490,6 +490,8 @@ class Bolo:
                     "model": turn.id if turn else None,
                     "available": self.turn_model() is not None,
                     "installed": bool(turn and self.manager.is_installed(turn)),
+                    # what the model judges: the sound of the utterance, or its transcript (decoded at each pause)
+                    "input": ("text" if self.turn_reads_text(turn) else "audio") if turn else None,
                 },
                 "sip": False,
                 "pipeline": s.realtime_pipeline,
@@ -1197,23 +1199,43 @@ class Bolo:
             log.debug("neural VAD unavailable (%s); using the energy detector", exc.message)
         return EnergyVad(params), "energy"
 
-    def turn_model(self) -> ModelSpec | None:
-        """The end-of-turn model, if it can be used now (installed, or allowed to be pulled on first use)."""
-        spec = self.catalog.resolve(self.settings.default_turn)
-        if spec is None or spec.task != "turn" or not self.engines.status(spec.engine).available:
+    def turn_model(self, name: str | None = None) -> ModelSpec | None:
+        """The end-of-turn model (``name``, else the ``default_turn`` setting), if it can be used now: installed, or
+        allowed to be pulled on first use. None as well for ``silence-only``, which is no model: a pause ends the
+        turn."""
+        from bolo.engines.builtin import SILENCE_TURN
+
+        spec = self.catalog.resolve(name or self.settings.default_turn)
+        if spec is None or spec.task != "turn" or spec.kind == SILENCE_TURN or not spec.runnable:
+            return None
+        if not self.engines.status(spec.engine).available:
             return None
         if self.manager.is_installed(spec) or (self.settings.auto_pull and not spec.gated):
             return spec
         return None
 
-    async def end_of_turn(self, samples16: FloatArray) -> float | None:
-        """Probability that the utterance (16 kHz) is a finished turn, or None without an end-of-turn model."""
-        spec = self.turn_model()
+    @staticmethod
+    def turn_reads_text(spec: ModelSpec) -> bool:
+        """Whether an end-of-turn model judges the transcript (catalog option ``input: text``) instead of the sound."""
+        return str(spec.options.get("input", "audio")) == "text"
+
+    async def end_of_turn(
+        self, samples16: FloatArray, text: str | None = None, model: str | None = None
+    ) -> float | None:
+        """Probability that the utterance (16 kHz) is a finished turn, or None without an end-of-turn model (and, for
+        a model that reads text, without a transcript)."""
+        spec = self.turn_model(model)
         if spec is None:
+            return None
+        reads_text = self.turn_reads_text(spec)
+        if reads_text and not (text or "").strip():
             return None
         try:
             async with self.manager.use(spec.id) as entry:
-                probability, _ = await entry.queue.submit("turn", samples16)
+                if reads_text:
+                    probability, _ = await entry.queue.submit("turn_text", str(text))
+                else:
+                    probability, _ = await entry.queue.submit("turn", samples16)
                 return float(probability)
         except BoloError as exc:
             log.warning("end-of-turn model unavailable (%s); falling back to silence only", exc.message)

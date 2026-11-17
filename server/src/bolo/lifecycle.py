@@ -758,7 +758,9 @@ class ModelManager:
         elif isinstance(model, TurnModel):
             turn = model
             handlers["turn"] = lambda items: [turn.probability(item) for item in items]
+            handlers["turn_text"] = lambda items: [turn.probability_text(item) for item in items]
             max_batch["turn"] = 1
+            max_batch["turn_text"] = 1
         return ModelQueue(
             spec.id,
             handlers,

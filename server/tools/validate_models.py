@@ -275,15 +275,16 @@ async def validate_turn(core: Bolo, spec: Any, synth: dict[str, Any]) -> dict[st
     """The end-of-turn model on a finished sentence: a probability comes back; its time per call is recorded."""
     from bolo.audio.resample import resample
 
-    audio, rate, _text, _voice = sample_speech(synth)
+    audio, rate, text, _voice = sample_speech(synth)
     speech = np.ascontiguousarray(resample(audio, rate, 16000)[-8 * 16000 :], dtype=np.float32)
+    op, item = ("turn_text", text) if core.turn_reads_text(spec) else ("turn", speech)  # a model that reads text
     async with core.manager.use(spec.id) as entry:
-        await entry.queue.submit("turn", speech)  # warm-up
+        await entry.queue.submit(op, item)  # warm-up
         best = float("inf")
         probability = 0.0
         for _ in range(3):
             t0 = time.perf_counter()
-            probability, _ = await entry.queue.submit("turn", speech)
+            probability, _ = await entry.queue.submit(op, item)
             best = min(best, time.perf_counter() - t0)
     if not 0.0 <= float(probability) <= 1.0:
         raise RuntimeError(f"expected a probability, got {probability!r}")

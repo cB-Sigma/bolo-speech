@@ -305,6 +305,11 @@ FAKE_MODELS: list[dict[str, Any]] = [
         "description": "Test end-of-turn model: a turn is finished once it holds three seconds of sound.",
     },
     {
+        "id": "fake-turn-text", "task": "turn", "engine": "fake", "kind": "fake-turn-text", "family": "Fake",
+        "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True, "options": {"input": "text"},
+        "description": "Test end-of-turn model that reads text: a turn is finished once it holds eight words.",
+    },
+    {
         "id": "fake-vad", "task": "vad", "engine": "fake", "kind": "fake-vad", "family": "Fake", "languages": [],
         "tier": "realtime", "license": "Apache-2.0", "builtin": True,
         "description": "Energy-threshold voice-activity detector (no model file).",

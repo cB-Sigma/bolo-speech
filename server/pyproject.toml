@@ -67,8 +67,8 @@ wyoming = ["wyoming>=1.6"]
 # WebRTC transport of the Realtime API (aiortc is BSD-3-Clause; it brings PyAV for Opus)
 webrtc = ["aiortc>=1.9", "av>=12"]
 # end-of-turn detection for Realtime sessions (semantic_vad) and the MarbleNet voice-activity detector.
-# faster-whisper already brings onnxruntime.
-turn = ["onnxruntime>=1.17"]
+# faster-whisper already brings onnxruntime; tokenizers (Apache-2.0) is for the end-of-turn models that read text.
+turn = ["onnxruntime>=1.17", "tokenizers>=0.20"]
 # the WebRTC voice-activity detector (webrtcvad-wheels is MIT; the WebRTC code inside is BSD-3-Clause)
 webrtcvad = ["webrtcvad-wheels>=2.0.14"]
 # Orpheus-family voices (Svara, Veena, Orpheus, snorTTS) on llama.cpp: the SNAC audio decoder runs in onnxruntime

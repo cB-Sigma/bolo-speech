@@ -33,6 +33,21 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   `darwin`, `win32-x86_64`), and a `.whl` is unpacked like a `.zip`.
 - Plugin protocol: op `denoise` for models loaded with task `denoise` (docs/plugins.md); the SDK serves a
   `DenoiseModel`, the reference plugin has `fake-denoise`.
+- **End-of-turn models to choose from, and models that read the transcript.** `smart-turn-v3.1`, `smart-turn-v3.0`
+  and `smart-turn-v3-fp32` (the float32 v3.2 build), BSD-2-Clause; `namo-turn-en` and `namo-turn-multilingual`
+  (VideoSDK's Namo Turn Detector v1, Apache-2.0), which read text: at each pause a `semantic_vad` session decodes the
+  utterance so far with its transcription model (not for cloud recognisers) and asks the model about that text
+  (`tokenizers` joins the `turn` extra); and `silence-only`, no model, which makes `semantic_vad` behave like
+  `server_vad`. A session chooses its model with the bolo extension `turn_detection.turn_model` (default
+  `default_turn`); traces name the model, and a text model's checks record the text and the decode time;
+  `capabilities.realtime.semantic_vad.input` says `audio` or `text`. Catalogued with their terms but not run
+  (`runnable: false`, with the reason): `smart-turn-v2` (PyTorch weights only), `livekit-turn-detector` and
+  `livekit-turn-detector-en` (LiveKit Model License: only with the LiveKit Agents framework) and
+  `ten-turn-detection` (a 7.6 B model; Apache-2.0 plus Agora's conditions in its GitHub licence). Downloads are pinned
+  by SHA-256. Measured on a scripted set of 20 English and 6 Hindi finished and unfinished utterances
+  (docs/measurements/turn-detectors.json): on English, accuracy 0.63 for the default `smart-turn-v3`, 0.80 for its
+  float32 build, 0.98 for `namo-turn-en` on clean text (0.85 without final punctuation), chance for
+  `namo-turn-multilingual`. The default stays `smart-turn-v3` (docs/models.md, "End-of-turn detection").
 - **More voice-activity detectors, chosen by name.** `silero-vad-v6` (MIT), `ten-vad` and `ten-vad-int8` (TEN VAD:
   Apache-2.0 with Agora's conditions, labelled `commercial_use: false`: only for your own applications, not in a way
   that competes with Agora), `marblenet-vad` (NVIDIA Frame-VAD Multilingual MarbleNet v2.0, NVIDIA Open Model

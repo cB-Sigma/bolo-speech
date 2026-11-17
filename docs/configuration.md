@@ -50,7 +50,7 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `separation_timeout_s` | `300` | | stop separating after this long per request; what was not separated is transcribed from the mixture and the response says `reason: "timeout"` |
 | `default_denoise` | `gtcrn-simple` | | speech-enhancement model used by `denoise` when it names no model (pulled on first use, 0.5 MB) |
 | `denoise` | `off` | | denoise audio before speech recognition unless a request or a model pin says otherwise: `off`, `on`, a strength between 0 and 1 (the denoised audio mixed with the original at that weight) or a denoise model id. See "Denoising" below: it can make clean audio worse |
-| `default_turn` | `smart-turn-v3` | | end-of-turn model for Realtime sessions that ask for `semantic_vad` (pulled on first use; without it `semantic_vad` is plain silence detection) |
+| `default_turn` | `smart-turn-v3` | | end-of-turn model for Realtime sessions that ask for `semantic_vad` (pulled on first use; without it `semantic_vad` is plain silence detection): any `turn` model, such as `namo-turn-en` (reads the transcript) or `silence-only` (no model; voice-agents.md, "Semantic turn detection") |
 | `plugins` | `[]` | | out-of-process engine plugins, `name=command args` each (docs/plugins.md) |
 | `plugin_entry_points` | `true` | | also use plugins installed as packages (entry-point group `bolo.engines`) |
 | `plugin_idle_s` | `300` | | stop a plugin process when none of its models has been loaded for this long |

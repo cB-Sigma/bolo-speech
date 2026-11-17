@@ -539,10 +539,17 @@ class TurnModel(Model):
     """End-of-turn detection: has the speaker finished, or only paused?"""
 
     task = "turn"
+    #: what the model judges: "audio" (the sound of the utterance, :meth:`probability`) or "text" (its transcript so
+    #: far, :meth:`probability_text`)
+    hears: str = "audio"
 
     @abc.abstractmethod
     def probability(self, samples: FloatArray) -> float:
         """Probability (0..1) that the 16 kHz utterance in ``samples`` is a finished turn."""
+
+    def probability_text(self, text: str) -> float:
+        """Probability (0..1) that an utterance with this transcript is a finished turn (models that read text)."""
+        raise NotImplementedError(f"{type(self).__name__} judges audio, not text")
 
 
 class Engine(abc.ABC):

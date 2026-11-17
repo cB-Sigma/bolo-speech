@@ -148,7 +148,7 @@ WebSocket subprotocols `realtime` and `openai-insecure-api-key.<key>`.
 
 | Client event | Behaviour |
 | --- | --- |
-| `session.update` | `type` (`realtime` \| `transcription`), `instructions`, `output_modalities` (`["audio"]` or `["text"]`), `audio.input.format` / `audio.output.format` (`audio/pcm` at 24 kHz, `audio/pcmu`, `audio/pcma`), `audio.input.transcription` (`model`, `language`, `prompt`), `audio.input.noise_reduction` (`{"type": "near_field"}` or `"far_field"`: the default denoiser before transcription; `null`: the server's default; see below), `audio.input.denoise` (bolo extension: `true`, `false`, a strength between 0 and 1, a model id, or `{"model", "strength"}`; wins over `noise_reduction`), `audio.input.turn_detection` (`server_vad` with `threshold`, `silence_duration_ms`, `prefix_padding_ms`, `create_response`, `interrupt_response`; `semantic_vad` with `eagerness`, see below; or `null`; bolo extension in either: `vad_model`, the voice-activity detector of the session, any `vad` model, default `default_vad`), `audio.output.voice`, `audio.output.speed`, `tools` (functions), `tool_choice`, `max_output_tokens` |
+| `session.update` | `type` (`realtime` \| `transcription`), `instructions`, `output_modalities` (`["audio"]` or `["text"]`), `audio.input.format` / `audio.output.format` (`audio/pcm` at 24 kHz, `audio/pcmu`, `audio/pcma`), `audio.input.transcription` (`model`, `language`, `prompt`), `audio.input.noise_reduction` (`{"type": "near_field"}` or `"far_field"`: the default denoiser before transcription; `null`: the server's default; see below), `audio.input.denoise` (bolo extension: `true`, `false`, a strength between 0 and 1, a model id, or `{"model", "strength"}`; wins over `noise_reduction`), `audio.input.turn_detection` (`server_vad` with `threshold`, `silence_duration_ms`, `prefix_padding_ms`, `create_response`, `interrupt_response`; `semantic_vad` with `eagerness`, see below; or `null`; bolo extensions in either: `vad_model`, the voice-activity detector of the session, any `vad` model, default `default_vad`; `turn_model`, the end-of-turn model `semantic_vad` asks, any `turn` model, default `default_turn`), `audio.output.voice`, `audio.output.speed`, `tools` (functions), `tool_choice`, `max_output_tokens` |
 | `input_audio_buffer.append` / `.commit` / `.clear` | base64 audio in the session's input format; manual commit when turn detection is off |
 | `conversation.item.create` | user/assistant/system messages (`input_text`, `input_audio` with base64 audio that is transcribed, `output_text`), `function_call`, `function_call_output` |
 | `conversation.item.delete` / `.retrieve` / `.truncate` | `truncate` cuts an assistant message's transcript to the sentences that had started playing before `audio_end_ms`, so the model does not "remember" words the user never heard |
@@ -180,19 +180,33 @@ Stop your playback when you see `input_audio_buffer.speech_started`, and send
 the history to match what the user heard.
 
 **Semantic turn detection (optional).** `turn_detection: {"type":
-"semantic_vad"}` adds an end-of-turn model, [Smart Turn
-v3](https://huggingface.co/pipecat-ai/smart-turn-v3) (BSD-2-Clause, 8 MB,
-23 languages including Hindi, Bengali and Marathi; catalog id
-`smart-turn-v3`, pulled on first use like any model). The voice-activity
-detector then reports a pause after 300 ms of silence, the model listens to
-the last eight seconds of the utterance and says whether the speaker has
-finished. If so the turn ends at once; if not, the turn stays open until the
-speaker continues or the pause has lasted 1.5 s (`eagerness: "high"`), 3 s
-(`"medium"`, `"auto"`) or 6 s (`"low"`). Without the model (not installed
-and `auto_pull` off, or no `onnxruntime`), `semantic_vad` behaves exactly
-like `server_vad`; `GET /api/v1/info` says which under
-`capabilities.realtime.semantic_vad`. Each check is recorded on the turn's
-trace (`turn_detection.checks`: probability and milliseconds).
+"semantic_vad"}` adds an end-of-turn model: the voice-activity detector
+reports a pause after 300 ms of silence and the model says whether the
+speaker has finished. If so the turn ends at once; if not, the turn stays
+open until the speaker continues or the pause has lasted 1.5 s
+(`eagerness: "high"`), 3 s (`"medium"`, `"auto"`) or 6 s (`"low"`). The
+`default_turn` setting chooses the model, and a session can choose its own
+with the bolo extension `turn_detection.turn_model`:
+
+| id | judges | size | licence | runs in bolo |
+| --- | --- | --- | --- | --- |
+| `smart-turn-v3` (default), `smart-turn-v3.1`, `smart-turn-v3.0`, `smart-turn-v3-fp32` | the last 8 s of audio; 23 languages | 9 MB (fp32: 32 MB) | BSD-2-Clause | yes (`onnxruntime`) |
+| `namo-turn-en`, `namo-turn-multilingual` | the transcript; English, or 23 languages | 139 MB, 343 MB | Apache-2.0 | yes (`onnxruntime`, `tokenizers`) |
+| `silence-only` | nothing: the pause decides | none | - | yes (built in) |
+| `smart-turn-v2` | audio | 380 MB | BSD-2-Clause | no: PyTorch weights only |
+| `livekit-turn-detector`, `livekit-turn-detector-en` | the conversation's text | 408 MB, 169 MB | LiveKit Model License: **only with the LiveKit Agents framework** | no: its licence does not allow it |
+| `ten-turn-detection` | the user's text (finished / unfinished / wait) | 15 GB | Apache-2.0 with Agora's conditions | no: a 7.6-billion-parameter model |
+
+Models that read text need words, so when the pause comes the session
+decodes the utterance so far with its transcription model (one extra
+decode per pause; not done for cloud recognisers, which bill every decode)
+and asks the model about that text. Without a transcript, or without the
+model (not installed and `auto_pull` off, no `onnxruntime`, or
+`silence-only`), `semantic_vad` behaves exactly like `server_vad`;
+`GET /api/v1/info` says which under `capabilities.realtime.semantic_vad`
+(with `input`: `audio` or `text`). Each check is recorded on the turn's
+trace (`turn_detection.checks`: probability and milliseconds, and for a
+text model the text and the time the decode took).
 
 What we measured with it (`docs/measurements/semantic-vad-smart-turn.json`;
 the built-in English sample through `moonshine-tiny-en`, three runs each, on

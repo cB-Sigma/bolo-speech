@@ -404,7 +404,7 @@ async def test_semantic_vad_keeps_a_turn_open_across_a_pause(settings: Settings)
         import httpx
 
         info = httpx.get(live.url + "/api/v1/info").json()["capabilities"]["realtime"]
-        assert info["semantic_vad"] == {"model": "fake-turn", "available": True, "installed": True}
+        assert info["semantic_vad"] == {"model": "fake-turn", "available": True, "installed": True, "input": "audio"}
         assert info["turn_detection"] == ["server_vad", "semantic_vad"] and info["sip"] is False
         assert (
             info["webrtc"]["endpoint"] == "/v1/realtime/calls"

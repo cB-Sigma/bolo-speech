@@ -522,6 +522,23 @@ class FakeTurn(TurnModel):
         return 0.95 if sound_s >= self.min_complete_s else 0.05
 
 
+class FakeTextTurn(TurnModel):
+    """Reads the transcript: a turn is finished once it holds ``min_words`` words (tests only)."""
+
+    hears = "text"
+
+    def __init__(self, opts: dict[str, Any]) -> None:
+        self.min_words = int(opts.get("min_words", 8))
+        self.texts: list[str] = []
+
+    def probability(self, samples: FloatArray) -> float:
+        raise NotImplementedError("reads text")
+
+    def probability_text(self, text: str) -> float:
+        self.texts.append(text)
+        return 0.95 if len(text.split()) >= self.min_words else 0.05
+
+
 class FakeDenoiser(DenoiseModel):
     """Spectral gate: frequency bins weaker than a few times the median are removed (tests only).
 
@@ -554,7 +571,7 @@ class FakeEngine(Engine):
     license = "Apache-2.0"
     kinds = (
         "fake-stt", "fake-stt-streaming", "fake-stt-speakers", "fake-tts", "fake-vad", "fake-diarization", "fake-turn",
-        "fake-separation", "fake-denoise",
+        "fake-turn-text", "fake-separation", "fake-denoise",
     )  # fmt: skip
 
     def __init__(self) -> None:
@@ -580,6 +597,8 @@ class FakeEngine(Engine):
             model = FakeDiarization(merged)
         elif kind == "fake-turn":
             model = FakeTurn(merged)
+        elif kind == "fake-turn-text":
+            model = FakeTextTurn(merged)
         elif kind == "fake-separation":
             model = FakeSeparation(merged)
         elif kind == "fake-denoise":
