@@ -181,6 +181,8 @@ class ModelSpec:
         features = list(self.features)
         if self.task == "stt" and "partials" not in features:
             features.append("partials")
+        if self.task == "tts" and self.kind in ("kokoro", "kokoro-onnx") and "voice-blending" not in features:
+            features.append("voice-blending")  # bolo.engines.blend.BLEND_KINDS
         return {
             "id": self.id,
             "aliases": self.aliases,

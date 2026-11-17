@@ -35,6 +35,17 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   attributes, sent over OTLP. Switched on by the setting `otel` or by `OTEL_EXPORTER_OTLP_ENDPOINT`; the other
   standard `OTEL_*` variables apply (`OTEL_SERVICE_NAME`, headers, protocol, sampler). Switched on without the extra,
   bolo logs one warning and carries on. Prometheus `/metrics` and the request traces are unchanged.
+- **Kokoro voice blends**: `voice` takes a mix of a Kokoro model's voices, `af_bella+af_sky` (equal parts) or
+  `af_bella(0.7)+af_sky(0.3)` (weights, normalised to sum to 1); the style vectors are added up with those weights
+  and the text is read in the language of the heaviest voice. Unknown voices are a `400` naming the near matches
+  (an unknown single voice now names them too). The response carries `x-bolo-blend`. `GET /v1/audio/voices` marks
+  the voices that can be blended (`blendable`), and models that blend voices have the feature `voice-blending`.
+  With sherpa-onnx, blends are spoken by a second instance of the model that holds the blends in use: the first
+  request with a new blend loads it (1 to 2 s on CPU) and it takes about as much memory again as the model.
+- **Saved blends** in the voice library: `POST /api/v1/voices/blends` keeps a blend under a name, used as `voice`
+  like any saved voice (without `model`, the blend's model answers). A saved blend is marked `"kind": "blend"`,
+  listed under `blends` in `GET /api/v1/voices` (apart from the recordings), needs no recording and no consent,
+  and goes into exports.
 
 ## [0.6.6] - 2026-11-17
 

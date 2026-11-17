@@ -15,6 +15,7 @@ curl localhost:8000/v1/audio/speech -H 'content-type: application/json' \
 
 * [Creating a voice](#creating-a-voice)
 * [Using a voice](#using-a-voice)
+* [Blends of a model's voices](#blends-of-a-models-voices)
 * [Voice cloning responsibly](#voice-cloning-responsibly)
 * [How alike is the clone? Speaker similarity](#how-alike-is-the-clone-speaker-similarity)
 * [Measured: cloning on CPU](#measured-cloning-on-cpu)
@@ -86,6 +87,49 @@ ids: stock clients send them for ordinary voices.
 Speech in a cloned voice carries the response headers `x-bolo-cloned: true`
 and `x-bolo-voice: <id>`, and the request trace says which saved voice was
 used and on what consent (`extra.voice`).
+
+## Blends of a model's voices
+
+A model that blends voices (`features: [voice-blending]`: the Kokoro voices) speaks a mix of its own voices: the
+style vectors of the voices are added up with weights that are normalised to sum to 1.
+
+```bash
+curl localhost:8000/v1/audio/speech -H 'content-type: application/json' -o mix.wav \
+  -d '{"model": "kokoro-v1.0-int8", "voice": "af_bella(0.7)+af_sky(0.3)", "input": "Hello.", "response_format": "wav"}'
+```
+
+* `af_bella+af_sky` takes equal parts; `af_bella(0.7)+af_sky(0.3)` weighs them; `af_bella(2)+af_sky` is two parts
+  Bella to one part Sky (a voice without a weight counts 1). Up to 8 voices; ids or display names, any case.
+* The text is read in the language of the voice with the largest weight (the first on a tie). Voices of
+  different languages can be mixed; the accent is then a mix too.
+* A voice the model does not have is a `400` naming the near matches (`voice 'af_bela' is not available for model
+  'kokoro-v1.0-int8'. Did you mean: af_bella?`). A blend with a model that cannot blend is a `400` naming the
+  models that can.
+* The response carries `x-bolo-blend: af_bella(0.7)+af_sky(0.3)` (the normalised weights).
+* `GET /v1/audio/voices` marks the voices that can be blended (`blendable: true`).
+
+**Saving a blend under a name.** A blend can be kept in the voice library and then named like any voice:
+
+```bash
+curl localhost:8000/api/v1/voices/blends -H 'content-type: application/json' \
+  -d '{"name": "Warm Mix", "blend": "af_bella(0.7)+af_sky(0.3)", "model": "kokoro-v1.0-int8"}'
+curl localhost:8000/v1/audio/speech -H 'content-type: application/json' \
+  -d '{"voice": "warm-mix", "input": "Hello."}' -o hello.mp3      # the blend's model answers
+```
+
+A saved blend is marked `"kind": "blend"` and listed under `blends` in `GET /api/v1/voices`, apart from the
+recordings. It is not a clone: it has no recording and imitates no one, so it needs no consent statement and has
+no similarity score; `PATCH` can change its voices (`{"blend": "..."}`, checked again). Exports include blends
+(their `voice.json` only). The response to a saved blend also carries `x-bolo-voice: <id>`.
+
+**What it costs.** sherpa-onnx (which runs the catalog's Kokoro entries) takes a voice only as a row of the model's
+voices file, which must hold exactly the model's 54 voices. Blends are therefore spoken by a second instance of the
+model whose voices file holds the blends in use (up to 54; the least recently used makes room for a new one). It
+is created by the first request with a blend and rebuilt when a blend it does not hold arrives, which costs about
+one model load (1 to 2 s on CPU for `kokoro-v1.0-int8`); until the model is unloaded the second instance takes
+about as much memory again as the model itself (about 240 MB for `kokoro-v1.0-int8`), which `bolo ps` does not
+count. Requests with a blend already held cost the same as any voice. The optional `kokoro-onnx` engine mixes the
+style per request and needs no second instance.
 
 ## Voice cloning responsibly
 

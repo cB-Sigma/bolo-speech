@@ -54,7 +54,9 @@ async def audio_models(request: Request) -> JSONResponse:
 
 @router.get("/v1/audio/voices", tags=["speaches"], summary="List voices of installed text-to-speech models")
 async def audio_voices(request: Request, model: str | None = None) -> JSONResponse:
-    """The voices of the installed text-to-speech models; ``model`` (an id or alias): that model's voices only."""
+    """The voices of the installed text-to-speech models; ``model`` (an id or alias): that model's voices only.
+    ``blendable`` marks the voices that can be mixed into a blend (``af_bella(0.7)+af_sky(0.3)`` as ``voice``);
+    saved blends are listed with their model, with ``blend`` set."""
     core = get_core(request)
     voices: list[dict[str, Any]] = []
     wanted: str | None = None
@@ -63,11 +65,20 @@ async def audio_voices(request: Request, model: str | None = None) -> JSONRespon
         if spec is None or spec.task != "tts":
             raise ModelNotFound(f"no text-to-speech model '{model}'", param="model")
         wanted = spec.id
+    blends = await asyncio.to_thread(core.voices.blends)
     for m in core.catalog_api(task="tts", installed=None if wanted else True):
         if wanted is not None and m["id"] != wanted:
             continue
+        blendable = "voice-blending" in m["features"]
         for v in _model_object(m)["voices"]:
-            voices.append({**v, "model_id": m["id"]})
+            voices.append({**v, "model_id": m["id"], "blendable": blendable})
+        # saved blends of this model's voices (bolo.voices), spoken by naming them like any voice
+        for b in blends:
+            if b.default_model == m["id"]:
+                voices.append(
+                    {"name": b.name, "id": b.id, "language": b.language or "", "gender": "", "model_id": m["id"],
+                     "blendable": False, "blend": b.blend}
+                )  # fmt: skip
     return JSONResponse({"object": "list", "voices": voices})
 
 

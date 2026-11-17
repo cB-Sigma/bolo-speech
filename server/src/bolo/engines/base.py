@@ -241,6 +241,8 @@ class TTSModel(Model):
     supports_cloning: bool = False
     #: names of the request options (``SynthesisExtras.options``) the model reads; ``("*",)``: any
     request_options: tuple[str, ...] = ()
+    #: True when ``voice`` may be a blend of the model's voices, ``af_bella(0.7)+af_sky(0.3)`` (bolo.engines.blend)
+    supports_blending: bool = False
 
     @abc.abstractmethod
     def synthesize(

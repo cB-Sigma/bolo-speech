@@ -6,6 +6,10 @@ statement with who gave it and when, the analysis of the recording, an optional 
 similarity measured per model). Any request that names the voice (``voice="priya"`` or ``voice={"id": "priya"}``
 in ``/v1/audio/speech``) with a model that clones voices is spoken from that reference.
 
+A saved *blend* is another kind of entry: ``voice.json`` only, with ``"kind": "blend"``, the blend of a model's
+own voices (``af_bella(0.7)+af_sky(0.3)``, :mod:`bolo.engines.blend`) and the model it is for. It imitates no
+one, so it needs no recording and no consent; it is listed apart from the recordings (``blends``).
+
 Creating a voice needs an explicit consent statement: ``self`` ("this is my voice") or ``permission`` ("I have
 the speaker's permission"). The store refuses a voice without one, and an import whose metadata has none.
 
@@ -55,6 +59,8 @@ METADATA = "voice.json"
 REFERENCE = "reference.wav"
 EXPORT_FORMAT = "bolo-voices"
 EXPORT_VERSION = 1
+#: ``kind`` of a saved blend (a recording has no ``kind``)
+BLEND = "blend"
 
 #: the consent statements a voice can be created with
 CONSENT = {
@@ -322,12 +328,23 @@ class SavedVoice:
     def language(self) -> str | None:
         return str(self.meta["language"]) if self.meta.get("language") else None
 
+    @property
+    def is_blend(self) -> bool:
+        return self.meta.get("kind") == BLEND
+
+    @property
+    def blend(self) -> str:
+        """A saved blend's voices, ``af_bella(0.7)+af_sky(0.3)`` (empty for a recording)."""
+        return str(self.meta.get("blend") or "")
+
     def reference_bytes(self) -> bytes:
+        if self.is_blend:
+            raise InvalidRequest(f"'{self.id}' is a saved blend of {self.blend}: it has no recording", param="voice")
         return (self.path / REFERENCE).read_bytes()
 
     def to_dict(self) -> dict[str, Any]:
         out = {"id": self.id, "object": "voice", **self.meta}
-        out["audio_url"] = f"/api/v1/voices/{self.id}/audio"
+        out["audio_url"] = None if self.is_blend else f"/api/v1/voices/{self.id}/audio"
         return out
 
 
@@ -339,17 +356,38 @@ class VoiceStore:
     def _dir(self, voice_id: str) -> Path:
         return self.root / voice_id
 
+    @staticmethod
+    def _complete(path: Path) -> bool:
+        """A recording with its reference, or a saved blend (metadata only)."""
+        if not (path / METADATA).is_file():
+            return False
+        if (path / REFERENCE).is_file():
+            return True
+        try:
+            return json.loads((path / METADATA).read_text(encoding="utf-8")).get("kind") == BLEND
+        except (ValueError, OSError, AttributeError):
+            return False
+
     def ids(self) -> list[str]:
+        """Every entry: recordings and saved blends."""
         if not self.root.is_dir():
             return []
-        return sorted(p.name for p in self.root.iterdir() if (p / METADATA).is_file() and (p / REFERENCE).is_file())
+        return sorted(p.name for p in self.root.iterdir() if not p.name.startswith(".") and self._complete(p))
 
-    def all(self) -> list[SavedVoice]:
+    def _entries(self) -> list[SavedVoice]:
         out = []
         for vid in self.ids():
             with contextlib.suppress(VoiceNotFound, ValueError, OSError):
                 out.append(self.get(vid))
         return sorted(out, key=lambda v: str(v.meta.get("created_at") or ""), reverse=True)
+
+    def all(self) -> list[SavedVoice]:
+        """The saved recordings (voices to clone), newest first; saved blends are in :meth:`blends`."""
+        return [v for v in self._entries() if not v.is_blend]
+
+    def blends(self) -> list[SavedVoice]:
+        """The saved blends, newest first."""
+        return [v for v in self._entries() if v.is_blend]
 
     def find(self, name: str | None) -> SavedVoice | None:
         """The saved voice with this id (case-insensitive), or None."""
@@ -359,7 +397,7 @@ class VoiceStore:
         if not _ID_RE.match(vid):
             return None
         path = self._dir(vid)
-        if not (path / METADATA).is_file() or not (path / REFERENCE).is_file():
+        if not self._complete(path):
             return None
         try:
             return self.get(vid)
@@ -447,13 +485,68 @@ class VoiceStore:
                 raise
         return self.get(vid)
 
+    def create_blend(
+        self,
+        *,
+        name: str,
+        blend: str,
+        voices: list[dict[str, Any]],
+        model: str,
+        created_by: dict[str, Any],
+        voice_id: str | None = None,
+        language: str | None = None,
+        description: str | None = None,
+    ) -> SavedVoice:
+        """Save a blend of a model's voices under a name. ``blend`` is the canonical spelling and ``voices`` its
+        parts (``[{"voice": "af_bella", "weight": 0.7}, ...]``), both checked by the caller against the model."""
+        name = (name or "").strip()
+        if not name:
+            raise InvalidRequest("a blend needs a name", param="name")
+        if len(name) > 100:
+            raise InvalidRequest("a voice name is limited to 100 characters", param="name")
+        vid = check_id(voice_id or slug(name), "id" if voice_id else "name")
+        with self._lock:
+            if len(self.ids()) >= MAX_VOICES:
+                raise InvalidRequest(f"the voice library is limited to {MAX_VOICES} voices", param="name")
+            path = self._dir(vid)
+            if path.exists():
+                raise VoiceExists(f"a voice with the id '{vid}' exists; choose another name or delete it first")
+            tmp = self.root / f".{vid}.partial"
+            shutil.rmtree(tmp, ignore_errors=True)
+            tmp.mkdir(parents=True)
+            try:
+                meta: dict[str, Any] = {
+                    "kind": BLEND,
+                    "name": name,
+                    "description": (description or "").strip() or None,
+                    "language": (language or "").strip() or None,
+                    "blend": blend,
+                    "voices": voices,
+                    "default_model": model,
+                    "created_at": now_iso(),
+                    "created_by": created_by,
+                    "source": BLEND,
+                }
+                self._write_meta(tmp, meta)
+                tmp.rename(path)
+            except BaseException:
+                shutil.rmtree(tmp, ignore_errors=True)
+                raise
+        return self.get(vid)
+
     def update(self, voice_id: str, changes: dict[str, Any]) -> SavedVoice:
+        """Change a voice's details. A saved blend also takes ``blend`` and ``voices`` (checked by the caller)
+        and has no transcript."""
         allowed = {"name", "description", "language", "transcript", "default_model"}
-        unknown = set(changes) - allowed
-        if unknown:
-            raise InvalidRequest(f"cannot change {', '.join(sorted(unknown))}", param=sorted(unknown)[0])
         with self._lock:
             voice = self.get(voice_id)
+            if voice.is_blend:
+                allowed = (allowed - {"transcript"}) | {"blend", "voices"}
+            unknown = set(changes) - allowed
+            if unknown:
+                raise InvalidRequest(f"cannot change {', '.join(sorted(unknown))}", param=sorted(unknown)[0])
+            if "voices" in changes:
+                voice.meta["voices"] = changes.pop("voices")
             for key, value in changes.items():
                 text = None if value is None else str(value).strip()
                 if key == "name" and not text:
@@ -488,7 +581,7 @@ class VoiceStore:
     # -- export / import ----------------------------------------------------------------------------------------
     def export_zip(self, ids: list[str] | None = None) -> bytes:
         """A .zip of ``manifest.json`` and ``<id>/voice.json`` + ``<id>/reference.wav`` per voice."""
-        voices = [self.get(i) for i in ids] if ids else self.all()
+        voices = [self.get(i) for i in ids] if ids else self._entries()
         if not voices:
             raise VoiceNotFound("there are no saved voices to export")
         buf = io.BytesIO()
@@ -500,7 +593,8 @@ class VoiceStore:
             zf.writestr("manifest.json", json.dumps(manifest, indent=2))
             for v in voices:
                 zf.writestr(f"{v.id}/{METADATA}", json.dumps(v.meta, indent=2, ensure_ascii=False))
-                zf.write(v.path / REFERENCE, f"{v.id}/{REFERENCE}")
+                if not v.is_blend:  # a blend is its metadata only
+                    zf.write(v.path / REFERENCE, f"{v.id}/{REFERENCE}")
         return buf.getvalue()
 
     def import_zip(
@@ -527,9 +621,27 @@ class VoiceStore:
                 vid = check_id(str(raw_id))
                 try:
                     meta = json.loads(zf.read(f"{vid}/{METADATA}"))
-                    audio = zf.read(f"{vid}/{REFERENCE}")
+                    is_blend = isinstance(meta, dict) and meta.get("kind") == BLEND
+                    audio = b"" if is_blend else zf.read(f"{vid}/{REFERENCE}")
                 except (KeyError, ValueError) as exc:
                     raise InvalidRequest(f"voice '{vid}' is incomplete in the archive", param="file") from exc
+                if is_blend:
+                    if not str(meta.get("blend") or "").strip():
+                        raise InvalidRequest(f"blend '{vid}' in the archive names no voices", param="file")
+                    with self._lock:
+                        if self._dir(vid).exists():
+                            if not replace:
+                                continue
+                            shutil.rmtree(self._dir(vid))
+                        meta["imported_at"] = now_iso()
+                        meta["imported_by"] = imported_by
+                        tmp = self.root / f".{vid}.partial"
+                        shutil.rmtree(tmp, ignore_errors=True)
+                        tmp.mkdir(parents=True)
+                        self._write_meta(tmp, meta)
+                        tmp.rename(self._dir(vid))
+                    added.append(vid)
+                    continue
                 record = meta.get("consent") if isinstance(meta.get("consent"), dict) else None
                 if basis is None and (not record or record.get("basis") not in CONSENT):
                     raise ConsentRequired(

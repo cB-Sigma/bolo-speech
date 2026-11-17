@@ -49,6 +49,7 @@ from bolo.engines.base import (
     Voice,
     Word,
 )
+from bolo.engines.blend import looks_like_blend, resolve_blend
 
 VOCAB = [
     "the",
@@ -250,6 +251,8 @@ class FakeTTS(TTSModel):
         self.supports_cloning = bool(opts.get("cloning"))
         self.accepts_extras = self.supports_cloning
         self.request_options = ("pitch",) if self.supports_cloning else ()
+        #: option ``blending``: voice blends (bolo.engines.blend) sound at the weighted mean of their voices' pitches
+        self.supports_blending = bool(opts.get("blending"))
         self.extras: list[SynthesisExtras | None] = []
 
     @staticmethod
@@ -273,6 +276,9 @@ class FakeTTS(TTSModel):
         self.extras.append(extras)
         v = self.find_voice(voice)
         freq = 220.0 * (1 + (v.sid if v else 0) * 0.25)
+        if v is None and voice and self.supports_blending and looks_like_blend(voice):
+            blend = resolve_blend(voice, self.voices, "fake-tts")
+            freq = sum(w * 220.0 * (1 + x.sid * 0.25) for x, w in blend.parts)
         if extras is not None and extras.reference_audio is not None:
             freq = self._pitch_of(extras.reference_audio)
         if extras is not None and "pitch" in extras.options:

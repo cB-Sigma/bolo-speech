@@ -61,6 +61,7 @@ from bolo.engines.base import (
     Voice,
     Word,
 )
+from bolo.engines.blend import Blend, looks_like_blend, model_blends, resolve_blend, unknown_voice_message
 from bolo.errors import (
     BoloError,
     ComponentMissing,
@@ -1712,8 +1713,24 @@ class Bolo:
         if voice.lower() in OPENAI_VOICES:
             # Stock OpenAI clients send OpenAI voice names; map them onto the model's voices.
             return tts.voices[OPENAI_VOICES.index(voice.lower()) % len(tts.voices)]
-        names = ", ".join(v.id for v in tts.voices[:12]) + (", …" if len(tts.voices) > 12 else "")
-        raise InvalidRequest(f"voice '{voice}' is not available for model '{spec.id}'. Voices: {names}", param="voice")
+        raise InvalidRequest(unknown_voice_message(voice, tts.voices, spec.id), param="voice")
+
+    def blending_models(self, installed_only: bool = True) -> list[str]:
+        """Text-to-speech models whose voices can be blended (``features`` has ``voice-blending``)."""
+        out = []
+        for spec in self.catalog.all():
+            if spec.task != "tts" or not model_blends(spec.kind, spec.features) or spec.status == "pending":
+                continue
+            if not installed_only or self.manager.is_installed(spec):
+                out.append(spec.id)
+        return out
+
+    def no_blending_message(self, spec: ModelSpec, voice: str) -> str:
+        models = self.blending_models() or self.blending_models(installed_only=False)
+        return (
+            f"'{voice}' is a voice blend, and model '{spec.id}' cannot blend voices. Models that can: "
+            f"{', '.join(models) or 'none'}."
+        )
 
     def cloning_models(self, installed_only: bool = True) -> list[str]:
         """Text-to-speech models that clone voices (``features`` has ``voice-cloning``), installed ones by
@@ -1771,6 +1788,10 @@ class Bolo:
         the saved voice's default model answers. ``options`` are model-specific request options
         (``SynthesisExtras.options``).
 
+        A ``voice`` written as a blend (``af_bella(0.7)+af_sky(0.3)``, :mod:`bolo.engines.blend`), or naming a
+        saved blend, is spoken by a model that blends voices (Kokoro); its voices are checked first (400 naming
+        the near matches.
+
         ``romanised`` (``off`` / ``auto`` / ``on``; None: the voice's default) writes an Indian language typed in
         Latin letters in the voice's script first (bolo.text.romanised). With ``romanised_strict`` false (sessions,
         agents) a conversion that cannot happen is a notice in the trace, never an error.
@@ -1788,6 +1809,11 @@ class Bolo:
         if saved is not None and model is None and saved.default_model:
             model = saved.default_model
         spec = self.resolve(model, "tts")
+        blend_name: str | None = None
+        if saved is not None and saved.is_blend:
+            if custom_voice or not any(str(v.get("id", "")).lower() == str(voice).lower() for v in spec.voices):
+                blend_name, voice = saved.id, saved.blend
+            saved = None  # a blend is spoken by the model's own voices, never cloned
         if (
             saved is not None
             and not custom_voice
@@ -1808,6 +1834,7 @@ class Bolo:
                     reference_audio=reference_audio, reference_text=reference_text, wordlists=wordlists,
                     pronunciations=pronunciations, input_format=input_format, romanised=romanised,
                     romanised_strict=romanised_strict, saved=saved, custom_voice=custom_voice, options=options,
+                    blend_name=blend_name,
                 )  # fmt: skip
                 try:
                     async for chunk in attempt:
@@ -1850,6 +1877,7 @@ class Bolo:
         saved: SavedVoice | None = None,
         custom_voice: bool = False,
         options: dict[str, Any] | None = None,
+        blend_name: str | None = None,
     ) -> AsyncGenerator[SynthChunk, None]:
         """One model's attempt at :meth:`synthesize`. ``own_voice`` is false for a fallback model: a voice it
         does not have is replaced by its default instead of refused."""
@@ -1882,13 +1910,26 @@ class Bolo:
                     trace.extra["voice"] = {"saved": saved.id, "cloned": True, "consent": consent.get("basis")}
                 elif reference_audio is not None:
                     trace.extra["voice"] = {"saved": None, "cloned": True}
+                blend: Blend | None = None
+                if voice and looks_like_blend(voice) and tts.find_voice(voice) is None:
+                    try:
+                        if not tts.supports_blending:
+                            raise InvalidRequest(self.no_blending_message(spec, blend_name or voice), param="voice")
+                        blend = resolve_blend(voice, tts.voices, spec.id)
+                    except InvalidRequest:
+                        if own_voice:
+                            raise
+                        voice = None  # a fallback model speaks with its default voice
+                    else:
+                        trace.extra["voice"] = {"saved": blend_name, "cloned": False, **blend.to_dict()}
                 try:
-                    chosen = self.pick_voice(tts, voice, spec)
+                    chosen = blend.lead if blend is not None else self.pick_voice(tts, voice, spec)
                 except InvalidRequest:
                     if own_voice:
                         raise
                     voice, chosen = None, tts.find_voice(None)
                     phonemizer = None  # the pin was for the requested model's voice
+                engine_voice = blend.key if blend is not None else (chosen.id if chosen else voice)
                 phonemizer = self.components.check_phonemizer(spec, chosen.id if chosen else voice, phonemizer)
                 lang = language or (
                     chosen.language if chosen and chosen.language else (spec.languages[0] if spec.languages else "en")
@@ -1949,7 +1990,7 @@ class Bolo:
                     job = asyncio.ensure_future(
                         entry.queue.submit(
                             "tts",
-                            (piece, chosen.id if chosen else voice, speed, emit, stop.is_set, phonemizer, extras),
+                            (piece, engine_voice, speed, emit, stop.is_set, phonemizer, extras),
                         )
                     )
                     job.add_done_callback(lambda _f, _out=out: _out.put_nowait(None))  # type: ignore[misc]
@@ -2057,8 +2098,10 @@ def fallback_headers(trace: Trace) -> dict[str, str]:
     cloned = trace.extra.get("voice")
     if isinstance(cloned, dict) and cloned.get("cloned"):
         headers["x-bolo-cloned"] = "true"
-        if cloned.get("saved"):
-            headers["x-bolo-voice"] = str(cloned["saved"])
+    if isinstance(cloned, dict) and cloned.get("saved"):
+        headers["x-bolo-voice"] = str(cloned["saved"])
+    if isinstance(cloned, dict) and cloned.get("blend"):
+        headers["x-bolo-blend"] = str(cloned["blend"])
     record = trace.extra.get("fallback")
     if isinstance(record, dict) and record.get("attempts"):
         first = record["attempts"][0]

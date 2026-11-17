@@ -489,7 +489,9 @@ class SpeechRequest(BaseModel):
     voice: str | dict[str, Any] | None = Field(
         default=None,
         description="A voice of the model, or a saved voice (/api/v1/voices) for a model that clones voices: by "
-        'id (`"priya"`) or as OpenAI\'s custom-voice object (`{"id": "priya"}`, which prefers the saved voice).',
+        'id (`"priya"`) or as OpenAI\'s custom-voice object (`{"id": "priya"}`, which prefers the saved voice). For a '
+        'model that blends voices (Kokoro), a blend of its voices: `"af_bella+af_sky"` or `"af_bella(0.7)+af_sky(0.3)"` '
+        "(weights normalised), or a saved blend's id.",
     )
     instructions: str | None = Field(default=None, description="Accepted for compatibility; ignored.")
     response_format: str = "mp3"

@@ -18,7 +18,9 @@ from __future__ import annotations
 import contextlib
 import json
 import re
+import tempfile
 import threading
+from collections import OrderedDict
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -49,6 +51,7 @@ from bolo.engines.base import (
     Voice,
     Word,
 )
+from bolo.engines.blend import Blend, looks_like_blend, mix_styles, resolve_blend
 from bolo.ort_providers import sherpa_provider
 
 OFFLINE_KINDS = (
@@ -525,11 +528,26 @@ class SherpaTTS(TTSModel):
             raise ValueError(f"sherpa-onnx engine cannot load TTS kind {kind!r}")
         rule_fsts = ",".join(str(f) for f in sorted(p.glob("*.fst")))
         provider = sherpa_provider(opts.device)
-        model_cfg = so.OfflineTtsModelConfig(num_threads=opts.threads, provider=provider, **cfg)
-        config = so.OfflineTtsConfig(model=model_cfg, rule_fsts=rule_fsts, max_num_sentences=1)
-        if not config.validate():
-            raise ValueError(f"sherpa-onnx rejected the TTS configuration for {p.name}")
-        self._tts = so.OfflineTts(config)
+
+        def build(parts: dict[str, Any]) -> Any:
+            model_cfg = so.OfflineTtsModelConfig(num_threads=opts.threads, provider=provider, **parts)
+            config = so.OfflineTtsConfig(model=model_cfg, rule_fsts=rule_fsts, max_num_sentences=1)
+            if not config.validate():
+                raise ValueError(f"sherpa-onnx rejected the TTS configuration for {p.name}")
+            return so.OfflineTts(config)
+
+        self._tts = build(cfg)
+        # Kokoro voice blends (bolo.engines.blend): sherpa-onnx takes a voice only as a row of its voices file, and
+        # the file must hold exactly the model's number of voices. Blends therefore get a second instance whose
+        # voices file holds the blends in use (up to that number, least recently used first out), rebuilt when a
+        # new blend arrives. It exists only once a blend was asked for.
+        self.supports_blending = kind == "kokoro"
+        self._build = build
+        self._cfg = cfg
+        self._blend_lock = threading.Lock()
+        self._blend_tts: Any = None
+        self._blends: OrderedDict[str, FloatArray] = OrderedDict()
+        self._blend_slots: dict[str, int] = {}
         self.accepts_phonemizer = True
         self.sample_rate = int(self._tts.sample_rate)
         self.num_speakers = int(self._tts.num_speakers)
@@ -636,8 +654,13 @@ class SherpaTTS(TTSModel):
     ) -> Iterator[FloatArray]:
         original = text
         v = self.find_voice(voice)
+        tts = self._tts
         config = self._so.GenerationConfig()
         config.sid = v.sid if v else (int(voice) if voice and voice.isdigit() else 0)
+        if v is None and voice and self.supports_blending and looks_like_blend(voice):
+            blend = resolve_blend(voice, self.voices, self.path.name)
+            v = blend.lead  # its language reads the text
+            tts, config.sid = self._blend_voice(blend)
         config.speed = speed
         target = self.phoneme_target(v, phonemizer)
         if target:
@@ -654,7 +677,7 @@ class SherpaTTS(TTSModel):
         def callback(_samples: Any, _progress: float) -> int:
             return 0 if cancelled is not None and cancelled() else 1
 
-        audio = self._tts.generate(text, config, callback)
+        audio = tts.generate(text, config, callback)
         samples = np.asarray(audio.samples, dtype=np.float32)
         if len(samples) == 0 and not (cancelled is not None and cancelled()):
             # sherpa-onnx logs the reason (unknown tokens, missing lexicon, ...) and returns nothing.
@@ -664,6 +687,46 @@ class SherpaTTS(TTSModel):
             )
         if len(samples):
             yield samples
+
+    def _blend_voice(self, blend: Blend) -> tuple[Any, int]:
+        """The instance and speaker id that speak ``blend``; builds (or rebuilds) the blend instance when the
+        blend is new. The first request with a new blend pays for loading the model once more."""
+        key = blend.key
+        with self._blend_lock:
+            if key in self._blends and self._blend_tts is not None:
+                self._blends.move_to_end(key)
+                return self._blend_tts, self._blend_slots[key]
+            voices_file = Path(self._cfg["kokoro"].voices)
+            rows = max(1, self.num_speakers)
+            table = np.fromfile(voices_file, dtype=np.float32)
+            table = table.reshape(rows, -1)
+            if key not in self._blends:
+                if len(self._blends) >= rows:
+                    old, _ = self._blends.popitem(last=False)
+                    self._blend_slots.pop(old, None)
+                self._blends[key] = mix_styles(table, blend)
+            used = set(self._blend_slots.values())
+            if key not in self._blend_slots:
+                self._blend_slots[key] = next(i for i in range(rows) if i not in used)
+            out = table.copy()  # unused rows keep the model's own voices
+            for name, row in self._blends.items():
+                out[self._blend_slots[name]] = row
+            cfg = self._cfg["kokoro"]
+            with tempfile.TemporaryDirectory(prefix="bolo-blend-") as tmp:
+                path = Path(tmp) / "voices.bin"
+                out.tofile(path)
+                parts = dict(self._cfg)
+                parts["kokoro"] = self._so.OfflineTtsKokoroModelConfig(
+                    model=cfg.model, voices=str(path), tokens=cfg.tokens, lexicon=cfg.lexicon
+                )
+                self._blend_tts = None  # free the old one first: at most two copies of the model at a time
+                self._blend_tts = self._build(parts)  # sherpa-onnx reads the voices file while loading
+            return self._blend_tts, self._blend_slots[key]
+
+    def close(self) -> None:
+        self._blend_tts = None
+        self._blends.clear()
+        self._blend_slots.clear()
 
 
 class _SherpaVadDetector(VadDetector):

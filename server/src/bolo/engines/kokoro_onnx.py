@@ -22,12 +22,14 @@ from typing import Any
 import numpy as np
 
 from bolo.engines.base import Engine, EngineStatus, FloatArray, LoadOptions, Model, TTSModel, Voice
+from bolo.engines.blend import looks_like_blend, resolve_blend
 
 _LANG = {"a": "en-us", "b": "en-gb", "e": "es", "f": "fr-fr", "h": "hi", "i": "it", "p": "pt-br", "j": "ja", "z": "cmn"}
 
 
 class KokoroOnnxTTS(TTSModel):
     sample_rate = 24000
+    supports_blending = True
 
     def __init__(self, path: Path, spec: dict[str, Any], opts: LoadOptions) -> None:
         from kokoro_onnx import Kokoro
@@ -50,8 +52,15 @@ class KokoroOnnxTTS(TTSModel):
         cancelled: Callable[[], bool] | None = None,
     ) -> Iterator[FloatArray]:
         v = self.find_voice(voice)
-        name = v.id if v else "af_heart"
-        samples, rate = self.kokoro.create(text, voice=name, speed=speed, lang=_LANG.get(name[:1], "en-us"))
+        style: Any = v.id if v else "af_heart"
+        name = style
+        if v is None and voice and looks_like_blend(voice):
+            # a blend (bolo.engines.blend): the weighted sum of the voices' style tables, read in the language of
+            # the voice with the largest weight
+            blend = resolve_blend(voice, self.voices, "kokoro-onnx")
+            name = blend.lead.id
+            style = sum(w * np.asarray(self.kokoro.get_voice_style(x.id), dtype=np.float32) for x, w in blend.parts)
+        samples, rate = self.kokoro.create(text, voice=style, speed=speed, lang=_LANG.get(name[:1], "en-us"))
         self.sample_rate = int(rate)
         yield np.asarray(samples, dtype=np.float32)
 

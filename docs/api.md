@@ -255,7 +255,7 @@ JSON body.
 | --- | --- | --- |
 | `input` | required | text. Split into sentences and synthesised one at a time |
 | `model` | optional | see model names |
-| `voice` | optional | a voice id of the model (`GET /api/v1/models/{id}`), or a **saved voice** ([voices.md](voices.md)) for a model that clones voices: `"priya"`, or OpenAI's custom-voice object `{"id": "priya"}`. A string is the model's own voice when it has one of that name, else the saved voice; the object prefers the saved voice. A saved voice with a model that cannot clone → `400` naming the cloning models installed. Without `model`, a saved voice's `default_model` answers. OpenAI voice names (`alloy`, `echo`, `nova`, …) are mapped onto the model's voices so stock clients work |
+| `voice` | optional | a voice id of the model (`GET /api/v1/models/{id}`), or a **saved voice** ([voices.md](voices.md)) for a model that clones voices: `"priya"`, or OpenAI's custom-voice object `{"id": "priya"}`. A string is the model's own voice when it has one of that name, else the saved voice; the object prefers the saved voice. A saved voice with a model that cannot clone → `400` naming the cloning models installed. Without `model`, a saved voice's `default_model` answers. OpenAI voice names (`alloy`, `echo`, `nova`, …) are mapped onto the model's voices so stock clients work. For a model that blends voices (`features` contains `voice-blending`: Kokoro), a **blend** of its voices: `"af_bella+af_sky"` (equal parts) or `"af_bella(0.7)+af_sky(0.3)"` (weights, normalised to sum to 1; a voice without one counts 1; at most 8 voices), or the id of a saved blend. A voice the model does not have → `400` (`param: "voice"`) naming the near matches; a blend with a model that cannot blend → `400` naming the models that can |
 | `response_format` | `mp3` | `mp3`, `opus` (Ogg), `aac` (ADTS; needs `bolo-speech[av]` or ffmpeg), `flac`, `wav`, `pcm` (16-bit little-endian mono at the model's rate), and the telephony extensions `mulaw` / `alaw` (raw 8 kHz G.711) |
 | `speed` | `1.0` | 0.25 to 4.0 |
 | `stream_format` | `audio` | `sse` wraps the audio in `speech.audio.delta` events (base64) followed by `speech.audio.done` |
@@ -276,6 +276,11 @@ Speech in a cloned voice (a saved voice, or `reference_audio`) carries the
 response headers `x-bolo-cloned: true` and, for a saved voice, `x-bolo-voice:
 <id>`; the request's trace (`GET /api/v1/requests/{id}`) has `extra.voice`
 (`{"saved": "priya", "cloned": true, "consent": "self"}`).
+
+Speech in a blend carries `x-bolo-blend` with the blend as it was spoken (normalised weights,
+`af_bella(0.7)+af_sky(0.3)`) and, for a saved blend, `x-bolo-voice: <id>`; the trace's `extra.voice` is
+`{"saved": "warm-mix" | null, "cloned": false, "blend": "...", "voices": [{"voice", "weight"}, ...]}`. The text is
+read in the language of the voice with the largest weight. See [voices.md](voices.md), "Blends".
 
 The body is streamed (chunked transfer) while synthesis is still running:
 the first sentence is audible while the rest is being generated. `pcm`,
@@ -446,7 +451,7 @@ For clients written against speaches; details and differences are in
 | `GET /v1/registry?task=` | every catalog model, installed or not |
 | `POST /v1/models/{id}` | download and wait: `200` downloaded, `201` already present, `401` gated, `404` unknown |
 | `DELETE /v1/models/{id}` | delete from disk |
-| `GET /v1/audio/models`, `GET /v1/audio/voices` | installed text-to-speech models / their voices |
+| `GET /v1/audio/models`, `GET /v1/audio/voices` | installed text-to-speech models / their voices. Extension: each voice has `blendable` (true for the voices of a model that blends voices), and saved blends are listed with their model, with `blend` set |
 | `GET /api/ps` | `{"models": [ids in memory]}` |
 | `POST /api/ps/{id}` / `DELETE /api/ps/{id}` | load (`201`, `409` if loaded) / unload (`200`, `404`, `409` if busy) |
 | `POST /v1/audio/speech/timestamps` | multipart `file` (+ `threshold`, `min_silence_duration_ms`, `min_speech_duration_ms`, `max_speech_duration_s`, `speech_pad_ms`) → `[{"start": ms, "end": ms}]` |
@@ -1080,13 +1085,14 @@ similarity score.
 | Route | |
 | --- | --- |
 | `POST /api/v1/voices` | multipart: `file` (one or more recordings of the same person, also `files[]`), `name`, **`consent`** (required: `self` = "this is my voice", `permission` = "I have the speaker's permission"; anything else → `400 consent_required`), optional `id`, `transcript` (else transcribed by the default STT model when it is installed; `transcribe=false` skips that), `language`, `description`, `default_model` (a cloning model), `created_by` (a name to record), `score_model` (speak a test sentence with it and return `score`; default: `default_model`), `score_audio=true` (include the test clip). → `201` with the voice. `409 voice_exists` for an id that is taken; the id comes from the name (`"Priya S."` → `priya-s`), and OpenAI's voice names are reserved |
-| `GET /api/v1/voices` | `{"voices": [...], "cloning_models": [...], "consent": {...}, "similarity": {thresholds, calibration}}` |
+| `GET /api/v1/voices` | `{"voices": [...], "blends": [...], "cloning_models": [...], "blending_models": [...], "consent": {...}, "similarity": {thresholds, calibration}}`; `voices` are the recordings, `blends` the saved blends |
+| `POST /api/v1/voices/blends` | JSON: `name`, `blend` (`"af_bella(0.7)+af_sky(0.3)"`), `model` (a model that blends voices; default: the default TTS model), optional `id`, `description`, `created_by`. The voices are checked against the model (`400` naming the near matches). No recording and no consent: a blend imitates no one. → `201` with the blend (`"kind": "blend"`) |
 | `GET /api/v1/voices/{id}` | one voice |
-| `PATCH /api/v1/voices/{id}` | JSON: `name`, `description`, `language`, `transcript`, `default_model` (`""` clears it) |
+| `PATCH /api/v1/voices/{id}` | JSON: `name`, `description`, `language`, `transcript`, `default_model` (`""` clears it). A saved blend takes `blend` (checked again) and no `transcript`, and keeps a model |
 | `DELETE /api/v1/voices/{id}` | removes the voice and its recording |
-| `GET /api/v1/voices/{id}/audio` | the cleaned reference (WAV, 24 kHz mono) |
+| `GET /api/v1/voices/{id}/audio` | the cleaned reference (WAV, 24 kHz mono); `400` for a saved blend |
 | `GET /api/v1/voices/{id}/score?model=&text=&audio=` | speaks `text` (default: a test sentence in the voice's language) with `model` (default: the voice's default model, else the default TTS model) and compares it with the reference: `similarity`, `verdict`, `embedding_model`, `calibrated`, `rtf`, `ttfa_ms`, `audio_s`, and with `audio=true` the clip as a data URL. Kept in the voice's `scores` |
-| `GET /api/v1/voices/export?ids=a,b` | a .zip of `manifest.json` and `<id>/voice.json` + `<id>/reference.wav` (all voices without `ids`) |
+| `GET /api/v1/voices/export?ids=a,b` | a .zip of `manifest.json` and `<id>/voice.json` + `<id>/reference.wav` (all voices and blends without `ids`; a blend is its `voice.json` only) |
 | `POST /api/v1/voices/import` | multipart `file` (an export), `consent` (for voices whose metadata has none; refused otherwise), `replace=true` |
 
 A voice:
@@ -1102,6 +1108,15 @@ A voice:
  "warnings": [],                                  // short, noisy, clipped, several people, cut to 60 s
  "scores": {"pocket-tts-en-llamacpp": {"similarity": 0.66, "verdict": "same speaker", "rtf": 0.47, ...}},
  "audio_url": "/api/v1/voices/priya/audio"}
+```
+
+A saved blend:
+
+```jsonc
+{"id": "warm-mix", "object": "voice", "kind": "blend", "name": "Warm Mix", "description": null, "language": "en-US",
+ "blend": "af_bella(0.7)+af_sky(0.3)", "voices": [{"voice": "af_bella", "weight": 0.7}, {"voice": "af_sky", "weight": 0.3}],
+ "default_model": "kokoro-v1.0-int8", "created_at": "2026-11-17T18:40:00Z",
+ "created_by": {"auth": "none", "name": null, "client": "127.0.0.1"}, "source": "blend", "audio_url": null}
 ```
 
 `by.auth` is `api_key` when the server has an API key (bolo has one key, so

@@ -141,6 +141,10 @@ async def score_voice(
     from bolo.voices import now_iso
 
     voice = core.voices.get(voice_id)
+    if voice.is_blend:
+        raise InvalidRequest(
+            f"'{voice.id}' is a saved blend: it has no recording to compare a clone with", param="voice"
+        )
     spec = core.resolve(model or voice.default_model, "tts")
     sentence = (text or "").strip() or test_sentence(voice.language)
     trace = Trace("tts", "score", spec.id)

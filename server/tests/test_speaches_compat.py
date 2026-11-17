@@ -37,7 +37,14 @@ def test_registry_and_model_listing(live: LiveServer) -> None:
     assert audio_models["object"] == "list" and [m["id"] for m in audio_models["models"]] == ["fake-tts"]
     assert audio_models["models"][0]["sample_rate"] == 24000
     voices = httpx.get(live.url + "/v1/audio/voices").json()["voices"]
-    assert {"name": "alpha", "id": "alpha", "language": "en-US", "gender": "female", "model_id": "fake-tts"} in voices
+    assert {
+        "name": "alpha",
+        "id": "alpha",
+        "language": "en-US",
+        "gender": "female",
+        "model_id": "fake-tts",
+        "blendable": False,
+    } in voices
 
 
 def test_speaches_model_ids_resolve_to_catalog_entries(live: LiveServer) -> None:

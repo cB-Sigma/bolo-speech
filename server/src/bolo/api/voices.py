@@ -5,6 +5,10 @@ for a model, export and import (.zip). OpenAI-compatible: ``POST /v1/audio/voice
 ``consent``), ``DELETE /v1/audio/voices/{id}`` and ``/v1/audio/voice_consents`` for recorded consent statements,
 as in the OpenAI API reference (openai-python 3.x: ``client.audio.voices`` and ``client.audio.voice_consents``).
 A saved voice is used by naming it in ``/v1/audio/speech``: ``voice="priya"`` or ``voice={"id": "priya"}``.
+
+Saved blends (``POST /api/v1/voices/blends``): a name for a blend of a model's own voices
+(``af_bella(0.7)+af_sky(0.3)``), used the same way. They need no recording and no consent, and are listed apart
+from the recordings (``blends`` in ``GET /api/v1/voices``).
 """
 
 from __future__ import annotations
@@ -28,6 +32,8 @@ from bolo.api.common import get_core, parse_bool, read_upload
 from bolo.audio import decode_audio
 from bolo.audio.encode import encode_audio
 from bolo.core import Bolo
+from bolo.engines.base import TTSModel, Voice
+from bolo.engines.blend import Blend, model_blends, resolve_blend
 from bolo.errors import BoloError, InvalidRequest
 from bolo.voices import (
     CONSENT,
@@ -165,11 +171,14 @@ async def _score(core: Bolo, voice_id: str, model: str | None, text: str | None,
 async def list_voices(request: Request) -> JSONResponse:
     core = get_core(request)
     voices = [v.to_dict() for v in await asyncio.to_thread(core.voices.all)]
+    blends = [v.to_dict() for v in await asyncio.to_thread(core.voices.blends)]
     return JSONResponse(
         {
             "object": "list",
             "voices": voices,
+            "blends": blends,
             "cloning_models": core.cloning_models(),
+            "blending_models": core.blending_models(),
             "consent": CONSENT,
             "similarity": {
                 "embedding_model": similarity.embedding_model(core),
@@ -258,6 +267,63 @@ async def import_voices(request: Request) -> JSONResponse:
     return JSONResponse({"imported": added})
 
 
+async def check_blend(core: Bolo, blend: str, model: str | None) -> tuple[str, Blend]:
+    """The model a blend is for (``model``, else the default text-to-speech model) and the blend checked against
+    its voices: 400 for a model that cannot blend voices or a voice it does not have (naming the near matches)."""
+    if not isinstance(blend, str) or not blend.strip():
+        raise InvalidRequest("a blend names its voices: blend='af_bella(0.7)+af_sky(0.3)'", param="blend")
+    spec = core.resolve(model, "tts")
+    if not model_blends(spec.kind, spec.features):
+        models = core.blending_models() or core.blending_models(installed_only=False)
+        raise InvalidRequest(
+            f"model '{spec.id}' cannot blend voices; models that can: {', '.join(models) or 'none'}",
+            param="model" if model else "blend",
+        )
+    voices = [
+        Voice(str(v["id"]), str(v.get("name", "")), str(v.get("language", "")), str(v.get("gender", "")),
+              int(v.get("sid", i)))
+        for i, v in enumerate(spec.voices)
+    ]  # fmt: skip
+    if not voices:  # a model whose voices come from its files (kokoro-onnx): ask the loaded model
+        async with core.manager.use(spec.id) as entry:
+            if isinstance(entry.model, TTSModel):
+                voices = list(entry.model.voices)
+    return spec.id, resolve_blend(blend, voices, spec.id)
+
+
+class BlendCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(description="The blend's name; its id is made from it unless `id` is given.")
+    blend: str = Field(
+        description="Voices of the model joined by '+', with optional weights: af_bella(0.7)+af_sky(0.3)."
+    )
+    model: str | None = Field(
+        default=None, description="A model that blends voices (Kokoro); default: the default TTS model."
+    )
+    id: str | None = None
+    description: str | None = None
+    created_by: str | None = None
+
+
+@router.post("/api/v1/voices/blends", status_code=201, tags=["voices"], summary="Save a blend of a model's voices")
+async def post_blend(request: Request, body: BlendCreate) -> JSONResponse:
+    """Saves ``blend`` (voices of ``model`` joined by '+', each optionally weighted: ``af_bella(0.7)+af_sky(0.3)``;
+    weights are normalised) under ``name``. Use it as ``voice`` in ``/v1/audio/speech``; without ``model`` there,
+    the blend's model answers. A blend imitates no one: no recording and no consent statement are needed. The
+    entry is marked ``"kind": "blend"`` and listed under ``blends``."""
+    core = get_core(request)
+    model_id, blend = await check_blend(core, body.blend, body.model)
+    voice = await asyncio.to_thread(
+        lambda: core.voices.create_blend(
+            name=body.name, blend=blend.key, voices=blend.to_dict()["voices"], model=model_id,
+            created_by=created_by(request, body.created_by), voice_id=body.id, language=blend.lead.language or None,
+            description=body.description,
+        )
+    )  # fmt: skip
+    core.events.publish("voice", {"id": voice.id, "event": "created"})
+    return JSONResponse(voice.to_dict(), status_code=201)
+
+
 @router.get("/api/v1/voices/{voice_id}", tags=["voices"], summary="One saved voice")
 async def get_voice(request: Request, voice_id: str) -> JSONResponse:
     return JSONResponse(get_core(request).voices.get(voice_id).to_dict())
@@ -269,13 +335,31 @@ class VoicePatch(BaseModel):
     description: str | None = None
     language: str | None = None
     transcript: str | None = None
-    default_model: str | None = Field(default=None, description="A model that clones voices; empty string clears it.")
+    default_model: str | None = Field(
+        default=None,
+        description="A model that clones voices (for a blend: one that blends voices); empty string clears it.",
+    )
+    blend: str | None = Field(default=None, description="Saved blends only: new voices and weights.")
 
 
 @router.patch("/api/v1/voices/{voice_id}", tags=["voices"], summary="Change a saved voice's details")
 async def patch_voice(request: Request, voice_id: str, body: VoicePatch) -> JSONResponse:
     core = get_core(request)
     changes = body.model_dump(exclude_unset=True)
+    current = core.voices.get(voice_id)
+    if current.is_blend:
+        if "default_model" in changes and not changes["default_model"]:
+            raise InvalidRequest("a blend keeps the model it is for", param="default_model")
+        if "blend" in changes or changes.get("default_model"):
+            model_id, blend = await check_blend(
+                core, changes.get("blend") or current.blend, changes.get("default_model") or current.default_model
+            )
+            changes.update(default_model=model_id, blend=blend.key, voices=blend.to_dict()["voices"])
+        voice = core.voices.update(voice_id, changes)
+        core.events.publish("voice", {"id": voice.id, "event": "updated"})
+        return JSONResponse(voice.to_dict())
+    if "blend" in changes:
+        raise InvalidRequest(f"'{current.id}' is a recording, not a blend", param="blend")
     if changes.get("default_model"):
         spec = core.resolve(changes["default_model"], "tts")
         if "voice-cloning" not in spec.features:
@@ -311,7 +395,8 @@ async def voice_score(
     thresholds, and the synthesis speed. ``audio=true`` also returns the clip as a data URL. The score is kept in
     the voice's ``scores``."""
     core = get_core(request)
-    core.voices.get(voice_id)
+    if core.voices.get(voice_id).is_blend:
+        raise InvalidRequest(f"'{voice_id}' is a saved blend: it has no recording to compare with", param="voice_id")
     return JSONResponse(await _score(core, voice_id, model, text, parse_bool(audio)))
 
 
