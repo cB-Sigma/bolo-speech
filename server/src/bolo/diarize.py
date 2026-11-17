@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import itertools
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -373,6 +373,10 @@ def turns_to_activity(
 CONDITIONING = ("turns", "probabilities")
 #: frame step of activity made from turns for conditioned recognition
 TURN_FRAME_S = 0.02
+#: a first turn that starts this soon is taken back to 0 s: with no one marked in the silent lead-in, the other
+#: speaker's stream took the first sentence (DiCoW on the demo's two-voice dialogue, whose speech starts at 0.17 s:
+#: B's text began with A's "good morning")
+LEAD_IN_S = 0.5
 
 
 def conditioning_activity(
@@ -391,6 +395,10 @@ def conditioning_activity(
     n_spk = max((t.speaker for t in turns), default=-1) + 1
     if mode == "probabilities" and activity is not None and activity.num_speakers == n_spk:
         return activity, "probabilities"
+    first = min(turns, key=lambda t: t.start, default=None)
+    if first is not None and 0.0 < first.start <= LEAD_IN_S:
+        # nobody is marked in a short silent lead-in, and the other speaker's stream then took the first sentence
+        turns = [replace(t, start=0.0) if t is first else t for t in turns]
     return turns_to_activity(turns, duration, frame_s=TURN_FRAME_S, num_speakers=n_spk), "turns"
 
 

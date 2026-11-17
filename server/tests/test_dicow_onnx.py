@@ -59,7 +59,8 @@ def test_stno_masks_match_the_reference_formula(speakers: int) -> None:
 
 
 def test_turns_give_the_reference_masks_on_its_20ms_grid() -> None:
-    turns = [SpeakerTurn(0.013, 1.23, 0), SpeakerTurn(1.01, 4.47, 1), SpeakerTurn(2.07, 3.011, 0)]
+    # the first turn starts after the lead-in (a start within it is taken back to 0 s, below)
+    turns = [SpeakerTurn(0.613, 1.23, 0), SpeakerTurn(1.01, 4.47, 1), SpeakerTurn(2.07, 3.011, 0)]
     activity, _ = conditioning_activity(turns, None, 5.0, "turns")
     ours = d.stno_masks(d.activity_at_mask_rate(activity.probs, activity.frame_s, 1500))
     diar = np.zeros((2, 1500))
@@ -70,6 +71,17 @@ def test_turns_give_the_reference_masks_on_its_20ms_grid() -> None:
     assert d.mask_frames(10 * SR) == 1500 and d.mask_frames(45 * SR) == 2250
     with pytest.raises(ValueError):
         d.activity_at_mask_rate(np.zeros(5, np.float32), 0.01, 10)
+
+
+def test_a_short_silent_lead_in_belongs_to_the_first_speaker() -> None:
+    """With nobody marked before the first turn, the other speaker's stream took the first sentence (the demo's
+    two-voice dialogue starts at 0.17 s): a first turn within the lead-in starts at 0 s; later ones do not move."""
+    turns = [SpeakerTurn(0.17, 3.23, 0), SpeakerTurn(4.26, 7.61, 1)]
+    activity, kind = conditioning_activity(turns, None, 8.0, "turns")
+    assert kind == "turns" and activity.probs[0, 0] == 1 and activity.probs[0, 1] == 0
+    assert activity.probs[round(4.0 / activity.frame_s), 1] == 0  # the second speaker's turn is unchanged
+    late, _ = conditioning_activity([SpeakerTurn(1.5, 3.0, 0)], None, 4.0, "turns")
+    assert late.probs[0, 0] == 0 and late.probs[round(1.6 / late.frame_s), 0] == 1
 
 
 def test_windows_pad_features_with_zeros_and_masks_with_silence() -> None:

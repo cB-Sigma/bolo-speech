@@ -28,6 +28,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- DiCoW: when a recording opened with a short silence (the demo's two-voice dialogue starts at 0.17 s), the
+  second speaker's text began with the first speaker's sentence ("good morning did you get a chance…"). A first
+  speaker turn that starts within 0.5 s now starts at 0 s for the speaker masks.
 - **Live transcription: "Good morning" after a burst of noise, and speech 40 dB down** (found on a Windows laptop
   with 0.6.3, the samples sent over `/api/v1/stt/stream` in 100 ms pieces: `zipformer-en-20m-streaming` gave "in
   could you tell me..." for en-short with an 80 ms burst 0.3 s before it, and "ular" at -40 dB, where Moonshine lost
