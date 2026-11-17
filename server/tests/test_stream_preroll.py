@@ -24,6 +24,7 @@ from bolo.streaming.session import (
     STTSession,
     aligned_preroll,
     better_start,
+    hush_before,
     lift_onset,
     room_level,
     sounding,
@@ -589,3 +590,73 @@ async def test_a_model_with_a_known_chunk_hears_each_utterance_from_two_pre_roll
     # two streams heard the utterance: about twice what one did
     one = BURST_SPEECH_AT + 2.0 - (BURST_SPEECH_AT - 0.4)
     assert model.heard / SR > 2 * one
+
+
+# -- the laptop's click before en-short (bolo 0.6.4: "ular good morning could you tell me") ---------------------------
+
+LAPTOP_SPEECH_AT = 0.88  # 0.5 s of digital silence, an 80 ms click, 0.3 s of digital silence, then the speech
+
+
+def laptop_click_then_speech(click: bool = True) -> np.ndarray:
+    """The Windows laptop's recipe: a Hann-windowed click of noise at 0.3, the speech 0.3 s after it, all after
+    digital silence; ``click=False``: the same without the click."""
+    n = int(0.08 * SR)
+    burst = np.random.default_rng(1).standard_normal(n) * 0.3 * np.hanning(n) * (1.0 if click else 0.0)
+    body = np.concatenate([speechlike(1.5), np.zeros(int(1.5 * SR))])
+    return np.concatenate([np.zeros(int(0.5 * SR)), burst, np.zeros(int(0.3 * SR)), body]).astype(np.float32)
+
+
+def test_hush_before_brings_a_click_before_the_speech_down_to_the_room() -> None:
+    audio = laptop_click_then_speech()
+    at = int(LAPTOP_SPEECH_AT * SR)
+    quiet = hush_before(audio, at, DIGITAL_SILENCE_DB)
+    assert not np.any(quiet[:at])  # after digital silence the click becomes digital silence too
+    assert np.array_equal(quiet[at:], audio[at:])  # the speech is left alone
+    # over a room at -70 dBFS: the click comes down to the room, the room is left as it is
+    room = noise(len(audio) / SR, -70.0, seed=4)
+    roomy = audio + room
+    db = room_level(roomy[: int(0.5 * SR)])
+    out = hush_before(roomy, at, db)
+    assert 20 * np.log10(speech_level(out[int(0.5 * SR) : int(0.58 * SR)])) < db + 3.0
+    assert np.array_equal(out[: int(0.48 * SR)], roomy[: int(0.48 * SR)])
+    assert np.array_equal(out[at:], roomy[at:])
+    # a quiet word (voiced) in the pre-roll, and a hiss right before the speech, are not bursts
+    worded = audio.copy()
+    worded[int(0.5 * SR) : int(0.8 * SR)] = speechlike(0.3) * 10 ** (-20 / 20)
+    assert np.array_equal(hush_before(worded, at, DIGITAL_SILENCE_DB), worded)
+    hissed = np.zeros_like(audio)
+    hissed[at - int(0.06 * SR) : at] = noise(0.06, -30.0, seed=5)
+    assert np.array_equal(hush_before(hissed, at, DIGITAL_SILENCE_DB), hissed)
+
+
+async def test_a_click_a_chunk_aligned_pre_roll_reaches_back_over_is_not_heard(
+    core: Bolo, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """en-short 0.3 s after an 80 ms click (the laptop's recipe): Silero reported the start on the speech, not the
+    click, but the main stream's pre-roll, lengthened to put the speech CHUNK_LEAD_S into an encoder chunk, began
+    0.65 s before the speech and so over the click, and the 20M Zipformer wrote "ular good morning". Both streams
+    now hear the same as without the click: digital silence before the speech."""
+    heard: list[np.ndarray] = []
+    accept = fake._FakeStream.accept
+
+    def recording(self: fake._FakeStream, samples: FloatArray) -> None:
+        heard.append(np.array(samples))
+        accept(self, samples)
+
+    monkeypatch.setattr(fake._FakeStream, "accept", recording)
+    add(core, "t-click", step_delay_s=0.005, preroll_s=0.5)
+    entry = await core.manager.load("t-click")
+    model = entry.model
+    assert isinstance(model, FakeStreamingSTT)
+    model.stream_chunk_s, model.stream_primed_s = 0.32, 1.0
+    results = []
+    for click in (True, False):
+        heard.clear()
+        scripted_vad(core, monkeypatch, [("speech_start", LAPTOP_SPEECH_AT + 0.08), ("speech_end", 2.9)])
+        messages, _ = await run_stream(core, "t-click", laptop_click_then_speech(click), chunk_ms=100, pace=0.1)
+        finals = [m for m in messages if m["type"] == "final"]
+        assert len(finals) == 1
+        # the main stream began before the click ended: its pre-roll reaches back over it
+        assert finals[0]["words"][0]["t0"] < 0.58
+        results.append((finals[0]["text"], [w["t0"] for w in finals[0]["words"]], [h.tobytes() for h in heard]))
+    assert results[0] == results[1]  # with the click, the recognisers heard and wrote exactly what they did without

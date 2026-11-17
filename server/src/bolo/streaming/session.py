@@ -89,6 +89,7 @@ VOICED_R = 0.5  # normalised autocorrelation at the pitch period that makes a fr
 PENDING_S = 0.5  # how long a fresh stream waits for a vowel after the VAD reports a start
 LEAD_BACK_S = 0.1  # how far before the start the VAD reported the speech's first vowel is looked for
 CHUNK_LEAD_S = 0.05  # where in an encoder chunk a first word is kept best (see aligned_preroll)
+BURST_GAP_S = 0.1  # sound with no vowel in it that ends this long before the speech is a burst, not its first word
 # Quiet input is raised for the VAD (only): see InputLevel
 VAD_SPEECH_DBFS = -30.0  # the loudest recent frame is raised to this
 VAD_ROOM_DBFS = -65.0  # the room is raised no higher than this: a microphone's own noise is not raised at all
@@ -660,6 +661,46 @@ def lift_onset(audio: FloatArray, a: int, b: int, heard: FloatArray) -> FloatArr
 STRAY_LETTER = re.compile(r"^'?[b-hj-z]$", re.IGNORECASE)
 
 
+def hush_before(audio: FloatArray, end: int, room_db: float) -> FloatArray:
+    """``audio`` with each burst of sound before ``audio[end]``, where the speech begins, brought down to the room
+    (``room_db``): a stretch of 20 ms frames (counted back from ``end``) louder than the room by ``ONSET_MARGIN_DB``
+    that ends ``BURST_GAP_S`` or more before the speech and has fewer than ``ONSET_VOICED_S`` of voiced frames in it;
+    after digital silence (``DIGITAL_SILENCE_DB``) it becomes digital silence. A quiet word (voiced) and the hiss that
+    starts the first word (right before it) are left alone. This is for a click or a burst of noise that the VAD did
+    not take for speech but a pre-roll lengthened to an encoder chunk reached back over: the 20M Zipformer heard an
+    80 ms click 0.3 s before en-short and wrote "ular good morning"; at the room's level it is gone ("good morning"),
+    while brought down only to -90 dBFS after digital silence it still gave "ul"."""
+    end = min(end, len(audio))
+    n = end // FRAME
+    if n == 0:
+        return audio
+    a = end - n * FRAME
+    db = 20.0 * np.log10(frame_rms(audio[a:end]) + 1e-9)
+    loud = db > max(room_db + ONSET_MARGIN_DB, ONSET_FLOOR_DB)
+    last = n - int(BURST_GAP_S * SR) // FRAME  # stretches ending before this frame are far enough from the speech
+    if last <= 0 or not np.any(loud[:last]):
+        return audio
+    vowels = voiced(audio[a:end])
+    need = int(ONSET_VOICED_S * SR) // FRAME
+    out = np.array(audio, dtype=np.float32)
+    frames = out[a:end].reshape(n, FRAME)
+    k = 0
+    while k < n:
+        if not loud[k]:
+            k += 1
+            continue
+        j = k
+        while j < n and loud[j]:
+            j += 1
+        if j <= last and int(np.sum(vowels[k:j])) < need:  # [k, j): a burst, not a word
+            if room_db <= DIGITAL_SILENCE_DB:
+                frames[k:j] = 0.0
+            else:
+                frames[k:j] *= (10.0 ** ((room_db - db[k:j]) / 20.0)).astype(np.float32)[:, None]
+        k = j
+    return out
+
+
 def without_stray_letter(text: str, words: list[Word]) -> tuple[str, list[Word]]:
     """``text`` and its ``words`` without a stray letter at the start (:data:`STRAY_LETTER`)."""
     head, _, rest = text.partition(" ")
@@ -869,8 +910,9 @@ class _NativeProcessor(_Processor):
         the start on a burst of noise or a click before the speech: the stream opens once the audio held has the
         speech's voiced frames in it (:func:`speech_lead`), ``PENDING_S`` after the reported start without them, or
         (``force``) when the VAD hears the speech end. The pre-roll is made just long enough that the speech falls
-        where the recogniser's encoder chunks keep a first word (:func:`aligned_preroll`). What was heard after the
-        reported start sets the utterance's gain."""
+        where the recogniser's encoder chunks keep a first word (:func:`aligned_preroll`), and the sound before the
+        speech in it is brought down to the room (:func:`hush_before`). What was heard after the reported start sets
+        the utterance's gain."""
         pre = self.preroll
         assert pre is not None and self.pending is not None
         speech_at = min(self.pending, pre.end)
@@ -895,6 +937,7 @@ class _NativeProcessor(_Processor):
             audio = np.concatenate([np.zeros(start - lowest, dtype=np.float32), audio])
         heard = sounding(audio[speech_at - lowest :], room)
         audio = lift_onset(audio, first - lowest, speech_at - lowest, heard)
+        audio = hush_before(audio, first - lowest, room)
         if self.target_dbfs is not None:
             self.gain = speech_gain(heard, self.target_dbfs)
         self.stream.restart()

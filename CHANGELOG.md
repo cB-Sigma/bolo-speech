@@ -10,6 +10,30 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 - Every ONNX Runtime session printed "Config with key [session.x64quantprecision] already exists" to the console:
   the exact-int8 option was set twice (by `session_options()` and again by `create_session`). It is set once.
+- **Live transcription: a junk "ular" before "good morning" after a click** (found on a Windows laptop with 0.6.4:
+  en-short sent over `/api/v1/stt/stream` with an 80 ms Hann-windowed burst of noise at 0.3 peak, 0.3 s before the
+  speech, gave "ular good morning could you tell me when my order will arrive" with `zipformer-en-20m-streaming`).
+  Silero reported the start on the speech, not on the click, but the pre-roll lengthened to put the speech 0.05 s
+  into an encoder chunk began 0.65 s before the speech and so took the click in, and so did the second stream's
+  (0.5 s before the reported start); the chunk-aligned decode made "ular" of it and, having more words before the two
+  first agreed, was taken. A burst in the pre-roll (sound above the room with no voiced frames in it, ending 0.1 s or
+  more before the speech) is now brought down to the room before either stream hears it, to digital silence after
+  digital silence (brought down only to -90 dBFS, it still gave "ul"); a quiet first word and the hiss that starts a
+  word are left alone. The laptop's recipe, seeds 1-3, sends of 20, 100 and 250 ms: "good morning" first in 3 of 9
+  takes before ("ular good morning" 3, "in could you" 3), 6 of 9 now; the three left are the 250 ms sends, which give
+  "in could you" without the click as well. `tools/measure_stream_onset.py`, 252 takes per model, before -> now:
+  Zipformer first word right 150 -> 150, stray tokens 0 -> 0, WER 0.100 -> 0.101 (three takes changed: en-long after
+  a burst without a room right now, over a room at -60 dBFS "servers are" now; one quiet first word "ul could you" ->
+  "tell me"); Moonshine 192 -> 192, 2 -> 2, 0.062 -> 0.062, every transcript the same.
+- `bolo ps` and the placement of `nemotron-3-diarization` on DirectML said "100% GPU" with no notice although part
+  of the graph runs on the CPU. From ONNX Runtime's kernel lists (OperatorKernels.md and DirectML's operator
+  registrations, 1.18 to 1.24.4, the DirectML package's latest), DirectML has kernels for every operator in the int8
+  graph but one: its 127 MatMulNBits nodes (8 bits, block 32, no g_idx or bias) pass DirectML's support check, as do
+  RotaryEmbedding and SkipLayerNormalization, but Gelu is registered only in the com.microsoft domain, so the graph's
+  31 ONNX Gelu nodes (opset 20) run on the CPU between the GPU's parts. The weights are all on the GPU, so the
+  placement stays "100% GPU" (it counts bytes) and its notice now says that the Gelu nodes run on the CPU. The same
+  diarization to every printed digit on CPU and DirectML does not by itself show that the graph ran on the CPU:
+  speaker activity is thresholded frame by frame, and small float differences need not move anything printed.
 
 ## [0.6.4] - 2026-11-17
 
