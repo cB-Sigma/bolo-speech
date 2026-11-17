@@ -9,7 +9,15 @@ from pathlib import Path
 import numpy as np
 import pytest
 from bolo.catalog import Catalog
-from bolo.engines.base import DiarizationModel, LoadOptions, SeparationModel, TTSModel
+from bolo.engines.base import (
+    ConversationRequest,
+    ConversationTurn,
+    DiarizationModel,
+    LoadOptions,
+    SeparationModel,
+    SpeechToSpeechModel,
+    TTSModel,
+)
 from bolo.errors import GatedModel, InvalidRequest
 from bolo.plugin.host import PluginConfig, PluginEngine
 
@@ -34,7 +42,9 @@ def test_hello_and_tts_through_the_host(engine: PluginEngine, tmp_path: Path) ->
     model = engine.load("parler-tts", "tts", tmp_path, {"voices": voices, "model_id": "x"}, LoadOptions(threads=1))
     assert isinstance(model, TTSModel)
     assert engine.process.hello["name"] == "torch" and engine.process.hello["protocol"] == 1
-    assert engine.process.hello["kinds"] == ["parler-tts", "sepformer", "gated", "dicow", "pyannote-diarization"]
+    assert engine.process.hello["kinds"] == [
+        "parler-tts", "sepformer", "gated", "dicow", "pyannote-diarization", "qwen-omni",
+    ]  # fmt: skip
     assert model.sample_rate == 44100 and [v.id for v in model.voices] == ["divya", "rohit"]
     chunks = list(model.synthesize("पहला वाक्य। दूसरा वाक्य।", "rohit"))
     assert len(chunks) == 2 and all(c.dtype == np.float32 for c in chunks)
@@ -77,11 +87,28 @@ def test_diarization_through_the_host(engine: PluginEngine, tmp_path: Path) -> N
     model.close()
 
 
+def test_speech_to_speech_through_the_host(engine: PluginEngine, tmp_path: Path) -> None:
+    opts = LoadOptions(threads=1, device="cpu")
+    model = engine.load("qwen-omni", "speech-to-speech", tmp_path, {"family": "qwen3-omni"}, opts)
+    assert isinstance(model, SpeechToSpeechModel) and model.sample_rate == 24000 and not model.supports_tools
+    assert [v.id for v in model.voices] == ["Ethan", "Chelsie", "Aiden"]
+    turns = [ConversationTurn("user", audio=tone(1.0)), ConversationTurn("assistant", text="Hi."),
+             ConversationTurn("user", text="And?")]  # fmt: skip
+    chunks = list(model.respond(ConversationRequest(turns, voice="aiden")))
+    assert len(chunks) == 1 and chunks[0].text == "w7 w8 w9"
+    assert chunks[0].audio is not None and len(chunks[0].audio) == 12000 and chunks[0].audio.dtype == np.float32
+    with pytest.raises(InvalidRequest, match="unknown voice"):
+        list(model.respond(ConversationRequest(turns, voice="nobody")))
+    model.close()
+
+
 def test_errors_keep_their_meaning(engine: PluginEngine, tmp_path: Path) -> None:
     with pytest.raises(GatedModel, match="accept its conditions"):
         engine.load("gated", "tts", tmp_path, {}, LoadOptions())
     with pytest.raises(InvalidRequest, match="cannot load SraVaani"):
         engine.load("sravaani", "stt", tmp_path, {}, LoadOptions())
+    with pytest.raises(InvalidRequest, match="full-duplex"):
+        engine.load("moshi", "speech-to-speech", tmp_path, {}, LoadOptions())
     with pytest.raises(InvalidRequest, match="has no model kind"):
         engine.load("nope", "tts", tmp_path, {}, LoadOptions())
     model = engine.load("parler-tts", "tts", tmp_path, {}, LoadOptions())

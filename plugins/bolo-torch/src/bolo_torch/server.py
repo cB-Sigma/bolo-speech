@@ -45,6 +45,8 @@ class TorchServer(_Server):
                 self.separation(rid, op, message, payload)
             elif op in ("diarize", "embed") and hasattr(self, "diarization"):  # bolo 0.6.7 and later
                 self.diarization(rid, op, message, payload)
+            elif op == "respond" and hasattr(self, "respond"):  # bolo 0.6.7 and later
+                self.respond(rid, message, payload)
             else:
                 self.fail(rid, "unknown_op", f"unknown op {op!r}")
         except Exception as exc:

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "bolo-torch"
 dynamic = ["version"]
-description = "PyTorch engine plugin for the bolo speech server: Indic Parler-TTS, IndicF5 and F5-TTS, Veena, Svara, Indic-Speak, SepFormer, pyannote PixIT and DiCoW diarization-conditioned recognition, run out of process."
+description = "PyTorch engine plugin for the bolo speech server: Indic Parler-TTS, IndicF5 and F5-TTS, Veena, Svara, Indic-Speak, SepFormer, pyannote PixIT and DiCoW diarization-conditioned recognition, Qwen-Omni speech-to-speech, run out of process."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
@@ -63,6 +63,9 @@ dicow = ["transformers>=4.55.0,<4.56", "pandas"]
 # Demucs denoiser (facebookresearch/denoiser; code and weights CC-BY-NC-4.0, not for commercial use). Only its model
 # class is used: `pip install --no-deps denoiser julius` avoids the training dependencies (hydra 0.11, sounddevice)
 demucs-denoiser = ["denoiser>=0.1.5", "julius"]
+# Qwen2.5-Omni (transformers 4.52+) and Qwen3-Omni (4.57+) as speech-to-speech models, with transformers' own model
+# classes (no remote code). The processors' video part imports torchvision; accelerate splits large models.
+omni = ["transformers>=4.57", "accelerate>=0.33", "torchvision"]
 dev = ["pytest>=8", "pytest-timeout>=2.3", "ruff>=0.8", "mypy>=1.13", "build", "twine"]
 
 [project.scripts]

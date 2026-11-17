@@ -29,6 +29,7 @@ LOADERS: dict[str, tuple[str, str]] = {
     "dicow": ("bolo_torch.models.dicow", "load"),
     "pyannote-diarization": ("bolo_torch.models.diarization", "load"),
     "demucs-denoiser": ("bolo_torch.models.denoise", "load_demucs"),
+    "qwen-omni": ("bolo_torch.models.omni", "load"),
 }
 #: kinds the catalog lists for this plugin that are not implemented yet
 NOT_IMPLEMENTED = {
@@ -39,6 +40,12 @@ NOT_IMPLEMENTED = {
     "maskgct": "MaskGCT (no packaged inference code)",
     "clearvoice": "ClearVoice speech enhancement (FRCRN, MossFormer2, MossFormerGAN)",
     "resemble-enhance": "Resemble Enhance",
+    "moshi": "Moshi (full-duplex: it listens and speaks at once, frame by frame, which the turn-based respond op "
+    "cannot carry)",
+    "glm-4-voice": "GLM-4-Voice (its speech tokenizer and decoder live in the GLM-4-Voice repository, not a package)",
+    "minicpm-o": "MiniCPM-o (its model code runs only as trust_remote_code, which bolo-torch does not run)",
+    "step-audio-2": "Step-Audio 2 (its inference code and token2wav decoder live in the Step-Audio2 repository)",
+    "kimi-audio": "Kimi-Audio (it needs the kimia_infer code of the Kimi-Audio repository and flash-attn)",
 }
 
 

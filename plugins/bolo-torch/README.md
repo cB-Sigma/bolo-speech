@@ -26,6 +26,9 @@ the console, the OpenAI-compatible API) works as for bolo's own engines.
 | `pyannote-speaker-diarization-community-1` | diarization | pyannote `speaker-diarization-community-1` (VBx clustering) | `pyannote` | CC-BY-4.0 | yes | CPU, see below |
 | `dicow-v3.3` | STT, diarization-conditioned | BUT-FIT DiCoW v3.3: Whisper large-v3-turbo told who talks when | `dicow` | CC-BY-4.0 | no | CPU, see below |
 | `se-dicow` | STT, diarization-conditioned | BUT-FIT SE-DiCoW: DiCoW with self-enrolment | `dicow` | Apache-2.0 | no | CPU, see below |
+| `qwen2.5-omni-3b-torch` | speech-to-speech | Qwen2.5-Omni 3B, text and speech out (voices Chelsie, Ethan) | `omni` | Qwen Research License (non-commercial) | no | **no** (fakes only) |
+| `qwen2.5-omni-7b-torch` | speech-to-speech | Qwen2.5-Omni 7B | `omni` | Apache-2.0 | no | **no** (fakes only) |
+| `qwen3-omni-30b-a3b-instruct-torch` | speech-to-speech | Qwen3-Omni 30B-A3B Instruct, speech out in 10 languages (voices Ethan, Chelsie, Aiden) | `omni` | Apache-2.0 | no | **no** (fakes only) |
 
 The separation models are bolo `separation` models in "blind" mode: bolo uses them for `separate_overlaps=true`
 on diarized transcription and on `POST /api/v1/diarize`, and assigns their tracks to its own diarized speakers.
@@ -46,7 +49,18 @@ ordinary (slow) Whisper. See "DiCoW" below and docs/models.md, "Diarization-cond
 DiCoW v3.3 also runs without PyTorch, in bolo's own process, as the catalog entry `dicow-v3.3-onnx`
 (docs/models.md, "DiCoW without PyTorch").
 
-The catalog also lists `sravaani-1.0` and `indicconformer-600m-official` for this plugin. bolo-torch does
+The Qwen-Omni models are bolo `speech-to-speech` models, behind the Realtime API's `speech-to-speech` pipeline
+(`s2s_model = "qwen2.5-omni-3b-torch"`), over the protocol's `respond` op (bolo 0.6.7 or later): bolo sends the whole
+conversation each turn (the user's turns as 16 kHz audio, the model's earlier answers as text) and the plugin runs
+the processor's chat template and `generate` with the Talker on (transformers' own `Qwen2_5OmniForConditionalGeneration`
+and `Qwen3OmniMoeForConditionalGeneration`, no remote code). Qwen2.5-Omni gets the system prompt it needs for
+speech ("You are Qwen, a virtual human ...") with the session's instructions after it. The answer, text and 24 kHz
+speech, comes back in one piece when generation ends; tools are not passed. None of them was run here: the
+downloads are 12 to 70 GB.
+
+The catalog also lists `sravaani-1.0` and `indicconformer-600m-official` for this plugin, and the speech-to-speech
+models `moshiko-pytorch-bf16` / `moshika-pytorch-bf16` (full-duplex), `glm-4-voice-9b`, `minicpm-o-2.6`,
+`step-audio-2-mini` and `kimi-audio-7b-instruct` (each with the reason it cannot run yet). bolo-torch does
 not implement them yet; loading one answers `400 invalid_request` saying so.
 
 ### How each family runs
@@ -158,8 +172,9 @@ pip install ./server "./plugins/bolo-torch[parler,sepformer]"
 Extras: `parler` (Parler-TTS), `f5` (IndicF5), `f5-original` (the original F5-TTS checkpoints, on the `f5-tts`
 package, which pins its own libraries: give it its own environment), `indic-speak` (transformers 5 and SNAC),
 `orpheus` (Veena, Svara), `sepformer`, `pyannote` (PixIT, pyannote speaker diarization),
-`dicow` (DiCoW, SE-DiCoW: transformers 4.55 and pandas). DiCoW uses the plugin
-protocol's `speakers` request (bolo 0.2.0 or later).
+`dicow` (DiCoW, SE-DiCoW: transformers 4.55 and pandas), `omni` (Qwen2.5-Omni and Qwen3-Omni: transformers 4.57
+or later, accelerate, torchvision). DiCoW uses the plugin protocol's `speakers` request (bolo 0.2.0 or later), the
+Qwen-Omni models its `respond` request (bolo 0.6.7 or later).
 Installed in bolo's environment, the plugin is found through its entry point (`bolo.engines: torch`) and
 `bolo doctor` lists `plugin:torch`. Check the plugin's own environment with `bolo-torch doctor`.
 

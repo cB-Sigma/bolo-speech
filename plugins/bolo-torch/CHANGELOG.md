@@ -11,6 +11,14 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
   the protocol's new `denoise` op (needs a bolo that sends it). Code and weights are CC-BY-NC-4.0: not for commercial
   use. `pip install --no-deps denoiser julius` is enough (the package's other dependencies are for training).
 - `clearvoice` and `resemble-enhance` kinds are known and answer that they are not implemented yet.
+- **Qwen2.5-Omni and Qwen3-Omni as speech-to-speech models** (`kind: qwen-omni`, `omni` extra): the catalog's
+  `qwen2.5-omni-3b-torch` (Qwen Research License, non-commercial), `qwen2.5-omni-7b-torch` and
+  `qwen3-omni-30b-a3b-instruct-torch` (Apache-2.0), served through the protocol's new `respond` op (needs a bolo that
+  sends it): the whole conversation in (turns as 16 kHz audio or text), the answer's text and 24 kHz speech out in
+  one piece, the model's voices, Qwen2.5-Omni's required system prompt before the session's instructions;
+  transformers' own model classes, no remote code. Tested with fake model objects only; no real model was run.
+- Model kinds `moshi`, `glm-4-voice`, `minicpm-o`, `step-audio-2` and `kimi-audio` are known and answer that they
+  cannot be loaded yet, with the reason (full-duplex; remote code only; no packaged inference code).
 - **pyannote speaker diarization** (`kind: pyannote-diarization`, `pyannote` extra): `pyannote-speaker-diarization-3.1`
   and `pyannote-speaker-diarization-community-1` as bolo `diarization` models, served through the protocol's new
   `diarize` and `embed` ops (needs a bolo that sends them). Turns in bolo's format, `num_speakers` from the request,
