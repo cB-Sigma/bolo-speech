@@ -698,8 +698,7 @@ class SherpaTTS(TTSModel):
                 return self._blend_tts, self._blend_slots[key]
             voices_file = Path(self._cfg["kokoro"].voices)
             rows = max(1, self.num_speakers)
-            table = np.fromfile(voices_file, dtype=np.float32)
-            table = table.reshape(rows, -1)
+            table = np.fromfile(voices_file, dtype=np.float32).reshape(rows, -1)
             if key not in self._blends:
                 if len(self._blends) >= rows:
                     old, _ = self._blends.popitem(last=False)

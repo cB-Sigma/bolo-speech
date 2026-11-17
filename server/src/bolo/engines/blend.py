@@ -15,6 +15,7 @@ import difflib
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -58,7 +59,7 @@ class Blend:
                 best = part
         return best[0]
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {"blend": self.key, "voices": [{"voice": v.id, "weight": round(w, 4)} for v, w in self.parts]}
 
 

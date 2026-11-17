@@ -364,7 +364,7 @@ class VoiceStore:
         if (path / REFERENCE).is_file():
             return True
         try:
-            return json.loads((path / METADATA).read_text(encoding="utf-8")).get("kind") == BLEND
+            return bool(json.loads((path / METADATA).read_text(encoding="utf-8")).get("kind") == BLEND)
         except (ValueError, OSError, AttributeError):
             return False
 
