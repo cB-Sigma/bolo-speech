@@ -53,6 +53,18 @@ CPU_ONLY_ON: dict[tuple[str, str], dict[str, str]] = {
         "with 8007023E, on every adapter); it is 8 MB and takes 13-39 ms on the CPU",
     },
 }
+#: (engine, kind) -> device families that run such a model's weights but leave some of its nodes to the CPU, and
+#: which: the placement stays on the accelerator (all the weights are there) and says so in its notice
+#: (:func:`partly_on_cpu`). From ONNX Runtime's kernel lists (docs/OperatorKernels.md and DirectML's operator
+#: registrations, 1.18 to 1.24): DirectML registers 8-bit MatMulNBits (the int8 graph's 127 matrix products, K a whole
+#: number of blocks, no g_idx or bias), RotaryEmbedding and SkipLayerNormalization, but Gelu only in the
+#: com.microsoft domain, not the ONNX Gelu (opset 20) the Nemotron graph has
+PARTLY_ON_CPU_ON: dict[tuple[str, str], dict[str, str]] = {
+    ("onnxruntime", "nemotron_diarization"): {
+        "dml": "DirectML has no kernel for the ONNX Gelu in its graph, so its 31 Gelu nodes run on the CPU between "
+        "the GPU's parts (the matrix products, attention and the rest run on the GPU)",
+    },
+}
 #: model kinds of the onnxruntime engine made of several graphs, placed graph by graph
 GRAPH_KINDS = ("dicow_onnx", "lfm3_audio_onnx")
 #: share of a llama.cpp model's size added for its KV cache and compute buffers when offloading layers
@@ -72,6 +84,11 @@ def family(device: str | None) -> str:
     if name == "directml":
         return "dml"
     return name or "cpu"
+
+
+def partly_on_cpu(engine_id: str, kind: str, device: str) -> str | None:
+    """What of a model of ``kind`` placed on ``device`` still runs on the CPU (:data:`PARTLY_ON_CPU_ON`), or None."""
+    return PARTLY_ON_CPU_ON.get((engine_id, kind), {}).get(family(device))
 
 
 def engine_families(engine_id: str) -> frozenset[str]:

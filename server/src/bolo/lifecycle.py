@@ -58,6 +58,7 @@ from bolo.placement import (
     family,
     gguf_block_count,
     operator_layers,
+    partly_on_cpu,
     plan,
     plan_spread,
     processor,
@@ -509,11 +510,16 @@ class ModelManager:
             with contextlib.suppress(Exception):
                 graphs = engine.graphs(spec.kind, path, spec.options) if engine is not None else None
         _, _, idx = device.partition(":")
-        return self._finish(plan(
+        p = self._finish(plan(
             model_id=spec.id, engine_id=spec.engine, requested=requested, device=device, split=split,
             need_bytes=need, available_bytes=available, layers=layers, graphs=graphs, operator_ngl=op_ngl,
             device_index=int(idx) if idx.isdigit() else 0, onnx_split=self.onnx_split_allowed(spec),
         ))  # fmt: skip
+        part = partly_on_cpu(spec.engine, spec.kind, p.device) if p.gpu_bytes > 0 else None
+        if part:  # "100% GPU" counts the weights: say what runs on the CPU all the same
+            part = f"'{spec.id}' on {p.device}: {part}"
+            p.notice = f"{p.notice}; {part}" if p.notice else part
+        return p
 
     @staticmethod
     def _finish(p: Placement) -> Placement:

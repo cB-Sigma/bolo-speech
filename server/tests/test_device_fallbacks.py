@@ -136,6 +136,20 @@ async def test_the_turn_model_is_placed_on_the_cpu_with_dml(settings: Settings) 
     assert (await m.place(other)).device == "dml"
 
 
+async def test_nemotron_on_dml_says_its_gelu_nodes_run_on_the_cpu(settings: Settings) -> None:
+    # DirectML runs the int8 graph's MatMulNBits (8-bit) but has no kernel for the ONNX Gelu (opset 20): the weights
+    # are all on the GPU ("100% GPU" by bytes) and the notice says what runs on the CPU all the same
+    nemo = spec("nemo", "onnxruntime", "nemotron_diarization", task="diarization")
+    p = await manager(settings, "dml").place(nemo)
+    assert p.device == "dml" and p.processor() == "100% GPU"
+    assert "Gelu" in (p.notice or "") and "CPU" in (p.notice or "") and "'nemo' on dml" in (p.notice or "")
+    assert "Gelu" in ((await manager(settings, "dml:1").place(nemo)).notice or "")
+    # on CUDA every node has a kernel; other ONNX Runtime models on DirectML say nothing
+    assert (await manager(settings, "cuda:0").place(nemo)).notice is None
+    other = spec("dicow", "onnxruntime", "dicow_onnx")
+    assert "Gelu" not in ((await manager(settings, "dml").place(other)).notice or "")
+
+
 def test_a_runtime_failure_on_an_accelerator_moves_the_turn_model_to_the_cpu_once(
     turn_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
