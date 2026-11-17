@@ -75,6 +75,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   equal error rate on LibriSpeech 0.6 % for ERes2Net (the default, unchanged), 0 % for `campplus-zh-en` and
   `titanet-small`, 1.3 % for ECAPA-TDNN, 3.3 % for WeSpeaker ResNet34; the two VoxCeleb CAM++ exports were close to
   chance (docs/models.md, "Speaker embedding").
+- **Live demo: the repetition guard for the recognisers in the page.** Finals of the in-browser recogniser go
+  through the server's repetition guard (`max_repeats`, default 4, `0` off): a phrase repeated back to back more
+  often than that, inside one final or running on from the finals before it, is cut to one copy, and a final that
+  only repeats earlier ones comes out empty. The limit is chosen in the new "Before and after recognition" panel on
+  Speech to text (kept in the browser), which also says how many repeated words a session lost. The guard and the
+  text-language detector (`bolo.text.langdetect`) are ported to TypeScript and held to the server's answers by unit
+  tests over the server's own test cases and a corpus (`ui/scripts/parity/export_cases.py` writes them).
 - **More denoisers, chosen and pulled like any other model** (`denoise=<model id>` on transcriptions, Realtime
   sessions, pins and the `denoise` setting; `bolo list`, `bolo pull`, recommendations). Every entry states its licence;
   non-commercial ones are in, marked. Runnable: **DPDFNet** (Ceva, Apache-2.0; `dpdfnet-baseline`, `dpdfnet2`,

@@ -19,6 +19,8 @@ export interface Prefs {
   modelsSort: 'default' | 'fit'
   /** The first-run "Pick for me" prompt was dismissed. */
   pickDismissed: boolean
+  /** In-browser recogniser: the repetition guard's `max_repeats` (0: off), as on the server. */
+  browserMaxRepeats: number
 }
 
 const KEY = 'bolo.prefs'
@@ -35,6 +37,7 @@ const defaults: Prefs = {
   modelsView: 'cards',
   modelsSort: 'default',
   pickDismissed: false,
+  browserMaxRepeats: 4,
 }
 
 export function readPrefs(): Prefs {

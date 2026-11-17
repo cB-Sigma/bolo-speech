@@ -27,6 +27,7 @@ import { Panel, Readout } from '@/components/panel'
 import { DevicePanel } from '@/components/model-fit'
 import { DownloadsPanel, InterruptedLoadNotice } from '@/components/downloads-panel'
 import { BrowserEnginePanel } from '@/components/stt/engine-panel'
+import { BrowserProcessingPanel } from '@/components/stt/browser-processing'
 import { BrowserModelPicker, LanguageSelect, SwitchModelDialog } from '@/components/stt/language-controls'
 import { MicHelpPanel, MicStatusLine } from '@/components/stt/mic-help'
 import { LoadProgress, LoadTrouble, ModelStatusChip } from '@/components/stt/model-status'
@@ -1004,6 +1005,7 @@ export default function SttPage() {
             )}
           </Panel>
 
+          {mode !== 'server' && <BrowserProcessingPanel disabled={running} removed={browserState.repeatsRemoved} />}
           {mode !== 'server' && <DownloadsPanel />}
           {mode !== 'server' && <DevicePanel />}
           {mode !== 'server' && (

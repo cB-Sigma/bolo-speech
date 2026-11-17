@@ -35,6 +35,8 @@ export interface TranscriptState {
   backend: string | null
   /** Median websocket ping round trip (server mode only). */
   rttMs: number | null
+  /** Words the repetition guard removed from finals (in-browser recogniser). */
+  repeatsRemoved?: number
 }
 
 export const emptyTranscript = (): TranscriptState => ({

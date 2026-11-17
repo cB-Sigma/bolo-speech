@@ -1,0 +1,1220 @@
+{
+  "langdetect": [
+    {
+      "text": "नमस्ते, आप कैसे हैं? मैं ठीक हूँ।",
+      "expect": {
+        "language": "hi",
+        "script": "Devanagari"
+      },
+      "source": "server-test",
+      "language": "hi",
+      "script": "Devanagari",
+      "confidence": 0.85,
+      "alternatives": ["mr", "ne", "mai", "bho", "sa", "kok", "doi", "brx", "mag", "hne"],
+      "reason": "words"
+    },
+    {
+      "text": "मी घरी आहे आणि तुम्ही कुठे आहात?",
+      "expect": {
+        "language": "mr",
+        "script": "Devanagari"
+      },
+      "source": "server-test",
+      "language": "mr",
+      "script": "Devanagari",
+      "confidence": 0.85,
+      "alternatives": ["hi", "ne", "mai", "bho", "sa", "kok", "doi", "brx", "mag", "hne"],
+      "reason": "words"
+    },
+    {
+      "text": "म घर जान्छु। यो राम्रो छ।",
+      "expect": {
+        "language": "ne",
+        "script": "Devanagari"
+      },
+      "source": "server-test",
+      "language": "ne",
+      "script": "Devanagari",
+      "confidence": 0.85,
+      "alternatives": ["hi", "mr", "mai", "bho", "sa", "kok", "doi", "brx", "mag", "hne"],
+      "reason": "words"
+    },
+    {
+      "text": "मैं कल office जा रहा हूँ",
+      "expect": {
+        "language": "hi",
+        "script": "Devanagari"
+      },
+      "source": "server-test",
+      "language": "hi",
+      "script": "Devanagari",
+      "confidence": 0.85,
+      "alternatives": ["mr", "ne", "mai", "bho", "sa", "kok", "doi", "brx", "mag", "hne"],
+      "reason": "words"
+    },
+    {
+      "text": "வணக்கம், எப்படி இருக்கிறீர்கள்?",
+      "expect": {
+        "language": "ta",
+        "script": "Tamil"
+      },
+      "source": "server-test",
+      "language": "ta",
+      "script": "Tamil",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "আমি ভাত খাই",
+      "expect": {
+        "language": "bn",
+        "script": "Bengali"
+      },
+      "source": "server-test",
+      "language": "bn",
+      "script": "Bengali",
+      "confidence": 0.75,
+      "alternatives": ["as", "mni"],
+      "reason": ""
+    },
+    {
+      "text": "মই ভাত খাওঁ, তুমি কি কৰা?",
+      "expect": {
+        "language": "as",
+        "script": "Bengali"
+      },
+      "source": "server-test",
+      "language": "as",
+      "script": "Bengali",
+      "confidence": 0.75,
+      "alternatives": ["bn", "mni"],
+      "reason": "letters"
+    },
+    {
+      "text": "ਸਤ ਸ੍ਰੀ ਅਕਾਲ",
+      "expect": {
+        "language": "pa",
+        "script": "Gurmukhi"
+      },
+      "source": "server-test",
+      "language": "pa",
+      "script": "Gurmukhi",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "કેમ છો?",
+      "expect": {
+        "language": "gu",
+        "script": "Gujarati"
+      },
+      "source": "server-test",
+      "language": "gu",
+      "script": "Gujarati",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "నమస్కారం",
+      "expect": {
+        "language": "te",
+        "script": "Telugu"
+      },
+      "source": "server-test",
+      "language": "te",
+      "script": "Telugu",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "ನಮಸ್ಕಾರ",
+      "expect": {
+        "language": "kn",
+        "script": "Kannada"
+      },
+      "source": "server-test",
+      "language": "kn",
+      "script": "Kannada",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "നമസ്കാരം",
+      "expect": {
+        "language": "ml",
+        "script": "Malayalam"
+      },
+      "source": "server-test",
+      "language": "ml",
+      "script": "Malayalam",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "ନମସ୍କାର",
+      "expect": {
+        "language": "or",
+        "script": "Oriya"
+      },
+      "source": "server-test",
+      "language": "or",
+      "script": "Oriya",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "مرحبا كيف حالك",
+      "expect": {
+        "language": "ar",
+        "script": "Arabic"
+      },
+      "source": "server-test",
+      "language": "ar",
+      "script": "Arabic",
+      "confidence": 0.75,
+      "alternatives": ["ur", "fa", "ps", "sd", "ks"],
+      "reason": ""
+    },
+    {
+      "text": "آپ کیسے ہیں؟ میں ٹھیک ہوں",
+      "expect": {
+        "language": "ur",
+        "script": "Arabic"
+      },
+      "source": "server-test",
+      "language": "ur",
+      "script": "Arabic",
+      "confidence": 0.75,
+      "alternatives": ["ar", "fa", "ps", "sd", "ks"],
+      "reason": "letters"
+    },
+    {
+      "text": "Привет, как дела? Это хорошо.",
+      "expect": {
+        "language": "ru",
+        "script": "Cyrillic"
+      },
+      "source": "server-test",
+      "language": "ru",
+      "script": "Cyrillic",
+      "confidence": 0.85,
+      "alternatives": ["uk", "bg", "sr", "be", "mk", "kk"],
+      "reason": "words"
+    },
+    {
+      "text": "Привіт, як справи? Це добре.",
+      "expect": {
+        "language": "uk",
+        "script": "Cyrillic"
+      },
+      "source": "server-test",
+      "language": "uk",
+      "script": "Cyrillic",
+      "confidence": 0.75,
+      "alternatives": ["ru", "bg", "sr", "be", "mk", "kk"],
+      "reason": "letters"
+    },
+    {
+      "text": "こんにちは、元気ですか",
+      "expect": {
+        "language": "ja",
+        "script": "Kana"
+      },
+      "source": "server-test",
+      "language": "ja",
+      "script": "Kana",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "今日は東京へ行きます",
+      "expect": {
+        "language": "ja",
+        "script": "Kana"
+      },
+      "source": "server-test",
+      "language": "ja",
+      "script": "Kana",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "你好，今天天气很好",
+      "expect": {
+        "language": "zh",
+        "script": "Han"
+      },
+      "source": "server-test",
+      "language": "zh",
+      "script": "Han",
+      "confidence": 0.8,
+      "alternatives": ["yue", "ja"],
+      "reason": ""
+    },
+    {
+      "text": "안녕하세요, 반갑습니다",
+      "expect": {
+        "language": "ko",
+        "script": "Hangul"
+      },
+      "source": "server-test",
+      "language": "ko",
+      "script": "Hangul",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "สวัสดีครับ",
+      "expect": {
+        "language": "th",
+        "script": "Thai"
+      },
+      "source": "server-test",
+      "language": "th",
+      "script": "Thai",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Γεια σου, τι κάνεις;",
+      "expect": {
+        "language": "el",
+        "script": "Greek"
+      },
+      "source": "server-test",
+      "language": "el",
+      "script": "Greek",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "שלום, מה שלומך?",
+      "expect": {
+        "language": "he",
+        "script": "Hebrew"
+      },
+      "source": "server-test",
+      "language": "he",
+      "script": "Hebrew",
+      "confidence": 0.75,
+      "alternatives": ["yi"],
+      "reason": ""
+    },
+    {
+      "text": "Hello, how are you doing today? It is a good day.",
+      "expect": {
+        "language": "en",
+        "script": "Latin"
+      },
+      "source": "server-test",
+      "language": "en",
+      "script": "Latin",
+      "confidence": 0.75,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Hola, ¿cómo estás? Yo estoy muy bien, gracias.",
+      "expect": {
+        "language": "es",
+        "script": "Latin"
+      },
+      "source": "server-test",
+      "language": "es",
+      "script": "Latin",
+      "confidence": 1.0,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Bonjour, je suis très content de vous voir ici.",
+      "expect": {
+        "language": "fr",
+        "script": "Latin"
+      },
+      "source": "server-test",
+      "language": "fr",
+      "script": "Latin",
+      "confidence": 0.75,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Guten Tag, ich bin nicht sicher, ob das stimmt.",
+      "expect": {
+        "language": "de",
+        "script": "Latin"
+      },
+      "source": "server-test",
+      "language": "de",
+      "script": "Latin",
+      "confidence": 0.833333,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Ciao, come stai? Io sono molto contento di questo.",
+      "expect": {
+        "language": "it",
+        "script": "Latin"
+      },
+      "source": "server-test",
+      "language": "it",
+      "script": "Latin",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Olá, você está bem? Não sei se ele vem para a festa.",
+      "expect": {
+        "language": "pt",
+        "script": "Latin"
+      },
+      "source": "server-test",
+      "language": "pt",
+      "script": "Latin",
+      "confidence": 0.823529,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Dit is een goed idee, maar ik heb er geen tijd voor.",
+      "expect": {
+        "language": "nl",
+        "script": "Latin"
+      },
+      "source": "server-test",
+      "language": "nl",
+      "script": "Latin",
+      "confidence": 0.928571,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Dzień dobry, nie wiem, czy to jest prawda.",
+      "expect": {
+        "language": "pl",
+        "script": "Latin"
+      },
+      "source": "server-test",
+      "language": "pl",
+      "script": "Latin",
+      "confidence": 0.916667,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Bu çok güzel bir gün ve ben de mutluyum.",
+      "expect": {
+        "language": "tr",
+        "script": "Latin"
+      },
+      "source": "server-test",
+      "language": "tr",
+      "script": "Latin",
+      "confidence": 0.916667,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "OK",
+      "expect": {
+        "language": null
+      },
+      "source": "server-test",
+      "language": null,
+      "script": "Latin",
+      "confidence": 0.0,
+      "alternatives": [],
+      "reason": "no common words of a known language"
+    },
+    {
+      "text": "Hello there",
+      "expect": {
+        "language": null
+      },
+      "source": "server-test",
+      "language": null,
+      "script": "Latin",
+      "confidence": 1.0,
+      "alternatives": [],
+      "reason": "too few words to tell"
+    },
+    {
+      "text": "12345",
+      "expect": {
+        "language": null
+      },
+      "source": "server-test",
+      "language": null,
+      "script": null,
+      "confidence": 0.0,
+      "alternatives": [],
+      "reason": "no letters"
+    },
+    {
+      "text": "",
+      "expect": {
+        "language": null
+      },
+      "source": "server-test",
+      "language": null,
+      "script": null,
+      "confidence": 0.0,
+      "alternatives": [],
+      "reason": "no letters"
+    },
+    {
+      "text": "Sí",
+      "expect": {
+        "language": null
+      },
+      "source": "server-test",
+      "language": null,
+      "script": "Latin",
+      "confidence": 0.0,
+      "alternatives": [],
+      "reason": "no common words of a known language"
+    },
+    {
+      "text": "Taxi, hotel, radio, piano.",
+      "expect": {
+        "language": null
+      },
+      "source": "server-test",
+      "language": null,
+      "script": "Latin",
+      "confidence": 0.0,
+      "alternatives": [],
+      "reason": "no common words of a known language"
+    },
+    {
+      "text": "नमस्ते, आप कैसे हैं?",
+      "source": "server-test",
+      "language": "hi",
+      "script": "Devanagari",
+      "confidence": 0.85,
+      "alternatives": ["mr", "ne", "mai", "bho", "sa", "kok", "doi", "brx", "mag", "hne"],
+      "reason": "words"
+    },
+    {
+      "text": "<speak>नमस्ते <break time=\"1s\"/> आप कैसे हैं?</speak>",
+      "source": "server-test",
+      "language": "hi",
+      "script": "Devanagari",
+      "confidence": 0.85,
+      "alternatives": ["mr", "ne", "mai", "bho", "sa", "kok", "doi", "brx", "mag", "hne"],
+      "reason": "words"
+    },
+    {
+      "text": "[Kokoro](/kˈOkəɹO/) नमस्ते, आप कैसे हैं?",
+      "source": "server-test",
+      "language": "hi",
+      "script": "Devanagari",
+      "confidence": 0.85,
+      "alternatives": ["mr", "ne", "mai", "bho", "sa", "kok", "doi", "brx", "mag", "hne"],
+      "reason": "words"
+    },
+    {
+      "text": "The weather is lovely this morning, and we will go out for a walk.",
+      "source": "corpus",
+      "language": "en",
+      "script": "Latin",
+      "confidence": 0.857143,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "I think it is what it is.",
+      "source": "corpus",
+      "language": "en",
+      "script": "Latin",
+      "confidence": 0.8,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Hej, jeg hedder Anna og jeg kan godt lide at læse bøger.",
+      "source": "corpus",
+      "language": null,
+      "script": "Latin",
+      "confidence": 0.0,
+      "alternatives": ["da", "no"],
+      "reason": "da or no"
+    },
+    {
+      "text": "Hei, jeg heter Anna og jeg liker å lese bøker, ikkje sant.",
+      "source": "corpus",
+      "language": null,
+      "script": "Latin",
+      "confidence": 0.153846,
+      "alternatives": ["no", "da"],
+      "reason": "no or da"
+    },
+    {
+      "text": "Jag heter Anna och jag tycker om att läsa böcker.",
+      "source": "corpus",
+      "language": "sv",
+      "script": "Latin",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Minä olen kotona ja hän on töissä, mutta me tulemme myöhemmin.",
+      "source": "corpus",
+      "language": "fi",
+      "script": "Latin",
+      "confidence": 0.876238,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Dobrý den, jak se máte? Já jsem v pořádku a není to tak špatné.",
+      "source": "corpus",
+      "language": "cs",
+      "script": "Latin",
+      "confidence": 0.863636,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Bună ziua, ce mai faci? Eu sunt bine și mă bucur să te văd.",
+      "source": "corpus",
+      "language": "ro",
+      "script": "Latin",
+      "confidence": 0.884615,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Jó napot, hogy van? Nem tudom, hogy ez még kell-e.",
+      "source": "corpus",
+      "language": "hu",
+      "script": "Latin",
+      "confidence": 0.928571,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Selamat pagi, saya akan pergi ke pasar dengan ibu saya.",
+      "source": "corpus",
+      "language": "id",
+      "script": "Latin",
+      "confidence": 1.0,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Xin chào, tôi là người Việt Nam và tôi đã đến đây.",
+      "source": "corpus",
+      "language": "vi",
+      "script": "Latin",
+      "confidence": 0.962963,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Bon dia, com estàs? Jo estic molt bé, però és tard.",
+      "source": "corpus",
+      "language": "ca",
+      "script": "Latin",
+      "confidence": 0.833333,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Habari yako? Mimi ni mzima sana na wewe je?",
+      "source": "corpus",
+      "language": "sw",
+      "script": "Latin",
+      "confidence": 0.8,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Ciao, sono qui per il lavoro e non per la vacanza.",
+      "source": "corpus",
+      "language": "it",
+      "script": "Latin",
+      "confidence": 0.785714,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Добрий день! Як справи? Все добре, дякую.",
+      "source": "corpus",
+      "language": "uk",
+      "script": "Cyrillic",
+      "confidence": 0.85,
+      "alternatives": ["ru", "bg", "sr", "be", "mk", "kk"],
+      "reason": "words"
+    },
+    {
+      "text": "Добър ден, как сте? Аз съм добре и всички са тук.",
+      "source": "corpus",
+      "language": "bg",
+      "script": "Cyrillic",
+      "confidence": 0.85,
+      "alternatives": ["ru", "uk", "sr", "be", "mk", "kk"],
+      "reason": "words"
+    },
+    {
+      "text": "Здраво, како си? Ја сам добро, хвала.",
+      "source": "corpus",
+      "language": "ru",
+      "script": "Cyrillic",
+      "confidence": 0.75,
+      "alternatives": ["uk", "bg", "sr", "be", "mk", "kk"],
+      "reason": ""
+    },
+    {
+      "text": "سلام، حال شما چطور است؟ من خوبم.",
+      "source": "corpus",
+      "language": "fa",
+      "script": "Arabic",
+      "confidence": 0.75,
+      "alternatives": ["ar", "ur", "ps", "sd", "ks"],
+      "reason": "letters"
+    },
+    {
+      "text": "मला माहित नाही की तो कुठे आहे.",
+      "source": "corpus",
+      "language": "mr",
+      "script": "Devanagari",
+      "confidence": 0.85,
+      "alternatives": ["hi", "ne", "mai", "bho", "sa", "kok", "doi", "brx", "mag", "hne"],
+      "reason": "words"
+    },
+    {
+      "text": "तिमी कहाँ जाँदै छौ? म घर जाँदै छु।",
+      "source": "corpus",
+      "language": "ne",
+      "script": "Devanagari",
+      "confidence": 0.85,
+      "alternatives": ["hi", "mr", "mai", "bho", "sa", "kok", "doi", "brx", "mag", "hne"],
+      "reason": "words"
+    },
+    {
+      "text": "আমি তোমাকে ভালোবাসি।",
+      "source": "corpus",
+      "language": "bn",
+      "script": "Bengali",
+      "confidence": 0.75,
+      "alternatives": ["as", "mni"],
+      "reason": ""
+    },
+    {
+      "text": "ਮੈਂ ਘਰ ਜਾ ਰਿਹਾ ਹਾਂ।",
+      "source": "corpus",
+      "language": "pa",
+      "script": "Gurmukhi",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "ଆପଣ କେମିତି ଅଛନ୍ତି?",
+      "source": "corpus",
+      "language": "or",
+      "script": "Oriya",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "ᱥᱟᱱᱛᱟᱲᱤ",
+      "source": "corpus",
+      "language": "sat",
+      "script": "Ol Chiki",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "東京は日本の首都です",
+      "source": "corpus",
+      "language": "ja",
+      "script": "Kana",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "我爱北京天安门",
+      "source": "corpus",
+      "language": "zh",
+      "script": "Han",
+      "confidence": 0.8,
+      "alternatives": ["yue", "ja"],
+      "reason": ""
+    },
+    {
+      "text": "ありがとう",
+      "source": "corpus",
+      "language": "ja",
+      "script": "Kana",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Ελληνικά είναι ωραία",
+      "source": "corpus",
+      "language": "el",
+      "script": "Greek",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Բարեւ Ձեզ",
+      "source": "corpus",
+      "language": "hy",
+      "script": "Armenian",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "გამარჯობა",
+      "source": "corpus",
+      "language": "ka",
+      "script": "Georgian",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "ສະບາຍດີ",
+      "source": "corpus",
+      "language": "lo",
+      "script": "Lao",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "ជំរាបសួរ",
+      "source": "corpus",
+      "language": "km",
+      "script": "Khmer",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "မင်္ဂလာပါ",
+      "source": "corpus",
+      "language": "my",
+      "script": "Myanmar",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "བཀྲ་ཤིས་བདེ་ལེགས།",
+      "source": "corpus",
+      "language": "bo",
+      "script": "Tibetan",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "ሰላም እንዴት ነህ",
+      "source": "corpus",
+      "language": "am",
+      "script": "Ethiopic",
+      "confidence": 0.75,
+      "alternatives": ["ti"],
+      "reason": ""
+    },
+    {
+      "text": "<speak><prosody rate='slow'>Bonjour, je suis très content de vous voir ici.</prosody></speak>",
+      "source": "corpus",
+      "language": "fr",
+      "script": "Latin",
+      "confidence": 0.75,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "[Kokoro](/kˈOkəɹO/) is a voice, and it is good at this.",
+      "source": "corpus",
+      "language": "en",
+      "script": "Latin",
+      "confidence": 0.75,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Mixed: नमस्ते and hello, this is a test of the system.",
+      "source": "corpus",
+      "language": "en",
+      "script": "Latin",
+      "confidence": 0.8,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Hello नमस्ते",
+      "source": "corpus",
+      "language": "hi",
+      "script": "Devanagari",
+      "confidence": 0.75,
+      "alternatives": ["mr", "ne", "mai", "bho", "sa", "kok", "doi", "brx", "mag", "hne"],
+      "reason": ""
+    },
+    {
+      "text": "Straße, Größe, Fuß — ß ist deutsch.",
+      "source": "corpus",
+      "language": "de",
+      "script": "Latin",
+      "confidence": 0.97619,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "¿Qué?",
+      "source": "corpus",
+      "language": "es",
+      "script": "Latin",
+      "confidence": 1.0,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Ça va très bien, merci beaucoup.",
+      "source": "corpus",
+      "language": null,
+      "script": "Latin",
+      "confidence": 0.5,
+      "alternatives": [],
+      "reason": "too few words to tell"
+    },
+    {
+      "text": "Zażółć gęślą jaźń.",
+      "source": "corpus",
+      "language": "pl",
+      "script": "Latin",
+      "confidence": 1.0,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Tamam, şimdi geliyorum ve ılık bir çay içeceğiz.",
+      "source": "corpus",
+      "language": "tr",
+      "script": "Latin",
+      "confidence": 0.961538,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "da da da da",
+      "source": "corpus",
+      "language": null,
+      "script": "Latin",
+      "confidence": 0.0,
+      "alternatives": ["pt", "tr"],
+      "reason": "pt or tr"
+    },
+    {
+      "text": "It’s a dog’s life, isn’t it? We don’t know.",
+      "source": "corpus",
+      "language": "en",
+      "script": "Latin",
+      "confidence": 0.75,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "123 456 789",
+      "source": "corpus",
+      "language": null,
+      "script": null,
+      "confidence": 0.0,
+      "alternatives": [],
+      "reason": "no letters"
+    },
+    {
+      "text": "!!! ??? ...",
+      "source": "corpus",
+      "language": null,
+      "script": null,
+      "confidence": 0.0,
+      "alternatives": [],
+      "reason": "no letters"
+    },
+    {
+      "text": "ab cd ef",
+      "source": "corpus",
+      "language": null,
+      "script": "Latin",
+      "confidence": 0.0,
+      "alternatives": [],
+      "reason": "no common words of a known language"
+    },
+    {
+      "text": "ΟΔΟΣ ΣΟΦΙΑΣ",
+      "source": "corpus",
+      "language": "el",
+      "script": "Greek",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Ⅻ century and ² of the things in the world",
+      "source": "corpus",
+      "language": "en",
+      "script": "Latin",
+      "confidence": 1.0,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "क्या हाल है? सब ठीक है।",
+      "source": "corpus",
+      "language": "hi",
+      "script": "Devanagari",
+      "confidence": 0.85,
+      "alternatives": ["mr", "ne", "mai", "bho", "sa", "kok", "doi", "brx", "mag", "hne"],
+      "reason": "words"
+    },
+    {
+      "text": "நான் நன்றாக இருக்கிறேன்",
+      "source": "corpus",
+      "language": "ta",
+      "script": "Tamil",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "ఎలా ఉన్నారు",
+      "source": "corpus",
+      "language": "te",
+      "script": "Telugu",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "ಹೇಗಿದ್ದೀರಿ",
+      "source": "corpus",
+      "language": "kn",
+      "script": "Kannada",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "സുഖമാണോ",
+      "source": "corpus",
+      "language": "ml",
+      "script": "Malayalam",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "કેમ છો મિત્રો",
+      "source": "corpus",
+      "language": "gu",
+      "script": "Gujarati",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "ꯃꯤꯇꯩꯂꯣꯟ",
+      "source": "corpus",
+      "language": "mni",
+      "script": "Meetei Mayek",
+      "confidence": 0.9,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Hallo, wie geht es dir? Ich bin müde, aber es ist schön.",
+      "source": "corpus",
+      "language": "de",
+      "script": "Latin",
+      "confidence": 0.846154,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Hoje é um bom dia para ir à praia, não é?",
+      "source": "corpus",
+      "language": "pt",
+      "script": "Latin",
+      "confidence": 0.928571,
+      "alternatives": [],
+      "reason": ""
+    },
+    {
+      "text": "Een twee drie, dat is het, en ik ga naar huis.",
+      "source": "corpus",
+      "language": "nl",
+      "script": "Latin",
+      "confidence": 0.928571,
+      "alternatives": [],
+      "reason": ""
+    }
+  ],
+  "trim": [
+    {
+      "text": "So we went home and the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the end.",
+      "max_repeats": 4,
+      "out": "So we went home and the end.",
+      "removed": 39
+    },
+    {
+      "text": "thank you for watching thank you for watching thank you for watching thank you for watching thank you for watching thank you for watching thank you for watching thank you for watching thank you for watching thank you for watching thank you for watching thank you for watching ",
+      "max_repeats": 4,
+      "out": "thank you for watching",
+      "removed": 44
+    },
+    {
+      "text": "No, no, no, no, no, no, I said.",
+      "max_repeats": 4,
+      "out": "No, I said.",
+      "removed": 5
+    },
+    {
+      "text": "谢谢大家谢谢大家谢谢大家谢谢大家谢谢大家谢谢大家谢谢大家谢谢大家谢谢大家谢谢大家",
+      "max_repeats": 4,
+      "out": "谢谢大家",
+      "removed": 36
+    },
+    {
+      "text": "very very good",
+      "max_repeats": 4,
+      "out": "very very good",
+      "removed": 0
+    },
+    {
+      "text": "no no no no",
+      "max_repeats": 4,
+      "out": "no no no no",
+      "removed": 0
+    },
+    {
+      "text": "it is what it is",
+      "max_repeats": 4,
+      "out": "it is what it is",
+      "removed": 0
+    },
+    {
+      "text": "ha ha ha ha",
+      "max_repeats": 4,
+      "out": "ha ha ha ha",
+      "removed": 0
+    },
+    {
+      "text": "the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the ",
+      "max_repeats": 0,
+      "out": "the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the ",
+      "removed": 0
+    },
+    {
+      "text": "the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the the ",
+      "max_repeats": 2,
+      "out": "the",
+      "removed": 39
+    },
+    {
+      "text": "hello you know you know you know you know you know you know you know you know you know you know right",
+      "max_repeats": 4,
+      "out": "hello you know right",
+      "removed": 18
+    },
+    {
+      "text": "one two three one two three one two three one two three one two three four",
+      "max_repeats": 4,
+      "out": "one two three four",
+      "removed": 12
+    },
+    {
+      "text": "ठीक है ठीक है ठीक है ठीक है ठीक है ठीक है",
+      "max_repeats": 4,
+      "out": "ठीक है",
+      "removed": 10
+    },
+    {
+      "text": "ขอบคุณครับขอบคุณครับขอบคุณครับขอบคุณครับขอบคุณครับขอบคุณครับ",
+      "max_repeats": 4,
+      "out": "ขอบคุณครับ",
+      "removed": 50
+    },
+    {
+      "text": "The The the THE the, the. the! done",
+      "max_repeats": 4,
+      "out": "The done",
+      "removed": 6
+    },
+    {
+      "text": "a b a b a b a b a b c c c c c c d",
+      "max_repeats": 2,
+      "out": "a b c d",
+      "removed": 13
+    }
+  ],
+  "live": [
+    {
+      "finals": [
+        "Hello there.",
+        "Thank you.",
+        "Thank you.",
+        "Thank you.",
+        "Thank you.",
+        "Thank you.",
+        "Thank you.",
+        "Thank you. Bye."
+      ],
+      "max_repeats": 4,
+      "out": ["Hello there.", "Thank you.", "Thank you.", "Thank you.", "Thank you.", "", "", "Bye."],
+      "removed": 6
+    },
+    {
+      "finals": ["so we went the the", "the the the the the the end", "the end"],
+      "max_repeats": 4,
+      "out": ["so we went the the", "end", "the end"],
+      "removed": 6
+    },
+    {
+      "finals": ["the the the the the the", "the the the the the the", "the the the the the the"],
+      "max_repeats": 0,
+      "out": ["the the the the the the", "the the the the the the", "the the the the the the"],
+      "removed": 0
+    },
+    {
+      "finals": ["one two", "one two", "one two", "one two", "one two three"],
+      "max_repeats": 3,
+      "out": ["one two", "one two", "one two", "", "three"],
+      "removed": 4
+    },
+    {
+      "finals": ["谢谢", "谢谢谢谢谢谢谢谢", "谢谢你"],
+      "max_repeats": 4,
+      "out": ["谢谢", "", "谢谢你"],
+      "removed": 8
+    }
+  ]
+}

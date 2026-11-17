@@ -20,6 +20,7 @@ import { prepareText } from '@/lib/browser-tts/text'
 import { isPhoneLike, verdictFor } from '@/lib/device'
 import { isDownloaded } from '@/lib/downloads'
 import { fmtBytes } from '@/lib/format'
+import { prefs } from '@/lib/prefs'
 import { BrowserTranscriber } from '@/lib/stt/browser'
 import { cn } from '@/lib/utils'
 
@@ -143,7 +144,11 @@ export function BrowserConversation() {
       conv ??
       new Conversation(() => (source === 'endpoint' ? new EndpointLlm(readEndpoint()) : llm), voiceSpeaker(player))
     try {
-      const transcriber = new BrowserTranscriber(sharedEngine(), { language: 'auto', endpointMs: 600 })
+      const transcriber = new BrowserTranscriber(sharedEngine(), {
+        language: 'auto',
+        endpointMs: 600,
+        maxRepeats: prefs.get().browserMaxRepeats,
+      })
       const off = transcriber.store.subscribe(() => c.onTranscript(transcriber.store.get()))
       const mic = await openMicrophone((b) => transcriber.push(b))
       await transcriber.start()

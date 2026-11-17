@@ -4,6 +4,7 @@ import { rms } from '@/lib/audio/pcm'
 import { sharedEngine } from '@/lib/browser-stt/engine'
 import { diag } from '@/lib/diagnostics'
 import type { MicFailure } from '@/lib/mic-help'
+import { prefs } from '@/lib/prefs'
 import { levelFromRms, type LevelTrack } from '@/components/charts/level-strip'
 import { BrowserTranscriber } from '@/lib/stt/browser'
 import { ServerTranscriber } from '@/lib/stt/server'
@@ -159,7 +160,10 @@ export function useSttSession() {
           : null
       const brw =
         cfg.mode !== 'server'
-          ? new BrowserTranscriber(sharedEngine(), { language: cfg.browserLanguage ?? 'auto' })
+          ? new BrowserTranscriber(sharedEngine(), {
+              language: cfg.browserLanguage ?? 'auto',
+              maxRepeats: prefs.get().browserMaxRepeats,
+            })
           : null
       const all = [srv, brw].filter((t): t is ServerTranscriber | BrowserTranscriber => t != null)
       active.current = all

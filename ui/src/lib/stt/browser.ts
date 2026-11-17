@@ -2,6 +2,8 @@ import { STT_RATE } from '@/lib/audio/capture'
 import { concatFloat } from '@/lib/audio/pcm'
 import type { BrowserSttEngine } from '@/lib/browser-stt/engine'
 import { recordBrowserTrace } from '@/lib/browser-stt/traces'
+import { diag } from '@/lib/diagnostics'
+import { DEFAULT_MAX_REPEATS, RepeatGuard } from '@/lib/repeat-guard'
 import { TranscriptTracker, type Transcriber } from './transcriber'
 import { EnergyVad } from './vad'
 
@@ -12,6 +14,11 @@ export interface BrowserTranscriberOptions {
   endpointMs?: number
   /** Language to decode in, or `auto` to let a multilingual model guess per utterance. */
   language?: string
+  /**
+   * The server's repetition guard on finals (`max_repeats`, default 4; 0: off): a phrase repeated back to back
+   * more often than this, within a final or running on from the finals before it, is cut to one copy.
+   */
+  maxRepeats?: number
 }
 
 /** Whisper sees 30 s at a time; cut a non-stop utterance before that. */
@@ -57,12 +64,19 @@ export class BrowserTranscriber implements Transcriber {
   private readonly language: string
   /** The model's guess for the utterance being spoken (auto mode). */
   private guessed: string | null = null
+  private readonly guard: RepeatGuard
 
   constructor(engine: BrowserSttEngine, opts: BrowserTranscriberOptions = {}) {
     this.engine = engine
     this.partialEvery = ((opts.partialEveryMs ?? 600) / 1000) * STT_RATE
     this.vad = new EnergyVad({ sampleRate: STT_RATE, endMs: opts.endpointMs ?? 500 })
     this.language = opts.language ?? 'auto'
+    this.guard = new RepeatGuard(opts.maxRepeats ?? DEFAULT_MAX_REPEATS)
+  }
+
+  /** Words (or characters) the repetition guard has removed from finals so far. */
+  get repeatsRemoved(): number {
+    return this.guard.removed
   }
 
   async start(): Promise<void> {
@@ -141,7 +155,17 @@ export class BrowserTranscriber implements Transcriber {
     this.utteranceSamples = 0
     this.generation += 1
     const language = this.guessed ?? this.language
-    void this.decode(audio, language, (text, ms, spoken) => {
+    void this.decode(audio, language, (decoded, ms, spoken) => {
+      const before = this.guard.removed
+      const text = this.guard.apply(decoded)
+      if (this.guard.removed > before) {
+        const cut = this.guard.removed - before
+        diag.event(
+          'stt',
+          `repetition guard: ${cut} repeated word${cut === 1 ? '' : 's'} removed (max_repeats ${this.guard.maxRepeats})`,
+        )
+        this.store.patch({ repeatsRemoved: this.guard.removed })
+      }
       this.tracker.final({ text, t0, t1: t, words: null, language: spoken, latencyMs: ms })
       const finalMs = performance.now() - speechEndAt
       const endpointMs = Math.max(0, decidedAt - speechEndAt)
