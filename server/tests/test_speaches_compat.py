@@ -32,7 +32,7 @@ def test_registry_and_model_listing(live: LiveServer) -> None:
     tts = httpx.get(live.url + "/v1/registry", params={"task": "text-to-speech"}).json()["data"]
     assert tts and all(m["task"] == "text-to-speech" for m in tts)
     asr = httpx.get(live.url + "/v1/models", params={"task": "automatic-speech-recognition"}).json()["data"]
-    assert {m["id"] for m in asr} == {"fake-stt", "fake-stt-streaming"}
+    assert {m["id"] for m in asr} == {"fake-stt", "fake-stt-streaming", "fake-stt-ta"}
     audio_models = httpx.get(live.url + "/v1/audio/models").json()
     assert audio_models["object"] == "list" and [m["id"] for m in audio_models["models"]] == ["fake-tts"]
     assert audio_models["models"][0]["sample_rate"] == 24000

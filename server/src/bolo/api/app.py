@@ -106,6 +106,7 @@ def create_app(settings: Settings | None = None, core: Bolo | None = None) -> Fa
                 "x-bolo-separation",
                 "x-bolo-ignored-options",
                 "x-bolo-denoise",
+                "x-bolo-route",
                 "x-bolo-voice",
                 "x-bolo-cloned",
                 "x-bolo-blend",

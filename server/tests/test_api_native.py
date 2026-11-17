@@ -55,6 +55,7 @@ def test_catalog_shape_and_filters(live: LiveServer) -> None:
             "turn",
             "separation",
             "denoise",
+            "lid",
             "speech-to-speech",
             "audio-llm",
         )
@@ -78,6 +79,8 @@ def test_catalog_shape_and_filters(live: LiveServer) -> None:
         "fake-denoise",
         "fake-denoise-48k",
         "fake-s2s",
+        "fake-lid",
+        "fake-stt-ta",
     } | BUILT_IN
     not_installed = httpx.get(live.url + "/api/v1/catalog", params={"installed": "false", "task": "vad"}).json()[
         "models"

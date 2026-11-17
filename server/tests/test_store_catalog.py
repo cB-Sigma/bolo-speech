@@ -269,6 +269,7 @@ def test_every_packaged_entry_is_well_formed() -> None:
         "turn",
         "separation",
         "denoise",
+        "lid",
         "audio-llm",
         "speech-to-speech",
     }

@@ -106,6 +106,16 @@ class Settings:
     #: "on", a strength between 0 and 1 (the denoised audio mixed with the original) or a denoise model id.
     #: Off by default: denoising can hurt clean audio and recognisers trained on noisy data (docs/configuration.md)
     denoise: str = "off"
+    #: spoken-language identification model: POST /v1/audio/language without a model, and language routing
+    default_lid: str = "voxlingua107-ecapa"
+    #: transcription with the model "auto" and no language: identify the language and send the audio to the best
+    #: installed recogniser for it (docs/api.md, "Language identification and routing"). Off: "auto" is the default
+    language_routing: bool = True
+    #: routing table, '<language>=<model>' per entry ("ta=indicconformer-ta-community"): which recogniser a routed
+    #: request uses for a language. Languages not listed go to the best installed recogniser that speaks them
+    language_routes: list[str] = field(default_factory=list)
+    #: below this probability the detected language is not trusted: the request goes to default_stt, unsteered
+    lid_min_probability: float = 0.5
     #: end-of-turn model used by Realtime sessions that ask for turn_detection.type = "semantic_vad"
     default_turn: str = "smart-turn-v3"
     preload: list[str] = field(default_factory=list)
@@ -419,6 +429,12 @@ def _check_cloud(settings: Settings) -> None:
             raise ValueError(
                 exc.message if exc.message.startswith("telephony") else f"telephony: {exc.message}"
             ) from exc
+    for item in settings.language_routes:
+        language, sep, model = str(item).partition("=")
+        if not sep or not language.strip() or not model.strip() or "," in model:
+            raise ValueError(f"language_routes: expected '<language>=<model>', got {item!r}")
+    if not 0.0 <= settings.lid_min_probability <= 1.0:
+        raise ValueError(f"lid_min_probability must be between 0 and 1, got {settings.lid_min_probability}")
     for item in settings.fallbacks:
         model, sep, rest = str(item).partition("=")
         if not sep or not model.strip() or not rest.strip():

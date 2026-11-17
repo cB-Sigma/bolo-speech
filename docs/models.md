@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-401 models: 151 validated on CPU by the maintainers, 250 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
+411 models: 156 validated on CPU by the maintainers, 255 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
 
 ### Speech to text
 
@@ -827,6 +827,48 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `resemble-enhance` | - | accuracy | - | 713 MB | MIT · needs plugin torch | not runnable yet |
 
+### Language identification
+
+#### VoxLingua107 ECAPA-TDNN
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `voxlingua107-ecapa` | ab, af, am, ar, as, az +101 | realtime | - | 87 MB | Apache-2.0 | **CPU** · RTF 0.106 |
+| `voxlingua107-ecapa-int8` | ab, af, am, ar, as, az +101 | realtime | - | 22 MB | Apache-2.0 | **CPU** · RTF 0.135 |
+
+#### Whisper
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `whisper-tiny-lid` | sq, ml, de, hi, uz, zh +93 | realtime | - | 103 MB | MIT | **CPU** · RTF 0.301 |
+| `whisper-base-lid` | sq, ml, de, hi, uz, zh +93 | balanced | - | 160 MB | MIT | **CPU** · RTF 0.608 |
+
+#### AmberNet
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ambernet-langid` | ab, af, am, ar, as, az +101 | realtime | - | 117 MB | NGC-Terms-of-Use ⚠ | **CPU** · RTF 0.104 |
+
+#### MMS-LID
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `mms-lid-126` | ar, zh, en, es, fr, mg +120 | accuracy | - | 974 MB | CC-BY-NC-4.0 ⚠ | untested |
+| `mms-lid-4017` | ar, zh, en, es, fr, mg +4010 | accuracy | - | 978 MB | CC-BY-NC-4.0 ⚠ | untested |
+
+#### Voxlect
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `voxlect-indic-lid-whisper-small` | as, bn, brx, doi, en, gu +17 | balanced | - | 362 MB | OpenRAIL · needs plugin torch | not runnable yet |
+| `voxlect-indic-lid-mms-lid-256` | as, bn, brx, doi, en, gu +17 | accuracy | - | 3.9 GB | CC-BY-NC-4.0 ⚠ · needs plugin torch | not runnable yet |
+
+#### SpeechBrain ECAPA-TDNN
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `lid-indic-vaani` | en, hi, mr, ta, te | realtime | - | 83 MB | Apache-2.0 · needs plugin torch | not runnable yet |
+
 ### Speech to speech (Realtime speech-to-speech pipeline)
 
 #### Qwen2.5-Omni 3B
@@ -941,6 +983,9 @@ models below were checked against their model cards and licence files on 2026-11
 | `spark-tts-0.5b` | CC-BY-NC-SA-4.0 (no) | none yet: no ggml/ONNX runtime runs the BiCodec decoder, and the reference code is not packaged | catalogued, not runnable (bolo-torch answers "not implemented") |
 | `maskgct` | CC-BY-NC-4.0 (no) | none yet: Amphion's code is not packaged (the PyPI `maskgct` wrapper is a third-party GPL-3.0 project) | catalogued, not runnable |
 | `diarizen-wavlm-large-s80-md-v2` | CC-BY-NC-4.0, PLDA CC-BY-4.0 (no) | none yet: bolo-torch has no DiariZen loader (its inference code is not packaged), and the community ONNX export needs a VBx/PLDA pipeline that sherpa-onnx lacks | catalogued, not runnable |
+| `mms-lid-126`, `mms-lid-4017` | CC-BY-NC-4.0 (no) | ONNX Runtime, `onnx_lid` kind on Xenova's int8 exports | runnable, not measured (978 MB); "Language identification" below |
+| `voxlect-indic-lid-mms-lid-256` | CC-BY-NC-4.0 (no) | none yet: a PyTorch class from the Voxlect repository | catalogued, not runnable |
+| `ambernet-langid` | NVIDIA NGC Terms of Use (not an open licence) | ONNX Runtime, `onnx_lid` kind | measured |
 | `breeze-tts-2-audiocpp`, `indextts-2-audiocpp`, `omnivoice-audiocpp`, `voxtral-4b-tts-audiocpp`, `higgs-tts-3-4b-audiocpp`, `fish-audio-s2-pro-audiocpp`, … | non-commercial or conditional | tts-server (audio.cpp, llama-server) | catalogued earlier |
 
 Speech-to-speech: `s2s_model` (default `lfm3-audio-2b-llamacpp`, LFM Open License v1.0: commercial use only
@@ -1923,6 +1968,83 @@ Mixing half of the original back (`denoise=0.5`) was the better setting for
 both. This is a small, synthetic test: it shows the direction, not the
 size, of the effect on your audio. Measure before you turn denoising on for
 a model or the server.
+
+## Language identification
+
+`POST /v1/audio/language` says which language a recording is in, and a
+transcription with `model=auto` uses the answer to pick a recogniser
+(api.md, "Language identification and routing"; configuration.md,
+"Language routing"). These are the `task: lid` entries; each states its
+licence, and none is left out for its licence:
+
+| id | Licence (commercial use) | Size | Languages | Runtime | State |
+| --- | --- | --- | --- | --- | --- |
+| `voxlingua107-ecapa` (default) | Apache-2.0 (yes) | 87 MB | 107 (VoxLingua107) | ONNX Runtime, raw audio in | measured |
+| `voxlingua107-ecapa-int8` | Apache-2.0 (yes) | 22 MB | 107 | ONNX Runtime, SpeechBrain filterbanks computed by bolo | measured |
+| `ambernet-langid` | NVIDIA NGC Terms of Use (marked no: not an open licence; read the terms) | 117 MB | 107 | ONNX Runtime, raw audio in | measured |
+| `whisper-tiny-lid` | MIT (yes) | 103 MB | 99 (Whisper's) | ONNX Runtime on sherpa-onnx's int8 Whisper graphs | measured |
+| `whisper-base-lid` | MIT (yes) | 160 MB | 99 | the same | measured |
+| `mms-lid-126` | CC-BY-NC-4.0 (no) | 978 MB | 126, Odia among them | ONNX Runtime (Xenova's int8 export of facebook/mms-lid-126) | runnable, not measured (too large for the test machine's 500 MB budget) |
+| `mms-lid-4017` | CC-BY-NC-4.0 (no) | 978 MB | 4017, among them Bhojpuri, Maithili, Magahi, Chhattisgarhi, Bodo, Manipuri, Santali, Konkani, Kashmiri | the same | runnable, not measured |
+| `voxlect-indic-lid-whisper-small` | OpenRAIL (yes, with use restrictions) | 362 MB | the 22 scheduled languages and English | none yet: a PyTorch class from the Voxlect repository | catalogued, not runnable |
+| `voxlect-indic-lid-mms-lid-256` | CC-BY-NC-4.0 (no) | 3.9 GB | the same | none yet | catalogued, not runnable |
+| `lid-indic-vaani` | Apache-2.0 (yes) | 83 MB | English, Hindi, Marathi, Tamil, Telugu | none yet: a SpeechBrain classifier, no ONNX export | catalogued, not runnable |
+
+Whisper's language detection is used on its own: the encoder hears the
+first 30 seconds and the decoder, given only the start-of-transcript
+token, scores Whisper's language tokens, which a softmax turns into a
+probability per language (what Whisper's own `detect_language` does).
+sherpa-onnx has a spoken-language-identification API for the same
+models, but it returns only the top language, without probabilities, so
+bolo runs the two graphs in ONNX Runtime itself. AI4Bharat publishes no
+audio language identifier (IndicLID is for text); the Indian-specific
+identifiers on Hugging Face are Voxlect's (catalogued above) and a few
+small fine-tunes without a licence, which are not catalogued.
+
+**Measured** (docs/measurements/lid.json; one thread of a shared 4-vCPU
+Xeon, load average 14 to 18). The repository has recorded test speech
+only in English and Hindi, so the Indian languages were **synthesised
+with bolo's own Indian voices**: three everyday sentences per language
+(2.4 to 6.9 s), one voice per language (Piper, Mimic 3, SYSPIN and
+MMS-TTS voices). Synthetic speech from one voice is easier than real
+recordings; these numbers show which models tell the languages apart, not
+their accuracy on your audio.
+
+| model | repository clips (11, en and hi) | Indian clips (39) | hi | bn | ta | te | mr | gu | kn | ml | pa | ur | ne | or | as | RTF (median) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `voxlingua107-ecapa` | 11/11 | 33/39 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 0/3 | 3/3 | 0/3 | 3/3 | 0.106 |
+| `voxlingua107-ecapa-int8` | 11/11 | 33/39 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 0/3 | 3/3 | 0/3 | 3/3 | 0.135 |
+| `ambernet-langid` | 10/11 | 33/39 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 0/3 | 3/3 | 0/3 | 3/3 | 0.104 |
+| `whisper-base-lid` | 11/11 | 24/39 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 1/3 | 0/3 | 3/3 | 3/3 | 1/3 | 1/3 | 0/3 | 0/3 | 0.608 |
+| `whisper-tiny-lid` | 11/11 | 19/39 | 3/3 | 3/3 | 3/3 | 2/3 | 2/3 | 0/3 | 2/3 | 3/3 | 1/3 | 0/3 | 0/3 | 0/3 | 0/3 | 0.301 |
+
+* **Odia** is not among the languages of VoxLingua107, AmberNet or Whisper:
+  those models answer Bengali or Assamese. Only the MMS-LID entries know it.
+* **Urdu** was heard as Hindi by every model (Whisper base got one of three).
+  Spoken everyday Urdu and Hindi are close to one language; the difference
+  is mostly in the script, which speech does not have. Route both to a
+  recogniser that writes the script you want (`language_routes`).
+* The two VoxLingua107 graphs agreed on every clip; the int8 one is a
+  quarter of the size and, here, a little slower (bolo computes its
+  filterbanks in NumPy).
+* AmberNet heard a 1961 recording of English (`en-fellow-americans`,
+  old and noisy) as Portuguese; the VoxLingua107 model was right at 0.81.
+* Whisper's detector confused Gujarati, Kannada, Nepali and Assamese
+  with neighbours and with unrelated languages on these short clips, and
+  always pays for 30 s of encoder work, so it is the slowest per clip.
+  It is the identifier to use when you want exactly Whisper's view of the
+  language (it is what a Whisper recogniser would detect by itself).
+
+`voxlingua107-ecapa` is the default (`default_lid`): permissive licence,
+the best results here and about a tenth of a second per second of audio
+on one core. Routing with it in front of `whisper-tiny`, with
+`indicconformer-ta-community` installed: the Tamil clips went to the
+Tamil recogniser (which wrote both clips word for word, punctuation aside, where `whisper-tiny` wrote
+broken Tamil), English and Hindi stayed with `whisper-tiny`, and the
+`x-bolo-route` header named `indicconformer-hi-community` and
+`indicconformer-bn-community` as the recognisers to pull for Hindi and
+Bengali. The Odia clip, heard as Bengali, was routed as Bengali: a
+language the identifier does not know is routed as its nearest neighbour.
 
 ## Word timestamps
 

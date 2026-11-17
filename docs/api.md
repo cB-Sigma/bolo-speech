@@ -61,6 +61,7 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 
 | Method | Path | Summary |
 | --- | --- | --- |
+| `POST` | `/v1/audio/language` | Identify the spoken language |
 | `GET` | `/api/v1/info` | Server, engine and platform information |
 | `GET` | `/api/v1/catalog` | Model catalog with install and load state |
 | `GET` | `/api/v1/hardware` | This machine: CPU, memory, disk, GPUs, runtimes, container limits |
@@ -183,7 +184,8 @@ server: see [providers.md](providers.md).
 `x-sample-rate` on speech. `x-bolo-model` on transcriptions and speech is the
 model that answered; `x-bolo-fallback: <requested> -> <answered>;
 reason=<code>` is added when a [fallback](providers.md#fallback) answered
-instead of the model that was asked for, and `x-bolo-estimated-cost:
+instead of the model that was asked for, `x-bolo-route` and `x-bolo-language` when a transcription with
+`model=auto` was routed by the language heard ([Language identification and routing](#language-identification-and-routing)), and `x-bolo-estimated-cost:
 <amount> <currency>` on transcriptions served by a cloud model that has a
 price in the provider's price table.
 
@@ -198,7 +200,7 @@ Multipart form.
 | Field | | |
 | --- | --- | --- |
 | `file` | required | audio. WAV, FLAC, OGG/Vorbis, OGG/Opus, MP3, AIFF decode with no extra install; M4A/AAC, WebM, MP4 and others need `bolo-speech[av]` or `ffmpeg` on `PATH`. Raw headerless audio is accepted when the part's content type says so: `audio/basic` or `audio/x-mulaw` (8 kHz μ-law), `audio/x-alaw`, `audio/pcm;rate=16000` (16-bit little-endian) |
-| `model` | optional | see model names |
+| `model` | optional | see model names. `auto` with no `language`: the language is identified first and the audio goes to a recogniser for it ([Language identification and routing](#language-identification-and-routing)) |
 | `language` | optional | ISO-639-1 code. Improves accuracy and latency for multilingual models |
 | `prompt` | optional | initial prompt (Whisper models) |
 | `response_format` | `json` | `json`, `text`, `srt`, `vtt`, `verbose_json`, `diarized_json` |
@@ -328,6 +330,68 @@ sent as `{"type":"error","error":{…}}`. Disconnecting cancels the remaining wo
 
 Same form without `language` and `stream`; translates to English. Needs a
 multilingual Whisper model (feature `translate`); other models answer 400.
+
+### Language identification and routing
+
+#### `POST /v1/audio/language`
+
+Extension: which language is spoken in a recording. Multipart form.
+
+| Field | | |
+| --- | --- | --- |
+| `file` | required | audio, as for transcriptions |
+| `model` | `default_lid` | a language-identification model (`task: lid` in the catalog: `voxlingua107-ecapa`, `voxlingua107-ecapa-int8`, `whisper-tiny-lid`, `whisper-base-lid`, `ambernet-langid`, `mms-lid-126`, `mms-lid-4017`; [models.md](models.md#language-identification-1)) |
+| `top_k` | `5` | how many languages to list (1 to 500) |
+| `keep_alive` | - | how long the model stays loaded after the request ([Keep-alive](#keep-alive)) |
+
+```jsonc
+{"model": "voxlingua107-ecapa",
+ "language": "ta", "name": "Tamil", "probability": 0.9874,
+ "languages": [{"language": "ta", "name": "Tamil", "probability": 0.9874},
+               {"language": "ml", "name": "Malayalam", "probability": 0.0061}, …],
+ "duration": 6.42,          // seconds in the recording
+ "heard": 6.42,             // seconds the model looked at (the first 30 s at most)
+ "recogniser": {"model": "indicconformer-ta-community", "reason": "recommended", "language": "ta",
+                "recommended": null, "detail": null}}
+```
+
+Codes are ISO 639-1 where the language has one, else ISO 639-3 (`bho`, `mai`, `sat`), the way the catalog writes
+them; a model's legacy codes are rewritten (`iw` is `he`). Probabilities over all the languages the model knows sum
+to 1: the model always answers one of its languages, even for music, silence or a language it does not know, so
+read a low probability as "not sure". `recogniser` is what a transcription with `model=auto` would do with this
+audio (below), without transcribing it: the model, why (`reason`), the language it would be told, and
+`recommended`, a better recogniser for the language that is not installed. `x-bolo-model` names the identifier;
+the request's trace has kind `lid`.
+
+#### Routing a transcription: `model=auto`
+
+A transcription (not a translation) with `model=auto` and no `language` (or `language=auto`) is heard by
+`default_lid` first, then sent to a recogniser for the language it heard: the one the `language_routes` setting
+names for it, else the best **installed** local recogniser that speaks it (the one `bolo recommend` names first for
+the language on this machine, then one made for that language before one that covers many, then one measured
+here, then `default_stt`), else `default_stt`. The routed recogniser is told the language when it speaks it. A
+language heard with less than `lid_min_probability` (0.5) goes to `default_stt`, not told a language. Routing never
+downloads a recogniser it was not told to use and never picks a cloud model on its own, and a request that names a
+model or a language is never changed. `language_routing = false` makes `auto` mean `default_stt` again
+([configuration.md](configuration.md#language-routing)).
+
+The decision comes back in two headers (also on streamed responses) and in the trace's `route` field:
+
+| Header | Example | |
+| --- | --- | --- |
+| `x-bolo-route` | `auto -> indicconformer-ta-community; reason=recommended; language=ta; probability=0.987; lid=voxlingua107-ecapa` | `<requested> -> <answered>; reason=<why>`, then what was heard |
+| `x-bolo-language` | `ta; source=detected; probability=0.987; applied=true` | the language heard; `applied=true` when the recogniser was told it |
+
+| `reason` | Meaning |
+| --- | --- |
+| `route` | `language_routes` names the recogniser for the language |
+| `recommended` | the best installed recogniser that speaks the language |
+| `default` | no installed recogniser speaks it: `default_stt` answered on its own; `recommended=<id>` names one to pull |
+| `unsure` | the language was heard with less than `lid_min_probability` |
+| `lid-failed` | the language identifier could not run (not installed with `auto_pull` off, engine missing, an error); `default_stt` answered |
+
+`GET /api/v1/info` describes it under `capabilities.lid` (default model, whether it is available, the routing
+settings), so a client can offer an "Auto (detect the language)" choice when `routing.enabled` is true.
 
 ### `POST /v1/audio/speech`
 

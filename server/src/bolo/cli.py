@@ -1242,7 +1242,7 @@ def cmd_telephony(args: argparse.Namespace) -> int:
 _TASK_TITLES = {
     "stt": "Speech to text", "tts": "Text to speech", "diarization": "Speaker diarization",
     "vad": "Voice-activity detection", "turn": "End-of-turn detection", "separation": "Overlapped-speech separation",
-    "denoise": "Denoising", "speech-to-speech": "Speech to speech",
+    "denoise": "Denoising", "lid": "Language identification", "speech-to-speech": "Speech to speech",
 }  # fmt: skip
 
 

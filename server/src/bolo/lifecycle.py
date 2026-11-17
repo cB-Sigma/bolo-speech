@@ -38,6 +38,7 @@ from bolo.engines import EngineRegistry
 from bolo.engines.base import (
     DenoiseModel,
     DiarizationModel,
+    LidModel,
     LoadOptions,
     Model,
     SeparationModel,
@@ -755,6 +756,10 @@ class ModelManager:
             denoiser = model
             handlers["denoise"] = lambda items: [denoiser.denoise(item) for item in items]
             max_batch["denoise"] = 1
+        elif isinstance(model, LidModel):
+            lid = model
+            handlers["lid"] = lambda items: [lid.identify(item) for item in items]
+            max_batch["lid"] = 1
         elif isinstance(model, TurnModel):
             turn = model
             handlers["turn"] = lambda items: [turn.probability(item) for item in items]

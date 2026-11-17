@@ -95,6 +95,32 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   `audio_llm_model` naming a catalog entry of task `audio-llm` is pulled and served by a managed llama-server
   (loopback port, random API key, `--parallel audio_llm_parallel`, `audio_llm_server_args`, GPU/CPU placement,
   restarted after a crash, stopped with bolo). `GET /api/v1/info` reports it under the `audio-llm` pipeline.
+- **Spoken-language identification**, a new model task `lid`, and **routing by language**. `POST /v1/audio/language`
+  (multipart `file`, optional `model`, `top_k`) answers the most likely language with its probability, the `top_k`
+  most likely ones, and which recogniser a routed transcription would use. A transcription with `model=auto` and no
+  `language` is heard by the identifier first (`default_lid`, `voxlingua107-ecapa`) and sent to the recogniser
+  `language_routes` names for the language, else the best installed local recogniser that speaks it (the one the
+  recommendations name for the language, then a recogniser made for it), else `default_stt`; the routed recogniser
+  is told the language. Below `lid_min_probability` (0.5) or when the identifier cannot run, `default_stt` answers.
+  Routing never downloads a recogniser it was not told to use and never picks a cloud model on its own; a request
+  that names a model or a language is never changed; translations are not routed. The decision is in the new
+  `x-bolo-route` header (`auto -> indicconformer-ta-community; reason=recommended; language=ta; probability=1;
+  lid=voxlingua107-ecapa`, plus `recommended=<id>` when a better recogniser for the language is not installed), in
+  `x-bolo-language` (`ta; source=detected; probability=1; applied=true`) and in the trace's `route`.
+  `GET /api/v1/info` describes it under `capabilities.lid`. Settings `default_lid`, `language_routing` (on),
+  `language_routes` and `lid_min_probability`; extra `bolo-speech[lid]` (ONNX Runtime, which `all` already has
+  through faster-whisper).
+- Language identifiers in the catalog, each with its licence: `voxlingua107-ecapa` (SpeechBrain VoxLingua107
+  ECAPA-TDNN, Apache-2.0, 87 MB, 107 languages), `voxlingua107-ecapa-int8` (the same quantised, 22 MB, filterbanks
+  computed in NumPy), `ambernet-langid` (NVIDIA AmberNet, NGC Terms of Use, marked not for commercial use),
+  `whisper-tiny-lid` and `whisper-base-lid` (MIT: Whisper's own language detection with probabilities, on
+  sherpa-onnx's int8 Whisper graphs), all run in ONNX Runtime and measured; `mms-lid-126` and `mms-lid-4017`
+  (CC-BY-NC-4.0, int8 ONNX, 978 MB, runnable but not measured); and, not runnable yet,
+  `voxlect-indic-lid-whisper-small` (OpenRAIL), `voxlect-indic-lid-mms-lid-256` (CC-BY-NC-4.0) and `lid-indic-vaani`
+  (Apache-2.0). On the repository's English and Hindi clips and 39 clips synthesised with bolo's voices in 13 Indian
+  languages, the VoxLingua107 model was right on 11/11 and 33/39 (it does not know Odia and heard Urdu as Hindi) at
+  RTF 0.11 on one thread; Whisper base 11/11 and 24/39 at 0.61 (docs/models.md, "Language identification";
+  docs/measurements/lid.json).
 - **Console: voice blends and the language decision.** The text-to-speech page has a "Blend voices" panel for models
   with `voice-blending` (Kokoro): pick up to 8 of the model's voices with weights, see the blend as it is sent
   (`af_bella(0.7)+af_sky(0.3)`) and keep it in the voice library under a name. Saved blends are listed in the library

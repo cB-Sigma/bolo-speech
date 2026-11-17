@@ -76,6 +76,8 @@ from bolo.errors import (
     SynthesisFailed,
 )
 from bolo.jobs import Job, JobStore
+from bolo.lid import LidResult, parse_routes, route_headers
+from bolo.lid import identify as identify_language
 from bolo.lifecycle import LoadedModel, ModelManager
 from bolo.llm import AudioLLMClient, LLMClient
 from bolo.obs import otel
@@ -467,6 +469,7 @@ class Bolo:
             },
             "separation": self._separation_capability(),
             "denoise": self._denoise_capability(),
+            "lid": self._lid_capability(),
             "voices": {
                 "endpoint": "/api/v1/voices",
                 "openai": ["/v1/audio/voices", "/v1/audio/voice_consents"],
@@ -568,6 +571,54 @@ class Bolo:
             "default_on": bool(default and default.enabled),
             "setting": s.denoise,
         }
+
+    def _lid_capability(self) -> dict[str, Any]:
+        s = self.settings
+        spec = self.catalog.resolve(s.default_lid)
+        installed = bool(spec and self.manager.is_installed(spec))
+        engine_ok = bool(spec and self.engines.status(spec.engine).available)
+        return {
+            "available": bool(spec) and engine_ok and (installed or s.auto_pull),
+            "installed": installed,
+            "default_model": spec.id if spec else None,
+            "endpoint": "/v1/audio/language",
+            "routing": {
+                "enabled": bool(s.language_routing),
+                "model_names": ["auto"],
+                "routes": dict(sorted(parse_routes(s.language_routes).items())),
+                "min_probability": s.lid_min_probability,
+                "header": "x-bolo-route",
+            },
+        }
+
+    async def identify_language(
+        self, samples: FloatArray, sample_rate: int, model: str | None = None, trace: Trace | None = None
+    ) -> LidResult:
+        """Which language is spoken (``model``, else ``default_lid``): every language the model knows with its
+        probability, most likely first (bolo.lid)."""
+        spec = self.resolve(model, "lid")
+        trace = trace or Trace("lid", "internal", spec.id)
+        trace.model = spec.id
+        trace.audio_seconds = len(samples) / sample_rate if sample_rate else 0.0
+        try:
+            result = await identify_language(self, samples, sample_rate, spec.id, trace)
+            trace.extra["lid"] = {"language": result.language, "probability": round(result.probability, 4)}
+            trace.mark_final()
+            trace.finish("ok")
+            if trace.audio_seconds and trace.total_ms is not None:
+                trace.rtf = trace.total_ms / 1000.0 / trace.audio_seconds
+            return result
+        except asyncio.CancelledError:
+            trace.finish("cancelled", "client disconnected")
+            raise
+        except BoloError as exc:
+            trace.finish("error", exc.message)
+            raise
+        except Exception as exc:
+            trace.finish("error", f"{type(exc).__name__}: {exc}")
+            raise
+        finally:
+            self.traces.record(trace)
 
     def note_separation(self, result: SeparationResult) -> None:
         self.separation_counts[result.status] = self.separation_counts.get(result.status, 0) + 1
@@ -819,6 +870,7 @@ class Bolo:
                 "turn": s.default_turn,
                 "separation": s.default_separation,
                 "denoise": s.default_denoise,
+                "lid": s.default_lid,
             }
             name = defaults[task]
         elif name == "realtime":
@@ -2409,6 +2461,9 @@ def fallback_headers(trace: Trace) -> dict[str, str]:
     if isinstance(record, dict) and record.get("attempts"):
         first = record["attempts"][0]
         headers["x-bolo-fallback"] = f"{record['requested']} -> {trace.model}; reason={first.get('code')}"
+    routed = trace.extra.get("route")
+    if isinstance(routed, dict):
+        headers.update(route_headers(routed))
     cleanup = trace.extra.get("denoise")
     if isinstance(cleanup, dict) and cleanup.get("model"):
         if cleanup.get("status") == "skipped":

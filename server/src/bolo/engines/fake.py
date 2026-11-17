@@ -31,6 +31,7 @@ from bolo.engines.base import (
     Engine,
     EngineStatus,
     FloatArray,
+    LidModel,
     LoadOptions,
     Model,
     Segment,
@@ -621,13 +622,46 @@ class FakeS2S(SpeechToSpeechModel):
             yield ConversationChunk(text=word if i == 0 else " " + word, audio=tone)
 
 
+class FakeLid(LidModel):
+    """Language identification by pitch (tests only): the dominant frequency picks the language whose tone in
+    ``tones`` (Hz -> language) is nearest. That language gets ``confidence``; the rest share what is left.
+    A recording with no sound at all answers the first language at an even split. Remembers every call's length."""
+
+    DEFAULT_TONES = {220.0: "en", 440.0: "hi", 660.0: "ta", 880.0: "fr"}
+
+    def __init__(self, opts: dict[str, Any]) -> None:
+        raw = opts.get("tones")
+        self.tones = {float(k): str(v) for k, v in raw.items()} if isinstance(raw, dict) else dict(self.DEFAULT_TONES)
+        self.labels = list(dict.fromkeys(self.tones.values()))
+        self.confidence = float(opts.get("confidence", 0.9))
+        self.max_s = float(opts.get("max_s", 30.0))
+        self.fail = bool(opts.get("fail", False))
+        self.calls: list[int] = []
+        self._lock = threading.Lock()
+
+    def identify(self, samples: FloatArray) -> list[tuple[str, float]]:
+        if self.fail:
+            raise RuntimeError("fake language identification failure requested")
+        with self._lock:
+            self.calls.append(len(samples))
+        n = len(self.labels)
+        if len(samples) == 0 or not np.any(samples):
+            return [(lang, 1.0 / n) for lang in self.labels]
+        spectrum = np.abs(np.fft.rfft(samples))
+        peak = float(np.argmax(spectrum)) * self.sample_rate / len(samples)
+        best = self.tones[min(self.tones, key=lambda f: abs(f - peak))]
+        rest = (1.0 - self.confidence) / max(1, n - 1)
+        out = [(best, self.confidence if n > 1 else 1.0)] + [(lang, rest) for lang in self.labels if lang != best]
+        return out
+
+
 class FakeEngine(Engine):
     id = "fake"
     name = "Fake engine (testing)"
     license = "Apache-2.0"
     kinds = (
         "fake-stt", "fake-stt-streaming", "fake-stt-speakers", "fake-tts", "fake-vad", "fake-diarization", "fake-turn",
-        "fake-turn-text", "fake-separation", "fake-denoise", "fake-s2s",
+        "fake-turn-text", "fake-separation", "fake-denoise", "fake-s2s", "fake-lid",
     )  # fmt: skip
 
     def __init__(self) -> None:
@@ -661,6 +695,8 @@ class FakeEngine(Engine):
             model = FakeDenoiser(merged)
         elif kind == "fake-s2s":
             model = FakeS2S(merged)
+        elif kind == "fake-lid":
+            model = FakeLid(merged)
         else:
             raise ValueError(f"fake engine cannot load kind {kind!r}")
         self.loaded.append(model)

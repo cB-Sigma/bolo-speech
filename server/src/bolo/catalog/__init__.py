@@ -19,7 +19,8 @@ import yaml
 from bolo.store import Source
 
 TASKS = (
-    "stt", "tts", "vad", "diarization", "turn", "translation", "separation", "denoise", "speech-to-speech", "audio-llm",
+    "stt", "tts", "vad", "diarization", "turn", "translation", "separation", "denoise", "lid", "speech-to-speech",
+    "audio-llm",
 )  # fmt: skip
 TIERS = ("realtime", "balanced", "accuracy")
 VALIDATED = ("cpu", "untested")
@@ -300,6 +301,18 @@ FAKE_MODELS: list[dict[str, Any]] = [
         "id": "fake-denoise-48k", "task": "denoise", "engine": "fake", "kind": "fake-denoise", "family": "Fake",
         "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True, "options": {"sample_rate": 48000},
         "description": "Test denoiser that works at 48 kHz, like full-band enhancement models.",
+    },
+    {
+        "id": "fake-lid", "task": "lid", "engine": "fake", "kind": "fake-lid", "family": "Fake",
+        "languages": ["en", "hi", "ta", "fr"], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
+        "description": "Test language identifier: the dominant pitch picks the language (220 Hz English, 440 Hz Hindi, "
+        "660 Hz Tamil, 880 Hz French). Not real language identification.",
+    },
+    {
+        "id": "fake-stt-ta", "task": "stt", "engine": "fake", "kind": "fake-stt", "family": "Fake",
+        "languages": ["ta"], "tier": "balanced", "license": "Apache-2.0", "builtin": True,
+        "description": "Deterministic one-language test recogniser (Tamil), for language routing. Not real recognition.",
+        "options": {"base_delay_s": 0.01, "delay_per_audio_s": 0.0},
     },
     {
         "id": "fake-turn", "task": "turn", "engine": "fake", "kind": "fake-turn", "family": "Fake", "languages": [],

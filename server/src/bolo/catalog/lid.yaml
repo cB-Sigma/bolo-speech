@@ -1,0 +1,578 @@
+# Spoken-language identification (task: lid): which language a recording is in. Used by POST /v1/audio/language
+# and by language routing (a transcription with model "auto" and no language goes to a recogniser for the language
+# heard; bolo.lid, docs/api.md "Language identification and routing"). The runnable ones run in ONNX Runtime
+# (bolo.engines.lid_onnx). Licences differ: MMS-LID and its fine-tunes are non-commercial, AmberNet is under
+# NVIDIA's NGC Terms of Use.
+
+- id: voxlingua107-ecapa
+  aliases: [speechbrain/lang-id-voxlingua107-ecapa, voxlingua107]
+  task: lid
+  engine: onnxruntime
+  kind: onnx_lid
+  family: VoxLingua107 ECAPA-TDNN
+  languages: [ab, af, am, ar, as, az, ba, be, bg, bn, bo, br, bs, ca, ceb, cs, cy, da, de, el, en, eo, es, et, eu, fa, fi,
+    fo, fr, gl, gn, gu, gv, ha, haw, hi, hr, ht, hu, hy, ia, id, is, it, he, ja, jv, ka, kk, km, kn, ko, la, lb,
+    ln, lo, lt, lv, mg, mi, mk, ml, mn, mr, ms, mt, my, ne, nl, nn, 'no', oc, pa, pl, ps, pt, ro, ru, sa, sco,
+    sd, si, sk, sl, sn, so, sq, sr, su, sv, sw, ta, te, tg, th, tk, tl, tr, tt, uk, ur, uz, vi, war, yi, yo, zh]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 86662854
+  params: 21000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/speechbrain/lang-id-voxlingua107-ecapa
+  description: 'SpeechBrain''s ECAPA-TDNN language identifier trained on VoxLingua107 (YouTube speech in 107 languages), as one
+    ONNX graph from 16 kHz audio to 107 language scores, the filterbank front end inside. Hears Hindi, Bengali,
+    Tamil, Telugu, Marathi, Gujarati, Kannada, Malayalam, Punjabi, Urdu, Nepali, Assamese, Sanskrit, Sindhi and
+    Sinhala; not Odia or the other scheduled languages. ONNX export by Chris Thompson
+    (christopherthompson81/voxlingua107-lid-onnx), checked by its author against the PyTorch model. Unreliable
+    on clips under about 3 s.'
+  source_url: https://huggingface.co/speechbrain/lang-id-voxlingua107-ecapa
+  validated: cpu
+  measured:
+    rtf: 0.106
+    rtf_note: median wall time per second of audio heard, one thread, clips of 2.4 to 30 s
+    accuracy: 0.88
+    audio_s: 4.2
+    load_s: 4.2
+    load_note: loading the model and identifying the first clip
+    threads: 1
+    engine: onnxruntime 1.29.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 14-18)
+    date: '2026-11-17'
+    test_audio: 50 clips, docs/measurements/lid.json
+    note: 'top-1 language right on 11/11 of the repository''s English and Hindi clips and 33/39 synthesised clips in 13
+      Indian languages (the misses: Odia, which it does not know, and Urdu, heard as Hindi);
+      docs/measurements/lid.json'
+  source:
+    repo: christopherthompson81/voxlingua107-lid-onnx
+    revision: e02e1da805ae49635fe1aa7913c3f1e7f5f5fde6
+    include: [voxlingua107.onnx, lang_map.json]
+  options:
+    model: voxlingua107.onnx
+    labels: lang_map.json
+    features: raw
+    max_s: 30
+- id: voxlingua107-ecapa-int8
+  task: lid
+  engine: onnxruntime
+  kind: onnx_lid
+  family: VoxLingua107 ECAPA-TDNN
+  languages: [ab, af, am, ar, as, az, ba, be, bg, bn, bo, br, bs, ca, ceb, cs, cy, da, de, el, en, eo, es, et, eu, fa, fi,
+    fo, fr, gl, gn, gu, gv, ha, haw, hi, hr, ht, hu, hy, ia, id, is, it, he, ja, jv, ka, kk, km, kn, ko, la, lb,
+    ln, lo, lt, lv, mg, mi, mk, ml, mn, mr, ms, mt, my, ne, nl, nn, 'no', oc, pa, pl, ps, pt, ro, ru, sa, sco,
+    sd, si, sk, sl, sn, so, sq, sr, su, sv, sw, ta, te, tg, th, tk, tl, tr, tt, uk, ur, uz, vi, war, yi, yo, zh]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 21935714
+  params: 21000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/speechbrain/lang-id-voxlingua107-ecapa
+  description: 'The same VoxLingua107 ECAPA-TDNN language identifier quantised to int8 (22 MB instead of 87 MB), from
+    doanhlt/cabin-lid-ecapa-voxlingua107-onnx. The graph takes 60-band filterbank features, which bolo computes
+    in NumPy as SpeechBrain does. In our check its top language and probabilities matched the full-precision
+    graph on every clip; the int8 weights change the scores of unlikely languages a little.'
+  source_url: https://huggingface.co/doanhlt/cabin-lid-ecapa-voxlingua107-onnx
+  validated: cpu
+  measured:
+    rtf: 0.135
+    rtf_note: median wall time per second of audio heard, one thread, clips of 2.4 to 30 s
+    accuracy: 0.88
+    audio_s: 4.2
+    load_s: 0.9
+    load_note: loading the model and identifying the first clip
+    threads: 1
+    engine: onnxruntime 1.29.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 14-18)
+    date: '2026-11-17'
+    test_audio: 50 clips, docs/measurements/lid.json
+    note: 'top-1 language right on 11/11 of the repository''s English and Hindi clips and 33/39 synthesised clips in 13
+      Indian languages (the misses: Odia, which it does not know, and Urdu, heard as Hindi);
+      docs/measurements/lid.json'
+
+  source:
+    repo: doanhlt/cabin-lid-ecapa-voxlingua107-onnx
+    revision: 44f3fb4facf01d97d1c3342807eaf15150b271d2
+    include: [ecapa.int8pc.onnx, labels.txt]
+  options:
+    model: ecapa.int8pc.onnx
+    labels: labels.txt
+    features: fbank60
+    max_s: 30
+- id: whisper-tiny-lid
+  task: lid
+  engine: onnxruntime
+  kind: whisper_lid
+  family: Whisper
+  languages: [sq, ml, de, hi, uz, zh, nl, he, sk, gl, lv, ar, tr, haw, gu, si, be, bo, tk, sr, mr, pt, mn, sa, tg, pa, sv,
+    as, sl, su, ba, hu, ln, br, es, ca, bg, hy, th, yo, it, da, oc, ro, ta, is, bs, cs, lb, my, sd, fo, ne, ha,
+    te, mi, cy, el, mg, af, yi, kn, ms, so, nn, tt, en, tl, pl, ko, az, hr, am, id, uk, ps, 'no', eu, kk, km,
+    lo, sn, fr, mk, la, jv, fi, bn, lt, vi, ka, mt, sw, ur, ru, ja, fa, ht, et]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 102793173
+  params: 39000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  description: 'OpenAI Whisper tiny''s own language detection, used on its own: the encoder hears the first 30 s and the
+    decoder scores Whisper''s 99 language tokens, which gives a probability for each language. Runs the int8
+    graphs of sherpa-onnx''s Whisper tiny export (the files whisper-tiny uses for recognition) in ONNX Runtime.
+    Covers Hindi, Bengali, Tamil, Telugu, Marathi, Gujarati, Kannada, Malayalam, Punjabi, Urdu, Nepali,
+    Assamese, Sanskrit and Sindhi; not Odia. Always 30 s of encoder work, however short the clip.'
+  source_url: https://github.com/openai/whisper
+  validated: cpu
+  measured:
+    rtf: 0.301
+    rtf_note: median wall time per second of audio heard, one thread, clips of 2.4 to 30 s
+    accuracy: 0.6
+    audio_s: 4.2
+    load_s: 2.5
+    load_note: loading the model and identifying the first clip
+    threads: 1
+    engine: onnxruntime 1.29.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 14-18)
+    date: '2026-11-17'
+    test_audio: 50 clips, docs/measurements/lid.json
+    note: 'always 30 s of encoder work, so short clips cost as much as 30 s ones; top-1 language right on 11/11 of the
+      repository''s English and Hindi clips and 19/39 synthesised clips in 13 Indian languages (it confuses the
+      Indian languages with each other and with unrelated ones on these short clips);
+      docs/measurements/lid.json'
+
+  source:
+    repo: csukuangfj/sherpa-onnx-whisper-tiny
+    revision: 65176e2deb88badc814a94058666cadccc29b61c
+    include: ['*-encoder.int8.onnx', '*-decoder.int8.onnx']
+  options:
+    encoder: '*-encoder.int8.onnx'
+    decoder: '*-decoder.int8.onnx'
+- id: whisper-base-lid
+  task: lid
+  engine: onnxruntime
+  kind: whisper_lid
+  family: Whisper
+  languages: [sq, ml, de, hi, uz, zh, nl, he, sk, gl, lv, ar, tr, haw, gu, si, be, bo, tk, sr, mr, pt, mn, sa, tg, pa, sv,
+    as, sl, su, ba, hu, ln, br, es, ca, bg, hy, th, yo, it, da, oc, ro, ta, is, bs, cs, lb, my, sd, fo, ne, ha,
+    te, mi, cy, el, mg, af, yi, kn, ms, so, nn, tt, en, tl, pl, ko, az, hr, am, id, uk, ps, 'no', eu, kk, km,
+    lo, sn, fr, mk, la, jv, fi, bn, lt, vi, ka, mt, sw, ur, ru, ja, fa, ht, et]
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 159792560
+  params: 74000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  description: 'OpenAI Whisper base''s own language detection, used on its own: the encoder hears the first 30 s and the
+    decoder scores Whisper''s 99 language tokens, which gives a probability for each language. Runs the int8
+    graphs of sherpa-onnx''s Whisper base export (the files whisper-base uses for recognition) in ONNX Runtime.
+    Covers Hindi, Bengali, Tamil, Telugu, Marathi, Gujarati, Kannada, Malayalam, Punjabi, Urdu, Nepali,
+    Assamese, Sanskrit and Sindhi; not Odia. Always 30 s of encoder work, however short the clip.'
+  source_url: https://github.com/openai/whisper
+  validated: cpu
+  measured:
+    rtf: 0.608
+    rtf_note: median wall time per second of audio heard, one thread, clips of 2.4 to 30 s
+    accuracy: 0.7
+    audio_s: 4.2
+    load_s: 9.4
+    load_note: loading the model and identifying the first clip
+    threads: 1
+    engine: onnxruntime 1.29.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 14-18)
+    date: '2026-11-17'
+    test_audio: 50 clips, docs/measurements/lid.json
+    note: 'always 30 s of encoder work, so short clips cost as much as 30 s ones; top-1 language right on 11/11 of the
+      repository''s English and Hindi clips and 24/39 synthesised clips in 13 Indian languages (it confuses the
+      Indian languages with each other and with unrelated ones on these short clips);
+      docs/measurements/lid.json'
+
+  source:
+    repo: csukuangfj/sherpa-onnx-whisper-base
+    revision: bb53ee204431c90d314c1cc08d28d23e5b7927cc
+    include: ['*-encoder.int8.onnx', '*-decoder.int8.onnx']
+  options:
+    encoder: '*-encoder.int8.onnx'
+    decoder: '*-decoder.int8.onnx'
+- id: ambernet-langid
+  aliases: [nvidia/langid_ambernet, ambernet]
+  task: lid
+  engine: onnxruntime
+  kind: onnx_lid
+  family: AmberNet
+  languages: [ab, af, am, ar, as, az, ba, be, bg, bn, bo, br, bs, ca, ceb, cs, cy, da, de, el, en, eo, es, et, eu, fa, fi,
+    fo, fr, gl, gn, gu, gv, ha, haw, hi, hr, ht, hu, hy, ia, id, is, it, he, ja, jv, ka, kk, km, kn, ko, la, lb,
+    ln, lo, lt, lv, mg, mi, mk, ml, mn, mr, ms, mt, my, ne, nl, nn, 'no', oc, pa, pl, ps, pt, ro, ru, sa, sco,
+    sd, si, sk, sl, sn, so, sq, sr, su, sv, sw, ta, te, tg, th, tk, tl, tr, tt, uk, ur, uz, vi, war, yi, yo, zh]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 116897592
+  params: 28900000
+  license: NGC-Terms-of-Use
+  license_url: https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/langid_ambernet
+  commercial_use: false
+  description: 'NVIDIA NeMo AmberNet (depthwise-separable convolutions with squeeze-and-excitation) trained on VoxLingua107:
+    107 languages, from 16 kHz audio to language scores in one ONNX graph (export by surogate/ambernet-langid).
+    Licence: NVIDIA''s model card says the NGC Terms of Use govern it, which are not an open licence; bolo marks
+    it not for commercial use until you have read those terms.'
+  source_url: https://huggingface.co/surogate/ambernet-langid
+  validated: cpu
+  measured:
+    rtf: 0.104
+    rtf_note: median wall time per second of audio heard, one thread, clips of 2.4 to 30 s
+    accuracy: 0.86
+    audio_s: 4.2
+    load_s: 2.8
+    load_note: loading the model and identifying the first clip
+    threads: 1
+    engine: onnxruntime 1.29.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 14-18)
+    date: '2026-11-17'
+    test_audio: 50 clips, docs/measurements/lid.json
+    note: 'top-1 language right on 10/11 of the repository''s English and Hindi clips and 33/39 synthesised clips in 13
+      Indian languages (the misses: Odia, which it does not know, and Urdu, heard as Hindi; and a 1961 recording
+      of English heard as Portuguese); docs/measurements/lid.json'
+
+  source:
+    repo: surogate/ambernet-langid
+    revision: 3b7b3fbfcc51753745f1d9abd107c9530c391d5b
+    include: [ambernet.onnx, config.json]
+  options:
+    model: ambernet.onnx
+    labels: config.json
+    features: raw
+    max_s: 30
+- id: mms-lid-126
+  aliases: [facebook/mms-lid-126]
+  task: lid
+  engine: onnxruntime
+  kind: onnx_lid
+  family: MMS-LID
+  languages: [ar, zh, en, es, fr, mg, sv, pt, vi, ff, su, as, bn, ms, ko, id, hi, tk, ur, az, sl, mn, ha, te, sw, bo, ru, tr,
+    he, mr, so, tl, tt, th, ca, ro, ml, be, pl, yo, nl, bg, ht, af, is, am, ta, hu, hr, lt, cy, fa, mk, el, bs,
+    de, sq, jv, 'no', uz, sd, la, ny, gn, my, om, ln, hy, yue, pa, ja, kk, ne, ka, gu, kn, tg, uk, cs, lv, ba,
+    km, fo, gl, lb, lo, mt, si, sn, it, sr, mi, nn, ps, eu, or, lg, br, luo, sk, fi, da, yi, et, ceb, war, sa,
+    ky, oc, wo, haw, kam, umb, xh, eo, zu, ig, ab, ckb, nso, ga, kea, ast, sco, gv, ia]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 973923790
+  params: 1000000000
+  license: CC-BY-NC-4.0
+  license_url: https://huggingface.co/facebook/mms-lid-126
+  commercial_use: false
+  description: 'Meta''s Massively Multilingual Speech language identifier (wav2vec 2.0, 1 B parameters) for 126 languages, Odia
+    among them (which Whisper and VoxLingua107 lack). Non-commercial (CC-BY-NC-4.0). The int8 ONNX export of
+    Xenova/mms-lid-126 (978 MB) in ONNX Runtime; the audio is normalised to zero mean and unit variance as the
+    model expects. Not run here: it is larger than this project''s test machines allow for a measured run, and
+    slow on a CPU (1 B parameters over every second of audio).'
+  source_url: https://huggingface.co/facebook/mms-lid-126
+  validated: untested
+  source:
+    repo: Xenova/mms-lid-126
+    revision: 0a867d6b271b76c068b2ce43f7ecebb76c58205d
+    include: [onnx/model_quantized.onnx, config.json]
+  options:
+    model: onnx/model_quantized.onnx
+    labels: config.json
+    features: raw
+    normalize: true
+    max_s: 20
+- id: mms-lid-4017
+  aliases: [facebook/mms-lid-4017]
+  task: lid
+  engine: onnxruntime
+  kind: onnx_lid
+  family: MMS-LID
+  languages: [ar, zh, en, es, fr, mg, sv, ff, pt, vi, su, ms, bn, ko, tk, hi, as, id, ur, sw, az, ha, so, mn, te, bo, ru, tt,
+    tl, sl, tr, mr, he, th, ro, yo, be, ml, ca, am, bg, ht, mk, pl, nl, hu, ta, hr, fa, af, ny, cy, is, om, ku,
+    ln, jv, sd, 'no', uz, bs, de, lt, my, la, gn, kk, ne, kik, el, sq, yue, cak, hy, ka, kn, ja, pa, lv, gu, cs,
+    tg, km, ba, uk, che, fo, mam, xog, gl, lb, quc, aka, lo, crh, sn, mt, poh, si, cfm, ixl, aiw, mi, tuv, gag,
+    ps, it, sr, lg, eu, kia, nn, nhx, gur, or, luo, sxn, xsm, cmo, kbp, sk, ewe, dtp, fi, acr, ayo, quy, saq,
+    quh, rif, br, bqc, tzj, mos, bwq, yao, cac, xon, new, yi, hne, da, hus, dyu, uig, pse, bam, bus, ttq, ngl,
+    et, txa, tso, gng, seh, wlx, sck, rjs, ntm, lok, tcc, mup, dga, lis, kru, cnh, bxk, mnk, amf, dos, guh, rmc,
+    rel, zne, teo, mzi, tpi, ycl, bis, xsr, ddn, thl, wal, ctg, onb, uhn, gbo, vmw, beh, mip, lnd, khg, bfz,
+    ifa, gna, rol, nzi, ceb, lcp, kml, sxb, nym, acn, bfo, mhy, adx, mqj, bbc, pmf, dsh, bfy, sid, nko, grc,
+    bno, bfa, pxm, sda, oku, mbu, pwg, qxl, ndv, nmz, soy, vut, tzh, mcr, box, iri, nxq, ayr, ikk, bgq, bbo,
+    gof, bmq, kdt, cla, asa, lew, war, muv, bqp, kfx, zpu, txu, xal, fon, maj, mag, kle, alp, hlb, any, poe,
+    bjw, rro, pil, rej, lbw, bdu, dgi, mgo, mkl, mco, maa, vif, btd, kcg, tng, pls, kdl, tzo, pui, pap, lns,
+    kyb, ksb, akp, zar, gil, blt, ctd, mhx, mtg, gud, hnn, kek, mxt, frd, bmv, krc, suz, ndy, pny, ava, cwa,
+    icr, mcp, hyw, bov, hlt, zim, dnw, naw, udm, xed, kqp, kpv, bkd, xnj, atb, cwe, lje, nog, kij, ttc, sch,
+    mqn, mbj, btx, atg, ife, bgw, gri, trs, kjh, bhz, moz, mjv, kyf, chv, ati, ybb, did, gau, dnj, bzh, kbo,
+    cle, pib, crs, had, nhy, yba, zpz, yka, tgo, dgk, mgd, twb, lon, cek, tuo, cab, muy, rug, taq, tex, tlj,
+    sne, smo, nsu, enx, bqj, nin, cnl, btt, nlc, nlg, mcq, tly, mge, prk, ium, zpt, aeu, eka, mfk, akb, mxb,
+    cso, kak, yre, obo, tgj, abi, yas, men, nga, blh, kdc, cmr, zyp, bom, aia, zpg, yea, xuo, ubl, hwc, xtm,
+    mhr, avn, log, xsb, kri, idd, mnw, plw, nuj, ted, guq, sbp, lln, blx, tmc, knb, kwf, met, rkt, mib, miy,
+    lsi, zaj, mih, myv, luc, rnl, tob, mpm, kfw, kne, asg, pps, ake, amk, flr, trn, tom, yat, tna, xmm, poi,
+    qxr, myy, bep, tte, zmz, kqe, sjm, kwd, abp, kmd, tih, pez, urt, mim, knj, gqr, kvn, suc, med, ury, kpq,
+    tbl, mto, kzf, lex, bdh, zpc, hoc, mbc, moa, krs, mej, snp, nlk, wsg, zaq, far, rap, bmr, gwr, not, yaz,
+    ess, pss, cgc, dbq, gub, kje, azg, ktj, sil, kqr, tnt, pjt, cul, tmf, tav, stn, cjo, mil, ky, cbi, dav, gai,
+    sey, ppk, xtd, pis, qvh, cbr, mai, omw, tao, prt, tnr, tlb, rw, ami, agu, cok, sa, kaq, lif, arl, tvw, atq,
+    iba, knk, wap, kog, rub, tuf, zga, crt, jun, yal, ksr, boj, run, tye, cpu, ngu, huu, mcd, byr, dah, cpb,
+    nas, nij, pkb, gux, dig, gog, gbm, kmu, tbk, nhe, snn, cui, lid, hnj, ojb, ubu, nyy, sho, mpd, ti, kdj, gvc,
+    urb, awa, bcc, cof, cot, bgr, sus, nan, ame, kno, nyn, nyf, bor, dnt, grt, xte, mdy, hak, guo, ses, suk,
+    mqf, bjr, bem, keo, guk, mtj, bbb, crk, lam, kue, khq, kus, lsm, bwu, dug, nsk, sbd, kdh, crq, sah, mur,
+    shn, spy, cko, aha, mfz, rmy, nim, gjn, kde, bsq, spp, esi, kqn, zyb, oc, nnw, qva, cly, rim, oss, vag, bru,
+    dag, ade, gum, law, yaa, tem, hap, kaa, raw, mpx, kff, lhu, taj, dyo, hui, kbr, mpg, mwq, guc, niy, nus,
+    mzj, mnx, tbz, bib, quz, mev, kma, ptu, wme, lef, mfi, bky, mdm, mgh, bvc, bim, eip, mnb, fij, maw, dip,
+    qul, bgc, mxv, thf, bud, dzo, lom, ztq, urk, mfq, ach, las, kyz, nia, sgb, tpm, tbt, dgo, qvo, zab, dik,
+    pbb, cas, kac, dop, pcm, shk, xnr, zpo, ktb, bba, sba, myb, quw, emp, ctu, gbk, guw, blz, nst, cnt, ilo,
+    cme, yan, srx, qvm, mhi, mzw, fal, zao, set, csk, wo, nnb, zas, zaw, cap, mgq, yam, sig, kam, biv, laj, otq,
+    pce, mwv, mak, bvz, kfb, alz, dwr, hif, hag, kao, rav, mor, lme, nav, lob, cax, cdj, upv, dhi, knf, mad,
+    kfy, alt, tgw, ceg, wwa, ljp, myk, acd, jow, sag, ntr, kbq, jiv, mxq, ahk, kab, mie, car, nfr, mfe, cni,
+    led, mbb, twu, nag, cya, kum, tsz, cco, mnf, prf, bgt, nhu, mzm, trq, ken, ker, bpr, cou, kyq, pkr, xpe,
+    zpl, kyc, enb, yva, zad, bcl, bex, huv, sas, ruf, srn, vun, gor, tik, xtn, gmv, kez, sld, kss, vid, old,
+    nod, kxm, lia, izr, ozm, bfd, acf, thk, mah, sgw, mfh, daa, yuz, ifb, jmc, nyo, anv, cbt, myx, zai, nhw,
+    tby, ncu, nhi, adj, wba, usp, lgg, irk, iou, tca, mjl, ote, kpz, bdq, qub, jam, agr, zpi, sml, soq, mvp,
+    kxc, bsc, hay, dyi, ilb, itv, hil, bkv, poy, tgp, awb, cuk, miz, bmu, txq, gyr, kdi, zpm, adh, npl, tue,
+    mrw, lee, bss, pam, aaz, kqy, pau, key, cpa, alj, kkj, tap, sbl, qvw, yua, ziw, xrb, msy, mcu, sur, heh,
+    con, lwo, gej, gnd, ace, zos, agd, bci, cce, toc, mbt, shi, tll, cjp, kjb, toi, pbi, ann, krl, bht, vmy,
+    bst, gkn, klv, nwb, bng, shp, pag, jbu, klu, gso, kyu, mio, ngp, zaa, eza, omi, izz, loq, pww, udu, miq,
+    tnk, min, pab, cuc, mca, agn, lem, bav, bzj, jac, gbi, pko, noa, dts, bnp, gxx, haw, ood, qxh, bts, crn,
+    krj, umb, sgj, tbc, tpp, zty, kki, rai, qwh, kub, ndj, hns, chz, ksp, qvn, gde, mfy, bjv, udg, mpp, sja,
+    cbs, ese, ded, rng, bao, muh, mif, cwt, wmw, ign, acu, ndp, mir, bzi, bps, ycn, snw, jnj, ifu, iqw, djk,
+    lip, gvl, kdn, mzk, tnn, toh, apb, qxn, nnq, rmo, xsu, ncj, nyu, mop, mrj, tpt, wob, ifk, mog, ter, bcw,
+    boa, stp, hig, mit, maz, way, tee, ban, srm, pao, pbc, mas, mda, nse, gym, tri, hto, mfx, hno, bgd, cbc,
+    mqb, yli, gwi, tac, cbv, bxg, npy, qvs, ura, nch, hub, coe, ibg, pir, mbh, mey, meq, zae, neb, ldi, ify,
+    qvz, zca, gam, pad, jvn, kwi, tfr, ata, bxh, mox, nab, ndz, sri, guu, quf, csy, yad, cbu, mza, inb, qve,
+    qvc, waw, saj, caa, wbi, alw, lgl, jic, lac, apr, azz, cnw, tos, qxo, ig, des, nca, mkw, avu, otn, stb, kby,
+    xh, bcq, pae, aui, lnl, tbg, tnc, guz, ksw, syl, tyv, lww, zu, lai, mww, mcb, loz, beq, mer, mwt, arn, ore,
+    bza, lun, lbj, apf, bto, mnh, sab, kxf, pov, nbw, ckb, bdg, eo, sfw, knc, tzm, top, lus, ige, tum, gvr, bjz,
+    csh, xdy, bho, ab, ijc, nso, vai, neq, gkp, dje, bev, jen, lub, ndc, lrc, qug, aca, bax, bum, srr, tiv, sea,
+    maf, pci, xkl, rhg, dgr, bft, ngc, tew, lua, kck, awn, cag, lag, tdy, ada, soe, swk, mni, pdt, ebu, bwr,
+    etu, krw, gaa, isn, sru, mkn, ga, ubr, mzz, mug, kqs, ipi, ssn, ida, kvj, knp, trc, zza, nzb, mcn, wed, lol,
+    lic, jaa, zpq, skr, dww, rml, ggu, hdy, ktu, mgw, lmp, mfa, enl, cje, ijn, mwm, vmk, mua, ngb, dur, nup,
+    tsc, bkm, kpm, ayz, wim, idu, ksf, kqf, kea, urh, ksz, mro, ego, gya, kfc, nnc, mrt, ndi, ena, ogo, tui,
+    bhi, bzw, elm, okr, its, adi, geb, dow, kng, mhw, mgr, ast, igb, kfi, dzg, mzl, gvs, ncl, rao, kmb, krr,
+    sat, unr, ald, bhb, glk, gnn, iso, sef, bin, sgc, coh, dua, aoi, swp, viv, acz, nbq, wbp, gvo, giz, tod,
+    mwf, khe, dks, kaj, wlo, ady, ntj, emk, suj, lzz, snf, tvs, wnc, jra, zav, bbj, mhu, kel, njz, tuy, efi,
+    lgr, bmk, dhg, lgm, tdh, lue, tke, igl, bzd, nde, tsn, beo, gom, nyd, trp, kjl, haq, byv, ven, gvj, mpj,
+    fan, ble, jmx, byd, toq, snc, bvu, sdr, wes, her, swb, wod, dbj, bcp, lma, nhr, dde, haj, mzp, wbf, ktz,
+    qxu, bvd, mlk, bee, rmn, mwc, sou, sot, pln, rag, gv, bjg, mve, kha, nmn, xuu, mjt, jmd, koe, mwn, yml, wof,
+    tvk, xer, oki, dim, nnh, tbo, kjc, sep, gno, mix, trd, sco, klr, evn, brv, kjg, nuy, srq, tkr, tsb, djr,
+    kgk, mfv, div, msc, rki, fmu, mch, eyo, aoz, twm, nfa, mhs, hvn, chf, kls, ggw, mym, lbx, are, mjx, mtd,
+    ghr, nys, lrm, hni, pmy, lbm, akh, kay, rgs, lwg, nuz, khw, the, pof, seg, wci, tpe, bqi, bjn, bmf, kiw,
+    khz, ccp, cto, abt, sbe, suv, nos, tog, llc, zac, tet, kuj, tab, tcz, psa, kyg, zin, yup, ajg, bkx, imo,
+    iru, knx, knu, llg, nyk, ymm, xmc, lig, bgz, ia, xem, mau, wat, hix, rgu, mbp, cnk, nni, kpc, bfg, kud, tnv,
+    loe, slu, ztg, dwy, esg, thq, pgg, snk, nza, srb, blo, otd, yrl, adq, cjs, bbr, gup, pht, lbf, blr, scg,
+    awi, tpa, xdn, xdo, tix, dnn, fli, zam, lla, hts, agg, xta, nuf, tro, tlr, ssy, rah, pbo, ckt, pri, yon,
+    duc, ctp, kpo, pnb, mki, zpv, bha, maq, tth, nwi, eto, bob, atd, beu, bhw, gwn, phr, mxx, mui, sdq, xsq,
+    tkt, xky, mee, tsj, uki, mgp, kap, vaa, awu, afz, mvv, enq, bxr, qxp, sza, tdt, olu, bji, ton, knl, pdu,
+    blb, pwo, bon, kei, xav, zgb, bug, yiu, cbn, ckh, tpr, age, sie, gah, nes, jml, dgc, kvo, kmw, mrr, asy,
+    oyb, ria, ghe, shr, gnk, vah, djo, krn, khb, tpx, vaj, ks, hii, bun, jab, sbu, hmd, aoj, yoy, dhw, lir, kvw,
+    dhn, onr, lyn, skx, cao, ssw, iii, kca, kps, row, pcf, peg, itl, agx, kib, bap, brx, tqo, jna, apz, gaj,
+    dry, mho, bmb, wmt, dre, leu, srl, nbe, kup, gld, kqb, dar, anu, nti, ncm, kmc, mxn, ksd, tnl, sei, ino,
+    lep, zyn, rwr, pcc, kpy, hmt, kxv, dta, fwe, aix, mxj, sdo, hea, kfv, lae, cns, aso, lri, nmi, ong, cdm,
+    nii, mji, zik, dib, ewo, yom, bpe, cli, cro, mrm, wib, cch, kfq, bzf, shj, apw, mlu, xmz, vay, yiz, kai,
+    afe, kcl, gea, bcf, ish, wbr, tpj, kgp, mrd, sgp, ola, thr, pmi, sip, xri, xtl, twe, ekg, aly, kqm, kvf,
+    pav, ygr, ybi, kwv, bas, kfk, bku, amn, njb, zzj, rab, pex, boq, lot, bzy, syw, stt, ppt, tnp, afu, dhd,
+    ulu, pud, mjc, bwi, ram, gol, tsx, twh, cfa, hut, snx, dhm, bfb, tdf, onp, wbm, kpb, blk, ass, bhj, kge,
+    att, swv, giw, krv, nmo, cua, tpu, ikx, bwx, kjp, mgm, ahl, cik, wtm, xuj, nbu, mle, tjg, les, ntp, gju,
+    kwl, kyo, goj, cgk, zpj, szb, ysn, haz, niq, xra, tsr, mpr, yig, dby, sfm, mtr, ttr, kzs, pah, sdp, bpx,
+    wlv, mfc, dwz, kpr, sya, uth, aai, tes, myl, brg, lar, aii, uar, bde, shg, bzz, cux, kty, say, nfu, hmo,
+    meu, shy, kjo, ian, mde, mke, tic, txo, baa, lml, knv, agw, dao, bco, ywq, jul, lbq, grv, kgq, kxz, gjk,
+    ztp, aau, sso, mks, mbz, lra, tsg, mte, dob, all, lpo, qud, gdb, kwx, kbd, loy, mrg, xub, yss, kun, scp,
+    arr, kbc, slr, nkb, ica, pkh, lec, raa, sjp, wad, mnz, soi, sax, ybh, tld, klz, bpp, mql, sif, uss, hoe,
+    arv, tbf, lsr, mxu, skj, nmf, xmt, mdk, soa, kbl, mdb, bns, byn, mvg, tba, klw, mdd, mdr, tcy, cnb, tio,
+    xtc, asc, tar, amr, tan, dot, plj, blw, lbe, aks, yij, mjg, puu, uri, byx, noe, lhm, kft, grj, shb, mcf,
+    mpc, hca, kwj, ruk, bcs, eja, btu, msi, grd, jao, tcu, gwj, sly, mmg, pnq, ssx, hmr, lnu, mzr, mgu, mlm,
+    lbk, jms, brh, kjd, cub, bkq, bla, nbl, xkk, bfw, ott, ldl, lyg, wbl, lax, ort, hms, zpa, juk, jmn, nku,
+    nlx, yet, bge, rog, bec, jda, anr, kxj, pug, tcs, llp, ksu, poc, bkk, prp, wuu, zua, npb, gry, kex, kcv,
+    bhu, lle, cna, hsn, kui, zlj, mxe, mjz, pai, bqg, kfp, bca, ksg, aar, kdp, ssk, cog, wmo, brt, khr, swi,
+    nto, xkf, kzr, pwr, tyz, dus, kua, dzl, bgp, hoy, oro, cnc, xwe, gec, bli, myp, nao, inj, lhi, sqq, nnu,
+    bww, hia, mxy, bix, msm, bma, zau, tdd, roh, sui, xkz, bhx, lmx, pwb, ahr, lro, clo, jer, saw, mpq, xbi,
+    nfd, dad, cin, hal, tcn, der, mng, roo, apt, wsi, muk, jib, nnm, jbj, sjl, qwa, fod, cta, kej, zom, keu,
+    gbe, tyr, gga, aro, ebo, tgs, gia, anm, bda, zyj, ssb, scu, bra, bio, lea, foi, chq, nbm, kad, kil, abo,
+    kpl, ysp, kph, aup, cav, abs, kmi, kvi, pcn, dka, esk, nhp, bhd, isu, kzq, ppq, sce, ums, aim, ril, xua,
+    aac, bbk, kfg, mab, wno, bfu, ttv, tsv, iyo, xkb, gaw, pid, alu, lch, apu, bei, kgr, mdv, ths, sss, kvx,
+    lhp, ygw, jid, phk, dai, jio, hmg, hld, myu, cvg, auc, okv, zyg, bkl, lmn, wog, kgy, diu, alk, tcf, dub,
+    lkt, aot, tuz, kxp, nke, sgh, tts, qvi, moc, pmj, yuf, ngt, gdn, duh, khn, xwl, nar, ndd, mme, alf, lkr,
+    bcn, bvr, kif, mpt, gaq, ldj, tja, koi, bkr, thy, ayg, zak, tcx, hre, hmj, nbr, vav, tdj, tvd, suy, esu,
+    'yes', bwd, nbc, tgd, ncq, irx, dbv, vas, tpq, xsn, bkc, xbr, bdv, lpn, jwi, bgg, muz, bjx, lbo, apn, aol,
+    dcc, gdr, sbx, ssi, bqv, ctl, scl, kul, skn, aon, eve, pih, bby, lsh, lez, eot, cih, tkb, jae, bdi, rop,
+    bvh, can, zay, kpk, dbm, juy, ngn, buu, bxa, bfr, spn, fai, zpk, mfl, kky, wiu, bhf, ndx, dir, faa, bcg,
+    tww, xac, ktn, yiq, bew, avt, cjv, cqd, mtt, lhl, pnc, wew, iws, stk, bfm, luj, mkz, hmb, hbn, dza, tqu,
+    kra, moi, kgj, lkh, pne, dmg, kxw, dso, mnl, mse, doz, hve, ggb, gru, ich, mig, ute, anp, ayb, oub, ghs,
+    rmb, kwe, cjk, wti, agl, xtj, nac, kga, brd, los, khj, noi, emn, brr, ndr, ldb, ymk, gwd, pcg, ktv, arg,
+    mbk, bjj, nqg, fie, mln, nms, hru, wau, suo, nxr, kwa, tis, tva, pca, bwo, zdj, kmo, qxs, bef, emb, mqu,
+    nzy, fir, drg, kmy, wja, arh, drs, yaq, saf, bqh, pll, gmb, ksm, jeh, kwc, kmt, azo, nux, lbn, gyz, bol,
+    baw, cdh, amb, yeu, tig, kjq, muo, byc, uiv, bab, nnp, bac, yde, xty, fqs, kwn, oym, nhb, bwe, uis, dmo,
+    dio, gby, ibb, mjs, nxk, drd, apj, pua, wmd, sme, lmd, mvn, tlx, biz, gdf, otx, prm, nud, yno, sgz, bfh,
+    aps, ekr, zaz, aoe, otr, ppo, res, brf, vmz, aez, sbn, brb, vmc, krx, usi, nco, mzq, nut, ndm, ihp, tkx,
+    kvb, gas, aio, heg, mfn, juo, ywl, kvl, plc, tlf, nsm, thz, vig, mfd, adl, thm, jbm, bej, sen, mgb, hoo,
+    liq, tpl, tek, kid, tcp, rin, chw, xkn, kbx, bbt, cjm, mrn, khs, gvn, siw, udi, mjw, nlu, kmn, rnd, wrm,
+    kix, bsp, pqa, hio, ynq, yev, lev, ldm, dnd, aki, ktm, sym, bnj, hul, bys, swo, nbn, yay, jkp, amu, stj,
+    pma, yrk, cyo, isi, grh, naq, bau, bsh, mrq, pbm, kkn, crw, nja, erk, dgh, bdl, ags, ite, int, kcc, svs,
+    bpn, nuk, kkc, tvu, ybj, mxp, myw, kio, bsf, mxs, lga, twx, pmq, zns, bzu, dni, itd, ndb, gfk, zwa, gel,
+    hmz, nma, pck, sng, scs, dgz, gue, nlv, ghk, clj, xwg, lop, fvr, snl, blf, sre, zkr, khy, bfj, kfr, tku,
+    zps, ksn, mgc, bdd, kwk, ciw, rue, eky, anj, tdn, lky, hue, zln, taw, zkn, tlp, ayu, wuv, ula, zkd, dia,
+    szp, hot, nbb, alh, aom, bpz, ito, ukw, byp, tdg, kys, duv, mkk, auu, aof, bhq, kyv, wms, sge, pym, kku,
+    eit, kee, uta, vrs, hmw, ncr, mlq, snm, wut, spt, wni, kzi, nnd, mdt, wlc, nna, pio, duw, xkt, bui, mcc,
+    mmm, jum, miu, ngw, ksa, lur, ilk, cde, mez, kvr, mus, tmn, pmx, asb, ppm, mlf, btg, ppl, ykm, cod, rar,
+    nri, jmr, ttk, abz, osi, jax, bse, dsq, doy, naj, kmm, hoj, pch, jit, for, jmb, yin, kji, kgo, akg, yuq,
+    loa, jnl, bgf, nez, tji, kow, wlw, ybl, pot, ape, klo, xks, lkn, zpx, kwo, bpy, jle, bqr, bdb, git, wle,
+    nir, wyy, pbs, cdo, nbh, isd, nhn, ckx, gim, kla, sjo, kvq, vmx, jad, cdr, mvo, uya, cho, aqm, mea, krf,
+    ijj, dez, gnm, cbj, bgn, mbl, utr, bcy, cry, spo, alx, ukp, bhh, ahp, kht, wwo, bya, mlv, qvj, nix, xkv,
+    has, slp, kza, mxd, dna, bmi, ont, rbb, auk, mov, bsn, mck, odu, kvt, nrf, rmt, duu, nnj, csa, sps, dox,
+    kal, bri, piy, atp, loh, ets, ccl, djm, nak, png, hoa, bgs, bbq, tnb, aab, cnq, lmu, pha, kvu, cpx, nih,
+    sjb, how, nxd, gis, xns, hbb, sde, ior, mmd, pnu, ngs, hrm, bze, byz, cov, oma, bfs, bfq, mdj, syk, pei,
+    mmz, ldg, tds, tkd, wow, cox, czt, coj, akc, grx, jiu, zng, kdu, iry, vam, siu, bmd, nyi, lcm, gut, bcj,
+    ogc, add, huc, bbf, wud, pwm, dms, lva, pum, emg, zms, bhs, cuv, adn, tvn, pwa, cyb, ale, kis, kql, yae,
+    ncg, mzb, tgc, gdl, msw, yah, erh, smf, ppi, cdi, clk, knm, ktp, nkx, das, smq, mkc, apm, bbp, bkw, rhp,
+    itz, yuy, nbp, mlw, iar, cut, lht, ekl, tty, mhp, slz, khc, boh, var, kdx, nou, khl, wbq, atu, rir, bkg,
+    mls, cky, sku, anc, mmc, bnx, pbp, sua, puc, mav, tif, nmb, goa, bet, bly, kcx, mfb, zmb, btm, hml, nau,
+    ikw, zoc, pia, afo, bpw, mxa, mvz, ccg, tvl, pta, sol, sto, rad, hra, vkn, xom, lgt, nnz, qws, ngi, dtb,
+    sbr, aug, tfn, skt, ibl, pem, gpa, byo, psn, nka, akw, xmh, jya, yui, jub, agc, njo, won, mxl, tcd, ikt,
+    hwo, ged, yuj, txn, kch, bhy, aal, kci, gro, liu, crx, yum, mdu, mds, dgd, bjp, vkl, aun, byj, thd, mrh,
+    ost, swj, bey, bip, kfh, qxa, mbi, ntu, nbi, gra, azd, kuy, llu, zpn, jog, bxq, jni, pnz, nxg, jiy, sse,
+    njm, ors, kmp, kkf, rkm, wan, bjt, bxs, ywa, ono, mgg, cbk, tce, xod, oia, moh, kih, nyq, akt, mct, prx,
+    nyh, weh, bil, mkf, mmx, nba, rau, taz, ddg, quv, clt, pow, mfg, abr, bqt, ktc, pkt, ver, jnd, caq, mgi,
+    trf, sed, nyb, cvn, zhi, mum, bqa, nbv, nid, kvy, hnd, gbz, liw, max, sad, mcs, dru, hav, ntk, teq, kxx,
+    kna, rdb, kmq, ega, nhz, klg, twy, bhp, lel, ner, dri, kpw, dun, aty, mbq, kny, cfg, hop, lgq, kbj, amm,
+    tml, bag, zts, gnu, pwn, yer, daq, shw, plg, kfo, yak, cfd, kce, kxb, kpj, gbg, mhl, buz, phl, org, chx,
+    gvf, qux, lgu, xkg, kie, yif, onn, nxa, buk, pip, doo, tdk, kvv, mpn, bjh, tfi, kmh, xkc, chr, sst, wrp,
+    bbw, bje, raf, mhz, sez, ato, yle, nat, zag, kfa, mut, wrs, yyu, mta, cld, kjs, jdg, nmk, dij, bgv, buo,
+    geg, gvp, sle, opa, hac, mqg, ert, gbh, ndu, gmz, glw, tli, kcq, aog, win, tmy, mqx, wgi, hah, dln, fak,
+    rey, czh, diw, bjk, bdm, stf, tal, nqy, ymb, nce, bqo, bbu, kqi, tii, pru, aww, ahg, nit, sop, wsk, gqa,
+    kbv, weo, nof, nmc, nap, jei, ndo, gcf, sgi, buh, gbr, tbp, she, bxb, mij, auy, bye, txt, kqo, umu, pku,
+    cll, yun, mfm, kcr, ryu, kli, kfm, deg, bvm, gow, jgk, kvd, bhl, odk, gdu, ems, syb, nng, gig, ggg, etr,
+    yix, asr, sbk, tov, pbn, ktf, jqr, slx, yis, alq, kfd, klq, oso, aku, pak, iyx, vmm, bga, mtk, mbd, sxw,
+    gew, dbi, rwa, xmg, kvm, tru, kdz, kxh, sjr, lse, chp, tay, nuo, mep, wji, elk, crj, fut, jns, agf, kyk,
+    iqu, mfo, jeb, sbz, xrw, mml, acv, kdq, tiw, jaq, kfz, aqg, kks, knt, gou, pdo, kcs, uba, abn, iti, amo,
+    gye, kbz, wem, yap, ghl, zbu, mgk, nen, uuu, bit, vum, bvw, itt, kod, slc, awe, ccj, orh, dih, kbh, jig,
+    one, zaf, mqh, bub, siy, aad, kjr, ruy, kqj, hum, jku, xti, ydg, ots, thp, dtm, jru, yaf, tsw, mma, rei,
+    mtu, gdx, ttm, mbx, smy, nzm, ncf, anw, adz, ank, koh, lan, tuq, otm, kip, aik, ldq, tak, wca, wom, huh,
+    jup, nhv, def, mfj, mtf, tsp, bnv, hch, fun, dil, ttb, dof, nyg, src, ael, scv, gop, xnz, sti, ebr, ahb,
+    due, spm, wss, kdm, ldp, mcw, mbv, sct, vra, mkg, agy, cib, vmp, sdh, brq, bmj, vls, kcd, akq, rwk, dbd,
+    spu, udl, meh, auq, liz, cdn, kmk, mmp, bwm, akr, sor, xtt, kqa, ruz, afi, tma, laa, ctt, bux, ldk, jma,
+    kwu, klk, ybe, szg, pyu, frc, itr, bvi, ala, pbl, kni, dya, ahs, msl, nlo, bof, mhk, kic, gid, ung, boo,
+    bpu, eze, yns, tvt, mla, sob, kzc, ywn, mku, mef, mxh, kpa, whg, akl, bqx, iko, krh, bcz, clc, rat, zro,
+    dkx, sau, zpr, mqz, mii, duq, fla, yim, mne, tny, sok, saz, skv, kcj, zrg, dyg, mph, enn, jkr, blc, skd,
+    kmj, gmm, gab, hkk, com, ttj, ckl, aaw, xvi, nfl, see, dak, pdc, iow, ogb, twp, ocu, hdn, bni, rcf, soo,
+    fap, nhg, ike, smt, snq, mrz, zcd, rui, ksj, msg, kwb, fll, zuy, bja, bwt, mtp, kot, irr, tsu, dgx, gek,
+    ncb, mek, klx, aif, mmn, piu, gaf, mat, kqk, arx, glr, orx, fay, tiy, msn, cdf, bcv, big, agh, leq, nrg,
+    amc, pmm, epi, kev, njj, hol, bif, eme, ilp, pbv, hux, srz, lmk, esh, anl, coc, kvg, bva, iwm, trv, lie,
+    aqt, sky, lrl, nph, dor, cob, sry, sgd, scn, tla, lor, anf, ado, kqw, mtb, tou, mna, bez, tlq, was, vaf,
+    cgg, zrs, asu, yax, bxl, hgm, wbb, sug, cte, ykg, akf, dee, goz, xkj, kbm, mae, arp, avi, nmh, bpv, aaf,
+    mdn, arw, cku, bzx, apy, pcl, job, sgr, vmh, mdh, bhg, wbj, dbn, ctz, nsa, rtm, sbg, bbv, buf, bqs, bea,
+    idi, lna, gcr, njh, chd, skq, van, shc, iby, hla, toj, pac, ifm, gul, tug, xmf, sev, cos, gox, okh, tyy,
+    nev, knz, jrt, nuq, moe, psw, sek, ngz, kzm, tdv, nyw, asi, plv, shs, pbg, ity, gua, plr, hna, vem, mic,
+    pcb, tti, qus, zpy, tiq, lih, mkb, ldo, pqm, mye, nre, bsy, atk, lwl, gar, too, yra, yrb, buw, kit, ksv,
+    nge, twr, ekp, tol, zte, agb, crv, ivb, dis, kjt, bfe, ney, sao, dbb, sha, keb, zia, bws, cra, bou, scw,
+    avd, mti, sns, cae, chy, wdj, dsn, mlx, mwe, lki, luz, grs, dem, nlj, kkh, njs, aba, biu, mbf, tgy, nal,
+    pfe, mnv, ijs, oke, ykk, tdl, mot, plu, tls, abu, shh, bid, tsa, kfe, pek, irn, tto, nyj, pos, nmm, kst,
+    nkw, gbn, abm, brl, xes, kmz, zbc, lik, nil, kkk, erg, brp, mtl, blq, coz, stv, djn, tbj, knn, tkq, yog,
+    mwg, mtq, tdc, bgi, nwm, dhv, tau, phq, vnk, yhd, iai, gnb, ema, daw, dge, ler, bdw, agt, mmy, orz, dma,
+    pkg, mnp, chk, kpx, aul, pcj, zmq, ztx, aee, kdd, lil, azt, kof, tdo, zoh, lum, une, nds, bnn, usa, soz,
+    aey, rji, mgf, tow, anx, caz, peb, dmr, okx, uni, ibd, oyd, umm, tef, nun, tul, gla, biy, bjo, bar, unx,
+    bks, lvk, moy, hur, mxm, lek, dme, mnm, axk, oni, env, gni, rwo, ogg, niu, iki, mzn, cbg, mbs, saa, owi,
+    puo, lmg, oka, lal, hid, kbb, kuh, dwa, plk, bwf, gwa, ral, aji, zmp, kyy, tkp, jaf, ivv, bek, yur, ndh,
+    pdn, sys, gae, hvv, kdy, oks, kkd, hei, bjc, dva, mzv, dgg, sir, lad, sbh, mdw, sjg, moj, cja, diz, lti,
+    kos, psi, ofu, bgx, snv, pon, sro, yki, bte, sgy, onj, poo, yaw, gyd, gad, mps, ipo, blm, nqt, prc, sos,
+    kol, kxn, kwt, buj, haa, cbo, kfu, zpw, noz, wgb, kms, etx, sbc, end, sby, huf, msk, crc, wsa, mhc, kyh,
+    pic, tof, niw, ilu, xok, ttw, sbb, zun, tnm, mnu, glo, tsi, nkh, ugo, gsw, dei, skb, chj, mbo, kkz, kgb,
+    huz, jge, ano, lmi, vmj, tft, svb, hgw, swr, mrp, cma, wkd, kep, yot, zpe, zpd, har, fry, gbv, clu, kcf,
+    wro, ayt, qun, bta, lcc, wbk, mwp, mrf, sny, nzk, xgu, knw, psh, smn, zat, ngj, shq, amt, qui, gww, caf,
+    agi, pay, cbd, suq, djc, mwa, gcn, aaa, etn]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 978016259
+  params: 1000000000
+  license: CC-BY-NC-4.0
+  license_url: https://huggingface.co/facebook/mms-lid-4017
+  commercial_use: false
+  description: 'Meta''s Massively Multilingual Speech language identifier (wav2vec 2.0, 1 B parameters) for 4017 languages,
+    among them Bhojpuri, Maithili, Magahi, Chhattisgarhi, Awadhi, Bodo, Manipuri, Santali, Konkani, Kashmiri,
+    Tulu, Khasi and Mizo. Non-commercial (CC-BY-NC-4.0). The int8 ONNX export of Xenova/mms-lid-4017 (978 MB) in
+    ONNX Runtime; the audio is normalised to zero mean and unit variance as the model expects. Not run here: it
+    is larger than this project''s test machines allow for a measured run, and slow on a CPU (1 B parameters
+    over every second of audio).'
+  source_url: https://huggingface.co/facebook/mms-lid-4017
+  validated: untested
+  source:
+    repo: Xenova/mms-lid-4017
+    revision: c52983b81c46f451913c9469a2e872f169645510
+    include: [onnx/model_quantized.onnx, config.json]
+  options:
+    model: onnx/model_quantized.onnx
+    labels: config.json
+    features: raw
+    normalize: true
+    max_s: 20
+- id: voxlect-indic-lid-whisper-small
+  runnable: false
+  not_runnable_reason: its classification head is defined in the Voxlect code, which no runtime bolo has can run yet
+  aliases: [tiantiaf/voxlect-indic-lid-whisper-small]
+  task: lid
+  engine: plugin:torch
+  kind: voxlect-lid
+  family: Voxlect
+  languages: [as, bn, brx, doi, en, gu, hi, kn, ks, kok, mai, ml, mni, mr, ne, or, pa, sa, sat, sd, ta, te, ur]
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 361769712
+  params: 90000000
+  license: OpenRAIL
+  license_url: https://huggingface.co/tiantiaf/voxlect-indic-lid-whisper-small
+  description: 'Voxlect''s language identifier for India: Whisper small''s encoder with a classification head, fine-tuned on
+    AI4Bharat IndicVoices and Common Voice for the 22 scheduled languages and English: Assamese, Bengali, Bodo,
+    Dogri, Gujarati, Hindi, Kannada, Kashmiri, Konkani, Maithili, Malayalam, Manipuri, Marathi, Nepali, Odia,
+    Punjabi, Sanskrit, Santali, Sindhi, Tamil, Telugu and Urdu. OpenRAIL licence on the model card (use
+    restrictions apply). Not runnable yet: the model is a PyTorch class from the Voxlect repository
+    (github.com/tiantiaf0627/voxlect), which is not a package bolo-torch can depend on, and there is no ONNX
+    export.'
+  source_url: https://huggingface.co/tiantiaf/voxlect-indic-lid-whisper-small
+  validated: untested
+  source:
+    repo: tiantiaf/voxlect-indic-lid-whisper-small
+    revision: 1792f34d4a5c71d9a61583aaf98b7226eaaaa916
+  options:
+    plugin_install: not supported by bolo-torch yet (no packaged inference code)
+- id: voxlect-indic-lid-mms-lid-256
+  runnable: false
+  not_runnable_reason: its classification head is defined in the Voxlect code, which no runtime bolo has can run yet
+  aliases: [tiantiaf/voxlect-indic-lid-mms-lid-256]
+  task: lid
+  engine: plugin:torch
+  kind: voxlect-lid
+  family: Voxlect
+  languages: [as, bn, brx, doi, en, gu, hi, kn, ks, kok, mai, ml, mni, mr, ne, or, pa, sa, sat, sd, ta, te, ur]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 3896915664
+  params: 1000000000
+  license: CC-BY-NC-4.0
+  license_url: https://huggingface.co/tiantiaf/voxlect-indic-lid-mms-lid-256
+  commercial_use: false
+  description: 'Voxlect''s language identifier for India built on MMS-LID-256 (1 B parameters), fine-tuned on AI4Bharat
+    IndicVoices and Common Voice for the 22 scheduled languages and English. Non-commercial (CC-BY-NC-4.0, from
+    MMS). Not runnable yet: a PyTorch class from the Voxlect repository, not a package bolo-torch can depend on,
+    3.9 GB.'
+  source_url: https://huggingface.co/tiantiaf/voxlect-indic-lid-mms-lid-256
+  validated: untested
+  source:
+    repo: tiantiaf/voxlect-indic-lid-mms-lid-256
+    revision: 827a6c2fca5ce4bf966d2302d9b941ec6121ab15
+  options:
+    plugin_install: not supported by bolo-torch yet (no packaged inference code)
+- id: lid-indic-vaani
+  runnable: false
+  not_runnable_reason: a SpeechBrain classifier, which bolo-torch does not run yet, and no ONNX export exists
+  aliases: [panchajanya-ai/lid_Indic_Vaani]
+  task: lid
+  engine: plugin:torch
+  kind: speechbrain-lid
+  family: SpeechBrain ECAPA-TDNN
+  languages: [en, hi, mr, ta, te]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 83323014
+  params: 21000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/panchajanya-ai/lid_Indic_Vaani
+  description: 'A five-language identifier for India (English, Hindi, Marathi, Tamil, Telugu): SpeechBrain''s CommonLanguage
+    ECAPA-TDNN fine-tuned by panchajanya-ai, presumably on the Vaani data its name refers to (the model card
+    does not say). Apache-2.0. Not runnable yet: bolo-torch has no SpeechBrain classifier and there is no ONNX
+    export.'
+  source_url: https://huggingface.co/panchajanya-ai/lid_Indic_Vaani
+  validated: untested
+  source:
+    repo: panchajanya-ai/lid_Indic_Vaani
+    revision: 338cd6ab84ec3bcc94ed5afe2ea8998b48525dcf
+  options:
+    plugin_install: not supported by bolo-torch yet (no SpeechBrain models)

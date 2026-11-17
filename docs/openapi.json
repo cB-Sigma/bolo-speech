@@ -213,6 +213,26 @@
     }
    }
   },
+  "/v1/audio/language": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Identify the spoken language",
+    "description": "Extension. Multipart form: ``file``, optional ``model`` (a language-identification model; default\n``default_lid``), ``top_k`` (how many languages to list, default 5) and ``keep_alive``.\n\nReturns the most likely language with its probability, the ``top_k`` most likely ones, and ``recogniser``:\nthe speech-to-text model a transcription with ``model=auto`` would be sent to for this audio (routing, see\n``POST /v1/audio/transcriptions``), whether it is installed, and the recogniser bolo recommends for the\nlanguage when that one is not installed.",
+    "operationId": "identify_language_v1_audio_language_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
   "/v1/audio/speech": {
    "post": {
     "tags": [

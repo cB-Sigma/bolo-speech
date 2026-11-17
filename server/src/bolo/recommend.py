@@ -33,7 +33,7 @@ LEVEL_LABEL = {
     "unavailable": "not available yet",
 }
 #: tasks the recommender takes; "speech-to-speech" is a feature of some catalog entries, not a catalog task
-TASKS = ("stt", "tts", "diarization", "vad", "turn", "separation", "denoise", "speech-to-speech")
+TASKS = ("stt", "tts", "diarization", "vad", "turn", "separation", "denoise", "lid", "speech-to-speech")
 TASK_ALIASES = {
     "s2s": "speech-to-speech",
     "asr": "stt",
@@ -41,6 +41,8 @@ TASK_ALIASES = {
     "separate": "separation",
     "denoiser": "denoise",
     "noise": "denoise",
+    "language-id": "lid",
+    "langid": "lid",
 }
 S2S = "speech-to-speech"
 
@@ -869,7 +871,7 @@ class Advisor:
         names = {
             "stt": s.default_stt, "tts": s.default_tts, "vad": s.default_vad, "diarization": s.default_diarization,
             "separation": s.default_separation, "turn": s.default_turn, "denoise": s.default_denoise,
-            S2S: s.s2s_model,
+            "lid": s.default_lid, S2S: s.s2s_model,
         }  # fmt: skip
         out: dict[str, str] = {}
         for task, name in names.items():
@@ -970,6 +972,8 @@ class Advisor:
             # the languages of each model once: `speaks` for every model and language is most of the work otherwise
             covers = {s.id: {base_language(code) for code in s.languages} for s in in_this}
             languages = sorted(set().union(*covers.values()) - {"multi", "multilingual"}) if covers else []
+            if task == "lid":  # identifiers are chosen for the set of languages they tell apart, not one of them
+                languages = []
             for language in [None, *languages]:
                 q = Query(task, language)
                 candidates = [

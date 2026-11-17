@@ -46,6 +46,7 @@ TASK_TITLES = {
     "turn": "End-of-turn detection",
     "separation": "Overlapped-speech separation",
     "denoise": "Denoising",
+    "lid": "Language identification",
     "speech-to-speech": "Speech to speech (Realtime speech-to-speech pipeline)",
     "audio-llm": "Audio-in language models (Realtime audio-llm pipeline)",
 }

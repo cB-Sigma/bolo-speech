@@ -50,6 +50,10 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `separation_timeout_s` | `300` | | stop separating after this long per request; what was not separated is transcribed from the mixture and the response says `reason: "timeout"` |
 | `default_denoise` | `gtcrn-simple` | | speech-enhancement model used by `denoise` when it names no model (pulled on first use, 0.5 MB) |
 | `denoise` | `off` | | denoise audio before speech recognition unless a request or a model pin says otherwise: `off`, `on`, a strength between 0 and 1 (the denoised audio mixed with the original at that weight) or a denoise model id. See "Denoising" below: it can make clean audio worse |
+| `default_lid` | `voxlingua107-ecapa` | | spoken-language identifier used by `POST /v1/audio/language` without a model and by language routing (pulled on first use, 87 MB, Apache-2.0). See "Language routing" below |
+| `language_routing` | `true` | | a transcription with `model=auto` and no `language` is heard by `default_lid` first and sent to a recogniser for the language it hears; `false`: `auto` is `default_stt`, as before. Requests that name a model or a language are never routed |
+| `language_routes` | `[]` | | which recogniser a routed request uses for a language, `<language>=<model>` each (`["ta=indicconformer-ta-community", "hi=whisper-base"]`; `BOLO_LANGUAGE_ROUTES=ta=indicconformer-ta-community,hi=whisper-base`). Languages not listed go to the best installed recogniser for them |
+| `lid_min_probability` | `0.5` | | a detected language less likely than this is not trusted: a routed request goes to `default_stt`, not told a language |
 | `default_turn` | `smart-turn-v3` | | end-of-turn model for Realtime sessions that ask for `semantic_vad` (pulled on first use; without it `semantic_vad` is plain silence detection): any `turn` model, such as `namo-turn-en` (reads the transcript) or `silence-only` (no model; voice-agents.md, "Semantic turn detection") |
 | `plugins` | `[]` | | out-of-process engine plugins, `name=command args` each (docs/plugins.md) |
 | `plugin_entry_points` | `true` | | also use plugins installed as packages (entry-point group `bolo.engines`) |
@@ -787,6 +791,40 @@ your own audio before turning it on for a model or the server; a strength
 below 1 (`0.5`) is a gentler middle way. A denoiser that cannot run is
 skipped with a warning and the original audio is transcribed; the response
 header `x-bolo-denoise` and the request's trace say what ran.
+
+## Language routing
+
+A transcription with `model=auto` and no `language` is heard by the
+language identifier first (`default_lid`, `voxlingua107-ecapa`, a
+fifth of a second for a few seconds of audio on one core) and then
+transcribed by a recogniser for the language it heard:
+
+1. the one `language_routes` names for the language, if any
+   (`language_routes = ["ta=indicconformer-ta-community"]`);
+2. else the best **installed** local recogniser that speaks it: the one
+   `bolo recommend` names first for the language on this machine, then a
+   recogniser made for that language before one that covers many, then
+   one measured here, then `default_stt`;
+3. else `default_stt`, not told the language. The response then names the
+   recogniser bolo recommends for the language (`recommended=` in
+   `x-bolo-route`): routing never starts a download of a recogniser you did
+   not name. Pull it (`bolo pull <id>`) and later requests use it.
+
+Below `lid_min_probability` (0.5) the detected language is not trusted
+and `default_stt` answers. When the language identifier cannot run (not
+installed with `auto_pull` off, engine missing) the request is still
+answered, by `default_stt`. A request that names a model other than `auto`
+or a `language` is never routed or overridden, and translations are not
+routed. Cloud recognisers are only used when `language_routes` names
+them: routing never sends audio off the machine on its own.
+
+The decision is in the response headers (`x-bolo-route`,
+`x-bolo-language`; api.md, "Language identification and routing") and in
+the request's trace (`route`). `language_routing = false` turns it off:
+`auto` is then `default_stt`, as it was before. The language identifier
+is an ONNX Runtime model: `bolo-speech[all]` has ONNX Runtime (through
+faster-whisper), and `pip install "bolo-speech[lid]"` adds it on its own when
+`bolo doctor` says the `onnxruntime` engine is missing.
 
 ## Coming from Ollama
 

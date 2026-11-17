@@ -29,6 +29,8 @@ from bolo.diarize import DiarizeOptions, KnownSpeaker
 from bolo.engines.base import Segment
 from bolo.errors import BoloError, InvalidRequest, ModelNotFound
 from bolo.keepalive import request_keep_alive
+from bolo.lid import is_routing_request, route_headers
+from bolo.lid import route as route_language
 from bolo.obs.trace import Trace
 from bolo.separate import SeparateOptions
 from bolo.stt_options import OptionError
@@ -362,11 +364,14 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
             raise InvalidRequest("temperature must be a number", param="temperature") from exc
         model = str(form.get("model") or "") or None
         # extension (Ollama's keep_alive): how long the model stays loaded after this request
-        request_keep_alive(form.get("keep_alive"), ("stt", "diarization", "separation", "denoise"))
+        request_keep_alive(form.get("keep_alive"), ("stt", "diarization", "separation", "denoise", "lid"))
         diarize = await _diarize_options(form, fmt, model, task)
         separate = separate_options(form)
         denoise = parse_denoise(form.get("denoise"), strength=form.get("denoise_strength"))
-        spec = core.resolve(model, "stt")
+        language = str(form.get("language") or "") or None
+        # extension: model "auto" without a language identifies the language and picks the recogniser (bolo.lid)
+        routing = task == "transcribe" and is_routing_request(core, model, language)
+        spec = core.resolve(None if routing else model, "stt")
         if denoise is not None and denoise.enabled and denoise.model:
             try:
                 core.resolve(denoise.model, "denoise")  # unknown denoiser: fail before reading the upload
@@ -385,6 +390,12 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
         trace.model = spec.id
         samples, rate = await read_upload(core, file)
         trace.restart()
+        if routing:
+            decision = await route_language(core, samples, rate, str(model), trace)
+            trace.extra["route"] = decision.to_dict()
+            spec = core.resolve(decision.model, "stt")
+            trace.model = spec.id
+            language = decision.steer
         vad_raw = form.get("vad_filter")
         try:
             decode = decode_options_from_form(form)
@@ -393,7 +404,7 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
         decode.pop("vad_filter", None)  # read as before, below
         kwargs: dict[str, Any] = {
             "model": spec.id,
-            "language": str(form.get("language") or "") or None,
+            "language": language,
             "task": task,
             "prompt": str(form.get("prompt") or "") or None,
             "word_timestamps": "word" in granularities and fmt == "verbose_json",
@@ -412,6 +423,9 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
             core.traces.record(trace)
         raise
     headers = {"x-request-id": trace.id}
+    routed = trace.extra.get("route")
+    if isinstance(routed, dict):
+        headers.update(route_headers(routed))
     if not stream:
         transcript = await run_unless_disconnected(request, core.transcribe(samples, rate, **kwargs))
         if transcript is None:
@@ -508,6 +522,45 @@ async def create_transcription(request: Request) -> Response:
 async def create_translation(request: Request) -> Response:
     """Same form as transcriptions; needs a multilingual Whisper model."""
     return await _transcribe_endpoint(request, "translate")
+
+
+@router.post("/v1/audio/language", tags=["native"], summary="Identify the spoken language")
+async def identify_language(request: Request) -> Response:
+    """Extension. Multipart form: ``file``, optional ``model`` (a language-identification model; default
+    ``default_lid``), ``top_k`` (how many languages to list, default 5) and ``keep_alive``.
+
+    Returns the most likely language with its probability, the ``top_k`` most likely ones, and ``recogniser``:
+    the speech-to-text model a transcription with ``model=auto`` would be sent to for this audio (routing, see
+    ``POST /v1/audio/transcriptions``), whether it is installed, and the recogniser bolo recommends for the
+    language when that one is not installed."""
+    from bolo.lid import decide
+
+    core = get_core(request)
+    form = await request.form()
+    file = form.get("file")
+    if file is None or isinstance(file, str):
+        raise InvalidRequest("a multipart 'file' field with the audio is required", param="file")
+    top_k = _int_field(form, "top_k")
+    if top_k is not None and not 1 <= top_k <= 500:
+        raise InvalidRequest("top_k must be between 1 and 500", param="top_k")
+    request_keep_alive(form.get("keep_alive"), ("lid",))
+    spec = core.resolve(str(form.get("model") or "") or None, "lid")
+    samples, rate = await read_upload(core, file)
+    trace = Trace("lid", "http", spec.id)
+    result = await run_unless_disconnected(request, core.identify_language(samples, rate, spec.id, trace))
+    if result is None:
+        return Response(status_code=499)  # the client went away; nobody reads this
+    body = result.to_dict(top_k or 5)
+    decision = decide(core, result)
+    body["recogniser"] = {
+        "model": decision.model,
+        "reason": decision.reason,
+        "language": decision.steer,
+        "recommended": decision.recommended,
+        "detail": decision.detail,
+    }
+    headers = {"x-request-id": trace.id, "x-bolo-model": spec.id}
+    return JSONResponse(body, headers=headers)
 
 
 class SpeechRequest(BaseModel):

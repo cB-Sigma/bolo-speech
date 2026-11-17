@@ -71,6 +71,8 @@ webrtc = ["aiortc>=1.9", "av>=12"]
 turn = ["onnxruntime>=1.17", "tokenizers>=0.20"]
 # the WebRTC voice-activity detector (webrtcvad-wheels is MIT; the WebRTC code inside is BSD-3-Clause)
 webrtcvad = ["webrtcvad-wheels>=2.0.14"]
+# spoken-language identification (POST /v1/audio/language, routing with model=auto); faster-whisper brings it too
+lid = ["onnxruntime>=1.17"]
 # Orpheus-family voices (Svara, Veena, Orpheus, snorTTS) on llama.cpp: the SNAC audio decoder runs in onnxruntime
 orpheus = ["onnxruntime>=1.17"]
 # LFM3-Audio in this process (speech-to-speech and text-to-speech without llama-server): the model's ONNX graphs

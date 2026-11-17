@@ -536,6 +536,20 @@ class DenoiseModel(Model):
         return OverlapDenoiseStream(self)
 
 
+class LidModel(Model):
+    """Spoken-language identification: which language is spoken in a recording (16 kHz mono in)."""
+
+    task = "lid"
+    #: the language codes the model can answer (ISO 639-1 where one exists, else ISO 639-3)
+    labels: list[str] = []
+    #: longest stretch of audio looked at, in seconds; a longer recording is cut to its first ``max_s``
+    max_s: float = 30.0
+
+    @abc.abstractmethod
+    def identify(self, samples: FloatArray) -> list[tuple[str, float]]:
+        """Every language the model knows with its probability (summing to 1), most likely first."""
+
+
 class TurnModel(Model):
     """End-of-turn detection: has the speaker finished, or only paused?"""
 
