@@ -1155,8 +1155,6 @@
   - {id: female, name: Female, gender: f}
   - {id: male, name: Male, gender: m}
 - id: kimi-audio-7b-instruct
-  runnable: false
-  not_runnable_reason: it needs the kimia_infer code of the Kimi-Audio repository and flash-attn on a GPU
   task: speech-to-speech
   engine: plugin:torch
   kind: kimi-audio
@@ -1164,24 +1162,53 @@
   languages: [en, zh]
   tier: accuracy
   sample_rate: 24000
-  size_bytes: 42600000000
+  size_bytes: 44060000000
   params: 7000000000
   license: MIT
   license_url: https://huggingface.co/moonshotai/Kimi-Audio-7B-Instruct
   commercial_use: true
   gated: false
   features: [speech-to-speech]
-  description: 'Moonshot Kimi-Audio 7B Instruct (on Qwen2.5-7B, with a Whisper encoder and a flow-matching detokenizer):
-    English and Chinese spoken conversation, recognition and audio understanding. MIT per the model card. Not
-    runnable yet: inference needs the kimia_infer code of github.com/MoonshotAI/Kimi-Audio (not a package bolo-torch
-    can depend on) and flash-attn, so an NVIDIA GPU; the repository is 42.6 GB (the detokenizer included), about 24 GB
-    of GPU memory.'
+  description: 'Moonshot Kimi-Audio 7B Instruct (on Qwen2.5-7B, with a Whisper large-v3 encoder, GLM-4-Voice speech
+    tokens and a streaming flow-matching detokenizer with BigVGAN): English and Chinese spoken conversation, through
+    the torch plugin. The plugin runs the authors'' generation loop step by step: text streams as it is generated,
+    speech in chunks of 30 speech tokens (24 kHz), the first after about 2.4 s of generated speech. Remote code: its
+    modelling code and tokenizer are Python in the model repository, which run only after you opt in for this model
+    (allow_remote_code; docs/models.md, "Remote code"); the rest comes from github.com/MoonshotAI/Kimi-Audio (MIT)
+    at a pinned commit. MIT per the model card (code derived from Qwen2.5: Apache-2.0). NVIDIA GPU only (its code
+    calls torch.cuda and imports flash-attn, which you install yourself). The download is 44 GB (the detokenizer is
+    19 GB of it, plus the pinned glm-4-voice-tokenizer); plan on 24 GB of GPU memory or more and 48 GB of RAM to load
+    it. Untested here (wiring tested with fakes).'
   source_url: https://huggingface.co/moonshotai/Kimi-Audio-7B-Instruct
   validated: untested
   source:
     repo: moonshotai/Kimi-Audio-7B-Instruct
     revision: 9a82a84c37ad9eb1307fb6ed8d7b397862ef9e6b
     exclude: [.gitattributes]
+    urls:
+    - {path: glm-4-voice-tokenizer/config.json, url: 'https://huggingface.co/zai-org/glm-4-voice-tokenizer/resolve/a5f2404e63c84e92f5238908e1706316324ebafa/config.json', size: 1746, sha256: 5a5181fcc293ced0a1e7455f6e3503ce4e8be9229922ea34aeb785f62720c0aa}
+    - {path: glm-4-voice-tokenizer/preprocessor_config.json, url: 'https://huggingface.co/zai-org/glm-4-voice-tokenizer/resolve/a5f2404e63c84e92f5238908e1706316324ebafa/preprocessor_config.json', size: 340, sha256: 7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711}
+    - {path: glm-4-voice-tokenizer/model.safetensors, url: 'https://huggingface.co/zai-org/glm-4-voice-tokenizer/resolve/a5f2404e63c84e92f5238908e1706316324ebafa/model.safetensors', size: 1458374480, sha256: 2800bd503f52b51e45f0c53cfd5c31dcfe8ef7f13d22b396aa3d53e0280dd1e4}
   options:
-    plugin_install: not supported by bolo-torch yet (no packaged inference code)
-    hardware: {gpu: required, vram_gb: 24, note: 'bfloat16, flash-attn'}
+    plugin_install: pip install "bolo-torch[kimi-audio]" (the bolo PyTorch engine plugin, plugins/bolo-torch) and
+      flash-attn (pip install flash-attn --no-build-isolation on Linux), then bolo-torch code install kimi-audio
+      (github.com/MoonshotAI/Kimi-Audio at a pinned commit; a load also installs it); opt in to the model's remote
+      code with bolo models config kimi-audio-7b-instruct --set allow_remote_code=true
+    device: cuda
+    remote_code:
+      revision: 9a82a84c37ad9eb1307fb6ed8d7b397862ef9e6b
+      reviewed: '2026-11-17: configuration_moonshot_kimia.py, modeling_moonshot_kimia.py (Qwen2 layers with a second
+        output head for speech tokens and Whisper features mixed into the input; moves tensors to the current CUDA
+        device) and tokenization_kimia.py (a tiktoken tokenizer reading tiktoken.model). Imports torch, transformers,
+        packaging, tiktoken and tokenizers; no downloads or subprocesses. kimia_infer itself (GitHub) passes
+        trust_remote_code; the plugin runs the check first.'
+      files:
+        config.json: 515a352843ad45896514ecf707b0983fa39bd3ee2c32bd88cc4fa98a50516ba1
+        configuration_moonshot_kimia.py: 47074a01d4ffc36d78844ba3de4ff3abceec1e28f4d34e7c5daee5567dfa3285
+        modeling_moonshot_kimia.py: 27981bc23ef2e7c383ab4af4c125b270ce1fad5391b2cd3a83f844c1008882e6
+        tokenization_kimia.py: 380c58ac41a42083bec5f348bfce3d0076be9ed5dfa560c892a425807bc2620d
+        tokenizer_config.json: c6c2717a80021d86a364736e4112dc15a67b86ab03ff6c3de0a6d8fc86839233
+    hardware: {gpu: required, vram_gb: 24, ram_gb: 48, note: 'NVIDIA only (flash-attn); bfloat16; 24 GB is the least,
+      more is safer'}
+  voices:
+  - {id: default, name: Kimi}

@@ -903,7 +903,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `kimi-audio-7b-instruct` | en, zh | accuracy | - | 42.6 GB | MIT · needs plugin torch | not runnable yet |
+| `kimi-audio-7b-instruct` | en, zh | accuracy | - | 44.1 GB | MIT · needs plugin torch | untested |
 
 ### Audio-in language models (Realtime audio-llm pipeline)
 
@@ -1000,7 +1000,7 @@ are listed like the rest and marked ⚠. Checked against the model cards, LICENS
 | `glm-4-voice-9b` | speech-to-speech | ⚠ glm-4-voice License: academic use free; **commercial use only after registering with Zhipu** (open.bigmodel.cn/mla/form, then free), "Built with glm-4", Chinese law | 21.1 GB (model, glm-4-voice-tokenizer, glm-4-voice-decoder) | bolo-torch (`glm-4-voice` extra): ChatGLM remote code (opt-in), tokenizer and decoder from github.com/THUDM/GLM-4-Voice at a pinned commit; 24 GB GPU in bfloat16, about 9 GB with `quantization: int4` | turn-based; text and speech interleaved and streamed, first audio after 25 speech tokens (about 2 s of speech) | runnable, untested (fakes only) |
 | `minicpm-o-2.6` | speech-to-speech | Apache-2.0 (yes; registration optional) | 17.4 GB | trust_remote_code only; llama.cpp runs its vision part, not its audio | turn-based and a live mode | not runnable: bolo-torch does not run remote code |
 | `step-audio-2-mini` | speech-to-speech | Apache-2.0 (yes) | 17.9 GB | bolo-torch (`step-audio-2` extra): the model's remote code (opt-in) and token2wav from github.com/stepfun-ai/Step-Audio2 at a pinned commit; a 24 GB NVIDIA GPU | turn-based; text streamed, speech in 25-token pieces (first audio after about 1 s of speech), tool calls | runnable, untested (fakes only) |
-| `kimi-audio-7b-instruct` | speech-to-speech | MIT (yes) | 42.6 GB | kimia_infer (the Kimi-Audio repository) and flash-attn | turn-based | not runnable: no packaged inference code, NVIDIA GPU only |
+| `kimi-audio-7b-instruct` | speech-to-speech | MIT (yes; code derived from Qwen2.5 Apache-2.0) | 44.1 GB (with the pinned glm-4-voice-tokenizer) | bolo-torch (`kimi-audio` extra and flash-attn): remote code (opt-in) and kimia_infer from github.com/MoonshotAI/Kimi-Audio at a pinned commit; NVIDIA GPU only, 24 GB or more | turn-based; the authors' loop run step by step: text streamed, speech in 30-token chunks (first audio after about 2.4 s of speech) | runnable, untested (fakes only) |
 | `lfm2.5-audio-1.5b-llamacpp` | audio-llm | LFM Open License v1.0 (only below USD 10M revenue) | 915 MB | llama-server (bolo starts it) | - | **ran here** (see below) |
 | `ultravox-0.5-llama-3.2-1b-llamacpp` | audio-llm | MIT adapter + Llama 3.2 Community License (yes, with Meta's conditions) | 2.2 GB | llama-server | - | runnable, untested |
 | `qwen2.5-omni-3b-llamacpp` | audio-llm | Qwen Research License (no) | 3.6 GB | llama-server (text out only: llama.cpp has no Talker) | - | runnable, untested |
@@ -1076,6 +1076,7 @@ to `BOLO_TORCH_CODE_DIR` (default `~/.cache/bolo-torch/code`, `%LOCALAPPDATA%\bo
 | Bundle | Repository @ commit | Licence | Used by |
 | --- | --- | --- | --- |
 | `step-audio-2` | stepfun-ai/Step-Audio2 @ `76e272b56c39` | Apache-2.0 | `step-audio-2-mini` |
+| `kimi-audio` | MoonshotAI/Kimi-Audio @ `349251e1d8f4` (`kimia_infer/`) and THUDM/GLM-4-Voice @ `eb00ce9142e8` (`speech_tokenizer/`, its submodule) | MIT per README and pyproject (no LICENSE file; Qwen-derived parts Apache-2.0); Apache-2.0 | `kimi-audio-7b-instruct` |
 | `glm-4-voice` | THUDM/GLM-4-Voice @ `eb00ce9142e8` (speech tokenizer, `flow_inference.py`, CosyVoice code) and shivammehta25/Matcha-TTS @ `dd9105b34bf2` (its git submodule) | Apache-2.0 (code; the weights have the glm-4-voice License), MIT | `glm-4-voice-9b` |
 
 ## Models outside the catalog

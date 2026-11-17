@@ -7,6 +7,7 @@ Each fake has the entry points the plugin calls on the real object, with the sam
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -189,3 +190,89 @@ class GlmDecoder:
                            "prompt_feat": int(prompt_feat.shape[1]), "finalize": finalize, "uuid": uuid})  # fmt: skip
         n = int(token.shape[1])
         return torch.full((1, n * 1764), 0.1), torch.zeros((1, 80, n * 2))
+
+
+class KimiContent:
+    """``KimiAContent``: ``to_tensor()`` and ``continuous_feature``."""
+
+    def __init__(self, n: int) -> None:
+        self.n = n
+        self.continuous_feature = [torch.zeros((1, 4, 5120))]
+
+    def to_tensor(self) -> tuple[torch.Tensor, ...]:
+        ids = torch.zeros((1, self.n), dtype=torch.long)
+        mask = torch.zeros((1, self.n), dtype=torch.bool)
+        return ids, ids.clone(), mask, mask, mask
+
+
+class KimiFake:
+    """``KimiAudio``: ``alm``, ``prompt_manager``, ``detokenizer``, ``extra_tokens``, the delay and the token offset.
+    Each step of ``alm.forward`` produces the next (text, speech) pair of ``script``."""
+
+    offset = 1000
+    words = {1: "Of", 2: " course", 3: "."}
+
+    def __init__(self, script: list[tuple[int, int]], prompt: int = 20) -> None:
+        import types
+
+        self.script = script
+        self.extra_tokens = types.SimpleNamespace(msg_end=7, media_end=15, kimia_text_blank=18, kimia_text_eos=19)
+        self.kimia_text_audiodelaytokens = 2
+        self.kimia_token_offset = self.offset
+        self.forwards: list[dict[str, Any]] = []
+        self.chats: list[list[dict[str, Any]]] = []
+        self.detokenized: list[tuple[int, bool, int]] = []
+        self.cleared = 0
+        fake = self
+
+        class PromptManager:
+            class text_tokenizer:
+                @staticmethod
+                def decode(ids: list[int]) -> str:
+                    return "".join(fake.words.get(i, "") for i in ids)
+
+            @staticmethod
+            def get_prompt(chats: list[dict[str, Any]], output_type: str = "text") -> KimiContent:
+                for c in chats:
+                    if c["message_type"] == "audio":
+                        assert Path(c["content"]).is_file()
+                fake.chats.append(chats)
+                fake.output_type = output_type
+                return KimiContent(prompt)
+
+        class Alm:
+            @staticmethod
+            def forward(**kwargs: Any) -> tuple[torch.Tensor, torch.Tensor, Any]:
+                step = len(fake.forwards)
+                fake.forwards.append(kwargs)
+                return torch.tensor([step]), torch.tensor([step]), ("past", step)
+
+        class Detokenizer:
+            @staticmethod
+            def clear_states() -> None:
+                fake.cleared += 1
+
+            @staticmethod
+            def detokenize_streaming(
+                tokens: torch.Tensor, is_final: bool = False, upsample_factor: int = 1
+            ) -> torch.Tensor:
+                fake.detokenized.append((int(tokens.shape[1]), is_final, upsample_factor))
+                return torch.full((1, int(tokens.shape[1]) * 1920), 0.2)
+
+        self.prompt_manager, self.alm, self.detokenizer = PromptManager(), Alm(), Detokenizer()
+
+    def sampler(self, **kwargs: Any) -> Any:
+        """``KimiASampler(**infer.py's sampling)``: the scripted tokens of each step."""
+        fake = self
+        fake.sampling = kwargs
+
+        class Sampler:
+            def sample_text_logits(self, logits: torch.Tensor, recent_tokens: Any = None) -> torch.Tensor:
+                step = int(logits[0])
+                return torch.tensor([fake.script[min(step, len(fake.script) - 1)][0]])
+
+            def sample_audio_logits(self, logits: torch.Tensor, recent_tokens: Any = None) -> torch.Tensor:
+                step = int(logits[0])
+                return torch.tensor([fake.script[min(step, len(fake.script) - 1)][1]])
+
+        return Sampler()

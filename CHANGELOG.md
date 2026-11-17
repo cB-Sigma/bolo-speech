@@ -26,6 +26,10 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   download now includes glm-4-voice-tokenizer and glm-4-voice-decoder, pinned by revision and sha256. ChatGLM's code
   is remote code (opt-in); the tokenizer and decoder code come from THUDM/GLM-4-Voice and Matcha-TTS at pinned commits.
   Licence labelled everywhere: commercial use only after registering with Zhipu (`license_note`). Fakes only.
+- **Kimi-Audio 7B Instruct runs** (`kimi-audio-7b-instruct`, bolo-torch `kimi-audio` extra and flash-attn, NVIDIA
+  only): the authors' `kimia_infer` at a pinned commit, its generation loop run step by step so text streams and
+  speech comes in 30-token chunks. The download now includes the pinned glm-4-voice-tokenizer, which kimia_infer
+  otherwise fetches unpinned from the Hub. Remote code opt-in. Fakes only.
 
 - **More denoisers, chosen and pulled like any other model** (`denoise=<model id>` on transcriptions, Realtime
   sessions, pins and the `denoise` setting; `bolo list`, `bolo pull`, recommendations). Every entry states its licence;

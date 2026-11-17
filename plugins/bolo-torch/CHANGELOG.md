@@ -28,6 +28,11 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
   remote code (opt-in), the GLM-4-Voice and Matcha-TTS code at pinned commits, the decoder's `config.yaml` checked by
   sha256, `quantization: int4` (bitsandbytes NF4). Each load logs the licence: commercial use only after registering
   with Zhipu. Tested with fakes only.
+- **Kimi-Audio 7B Instruct** (`kind: kimi-audio`, `kimi-audio` extra, flash-attn installed separately): `KimiAudio` from
+  `kimia_infer` (MoonshotAI/Kimi-Audio at a pinned commit, with GLM-4-Voice's speech tokenizer from its submodule),
+  remote code opt-in, the speech tokenizer from the pinned folder instead of the Hub, `_generate_loop` run one step at
+  a time: text streamed, speech through `detokenize_streaming` in 30-token chunks, cancel between steps. CUDA only, with
+  a clear error elsewhere and a hint for flash-attn. Tested with fakes only.
 
 - **Demucs denoiser** (`kind: demucs-denoiser`, `demucs-denoiser` extra): `demucs-dns48`, `demucs-dns64`,
   `demucs-master64` and `demucs-valentini-nc` from facebookresearch/denoiser as bolo `denoise` models, served through
