@@ -1008,8 +1008,6 @@
   voices:
   - {id: default, name: GLM-4-Voice}
 - id: minicpm-o-2.6
-  runnable: false
-  not_runnable_reason: its model code runs only as trust_remote_code, which bolo-torch does not run
   task: speech-to-speech
   engine: plugin:torch
   kind: minicpm-o
@@ -1017,7 +1015,7 @@
   languages: [en, zh]
   tier: accuracy
   sample_rate: 24000
-  size_bytes: 17430000000
+  size_bytes: 17420000000
   params: 8000000000
   license: Apache-2.0
   license_url: https://huggingface.co/openbmb/MiniCPM-o-2_6
@@ -1025,20 +1023,54 @@
   gated: false
   features: [speech-to-speech]
   description: 'OpenBMB MiniCPM-o 2.6 (8 B: SigLIP, Whisper-medium encoder, Qwen2.5-7B and a ChatTTS-based speech
-    decoder): English and Chinese spoken conversation with voice cloning and a live streaming mode; weights and code
-    under Apache-2.0 per the model card (registration optional). Not runnable yet: its modelling code exists only as
-    trust_remote_code in the repository, which bolo-torch does not execute, and llama.cpp runs only its vision part
-    (no MiniCPM audio projector in libmtmd). About 18 GB in bfloat16; the card''s int4 build needs about 9 GB of GPU
-    memory.'
+    decoder): English and Chinese spoken conversation, through the torch plugin. REMOTE CODE: the whole model is
+    Python in its Hugging Face repository (modeling_minicpmo.py and six more files). bolo runs it only after you opt
+    in for this model (bolo models config minicpm-o-2.6 --set allow_remote_code=true) and only the files reviewed at
+    the pinned commit, each checked by sha256 before it is imported; that code runs with the plugin''s rights
+    (docs/models.md, "Remote code"). By default it streams through the model''s own streaming API (text with 24 kHz
+    speech piece by piece, voices female, male and default_female from the model''s reference recordings); mode:
+    chat answers in one piece. Weights and code Apache-2.0 per the model card (registration optional). bfloat16,
+    about 18 GB of GPU memory. Untested here (wiring tested with fakes).'
   source_url: https://huggingface.co/openbmb/MiniCPM-o-2_6
   validated: untested
   source:
     repo: openbmb/MiniCPM-o-2_6
     revision: cf0b69a6118cd3b2c90bb37f3f4366e2fba802ab
-    exclude: ['assets/*', .gitattributes]
+    # the voices' reference recordings, Vocos and the ChatTTS tokenizer stay: init_tts downloads them unpinned otherwise
+    exclude: [assets/Skiing.mp4, assets/demo.wav, 'assets/input_examples/[!a]*', assets/input_examples/audio_understanding.mp3,
+      .gitattributes]
   options:
-    plugin_install: not supported by bolo-torch yet (remote code only)
-    hardware: {gpu: required, vram_gb: 18, note: 'bfloat16; int4 about 9 GB'}
+    plugin_install: pip install "bolo-torch[minicpm-o]" (the bolo PyTorch engine plugin, plugins/bolo-torch); the model
+      is remote code, so opt in with bolo models config minicpm-o-2.6 --set allow_remote_code=true
+    dtype: bfloat16
+    mode: stream
+    max_new_tokens: 512
+    temperature: 0.5
+    remote_code:
+      revision: cf0b69a6118cd3b2c90bb37f3f4366e2fba802ab
+      reviewed: '2026-11-17: all seven .py files (configuration, modelling with the Whisper encoder, SigLIP, the
+        resampler and the ChatTTS decoder, processing, image processing, tokenizer, utils). Imports torch,
+        transformers, numpy, PIL, soundfile, vector_quantize_pytorch and vocos. Side effects: init_tts downloads
+        openbmb/chattts_tokenizer and assets/Vocos.pt from the Hub when they are missing locally (bolo pulls both, and
+        the plugin refuses to load without them); torch.load of Vocos.pt with weights_only=True; chat() writes a WAV
+        only when given output_audio_path (the plugin never does). No subprocesses.'
+      files:
+        config.json: 917813ee571faf0447669b6b3549c8357c583141b5e4a8be1bcf9cc800a7c8cf
+        configuration_minicpm.py: b6fe4224dabce0389aaa6ecf9c05849a81935b7a56a8585e581aac11262e70cd
+        image_processing_minicpmv.py: be645337bd25811ae1f86e3aaa21fa5b555719870f5612004b4a67357148fe1f
+        modeling_minicpmo.py: 12f7d91b5ba380ec23ce472fd1870a3983d97e3cd93ca733cf5db8cbdded126b
+        modeling_navit_siglip.py: f0a3e2fb52824ae06e30973c9e92abfdb441d0585674fa0cfc779bca4820c223
+        preprocessor_config.json: 2d9b0069b9bc2804df682fb29c12a2c193cfdf4fd87966e5364ba6e4d38de20c
+        processing_minicpmo.py: dcc392a3ce053579d57ecf88dd8607d40723cb740cf47ce465dd36db4047ac29
+        resampler.py: ddb4f2e4d7a8e6088656b1a6d314c4d832868e66edf73f0ab90007b862a1e5e8
+        tokenization_minicpmo_fast.py: 6b9393bab49d4843fbf7ffdced7d58ebbfc5269c3876721a4e9f6090021d990b
+        tokenizer_config.json: 8816dde110010310ceeaa1412a1f532744cd96efd3e97d473dd031861aa98dd5
+        utils.py: b94f26ab37e99541a461eacf6009d8ddca70dfe446b8ed6b48db698b7564b27b
+    hardware: {gpu: required, vram_gb: 18, note: 'bfloat16; 24 GB GPU; a 16 GB GPU only with part of it on the CPU'}
+  voices:
+  - {id: female, name: Female, gender: f}
+  - {id: male, name: Male, gender: m}
+  - {id: default_female, name: Default female, gender: f}
 - id: step-audio-2-mini
   task: speech-to-speech
   engine: plugin:torch

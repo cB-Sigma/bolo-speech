@@ -923,7 +923,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `minicpm-o-2.6` | en, zh | accuracy | - | 17.4 GB | Apache-2.0 · needs plugin torch | not runnable yet |
+| `minicpm-o-2.6` | en, zh | accuracy | - | 17.4 GB | Apache-2.0 · needs plugin torch | untested |
 
 #### Step-Audio 2
 
@@ -1064,7 +1064,7 @@ are listed like the rest and marked ⚠. Checked against the model cards, LICENS
 | `qwen3-omni-30b-a3b-instruct-torch` | speech-to-speech | Apache-2.0 (yes) | 70.5 GB | bolo-torch, transformers 4.57+; about 79 GB of GPU memory | turn-based | runnable, untested (fakes only) |
 | `moshiko-*`, `moshika-*` (14 builds), `hibiki-*` (5), `personaplex-7b-v1`, `personaplex-rl-seamless`, `flm-audio`, `freeze-omni` | speech-to-speech | see [Full-duplex models](#full-duplex-models) | 4.0 to 17.1 GB | their authors' servers, which bolo installs and starts | **full-duplex** (listens while it speaks, 80 ms frames) | runnable, untested (fakes only) |
 | `glm-4-voice-9b` | speech-to-speech | ⚠ glm-4-voice License: academic use free; **commercial use only after registering with Zhipu** (open.bigmodel.cn/mla/form, then free), "Built with glm-4", Chinese law | 21.1 GB (model, glm-4-voice-tokenizer, glm-4-voice-decoder) | bolo-torch (`glm-4-voice` extra): ChatGLM remote code (opt-in), tokenizer and decoder from github.com/THUDM/GLM-4-Voice at a pinned commit; 24 GB GPU in bfloat16, about 9 GB with `quantization: int4` | turn-based; text and speech interleaved and streamed, first audio after 25 speech tokens (about 2 s of speech) | runnable, untested (fakes only) |
-| `minicpm-o-2.6` | speech-to-speech | Apache-2.0 (yes; registration optional) | 17.4 GB | trust_remote_code only; llama.cpp runs its vision part, not its audio | turn-based and a live mode | not runnable: bolo-torch does not run remote code |
+| `minicpm-o-2.6` | speech-to-speech | Apache-2.0 (yes; registration optional) | 17.4 GB (with the voices, Vocos and the ChatTTS tokenizer) | bolo-torch (`minicpm-o` extra): **the whole model is remote code**, run only after the per-model opt-in, pinned files checked by sha256; about 18 GB of GPU memory | turn-based; its streaming API (text and 24 kHz speech piece by piece) or `mode: chat` (whole answer) | runnable, untested (fakes only) |
 | `step-audio-2-mini` | speech-to-speech | Apache-2.0 (yes) | 17.9 GB | bolo-torch (`step-audio-2` extra): the model's remote code (opt-in) and token2wav from github.com/stepfun-ai/Step-Audio2 at a pinned commit; a 24 GB NVIDIA GPU | turn-based; text streamed, speech in 25-token pieces (first audio after about 1 s of speech), tool calls | runnable, untested (fakes only) |
 | `kimi-audio-7b-instruct` | speech-to-speech | MIT (yes; code derived from Qwen2.5 Apache-2.0) | 44.1 GB (with the pinned glm-4-voice-tokenizer) | bolo-torch (`kimi-audio` extra and flash-attn): remote code (opt-in) and kimia_infer from github.com/MoonshotAI/Kimi-Audio at a pinned commit; NVIDIA GPU only, 24 GB or more | turn-based; the authors' loop run step by step: text streamed, speech in 30-token chunks (first audio after about 2.4 s of speech) | runnable, untested (fakes only) |
 | `lfm2.5-audio-1.5b-llamacpp` | audio-llm | LFM Open License v1.0 (only below USD 10M revenue) | 915 MB | llama-server (bolo starts it) | - | **ran here** (see below) |
@@ -1158,10 +1158,10 @@ account running bolo may do (read and write files, reach the network, see other 
 unless you opt in, for one model at a time:
 
 ```bash
-bolo pull step-audio-2-mini            # the files download either way; bolo pull warns that the model needs remote code
-bolo show step-audio-2-mini            # remote_code: the pinned commit, the files, what the review found
-bolo models config step-audio-2-mini --set allow_remote_code=true      # the opt-in (or PUT .../settings)
-bolo models config step-audio-2-mini --unset allow_remote_code         # back to off
+bolo pull minicpm-o-2.6                # the files download either way; bolo pull warns that the model needs remote code
+bolo show minicpm-o-2.6                # remote_code: the pinned commit, the files, what the review found
+bolo models config minicpm-o-2.6 --set allow_remote_code=true      # the opt-in (or PUT .../settings)
+bolo models config minicpm-o-2.6 --unset allow_remote_code         # back to off
 ```
 
 What the opt-in allows, and nothing more:
@@ -1178,7 +1178,9 @@ What the opt-in allows, and nothing more:
   `bolo pull`, the pull job's `warnings`, the catalog API (`remote_code.notice`) and every load (a log warning) say
   what runs.
 
-The same mechanism serves any other model with remote code: add the `remote_code` block to its catalog entry (for
+Models in the catalog with remote code: `minicpm-o-2.6` (the whole model), `step-audio-2-mini`, `glm-4-voice-9b`
+and `kimi-audio-7b-instruct` (their language models; the rest of their code comes from GitHub, below). The same
+mechanism serves any other model with remote code: add the `remote_code` block to its catalog entry (for
 your own entries, `<data_dir>/custom.yaml`). `bolo-torch pin-remote-code <downloaded folder> --revision <commit>`
 prints it; read every file it lists before you trust it.
 

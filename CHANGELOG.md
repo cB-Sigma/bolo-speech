@@ -73,6 +73,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   only): the authors' `kimia_infer` at a pinned commit, its generation loop run step by step so text streams and
   speech comes in 30-token chunks. The download now includes the pinned glm-4-voice-tokenizer, which kimia_infer
   otherwise fetches unpinned from the Hub. Remote code opt-in. Fakes only.
+- **MiniCPM-o 2.6 runs** (`minicpm-o-2.6`, bolo-torch `minicpm-o` extra), the first model that is remote code and
+  nothing else: it loads only after `allow_remote_code` is set for it, with its seven pinned files checked. The model
+  card's audio-assistant prompt and streaming API (text and 24 kHz speech piece by piece), or `mode: chat`; voices
+  `female`, `male`, `default_female`. The download now keeps the voices, Vocos and the ChatTTS tokenizer (its code
+  fetched them unpinned when they were missing). Fakes only.
 
 - **Speaker embedders as models of their own** (task `speaker-embedding`): `eres2net-voxceleb`, `campplus-voxceleb`,
   `campplus-zh-en` (3D-Speaker, Apache-2.0), `wespeaker-campplus-voxceleb`, `wespeaker-resnet34-voxceleb` (WeSpeaker,

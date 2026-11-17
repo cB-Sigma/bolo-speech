@@ -90,6 +90,12 @@ kimi-audio = [
   "transformers>=4.48,<4.52", "accelerate>=0.33", "torchaudio>=2.1", "librosa", "soundfile>=0.12.1", "tqdm", "loguru",
   "tiktoken", "timm", "torchdyn==1.0.6", "safetensors", "pyyaml", "packaging", "ninja",
 ]
+# MiniCPM-o 2.6 (speech-to-speech): the model is Hugging Face remote code (opt in per model); these are the libraries
+# it imports, at the model card's versions (transformers 4.44.2, vector-quantize-pytorch 1.18.5, vocos 0.1.0).
+minicpm-o = [
+  "transformers==4.44.2", "accelerate>=0.33", "torchaudio>=2.1", "torchvision", "Pillow", "librosa", "soundfile>=0.12.1",
+  "vector-quantize-pytorch==1.18.5", "vocos==0.1.0",
+]
 dev = ["pytest>=8", "pytest-timeout>=2.3", "ruff>=0.8", "mypy>=1.13", "build", "twine"]
 
 [project.scripts]

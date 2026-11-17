@@ -7,6 +7,7 @@ Each fake has the entry points the plugin calls on the real object, with the sam
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +37,7 @@ class FakeGenerator:
             ids = torch.cat([ids, torch.tensor([[token]])], dim=1)
             streamer.put(torch.tensor([token]))
             self.produced += 1
+            time.sleep(0.002)  # a token takes time on a real model: a cancel can arrive mid-generation
         streamer.end()  # transformers' generate ends the streamer itself
         return ids
 
@@ -276,3 +278,41 @@ class KimiFake:
                 return torch.tensor([fake.script[min(step, len(fake.script) - 1)][1]])
 
         return Sampler()
+
+
+class MiniCPMoFake:
+    """``MiniCPMO`` (remote code): ``get_sys_prompt``, ``reset_session``, ``streaming_prefill``,
+    ``streaming_generate`` (``OmniOutput`` pieces) and ``chat``."""
+
+    def __init__(self, pieces: int = 3) -> None:
+        import types
+
+        self.pieces = pieces
+        self.prefilled: list[tuple[str, dict[str, Any]]] = []
+        self.generated: list[dict[str, Any]] = []
+        self.chats: list[dict[str, Any]] = []
+        self.resets = 0
+        self.out = types.SimpleNamespace
+
+    def get_sys_prompt(self, ref_audio: Any = None, mode: str = "default", language: str = "zh") -> dict[str, Any]:
+        assert mode == "audio_assistant" and language == "en" and isinstance(ref_audio, np.ndarray)
+        return {"role": "user", "content": ["Use the voice in the audio prompt to synthesize new content.", ref_audio,
+                                            "You are a helpful assistant with the above voice style."]}  # fmt: skip
+
+    def reset_session(self) -> None:
+        self.resets += 1
+
+    def streaming_prefill(self, session_id: str, msgs: list[dict[str, Any]], tokenizer: Any, **kwargs: Any) -> None:
+        assert len(msgs) == 1
+        self.prefilled.append((session_id, msgs[0]))
+
+    def streaming_generate(self, session_id: str, tokenizer: Any, **kwargs: Any) -> Any:
+        self.generated.append({"session_id": session_id, **kwargs})
+        for i in range(self.pieces):
+            text = f"part{i} " + ("<|tts_eos|>" if i == self.pieces - 1 else "")
+            yield self.out(text=text, audio_wav=np.full(24000 // 2, 0.3, dtype=np.float32), sampling_rate=24000)
+
+    def chat(self, **kwargs: Any) -> Any:
+        self.chats.append(kwargs)
+        wav = np.full(24000, 3.0, dtype=np.float32) if kwargs["generate_audio"] else None
+        return self.out(text="whole answer<|tts_eos|>", audio_wav=wav, sampling_rate=24000)

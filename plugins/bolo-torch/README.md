@@ -31,6 +31,7 @@ the console, the OpenAI-compatible API) works as for bolo's own engines.
 | `qwen3-omni-30b-a3b-instruct-torch` | speech-to-speech | Qwen3-Omni 30B-A3B Instruct, speech out in 10 languages (voices Ethan, Chelsie, Aiden) | `omni` | Apache-2.0 | no | **no** (fakes only) |
 | `glm-4-voice-9b` | speech-to-speech | Zhipu GLM-4-Voice 9B, Chinese and English, text and speech interleaved, streamed | `glm-4-voice` + remote code opt-in | glm-4-voice License: **commercial use only after registering with Zhipu** | no | **no** (fakes only) |
 | `kimi-audio-7b-instruct` | speech-to-speech | Moonshot Kimi-Audio 7B Instruct, English and Chinese, text and speech streamed | `kimi-audio` + flash-attn + remote code opt-in | MIT | no | **no** (fakes only) |
+| `minicpm-o-2.6` | speech-to-speech | OpenBMB MiniCPM-o 2.6, English and Chinese, text and speech streamed (voices female, male, default_female) | `minicpm-o` + remote code opt-in (the whole model) | Apache-2.0 | no | **no** (fakes only) |
 | `step-audio-2-mini` | speech-to-speech | StepFun Step-Audio 2 mini, text, speech (voices female, male) and tool calls, streamed | `step-audio-2` + remote code opt-in | Apache-2.0 | no | **no** (fakes only) |
 
 The separation models are bolo `separation` models in "blind" mode: bolo uses them for `separate_overlaps=true`
@@ -92,11 +93,19 @@ pinned and downloaded with the model instead. NVIDIA GPU only (its code uses `to
 which is not in the extra: `pip install flash-attn --no-build-isolation` on Linux; on Windows a community wheel or
 WSL2). Not run here.
 
-The catalog also lists `sravaani-1.0` and `indicconformer-600m-official` for this plugin, and the speech-to-speech
-model `minicpm-o-2.6` (with the reason it cannot run yet). bolo-torch does
-not implement it yet; loading it answers `400 invalid_request` saying so. Moshi, Hibiki and PersonaPlex
-(full-duplex) are not plugin models: bolo runs them in their own servers (bolo's docs/voice-agents.md, "Full-duplex
-models").
+MiniCPM-o 2.6 (`minicpm-o-2.6`, kind `minicpm-o`) is Python in its Hugging Face repository and nothing else, so it
+loads only after the per-model opt-in (see "Remote code"). It follows the model card: the "audio assistant" system
+prompt with a voice's reference recording (`female`, `male`: stable; `default_female`: more natural, less stable,
+per the card), and by default the card's streaming API: a new session per answer, the conversation prefilled (user
+speech in 1 s pieces), `streaming_generate` giving text and 24 kHz speech piece by piece. Earlier answers are
+prefilled as text with the chat markup that the streaming API does not add for the assistant role, an adaptation of
+the card's single-session example. `mode: chat` uses `chat()` instead (the whole answer when generation ends); a
+text-only answer always does. bolo downloads the voices, Vocos and the ChatTTS tokenizer with the model, so its
+`init_tts` fetches nothing at load. Not run here.
+
+The catalog also lists `sravaani-1.0` and `indicconformer-600m-official` for this plugin; bolo-torch does not
+implement them yet. Moshi, Hibiki and PersonaPlex (full-duplex) are not plugin models: bolo runs them in their own
+servers (bolo's docs/voice-agents.md, "Full-duplex models").
 
 ### How each family runs
 
@@ -211,7 +220,8 @@ package, which pins its own libraries: give it its own environment), `indic-spea
 or later, accelerate, torchvision), `step-audio-2` (Step-Audio 2 mini: transformers 4.49.0, which the authors use, and
 token2wav's libraries: s3tokenizer, onnxruntime, hyperpyyaml, diffusers, torchaudio, librosa), `glm-4-voice` (GLM-4-Voice: transformers 4.44.1, diffusers 0.27.2 with huggingface-hub below 0.26, conformer,
 hyperpyyaml, hydra-core, lightning, tiktoken, bitsandbytes, as in the authors' requirements), `kimi-audio`
-(Kimi-Audio: transformers 4.48 to 4.51, tiktoken, torchdyn, timm, loguru; flash-attn separately). DiCoW uses the plugin protocol's `speakers` request (bolo 0.2.0 or later), the
+(Kimi-Audio: transformers 4.48 to 4.51, tiktoken, torchdyn, timm, loguru; flash-attn separately), `minicpm-o`
+(MiniCPM-o 2.6: transformers 4.44.2, vector-quantize-pytorch 1.18.5, vocos 0.1.0, as on the model card). DiCoW uses the plugin protocol's `speakers` request (bolo 0.2.0 or later), the
 Qwen-Omni models its `respond` request (bolo 0.6.7 or later).
 Installed in bolo's environment, the plugin is found through its entry point (`bolo.engines: torch`) and
 `bolo doctor` lists `plugin:torch`. Check the plugin's own environment with `bolo-torch doctor`.
@@ -442,6 +452,8 @@ docs/measurements/dicow-conditioned.json.
   `AudioDecoder` only; the bundle was downloaded and matched its pins, not imported. The speech-token extraction is
   the authors' `extract_speech_token` with the device made a parameter (theirs moves everything to CUDA).
   `quantization: int4` was not tried.
+* `minicpm-o-2.6`: tested with a fake of its remote-code model only. Prefilling earlier answers into the streaming
+  API, `init_vision: false` and `mode: chat` with long conversations were not checked against the real model.
 * `kimi-audio-7b-instruct`: tested with a fake `KimiAudio` (language model, prompt manager, sampler, detokenizer)
   only; the step-by-step loop mirrors `KimiAudio._generate_loop` at the pinned commit. The transformers range of the
   extra (4.48 to 4.51) is a guess from when the code was published; flash-attn on Windows was not tried.
@@ -470,6 +482,7 @@ card before commercial use.
 | pyannote speaker-diarization-3.1 | MIT | Gated (with `pyannote/segmentation-3.0`, MIT, gated). Downloads `pyannote/wespeaker-voxceleb-resnet34-LM` (CC-BY-4.0, WeSpeaker trained on VoxCeleb) and the PLDA files of community-1 (CC-BY-4.0, gated). |
 | pyannote speaker-diarization-community-1 | CC-BY-4.0 | Gated (asks for contact details). Attribution required. |
 | GLM-4-Voice 9B | glm-4-voice License | **Commercial use only after registering with Zhipu** (https://open.bigmodel.cn/mla/form, then free); academic research free; show "Built with glm-4" and ship the licence with the product; no military or illegal use; Chinese law, Haidian court. The same licence covers glm-4-voice-tokenizer and glm-4-voice-decoder. Code: Apache-2.0 (GLM-4-Voice), MIT (Matcha-TTS). |
+| MiniCPM-o 2.6 | Apache-2.0 | Weights and code (the repository's remote code) per the model card; an optional registration questionnaire. |
 | Kimi-Audio 7B Instruct | MIT | Per the model card; the model is built on Qwen2.5-7B (Apache-2.0). Its code repository has no LICENSE file: README and pyproject say MIT, Qwen-derived code Apache-2.0. Uses glm-4-voice-tokenizer, whose weights are under the glm-4-voice License (commercial use after registering with Zhipu): check that before commercial use. |
 | Step-Audio 2 mini | Apache-2.0 | Model and code (the model repository's remote code, the Step-Audio2 repository's token2wav) under Apache-2.0. |
 | PixIT `speech-separation-ami-1.0` | MIT | Gated (both repositories). Downloads `speechbrain/spkrec-ecapa-voxceleb` (Apache-2.0) and `microsoft/wavlm-large` (no licence stated on its model card; check before commercial use). |

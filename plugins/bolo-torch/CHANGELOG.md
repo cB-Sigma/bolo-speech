@@ -35,6 +35,11 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
   a clear error elsewhere and a hint for flash-attn. Tested with fakes only.
 - The `moshi` kind's message says where Moshi runs now: in Kyutai's own server, which bolo starts for a full-duplex
   `s2s_model` (not in this plugin).
+- **MiniCPM-o 2.6** (`kind: minicpm-o`, `minicpm-o` extra): the model card's recipe on the repository's remote code
+  (opt-in, pinned): `init_tts`, the audio-assistant system prompt with the card's reference voices, the streaming API
+  with the conversation prefilled (`mode: stream`, default) or `chat()` (`mode: chat`, and text-only answers). Refuses
+  to load when Vocos or the ChatTTS tokenizer is missing, instead of letting its code download them. Tested with fakes
+  only.
 
 - **Demucs denoiser** (`kind: demucs-denoiser`, `demucs-denoiser` extra): `demucs-dns48`, `demucs-dns64`,
   `demucs-master64` and `demucs-valentini-nc` from facebookresearch/denoiser as bolo `denoise` models, served through
@@ -46,8 +51,8 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
   sends it): the whole conversation in (turns as 16 kHz audio or text), the answer's text and 24 kHz speech out in
   one piece, the model's voices, Qwen2.5-Omni's required system prompt before the session's instructions;
   transformers' own model classes, no remote code. Tested with fake model objects only; no real model was run.
-- Model kinds `moshi`, `glm-4-voice`, `minicpm-o`, `step-audio-2` and `kimi-audio` are known and answer that they
-  cannot be loaded yet, with the reason (full-duplex; remote code only; no packaged inference code).
+- Model kind `moshi` is known and answers that it cannot be loaded yet (full-duplex). `glm-4-voice`, `minicpm-o`,
+  `step-audio-2` and `kimi-audio`, listed the same way at first, now load (above).
 - **pyannote speaker diarization** (`kind: pyannote-diarization`, `pyannote` extra): `pyannote-speaker-diarization-3.1`
   and `pyannote-speaker-diarization-community-1` as bolo `diarization` models, served through the protocol's new
   `diarize` and `embed` ops (needs a bolo that sends them). Turns in bolo's format, `num_speakers` from the request,

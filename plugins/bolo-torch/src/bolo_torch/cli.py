@@ -52,6 +52,7 @@ FAMILIES = {
     "omni": ["transformers", "accelerate"],
     "step-audio-2": ["transformers", "s3tokenizer", "hyperpyyaml", "onnxruntime", "librosa", "torchaudio"],
     "glm-4-voice": ["transformers", "tiktoken", "hyperpyyaml", "diffusers", "conformer", "lightning", "hydra"],
+    "minicpm-o": ["transformers", "vector_quantize_pytorch", "vocos", "librosa", "PIL", "torchvision"],
     "kimi-audio": ["transformers", "tiktoken", "flash_attn", "torchdyn", "loguru", "timm", "diffusers", "librosa"],
 }
 

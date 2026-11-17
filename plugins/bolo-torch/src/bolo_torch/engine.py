@@ -33,6 +33,7 @@ LOADERS: dict[str, tuple[str, str]] = {
     "step-audio-2": ("bolo_torch.models.step_audio", "load"),
     "glm-4-voice": ("bolo_torch.models.glm_voice", "load"),
     "kimi-audio": ("bolo_torch.models.kimi_audio", "load"),
+    "minicpm-o": ("bolo_torch.models.minicpm_o", "load"),
 }
 #: kinds the catalog lists for this plugin that are not implemented yet
 NOT_IMPLEMENTED = {
@@ -43,7 +44,6 @@ NOT_IMPLEMENTED = {
     "maskgct": "MaskGCT (no packaged inference code)",
     "moshi": "Moshi (full-duplex: bolo runs it in Kyutai's own server, not in this plugin; set s2s_model to a moshiko- "
     "or moshika- catalog entry, docs/voice-agents.md, 'Full-duplex models')",
-    "minicpm-o": "MiniCPM-o (its model code runs only as trust_remote_code, which bolo-torch does not run)",
 }
 
 
