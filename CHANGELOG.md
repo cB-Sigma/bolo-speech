@@ -6,6 +6,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Changed
+
+- Documentation: the README, status, models, recommendations, architecture, configuration and performance pages no
+  longer say that GPUs, Windows and DirectML are untested. They give what was measured on one Windows 11 laptop (CPU,
+  CUDA, DirectML, Vulkan, WSL2, Chrome and Edge), collected in docs/status.md, "A Windows 11 laptop", and keep Apple
+  Silicon, ROCm and discrete Radeon cards, native Linux GPUs, several NVIDIA GPUs, arm64 and phones as untested.
+
 ## [0.6.3] - 2026-11-17
 
 ### Fixed

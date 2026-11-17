@@ -1,7 +1,8 @@
 # Performance
 
-What was measured, on what, and what the numbers do and do not show. Everything here is CPU only: **no GPU was
-available, so nothing on this page was measured on one**. The per-model real-time factors of the
+What was measured, on what, and what the numbers do and do not show. Everything here is CPU only, on the reference machine: **nothing on this
+page was measured on a GPU**. The few GPU figures, from one Windows laptop, are in
+[status.md](status.md#a-windows-11-laptop). The per-model real-time factors of the
 catalog are in [models.md](models.md); how they are scaled to your machine is in
 [recommendations.md](recommendations.md).
 

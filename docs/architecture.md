@@ -219,7 +219,11 @@ halves run as two sessions behind `SplitSession`, which answers `run`,
 its hash and the cut. CTranslate2 cannot split a model; sherpa-onnx builds its
 own sessions, so its models move whole.
 
-**Untested on hardware.** CI has no GPU. The placement arithmetic, the NVML
+**Little tested on hardware.** CI has no GPU. One laptop (an RTX 3060 Laptop
+GPU on Windows 11, natively and under WSL2) ran models whole on its GPU with
+CUDA, DirectML and Vulkan (`bolo ps`: `100% GPU`;
+[status.md](status.md#a-windows-11-laptop)); the lost-GPU detection was not
+triggered there. The rest is tested without a GPU: the placement arithmetic, the NVML
 and nvidia-smi readings, the GPU budget and eviction, `-ngl` and the per-graph
 providers are tested with fake NVML modules and made-up memory figures only;
 graph cuts are tested with both halves on the CPU (outputs compared with the

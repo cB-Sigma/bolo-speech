@@ -46,7 +46,8 @@ How the numbers were produced:
   came out, unless noted.
 * The raw report is in [`docs/measurements/validation.json`](measurements/validation.json).
 
-GPU execution is untested for every model.
+GPU execution was measured for a few models on one laptop (see
+[status.md](status.md#a-windows-11-laptop)); untested for the rest.
 
 ## Tiers
 

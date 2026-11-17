@@ -1,34 +1,78 @@
 # What has been tested, and what has not
 
-bolo is alpha software, developed and measured on one kind of machine. This page states plainly what was run and
+bolo is alpha software, developed and measured on one kind of machine, and checked on one Windows laptop. This page states plainly what was run and
 what was only written against documentation, so that you do not find out the hard way. Each feature's own page
 has the details; the links say where.
 
-## The machine everything was measured on
+## The reference machine
 
 4 vCPUs of an Intel Xeon at 2.1 GHz (AVX-512, AMX), 15 GB RAM, Linux x86-64, **no GPU**; a shared cloud VM that
-was running other workloads at the same time. Every real-time factor, latency and memory figure in the
+was running other workloads at the same time. Every CPU real-time factor, latency and memory figure in the
 documentation comes from it ([performance.md](performance.md)), from small samples, with the conditions next to
-the number.
+the number, unless it names the laptop below.
+
+## A Windows 11 laptop
+
+Windows, the GPU runtimes and the live demo in a desktop browser were also measured on one laptop: an AMD Ryzen 7
+5800H (8 cores, AVX2, no VNNI), an NVIDIA RTX 3060 Laptop GPU with 6 GB next to AMD Radeon integrated graphics,
+Windows 11, bolo 0.6.1 and 0.6.2. Every GPU figure in the documentation comes from this one machine; it says what
+ran there, not what other GPUs or drivers do.
+
+- **Native Windows, CPU.** The server's test suite passes. `server/tools/validate_models.py` ran 19 of the 23 core
+  models and 56 of the 92 further models; their median real-time factor was 0.31 to 0.60 times the reference
+  machine's (faster), the slowest being int8 faster-whisper at 1.02 to 1.04 times. 33 models cannot be run by the
+  tool on any machine: they have no test audio or validation sentence (mostly Indian languages), or they are gated.
+- **CUDA on Windows** (`onnxruntime-gpu` 1.32, CTranslate2 4.9; the recipe is in
+  [configuration.md](configuration.md#cuda-on-windows)). faster-whisper ran 6 to 19 times faster on the GPU than on
+  the CPU. Nemotron diarization: real-time factor 0.0019 on CUDA, 0.0226 on the CPU. Pocket TTS on llama.cpp's
+  prebuilt Windows CUDA build: real-time factor 0.032, first audio after 47 ms (CPU build 0.168, Vulkan build
+  0.049). `bolo ps` showed the models at `100% GPU`. sherpa-onnx's CUDA wheel cannot load inside bolo on Windows
+  (Error 1114), so sherpa-onnx models run on the CPU there.
+- **DirectML** (`onnxruntime-directml` 1.24.4). Nemotron diarization: real-time factor 0.0055 on the RTX 3060 with
+  plain `dml` (the high-performance adapter), 0.0131 on the Radeon (`dml:0`), 0.0226 on the CPU. `smart-turn-v3`
+  fails on DirectML, so bolo runs it on the CPU.
+- **WSL2 on the same laptop.** CPU speed within about 10 % of native Windows. CUDA works there with ONNX Runtime and
+  faster-whisper. llama-server built from source with CUDA
+  ([configuration.md](configuration.md#a-gpu-build-of-llama-server-on-linux)) ran Pocket TTS at real-time factor
+  0.034, first audio after 41 ms, the same as native Windows.
+- **Vulkan llama-server on Windows** works once AMD's switchable-graphics layer is disabled, which bolo does itself
+  since 0.6.2 ([configuration.md](configuration.md#windows)).
+- **A lost GPU.** In long runs at about 92 °C the RTX 3060 dropped out twice. bolo now notices a lost GPU and moves
+  its models to the CPU; that detection has not yet been triggered on real hardware.
+- **The live demo** works in Chrome and Edge 157 there. For the small recognisers WebAssembly was 2 to 10 times
+  faster than WebGPU (Moonshine Tiny: real-time factor 0.097 on WebAssembly, 0.94 on WebGPU). Chrome on Windows
+  ignores the request for the high-performance GPU (crbug 369219127). MOSS-TTS-Nano cloning in the browser:
+  real-time factor 0.69, speaker similarity 0.70. Memory stayed flat over 20 reloads.
+- **Voice cloning.** Saved voices work over the command line and HTTP on Windows; Pocket TTS cloned on the CUDA
+  build of llama-server.
+
+- **Two GPUs, AMD and NVIDIA.** The integrated Radeon (GCN 5) ran compute through DirectML (Nemotron diarization
+  above, `dml:0`) and through WebGPU in the browser. As a hybrid laptop: bolo picks the high-performance adapter for
+  plain `dml`, lists the NVIDIA card once, never counts the integrated GPU as the best GPU, and the Vulkan build
+  works with the AMD layer disabled.
+
+Not covered by the laptop: Apple Silicon (Metal, CoreML); ROCm (which does not support that integrated Radeon) and
+discrete Radeon cards; a discrete GPU under native Linux (only WSL2); the features for several NVIDIA GPUs (models
+or layers spread over `cuda:0` and `cuda:1`, the `gpus` setting), which need two NVIDIA cards; arm64 Linux; phones;
+GPU runs of the catalog models not named above; and cloud providers with real accounts.
 
 ## Not run at all
 
-- **GPUs other than one laptop's.** One GPU was used: the RTX 3060 Laptop GPU of a Windows 11 laptop (Ryzen 7
-  5800H), natively (CPU-only and CUDA: faster-whisper, ONNX Runtime's CUDA provider, the Windows llama.cpp CUDA
-  build) and under WSL2; the GPU figures in the documentation come from it. The torch plugin on a GPU,
-  `Dockerfile.gpu`, ROCm, Metal and several GPUs have not been run. The hardware recommendations for GPU machines are
+- **GPUs other than one laptop's.** One GPU machine was used: the laptop [above](#a-windows-11-laptop), through
+  CUDA, DirectML and Vulkan on its NVIDIA GPU and DirectML and WebGPU on its integrated Radeon, natively and under
+  WSL2. The torch plugin on a GPU, `Dockerfile.gpu`, a discrete GPU under native Linux, ROCm, discrete Radeon cards,
+  Metal and several NVIDIA GPUs have not been run. The hardware recommendations for GPU machines are
   estimates from formulas, not measurements ([recommendations.md](recommendations.md#how-uncertain-this-is)).
-  GPU/CPU placement, keep-alive eviction of GPU-resident models, several GPUs, llama.cpp `-ngl` and
-  `--tensor-split`, the ONNX graph cut and bolo-torch's `device_map` splits are tested with a fake NVML of made-up
+  Apart from whole models placed on the laptop's GPU, GPU/CPU placement, keep-alive eviction of GPU-resident
+  models, several NVIDIA GPUs, llama.cpp `-ngl` and `--tensor-split`, the ONNX graph cut and bolo-torch's `device_map` splits are tested with a fake NVML of made-up
   GPUs and llama-server command lines that are built but not run; the cut graph was run with both halves on the CPU
   ([configuration.md](configuration.md#gpu-and-cpu-placement)).
 - **Apple Silicon and macOS, Linux arm64.** Not run. The dependencies publish wheels for macOS and arm64,
   so it should work there.
-- **Windows: one laptop, plus CI.** Windows 11 was run natively on a laptop (Ryzen 7 5800H, RTX 3060 Laptop
-  GPU), CPU-only and with CUDA ([configuration.md](configuration.md#cuda-on-windows)), and WSL2 on the same laptop.
-  The server's test suite, the bolo-torch plugin's fast tests, `bolo doctor` and `bolo serve` (answering `/healthz`)
+- **Windows: one laptop, plus CI.** Windows 11 was run natively on the laptop [above](#a-windows-11-laptop), on
+  its CPU and with CUDA, DirectML and Vulkan, and WSL2 on the same laptop. The server's test suite, the bolo-torch plugin's fast tests, `bolo doctor` and `bolo serve` (answering `/healthz`)
   run on every push on `windows-latest` (CPU, Python 3.12, the win_amd64 wheels of sherpa-onnx,
-  CTranslate2/faster-whisper, PyAV, soundfile and uccharan). DirectML, the pinned Windows audio.cpp builds, the
+  CTranslate2/faster-whisper, PyAV, soundfile and uccharan). The pinned Windows audio.cpp builds, the
   restart and service recipes (PowerShell loop, NSSM, WinSW) and the junction fallback for local model folders on a
   machine without Developer Mode have not been run (docs/configuration.md, "Windows").
 - **Python 3.10 and 3.11.** The package targets 3.10 and newer; the test-suite was run on 3.12, 3.13 and 3.14.
@@ -43,8 +87,9 @@ the number.
   ([providers.md](providers.md#what-was-verified-and-what-was-not)). Cost estimates use prices you enter; none
   are shipped.
 - **The live demo on real devices.** The demo's end-to-end tests run in headless Chromium on a desktop CPU (the
-  storage crash was reproduced and fixed in WebKit). WebGPU, the GPU/CPU split of a model, and the limits for phones
-  and small devices are tested with a faked device; nothing was run on a GPU, an iPhone or an Android phone.
+  storage crash was reproduced and fixed in WebKit). It was run in Chrome and Edge on the laptop
+  [above](#a-windows-11-laptop), WebGPU included. The GPU/CPU split of a model and the limits for phones and small
+  devices are tested with a faked device; nothing was run on an iPhone or an Android phone.
 - **Home Assistant and browsers.** The Wyoming flows Home Assistant uses were run with the official `wyoming`
   client against a real server with real models, not with Home Assistant itself. The WebRTC transport of the
   Realtime API is tested with the aiortc library (also with real models), not with Chrome, Firefox or Safari, and
@@ -62,7 +107,7 @@ the number.
 - **Most of the catalog.** About two thirds of the local catalog entries are marked `untested` (the exact counts
   head the table in [models.md](models.md#the-catalog)): their files were checked on the Hub and a sibling of the
   same architecture was run, but that model was not. Entries marked `validated: cpu` were downloaded and run by
-  `server/tools/validate_models.py` on the machine above.
+  `server/tools/validate_models.py` on the reference machine.
 - **Accuracy.** Word and character error rates come from a handful of clips or, for the phonemiser comparison,
   500 sentences per voice. They show that the pipelines work, not how good the models are; for that, see the
   model publishers' evaluations.

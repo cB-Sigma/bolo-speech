@@ -149,9 +149,10 @@ heuristic-scaled figure is given a range of **x0.5 to x2**, the command line
 and the console say "rough estimate", and `bolo recommend` reminds you that
 the benchmark has not run.
 
-GPU speed is not estimated at all: the maintainers never measured a model on
-a GPU (see [models.md](models.md#what-validated-means)), so there is no
-number to scale.
+GPU speed is not estimated: only a few models were measured on a GPU, on
+one laptop ([status.md](status.md#a-windows-11-laptop)), which is not
+enough to scale from. Only faster-whisper's measured CUDA speed-up is quoted
+in its fit.
 
 ## How a fit is computed
 
@@ -276,7 +277,9 @@ Be clear about what the numbers are worth:
   worst.
 * Memory needs are estimates from file sizes; the catalog's `vram_gb`
   figures are a formula too.
-* Nothing was ever measured on a GPU.
+* GPU speed was measured for a few models on one laptop's RTX 3060
+  ([status.md](status.md#a-windows-11-laptop)); for every other model and
+  GPU it is a guess.
 * Quality figures (word error rate, round-trip error rate, diarization error
   rate) come from each model's *own* test audio. They show that a model
   works; they do not rank two models against each other. The recommender

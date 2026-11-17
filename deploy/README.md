@@ -4,7 +4,7 @@
 | --- | --- | --- |
 | `Dockerfile` | CPU image (Python 3.12 slim, sherpa-onnx + faster-whisper + Moonshine + PyAV + Wyoming + uccharan; 994 MB) | **built and run** by the maintainers (2026-11-13, Docker 29.9): `/healthz`, the container health check, synthesis with `piper-en-us-amy-low` (uccharan phonemes) and transcription of that audio back with `faster-whisper-tiny`; built and smoke-tested by CI on every push (`deploy/smoke_test.sh`), and before the release workflow pushes it |
 | `smoke_test.sh` | starts an image, waits for `/healthz`, synthesises a sentence and transcribes it back | used by CI and the release workflow; run here |
-| `Dockerfile.gpu` | NVIDIA CUDA 12 image | **untested** - no GPU was available during development |
+| `Dockerfile.gpu` | NVIDIA CUDA 12 image | **untested** - not built; GPUs were run only on one Windows laptop, natively and under WSL2 ([docs/status.md](../docs/status.md#a-windows-11-laptop)) |
 | `docker-compose.yml` | one service, a named volume for models | **run** with the image above: started, reported `healthy`, answered `/healthz` |
 | `systemd/bolo.service` | hardened unit for a virtualenv install | `systemd-analyze verify` passes (apart from the missing virtualenv); not run under systemd (no systemd in the build machine) |
 | Windows (below) | Task Scheduler, NSSM and WinSW recipes | **not run**; CI runs the tests and `bolo serve` on `windows-latest` |

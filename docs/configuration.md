@@ -96,7 +96,7 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `agreement` | `2` | | hypotheses that must agree before a word is shown as stable |
 | `wyoming` | `false` | `--wyoming` | serve the Wyoming protocol |
 | `wyoming_host`, `wyoming_port` | `127.0.0.1`, `10300` | `--wyoming-host`, `--wyoming-port` | Wyoming bind address |
-| `device` | `cpu` | | where models run (per model, as placed by the scheduler: see "GPU and CPU placement" below; a model can pin its own with `PUT /api/v1/models/{id}/settings` `{"device": "cpu"}` or a catalog `options.device`): `cpu`, `cuda` (or `cuda:1`), `coreml` (also `mps`, `metal`), `rocm`, `dml`, `openvino`, or `auto` (the first accelerator found; for the ONNX Runtime engines, the first one the installed `onnxruntime` has a provider for: see "GPU and CPU placement"). sherpa-onnx models use `cuda` (only with a CUDA build of sherpa-onnx: the wheels on PyPI are CPU builds, and their models are placed on the CPU with a notice) or `coreml`; faster-whisper uses `cuda`; the ONNX Runtime engines (Nemotron diarization, DiCoW ONNX, the Orpheus-family decoder, the end-of-turn model, in-process speech-to-speech) use the matching execution provider when the installed `onnxruntime` has it (for `cuda`, install `onnxruntime-gpu`; on Windows also its CUDA libraries, see "CUDA on Windows"), and otherwise run on the CPU with one warning; llama-server gets `-ngl N`, the layers that fit in the free accelerator memory (all of them when everything fits; none when nothing does), unless you set `-ngl` yourself in `tts_server_args`, `s2s_server_args` or the entry's `server_args`; audio.cpp gets the device as its backend (`cuda`, `hip` for `rocm`, `vulkan`, `metal` for `coreml`; the CPU for `dml` and `openvino`, which it does not have). With `dml` (Windows, DirectML) only the ONNX Runtime engines use the GPU; sherpa-onnx and faster-whisper run on the CPU (see "Windows" below). **Untested on a GPU** |
+| `device` | `cpu` | | where models run (per model, as placed by the scheduler: see "GPU and CPU placement" below; a model can pin its own with `PUT /api/v1/models/{id}/settings` `{"device": "cpu"}` or a catalog `options.device`): `cpu`, `cuda` (or `cuda:1`), `coreml` (also `mps`, `metal`), `rocm`, `dml`, `openvino`, or `auto` (the first accelerator found; for the ONNX Runtime engines, the first one the installed `onnxruntime` has a provider for: see "GPU and CPU placement"). sherpa-onnx models use `cuda` (only with a CUDA build of sherpa-onnx: the wheels on PyPI are CPU builds, and their models are placed on the CPU with a notice) or `coreml`; faster-whisper uses `cuda`; the ONNX Runtime engines (Nemotron diarization, DiCoW ONNX, the Orpheus-family decoder, the end-of-turn model, in-process speech-to-speech) use the matching execution provider when the installed `onnxruntime` has it (for `cuda`, install `onnxruntime-gpu`; on Windows also its CUDA libraries, see "CUDA on Windows"), and otherwise run on the CPU with one warning; llama-server gets `-ngl N`, the layers that fit in the free accelerator memory (all of them when everything fits; none when nothing does), unless you set `-ngl` yourself in `tts_server_args`, `s2s_server_args` or the entry's `server_args`; audio.cpp gets the device as its backend (`cuda`, `hip` for `rocm`, `vulkan`, `metal` for `coreml`; the CPU for `dml` and `openvino`, which it does not have). With `dml` (Windows, DirectML) only the ONNX Runtime engines use the GPU; sherpa-onnx and faster-whisper run on the CPU (see "Windows" below). **Measured on one laptop's GPU only** (CUDA, DirectML, Vulkan: [status.md](status.md#a-windows-11-laptop)) |
 | `gpu_health_interval_s` | `30` | | while models are on a GPU, ask the driver this often whether the GPU is still there (NVML, else nvidia-smi), and also right after a request whose real-time factor is more than twice that model's recent median. `0`: no such checks; a CUDA or Vulkan error printed by a llama-server or audio.cpp bolo started still counts. See "A lost GPU" |
 | `gpu_lost_fallback` | `cpu` | | what happens to the models on a GPU that was lost: `cpu` loads them again on the CPU (the CPU build of llama-server and audio.cpp, every GPU hidden) and places later loads there; `fail` leaves them in place and fails their requests (and later GPU loads) with `engine_unavailable`, for a deployment that would rather fail than run many times slower. See "A lost GPU" |
 | `log_level` | `info` | `--log-level` | `debug`, `info`, `warning`, `error` |
@@ -311,7 +311,8 @@ with them on, since ONNX Runtime fuses nodes differently on each side of the cut
 
 `memory_budget_mb` counts the RAM side of each model, `gpu_memory_budget_mb` the accelerator side.
 
-None of this has run on a real GPU in bolo's tests: it is tested with fake NVML readings and made-up memory figures.
+None of this runs on a real GPU in bolo's tests: it is tested with fake NVML readings and made-up memory figures.
+On real hardware, whole models were placed on one laptop's GPU ([status.md](status.md#a-windows-11-laptop)).
 
 ### Several GPUs
 
@@ -342,7 +343,7 @@ On a machine with several NVIDIA GPUs:
   `placement.tensor_split` and `main_gpu` for a spread model, and per GPU `allowed` and `models_vram_bytes`. The
   console's Loaded models panel shows a memory bar per GPU.
 
-None of this has run on a machine with two GPUs: it is tested with a fake NVML of several made-up GPUs and with
+None of this has run on a machine with two NVIDIA GPUs (the one laptop it was checked on has one NVIDIA GPU and integrated AMD graphics): it is tested with a fake NVML of several made-up GPUs and with
 llama-server command lines that are built but not run.
 
 ### llama.cpp speed and memory
@@ -408,7 +409,7 @@ writes (`GET /api/v1/info` has `log_file`), else uses the settings, else the pla
 
 ## Windows
 
-What differs on Windows (CI runs the server's tests on `windows-latest`; the CPU and CUDA notes below were found on a Windows 11 laptop with an RTX 3060 Laptop GPU; DirectML is untested):
+What differs on Windows (CI runs the server's tests on `windows-latest`; the CPU, CUDA, DirectML and Vulkan notes below were found on a Windows 11 laptop with an RTX 3060 Laptop GPU and Radeon integrated graphics, whose numbers are in [status.md](status.md#a-windows-11-laptop)):
 
 | | |
 | --- | --- |
