@@ -23,7 +23,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 import numpy as np
 
@@ -184,24 +184,64 @@ def _skipped(record: dict[str, Any], detail: str, samples: FloatArray) -> FloatA
     return samples
 
 
+class _Resampler(Protocol):
+    def process(self, samples: FloatArray) -> FloatArray: ...
+
+    def finish(self) -> FloatArray: ...
+
+
+class _Soxr:
+    """soxr's streaming resampler where the rates are not whole multiples of each other."""
+
+    def __init__(self, rate_in: int, rate_out: int) -> None:
+        from bolo.audio.resample import StreamResampler
+
+        self._r = StreamResampler(rate_in, rate_out)
+
+    def process(self, samples: FloatArray) -> FloatArray:
+        return self._r.process(samples)
+
+    def finish(self) -> FloatArray:
+        return self._r.process(np.zeros(0, dtype=np.float32), last=True)
+
+
+class _Same:
+    def process(self, samples: FloatArray) -> FloatArray:
+        return samples
+
+    def finish(self) -> FloatArray:
+        return np.zeros(0, dtype=np.float32)
+
+
+def _resampler(rate_in: int, rate_out: int) -> _Resampler:
+    from bolo.audio.resample import LowDelayResampler
+
+    if rate_in == rate_out:
+        return _Same()
+    if rate_out % rate_in == 0 or rate_in % rate_out == 0:
+        return LowDelayResampler(rate_in, rate_out)  # 8, 16, 48 kHz: a millisecond, not soxr's 40 to 110
+    return _Soxr(rate_in, rate_out)
+
+
 class LiveDenoiser:
     """``denoise`` on a live stream (the speech-to-text WebSocket): pieces of audio at ``rate`` in, enhanced pieces at
     ``rate`` out, aligned with the input by sample count (sample ``k`` out is sample ``k`` in, enhanced).
 
     The model's stream (:meth:`DenoiseModel.create_stream`) keeps its state across pieces when the model has a
     streaming form (GTCRN and DPDFNet through sherpa-onnx's online denoiser, DeepFilterNet 3, RNNoise); other models
-    enhance each piece with half a second of audio before it. The model runs at its own rate (resampled to it and
-    back, in step). ``strength`` below 1 mixes the original back in. :attr:`ms` collects the time each piece took."""
+    enhance each piece with half a second of audio before it. The model runs at its own rate, resampled to it and
+    back in step (with a short FIR filter when the rates are whole multiples of each other: 1 to 2 ms held back, where
+    soxr's streaming filters hold 40 to 110 ms). ``strength`` below 1 mixes the original back in. :attr:`ms` collects
+    the time each piece took; ``held_ms`` in :meth:`summary` is the most audio held back at once (the model's own delay,
+    its frame and the resampling)."""
 
     def __init__(self, model: DenoiseModel, rate: int, strength: float) -> None:
-        from bolo.audio.resample import StreamResampler
-
         self.stream = model.create_stream()
         self.native = int(model.sample_rate)
         self.rate = rate
         self.strength = strength
-        self._down = StreamResampler(rate, self.native)
-        self._up = StreamResampler(self.native, rate)
+        self._down = _resampler(rate, self.native)
+        self._up = _resampler(self.native, rate)
         self._original = np.zeros(0, dtype=np.float32)  # input not yet matched by output
         self.ms: list[float] = []
         self._held = 0  # most audio held back at once (samples at ``rate``): the denoiser's own delay
@@ -227,9 +267,9 @@ class LiveDenoiser:
 
     def finish(self) -> FloatArray:
         """The rest, at the end of the stream: in all, as many samples as were given."""
-        native = self._down.process(np.zeros(0, dtype=np.float32), last=True)
+        native = self._down.finish()
         enhanced = np.concatenate([self.stream.process(native) if len(native) else native, self.stream.finish()])
-        back = np.concatenate([self._up.process(enhanced), self._up.process(np.zeros(0, np.float32), last=True)])
+        back = np.concatenate([self._up.process(enhanced), self._up.finish()])
         missing = len(self._original) - len(back)
         if missing > 0:  # resampling rounded the length down: the last few samples are the original's
             back = np.concatenate([back, self._original[len(back) :]])

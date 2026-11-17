@@ -313,3 +313,21 @@ def dn_ws(settings: Settings) -> Iterator[LiveServer]:
         yield server
     finally:
         server.stop()
+
+
+@pytest.mark.parametrize(("rate_in", "rate_out"), [(16000, 48000), (16000, 8000), (48000, 16000), (8000, 16000)])
+def test_low_delay_resampler_is_in_step_and_holds_back_little(rate_in: int, rate_out: int) -> None:
+    from bolo.audio.resample import LowDelayResampler
+
+    r = LowDelayResampler(rate_in, rate_out)
+    x = (0.5 * np.sin(2 * np.pi * 1000 * np.arange(rate_in) / rate_in)).astype(np.float32)
+    step = rate_in // 50
+    outs = [r.process(x[i : i + step]) for i in range(0, len(x), step)]
+    y = np.concatenate([*outs, r.finish()])
+    assert len(y) == rate_out
+    ref = 0.5 * np.sin(2 * np.pi * 1000 * np.arange(len(y)) / rate_out)
+    assert np.max(np.abs(y[200:-200] - ref[200:-200])) < 1e-3
+    held = 16 * rate_out // min(rate_in, rate_out)  # the filter's delay: 16 samples of the lower rate
+    assert len(outs[0]) >= rate_out // 50 - held - 1
+    with pytest.raises(ValueError):
+        LowDelayResampler(16000, 44100)
