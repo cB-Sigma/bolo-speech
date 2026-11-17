@@ -6,6 +6,13 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ### Added
 
+- **DiariZen** (kind `diarizen`, extra `diarizen`): BUT-FIT's DiariZen v2 diarization through the authors' own
+  `DiariZenPipeline` and their pyannote.audio 3.1.1 fork, both installed from github.com/BUTSpeechFIT/DiariZen at a
+  pinned commit (the loader refuses any other commit, read from pip's `direct_url.json`), in an environment of their
+  own. Audio reaches the pipeline as an in-memory float WAV; the WeSpeaker embedding is fetched at a pinned revision
+  and passed as a checkpoint dictionary; the two checkpoints load under `weights_only` with pyannote's task classes
+  and torch's version object allowed by name. Served through the `diarize` and `embed` ops. Run here on CPU through
+  bolo (DER 5.0 % on the demo dialogue, RTF 12 on a shared 4-vCPU machine). Weights CC-BY-NC-4.0.
 - **Remote code, opted in per model and pinned** (`bolo_torch.remote_code`): `trust_remote_code=True` is passed only
   when the load options say `allow_remote_code: true` (bolo's per-model setting) and the catalog's
   `options.remote_code` pins the folder's revision and the sha256 of every `.py` file and of every JSON file with an

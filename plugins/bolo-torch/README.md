@@ -24,6 +24,7 @@ the console, the OpenAI-compatible API) works as for bolo's own engines.
 | `pixit-ami` | separation | pyannote PixIT `speech-separation-ami-1.0`, diarization + separation | `pyannote` | MIT | yes (two repositories) | CPU, see below |
 | `pyannote-speaker-diarization-3.1` | diarization | pyannote `speaker-diarization-3.1`, the original PyTorch pipeline | `pyannote` | MIT (pipeline, segmentation) + CC-BY-4.0 (WeSpeaker embedding, PLDA files) | yes (three repositories) | CPU, see below |
 | `pyannote-speaker-diarization-community-1` | diarization | pyannote `speaker-diarization-community-1` (VBx clustering) | `pyannote` | CC-BY-4.0 | yes | CPU, see below |
+| `diarizen-wavlm-large-s80-md-v2` | diarization | BUT-FIT DiariZen v2: pruned WavLM Large + Conformer, VBx clustering (the authors' pipeline) | `diarizen` + the authors' code (see below) | CC-BY-NC-4.0 (non-commercial; PLDA CC-BY-4.0) | no | CPU, see below |
 | `dicow-v3.3` | STT, diarization-conditioned | BUT-FIT DiCoW v3.3: Whisper large-v3-turbo told who talks when | `dicow` | CC-BY-4.0 | no | CPU, see below |
 | `se-dicow` | STT, diarization-conditioned | BUT-FIT SE-DiCoW: DiCoW with self-enrolment | `dicow` | Apache-2.0 | no | CPU, see below |
 | `qwen2.5-omni-3b-torch` | speech-to-speech | Qwen2.5-Omni 3B, text and speech out (voices Chelsie, Ethan) | `omni` | Qwen Research License (non-commercial) | no | **no** (fakes only) |
@@ -43,6 +44,27 @@ The pyannote diarizers are bolo `diarization` models: `POST /api/v1/diarize` wit
 transcriptions. bolo's own diarization runs pyannote's segmentation model exported to ONNX with its own embeddings and
 clustering; these run pyannote.audio's pipelines unchanged, for pyannote's exact results. See "pyannote speaker
 diarization" below.
+
+DiariZen (`diarizen-wavlm-large-s80-md-v2`, kind `diarizen`) is a bolo `diarization` model too, run by the authors'
+own `DiariZenPipeline` (github.com/BUTSpeechFIT/DiariZen, MIT) on their fork of pyannote.audio 3.1.1 (in the same
+repository). Neither is on PyPI, so both are installed from the pinned commit, in an environment of their own
+because the fork replaces pyannote.audio (it cannot share one with the `pyannote` extra):
+
+```bash
+python -m venv /opt/bolo-torch-diarizen
+/opt/bolo-torch-diarizen/bin/pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+/opt/bolo-torch-diarizen/bin/pip install ./server "./plugins/bolo-torch[diarizen]" \
+  "pyannote.audio @ git+https://github.com/BUTSpeechFIT/DiariZen@844f5555b0a98acd0931511fc641a8c5b8ba92c7#subdirectory=pyannote-audio" \
+  "diarizen @ git+https://github.com/BUTSpeechFIT/DiariZen@844f5555b0a98acd0931511fc641a8c5b8ba92c7"
+BOLO_PLUGINS="torch=/opt/bolo-torch-diarizen/bin/python -m bolo_torch" bolo serve
+```
+
+(pip needs git for these two; on Windows install Git for Windows first.) The loader refuses any other commit of
+either package. It fetches the WeSpeaker embedding (`pyannote/wespeaker-voxceleb-resnet34-LM`, CC-BY-4.0, not gated)
+at a pinned revision; the PLDA comes with the model. VBx finds the number of speakers: `num_speakers` and the
+`min_speakers` / `max_speakers` options are not used, as in the authors' pipeline. Its weights are CC-BY-NC-4.0:
+not for commercial use. Slow on a CPU (more than ten times slower than real time on the test machine); a GPU is
+recommended. See "DiariZen" below.
 
 The DiCoW models are bolo `stt` models that are *speaker-conditioned*: in a diarized transcription
 (`diarize=true` or `response_format=diarized_json`) bolo diarizes the recording (with
@@ -216,7 +238,8 @@ pip install ./server "./plugins/bolo-torch[parler,sepformer]"
 Extras: `parler` (Parler-TTS), `f5` (IndicF5), `f5-original` (the original F5-TTS checkpoints, on the `f5-tts`
 package, which pins its own libraries: give it its own environment), `indic-speak` (transformers 5 and SNAC),
 `orpheus` (Veena, Svara), `sepformer`, `pyannote` (PixIT, pyannote speaker diarization),
-`dicow` (DiCoW, SE-DiCoW: transformers 4.55 and pandas), `omni` (Qwen2.5-Omni and Qwen3-Omni: transformers 4.57
+`dicow` (DiCoW, SE-DiCoW: transformers 4.55 and pandas), `diarizen` (DiariZen: toml, accelerate, scipy, torchaudio
+below 2.9; with the authors' two packages from GitHub, see above), `omni` (Qwen2.5-Omni and Qwen3-Omni: transformers 4.57
 or later, accelerate, torchvision), `step-audio-2` (Step-Audio 2 mini: transformers 4.49.0, which the authors use, and
 token2wav's libraries: s3tokenizer, onnxruntime, hyperpyyaml, diffusers, torchaudio, librosa), `glm-4-voice` (GLM-4-Voice: transformers 4.44.1, diffusers 0.27.2 with huggingface-hub below 0.26, conformer,
 hyperpyyaml, hydra-core, lightning, tiktoken, bitsandbytes, as in the authors' requirements), `kimi-audio`
@@ -504,6 +527,21 @@ collar all are under 1 %. `num_speakers=3` gave three speakers and `max_speakers
 machine). One clean synthetic dialogue: it shows the pipelines run and agree, not which is better on meetings
 (pyannote's model cards: AMI SDM DER 22.7 % for 3.1, 19.9 % for community-1).
 
+### DiariZen
+
+2026-11-17, same machine type, torch 2.8.0+cpu, Python 3.13, diarizen and the pyannote.audio fork from
+BUTSpeechFIT/DiariZen @ `844f5555b0a9`, 4 threads, the machine shared (load average about 15). The demo's two-voice
+dialogue as above, through bolo (`POST /api/v1/diarize` with `model=diarizen`, plugin process started by bolo):
+
+| Diarizer | DER | Missed | False alarm | Confusion | Speakers | Load | RTF |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `diarizen-wavlm-large-s80-md-v2` | 5.03 % | 3.3 % | 1.8 % | 0 | 2 | 14.7 s | 12.4 |
+
+The same seven turns through bolo as from the loader called directly; with a 250 ms collar DER 0. Its 16 s windows
+every 1.6 s through WavLM Large make it slow on a CPU (337 s for 27 s of audio here). The authors' example
+(`example/EN2002a_30s.wav`, an AMI excerpt with four speakers) ran with their pipeline the same way and gave four
+speakers. On the model card, AMI SDM DER 13.9 % (pyannote 3.1: 22.4 %).
+
 ### DiCoW
 
 2026-11-14, same machine type (it has AMX, so DiCoW ran in bfloat16), bolo and the plugin at 2 threads, the
@@ -544,8 +582,10 @@ docs/measurements/dicow-conditioned.json.
   synthetic voice pair, and on single-speaker audio against plain Whisper large-v3-turbo; on CPUs without AMX /
   AVX512-BF16 only float32 speed was measured (forced on this machine). DiCoW gives no word timestamps.
 * Telephone (8 kHz) recordings with the 8 kHz SepFormer; real meeting audio with any separator.
-* `sravaani-1.0` and `indicconformer-600m-official`: not implemented. `spark-tts-0.5b`, `maskgct` and
-  `diarizen-wavlm-large-s80-md-v2` are catalogued but not implemented (no packaged inference code).
+* `sravaani-1.0` and `indicconformer-600m-official`: not implemented. `spark-tts-0.5b` and `maskgct` are
+  catalogued but not implemented (no packaged inference code).
+* DiariZen on a GPU, on real meetings, with torch 2.9 or later (torchaudio 2.9 reads audio through torchcodec, which
+  the extra keeps out), and on Windows (the install needs git).
 * `glm-4-voice-9b`: tested with fakes of ChatGLM, its tokenizer, `WhisperVQEncoder`, the feature extractor and
   `AudioDecoder` only; the bundle was downloaded and matched its pins, not imported. The speech-token extraction is
   the authors' `extract_speech_token` with the device made a parameter (theirs moves everything to CUDA).
@@ -583,9 +623,11 @@ card before commercial use.
 | MiniCPM-o 2.6 | Apache-2.0 | Weights and code (the repository's remote code) per the model card; an optional registration questionnaire. |
 | Kimi-Audio 7B Instruct | MIT | Per the model card; the model is built on Qwen2.5-7B (Apache-2.0). Its code repository has no LICENSE file: README and pyproject say MIT, Qwen-derived code Apache-2.0. Uses glm-4-voice-tokenizer, whose weights are under the glm-4-voice License (commercial use after registering with Zhipu): check that before commercial use. |
 | Step-Audio 2 mini | Apache-2.0 | Model and code (the model repository's remote code, the Step-Audio2 repository's token2wav) under Apache-2.0. |
+| DiariZen v2 (`BUT-FIT/diarizen-wavlm-large-s80-md-v2`) | CC-BY-NC-4.0 | **Not for commercial use** (the authors apply NC because some training sets forbid commercial use). The PLDA files are CC-BY-4.0. Code (DiariZen and its pyannote.audio fork): MIT. Downloads `pyannote/wespeaker-voxceleb-resnet34-LM` (CC-BY-4.0). |
 | PixIT `speech-separation-ami-1.0` | MIT | Gated (both repositories). Downloads `speechbrain/spkrec-ecapa-voxceleb` (Apache-2.0) and `microsoft/wavlm-large` (no licence stated on its model card; check before commercial use). |
 
-Apart from GLM-4-Voice (commercial use after registration), no model here is marked non-commercial by its publisher; the SepFormer training-data caveat above is the one to
+Apart from GLM-4-Voice (commercial use after registration) and DiariZen (non-commercial), no model here is marked
+non-commercial by its publisher; the SepFormer training-data caveat above is the one to
 weigh for commercial use. Nothing is downloaded unless you ask for that model.
 
 ## Development

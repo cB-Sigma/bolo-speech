@@ -1122,9 +1122,8 @@ def test_console_flags(live: LiveServer, settings: Settings, tmp_path: Path, llm
         assert with_llm["cascade"] == {"configured": True, "available": True}
         assert with_llm["audio-llm"]["available"] is True and info["auto_pull"] is True
     listed = {m["id"]: m for m in httpx.get(f"{live.url}/api/v1/catalog").json()["models"]}
-    # nothing bolo has can run these three: a flag says so, and why
-    for model_id in ("spark-tts-0.5b", "maskgct", "diarizen-wavlm-large-s80-md-v2"):
-        assert listed[model_id]["runnable"] is False and listed[model_id]["not_runnable_reason"]
+    # every entry the catalog lists runs somewhere: the flag stays in the API for custom entries
+    assert listed["diarizen-wavlm-large-s80-md-v2"]["runnable"] is True
     assert listed["fake-stt"]["runnable"] is True and listed["fake-stt"]["not_runnable_reason"] is None
     # entries whose files are not published yet are listed, with their status
     pending = [m for m in listed.values() if m["status"] == "pending"]

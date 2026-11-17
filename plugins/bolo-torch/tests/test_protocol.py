@@ -23,6 +23,7 @@ from bolo.errors import GatedModel, InvalidRequest
 from bolo.plugin.host import PluginConfig, PluginEngine
 
 from bolo_torch.engine import LOADERS, NOT_IMPLEMENTED, TorchEngine
+from bolo_torch.models.diarizen import COMMIT as DIARIZEN_COMMIT
 from fakes import tone
 
 FAKE_PLUGIN = [sys.executable, str(Path(__file__).parent / "fake_plugin.py")]
@@ -136,8 +137,12 @@ def test_catalog_entries_use_kinds_the_plugin_knows() -> None:
     assert TorchEngine().kinds == tuple(LOADERS)
     seps = {s.id for s in entries if s.task == "separation"}
     assert {"sepformer-whamr16k", "sepformer-whamr", "pixit-ami"} <= seps
-    diarizers = {s.id: s for s in entries if s.task == "diarization" and s.runnable}
+    diarizers = {s.id: s for s in entries if s.task == "diarization" and s.kind == "pyannote-diarization"}
     assert set(diarizers) == {"pyannote-speaker-diarization-3.1", "pyannote-speaker-diarization-community-1"}
+    diarizen = next(s for s in entries if s.kind == "diarizen")
+    # the authors' code at the commit the loader accepts, and nothing that is not runnable
+    assert diarizen.runnable and diarizen.source.revision and len(diarizen.source.revision) == 40
+    assert f"DiariZen@{DIARIZEN_COMMIT}" in str(diarizen.options["plugin_install"])
     for spec in [*diarizers.values(), *(s for s in entries if s.id == "pixit-ami")]:
         # pinned pipeline and sub-models, with the hashes the plugin checks again before pyannote reads anything
         assert spec.gated and len(spec.source.revision or "") == 40, spec.id

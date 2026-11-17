@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-464 models: 168 validated on CPU by the maintainers, 296 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+464 models: 169 validated on CPU by the maintainers, 295 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -731,7 +731,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `diarizen-wavlm-large-s80-md-v2` | - | accuracy | - | 278 MB | CC-BY-NC-4.0 (segmentation) + CC-BY-4.0 (PLDA) ⚠ · needs plugin torch | not runnable yet |
+| `diarizen-wavlm-large-s80-md-v2` | - | accuracy | - | 278 MB | CC-BY-NC-4.0 (segmentation) + CC-BY-4.0 (PLDA) ⚠ · needs plugin torch | **CPU** · RTF 12.400 · DER 5.0% on a two-voice test clip |
 
 ### End-of-turn detection
 
@@ -1073,7 +1073,7 @@ models below were checked against their model cards and licence files on 2026-11
 | `indextts-2.5-audiocpp` | bilibili Model Use License (conditional) | tts-server, audio.cpp `index_tts2` family, `IndexTTS2.5-GGUF` q8_0 | catalogued |
 | `spark-tts-0.5b` | CC-BY-NC-SA-4.0 (no) | none yet: no ggml/ONNX runtime runs the BiCodec decoder, and the reference code is not packaged | catalogued, not runnable (bolo-torch answers "not implemented") |
 | `maskgct` | CC-BY-NC-4.0 (no) | none yet: Amphion's code is not packaged (the PyPI `maskgct` wrapper is a third-party GPL-3.0 project) | catalogued, not runnable |
-| `diarizen-wavlm-large-s80-md-v2` | CC-BY-NC-4.0, PLDA CC-BY-4.0 (no) | none yet: bolo-torch has no DiariZen loader (its inference code is not packaged), and the community ONNX export needs a VBx/PLDA pipeline that sherpa-onnx lacks | catalogued, not runnable |
+| `diarizen-wavlm-large-s80-md-v2` | CC-BY-NC-4.0, PLDA CC-BY-4.0 (no) | bolo-torch, `diarizen` kind: the authors' `DiariZenPipeline` and pyannote.audio fork from github.com/BUTSpeechFIT/DiariZen at a pinned commit (`bolo-torch[diarizen]`, own environment) | measured on CPU (DER 5.0 % on the demo dialogue, RTF 12.4) |
 | `mms-lid-126`, `mms-lid-4017` | CC-BY-NC-4.0 (no) | ONNX Runtime, `onnx_lid` kind on Xenova's int8 exports | runnable, not measured (978 MB); "Language identification" below |
 | `voxlect-indic-lid-mms-lid-256` | CC-BY-NC-4.0 (no) | bolo-torch, `voxlect-lid` kind (`bolo-torch[voxlect]`) | runnable, not measured (3.9 GB) |
 | `indic-slid-mhubert`, `indic-slid-mhubert-task2` | CC-BY-NC-SA-4.0 (no) | bolo-torch, `hf-audio-classification` kind | measured |
@@ -1532,6 +1532,18 @@ clustering and clean-up, so its turns are not pyannote's. For pyannote's exact r
   to 17 on 4 cores): the PyTorch RTFs above are from quiet moments; through bolo under load they were 1.0-1.5 (3.1)
   and 4.1 (community-1, 2 threads), and a run at 4 threads
   stalled for minutes in the segmentation LSTM (thread oversubscription; fewer `BOLO_TORCH_THREADS` helps).
+
+### DiariZen (bolo-torch)
+
+`diarizen-wavlm-large-s80-md-v2` (alias `diarizen`) is BUT Speech@FIT's DiariZen v2: a pruned WavLM Large with
+Conformer layers labels up to four speakers per 16 s window (windows every 1.6 s), WeSpeaker ResNet34 embeddings of
+each local speaker are clustered with VBx and the model's PLDA. The plugin runs the authors' own `DiariZenPipeline`
+on their pyannote.audio 3.1.1 fork, both installed from github.com/BUTSpeechFIT/DiariZen (MIT) at a pinned commit in
+an environment of their own (the fork replaces pyannote.audio; the install command is the entry's `plugin_install`
+and plugins/bolo-torch/README.md). VBx finds the number of speakers: `num_speakers` is not used. Weights
+CC-BY-NC-4.0 (not for commercial use), PLDA CC-BY-4.0. On the demo dialogue above, through bolo: DER 5.03 % (missed
+3.3 %, false alarm 1.8 %, no confusion, two speakers), but RTF 12.4 on the shared 4-vCPU machine at 4 threads (load
+average about 15): a GPU model in practice. The model card reports AMI SDM DER 13.9 % against 22.4 % for pyannote 3.1.
 
 ### Measured: Nemotron against clustering
 

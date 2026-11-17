@@ -188,7 +188,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | TTS | Indic-Speak | 1 | as, bn, brx, doi, en, gu, hi, kn +15 | 0 | - |
 | TTS | Spark-TTS | 1 | en, zh | 0 | - |
 | TTS | MaskGCT | 1 | de, en, fr, ja, ko, zh | 0 | - |
-| DIARIZATION | DiariZen | 1 | - | 0 | - |
+| DIARIZATION | DiariZen | 1 | - | 1 | 12.400 (`diarizen-wavlm-large-s80-md-v2`) |
 | SPEECH-TO-SPEECH | Qwen2.5-Omni 3B | 1 | en, zh | 0 | - |
 | SPEECH-TO-SPEECH | Qwen2.5-Omni 7B | 1 | en, zh | 0 | - |
 | SPEECH-TO-SPEECH | Qwen3-Omni 30B-A3B | 1 | de, en, es, fr, it, ja, ko, pt +2 | 0 | - |
@@ -235,7 +235,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | VAD | WebRTC VAD | 2 | - | 2 | 0.000 (`webrtc-vad-aggressive`) |
 | VAD | Energy VAD | 1 | - | 1 | 0.000 (`energy-vad`) |
 
-**464 models in the catalog, 168 validated on CPU, 296 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**464 models in the catalog, 169 validated on CPU, 295 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

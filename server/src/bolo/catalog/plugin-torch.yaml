@@ -803,8 +803,7 @@
   options:
     plugin_install: not supported by bolo-torch yet (no packaged inference code)
 - id: diarizen-wavlm-large-s80-md-v2
-  runnable: false
-  not_runnable_reason: bolo-torch has no DiariZen loader yet
+  aliases: [diarizen]
   task: diarization
   engine: plugin:torch
   kind: diarizen
@@ -819,23 +818,39 @@
   gated: false
   features: []
   description: 'BUT-FIT DiariZen (v2): end-to-end neural diarization on a pruned WavLM Large with Conformer layers (up
-    to four overlapping speakers), then speaker embeddings and VBx clustering, built on pyannote. The model card reports
-    DER 13.9 % on AMI against 22.4 % for pyannote 3.1 (collar 0). Non-commercial (CC-BY-NC-4.0; the PLDA files are
-    CC-BY-4.0). Not runnable yet: bolo-torch has no DiariZen loader (its inference code is not packaged), and the community ONNX export
-    (christopherthompson81/diarizen_onnx, CC-BY-NC-4.0) needs a VBx/PLDA clustering pipeline that sherpa-onnx does not
-    have.'
+    to four overlapping speakers per 16 s window), then WeSpeaker embeddings and VBx clustering with a PLDA, built on
+    pyannote. The model card reports DER 13.9 % on AMI against 22.4 % for pyannote 3.1 (collar 0). VBx finds the number
+    of speakers itself (a requested count is not used). Non-commercial (CC-BY-NC-4.0; the PLDA files are CC-BY-4.0).
+    Runs the authors'' pipeline through the torch plugin: their code and their pyannote.audio fork come from
+    github.com/BUTSpeechFIT/DiariZen (MIT) at a pinned commit, in an environment of their own (diarizen extra). Slow on
+    a CPU (16 s windows every 1.6 s through WavLM Large): a GPU is recommended.'
   source_url: https://huggingface.co/BUT-FIT/diarizen-wavlm-large-s80-md-v2
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 12.4
+    der: 0.0503
+    der_collar_250ms: 0.0
+    load_s: 14.7
+    audio_s: 27.15
+    threads: 4
+    engine: bolo-torch (unreleased, after 0.1.4), torch 2.8.0+cpu, diarizen and pyannote.audio 3.1.1 from
+      BUTSpeechFIT/DiariZen@844f5555b0a9
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+    test_audio: the demo's two-voice dialogue (two SYSPIN voices taking turns, server/src/bolo/_ui/diarization)
+    note: 'Through bolo (POST /api/v1/diarize, plugin process): two speakers, no confusion, missed 3.3 %, false alarm
+      1.8 %; the same seven turns as the plugin loader called directly. pyannote community-1 on the same clip: DER 6.05 %.
+      Very slow on this shared CPU (load average about 15): 337 s for 27 s of audio.'
   source:
     repo: BUT-FIT/diarizen-wavlm-large-s80-md-v2
     revision: 027b3e221b9d81dce2be794084f1dbd3ba2da403
-    exclude: [.gitattributes]
+    include: [config.toml, pytorch_model.bin, plda/*]
   options:
-    plugin_install: not supported by bolo-torch yet (no DiariZen loader)
-# Speech-to-speech models (task speech-to-speech): turn-based conversation over the plugin protocol's respond op,
-# behind the Realtime speech-to-speech pipeline (s2s_model = "<id>"). Sources, read 2026-11-17: the model cards and
-# LICENSE files at the pinned revisions, the Hugging Face API (sizes), transformers' Qwen2.5-Omni and Qwen3-Omni
-# classes. None of them was run here (each download is 12 GB or more and the test machine has no GPU).
+    plugin_install: 'pip install "bolo-torch[diarizen]" "pyannote.audio @ git+https://github.com/BUTSpeechFIT/DiariZen@844f5555b0a98acd0931511fc641a8c5b8ba92c7#subdirectory=pyannote-audio"
+      "diarizen @ git+https://github.com/BUTSpeechFIT/DiariZen@844f5555b0a98acd0931511fc641a8c5b8ba92c7" in an environment
+      of its own (the authors'' pyannote.audio fork replaces pyannote.audio; pip needs git), then point bolo at that
+      environment''s bolo-torch (docs/plugins.md)'
+    hardware: {gpu: recommended, vram_gb: 2.0, note: 'WavLM Large on 16 s windows every 1.6 s; more than 10 times slower than real time on a 4-vCPU machine'}
 - id: qwen2.5-omni-3b-torch
   task: speech-to-speech
   engine: plugin:torch

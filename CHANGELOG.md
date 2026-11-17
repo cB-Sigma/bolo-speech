@@ -379,6 +379,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   detected language (whisper.cpp's own default was English for every request); `.en` models stay English and
   cannot translate.
 
+- DiariZen v2 runs: `diarizen-wavlm-large-s80-md-v2` (alias `diarizen`) is a runnable diarization model on the
+  torch plugin (kind `diarizen`), the authors' pipeline and pyannote.audio fork installed from their GitHub repository
+  at a pinned commit in an environment of their own (`plugin_install` has the command). Measured here through
+  `POST /api/v1/diarize`: DER 5.0 % on the demo's two-voice dialogue (community-1: 6.05 %), RTF 12.4 on the shared
+  4-vCPU machine; licence labelled CC-BY-NC-4.0 (PLDA CC-BY-4.0), `commercial_use: false`.
 ### Fixed
 
 - `test_gated_entries_explain_what_to_do` failed whenever bolo-torch was installed next to the server: the test's
