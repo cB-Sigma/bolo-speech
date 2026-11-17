@@ -4,6 +4,8 @@
  * count hints and separation of overlapped speech.
  */
 
+import { applyDecoding, applyDenoise, type DecodingOptions, type Denoise } from './stt-options'
+
 export type SpeakerCount =
   { mode: 'auto' } | { mode: 'exact'; n: number } | { mode: 'range'; min?: number; max?: number }
 
@@ -18,6 +20,10 @@ export interface TranscribeOptions {
   separationModel?: string
   /** Separate audio recorded below 16 kHz anyway. */
   allowNarrowband?: boolean
+  /** Whisper decoding options and the repetition guard. */
+  decoding?: DecodingOptions
+  /** Denoising before recognition. */
+  denoise?: Denoise
 }
 
 export interface DiarizedSegment {
@@ -57,8 +63,14 @@ export interface DiarizedResult {
   text: string
   duration?: number
   language?: string
+  /** How sure the model was of the language it detected (0 to 1; faster-whisper). */
+  languageProbability?: number
   segments: DiarizedSegment[]
   separation?: SeparationReport
+  /** `x-bolo-ignored-options`: options the model could not honour. */
+  ignoredOptions?: string | null
+  /** `x-bolo-denoise`: the denoiser that ran (or `skipped; ...`). */
+  denoiseHeader?: string | null
   /** `x-bolo-separation` response header, when sent. */
   separationHeader?: string | null
   /** `x-request-id`, to find the trace. */
@@ -73,6 +85,8 @@ export function transcriptionForm(file: Blob, name: string, o: TranscribeOptions
   f.set('model', o.model)
   if (o.language && o.language !== 'auto') f.set('language', o.language)
   f.set('response_format', o.diarize ? 'diarized_json' : 'verbose_json')
+  applyDecoding(f, o.decoding)
+  applyDenoise(f, o.denoise)
   if (!o.diarize) return f
   f.set('diarize', 'true')
   if (o.diarizer) f.set('diarization_model', o.diarizer)
@@ -118,9 +132,12 @@ export function parseTranscription(body: unknown, headers?: Headers): DiarizedRe
     text: String(b.text ?? ''),
     duration: typeof b.duration === 'number' ? b.duration : undefined,
     language: typeof b.language === 'string' ? b.language : undefined,
+    languageProbability: typeof b.language_probability === 'number' ? b.language_probability : undefined,
     segments,
     separation: (b.separation as SeparationReport | undefined) ?? undefined,
     separationHeader: headers?.get('x-bolo-separation') ?? null,
+    ignoredOptions: headers?.get('x-bolo-ignored-options') ?? null,
+    denoiseHeader: headers?.get('x-bolo-denoise') ?? null,
     requestId: headers?.get('x-request-id') ?? null,
   }
 }

@@ -23,6 +23,14 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - Console: the diarizer list names each model's licence, its runtime (`plugin torch` for pyannote's PyTorch
   pipelines), whether it is gated and whether it is non-commercial; the model pickers mark gated and non-commercial
   models; the Speakers page lists pyannote's PyTorch pipelines among the diarizers a server runs.
+- **Console: decoding options and denoising.** The "Who spoke when" transcription panel has an "Advanced decoding"
+  section (folded away; empty fields are the defaults): `condition_on_previous_text`, `repetition_penalty`,
+  `no_repeat_ngram_size`, `compression_ratio_threshold`, `log_prob_threshold`, `no_speech_threshold`,
+  `temperature_increment_on_fallback`, `hallucination_silence_threshold`, `chunk_length`, `max_repeats`,
+  `vad_filter` and `vad_parameters`, and a "Denoise first" control (server default, off, or on with a strength and
+  a denoise model). The result shows the language with `language_probability`, `x-bolo-denoise` and
+  `x-bolo-ignored-options`. The Conversation page sends the same denoise choice as `audio.input.denoise` and shows
+  what the session reports. The Models screen lists the `denoise` task as "Denoising".
 - `GET /api/v1/info` reports OpenTelemetry export under `capabilities.opentelemetry` (switched on, running, endpoint
   without credentials or query string, protocol, service name, spans exported), read-only; the console's Connect
   screen shows it.

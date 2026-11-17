@@ -1,6 +1,6 @@
 /** Types for the bolo native API (`/api/v1`). Field names mirror the wire format. */
 
-export type Task = 'stt' | 'tts' | 'vad' | 'diarization' | 'translation' | 'separation' | 'turn'
+export type Task = 'stt' | 'tts' | 'vad' | 'diarization' | 'translation' | 'separation' | 'turn' | 'denoise'
 export type Tier = 'realtime' | 'balanced' | 'accuracy'
 export type Validated = 'cpu' | 'untested'
 

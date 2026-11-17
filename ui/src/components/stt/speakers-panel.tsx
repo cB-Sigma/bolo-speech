@@ -14,7 +14,9 @@ import type { CatalogModel, Sample, ServerInfo } from '@/lib/api/types'
 import { diarizerOptions, separationModels, speakerConditionedModels } from '@/lib/capabilities'
 import { speakerCountProblem, wavSampleRate, type DiarizedResult, type SpeakerCount } from '@/lib/diarize'
 import { cn } from '@/lib/utils'
+import { defaultDenoise, emptyDecoding, type DecodingOptions, type Denoise } from '@/lib/stt-options'
 import { SpeakerResult } from './speaker-result'
+import { DecodingSection, DenoiseControl, RunNotes } from './transcribe-options'
 
 const PAGE_MODEL = '__page'
 
@@ -65,6 +67,8 @@ export function SpeakersPanel({
   const [separate, setSeparate] = useState(false)
   const [separator, setSeparator] = useState('')
   const [narrowband, setNarrowband] = useState(false)
+  const [decoding, setDecoding] = useState<DecodingOptions>(emptyDecoding)
+  const [denoise, setDenoise] = useState<Denoise>(defaultDenoise)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<DiarizedResult | null>(null)
   const [error, setError] = useState<{ message: string; param: string | null } | null>(null)
@@ -124,6 +128,8 @@ export function SpeakersPanel({
         separate: separateOn,
         separationModel: separateOn ? chosenSeparator || undefined : undefined,
         allowNarrowband: separateOn && lowRate && narrowband,
+        decoding,
+        denoise,
       })
       setResult(r)
     } catch (err) {
@@ -365,6 +371,9 @@ export function SpeakersPanel({
           )}
         </div>
 
+        <DenoiseControl value={denoise} onChange={setDenoise} disabled={busy} />
+        <DecodingSection value={decoding} onChange={setDecoding} disabled={busy} />
+
         <div className="flex flex-wrap items-center gap-2">
           <Button
             onClick={() => void run()}
@@ -385,6 +394,7 @@ export function SpeakersPanel({
             {error.message}
           </p>
         )}
+        {result && <RunNotes result={result} />}
         {result && <SpeakerResult result={result} />}
       </div>
     </Panel>

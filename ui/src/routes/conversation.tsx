@@ -6,6 +6,7 @@ import { NeedsServer } from '@/components/demo'
 import { Page } from '@/components/layout/app-shell'
 import { Empty, Panel } from '@/components/panel'
 import { MicHelpPanel } from '@/components/stt/mic-help'
+import { DenoiseControl } from '@/components/stt/transcribe-options'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -23,6 +24,7 @@ import {
   type RealtimeTransport,
 } from '@/lib/realtime/session'
 import { Store } from '@/lib/store'
+import { defaultDenoise, realtimeDenoise, type Denoise } from '@/lib/stt-options'
 import { cn } from '@/lib/utils'
 
 const idle = new Store<ConversationState>(emptyConversation())
@@ -54,6 +56,7 @@ function ServerConversation() {
   const [chosen, setChosen] = useState<PipelineId | null>(null)
   const pipeline = chosen ?? defaultPipeline(info.data, options)
   const [transport, setTransport] = useState<RealtimeTransport>('websocket')
+  const [denoise, setDenoise] = useState<Denoise>(defaultDenoise)
   const [session, setSession] = useState<ConversationSession | null>(null)
   const state = useStore(session?.store ?? idle)
   const active = state.status === 'starting' || state.status === 'live'
@@ -73,7 +76,7 @@ function ServerConversation() {
 
   const start = () => {
     // Everything that needs the tap happens inside start(): the microphone prompt first.
-    const s = new ConversationSession(pipeline, transport)
+    const s = new ConversationSession(pipeline, transport, realtimeDenoise(denoise))
     void s.start()
     setSession(s)
   }
@@ -138,6 +141,17 @@ function ServerConversation() {
                 : 'Audio as PCM in Realtime events over WS /v1/realtime.'}
             </span>
           </div>
+          <DenoiseControl value={denoise} onChange={setDenoise} disabled={active} className="mt-3" />
+          {state.status !== 'idle' && (
+            <p className="mt-1.5 text-xs text-muted-foreground" data-testid="server-denoise">
+              Server:{' '}
+              {state.serverDenoise?.enabled
+                ? `denoising with ${state.serverDenoise.model ?? 'the default denoiser'} at strength ${state.serverDenoise.strength}`
+                : state.serverDenoise
+                  ? 'no denoising'
+                  : 'denoising as configured on the server (not reported)'}
+            </p>
+          )}
         </Panel>
       )}
 

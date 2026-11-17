@@ -52,6 +52,8 @@ export interface ConversationState {
   locked: boolean
   /** What the server says the session uses (from `session.created` / `session.updated`). */
   serverPipeline: string | null
+  /** The denoiser the server says runs before transcription (`audio.input.denoise`); null: none reported. */
+  serverDenoise: { enabled: boolean; model: string | null; strength: number } | null
   turns: Turn[]
   userSpeaking: boolean
   agentSpeaking: boolean
@@ -73,6 +75,7 @@ export const emptyConversation = (
   remoteAudio: null,
   locked: false,
   serverPipeline: null,
+  serverDenoise: null,
   turns: [],
   userSpeaking: false,
   agentSpeaking: false,
@@ -90,22 +93,29 @@ export function sessionUpdate(
   pipeline: PipelineId,
   voice?: string,
   transport: RealtimeTransport = 'websocket',
+  denoise?: RealtimeDenoise,
 ): Record<string, unknown> & { session: Record<string, unknown> } {
   const pcm = transport === 'websocket'
   const format = { type: 'audio/pcm', rate: REALTIME_RATE }
   const output: Record<string, unknown> = pcm ? { format } : {}
   if (voice) output.voice = voice
   const turn_detection = { type: 'server_vad' }
+  const input: Record<string, unknown> = pcm ? { format, turn_detection } : { turn_detection }
+  // bolo's extension; left out, the server's default (its `denoise` setting) applies
+  if (denoise !== undefined) input.denoise = denoise
   return {
     type: 'session.update',
     session: {
       type: 'realtime',
       pipeline,
       output_modalities: ['audio'],
-      audio: { input: pcm ? { format, turn_detection } : { turn_detection }, output },
+      audio: { input, output },
     },
   }
 }
+
+/** `audio.input.denoise`: off, or a model and strength (see `realtimeDenoise`). */
+export type RealtimeDenoise = false | { model?: string; strength: number }
 
 type Ev = Record<string, unknown> & { type: string }
 
@@ -124,11 +134,13 @@ export function applyEvent(s: ConversationState, ev: Ev): ConversationState {
   switch (ev.type) {
     case 'session.created':
     case 'session.updated': {
-      const session = (ev.session ?? {}) as { pipeline?: unknown }
+      const session = (ev.session ?? {}) as { pipeline?: unknown; audio?: { input?: { denoise?: unknown } } }
+      const d = session.audio?.input?.denoise as ConversationState['serverDenoise'] | undefined
       return {
         ...s,
         events,
         serverPipeline: typeof session.pipeline === 'string' ? session.pipeline : s.serverPipeline,
+        serverDenoise: d && typeof d === 'object' ? d : d === null ? null : s.serverDenoise,
       }
     }
     case 'input_audio_buffer.speech_started':
@@ -242,8 +254,11 @@ export class ConversationSession {
   private speechStoppedAt: number | null = null
   private answered = new Set<string>()
 
-  constructor(pipeline: PipelineId, transport: RealtimeTransport = 'websocket') {
+  private readonly denoise: RealtimeDenoise | undefined
+
+  constructor(pipeline: PipelineId, transport: RealtimeTransport = 'websocket', denoise?: RealtimeDenoise) {
     this.store = new Store(emptyConversation(pipeline, transport))
+    this.denoise = denoise
   }
 
   /** Choose the pipeline. Refused (returns false) once audio has gone out. */
@@ -304,7 +319,7 @@ export class ConversationSession {
       onFail: (message, code, mic) => this.fail(message, code ?? null, mic ?? null),
     })
     this.rtc = link
-    return link.start(sessionUpdate(pipeline, voice, 'webrtc').session)
+    return link.start(sessionUpdate(pipeline, voice, 'webrtc', this.denoise).session)
   }
 
   private openSocket(pipeline: PipelineId, voice?: string): void {
@@ -318,7 +333,7 @@ export class ConversationSession {
     }
     this.ws = ws
     ws.onopen = () => {
-      ws.send(JSON.stringify(sessionUpdate(pipeline, voice)))
+      ws.send(JSON.stringify(sessionUpdate(pipeline, voice, 'websocket', this.denoise)))
       this.ready = true
       for (const chunk of this.pending.splice(0)) this.sendAudio(chunk)
       this.store.patch({ status: 'live' })

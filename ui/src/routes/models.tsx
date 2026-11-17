@@ -91,6 +91,7 @@ const TASK_LABEL: Record<Task, string> = {
   vad: 'Voice activity',
   diarization: 'Diarization',
   separation: 'Overlapped speech separation',
+  denoise: 'Denoising',
   turn: 'End of turn',
   translation: 'Translation',
 }
@@ -100,10 +101,11 @@ const TASK_SHORT: Record<Task, string> = {
   vad: 'VAD',
   diarization: 'Diarization',
   separation: 'Separation',
+  denoise: 'Denoise',
   turn: 'Turn',
   translation: 'Translation',
 }
-const TASK_ORDER: Task[] = ['stt', 'tts', 'vad', 'diarization', 'separation', 'turn', 'translation']
+const TASK_ORDER: Task[] = ['stt', 'tts', 'vad', 'diarization', 'separation', 'denoise', 'turn', 'translation']
 
 /** "Needs eSpeak NG" for a model whose optional component is not installed; nothing otherwise. */
 function UnmetMark({ m }: { m: CatalogModel }) {
