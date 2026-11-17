@@ -112,3 +112,80 @@ def step_model(script: list[int]) -> tuple[Any, FakeGenerator, StepTokenizer, St
         generation_config=dict, device="cpu", max_new_tokens=512,
     )  # fmt: skip
     return model, llm, tok, utils, t2w
+
+
+class Encoded(dict):  # type: ignore[type-arg]
+    """transformers' BatchEncoding / BatchFeature: a dict with ``.to``."""
+
+    def to(self, device: Any = None, **kwargs: Any) -> Encoded:
+        return self
+
+
+class GlmTokenizer:
+    """ChatGLM4Tokenizer: ``<|audio_N|>`` from 152353, ``<|user|>`` 151336; words 1-3."""
+
+    audio_0 = 152353
+    words = {1: "Sure", 2: ", here", 3: " it is."}
+
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    def convert_tokens_to_ids(self, token: str) -> int:
+        return {"<|audio_0|>": self.audio_0, "<|user|>": 151336}[token]
+
+    def __call__(self, texts: list[str], return_tensors: str = "pt") -> Encoded:
+        self.prompts.extend(texts)
+        return Encoded(input_ids=torch.zeros((1, 5), dtype=torch.long), attention_mask=torch.ones((1, 5)))
+
+    def decode(self, ids: list[int], **kwargs: Any) -> str:
+        assert kwargs == {"spaces_between_special_tokens": False}
+        return "".join(self.words.get(i, "") for i in ids)
+
+
+class WhisperVQ:
+    """``WhisperVQEncoder``: strides 1 and 2, pooling 4; one token per 8 feature frames."""
+
+    class Conv:
+        def __init__(self, stride: int) -> None:
+            self.stride = (stride,)
+
+    def __init__(self) -> None:
+        self.config = type("C", (), {"pooling_kernel_size": 4})()
+        self.conv1, self.conv2 = self.Conv(1), self.Conv(2)
+
+    def __call__(self, input_features: torch.Tensor, attention_mask: torch.Tensor) -> Any:
+        n = attention_mask.shape[1] // 8
+        return type("O", (), {"quantized_token_ids": torch.arange(n).repeat(attention_mask.shape[0], 1) + 10})()
+
+
+class WhisperFeatures:
+    """``WhisperFeatureExtractor``: 100 frames a second, padded to the longest and to ``pad_to_multiple_of``."""
+
+    hop_length = 160
+
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    def __call__(self, pieces: list[np.ndarray], **kwargs: Any) -> Encoded:
+        self.calls.append(kwargs)
+        frames = [len(p) // 160 for p in pieces]
+        multiple = kwargs["pad_to_multiple_of"] // self.hop_length
+        longest = -(-max(frames) // multiple) * multiple
+        mask = torch.zeros((len(pieces), longest), dtype=torch.long)
+        for i, f in enumerate(frames):
+            mask[i, :f] = 1
+        return Encoded(input_features=torch.zeros((len(pieces), 128, longest)), attention_mask=mask)
+
+
+class GlmDecoder:
+    """``flow_inference.AudioDecoder.token2wav``: 22050 / 12.5 samples per token; the mel has 80 bins."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    def token2wav(self, token: torch.Tensor, uuid: str, prompt_token: torch.Tensor, prompt_feat: torch.Tensor,
+                  finalize: bool = False) -> tuple[torch.Tensor, torch.Tensor]:  # fmt: skip
+        self.calls.append({"n": int(token.shape[1]), "prompt_token": int(prompt_token.shape[1]),
+                           "prompt_feat": int(prompt_feat.shape[1]), "finalize": finalize, "uuid": uuid})  # fmt: skip
+        n = int(token.shape[1])
+        return torch.full((1, n * 1764), 0.1), torch.zeros((1, 80, n * 2))

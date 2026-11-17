@@ -31,6 +31,7 @@ LOADERS: dict[str, tuple[str, str]] = {
     "demucs-denoiser": ("bolo_torch.models.denoise", "load_demucs"),
     "qwen-omni": ("bolo_torch.models.omni", "load"),
     "step-audio-2": ("bolo_torch.models.step_audio", "load"),
+    "glm-4-voice": ("bolo_torch.models.glm_voice", "load"),
 }
 #: kinds the catalog lists for this plugin that are not implemented yet
 NOT_IMPLEMENTED = {
@@ -41,7 +42,6 @@ NOT_IMPLEMENTED = {
     "maskgct": "MaskGCT (no packaged inference code)",
     "moshi": "Moshi (full-duplex: it listens and speaks at once, frame by frame, which the turn-based respond op "
     "cannot carry)",
-    "glm-4-voice": "GLM-4-Voice (its speech tokenizer and decoder live in the GLM-4-Voice repository, not a package)",
     "minicpm-o": "MiniCPM-o (its model code runs only as trust_remote_code, which bolo-torch does not run)",
     "kimi-audio": "Kimi-Audio (it needs the kimia_infer code of the Kimi-Audio repository and flash-attn)",
 }

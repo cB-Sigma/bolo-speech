@@ -21,6 +21,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   from the authors' token2wav decoder in 25-token pieces, voices `female` and `male`. Its model code is remote code
   (opt-in, pinned); token2wav comes from github.com/stepfun-ai/Step-Audio2 (Apache-2.0) at a pinned commit. No longer
   listed as not runnable. Tested with fakes only; nothing ran for real.
+- **GLM-4-Voice 9B runs** (`glm-4-voice-9b`, bolo-torch `glm-4-voice` extra): text and speech interleaved and
+  streamed (22.05 kHz, first audio after 25 speech tokens), `quantization: int4` for about 9 GB of GPU memory. The
+  download now includes glm-4-voice-tokenizer and glm-4-voice-decoder, pinned by revision and sha256. ChatGLM's code
+  is remote code (opt-in); the tokenizer and decoder code come from THUDM/GLM-4-Voice and Matcha-TTS at pinned commits.
+  Licence labelled everywhere: commercial use only after registering with Zhipu (`license_note`). Fakes only.
 
 - **More denoisers, chosen and pulled like any other model** (`denoise=<model id>` on transcriptions, Realtime
   sessions, pins and the `denoise` setting; `bolo list`, `bolo pull`, recommendations). Every entry states its licence;

@@ -23,6 +23,11 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
   from `<tool_call>` blocks, speech in pieces of 25 speech tokens (first audio after about 1 s of speech), voices
   `female` and `male`, cancel inside generation. Without CUDA it answers in text only, with a warning. Tested with
   fakes only.
+- **GLM-4-Voice 9B** (`kind: glm-4-voice`, `glm-4-voice` extra): the authors' web-demo recipe (speech tokens from
+  `WhisperVQEncoder`, the interleaved prompt, `AudioDecoder.token2wav` in blocks of 25 to 200 tokens), ChatGLM's
+  remote code (opt-in), the GLM-4-Voice and Matcha-TTS code at pinned commits, the decoder's `config.yaml` checked by
+  sha256, `quantization: int4` (bitsandbytes NF4). Each load logs the licence: commercial use only after registering
+  with Zhipu. Tested with fakes only.
 
 - **Demucs denoiser** (`kind: demucs-denoiser`, `demucs-denoiser` extra): `demucs-dns48`, `demucs-dns64`,
   `demucs-master64` and `demucs-valentini-nc` from facebookresearch/denoiser as bolo `denoise` models, served through

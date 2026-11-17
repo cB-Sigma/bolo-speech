@@ -1001,8 +1001,6 @@
     plugin_install: not supported by bolo-torch yet (full-duplex; no duplex streaming op)
     hardware: {gpu: required, vram_gb: 24, note: 'PyTorch, bfloat16; the MLX and candle builds need less'}
 - id: glm-4-voice-9b
-  runnable: false
-  not_runnable_reason: its speech tokenizer and flow-matching decoder run only from the GLM-4-Voice repository's code
   task: speech-to-speech
   engine: plugin:torch
   kind: glm-4-voice
@@ -1010,28 +1008,67 @@
   languages: [zh, en]
   tier: accuracy
   sample_rate: 22050
-  size_bytes: 19090000000
+  size_bytes: 21075000000
   params: 9000000000
   license: glm-4-voice License
   license_url: https://huggingface.co/zai-org/glm-4-voice-9b/blob/352e5a64063448d5e46394753fb65bf1dbab975b/LICENSE
   commercial_use: false
   gated: false
   features: [speech-to-speech]
-  description: 'Zhipu GLM-4-Voice 9B: Chinese and English spoken conversation (text and speech tokens interleaved,
-    streaming), with emotion, speed and dialect control. Licence: free for academic research; commercial use only
-    after registering with Zhipu (then free), "Built with glm-4" attribution, Chinese law; treated here as
-    non-commercial. Not runnable yet: besides these 19 GB it needs the glm-4-voice-tokenizer (Whisper-based) and
-    glm-4-voice-decoder (flow matching + HiFi-GAN) repositories and the inference code of github.com/THUDM/GLM-4-Voice,
-    which is not a package bolo-torch can depend on; a GPU with about 20 GB (bfloat16).'
+  description: 'Zhipu GLM-4-Voice 9B: Chinese and English spoken conversation, text and speech tokens interleaved,
+    through the torch plugin. Text streams as it is generated; speech from its flow-matching decoder with HiFi-GAN
+    (22.05 kHz, one voice) in blocks of 25, 50, 100, 150 and 200 speech tokens, so the first audio comes after about
+    2 s of generated speech. LICENCE: the weights are free for academic research only; commercial use needs a
+    registration with Zhipu first (https://open.bigmodel.cn/mla/form, then free of charge), and products must show
+    "Built with glm-4" and ship the licence; no military or illegal use; Chinese law. Marked non-commercial here
+    until you register. The download is 21 GB: the model, glm-4-voice-tokenizer (Whisper-based speech tokenizer) and
+    glm-4-voice-decoder, pinned. Remote code: ChatGLM''s modelling code is Python in the model repository, which runs
+    only after you opt in for this model (allow_remote_code; docs/models.md, "Remote code"); the tokenizer and
+    decoder code come from github.com/THUDM/GLM-4-Voice (Apache-2.0) and Matcha-TTS (MIT) at pinned commits.
+    bfloat16 needs about 22 GB of GPU memory (a 24 GB GPU); quantization int4 (bitsandbytes) about 9 GB. Untested
+    here (wiring tested with fakes).'
   source_url: https://huggingface.co/zai-org/glm-4-voice-9b
   validated: untested
   source:
     repo: zai-org/glm-4-voice-9b
     revision: 352e5a64063448d5e46394753fb65bf1dbab975b
     exclude: [.gitattributes]
+    urls:
+    - {path: glm-4-voice-tokenizer/config.json, url: 'https://huggingface.co/zai-org/glm-4-voice-tokenizer/resolve/a5f2404e63c84e92f5238908e1706316324ebafa/config.json', size: 1746, sha256: 5a5181fcc293ced0a1e7455f6e3503ce4e8be9229922ea34aeb785f62720c0aa}
+    - {path: glm-4-voice-tokenizer/preprocessor_config.json, url: 'https://huggingface.co/zai-org/glm-4-voice-tokenizer/resolve/a5f2404e63c84e92f5238908e1706316324ebafa/preprocessor_config.json', size: 340, sha256: 7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711}
+    - {path: glm-4-voice-tokenizer/model.safetensors, url: 'https://huggingface.co/zai-org/glm-4-voice-tokenizer/resolve/a5f2404e63c84e92f5238908e1706316324ebafa/model.safetensors', size: 1458374480, sha256: 2800bd503f52b51e45f0c53cfd5c31dcfe8ef7f13d22b396aa3d53e0280dd1e4}
+    - {path: glm-4-voice-decoder/config.yaml, url: 'https://huggingface.co/zai-org/glm-4-voice-decoder/resolve/81ed541f0350d0b81728681afb628acee62772c2/config.yaml', size: 4447, sha256: 44c108d91a3d0ee97940252fbf64ffe1f3a0d13ff2103f8e6cea95f9db50fe88}
+    - {path: glm-4-voice-decoder/flow.pt, url: 'https://huggingface.co/zai-org/glm-4-voice-decoder/resolve/81ed541f0350d0b81728681afb628acee62772c2/flow.pt', size: 445171500, sha256: 450f52ba9cbea63757914e72b42ac5af21509a2767de0b18b4694546fd1d30ed}
+    - {path: glm-4-voice-decoder/hift.pt, url: 'https://huggingface.co/zai-org/glm-4-voice-decoder/resolve/81ed541f0350d0b81728681afb628acee62772c2/hift.pt', size: 81896716, sha256: 91e679b6ca1eff71187ffb4f3ab0444935594cdcc20a9bd12afad111ef8d6012}
   options:
-    plugin_install: not supported by bolo-torch yet (no packaged inference code)
-    hardware: {gpu: required, vram_gb: 20, note: bfloat16}
+    plugin_install: pip install "bolo-torch[glm-4-voice]" (the bolo PyTorch engine plugin, plugins/bolo-torch), then
+      bolo-torch code install glm-4-voice (github.com/THUDM/GLM-4-Voice and Matcha-TTS at pinned commits; a load also
+      installs it); opt in to the model's remote code with bolo models config glm-4-voice-9b --set
+      allow_remote_code=true
+    license_note: 'glm-4-voice License: free for academic research; COMMERCIAL USE ONLY AFTER REGISTERING with Zhipu at
+      https://open.bigmodel.cn/mla/form (then free); show "Built with glm-4" and include the licence; no military or
+      illegal use; governed by Chinese law'
+    dtype: bfloat16
+    max_new_tokens: 2000
+    temperature: 0.2
+    top_p: 0.8
+    remote_code:
+      revision: 352e5a64063448d5e46394753fb65bf1dbab975b
+      reviewed: '2026-11-17: configuration_chatglm.py, modeling_chatglm.py (the ChatGLM transformer, rotary
+        embeddings, GenerationMixin) and tokenization_chatglm.py (a tiktoken tokenizer that reads tokenizer.model and
+        writes it only when saving). Imports torch, transformers and tiktoken; no downloads or subprocesses.'
+      files:
+        config.json: 46b586c2d8a52a11a96f3bc45c0e075908915fd66b61263027e95dd9182429d5
+        configuration_chatglm.py: db714e8a9f7532eb2b6bfd4df01d24c700b373d2ab76b81eff0fe5a2617edb11
+        modeling_chatglm.py: 88ec7a2436fc67e4d83fe07692f819b442af25e53e490268cd19fe82155c46f4
+        tokenization_chatglm.py: 90a9a1b739f834cdf7a2f40959f9eeff2a705b80acefb2cea9c19ff3958a9279
+        tokenizer_config.json: 750133877b9765ff8b83d2d0eced0a73775c430c5edec93f0a9844690975fbaf
+    sha256:
+      # hyperpyyaml: it names the classes the decoder builds
+      glm-4-voice-decoder/config.yaml: 44c108d91a3d0ee97940252fbf64ffe1f3a0d13ff2103f8e6cea95f9db50fe88
+    hardware: {gpu: required, vram_gb: 22, note: 'bfloat16; quantization int4 (bitsandbytes) about 9 GB'}
+  voices:
+  - {id: default, name: GLM-4-Voice}
 - id: minicpm-o-2.6
   runnable: false
   not_runnable_reason: its model code runs only as trust_remote_code, which bolo-torch does not run

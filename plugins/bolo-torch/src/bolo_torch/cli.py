@@ -51,6 +51,7 @@ FAMILIES = {
     "pyannote": ["pyannote.audio"],
     "omni": ["transformers", "accelerate"],
     "step-audio-2": ["transformers", "s3tokenizer", "hyperpyyaml", "onnxruntime", "librosa", "torchaudio"],
+    "glm-4-voice": ["transformers", "tiktoken", "hyperpyyaml", "diffusers", "conformer", "lightning", "hydra"],
 }
 
 

@@ -885,7 +885,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `glm-4-voice-9b` | zh, en | accuracy | - | 19.1 GB | glm-4-voice License ⚠ · needs plugin torch | not runnable yet |
+| `glm-4-voice-9b` | zh, en | accuracy | - | 21.1 GB | glm-4-voice License ⚠ · needs plugin torch | untested |
 
 #### MiniCPM-o 2.6
 
@@ -997,7 +997,7 @@ are listed like the rest and marked ⚠. Checked against the model cards, LICENS
 | `qwen2.5-omni-7b-torch` | speech-to-speech | Apache-2.0 (yes) | 22.4 GB | bolo-torch, transformers; a 24 GB GPU | turn-based | runnable, untested (fakes only) |
 | `qwen3-omni-30b-a3b-instruct-torch` | speech-to-speech | Apache-2.0 (yes) | 70.5 GB | bolo-torch, transformers 4.57+; about 79 GB of GPU memory | turn-based | runnable, untested (fakes only) |
 | `moshiko-pytorch-bf16`, `moshika-pytorch-bf16` | speech-to-speech | CC-BY-4.0 (yes, with attribution) | 15.8 GB each | Kyutai's PyTorch, MLX (`moshiko-mlx-q4`, 5.2 GB) and Rust/candle (`moshiko-candle-q8`, 8.6 GB) runtimes | **full-duplex** (listens while it speaks, 80 ms frames) | not runnable: bolo's interface and the plugin's `respond` op are turn-based |
-| `glm-4-voice-9b` | speech-to-speech | glm-4-voice License (academic; commercial after registering with Zhipu) | 19.1 GB + tokenizer and decoder | the GLM-4-Voice repository's code | turn-based, streaming | not runnable: no packaged inference code |
+| `glm-4-voice-9b` | speech-to-speech | ⚠ glm-4-voice License: academic use free; **commercial use only after registering with Zhipu** (open.bigmodel.cn/mla/form, then free), "Built with glm-4", Chinese law | 21.1 GB (model, glm-4-voice-tokenizer, glm-4-voice-decoder) | bolo-torch (`glm-4-voice` extra): ChatGLM remote code (opt-in), tokenizer and decoder from github.com/THUDM/GLM-4-Voice at a pinned commit; 24 GB GPU in bfloat16, about 9 GB with `quantization: int4` | turn-based; text and speech interleaved and streamed, first audio after 25 speech tokens (about 2 s of speech) | runnable, untested (fakes only) |
 | `minicpm-o-2.6` | speech-to-speech | Apache-2.0 (yes; registration optional) | 17.4 GB | trust_remote_code only; llama.cpp runs its vision part, not its audio | turn-based and a live mode | not runnable: bolo-torch does not run remote code |
 | `step-audio-2-mini` | speech-to-speech | Apache-2.0 (yes) | 17.9 GB | bolo-torch (`step-audio-2` extra): the model's remote code (opt-in) and token2wav from github.com/stepfun-ai/Step-Audio2 at a pinned commit; a 24 GB NVIDIA GPU | turn-based; text streamed, speech in 25-token pieces (first audio after about 1 s of speech), tool calls | runnable, untested (fakes only) |
 | `kimi-audio-7b-instruct` | speech-to-speech | MIT (yes) | 42.6 GB | kimia_infer (the Kimi-Audio repository) and flash-attn | turn-based | not runnable: no packaged inference code, NVIDIA GPU only |
@@ -1076,6 +1076,7 @@ to `BOLO_TORCH_CODE_DIR` (default `~/.cache/bolo-torch/code`, `%LOCALAPPDATA%\bo
 | Bundle | Repository @ commit | Licence | Used by |
 | --- | --- | --- | --- |
 | `step-audio-2` | stepfun-ai/Step-Audio2 @ `76e272b56c39` | Apache-2.0 | `step-audio-2-mini` |
+| `glm-4-voice` | THUDM/GLM-4-Voice @ `eb00ce9142e8` (speech tokenizer, `flow_inference.py`, CosyVoice code) and shivammehta25/Matcha-TTS @ `dd9105b34bf2` (its git submodule) | Apache-2.0 (code; the weights have the glm-4-voice License), MIT | `glm-4-voice-9b` |
 
 ## Models outside the catalog
 

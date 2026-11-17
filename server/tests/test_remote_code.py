@@ -46,7 +46,7 @@ def test_catalog_pins_are_checked(pin: Any, message: str) -> None:
 
 def test_packaged_remote_code_entries_are_pinned() -> None:
     entries = [s for s in Catalog.load().all() if remote_code.pin(s) is not None]
-    assert {"step-audio-2-mini"} <= {s.id for s in entries}
+    assert {"step-audio-2-mini", "glm-4-voice-9b"} <= {s.id for s in entries}
     for spec in entries:
         pin = remote_code.pin(spec)
         assert pin is not None and pin["revision"] == spec.source.revision and pin.get("reviewed"), spec.id

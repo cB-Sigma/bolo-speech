@@ -73,6 +73,15 @@ step-audio-2 = [
   "transformers==4.49.0", "accelerate>=0.33", "torchaudio>=2.1", "librosa", "onnxruntime", "s3tokenizer",
   "hyperpyyaml", "diffusers", "einops", "scipy", "soundfile>=0.12.1",
 ]
+# GLM-4-Voice 9B (speech-to-speech): the libraries of ChatGLM's remote code (opt-in per model) and of the speech
+# tokenizer and decoder (github.com/THUDM/GLM-4-Voice and Matcha-TTS at pinned commits, installed by the plugin:
+# `bolo-torch code install glm-4-voice`), at the versions of the authors' requirements.txt: transformers 4.44.1;
+# diffusers 0.27 needs huggingface-hub below 0.26. bitsandbytes for quantization int4. Its own environment.
+glm-4-voice = [
+  "transformers==4.44.1", "accelerate>=0.33", "huggingface-hub>=0.23,<0.26", "tiktoken", "torchaudio>=2.1",
+  "conformer==0.3.2", "diffusers==0.27.2", "hyperpyyaml==1.2.2", "hydra-core==1.3.2", "lightning==2.2.4",
+  "omegaconf==2.3.0", "rich", "einops", "librosa", "soundfile>=0.12.1", "safetensors", "bitsandbytes",
+]
 dev = ["pytest>=8", "pytest-timeout>=2.3", "ruff>=0.8", "mypy>=1.13", "build", "twine"]
 
 [project.scripts]

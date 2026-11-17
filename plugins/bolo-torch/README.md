@@ -29,6 +29,7 @@ the console, the OpenAI-compatible API) works as for bolo's own engines.
 | `qwen2.5-omni-3b-torch` | speech-to-speech | Qwen2.5-Omni 3B, text and speech out (voices Chelsie, Ethan) | `omni` | Qwen Research License (non-commercial) | no | **no** (fakes only) |
 | `qwen2.5-omni-7b-torch` | speech-to-speech | Qwen2.5-Omni 7B | `omni` | Apache-2.0 | no | **no** (fakes only) |
 | `qwen3-omni-30b-a3b-instruct-torch` | speech-to-speech | Qwen3-Omni 30B-A3B Instruct, speech out in 10 languages (voices Ethan, Chelsie, Aiden) | `omni` | Apache-2.0 | no | **no** (fakes only) |
+| `glm-4-voice-9b` | speech-to-speech | Zhipu GLM-4-Voice 9B, Chinese and English, text and speech interleaved, streamed | `glm-4-voice` + remote code opt-in | glm-4-voice License: **commercial use only after registering with Zhipu** | no | **no** (fakes only) |
 | `step-audio-2-mini` | speech-to-speech | StepFun Step-Audio 2 mini, text, speech (voices female, male) and tool calls, streamed | `step-audio-2` + remote code opt-in | Apache-2.0 | no | **no** (fakes only) |
 
 The separation models are bolo `separation` models in "blind" mode: bolo uses them for `separate_overlaps=true`
@@ -68,8 +69,20 @@ the plugin installs (see "Inference code from GitHub" below). token2wav calls `.
 model answers in text only, with a warning. The model's `forward` keeps no key-value cache, so every token
 reprocesses the conversation. Not run here.
 
+GLM-4-Voice 9B (`glm-4-voice-9b`, kind `glm-4-voice`) follows the authors' web demo: the user's speech as tokens of
+the Whisper-based `glm-4-voice-tokenizer`, the demo's prompt and system instruction, text and speech tokens
+interleaved in one stream, and speech through `glm-4-voice-decoder` (`AudioDecoder.token2wav`, flow matching and
+HiFi-GAN, 22.05 kHz) in blocks of 25, 50, 100, 150 and 200 tokens, each conditioned on the earlier ones. The first
+audio comes after 25 speech tokens (about 2 s of speech). The model's own code (ChatGLM) is remote code (opt in per
+model); the tokenizer and decoder code comes from github.com/THUDM/GLM-4-Voice and Matcha-TTS at pinned commits
+(bundle `glm-4-voice`). `quantization: int4` loads the language model with bitsandbytes NF4, as the authors'
+`model_server.py --dtype int4`. **Licence:** the weights are under the glm-4-voice License: free for academic
+research, commercial use only after registering with Zhipu (https://open.bigmodel.cn/mla/form, then free), "Built
+with glm-4" shown in the product, Chinese law. bolo marks it non-commercial, and `bolo pull` and every load print
+this. Not run here.
+
 The catalog also lists `sravaani-1.0` and `indicconformer-600m-official` for this plugin, and the speech-to-speech
-models `moshiko-pytorch-bf16` / `moshika-pytorch-bf16` (full-duplex), `glm-4-voice-9b`, `minicpm-o-2.6` and
+models `moshiko-pytorch-bf16` / `moshika-pytorch-bf16` (full-duplex), `minicpm-o-2.6` and
 `kimi-audio-7b-instruct` (each with the reason it cannot run yet). bolo-torch does
 not implement them yet; loading one answers `400 invalid_request` saying so.
 
@@ -184,7 +197,8 @@ package, which pins its own libraries: give it its own environment), `indic-spea
 `orpheus` (Veena, Svara), `sepformer`, `pyannote` (PixIT, pyannote speaker diarization),
 `dicow` (DiCoW, SE-DiCoW: transformers 4.55 and pandas), `omni` (Qwen2.5-Omni and Qwen3-Omni: transformers 4.57
 or later, accelerate, torchvision), `step-audio-2` (Step-Audio 2 mini: transformers 4.49.0, which the authors use, and
-token2wav's libraries: s3tokenizer, onnxruntime, hyperpyyaml, diffusers, torchaudio, librosa). DiCoW uses the plugin protocol's `speakers` request (bolo 0.2.0 or later), the
+token2wav's libraries: s3tokenizer, onnxruntime, hyperpyyaml, diffusers, torchaudio, librosa), `glm-4-voice` (GLM-4-Voice: transformers 4.44.1, diffusers 0.27.2 with huggingface-hub below 0.26, conformer,
+hyperpyyaml, hydra-core, lightning, tiktoken, bitsandbytes, as in the authors' requirements). DiCoW uses the plugin protocol's `speakers` request (bolo 0.2.0 or later), the
 Qwen-Omni models its `respond` request (bolo 0.6.7 or later).
 Installed in bolo's environment, the plugin is found through its entry point (`bolo.engines: torch`) and
 `bolo doctor` lists `plugin:torch`. Check the plugin's own environment with `bolo-torch doctor`.
@@ -238,6 +252,7 @@ refused at load.
 | Bundle | Repository @ commit | Licence |
 | --- | --- | --- |
 | `step-audio-2` | stepfun-ai/Step-Audio2 @ `76e272b56c39` (`utils.py`, `token2wav.py`, `cosyvoice2/`, part of `flashcosyvoice/`, the two prompt voices) | Apache-2.0 |
+| `glm-4-voice` | THUDM/GLM-4-Voice @ `eb00ce9142e8` (`speech_tokenizer/`, `flow_inference.py`, `cosyvoice/`) and shivammehta25/Matcha-TTS @ `dd9105b34bf2` (`matcha/`, its submodule) | Apache-2.0; MIT |
 
 ## GPUs
 
@@ -409,6 +424,10 @@ docs/measurements/dicow-conditioned.json.
 * Telephone (8 kHz) recordings with the 8 kHz SepFormer; real meeting audio with any separator.
 * `sravaani-1.0` and `indicconformer-600m-official`: not implemented. `spark-tts-0.5b`, `maskgct` and
   `diarizen-wavlm-large-s80-md-v2` are catalogued but not implemented (no packaged inference code).
+* `glm-4-voice-9b`: tested with fakes of ChatGLM, its tokenizer, `WhisperVQEncoder`, the feature extractor and
+  `AudioDecoder` only; the bundle was downloaded and matched its pins, not imported. The speech-token extraction is
+  the authors' `extract_speech_token` with the device made a parameter (theirs moves everything to CUDA).
+  `quantization: int4` was not tried.
 * `step-audio-2-mini`: tested with fakes of its model, tokenizer, `utils.py` and `Token2wav` only; the bundle of
   inference code was downloaded and checked against its pins here, but not imported (its libraries and a GPU were
   not available). The format of its tool calls (`<tool_call>function\nname\narguments</tool_call>`) follows the
@@ -433,10 +452,11 @@ card before commercial use.
 | SE-DiCoW | Apache-2.0 | Same base model and training-data notes as DiCoW v3.3. |
 | pyannote speaker-diarization-3.1 | MIT | Gated (with `pyannote/segmentation-3.0`, MIT, gated). Downloads `pyannote/wespeaker-voxceleb-resnet34-LM` (CC-BY-4.0, WeSpeaker trained on VoxCeleb) and the PLDA files of community-1 (CC-BY-4.0, gated). |
 | pyannote speaker-diarization-community-1 | CC-BY-4.0 | Gated (asks for contact details). Attribution required. |
+| GLM-4-Voice 9B | glm-4-voice License | **Commercial use only after registering with Zhipu** (https://open.bigmodel.cn/mla/form, then free); academic research free; show "Built with glm-4" and ship the licence with the product; no military or illegal use; Chinese law, Haidian court. The same licence covers glm-4-voice-tokenizer and glm-4-voice-decoder. Code: Apache-2.0 (GLM-4-Voice), MIT (Matcha-TTS). |
 | Step-Audio 2 mini | Apache-2.0 | Model and code (the model repository's remote code, the Step-Audio2 repository's token2wav) under Apache-2.0. |
 | PixIT `speech-separation-ami-1.0` | MIT | Gated (both repositories). Downloads `speechbrain/spkrec-ecapa-voxceleb` (Apache-2.0) and `microsoft/wavlm-large` (no licence stated on its model card; check before commercial use). |
 
-No model here is marked non-commercial by its publisher; the SepFormer training-data caveat above is the one to
+Apart from GLM-4-Voice (commercial use after registration), no model here is marked non-commercial by its publisher; the SepFormer training-data caveat above is the one to
 weigh for commercial use. Nothing is downloaded unless you ask for that model.
 
 ## Development
