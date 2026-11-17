@@ -103,7 +103,7 @@ class FakeSTT(STTModel):
         self.max_chunk_s = float(opts.get("max_chunk_s", 30.0))
         self.words_per_second = float(opts.get("words_per_second", 2.5))
         self.fail_on = opts.get("fail_on")
-        #: a request with this prompt gets Whisper's loop: its words, then "the" forty times
+        #: a request with this prompt gets Whisper's loop: its words, then "the" forty times ("*": every request)
         self.loop_on = opts.get("loop_on", "loop")
         self.decode_options = tuple(opts.get("decode_options", self._all_options()))
         self.seen_options: list[dict[str, Any]] = []  # STTRequest.options of every request
@@ -138,7 +138,7 @@ class FakeSTT(STTModel):
                     raise RuntimeError("fake engine failure requested")
                 seconds = len(r.samples) / self.sample_rate
                 words = fake_words(seconds, self.words_per_second)
-                if self.loop_on and r.prompt == self.loop_on:
+                if self.loop_on and self.loop_on in (r.prompt, "*"):
                     t = words[-1].t1 if words else 0.0
                     step = max(seconds - t, 0.1) / 40
                     words = words + [Word("the", t + i * step, t + (i + 1) * step) for i in range(40)]
@@ -214,6 +214,8 @@ class _FakeStream(STTStream):
     def result(self) -> StreamResult:
         seconds = (self.voiced_decoded - self.base) / self.model.sample_rate
         words = fake_words(seconds, self.model.words_per_second)
+        if self.model.loop_word:  # stuck on one word, utterance after utterance
+            words = [Word(self.model.loop_word, w.t0, w.t1) for w in words]
         return StreamResult(" ".join(w.w for w in words), words)
 
     def is_endpoint(self) -> bool:
@@ -238,6 +240,8 @@ class FakeStreamingSTT(FakeSTT):
         level = opts.get("speech_dbfs")
         self.stream_speech_dbfs = None if level is None else float(level)
         self.stream_calls: list[int] = []
+        #: every word the streams "hear" is this one (a recogniser stuck in a loop)
+        self.loop_word = str(opts.get("loop_word") or "")
         self.heard = 0  # samples the streams were given
         self.peak = 0.0  # loudest of them
 

@@ -223,6 +223,46 @@ def _longest_run(keys: list[str], max_repeats: int, max_n: int) -> tuple[int, in
     return None
 
 
+def _by_chars(text: str) -> bool:
+    """Text written without spaces (Chinese, Japanese, Thai): phrases are counted in characters."""
+    return " " not in text.strip() and any(ord(c) >= 0x0E00 for c in text)
+
+
+def _tokens(text: str, by_chars: bool) -> list[str]:
+    return list(text.strip()) if by_chars else text.split()
+
+
+def _keep_mask(keys: list[str], max_repeats: int, by_chars: bool, sent: int = 0) -> list[bool]:
+    """Which of ``keys`` stay: every run of more than ``max_repeats`` back-to-back copies of one phrase keeps its
+    first copy. The first ``sent`` keys were already sent (a live transcript's earlier finals): they are looked at,
+    and always kept."""
+    keep = [True] * len(keys)
+    start = 0
+    while True:
+        run = _longest_run(keys[start:], max_repeats, 2 * MAX_NGRAM if by_chars else MAX_NGRAM)
+        if run is None:
+            break
+        at, n, copies = run
+        at += start
+        for k in range(max(at + n, sent), at + n * copies):
+            keep[k] = False
+        start = at + n * copies
+    return keep
+
+
+def _apply_mask(
+    text: str, words: list[Word], tokens: list[str], keep: list[bool], by_chars: bool
+) -> tuple[str, list[Word]]:
+    kept_tokens = [t for t, k in zip(tokens, keep) if k]
+    out = ("" if by_chars else " ").join(kept_tokens)
+    if words and not by_chars:
+        # when the engine split words differently from the spaces, keep as many words as there are kept tokens
+        words = [w for w, k in zip(words, keep) if k] if len(words) == len(tokens) else words[: len(kept_tokens)]
+    elif by_chars:
+        words = words[: len(kept_tokens)] if words and len(words) == len(tokens) else words
+    return out, [Word(w.w, w.t0, w.t1) for w in words]
+
+
 def trim_repeats(segment: Segment, max_repeats: int = DEFAULT_MAX_REPEATS) -> tuple[Segment, int]:
     """Cut every run of more than ``max_repeats`` back-to-back copies of one phrase (1 to :data:`MAX_NGRAM` words)
     in ``segment`` down to one copy: Whisper's loop ("the the the ...") on silence and long audio.
@@ -232,35 +272,51 @@ def trim_repeats(segment: Segment, max_repeats: int = DEFAULT_MAX_REPEATS) -> tu
     """
     if max_repeats <= 0 or not segment.text:
         return segment, 0
-    # text written without spaces (Chinese, Japanese, Thai): the phrase is counted in characters
-    by_chars = " " not in segment.text.strip() and any(ord(c) >= 0x0E00 for c in segment.text)
-    tokens = list(segment.text.strip()) if by_chars else segment.text.split()
-    keys = [_norm(t) for t in tokens]
-    keep = [True] * len(tokens)
-    removed = 0
-    start = 0
-    while True:
-        run = _longest_run(keys[start:], max_repeats, 2 * MAX_NGRAM if by_chars else MAX_NGRAM)
-        if run is None:
-            break
-        at, n, copies = run
-        at += start
-        for k in range(at + n, at + n * copies):
-            keep[k] = False
-        removed += n * (copies - 1)
-        start = at + n * copies
+    by_chars = _by_chars(segment.text)
+    tokens = _tokens(segment.text, by_chars)
+    keep = _keep_mask([_norm(t) for t in tokens], max_repeats, by_chars)
+    removed = keep.count(False)
     if not removed:
         return segment, 0
-    kept_tokens = [t for t, k in zip(tokens, keep) if k]
-    text = ("" if by_chars else " ").join(kept_tokens)
-    words = segment.words
-    end = segment.end
-    if words and not by_chars:
-        # when the engine split words differently from the spaces, keep as many words as there are kept tokens
-        words = [w for w, k in zip(words, keep) if k] if len(words) == len(tokens) else words[: len(kept_tokens)]
-        if words:
-            end = min(end, words[-1].t1)
-    return replace(segment, text=text, words=[Word(w.w, w.t0, w.t1) for w in words], end=end), removed
+    text, words = _apply_mask(segment.text, segment.words, tokens, keep, by_chars)
+    end = min(segment.end, words[-1].t1) if words and not by_chars else segment.end
+    return replace(segment, text=text, words=words, end=end), removed
+
+
+class RepeatGuard:
+    """The repetition guard of a live transcript (WebSocket STT, Realtime): a loop can run on across utterances, so
+    each final is checked together with the end of the finals sent before it.
+
+    Only the new final is ever changed: text a client already has as final is never rewritten. A phrase that was
+    already sent and comes back more than ``max_repeats`` times in a row loses its new copies; a final that is
+    nothing but such copies comes back empty (the caller sends nothing, as for a final that decoded to nothing).
+    Partials are not touched: they are provisional, and the final replaces them.
+    """
+
+    def __init__(self, max_repeats: int = DEFAULT_MAX_REPEATS) -> None:
+        self.max_repeats = max_repeats
+        self.removed = 0  # words (or characters) dropped so far in this session
+        self._tail: list[str] = []  # normalised tokens of the finals sent, the most recent ones
+        self._tail_chars = False
+
+    def apply(self, text: str, words: list[Word] | None = None) -> tuple[str, list[Word]]:
+        words = list(words or [])
+        if self.max_repeats <= 0 or not text.strip():
+            return text, words
+        by_chars = _by_chars(text)
+        if by_chars != self._tail_chars:
+            self._tail, self._tail_chars = [], by_chars
+        tokens = _tokens(text, by_chars)
+        keys = [_norm(t) for t in tokens]
+        keep = _keep_mask(self._tail + keys, self.max_repeats, by_chars, sent=len(self._tail))[len(self._tail) :]
+        removed = keep.count(False)
+        if removed:
+            self.removed += removed
+            text, words = _apply_mask(text, words, tokens, keep, by_chars)
+        # enough of what was sent to see a run of the longest phrase start before the next final
+        limit = (2 * MAX_NGRAM if by_chars else MAX_NGRAM) * (self.max_repeats + 1)
+        self._tail = (self._tail + [k for k, kept in zip(keys, keep) if kept])[-limit:]
+        return text, words
 
 
 def drop_repeated_segments(segments: list[Segment], max_repeats: int = DEFAULT_MAX_REPEATS) -> list[Segment]:

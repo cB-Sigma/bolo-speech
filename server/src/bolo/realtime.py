@@ -59,6 +59,7 @@ from bolo.errors import BoloError, EngineUnavailable
 from bolo.obs.trace import Trace, preview
 from bolo.s2s import AudioDelta, ResponseEnd, S2SConfig, S2SConversation, TextDelta, ToolCall
 from bolo.streaming.agreement import LocalAgreement
+from bolo.stt_options import DEFAULT_MAX_REPEATS, RepeatGuard
 
 if TYPE_CHECKING:
     from bolo.core import Bolo
@@ -207,6 +208,8 @@ class RealtimeSession:
         # incremental user transcript: item id -> text already sent as deltas
         self._partial_task: asyncio.Task[None] | None = None
         self._partial_sent: dict[str, str] = {}
+        #: the repetition guard across this session's transcripts, for the transcription model it was made for
+        self._guard: tuple[str, RepeatGuard] | None = None
         # work
         self._turns: asyncio.Queue[Callable[[], Awaitable[None]] | None] = asyncio.Queue()
         self._worker: asyncio.Task[None] | None = None
@@ -857,8 +860,8 @@ class RealtimeSession:
         trace.mark_final()
         trace.language = result.language
         trace.extra["stt_model"] = result.model
-        trace.extra["user_text"] = preview(result.text)
-        text = result.text
+        text = self._guarded(result.model, result.text)
+        trace.extra["user_text"] = preview(text)
         item["content"][0]["transcript"] = text
         sent = self._partial_sent.pop(item["id"], "")
         trace.extra["transcript_deltas_before_final"] = bool(sent)
@@ -872,6 +875,19 @@ class RealtimeSession:
             usage={"type": "duration", "seconds": round(len(audio) / SR, 2)},
         )  # fmt: skip
         return bool(text.strip())
+
+    def _guarded(self, model: str, text: str) -> str:
+        """``text`` through the session's repetition guard (bolo.stt_options.RepeatGuard): each utterance's transcript
+        is already trimmed on its own; this drops a loop that runs on from one utterance into the next. The model's
+        pinned ``max_repeats`` applies (0: off)."""
+        if self._guard is None or self._guard[0] != model:
+            spec = self.core.catalog.resolve(model)
+            limit = (
+                self.core.decode_options(spec).get("max_repeats", DEFAULT_MAX_REPEATS) if spec else DEFAULT_MAX_REPEATS
+            )
+            self._guard = (model, RepeatGuard(int(limit)))
+        guarded, _ = self._guard[1].apply(text)
+        return guarded
 
     # -- conversation items ---------------------------------------------------
     def _find(self, item_id: Any) -> dict[str, Any]:

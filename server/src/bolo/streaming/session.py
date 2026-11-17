@@ -55,6 +55,7 @@ from bolo.engines.base import (
 from bolo.errors import BoloError, InvalidRequest, Overloaded
 from bolo.obs.trace import Trace, preview
 from bolo.streaming.agreement import LocalAgreement, PrefixStability
+from bolo.stt_options import DEFAULT_MAX_REPEATS, ENGINE_OPTIONS, RepeatGuard
 
 if TYPE_CHECKING:
     from bolo.core import Bolo
@@ -138,6 +139,10 @@ class STTSession:
         self._diarizer: LoadedModel | None = None
         self._labeler: OnlineSpeakerLabeler | None = None
         self._embedded: list[int | None] = []  # per final: index of its embedding in the labeler, if it has one
+        #: decoding options pinned for the model (or in its catalog entry): a live session has no request form, so
+        #: these are how its Whisper options and the repetition guard are set
+        self.decode_options = core.decode_options(self.spec)
+        self.guard = RepeatGuard(int(self.decode_options.get("max_repeats", DEFAULT_MAX_REPEATS)))
 
     # -- public API -------------------------------------------------------
     async def start(self) -> None:
@@ -403,6 +408,12 @@ class STTSession:
     ) -> None:
         trace = self.trace
         assert trace is not None
+        text, words = self.guard.apply(text, words)
+        if self.guard.removed:
+            trace.extra["repeats_trimmed"] = self.guard.removed
+        if not text.strip():  # nothing but a repeat of what was already sent: no final, as for an empty decode
+            log.info("%s: the repetition guard dropped a final that only repeated earlier ones", self.spec.id)
+            return
         speaker = await self.speaker_for(audio) if audio is not None else None
         t_fin = trace.now()
         latency = (time.perf_counter() - recv_t) * 1000.0
@@ -1074,7 +1085,12 @@ class _PseudoProcessor(_Processor):
             self.buf_start += drop
 
     async def _decode(self, start: int, end: int, words: bool) -> STTResult:
-        req = STTRequest(self._slice(start, end).copy(), self.s.cfg.language, "transcribe", None, words)
+        options = {
+            k: v for k, v in self.s.decode_options.items() if k in ENGINE_OPTIONS and k in self.stt.decode_options
+        }
+        req = STTRequest(
+            self._slice(start, end).copy(), self.s.cfg.language, "transcribe", None, words, options=options
+        )
         result, info = await self.entry.queue.submit("batch", req)
         assert isinstance(result, STTResult)
         self.s.note_job(info.queue_ms, info.run_ms, info.batch_size, info.started, info.finished)
