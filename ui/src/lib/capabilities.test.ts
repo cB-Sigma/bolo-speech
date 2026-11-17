@@ -158,6 +158,28 @@ describe('diarization helpers', () => {
       'Better with overlapping speech and similar voices; can merge speakers on clean phone-quality turn-taking',
     )
   })
+  it("lists pyannote's PyTorch pipelines with their licence, gate and plugin", () => {
+    const torch = model({
+      id: 'pyannote-speaker-diarization-3.1',
+      task: 'diarization',
+      engine: 'plugin:torch',
+      license: 'MIT + CC-BY-4.0',
+      gated: true,
+      available: false,
+      installed: false,
+    })
+    const d = diarizerOptions(info({}, { diarization: { default_model: 'pyannote-3.0-eres2net' } }), [
+      ...catalog,
+      torch,
+    ])
+    expect(d.map((x) => x.id)).toEqual([
+      'pyannote-3.0-eres2net',
+      'nemotron-3-diarization',
+      'pyannote-speaker-diarization-3.1',
+    ])
+    expect(d[2]).toMatchObject({ gated: true, license: 'MIT + CC-BY-4.0', runtime: 'plugin torch', usable: false })
+    expect(d[2]?.note).toContain('BOLO_HF_TOKEN')
+  })
   it('finds speaker-conditioned models', () => {
     expect(speakerConditionedModels(undefined, catalog).map((m) => m.id)).toEqual(['dicow-v3.3'])
   })

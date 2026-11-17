@@ -111,6 +111,8 @@ export function ModelPicker({
                       {isCloud(m) ? '' : ` · ${fmtBytes(m.size_bytes)}`}
                       {runtimeLabel(m) ? ` · ${runtimeLabel(m)}` : ''}
                       {m.hardware && m.hardware.gpu !== 'optional' ? ` · ${hardwareLabel(m.hardware)}` : ''}
+                      {m.gated ? ' · gated' : ''}
+                      {m.commercial_use === false ? ' · non-commercial' : ''}
                       {m.available === false
                         ? ' · needs a component'
                         : m.loaded

@@ -16,6 +16,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   the server picks one that speaks the detected language). After synthesis over chunked HTTP a "What the server
   decided" panel shows `x-bolo-model`, `x-bolo-voice`, `x-bolo-blend` and `x-bolo-language` in words, with a warning
   when a named voice speaks another language than the text.
+- **Console: compare two voices.** The Speakers page has a "Compare two voices" panel: upload or record two clips,
+  and the server's speaker embeddings (`POST /v1/audio/speech/embedding`, the default embedder or a chosen
+  diarization model) give their cosine, read as same speaker / similar / different with the default model's
+  thresholds (and as a bare cosine with another model).
+- Console: the diarizer list names each model's licence, its runtime (`plugin torch` for pyannote's PyTorch
+  pipelines), whether it is gated and whether it is non-commercial; the model pickers mark gated and non-commercial
+  models; the Speakers page lists pyannote's PyTorch pipelines among the diarizers a server runs.
 - `GET /api/v1/info` reports OpenTelemetry export under `capabilities.opentelemetry` (switched on, running, endpoint
   without credentials or query string, protocol, service name, spans exported), read-only; the console's Connect
   screen shows it.

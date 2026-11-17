@@ -2,6 +2,7 @@ import { AudioLines, FileUp, Loader2, Mic, Play, Square, Users } from 'lucide-re
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { DownloadsPanel } from '@/components/downloads-panel'
+import { VoiceCompare } from '@/components/voices/voice-compare'
 import { Page } from '@/components/layout/app-shell'
 import { useDevice, VerdictBadge } from '@/components/model-fit'
 import { Panel } from '@/components/panel'
@@ -27,6 +28,7 @@ import { der, type DerResult, type Segment } from '@/lib/browser-diarize/pipelin
 import { sharedEngine } from '@/lib/browser-stt/engine'
 import { browserModel } from '@/lib/browser-stt/models'
 import { peakFor, verdictFor } from '@/lib/device'
+import { isDemo } from '@/lib/api/config'
 import { isDownloaded } from '@/lib/downloads'
 import { fmtBytes } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -561,6 +563,7 @@ export default function DiarizePage() {
               ))}
             </ul>
           </Panel>
+          {!isDemo && <VoiceCompare />}
           <DownloadsPanel />
         </div>
       </div>

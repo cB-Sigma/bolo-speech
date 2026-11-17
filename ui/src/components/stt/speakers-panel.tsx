@@ -231,9 +231,15 @@ export function SpeakersPanel({
               </SelectTrigger>
               <SelectContent position="popper" align="start">
                 {diarizers.map((d) => (
-                  <SelectItem key={d.id} value={d.id} disabled={!d.usable}>
+                  <SelectItem key={d.id} value={d.id} disabled={!d.usable} textValue={d.label}>
                     {d.label}
-                    {!d.installed && <span className="text-muted-foreground"> · not installed</span>}
+                    <span className="text-muted-foreground [[data-slot=select-trigger]_&]:hidden">
+                      {d.license ? ` · ${d.license}` : ''}
+                      {d.runtime ? ` · ${d.runtime}` : ''}
+                      {d.gated && <span className="text-warning-text"> · gated</span>}
+                      {d.commercialUse === false && <span className="text-warning-text"> · non-commercial</span>}
+                      {!d.usable ? ' · needs a component' : !d.installed ? ' · not installed' : ''}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>

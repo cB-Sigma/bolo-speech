@@ -100,6 +100,14 @@ export const SERVER_DIARIZERS = [
     needs: 'needs a bolo server or a desktop with a large GPU: too large for a browser tab',
     source: 'https://huggingface.co/BUT-FIT/DiCoW_v3_3',
   },
+  {
+    label: "pyannote's PyTorch pipelines (speaker-diarization-3.1, community-1)",
+    license: 'MIT + CC-BY-4.0 · gated',
+    size: '33 MB',
+    needs:
+      'needs a bolo server with the torch engine plugin (PyTorch, pyannote.audio); accept the conditions on Hugging Face and set BOLO_HF_TOKEN',
+    source: 'https://huggingface.co/pyannote/speaker-diarization-community-1',
+  },
 ]
 
 export const DEFAULT_EMBEDDING = EMBEDDINGS[0] as DiarizeModel

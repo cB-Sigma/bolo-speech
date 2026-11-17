@@ -139,12 +139,22 @@ export interface DiarizerOption {
   isDefault: boolean
   installed: boolean
   usable: boolean
+  license: string
+  /** The weights are gated on Hugging Face: accept the conditions there and give the server a token. */
+  gated: boolean
+  commercialUse: boolean | null
+  /** Runs on an engine plugin (`plugin torch`), else null. */
+  runtime: string | null
 }
 
 const DIARIZER_NOTES: Record<string, string> = {
   'nemotron-3-diarization':
     'Better with overlapping speech and similar voices; can merge speakers on clean phone-quality turn-taking',
   'pyannote-3.0-eres2net': 'Default: segmentation and clustering, small and fast',
+  'pyannote-speaker-diarization-3.1':
+    "pyannote's own PyTorch pipeline, for pyannote's exact results; needs the torch plugin with pyannote, and is gated: accept its conditions on Hugging Face and set BOLO_HF_TOKEN",
+  'pyannote-speaker-diarization-community-1':
+    "pyannote 4's community-1 pipeline (VBx clustering) in PyTorch; needs the torch plugin with pyannote, and is gated: accept its conditions on Hugging Face and set BOLO_HF_TOKEN",
 }
 
 /** Diarization models a request can name, the server default first. */
@@ -159,11 +169,16 @@ export function diarizerOptions(info: ServerInfo | undefined, catalog: CatalogMo
       isDefault: m.id === def,
       installed: m.installed,
       usable: m.available !== false,
+      license: m.license,
+      gated: m.gated,
+      commercialUse: m.commercial_use ?? null,
+      runtime: runtimeLabel(m),
     }))
   return list.sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || rankDiarizer(a.id) - rankDiarizer(b.id))
 }
 
 function rankDiarizer(id: string): number {
+  if (id.startsWith('pyannote-speaker-diarization')) return 2
   if (id.startsWith('pyannote')) return 0
   if (id.startsWith('nemotron')) return 1
   if (id.startsWith('fake')) return 3
