@@ -130,7 +130,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | **Engine plugins** | models that need another runtime run out of process behind the same API: [bolo-torch](https://github.com/cB-Sigma/bolo/blob/main/plugins/bolo-torch/README.md) for PyTorch models | [plugins.md](https://github.com/cB-Sigma/bolo/blob/main/docs/plugins.md) |
 | **Wyoming** | speech-to-text and text-to-speech for Home Assistant on one TCP port | [api.md](https://github.com/cB-Sigma/bolo/blob/main/docs/api.md#wyoming-protocol), [examples/home_assistant.md](https://github.com/cB-Sigma/bolo/blob/main/examples/home_assistant.md) |
 | **Ollama-style model scheduling** | each model goes on the GPU when it fits in free VRAM and on the CPU when it does not (llama.cpp models split by layers, ONNX models by graph or cut in two at a layer boundary); several GPUs (`gpus`, `gpu_spread`, `--tensor-split` for llama.cpp); `keep_alive` per request, `num_parallel` and `max_queue` per model, flash attention and a quantized KV cache for llama.cpp voices; `bolo ps` with size, CPU/GPU split, GPU and time until unload, `bolo load` / `stop` / `show` / `rm` / `cp` (presets) / `logs`, a "Loaded models" panel in the console; `OLLAMA_*` variables mapped. GPU side tested with fakes, and with whole models on one laptop's GPU | [configuration.md](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md#gpu-and-cpu-placement), [coming from Ollama](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md#coming-from-ollama), [api.md](https://github.com/cB-Sigma/bolo/blob/main/docs/api.md#keep-alive) |
-| **Server behaviour** | per-model queues with micro-batching, backpressure (`429`, not a growing delay), cancellation, lazy loading, idle unloading, a memory budget, resumable verified downloads, Prometheus metrics, and a phase-by-phase trace of every request | [architecture.md](https://github.com/cB-Sigma/bolo/blob/main/docs/architecture.md), [configuration.md](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md) |
+| **Server behaviour** | per-model queues with micro-batching, backpressure (`429`, not a growing delay), cancellation, lazy loading, idle unloading, a memory budget, resumable verified downloads, Prometheus metrics, and a phase-by-phase trace of every request, exportable to OpenTelemetry | [architecture.md](https://github.com/cB-Sigma/bolo/blob/main/docs/architecture.md), [configuration.md](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md#opentelemetry) |
 
 ## Models and licences
 
@@ -154,6 +154,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | STT | IndicConformer | 27 | as, bn, brx, doi, gu, hi, kn, kok +14 | 20 | 0.060 (`indicconformer-ta-community`) |
 | SEPARATION | SepFormer | 2 | en | 2 | 1.440 (`sepformer-whamr`) |
 | SEPARATION | PixIT | 1 | en | 1 | 5.690 (`pixit-ami`) |
+| DIARIZATION | pyannote (PyTorch) | 2 | - | 2 | 0.876 (`pyannote-speaker-diarization-community-1`) |
 | STT | DiCoW | 3 | en | 3 | 0.453 (`dicow-v3.3`) |
 | TTS | Indic-Speak | 1 | as, bn, brx, doi, en, gu, hi, kn +15 | 0 | - |
 | TTS | Spark-TTS | 1 | en, zh | 0 | - |
@@ -186,7 +187,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | TURN | Smart Turn | 1 | ar, bn, da, de, en, es, fi, fr +15 | 0 | - |
 | VAD | Silero VAD | 2 | - | 2 | 0.006 (`silero-vad-v5`) |
 
-**344 models in the catalog, 133 validated on CPU, 211 untested**, plus 20 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md).
+**346 models in the catalog, 135 validated on CPU, 211 untested**, plus 20 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.
@@ -340,7 +341,7 @@ The double quotes work in bash, zsh, PowerShell and cmd (cmd.exe does not treat 
 
 The PyPI distribution is `bolo-speech`; the command and the Python package are `bolo`. Python 3.10 or newer.
 
-The base install has no engine at all; extras add what you want. `all` is `sherpa` (most models), `faster-whisper`, `uccharan` (phonemes and text normalisation), `av` (M4A/WebM/AAC through bundled FFmpeg) and `wyoming`. Opt-in extras: `webrtc`, `turn` (end-of-turn model), `orpheus`, `s2s` (in-process speech-to-speech), `sip`, `moonshine`, `whispercpp`, `cuda` (CUDA 12's cuBLAS and cuDNN for faster-whisper on an NVIDIA GPU, Windows and Linux), and `espeak` (eSpeak NG, GPL-3.0-or-later, never part of `all`; see [Licences](#licences)).
+The base install has no engine at all; extras add what you want. `all` is `sherpa` (most models), `faster-whisper`, `uccharan` (phonemes and text normalisation), `av` (M4A/WebM/AAC through bundled FFmpeg) and `wyoming`. Opt-in extras: `webrtc`, `otel` (OpenTelemetry export of request traces), `turn` (end-of-turn model), `orpheus`, `s2s` (in-process speech-to-speech), `sip`, `moonshine`, `whispercpp`, `cuda` (CUDA 12's cuBLAS and cuDNN for faster-whisper on an NVIDIA GPU, Windows and Linux), and `espeak` (eSpeak NG, GPL-3.0-or-later, never part of `all`; see [Licences](#licences)).
 
 On Windows, from PowerShell or cmd:
 
