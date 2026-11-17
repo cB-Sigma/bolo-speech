@@ -65,8 +65,9 @@ def test_turns_on_a_20ms_grid_give_the_reference_masks_exactly() -> None:
     from bolo.engines.base import SpeakerTurn
 
     # 10 ms diarizer times put many edges on a .5 tie at 50 Hz (1.23 * 50 = 61.5): rounded as the reference does
+    # the first turn starts after the lead-in (bolo takes a first turn within 0.5 s back to 0 s)
     turns = [
-        SpeakerTurn(0.013, 1.23, 0),
+        SpeakerTurn(0.613, 1.23, 0),
         SpeakerTurn(1.01, 4.47, 1),
         SpeakerTurn(2.07, 3.011, 0),
         SpeakerTurn(4.49, 4.83, 0),
