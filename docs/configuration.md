@@ -104,6 +104,7 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `log_max_mb` | `10` | | rotate the log file at this size |
 | `log_backups` | `3` | | rotated files kept (`server.log.1`, `server.log.2`, ...) |
 | `trace_buffer` | `1000` | | request traces kept in memory |
+| `otel` | unset (off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set) | | export each request's trace as OpenTelemetry spans over OTLP; needs the `otel` extra. `true` / `false` force it on or off; unset, it is on when `OTEL_EXPORTER_OTLP_ENDPOINT` or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` is set. See "OpenTelemetry" below |
 | `fake_engine` | `false` | `--fake-engine` | add deterministic test models (development) |
 | `tts_servers` | `[]` | | external TTS servers the operator runs, as `"<model id or runtime>=<url>"`, e.g. `"llama-server=http://127.0.0.1:8080"` (every llama-server model goes there) or `"voxcpm2-audiocpp=http://gpu-box:8080"` (one model). A model id or alias wins over a runtime name. Such a model needs no download and no binary; for audio.cpp the server's config must declare the model under the id in the entry's `options.server_model` (the catalog id). See models.md, "External TTS servers" |
 | `tts_server_api_key` | unset | | sent as `Authorization: Bearer …` to the servers in `tts_servers` (llama-server `--api-key`) |
@@ -406,6 +407,37 @@ Unset, `log_file` is off, except when `bolo serve` runs under systemd (it sets `
 rotations). It asks the running server (`--url`, default `$BOLO_URL` or `http://127.0.0.1:8000`) which file it
 writes (`GET /api/v1/info` has `log_file`), else uses the settings, else the platform's place when a file is there.
 `bolo doctor` says where the logs are.
+
+## OpenTelemetry
+
+`pip install "bolo-speech[otel]"` (opentelemetry-sdk and the OTLP/HTTP exporter, Apache-2.0) and point bolo at a
+collector:
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318 OTEL_SERVICE_NAME=bolo-eu1 bolo serve
+```
+
+Each finished request becomes one span, `bolo.stt`, `bolo.tts`, `bolo.agent` (a voice-agent turn), `bolo.diarization`,
+`bolo.embedding` or `bolo.vad`, with a child span per phase of its trace (`queue`, `resample`, `decode`,
+`synthesize_first`, `llm_first_token` ...), placed where the phase ran. The request span's attributes:
+`bolo.request_id` (the id `/api/v1/requests/{id}` knows), `bolo.kind`, `bolo.transport`, `bolo.model`, `bolo.device`
+(where the model was loaded: `cpu`, `cuda:0`, `remote` ...; absent when it was not), `bolo.status`, the sizes
+`bolo.audio_seconds` and `bolo.chars`, `bolo.language`, the latencies bolo measured (`bolo.total_ms`, `bolo.ttfa_ms`,
+`bolo.final_ms`, `bolo.first_partial_ms`, `bolo.rtf`, `bolo.batch_size`), numeric extras such as `bolo.first_token_ms`,
+and the model ids an agent turn used (`bolo.stt_model`, `bolo.voice`, `bolo.pipeline`). A failed request's span has
+status `ERROR` and `error.type`. Transcripts and the text that was spoken are not exported.
+
+What the standard variables do: `OTEL_SERVICE_NAME` names the service (default `bolo`), `OTEL_RESOURCE_ATTRIBUTES`
+adds resource attributes, `OTEL_EXPORTER_OTLP_HEADERS` sends headers (an API key for a hosted backend),
+`OTEL_TRACES_SAMPLER` samples, `OTEL_BSP_*` tunes the batching, `OTEL_SDK_DISABLED=true` switches export off.
+`OTEL_EXPORTER_OTLP_PROTOCOL` is `http/protobuf` (port 4318) by default; `grpc` (port 4317, what speaches' examples
+use) also needs `opentelemetry-exporter-otlp-proto-grpc`. The setting `otel` (`BOLO_OTEL`) forces export on or off
+whatever the variables say.
+
+The spans are built from the trace bolo keeps anyway, after the request has finished, and sent in batches off the
+request path; an unreachable collector costs a log line, not latency. `/metrics`, `/api/v1/requests` and the event
+stream are unchanged. When export is switched on but the extra is missing, bolo logs one warning naming the package
+and carries on without it. Only traces are exported: metrics stay on Prometheus `/metrics`, and the log is not sent.
 
 ## Windows
 

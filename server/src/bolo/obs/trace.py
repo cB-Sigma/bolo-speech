@@ -49,6 +49,8 @@ class Trace:
     clock: Callable[[], float] = time.perf_counter
     id: str = field(default_factory=lambda: f"r_{next(_ids):06d}")
     started_at: str = field(default_factory=_now_iso)
+    #: wall-clock start in nanoseconds since the epoch (where OpenTelemetry spans are placed)
+    started_ns: int = field(default_factory=time.time_ns)
     status: str = "running"
     error: str | None = None
     audio_seconds: float | None = None
@@ -80,6 +82,7 @@ class Trace:
         """Move the origin to now (e.g. once an upload has been fully received)."""
         self._t0 = self.clock()
         self.started_at = _now_iso()
+        self.started_ns = time.time_ns()
 
     def add_phase(self, name: str, start: float, end: float) -> None:
         """Record a phase from absolute clock readings ``start`` and ``end``."""

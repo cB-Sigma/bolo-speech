@@ -75,7 +75,7 @@ to the speaker name (`amy`).
 | `POST /v1/audio/diarization` | yes (pyannote, needs PyTorch) | **different route**: `POST /api/v1/diarize`, or `diarize=true` / `diarized_json` on transcriptions (ONNX pipeline, no PyTorch) |
 | `POST /v1/audio/speech/embedding` | yes | yes; same form (`file`, `model`) and response. The embedder is bolo's (ERes2Net from its default diarization model, 192 numbers), not speaches' WeSpeaker ResNet34, so vectors from the two servers cannot be compared with each other; speaches' model id falls back to bolo's default |
 | Gradio UI at `/` | yes | replaced by bolo's web console |
-| OpenTelemetry export | yes | **no**; bolo has Prometheus `/metrics`, request traces and an SSE event stream instead |
+| OpenTelemetry export | yes | yes, traces (extra `otel`): `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_SERVICE_NAME` are read, one span per request with a child per phase. OTLP/HTTP by default; speaches' gRPC endpoint (port 4317) needs `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` and `opentelemetry-exporter-otlp-proto-grpc`. Metrics stay on Prometheus `/metrics`; no auto-instrumentation of FastAPI or HTTP clients ([configuration.md](configuration.md#opentelemetry)) |
 
 If you depend on one of the rows marked **no**, stay on speaches for that
 part, or run both side by side: the two servers can share a host on

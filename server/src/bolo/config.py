@@ -253,6 +253,10 @@ class Settings:
     log_max_mb: int = 10  # rotate the log file at this size
     log_backups: int = 3  # rotated files kept (server.log.1, ...)
     trace_buffer: int = 1000
+    #: export each request's trace as OpenTelemetry spans over OTLP (the `otel` extra). Unset: on when
+    #: OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT is set. Where to and how: the standard
+    #: OTEL_* variables (bolo.obs.otel)
+    otel: bool | None = None
     fake_engine: bool = False
 
     def resolved_threads(self) -> int:

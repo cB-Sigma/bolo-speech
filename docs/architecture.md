@@ -51,7 +51,7 @@ The source tree mirrors the picture:
 | `catalog/` | YAML model catalog and its validation |
 | `store.py`, `custom.py` | downloads, the blob cache, `hf:` pulls |
 | `audio/`, `text/` | codecs, resampling, encoders; segmentation, normalisation, word lists, romanised text, phonemes |
-| `obs/` | traces, quantile sketches, event bus, Prometheus text |
+| `obs/` | traces, quantile sketches, event bus, Prometheus text, OpenTelemetry export |
 | `bench.py`, `samples/` | load generator and built-in samples |
 
 ## Engines are plugins
@@ -309,6 +309,10 @@ Each request owns a `Trace` (an id, the transport, and a list of named phases
 with start and duration from one monotonic clock). Finished traces go into a
 ring buffer served by `/api/v1/requests`, are published on `/api/v1/events`,
 and feed per-model rolling quantiles (the most recent 2,048 observations, at
-most 15 minutes old) that `/api/v1/stats` and `/metrics` report. The timing
+most 15 minutes old) that `/api/v1/stats` and `/metrics` report. With the
+`otel` extra switched on (`obs/otel.py`), a listener on the same ring buffer
+turns each finished trace into an OpenTelemetry span with a child span per
+phase and sends them over OTLP in batches, after the request is done
+(docs/configuration.md, "OpenTelemetry"). The timing
 tests run the whole pipeline against a fake engine with known delays and
 check every reported number against them.

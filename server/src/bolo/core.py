@@ -74,6 +74,7 @@ from bolo.errors import (
 from bolo.jobs import Job, JobStore
 from bolo.lifecycle import LoadedModel, ModelManager
 from bolo.llm import AudioLLMClient, LLMClient
+from bolo.obs import otel
 from bolo.obs.events import EventBus
 from bolo.obs.trace import Trace, TraceStore, preview
 from bolo.providers import KINDS as PROVIDER_KINDS
@@ -188,6 +189,10 @@ class Bolo:
         self._cpu_at = 0.0
         self.ready = False
         self.traces.listeners.append(self._on_trace)
+        #: OpenTelemetry export of the request traces (bolo.obs.otel), when switched on and installed
+        self.otel = otel.setup(s.otel, self._device_of)
+        if self.otel is not None:
+            self.traces.listeners.append(self.otel.export)
 
     # ------------------------------------------------------------------
     # lifecycle
@@ -258,6 +263,9 @@ class Bolo:
         with contextlib.suppress(Exception):
             await self.s2s.close()
         await self.manager.close()
+        if self.otel is not None:  # send the spans still queued, without waiting long for a collector that is gone
+            with contextlib.suppress(Exception):
+                await asyncio.wait_for(asyncio.to_thread(self.otel.shutdown), 15)
         await asyncio.get_running_loop().run_in_executor(None, self.engines.shutdown)
 
     def pack_download(self, pack: Any, reason: str, run: Any) -> None:
@@ -316,6 +324,11 @@ class Bolo:
     def log(self, level: str, message: str) -> None:
         getattr(log, level if level in ("debug", "info", "warning", "error") else "info")(message)
         self.events.publish_threadsafe("log", {"level": level, "message": message})
+
+    def _device_of(self, model: str) -> str | None:
+        """Where a loaded model runs (``cpu``, ``cuda:0``, ``remote`` ...), or None when it is not loaded."""
+        entry = self.manager.loaded.get(model)
+        return str(entry.placement.device) if entry is not None else None
 
     def _on_trace(self, trace: Trace) -> None:
         self.events.publish_threadsafe("request", {"request": trace.to_dict()})

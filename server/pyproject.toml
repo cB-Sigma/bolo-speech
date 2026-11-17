@@ -76,6 +76,9 @@ s2s = ["onnxruntime>=1.20", "tokenizers>=0.20"]
 # inbound SIP endpoint for trunks and PBXs (sipmessage is BSD-2-Clause, pure Python: it parses and writes SIP messages)
 sip = ["sipmessage>=0.7"]
 text = ["whisper-normalizer>=0.1"]
+# OpenTelemetry export of request traces (Apache-2.0): spans over OTLP/HTTP; off unless switched on (setting otel or
+# OTEL_EXPORTER_OTLP_ENDPOINT). For OTLP/gRPC add opentelemetry-exporter-otlp-proto-grpc
+otel = ["opentelemetry-sdk>=1.27", "opentelemetry-exporter-otlp-proto-http>=1.27"]
 # NVIDIA GPU memory per process through NVML (BSD-3-Clause), for GPU/CPU placement and `bolo ps`; without it bolo
 # asks nvidia-smi
 nvidia = ["nvidia-ml-py>=12"]
@@ -163,6 +166,7 @@ module = [
   "sherpa_onnx.*", "faster_whisper.*", "ctranslate2.*", "soundfile.*", "soxr.*", "av.*",
   "moonshine_onnx.*", "kokoro_onnx.*", "pywhispercpp.*", "wyoming.*", "whisper_normalizer.*",
   "onnxruntime.*", "tomli.*", "aiortc.*", "uccharan.*", "tokenizers.*", "sipmessage.*", "onnx.*", "pynvml.*",
+  "opentelemetry.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"

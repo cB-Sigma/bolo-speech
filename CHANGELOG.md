@@ -12,6 +12,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   speaker embedding out in the shape of OpenAI's embeddings response. The embedder is the one that scores cloned
   voices (`voice_similarity_model`, else the default diarization model's ERes2Net, 192 numbers); speaches' own model
   id falls back to it. With the real model, two halves of one speaker's clip scored 0.81 and another voice 0.09.
+- **OpenTelemetry export** (extra `otel`, off by default): each request's trace becomes a span (`bolo.stt`,
+  `bolo.tts`, `bolo.agent` ...) with a child span per phase and the model, device, transport, sizes and latencies as
+  attributes, sent over OTLP. Switched on by the setting `otel` or by `OTEL_EXPORTER_OTLP_ENDPOINT`; the other
+  standard `OTEL_*` variables apply (`OTEL_SERVICE_NAME`, headers, protocol, sampler). Switched on without the extra,
+  bolo logs one warning and carries on. Prometheus `/metrics` and the request traces are unchanged.
 
 ## [0.6.6] - 2026-11-17
 
