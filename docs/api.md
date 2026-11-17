@@ -262,6 +262,7 @@ JSON body.
 | `instructions` | - | accepted and ignored |
 | `sample_rate` | model's | extension: resample the output (8000 to 48000) |
 | `language` | voice's | extension: language for text normalisation |
+| `detect_language` | `true` | extension: without `language`, a multilingual model (Kokoro, the Indian-language voices, the multilingual `tts-server` models, …) gets the language guessed from the text, and, unless a voice of the model is named, the first voice that speaks it (see "Language detection" below). An explicit `voice` or `language` is never changed; `false` keeps the model's default voice and language |
 | `normalize` | `true` | extension: `true` uses the voice's default normaliser (see "Text preparation" below); `"uccharan"`, `"light"` (bolo's own), `"model"` (leave numbers to the model) or `false` / `"none"` (word lists still apply) |
 | `input_format` | `text` | extension: `ssml` accepts the SSML subset below; `markdown` is the same as `text`. In every format, Kokoro-style `[word](/ipa/)` sets the pronunciation of that word |
 | `wordlists` | model pins, then `default` | extension: names of pronunciation word lists (`/api/v1/wordlists`), highest priority first. `[]` applies none. An unknown name → `404 wordlist_not_found` |
@@ -281,6 +282,39 @@ Speech in a blend carries `x-bolo-blend` with the blend as it was spoken (normal
 `af_bella(0.7)+af_sky(0.3)`) and, for a saved blend, `x-bolo-voice: <id>`; the trace's `extra.voice` is
 `{"saved": "warm-mix" | null, "cloned": false, "blend": "...", "voices": [{"voice", "weight"}, ...]}`. The text is
 read in the language of the voice with the largest weight. See [voices.md](voices.md), "Blends".
+
+#### Language detection
+
+Without `language`, the speech route guesses the language of the text for a model with more than one language:
+the script settles most languages (Devanagari, Bengali, Tamil, Telugu, Gurmukhi, Gujarati, Kannada, Malayalam,
+Odia, Sinhala, Arabic, Cyrillic, Greek, Hebrew, Thai, Hangul, kana, Han, …); a few frequent words or letters tell
+apart the languages that share one (Hindi, Marathi or Nepali; Bengali or Assamese; Arabic, Urdu or Persian;
+Russian, Ukrainian or Bulgarian), and Latin-script text is scored against the most frequent words of twenty
+languages. It needs no model and no dependency (`bolo.text.langdetect`). Text that is too short or ambiguous
+("OK", a list of names) is reported as unsure and changes nothing.
+
+* No voice named (or an OpenAI voice name, which a stock client sends for any voice): the first voice of the
+  model that speaks the language answers; for a language the model has no voice of, the closest language of the
+  same script (Marathi → a Hindi voice). An OpenAI voice name picks among the voices of that language.
+* A voice of the model named: it is kept. A voice with no particular language (most `tts-server` models) is told
+  the detected language.
+* The model does not offer the language, or the guess is unsure: the default stays.
+
+The response header `x-bolo-language` says what was decided, as `<language>; source=<how>` plus details:
+
+| Example | Meaning |
+| --- | --- |
+| `hi; source=request` | the request's `language` |
+| `hi-IN; source=detected; detected=hi; script=Devanagari; voice=hf_alpha` | guessed and applied: this voice was chosen |
+| `hi-IN; source=detected; detected=mr; script=Devanagari; matched=hi; voice=hf_alpha` | no Marathi voice: the closest language of the script |
+| `ta; source=detected; detected=ta; script=Tamil` | a voice without a language was told the language |
+| `en-US; source=voice; detected=hi; script=Devanagari; mismatch=true` | the named voice was kept; it speaks another language than the text |
+| `en-US; source=default; detected=unsure; script=Latin` | unsure: the default voice and language stayed |
+| `en-US; source=default; detected=fr; script=Latin; offered=false` | the model offers no voice or language for it |
+| `en-US; source=model` | a model with one language: nothing to choose |
+
+The request trace has the same in `extra.language` (with the detector's `confidence`). `bolo speak` detects too
+and prints the decision; sessions (Realtime, telephony, agents, the TTS WebSocket) keep their configured voice.
 
 The body is streamed (chunked transfer) while synthesis is still running:
 the first sentence is audible while the rest is being generated. `pcm`,

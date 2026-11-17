@@ -90,7 +90,7 @@ from bolo.separate import separate as run_separation
 from bolo.store import HubClient, ModelStore
 from bolo.streaming.vad import EnergyVad, FallbackVad, detect_segments, merge_segments
 from bolo.telephony.manager import TelephonyManager
-from bolo.text import packs, phonemize
+from bolo.text import langdetect, packs, phonemize
 from bolo.text.phonemize import strip_overrides
 from bolo.text.prepare import prepare as prepare_text
 from bolo.text.romanised import status as romanised_status
@@ -1746,6 +1746,64 @@ class Bolo:
             f"{', '.join(models) or 'none'}."
         )
 
+    def choose_language(
+        self,
+        tts: TTSModel,
+        spec: ModelSpec,
+        text: str,
+        voice: str | None,
+        *,
+        blend: Blend | None = None,
+        cloning: bool = False,
+    ) -> tuple[dict[str, Any], str | None, str | None]:
+        """For a request without a language: ``(note, voice, language)``, the language guessed from ``text`` and
+        what follows from it. A model with one language is left alone (``source=model``). Unless the request
+        named a voice of the model (an OpenAI voice name mapped onto the model's voices does not count), the first
+        voice that speaks the language is chosen (``voice`` in the note); a voice that speaks no particular
+        language keeps the voice and tells the model the language. An unsure guess, or a language the model does
+        not offer, keeps the current default (``source=default``); a named voice of another language is kept and
+        the note says so (``source=voice``)."""
+        voices = tts.voices
+        voice_langs = [langdetect.base(v.language) for v in voices if v.language]
+        offered = list(dict.fromkeys([langdetect.base(x) for x in spec.languages] + voice_langs))
+        if len(offered) <= 1:
+            return {"source": "model"}, voice, None
+        found = langdetect.detect(text)
+        note: dict[str, Any] = {"detected": found.language or "unsure", "script": found.script}
+        if found.sure:
+            note["confidence"] = round(found.confidence, 2)
+        elif found.reason:
+            note["reason"] = found.reason
+        if not found.sure:
+            return {**note, "source": "default"}, voice, None
+        wanted = [found.language, *found.alternatives]
+        named = blend is not None or (
+            bool(voice) and (tts.find_voice(voice) is not None or str(voice).lower() not in OPENAI_VOICES)
+        )
+        if named or cloning:
+            current = blend.lead if blend is not None else (tts.find_voice(voice) if voice else None)
+            speaks = langdetect.base(current.language) if current is not None and current.language else ""
+            if speaks:
+                if speaks not in wanted:
+                    note["mismatch"] = True
+                return {**note, "source": "voice"}, voice, None
+            match = next((x for x in wanted if x in offered), None)
+            if match is None:
+                return {**note, "source": "default", "offered": False}, voice, None
+            return {**note, "source": "detected"}, voice, match
+        for lang in wanted:
+            fits = [v for v in voices if langdetect.base(v.language) == lang]
+            if fits:
+                index = OPENAI_VOICES.index(str(voice).lower()) if voice else 0
+                pick = fits[index % len(fits)]
+                if lang != found.language:
+                    note["matched"] = lang
+                return {**note, "source": "detected", "voice": pick.id}, pick.id, None
+        match = next((x for x in wanted if x in offered), None)
+        if match is not None and not voice_langs:
+            return {**note, "source": "detected"}, voice, match
+        return {**note, "source": "default", "offered": False}, voice, None
+
     def cloning_models(self, installed_only: bool = True) -> list[str]:
         """Text-to-speech models that clone voices (``features`` has ``voice-cloning``), installed ones by
         default (a model on an operator-run server counts as installed)."""
@@ -1793,6 +1851,7 @@ class Bolo:
         romanised_strict: bool = True,
         custom_voice: bool = False,
         options: dict[str, Any] | None = None,
+        detect_language: bool = False,
     ) -> AsyncGenerator[SynthChunk, None]:
         """Synthesise ``text`` sentence by sentence, yielding audio as soon as it exists.
 
@@ -1805,6 +1864,11 @@ class Bolo:
         A ``voice`` written as a blend (``af_bella(0.7)+af_sky(0.3)``, :mod:`bolo.engines.blend`), or naming a
         saved blend, is spoken by a model that blends voices (Kokoro); its voices are checked first (400 naming
         the near matches.
+
+        ``detect_language``: when the request names no language, the language of a multilingual model is guessed
+        from the text (:mod:`bolo.text.langdetect`) and, unless a voice of the model was named, a voice that speaks
+        it is chosen; an explicit voice or language is never changed. ``trace.extra["language"]`` records the
+        decision (the ``x-bolo-language`` header).
 
         ``romanised`` (``off`` / ``auto`` / ``on``; None: the voice's default) writes an Indian language typed in
         Latin letters in the voice's script first (bolo.text.romanised). With ``romanised_strict`` false (sessions,
@@ -1848,7 +1912,7 @@ class Bolo:
                     reference_audio=reference_audio, reference_text=reference_text, wordlists=wordlists,
                     pronunciations=pronunciations, input_format=input_format, romanised=romanised,
                     romanised_strict=romanised_strict, saved=saved, custom_voice=custom_voice, options=options,
-                    blend_name=blend_name,
+                    blend_name=blend_name, detect_language=detect_language,
                 )  # fmt: skip
                 try:
                     async for chunk in attempt:
@@ -1892,6 +1956,7 @@ class Bolo:
         custom_voice: bool = False,
         options: dict[str, Any] | None = None,
         blend_name: str | None = None,
+        detect_language: bool = False,
     ) -> AsyncGenerator[SynthChunk, None]:
         """One model's attempt at :meth:`synthesize`. ``own_voice`` is false for a fallback model: a voice it
         does not have is replaced by its default instead of refused."""
@@ -1936,6 +2001,13 @@ class Bolo:
                         voice = None  # a fallback model speaks with its default voice
                     else:
                         trace.extra["voice"] = {"saved": blend_name, "cloned": False, **blend.to_dict()}
+                language_note: dict[str, Any] | None = None
+                if language:
+                    language_note = {"source": "request"}
+                elif detect_language:
+                    language_note, voice, language = self.choose_language(
+                        tts, spec, text, voice, blend=blend, cloning=reference_audio is not None
+                    )
                 try:
                     chosen = blend.lead if blend is not None else self.pick_voice(tts, voice, spec)
                 except InvalidRequest:
@@ -1949,6 +2021,8 @@ class Bolo:
                     chosen.language if chosen and chosen.language else (spec.languages[0] if spec.languages else "en")
                 )
                 trace.language = lang
+                if language_note is not None:
+                    trace.extra["language"] = {"language": lang, **language_note}
                 extras: SynthesisExtras | None = None
                 if reference_audio is not None and not tts.supports_cloning:
                     raise InvalidRequest(
@@ -2116,6 +2190,9 @@ def fallback_headers(trace: Trace) -> dict[str, str]:
         headers["x-bolo-voice"] = str(cloned["saved"])
     if isinstance(cloned, dict) and cloned.get("blend"):
         headers["x-bolo-blend"] = str(cloned["blend"])
+    language = language_header(trace)
+    if language:
+        headers["x-bolo-language"] = language
     record = trace.extra.get("fallback")
     if isinstance(record, dict) and record.get("attempts"):
         first = record["attempts"][0]
@@ -2124,6 +2201,26 @@ def fallback_headers(trace: Trace) -> dict[str, str]:
     if isinstance(cost, dict):
         headers["x-bolo-estimated-cost"] = f"{cost.get('amount')} {cost.get('currency')}"
     return headers
+
+
+def language_header(trace: Trace) -> str | None:
+    """``x-bolo-language``: the language spoken and how it was decided, ``hi-IN; source=detected; detected=hi;
+    script=Devanagari; voice=hf_alpha``. ``source`` is ``request`` (the request's ``language``), ``detected``
+    (guessed from the text and applied), ``voice`` (a named voice decided; ``mismatch`` when it speaks another
+    language than the text), ``default`` (the guess was unsure, ``detected=unsure``, or names a language the
+    model does not offer, ``offered=false``) or ``model`` (a model with one language)."""
+    note = trace.extra.get("language")
+    if not isinstance(note, dict):
+        return None
+    parts = [str(note.get("language") or trace.language or ""), f"source={note.get('source')}"]
+    for key in ("detected", "script", "matched", "voice"):
+        if note.get(key):
+            parts.append(f"{key}={note[key]}")
+    if note.get("mismatch"):
+        parts.append("mismatch=true")
+    if note.get("offered") is False:
+        parts.append("offered=false")
+    return "; ".join(parts)
 
 
 def reference_wav(data: bytes) -> bytes:

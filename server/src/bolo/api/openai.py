@@ -499,6 +499,12 @@ class SpeechRequest(BaseModel):
     stream_format: str = "audio"
     sample_rate: int | None = Field(default=None, ge=8000, le=48000, description="Extension: resample the output.")
     language: str | None = Field(default=None, description="Extension: language hint for text normalisation.")
+    detect_language: bool = Field(
+        default=True,
+        description="Extension: without `language`, guess the language of a multilingual model from the text and, "
+        "unless a voice of the model is named, choose a voice that speaks it (`x-bolo-language` says what was "
+        "decided). An explicit voice or language is never changed.",
+    )
     keep_alive: str | float | None = Field(
         default=None,
         description="Extension (Ollama's keep_alive): how long the voice stays loaded after this request: seconds or "
@@ -646,6 +652,7 @@ async def create_speech(request: Request, body: SpeechRequest) -> Response:
         phonemizer=body.phonemizer, reference_audio=reference, reference_text=body.reference_text,
         wordlists=body.wordlists, pronunciations=body.pronunciations, input_format=body.input_format,
         romanised=body.romanised, custom_voice=custom_voice, options=body.options,
+        detect_language=body.detect_language,
     )  # fmt: skip
     chunks = stream.chunks()
     try:

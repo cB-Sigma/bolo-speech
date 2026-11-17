@@ -235,7 +235,7 @@ class FakeTTS(TTSModel):
     """Synthesis time = ``first_delay_s`` + ``delay_per_char_s`` x characters, per chunk."""
 
     sample_rate = 24000
-    voices = (
+    voices: tuple[Voice, ...] = (
         Voice("alpha", "Alpha", "en-US", "f", 0),
         Voice("beta", "Beta", "en-GB", "m", 1),
         Voice("gamma", "Gamma", "hi-IN", "f", 2),
@@ -251,6 +251,12 @@ class FakeTTS(TTSModel):
         self.supports_cloning = bool(opts.get("cloning"))
         self.accepts_extras = self.supports_cloning
         self.request_options = ("pitch",) if self.supports_cloning else ()
+        #: option ``declared_voices``: the catalog entry's voices instead of the three above
+        if opts.get("declared_voices"):
+            self.voices = tuple(
+                Voice(str(v["id"]), str(v.get("name", "")), str(v.get("language", "")), str(v.get("gender", "")), i)
+                for i, v in enumerate(opts.get("voices") or [])
+            )
         #: option ``blending``: voice blends (bolo.engines.blend) sound at the weighted mean of their voices' pitches
         self.supports_blending = bool(opts.get("blending"))
         self.extras: list[SynthesisExtras | None] = []

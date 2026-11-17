@@ -70,6 +70,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   format; long audio is cut at pauses into pieces of at most 30 s. The model gives no timestamps: `verbose_json`
   segments are those pieces, and word timestamps are unavailable. docs/models.md, "Voxtral speech-to-text on
   llama.cpp".
+- **Language detection for speech**: without `language`, `/v1/audio/speech` and `bolo speak` guess the language of
+  the text for a multilingual model (Kokoro, the Indian-language voices, multilingual `tts-server` models) and,
+  unless a voice of the model is named, choose a voice that speaks it. The script decides most languages
+  (Devanagari, Tamil, Bengali, ...), frequent words tell Latin-script languages and those sharing a script apart;
+  no model and no new dependency. An unsure guess keeps the default. An explicit voice or language is never
+  changed. The response header `x-bolo-language` reports the decision (`hi-IN; source=detected; detected=hi;
+  script=Devanagari; voice=hf_alpha`); `detect_language: false` turns it off.
 
 ## [0.6.6] - 2026-11-17
 

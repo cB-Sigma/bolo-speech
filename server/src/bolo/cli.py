@@ -821,7 +821,7 @@ def cmd_speak(args: argparse.Namespace) -> int:
             try:
                 async for chunk in core.synthesize(
                     text, model=args.model, voice=args.voice, speed=args.speed, trace=trace,
-                    romanised=args.romanised,
+                    romanised=args.romanised, detect_language=True,
                 ):  # fmt: skip
                     trace.mark_ttfa()
                     parts.append(chunk.samples)
@@ -832,7 +832,10 @@ def cmd_speak(args: argparse.Namespace) -> int:
 
             audio = np.concatenate(parts)
             out.write_bytes(encode_audio(audio, rate, fmt, args.sample_rate))
-            print(f"wrote {out} ({len(audio) / rate:.1f}s, {fmt})")
+            from bolo.core import language_header
+
+            chosen = language_header(trace)
+            print(f"wrote {out} ({len(audio) / rate:.1f}s, {fmt})" + (f"; language: {chosen}" if chosen else ""))
             if args.verbose:
                 print(
                     f"[{trace.model}] first audio after {trace.ttfa_ms:.0f} ms, total {trace.total_ms:.0f} ms, RTF {trace.rtf:.3f}",

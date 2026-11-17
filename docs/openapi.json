@@ -4116,6 +4116,12 @@
       "title": "Language",
       "description": "Extension: language hint for text normalisation."
      },
+     "detect_language": {
+      "type": "boolean",
+      "title": "Detect Language",
+      "description": "Extension: without `language`, guess the language of a multilingual model from the text and, unless a voice of the model is named, choose a voice that speaks it (`x-bolo-language` says what was decided). An explicit voice or language is never changed.",
+      "default": true
+     },
      "keep_alive": {
       "anyOf": [
        {
