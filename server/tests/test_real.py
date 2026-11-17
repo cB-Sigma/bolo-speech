@@ -626,6 +626,46 @@ async def test_nemotron_on_a_clean_dialogue_as_telephone_audio(core: Bolo) -> No
     assert opts.activity is not None and abs(len(opts.activity.probs) - len(dialogue) / 8000 * 100) <= 2
 
 
+@pytest.mark.parametrize("seconds", [20.8, None])
+async def test_nemotron_separates_the_demo_dialogue(core: Bolo, seconds: float | None) -> None:
+    """The demo's two-voice dialogue (two SYSPIN voices taking turns, the clip DiCoW's test uses): the whole 27.2 s
+    and the first 20.8 s. Two speakers, every line given to its own speaker, the lines alternating.
+
+    Measured 2026-11-17 on Linux: DER 5.2 % (20.8 s) and 5.9 % (27.2 s), no confusion, the same with onnxruntime
+    1.24.4, 1.31.1 and 1.32.0 and on an emulated CPU without VNNI (probabilities within 1.2e-6 of native). A run that
+    finds one speaker here prints the per-speaker peak probabilities and the ONNX Runtime build, to tell the model's
+    answer from a broken runtime."""
+    import onnxruntime
+
+    import bolo
+    from bolo.diarize import DiarizeOptions, diarization_error_rate
+    from bolo.engines.base import SpeakerTurn
+
+    example = Path(bolo.__file__).parent / "_ui" / "diarization"
+    audio, rate = decode_audio((example / "two-speakers-en.mp3").read_bytes(), filename="two-speakers-en.mp3")
+    end = seconds if seconds is not None else len(audio) / rate
+    audio = audio[: int(end * rate)]
+    lines = json.loads((example / "two-speakers-en.json").read_text(encoding="utf-8"))["turns"]
+    reference = [
+        SpeakerTurn(t["start"], min(t["end"], end), "AB".index(t["speaker"])) for t in lines if t["start"] < end
+    ]
+
+    opts = DiarizeOptions(model="nemotron-3-diarization")
+    turns = await core.diarize(audio, rate, opts)
+    score = diarization_error_rate(reference, turns)
+    assert opts.activity is not None
+    peaks = [round(float(x), 3) for x in opts.activity.probs.max(axis=0)]
+    print(
+        f"\nnemotron, demo dialogue {end:.1f} s: {len({t.speaker for t in turns})} speakers, DER {score['der']:.3f} "
+        f"({score}); peak probability per speaker {peaks}; onnxruntime {onnxruntime.__version__} "
+        f"{onnxruntime.get_available_providers()}"
+    )
+    assert len({t.speaker for t in turns}) == 2, turns
+    dominant = _dominant_speakers(reference, turns)
+    assert dominant == [r.speaker for r in reference], dominant  # A is speaker 0 (first heard), B speaker 1
+    assert score["confusion"] <= 0.02 and score["der"] <= 0.12
+
+
 async def test_overlap_separation_recovers_the_second_voice(core: Bolo) -> None:
     """Two Kokoro voices, the second talking over the first for about 2.5 s: with separate_overlaps the second
     speaker's overlapped words are transcribed from their own track, and the whole transcript gets better."""
@@ -1134,5 +1174,7 @@ async def test_dicow_onnx_large_transcribes_each_speaker(core: Bolo) -> None:
     best = min(itertools.permutations(hyps), key=lambda p: sum(word_error_rate(r, h, "en") for r, h in zip(refs, p)))
     rates = [word_error_rate(r, h, "en") for r, h in zip(refs, best)]
     print("per-speaker WER", [round(x, 3) for x in rates])
-    # Nemotron hears the first sentence for both voices, so one stream may carry it twice: a loose bound
+    # B's stream may carry A's first sentence as well: a loose bound. Nemotron's turns are right (A from 0.17 s,
+    # where the speech starts); DiCoW's stream for B decodes A's sentence when the recording starts with frames
+    # nobody speaks in (A's turn moved to 0.0 s, or the reference turns, leave B with its own lines only)
     assert all(x <= 0.5 for x in rates) and sum(rates) / len(rates) <= 0.35

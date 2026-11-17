@@ -6,6 +6,19 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Added
+
+- Real-model test: `nemotron-3-diarization` on the demo's two-voice dialogue (`two-speakers-en`, the first 20.8 s
+  and the whole 27.2 s) wants two speakers, every line with its own speaker and DER at most 12 %, and prints the
+  per-speaker peak probability and the ONNX Runtime build. Checked after a report that this clip gave one speaker on
+  a Windows laptop: on Linux it gives two speakers with every line right (DER 5.2 % and 5.9 %, no confusion), the
+  same with onnxruntime 1.24.4 (the DirectML package's version), 1.31.1 and 1.32.0, with 1 to 16 threads, in the
+  three live latency modes, and on an emulated AVX2 CPU without VNNI like the laptop's (probabilities within
+  1.2e-6 of native, no decision changed), so no fault was found in the engine's chunking, thresholds or
+  post-processing. In DiCoW's
+  test, the comment blamed Nemotron's turns for speaker B's stream repeating A's first sentence: the turns are
+  right; DiCoW's stream for B does that when the recording starts with 0.17 s that nobody speaks in.
+
 ### Changed
 
 - Documentation: the README, status, models, recommendations, architecture, configuration and performance pages no
