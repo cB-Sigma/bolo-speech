@@ -426,6 +426,7 @@ class ModelStore:
     MODEL_SETTINGS = (
         "phonemizer", "text_normalizer", "wordlists", "fallback", "romanised", "device", "keep_alive",
         "num_parallel", "max_queue", "flash_attention", "kv_cache_type", "context_size", "batch_size", "denoise",
+        "allow_remote_code",
         *DECODE_SETTINGS,
     )  # fmt: skip
 

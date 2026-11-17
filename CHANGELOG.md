@@ -8,6 +8,20 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Remote code as an explicit, pinned opt-in per model.** A catalog entry whose model exists only as Python in its
+  Hugging Face repository (transformers' `trust_remote_code`) pins it in `options.remote_code`: the reviewed commit
+  (the entry's source revision), what the review found, and the sha256 of every `.py` file and of every JSON file
+  with an `auto_map`; catalog validation refuses an incomplete pin. The code runs only after the operator opts in for
+  that model: the per-model setting `allow_remote_code` (`bolo models config <id> --set allow_remote_code=true`,
+  `PUT /api/v1/models/{id}/settings`), off by default; bolo sends plugins that setting in `load` options and
+  overwrites whatever a catalog entry says. `bolo pull`, a pull job's `warnings`, `bolo show`, the catalog API
+  (`remote_code`: `revision`, `files`, `reviewed`, `allowed`, `notice`) and every load (a log warning) say what runs.
+  docs/models.md, "Remote code". Catalog entries may carry `options.license_note` (shown by `bolo pull` and the API).
+- **Step-Audio 2 mini runs** (`step-audio-2-mini`, bolo-torch `step-audio-2` extra): text streamed, tool calls, speech
+  from the authors' token2wav decoder in 25-token pieces, voices `female` and `male`. Its model code is remote code
+  (opt-in, pinned); token2wav comes from github.com/stepfun-ai/Step-Audio2 (Apache-2.0) at a pinned commit. No longer
+  listed as not runnable. Tested with fakes only; nothing ran for real.
+
 - **More denoisers, chosen and pulled like any other model** (`denoise=<model id>` on transcriptions, Realtime
   sessions, pins and the `denoise` setting; `bolo list`, `bolo pull`, recommendations). Every entry states its licence;
   non-commercial ones are in, marked. Runnable: **DPDFNet** (Ceva, Apache-2.0; `dpdfnet-baseline`, `dpdfnet2`,
@@ -256,6 +270,10 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   pinned on a model now reach its live decodes as well.
 
 ### Fixed
+
+- `test_gated_entries_explain_what_to_do` failed whenever bolo-torch was installed next to the server: the test's
+  live server discovered the plugin through its entry point, so `plugin:torch` was available and the assertion that
+  `indic-parler-tts` is unavailable failed. It now runs a server that does not discover installed plugins.
 
 - whisper.cpp: a request's `language`, `prompt` or decoding options stayed set for every later request
   (pywhispercpp keeps parameters between calls). Every request now sets all of them, from the model's defaults where

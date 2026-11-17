@@ -147,6 +147,12 @@ the plugin stops before its next chunk. `audio_out: false` is a text-only respon
 the model is a `SpeechToSpeechModel` that implements `respond(ConversationRequest, cancelled) ->
 Iterator[ConversationChunk]`. Full-duplex models (that listen and speak at once, frame by frame) do not fit this op.
 
+`load` options always carry `allow_remote_code` for a plugin model: `true` only when the operator opted in for that
+model (the per-model setting of the same name); bolo overwrites whatever the catalog entry says. A plugin that runs
+code from a model's repository (Hugging Face `trust_remote_code`) should do so only when it is `true`, and only for
+the files the entry pins in `options.remote_code` (`revision`, and the sha256 of each file); bolo-torch refuses
+anything else with the error code `remote_code_refused` (models.md, "Remote code").
+
 A speech-recognition model whose `load` reply says `info.speaker_conditioned: true` is a
 diarization-conditioned (target-speaker) recogniser. For a diarized transcription bolo then does not
 cut the recording at speaker turns: it diarizes, and sends the whole recording once with `speakers`,

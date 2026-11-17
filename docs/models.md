@@ -897,7 +897,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `step-audio-2-mini` | en, zh | accuracy | - | 17.9 GB | Apache-2.0 · needs plugin torch | not runnable yet |
+| `step-audio-2-mini` | en, zh | accuracy | - | 17.9 GB | Apache-2.0 · needs plugin torch | untested |
 
 #### Kimi-Audio
 
@@ -999,7 +999,7 @@ are listed like the rest and marked ⚠. Checked against the model cards, LICENS
 | `moshiko-pytorch-bf16`, `moshika-pytorch-bf16` | speech-to-speech | CC-BY-4.0 (yes, with attribution) | 15.8 GB each | Kyutai's PyTorch, MLX (`moshiko-mlx-q4`, 5.2 GB) and Rust/candle (`moshiko-candle-q8`, 8.6 GB) runtimes | **full-duplex** (listens while it speaks, 80 ms frames) | not runnable: bolo's interface and the plugin's `respond` op are turn-based |
 | `glm-4-voice-9b` | speech-to-speech | glm-4-voice License (academic; commercial after registering with Zhipu) | 19.1 GB + tokenizer and decoder | the GLM-4-Voice repository's code | turn-based, streaming | not runnable: no packaged inference code |
 | `minicpm-o-2.6` | speech-to-speech | Apache-2.0 (yes; registration optional) | 17.4 GB | trust_remote_code only; llama.cpp runs its vision part, not its audio | turn-based and a live mode | not runnable: bolo-torch does not run remote code |
-| `step-audio-2-mini` | speech-to-speech | Apache-2.0 (yes) | 17.9 GB | the Step-Audio2 repository's code and token2wav | turn-based, tool calls | not runnable: no packaged inference code |
+| `step-audio-2-mini` | speech-to-speech | Apache-2.0 (yes) | 17.9 GB | bolo-torch (`step-audio-2` extra): the model's remote code (opt-in) and token2wav from github.com/stepfun-ai/Step-Audio2 at a pinned commit; a 24 GB NVIDIA GPU | turn-based; text streamed, speech in 25-token pieces (first audio after about 1 s of speech), tool calls | runnable, untested (fakes only) |
 | `kimi-audio-7b-instruct` | speech-to-speech | MIT (yes) | 42.6 GB | kimia_infer (the Kimi-Audio repository) and flash-attn | turn-based | not runnable: no packaged inference code, NVIDIA GPU only |
 | `lfm2.5-audio-1.5b-llamacpp` | audio-llm | LFM Open License v1.0 (only below USD 10M revenue) | 915 MB | llama-server (bolo starts it) | - | **ran here** (see below) |
 | `ultravox-0.5-llama-3.2-1b-llamacpp` | audio-llm | MIT adapter + Llama 3.2 Community License (yes, with Meta's conditions) | 2.2 GB | llama-server | - | runnable, untested |
@@ -1026,6 +1026,56 @@ the model. Nothing else in the table above was downloaded: the Qwen-Omni,
 Moshi, GLM, MiniCPM, Step-Audio and Kimi weights are 12 to 70 GB and the test machine had about 6 GB of disk and
 no GPU. The bolo-torch Qwen-Omni loader, the plugin's `respond` op and bolo's turn-based backend were tested with
 fake model objects, and the managed audio-llm server with a stand-in for llama-server.
+
+## Remote code
+
+Some models exist only as Python files in their own Hugging Face repository: transformers imports and runs those
+files when a loader passes `trust_remote_code=True`. That code runs inside the plugin's process with everything the
+account running bolo may do (read and write files, reach the network, see other models' data). bolo never runs it
+unless you opt in, for one model at a time:
+
+```bash
+bolo pull step-audio-2-mini            # the files download either way; bolo pull warns that the model needs remote code
+bolo show step-audio-2-mini            # remote_code: the pinned commit, the files, what the review found
+bolo models config step-audio-2-mini --set allow_remote_code=true      # the opt-in (or PUT .../settings)
+bolo models config step-audio-2-mini --unset allow_remote_code         # back to off
+```
+
+What the opt-in allows, and nothing more:
+
+* **A reviewed commit.** The catalog entry pins `options.remote_code.revision` (it must be the entry's
+  `source.revision`), with a note of what was read (`reviewed`) and the sha256 of every `.py` file and of every JSON
+  file with an `auto_map` (`files`). Catalog validation refuses an entry whose pin does not say all of this.
+* **Checked before import.** Right before the model library is imported, bolo-torch checks that the folder was
+  downloaded at exactly that revision (bolo's `manifest.json`), that each pinned file has its sha256, that no other
+  `.py` file is in the folder, and that no `auto_map` names a class in another repository (`org/repo--module.Class`,
+  which transformers would download and run). Any difference is refused (`remote_code_refused`) with what to do.
+* **Only the operator can opt in.** The setting is per model (`allow_remote_code` in `model-settings.json`); bolo
+  sends the plugin your setting and overwrites anything a catalog entry says, so an entry cannot opt in for you.
+  `bolo pull`, the pull job's `warnings`, the catalog API (`remote_code.notice`) and every load (a log warning) say
+  what runs.
+
+The same mechanism serves any other model with remote code: add the `remote_code` block to its catalog entry (for
+your own entries, `<data_dir>/custom.yaml`). `bolo-torch pin-remote-code <downloaded folder> --revision <commit>`
+prints it; read every file it lists before you trust it.
+
+Configuration files that name classes to build (the hyperpyyaml `flow.yaml` of Step-Audio 2's token2wav, GLM-4-Voice's
+decoder `config.yaml`) are treated the same way: their sha256 is in the entry's `options.sha256` and checked before
+they are read.
+
+### Inference code from GitHub
+
+Some models need code from their authors' GitHub repository that is not a package (a speech tokenizer, a decoder, a
+prompt format). bolo-torch carries a pin for each such bundle: the repository, the commit, its licence and the sha256
+of every file used (`plugins/bolo-torch/src/bolo_torch/upstream/*.json`). `bolo-torch code install <name>` downloads
+exactly those files from `raw.githubusercontent.com` and checks each; a load installs the bundle when it is missing
+(`BOLO_TORCH_CODE_AUTO_INSTALL=0` turns that off) and checks every file again before importing anything. The code goes
+to `BOLO_TORCH_CODE_DIR` (default `~/.cache/bolo-torch/code`, `%LOCALAPPDATA%\bolo-torch\code` on Windows).
+`bolo-torch code list` shows each bundle with its licences.
+
+| Bundle | Repository @ commit | Licence | Used by |
+| --- | --- | --- | --- |
+| `step-audio-2` | stepfun-ai/Step-Audio2 @ `76e272b56c39` | Apache-2.0 | `step-audio-2-mini` |
 
 ## Models outside the catalog
 

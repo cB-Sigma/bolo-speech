@@ -66,6 +66,13 @@ demucs-denoiser = ["denoiser>=0.1.5", "julius"]
 # Qwen2.5-Omni (transformers 4.52+) and Qwen3-Omni (4.57+) as speech-to-speech models, with transformers' own model
 # classes (no remote code). The processors' video part imports torchvision; accelerate splits large models.
 omni = ["transformers>=4.57", "accelerate>=0.33", "torchvision"]
+# Step-Audio 2 mini (speech-to-speech): the libraries of its model code (Hugging Face remote code, an opt-in per
+# model) and of its token2wav decoder (github.com/stepfun-ai/Step-Audio2 at a pinned commit, installed by the plugin:
+# `bolo-torch code install step-audio-2`). The authors use transformers 4.49.0; keep it in its own environment.
+step-audio-2 = [
+  "transformers==4.49.0", "accelerate>=0.33", "torchaudio>=2.1", "librosa", "onnxruntime", "s3tokenizer",
+  "hyperpyyaml", "diffusers", "einops", "scipy", "soundfile>=0.12.1",
+]
 dev = ["pytest>=8", "pytest-timeout>=2.3", "ruff>=0.8", "mypy>=1.13", "build", "twine"]
 
 [project.scripts]

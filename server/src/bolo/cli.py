@@ -226,6 +226,11 @@ def cmd_pull(args: argparse.Namespace) -> int:
     for warning in core.advisor.warnings(spec, pulling=True):
         # advice only: the download goes ahead (`hardware_warnings = false` silences it)
         print(f"warning: {warning['message']}", file=sys.stderr)
+    from bolo import remote_code
+
+    code_notice = remote_code.notice(spec, core.store.model_settings(spec.id))
+    if code_notice:  # the files are downloaded either way; the code runs only after the opt-in
+        print(f"warning: {code_notice}", file=sys.stderr)
     last = 0.0
 
     def progress(done: int, total: int) -> None:
@@ -242,6 +247,8 @@ def cmd_pull(args: argparse.Namespace) -> int:
     print(f"installed {spec.id} ({_human(manifest['size_bytes'])}, {len(manifest['files'])} files)")
     if not spec.commercial_use:
         print(f"note: licence {spec.license} restricts commercial use")
+    if spec.options.get("license_note"):
+        print(f"note: {spec.options['license_note']}")
     return 0
 
 
@@ -468,6 +475,14 @@ def format_show(doc: dict[str, Any]) -> str:
         ("commercial use", "yes" if doc.get("commercial_use") else "NO (restricted by the licence)"),
         ("gated", "yes: accept the terms on Hugging Face and set hf_token" if doc.get("gated") else "no"),
         ("cloud", "yes: audio or text leaves this server" if doc.get("cloud") else None),
+        ("note", doc.get("license_note")),
+    ])  # fmt: skip
+    code = doc.get("remote_code") or {}
+    section("Remote code", [
+        ("files", ", ".join(code.get("files") or [])), ("commit", code.get("revision")),
+        ("reviewed", code.get("reviewed")),
+        ("allowed", ("yes (allow_remote_code = true)" if code.get("allowed") else
+                     f"NO: bolo models config {doc['id']} --set allow_remote_code=true") if code else None),
     ])  # fmt: skip
     langs = doc.get("languages") or []
     voices = doc.get("voices") or []
@@ -548,6 +563,11 @@ def _model_setting(key: str, raw: str) -> Any:
     elif key == "keep_alive":
         parse_keep_alive(raw)
         value = raw
+    elif key == "allow_remote_code":
+        lowered = raw.strip().lower()
+        if lowered not in ("true", "false", "1", "0", "yes", "no", "on", "off"):
+            raise ValueError("allow_remote_code: expected true or false")
+        return lowered in ("true", "1", "yes", "on")
     elif key in DECODE_SETTINGS:
         value = json.loads(raw) if key == "vad_parameters" else raw
         return check_decode_options({key: value})[key]

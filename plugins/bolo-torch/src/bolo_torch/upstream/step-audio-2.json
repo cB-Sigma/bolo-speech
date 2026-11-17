@@ -1,0 +1,45 @@
+{
+ "name": "step-audio-2",
+ "about": "Step-Audio 2 mini: audio feature extraction (utils.py), the token2wav decoder (CosyVoice 2 flow matching and HiFT vocoder) and the two prompt voices",
+ "extra": "step-audio-2",
+ "paths": [
+  ""
+ ],
+ "parts": [
+  {
+   "repo": "stepfun-ai/Step-Audio2",
+   "commit": "76e272b56c3917a8d7188f18bbb5a65dfc8a0845",
+   "license": "Apache-2.0",
+   "license_url": "https://github.com/stepfun-ai/Step-Audio2/blob/76e272b56c3917a8d7188f18bbb5a65dfc8a0845/LICENSE",
+   "dest": "",
+   "files": {
+    "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "assets/default_female.wav": "5fc92ddcd9bc9af10437d9630642378777a98fc260f16508a9777db12c830a41",
+    "assets/default_male.wav": "812fedb6973d4a35441a84cf35536f29add2afa414c5e685d55b33896b290504",
+    "cosyvoice2/flow/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cosyvoice2/flow/decoder_dit.py": "790c55d898d92c8d874961e5b47b5f9d4dd5c067ec20ca5ea66833b32ce2b15d",
+    "cosyvoice2/flow/flow.py": "301a69c3970eb073fbddd5df1b9f53fb6a76a6ffb38371c26bb8151e82e648a3",
+    "cosyvoice2/flow/flow_matching.py": "5fd183ea0a6417e68cff64523f421606a94ad88698175fd0a97cb6906045af6e",
+    "cosyvoice2/transformer/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cosyvoice2/transformer/attention.py": "632df19aa7e712313d0f1b06789ecd28a87960bbbb9ec2d22dc0a09a2794a3dd",
+    "cosyvoice2/transformer/embedding.py": "db10d92b23343f6e981b66417afafe1b7664c95ba46442a37ad868d32a1b4a8e",
+    "cosyvoice2/transformer/encoder_layer.py": "de5453aaede6eca849261a9ce81e0ce4eaa0bda933de3ba7997d934d8b555c41",
+    "cosyvoice2/transformer/positionwise_feed_forward.py": "af8f55d5d143c5b9c6a1c0ea08ef81f0e5e16f7678a32921443e43981320840a",
+    "cosyvoice2/transformer/subsampling.py": "b858da9ca75ff39e62025ab7b2fe188696ce428227448d90ef10032c87c816a7",
+    "cosyvoice2/transformer/upsample_encoder_v2.py": "ff8e52f546d33dcf8f3881669c3be304068fac98322519e9c61a1e5ac6f6498b",
+    "cosyvoice2/utils/class_utils.py": "7f8fc571352cd0e65a9a051f0177e3a89750cc00b62e2aefd7f09c04b2c041ec",
+    "cosyvoice2/utils/common.py": "588b807789f4706c309353720f4a1e535a0afb972c5bbea45cbfb1cf582b6882",
+    "cosyvoice2/utils/mask.py": "0a40981b9a460472c7f8576de5f11e42a9dcdf2b57158039837761b03e51b696",
+    "flashcosyvoice/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "flashcosyvoice/modules/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "flashcosyvoice/modules/hifigan.py": "8d896a10c4b3f8dae5a40701f389021b31c92a3416052b248effaa09b5a8e11a",
+    "flashcosyvoice/modules/hifigan_components/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "flashcosyvoice/modules/hifigan_components/layers.py": "8c46fc66e3d967a436371e42281ae60a401e4cb47e1e5c3b935ab1b94278903d",
+    "flashcosyvoice/utils/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "flashcosyvoice/utils/audio.py": "69fc55008915fd0962233030c8e5b54328328d9c415178cbc33e2b4826c1b3e7",
+    "token2wav.py": "37a13e82d7a0cc656d465197f3c7ac61b8029ae85c91e7ca606cb4c6010974c7",
+    "utils.py": "a7cdd3ab19cb02ed8ec80ab77829c44a591b53d92435d1f94e78750daf89ec58"
+   }
+  }
+ ]
+}

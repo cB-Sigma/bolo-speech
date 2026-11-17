@@ -30,6 +30,7 @@ LOADERS: dict[str, tuple[str, str]] = {
     "pyannote-diarization": ("bolo_torch.models.diarization", "load"),
     "demucs-denoiser": ("bolo_torch.models.denoise", "load_demucs"),
     "qwen-omni": ("bolo_torch.models.omni", "load"),
+    "step-audio-2": ("bolo_torch.models.step_audio", "load"),
 }
 #: kinds the catalog lists for this plugin that are not implemented yet
 NOT_IMPLEMENTED = {
@@ -42,7 +43,6 @@ NOT_IMPLEMENTED = {
     "cannot carry)",
     "glm-4-voice": "GLM-4-Voice (its speech tokenizer and decoder live in the GLM-4-Voice repository, not a package)",
     "minicpm-o": "MiniCPM-o (its model code runs only as trust_remote_code, which bolo-torch does not run)",
-    "step-audio-2": "Step-Audio 2 (its inference code and token2wav decoder live in the Step-Audio2 repository)",
     "kimi-audio": "Kimi-Audio (it needs the kimia_infer code of the Kimi-Audio repository and flash-attn)",
 }
 

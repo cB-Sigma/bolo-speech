@@ -238,6 +238,12 @@ class ModelSettingsRequest(BaseModel):
         description="Pin where the model runs: cpu, cuda, cuda:1, coreml, auto, ... (overrides the `device` setting "
         "for this model; it still goes on the CPU when it does not fit on the accelerator); null removes the pin.",
     )
+    allow_remote_code: bool | None = Field(
+        default=None,
+        description="Opt in to the Python code of the model's own repository (Hugging Face remote code) for this "
+        "model: the files reviewed at the catalog's pinned commit, each checked by sha256 before it is imported. Off "
+        "unless set to true; null removes the pin. Read the files first: the code runs with the plugin's rights.",
+    )
     keep_alive: str | float | None = Field(
         default=None,
         description="Pin how long the model stays loaded when idle: seconds or a duration ('10m'); -1 keeps it "

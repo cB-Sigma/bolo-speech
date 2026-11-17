@@ -29,6 +29,7 @@ the console, the OpenAI-compatible API) works as for bolo's own engines.
 | `qwen2.5-omni-3b-torch` | speech-to-speech | Qwen2.5-Omni 3B, text and speech out (voices Chelsie, Ethan) | `omni` | Qwen Research License (non-commercial) | no | **no** (fakes only) |
 | `qwen2.5-omni-7b-torch` | speech-to-speech | Qwen2.5-Omni 7B | `omni` | Apache-2.0 | no | **no** (fakes only) |
 | `qwen3-omni-30b-a3b-instruct-torch` | speech-to-speech | Qwen3-Omni 30B-A3B Instruct, speech out in 10 languages (voices Ethan, Chelsie, Aiden) | `omni` | Apache-2.0 | no | **no** (fakes only) |
+| `step-audio-2-mini` | speech-to-speech | StepFun Step-Audio 2 mini, text, speech (voices female, male) and tool calls, streamed | `step-audio-2` + remote code opt-in | Apache-2.0 | no | **no** (fakes only) |
 
 The separation models are bolo `separation` models in "blind" mode: bolo uses them for `separate_overlaps=true`
 on diarized transcription and on `POST /api/v1/diarize`, and assigns their tracks to its own diarized speakers.
@@ -58,9 +59,18 @@ speech ("You are Qwen, a virtual human ...") with the session's instructions aft
 speech, comes back in one piece when generation ends; tools are not passed. None of them was run here: the
 downloads are 12 to 70 GB.
 
+Step-Audio 2 mini (`step-audio-2-mini`, kind `step-audio-2`) streams: its text as it is generated, tool calls as
+they close, and speech from the authors' token2wav decoder in pieces of 25 speech tokens (the first after about 1 s
+of generated speech). It needs two things beyond the extra: the model's own code from its Hugging Face repository,
+which runs only after you opt in for this model (`bolo models config step-audio-2-mini --set allow_remote_code=true`;
+see "Remote code" below), and token2wav from github.com/stepfun-ai/Step-Audio2 (Apache-2.0) at a pinned commit, which
+the plugin installs (see "Inference code from GitHub" below). token2wav calls `.cuda()`: without an NVIDIA GPU the
+model answers in text only, with a warning. The model's `forward` keeps no key-value cache, so every token
+reprocesses the conversation. Not run here.
+
 The catalog also lists `sravaani-1.0` and `indicconformer-600m-official` for this plugin, and the speech-to-speech
-models `moshiko-pytorch-bf16` / `moshika-pytorch-bf16` (full-duplex), `glm-4-voice-9b`, `minicpm-o-2.6`,
-`step-audio-2-mini` and `kimi-audio-7b-instruct` (each with the reason it cannot run yet). bolo-torch does
+models `moshiko-pytorch-bf16` / `moshika-pytorch-bf16` (full-duplex), `glm-4-voice-9b`, `minicpm-o-2.6` and
+`kimi-audio-7b-instruct` (each with the reason it cannot run yet). bolo-torch does
 not implement them yet; loading one answers `400 invalid_request` saying so.
 
 ### How each family runs
@@ -173,7 +183,8 @@ Extras: `parler` (Parler-TTS), `f5` (IndicF5), `f5-original` (the original F5-TT
 package, which pins its own libraries: give it its own environment), `indic-speak` (transformers 5 and SNAC),
 `orpheus` (Veena, Svara), `sepformer`, `pyannote` (PixIT, pyannote speaker diarization),
 `dicow` (DiCoW, SE-DiCoW: transformers 4.55 and pandas), `omni` (Qwen2.5-Omni and Qwen3-Omni: transformers 4.57
-or later, accelerate, torchvision). DiCoW uses the plugin protocol's `speakers` request (bolo 0.2.0 or later), the
+or later, accelerate, torchvision), `step-audio-2` (Step-Audio 2 mini: transformers 4.49.0, which the authors use, and
+token2wav's libraries: s3tokenizer, onnxruntime, hyperpyyaml, diffusers, torchaudio, librosa). DiCoW uses the plugin protocol's `speakers` request (bolo 0.2.0 or later), the
 Qwen-Omni models its `respond` request (bolo 0.6.7 or later).
 Installed in bolo's environment, the plugin is found through its entry point (`bolo.engines: torch`) and
 `bolo doctor` lists `plugin:torch`. Check the plugin's own environment with `bolo-torch doctor`.
@@ -195,6 +206,38 @@ plugin runs in must hold every family you want to use at the same time.
 The `parler` extra also pins `sentencepiece<0.2.1`: Parler's audio library pins `protobuf<5`, and sentencepiece
 0.2.3 cannot be imported with protobuf 4 (`cannot import name 'runtime_version'`), which broke loading Indic
 Parler-TTS here until it was pinned.
+
+## Remote code
+
+A model whose code exists only in its Hugging Face repository (transformers' `trust_remote_code=True`) loads only
+when all of this holds: the catalog entry pins the reviewed commit and the sha256 of every `.py` file and of every
+JSON file with an `auto_map` (`options.remote_code`); the downloaded folder is exactly that revision, every pinned
+file matches, no unpinned `.py` file is present and no `auto_map` points at another repository; and the operator set
+`allow_remote_code = true` for this model (`bolo models config <id> --set allow_remote_code=true`). bolo sends the
+plugin that setting and overrides whatever a catalog entry says. The check runs right before the import, and each
+load logs a warning that names the files. Otherwise the load fails with `remote_code_refused` and says what to do.
+The code runs inside this plugin's process with its rights. `bolo-torch pin-remote-code <folder> --revision <commit>`
+prints the pin for a new entry; read the files it lists first. bolo's docs/models.md, "Remote code", has the details.
+
+## Inference code from GitHub
+
+Code that is not a package (Step-Audio 2's token2wav, ...) comes from the authors' GitHub repository at a pinned
+commit, each file pinned by sha256 (`src/bolo_torch/upstream/<name>.json`, written by `tools/pin_upstream.py` from a
+checkout at that commit):
+
+```bash
+bolo-torch code list                     # bundles, their repositories, commits and licences, installed or not
+bolo-torch code install step-audio-2     # download now (a load installs a missing bundle too)
+bolo-torch code verify                   # every installed file against its sha256
+```
+
+Files go to `BOLO_TORCH_CODE_DIR` (default `~/.cache/bolo-torch/code`, `%LOCALAPPDATA%\bolo-torch\code` on Windows),
+one folder per pin. `BOLO_TORCH_CODE_AUTO_INSTALL=0` makes a load fail instead of downloading. A changed file is
+refused at load.
+
+| Bundle | Repository @ commit | Licence |
+| --- | --- | --- |
+| `step-audio-2` | stepfun-ai/Step-Audio2 @ `76e272b56c39` (`utils.py`, `token2wav.py`, `cosyvoice2/`, part of `flashcosyvoice/`, the two prompt voices) | Apache-2.0 |
 
 ## GPUs
 
@@ -366,6 +409,10 @@ docs/measurements/dicow-conditioned.json.
 * Telephone (8 kHz) recordings with the 8 kHz SepFormer; real meeting audio with any separator.
 * `sravaani-1.0` and `indicconformer-600m-official`: not implemented. `spark-tts-0.5b`, `maskgct` and
   `diarizen-wavlm-large-s80-md-v2` are catalogued but not implemented (no packaged inference code).
+* `step-audio-2-mini`: tested with fakes of its model, tokenizer, `utils.py` and `Token2wav` only; the bundle of
+  inference code was downloaded and checked against its pins here, but not imported (its libraries and a GPU were
+  not available). The format of its tool calls (`<tool_call>function\nname\narguments</tool_call>`) follows the
+  authors' examples and could not be checked against the model.
 * `f5-tts-v1-base` and `indic-speak`: unit-tested with fake backends only; the weights (1.3 GB / 7.1 GB, Indic-Speak
   gated) were not downloaded, and Indic-Speak's `inference.py` (gated) was not read.
 
@@ -386,6 +433,7 @@ card before commercial use.
 | SE-DiCoW | Apache-2.0 | Same base model and training-data notes as DiCoW v3.3. |
 | pyannote speaker-diarization-3.1 | MIT | Gated (with `pyannote/segmentation-3.0`, MIT, gated). Downloads `pyannote/wespeaker-voxceleb-resnet34-LM` (CC-BY-4.0, WeSpeaker trained on VoxCeleb) and the PLDA files of community-1 (CC-BY-4.0, gated). |
 | pyannote speaker-diarization-community-1 | CC-BY-4.0 | Gated (asks for contact details). Attribution required. |
+| Step-Audio 2 mini | Apache-2.0 | Model and code (the model repository's remote code, the Step-Audio2 repository's token2wav) under Apache-2.0. |
 | PixIT `speech-separation-ami-1.0` | MIT | Gated (both repositories). Downloads `speechbrain/spkrec-ecapa-voxceleb` (Apache-2.0) and `microsoft/wavlm-large` (no licence stated on its model card; check before commercial use). |
 
 No model here is marked non-commercial by its publisher; the SepFormer training-data caveat above is the one to

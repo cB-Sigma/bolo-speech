@@ -6,6 +6,24 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ### Added
 
+- **Remote code, opted in per model and pinned** (`bolo_torch.remote_code`): `trust_remote_code=True` is passed only
+  when the load options say `allow_remote_code: true` (bolo's per-model setting) and the catalog's
+  `options.remote_code` pins the folder's revision and the sha256 of every `.py` file and of every JSON file with an
+  `auto_map`; an unlisted `.py` file, a changed file, another revision or an `auto_map` into another repository is
+  refused (`remote_code_refused`). Each load logs a warning naming the files. `bolo-torch pin-remote-code <folder>
+  --revision <commit>` prints a pin. Configuration files that name classes (hyperpyyaml) are checked against the
+  entry's `sha256` option before they are read.
+- **Inference code from GitHub, pinned** (`bolo_torch.upstream`): bundles of files from the authors' repositories at
+  a fixed commit, each file pinned by sha256 and each repository's licence recorded
+  (`src/bolo_torch/upstream/*.json`, written by `tools/pin_upstream.py`). `bolo-torch code list | install <name> |
+  verify`; a load installs a missing bundle (`BOLO_TORCH_CODE_AUTO_INSTALL=0` turns that off) into
+  `BOLO_TORCH_CODE_DIR` and checks every file before importing.
+- **Step-Audio 2 mini** (`kind: step-audio-2`, `step-audio-2` extra): the authors' prompt format, the model's remote
+  code (opt-in), token2wav from stepfun-ai/Step-Audio2 at a pinned commit; text streamed as generated, tool calls
+  from `<tool_call>` blocks, speech in pieces of 25 speech tokens (first audio after about 1 s of speech), voices
+  `female` and `male`, cancel inside generation. Without CUDA it answers in text only, with a warning. Tested with
+  fakes only.
+
 - **Demucs denoiser** (`kind: demucs-denoiser`, `demucs-denoiser` extra): `demucs-dns48`, `demucs-dns64`,
   `demucs-master64` and `demucs-valentini-nc` from facebookresearch/denoiser as bolo `denoise` models, served through
   the protocol's new `denoise` op (needs a bolo that sends it). Code and weights are CC-BY-NC-4.0: not for commercial

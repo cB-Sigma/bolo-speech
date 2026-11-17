@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import sys
 import time
+from collections.abc import Iterator
 
 import httpx
 import numpy as np
@@ -304,8 +305,23 @@ def test_unknown_command_and_errors() -> None:
         ref.stop()
 
 
-def test_gated_entries_explain_what_to_do(live: LiveServer) -> None:
+@pytest.fixture
+def live_without_installed_plugins(settings: Settings) -> Iterator[LiveServer]:
+    """A live server that does not discover plugins installed as packages (entry points). With bolo-torch installed
+    in the same environment, its entry point would register plugin:torch and make the torch catalog entries
+    available, which the assertions about a missing plugin rely on not happening."""
+    settings.plugin_entry_points = False
+    srv = LiveServer(settings)
+    srv.start()
+    try:
+        yield srv
+    finally:
+        srv.stop()
+
+
+def test_gated_entries_explain_what_to_do(live_without_installed_plugins: LiveServer) -> None:
     """A gated catalog entry is never pulled without a token, and the error says how to get access."""
+    live = live_without_installed_plugins
     live.core.catalog.add(
         ModelSpec.from_dict(
             {

@@ -3,6 +3,9 @@
 bolo-torch serve                       # the plugin protocol on stdin/stdout (bolo starts this)
 bolo-torch doctor                      # torch build, devices, which model families are installed
 bolo-torch separate mix.wav -o out/    # speech separation without bolo (SepFormer / PixIT)
+bolo-torch code list                   # inference code from GitHub repositories, pinned by commit and sha256
+bolo-torch code install step-audio-2   # download one bundle now (a load also installs it when missing)
+bolo-torch pin-remote-code DIR --revision COMMIT   # the remote_code pin of a downloaded model folder
 """
 
 from __future__ import annotations
@@ -46,6 +49,8 @@ FAMILIES = {
     "orpheus": ["transformers", "snac"],
     "sepformer": ["speechbrain", "torchaudio"],
     "pyannote": ["pyannote.audio"],
+    "omni": ["transformers", "accelerate"],
+    "step-audio-2": ["transformers", "s3tokenizer", "hyperpyyaml", "onnxruntime", "librosa", "torchaudio"],
 }
 
 
@@ -122,6 +127,32 @@ def separate(args: argparse.Namespace) -> dict[str, Any]:
     }  # fmt: skip
 
 
+def code_command(args: argparse.Namespace) -> int:
+    from bolo_torch import upstream
+    from bolo_torch.runtime import PluginError
+
+    if args.action == "list":
+        print(json.dumps(upstream.describe(), indent=2))
+        return 0
+    names = [args.name] if args.name else sorted(upstream.bundles())
+    status = 0
+    for name in names:
+        try:
+            bundle = upstream.get(name)
+            if args.action == "install":
+                print(f"{name}: {bundle.licences()}", file=sys.stderr)
+                path = upstream.install(bundle, force=args.force)
+                print(f"{name}: installed in {path}")
+            else:
+                problems = upstream.verify(bundle)
+                print(f"{name}: " + ("matches its pins" if not problems else "; ".join(problems)))
+                status = status or (1 if problems else 0)
+        except PluginError as exc:
+            print(f"error ({exc.code}): {exc}", file=sys.stderr)
+            status = 2
+    return status
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="bolo-torch", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -136,6 +167,13 @@ def main(argv: list[str] | None = None) -> int:
     sep.add_argument("-m", "--model", default="sepformer-whamr16k", choices=sorted(SEPARATION_MODELS))
     sep.add_argument("--device", default=os.environ.get("BOLO_TORCH_DEVICE", "auto"))
     sep.add_argument("--threads", type=int, default=0)
+    code = sub.add_parser("code", help="inference code from GitHub repositories (pinned by commit and sha256)")
+    code.add_argument("action", choices=["list", "install", "verify"])
+    code.add_argument("name", nargs="?")
+    code.add_argument("--force", action="store_true", help="install again even when present")
+    pin = sub.add_parser("pin-remote-code", help="print the remote_code pin of a downloaded model folder")
+    pin.add_argument("folder")
+    pin.add_argument("--revision", required=True, help="the commit the folder was downloaded at")
     args = parser.parse_args(argv)
     if args.command in (None, "serve"):
         logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(name)s: %(message)s")
@@ -145,6 +183,17 @@ def main(argv: list[str] | None = None) -> int:
         return serve(TorchEngine())
     if args.command == "doctor":
         print(json.dumps(doctor(), indent=2))
+        return 0
+    if args.command == "code":
+        return code_command(args)
+    if args.command == "pin-remote-code":
+        from bolo_torch.remote_code import pins
+
+        print(json.dumps({"remote_code": pins(Path(args.folder), args.revision)}, indent=2))
+        print(
+            "Read every listed file before you put this pin in a catalog entry: the code runs in the plugin's process.",
+            file=sys.stderr,
+        )
         return 0
     if args.command == "separate":
         from bolo_torch.runtime import PluginError

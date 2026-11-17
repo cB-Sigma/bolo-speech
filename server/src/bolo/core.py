@@ -24,7 +24,7 @@ from typing import Any
 import numpy as np
 import psutil
 
-from bolo import __version__, logs, ort_providers
+from bolo import __version__, logs, ort_providers, remote_code
 from bolo.audio.decode import decode_audio
 from bolo.audio.encode import encode_audio
 from bolo.audio.resample import resample
@@ -1066,6 +1066,9 @@ class Bolo:
         job = self.jobs.create("pull", spec.id)
         if not (spec.builtin or spec.cloud or self.store.is_installed(spec.id)):
             job.warnings = self.advisor.warnings(spec, pulling=True, wait=False)
+            code_notice = remote_code.notice(spec, self.store.model_settings(spec.id))
+            if code_notice:  # the files are downloaded either way; the code runs only after the opt-in
+                job.warnings.append({"kind": "remote_code", "message": code_notice})
             for warning in job.warnings:
                 self.log("warning", str(warning["message"]))
         if spec.builtin or self.store.is_installed(spec.id):

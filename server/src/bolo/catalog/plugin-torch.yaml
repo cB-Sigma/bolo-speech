@@ -1065,8 +1065,6 @@
     plugin_install: not supported by bolo-torch yet (remote code only)
     hardware: {gpu: required, vram_gb: 18, note: 'bfloat16; int4 about 9 GB'}
 - id: step-audio-2-mini
-  runnable: false
-  not_runnable_reason: its inference code and token2wav decoder run only from the Step-Audio2 repository's code
   task: speech-to-speech
   engine: plugin:torch
   kind: step-audio-2
@@ -1082,9 +1080,14 @@
   gated: false
   features: [speech-to-speech, tool-calls]
   description: 'StepFun Step-Audio 2 mini (8 B, on Qwen2.5-7B): English and Chinese spoken conversation with
-    paralinguistic understanding and tool calls; speech out through a CosyVoice-style token2wav decoder. Apache-2.0.
-    Not runnable yet: the inference code and token2wav live in github.com/stepfun-ai/Step-Audio2, not a package
-    bolo-torch can depend on. About 18 GB in bfloat16; a GPU is needed.'
+    paralinguistic understanding and tool calls, through the torch plugin. Text streams as it is generated; speech
+    from its token2wav decoder (CosyVoice 2 flow matching + HiFT, 24 kHz, voices female and male) in pieces of 25
+    speech tokens, so the first audio comes after about 1 s of generated speech. The model code keeps no key-value
+    cache, so each token reprocesses the whole conversation: long conversations get slow. Remote code: its modelling
+    code is Python in the model repository, which runs only after you opt in for this model (allow_remote_code,
+    pinned files; see docs/models.md, "Remote code"); token2wav comes from github.com/stepfun-ai/Step-Audio2
+    (Apache-2.0) at a pinned commit. Model and code Apache-2.0. bfloat16, about 17 GB of weights: a 24 GB NVIDIA
+    GPU (token2wav needs CUDA; without it the model answers in text only). Untested here (wiring tested with fakes).'
   source_url: https://huggingface.co/stepfun-ai/Step-Audio-2-mini
   validated: untested
   source:
@@ -1092,8 +1095,28 @@
     revision: e36fdd5d71e0ea22f09dd94bbab9bfc544ca1e36
     exclude: ['assets/*', .gitattributes]
   options:
-    plugin_install: not supported by bolo-torch yet (no packaged inference code)
-    hardware: {gpu: required, vram_gb: 20, note: bfloat16}
+    plugin_install: pip install "bolo-torch[step-audio-2]" (the bolo PyTorch engine plugin, plugins/bolo-torch), then
+      bolo-torch code install step-audio-2 (github.com/stepfun-ai/Step-Audio2 at a pinned commit; a load also
+      installs it); opt in to the model's remote code with bolo models config step-audio-2-mini --set
+      allow_remote_code=true
+    dtype: bfloat16
+    max_new_tokens: 2048
+    remote_code:
+      revision: e36fdd5d71e0ea22f09dd94bbab9bfc544ca1e36
+      reviewed: '2026-11-17: configuration_step_audio_2.py (a Qwen2 configuration with an audio encoder) and
+        modeling_step_audio_2.py (Whisper-style audio encoder, adaptor, Qwen2Model, GenerationMixin). Imports
+        librosa, torch, torchaudio and transformers only; no downloads, no file writes, no subprocesses.'
+      files:
+        config.json: bb3bc7cbfc4f11f7e32c55709b66cf76eb8a80e72856944409fabe1e13a300f5
+        configuration_step_audio_2.py: 699df8e17a713b07ceccdd0d3a79f61b2e38361541a617c65a1dd6181ac96bb4
+        modeling_step_audio_2.py: 82b93db45a4bf37c2877660b321782aea4715e3e0d7be221e91e99e13815cbe3
+    sha256:
+      # hyperpyyaml: it names the classes token2wav builds
+      token2wav/flow.yaml: 723295d37bf11f5f1b896ca4f2f4c81ebc2fbb3e51b753c2507ef8461c751486
+    hardware: {gpu: required, vram_gb: 20, note: 'bfloat16 weights (17 GB) and token2wav; CUDA for speech output'}
+  voices:
+  - {id: female, name: Female, gender: f}
+  - {id: male, name: Male, gender: m}
 - id: kimi-audio-7b-instruct
   runnable: false
   not_runnable_reason: it needs the kimia_infer code of the Kimi-Audio repository and flash-attn on a GPU

@@ -30,7 +30,7 @@ from typing import Any
 
 import psutil
 
-from bolo import cuda_libs, gpu_health, ort_providers
+from bolo import cuda_libs, gpu_health, ort_providers, remote_code
 from bolo.accel import Accelerators, our_pids
 from bolo.catalog import Catalog, ModelSpec
 from bolo.config import Settings
@@ -905,6 +905,11 @@ class ModelManager:
         for key in TUNING_KEYS:  # llama.cpp speed settings pinned for the model win over the catalog's
             if pins.get(key) not in (None, ""):
                 model_opts[key] = pins[key]
+        # remote code runs only on the operator's opt-in for this model, never on a catalog entry's say-so
+        if spec.engine.startswith("plugin:"):
+            model_opts["allow_remote_code"] = remote_code.allowed(pins)
+        if remote_code.pin(spec) is not None:
+            log.warning("%s", remote_code.notice(spec, pins))
         if spec.voices:
             model_opts.setdefault("voices", spec.voices)
         if len(spec.languages) == 1:

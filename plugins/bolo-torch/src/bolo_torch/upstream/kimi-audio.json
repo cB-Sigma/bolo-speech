@@ -1,0 +1,73 @@
+{
+ "name": "kimi-audio",
+ "about": "Kimi-Audio: kimia_infer (prompt format, Whisper features, the streaming flow-matching detokenizer and BigVGAN vocoder) with the GLM-4-Voice speech tokenizer it imports (a git submodule of Kimi-Audio)",
+ "extra": "kimi-audio",
+ "paths": [
+  ""
+ ],
+ "parts": [
+  {
+   "repo": "MoonshotAI/Kimi-Audio",
+   "commit": "349251e1d8f4f98d58fda59246381faecd7392e0",
+   "license": "MIT (code derived from Qwen2.5-7B: Apache-2.0); no LICENSE file, stated in README.md and pyproject.toml",
+   "license_url": "https://github.com/MoonshotAI/Kimi-Audio/blob/349251e1d8f4f98d58fda59246381faecd7392e0/README.md#license",
+   "dest": "",
+   "files": {
+    "README.md": "2679e9b0031b45a72b64699d6f8a2080513a19683617f44596c7efcfa5a206fa",
+    "kimia_infer/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "kimia_infer/api/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "kimia_infer/api/kimia.py": "54dd7c02072bc2488bf2dc2524ada365d9a3fac5dff830455263225eef037ac9",
+    "kimia_infer/api/prompt_manager.py": "ef3953607c22458852b3b6f7639415c37c3be712fd771e894ed96323e7d2c364",
+    "kimia_infer/models/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "kimia_infer/models/detokenizer/__init__.py": "a3fdcb7e9017173374ad6d112be3cb276b41ae8e319152ae6ef83e6eda65400d",
+    "kimia_infer/models/detokenizer/bigvgan_wrapper.py": "3920de313b9e471a2bdf0e892f900f60c4d3356d71a63c6dfb906726b69c6b1b",
+    "kimia_infer/models/detokenizer/flow_matching/dit_block.py": "ffe01005a0735329e3c94528d576ceeb6d7ba67ba2840b26c63771a670484472",
+    "kimia_infer/models/detokenizer/flow_matching/model.py": "f5db52127143a809cc49abef350d3d1e0d60d53a4c188acf0ca0e8c328522b2e",
+    "kimia_infer/models/detokenizer/flow_matching/ode_wrapper.py": "2cbdc036d7e3a98175c093a26e873e1f0eae93fe720fb2830ea86aa1902ba99b",
+    "kimia_infer/models/detokenizer/flow_matching/scheduler.py": "676fed4f7435d55b9984231474747e338fa349d1e8ffcfeaa82c31ed0139d903",
+    "kimia_infer/models/detokenizer/semantic_fm_prefix_streaming.py": "325f7128a054cba2c2f59fa166eeef105f53232f0c54e29642a18f373e1a053a",
+    "kimia_infer/models/detokenizer/vocoder/activations.py": "7ce2bb164c7cebc3a201d57f6c3ac5d62c7e4dcd4dcb32fb4e6e75b004187340",
+    "kimia_infer/models/detokenizer/vocoder/alias_free_activation/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "kimia_infer/models/detokenizer/vocoder/alias_free_activation/cuda/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "kimia_infer/models/detokenizer/vocoder/alias_free_activation/cuda/activation1d.py": "cf43e7237dbd2cd07217d3adc93a7c78137084b2d8c96e2aadc9be8bc8054a60",
+    "kimia_infer/models/detokenizer/vocoder/alias_free_activation/cuda/anti_alias_activation.cpp": "222ce6cd687fdc1d541a4bedbf5f3578f321bc2649996b2747ebc60ddd2e1d8e",
+    "kimia_infer/models/detokenizer/vocoder/alias_free_activation/cuda/anti_alias_activation_cuda.cu": "e3fa60fbf80fd95cad6f05dd605c85393b6539d6684502a56b64c348c655de7d",
+    "kimia_infer/models/detokenizer/vocoder/alias_free_activation/cuda/compat.h": "39e530d6d9cf5eda60c25b899cf0ba87c70cdca3424de7cb1716adad8f212388",
+    "kimia_infer/models/detokenizer/vocoder/alias_free_activation/cuda/load.py": "6ee5cbfaedc6b73cf2bff9677f18bcc5a46c91a088523e853bca12805a909e8a",
+    "kimia_infer/models/detokenizer/vocoder/alias_free_activation/cuda/type_shim.h": "3e32f2fec72b2b6749389acd64c336b2932a3764b686634c696af8151df0e38c",
+    "kimia_infer/models/detokenizer/vocoder/alias_free_activation/torch/__init__.py": "2e3138e1052e377ba2e51ea59c7d5d255a519559001757af21dbec4cb9c22471",
+    "kimia_infer/models/detokenizer/vocoder/alias_free_activation/torch/act.py": "0b92766f905251989a160f265f672cf76bce1726f7e1d6df63fa7fc403970219",
+    "kimia_infer/models/detokenizer/vocoder/alias_free_activation/torch/filter.py": "acf2257276e617dd3161e53abc0a1582e586a3d2d618a43235c7f83818b4e179",
+    "kimia_infer/models/detokenizer/vocoder/alias_free_activation/torch/resample.py": "2c7d4c3e897a0b49d2028dc738145429d3e11871bb3c15e8f610c63728ef1bf2",
+    "kimia_infer/models/detokenizer/vocoder/bigvgan.py": "9813f347721ad776d8c8d3aa91b3da70d17156c43388384c23adccc97b487887",
+    "kimia_infer/models/detokenizer/vocoder/utils.py": "3915e52d78dec1a278b7e1c137677af8d7f3c2712f573f0c817ec9eaaa897641",
+    "kimia_infer/models/tokenizer/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "kimia_infer/models/tokenizer/glm4_tokenizer.py": "d93305e6db81e83ac0190405b6503cd62ed0dca2da2f9a15e0e4c82c2667bb6a",
+    "kimia_infer/models/tokenizer/glm4_utils.py": "1f9f15869a89c1bed9d0b00eef0180b80b6f696638d510f27380f1936fef5b0e",
+    "kimia_infer/models/tokenizer/whisper_Lv3/mel_filters.npz": "7450ae70723a5ef9d341e3cee628c7cb0177f36ce42c44b7ed2bf3325f0f6d4c",
+    "kimia_infer/models/tokenizer/whisper_Lv3/modeling_whisper.py": "acd5227d47d5fb8812f79801bc43cf86d207013a347edbf94ce50f16d3c97cc0",
+    "kimia_infer/models/tokenizer/whisper_Lv3/whisper.py": "1e34a5b72a7cec5a045b7c46d3eca34fa374104d852868cee1efe6c2c1e870e9",
+    "kimia_infer/utils/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "kimia_infer/utils/data.py": "752c255b64e8c47f3acd34366691101229d4dc59f402c73be27600f5e690d1b3",
+    "kimia_infer/utils/sampler.py": "7be8cc8b1713049a92a6b398a0a023aca982aab4482e75b7d5882f12e423a3ff",
+    "kimia_infer/utils/special_tokens.py": "ec409998c7ffef696d0870fe24534dcfd7ac617be2ed75787576dbf572a23437",
+    "pyproject.toml": "071af7287b5fbabc70680f42afe1f4d65f1f92bb17d4b83ea2bba458f813c0f1"
+   }
+  },
+  {
+   "repo": "THUDM/GLM-4-Voice",
+   "commit": "eb00ce9142e8d98b0ed7c57cd47e0d6d5dce9a1a",
+   "license": "Apache-2.0",
+   "license_url": "https://github.com/THUDM/GLM-4-Voice/blob/eb00ce9142e8d98b0ed7c57cd47e0d6d5dce9a1a/LICENSE",
+   "dest": "kimia_infer/models/tokenizer/glm4",
+   "files": {
+    "LICENSE": "e70bd1f5aa3e4f5fa316b65fb237b1d921b9b8432fedd64416ca16f739cb11b9",
+    "speech_tokenizer/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "speech_tokenizer/configuration_whisper.py": "edfaddabc51cf7a0c65ee337784bef774dfc531d5b8a4686cfd05c90cc2d87e3",
+    "speech_tokenizer/generation_whisper.py": "b672eaee9b1048fad5c891dbca2a771f6f8a197f7b52c835b3d75b4e3950cdd7",
+    "speech_tokenizer/modeling_whisper.py": "952de28d8c020f7d1ee7c7c0154ffccf0b36ec01d3c4b5e05dfafe1b2028fb59",
+    "speech_tokenizer/utils.py": "b7519de800d401c0beb11bfc1a1a395fab106d134825d396fa70c90ef63f29e2"
+   }
+  }
+ ]
+}

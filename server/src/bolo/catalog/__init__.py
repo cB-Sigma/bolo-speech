@@ -151,6 +151,11 @@ class ModelSpec:
         for v in self.voices:
             if "id" not in v:
                 raise CatalogError(f"{self.id}: voice without id")
+        from bolo.remote_code import check_pin
+
+        problem = check_pin(self)
+        if problem:
+            raise CatalogError(f"{self.id}: {problem}")
 
     def to_dict(self) -> dict[str, Any]:
         """Serialisable form (used for custom.yaml)."""
@@ -241,6 +246,25 @@ class ModelSpec:
             # what the model needs to run well, when the catalog says (options.hardware), e.g.
             # {"gpu": "recommended", "vram_gb": 3.5, "note": "..."}; null for entries that run fine on a CPU
             "hardware": self.options.get("hardware"),
+            # Python code from the model's own repository that loading it runs (options.remote_code): the pinned
+            # commit and files, and whether the operator opted in (per-model setting allow_remote_code); else null
+            "remote_code": self._remote_code_api(settings or {}),
+            # a licence term to act on before use (for example a registration for commercial use); else null
+            "license_note": self.options.get("license_note"),
+        }
+
+    def _remote_code_api(self, settings: dict[str, Any]) -> dict[str, Any] | None:
+        from bolo import remote_code
+
+        p = remote_code.pin(self)
+        if p is None:
+            return None
+        return {
+            "revision": p.get("revision"),
+            "files": sorted(str(n) for n in p.get("files", {})),
+            "reviewed": p.get("reviewed"),
+            "allowed": remote_code.allowed(settings),
+            "notice": remote_code.notice(self, settings),
         }
 
 
