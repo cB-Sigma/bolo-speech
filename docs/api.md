@@ -209,11 +209,11 @@ Multipart form.
 | `separate_overlaps` | `false` | extension, with diarization: transcribe overlapped speech from one separated track per speaker (see [Separating overlapping speech](#speaker-diarization)); `separation_model`, `separation_context_s`, `separation_min_overlap_s`, `separation_allow_narrowband` |
 | `vad_filter` | auto | extension. `true` forces silence removal before decoding; by default VAD is used only to split audio longer than the model's window |
 | `vad_parameters` | - | extension. Tunes the silence removal, as a JSON object or as bracketed fields (`vad_parameters[threshold]=0.6`, which is how the OpenAI SDKs send a nested `extra_body` object): `threshold` (0 to 1, default 0.5), `min_speech_duration_ms`, `max_speech_duration_s`, `min_silence_duration_ms` (default 300), `speech_pad_ms` (default 150). Given without `vad_filter`, it switches the filter on. `neg_threshold` is accepted and ignored |
-| `chunk_length` | `30` | extension. Longest piece of audio decoded at once, in seconds (1 to 30): longer audio is cut at pauses into pieces of at most this length, for every engine; faster-whisper also uses it as its own window |
+| `chunk_length` | `30` | extension. Longest piece of audio decoded at once, in seconds (1 to 30): audio longer than this goes through silence removal and is cut at pauses into pieces of at most this length, for every engine; faster-whisper also uses it as its own window. With `vad_filter=false` nothing is cut, and faster-whisper decodes the audio in windows of this length: short windows of silence are where Whisper hallucinates most, so keep the filter on with a short `chunk_length` |
 | `hotwords` | - | extension, passed to engines that support it |
 | `condition_on_previous_text` | `false` | extension, Whisper models: give the decoder the text of the previous window. Off by default: it is the main cause of repetition loops on long audio |
 | `repetition_penalty` | `1` | extension, faster-whisper: penalty on tokens already generated (greater than 0; 1 is off; 1.1 to 1.3 is a usual value against loops) |
-| `no_repeat_ngram_size` | `0` | extension, faster-whisper: never generate the same n-gram of this many tokens twice (0 to 100; 0 is off) |
+| `no_repeat_ngram_size` | `0` | extension, faster-whisper: never generate the same n-gram of this many tokens twice in a window (0 to 100; 0 is off). It also removes speech that really is repeated: a phrase said several times in one window comes out once |
 | `compression_ratio_threshold` | `2.4` | extension, faster-whisper: a window whose text compresses better than this (gzip ratio) is decoded again at a higher temperature; has an effect only with `temperature_increment_on_fallback` |
 | `log_prob_threshold`, `no_speech_threshold` | `-1`, `0.6` | extension, Whisper models: a window with an average log probability under the first fails (and is retried at a higher temperature, with `temperature_increment_on_fallback`); one that is also more likely silence than the second is dropped |
 | `temperature_increment_on_fallback` | `0` | extension, Whisper models: retry a failed window at this much higher temperature, up to 1 (0 to 1). faster-whisper does not retry by default; whisper.cpp's own default, 0.2, applies when it is not given |
@@ -244,7 +244,16 @@ it: `condition_on_previous_text` is off, audio longer than the model's window is
 guard (`max_repeats`) trims what still gets through. When loops remain, in that order of cost:
 `repetition_penalty=1.1` to `1.3`, `no_repeat_ngram_size=3`, `vad_filter=true`, and
 `temperature_increment_on_fallback=0.2` with `compression_ratio_threshold` (which decodes failed windows again). With
-`condition_on_previous_text=true` keep the guard on. From the OpenAI SDK:
+`condition_on_previous_text=true` keep the guard on.
+
+Measured with `faster-whisper-tiny` on the CPU: the bundled `en-short` sample with 10 s of near-silence before it and
+15 s after, sent with `chunk_length=10` and `vad_filter=false`, came back as 457 words: "I'm going to do a little bit
+of a little bit of ..." for 223 words in each silent window around the real sentence. With the guard at its default
+(4) it was 33 words (the invented phrase once per silent window, and the sentence); adding `no_repeat_ngram_size=3`
+left only the sentence; with silence removal on (the default for audio longer than `chunk_length`) the answer was the
+sentence alone, at a `language_probability` of 0.99 instead of 0.31.
+
+From the OpenAI SDK:
 
 ```python
 client.audio.transcriptions.create(
