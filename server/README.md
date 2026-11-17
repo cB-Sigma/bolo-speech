@@ -289,7 +289,7 @@ Served at `/` by the same process, and as a browser-only [live demo](https://cb-
 
 ## Compatibility
 
-- **OpenAI.** Request and response shapes follow the API as typed in the official `openai` Python SDK (3.50.0) and are exercised with that SDK in the test-suite: audio (transcription, translation, speech, streaming, `diarized_json`), Realtime (GA event names; WebSocket and WebRTC, the latter tested with an aiortc peer, not a browser) and chat completions with audio. Not implemented: OpenAI's SIP connector (phone calls have their own path), MCP tools, image input. [docs/voice-agents.md](https://github.com/cB-Sigma/bolo/blob/main/docs/voice-agents.md#what-is-different-from-openai-or-missing).
+- **OpenAI.** Request and response shapes follow the API as typed in the official `openai` Python SDK (3.50.0) and are exercised with that SDK in the test-suite: audio (transcription, translation, speech, streaming, `diarized_json`), Realtime (GA event names; WebSocket and WebRTC, the latter tested with an aiortc peer and in headless Chromium, not yet in Chrome or Edge themselves) and chat completions with audio. Not implemented: OpenAI's SIP connector (phone calls have their own path), MCP tools, image input. [docs/voice-agents.md](https://github.com/cB-Sigma/bolo/blob/main/docs/voice-agents.md#what-is-different-from-openai-or-missing).
 - **speaches.** Existing clients keep their model ids and environment variables; what matches, differs and is missing: [docs/migration-from-speaches.md](https://github.com/cB-Sigma/bolo/blob/main/docs/migration-from-speaches.md).
 - **Wyoming / Home Assistant.** `bolo serve --wyoming` exposes installed models on port 10300. Tested with the `wyoming` Python client, not against a Home Assistant instance.
 - **Agent frameworks.** Run from Pipecat 1.16 and LiveKit Agents 1.8 through their Realtime and HTTP integrations.
@@ -323,7 +323,7 @@ All tables, the method and what batching does and does not buy on CPU: [docs/per
 - **Cloud providers.** Nothing was run against OpenAI, Sarvam, ElevenLabs, Deepgram or Soniox; the adapters follow their documentation and are tested against stand-ins.
 - **Most of the catalog.** About two thirds of the entries are marked untested: their files were checked and a sibling of the same architecture was run.
 - **Accuracy.** Error rates come from small samples; they show that a pipeline works, not how good a model is.
-- **Voice agents with a capable language model; browsers over WebRTC; Home Assistant; the speech-to-speech model at conversational speed** (0.4 to 0.5× real time on four shared cores).
+- **Voice agents with a capable language model; real browsers over WebRTC (headless Chromium only so far); Home Assistant; the speech-to-speech model at conversational speed** (0.4 to 0.5× real time on four shared cores).
 - **Romanised input** beyond bolo's own tests: how converted text sounds was not evaluated.
 
 The full list, with what *was* run of each: [docs/status.md](https://github.com/cB-Sigma/bolo/blob/main/docs/status.md).
@@ -393,7 +393,7 @@ bolo itself is [Apache-2.0](https://github.com/cB-Sigma/bolo/blob/main/LICENSE).
 
 ## Roadmap
 
-- Phone calls on real provider accounts and a real SIP trunk; WebRTC tested with browsers and behind NAT.
+- Phone calls on real provider accounts and a real SIP trunk; WebRTC in Chrome, Edge, Firefox and Safari themselves (headless Chromium only so far) and behind NAT.
 - Cloud providers checked against real accounts.
 - GPU and Apple Silicon validation.
 - A Bhojpuri recogniser better than the Hindi fallback; models trained for 8 kHz telephone speech.

@@ -71,7 +71,7 @@ to the speaker name (`amy`).
 | `GET /health` | yes | yes (also `/healthz`, `/readyz`) |
 | `POST /v1/chat/completions` (audio in/out, proxied to an LLM) | yes | yes; `CHAT_COMPLETION_BASE_URL` / `CHAT_COMPLETION_API_KEY` are read (see [voice-agents.md](voice-agents.md)) |
 | `WS /v1/realtime` (OpenAI Realtime API) | yes | yes, over WebSocket, with the GA event names |
-| `POST /v1/realtime` (WebRTC) | yes | **different route**: OpenAI's current `POST /v1/realtime/calls` (SDP offer in, answer out; extra `webrtc`), plus `POST /v1/realtime/client_secrets`. Tested with a WebRTC library, not with browsers |
+| `POST /v1/realtime` (WebRTC) | yes | **different route**: OpenAI's current `POST /v1/realtime/calls` (SDP offer in, answer out; extra `webrtc`), plus `POST /v1/realtime/client_secrets`. Tested with a WebRTC library and in headless Chromium (the console's Conversation page and `examples/webrtc_browser.html`); Chrome and Edge themselves, Firefox and Safari are not yet |
 | `POST /v1/audio/diarization` | yes (pyannote, needs PyTorch) | **different route**: `POST /api/v1/diarize`, or `diarize=true` / `diarized_json` on transcriptions (ONNX pipeline, no PyTorch). pyannote's own PyTorch pipeline is available through the bolo-torch plugin: `model=pyannote-speaker-diarization-3.1` (or `-community-1`), [models.md](models.md#pyannotes-pytorch-pipelines-bolo-torch) |
 | `POST /v1/audio/speech/embedding` | yes | yes; same form (`file`, `model`) and response. The embedder is bolo's (ERes2Net from its default diarization model, 192 numbers), not speaches' WeSpeaker ResNet34, so vectors from the two servers cannot be compared with each other; speaches' model id falls back to bolo's default |
 | Gradio UI at `/` | yes | replaced by bolo's web console |

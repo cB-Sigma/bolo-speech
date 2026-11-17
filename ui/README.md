@@ -76,6 +76,7 @@ swapped.
 | `npm run format`                      | Prettier, in place                                                               |
 | `npm test`                            | Unit and component tests (Vitest, Testing Library)                               |
 | `npm run e2e`                         | End-to-end and accessibility tests (Playwright, axe) against the mock build      |
+| `npm run e2e:webrtc`                  | A WebRTC conversation in headless Chromium against a real `bolo serve` (opt-in)  |
 
 ## Build
 
@@ -176,6 +177,7 @@ scripts/voices/     prepares the voices the live demo publishes (shrink, check, 
   demo/             live-demo backend fed by real in-browser work, service worker, catalog snapshot
 e2e/                Playwright specs for the normal build
 e2e-demo/           Playwright specs for the live demo build
+e2e-webrtc/         Playwright spec for WebRTC against a real server (playwright.webrtc.config.ts)
 ```
 
 ## In-browser speech recognition

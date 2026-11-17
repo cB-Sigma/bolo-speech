@@ -9,17 +9,30 @@ import { MicHelpPanel } from '@/components/stt/mic-help'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useComponents, useInfo } from '@/hooks/use-api'
 import { useStore } from '@/hooks/use-store'
 import { useSupport } from '@/hooks/use-support'
 import { isDemo } from '@/lib/api/config'
 import { defaultPipeline, hasPipelines, pipelineOptions, type PipelineId } from '@/lib/capabilities'
 import { fmtMs } from '@/lib/format'
-import { ConversationSession, emptyConversation, type ConversationState } from '@/lib/realtime/session'
+import {
+  ConversationSession,
+  emptyConversation,
+  type ConversationState,
+  type RealtimeTransport,
+} from '@/lib/realtime/session'
 import { Store } from '@/lib/store'
 import { cn } from '@/lib/utils'
 
 const idle = new Store<ConversationState>(emptyConversation())
+
+const ERROR_TITLE: Record<string, string> = {
+  engine_unavailable: 'The model is not reachable',
+  webrtc_unavailable: 'WebRTC is not installed on the server',
+  webrtc_failed: 'The WebRTC connection failed',
+  unauthorized: 'The server refused the API key',
+}
 
 const STATUS: Record<ConversationState['status'], string> = {
   idle: 'Not started',
@@ -40,17 +53,27 @@ function ServerConversation() {
   const options = useMemo(() => pipelineOptions(info.data, components ?? []), [info.data, components])
   const [chosen, setChosen] = useState<PipelineId | null>(null)
   const pipeline = chosen ?? defaultPipeline(info.data, options)
+  const [transport, setTransport] = useState<RealtimeTransport>('websocket')
   const [session, setSession] = useState<ConversationSession | null>(null)
   const state = useStore(session?.store ?? idle)
   const active = state.status === 'starting' || state.status === 'live'
   const selected = options.find((o) => o.id === pipeline)
-  const micBlocked = !support.getUserMedia || !support.audioWorklet || !support.secureContext
+  const webrtc = info.data?.capabilities?.realtime?.webrtc
+  const webrtcAvailable = webrtc?.available !== false && typeof RTCPeerConnection !== 'undefined'
+  const webrtcReason =
+    typeof RTCPeerConnection === 'undefined'
+      ? 'This browser has no WebRTC'
+      : webrtc?.available === false
+        ? `The server has no WebRTC transport: ${webrtc.install ?? "pip install 'bolo-speech[webrtc]'"}`
+        : undefined
+  const micBlocked =
+    !support.getUserMedia || !support.secureContext || (transport === 'websocket' && !support.audioWorklet)
 
   useEffect(() => () => void session?.stop(), [session])
 
   const start = () => {
     // Everything that needs the tap happens inside start(): the microphone prompt first.
-    const s = new ConversationSession(pipeline)
+    const s = new ConversationSession(pipeline, transport)
     void s.start()
     setSession(s)
   }
@@ -84,6 +107,37 @@ function ServerConversation() {
           }
         >
           <PipelinePicker options={options} value={pipeline} onChange={setChosen} locked={active} />
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+            <span id="transport-label">Transport</span>
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              value={transport}
+              onValueChange={(v) => v && setTransport(v as RealtimeTransport)}
+              aria-labelledby="transport-label"
+              disabled={active}
+              data-testid="transport"
+            >
+              <ToggleGroupItem value="websocket" className="px-3 text-xs" data-testid="transport-websocket">
+                WebSocket
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="webrtc"
+                className="px-3 text-xs"
+                disabled={!webrtcAvailable}
+                title={webrtcReason}
+                data-testid="transport-webrtc"
+              >
+                WebRTC
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <span>
+              {transport === 'webrtc'
+                ? 'Microphone and voice as WebRTC audio tracks, events on a data channel (POST /v1/realtime/calls).'
+                : 'Audio as PCM in Realtime events over WS /v1/realtime.'}
+            </span>
+          </div>
         </Panel>
       )}
 
@@ -105,7 +159,7 @@ function ServerConversation() {
       {state.error && !state.mic && (
         <Alert className="mb-4" variant="destructive" data-testid="conversation-error">
           <Info />
-          <AlertTitle>{state.errorCode === 'engine_unavailable' ? 'The model is not reachable' : 'Error'}</AlertTitle>
+          <AlertTitle>{ERROR_TITLE[state.errorCode ?? ''] ?? 'Error'}</AlertTitle>
           <AlertDescription>{state.error}</AlertDescription>
         </Alert>
       )}
@@ -141,6 +195,19 @@ function ServerConversation() {
           <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground" aria-live="polite">
             <Indicator on={state.userSpeaking} label="You are speaking" idleLabel="You: quiet" />
             <Indicator on={state.agentSpeaking} label="Agent is speaking" idleLabel="Agent: quiet" />
+            {state.transport === 'webrtc' && state.link && (
+              <span
+                className="num"
+                data-testid="webrtc-state"
+                data-connection={state.link.connection}
+                data-heard={state.remoteAudio?.heard ? 'true' : 'false'}
+                data-packets={state.remoteAudio?.packets ?? 0}
+              >
+                WebRTC {state.link.connection} · ICE {state.link.ice} · events {state.link.channel}
+                {state.remoteAudio &&
+                  ` · agent audio ${state.remoteAudio.seconds.toFixed(1)} s${state.remoteAudio.heard ? ', sound received' : ''}`}
+              </span>
+            )}
             {micBlocked && (
               <span className="inline-flex items-center gap-1 text-warning-text">
                 <MicOff className="size-3.5" aria-hidden /> Microphone capture is unavailable here (HTTPS or localhost

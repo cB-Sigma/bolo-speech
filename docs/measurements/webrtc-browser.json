@@ -1,0 +1,105 @@
+{
+ "date": "2026-11-17",
+ "what": "A voice-agent turn over WebRTC in headless Chromium (Playwright) against a real bolo serve: fake microphone -> RTCPeerConnection (Opus) -> bolo (silero-vad, recogniser, language model, voice) -> remote audio track. Times are from the Start click; \"agent_sound\" is the first inbound audio with energy above silence (getStats totalAudioEnergy). The fake microphone loops the sample with 8 s of silence after it, starting when the microphone opens, so the first words may be lost before the call connects and the transcript time includes waiting for the sample to come round again.",
+ "browser": "chromium 153.0.8010.12",
+ "machine": "4 cores of a shared Linux x86-64 VM, no GPU; bolo --threads 2",
+ "chromium_flags": [
+  "--use-fake-ui-for-media-stream",
+  "--use-fake-device-for-media-stream",
+  "--use-file-for-fake-audio-capture=<en-short.wav + 8 s of silence>"
+ ],
+ "microphone": {
+  "sample": "en-short.wav",
+  "text": "Good morning. Could you tell me when my order will arrive?",
+  "silence_after_s": 8
+ },
+ "models": {
+  "stt": "moonshine-tiny-en",
+  "tts": "piper-en-us-amy-low",
+  "vad": "silero-vad",
+  "llm": "fake-llm (server/tests/fake_llm.py: deterministic, echoes the transcript)"
+ },
+ "network": "browser and server on the same machine; no STUN or TURN",
+ "runs": [
+  {
+   "page": "console Conversation page (transport WebRTC)",
+   "connected_ms": 995,
+   "user_transcript_ms": 4997,
+   "agent_text_ms": 5042,
+   "agent_sound_ms": 6537,
+   "user_transcript": "And could you tell me when my order will arrive?",
+   "agent_text": "You said: And could you tell me when my order will arrive?. That is all I heard. Goodbye for now.",
+   "remote_audio": {
+    "packets": 291,
+    "seconds": 5.5
+   },
+   "events_seen": [],
+   "server_trace": {
+    "transport": "webrtc",
+    "status": "ok",
+    "stt_model": "moonshine-tiny-en",
+    "model": "voice-agent",
+    "final_ms": 826,
+    "first_token_ms": 1086,
+    "ttfa_ms": 1972,
+    "total_ms": 2557,
+    "phases": {
+     "decode": 787,
+     "llm_first_token": 210,
+     "synthesize_first": 885,
+     "synthesize_rest": 585
+    }
+   }
+  },
+  {
+   "page": "examples/webrtc_browser.html",
+   "connected_ms": 305,
+   "user_transcript_ms": 4076,
+   "agent_text_ms": 5848,
+   "agent_sound_ms": 4947,
+   "user_transcript": "Good morning. Could you tell me when my order will arise?",
+   "agent_text": "You said: Good morning. Could you tell me when my order will arise?. That is all I heard. Goodbye for now.",
+   "remote_audio": {
+    "packets": 274,
+    "seconds": 5.5
+   },
+   "events_seen": [
+    "conversation.item.added",
+    "conversation.item.done",
+    "conversation.item.input_audio_transcription.completed",
+    "conversation.item.input_audio_transcription.delta",
+    "input_audio_buffer.committed",
+    "input_audio_buffer.speech_started",
+    "input_audio_buffer.speech_stopped",
+    "output_audio_buffer.started",
+    "response.content_part.added",
+    "response.content_part.done",
+    "response.created",
+    "response.done",
+    "response.output_audio.done",
+    "response.output_audio_transcript.delta",
+    "response.output_audio_transcript.done",
+    "response.output_item.added",
+    "response.output_item.done",
+    "session.created"
+   ],
+   "server_trace": {
+    "transport": "webrtc",
+    "status": "ok",
+    "stt_model": "moonshine-tiny-en",
+    "model": "voice-agent",
+    "final_ms": 557,
+    "first_token_ms": 729,
+    "ttfa_ms": 1073,
+    "total_ms": 2042,
+    "phases": {
+     "decode": 528,
+     "llm_first_token": 170,
+     "synthesize_first": 344,
+     "synthesize_rest": 969
+    }
+   }
+  }
+ ],
+ "not_covered": "headed Chrome, Edge, Firefox and Safari; a real microphone and speakers; NAT traversal, TURN, calls across the internet"
+}

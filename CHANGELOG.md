@@ -23,9 +23,6 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   clustering names, plain parameter values and pinned sub-models; anything else is refused before pyannote is
   imported. PixIT's separation model is now part of its pinned, hashed catalog download. pyannote.audio 4's usage
   metrics are off unless `PYANNOTE_METRICS_ENABLED` is set.
-
-### Added
-
 - **`POST /v1/audio/speech/embedding`**, speaches' speaker-embedding route: multipart `file` (and `model`) in, the
   speaker embedding out in the shape of OpenAI's embeddings response. The embedder is the one that scores cloned
   voices (`voice_similarity_model`, else the default diarization model's ERes2Net, 192 numbers); speaches' own model
@@ -58,6 +55,12 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   labels speakers (Soniox) is asked to, instead of cutting the recording at bolo's speaker turns; no local
   diarization model is needed. Naming `diarization_model`, giving known speakers or asking for overlap
   separation still uses bolo's diarizer.
+- **WebRTC from the browser.** The console's Conversation page has a transport switch, WebSocket / WebRTC: with WebRTC
+  the microphone is an `RTCPeerConnection` audio track, the Realtime events travel on the `oai-events` data channel,
+  the agent's voice plays from the remote track, and the page shows the connection, ICE and data-channel states and
+  the audio received. `examples/webrtc_browser.html` does the same in one self-contained page. Tested in headless
+  Chromium against a real `bolo serve` (`npm run e2e:webrtc`, `docs/measurements/webrtc-browser.json`); Chrome and
+  Edge themselves are next.
 
 ## [0.6.6] - 2026-11-17
 

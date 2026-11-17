@@ -7,6 +7,9 @@ Replies are a pure function of the request:
 * otherwise                          -> "You said: <last user text>. That is all I heard. Goodbye for now."
 
 Streaming sends one word per chunk with ``token_delay_s`` between chunks.
+
+Run on its own (``python fake_llm.py --port 8090``) it serves until stopped: the browser WebRTC test
+(ui/e2e-webrtc) points a real ``bolo serve`` at it, so no language model has to be downloaded.
 """
 
 from __future__ import annotations
@@ -19,7 +22,7 @@ from typing import Any
 
 
 class FakeLLM:
-    def __init__(self, token_delay_s: float = 0.01, first_token_delay_s: float = 0.05) -> None:
+    def __init__(self, token_delay_s: float = 0.01, first_token_delay_s: float = 0.05, port: int = 0) -> None:
         self.token_delay_s = token_delay_s
         self.first_token_delay_s = first_token_delay_s
         self.requests: list[dict[str, Any]] = []
@@ -117,7 +120,7 @@ class FakeLLM:
                 except ConnectionError:  # BrokenPipe, ConnectionReset, ConnectionAborted (Windows)
                     pass  # the client cancelled the response
 
-        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", port), Handler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
 
     @staticmethod
@@ -150,3 +153,13 @@ class FakeLLM:
     def stop(self) -> None:
         self.server.shutdown()
         self.thread.join(timeout=5)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="a deterministic OpenAI-compatible chat server for tests")
+    parser.add_argument("--port", type=int, default=8090)
+    server = FakeLLM(port=parser.parse_args().port)
+    print(f"fake language model at {server.url}", flush=True)
+    server.server.serve_forever()

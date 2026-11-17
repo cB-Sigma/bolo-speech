@@ -55,6 +55,9 @@ export interface Capabilities {
     conversation_sessions?: boolean
     pipeline?: string
     pipelines?: Record<string, RealtimePipelineInfo | undefined>
+    transports?: string[]
+    /** `POST /v1/realtime/calls`; `available` is false without the server's `webrtc` extra. */
+    webrtc?: { endpoint?: string; available?: boolean; install?: string | null; ice_servers?: string[] }
     [k: string]: unknown
   }
   llm?: { configured?: boolean; base_url?: string | null; model?: string | null }

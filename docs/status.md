@@ -92,8 +92,9 @@ GPU runs of the catalog models not named above; and cloud providers with real ac
   devices are tested with a faked device; nothing was run on an iPhone or an Android phone.
 - **Home Assistant and browsers.** The Wyoming flows Home Assistant uses were run with the official `wyoming`
   client against a real server with real models, not with Home Assistant itself. The WebRTC transport of the
-  Realtime API is tested with the aiortc library (also with real models), not with Chrome, Firefox or Safari, and
-  not across NAT or a TURN relay. Pipecat and LiveKit Agents were run against bolo, but without a transport in
+  Realtime API is tested with the aiortc library (also with real models) and in headless Chromium against a real
+  server (`docs/measurements/webrtc-browser.json`); not yet in Chrome or Edge themselves (next, on the Windows
+  laptop), nor in Firefox or Safari, and not across NAT or a TURN relay. Pipecat and LiveKit Agents were run against bolo, but without a transport in
   front (a wav file played the caller).
 - **The GPU image, the systemd unit and the Kubernetes manifest.** The CPU image was built and run (health check,
   synthesis, transcription) and CI builds and smoke-tests it on every push; the compose file was run. The systemd

@@ -14,6 +14,7 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "e2e": "playwright test --trace off",
+    "e2e:webrtc": "playwright test --config playwright.webrtc.config.ts --trace off",
     "screenshots": "node scripts/screenshots.mjs",
     "build:demo": "tsc -b && vite build --mode demo",
     "dev:demo": "vite --mode demo",

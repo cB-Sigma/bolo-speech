@@ -1,0 +1,393 @@
+<!doctype html>
+<!--
+  A voice conversation with bolo over WebRTC, in one page with no build step and no dependencies.
+
+  The browser's microphone is the audio track of an SDP offer, the Realtime events travel as JSON on a data
+  channel named "oai-events", and the agent's voice comes back as the answer's audio track: OpenAI's browser
+  flow, against `POST /v1/realtime/calls` (bolo with the `webrtc` extra).
+
+  Open it from a web server on the same machine as the browser (a microphone needs https or localhost):
+      bolo serve --cors-origin http://127.0.0.1:8080 --llm-base-url ... --llm-model ...
+      python -m http.server 8080 --bind 127.0.0.1      (in this folder)
+      then open http://127.0.0.1:8080/webrtc_browser.html
+  or add ?server=http://host:8000 to the URL. The key field takes the server's API key or an ephemeral key
+  from POST /v1/realtime/client_secrets; never put a long-lived key in a page other people load.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>bolo WebRTC call</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fbfbfa;
+        --fg: #1d1d1b;
+        --muted: #6b6b66;
+        --line: #deded8;
+        --accent: #1f6feb;
+        --bad: #c62828;
+        --ok: #2e7d32;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #161615;
+          --fg: #ededea;
+          --muted: #a3a39c;
+          --line: #34342f;
+          --accent: #6ea8fe;
+          --bad: #ef7676;
+          --ok: #7bc47f;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font: 15px/1.5 system-ui, sans-serif;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 24px 16px 48px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 4px;
+      }
+      p.lead {
+        margin: 0 0 20px;
+        color: var(--muted);
+      }
+      form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px 12px;
+        margin-bottom: 16px;
+      }
+      label {
+        display: grid;
+        gap: 3px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      input {
+        font: inherit;
+        padding: 6px 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: transparent;
+        color: var(--fg);
+        min-width: 0;
+      }
+      .buttons {
+        display: flex;
+        gap: 8px;
+        align-items: end;
+      }
+      button {
+        font: inherit;
+        padding: 7px 14px;
+        border-radius: 6px;
+        border: 1px solid var(--accent);
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: transparent;
+        color: var(--fg);
+        border-color: var(--line);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      dl {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 2px 12px;
+        margin: 0 0 16px;
+        font-size: 13px;
+      }
+      dt {
+        color: var(--muted);
+      }
+      dd {
+        margin: 0;
+        font-variant-numeric: tabular-nums;
+      }
+      .error {
+        border: 1px solid var(--bad);
+        color: var(--bad);
+        border-radius: 6px;
+        padding: 8px 10px;
+        margin-bottom: 16px;
+      }
+      .error:empty {
+        display: none;
+      }
+      ol {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 8px;
+      }
+      li {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 10px;
+        max-width: 85%;
+      }
+      li.user {
+        justify-self: end;
+      }
+      li small {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .ok {
+        color: var(--ok);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>bolo WebRTC call</h1>
+      <p class="lead">Microphone in, the agent's voice out, transcripts both ways, over <code>POST /v1/realtime/calls</code>.</p>
+
+      <form id="form">
+        <label>Server <input id="server" autocomplete="url" spellcheck="false" /></label>
+        <label>API key or ephemeral key <input id="key" type="password" autocomplete="off" placeholder="none" /></label>
+        <label>Model <input id="model" value="gpt-realtime" spellcheck="false" /></label>
+        <div class="buttons">
+          <button id="start" type="submit">Start call</button>
+          <button id="stop" type="button" class="secondary" disabled>Hang up</button>
+        </div>
+      </form>
+
+      <div id="error" class="error" role="alert"></div>
+
+      <dl>
+        <dt>Call</dt>
+        <dd id="status" data-testid="status">idle</dd>
+        <dt>Connection</dt>
+        <dd id="connection">-</dd>
+        <dt>ICE</dt>
+        <dd id="ice">-</dd>
+        <dt>Data channel</dt>
+        <dd id="channel">-</dd>
+        <dt>Agent audio</dt>
+        <dd id="audio">-</dd>
+        <dt>Last event</dt>
+        <dd id="event">-</dd>
+      </dl>
+
+      <ol id="turns" aria-live="polite"></ol>
+      <audio id="remote" autoplay></audio>
+    </main>
+
+    <script>
+      'use strict'
+      const $ = (id) => document.getElementById(id)
+      const params = new URLSearchParams(location.search)
+      const sameOrigin = location.protocol.startsWith('http') ? location.origin : 'http://127.0.0.1:8000'
+      $('server').value = params.get('server') || localStorage.getItem('bolo.webrtc.server') || sameOrigin
+
+      // What a test (or the console) can read: every event type, the transcripts and the audio received.
+      const call = (window.boloCall = { state: 'idle', events: [], user: [], assistant: [], audio: null, error: null })
+      let pc = null
+      let mic = null
+      let location_ = null
+      let statsTimer = null
+
+      function setStatus(text) {
+        call.state = text
+        $('status').textContent = text
+      }
+      function fail(message) {
+        call.error = message
+        $('error').textContent = message
+        setStatus('error')
+        void hangUp(false)
+      }
+      function turn(role, id) {
+        let li = document.querySelector(`li[data-id="${CSS.escape(role + ':' + id)}"]`)
+        if (!li) {
+          li = document.createElement('li')
+          li.className = role
+          li.dataset.id = role + ':' + id
+          li.dataset.testid = role === 'user' ? 'user-turn' : 'agent-turn'
+          li.innerHTML = `<small>${role === 'user' ? 'You' : 'Agent'}</small><span></span>`
+          $('turns').append(li)
+        }
+        return li.querySelector('span')
+      }
+
+      function onEvent(ev) {
+        call.events.push(ev.type)
+        $('event').textContent = ev.type
+        switch (ev.type) {
+          case 'conversation.item.input_audio_transcription.delta':
+            turn('user', ev.item_id).textContent += ev.delta || ''
+            break
+          case 'conversation.item.input_audio_transcription.completed':
+            turn('user', ev.item_id).textContent = ev.transcript || ''
+            call.user.push(ev.transcript || '')
+            break
+          case 'response.output_audio_transcript.delta':
+          case 'response.output_text.delta':
+            turn('assistant', ev.response_id).textContent += ev.delta || ''
+            break
+          case 'response.output_audio_transcript.done':
+          case 'response.output_text.done':
+            turn('assistant', ev.response_id).textContent = ev.transcript || ev.text || ''
+            call.assistant.push(ev.transcript || ev.text || '')
+            break
+          case 'error':
+            $('error').textContent = (ev.error && ev.error.message) || 'The server reported an error.'
+            break
+        }
+      }
+
+      async function pollStats() {
+        if (!pc) return
+        const stats = await pc.getStats()
+        stats.forEach((s) => {
+          if (s.type === 'inbound-rtp' && s.kind === 'audio') {
+            call.audio = {
+              packets: s.packetsReceived || 0,
+              samples: s.totalSamplesReceived || 0,
+              energy: s.totalAudioEnergy || 0,
+              seconds: s.totalSamplesDuration || 0,
+              level: s.audioLevel || 0,
+            }
+            const heard = call.audio.energy > 1e-4 ? 'sound received' : 'silence so far'
+            $('audio').textContent = `${call.audio.packets} packets, ${call.audio.seconds.toFixed(1)} s, ${heard}`
+          }
+        })
+      }
+
+      // Waits until the browser has gathered its ICE candidates (or 3 s), so the offer carries them: bolo does not
+      // take candidates trickled in later.
+      function gathered(peer) {
+        if (peer.iceGatheringState === 'complete') return Promise.resolve()
+        return new Promise((resolve) => {
+          const done = () => {
+            if (peer.iceGatheringState === 'complete') {
+              peer.removeEventListener('icegatheringstatechange', done)
+              resolve()
+            }
+          }
+          peer.addEventListener('icegatheringstatechange', done)
+          setTimeout(resolve, 3000)
+        })
+      }
+
+      async function startCall() {
+        const server = $('server').value.trim().replace(/\/+$/, '')
+        const key = $('key').value.trim()
+        localStorage.setItem('bolo.webrtc.server', server)
+        $('error').textContent = ''
+        call.events.length = call.user.length = call.assistant.length = 0
+        call.error = null
+        $('turns').textContent = ''
+        $('start').disabled = true
+        $('stop').disabled = false
+        setStatus('opening the microphone')
+        try {
+          mic = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          })
+        } catch (err) {
+          return fail(`Could not open the microphone: ${err.message || err.name}. Allow it for this page and retry.`)
+        }
+        pc = new RTCPeerConnection()
+        pc.addEventListener('connectionstatechange', () => {
+          $('connection').textContent = pc.connectionState
+          if (pc.connectionState === 'connected') setStatus('live')
+          if (pc.connectionState === 'failed') fail('The connection failed: the browser and the server could not reach each other (see the ICE row).')
+        })
+        pc.addEventListener('iceconnectionstatechange', () => ($('ice').textContent = pc.iceConnectionState))
+        pc.addEventListener('track', (e) => {
+          $('remote').srcObject = e.streams[0] || new MediaStream([e.track])
+          void $('remote').play().catch(() => undefined)
+        })
+        pc.addTrack(mic.getAudioTracks()[0], mic)
+        const channel = pc.createDataChannel('oai-events')
+        channel.addEventListener('open', () => ($('channel').textContent = 'open'))
+        channel.addEventListener('close', () => ($('channel').textContent = 'closed'))
+        channel.addEventListener('message', (e) => {
+          try {
+            onEvent(JSON.parse(e.data))
+          } catch {
+            /* not JSON: ignored */
+          }
+        })
+        setStatus('connecting')
+        try {
+          await pc.setLocalDescription(await pc.createOffer())
+          await gathered(pc)
+          const headers = { 'Content-Type': 'application/sdp' }
+          if (key) headers.Authorization = `Bearer ${key}`
+          const model = encodeURIComponent($('model').value.trim() || 'gpt-realtime')
+          const resp = await fetch(`${server}/v1/realtime/calls?model=${model}`, {
+            method: 'POST',
+            body: pc.localDescription.sdp,
+            headers,
+          })
+          const body = await resp.text()
+          if (!resp.ok) {
+            let message = body
+            try {
+              message = JSON.parse(body).error.message
+            } catch {
+              /* plain text */
+            }
+            return fail(`The server answered ${resp.status}: ${message}`)
+          }
+          location_ = new URL(resp.headers.get('Location') || '', server + '/').toString()
+          await pc.setRemoteDescription({ type: 'answer', sdp: body })
+        } catch (err) {
+          return fail(
+            `Could not reach ${server}: ${err.message || err}. Is bolo running there, with the webrtc extra, ` +
+              `and does it allow this page's origin (--cors-origin ${location.origin})?`,
+          )
+        }
+        statsTimer = setInterval(() => void pollStats(), 500)
+      }
+
+      async function hangUp(byUser = true) {
+        clearInterval(statsTimer)
+        statsTimer = null
+        if (pc) await pollStats().catch(() => undefined)
+        const key = $('key').value.trim()
+        if (location_ && byUser) {
+          await fetch(`${location_.replace(/\/$/, '')}/hangup`, {
+            method: 'POST',
+            headers: key ? { Authorization: `Bearer ${key}` } : {},
+          }).catch(() => undefined)
+        }
+        location_ = null
+        mic?.getTracks().forEach((t) => t.stop())
+        mic = null
+        pc?.close()
+        pc = null
+        $('start').disabled = false
+        $('stop').disabled = true
+        if (byUser) setStatus('ended')
+      }
+
+      $('form').addEventListener('submit', (e) => {
+        e.preventDefault()
+        void startCall()
+      })
+      $('stop').addEventListener('click', () => void hangUp(true))
+    </script>
+  </body>
+</html>

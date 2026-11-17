@@ -8,17 +8,25 @@ import { diag } from '@/lib/diagnostics'
 import type { MicFailure } from '@/lib/mic-help'
 import { MicrophoneError } from '@/lib/audio/capture'
 import { Store } from '@/lib/store'
+import { WebRtcLink, type LinkState, type RemoteAudio } from './webrtc'
 
 /**
- * A voice conversation over bolo's OpenAI Realtime endpoint (`WS /v1/realtime`):
- * microphone in as 24 kHz PCM16, the agent's voice out, transcripts both ways.
- * The pipeline (`session.pipeline`, a bolo extension) is sent before any audio
- * and cannot change afterwards, so it is fixed for the life of a session.
+ * A voice conversation over bolo's OpenAI Realtime endpoint, on one of two transports:
+ *
+ * - `websocket` (`WS /v1/realtime`): microphone in as 24 kHz PCM16 in `input_audio_buffer.append`
+ *   events, the agent's voice out as `response.output_audio.delta` events;
+ * - `webrtc` (`POST /v1/realtime/calls`, OpenAI's browser flow): the microphone is a WebRTC audio
+ *   track, the voice comes back on the answer's track, the events travel on a data channel (./webrtc.ts).
+ *
+ * Transcripts arrive both ways on either. The pipeline (`session.pipeline`, a bolo extension) is sent
+ * before any audio and cannot change afterwards, so it is fixed for the life of a session.
  */
 
 export const REALTIME_RATE = 24000
 
 export type ConversationStatus = 'idle' | 'starting' | 'live' | 'ended' | 'error'
+
+export type RealtimeTransport = 'websocket' | 'webrtc'
 
 export interface Turn {
   /** Conversation item id (user) or response id (assistant). */
@@ -35,6 +43,11 @@ export interface Turn {
 export interface ConversationState {
   status: ConversationStatus
   pipeline: PipelineId
+  transport: RealtimeTransport
+  /** WebRTC: the peer connection, ICE and data channel states. */
+  link: LinkState | null
+  /** WebRTC: what has arrived on the agent's audio track. */
+  remoteAudio: RemoteAudio | null
   /** True once audio has gone to the server: the pipeline can no longer change. */
   locked: boolean
   /** What the server says the session uses (from `session.created` / `session.updated`). */
@@ -49,9 +62,15 @@ export interface ConversationState {
   events: string[]
 }
 
-export const emptyConversation = (pipeline: PipelineId = 'cascade'): ConversationState => ({
+export const emptyConversation = (
+  pipeline: PipelineId = 'cascade',
+  transport: RealtimeTransport = 'websocket',
+): ConversationState => ({
   status: 'idle',
   pipeline,
+  transport,
+  link: null,
+  remoteAudio: null,
   locked: false,
   serverPipeline: null,
   turns: [],
@@ -63,23 +82,27 @@ export const emptyConversation = (pipeline: PipelineId = 'cascade'): Conversatio
   events: [],
 })
 
-/** The `session.update` the console sends first. */
-export function sessionUpdate(pipeline: PipelineId, voice?: string): Record<string, unknown> {
-  const output: Record<string, unknown> = { format: { type: 'audio/pcm', rate: REALTIME_RATE } }
+/**
+ * The `session.update` the console sends first. Over WebRTC the audio travels on tracks (Opus), so no
+ * audio formats are named; the same session object goes with the SDP offer instead.
+ */
+export function sessionUpdate(
+  pipeline: PipelineId,
+  voice?: string,
+  transport: RealtimeTransport = 'websocket',
+): Record<string, unknown> & { session: Record<string, unknown> } {
+  const pcm = transport === 'websocket'
+  const format = { type: 'audio/pcm', rate: REALTIME_RATE }
+  const output: Record<string, unknown> = pcm ? { format } : {}
   if (voice) output.voice = voice
+  const turn_detection = { type: 'server_vad' }
   return {
     type: 'session.update',
     session: {
       type: 'realtime',
       pipeline,
       output_modalities: ['audio'],
-      audio: {
-        input: {
-          format: { type: 'audio/pcm', rate: REALTIME_RATE },
-          turn_detection: { type: 'server_vad' },
-        },
-        output,
-      },
+      audio: { input: pcm ? { format, turn_detection } : { turn_detection }, output },
     },
   }
 }
@@ -112,6 +135,12 @@ export function applyEvent(s: ConversationState, ev: Ev): ConversationState {
       return { ...s, events, userSpeaking: true, agentSpeaking: false }
     case 'input_audio_buffer.speech_stopped':
       return { ...s, events, userSpeaking: false }
+    // WebRTC: what the agent's audio track is doing
+    case 'output_audio_buffer.started':
+      return { ...s, events, agentSpeaking: true }
+    case 'output_audio_buffer.stopped':
+    case 'output_audio_buffer.cleared':
+      return { ...s, events, agentSpeaking: false }
     case 'conversation.item.input_audio_transcription.delta': {
       const id = str(ev.item_id)
       return {
@@ -202,6 +231,7 @@ export function decodeAudioDelta(b64: string): Float32Array {
 export class ConversationSession {
   readonly store: Store<ConversationState>
   private ws: WebSocket | null = null
+  private rtc: WebRtcLink | null = null
   private mic: AudioSource | null = null
   private ctx: AudioContext | null = null
   private player: GaplessPlayer | null = null
@@ -212,8 +242,8 @@ export class ConversationSession {
   private speechStoppedAt: number | null = null
   private answered = new Set<string>()
 
-  constructor(pipeline: PipelineId) {
-    this.store = new Store(emptyConversation(pipeline))
+  constructor(pipeline: PipelineId, transport: RealtimeTransport = 'websocket') {
+    this.store = new Store(emptyConversation(pipeline, transport))
   }
 
   /** Choose the pipeline. Refused (returns false) once audio has gone out. */
@@ -230,8 +260,9 @@ export class ConversationSession {
    */
   start(opts: { voice?: string } = {}): Promise<void> {
     if (this.closed) return Promise.resolve()
-    const { pipeline } = this.store.get()
+    const { pipeline, transport } = this.store.get()
     this.store.patch({ status: 'starting', error: null, errorCode: null, mic: null })
+    if (transport === 'webrtc') return this.startWebRtc(pipeline, opts.voice)
     let micPromise: Promise<AudioSource>
     try {
       micPromise = openMicrophone((block) => this.onBlock(block))
@@ -257,6 +288,23 @@ export class ConversationSession {
         this.fail(err instanceof Error ? err.message : 'Could not open the microphone.', null, failure)
       },
     )
+  }
+
+  private startWebRtc(pipeline: PipelineId, voice?: string): Promise<void> {
+    diag.event('conversation', `start, pipeline=${pipeline}, transport=webrtc`)
+    const link = new WebRtcLink({
+      onEvent: (ev) => this.onEvent(ev),
+      onLink: (l) => this.store.patch({ link: l }),
+      onAudio: (audio) => this.store.patch({ remoteAudio: audio }),
+      onConnected: () => {
+        diag.event('conversation', 'webrtc connected')
+        // the configuration went with the offer: audio flows from here on and the pipeline is fixed
+        if (this.store.get().status === 'starting') this.store.patch({ status: 'live', locked: true })
+      },
+      onFail: (message, code, mic) => this.fail(message, code ?? null, mic ?? null),
+    })
+    this.rtc = link
+    return link.start(sessionUpdate(pipeline, voice, 'webrtc').session)
   }
 
   private openSocket(pipeline: PipelineId, voice?: string): void {
@@ -308,6 +356,15 @@ export class ConversationSession {
     }
     if (ev.type === 'input_audio_buffer.speech_stopped') this.speechStoppedAt = performance.now()
     let next = applyEvent(before, ev)
+    if (ev.type === 'output_audio_buffer.started') {
+      // WebRTC: the answer's first audio is on the track now
+      const id = typeof ev.response_id === 'string' ? ev.response_id : ''
+      if (id && !this.answered.has(id)) {
+        this.answered.add(id)
+        const ms = this.speechStoppedAt != null ? performance.now() - this.speechStoppedAt : null
+        next = { ...next, turns: upsert(next.turns, id, 'assistant', (t) => ({ ...t, firstAudioMs: ms })) }
+      }
+    }
     if (ev.type === 'response.output_audio.delta' && typeof ev.delta === 'string') {
       this.player?.enqueue(decodeAudioDelta(ev.delta), REALTIME_RATE)
       const id = typeof ev.response_id === 'string' ? ev.response_id : ''
@@ -350,6 +407,9 @@ export class ConversationSession {
     const ws = this.ws
     this.ws = null
     if (ws && ws.readyState <= 1) ws.close(1000)
+    const rtc = this.rtc
+    this.rtc = null
+    await rtc?.close()
     const mic = this.mic
     this.mic = null
     await mic?.stop().catch(() => undefined)

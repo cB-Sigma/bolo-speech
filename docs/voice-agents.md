@@ -412,13 +412,37 @@ network, or a server with a public address. bolo does not include a TURN
 relay. `GET /api/v1/info` reports the transport under
 `capabilities.realtime.webrtc`.
 
+Send the offer once the browser has gathered its ICE candidates (wait for
+`iceGatheringState === "complete"`, a few hundred milliseconds on a local
+network; bolo takes no candidates trickled in later). Chrome hides the
+machine's address behind an mDNS name (`….local`) until the page has
+microphone permission; bolo cannot always resolve those names, but it learns
+the browser's address from the first connectivity check, so the call
+connects anyway on the same machine or network.
+
+**In a browser.** The console's Conversation page has a transport switch,
+*WebSocket / WebRTC*: with WebRTC the microphone and the agent's voice are
+WebRTC audio tracks, the events go over the data channel, and the page shows
+the connection, ICE and data-channel states and how much of the agent's
+audio has arrived. `examples/webrtc_browser.html` is the same flow as one
+self-contained page (no build, no dependencies) to copy into your own
+front end.
+
 What was run: the test-suite drives calls with a real aiortc peer (Opus in
 both directions, data channel, barge-in, ephemeral keys). With real models
 (`moonshine-tiny-en`, a Piper voice, `qwen2.5:0.5b` behind Ollama) three
 turns completed over WebRTC and the reply, recorded from the incoming Opus
 track and transcribed again, matched the reply text with a word error rate of
-0, 0.18 and 0 (`docs/measurements/webrtc-real-models.json`). **No browser
-was used**: Chrome, Firefox and Safari are untested, as are NAT traversal,
+0, 0.18 and 0 (`docs/measurements/webrtc-real-models.json`). **Tested in
+headless Chromium** (Playwright, `npm run e2e:webrtc` in `ui/`): Chromium's
+fake microphone played bolo's `en-short` sample into a real `bolo serve`
+(`moonshine-tiny-en`, `piper-en-us-amy-low`, a scripted stand-in language
+model), once through the console page and once through the example page; in
+both the call connected (0.3 to 1.0 s after the click), the transcript of the
+sample came back on the data channel and the answer arrived as sound on the
+remote track (`docs/measurements/webrtc-browser.json`). **Real browsers are
+still pending**: Chrome and Edge on the Windows laptop are next; Firefox and
+Safari are untested, as are a real microphone and speakers, NAT traversal,
 TURN and calls across the internet. OpenAI's SIP connector for Realtime
 sessions (`sip:...@sip.api.openai.com`) is not implemented; phone calls have
 their own path, below.

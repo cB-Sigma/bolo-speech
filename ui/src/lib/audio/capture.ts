@@ -40,12 +40,25 @@ const SHORT_MESSAGE: Record<MicFailureKind, string> = {
   failed: 'Could not open the microphone.',
 }
 
-function classify(name: string, detail: string): MicFailureKind {
+export function classify(name: string, detail: string): MicFailureKind {
   if (name === 'NotAllowedError' || name === 'SecurityError' || name === 'PermissionDeniedError')
     return /dismiss/i.test(detail) ? 'dismissed' : 'denied'
   if (name === 'NotFoundError' || name === 'OverconstrainedError' || name === 'DevicesNotFoundError') return 'missing'
   if (name === 'NotReadableError' || name === 'AbortError' || name === 'TrackStartError') return 'busy'
   return 'failed'
+}
+
+/** The MicrophoneError for a failed `getUserMedia` (asked at `asked`, from `performance.now()`). */
+export async function microphoneError(err: unknown, asked: number): Promise<MicrophoneError> {
+  const name = err instanceof Error ? err.name : ''
+  const detail = err instanceof Error ? err.message : String(err)
+  const kind = classify(name, detail)
+  return new MicrophoneError(kind, SHORT_MESSAGE[kind], {
+    name,
+    detail,
+    elapsedMs: performance.now() - asked,
+    permission: await microphonePermission(),
+  })
 }
 
 /**
@@ -98,15 +111,7 @@ async function finishOpening(
     stream = await streamPromise
   } catch (err) {
     void ctx?.close().catch(() => undefined)
-    const name = err instanceof Error ? err.name : ''
-    const detail = err instanceof Error ? err.message : String(err)
-    const kind = classify(name, detail)
-    throw new MicrophoneError(kind, SHORT_MESSAGE[kind], {
-      name,
-      detail,
-      elapsedMs: performance.now() - asked,
-      permission: await microphonePermission(),
-    })
+    throw await microphoneError(err, asked)
   }
   const fail = (err: unknown, fallback: string): MicrophoneError => {
     stream.getTracks().forEach((t) => t.stop())
