@@ -9,10 +9,17 @@ Untested by the maintainers in this release.
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import Any
 
 from bolo.engines.base import Engine, EngineStatus, LoadOptions, Model, Segment, STTModel, STTRequest, STTResult
+
+#: whisper.cpp parameters bolo sets per request; each call passes all of them (see WhisperCppSTT.__init__)
+_PER_REQUEST = (
+    "language", "initial_prompt", "translate", "temperature", "no_context", "temperature_inc", "logprob_thold",
+    "no_speech_thold",
+)  # fmt: skip
 
 
 class WhisperCppSTT(STTModel):
@@ -33,11 +40,21 @@ class WhisperCppSTT(STTModel):
         if not files:
             raise FileNotFoundError(f"no ggml model (*.bin) in {path}")
         self.model = CppModel(str(files[0]), n_threads=opts.threads, print_progress=False, print_realtime=False)
+        # pywhispercpp keeps every parameter given to transcribe() for all later calls: a request's language, prompt
+        # or option would carry over to the next request. Each call sets all of these, from the model's own
+        # defaults read here unless the request gives one, under a lock (the parameters belong to the model object)
+        current = self.model.get_params()
+        self._defaults: dict[str, Any] = {k: current[k] for k in _PER_REQUEST if k in current}
+        self._lock = threading.Lock()
 
     def transcribe(self, requests: list[STTRequest]) -> list[STTResult]:
         out: list[STTResult] = []
         for r in requests:
-            kwargs: dict[str, Any] = {"translate": r.task == "translate"}
+            kwargs: dict[str, Any] = {
+                **self._defaults,
+                "translate": r.task == "translate",
+                "temperature": r.temperature,
+            }
             if r.language:
                 kwargs["language"] = r.language.split("-")[0]
             if r.prompt:
@@ -52,9 +69,10 @@ class WhisperCppSTT(STTModel):
             ):
                 if opts.get(name) is not None:
                     kwargs[param] = float(opts[name])
-            segs = self.model.transcribe(r.samples, **kwargs)
+            with self._lock:
+                segs = self.model.transcribe(r.samples, **kwargs)
             segments = [Segment(s.t0 / 100.0, s.t1 / 100.0, s.text.strip()) for s in segs if s.text.strip()]
-            out.append(STTResult(" ".join(s.text for s in segments), r.language, segments))
+            out.append(STTResult(" ".join(s.text for s in segments), str(kwargs["language"] or "") or None, segments))
         return out
 
 
