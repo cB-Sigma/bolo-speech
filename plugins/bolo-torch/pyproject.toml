@@ -60,6 +60,9 @@ pyannote = ["pyannote.audio[separation]>=3.3.2"]
 # DiCoW (diarization-conditioned Whisper, BUT-FIT). Its model code is written for transformers 4.55 and imports
 # pandas. Cannot share an environment with the `parler` extra (transformers 4.46.1).
 dicow = ["transformers>=4.55.0,<4.56", "pandas"]
+# Demucs denoiser (facebookresearch/denoiser; code and weights CC-BY-NC-4.0, not for commercial use). Only its model
+# class is used: `pip install --no-deps denoiser julius` avoids the training dependencies (hydra 0.11, sounddevice)
+demucs-denoiser = ["denoiser>=0.1.5", "julius"]
 dev = ["pytest>=8", "pytest-timeout>=2.3", "ruff>=0.8", "mypy>=1.13", "build", "twine"]
 
 [project.scripts]

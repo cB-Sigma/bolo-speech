@@ -28,6 +28,7 @@ LOADERS: dict[str, tuple[str, str]] = {
     "pixit": ("bolo_torch.models.separation", "load_pixit"),
     "dicow": ("bolo_torch.models.dicow", "load"),
     "pyannote-diarization": ("bolo_torch.models.diarization", "load"),
+    "demucs-denoiser": ("bolo_torch.models.denoise", "load_demucs"),
 }
 #: kinds the catalog lists for this plugin that are not implemented yet
 NOT_IMPLEMENTED = {
@@ -36,6 +37,8 @@ NOT_IMPLEMENTED = {
     "diarizen": "DiariZen diarization (no packaged inference code)",
     "spark-tts": "Spark-TTS (no packaged inference code)",
     "maskgct": "MaskGCT (no packaged inference code)",
+    "clearvoice": "ClearVoice speech enhancement (FRCRN, MossFormer2, MossFormerGAN)",
+    "resemble-enhance": "Resemble Enhance",
 }
 
 

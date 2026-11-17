@@ -40,8 +40,10 @@ from numpy.typing import NDArray
 
 from bolo.audio.codecs import decode_frame
 from bolo.audio.resample import StreamResampler
+from bolo.denoise import DenoiseOptions, LiveDenoiser
 from bolo.diarize import OnlineSpeakerLabeler, speaker_label
 from bolo.engines.base import (
+    DenoiseModel,
     FloatArray,
     StreamResult,
     STTModel,
@@ -111,6 +113,8 @@ class SessionConfig:
     endpoint_ms: float | None = None  # trailing silence that ends an utterance; None: the server default
     diarize: bool = False  # label every final with a speaker (one speaker per utterance)
     max_speakers: int | None = None
+    #: ``denoise`` of the stream (bolo.denoise); None: the model's pin, its catalog option and the server setting
+    denoise: DenoiseOptions | None = None
 
 
 class STTSession:
@@ -143,6 +147,10 @@ class STTSession:
         #: these are how its Whisper options and the repetition guard are set
         self.decode_options = core.decode_options(self.spec)
         self.guard = RepeatGuard(int(self.decode_options.get("max_repeats", DEFAULT_MAX_REPEATS)))
+        #: the denoiser the stream runs before recognition (bolo.denoise.LiveDenoiser), or None
+        self.denoise_plan = core.denoise_plan(self.spec, config.denoise)
+        self._live: LiveDenoiser | None = None
+        self._denoise_info: dict[str, Any] | None = None
 
     # -- public API -------------------------------------------------------
     async def start(self) -> None:
@@ -216,6 +224,8 @@ class STTSession:
                 else:
                     proc = _PseudoProcessor(self, entry, stt, detector)
                 resampler = StreamResampler(self.cfg.sample_rate, SR)
+                if self.denoise_plan is not None:
+                    await self._start_denoiser(stack)
                 await self._send(
                     {
                         "type": "ready",
@@ -227,6 +237,7 @@ class STTSession:
                         "vad": vad_name,
                         "endpoint_ms": round(endpoint_ms),
                         "diarization": self._diarizer.id if self._diarizer else None,
+                        "denoise": self._denoise_info,
                     }
                 )
                 trace.restart()
@@ -255,12 +266,15 @@ class STTSession:
                         t_res = trace.now()
                         samples = resampler.process(decode_frame(data, self.cfg.encoding))
                         trace.add_phase("resample", t_res, trace.now())
+                        samples = await self._denoised(samples)
                         if len(samples):
                             pos += len(samples)
                             await proc.audio(samples, last_recv)
                     if flush or stopping:
                         if stopping:
-                            tail = resampler.process(np.zeros(0, dtype=np.float32), last=True)
+                            tail = await self._denoised(resampler.process(np.zeros(0, dtype=np.float32), last=True))
+                            if self._live is not None:
+                                tail = np.concatenate([tail, self._live.finish()])
                             if len(tail):
                                 pos += len(tail)
                                 await proc.audio(tail, time.perf_counter())
@@ -298,6 +312,8 @@ class STTSession:
                 trace.text_preview = preview(text)
                 trace.chars = len(text)
             trace.extra["utterances"] = self.utterances
+            if self._denoise_info is not None:
+                trace.extra["denoise"] = {**self._denoise_info, **(self._live.summary() if self._live else {})}
             trace.compact()
             trace.finish(status, error)
             if trace.audio_seconds:
@@ -305,6 +321,40 @@ class STTSession:
             core.traces.record(trace, observe=False)
             if trace.rtf is not None and status == "ok":
                 core.traces.observe_latency(self.spec.id, "stt", rtf=trace.rtf)
+
+    # -- denoising ---------------------------------------------------------
+    async def _start_denoiser(self, stack: contextlib.AsyncExitStack) -> None:
+        """Load the stream's denoiser. One that cannot run live (a cloud API) or cannot load is skipped, said in
+        ``ready.denoise``; the stream goes on with the original audio, as a transcription request does."""
+        plan = self.denoise_plan
+        assert plan is not None and plan.model is not None
+        info: dict[str, Any] = {"model": plan.model, "strength": plan.strength, "status": "applied"}
+        self._denoise_info = info
+        try:
+            entry = await stack.enter_async_context(self.core.manager.use(plan.model))
+            model = entry.model
+            assert isinstance(model, DenoiseModel)
+            if not model.live:
+                raise InvalidRequest(f"'{plan.model}' enhances whole recordings only, not live streams")
+            self._live = await asyncio.to_thread(LiveDenoiser, model, SR, plan.strength)
+            info.update(sample_rate=model.sample_rate, stateful=self._live.stream.stateful)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            detail = exc.message if isinstance(exc, BoloError) else f"{type(exc).__name__}: {exc}"
+            info.update(status="skipped", detail=detail)
+            log.warning("live denoising with '%s' skipped, the original audio is used: %s", plan.model, detail)
+
+    async def _denoised(self, samples: FloatArray) -> FloatArray:
+        live = self._live
+        if live is None or not len(samples):
+            return samples
+        trace = self.trace
+        assert trace is not None
+        t0 = trace.now()
+        out = await asyncio.to_thread(live.process, samples)
+        trace.add_phase("denoise", t0, trace.now())
+        return out
 
     # -- speaker labels ----------------------------------------------------
     @contextlib.asynccontextmanager
@@ -461,6 +511,7 @@ class STTSession:
                 "audio_seconds": round(seconds, 3),
                 "rtf": round(rtf, 4) if rtf is not None else None,
                 "queue_ms": round(queue, 1),
+                **({"denoise": self._live.summary()} if self._live is not None else {}),
             }
         )
 

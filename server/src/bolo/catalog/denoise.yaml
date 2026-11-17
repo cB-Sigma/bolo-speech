@@ -40,3 +40,534 @@
       sha256: e77603ac0c23dac3227dd2d7135b3a585cbee2679048aecfa886657d3ae1b534
   options:
     model: gtcrn_simple.onnx
+
+- id: dpdfnet-baseline
+  task: denoise
+  engine: sherpa-onnx
+  kind: dpdfnet
+  family: DPDFNet
+  languages: []
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 8722707
+  params: 2310000
+  license: Apache-2.0
+  license_url: https://huggingface.co/Ceva-IP/DPDFNet
+  description: 'DPDFNet (Ceva, 2025), DeepFilterNet with dual-path recurrent blocks: the smallest and fastest DPDFNet (0.36 GMACs per second of audio). Causal, one ONNX graph
+    that sherpa-onnx runs at 16 kHz; other rates are resampled to it and back. Trained by its authors for noise
+    suppression in speech; option attenuation_limit_db caps how much noise it removes (0: no cap).'
+  source_url: https://github.com/ceva-ip/DPDFNet
+  validated: untested
+  source:
+    urls:
+    - path: baseline.onnx
+      url: https://huggingface.co/Ceva-IP/DPDFNet/resolve/dd6818d00f50c836fed43a6243ebe49116de5964/onnx/baseline.onnx
+      size: 8722707
+      sha256: 371d26182aff0e1e0d31354e24c81f79cd57458f5a7dd003fc10a7ebf64255e0
+  options:
+    model: baseline.onnx
+
+- id: dpdfnet2
+  task: denoise
+  engine: sherpa-onnx
+  kind: dpdfnet
+  family: DPDFNet
+  languages: []
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 10178747
+  params: 2490000
+  license: Apache-2.0
+  license_url: https://huggingface.co/Ceva-IP/DPDFNet
+  description: 'DPDFNet (Ceva, 2025), DeepFilterNet with dual-path recurrent blocks: two dual-path blocks (1.35 GMACs per second), the authors'' pick for real time and embedded use. Causal, one ONNX graph
+    that sherpa-onnx runs at 16 kHz; other rates are resampled to it and back. Trained by its authors for noise
+    suppression in speech; option attenuation_limit_db caps how much noise it removes (0: no cap).'
+  source_url: https://github.com/ceva-ip/DPDFNet
+  validated: untested
+  source:
+    urls:
+    - path: dpdfnet2.onnx
+      url: https://huggingface.co/Ceva-IP/DPDFNet/resolve/dd6818d00f50c836fed43a6243ebe49116de5964/onnx/dpdfnet2.onnx
+      size: 10178747
+      sha256: 4f0ee28935b4a32abecc717d745416976565834d839601acf43031094b4dc94c
+  options:
+    model: dpdfnet2.onnx
+
+- id: dpdfnet4
+  task: denoise
+  engine: sherpa-onnx
+  kind: dpdfnet
+  family: DPDFNet
+  languages: []
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 11633337
+  params: 2840000
+  license: Apache-2.0
+  license_url: https://huggingface.co/Ceva-IP/DPDFNet
+  description: 'DPDFNet (Ceva, 2025), DeepFilterNet with dual-path recurrent blocks: four dual-path blocks (2.36 GMACs per second). Causal, one ONNX graph
+    that sherpa-onnx runs at 16 kHz; other rates are resampled to it and back. Trained by its authors for noise
+    suppression in speech; option attenuation_limit_db caps how much noise it removes (0: no cap).'
+  source_url: https://github.com/ceva-ip/DPDFNet
+  validated: untested
+  source:
+    urls:
+    - path: dpdfnet4.onnx
+      url: https://huggingface.co/Ceva-IP/DPDFNet/resolve/dd6818d00f50c836fed43a6243ebe49116de5964/onnx/dpdfnet4.onnx
+      size: 11633337
+      sha256: 42a386d3601922f474c4309927e1f471cce422e9bd8e3fd3967bb943bac36c01
+  options:
+    model: dpdfnet4.onnx
+
+- id: dpdfnet8
+  task: denoise
+  engine: sherpa-onnx
+  kind: dpdfnet
+  family: DPDFNet
+  languages: []
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 14542517
+  params: 3540000
+  license: Apache-2.0
+  license_url: https://huggingface.co/Ceva-IP/DPDFNet
+  description: 'DPDFNet (Ceva, 2025), DeepFilterNet with dual-path recurrent blocks: eight dual-path blocks (4.37 GMACs per second), the best of the 16 kHz models. Causal, one ONNX graph
+    that sherpa-onnx runs at 16 kHz; other rates are resampled to it and back. Trained by its authors for noise
+    suppression in speech; option attenuation_limit_db caps how much noise it removes (0: no cap).'
+  source_url: https://github.com/ceva-ip/DPDFNet
+  validated: untested
+  source:
+    urls:
+    - path: dpdfnet8.onnx
+      url: https://huggingface.co/Ceva-IP/DPDFNet/resolve/dd6818d00f50c836fed43a6243ebe49116de5964/onnx/dpdfnet8.onnx
+      size: 14542517
+      sha256: 899d4f23f3ff86edbffa8c537e4bcbdc49da1b4e84e0ef390611e0604a3b26cb
+  options:
+    model: dpdfnet8.onnx
+
+- id: dpdfnet2-48k
+  task: denoise
+  engine: sherpa-onnx
+  kind: dpdfnet
+  family: DPDFNet
+  languages: []
+  tier: balanced
+  sample_rate: 48000
+  size_bytes: 10493337
+  params: 2580000
+  license: Apache-2.0
+  license_url: https://huggingface.co/Ceva-IP/DPDFNet
+  description: 'DPDFNet (Ceva, 2025), DeepFilterNet with dual-path recurrent blocks: full band (48 kHz, high resolution), two dual-path blocks (2.42 GMACs per second). Causal, one ONNX graph
+    that sherpa-onnx runs at 48 kHz; other rates are resampled to it and back. Trained by its authors for noise
+    suppression in speech; option attenuation_limit_db caps how much noise it removes (0: no cap).'
+  source_url: https://github.com/ceva-ip/DPDFNet
+  validated: untested
+  source:
+    urls:
+    - path: dpdfnet2_48khz_hr.onnx
+      url: https://huggingface.co/Ceva-IP/DPDFNet/resolve/dd6818d00f50c836fed43a6243ebe49116de5964/onnx/dpdfnet2_48khz_hr.onnx
+      size: 10493337
+      sha256: 7f0575a5cec0ba4ffd8f8bd657e06d007e4ccdd955d76faab922b9d3291dc14b
+  options:
+    model: dpdfnet2_48khz_hr.onnx
+
+- id: dpdfnet8-48k
+  task: denoise
+  engine: sherpa-onnx
+  kind: dpdfnet
+  family: DPDFNet
+  languages: []
+  tier: accuracy
+  sample_rate: 48000
+  size_bytes: 14857107
+  params: 3630000
+  license: Apache-2.0
+  license_url: https://huggingface.co/Ceva-IP/DPDFNet
+  description: 'DPDFNet (Ceva, 2025), DeepFilterNet with dual-path recurrent blocks: full band (48 kHz, high resolution), eight dual-path blocks (7.17 GMACs per second). Causal, one ONNX graph
+    that sherpa-onnx runs at 48 kHz; other rates are resampled to it and back. Trained by its authors for noise
+    suppression in speech; option attenuation_limit_db caps how much noise it removes (0: no cap).'
+  source_url: https://github.com/ceva-ip/DPDFNet
+  validated: untested
+  source:
+    urls:
+    - path: dpdfnet8_48khz_hr.onnx
+      url: https://huggingface.co/Ceva-IP/DPDFNet/resolve/dd6818d00f50c836fed43a6243ebe49116de5964/onnx/dpdfnet8_48khz_hr.onnx
+      size: 14857107
+      sha256: 7b3afbb260a08fe9af3d16e3bda992971be1e7e951d1dee7c2d235f5c43f5631
+  options:
+    model: dpdfnet8_48khz_hr.onnx
+
+- id: dpdfnet2-8k
+  task: denoise
+  engine: sherpa-onnx
+  kind: dpdfnet
+  family: DPDFNet
+  languages: []
+  tier: realtime
+  sample_rate: 8000
+  size_bytes: 10188357
+  params: 2510000
+  license: Apache-2.0
+  license_url: https://huggingface.co/Ceva-IP/DPDFNet
+  description: 'DPDFNet (Ceva, 2025), DeepFilterNet with dual-path recurrent blocks: narrow band (8 kHz, telephone audio), two dual-path blocks (1.29 GMACs per second). Causal, one ONNX graph
+    that sherpa-onnx runs at 8 kHz; other rates are resampled to it and back. Trained by its authors for noise
+    suppression in speech; option attenuation_limit_db caps how much noise it removes (0: no cap).'
+  source_url: https://github.com/ceva-ip/DPDFNet
+  validated: untested
+  source:
+    urls:
+    - path: dpdfnet2_8khz.onnx
+      url: https://huggingface.co/Ceva-IP/DPDFNet/resolve/dd6818d00f50c836fed43a6243ebe49116de5964/onnx/dpdfnet2_8khz.onnx
+      size: 10188357
+      sha256: 6218f1dbd6e4bac5768c63b7d899fe7b84b3788f2a35c4e246d4ab0946165c5d
+  options:
+    model: dpdfnet2_8khz.onnx
+
+- id: dpdfnet8-8k
+  task: denoise
+  engine: sherpa-onnx
+  kind: dpdfnet
+  family: DPDFNet
+  languages: []
+  tier: balanced
+  sample_rate: 8000
+  size_bytes: 14552127
+  params: 3560000
+  license: Apache-2.0
+  license_url: https://huggingface.co/Ceva-IP/DPDFNet
+  description: 'DPDFNet (Ceva, 2025), DeepFilterNet with dual-path recurrent blocks: narrow band (8 kHz, telephone audio), eight dual-path blocks (3.99 GMACs per second). Causal, one ONNX graph
+    that sherpa-onnx runs at 8 kHz; other rates are resampled to it and back. Trained by its authors for noise
+    suppression in speech; option attenuation_limit_db caps how much noise it removes (0: no cap).'
+  source_url: https://github.com/ceva-ip/DPDFNet
+  validated: untested
+  source:
+    urls:
+    - path: dpdfnet8_8khz.onnx
+      url: https://huggingface.co/Ceva-IP/DPDFNet/resolve/dd6818d00f50c836fed43a6243ebe49116de5964/onnx/dpdfnet8_8khz.onnx
+      size: 14552127
+      sha256: c061bcc56b803fa2fa97d448a45db6d966f7d17aff1304e464455d748745ea62
+  options:
+    model: dpdfnet8_8khz.onnx
+
+- id: deepfilternet3
+  aliases: [dfn3]
+  task: denoise
+  engine: onnxruntime
+  kind: deepfilternet3_stream
+  family: DeepFilterNet
+  languages: []
+  tier: balanced
+  sample_rate: 48000
+  size_bytes: 16104687
+  params: 2130000
+  license: MIT OR Apache-2.0
+  license_url: https://github.com/Rikorose/DeepFilterNet#license
+  description: 'DeepFilterNet 3 (Schroter et al., Interspeech 2023): full-band (48 kHz) noise suppression with an
+    ERB-band mask and deep filtering of the low frequencies. This is the single-graph streaming ONNX export of
+    torchDF (grazder/DeepFilterNet, branch torchDF), which carries the STFT and the filtering inside the graph, so
+    ONNX Runtime alone runs it (pip install onnxruntime), 10 ms at a time on the CPU. The file is the copy that
+    kimtos-labs keeps on Hugging Face, pinned by SHA-256. Option atten_lim_db caps the suppression (0: no cap).'
+  source_url: https://github.com/Rikorose/DeepFilterNet
+  validated: untested
+  source:
+    urls:
+    - path: denoiser_model.onnx
+      url: https://huggingface.co/kimtos-labs/denoiser-dfn3/resolve/888f33c41851d7168ae31c3637c323b9e2f3c2a4/denoiser_model.onnx
+      size: 16104687
+      sha256: fe5eb64fa2e4154c83f8e4935e82871c850c154387ee892e0ab65fe179e7d8c9
+  options:
+    model: denoiser_model.onnx
+
+- id: rnnoise
+  task: denoise
+  engine: rnnoise
+  kind: rnnoise
+  family: RNNoise
+  languages: []
+  tier: realtime
+  sample_rate: 48000
+  size_bytes: 13273323
+  license: BSD-3-Clause
+  license_url: https://gitlab.xiph.org/xiph/rnnoise/-/blob/main/COPYING
+  description: 'RNNoise (Xiph; Valin, 2018), the small recurrent noise suppressor of many voice-chat apps, with the
+    model of its 0.2 release (2024). 48 kHz, 10 ms frames, causal. Its weights are compiled into its C library: the
+    download is the pyrnnoise 0.4.5 wheel for this platform (Linux x86-64 and ARM64, macOS 26 and later, Windows
+    x86-64; Apache-2.0 packaging, pinned by SHA-256), unpacked into the model directory; bolo calls the library
+    directly, without pyrnnoise''s Python code or its dependencies. Tuned for listening, not for recognisers.'
+  source_url: https://github.com/pengzhendong/pyrnnoise
+  validated: untested
+  source:
+    urls:
+    - path: pyrnnoise-0.4.5-linux-x86_64.whl
+      platform: linux-x86_64
+      extract: true
+      url: https://files.pythonhosted.org/packages/f1/8b/6498de7ef0a4670bbeae951bec9cfd2386e57ef386f53eec28e75be39790/pyrnnoise-0.4.5-py3-none-manylinux1_x86_64.whl
+      size: 13273323
+      sha256: c095114532f9fa21f621084c879d72c93aaa0c9dbe38b662a63577bada2c214e
+    - path: pyrnnoise-0.4.5-linux-aarch64.whl
+      platform: linux-aarch64
+      extract: true
+      url: https://files.pythonhosted.org/packages/d7/69/96144ce909a371d9f0de8aceb18fb53188b8df14ef34fce909d345bafb42/pyrnnoise-0.4.5-py3-none-manylinux2014_aarch64.whl
+      size: 13267263
+      sha256: 4b382d39b4963d38c8fe2f61639f634a5de0dd7dc731aca7ff1df48f9b1424cf
+    - path: pyrnnoise-0.4.5-macos.whl
+      platform: darwin
+      extract: true
+      url: https://files.pythonhosted.org/packages/29/bb/e19eb6a6c0706d955de366b72c4495369a79d52c839495a1d360e9ea1b91/pyrnnoise-0.4.5-py3-none-macosx_26_0_universal2.whl
+      size: 13382843
+      sha256: 8289b32664ac05d3246c1d8e95522f2bec7fd99b29f238a58745e9c2fad47dae
+    - path: pyrnnoise-0.4.5-windows-x86_64.whl
+      platform: win32-x86_64
+      extract: true
+      url: https://files.pythonhosted.org/packages/20/8d/0e19fbae841a4933c4ba783cf4466dfd24c70305fab9bc0c8674aa19ebc6/pyrnnoise-0.4.5-py3-none-win_amd64.whl
+      size: 13263766
+      sha256: f46015e5a58212d2883bf8e5a2cafb3c6b115176d8039f8340132cb24866b7da
+
+# PyTorch denoisers: they run on the bolo-torch engine plugin (plugins/bolo-torch, op denoise).
+- id: demucs-dns48
+  task: denoise
+  engine: plugin:torch
+  kind: demucs-denoiser
+  family: Demucs denoiser
+  languages: []
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 75478395
+  params: 18900000
+  license: CC-BY-NC-4.0
+  license_url: https://github.com/facebookresearch/denoiser/blob/main/LICENSE
+  commercial_use: false
+  description: 'Demucs denoiser (Facebook Research; Defossez et al., Interspeech 2020), a waveform U-Net with an LSTM
+    at 16 kHz: 48 hidden channels, trained on the DNS Challenge data; causal. Code and weights are CC-BY-NC 4.0, not for commercial use. Needs PyTorch: it runs on the
+    torch engine plugin (pip install "bolo-torch[demucs-denoiser]").'
+  source_url: https://github.com/facebookresearch/denoiser
+  validated: untested
+  source:
+    urls:
+    - path: dns48-11decc9d8e3f0998.th
+      url: https://dl.fbaipublicfiles.com/adiyoss/denoiser/dns48-11decc9d8e3f0998.th
+      size: 75478395
+      sha256: 11decc9d8e3f0998a64caed6b57b68a40cb200a627996a636625f20bdb91f1d6
+  options:
+    model: dns48-11decc9d8e3f0998.th
+    hidden: 48
+    plugin_install: pip install "bolo-torch[demucs-denoiser]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+- id: demucs-dns64
+  task: denoise
+  engine: plugin:torch
+  kind: demucs-denoiser
+  family: Demucs denoiser
+  languages: []
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 134140945
+  params: 33500000
+  license: CC-BY-NC-4.0
+  license_url: https://github.com/facebookresearch/denoiser/blob/main/LICENSE
+  commercial_use: false
+  description: 'Demucs denoiser (Facebook Research; Defossez et al., Interspeech 2020), a waveform U-Net with an LSTM
+    at 16 kHz: 64 hidden channels, trained on the DNS Challenge data; causal. Code and weights are CC-BY-NC 4.0, not for commercial use. Needs PyTorch: it runs on the
+    torch engine plugin (pip install "bolo-torch[demucs-denoiser]").'
+  source_url: https://github.com/facebookresearch/denoiser
+  validated: untested
+  source:
+    urls:
+    - path: dns64-a7761ff99a7d5bb6.th
+      url: https://dl.fbaipublicfiles.com/adiyoss/denoiser/dns64-a7761ff99a7d5bb6.th
+      size: 134140945
+      sha256: a7761ff99a7d5bb69c16a61b3089469805cf3afd82e128103f0f77e79dfead5f
+  options:
+    model: dns64-a7761ff99a7d5bb6.th
+    hidden: 64
+    plugin_install: pip install "bolo-torch[demucs-denoiser]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+- id: demucs-master64
+  task: denoise
+  engine: plugin:torch
+  kind: demucs-denoiser
+  family: Demucs denoiser
+  languages: []
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 134140945
+  params: 33500000
+  license: CC-BY-NC-4.0
+  license_url: https://github.com/facebookresearch/denoiser/blob/main/LICENSE
+  commercial_use: false
+  description: 'Demucs denoiser (Facebook Research; Defossez et al., Interspeech 2020), a waveform U-Net with an LSTM
+    at 16 kHz: 64 hidden channels, trained on the DNS Challenge data and Valentini (VCTK-DEMAND); causal. Code and weights are CC-BY-NC 4.0, not for commercial use. Needs PyTorch: it runs on the
+    torch engine plugin (pip install "bolo-torch[demucs-denoiser]").'
+  source_url: https://github.com/facebookresearch/denoiser
+  validated: untested
+  source:
+    urls:
+    - path: master64-8a5dfb4bb92753dd.th
+      url: https://dl.fbaipublicfiles.com/adiyoss/denoiser/master64-8a5dfb4bb92753dd.th
+      size: 134140945
+      sha256: 8a5dfb4bb92753dd0e170ffa3b05b52b4c374188873a2052b4c0bd191929e5a4
+  options:
+    model: master64-8a5dfb4bb92753dd.th
+    hidden: 64
+    plugin_install: pip install "bolo-torch[demucs-denoiser]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+- id: demucs-valentini-nc
+  task: denoise
+  engine: plugin:torch
+  kind: demucs-denoiser
+  family: Demucs denoiser
+  languages: []
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 243263941
+  params: 60800000
+  license: CC-BY-NC-4.0
+  license_url: https://github.com/facebookresearch/denoiser/blob/main/LICENSE
+  commercial_use: false
+  description: 'Demucs denoiser (Facebook Research; Defossez et al., Interspeech 2020), a waveform U-Net with an LSTM
+    at 16 kHz: 64 hidden channels, non-causal (it looks ahead), trained on Valentini (VCTK-DEMAND) only. Code and weights are CC-BY-NC 4.0, not for commercial use. Needs PyTorch: it runs on the
+    torch engine plugin (pip install "bolo-torch[demucs-denoiser]").'
+  source_url: https://github.com/facebookresearch/denoiser
+  validated: untested
+  source:
+    urls:
+    - path: valentini_nc-93fc4337.th
+      url: https://dl.fbaipublicfiles.com/adiyoss/denoiser/valentini_nc-93fc4337.th
+      size: 243263941
+      sha256: 93fc4337fb425758dba8cf9fe4a6556c49858c191fa44ae84080c510b6d3017c
+  options:
+    model: valentini_nc-93fc4337.th
+    hidden: 64
+    causal: false
+    stride: 2
+    resample: 2
+    plugin_install: pip install "bolo-torch[demucs-denoiser]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+- id: clearvoice-frcrn-se-16k
+  runnable: false
+  not_runnable_reason: ClearVoice's networks come only with its clearvoice package, which pins numpy below 2, librosa
+    0.10.2, opencv and torchvision and loads checkpoints from its own folders; bolo-torch has no loader for it yet
+  task: denoise
+  engine: plugin:torch
+  kind: clearvoice
+  family: ClearVoice
+  languages: []
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 161053751
+  license: Apache-2.0
+  license_url: https://huggingface.co/alibabasglab/FRCRN_SE_16K
+  description: 'ClearerVoice-Studio (Alibaba Tongyi Lab): FRCRN (Zhao et al., ICASSP 2022), a frequency-recurrent complex convolutional network, 16 kHz. Apache-2.0 weights. Not runnable yet: PyTorch
+    only, through the clearvoice package, and no ONNX export is published.'
+  source_url: https://github.com/modelscope/ClearerVoice-Studio
+  validated: untested
+  source:
+    urls:
+    - path: last_best_checkpoint.pt
+      url: https://huggingface.co/alibabasglab/FRCRN_SE_16K/resolve/3766e6a64b0d8cb58f08d913d617bf129f11ed53/last_best_checkpoint.pt
+      size: 161053751
+      sha256: b22256adbb91b68cf5a3db8f6657a4fb17066eecd5f069803e59c186c1cf3ebb
+  options:
+    plugin_install: pip install bolo-torch (the bolo PyTorch engine plugin, plugins/bolo-torch; no loader for this model yet)
+- id: clearvoice-mossformer2-se-48k
+  runnable: false
+  not_runnable_reason: ClearVoice's networks come only with its clearvoice package, which pins numpy below 2, librosa
+    0.10.2, opencv and torchvision and loads checkpoints from its own folders; bolo-torch has no loader for it yet
+  task: denoise
+  engine: plugin:torch
+  kind: clearvoice
+  family: ClearVoice
+  languages: []
+  tier: accuracy
+  sample_rate: 48000
+  size_bytes: 221552019
+  license: Apache-2.0
+  license_url: https://huggingface.co/alibabasglab/MossFormer2_SE_48K
+  description: 'ClearerVoice-Studio (Alibaba Tongyi Lab): MossFormer2 for full-band (48 kHz) speech enhancement. Apache-2.0 weights. Not runnable yet: PyTorch
+    only, through the clearvoice package, and no ONNX export is published.'
+  source_url: https://github.com/modelscope/ClearerVoice-Studio
+  validated: untested
+  source:
+    urls:
+    - path: last_best_checkpoint.pt
+      url: https://huggingface.co/alibabasglab/MossFormer2_SE_48K/resolve/eff8c97925c8bec812af707814b3e5d777fd4503/last_best_checkpoint.pt
+      size: 221552019
+      sha256: 03692b9f773bbd6bb43b9c5a41f96b1e28affd66e13796b7bec66ad3d8b227c6
+  options:
+    plugin_install: pip install bolo-torch (the bolo PyTorch engine plugin, plugins/bolo-torch; no loader for this model yet)
+- id: clearvoice-mossformergan-se-16k
+  runnable: false
+  not_runnable_reason: ClearVoice's networks come only with its clearvoice package, which pins numpy below 2, librosa
+    0.10.2, opencv and torchvision and loads checkpoints from its own folders; bolo-torch has no loader for it yet
+  task: denoise
+  engine: plugin:torch
+  kind: clearvoice
+  family: ClearVoice
+  languages: []
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 38845593
+  license: Apache-2.0
+  license_url: https://huggingface.co/alibabasglab/MossFormerGAN_SE_16K
+  description: 'ClearerVoice-Studio (Alibaba Tongyi Lab): MossFormerGAN (a MossFormer generator trained against a discriminator), 16 kHz. Apache-2.0 weights. Not runnable yet: PyTorch
+    only, through the clearvoice package, and no ONNX export is published.'
+  source_url: https://github.com/modelscope/ClearerVoice-Studio
+  validated: untested
+  source:
+    urls:
+    - path: last_best_checkpoint.pt
+      url: https://huggingface.co/alibabasglab/MossFormerGAN_SE_16K/resolve/dcb1b20e1e44d435090072ab9b223c792ea1f624/last_best_checkpoint.pt
+      size: 38845593
+      sha256: 04bf00db575389e1ea8b1fcca48d9efcf073e50ad170e6dd5230df3bac98be27
+  options:
+    plugin_install: pip install bolo-torch (the bolo PyTorch engine plugin, plugins/bolo-torch; no loader for this model yet)
+- id: resemble-enhance
+  runnable: false
+  not_runnable_reason: the resemble-enhance package pins torch 2.1.1, deepspeed 0.12.4 and gradio 4.8, and its 713 MB
+    enhancer has no ONNX export; bolo-torch has no loader for it yet
+  task: denoise
+  engine: plugin:torch
+  kind: resemble-enhance
+  family: Resemble Enhance
+  languages: []
+  tier: accuracy
+  sample_rate: 44100
+  size_bytes: 713176232
+  license: MIT
+  license_url: https://github.com/resemble-ai/resemble-enhance/blob/main/LICENSE
+  description: 'Resemble Enhance (Resemble): a denoiser followed by a latent conditional flow matching enhancer that
+    also restores bandwidth, 44.1 kHz. MIT code and weights. Not runnable yet, and at 713 MB it was not tried here.'
+  source_url: https://github.com/resemble-ai/resemble-enhance
+  validated: untested
+  source:
+    urls:
+    - path: enhancer_stage2/ds/G/default/mp_rank_00_model_states.pt
+      url: https://huggingface.co/ResembleAI/resemble-enhance/resolve/4e3510ce4a8391159f665903544c5150bee7b2cb/enhancer_stage2/ds/G/default/mp_rank_00_model_states.pt
+      size: 713176232
+      sha256: f9d035f318de3e6d919bc70cf7ad7d32b4fe92ec5cbe0b30029a27f5db07d9d6
+  options:
+    plugin_install: pip install bolo-torch (the bolo PyTorch engine plugin, plugins/bolo-torch; no loader for this model yet)
+- id: deepfilternet2
+  runnable: false
+  not_runnable_reason: the official ONNX export is three graphs (encoder, ERB decoder, deep-filter decoder) that need
+    DeepFilterNet's own STFT, ERB features and deep filtering around them (libDF); bolo runs DeepFilterNet 3 through
+    torchDF's single streaming graph instead (deepfilternet3)
+  task: denoise
+  engine: onnxruntime
+  kind: deepfilternet_graphs
+  family: DeepFilterNet
+  languages: []
+  tier: balanced
+  sample_rate: 48000
+  size_bytes: 8628375
+  params: 2310000
+  license: MIT OR Apache-2.0
+  license_url: https://github.com/Rikorose/DeepFilterNet#license
+  description: 'DeepFilterNet 2 (Schroter et al., ICASSP 2023): full-band (48 kHz) noise suppression, the official
+    ONNX export of release 0.5.6. Not runnable yet: its three graphs need DeepFilterNet''s signal processing around
+    them, which bolo does not have; use deepfilternet3.'
+  source_url: https://github.com/Rikorose/DeepFilterNet
+  validated: untested
+  source:
+    urls:
+    - path: DeepFilterNet2_onnx.tar.gz
+      extract: true
+      url: https://raw.githubusercontent.com/Rikorose/DeepFilterNet/978576aa8400552a4ce9730838c635aa30db5e61/models/DeepFilterNet2_onnx.tar.gz
+      size: 8628375
+      sha256: 412e81d8d1779b8f925ac4b53472655a9f866c4af73dbf930ab587359f631628

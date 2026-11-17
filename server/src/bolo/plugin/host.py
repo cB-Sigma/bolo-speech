@@ -37,8 +37,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from bolo import procs
 from bolo.engines.base import (
+    DenoiseModel,
     DiarizationModel,
     DiarizationResult,
     Engine,
@@ -553,6 +556,30 @@ class PluginDiarization(_PluginModelMixin, DiarizationModel):
         return audio_from_bytes(payload)
 
 
+class PluginDenoise(_PluginModelMixin, DenoiseModel):
+    """A speech-enhancement model in a plugin: op ``denoise``, audio in and out at the model's ``sample_rate``."""
+
+    def __init__(self, process: PluginProcess, load_message: dict[str, Any]) -> None:
+        self.process, self._load_message, self._handle, self._generation = process, load_message, None, 0
+        self._ensure_loaded()
+
+    def _apply_load_reply(self, reply: dict[str, Any]) -> None:
+        self.sample_rate = int(reply.get("sample_rate") or 16000)
+
+    def denoise(self, samples: FloatArray) -> FloatArray:
+        handle = self._ensure_loaded()
+        # a whole recording in one request: allow longer than for a batch of short chunks
+        seconds = len(samples) / max(1, self.sample_rate)
+        timeout = max(self.process.config.request_timeout_s, 10.0 * seconds)
+        _, payload = self.process.request_with_payload(
+            {"op": "denoise", "handle": handle}, audio_bytes(samples), timeout=timeout
+        )
+        out = audio_from_bytes(payload)
+        if len(out) < len(samples):
+            out = np.pad(out, (0, len(samples) - len(out)))
+        return np.ascontiguousarray(out[: len(samples)], dtype=np.float32)
+
+
 class PluginEngine(Engine):
     """The registry's face of one plugin (``plugin:<name>``)."""
 
@@ -588,7 +615,9 @@ class PluginEngine(Engine):
             return PluginSeparation(self.process, message)
         if task == "diarization":
             return PluginDiarization(self.process, message)
-        raise EngineUnavailable(f"plugins can serve stt, tts, separation and diarization models, not {task!r}")
+        if task == "denoise":
+            return PluginDenoise(self.process, message)
+        raise EngineUnavailable(f"plugins can serve stt, tts, separation, diarization and denoise models, not {task!r}")
 
     def shutdown(self) -> None:
         self.process.stop()

@@ -196,7 +196,7 @@ def test_cloud_entries_of_the_catalog() -> None:
         assert m.options["provider"] in ("openai", "sarvam", "elevenlabs", "deepgram", "soniox") and m.options["model"]
         api = m.to_api()
         assert api["cloud"] is True and api["notice"] == "paid cloud API; audio leaves this server"
-        assert "leaves this server" in m.description and m.languages
+        assert "leaves this server" in m.description and (m.languages or m.task == "denoise")
     ids = {m.id for m in cloud_models}
     assert {"openai-whisper-1", "openai-gpt-4o-mini-tts", "sarvam-saaras-v4", "sarvam-bulbul-v3",
             "elevenlabs-flash-v2.5", "elevenlabs-scribe-v3", "deepgram-nova-3", "soniox-stt-async-v6",

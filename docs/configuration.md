@@ -744,8 +744,10 @@ the maintainers yet.
 
 `denoise` runs a speech-enhancement model over the audio before the
 recogniser hears it: on a transcription request (`denoise=true`, a
-strength such as `denoise=0.5`, or a model id; api.md), on a Realtime
-session (`noise_reduction` or `denoise`; realtime.md), as a pin per
+strength such as `denoise=0.5`, or a model id; api.md), on the live
+speech-to-text WebSocket (`/api/v1/stt/stream?denoise=…`; api.md, "Denoising
+a live stream"), on a Realtime session (`noise_reduction` or `denoise`;
+realtime.md), as a pin per
 speech-to-text model (`bolo models config whisper-base --set denoise=0.5`,
 `PUT /api/v1/models/{id}/settings` with `{"denoise": 0.5}`), as a catalog
 option (`options.denoise`) or for the whole server (`denoise = "on"`,
@@ -754,9 +756,24 @@ that says anything decides; `denoise=false` in a request turns it off
 whatever the defaults say.
 
 The default denoiser is GTCRN (`gtcrn-simple`, MIT, 0.5 MB, 16 kHz) on
-sherpa-onnx; any `task: denoise` model of the catalog can be named. It runs
-at the model's own sample rate (the audio is resampled to it and back) and
-costs about 0.06 to 0.13 s of one CPU core per second of audio.
+sherpa-onnx. Any `task: denoise` model of the catalog can be named instead,
+in a request or as `default_denoise`, and is pulled like any other model
+(`bolo list --task denoise`, `bolo pull dpdfnet2`):
+
+| family | ids | licence | runs on | rate |
+| --- | --- | --- | --- | --- |
+| GTCRN | `gtcrn-simple` (default) | MIT | sherpa-onnx | 16 kHz |
+| DPDFNet | `dpdfnet-baseline`, `dpdfnet2`, `dpdfnet4`, `dpdfnet8`; `dpdfnet2-48k`, `dpdfnet8-48k`; `dpdfnet2-8k`, `dpdfnet8-8k` | Apache-2.0 | sherpa-onnx | 16, 48, 8 kHz |
+| DeepFilterNet 3 | `deepfilternet3` | MIT or Apache-2.0 | onnxruntime (`pip install onnxruntime`) | 48 kHz |
+| RNNoise | `rnnoise` | BSD-3-Clause | its own C library (downloaded per platform) | 48 kHz |
+| Demucs denoiser | `demucs-dns48`, `demucs-dns64`, `demucs-master64`, `demucs-valentini-nc` | **CC-BY-NC-4.0** (not for commercial use) | PyTorch, bolo-torch plugin | 16 kHz |
+| ElevenLabs Voice Isolator | `elevenlabs-voice-isolator` | provider's terms (paid cloud API) | ElevenLabs | 16 kHz up |
+
+The catalog also lists ClearVoice (FRCRN, MossFormer2, MossFormerGAN),
+Resemble Enhance and DeepFilterNet 2, which cannot run yet; each entry says
+why. A denoiser runs at its own sample rate (the audio is resampled to it
+and back). models.md, "Denoising", compares them on noisy speech: word error
+rates with two recognisers and the CPU each needs.
 
 **It is off by default for a reason.** Denoising removes some of the
 speech along with the noise. It helps on loud, steady background noise and

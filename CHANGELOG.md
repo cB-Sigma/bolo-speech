@@ -8,6 +8,31 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **More denoisers, chosen and pulled like any other model** (`denoise=<model id>` on transcriptions, Realtime
+  sessions, pins and the `denoise` setting; `bolo list`, `bolo pull`, recommendations). Every entry states its licence;
+  non-commercial ones are in, marked. Runnable: **DPDFNet** (Ceva, Apache-2.0; `dpdfnet-baseline`, `dpdfnet2`,
+  `dpdfnet4`, `dpdfnet8` at 16 kHz, `dpdfnet2-48k`, `dpdfnet8-48k` full band, `dpdfnet2-8k`, `dpdfnet8-8k` for
+  telephone audio; 9 to 15 MB each, sherpa-onnx, option `attenuation_limit_db`), **DeepFilterNet 3**
+  (`deepfilternet3`, MIT or Apache-2.0, 16 MB, torchDF's single streaming ONNX graph on onnxruntime, 48 kHz),
+  **RNNoise** (`rnnoise`, BSD-3-Clause, 48 kHz: engine `rnnoise`, the library from the pyrnnoise wheel of the
+  platform, pinned by sha256 and called through ctypes, no new dependency), the **Demucs denoiser** (`demucs-dns48`,
+  `demucs-dns64`, `demucs-master64`, `demucs-valentini-nc`; CC-BY-NC-4.0, not for commercial use; PyTorch, on the
+  bolo-torch plugin, extra `demucs-denoiser`) and **ElevenLabs Voice Isolator** (`elevenlabs-voice-isolator`, cloud,
+  `POST /v1/audio-isolation`; not run against a real account). Catalogued, not runnable yet, each with its reason:
+  ClearVoice FRCRN, MossFormer2 (48 kHz) and MossFormerGAN (Apache-2.0), Resemble Enhance (MIT, 713 MB) and
+  DeepFilterNet 2's three-graph export. `gtcrn-simple` stays the default. Measured with the harness of the first
+  denoiser (docs/measurements/denoise.json, docs/models.md, "Denoising").
+- **`denoise` on the live speech-to-text WebSocket** (`/api/v1/stt/stream`): query or `config` message, the same
+  values as for transcriptions (`true`, `false`, a strength, a model id, `denoise_strength`), and the model's pin, its
+  catalog option and the `denoise` setting when the stream says nothing. The denoiser keeps its state from chunk to
+  chunk where the model has a streaming form (GTCRN and DPDFNet through sherpa-onnx's online denoiser, DeepFilterNet 3,
+  RNNoise; the output is in step with the input, the model's own delay cut off) and enhances each chunk with half a
+  second of audio before it otherwise. `ready.denoise` says what runs; `metrics.denoise` reports the time per chunk
+  and the audio held back (docs/api.md). A cloud denoiser is refused for live streams.
+- Catalog downloads can be per platform (`platform` on a `source.urls` entry: `linux-x86_64`, `linux-aarch64`,
+  `darwin`, `win32-x86_64`), and a `.whl` is unpacked like a `.zip`.
+- Plugin protocol: op `denoise` for models loaded with task `denoise` (docs/plugins.md); the SDK serves a
+  `DenoiseModel`, the reference plugin has `fake-denoise`.
 - **More voice-activity detectors, chosen by name.** `silero-vad-v6` (MIT), `ten-vad` and `ten-vad-int8` (TEN VAD:
   Apache-2.0 with Agora's conditions, labelled `commercial_use: false`: only for your own applications, not in a way
   that competes with Agora), `marblenet-vad` (NVIDIA Frame-VAD Multilingual MarbleNet v2.0, NVIDIA Open Model

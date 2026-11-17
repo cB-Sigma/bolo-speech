@@ -52,6 +52,11 @@ CPU_ONLY_ON: dict[tuple[str, str], dict[str, str]] = {
         "dml": "DirectML cannot run the end-of-turn model (ONNX Runtime fails in its Reshape node 'node_view_1' "
         "with 8007023E, on every adapter); it is 8 MB and takes 13-39 ms on the CPU",
     },
+    ("onnxruntime", "deepfilternet3_stream"): dict.fromkeys(
+        _ORT,
+        "DeepFilterNet 3 runs its graph once per 10 ms frame, where an accelerator would spend more time copying than "
+        "computing; it runs on the CPU",
+    ),
 }
 #: (engine, kind) -> device families that run such a model's weights but leave some of its nodes to the CPU, and
 #: which: the placement stays on the accelerator (all the weights are there) and says so in its notice

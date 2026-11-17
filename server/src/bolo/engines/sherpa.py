@@ -30,6 +30,7 @@ import numpy as np
 from bolo import ort_providers
 from bolo.engines.base import (
     DenoiseModel,
+    DenoiseStream,
     DiarizationModel,
     Engine,
     EngineStatus,
@@ -82,7 +83,7 @@ TTS_KINDS = ("vits", "kokoro", "matcha", "kitten")
 VAD_KINDS = ("silero_vad", "ten_vad")
 DIARIZATION_KINDS = ("pyannote_diarization",)
 SEPARATION_KINDS = ("voxlock",)
-DENOISE_KINDS = ("gtcrn",)
+DENOISE_KINDS = ("gtcrn", "dpdfnet")
 
 
 def find_file(path: Path, *patterns: str, required: bool = True, prefer_int8: bool = True) -> str:
@@ -945,19 +946,33 @@ class SherpaVoxLock(SeparationModel):
 
 
 class SherpaDenoiser(DenoiseModel):
-    """Speech enhancement with sherpa-onnx's offline denoiser (GTCRN: one ONNX graph of about 0.5 MB)."""
+    """Speech enhancement with sherpa-onnx's offline denoiser: GTCRN (one ONNX graph of about 0.5 MB) or DPDFNet
+    (Ceva's dual-path DeepFilterNet, 9 to 15 MB, at 8, 16 or 48 kHz; the rate is in the graph's metadata).
 
-    def __init__(self, path: Path, spec: dict[str, Any], opts: LoadOptions) -> None:
+    DPDFNet takes ``attenuation_limit_db`` (catalog option or pin): at most this many dB of noise are removed, which
+    keeps some of the original under the speech; 0 (the default) is no limit."""
+
+    def __init__(self, kind: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> None:
         import sherpa_onnx as so
 
         model = find_file(path, str(spec.get("model", "*.onnx")), "*.onnx")
-        config = so.OfflineSpeechDenoiserModelConfig(
-            gtcrn=so.OfflineSpeechDenoiserGtcrnModelConfig(model=model),
-            num_threads=opts.threads,
-            provider=sherpa_provider(opts.device),
-        )
+        common: dict[str, Any] = {"num_threads": opts.threads, "provider": sherpa_provider(opts.device)}
+        if kind == "dpdfnet":
+            if not hasattr(so, "OfflineSpeechDenoiserDpdfNetModelConfig"):
+                raise RuntimeError("this sherpa-onnx has no DPDFNet denoiser; upgrade it (pip install -U sherpa-onnx)")
+            limit = float(spec.get("attenuation_limit_db") or 0.0)
+            if not 0.0 <= limit <= 100.0:
+                raise ValueError(f"attenuation_limit_db must be between 0 and 100, got {limit:g}")
+            dpdfnet = so.OfflineSpeechDenoiserDpdfNetModelConfig(model=model, attenuation_limit_db=limit)
+            config = so.OfflineSpeechDenoiserModelConfig(dpdfnet=dpdfnet, **common)
+        else:
+            gtcrn = so.OfflineSpeechDenoiserGtcrnModelConfig(model=model)
+            config = so.OfflineSpeechDenoiserModelConfig(gtcrn=gtcrn, **common)
         self._denoiser = so.OfflineSpeechDenoiser(so.OfflineSpeechDenoiserConfig(model=config))
         self.sample_rate = int(self._denoiser.sample_rate)
+        self._config = config
+        self._kind = kind
+        self._stream_delay = spec.get("stream_delay")
 
     def denoise(self, samples: FloatArray) -> FloatArray:
         out = self._denoiser(np.ascontiguousarray(samples, dtype=np.float32), self.sample_rate)
@@ -969,6 +984,55 @@ class SherpaDenoiser(DenoiseModel):
         if len(audio) < len(samples):  # the model works in whole frames: the last few milliseconds come back short
             audio = np.pad(audio, (0, len(samples) - len(audio)))
         return np.ascontiguousarray(audio[: len(samples)], dtype=np.float32)
+
+    def create_stream(self) -> DenoiseStream:
+        """sherpa-onnx's online denoiser (its own state per stream), when this sherpa-onnx has one."""
+        import sherpa_onnx as so
+
+        if not hasattr(so, "OnlineSpeechDenoiser"):
+            return super().create_stream()
+        online = so.OnlineSpeechDenoiser(so.OnlineSpeechDenoiserConfig(model=self._config))
+        # measured against the offline denoiser (sherpa-onnx 2.0.1): GTCRN's online output is in step with its
+        # input; DPDFNet's runs four frame shifts behind (40 ms)
+        delay = self._stream_delay
+        if delay is None:
+            delay = 4 * int(online.frame_shift_in_samples) if self._kind == "dpdfnet" else 0
+        return _SherpaDenoiseStream(online, self.sample_rate, int(delay))
+
+
+class _SherpaDenoiseStream(DenoiseStream):
+    def __init__(self, online: Any, rate: int, delay: int) -> None:
+        self.online = online
+        self.rate = rate
+        self.delay = delay
+        self.taken = self.made = self.given = 0
+
+    def _keep(self, out: FloatArray) -> FloatArray:
+        start = max(0, self.delay - self.made)  # the model's delay is cut off once, at the start
+        self.made += len(out)
+        out = out[start:][: max(0, self.taken - self.given)]
+        self.given += len(out)
+        return np.ascontiguousarray(out, dtype=np.float32)
+
+    def process(self, samples: FloatArray) -> FloatArray:
+        self.taken += len(samples)
+        out = self.online(np.ascontiguousarray(samples, dtype=np.float32), self.rate)
+        return self._keep(np.asarray(out.samples, dtype=np.float32))
+
+    def finish(self) -> FloatArray:
+        need = self.taken - self.given
+        if need <= 0:
+            return np.zeros(0, dtype=np.float32)
+        tail = []
+        if self.delay:  # push what the delay holds back out of the model
+            pad = np.zeros(self.delay + 4 * int(self.online.frame_shift_in_samples), dtype=np.float32)
+            tail.append(np.asarray(self.online(pad, self.rate).samples, dtype=np.float32))
+        tail.append(np.asarray(self.online.flush().samples, dtype=np.float32))
+        out = self._keep(np.concatenate(tail))
+        if len(out) < need:
+            self.given += need - len(out)
+            out = np.pad(out, (0, need - len(out)))
+        return out
 
 
 #: what sherpa-onnx says on standard error when it was asked for an accelerator it was not built with
@@ -1028,5 +1092,5 @@ class SherpaOnnxEngine(Engine):
         if kind in SEPARATION_KINDS:
             return SherpaVoxLock(path, spec, opts)
         if kind in DENOISE_KINDS:
-            return SherpaDenoiser(path, spec, opts)
+            return SherpaDenoiser(kind, path, spec, opts)
         raise ValueError(f"sherpa-onnx engine cannot load kind {kind!r}")

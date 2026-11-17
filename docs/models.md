@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-356 models: 143 validated on CPU by the maintainers, 213 untested. 22 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
+375 models: 143 validated on CPU by the maintainers, 232 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
 
 ### Speech to text
 
@@ -736,11 +736,66 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 ### Denoising
 
+#### ElevenLabs (cloud)
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `elevenlabs-voice-isolator` | - | accuracy | - | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` | untested |
+
 #### GTCRN
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `gtcrn-simple` | - | realtime | - | 1 MB | MIT | **CPU** · RTF 0.060 |
+
+#### DPDFNet
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `dpdfnet-baseline` | - | realtime | - | 9 MB | Apache-2.0 | untested |
+| `dpdfnet2` | - | realtime | - | 10 MB | Apache-2.0 | untested |
+| `dpdfnet4` | - | balanced | - | 12 MB | Apache-2.0 | untested |
+| `dpdfnet8` | - | accuracy | - | 15 MB | Apache-2.0 | untested |
+| `dpdfnet2-48k` | - | balanced | - | 10 MB | Apache-2.0 | untested |
+| `dpdfnet8-48k` | - | accuracy | - | 15 MB | Apache-2.0 | untested |
+| `dpdfnet2-8k` | - | realtime | - | 10 MB | Apache-2.0 | untested |
+| `dpdfnet8-8k` | - | balanced | - | 15 MB | Apache-2.0 | untested |
+
+#### DeepFilterNet
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `deepfilternet3` | - | balanced | - | 16 MB | MIT OR Apache-2.0 | untested |
+| `deepfilternet2` | - | balanced | - | 9 MB | MIT OR Apache-2.0 | untested |
+
+#### RNNoise
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `rnnoise` | - | realtime | - | 13 MB | BSD-3-Clause | untested |
+
+#### Demucs denoiser
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `demucs-dns48` | - | realtime | - | 75 MB | CC-BY-NC-4.0 ⚠ · needs plugin torch | untested |
+| `demucs-dns64` | - | balanced | - | 134 MB | CC-BY-NC-4.0 ⚠ · needs plugin torch | untested |
+| `demucs-master64` | - | balanced | - | 134 MB | CC-BY-NC-4.0 ⚠ · needs plugin torch | untested |
+| `demucs-valentini-nc` | - | accuracy | - | 243 MB | CC-BY-NC-4.0 ⚠ · needs plugin torch | untested |
+
+#### ClearVoice
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `clearvoice-frcrn-se-16k` | - | balanced | - | 161 MB | Apache-2.0 · needs plugin torch | untested |
+| `clearvoice-mossformer2-se-48k` | - | accuracy | - | 222 MB | Apache-2.0 · needs plugin torch | untested |
+| `clearvoice-mossformergan-se-16k` | - | accuracy | - | 39 MB | Apache-2.0 · needs plugin torch | untested |
+
+#### Resemble Enhance
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `resemble-enhance` | - | accuracy | - | 713 MB | MIT · needs plugin torch | untested |
 
 ⚠ = the licence restricts commercial use. RTF = processing time / audio duration (lower is faster).
 <!-- END GENERATED: models -->

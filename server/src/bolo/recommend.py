@@ -33,8 +33,15 @@ LEVEL_LABEL = {
     "unavailable": "not available yet",
 }
 #: tasks the recommender takes; "speech-to-speech" is a feature of some catalog entries, not a catalog task
-TASKS = ("stt", "tts", "diarization", "vad", "turn", "separation", "speech-to-speech")
-TASK_ALIASES = {"s2s": "speech-to-speech", "asr": "stt", "diarize": "diarization", "separate": "separation"}
+TASKS = ("stt", "tts", "diarization", "vad", "turn", "separation", "denoise", "speech-to-speech")
+TASK_ALIASES = {
+    "s2s": "speech-to-speech",
+    "asr": "stt",
+    "diarize": "diarization",
+    "separate": "separation",
+    "denoiser": "denoise",
+    "noise": "denoise",
+}
 S2S = "speech-to-speech"
 
 #: real-time factor (processing time / audio duration) up to which a level applies
@@ -861,7 +868,8 @@ class Advisor:
         s = self.core.settings
         names = {
             "stt": s.default_stt, "tts": s.default_tts, "vad": s.default_vad, "diarization": s.default_diarization,
-            "separation": s.default_separation, "turn": s.default_turn, S2S: s.s2s_model,
+            "separation": s.default_separation, "turn": s.default_turn, "denoise": s.default_denoise,
+            S2S: s.s2s_model,
         }  # fmt: skip
         out: dict[str, str] = {}
         for task, name in names.items():

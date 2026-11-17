@@ -11,6 +11,10 @@ voices/search) and the models overview on 2026-11-14:
   ``scribe_v2``), ``file``, ``language_code``, ``timestamps_granularity`` (``word``), ``keyterms``,
   ``temperature``. Answer: ``text``, ``language_code``, ``words`` (``text``, ``start``, ``end``, ``type``).
 * ``GET https://api.elevenlabs.io/v2/voices`` lists the account's voices (``voice_id``, ``name``, ``labels``).
+* ``POST https://api.elevenlabs.io/v1/audio-isolation`` (multipart): ``audio``, ``file_format`` (``pcm_s16le_16``:
+  raw 16-bit mono 16 kHz PCM, lower latency; or ``other``). The answer is the isolated voice as an audio file
+  (checked against the API reference on 2026-11-17; the reference does not name the answer's format, so bolo
+  decodes whatever arrives). ElevenLabs bills it per minute of audio and accepts up to 500 MB and one hour.
 * Header ``xi-api-key``.
 
 Not verified: the limits of ``voice_settings.speed`` (the reference gives none; ElevenLabs answers 400 outside
@@ -25,9 +29,9 @@ from typing import Any
 from urllib.parse import quote
 
 from bolo.engines.base import FloatArray, STTResult, Voice, Word
-from bolo.errors import BoloError, InvalidRequest
+from bolo.errors import BoloError, InvalidRequest, ProviderError
 from bolo.providers import Usage
-from bolo.remote.base import Adapter, RemoteRequest, base_language, read_pcm_stream
+from bolo.remote.base import Adapter, RemoteRequest, base_language, decode_whole, float_to_pcm16, read_pcm_stream
 
 PCM_RATES = (8000, 16000, 22050, 24000, 32000, 44100, 48000)
 
@@ -138,3 +142,15 @@ class ElevenLabs(Adapter):
         language = base_language(str(doc.get("language_code") or "")) or base_language(req.language)
         # ISO 639-3 answers ("eng", "hin") stay as they are; clients that need 639-1 send the language
         return STTResult(str(doc.get("text") or "").strip(), language, [], words)
+
+    # -- voice isolation ----------------------------------------------------------------------------------
+    def isolate(self, samples: FloatArray, rate: int, usage: Usage) -> FloatArray:
+        if rate != 16000:
+            raise InvalidRequest(f"{self.where}: voice isolation is sent 16 kHz audio, got {rate} Hz", param="denoise")
+        data: dict[str, Any] = {"file_format": "pcm_s16le_16"}
+        data.update(self.spec.get("request") or {})
+        files = {"audio": ("audio.pcm", float_to_pcm16(samples), "application/octet-stream")}
+        resp = self.request("POST", self.base_url + "/v1/audio-isolation", usage, data=data, files=files)
+        if not resp.content:
+            raise ProviderError(f"{self.where} answered the voice isolation with no audio")
+        return decode_whole(resp.content, rate)

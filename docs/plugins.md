@@ -116,8 +116,14 @@ messages before its final reply. Replies to different requests may interleave.
 | `release` | `handle`, `key` | - |
 | `diarize` | `handle`, `num_speakers`, `threshold` (either may be null) + the recording (16 kHz) | `turns`: `[[start, end, speaker], ...]` |
 | `embed` | `handle` + one voice (16 kHz) | the unit-length speaker embedding (float32) |
+| `denoise` | `handle` + the recording (at the model's `sample_rate`) | the enhanced recording, as long as the input |
 | `cancel` | `target` (id of a running request) | - |
 | `shutdown` | - | - (the process exits) |
+
+A denoise model (`task: denoise`, bolo 0.6.7 and later) answers `denoise`: audio in and out at the `sample_rate` of
+its `load` reply, which bolo resamples to and from. bolo sends it the whole recording of a transcription; on the live
+speech-to-text WebSocket it sends each chunk with the half second before it (a plugin model keeps no state between
+requests). In a plugin built on bolo's SDK, the model is a `DenoiseModel`.
 
 A separation model's `load` reply carries `info.mode` (`"blind"`: answers `separate`; `"target"`:
 answers `enrol` / `extract` / `release`) and `info.min_sample_s`.
@@ -177,6 +183,8 @@ definitions are in `server/src/bolo/plugin/protocol.py`.
 | `pyannote-speaker-diarization-community-1` | diarization (VBx clustering) | `pyannote` | CC-BY-4.0 | yes | RTF 0.9; DER 6.0 % on the demo dialogue |
 | `dicow-v3.3` (BUT-FIT DiCoW) | STT, diarization-conditioned (speaker request) | `dicow` | CC-BY-4.0 | no | RTF 0.45 with Nemotron diarization (bf16, AMX); AMI cpWER 69 → 26 % |
 | `se-dicow` (BUT-FIT SE-DiCoW) | STT, diarization-conditioned, self-enrolment | `dicow` | Apache-2.0 | no | RTF 0.59 with Nemotron diarization (bf16); AMI cpWER 69 → 25 % |
+| `demucs-dns48`, `demucs-dns64`, `demucs-master64`, `demucs-valentini-nc` (Facebook Research Demucs denoiser) | denoise (16 kHz) | `demucs-denoiser` | **CC-BY-NC-4.0, not for commercial use** | no | docs/models.md, "Denoising" |
+| `clearvoice-frcrn-se-16k`, `clearvoice-mossformer2-se-48k`, `clearvoice-mossformergan-se-16k`, `resemble-enhance` | denoise | - | Apache-2.0; MIT | no | not implemented in bolo-torch yet (catalogued with the reason) |
 | `sravaani-1.0`, `indicconformer-600m-official` | STT | - | MIT | yes | not implemented in bolo-torch yet |
 
 Install (CPU): `pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu`, then

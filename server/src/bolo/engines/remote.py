@@ -1,4 +1,4 @@
-"""The ``remote`` engine: speech-to-text and text-to-speech forwarded to a cloud API.
+"""The ``remote`` engine: speech-to-text, text-to-speech and denoising forwarded to a cloud API.
 
 A catalog entry with ``engine: remote`` names a provider (``options.provider``, an entry of the ``providers``
 setting) and the provider's model (``options.model``). The provider's ``kind`` picks the adapter
@@ -37,6 +37,7 @@ import numpy as np
 
 from bolo.audio.encode import encode_audio
 from bolo.engines.base import (
+    DenoiseModel,
     Engine,
     EngineStatus,
     FloatArray,
@@ -399,12 +400,48 @@ class RemoteTTS(TTSModel):
                 sink.add(usage)
 
 
+class RemoteDenoise(DenoiseModel):
+    """Speech enhancement at a provider (ElevenLabs' voice isolator): the recording is sent at 16 kHz and the
+    isolated voice comes back, resampled to 16 kHz. One request per recording: not for live streams."""
+
+    live = False
+
+    def __init__(self, registry: ProviderRegistry, adapter: Adapter, name: str, spec: dict[str, Any]) -> None:
+        self.registry = registry
+        self.adapter = adapter
+        self.name = name
+        self.spec = spec
+        self.sample_rate = 16000
+
+    @property
+    def provider(self) -> ProviderConfig:
+        return self.adapter.provider
+
+    def close(self) -> None:
+        self.adapter.close()
+
+    def denoise(self, samples: FloatArray) -> FloatArray:
+        seconds = len(samples) / self.sample_rate
+        usage = self.adapter.new_usage()
+        usage.audio_seconds = seconds
+        try:
+            out = self.adapter.isolate(np.asarray(samples, dtype=np.float32), self.sample_rate, usage)
+        except BoloError as exc:
+            self.registry.record(usage, error=exc.message)
+            raise
+        usage.cost = self.provider.estimate(self.adapter.model, audio_seconds=seconds, requests=usage.requests)
+        self.registry.record(usage)
+        if len(out) < len(samples):
+            out = np.pad(out, (0, len(samples) - len(out)))
+        return np.ascontiguousarray(out[: len(samples)], dtype=np.float32)
+
+
 class RemoteEngine(Engine):
     id = ENGINE_ID
     name = "Cloud speech APIs (OpenAI-compatible, Sarvam, ElevenLabs, Deepgram, Soniox)"
     license = "Apache-2.0 (bolo's client); each provider's terms apply to its API"
     url = "https://github.com/cb-Sigma/bolo/blob/main/docs/providers.md"
-    kinds = ("remote-stt", "remote-tts")
+    kinds = ("remote-stt", "remote-tts", "remote-denoise")
 
     def __init__(self) -> None:
         self.settings: Settings | None = None
@@ -432,8 +469,10 @@ class RemoteEngine(Engine):
     def load(self, kind: str, task: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Model:
         registry = self._registry()
         name = str(spec.get("model_id") or path.name)
-        if task not in ("stt", "tts"):
-            raise EngineUnavailable(f"the remote engine serves speech-to-text and text-to-speech, not {task!r}")
+        if task not in ("stt", "tts", "denoise"):
+            raise EngineUnavailable(
+                f"the remote engine serves speech-to-text, text-to-speech and denoising, not {task!r}"
+            )
         provider = registry.require(
             str(spec.get("provider") or "") or None, str(spec.get("provider_kind") or "") or None, model=name
         )
@@ -444,6 +483,8 @@ class RemoteEngine(Engine):
         adapter = make_adapter(provider, remote_model, spec, timeout_s=timeout)
         if task == "stt":
             return RemoteSTT(registry, adapter, name, spec)
+        if task == "denoise":
+            return RemoteDenoise(registry, adapter, name, spec)
         model = RemoteTTS(registry, adapter, name, spec)
         model.connect()
         return model

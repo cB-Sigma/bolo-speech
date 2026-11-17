@@ -23,6 +23,7 @@ from typing import IO, Any
 import numpy as np
 
 from bolo.engines.base import (
+    DenoiseModel,
     DiarizationModel,
     Engine,
     LoadOptions,
@@ -110,6 +111,8 @@ class _Server:
                 self.separation(rid, op, message, payload)
             elif op in ("diarize", "embed"):
                 self.diarization(rid, op, message, payload)
+            elif op == "denoise":
+                self.denoise(rid, message, payload)
             else:
                 self.fail(rid, "unknown_op", f"unknown op {op!r}")
         except Exception as exc:
@@ -221,6 +224,13 @@ class _Server:
             audio, int(num) if num else None, float(threshold) if threshold is not None else None
         )
         self.reply(rid, turns=[[t.start, t.end, t.speaker] for t in result.turns])
+
+    def denoise(self, rid: str, m: dict[str, Any], payload: bytes) -> None:
+        model = self.model(m)
+        if not isinstance(model, DenoiseModel):
+            raise TypeError("this model does not denoise")
+        enhanced = np.asarray(model.denoise(audio_from_bytes(payload)), dtype=np.float32)
+        self.send({"id": rid, "ok": True}, audio_bytes(enhanced))
 
     def synthesize(self, rid: str, m: dict[str, Any]) -> None:
         model = self.model(m)

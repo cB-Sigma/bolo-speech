@@ -1805,6 +1805,8 @@ def cmd_logs(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    from bolo.catalog import TASKS as CATALOG_TASKS
+
     p = argparse.ArgumentParser(prog="bolo", description="A lightweight speech server: STT, TTS and VAD.")
     p.add_argument("--version", action="version", version=f"bolo {__version__}")
     sub = p.add_subparsers(dest="command", metavar="COMMAND")
@@ -1901,7 +1903,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("list", aliases=["ls"], help="list installed models (--all: the whole catalog)")
     _common(s)
     s.add_argument("--all", "-a", action="store_true")
-    s.add_argument("--task", choices=["stt", "tts", "vad"])
+    s.add_argument("--task", choices=list(CATALOG_TASKS))
     s.add_argument("--query", "-q", help="filter by text")
     s.add_argument("--json", action="store_true")
     s.set_defaults(func=cmd_list)

@@ -1519,6 +1519,28 @@
     list_voices: true
     send_language: true
     text_normalizer: model
+- id: elevenlabs-voice-isolator
+  task: denoise
+  engine: remote
+  kind: remote-denoise
+  family: ElevenLabs (cloud)
+  languages: []
+  tier: accuracy
+  streaming: false
+  sample_rate: 16000
+  license: ElevenLabs Terms of Use (paid cloud API)
+  license_url: https://elevenlabs.io/terms-of-use
+  cloud: true
+  description: 'ElevenLabs Voice Isolator (POST /v1/audio-isolation): removes background noise, music and other
+    sounds and keeps the voice. bolo sends the recording as 16 kHz PCM and transcribes the isolated voice it gets
+    back. Billed per minute of audio (1,000 credits a minute at the time of writing). Not run against a real
+    account. Paid cloud API: the audio leaves this server.'
+  source_url: https://elevenlabs.io/docs/api-reference/audio-isolation/convert
+  validated: untested
+  options:
+    provider: elevenlabs
+    provider_kind: elevenlabs
+    model: audio-isolation
 - id: elevenlabs-scribe-v3
   task: stt
   engine: remote

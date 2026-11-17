@@ -432,14 +432,103 @@ class SeparationModel(Model):
         raise NotImplementedError(f"{type(self).__name__} is a {self.mode} separator")
 
 
+class DenoiseStream(abc.ABC):
+    """Live denoising of one audio stream, piece by piece, at the model's ``sample_rate``.
+
+    :meth:`process` returns the enhanced audio that is ready so far; sample ``k`` of everything it returned is sample
+    ``k`` of everything it was given (a model's own delay is cut off, so it may hold back a few milliseconds at first).
+    :meth:`finish` returns the rest: in all, the stream returns exactly as many samples as it was given."""
+
+    #: the model keeps its state from piece to piece (False: each piece is enhanced with some audio before it)
+    stateful: bool = True
+
+    @abc.abstractmethod
+    def process(self, samples: FloatArray) -> FloatArray: ...
+
+    def finish(self) -> FloatArray:
+        return np.zeros(0, dtype=np.float32)
+
+
+class OverlapDenoiseStream(DenoiseStream):
+    """For denoisers that only enhance whole recordings: every piece is enhanced together with up to ``context_s``
+    of the audio before it, and the end of the result is kept. Nothing is held back."""
+
+    stateful = False
+
+    def __init__(self, model: DenoiseModel, context_s: float = 0.5) -> None:
+        self.model = model
+        self.keep = max(0, int(context_s * model.sample_rate))
+        self.before = np.zeros(0, dtype=np.float32)
+
+    def process(self, samples: FloatArray) -> FloatArray:
+        if not len(samples):
+            return np.zeros(0, dtype=np.float32)
+        window = np.concatenate([self.before, np.asarray(samples, dtype=np.float32)])
+        out = np.asarray(self.model.denoise(window), dtype=np.float32)[-len(samples) :]
+        self.before = window[-self.keep :] if self.keep else self.before[:0]
+        return np.ascontiguousarray(out, dtype=np.float32)
+
+
+class FrameDenoiseStream(DenoiseStream):
+    """For causal models that work on fixed frames and keep a state: ``step`` enhances one frame of ``frame`` samples;
+    its output runs ``delay`` samples behind its input, which this cuts off."""
+
+    def __init__(self, step: Callable[[FloatArray], FloatArray], frame: int, delay: int) -> None:
+        self.step = step
+        self.frame = frame
+        self.delay = delay
+        self.pending = np.zeros(0, dtype=np.float32)
+        self.taken = 0  # samples given
+        self.made = 0  # samples of output produced (including the delay)
+        self.given = 0  # samples handed back
+
+    def _run(self, audio: FloatArray) -> FloatArray:
+        self.pending = np.concatenate([self.pending, np.asarray(audio, dtype=np.float32)])
+        whole = len(self.pending) - len(self.pending) % self.frame
+        if not whole:
+            return np.zeros(0, dtype=np.float32)
+        out = [
+            np.asarray(self.step(self.pending[i : i + self.frame]), dtype=np.float32)
+            for i in range(0, whole, self.frame)
+        ]
+        self.pending = self.pending[whole:]
+        made = np.concatenate(out)
+        start = max(0, self.delay - self.made)  # the model's delay is cut off once, at the start
+        self.made += len(made)
+        return made[start:]
+
+    def process(self, samples: FloatArray) -> FloatArray:
+        self.taken += len(samples)
+        out = self._run(samples)[: max(0, self.taken - self.given)]
+        self.given += len(out)
+        return np.ascontiguousarray(out, dtype=np.float32)
+
+    def finish(self) -> FloatArray:
+        need = self.taken - self.given
+        if need <= 0:
+            return np.zeros(0, dtype=np.float32)
+        pad = self.delay + need + 2 * self.frame  # enough to push the held-back audio out
+        out = self._run(np.zeros(pad, dtype=np.float32))[:need]
+        if len(out) < need:
+            out = np.pad(out, (0, need - len(out)))
+        self.given += len(out)
+        return np.ascontiguousarray(out, dtype=np.float32)
+
+
 class DenoiseModel(Model):
     """Speech enhancement: noise removed from a recording, voice kept. Audio in and out at ``sample_rate``."""
 
     task = "denoise"
+    #: can enhance a live stream (a cloud API that takes a whole recording per request cannot)
+    live: bool = True
 
     @abc.abstractmethod
     def denoise(self, samples: FloatArray) -> FloatArray:
         """The enhanced recording (mono float32 at ``sample_rate``), as long as the input."""
+
+    def create_stream(self) -> DenoiseStream:
+        """A live stream (:class:`DenoiseStream`); models without a streaming form overlap pieces instead."""
+        return OverlapDenoiseStream(self)
 
 
 class TurnModel(Model):

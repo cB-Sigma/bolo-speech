@@ -19,8 +19,10 @@ import hashlib
 import json
 import logging
 import os
+import platform
 import shutil
 import stat
+import sys
 import tarfile
 import threading
 import time
@@ -228,7 +230,7 @@ def extract_archive(archive: Path, dest: Path, name: str) -> list[str]:
     members: list[tuple[str, Any]] = []
     lower = name.lower()
     opened: Any
-    if lower.endswith(".zip"):
+    if lower.endswith((".zip", ".whl")):  # a Python wheel is a zip archive
         opened = zipfile.ZipFile(archive)
         for info in opened.infolist():
             if info.is_dir():
@@ -248,7 +250,7 @@ def extract_archive(archive: Path, dest: Path, name: str) -> list[str]:
                 raise DownloadError(f"{name}: archive member '{member.name}' is not a regular file; refusing to unpack")
             members.append((member.name, member))
     else:
-        raise DownloadError(f"{name}: unsupported archive type (use .tar.gz, .tgz, .tar.bz2, .tar or .zip)")
+        raise DownloadError(f"{name}: unsupported archive type (use .tar.gz, .tgz, .tar.bz2, .tar, .zip or .whl)")
     try:
         cleaned: list[tuple[str, Any]] = []
         for raw, member in members:
@@ -277,6 +279,23 @@ def extract_archive(archive: Path, dest: Path, name: str) -> list[str]:
         return sorted(written)
     finally:
         opened.close()
+
+
+def platform_tag() -> str:
+    """This machine as a download's ``platform`` names it: ``linux-x86_64``, ``linux-aarch64``, ``darwin-arm64``,
+    ``win32-amd64``..."""
+    machine = platform.machine().lower() or "unknown"
+    machine = {"x86_64": "x86_64", "amd64": "x86_64", "arm64": "aarch64", "aarch64": "aarch64"}.get(machine, machine)
+    system = "linux" if sys.platform.startswith("linux") else sys.platform
+    return f"{system}-{machine}"
+
+
+def platform_matches(wanted: Any, tag: str | None = None) -> bool:
+    """Whether a file meant for ``wanted`` (a tag or a list of tags; ``darwin`` alone is any Mac) is for this machine."""
+    tag = tag or platform_tag()
+    system = tag.split("-", 1)[0]
+    tags = [wanted] if isinstance(wanted, str) else list(wanted or [])
+    return any(str(t) in (tag, system) for t in tags)
 
 
 def safe_id(model_id: str) -> str:
@@ -512,10 +531,17 @@ class ModelStore:
                 if rel.startswith(".git") or not match_patterns(rel, source.include, source.exclude):
                     continue
                 files.append(RemoteFile(rel, f.url, f.size, f.sha256, f.git_oid))
+        skipped = []
         for u in source.urls:
+            if u.get("platform") and not platform_matches(u["platform"]):
+                skipped.append(u["platform"])  # a file built for another platform (a native library)
+                continue
             files.append(
                 RemoteFile(u["path"], u["url"], u.get("size"), u.get("sha256"), extract=bool(u.get("extract")))
             )
+        if not files and skipped:
+            published = ", ".join(sorted({t for s in skipped for t in ([s] if isinstance(s, str) else s)}))
+            raise DownloadError(f"this model's files are published for {published}, not for {platform_tag()}")
         if not files:
             raise DownloadError("the model source matched no files")
         return files

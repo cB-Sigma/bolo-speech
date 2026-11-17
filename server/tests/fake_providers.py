@@ -10,7 +10,7 @@ openai-compatible  ``GET /v1/models``, ``POST /v1/audio/transcriptions``,      `
 sarvam             ``POST /speech-to-text``, ``/speech-to-text-translate``,    ``api-subscription-key``
                    ``/text-to-speech``
 elevenlabs         ``GET /v2/voices``, ``POST /v1/speech-to-text``,            ``xi-api-key``
-                   ``/v1/text-to-speech/{voice}/stream``
+                   ``/v1/text-to-speech/{voice}/stream``, ``/v1/audio-isolation``
 deepgram           ``GET /v1/projects``, ``POST /v1/listen``                   ``Authorization: Token``
 soniox             under ``/soniox``: ``GET /v1/models``, ``POST /v1/files``,  ``Authorization: Bearer``
                    ``POST /v1/transcriptions``, ``GET /v1/transcriptions/{id}``
@@ -199,6 +199,8 @@ class FakeProviders:
             def _family(self, path: str) -> str:
                 if path.startswith("/soniox/"):
                     return "soniox"
+                if path == "/v1/audio-isolation":
+                    return "elevenlabs"
                 if path.startswith(("/v1/audio", "/v1/models")):
                     return "openai"
                 if path.startswith(("/speech-to-text", "/text-to-speech")):
@@ -234,6 +236,7 @@ class FakeProviders:
                 if content_type.startswith("multipart/form-data"):
                     fields, files = parse_multipart(content_type, body)
                     record["form"] = fields
+                    record["files"] = {name: len(data) for name, data in files.items()}
                 elif content_type.startswith("application/json") and body:
                     doc = json.loads(body)
                     record["json"] = doc
@@ -348,6 +351,13 @@ class FakeProviders:
                         words.append({"text": w, "type": "word", "start": i * step, "end": (i + 1) * step})
                     self._json(200, {"language_code": fields.get("language_code") or "en", "language_probability": 0.99,
                                      "text": text, "words": words})  # fmt: skip
+                elif path == "/v1/audio-isolation":
+                    # the voice comes back as a 44.1 kHz WAV file (the real service sends an encoded file too)
+                    pcm = np.frombuffer(files.get("audio", b""), dtype="<i2").astype(np.float32) / 32768.0
+                    up = np.interp(np.arange(len(pcm) * 44100 // 16000) * 16000 / 44100, np.arange(len(pcm)), pcm)
+                    buf = io.BytesIO()
+                    sf.write(buf, up.astype(np.float32), 44100, format="WAV", subtype="PCM_16")
+                    self._send(200, buf.getvalue(), "audio/wav")
                 elif path.startswith("/v1/text-to-speech/") and path.endswith("/stream"):
                     voice = path.split("/")[3]
                     if voice not in {v["voice_id"] for v in VOICES}:

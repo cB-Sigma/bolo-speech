@@ -6,6 +6,11 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ### Added
 
+- **Demucs denoiser** (`kind: demucs-denoiser`, `demucs-denoiser` extra): `demucs-dns48`, `demucs-dns64`,
+  `demucs-master64` and `demucs-valentini-nc` from facebookresearch/denoiser as bolo `denoise` models, served through
+  the protocol's new `denoise` op (needs a bolo that sends it). Code and weights are CC-BY-NC-4.0: not for commercial
+  use. `pip install --no-deps denoiser julius` is enough (the package's other dependencies are for training).
+- `clearvoice` and `resemble-enhance` kinds are known and answer that they are not implemented yet.
 - **pyannote speaker diarization** (`kind: pyannote-diarization`, `pyannote` extra): `pyannote-speaker-diarization-3.1`
   and `pyannote-speaker-diarization-community-1` as bolo `diarization` models, served through the protocol's new
   `diarize` and `embed` ops (needs a bolo that sends them). Turns in bolo's format, `num_speakers` from the request,

@@ -182,3 +182,68 @@ def _skipped(record: dict[str, Any], detail: str, samples: FloatArray) -> FloatA
     record["detail"] = detail
     log.warning("denoising with '%s' skipped, the original audio is used: %s", record["model"], detail)
     return samples
+
+
+class LiveDenoiser:
+    """``denoise`` on a live stream (the speech-to-text WebSocket): pieces of audio at ``rate`` in, enhanced pieces at
+    ``rate`` out, aligned with the input by sample count (sample ``k`` out is sample ``k`` in, enhanced).
+
+    The model's stream (:meth:`DenoiseModel.create_stream`) keeps its state across pieces when the model has a
+    streaming form (GTCRN and DPDFNet through sherpa-onnx's online denoiser, DeepFilterNet 3, RNNoise); other models
+    enhance each piece with half a second of audio before it. The model runs at its own rate (resampled to it and
+    back, in step). ``strength`` below 1 mixes the original back in. :attr:`ms` collects the time each piece took."""
+
+    def __init__(self, model: DenoiseModel, rate: int, strength: float) -> None:
+        from bolo.audio.resample import StreamResampler
+
+        self.stream = model.create_stream()
+        self.native = int(model.sample_rate)
+        self.rate = rate
+        self.strength = strength
+        self._down = StreamResampler(rate, self.native)
+        self._up = StreamResampler(self.native, rate)
+        self._original = np.zeros(0, dtype=np.float32)  # input not yet matched by output
+        self.ms: list[float] = []
+        self._held = 0  # most audio held back at once (samples at ``rate``): the denoiser's own delay
+
+    def _mix(self, out: FloatArray) -> FloatArray:
+        n = min(len(out), len(self._original))
+        out, original = out[:n], self._original[:n]
+        self._original = self._original[n:]
+        return mix(original, out, self.strength) if self.strength < 1.0 else np.ascontiguousarray(out, np.float32)
+
+    def process(self, samples: FloatArray) -> FloatArray:
+        import time
+
+        t0 = time.perf_counter()
+        samples = np.asarray(samples, dtype=np.float32)
+        self._original = np.concatenate([self._original, samples])
+        native = self._down.process(samples)
+        enhanced = self.stream.process(native) if len(native) else native
+        out = self._mix(self._up.process(enhanced) if len(enhanced) else np.zeros(0, np.float32))
+        self.ms.append((time.perf_counter() - t0) * 1000.0)
+        self._held = max(self._held, len(self._original))
+        return out
+
+    def finish(self) -> FloatArray:
+        """The rest, at the end of the stream: in all, as many samples as were given."""
+        native = self._down.process(np.zeros(0, dtype=np.float32), last=True)
+        enhanced = np.concatenate([self.stream.process(native) if len(native) else native, self.stream.finish()])
+        back = np.concatenate([self._up.process(enhanced), self._up.process(np.zeros(0, np.float32), last=True)])
+        missing = len(self._original) - len(back)
+        if missing > 0:  # resampling rounded the length down: the last few samples are the original's
+            back = np.concatenate([back, self._original[len(back) :]])
+        return self._mix(back)
+
+    def summary(self) -> dict[str, Any]:
+        if not self.ms:
+            return {"chunks": 0}
+        ms = np.asarray(self.ms)
+        return {
+            "chunks": len(ms),
+            "mean_ms": round(float(ms.mean()), 2),
+            "p95_ms": round(float(np.percentile(ms, 95)), 2),
+            "max_ms": round(float(np.max(ms)), 2),
+            "held_ms": round(1000.0 * self._held / self.rate, 1),
+            "stateful": bool(self.stream.stateful),
+        }

@@ -10,6 +10,7 @@ import pytest
 import torch
 
 from bolo_torch.models import orpheus
+from bolo_torch.models.denoise import DemucsDenoiser
 from bolo_torch.models.f5 import F5TTS, batch_result, collect_voices, normalize_ref_text
 from bolo_torch.models.indic_speak import IndicSpeakTTS
 from bolo_torch.models.separation import PixIT, SepFormer
@@ -280,3 +281,37 @@ def test_indic_speak_needs_the_repository(tmp_path: Path) -> None:
     (tmp_path / "x").write_text("")
     with pytest.raises(InvalidRequest, match=r"inference\.py"):
         load(LoadContext("indic-speak", "tts", tmp_path, {}))
+
+
+# -- denoising --------------------------------------------------------------------
+
+
+class _HalfGain(torch.nn.Module):
+    """Stands in for the Demucs network: (batch, 1, time) in, the same shape out, a little shorter."""
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return 0.5 * x[..., :-3]
+
+
+def test_demucs_denoiser_keeps_length_and_rate() -> None:
+    model = DemucsDenoiser(_HalfGain(), "cpu")
+    x = tone(0.5)
+    y = model.denoise(x)
+    assert model.sample_rate == 16000 and model.task == "denoise"
+    assert len(y) == len(x) and y.dtype == np.float32 and np.allclose(y[:-3], 0.5 * x[:-3])
+    dry = DemucsDenoiser(_HalfGain(), "cpu", dry=0.5).denoise(x[:100])
+    assert len(dry) == 100
+
+
+def test_demucs_weights_load_into_the_network(tmp_path: Path) -> None:
+    demucs = pytest.importorskip("denoiser.demucs")
+    from bolo_torch.models.denoise import load_demucs
+    from bolo_torch.runtime import LoadContext
+
+    net = demucs.Demucs(hidden=4, depth=2, sample_rate=16000)
+    torch.save(net.state_dict(), tmp_path / "tiny.th")
+    with pytest.raises(RuntimeError):  # the options must describe the weights' network
+        load_demucs(LoadContext("demucs-denoiser", "denoise", tmp_path, {"hidden": 48}))
+    ctx = LoadContext("demucs-denoiser", "denoise", tmp_path, {"hidden": 4, "depth": 2})
+    model = load_demucs(ctx)
+    assert len(model.denoise(tone(0.3))) == len(tone(0.3))

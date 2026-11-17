@@ -354,6 +354,10 @@ class Adapter(abc.ABC):
     ) -> Iterator[FloatArray]:
         raise InvalidRequest(f"{self.where} has no text-to-speech API in bolo", param="model")
 
+    def isolate(self, samples: FloatArray, rate: int, usage: Usage) -> FloatArray:
+        """The voice of a recording with the background removed (speech enhancement), at ``rate``."""
+        raise InvalidRequest(f"{self.where} has no voice-isolation API in bolo", param="denoise")
+
     def voices(self) -> list[Voice]:
         """Voices the account can use, when the provider lists them (else none: the catalog's are used)."""
         return []

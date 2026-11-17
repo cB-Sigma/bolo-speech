@@ -78,7 +78,7 @@ async def test_plugin_models_through_the_scheduler(plugin_settings: Settings) ->
             proc.running
             and proc.hello["protocol"] == 1
             and proc.hello["kinds"]
-            == ["fake-stt", "fake-tts", "fake-separation", "fake-stt-speakers", "fake-diarization"]
+            == ["fake-stt", "fake-tts", "fake-separation", "fake-stt-speakers", "fake-diarization", "fake-denoise"]
         )
         assert len(proc.handles) == 2
         assert core.engines.status("plugin:ref").available

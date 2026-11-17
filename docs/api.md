@@ -207,7 +207,7 @@ Multipart form.
 | `diarize` | `false` | extension. `true` labels segments with speakers (see [Speaker diarization](#speaker-diarization)); also switched on by `response_format=diarized_json` or the model name `gpt-4o-transcribe-diarize` |
 | `num_speakers`, `min_speakers`, `max_speakers` | - | extension, with diarization: fix or bound the number of speakers |
 | `separate_overlaps` | `false` | extension, with diarization: transcribe overlapped speech from one separated track per speaker (see [Separating overlapping speech](#speaker-diarization)); `separation_model`, `separation_context_s`, `separation_min_overlap_s`, `separation_allow_narrowband` |
-| `denoise` | server default (off) | extension: run a speech-enhancement model before recognition. `true`, `false`, a strength between 0 and 1 (the denoised audio mixed with the original at that weight) or a denoise model id (`gtcrn-simple`); `denoise_strength` sets the strength separately. Unset: the model's pin, then the `denoise` setting. The response header `x-bolo-denoise` names what ran (`gtcrn-simple`, `gtcrn-simple; strength=0.5`, or `skipped; model=…` when the denoiser could not run and the original audio was used). Denoising can make clean audio and Whisper's transcripts worse: configuration.md, "Denoising" |
+| `denoise` | server default (off) | extension: run a speech-enhancement model before recognition. `true`, `false`, a strength between 0 and 1 (the denoised audio mixed with the original at that weight) or a denoise model id (`gtcrn-simple`, or any `task: denoise` model of the catalog: `dpdfnet2`, `deepfilternet3`, `rnnoise`, `demucs-dns48`, `elevenlabs-voice-isolator`, ...); `denoise_strength` sets the strength separately. Unset: the model's pin, then the `denoise` setting. The response header `x-bolo-denoise` names what ran (`gtcrn-simple`, `gtcrn-simple; strength=0.5`, or `skipped; model=…` when the denoiser could not run and the original audio was used). Denoising can make clean audio and Whisper's transcripts worse: configuration.md, "Denoising" |
 | `vad_filter` | auto | extension. `true` forces silence removal before decoding; by default VAD is used only to split audio longer than the model's window |
 | `vad_parameters` | - | extension. Tunes the silence removal, as a JSON object or as bracketed fields (`vad_parameters[threshold]=0.6`, which is how the OpenAI SDKs send a nested `extra_body` object): `threshold` (0 to 1, default 0.5), `min_speech_duration_ms`, `max_speech_duration_s`, `min_silence_duration_ms` (default 300), `speech_pad_ms` (default 150). Given without `vad_filter`, it switches the filter on. `neg_threshold` is accepted and ignored |
 | `chunk_length` | `30` | extension. Longest piece of audio decoded at once, in seconds (1 to 30): audio longer than this goes through silence removal and is cut at pauses into pieces of at most this length, for every engine; faster-whisper also uses it as its own window. With `vad_filter=false` nothing is cut, and faster-whisper decodes the audio in windows of this length: short windows of silence are where Whisper hallucinates most, so keep the filter on with a short `chunk_length` |
@@ -1289,6 +1289,7 @@ Realtime transcription. Query parameters:
 | `diarize` | `false` | add a `speaker` label (`A`, `B`, …) to every final; optional `max_speakers`. See [Speaker diarization](#speaker-diarization) |
 | `endpointing` | `balanced` | how long a pause ends an utterance: `fast` (250 ms), `balanced` (500 ms), `patient` (900 ms). The server default is `endpoint_silence_ms` |
 | `endpoint_ms` | - | the same as an exact number of milliseconds (100 to 5000); wins over `endpointing` |
+| `denoise` | server default (off) | run a speech-enhancement model on the audio before recognition: `true` (the default denoiser, `default_denoise`), `false`, a strength between 0 and 1 (the enhanced audio mixed with the original at that weight), or a denoise model id (`gtcrn-simple`, `dpdfnet2`, `deepfilternet3`, `rnnoise`, ...; `bolo list --task denoise`). `denoise_strength` sets the strength separately. Unset: the model's pin, its catalog option, then the `denoise` setting, as for `/v1/audio/transcriptions`. See [Denoising a live stream](#denoising-a-live-stream) |
 
 Whisper decoding options (`repetition_penalty`, `condition_on_previous_text`, ...) and the repetition guard's
 `max_repeats` are not query parameters: pin them on the model with `PUT /api/v1/models/{id}/settings` (see
@@ -1307,13 +1308,15 @@ Server → client (JSON text frames):
 
 ```jsonc
 {"type":"ready","model":"moonshine-tiny-en","sample_rate":16000,"request_id":"r_000051",
- "encoding":"pcm_s16le","mode":"pseudo","vad":"silero-vad","endpoint_ms":500}   // mode: native | pseudo
+ "encoding":"pcm_s16le","mode":"pseudo","vad":"silero-vad","endpoint_ms":500,
+ "denoise":null}   // mode: native | pseudo; denoise: see below
 {"type":"vad","event":"speech_start","t":1.23}                      // t: seconds into the stream
 {"type":"partial","text":"hello wor","t0":1.1,"t1":1.9,"latency_ms":140.2,"stable_chars":6}
 {"type":"final","text":"Hello world.","t0":1.1,"t1":2.5,"latency_ms":210.4,
  "words":[{"w":"Hello","t0":1.2,"t1":1.5},{"w":"world.","t0":1.6,"t1":2.1}],"language":"en"}
 {"type":"vad","event":"speech_end","t":2.3}
 {"type":"metrics","audio_seconds":3.2,"rtf":0.07,"queue_ms":2.0}   // after each final and before done
+                                                                    // (+ "denoise" when a denoiser runs)
 {"type":"error","code":"overloaded","message":"…"}
 {"type":"done","request_id":"r_000051"}
 ```
@@ -1328,6 +1331,42 @@ backlog passes 30 seconds, the stream ends with `overloaded`.
 
 A connection produces one trace in `/api/v1/requests` (`request_id`), with
 `utterances`, and one `request_progress` event per final.
+
+### Denoising a live stream
+
+With `denoise` (query parameter or `config` message), every chunk of audio
+goes through the denoiser after it is resampled to 16 kHz and before voice
+activity detection and recognition. `ready` says what runs:
+
+```jsonc
+"denoise": {"model":"gtcrn-simple","strength":1.0,"status":"applied","sample_rate":16000,"stateful":true}
+"denoise": {"model":"elevenlabs-voice-isolator","strength":1.0,"status":"skipped",
+            "detail":"'elevenlabs-voice-isolator' enhances whole recordings only, not live streams"}
+"denoise": null    // no denoising
+```
+
+A denoiser that cannot run (not installed and `auto_pull` off, its engine
+missing, a cloud model) is skipped and the stream goes on with the original
+audio, as a transcription request does; an unknown model id or a value that
+is not a strength or a model is an `invalid_request` error.
+
+* **Stateful models** (`stateful: true`) keep their state from chunk to chunk:
+  GTCRN and DPDFNet through sherpa-onnx's online denoiser, DeepFilterNet 3 and
+  RNNoise. Their output is in step with the input (sample `k` out is sample
+  `k` in, enhanced; the result equals denoising the whole recording at once):
+  the model's own delay is cut off, so the stream holds back that much audio
+  (DPDFNet 40 ms, DeepFilterNet 3 30 ms, RNNoise 20 ms, GTCRN up to one 16 ms
+  frame, plus the resampler's few milliseconds for models that run at 8 or
+  48 kHz). Partials and finals come that much later; times (`t0`, `t1`) are
+  unchanged. The held-back audio is released at `stop`.
+* **Other models** (the Demucs denoiser on the PyTorch plugin) enhance each
+  chunk together with the half second of audio before it, and nothing is
+  held back; they cost more per chunk.
+
+`metrics.denoise` reports, for the stream so far: `chunks`, `mean_ms`,
+`p95_ms` and `max_ms` (time spent denoising each chunk), `held_ms` (the most
+audio held back at once) and `stateful`; the trace in `/api/v1/requests` has
+the same under `denoise`.
 
 ## `WS /api/v1/tts/stream`
 

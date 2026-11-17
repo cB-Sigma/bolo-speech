@@ -41,6 +41,8 @@ diarize    ``handle``, ``num_speakers``, ``threshold`` (each may be     ``turns`
            null); the recording follows (16 kHz)                        ``[start, end, speaker]``
 embed      ``handle``; a stretch of one voice follows (16 kHz)          the unit-length embedding
                                                                         follows (float32)
+denoise    ``handle``; the recording follows (at the model's            the enhanced recording follows,
+           ``sample_rate``)                                             as long as the input
 cancel     ``target`` (the id of a running request)                     -
 shutdown   -                                                            - (then the process exits)
 ========== ============================================================ ==============================
@@ -62,7 +64,7 @@ Versioning: bolo sends the highest version it speaks in ``hello``; the plugin an
 version it will use (at most bolo's). A plugin that cannot speak any version bolo knows answers
 with ``ok: false``. New optional members may be added within a version, and new ops that bolo
 only sends to models announcing them in ``info`` (``speakers``, added in bolo 0.3; ``diarize`` and ``embed`` are sent only to models loaded with task
-``diarization``, bolo 0.6.7); anything
+``diarization``, bolo 0.6.7; ``denoise`` only to models loaded with task ``denoise``, bolo 0.6.7); anything
 incompatible gets a new version number.
 """
 

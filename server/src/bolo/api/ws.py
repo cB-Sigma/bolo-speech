@@ -16,6 +16,7 @@ from bolo.api.openai import SpeechStream
 from bolo.audio.encode import StreamEncoder, normalize_format
 from bolo.audio.resample import StreamResampler
 from bolo.core import Bolo
+from bolo.denoise import parse_denoise
 from bolo.errors import BoloError, InvalidRequest
 from bolo.keepalive import request_keep_alive
 from bolo.obs.trace import Trace
@@ -76,7 +77,11 @@ def _stt_config(params: Any, base: SessionConfig | None = None) -> SessionConfig
         max_speakers = int(get("max_speakers")) if get("max_speakers") else cfg.max_speakers
     except (TypeError, ValueError) as exc:
         raise InvalidRequest("max_speakers must be an integer", param="max_speakers") from exc
+    denoise = cfg.denoise
+    if get("denoise") is not None or get("denoise_strength") is not None:
+        denoise = parse_denoise(get("denoise"), strength=get("denoise_strength")) or cfg.denoise
     return SessionConfig(
+        denoise=denoise,
         diarize=parse_bool(get("diarize"), cfg.diarize),
         max_speakers=max_speakers,
         endpoint_ms=endpoint_ms,
@@ -123,7 +128,8 @@ async def _stt_stream(ws: WebSocket) -> None:
     """Realtime transcription.
 
     Query: ``model``, ``language``, ``sample_rate`` (16000), ``encoding``
-    (pcm_s16le | pcm_f32le | mulaw | alaw), ``interim`` (true), ``vad`` (true), ``keep_alive``.
+    (pcm_s16le | pcm_f32le | mulaw | alaw), ``interim`` (true), ``vad`` (true), ``denoise`` (true, false, a strength
+    or a denoise model id; ``denoise_strength``), ``keep_alive``.
     Client sends binary audio frames and JSON ``config`` / ``flush`` / ``stop``.
     """
     core: Bolo = ws.app.state.core

@@ -142,10 +142,17 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | STT | Sarvam (cloud) | 3 | as, bn, brx, doi, en, gu, hi, kn +15 | 0 | - |
 | TTS | Sarvam (cloud) | 3 | bn, en, gu, hi, kn, ml, mr, or +3 | 0 | - |
 | TTS | ElevenLabs (cloud) | 3 | ar, bg, cs, da, de, el, en, es +24 | 0 | - |
+| DENOISE | ElevenLabs (cloud) | 1 | - | 0 | - |
 | STT | ElevenLabs (cloud) | 2 | af, am, ar, as, az, ba, be, bg +92 | 0 | - |
 | STT | Deepgram (cloud) | 2 | af, ar, as, be, bg, bn, bs, ca +53 | 0 | - |
 | STT | Soniox (cloud) | 2 | af, ar, az, be, bg, bn, bs, ca +52 | 0 | - |
 | DENOISE | GTCRN | 1 | - | 1 | 0.060 (`gtcrn-simple`) |
+| DENOISE | DPDFNet | 8 | - | 0 | - |
+| DENOISE | DeepFilterNet | 2 | - | 0 | - |
+| DENOISE | RNNoise | 1 | - | 0 | - |
+| DENOISE | Demucs denoiser | 4 | - | 0 | - |
+| DENOISE | ClearVoice | 3 | - | 0 | - |
+| DENOISE | Resemble Enhance | 1 | - | 0 | - |
 | DIARIZATION | pyannote + speaker embeddings | 3 | - | 1 | 0.106 (`pyannote-3.0-eres2net`) |
 | DIARIZATION | Nemotron diarization | 1 | - | 1 | 0.039 (`nemotron-3-diarization`) |
 | TTS | Parler-TTS | 2 | as, bn, brx, doi, en, gu, hi, hne +13 | 2 | 4.540 (`parler-tts-tiny-v1`) |
@@ -194,7 +201,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | VAD | WebRTC VAD | 2 | - | 2 | 0.000 (`webrtc-vad-aggressive`) |
 | VAD | Energy VAD | 1 | - | 1 | 0.000 (`energy-vad`) |
 
-**356 models in the catalog, 143 validated on CPU, 213 untested**, plus 22 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**375 models in the catalog, 143 validated on CPU, 232 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.
