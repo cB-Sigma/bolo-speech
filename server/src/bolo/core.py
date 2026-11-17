@@ -1774,12 +1774,12 @@ class Bolo:
             note["confidence"] = round(found.confidence, 2)
         elif found.reason:
             note["reason"] = found.reason
-        if not found.sure:
-            return {**note, "source": "default"}, voice, None
-        wanted = [found.language, *found.alternatives]
         named = blend is not None or (
             bool(voice) and (tts.find_voice(voice) is not None or str(voice).lower() not in OPENAI_VOICES)
         )
+        if not found.sure:
+            return {**note, "source": "voice" if named else "default"}, voice, None
+        wanted = [found.language, *found.alternatives]
         if named or cloning:
             current = blend.lead if blend is not None else (tts.find_voice(voice) if voice else None)
             speaks = langdetect.base(current.language) if current is not None and current.language else ""

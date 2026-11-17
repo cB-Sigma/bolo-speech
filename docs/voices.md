@@ -126,7 +126,7 @@ no similarity score; `PATCH` can change its voices (`{"blend": "..."}`, checked 
 voices file, which must hold exactly the model's 54 voices. Blends are therefore spoken by a second instance of the
 model whose voices file holds the blends in use (up to 54; the least recently used makes room for a new one). It
 is created by the first request with a blend and rebuilt when a blend it does not hold arrives, which costs about
-one model load (1 to 2 s on CPU for `kokoro-v1.0-int8`); until the model is unloaded the second instance takes
+one model load (for `kokoro-v1.0-int8`, 1.5 to 5 s more than the same request with a plain voice on a busy 4-vCPU machine); until the model is unloaded the second instance takes
 about as much memory again as the model itself (about 240 MB for `kokoro-v1.0-int8`), which `bolo ps` does not
 count. Requests with a blend already held cost the same as any voice. The optional `kokoro-onnx` engine mixes the
 style per request and needs no second instance.

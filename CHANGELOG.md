@@ -38,7 +38,7 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   (an unknown single voice now names them too). The response carries `x-bolo-blend`. `GET /v1/audio/voices` marks
   the voices that can be blended (`blendable`), and models that blend voices have the feature `voice-blending`.
   With sherpa-onnx, blends are spoken by a second instance of the model that holds the blends in use: the first
-  request with a new blend loads it (1 to 2 s on CPU) and it takes about as much memory again as the model.
+  request with a new blend loads it (a few seconds on CPU) and it takes about as much memory again as the model.
 - **Saved blends** in the voice library: `POST /api/v1/voices/blends` keeps a blend under a name, used as `voice`
   like any saved voice (without `model`, the blend's model answers). A saved blend is marked `"kind": "blend"`,
   listed under `blends` in `GET /api/v1/voices` (apart from the recordings), needs no recording and no consent,

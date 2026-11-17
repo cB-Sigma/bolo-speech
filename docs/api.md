@@ -293,9 +293,10 @@ Russian, Ukrainian or Bulgarian), and Latin-script text is scored against the mo
 languages. It needs no model and no dependency (`bolo.text.langdetect`). Text that is too short or ambiguous
 ("OK", a list of names) is reported as unsure and changes nothing.
 
-* No voice named (or an OpenAI voice name, which a stock client sends for any voice): the first voice of the
-  model that speaks the language answers; for a language the model has no voice of, the closest language of the
-  same script (Marathi → a Hindi voice). An OpenAI voice name picks among the voices of that language.
+* No voice named (or an OpenAI voice name the model has no voice of, which a stock client sends for any voice):
+  the first voice of the model that speaks the language answers; for a language the model has no voice of, the
+  closest language of the same script (Marathi → a Hindi voice). Such an OpenAI voice name picks among the voices
+  of that language. (Kokoro has a voice called Alloy, `af_alloy`: `"alloy"` names it.)
 * A voice of the model named: it is kept. A voice with no particular language (most `tts-server` models) is told
   the detected language.
 * The model does not offer the language, or the guess is unsure: the default stays.
@@ -309,7 +310,7 @@ The response header `x-bolo-language` says what was decided, as `<language>; sou
 | `hi-IN; source=detected; detected=mr; script=Devanagari; matched=hi; voice=hf_alpha` | no Marathi voice: the closest language of the script |
 | `ta; source=detected; detected=ta; script=Tamil` | a voice without a language was told the language |
 | `en-US; source=voice; detected=hi; script=Devanagari; mismatch=true` | the named voice was kept; it speaks another language than the text |
-| `en-US; source=default; detected=unsure; script=Latin` | unsure: the default voice and language stayed |
+| `en-US; source=default; detected=unsure; script=Latin` | unsure: the default voice and language stayed (`source=voice` when a voice was named) |
 | `en-US; source=default; detected=fr; script=Latin; offered=false` | the model offers no voice or language for it |
 | `en-US; source=model` | a model with one language: nothing to choose |
 

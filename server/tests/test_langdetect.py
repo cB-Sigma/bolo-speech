@@ -104,6 +104,8 @@ def test_detected_language_picks_a_voice(client: TestClient) -> None:
 def test_unsure_or_unoffered_keeps_the_default(client: TestClient) -> None:
     r = speak(client, input="OK.")
     assert r.headers["x-bolo-language"].startswith("en-US; source=default; detected=unsure")
+    r = speak(client, input="OK.", voice="beta")
+    assert r.headers["x-bolo-language"].startswith("en-GB; source=voice; detected=unsure")
     r = speak(client, input="Bonjour, je suis très content de vous voir ici.")
     assert r.headers["x-bolo-language"] == "en-US; source=default; detected=fr; script=Latin; offered=false"
 
