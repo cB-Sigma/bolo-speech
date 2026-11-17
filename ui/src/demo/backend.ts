@@ -228,7 +228,12 @@ export class DemoBackend {
         const p = placementOf(r)
         return {
           id: r.id,
-          task: r.task === 'tts' ? 'tts' : 'stt',
+          task:
+            r.task === 'tts' || r.task === 'vad' || r.task === 'turn' || r.task === 'denoise'
+              ? r.task
+              : r.task === 'diarize' || r.task === 'embed'
+                ? 'diarization'
+                : 'stt',
           loaded: true,
           memory_bytes: r.bytes,
           memory_estimated: true,

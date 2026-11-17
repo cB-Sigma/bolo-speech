@@ -21,7 +21,10 @@ import { isPhoneLike, verdictFor } from '@/lib/device'
 import { isDownloaded } from '@/lib/downloads'
 import { fmtBytes } from '@/lib/format'
 import { prefs } from '@/lib/prefs'
+import { audioEngine } from '@/lib/browser-audio/engine'
 import { BrowserTranscriber } from '@/lib/stt/browser'
+import { ModelVad, type TurnCheck } from '@/lib/stt/model-vad'
+import { ListeningPanel } from './listening-panel'
 import { cn } from '@/lib/utils'
 
 /** Speaks with the voice chosen on the Text to speech screen, into one gapless player. */
@@ -91,6 +94,7 @@ export function BrowserConversation() {
     off: () => void
   } | null>(null)
   const [starting, setStarting] = useState(false)
+  const [checks, setChecks] = useState<TurnCheck[]>([])
   const [live, setLive] = useState(false)
   const gpu = d.webgpu
   const onGpu = Boolean(gpu?.available && gpu.f16)
@@ -144,14 +148,27 @@ export function BrowserConversation() {
       conv ??
       new Conversation(() => (source === 'endpoint' ? new EndpointLlm(readEndpoint()) : llm), voiceSpeaker(player))
     try {
+      const p = prefs.get()
+      // The detector and the end-of-turn model load while the microphone opens.
+      const vadEngine = p.browserVad !== 'energy-vad' ? audioEngine('vad') : null
+      const turnEngine = p.browserTurn ? audioEngine('turn') : null
+      const loads = [
+        vadEngine?.load(p.browserVad, p.browserAudioDevice),
+        turnEngine?.load(p.browserTurn as string, p.browserAudioDevice),
+      ]
+      setChecks([])
       const transcriber = new BrowserTranscriber(sharedEngine(), {
         language: 'auto',
-        endpointMs: 600,
-        maxRepeats: prefs.get().browserMaxRepeats,
+        // With an end-of-turn model a short pause is enough to ask it; the model decides whether the turn ends.
+        endpointMs: turnEngine ? 300 : 600,
+        maxRepeats: p.browserMaxRepeats,
+        vad: vadEngine ? new ModelVad(vadEngine, { endMs: turnEngine ? 300 : 600 }) : undefined,
+        turn: turnEngine ? { engine: turnEngine, maxWaitMs: 2500 } : undefined,
+        onTurnCheck: (check) => setChecks((all) => [...all.slice(-4), check]),
       })
       const off = transcriber.store.subscribe(() => c.onTranscript(transcriber.store.get()))
       const mic = await openMicrophone((b) => transcriber.push(b))
-      await transcriber.start()
+      await Promise.all([transcriber.start(), ...loads])
       if (source === 'page') void llm.load().catch(() => undefined)
       parts.current = { mic, transcriber, player, off }
       setLive(true)
@@ -270,6 +287,7 @@ export function BrowserConversation() {
           </Panel>
         </div>
         <div className="grid min-w-0 content-start gap-4">
+          <ListeningPanel disabled={live || starting} checks={checks} />
           <Panel title="Language model" data-testid="llm-settings">
             <div className="grid gap-3 text-xs">
               <Select value={source} onValueChange={(v) => setSource(v as 'page' | 'endpoint')} disabled={live}>

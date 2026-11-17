@@ -563,7 +563,7 @@ export default function DiarizePage() {
               ))}
             </ul>
           </Panel>
-          {!isDemo && <VoiceCompare />}
+          <VoiceCompare inBrowser={isDemo} />
           <DownloadsPanel />
         </div>
       </div>

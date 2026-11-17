@@ -42,6 +42,22 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   after installing their pinned requirements with PyTorch. Tested with fakes only (Freeze-Omni's against
   python-socketio's server).
 
+- **Live demo: the server's new audio features run in the page.** Small models of their own, with the server's
+  catalog ids and licences, one worker each, listed in the downloads manager and Loaded models and unloaded by the
+  keep-alive (`ui/src/lib/browser-audio/`). **Denoise first** on Speech to text (files and the live microphone):
+  `gtcrn-simple` (served by the demo itself, as the original is a release asset), `dpdfnet-baseline`, `dpdfnet2`,
+  `dpdfnet4`, `dpdfnet8`, `deepfilternet3` and `rnnoise`, with a strength and the take before and after to play;
+  each follows the server's STFT, state and delay handling. **Identify the language first**:
+  `voxlingua107-ecapa-int8` hears a file or sample and routes it as `model=auto` does on the server (a downloaded
+  recogniser that speaks the language, else a suggestion; the decision spelled as `x-bolo-route`). **Voice activity
+  and end of turn** on the Conversation page: Silero v4, v5, v6, TEN VAD (its own WebAssembly build) or the energy
+  detector, and Smart Turn v3.2, v3.1, v3.0 or v3.2 32-bit asked at each pause, with each check shown. **Compare two
+  voices** on Speakers with the speaker embedders (`eres2net-voxceleb`, calibrated thresholds, and five others).
+  Measured on WebAssembly and WebGPU in headless Chromium (WebGPU there is SwiftShader; it was 4 to 60 times slower
+  and gave different numbers for several graphs): every one defaults to WebAssembly, WebGPU stays a choice
+  (docs/measurements/browser-audio-models.json, docs/ui-server-notes.md "Small audio models in the page"). Left
+  out, with the reason shown in the page: the Demucs denoiser, the cloud isolator, MMS-LID, AmberNet, the torch
+  identifiers, WebRTC and MarbleNet VAD, TitaNet, Namo, and the speech-to-speech and full-duplex models.
 - **Full-duplex speech-to-speech models: Moshi, Hibiki, Hibiki-Zero and PersonaPlex** (`s2s_model` naming one, with
   `realtime_pipeline = "speech-to-speech"`). A full-duplex model hears and speaks at once and answers by itself; a
   shared layer, `bolo.duplex`, runs any such model behind Realtime (WebSocket) and WebRTC sessions: every sample of

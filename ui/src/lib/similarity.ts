@@ -4,6 +4,8 @@ export const SAME_SPEAKER = 0.5
 export const SIMILAR = 0.3
 /** The embedding model the thresholds were measured with. */
 export const CALIBRATED_MODEL = 'pyannote-3.0-eres2net'
+/** The same embedder by the ids it has (a diarization pipeline's, and its own since speaker embedders are models). */
+export const CALIBRATED_MODELS = [CALIBRATED_MODEL, 'eres2net-voxceleb']
 
 /** Cosine of two vectors (the server's are unit length, but a client should not rely on it); null if unusable. */
 export function cosine(a: number[], b: number[]): number | null {

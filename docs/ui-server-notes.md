@@ -445,3 +445,62 @@ real-time factor of 2.3 where native ONNX Runtime took 0.65 on the same busy mac
 costs about 3.5× here. With isolation switched off (1 thread) the numbers were about the same as
 with 4 threads, so on this loaded machine extra threads did not help; on an idle machine they
 should. A recent laptop or phone will do better than this shared server; it was not measured.
+
+## Small audio models in the page
+
+The live demo runs the server's newer audio features in the page with small models of their own (code in
+`ui/src/lib/browser-audio/`, one worker per task, registered with the downloads list, the Loaded models view,
+the keep-alive and the one-runtime-at-a-time rule of phones). Each keeps the id and licence of the server's
+catalog entry. Files come from Hugging Face at the server's pinned revisions, except where noted.
+
+| Feature (page) | Models (catalog id) | Source | Size | Licence |
+| --- | --- | --- | --- | --- |
+| Denoise first (Speech to text, live mic and files) | `gtcrn-simple` | sherpa-onnx's export, a GitHub release asset: copied next to the page by the Pages workflow (`models/`), SHA-256 checked | 0.5 MB | MIT |
+| | `dpdfnet-baseline`, `dpdfnet2`, `dpdfnet4`, `dpdfnet8` | `Ceva-IP/DPDFNet` (16 kHz builds; the 8 and 48 kHz ones do not fit 16 kHz input) | 8.7–14.5 MB | Apache-2.0 |
+| | `deepfilternet3` | `kimtos-labs/denoiser-dfn3` (torchDF's streaming graph, 48 kHz) | 16.1 MB | MIT OR Apache-2.0 |
+| | `rnnoise` | `@shiguredo/rnnoise-wasm` 2025.1.5 from jsDelivr (its own WebAssembly build of Xiph's library) | 4.8 MB | BSD-3-Clause (wrapper Apache-2.0) |
+| Identify the language first (Speech to text) | `voxlingua107-ecapa-int8` | `doanhlt/cabin-lid-ecapa-voxlingua107-onnx`; SpeechBrain's 60-band filterbank ported from `bolo.engines.lid_onnx` | 21.9 MB | Apache-2.0 |
+| Voice activity (Conversation) | `silero-vad` (v4), `silero-vad-v5`, `silero-vad-v6`, `ten-vad`, `energy-vad` | `csukuangfj/vad`; Silero's repository (raw GitHub, v6); `TEN-framework/ten-vad` (its own WebAssembly build); nothing for the energy detector | 0–2.3 MB | MIT; TEN VAD: Apache-2.0 with Agora's conditions, not for commercial use |
+| End of turn (Conversation) | `smart-turn-v3`, `smart-turn-v3.1`, `smart-turn-v3.0`, `smart-turn-v3-fp32` | `pipecat-ai/smart-turn-v3`; Whisper's log-mel ported from `bolo.audio.features` | 8.7–32.4 MB | BSD-2-Clause |
+| Compare two voices (Speakers) | `eres2net-voxceleb` (default, calibrated), `campplus-voxceleb`, `campplus-zh-en`, `wespeaker-campplus-voxceleb`, `wespeaker-resnet34-voxceleb`, `ecapa-tdnn-voxceleb` | `csukuangfj/speaker-embedding-models`; `Pawls2theWall/equivl-ecapa-voxceleb-onnx` | 26–42 MB | Apache-2.0; WeSpeaker models CC-BY-4.0 |
+
+Left out, with the reason shown next to the choices: the Demucs denoiser (PyTorch, non-commercial), ElevenLabs
+Voice Isolator (cloud), MMS-LID (978 MB, non-commercial), AmberNet (NGC terms), the identifiers on the torch
+plugin (Voxlect, SpeechBrain, mHuBERT: PyTorch), WebRTC VAD (no pinned WebAssembly build), MarbleNet VAD and
+TitaNet (NeMo front end not ported), Namo (136–309 MB and a transcript decode at every pause), and everything
+that needs a server: Voxtral, the speech-to-speech and audio-in models, the full-duplex ones (Moshi, Hibiki,
+PersonaPlex, MiniCPM-o, FLM-Audio, Freeze-Omni).
+
+The feature code follows the server: the same STFT, state and delay handling for each denoiser (checked by the
+signal-to-noise ratio of a sample-aligned output, below), the server's `mix` for the strength, its live
+half-second pieces with half a second of context, its routing for `model=auto` (`x-bolo-route` spelled the same;
+a recogniser that is not downloaded is only suggested), its segmenter for frame-scoring detectors, Smart Turn's
+8-second window, and its same / similar thresholds (0.50 / 0.30) for ERes2Net only. The filterbank ports are
+held to the server's NumPy output by `ui/src/lib/browser-audio/dsp.test.ts`.
+
+### WebAssembly or WebGPU: measured
+
+Headless Chromium on the build machine (4 cores of an Intel Xeon @ 2.10 GHz, no GPU, load average 12 to 20
+from other jobs). Headless Chromium has no hardware GPU here: WebGPU runs on SwiftShader (Vulkan emulated on the
+CPU), so the WebGPU column says what per-op dispatch costs these graphs, not what a real GPU does; on a laptop
+GPU the earlier recogniser measurements found small models 2 to 10 times faster on WebAssembly too. Full record:
+`docs/measurements/browser-audio-models.json`. Real-time factor = processing time per second of audio.
+
+| Model | WebAssembly | WebGPU (SwiftShader) | Other result |
+| --- | --- | --- | --- |
+| `gtcrn-simple` | 0.13 | 7.3 | SNR 5.0 → 13.5 dB (WebGPU 13.2) |
+| `dpdfnet-baseline` | 0.20 | over 240 s for 5.5 s | SNR 5.0 → 13.3 dB |
+| `dpdfnet2` | 0.40 | over 240 s | SNR 5.0 → 13.6 dB |
+| `deepfilternet3` | 0.38 | 15.9 | SNR 5.0 → 11.7 dB |
+| `rnnoise` | 0.15 | no WebGPU path | SNR 5.0 → 13.8 dB |
+| `voxlingua107-ecapa-int8` | 0.14 | 4.0 | Hindi 0.99; English 0.46 on 5.5 s (0.81 on the 11 s clip; the server's code gives 0.47 and 0.81) |
+| `silero-vad` / `-v5` / `-v6` | 0.039 / 0.015 / 0.018 | 3.0 / 2.4 / 2.5 | v5 and v6 mark different frames as speech on WebGPU |
+| `ten-vad` | 0.017 | no WebGPU path | |
+| `smart-turn-v3` / `-v3-fp32` | 0.11 / 0.12 | 4.5 / 3.9 | the 8-bit graph answers differently on WebGPU (0.23 against 0.38) |
+| `eres2net-voxceleb` | 0.27 | over 240 s | same speaker 0.72, other speaker −0.06 |
+| `campplus-voxceleb` | 0.085 | 5.1 | WebGPU's embeddings differ (other speaker 0.46 against −0.04) |
+| `wespeaker-resnet34-voxceleb` | 0.19 | over 240 s | same 0.76, other −0.05 |
+| `ecapa-tdnn-voxceleb` | 0.15 | over 240 s | same 0.66, other 0.01 |
+
+Every model defaults to WebAssembly ("Auto"); WebGPU stays a choice in the page. Models run frame by frame
+(denoisers, Silero) use one WebAssembly thread: with two, GTCRN took 0.70 instead of 0.13 here.

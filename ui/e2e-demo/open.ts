@@ -8,7 +8,16 @@ export async function openDemo(page: Page, route = '', opts: { theme?: 'dark' | 
   await page.addInitScript(
     ([theme, cdn]) => {
       localStorage.setItem('bolo.theme', theme as string)
-      localStorage.setItem('bolo.browserStt', JSON.stringify({ modelHost: cdn, ortWasmBase: `${cdn}/ort/` }))
+      localStorage.setItem(
+        'bolo.browserStt',
+        JSON.stringify({
+          modelHost: cdn,
+          ortWasmBase: `${cdn}/ort/`,
+          npmBase: `${cdn}/npm/`,
+          // The demo serves its copy of GTCRN next to the page; the mirror stands in for it.
+          modelsBase: `${cdn}/site-models/`,
+        }),
+      )
       localStorage.setItem('bolo.browserTts', JSON.stringify({ hubHost: cdn }))
     },
     [opts.theme ?? 'dark', CDN],

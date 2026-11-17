@@ -67,6 +67,7 @@ const KIND_TEXT: Record<DownloadEntry['kind'], string> = {
   diarize: 'Speaker diarization',
   llm: 'Language model',
   clone: 'Voice cloning',
+  audio: 'Audio model',
 }
 
 export function DownloadsPanel({ className }: { className?: string }) {

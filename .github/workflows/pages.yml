@@ -8,7 +8,8 @@ name: Live demo
 # this workflow takes the SYSPIN voices that the "Voices" workflow published as assets of the
 # voices-v1 release, plus one Piper voice from Hugging Face at a pinned revision, shrinks them for
 # the browser (ui/scripts/voices/build.py; numpy + onnx + onnxruntime, no PyTorch, a few minutes)
-# and caches the result. Voices not published yet are left out and the demo says so.
+# and caches the result. Voices not published yet are left out and the demo says so. The GTCRN denoiser, published
+# only as a release asset, is copied next to the page the same way.
 
 on:
   push:
@@ -76,6 +77,15 @@ jobs:
         run: |
           cp -r .voices ui/dist-demo/voices
           du -sh ui/dist-demo ui/dist-demo/voices
+      - name: Add the models only published as GitHub release assets
+        # A page cannot read release assets (no CORS headers), so the demo serves its own copy, pinned by
+        # SHA-256 as in the server's catalog (ui/src/lib/browser-audio/models.ts, `from: 'site'`).
+        run: |
+          mkdir -p ui/dist-demo/models
+          curl -fsSL -o ui/dist-demo/models/gtcrn_simple.onnx \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/speech-enhancement-models/gtcrn_simple.onnx
+          echo "e77603ac0c23dac3227dd2d7135b3a585cbee2679048aecfa886657d3ae1b534  ui/dist-demo/models/gtcrn_simple.onnx" \
+            | sha256sum -c -
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:

@@ -85,8 +85,8 @@ self.addEventListener('fetch', (event) => {
   if (sameOrigin && cacheable && /\/voices\/uccharan\//.test(url.pathname)) {
     // The phonemiser's language data: small, fetched by the library itself; network first (a new version has new files), kept for offline use.
     work = networkFirst(request)
-  } else if (sameOrigin && /\/voices\//.test(url.pathname)) {
-    // Voices are large and the synthesiser keeps its own copy (Cache Storage, "bolo-voices"): pass through.
+  } else if (sameOrigin && /\/(voices|models)\//.test(url.pathname)) {
+    // Voices and models keep their own copies (Cache Storage, "bolo-voices", "bolo-audio-models"): pass through.
     work = fetch(request)
   } else if (sameOrigin && cacheable) {
     // Hashed build assets never change; everything else (the page itself) prefers the network.

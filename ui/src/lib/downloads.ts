@@ -15,7 +15,7 @@ import { Store } from '@/lib/store'
  * "Clear all" deletes whole caches.
  */
 
-export type ModelKind = 'tts' | 'stt' | 'diarize' | 'llm' | 'clone'
+export type ModelKind = 'tts' | 'stt' | 'diarize' | 'llm' | 'clone' | 'audio'
 
 export interface DownloadEntry {
   id: string
@@ -85,7 +85,7 @@ export type Backend = 'webgpu' | 'wasm' | 'split'
 export interface Resident {
   id: string
   label: string
-  task: 'stt' | 'tts' | 'diarize' | 'llm' | 'vad' | 's2s'
+  task: 'stt' | 'tts' | 'diarize' | 'llm' | 'vad' | 's2s' | 'denoise' | 'lid' | 'turn' | 'embed'
   backend: Backend
   /** Estimated memory it takes while loaded (a page cannot measure one model's share), bytes. */
   bytes: number
@@ -368,7 +368,12 @@ function readInterrupted(): InterruptedLoad | null {
     if (!raw) return null
     const v = JSON.parse(raw) as Partial<InterruptedLoad>
     return typeof v.id === 'string' &&
-      (v.kind === 'tts' || v.kind === 'stt' || v.kind === 'diarize' || v.kind === 'llm' || v.kind === 'clone')
+      (v.kind === 'tts' ||
+        v.kind === 'stt' ||
+        v.kind === 'diarize' ||
+        v.kind === 'llm' ||
+        v.kind === 'clone' ||
+        v.kind === 'audio')
       ? { kind: v.kind, id: v.id, at: Number(v.at) || 0 }
       : null
   } catch {

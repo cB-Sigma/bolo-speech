@@ -6,7 +6,9 @@ import { diag } from '@/lib/diagnostics'
 import type { MicFailure } from '@/lib/mic-help'
 import { prefs } from '@/lib/prefs'
 import { levelFromRms, type LevelTrack } from '@/components/charts/level-strip'
+import { audioEngine } from '@/lib/browser-audio/engine'
 import { BrowserTranscriber } from '@/lib/stt/browser'
+import { DenoisingTranscriber } from '@/lib/stt/denoising'
 import { ServerTranscriber } from '@/lib/stt/server'
 import type { Transcriber } from '@/lib/stt/transcriber'
 
@@ -58,6 +60,8 @@ export function useSttSession() {
   const [phase, setPhase] = useState<Phase>('idle')
   const [server, setServer] = useState<Transcriber | null>(null)
   const [browser, setBrowser] = useState<Transcriber | null>(null)
+  /** The denoiser in front of the in-browser recogniser, when one is chosen. */
+  const [denoiser, setDenoiser] = useState<DenoisingTranscriber | null>(null)
   const [input, setInput] = useState<SessionInput | null>(null)
   const [error, setError] = useState<SessionError | null>(null)
   const [mic, setMic] = useState<MicState>('off')
@@ -158,14 +162,25 @@ export function useSttSession() {
         cfg.mode !== 'browser'
           ? new ServerTranscriber({ model: cfg.model, language: cfg.language, telephony: cfg.telephony })
           : null
-      const brw =
+      const p = prefs.get()
+      const recogniser =
         cfg.mode !== 'server'
           ? new BrowserTranscriber(sharedEngine(), {
               language: cfg.browserLanguage ?? 'auto',
-              maxRepeats: prefs.get().browserMaxRepeats,
+              maxRepeats: p.browserMaxRepeats,
             })
           : null
-      const all = [srv, brw].filter((t): t is ServerTranscriber | BrowserTranscriber => t != null)
+      const dn =
+        recogniser && p.browserDenoise
+          ? new DenoisingTranscriber(recogniser, audioEngine('denoise'), {
+              model: p.browserDenoise,
+              strength: p.browserDenoiseStrength,
+              device: p.browserAudioDevice,
+            })
+          : null
+      setDenoiser(dn)
+      const brw: Transcriber | null = dn ?? recogniser
+      const all = [srv, brw].filter((t): t is Transcriber => t != null)
       active.current = all
       setServer(srv)
       setBrowser(brw)
@@ -249,5 +264,20 @@ export function useSttSession() {
 
   useEffect(() => cancel, [cancel])
 
-  return { phase, server, browser, input, error, mic, buffered, levels, taken, start, stop, cancel, clearError }
+  return {
+    phase,
+    server,
+    browser,
+    denoiser,
+    input,
+    error,
+    mic,
+    buffered,
+    levels,
+    taken,
+    start,
+    stop,
+    cancel,
+    clearError,
+  }
 }

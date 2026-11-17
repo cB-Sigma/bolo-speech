@@ -1,5 +1,5 @@
 import { oneRuntimeAtATime } from '@/lib/browser-runtime'
-import { interrupted } from '@/lib/downloads'
+import { interrupted, isDownloaded } from '@/lib/downloads'
 import {
   Cloud,
   Copy,
@@ -28,6 +28,9 @@ import { DevicePanel } from '@/components/model-fit'
 import { DownloadsPanel, InterruptedLoadNotice } from '@/components/downloads-panel'
 import { BrowserEnginePanel } from '@/components/stt/engine-panel'
 import { BrowserProcessingPanel } from '@/components/stt/browser-processing'
+import { audioEngine } from '@/lib/browser-audio/engine'
+import { resample } from '@/lib/audio/resample'
+import { routeByLanguage, type LidDecision } from '@/lib/stt/routing'
 import { BrowserModelPicker, LanguageSelect, SwitchModelDialog } from '@/components/stt/language-controls'
 import { MicHelpPanel, MicStatusLine } from '@/components/stt/mic-help'
 import { LoadProgress, LoadTrouble, ModelStatusChip } from '@/components/stt/model-status'
@@ -255,6 +258,7 @@ export default function SttPage() {
   const bLanguage = bModel.multilingual ? p.browserLanguage : (bModel.languages[0] ?? 'en')
   const browserLanguages = useMemo(() => [...new Set(BROWSER_MODELS.flatMap((m) => m.languages))], [])
   const [switchFor, setSwitchFor] = useState<string | null>(null)
+  const [lidDecision, setLidDecision] = useState<LidDecision | null>(null)
   const [helpOpen, setHelpOpen] = useState(false)
   const lessData = useMemo(() => prefersLessData(), [])
   useEffect(() => {
@@ -321,11 +325,39 @@ export default function SttPage() {
     })
   }
 
+  /**
+   * The server's routing for `model=auto` with no language: the clip is heard by the language identifier first
+   * and goes to a recogniser that speaks what it heard. Returns the language to tell the recogniser, if any.
+   */
+  const identify = async (samples: Float32Array, rate: number): Promise<LidDecision | null> => {
+    const lid = p.browserLid
+    if (!lid || mode !== 'browser') return null
+    if (bModel.multilingual && bLanguage !== 'auto') return null
+    try {
+      const x = rate === STT_RATE ? samples : resample(samples, rate, STT_RATE)
+      const heard = x.subarray(0, 30 * STT_RATE)
+      const engine = audioEngine('lid')
+      await engine.load(lid, p.browserAudioDevice)
+      const { ranked, ms } = await engine.identify(heard)
+      const decision = routeByLanguage(ranked, bModel, isDownloaded, { seconds: heard.length / STT_RATE, ms, lid })
+      setLidDecision(decision)
+      if (decision.reason === 'routed') chooseBrowserModel(decision.model)
+      return decision
+    } catch (err) {
+      toast.error('Could not identify the language', { description: describeError(err) })
+      return null
+    }
+  }
+
   const startFile = async (name: string, data: ArrayBuffer, browserLanguage?: string) => {
     try {
       const audio = await decodeAudio(data)
       if (audio.samples.length === 0) throw new Error('The file contains no audio')
-      begin({ kind: 'file', label: name, samples: audio.samples, sampleRate: audio.sampleRate }, browserLanguage)
+      const decision = browserLanguage ? null : await identify(audio.samples, audio.sampleRate)
+      begin(
+        { kind: 'file', label: name, samples: audio.samples, sampleRate: audio.sampleRate },
+        browserLanguage ?? decision?.language ?? undefined,
+      )
     } catch (err) {
       toast.error(`Could not read ${name}`, { description: err instanceof Error ? err.message : undefined })
     }
@@ -333,6 +365,18 @@ export default function SttPage() {
 
   const startSample = async (s: Sample) => {
     if (!s.url) return
+    if (mode === 'browser' && p.browserLid) {
+      // The language identifier decides, as for any file.
+      setBusySample(s.id)
+      try {
+        await startFile(s.id, await api.bytes(s.url))
+      } catch (err) {
+        toast.error('Could not load the sample', { description: describeError(err) })
+      } finally {
+        setBusySample(null)
+      }
+      return
+    }
     if (mode === 'browser' && s.language && !bModel.languages.includes(s.language)) {
       // The sample is in a language this model cannot do: offer the ones that can.
       setSwitchFor(s.language)
@@ -1005,7 +1049,15 @@ export default function SttPage() {
             )}
           </Panel>
 
-          {mode !== 'server' && <BrowserProcessingPanel disabled={running} removed={browserState.repeatsRemoved} />}
+          {mode !== 'server' && (
+            <BrowserProcessingPanel
+              disabled={running}
+              removed={browserState.repeatsRemoved}
+              denoiser={session.denoiser}
+              decision={lidDecision}
+              onSuggest={(lang) => setSwitchFor(lang)}
+            />
+          )}
           {mode !== 'server' && <DownloadsPanel />}
           {mode !== 'server' && <DevicePanel />}
           {mode !== 'server' && (

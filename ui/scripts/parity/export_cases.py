@@ -6,7 +6,7 @@ page to the same results (src/lib/langdetect.test.ts, src/lib/repeat-guard.test.
 Language detection: every text of the server's own tests (server/tests/test_langdetect.py, read with `ast`, so
 new cases there are picked up) and a corpus of harder ones, each with what bolo.text.langdetect.detect answers.
 The repetition guard: the server tests' texts and sequences of live finals, with what trim_repeats and RepeatGuard
-answer. Rerun after changing either module on the server, and commit the JSON.
+answer. The feature front ends: server-features.json (see export_features). Rerun after changing either module on the server, and commit the JSON.
 """
 
 from __future__ import annotations
@@ -24,6 +24,36 @@ from bolo.stt_options import RepeatGuard, trim_repeats  # noqa: E402
 from bolo.text.langdetect import detect  # noqa: E402
 
 OUT = ROOT / "ui" / "src" / "lib" / "fixtures" / "server-text-cases.json"
+FEATURES = ROOT / "ui" / "src" / "lib" / "fixtures" / "server-features.json"
+
+
+def export_features() -> None:
+    """Whisper's log-mel (Smart Turn) and SpeechBrain's 60-band filterbank (VoxLingua107) of a test signal, as the
+    server computes them (src/lib/browser-audio/dsp.test.ts). Needs NumPy and ONNX Runtime (bolo.engines.lid_onnx)."""
+    import numpy as np
+
+    from bolo.audio.features import whisper_log_mel
+    from bolo.engines.lid_onnx import fbank60
+
+    i = np.arange(16000)
+    x = (np.sin(i / 7) * 0.3 + 0.1 * np.sin(i / 3.1) + 0.05 * np.sin(i / 0.9)).astype(np.float32)
+    w = whisper_log_mel(x, normalize=True)
+    f = fbank60(x)[0]
+    out = {
+        "whisper": {
+            "shape": list(w.shape),
+            "col0": [round(float(v), 5) for v in w[:, 0]],
+            "col50": [round(float(v), 5) for v in w[:, 50]],
+            "sum": float(w.sum()),
+        },
+        "fbank60": {
+            "shape": list(f.shape),
+            "row0": [round(float(v), 4) for v in f[0]],
+            "row30": [round(float(v), 4) for v in f[30]],
+            "sum": float(f.sum()),
+        },
+    }
+    FEATURES.write_text(json.dumps(out, indent=0) + "\n", encoding="utf-8")
 
 
 def server_test_texts() -> list[dict[str, object]]:
@@ -175,6 +205,7 @@ def main() -> None:
         + "\n",
         encoding="utf-8",
     )
+    export_features()
     print(f"{OUT}: {len(detect_cases)} texts, {len(trim_cases)} trims, {len(live_cases)} live sequences")
 
 

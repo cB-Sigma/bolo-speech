@@ -451,6 +451,10 @@ export interface BrowserSttConfig {
   modelHost?: string
   /** Directory serving the ONNX Runtime `.wasm`/`.mjs` files; defaults to the jsDelivr copy of the pinned version. */
   ortWasmBase?: string
+  /** Base of npm packages loaded at run time (RNNoise's WebAssembly build); defaults to jsDelivr. */
+  npmBase?: string
+  /** Directory of the demo's own model copies (GTCRN); defaults to `models/` next to the demo's page. */
+  modelsBase?: string
   /** Force a device instead of auto-detecting. */
   device?: BrowserDevice
   /** Seconds without any progress before the load is reported as stuck (default 40). */

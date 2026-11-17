@@ -21,6 +21,18 @@ export interface Prefs {
   pickDismissed: boolean
   /** In-browser recogniser: the repetition guard's `max_repeats` (0: off), as on the server. */
   browserMaxRepeats: number
+  /** In-browser recogniser: the denoiser run before it (a model id of src/lib/browser-audio/models.ts), or null. */
+  browserDenoise: string | null
+  /** Share of the denoised audio mixed with the original (the server's `denoise_strength`). */
+  browserDenoiseStrength: number
+  /** In-browser recogniser: identify the spoken language first with this model, or null. */
+  browserLid: string | null
+  /** Where the small audio models run: Auto (their measured default), WebAssembly or WebGPU. */
+  browserAudioDevice: 'auto' | 'wasm' | 'webgpu'
+  /** Conversation in the page: the voice-activity detector (`energy-vad` needs no model). */
+  browserVad: string
+  /** Conversation in the page: the end-of-turn model asked at each pause, or null for silence alone. */
+  browserTurn: string | null
 }
 
 const KEY = 'bolo.prefs'
@@ -38,6 +50,12 @@ const defaults: Prefs = {
   modelsSort: 'default',
   pickDismissed: false,
   browserMaxRepeats: 4,
+  browserDenoise: null,
+  browserDenoiseStrength: 1,
+  browserLid: null,
+  browserAudioDevice: 'auto',
+  browserVad: 'energy-vad',
+  browserTurn: null,
 }
 
 export function readPrefs(): Prefs {

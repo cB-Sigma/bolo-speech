@@ -1,0 +1,296 @@
+{
+ "date": "2026-11-17",
+ "what": "The small audio models of the live demo (ui/src/lib/browser-audio/models.ts) in headless Chromium, on WebAssembly and on WebGPU, through the page's own worker (ui/src/lib/browser-audio/worker.ts), files from a local mirror. Each model: load (download from the local mirror, compile, warm-up), then its task on the repository's en-ask-not sample (first 5.5 s for denoisers, detectors and end of turn; the whole 11 s split in halves plus hi-short for embedders; en-ask-not and hi-short for language identification). ms = time of the task, rtf = ms per second of audio. Denoisers: white noise added at 5 dB SNR; snr_out is the SNR of the output against the clean clip (sample-aligned, so it also checks the delay handling).",
+ "machine": "4 cores of an Intel Xeon @ 2.10 GHz, Linux x86_64, no GPU, shared with other jobs (load average 12 to 20 during the run)",
+ "headless_limits": "Headless Chromium has no hardware GPU here: WebGPU (--enable-unsafe-webgpu) runs on SwiftShader, Vulkan emulated on the CPU, without shader-f16. The WebGPU numbers therefore say how these graphs behave when every op goes through WebGPU's dispatch on a software device, not how fast a real GPU is; on a laptop GPU the earlier recogniser measurements (ui/src/lib/browser-stt/models.ts) found small models 2 to 10 times faster on WebAssembly than on WebGPU too.",
+ "browser": "Chromium 153 (Playwright 1.63), cross-origin isolated, onnxruntime-web 1.31.0-dev",
+ "threads": "1 WebAssembly thread for models run frame by frame (denoisers, Silero), 2 for the others",
+ "info": {
+  "isolated": true,
+  "cores": 4,
+  "gpu": "google swiftshader"
+ },
+ "results": [
+  {
+   "task": "denoise",
+   "id": "gtcrn-simple",
+   "device": "wasm",
+   "loadMs": 704,
+   "snrIn": 5.01,
+   "snrOut": 13.49,
+   "ms": 707,
+   "rtf": 0.1286
+  },
+  {
+   "task": "denoise",
+   "id": "gtcrn-simple",
+   "device": "webgpu",
+   "loadMs": 11388,
+   "snrIn": 5.01,
+   "snrOut": 13.15,
+   "ms": 40075,
+   "rtf": 7.2864
+  },
+  {
+   "task": "denoise",
+   "id": "dpdfnet-baseline",
+   "device": "wasm",
+   "loadMs": 859,
+   "snrIn": 5.01,
+   "snrOut": 13.32,
+   "ms": 1110,
+   "rtf": 0.2018
+  },
+  {
+   "task": "denoise",
+   "id": "dpdfnet-baseline",
+   "device": "webgpu",
+   "error": "timed out after 240 s"
+  },
+  {
+   "task": "denoise",
+   "id": "dpdfnet2",
+   "device": "wasm",
+   "loadMs": 1026,
+   "snrIn": 5.01,
+   "snrOut": 13.55,
+   "ms": 2184,
+   "rtf": 0.397
+  },
+  {
+   "task": "denoise",
+   "id": "dpdfnet2",
+   "device": "webgpu",
+   "error": "timed out after 240 s"
+  },
+  {
+   "task": "denoise",
+   "id": "rnnoise",
+   "device": "wasm",
+   "loadMs": 455,
+   "snrIn": 5.01,
+   "snrOut": 13.81,
+   "ms": 812,
+   "rtf": 0.1477
+  },
+  {
+   "task": "denoise",
+   "id": "rnnoise",
+   "device": "webgpu",
+   "skipped": "no WebGPU path"
+  },
+  {
+   "task": "denoise",
+   "id": "deepfilternet3",
+   "device": "wasm",
+   "loadMs": 838,
+   "snrIn": 5.01,
+   "snrOut": 11.65,
+   "ms": 2091,
+   "rtf": 0.3802
+  },
+  {
+   "task": "denoise",
+   "id": "deepfilternet3",
+   "device": "webgpu",
+   "loadMs": 11649,
+   "snrIn": 5.01,
+   "snrOut": 11.65,
+   "ms": 87493,
+   "rtf": 15.9079
+  },
+  {
+   "task": "turn",
+   "id": "smart-turn-v3",
+   "device": "wasm",
+   "loadMs": 1556,
+   "value": 0.384,
+   "ms": 585,
+   "rtf": 0.1064
+  },
+  {
+   "task": "turn",
+   "id": "smart-turn-v3",
+   "device": "webgpu",
+   "loadMs": 43009,
+   "value": 0.228,
+   "ms": 24750,
+   "rtf": 4.5001
+  },
+  {
+   "task": "turn",
+   "id": "smart-turn-v3-fp32",
+   "device": "wasm",
+   "loadMs": 2515,
+   "value": 0.664,
+   "ms": 680,
+   "rtf": 0.1236
+  },
+  {
+   "task": "turn",
+   "id": "smart-turn-v3-fp32",
+   "device": "webgpu",
+   "loadMs": 31253,
+   "value": 0.664,
+   "ms": 21662,
+   "rtf": 3.9386
+  },
+  {
+   "task": "lid",
+   "id": "voxlingua107-ecapa-int8",
+   "device": "wasm",
+   "loadMs": 2241,
+   "en": "en 0.46, nl 0.12, as 0.06",
+   "hi": "hi 0.99, ur 0.01, gu 0.00",
+   "ms": 1388,
+   "rtf": 0.1441
+  },
+  {
+   "task": "lid",
+   "id": "voxlingua107-ecapa-int8",
+   "device": "webgpu",
+   "loadMs": 12229,
+   "en": "en 0.45, nl 0.11, as 0.07",
+   "hi": "hi 0.99, ur 0.01, gu 0.00",
+   "ms": 38552,
+   "rtf": 3.9997
+  },
+  {
+   "task": "embed",
+   "id": "eres2net-voxceleb",
+   "device": "wasm",
+   "loadMs": 3875,
+   "sameSpeaker": 0.719,
+   "otherSpeaker": -0.055,
+   "ms": 4080,
+   "rtf": 0.2695
+  },
+  {
+   "task": "embed",
+   "id": "eres2net-voxceleb",
+   "device": "webgpu",
+   "error": "timed out after 240 s"
+  },
+  {
+   "task": "embed",
+   "id": "campplus-voxceleb",
+   "device": "wasm",
+   "loadMs": 2007,
+   "sameSpeaker": 0.739,
+   "otherSpeaker": -0.04,
+   "ms": 1288,
+   "rtf": 0.0851
+  },
+  {
+   "task": "embed",
+   "id": "campplus-voxceleb",
+   "device": "webgpu",
+   "loadMs": 20737,
+   "sameSpeaker": 0.862,
+   "otherSpeaker": 0.456,
+   "ms": 77445,
+   "rtf": 5.1156
+  },
+  {
+   "task": "embed",
+   "id": "wespeaker-resnet34-voxceleb",
+   "device": "wasm",
+   "loadMs": 1928,
+   "sameSpeaker": 0.761,
+   "otherSpeaker": -0.046,
+   "ms": 2863,
+   "rtf": 0.1891
+  },
+  {
+   "task": "embed",
+   "id": "wespeaker-resnet34-voxceleb",
+   "device": "webgpu",
+   "error": "timed out after 240 s"
+  },
+  {
+   "task": "embed",
+   "id": "ecapa-tdnn-voxceleb",
+   "device": "wasm",
+   "loadMs": 1472,
+   "sameSpeaker": 0.66,
+   "otherSpeaker": 0.013,
+   "ms": 2314,
+   "rtf": 0.1529
+  },
+  {
+   "task": "embed",
+   "id": "ecapa-tdnn-voxceleb",
+   "device": "webgpu",
+   "error": "timed out after 240 s"
+  },
+  {
+   "task": "vad",
+   "id": "silero-vad",
+   "device": "wasm",
+   "loadMs": 663,
+   "speechFrames": 0.509,
+   "ms": 215,
+   "rtf": 0.0391
+  },
+  {
+   "task": "vad",
+   "id": "silero-vad",
+   "device": "webgpu",
+   "loadMs": 7062,
+   "speechFrames": 0.509,
+   "ms": 16330,
+   "rtf": 2.9691
+  },
+  {
+   "task": "vad",
+   "id": "silero-vad-v5",
+   "device": "wasm",
+   "loadMs": 394,
+   "speechFrames": 0.444,
+   "ms": 84,
+   "rtf": 0.0153
+  },
+  {
+   "task": "vad",
+   "id": "silero-vad-v5",
+   "device": "webgpu",
+   "loadMs": 3789,
+   "speechFrames": 0.31,
+   "ms": 13311,
+   "rtf": 2.4202
+  },
+  {
+   "task": "vad",
+   "id": "silero-vad-v6",
+   "device": "wasm",
+   "loadMs": 422,
+   "speechFrames": 0.526,
+   "ms": 100,
+   "rtf": 0.0182
+  },
+  {
+   "task": "vad",
+   "id": "silero-vad-v6",
+   "device": "webgpu",
+   "loadMs": 4346,
+   "speechFrames": 0.374,
+   "ms": 13806,
+   "rtf": 2.5102
+  },
+  {
+   "task": "vad",
+   "id": "ten-vad",
+   "device": "wasm",
+   "loadMs": 211,
+   "speechFrames": 0.516,
+   "ms": 93,
+   "rtf": 0.017
+  },
+  {
+   "task": "vad",
+   "id": "ten-vad",
+   "device": "webgpu",
+   "skipped": "no WebGPU path"
+  }
+ ]
+}

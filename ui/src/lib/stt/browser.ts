@@ -4,8 +4,9 @@ import type { BrowserSttEngine } from '@/lib/browser-stt/engine'
 import { recordBrowserTrace } from '@/lib/browser-stt/traces'
 import { diag } from '@/lib/diagnostics'
 import { DEFAULT_MAX_REPEATS, RepeatGuard } from '@/lib/repeat-guard'
+import type { FrameVad, TurnCheck, TurnDetector } from './model-vad'
 import { TranscriptTracker, type Transcriber } from './transcriber'
-import { EnergyVad } from './vad'
+import { EnergyVad, type VadEvent } from './vad'
 
 export interface BrowserTranscriberOptions {
   /** Minimum new audio between partial decodes (ms). */
@@ -19,6 +20,15 @@ export interface BrowserTranscriberOptions {
    * more often than this, within a final or running on from the finals before it, is cut to one copy.
    */
   maxRepeats?: number
+  /** A model's voice-activity detector instead of the energy detector (src/lib/stt/model-vad.ts). */
+  vad?: FrameVad
+  /**
+   * An end-of-turn model (Smart Turn): at each pause the utterance is held and the model asked whether the
+   * speaker has finished; if not, the pause has to run longer (`maxWaitMs`) before the turn ends.
+   */
+  turn?: TurnDetector
+  /** Each end-of-turn check, as it happens. */
+  onTurnCheck?: (check: TurnCheck) => void
 }
 
 /** Whisper sees 30 s at a time; cut a non-stop utterance before that. */
@@ -36,14 +46,15 @@ function commonPrefix(a: string, b: string): number {
 }
 
 /**
- * Runs recognition in the page: an energy VAD cuts utterances, the growing
+ * Runs recognition in the page: a voice-activity detector (energy, or a model's) cuts utterances, an
+ * end-of-turn model may hold a pause until the speaker has finished, the growing
  * utterance is re-decoded for partials while the worker is idle, and the
  * whole utterance is decoded once more for the final.
  */
 export class BrowserTranscriber implements Transcriber {
   private readonly tracker = new TranscriptTracker()
   readonly store = this.tracker.store
-  private readonly vad: EnergyVad
+  private readonly vad: FrameVad
   private readonly engine: BrowserSttEngine
   private readonly partialEvery: number
   private preroll: Float32Array[] = []
@@ -65,11 +76,20 @@ export class BrowserTranscriber implements Transcriber {
   /** The model's guess for the utterance being spoken (auto mode). */
   private guessed: string | null = null
   private readonly guard: RepeatGuard
+  /** Seconds of audio that have gone through the detector (behind what was sent while a model detector works). */
+  private heard = 0
+  private vadChain: Promise<void> = Promise.resolve()
+  private readonly turn: TurnDetector | null
+  private readonly onTurnCheck: ((c: TurnCheck) => void) | null
+  /** A pause the end-of-turn model is being asked about (or said was not the end). */
+  private holding: { t: number; since: number; asked: boolean; generation: number } | null = null
 
   constructor(engine: BrowserSttEngine, opts: BrowserTranscriberOptions = {}) {
     this.engine = engine
     this.partialEvery = ((opts.partialEveryMs ?? 600) / 1000) * STT_RATE
-    this.vad = new EnergyVad({ sampleRate: STT_RATE, endMs: opts.endpointMs ?? 500 })
+    this.vad = opts.vad ?? new EnergyVad({ sampleRate: STT_RATE, endMs: opts.endpointMs ?? 500 })
+    this.turn = opts.turn ?? null
+    this.onTurnCheck = opts.onTurnCheck ?? null
     this.language = opts.language ?? 'auto'
     this.guard = new RepeatGuard(opts.maxRepeats ?? DEFAULT_MAX_REPEATS)
   }
@@ -98,20 +118,54 @@ export class BrowserTranscriber implements Transcriber {
     const copy = block.slice()
     this.tracker.markSent(copy.length / STT_RATE)
     const speaking = this.vad.isSpeaking
-    if (speaking) {
+    const events = this.vad.push(copy)
+    if (Array.isArray(events)) {
+      this.step(copy, speaking, events)
+      return
+    }
+    // A model's detector answers later: blocks are handled in order as its answers come.
+    this.vadChain = this.vadChain.then(async () => {
+      const before = this.vad.isSpeaking
+      try {
+        this.step(copy, before, await events)
+      } catch (err) {
+        if (!this.cancelled)
+          this.store.patch({ status: 'error', error: err instanceof Error ? err.message : String(err) })
+      }
+    })
+  }
+
+  /** One block, once the detector has heard it. */
+  private step(copy: Float32Array, speaking: boolean, events: VadEvent[]): void {
+    if (this.cancelled) return
+    this.heard += copy.length / STT_RATE
+    if (speaking || this.holding) {
       this.utterance.push(copy)
       this.utteranceSamples += copy.length
     } else {
       this.preroll.push(copy)
       if (this.preroll.length > 15) this.preroll.shift() // ~300 ms
     }
-    for (const ev of this.vad.push(copy)) {
-      if (ev.event === 'speech_start') this.onStart(ev.t)
+    for (const ev of events) {
+      if (ev.event === 'speech_start') {
+        if (this.holding) {
+          // The speaker went on after a pause the model heard as unfinished: the same turn continues.
+          this.holding = null
+          this.generation += 1
+        } else this.onStart(ev.t)
+      } else if (this.turn) this.hold(ev.t)
       else this.onEnd(ev.t)
+    }
+    const h = this.holding
+    if (h && h.asked && (this.heard - h.since) * 1000 >= (this.turn?.maxWaitMs ?? 2500)) {
+      this.holding = null
+      this.onTurnCheck?.({ probability: NaN, ms: 0, decision: 'timeout', at: h.t })
+      this.onEnd(h.t)
     }
     if (this.vad.isSpeaking && this.utteranceSamples >= MAX_UTTERANCE_S * STT_RATE) {
       // Still talking: close this stretch and carry on in a new one.
-      const t = this.tracker.clock.sentSeconds
+      const t = this.heard
+      this.holding = null
       this.onEnd(t)
       this.preroll = []
       this.onStart(t)
@@ -129,12 +183,41 @@ export class BrowserTranscriber implements Transcriber {
     }
   }
 
+  /** A pause: ask the end-of-turn model about the utterance so far before ending the turn. */
+  private hold(t: number): void {
+    const turn = this.turn
+    if (!turn) return
+    const generation = this.generation
+    this.holding = { t, since: this.heard, asked: false, generation }
+    const audio = concatFloat(this.utterance)
+    void turn.engine
+      .turn(audio)
+      .then(({ value, ms }) => {
+        const h = this.holding
+        if (this.cancelled || !h || h.generation !== generation) return
+        const finished = value >= (turn.threshold ?? 0.5)
+        this.onTurnCheck?.({ probability: value, ms, decision: finished ? 'end' : 'wait', at: t })
+        if (finished) {
+          this.holding = null
+          this.onEnd(t)
+        } else h.asked = true
+      })
+      .catch((err: unknown) => {
+        // Without an answer the pause decides, as with silence alone.
+        diag.error('turn', err instanceof Error ? err.message : String(err))
+        const h = this.holding
+        if (!h || h.generation !== generation) return
+        this.holding = null
+        this.onEnd(t)
+      })
+  }
+
   private onStart(t: number): void {
     const pre = this.preroll
     this.preroll = []
     this.utterance = pre
     this.utteranceSamples = pre.reduce((a, b) => a + b.length, 0)
-    this.utteranceT0 = Math.max(0, this.tracker.clock.sentSeconds - this.utteranceSamples / STT_RATE)
+    this.utteranceT0 = Math.max(0, this.heard - this.utteranceSamples / STT_RATE)
     this.lastPartialSamples = 0
     this.lastPartialText = ''
     this.guessed = null
@@ -235,6 +318,10 @@ export class BrowserTranscriber implements Transcriber {
       return
     }
     this.store.patch({ status: 'finishing' })
+    await this.vadChain
+    const held = this.holding
+    this.holding = null
+    if (held && !this.vad.isSpeaking) this.onEnd(held.t)
     for (const ev of this.vad.flush()) if (ev.event === 'speech_end') this.onEnd(ev.t)
     if (this.decoding > 0) await new Promise<void>((resolve) => (this.idle = resolve))
     this.tracker.abandon()
