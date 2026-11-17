@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-464 models: 169 validated on CPU by the maintainers, 295 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+466 models: 170 validated on CPU by the maintainers, 296 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -743,6 +743,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `smart-turn-v3.1` | ar, bn, da, de, en, es +17 | realtime | - | 9 MB | BSD-2-Clause | **CPU** · RTF 0.070 |
 | `smart-turn-v3.0` | ar, bn, da, de, en, es +17 | realtime | - | 9 MB | BSD-2-Clause | **CPU** · RTF 0.043 |
 | `smart-turn-v3-fp32` | ar, bn, da, de, en, es +17 | realtime | - | 32 MB | BSD-2-Clause | **CPU** · RTF 0.064 |
+| `smart-turn-v2` | en, de, es, fr, hi, it +8 | balanced | - | 379 MB | BSD-2-Clause | **CPU** · RTF 1.588 |
 
 #### Namo Turn Detector
 
@@ -756,6 +757,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `silence-only` | - | realtime | - | 0 MB | Apache-2.0 | **CPU** · RTF 0.000 |
+
+#### TEN Turn Detection
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ten-turn-detection` (TEN Turn Detection) | en, zh | accuracy | - | 4.7 GB | Apache-2.0 with Agora's additional conditions (not on end… ⚠ · runs on llama-server · GPU recommended | untested |
 
 ### Overlapped-speech separation
 
@@ -2121,11 +2128,40 @@ not the size, of the differences on real recordings.
 Realtime sessions with `turn_detection: {"type": "semantic_vad"}` ask an end-of-turn model, at each pause the
 voice-activity detector finds, whether the speaker has finished ([voice-agents.md](voice-agents.md), "Semantic
 turn detection"). `default_turn` chooses it (default `smart-turn-v3`), a session's `turn_detection.turn_model`
-overrides it. Smart Turn listens to the last eight seconds of audio; the Namo models read the transcript, which
-the session decodes at the pause with its transcription model; `silence-only` is no model (the pause ends the
-turn). LiveKit's turn detector (licence: only with the LiveKit Agents framework), TEN Turn Detection (a 7.6 B
-language model, 15 GB) and Smart Turn v2 (PyTorch weights only) cannot run in bolo and are not in the catalog;
-[models-unsupported.md](models-unsupported.md) gives the reasons.
+overrides it. Smart Turn v3 listens to the last eight seconds of audio, Smart Turn v2 to up to 16; the Namo models
+and TEN Turn Detection read the transcript, which the session decodes at the pause with its transcription model;
+`silence-only` is no model (the pause ends the turn). LiveKit's turn detector (licence: only with the LiveKit
+Agents framework) is not in the catalog; [models-unsupported.md](models-unsupported.md) says why.
+
+**Smart Turn v2** (`smart-turn-v2`) was published as PyTorch weights only. bolo reads its safetensors file and
+computes the network (wav2vec2-base, attention pooling, classifier) in its own NumPy code, so it needs no PyTorch
+and no converted or re-hosted file. The reference pads every clip to 16 s; bolo computes the same result over the
+real audio only (the padding's contribution to the first layer's normalisation is added analytically and stays one
+constant per layer afterwards). On 18 clips (the repository's samples, cuts of them, a 20 s clip, noise) its
+probabilities matched Pipecat's model.py run in PyTorch 2.15 with transformers 4.57 to within 4.5e-6. It is heavy:
+a wav2vec2-base pass costs several seconds per check on this shared 4-vCPU machine (load average about 13), so it
+wants a fast CPU or is a reference rather than a live choice. On the scripted set below it took 5.4 s per check (4
+threads, load average 11.3) and was no better than Smart Turn v3.
+
+**TEN Turn Detection** (`ten-turn-detection`) runs on llama-server from a Q4_K_M GGUF that GGUF-my-repo converted
+from the official weights (4.7 GB, pinned by SHA-256), started by bolo (`bolo components install llama-server`) or
+run by you (setting `tts_servers`). At each pause bolo sends the transcript as the user's message with an empty
+system message, as TEN's reference does, asks for one token at temperature 0 with its log-probabilities, and takes
+P(finished) + P(wait) over the three labels as the probability that the turn is over (`wait`, "stop talking", also
+ends the user's turn). It was tested against a stand-in server only; a 7.6-billion-parameter model does not fit
+this machine. To try it on a laptop with a GPU (or 8 GB free for the CPU):
+
+```bash
+bolo components install llama-server     # or set llama_server_bin to your own build (CUDA, Metal)
+bolo pull ten-turn-detection             # 4.7 GB
+BOLO_DEFAULT_TURN=ten-turn-detection BOLO_DEFAULT_REALTIME_STT=moonshine-tiny-en bolo serve
+# a Realtime session with turn_detection {"type": "semantic_vad"}: each turn's trace shows the text and the
+# probability (turn_detection.checks). Or ask directly:
+python server/tools/measure_detectors.py turn --out ten.json ten-turn-detection   # the scripted set (English only)
+```
+
+Its licence: Apache-2.0 per the Hugging Face card, plus Agora's conditions in the GitHub licence file (not hosted
+on end-user devices; only for your own applications; nothing competing with Agora), hence `commercial_use: false`.
 
 **Measured** (docs/measurements/turn-detectors.json, `server/tools/measure_detectors.py turn`). The repository has
 no end-of-turn test data, so the set is scripted for this test: 20 English and 6 Hindi sentences a voice agent
@@ -2143,6 +2179,7 @@ and AUC (how well the two classes are told apart at any threshold); 40 English a
 | `smart-turn-v3.1` | audio | 0.65 | 0.85 / 0.45 | 0.83 | 0.75 | 0.83 | 330 |
 | `smart-turn-v3.0` | audio | 0.70 | 1.00 / 0.40 | 0.92 | 0.50 | 0.78 | 400 |
 | `smart-turn-v3-fp32` (v3.2, float32) | audio | 0.80 | 0.95 / 0.65 | 0.88 | 0.83 | 0.81 | 350 |
+| `smart-turn-v2` (wav2vec2, bolo's NumPy) | audio | 0.63 | 1.00 / 0.25 | 0.83 | 0.75 | 0.83 | 5,400 |
 | `namo-turn-en` | text, as written | **0.98** | 1.00 / 0.95 | 0.97 | - | - | 43 |
 | `namo-turn-en` | text, no final punctuation | 0.85 | 0.75 / 0.95 | 0.96 | - | - | 43 |
 | `namo-turn-multilingual` | text, as written | 0.48 | 0.45 / 0.50 | 0.46 | 0.42 | 0.44 | 79 |
@@ -2158,6 +2195,21 @@ was at chance on this set (its logits stayed close to zero; it reproduces the di
 examples, weakly); do not use it without testing on your own data. The default stays `smart-turn-v3`: it hears
 any language without a decode, and the set is too small and too clean to justify a switch; `smart-turn-v3-fp32`
 (32 MB) or, for English agents, `namo-turn-en` are worth trying.
+
+**Int8 against float32 on a larger set** (docs/measurements/turn-detectors-large.json, `measure_detectors.py
+turn-large`): 60 English and 30 Hindi sentences, in four English and two Hindi Kokoro voices, each whole and cut at
+about 35 % and 65 % of its speech (270 clips):
+
+| | English: accuracy | finished / unfinished right | AUC | Hindi: accuracy | finished / unfinished right | AUC | ms per call |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `smart-turn-v3` (int8) | 0.52 | 0.90 / 0.33 | 0.79 | 0.88 | 0.97 / 0.83 | 0.96 | 290 |
+| `smart-turn-v3-fp32` | 0.60 | 0.87 / 0.47 | 0.81 | 0.90 | 0.77 / 0.97 | 0.94 | 288 |
+
+In English the float32 build was right on 18 clips the int8 build got wrong and wrong on 4 it got right (a sign
+test gives p < 0.01), better in every voice; in Hindi it was 8 against 6: it caught more cut-off sentences (97 %
+against 83 %) but held 23 % of the finished ones open (int8: 3 %), which costs the speaker the full pause before
+the answer. It is as fast (the same network; 32 MB instead of 9). Not consistently better, so it is not proposed
+as the default; for English agents it is the better Smart Turn.
 
 **In a live session** (docs/measurements/turn-text-realtime.json): a Realtime transcription session with
 `moonshine-tiny-en` and `namo-turn-en`, the English sample sent in real time. At each pause the session decoded the

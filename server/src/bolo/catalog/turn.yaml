@@ -1,8 +1,10 @@
 # End-of-turn models: given the utterance so far, has the speaker finished or only paused? Used by Realtime sessions
 # with turn_detection.type = "semantic_vad"; the default_turn setting or a session's turn_detection.turn_model (bolo
-# extension) chooses one. Smart Turn listens to the audio (bolo.engines.onnx_turn); the Namo models read the
-# transcript (option input: text, bolo.engines.text_turn), which the session decodes at each pause. silence-only is
-# no model at all: a pause ends the turn. Models bolo cannot run are listed in docs/models-unsupported.md, not here.
+# extension) chooses one. Smart Turn v3 listens to the audio (bolo.engines.onnx_turn), Smart Turn v2 too (bolo's NumPy
+# code, bolo.engines.smart_turn_v2); the Namo models (bolo.engines.text_turn) and TEN Turn Detection (llama-server,
+# bolo.engines.ten_turn_llamacpp) read the transcript (option input: text), which the session decodes at each pause.
+# silence-only is no model at all: a pause ends the turn. Models bolo cannot run are listed in
+# docs/models-unsupported.md, not here.
 
 - id: smart-turn-v3
   task: turn
@@ -346,3 +348,103 @@
     engine: builtin 0.6.6
     hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
     date: '2026-11-17'
+- id: ten-turn-detection
+  aliases:
+  - ten-turn-detection-q4_k_m
+  task: turn
+  engine: tts-server
+  kind: ten-turn-llamacpp
+  family: TEN Turn Detection
+  languages:
+  - en
+  - zh
+  tier: accuracy
+  size_bytes: 4683075819
+  params: 7600000000
+  license: Apache-2.0 with Agora's additional conditions (not on end-user devices; own applications only; no use
+    competing with Agora)
+  license_url: https://github.com/TEN-framework/ten-turn-detection/blob/b808d8a2eccc0e771965f31b74a04f136f55113f/LICENSE
+  commercial_use: false
+  description: 'TEN Turn Detection (Agora): Qwen2.5-7B fine-tuned to read the user''s words and answer finished,
+    unfinished or wait (the user asked the agent to stop talking), English and Chinese. Reads text: a Realtime session
+    decodes the utterance at each pause and asks it; finished and wait end the turn. Runs on llama.cpp (a Q4_K_M
+    GGUF converted by GGUF-my-repo from the official weights, 4.7 GB) in a llama-server that bolo starts (bolo components
+    install llama-server) or one you run (setting tts_servers). Its Hugging Face card says Apache-2.0; the licence
+    file of its GitHub repository adds Agora''s conditions: not hosted on end-user devices, deployed only for your
+    own applications and their direct end users, nothing that competes with Agora''s offerings. A 7.6-billion-parameter
+    model for a decision at every pause: a GPU is recommended.'
+  source_url: https://huggingface.co/TEN-framework/TEN_Turn_Detection
+  validated: untested
+  requires:
+  - llama-server
+  source:
+    urls:
+    - path: ten_turn_detection-q4_k_m.gguf
+      url: https://huggingface.co/sheldonrobinson/TEN_Turn_Detection-Q4_K_M-GGUF/resolve/660f9e0703893a2fb5b394b87f5f9bbe3e397c43/ten_turn_detection-q4_k_m.gguf
+      size: 4683073536
+      sha256: a30dc8d0d61f6210fb149d378550832d1fe778cd8fb70901ab4a4cd273872bb1
+    - path: LICENSE
+      url: https://raw.githubusercontent.com/TEN-framework/ten-turn-detection/b808d8a2eccc0e771965f31b74a04f136f55113f/LICENSE
+      size: 2283
+      sha256: a94d8491adb2db8158081fb562af51c8728ffa397191ba9a8ba9b94f35512740
+  options:
+    runtime: llama-server
+    model_file: ten_turn_detection-q4_k_m.gguf
+    input: text
+    server_args:
+    - -c
+    - '1024'
+    timeout_s: 120
+    hardware:
+      gpu: recommended
+      vram_gb: 5.5
+      note: 7.6 B parameters at 4 bits; on a CPU each pause costs a forward pass over the prompt
+- id: smart-turn-v2
+  task: turn
+  engine: builtin
+  kind: smart_turn_v2
+  family: Smart Turn
+  languages:
+  - en
+  - de
+  - es
+  - fr
+  - hi
+  - it
+  - ja
+  - ko
+  - nl
+  - pl
+  - pt
+  - ru
+  - tr
+  - zh
+  tier: balanced
+  size_bytes: 379157600
+  params: 94600000
+  license: BSD-2-Clause
+  license_url: https://huggingface.co/pipecat-ai/smart-turn-v2
+  description: 'Smart Turn v2 (Pipecat): wav2vec2-base with attention pooling and a classifier, listening to up
+    to 16 s of the utterance, 14 languages. Published as PyTorch weights only; bolo reads the safetensors file and
+    computes the network in its own NumPy code (no PyTorch, no converted file), which matched the reference PyTorch
+    model to within 5e-6 on the test clips. About 20 times the computation of Smart Turn v3 per check (a wav2vec2-base
+    pass over the utterance): seconds per check on a small CPU. Smart Turn v3 replaced it.'
+  source_url: https://huggingface.co/pipecat-ai/smart-turn-v2
+  validated: cpu
+  measured:
+    rtf: 1.5878
+    audio_s: 5.9
+    load_s: 1.02
+    memory_mb: 752
+    threads: 4
+    engine: builtin 0.6.6
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+  source:
+    urls:
+    - path: model.safetensors
+      url: https://huggingface.co/pipecat-ai/smart-turn-v2/resolve/3267e96b50db03fe030b9869eb35f849a5eea1fa/model.safetensors
+      size: 379157600
+      sha256: 0c4429a3f55d42d055e08903eb961f6ec4021c9e35d489007f3dc4981b6b028b
+  options:
+    file: model.safetensors

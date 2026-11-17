@@ -292,3 +292,177 @@ def test_kaldi_filterbank_frames_and_bands() -> None:
     # 16-bit sample values only move every band by the same amount
     np.testing.assert_allclose(kaldi_fbank(tone, scale=32768.0), feats, atol=1e-3)
     assert kaldi_fbank(tone[:300]).shape == (0, 80)
+
+
+# -- TEN Turn Detection on llama-server ------------------------------------------------------------------
+def test_ten_turn_labels_and_probabilities() -> None:
+    import math
+
+    from bolo.engines.ten_turn_llamacpp import label_of, turn_probability
+
+    assert [label_of(t) for t in ("finished", " Fin", "un", "unfinished", "wait", "w", "maybe", "")] == [
+        "finished", "finished", "unfinished", "unfinished", "wait", "wait", None, None,
+    ]  # fmt: skip
+    top = [{"token": "un", "logprob": math.log(0.6)}, {"token": "finished", "logprob": math.log(0.3)},
+           {"token": "wait", "logprob": math.log(0.1)}]  # fmt: skip
+    p = turn_probability({"logprobs": {"content": [{"token": "un", "top_logprobs": top}]}})
+    assert p is not None and abs(p - 0.4) < 1e-9  # finished and wait end the turn
+    assert turn_probability({"message": {"content": "finished"}}) == 1.0
+    assert turn_probability({"message": {"content": "unfinished"}}) == 0.0
+    assert turn_probability({"message": {"content": "hello"}}) is None
+
+
+async def test_ten_turn_through_an_operator_run_llama_server(settings: Settings) -> None:
+    from fake_ten_turn_server import FakeTenTurnServer
+
+    server = FakeTenTurnServer().start()
+    settings.tts_servers = [f"ten-turn-detection={server.url}"]
+    core = Bolo(settings)
+    await core.start()
+    try:
+        spec = core.turn_model("ten-turn-detection")
+        assert spec is not None and core.turn_reads_text(spec) and not spec.commercial_use
+        done = await core.end_of_turn(speechlike(1.0), text="I'd like a table for two.", model=spec.id)
+        open_ = await core.end_of_turn(speechlike(1.0), text="I'd like a table for", model=spec.id)
+        stop = await core.end_of_turn(speechlike(1.0), text="please stop talking", model=spec.id)
+        assert done is not None and done > 0.9 and open_ is not None and open_ < 0.2 and stop is not None and stop > 0.9
+        body = server.requests[-1]
+        assert body["max_tokens"] == 1 and body["temperature"] == 0.0 and body["logprobs"] is True
+        assert body["messages"] == [
+            {"role": "system", "content": ""}, {"role": "user", "content": "please stop talking"},
+        ]  # fmt: skip
+    finally:
+        await core.stop()
+        server.stop()
+
+
+# -- Smart Turn v2 in NumPy --------------------------------------------------------------------------------
+def _tiny_smart_turn_v2(path: Path) -> dict[str, np.ndarray]:
+    """Random weights in Smart Turn v2's layout, small: 8 conv channels, 48 hidden, 2 layers."""
+    import json as _json
+
+    rng = np.random.default_rng(3)
+    c, d, f = 8, 48, 64
+    kernels = (10, 3, 3, 3, 3, 2, 2)
+    t: dict[str, np.ndarray] = {}
+
+    def r(*shape: int, s: float = 0.3) -> np.ndarray:
+        return (rng.standard_normal(shape) * s).astype(np.float32)
+
+    p = "wav2vec2."
+    for i, k in enumerate(kernels):
+        t[f"{p}feature_extractor.conv_layers.{i}.conv.weight"] = r(c, 1 if i == 0 else c, k)
+    t[f"{p}feature_extractor.conv_layers.0.layer_norm.weight"] = 1 + r(c, s=0.1)
+    t[f"{p}feature_extractor.conv_layers.0.layer_norm.bias"] = r(c, s=0.1)
+    t[f"{p}feature_projection.layer_norm.weight"] = 1 + r(c, s=0.1)
+    t[f"{p}feature_projection.layer_norm.bias"] = r(c, s=0.1)
+    t[f"{p}feature_projection.projection.weight"] = r(d, c)
+    t[f"{p}feature_projection.projection.bias"] = r(d)
+    t[f"{p}encoder.pos_conv_embed.conv.parametrizations.weight.original0"] = 1 + r(1, 1, 128, s=0.1)
+    t[f"{p}encoder.pos_conv_embed.conv.parametrizations.weight.original1"] = r(d, d // 16, 128)
+    t[f"{p}encoder.pos_conv_embed.conv.bias"] = r(d)
+    t[f"{p}encoder.layer_norm.weight"] = 1 + r(d, s=0.1)
+    t[f"{p}encoder.layer_norm.bias"] = r(d, s=0.1)
+    for i in range(2):
+        q = f"{p}encoder.layers.{i}."
+        for n in "qkvo":
+            name = "out_proj" if n == "o" else f"{n}_proj"
+            t[q + f"attention.{name}.weight"] = r(d, d, s=0.15)
+            t[q + f"attention.{name}.bias"] = r(d, s=0.1)
+        t[q + "feed_forward.intermediate_dense.weight"] = r(f, d, s=0.15)
+        t[q + "feed_forward.intermediate_dense.bias"] = r(f, s=0.1)
+        t[q + "feed_forward.output_dense.weight"] = r(d, f, s=0.15)
+        t[q + "feed_forward.output_dense.bias"] = r(d, s=0.1)
+        for ln in ("layer_norm", "final_layer_norm"):
+            t[q + f"{ln}.weight"] = 1 + r(d, s=0.1)
+            t[q + f"{ln}.bias"] = r(d, s=0.1)
+    t["pool_attention.0.weight"], t["pool_attention.0.bias"] = r(16, d), r(16)
+    t["pool_attention.2.weight"], t["pool_attention.2.bias"] = r(1, 16), r(1)
+    t["classifier.0.weight"], t["classifier.0.bias"] = r(16, d), r(16)
+    t["classifier.1.weight"], t["classifier.1.bias"] = 1 + r(16, s=0.1), r(16, s=0.1)
+    t["classifier.4.weight"], t["classifier.4.bias"] = r(8, 16), r(8)
+    t["classifier.6.weight"], t["classifier.6.bias"] = r(1, 8), r(1)
+    header, blobs, offset = {}, [], 0
+    for name, a in t.items():
+        data = a.astype("<f4").tobytes()
+        header[name] = {"dtype": "F32", "shape": list(a.shape), "data_offsets": [offset, offset + len(data)]}
+        blobs.append(data)
+        offset += len(data)
+    head = _json.dumps(header).encode()
+    (path / "model.safetensors").write_bytes(len(head).to_bytes(8, "little") + head + b"".join(blobs))
+    return t
+
+
+def _smart_turn_v2_reference(t: dict[str, np.ndarray], audio: np.ndarray) -> float:
+    """The reference computation, plainly: the clip normalised and zero-padded to 16 s, every frame computed, the
+    masks applied as transformers' Wav2Vec2 and Smart Turn's model.py apply them."""
+    from bolo.engines.smart_turn_v2 import CONV_KERNEL, CONV_STRIDE, conv1d, conv_frames, gelu, layer_norm
+
+    n = len(audio)
+    x = np.zeros(16 * 16000, np.float32)
+    x[:n] = (audio - audio.mean()) / np.sqrt(audio.var() + 1e-7)
+    p = "wav2vec2."
+    h = conv1d(x[:, None], t[f"{p}feature_extractor.conv_layers.0.conv.weight"], 5)
+    mean, var = h.mean(axis=0), h.var(axis=0)
+    g, b = (
+        t[f"{p}feature_extractor.conv_layers.0.layer_norm.weight"],
+        t[f"{p}feature_extractor.conv_layers.0.layer_norm.bias"],
+    )
+    h = gelu((h - mean) / np.sqrt(var + 1e-5) * g + b)
+    for i in range(1, 7):
+        h = gelu(conv1d(h, t[f"{p}feature_extractor.conv_layers.{i}.conv.weight"], CONV_STRIDE[i]))
+    frames = len(h)
+    keep = n
+    for k, s in zip(CONV_KERNEL, CONV_STRIDE, strict=True):
+        keep = conv_frames(keep, k, s)
+    h = layer_norm(h, t[f"{p}feature_projection.layer_norm.weight"], t[f"{p}feature_projection.layer_norm.bias"])
+    h = h @ t[f"{p}feature_projection.projection.weight"].T + t[f"{p}feature_projection.projection.bias"]
+    h[keep:] = 0
+    gw = t[f"{p}encoder.pos_conv_embed.conv.parametrizations.weight.original0"]
+    vw = t[f"{p}encoder.pos_conv_embed.conv.parametrizations.weight.original1"]
+    w = gw * vw / np.sqrt((vw**2).sum(axis=(0, 1), keepdims=True))
+    d = h.shape[1]
+    cg = d // 16
+    padded = np.concatenate([np.zeros((64, d), np.float32), h, np.zeros((64, d), np.float32)])
+    pos = np.concatenate([conv1d(padded[:, i * cg : (i + 1) * cg], w[i * cg : (i + 1) * cg], 1) for i in range(16)], 1)
+    h = layer_norm(h + gelu(pos[:frames] + t[f"{p}encoder.pos_conv_embed.conv.bias"]),
+                   t[f"{p}encoder.layer_norm.weight"], t[f"{p}encoder.layer_norm.bias"])  # fmt: skip
+    mask = np.where(np.arange(frames) < keep, 0.0, -1e30)
+    for i in range(2):
+        q = f"{p}encoder.layers.{i}."
+        hd = d // 12
+
+        def proj(nm: str, z: np.ndarray, q: str = q) -> np.ndarray:
+            return z @ t[q + f"attention.{nm}.weight"].T + t[q + f"attention.{nm}.bias"]
+
+        qq, kk, vv = (proj(f"{nm}_proj", h).reshape(frames, 12, hd).transpose(1, 0, 2) for nm in "qkv")
+        sc = qq @ kk.transpose(0, 2, 1) * hd**-0.5 + mask
+        sc = np.exp(sc - sc.max(-1, keepdims=True))
+        sc /= sc.sum(-1, keepdims=True)
+        att = proj("out_proj", (sc @ vv).transpose(1, 0, 2).reshape(frames, d))
+        h = layer_norm(h + att, t[q + "layer_norm.weight"], t[q + "layer_norm.bias"])
+        ff = gelu(h @ t[q + "feed_forward.intermediate_dense.weight"].T + t[q + "feed_forward.intermediate_dense.bias"])
+        ff = ff @ t[q + "feed_forward.output_dense.weight"].T + t[q + "feed_forward.output_dense.bias"]
+        h = layer_norm(h + ff, t[q + "final_layer_norm.weight"], t[q + "final_layer_norm.bias"])
+    pool_mask = (np.arange(frames) * (len(x) / frames)).astype(np.int64) < n
+    a = np.tanh(h @ t["pool_attention.0.weight"].T + t["pool_attention.0.bias"]) @ t["pool_attention.2.weight"].T
+    a = a[:, 0] + t["pool_attention.2.bias"][0] + np.where(pool_mask, 0.0, -1e9)
+    a = np.exp(a - a.max())
+    v = (h * (a / a.sum())[:, None]).sum(0)
+    z = v @ t["classifier.0.weight"].T + t["classifier.0.bias"]
+    z = gelu(layer_norm(z, t["classifier.1.weight"], t["classifier.1.bias"]))
+    z = gelu(z @ t["classifier.4.weight"].T + t["classifier.4.bias"])
+    logit = float((z @ t["classifier.6.weight"].T + t["classifier.6.bias"])[0])
+    return 1 / (1 + np.exp(-logit))
+
+
+def test_smart_turn_v2_matches_the_full_16_second_computation(tmp_path: Path) -> None:
+    from bolo.engines.base import LoadOptions
+    from bolo.engines.smart_turn_v2 import SmartTurnV2
+
+    t = _tiny_smart_turn_v2(tmp_path)
+    model = SmartTurnV2(tmp_path, {}, LoadOptions())
+    rng = np.random.default_rng(5)
+    for seconds in (0.7, 2.13, 5.0):
+        audio = (speechlike(seconds) + 0.01 * rng.standard_normal(int(seconds * 16000))).astype(np.float32)
+        assert abs(model.probability(audio) - _smart_turn_v2_reference(t, audio)) < 1e-4

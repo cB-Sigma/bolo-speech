@@ -192,11 +192,12 @@ with the bolo extension `turn_detection.turn_model`:
 | --- | --- | --- | --- | --- |
 | `smart-turn-v3` (default), `smart-turn-v3.1`, `smart-turn-v3.0`, `smart-turn-v3-fp32` | the last 8 s of audio; 23 languages | 9 MB (fp32: 32 MB) | BSD-2-Clause | yes (`onnxruntime`) |
 | `namo-turn-en`, `namo-turn-multilingual` | the transcript; English, or 23 languages | 139 MB, 343 MB | Apache-2.0 | yes (`onnxruntime`, `tokenizers`) |
+| `smart-turn-v2` | up to 16 s of audio; 14 languages | 379 MB | BSD-2-Clause | yes (NumPy, built in; seconds per check on a small CPU) |
+| `ten-turn-detection` | the transcript (finished / unfinished / wait); English, Chinese | 4.7 GB | Apache-2.0 with Agora's conditions ⚠ | yes (llama-server; a GPU is recommended) |
 | `silence-only` | nothing: the pause decides | none | - | yes (built in) |
 
-Smart Turn v2, LiveKit's turn detector (its licence allows use only with the
-LiveKit Agents framework) and TEN Turn Detection (a 7.6 B model) are not run
-by bolo; [models-unsupported.md](models-unsupported.md) says why.
+LiveKit's turn detector is not run by bolo: its licence allows use only with
+the LiveKit Agents framework ([models-unsupported.md](models-unsupported.md)).
 
 Models that read text need words, so when the pause comes the session
 decodes the utterance so far with its transcription model (one extra

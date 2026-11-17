@@ -5,7 +5,6 @@
  "packages": {
   "sherpa-onnx": "2.0.1",
   "onnxruntime": "1.32.0",
-  "webrtcvad-wheels": "2.0.14.post1",
   "tokenizers": "0.23.3"
  },
  "date": "2026-11-17",
@@ -839,6 +838,87 @@
      0.502
     ]
    }
+  },
+  "smart-turn-v2": {
+   "input": "audio",
+   "load_s": 0.97,
+   "memory_mb": 751,
+   "en": {
+    "accuracy": 0.625,
+    "finished_called_finished": 1.0,
+    "unfinished_called_unfinished": 0.25,
+    "auc": 0.833,
+    "median_probability_finished": 0.973,
+    "median_probability_unfinished": 0.793,
+    "median_ms": 5432.4,
+    "probabilities": [
+     0.803,
+     0.956,
+     0.974,
+     0.423,
+     0.613,
+     0.029,
+     0.973,
+     0.757,
+     0.974,
+     0.281,
+     0.935,
+     0.974,
+     0.973,
+     0.7,
+     0.808,
+     0.829,
+     0.974,
+     0.968,
+     0.973,
+     0.57,
+     0.974,
+     0.631,
+     0.973,
+     0.927,
+     0.974,
+     0.918,
+     0.932,
+     0.654,
+     0.921,
+     0.945,
+     0.935,
+     0.299,
+     0.974,
+     0.836,
+     0.974,
+     0.446,
+     0.974,
+     0.93,
+     0.911,
+     0.912
+    ]
+   },
+   "hi": {
+    "accuracy": 0.75,
+    "finished_called_finished": 0.833,
+    "unfinished_called_unfinished": 0.667,
+    "auc": 0.833,
+    "median_probability_finished": 0.921,
+    "median_probability_unfinished": 0.262,
+    "median_ms": 7096.6,
+    "probabilities": [
+     0.009,
+     0.044,
+     0.974,
+     0.577,
+     0.974,
+     0.333,
+     0.974,
+     0.069,
+     0.868,
+     0.191,
+     0.79,
+     0.79
+    ]
+   },
+   "load_average": 11.3,
+   "measured_separately": "2026-11-17, later than the others"
   }
  }
 }

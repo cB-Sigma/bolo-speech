@@ -1,0 +1,2232 @@
+{
+ "what": "turn-large",
+ "hardware": "4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU",
+ "python": "3.12.3",
+ "packages": {
+  "sherpa-onnx": "2.0.1",
+  "onnxruntime": "1.32.0",
+  "tokenizers": "0.23.3"
+ },
+ "date": "2026-11-17",
+ "load_average": 15.6,
+ "set": {
+  "sentences": {
+   "en": 60,
+   "hi": 30
+  },
+  "audio": "synthesised by kokoro-v1.0-int8, voices {'en': ['af_heart', 'am_michael', 'bf_emma', 'bm_george'], 'hi': ['hf_alpha', 'hm_omega']} in turn; each finished sentence and two unfinished cuts of it, at the quietest 20 ms near (0.35, 0.65) of the speech; 0.2 s of silence after each"
+ },
+ "items": [
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "af_heart",
+   "text": "Can you book me a table for two at seven tonight?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "Can you book me a table for two at seven tonight? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "Can you book me a table for two at seven tonight? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "am_michael",
+   "text": "I'd like to change my delivery address."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "I'd like to change my delivery address. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "I'd like to change my delivery address. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bf_emma",
+   "text": "What's the weather going to be like tomorrow morning?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "What's the weather going to be like tomorrow morning? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "What's the weather going to be like tomorrow morning? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bm_george",
+   "text": "Please send the invoice to my work email."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "Please send the invoice to my work email. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "Please send the invoice to my work email. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "af_heart",
+   "text": "My order number is four five two nine."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "My order number is four five two nine. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "My order number is four five two nine. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "am_michael",
+   "text": "I think that's everything I needed, thanks."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "I think that's everything I needed, thanks. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "I think that's everything I needed, thanks. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bf_emma",
+   "text": "How long does shipping usually take to Delhi?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "How long does shipping usually take to Delhi? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "How long does shipping usually take to Delhi? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bm_george",
+   "text": "Cancel my subscription starting next month."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "Cancel my subscription starting next month. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "Cancel my subscription starting next month. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "af_heart",
+   "text": "Could you remind me to call my mother at six?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "Could you remind me to call my mother at six? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "Could you remind me to call my mother at six? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "am_michael",
+   "text": "The package arrived but the box was damaged."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "The package arrived but the box was damaged. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "The package arrived but the box was damaged. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bf_emma",
+   "text": "Is there a pharmacy open near me right now?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "Is there a pharmacy open near me right now? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "Is there a pharmacy open near me right now? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bm_george",
+   "text": "I want to transfer five hundred rupees to Priya."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "I want to transfer five hundred rupees to Priya. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "I want to transfer five hundred rupees to Priya. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "af_heart",
+   "text": "Turn off the lights in the living room."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "Turn off the lights in the living room. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "Turn off the lights in the living room. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "am_michael",
+   "text": "Yes, that works for me."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "Yes, that works for me. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "Yes, that works for me. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bf_emma",
+   "text": "No, I meant the blue one, not the red one."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "No, I meant the blue one, not the red one. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "No, I meant the blue one, not the red one. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bm_george",
+   "text": "Can you explain why my bill went up this month?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "Can you explain why my bill went up this month? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "Can you explain why my bill went up this month? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "af_heart",
+   "text": "Set an alarm for six thirty tomorrow."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "Set an alarm for six thirty tomorrow. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "Set an alarm for six thirty tomorrow. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "am_michael",
+   "text": "I'm calling about the job interview on Friday."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "I'm calling about the job interview on Friday. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "I'm calling about the job interview on Friday. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bf_emma",
+   "text": "Please read me the last message from Rahul."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "Please read me the last message from Rahul. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "Please read me the last message from Rahul. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bm_george",
+   "text": "That's all for now, goodbye."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "That's all for now, goodbye. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "That's all for now, goodbye. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "af_heart",
+   "text": "I need to reschedule my appointment to Thursday afternoon."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "I need to reschedule my appointment to Thursday afternoon. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "I need to reschedule my appointment to Thursday afternoon. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "am_michael",
+   "text": "Could you check if the doctor is available next week?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "Could you check if the doctor is available next week? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "Could you check if the doctor is available next week? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bf_emma",
+   "text": "My internet has been down since this morning."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "My internet has been down since this morning. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "My internet has been down since this morning. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bm_george",
+   "text": "Please add milk, eggs and bread to my shopping list."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "Please add milk, eggs and bread to my shopping list. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "Please add milk, eggs and bread to my shopping list. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "af_heart",
+   "text": "How much does the premium plan cost per month?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "How much does the premium plan cost per month? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "How much does the premium plan cost per month? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "am_michael",
+   "text": "I was charged twice for the same order."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "I was charged twice for the same order. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "I was charged twice for the same order. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bf_emma",
+   "text": "Can you tell me the balance on my savings account?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "Can you tell me the balance on my savings account? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "Can you tell me the balance on my savings account? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bm_george",
+   "text": "The driver called but I couldn't pick up the phone."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "The driver called but I couldn't pick up the phone. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "The driver called but I couldn't pick up the phone. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "af_heart",
+   "text": "What time does the last train to Pune leave?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "What time does the last train to Pune leave? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "What time does the last train to Pune leave? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "am_michael",
+   "text": "I'd like to speak to someone about a refund."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "I'd like to speak to someone about a refund. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "I'd like to speak to someone about a refund. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bf_emma",
+   "text": "Please cancel the meeting with the marketing team."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "Please cancel the meeting with the marketing team. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "Please cancel the meeting with the marketing team. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bm_george",
+   "text": "Do you have this shirt in a larger size?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "Do you have this shirt in a larger size? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "Do you have this shirt in a larger size? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "af_heart",
+   "text": "My password reset link doesn't seem to work."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "My password reset link doesn't seem to work. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "My password reset link doesn't seem to work. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "am_michael",
+   "text": "Book a cab to the airport for six in the morning."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "Book a cab to the airport for six in the morning. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "Book a cab to the airport for six in the morning. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bf_emma",
+   "text": "Is breakfast included in the room rate?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "Is breakfast included in the room rate? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "Is breakfast included in the room rate? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bm_george",
+   "text": "I forgot my card at the restaurant last night."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "I forgot my card at the restaurant last night. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "I forgot my card at the restaurant last night. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "af_heart",
+   "text": "Remind me to water the plants every Sunday."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "Remind me to water the plants every Sunday. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "Remind me to water the plants every Sunday. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "am_michael",
+   "text": "How do I update the address on my account?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "How do I update the address on my account? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "How do I update the address on my account? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bf_emma",
+   "text": "The heater in my room is making a strange noise."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "The heater in my room is making a strange noise. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "The heater in my room is making a strange noise. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bm_george",
+   "text": "Can you play something relaxing for the evening?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "Can you play something relaxing for the evening? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "Can you play something relaxing for the evening? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "af_heart",
+   "text": "We will need a table for six people on Saturday."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "We will need a table for six people on Saturday. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "We will need a table for six people on Saturday. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "am_michael",
+   "text": "What documents do I need to open a new account?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "What documents do I need to open a new account? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "What documents do I need to open a new account? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bf_emma",
+   "text": "My parcel shows delivered but I never received it."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "My parcel shows delivered but I never received it. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "My parcel shows delivered but I never received it. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bm_george",
+   "text": "Please transfer me to the billing department."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "Please transfer me to the billing department. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "Please transfer me to the billing department. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "af_heart",
+   "text": "I think there is a mistake in my last invoice."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "I think there is a mistake in my last invoice. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "I think there is a mistake in my last invoice. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "am_michael",
+   "text": "Could you read out today's top news headlines?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "Could you read out today's top news headlines? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "Could you read out today's top news headlines? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bf_emma",
+   "text": "How long will the repair take to finish?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "How long will the repair take to finish? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "How long will the repair take to finish? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bm_george",
+   "text": "I would like to upgrade my phone plan today."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "I would like to upgrade my phone plan today. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "I would like to upgrade my phone plan today. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "af_heart",
+   "text": "The app keeps crashing when I open the camera."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "The app keeps crashing when I open the camera. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "The app keeps crashing when I open the camera. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "am_michael",
+   "text": "Tell me a quick recipe for dinner tonight."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "Tell me a quick recipe for dinner tonight. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "Tell me a quick recipe for dinner tonight. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bf_emma",
+   "text": "Send a message to Anita saying I'll be late."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "Send a message to Anita saying I'll be late. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "Send a message to Anita saying I'll be late. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bm_george",
+   "text": "Which platform does the Shatabdi Express leave from?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "Which platform does the Shatabdi Express leave from? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "Which platform does the Shatabdi Express leave from? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "af_heart",
+   "text": "My flight was cancelled and I need another one."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "My flight was cancelled and I need another one. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "My flight was cancelled and I need another one. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "am_michael",
+   "text": "Can I pay the remaining amount in instalments?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "Can I pay the remaining amount in instalments? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "Can I pay the remaining amount in instalments? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bf_emma",
+   "text": "Please turn the temperature down by two degrees."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "Please turn the temperature down by two degrees. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "Please turn the temperature down by two degrees. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bm_george",
+   "text": "When does the pharmacy near the station close?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "When does the pharmacy near the station close? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "When does the pharmacy near the station close? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "af_heart",
+   "text": "I'd like to return the shoes I bought last week."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "I'd like to return the shoes I bought last week. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "af_heart",
+   "text": "I'd like to return the shoes I bought last week. (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "am_michael",
+   "text": "Is there any discount for senior citizens?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "Is there any discount for senior citizens? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "am_michael",
+   "text": "Is there any discount for senior citizens? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bf_emma",
+   "text": "How many steps did I walk yesterday?"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "How many steps did I walk yesterday? (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bf_emma",
+   "text": "How many steps did I walk yesterday? (cut at 65%)"
+  },
+  {
+   "lang": "en",
+   "finished": true,
+   "voice": "bm_george",
+   "text": "Let me know when the package is out for delivery."
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "Let me know when the package is out for delivery. (cut at 35%)"
+  },
+  {
+   "lang": "en",
+   "finished": false,
+   "voice": "bm_george",
+   "text": "Let me know when the package is out for delivery. (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hf_alpha",
+   "text": "क्या आप कल सुबह की ट्रेन का टिकट बुक कर सकते हैं?"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "क्या आप कल सुबह की ट्रेन का टिकट बुक कर सकते हैं? (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "क्या आप कल सुबह की ट्रेन का टिकट बुक कर सकते हैं? (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hm_omega",
+   "text": "मेरा ऑर्डर अभी तक नहीं आया है।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "मेरा ऑर्डर अभी तक नहीं आया है। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "मेरा ऑर्डर अभी तक नहीं आया है। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hf_alpha",
+   "text": "बिजली का बिल इस महीने बहुत ज़्यादा आया है।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "बिजली का बिल इस महीने बहुत ज़्यादा आया है। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "बिजली का बिल इस महीने बहुत ज़्यादा आया है। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hm_omega",
+   "text": "मुझे अपना पता बदलना है।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "मुझे अपना पता बदलना है। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "मुझे अपना पता बदलना है। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hf_alpha",
+   "text": "आज शाम को बारिश होगी क्या?"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "आज शाम को बारिश होगी क्या? (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "आज शाम को बारिश होगी क्या? (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hm_omega",
+   "text": "धन्यवाद, बस इतना ही चाहिए था।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "धन्यवाद, बस इतना ही चाहिए था। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "धन्यवाद, बस इतना ही चाहिए था। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hf_alpha",
+   "text": "मुझे कल डॉक्टर से मिलने का समय चाहिए।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "मुझे कल डॉक्टर से मिलने का समय चाहिए। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "मुझे कल डॉक्टर से मिलने का समय चाहिए। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hm_omega",
+   "text": "मेरे खाते में पैसे अभी तक नहीं आए हैं।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "मेरे खाते में पैसे अभी तक नहीं आए हैं। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "मेरे खाते में पैसे अभी तक नहीं आए हैं। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hf_alpha",
+   "text": "क्या आप मेरा टिकट रद्द कर सकते हैं?"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "क्या आप मेरा टिकट रद्द कर सकते हैं? (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "क्या आप मेरा टिकट रद्द कर सकते हैं? (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hm_omega",
+   "text": "आज रात के खाने के लिए कुछ बताइए।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "आज रात के खाने के लिए कुछ बताइए। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "आज रात के खाने के लिए कुछ बताइए। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hf_alpha",
+   "text": "मेरा फ़ोन बार बार बंद हो जाता है।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "मेरा फ़ोन बार बार बंद हो जाता है। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "मेरा फ़ोन बार बार बंद हो जाता है। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hm_omega",
+   "text": "स्टेशन तक जाने के लिए टैक्सी बुला दीजिए।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "स्टेशन तक जाने के लिए टैक्सी बुला दीजिए। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "स्टेशन तक जाने के लिए टैक्सी बुला दीजिए। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hf_alpha",
+   "text": "इस महीने का बिजली का बिल कितना है?"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "इस महीने का बिजली का बिल कितना है? (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "इस महीने का बिजली का बिल कितना है? (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hm_omega",
+   "text": "मुझे अपना पासवर्ड बदलना है।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "मुझे अपना पासवर्ड बदलना है। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "मुझे अपना पासवर्ड बदलना है। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hf_alpha",
+   "text": "क्या कल बैंक खुला रहेगा?"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "क्या कल बैंक खुला रहेगा? (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "क्या कल बैंक खुला रहेगा? (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hm_omega",
+   "text": "मेरी माँ को शाम सात बजे फ़ोन करने की याद दिलाना।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "मेरी माँ को शाम सात बजे फ़ोन करने की याद दिलाना। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "मेरी माँ को शाम सात बजे फ़ोन करने की याद दिलाना। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hf_alpha",
+   "text": "होटल में नाश्ता शामिल है या नहीं?"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "होटल में नाश्ता शामिल है या नहीं? (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "होटल में नाश्ता शामिल है या नहीं? (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hm_omega",
+   "text": "मेरा पार्सल गलत पते पर चला गया है।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "मेरा पार्सल गलत पते पर चला गया है। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "मेरा पार्सल गलत पते पर चला गया है। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hf_alpha",
+   "text": "कृपया मुझे बिलिंग विभाग से जोड़ दीजिए।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "कृपया मुझे बिलिंग विभाग से जोड़ दीजिए। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "कृपया मुझे बिलिंग विभाग से जोड़ दीजिए। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hm_omega",
+   "text": "दिल्ली के लिए अगली ट्रेन कब है?"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "दिल्ली के लिए अगली ट्रेन कब है? (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "दिल्ली के लिए अगली ट्रेन कब है? (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hf_alpha",
+   "text": "मुझे इस कमीज़ का बड़ा साइज़ चाहिए।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "मुझे इस कमीज़ का बड़ा साइज़ चाहिए। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "मुझे इस कमीज़ का बड़ा साइज़ चाहिए। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hm_omega",
+   "text": "क्या मैं बाकी पैसे किस्तों में दे सकता हूँ?"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "क्या मैं बाकी पैसे किस्तों में दे सकता हूँ? (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "क्या मैं बाकी पैसे किस्तों में दे सकता हूँ? (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hf_alpha",
+   "text": "आज के मुख्य समाचार सुनाइए।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "आज के मुख्य समाचार सुनाइए। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "आज के मुख्य समाचार सुनाइए। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hm_omega",
+   "text": "मेरे कमरे का एसी ठीक से काम नहीं कर रहा।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "मेरे कमरे का एसी ठीक से काम नहीं कर रहा। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "मेरे कमरे का एसी ठीक से काम नहीं कर रहा। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hf_alpha",
+   "text": "शनिवार को छह लोगों के लिए मेज़ बुक कर दीजिए।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "शनिवार को छह लोगों के लिए मेज़ बुक कर दीजिए। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "शनिवार को छह लोगों के लिए मेज़ बुक कर दीजिए। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hm_omega",
+   "text": "मेरी उड़ान रद्द हो गई है, दूसरी चाहिए।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "मेरी उड़ान रद्द हो गई है, दूसरी चाहिए। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "मेरी उड़ान रद्द हो गई है, दूसरी चाहिए। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hf_alpha",
+   "text": "दवा की दुकान कितने बजे बंद होती है?"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "दवा की दुकान कितने बजे बंद होती है? (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "दवा की दुकान कितने बजे बंद होती है? (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hm_omega",
+   "text": "मुझे पिछले हफ्ते के जूते वापस करने हैं।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "मुझे पिछले हफ्ते के जूते वापस करने हैं। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "मुझे पिछले हफ्ते के जूते वापस करने हैं। (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hf_alpha",
+   "text": "क्या बुज़ुर्गों के लिए कोई छूट है?"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "क्या बुज़ुर्गों के लिए कोई छूट है? (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hf_alpha",
+   "text": "क्या बुज़ुर्गों के लिए कोई छूट है? (cut at 65%)"
+  },
+  {
+   "lang": "hi",
+   "finished": true,
+   "voice": "hm_omega",
+   "text": "जब पार्सल निकले तो मुझे बता देना।"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "जब पार्सल निकले तो मुझे बता देना। (cut at 35%)"
+  },
+  {
+   "lang": "hi",
+   "finished": false,
+   "voice": "hm_omega",
+   "text": "जब पार्सल निकले तो मुझे बता देना। (cut at 65%)"
+  }
+ ],
+ "threshold": 0.5,
+ "models": {
+  "smart-turn-v3": {
+   "en": {
+    "accuracy": 0.522,
+    "finished_called_finished": 0.9,
+    "unfinished_called_unfinished": 0.333,
+    "auc": 0.785,
+    "median_probability_finished": 0.983,
+    "median_probability_unfinished": 0.817,
+    "median_ms": 290.9,
+    "probabilities": [
+     0.878,
+     0.926,
+     0.989,
+     0.988,
+     0.936,
+     0.72,
+     0.264,
+     0.616,
+     0.981,
+     0.983,
+     0.882,
+     0.981,
+     0.99,
+     0.145,
+     0.949,
+     0.634,
+     0.064,
+     0.878,
+     0.987,
+     0.347,
+     0.987,
+     0.988,
+     0.48,
+     0.985,
+     0.988,
+     0.963,
+     0.366,
+     0.985,
+     0.249,
+     0.92,
+     0.988,
+     0.886,
+     0.704,
+     0.85,
+     0.021,
+     0.967,
+     0.989,
+     0.588,
+     0.145,
+     0.976,
+     0.957,
+     0.805,
+     0.983,
+     0.911,
+     0.177,
+     0.982,
+     0.987,
+     0.096,
+     0.989,
+     0.72,
+     0.214,
+     0.973,
+     0.017,
+     0.72,
+     0.982,
+     0.145,
+     0.976,
+     0.249,
+     0.235,
+     0.751,
+     0.947,
+     0.33,
+     0.988,
+     0.214,
+     0.33,
+     0.979,
+     0.989,
+     0.928,
+     0.969,
+     0.967,
+     0.982,
+     0.053,
+     0.989,
+     0.917,
+     0.834,
+     0.979,
+     0.074,
+     0.886,
+     0.957,
+     0.984,
+     0.979,
+     0.053,
+     0.811,
+     0.177,
+     0.99,
+     0.249,
+     0.49,
+     0.973,
+     0.799,
+     0.52,
+     0.47,
+     0.962,
+     0.908,
+     0.98,
+     0.017,
+     0.016,
+     0.99,
+     0.018,
+     0.987,
+     0.949,
+     0.963,
+     0.98,
+     0.975,
+     0.911,
+     0.974,
+     0.979,
+     0.616,
+     0.313,
+     0.989,
+     0.083,
+     0.99,
+     0.986,
+     0.855,
+     0.938,
+     0.972,
+     0.122,
+     0.033,
+     0.977,
+     0.661,
+     0.98,
+     0.989,
+     0.799,
+     0.321,
+     0.988,
+     0.98,
+     0.017,
+     0.033,
+     0.917,
+     0.568,
+     0.976,
+     0.982,
+     0.977,
+     0.986,
+     0.412,
+     0.304,
+     0.988,
+     0.908,
+     0.811,
+     0.989,
+     0.983,
+     0.983,
+     0.89,
+     0.792,
+     0.027,
+     0.984,
+     0.786,
+     0.01,
+     0.99,
+     0.981,
+     0.988,
+     0.976,
+     0.942,
+     0.214,
+     0.855,
+     0.878,
+     0.928,
+     0.988,
+     0.024,
+     0.597,
+     0.985,
+     0.823,
+     0.983,
+     0.988,
+     0.976,
+     0.009,
+     0.988,
+     0.578,
+     0.01,
+     0.987,
+     0.869,
+     0.008,
+     0.971,
+     0.034,
+     0.985,
+     0.99,
+     0.987,
+     0.947,
+     0.823,
+     0.976,
+     0.983
+    ]
+   },
+   "hi": {
+    "accuracy": 0.878,
+    "finished_called_finished": 0.967,
+    "unfinished_called_unfinished": 0.833,
+    "auc": 0.961,
+    "median_probability_finished": 0.978,
+    "median_probability_unfinished": 0.068,
+    "median_ms": 287.5,
+    "probabilities": [
+     0.024,
+     0.366,
+     0.882,
+     0.978,
+     0.096,
+     0.208,
+     0.99,
+     0.011,
+     0.023,
+     0.987,
+     0.712,
+     0.122,
+     0.979,
+     0.01,
+     0.019,
+     0.873,
+     0.015,
+     0.012,
+     0.954,
+     0.03,
+     0.038,
+     0.99,
+     0.044,
+     0.321,
+     0.99,
+     0.422,
+     0.029,
+     0.986,
+     0.171,
+     0.011,
+     0.988,
+     0.304,
+     0.053,
+     0.712,
+     0.304,
+     0.208,
+     0.989,
+     0.041,
+     0.077,
+     0.988,
+     0.811,
+     0.013,
+     0.959,
+     0.009,
+     0.012,
+     0.923,
+     0.257,
+     0.037,
+     0.904,
+     0.012,
+     0.11,
+     0.989,
+     0.118,
+     0.679,
+     0.728,
+     0.086,
+     0.06,
+     0.982,
+     0.015,
+     0.013,
+     0.914,
+     0.007,
+     0.578,
+     0.89,
+     0.653,
+     0.195,
+     0.886,
+     0.033,
+     0.014,
+     0.834,
+     0.083,
+     0.103,
+     0.923,
+     0.01,
+     0.008,
+     0.979,
+     0.014,
+     0.989,
+     0.99,
+     0.015,
+     0.009,
+     0.99,
+     0.72,
+     0.661,
+     0.978,
+     0.28,
+     0.008,
+     0.839,
+     0.5,
+     0.161
+    ]
+   }
+  },
+  "smart-turn-v3-fp32": {
+   "en": {
+    "accuracy": 0.6,
+    "finished_called_finished": 0.867,
+    "unfinished_called_unfinished": 0.467,
+    "auc": 0.814,
+    "median_probability_finished": 0.988,
+    "median_probability_unfinished": 0.605,
+    "median_ms": 287.6,
+    "probabilities": [
+     0.802,
+     0.703,
+     0.99,
+     0.991,
+     0.969,
+     0.594,
+     0.021,
+     0.153,
+     0.988,
+     0.988,
+     0.736,
+     0.99,
+     0.99,
+     0.038,
+     0.881,
+     0.579,
+     0.014,
+     0.9,
+     0.99,
+     0.064,
+     0.968,
+     0.99,
+     0.191,
+     0.985,
+     0.988,
+     0.967,
+     0.027,
+     0.983,
+     0.071,
+     0.153,
+     0.99,
+     0.506,
+     0.92,
+     0.976,
+     0.012,
+     0.97,
+     0.991,
+     0.083,
+     0.214,
+     0.989,
+     0.901,
+     0.299,
+     0.987,
+     0.918,
+     0.096,
+     0.989,
+     0.99,
+     0.011,
+     0.99,
+     0.06,
+     0.104,
+     0.985,
+     0.012,
+     0.783,
+     0.985,
+     0.037,
+     0.98,
+     0.368,
+     0.014,
+     0.912,
+     0.887,
+     0.759,
+     0.989,
+     0.489,
+     0.13,
+     0.985,
+     0.989,
+     0.19,
+     0.478,
+     0.95,
+     0.984,
+     0.026,
+     0.984,
+     0.405,
+     0.873,
+     0.987,
+     0.035,
+     0.968,
+     0.457,
+     0.892,
+     0.989,
+     0.043,
+     0.771,
+     0.012,
+     0.99,
+     0.05,
+     0.088,
+     0.989,
+     0.817,
+     0.889,
+     0.046,
+     0.735,
+     0.966,
+     0.986,
+     0.018,
+     0.007,
+     0.99,
+     0.008,
+     0.986,
+     0.735,
+     0.954,
+     0.989,
+     0.986,
+     0.32,
+     0.931,
+     0.987,
+     0.493,
+     0.03,
+     0.99,
+     0.018,
+     0.989,
+     0.991,
+     0.039,
+     0.615,
+     0.989,
+     0.025,
+     0.01,
+     0.983,
+     0.012,
+     0.852,
+     0.99,
+     0.353,
+     0.793,
+     0.988,
+     0.987,
+     0.01,
+     0.01,
+     0.971,
+     0.618,
+     0.985,
+     0.974,
+     0.958,
+     0.99,
+     0.108,
+     0.291,
+     0.99,
+     0.173,
+     0.2,
+     0.991,
+     0.963,
+     0.907,
+     0.977,
+     0.582,
+     0.029,
+     0.989,
+     0.014,
+     0.009,
+     0.99,
+     0.896,
+     0.99,
+     0.988,
+     0.909,
+     0.088,
+     0.29,
+     0.97,
+     0.846,
+     0.99,
+     0.011,
+     0.869,
+     0.99,
+     0.044,
+     0.986,
+     0.989,
+     0.982,
+     0.007,
+     0.989,
+     0.537,
+     0.006,
+     0.988,
+     0.019,
+     0.007,
+     0.966,
+     0.01,
+     0.987,
+     0.99,
+     0.988,
+     0.849,
+     0.516,
+     0.99,
+     0.989
+    ]
+   },
+   "hi": {
+    "accuracy": 0.9,
+    "finished_called_finished": 0.767,
+    "unfinished_called_unfinished": 0.967,
+    "auc": 0.939,
+    "median_probability_finished": 0.967,
+    "median_probability_unfinished": 0.014,
+    "median_ms": 264.5,
+    "probabilities": [
+     0.008,
+     0.119,
+     0.047,
+     0.98,
+     0.013,
+     0.014,
+     0.991,
+     0.007,
+     0.01,
+     0.99,
+     0.74,
+     0.039,
+     0.923,
+     0.008,
+     0.012,
+     0.674,
+     0.014,
+     0.006,
+     0.875,
+     0.022,
+     0.011,
+     0.991,
+     0.01,
+     0.316,
+     0.99,
+     0.319,
+     0.007,
+     0.985,
+     0.012,
+     0.007,
+     0.989,
+     0.021,
+     0.106,
+     0.232,
+     0.036,
+     0.099,
+     0.991,
+     0.018,
+     0.028,
+     0.99,
+     0.027,
+     0.006,
+     0.886,
+     0.007,
+     0.011,
+     0.959,
+     0.04,
+     0.012,
+     0.053,
+     0.009,
+     0.027,
+     0.991,
+     0.014,
+     0.461,
+     0.194,
+     0.107,
+     0.011,
+     0.988,
+     0.008,
+     0.008,
+     0.737,
+     0.006,
+     0.353,
+     0.055,
+     0.234,
+     0.028,
+     0.371,
+     0.111,
+     0.007,
+     0.493,
+     0.046,
+     0.013,
+     0.742,
+     0.008,
+     0.006,
+     0.975,
+     0.009,
+     0.99,
+     0.99,
+     0.008,
+     0.006,
+     0.99,
+     0.021,
+     0.177,
+     0.988,
+     0.13,
+     0.006,
+     0.902,
+     0.018,
+     0.01
+    ]
+   }
+  }
+ }
+}

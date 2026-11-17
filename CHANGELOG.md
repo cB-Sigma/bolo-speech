@@ -8,6 +8,20 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Smart Turn v2 and TEN Turn Detection run.** `smart-turn-v2` (BSD-2-Clause): bolo reads the published PyTorch
+  weights (safetensors) and computes wav2vec2-base, the attention pooling and the classifier in its own NumPy code
+  (no PyTorch, nothing converted or re-hosted), over the real audio only with the reference's 16 s padding accounted
+  for exactly; its probabilities matched Pipecat's model in PyTorch to within 4.5e-6 on 18 clips. Heavy: 5.4 s per
+  check on the shared test machine, accuracy 0.63 / 0.75 on the scripted English / Hindi set.
+  `ten-turn-detection` (Agora; Apache-2.0 with Agora's conditions, `commercial_use: false`): Qwen2.5-7B on
+  llama-server from a pinned Q4_K_M GGUF (4.7 GB), a text end-of-turn model like Namo: one token at temperature 0 with
+  log-probabilities, P(finished) + P(wait) is the probability that the turn is over. Tested against a stand-in
+  server; laptop steps in docs/models.md, "End-of-turn detection". Both leave docs/models-unsupported.md, where
+  only LiveKit's turn detector stays (its licence allows use only with LiveKit Agents).
+- **Smart Turn v3 int8 against float32 on a larger set** (60 English and 30 Hindi sentences, six voices, 270 clips;
+  docs/measurements/turn-detectors-large.json, `measure_detectors.py turn-large`): float32 is better in English
+  (accuracy 0.60 against 0.52, 18 clips to 4), mixed in Hindi (0.90 against 0.88, but 23 % of finished sentences held
+  open against 3 %). The default stays the int8 `smart-turn-v3`.
 - docs/models-unsupported.md, "Full-duplex speech-to-speech": the full-duplex models looked at and not in the catalog,
   each with the reason (no weights published: SALMONN-omni, OmniFlatten, SyncLLM, LSLM, Covo-Audio-Chat-FD,
   RoboEgo; not wired yet: DuplexOmni, BayLing-Duplex, VITA-1.5; file-to-file only: NTPP, Hibiki's Rust builds).
@@ -150,9 +164,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   (docs/measurements/turn-detectors.json): on English, accuracy 0.63 for the default `smart-turn-v3`, 0.80 for its
   float32 build, 0.98 for `namo-turn-en` on clean text (0.85 without final punctuation), chance for
   `namo-turn-multilingual`. The default stays `smart-turn-v3` (docs/models.md, "End-of-turn detection").
-  Smart Turn v2 (PyTorch weights only), LiveKit's turn detector (licence: only with the LiveKit Agents framework) and
-  TEN Turn Detection (a 7.6 B model) cannot run in bolo and are not catalog entries: the new
-  docs/models-unsupported.md lists them with the reasons.
+  LiveKit's turn detector (licence: only with the LiveKit Agents framework) is not a catalog entry:
+  docs/models-unsupported.md says why.
 - **More voice-activity detectors, chosen by name.** `silero-vad-v6` (MIT), `ten-vad` and `ten-vad-int8` (TEN VAD:
   Apache-2.0 with Agora's conditions, labelled `commercial_use: false`: only for your own applications, not in a way
   that competes with Agora), `marblenet-vad` (NVIDIA Frame-VAD Multilingual MarbleNet v2.0, NVIDIA Open Model

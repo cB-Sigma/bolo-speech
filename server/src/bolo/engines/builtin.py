@@ -1,4 +1,4 @@
-"""Detectors that are part of bolo itself: nothing to download, nothing to install.
+"""Models computed by bolo itself, with no inference library: detectors that need no download, and NumPy networks.
 
 * ``energy_vad``: the adaptive energy detector (:class:`bolo.streaming.vad.EnergyVad`) that is also the fallback
   when no neural detector can be used, as a model that can be chosen by name (``energy-vad``).
@@ -6,6 +6,7 @@
   the turn, the silence does (``turn_detection.silence_duration_ms``). Realtime sessions that ask for
   ``semantic_vad`` with it behave exactly like ``server_vad``; :meth:`bolo.core.Bolo.turn_model` treats it as no
   end-of-turn model.
+* ``smart_turn_v2``: Smart Turn v2 computed by bolo's own NumPy code from its weights (:mod:`bolo.engines.smart_turn_v2`).
 """
 
 from __future__ import annotations
@@ -49,7 +50,7 @@ class BuiltinEngine(Engine):
     name = "bolo built-in detectors"
     license = "Apache-2.0"
     url = "https://github.com/cB-Sigma/bolo"
-    kinds = ("energy_vad", SILENCE_TURN)
+    kinds = ("energy_vad", SILENCE_TURN, "smart_turn_v2")
 
     def status(self) -> EngineStatus:
         return EngineStatus(self.id, True, __version__, None)
@@ -59,4 +60,8 @@ class BuiltinEngine(Engine):
             return EnergyVAD()
         if kind == SILENCE_TURN:
             return SilenceTurn()
+        if kind == "smart_turn_v2":
+            from bolo.engines.smart_turn_v2 import SmartTurnV2
+
+            return SmartTurnV2(path, spec, opts)
         raise ValueError(f"the builtin engine cannot load kind {kind!r}")

@@ -160,7 +160,12 @@ Voices converted by this project
     feature computation (server/src/bolo/audio/features.py) is its own
     implementation of the published algorithm. Other optional end-of-turn
     models: VideoSDK's Namo Turn Detector v1 (Apache-2.0), run with the
-    tokenizers library (Apache-2.0).
+    tokenizers library (Apache-2.0); Smart Turn v2 (BSD-2-Clause), whose
+    published weights bolo computes with its own NumPy implementation of
+    wav2vec2 (server/src/bolo/engines/smart_turn_v2.py, written from the
+    model's published architecture and Pipecat's model.py); and TEN Turn
+    Detection (Agora; Apache-2.0 with Agora's additional conditions, see its
+    LICENSE file) in a third-party Q4_K_M GGUF conversion run by llama.cpp.
 
 Web console: speech synthesis in the browser
     The console (and the live demo) can run text-to-speech voices in the

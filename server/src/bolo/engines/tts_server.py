@@ -745,7 +745,7 @@ class TTSServerEngine(Engine):
     name = "External TTS server (llama-server, audio.cpp)"
     license = "MIT (llama.cpp) / Apache-2.0 (audio.cpp)"
     url = "https://github.com/ggml-org/llama.cpp"
-    kinds = ("tts-server", "orpheus-llamacpp", "voxtral-llamacpp")
+    kinds = ("tts-server", "orpheus-llamacpp", "voxtral-llamacpp", "ten-turn-llamacpp")
 
     def __init__(self) -> None:
         self.settings: Settings | None = None
@@ -778,6 +778,13 @@ class TTSServerEngine(Engine):
             from bolo.engines.voxtral_llamacpp import load_model as load_voxtral
 
             return load_voxtral(self, path, spec, opts)
+        if kind == "ten-turn-llamacpp":
+            # TEN Turn Detection: an end-of-turn model that reads text, on llama-server (bolo.engines.ten_turn_llamacpp)
+            if task != "turn":
+                raise EngineUnavailable(f"the ten-turn-llamacpp kind is an end-of-turn model, not {task!r}")
+            from bolo.engines.ten_turn_llamacpp import load_model as load_ten_turn
+
+            return load_ten_turn(self, path, spec, opts)
         if task != "tts":
             raise EngineUnavailable(f"the tts-server engine serves text-to-speech models, not {task!r}")
         if kind == "orpheus-llamacpp":

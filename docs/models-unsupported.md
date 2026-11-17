@@ -29,17 +29,6 @@ not:
 | --- | --- | --- | --- |
 | Hibiki Rust builds ([kyutai/hibiki-1b-rs-q6k](https://huggingface.co/kyutai/hibiki-1b-rs-q6k), [hibiki-1b-rs-q8](https://huggingface.co/kyutai/hibiki-1b-rs-q8), [hibiki-1b-rs-bf16](https://huggingface.co/kyutai/hibiki-1b-rs-bf16), [hibiki-2b-rs-bf16](https://huggingface.co/kyutai/hibiki-2b-rs-bf16)) | CC-BY-4.0 | 1.9 to 6.2 GB | the only program that loads them is Kyutai's `hibiki-rs` (kyutai-labs/hibiki), a command line that translates a file (`gen in.mp3 out.wav`), not a server; Kyutai's Rust server (`moshi-backend`) loads Moshi's configuration only. The same models are in the catalog in their PyTorch and MLX builds. A streaming server for these files would change this. |
 | Third-party conversions of Moshi and PersonaPlex (GGUF such as `Codes4Fun/personaplex-7b-v1-q4_k-GGUF`, MLX 4- and 8-bit such as `aufklarer/PersonaPlex-7B-MLX-4bit`, bitsandbytes 4-bit, ONNX exports) | as their source (CC-BY-4.0, NVIDIA Open Model License) | 4 to 9 GB | not published by Kyutai or NVIDIA, and none comes with a server that speaks Kyutai's protocol and, for PersonaPlex, takes its voice and text prompts; Kyutai's MLX server loads Moshi checkpoints only. Not checked one by one. |
-
-## End-of-turn detection
-
-| model | licence | why bolo does not run it |
-| --- | --- | --- |
-| Smart Turn v2 ([pipecat-ai/smart-turn-v2](https://huggingface.co/pipecat-ai/smart-turn-v2) at `3267e96b`, `model.safetensors`, 379 MB) | BSD-2-Clause | Published only as PyTorch weights (a wav2vec2-base model with an end-of-turn head); there is no ONNX or other export that bolo's runtimes load, and bolo does not carry PyTorch in the core. Smart Turn v3 (`smart-turn-v3`, 9 MB, in the catalog) replaced it. |
-| LiveKit turn detector, multilingual ([livekit/turn-detector](https://huggingface.co/livekit/turn-detector) tag `v0.4.1-intl`, `onnx/model_q8.onnx`, 396 MB) and English ([main](https://huggingface.co/livekit/turn-detector) at `fba34c38`, `model_quantized.onnx`, 165 MB) | LiveKit Model License | Its licence allows use **only together with the LiveKit Agents framework**, "not on a standalone basis or with any other frameworks", and forbids using its outputs to improve other models. bolo is another framework, so running it inside bolo would break the licence. (Technically it would run: int8 ONNX, Qwen2.5-0.5B, reading the conversation as text.) |
-| TEN Turn Detection ([TEN-framework/TEN_Turn_Detection](https://huggingface.co/TEN-framework/TEN_Turn_Detection) at `41845390`, four safetensors files, 15.2 GB) | Hugging Face card: Apache-2.0; the [GitHub licence](https://github.com/TEN-framework/ten-turn-detection/blob/b808d8a2eccc0e771965f31b74a04f136f55113f/LICENSE) adds Agora's conditions (not on end-user devices; only for your own applications; nothing that competes with Agora) | A 7.6-billion-parameter language model (Qwen2.5-7B) in bfloat16 PyTorch weights: no ONNX or GGUF export from its authors, no in-process runtime in bolo for a causal language model used as a classifier, and 15 GB to load for a decision taken at every pause. |
-
-The text-reading end-of-turn models bolo does run are the Namo Turn Detectors (`namo-turn-en`,
-`namo-turn-multilingual`, Apache-2.0), wired to the transcript of the utterance at each pause.
 | MiniCPM-o 2.6 in full-duplex ([openbmb/MiniCPM-o-2_6](https://huggingface.co/openbmb/MiniCPM-o-2_6)) | Apache-2.0 | 17.4 GB | it has no full-duplex mode: its "live streaming" prefills the user's audio and then generates (the application decides when the turn ends; OpenBMB's demo server uses a voice-activity detector), so it never listens while it speaks. Its turn-based use is a separate catalog entry; its successor MiniCPM-o 4.5 is in the catalog as a full-duplex model (`minicpm-o-4.5`). |
 | SALMONN-omni (Tsinghua and ByteDance) | - | - | no weights or inference code published (a paper only); checked on Hugging Face and GitHub on 2026-11-17. |
 | OmniFlatten (Alibaba) | - | - | no weights or code from the authors (a paper and a project page; an unofficial reimplementation has no weights). |
@@ -52,6 +41,15 @@ The text-reading end-of-turn models bolo does run are the Namo Turn Detectors (`
 | VITA-1.5 ([VITA-MLLM/VITA-1.5](https://huggingface.co/VITA-MLLM/VITA-1.5)) | no licence on its model card (the VITA code is Apache-2.0) | 19.6 GB | its real-time demo interrupts a turn-based model with a voice-activity detector, like Freeze-Omni from the same team, and needs a vLLM build of its own; not wired here yet. |
 | LFM3-Audio 2B full-duplex adapter ([MAdel121/LFM3-Audio-2B-Full-Duplex](https://huggingface.co/MAdel121/LFM3-Audio-2B-Full-Duplex)) | LFM Open License v1.0 | 0.1 GB (+ the base model) | a third-party LoRA adapter with its own Python package in the model repository, not from the base model's authors; not checked further. |
 | OSUM-EChat, LLaMA-Omni2 | Apache-2.0 | 1 to 25 GB | not full-duplex (turn-based speech conversation); out of scope for this table. |
+
+## End-of-turn detection
+
+| model | licence | why bolo does not run it |
+| --- | --- | --- |
+| LiveKit turn detector, multilingual ([livekit/turn-detector](https://huggingface.co/livekit/turn-detector) tag `v0.4.1-intl`, `onnx/model_q8.onnx`, 396 MB) and English ([main](https://huggingface.co/livekit/turn-detector) at `fba34c38`, `model_quantized.onnx`, 165 MB) | LiveKit Model License | Its licence allows use **only together with the LiveKit Agents framework**, "not on a standalone basis or with any other frameworks", and forbids using its outputs to improve other models. bolo is another framework, so running it inside bolo would break the licence. (Technically it would run: int8 ONNX, Qwen2.5-0.5B, reading the conversation as text.) |
+
+Every other end-of-turn model asked about runs: Smart Turn v2 (bolo computes its PyTorch weights in NumPy), TEN Turn
+Detection (on llama-server, from a Q4_K_M GGUF) and the Namo models; see models.md, "End-of-turn detection".
 
 ## Language identification
 
