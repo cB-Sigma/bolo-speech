@@ -6,6 +6,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-11-17
+
 ### Fixed
 
 - `bolo ps` prints each model's placement notice (for example that DirectML runs Nemotron's Gelu nodes on the CPU,
