@@ -8,26 +8,35 @@
   </a>
 </p>
 
+<h3 align="center">Speech-to-text, text-to-speech and voice agents on your own machine.</h3>
+
+<p align="center">
+  One server, a few hundred open models, the APIs your apps already use. No PyTorch. Apache-2.0.
+</p>
+
 <p align="center">
   <a href="https://github.com/cb-Sigma/bolo/actions/workflows/ci.yml"><img src="https://github.com/cb-Sigma/bolo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-1f62b3" alt="License: Apache-2.0"></a>
-  <a href="https://github.com/cb-Sigma/bolo/actions/workflows/pages.yml"><img src="https://github.com/cb-Sigma/bolo/actions/workflows/pages.yml/badge.svg" alt="Live demo build status"></a>
-  <a href="https://cb-sigma.github.io/bolo/"><img src="https://img.shields.io/badge/live%20demo-runs%20in%20your%20browser-1f62b3" alt="Live demo: runs in your browser"></a>
+  <a href="https://pypi.org/project/bolo-speech/"><img src="https://img.shields.io/pypi/v/bolo-speech?color=1f62b3" alt="PyPI"></a>
   <img src="https://img.shields.io/badge/API-OpenAI%20compatible-1f62b3" alt="OpenAI-compatible API">
-  <img src="https://img.shields.io/badge/torch-free-1f62b3" alt="No PyTorch needed">
 </p>
-
-**bolo is a speech server you run yourself: it pulls speech models by name and serves speech-to-text, text-to-speech, speaker diarization and whole voice agents over the APIs your clients already use.** It speaks the OpenAI audio and Realtime APIs, the speaches routes and the Wyoming protocol; runs a catalog of a few hundred models on ONNX Runtime and CTranslate2 without PyTorch; puts cloud speech APIs behind the same routes when you want them; answers phone calls; and traces every request phase by phase. One Python process, CPU first, Apache-2.0.
-
-*bolo* (बोलो) is Hindi for "speak".
 
 <p align="center">
   <a href="https://cb-sigma.github.io/bolo/"><img src="docs/assets/brand/button-live-demo.png" alt="Try the live demo" width="233"></a>
 </p>
 
-<p align="center">
-  <sub>The demo runs speech recognition entirely in your browser with WebAssembly: no install, no upload.</sub>
-</p>
+**bolo** (बोलो, "speak") pulls speech models by name, like Ollama does for language models, and serves them:
+
+- **Transcribe** files or live audio, in 22 Indian languages and many more, with word timings and subtitles.
+- **Speak** text in hundreds of voices, streamed as it is made; numbers, dates and names read properly.
+- **Talk**: voice agents over the OpenAI Realtime API, with your own language model behind them.
+- **Answer phone calls** through Twilio, Plivo, Telnyx, Exotel or SIP.
+- **Tell speakers apart** and transcribe each one, and **clone a voice** with recorded consent.
+- **Use cloud models too** (OpenAI, Sarvam, ElevenLabs, Deepgram) behind the same API, with fallback either way.
+
+It runs on the CPU, and on an NVIDIA GPU or through DirectML when there is one. A web console comes with it, and a
+[live demo](https://cb-sigma.github.io/bolo/) runs models in your browser with nothing to install. bolo is alpha:
+[what was tested where](#status).
 
 <p align="center">
   <img src="docs/assets/console-playground.gif" alt="Animated capture of the speech-to-text playground: words appear as audio streams in, then the latency timeline shows how long the final transcript took after speech ended" width="900">
@@ -37,28 +46,15 @@
   <sub>The speech-to-text playground, live against a real server on a 4-core CPU. Lighter text is still changing; solid text is final.</sub>
 </p>
 
-> **Status: alpha.** Developed on Linux x86-64; measured on one Windows 11 laptop natively and under WSL2, on its CPU, its NVIDIA GPU (CUDA, DirectML, Vulkan), its integrated AMD Radeon (DirectML) and in Chrome and Edge ([the numbers](docs/status.md#a-windows-11-laptop)); CI runs the test suite on Linux and Windows. Apple Silicon, ROCm and discrete Radeon cards, native Linux GPUs, several NVIDIA GPUs, arm64 and phones are untested; the phone and cloud integrations have not met a real account. [What has not been validated](#what-has-not-been-validated) says so plainly.
-
 ## Install
 
 ```bash
-uv tool install "bolo-speech[all]"        # with uv (https://docs.astral.sh/uv/)
+uv tool install "bolo-speech[all]"
 bolo serve
 ```
 
-The double quotes work in bash, zsh, PowerShell and cmd (cmd.exe does not treat single quotes as quotes).
-
-- Upgrading: `uv tool upgrade bolo-speech`. Right after a release uv may still offer the previous version from its cache: add `--refresh`.
-- Run it once without installing: `uvx --from "bolo-speech[all]" bolo serve`.
-- Without uv: `pipx install "bolo-speech[all]"`, or `pip install "bolo-speech[all]"` into a virtual environment.
-- With Homebrew (macOS 14 or later, Linux): `brew install cb-sigma/tap/bolo`, then `brew services start bolo` to run it in the background (console at http://127.0.0.1:8000/). It installs `all`; the [tap's README](https://github.com/cB-Sigma/homebrew-tap#bolo) shows how to add the opt-in extras.
-- On Windows (PowerShell or cmd), the same command. Models go to `%USERPROFILE%\.cache\bolo`; DirectML, services and the other differences: [docs/configuration.md](docs/configuration.md#windows). On Windows, install natively. With an NVIDIA GPU, add the CUDA wheels (see [CUDA on Windows](docs/configuration.md#cuda-on-windows)): speech-to-text runs on the GPU natively as fast as under WSL2. Use WSL2 only for Tontaube and other Linux-only runtimes.
-- With an NVIDIA GPU on Windows: `uv tool install "bolo-speech[all,cuda]"`, then swap `onnxruntime` for `onnxruntime-gpu[cuda,cudnn]` in the tool's environment (`uv pip uninstall --python <tool python> onnxruntime`, then `uv pip install --python <tool python> "onnxruntime-gpu[cuda,cudnn]" nvidia-cublas-cu12 "nvidia-cudnn-cu12>=9,<10"`, about 2.5 GB for CUDA 12 and 13) and set `BOLO_DEVICE=cuda`; `bolo doctor` loads both CUDA runtimes and names what is missing. faster-whisper is the GPU route for speech-to-text there (sherpa-onnx's CUDA build cannot run inside bolo on Windows). The recipe: [CUDA on Windows](docs/configuration.md#cuda-on-windows).
-- As a container (CPU image): `docker run -p 8000:8000 -v bolo-data:/data ghcr.io/cb-sigma/bolo:latest`. Compose, systemd and Kubernetes examples, and what was run of each: [deploy/README.md](deploy/README.md).
-
-The PyPI distribution is `bolo-speech`; the command and the Python package are `bolo`. Python 3.10 or newer.
-
-The base install has no engine at all; extras add what you want. `all` is `sherpa` (most models), `faster-whisper`, `uccharan` (phonemes and text normalisation), `av` (M4A/WebM/AAC through bundled FFmpeg) and `wyoming`. Opt-in extras: `webrtc`, `turn` (end-of-turn model), `orpheus`, `s2s` (in-process speech-to-speech), `sip`, `moonshine`, `whispercpp`, `cuda` (CUDA 12's cuBLAS and cuDNN for faster-whisper on an NVIDIA GPU, Windows and Linux), and `espeak` (eSpeak NG, GPL-3.0-or-later, never part of `all`; see [Licences](#licences)).
+Then open <http://127.0.0.1:8000>. Also with `pipx`, `pip`, Homebrew (`brew install cb-sigma/tap/bolo`) and
+Docker; Windows, GPUs and the optional extras: [Installing in more detail](#installing-in-more-detail).
 
 ## Quick start
 
@@ -72,17 +68,6 @@ curl http://127.0.0.1:8000/v1/audio/transcriptions -F file=@recording.wav -F mod
 curl http://127.0.0.1:8000/v1/audio/speech -H 'Content-Type: application/json' \
   -d '{"model": "tts-1", "voice": "af_heart", "input": "Hello from bolo."}' -o hello.mp3
 ```
-
-In PowerShell (in Windows PowerShell 5.1 `curl` is `Invoke-WebRequest`, so call `curl.exe`):
-
-```powershell
-curl.exe http://127.0.0.1:8000/v1/audio/transcriptions -F file=@recording.wav -F model=whisper-1
-$body = @{ model = "tts-1"; voice = "af_heart"; input = "Hello from bolo." } | ConvertTo-Json
-Invoke-RestMethod http://127.0.0.1:8000/v1/audio/speech -Method Post -ContentType "application/json; charset=utf-8" `
-  -Body ([Text.Encoding]::UTF8.GetBytes($body)) -OutFile hello.mp3      # UTF-8 bytes: any language's text survives
-```
-
-Windows PowerShell 5.1 drops the double quotes inside an argument it passes to a program, so `curl.exe -d '{"model": ...}'` sends broken JSON there: use `Invoke-RestMethod` as above, or `curl.exe ... -d "@body.json"` (PowerShell 7.3 and later pass them as written). Piping a program's UTF-8 output on in 5.1 needs `[Console]::OutputEncoding = [Text.Encoding]::UTF8` first. In cmd, JSON needs escaped double quotes: `curl.exe ... -H "Content-Type: application/json" -d "{\"model\": \"tts-1\", \"voice\": \"af_heart\", \"input\": \"Hello from bolo.\"}" -o hello.mp3`. Environment variables are `$env:BOLO_DEVICE = "cuda"` in PowerShell and `set BOLO_DEVICE=cuda` in cmd.
 
 With the official OpenAI SDK, only the base URL changes:
 
@@ -330,6 +315,39 @@ All tables, the method and what batching does and does not buy on CPU: [docs/per
 - **Romanised input** beyond bolo's own tests: how converted text sounds was not evaluated.
 
 The full list, with what *was* run of each: [docs/status.md](docs/status.md).
+
+## Installing in more detail
+
+The double quotes work in bash, zsh, PowerShell and cmd (cmd.exe does not treat single quotes as quotes).
+
+- Upgrading: `uv tool upgrade bolo-speech`. Right after a release uv may still offer the previous version from its cache: add `--refresh`.
+- Run it once without installing: `uvx --from "bolo-speech[all]" bolo serve`.
+- Without uv: `pipx install "bolo-speech[all]"`, or `pip install "bolo-speech[all]"` into a virtual environment.
+- With Homebrew (macOS 14 or later, Linux): `brew install cb-sigma/tap/bolo`, then `brew services start bolo` to run it in the background (console at http://127.0.0.1:8000/). It installs `all`; the [tap's README](https://github.com/cB-Sigma/homebrew-tap#bolo) shows how to add the opt-in extras.
+- On Windows (PowerShell or cmd), the same command. Models go to `%USERPROFILE%\.cache\bolo`; DirectML, services and the other differences: [docs/configuration.md](docs/configuration.md#windows). On Windows, install natively. With an NVIDIA GPU, add the CUDA wheels (see [CUDA on Windows](docs/configuration.md#cuda-on-windows)): speech-to-text runs on the GPU natively as fast as under WSL2. Use WSL2 only for Tontaube and other Linux-only runtimes.
+- With an NVIDIA GPU on Windows: `uv tool install "bolo-speech[all,cuda]"`, then swap `onnxruntime` for `onnxruntime-gpu[cuda,cudnn]` in the tool's environment (`uv pip uninstall --python <tool python> onnxruntime`, then `uv pip install --python <tool python> "onnxruntime-gpu[cuda,cudnn]" nvidia-cublas-cu12 "nvidia-cudnn-cu12>=9,<10"`, about 2.5 GB for CUDA 12 and 13) and set `BOLO_DEVICE=cuda`; `bolo doctor` loads both CUDA runtimes and names what is missing. faster-whisper is the GPU route for speech-to-text there (sherpa-onnx's CUDA build cannot run inside bolo on Windows). The recipe: [CUDA on Windows](docs/configuration.md#cuda-on-windows).
+- As a container (CPU image): `docker run -p 8000:8000 -v bolo-data:/data ghcr.io/cb-sigma/bolo:latest`. Compose, systemd and Kubernetes examples, and what was run of each: [deploy/README.md](deploy/README.md).
+
+The PyPI distribution is `bolo-speech`; the command and the Python package are `bolo`. Python 3.10 or newer.
+
+The base install has no engine at all; extras add what you want. `all` is `sherpa` (most models), `faster-whisper`, `uccharan` (phonemes and text normalisation), `av` (M4A/WebM/AAC through bundled FFmpeg) and `wyoming`. Opt-in extras: `webrtc`, `turn` (end-of-turn model), `orpheus`, `s2s` (in-process speech-to-speech), `sip`, `moonshine`, `whispercpp`, `cuda` (CUDA 12's cuBLAS and cuDNN for faster-whisper on an NVIDIA GPU, Windows and Linux), and `espeak` (eSpeak NG, GPL-3.0-or-later, never part of `all`; see [Licences](#licences)).
+
+On Windows, from PowerShell or cmd:
+
+In PowerShell (in Windows PowerShell 5.1 `curl` is `Invoke-WebRequest`, so call `curl.exe`):
+
+```powershell
+curl.exe http://127.0.0.1:8000/v1/audio/transcriptions -F file=@recording.wav -F model=whisper-1
+$body = @{ model = "tts-1"; voice = "af_heart"; input = "Hello from bolo." } | ConvertTo-Json
+Invoke-RestMethod http://127.0.0.1:8000/v1/audio/speech -Method Post -ContentType "application/json; charset=utf-8" `
+  -Body ([Text.Encoding]::UTF8.GetBytes($body)) -OutFile hello.mp3      # UTF-8 bytes: any language's text survives
+```
+
+Windows PowerShell 5.1 drops the double quotes inside an argument it passes to a program, so `curl.exe -d '{"model": ...}'` sends broken JSON there: use `Invoke-RestMethod` as above, or `curl.exe ... -d "@body.json"` (PowerShell 7.3 and later pass them as written). Piping a program's UTF-8 output on in 5.1 needs `[Console]::OutputEncoding = [Text.Encoding]::UTF8` first. In cmd, JSON needs escaped double quotes: `curl.exe ... -H "Content-Type: application/json" -d "{\"model\": \"tts-1\", \"voice\": \"af_heart\", \"input\": \"Hello from bolo.\"}" -o hello.mp3`. Environment variables are `$env:BOLO_DEVICE = "cuda"` in PowerShell and `set BOLO_DEVICE=cuda` in cmd.
+
+## Status
+
+**Alpha.** Developed on Linux x86-64; measured on one Windows 11 laptop natively and under WSL2, on its CPU, its NVIDIA GPU (CUDA, DirectML, Vulkan), its integrated AMD Radeon (DirectML) and in Chrome and Edge ([the numbers](docs/status.md#a-windows-11-laptop)); CI runs the test suite on Linux and Windows. Apple Silicon, ROCm and discrete Radeon cards, native Linux GPUs, several NVIDIA GPUs, arm64 and phones are untested; the phone and cloud integrations have not met a real account. [What has not been validated](#what-has-not-been-validated) says so plainly.
 
 ## Documentation
 
