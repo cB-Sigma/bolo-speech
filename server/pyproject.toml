@@ -165,6 +165,8 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "src/bolo/cli.py" = ["T20"]
+# a server bolo runs in a model's own environment: it reports on its console
+"src/bolo/duplex/servers/*.py" = ["T20"]
 "tests/**" = ["T20", "B011", "ASYNC", "RUF007", "S324"]
 "tools/**" = ["T20"]
 
@@ -179,7 +181,7 @@ module = [
   "sherpa_onnx.*", "faster_whisper.*", "ctranslate2.*", "soundfile.*", "soxr.*", "av.*",
   "moonshine_onnx.*", "kokoro_onnx.*", "pywhispercpp.*", "wyoming.*", "whisper_normalizer.*",
   "onnxruntime.*", "tomli.*", "aiortc.*", "uccharan.*", "tokenizers.*", "sipmessage.*", "onnx.*", "pynvml.*",
-  "opentelemetry.*", "webrtcvad.*",
+  "opentelemetry.*", "webrtcvad.*", "sphn.*", "torch.*", "transformers.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"

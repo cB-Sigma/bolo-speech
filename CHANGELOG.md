@@ -8,6 +8,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **MiniCPM-o 4.5 as a full-duplex model** (`minicpm-o-4.5`, Apache-2.0): it listens and decides once a second
+  whether to speak (its `as_duplex()` API). The component `minicpm-o` is an environment with PyTorch 2.8.0,
+  transformers 4.51.0 and minicpmo-utils 1.0.6 in which bolo runs a small server of its own that drives that API and
+  speaks Kyutai's protocol, so the same bridge serves it; the session's instructions and voice (three reference
+  voices) reach it. Its model code is remote code: pinned file by file and run only after the operator opts in
+  (`allow_remote_code`); bolo checks the files before it starts the server. Tested with a stand-in for the model.
+
 - **FLM-Audio and Freeze-Omni as full-duplex models.** `flm-audio` (CofeAI, English and Chinese, Kyutai's protocol;
   weights with no licence stated, research use only per the model card) on CofeAI's server, and `freeze-omni`
   (Tencent, around a frozen Qwen2-7B-Instruct, its own voice-activity detection decides when to answer and when it was

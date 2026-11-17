@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-430 models: 163 validated on CPU by the maintainers, 267 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
+431 models: 163 validated on CPU by the maintainers, 268 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
 
 ### Speech to text
 
@@ -895,6 +895,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `freeze-omni` | en, zh | realtime | - | 17.6 GB | Freeze-Omni License (academic, research and education onl… ⚠ | untested |
 
+#### MiniCPM-o 4.5
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `minicpm-o-4.5` | en, zh | realtime | - | 20.0 GB | Apache-2.0 | untested |
+
 #### Qwen2.5-Omni 3B
 
 | id | languages | tier | streaming | download | licence | validated |
@@ -1062,7 +1068,7 @@ are listed like the rest and marked ⚠. Checked against the model cards, LICENS
 | `qwen2.5-omni-3b-torch` | speech-to-speech | Qwen Research License (no) | 12.0 GB | bolo-torch (`omni` extra), transformers | turn-based, answer comes back whole | runnable, untested (fakes only) |
 | `qwen2.5-omni-7b-torch` | speech-to-speech | Apache-2.0 (yes) | 22.4 GB | bolo-torch, transformers; a 24 GB GPU | turn-based | runnable, untested (fakes only) |
 | `qwen3-omni-30b-a3b-instruct-torch` | speech-to-speech | Apache-2.0 (yes) | 70.5 GB | bolo-torch, transformers 4.57+; about 79 GB of GPU memory | turn-based | runnable, untested (fakes only) |
-| `moshiko-*`, `moshika-*` (14 builds), `hibiki-*` (5), `personaplex-7b-v1`, `personaplex-rl-seamless`, `flm-audio`, `freeze-omni` | speech-to-speech | see [Full-duplex models](#full-duplex-models) | 4.0 to 17.1 GB | their authors' servers, which bolo installs and starts | **full-duplex** (listens while it speaks, 80 ms frames) | runnable, untested (fakes only) |
+| `moshiko-*`, `moshika-*` (14 builds), `hibiki-*` (5), `personaplex-7b-v1`, `personaplex-rl-seamless`, `flm-audio`, `freeze-omni`, `minicpm-o-4.5` | speech-to-speech | see [Full-duplex models](#full-duplex-models) | 4.0 to 20.0 GB | their authors' servers, which bolo installs and starts | **full-duplex** (listens while it speaks, 80 ms frames) | runnable, untested (fakes only) |
 | `glm-4-voice-9b` | speech-to-speech | ⚠ glm-4-voice License: academic use free; **commercial use only after registering with Zhipu** (open.bigmodel.cn/mla/form, then free), "Built with glm-4", Chinese law | 21.1 GB (model, glm-4-voice-tokenizer, glm-4-voice-decoder) | bolo-torch (`glm-4-voice` extra): ChatGLM remote code (opt-in), tokenizer and decoder from github.com/THUDM/GLM-4-Voice at a pinned commit; 24 GB GPU in bfloat16, about 9 GB with `quantization: int4` | turn-based; text and speech interleaved and streamed, first audio after 25 speech tokens (about 2 s of speech) | runnable, untested (fakes only) |
 | `minicpm-o-2.6` | speech-to-speech | Apache-2.0 (yes; registration optional) | 17.4 GB (with the voices, Vocos and the ChatTTS tokenizer) | bolo-torch (`minicpm-o` extra): **the whole model is remote code**, run only after the per-model opt-in, pinned files checked by sha256; about 18 GB of GPU memory | turn-based; its streaming API (text and 24 kHz speech piece by piece) or `mode: chat` (whole answer) | runnable, untested (fakes only) |
 | `step-audio-2-mini` | speech-to-speech | Apache-2.0 (yes) | 17.9 GB | bolo-torch (`step-audio-2` extra): the model's remote code (opt-in) and token2wav from github.com/stepfun-ai/Step-Audio2 at a pinned commit; a 24 GB NVIDIA GPU | turn-based; text streamed, speech in 25-token pieces (first audio after about 1 s of speech), tool calls | runnable, untested (fakes only) |
@@ -1115,6 +1121,7 @@ Freeze-Omni code under its own non-commercial licence.
 | `personaplex-rl-seamless` | `personaplex`, pytorch | ⚠ CC-BY-NC-4.0 with the NVIDIA Open Model License (no) | 17.1 GB, gated | as above |
 | `flm-audio` | `flm-audio`, pytorch (Kyutai's protocol) | ⚠ no licence stated; the model card says research use only (no) | 16.8 GB | NVIDIA GPU, about 24 GB; English and Chinese |
 | `freeze-omni` | `freeze-omni`, pytorch (Socket.IO) | ⚠ Freeze-Omni License: academic, research and education only (no); Qwen2-7B-Instruct, which comes with it, Apache-2.0 | 17.6 GB | NVIDIA GPU, about 24 GB; English and Chinese; no text out |
+| `minicpm-o-4.5` | `minicpm-o`, pytorch (bolo's server around the model's remote code, opt-in) | Apache-2.0 (yes) | 20.0 GB | NVIDIA GPU, about 24 GB; English and Chinese; it decides once a second whether to speak |
 
 Hibiki's Rust builds (`kyutai/hibiki-1b-rs-q8`, `-rs-q6k`) and other conversions are not in the catalog:
 [models-unsupported.md](models-unsupported.md) says why.

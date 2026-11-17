@@ -57,6 +57,8 @@ or optional extras and keep their own licences:
     client of the Socket.IO protocol that Freeze-Omni's server speaks. Model
     weights: FLM-Audio states no licence (research use only per its model
     card), Freeze-Omni under its licence, with Qwen2-7B-Instruct (Apache-2.0).
+    For MiniCPM-o 4.5 (Apache-2.0) bolo installs OpenBMB's minicpmo-utils
+    (Apache-2.0) with PyTorch and runs its own server around the model's code.
 
   Speaker diarization uses the pyannote segmentation-3.0 model (MIT) in its
   ONNX export and a 3D-Speaker ERes2Net speaker-embedding model (Apache-2.0),

@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import hashlib
+import json
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from bolo.duplex.base import DuplexBackend
@@ -29,6 +33,39 @@ def _codec_missing() -> str | None:
     return None
 
 
+def remote_code_problem(core: Bolo, spec: ModelSpec, path: Path | None = None) -> str | None:
+    """Why the model's remote code may not run (bolo.remote_code): the operator has not opted in for it, or, with
+    ``path``, its files are not the pinned ones (a changed file, an unlisted ``.py`` file, an ``auto_map`` into another
+    repository). None: no remote code, or the opt-in and the files are in order."""
+    from bolo import remote_code
+
+    pin = remote_code.pin(spec)
+    if pin is None:
+        return None
+    if not remote_code.allowed(core.store.model_settings(spec.id)):
+        return remote_code.notice(spec, core.store.model_settings(spec.id))
+    if path is None:
+        return None
+    files = {str(k): str(v) for k, v in (pin.get("files") or {}).items()}
+    files.update({str(k): str(v) for k, v in (spec.options.get("sha256") or {}).items()})
+    for name, digest in files.items():
+        target = path / name
+        if not target.is_file():
+            return f"model '{spec.id}': the pinned file {name} is missing; pull the model again"
+        if hashlib.sha256(target.read_bytes()).hexdigest() != digest:
+            return f"model '{spec.id}': {name} is not the reviewed file (sha256 differs); its remote code will not run"
+    extra = sorted(str(p.relative_to(path)) for p in path.rglob("*.py") if str(p.relative_to(path)) not in files)
+    if extra:
+        return f"model '{spec.id}': unreviewed code in its folder ({', '.join(extra)}); its remote code will not run"
+    for name in files:
+        if name.endswith(".json"):
+            with contextlib.suppress(ValueError, OSError):
+                auto_map = json.loads((path / name).read_text(encoding="utf-8")).get("auto_map") or {}
+                if "--" in json.dumps(auto_map):
+                    return f"model '{spec.id}': {name} maps classes to another repository; its remote code will not run"
+    return None
+
+
 def readiness(core: Bolo, spec: ModelSpec) -> tuple[bool, bool, str | None]:
     """``(configured, available, reason)`` of a full-duplex ``s2s_model``."""
     from bolo.duplex import runtime
@@ -41,7 +78,7 @@ def readiness(core: Bolo, spec: ModelSpec) -> tuple[bool, bool, str | None]:
         return True, False, problem
     if s.duplex_server_url:
         return True, True, None
-    problem = runtime.missing_reason(s, spec)
+    problem = runtime.missing_reason(s, spec) or remote_code_problem(core, spec)
     if problem:
         return True, False, problem
     if not (core.store.is_installed(spec.id) or (s.auto_pull and not spec.gated)):
@@ -79,6 +116,9 @@ async def build_backend(core: Bolo, spec: ModelSpec) -> DuplexBackend:
         raise ComponentMissing(f"the full-duplex model '{spec.id}' cannot start: {problem}")
     if not core.store.is_installed(spec.id):
         await core._auto_pull(spec)
+    problem = remote_code_problem(core, spec, core.store.model_dir(spec.id))
+    if problem:
+        raise EngineUnavailable(problem)
     try:
         launch = await asyncio.to_thread(
             runtime.launch, s, spec, core.store.model_dir(spec.id), free_port(), list(s.duplex_server_args)

@@ -398,7 +398,7 @@ voice names are not sent (LFM3's voices are `female` and `male`); upstream
 token usage is output tokens only. Tested against a scripted fake
 llama-server, **not against a real LFM3-Audio model.**
 
-### Full-duplex models: Moshi, Hibiki, PersonaPlex, FLM-Audio, Freeze-Omni
+### Full-duplex models: Moshi, Hibiki, PersonaPlex, FLM-Audio, Freeze-Omni, MiniCPM-o 4.5
 
 A *full-duplex* model listens and speaks at the same time, frame by frame (Moshi: 80 ms frames, about 200 ms of
 latency on a GPU). There are no turns: it decides itself when to answer, keeps listening while it talks, and stops
@@ -424,6 +424,7 @@ bolo serve
 | PersonaPlex (`personaplex-7b-v1`, `personaplex-rl-seamless`) | NVIDIA's `personaplex` (MIT), pinned commit | `pytorch` (PyTorch 2.4.1 CUDA 12.4) | 1 |
 | FLM-Audio (`flm-audio`) | CofeAI's `flm-audio` (Apache-2.0), pinned commit, run from its checkout | `pytorch` (PyTorch 2.6.0 CUDA 12.4) | 1 |
 | Freeze-Omni (`freeze-omni`) | Tencent's `freeze-omni` (Freeze-Omni License, non-commercial), pinned commit, run from its checkout; **Socket.IO**, not Kyutai's protocol | `pytorch` (PyTorch 2.2.0 CUDA 12.1, Python 3.10) | `duplex_max_sessions` (its `--max_users` and `--llm_exec_nums`) |
+| MiniCPM-o 4.5 (`minicpm-o-4.5`) | `minicpm-o`: an environment with PyTorch 2.8.0 (CUDA 12.8), transformers 4.51.0 and OpenBMB's minicpmo-utils 1.0.6, in which bolo runs its own small server (`bolo/duplex/servers/minicpmo_duplex.py`) around the model's `as_duplex()` API; it speaks Kyutai's protocol. The model's code is **remote code**: it runs only after `bolo models config minicpm-o-4.5 --set allow_remote_code=true`, and bolo checks every pinned file (sha256, no unlisted `.py`) before it starts the server | `pytorch` | 1 |
 
 bolo installs each server in a virtual environment of its own under `<data_dir>/components/<id>/<version>/<build>`
 (with `uv` when it is on `PATH`, which fetches Python 3.12; else bolo's own Python, 3.10 to 3.12), starts it on a
@@ -448,7 +449,7 @@ far from real time for 7 B models). Only Kyutai's servers are touched this way, 
 | `response.output_audio_transcript.delta` | the model's text tokens as they come (`response.output_text.delta` with `output_modalities: ["text"]`) |
 | `response.cancel`, `output_audio_buffer.clear` | ends the current response as `cancelled` and drops what the model says until its next pause; the model itself keeps running |
 | `response.create`, `conversation.item.create` (user text, tool results) | refused (`unsupported`): the model answers speech, by itself |
-| `instructions`, `voice` | PersonaPlex: its text prompt and voice prompt (`NATF0` … `VARM4`; OpenAI voice names mean the default `NATF2`); Freeze-Omni: its system prompt; fixed when the conversation opens. The other models take neither |
+| `instructions`, `voice` | PersonaPlex: its text prompt and voice prompt (`NATF0` … `VARM4`; OpenAI voice names mean the default `NATF2`); MiniCPM-o 4.5: its system prompt and reference voice (`ht`, `system`, `system-2`); Freeze-Omni: its system prompt; fixed when the conversation opens. The other models take neither |
 | the model stops because the caller talked over it (Freeze-Omni's `stop_tts`) | the current response ends as `cancelled` (`turn_detected`) and, over WebRTC, its unplayed audio is dropped |
 | `session.duplex` (bolo extension) | sampling options for the Rust server's query string (`text_temperature`, `text_topk`, `audio_temperature`, `audio_topk`, `pad_mult`, `repetition_penalty`, ...); the Python servers ignore them |
 | closing the session | closes the model's WebSocket; the server is free for the next conversation |
@@ -478,13 +479,15 @@ class DuplexBackend:                  # one per server
 ```
 
 The bridge does the rest (the clock, responses, transcripts, cancellation, WebRTC). Two backends exist:
-`bolo/duplex/kyutai.py` (Kyutai's protocol: Moshi, Hibiki, Hibiki-Zero, PersonaPlex, FLM-Audio) and
+`bolo/duplex/kyutai.py` (Kyutai's protocol: Moshi, Hibiki, Hibiki-Zero, PersonaPlex, FLM-Audio, and MiniCPM-o 4.5
+through bolo's own server, which shows how a model with a Python API but no server gets one) and
 `bolo/duplex/freeze_omni.py` (Freeze-Omni's Socket.IO events, with a small Socket.IO client in
 `bolo/duplex/socketio.py`); a backend that knows when its model was interrupted yields `DuplexInterrupt`.
 `tests/fake_kyutai_server.py` is a stand-in server with the real framing (Kyutai's `sphn` when installed, else
 bolo's own Ogg Opus), `tests/fake_freeze_omni_server.py` one built on python-socketio's own server.
 What ran: the bridge, both clients and the managed-server path against those fakes, and bolo's Ogg Opus against
-Kyutai's `sphn` both ways. **No real Moshi, Hibiki, PersonaPlex, FLM-Audio or Freeze-Omni model was run** (the smallest is 4.8 GB and they
+Kyutai's `sphn` both ways. **No real Moshi, Hibiki, PersonaPlex, FLM-Audio, Freeze-Omni or MiniCPM-o model was run** (bolo's MiniCPM-o server
+was run with a stand-in for the model's duplex object) (the smallest is 4.8 GB and they
 want a GPU); [models.md](models.md#full-duplex-models) has a checklist for a first run on a Windows machine with an
 NVIDIA GPU.
 

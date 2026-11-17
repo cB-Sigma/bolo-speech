@@ -34,3 +34,4 @@ not:
 
 The text-reading end-of-turn models bolo does run are the Namo Turn Detectors (`namo-turn-en`,
 `namo-turn-multilingual`, Apache-2.0), wired to the transcript of the utterance at each pause.
+| MiniCPM-o 2.6 in full-duplex ([openbmb/MiniCPM-o-2_6](https://huggingface.co/openbmb/MiniCPM-o-2_6)) | Apache-2.0 | 17.4 GB | it has no full-duplex mode: its "live streaming" prefills the user's audio and then generates (the application decides when the turn ends; OpenBMB's demo server uses a voice-activity detector), so it never listens while it speaks. Its turn-based use is a separate catalog entry; its successor MiniCPM-o 4.5 is in the catalog as a full-duplex model (`minicpm-o-4.5`). |

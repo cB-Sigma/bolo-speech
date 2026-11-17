@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
+import dataclasses
 import io
 import json
 import tarfile
@@ -532,11 +534,9 @@ async def test_managed_server_end_to_end(settings: Settings, tmp_path: Path, mon
     if not python.exists():  # Windows: the fake is python.cmd
         python.write_text("", encoding="utf-8")
     (root / ".bolo-complete").write_text("{}", encoding="utf-8")
-    model_dir = core.store.model_dir(spec.id)
+    model_dir = _model_dir(tmp_path, spec)
     monkeypatch.setattr(core.store, "is_installed", lambda name: True)
-    monkeypatch.setattr(
-        core.store, "model_dir", lambda name: _model_dir(tmp_path, spec) if not model_dir.exists() else model_dir
-    )
+    monkeypatch.setattr(core.store, "model_dir", lambda name: model_dir)
     backend = await build_backend(core, spec)
     try:
         assert backend.describe()["managed"] is True
@@ -689,3 +689,153 @@ def test_install_from_a_checkout(settings: Settings, monkeypatch: pytest.MonkeyP
     assert "torch==2.2.0" in next(c for c in commands if "--index-url" in c)
     check = commands[-1]
     assert "sys.path.insert" in check[-1] and "import flask_socketio, torchaudio" in check[-1]
+
+
+# -- MiniCPM-o 4.5: bolo's own server around the model's duplex API ---------------------------------------------------
+class FakeMiniCPMDuplex:
+    """MiniCPMODuplex as its remote code shapes it: prepare(), then streaming_prefill / streaming_generate per second."""
+
+    def __init__(self) -> None:
+        self.prepared: list[dict[str, Any]] = []
+        self.pieces: list[int] = []
+
+    def prepare(self, prefix_system_prompt: Any = None, ref_audio: Any = None, prompt_wav_path: Any = None) -> str:
+        self.prepared.append({"prompt": prefix_system_prompt, "voice": prompt_wav_path, "ref": len(ref_audio)})
+        return ""
+
+    def streaming_prefill(self, audio_waveform: Any = None, frame_list: Any = None) -> None:
+        self.pieces.append(len(audio_waveform))
+
+    def streaming_generate(self, **kwargs: Any) -> dict[str, Any]:
+        speak = len(self.pieces) == 2  # it answers in its second step
+        audio = (0.3 * np.sin(np.arange(24000) / 5)).astype(np.float32) if speak else None
+        return {
+            "is_listen": not speak,
+            "text": "Hi there." if speak else "",
+            "audio_waveform": audio,
+            "end_of_turn": speak,
+        }
+
+
+def _minicpmo_server() -> Any:
+    import importlib.util
+
+    path = Path(rt.__file__).with_name("servers") / "minicpmo_duplex.py"
+    spec = importlib.util.spec_from_file_location("minicpmo_duplex_under_test", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+async def test_minicpmo_duplex_server_speaks_kyutais_protocol() -> None:
+    pytest.importorskip("sphn")
+    from bolo.engines.tts_server import free_port
+
+    server = _minicpmo_server()
+    fake = FakeMiniCPMDuplex()
+    conversations = server.Conversations(
+        fake, {"ht": "/m/assets/HT.wav", "system": "/m/assets/system.wav"}, "ht", load_audio=lambda p: np.zeros(16000)
+    )
+    port = free_port()
+    task = asyncio.create_task(server.run(conversations, "127.0.0.1", port))
+    try:
+        backend = KyutaiBackend(
+            f"http://127.0.0.1:{port}", model="minicpm-o-4.5", voice_param="voice", default_voice="ht",
+            instructions_param="text_prompt",
+        )  # fmt: skip
+        for _ in range(50):
+            try:
+                session = await backend.open(DuplexConfig(instructions="Be a tour guide.", voice="system"))
+                break
+            except EngineUnavailable:
+                await asyncio.sleep(0.1)
+        await _feed(session, tone(2.2, 24000))
+        text, audio = "", 0
+        async with asyncio.timeout(10):
+            async for event in session.events():
+                if isinstance(event, DuplexText):
+                    text += event.text
+                elif isinstance(event, DuplexAudio):
+                    audio += len(event.samples)
+                if text and audio >= 48000 - 4000:
+                    break
+        await session.close()
+    finally:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+    assert fake.prepared == [{"prompt": "Be a tour guide.", "voice": "/m/assets/system.wav", "ref": 16000}]
+    assert fake.pieces[:2] == [16560, 16000]  # the first piece is 1035 ms, then one second at a time
+    assert text == "Hi there."
+
+
+def test_minicpmo_remote_code_is_opt_in_and_checked(
+    settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import hashlib
+
+    from bolo.core import Bolo
+    from bolo.duplex.manager import readiness, remote_code_problem
+
+    monkeypatch.setattr(rt, "platform_key", lambda: "linux-x86_64")
+    settings.s2s_model = "minicpm-o-4.5"
+    core = Bolo(settings)
+    spec = core.catalog.resolve("minicpm-o-4.5")
+    assert spec is not None and spec.options["remote_code"]["files"]
+    _install_fake(settings, "minicpm-o", "pytorch")
+    monkeypatch.setattr(core.store, "is_installed", lambda name: True)
+    configured, available, reason = readiness(core, spec)
+    assert configured and not available and "allow_remote_code=true" in str(reason)
+    core.store.set_model_settings(spec.id, {"allow_remote_code": True})
+    assert readiness(core, spec) == (True, True, None)
+    folder = tmp_path / "minicpm"
+    pinned = {**spec.options["remote_code"]["files"], **spec.options["sha256"]}
+    assert "unreviewed" not in str(remote_code_problem(core, spec, folder))  # missing files come first
+    for name in pinned:
+        (folder / name).parent.mkdir(parents=True, exist_ok=True)
+        (folder / name).write_text("changed", encoding="utf-8")
+    assert "not the reviewed file" in str(remote_code_problem(core, spec, folder))
+    # the same entry pinned to the files as they are now: accepted, until an unlisted .py file appears
+    digest = {n: hashlib.sha256((folder / n).read_bytes()).hexdigest() for n in pinned}
+    code = {n: d for n, d in digest.items() if n in spec.options["remote_code"]["files"]}
+    options = {**spec.options, "remote_code": {**spec.options["remote_code"], "files": code},
+               "sha256": {n: d for n, d in digest.items() if n not in code}}  # fmt: skip
+    repinned = dataclasses.replace(spec, options=options)
+    assert remote_code_problem(core, repinned, folder) is None
+    (folder / "evil.py").write_text("", encoding="utf-8")
+    assert "unreviewed code" in str(remote_code_problem(core, repinned, folder))
+
+
+def test_minicpmo_launch_and_install(settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from bolo.catalog import Catalog
+
+    monkeypatch.setattr(rt, "platform_key", lambda: "windows-x86_64")
+    settings.device = "cuda"
+    spec = Catalog.load(None).resolve("minicpm-o-4.5")
+    assert spec is not None
+    _install_fake(settings, "minicpm-o", "pytorch")
+    path = _model_dir(tmp_path, spec)
+    run = json.loads(rt.launch(settings, spec, path, 13, []).process.argv[4])
+    assert run["module"].endswith("minicpmo_duplex.py") and Path(run["module"]).is_file()
+    assert (
+        run["args"][run["args"].count("--voice") and run["args"].index("--voice") + 1] == "ht=assets/HT_ref_audio.wav"
+    )
+    monkeypatch.setattr(rt.shutil, "which", lambda name: f"/usr/bin/{name}" if name == "uv" else None)
+    commands: list[list[str]] = []
+
+    def run_step(cmd: list[str]) -> tuple[int, str]:
+        commands.append(cmd)
+        if cmd[1] == "venv":
+            python = rt._venv_python(Path(cmd[-1]))
+            python.parent.mkdir(parents=True, exist_ok=True)
+            python.write_text("", encoding="utf-8")
+        return 0, ""
+
+    import shutil
+
+    shutil.rmtree(rt.install_dir(settings, "minicpm-o", "pytorch"))
+    assert rt.install(settings, "minicpm-o", None, lambda p, f: f / p.name, run_step) is None
+    torch = next(c for c in commands if "--index-url" in c)
+    assert "torch==2.8.0" in torch and "torchaudio==2.8.0" in torch
+    assert any("minicpmo-utils[all]==1.0.6" in c and "transformers==4.51.0" in c for c in commands)

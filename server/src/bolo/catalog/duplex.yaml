@@ -1,5 +1,5 @@
 # Full-duplex speech-to-speech models (bolo.duplex): each one runs in its own server that bolo installs as a
-# component (moshi, hibiki-zero, personaplex, flm-audio, freeze-omni) and starts on a loopback port; Realtime and WebRTC sessions reach it
+# component (moshi, hibiki-zero, personaplex, flm-audio, freeze-omni, minicpm-o) and starts on a loopback port; Realtime and WebRTC sessions reach it
 # when s2s_model names it. Files pinned by revision and SHA-256.
 - id: moshiko-pytorch-bf16
   task: speech-to-speech
@@ -1524,3 +1524,190 @@
       gpu: required
       vram_gb: 24
       note: 'estimate: Qwen2-7B-Instruct in bfloat16 plus the speech encoder and decoder'
+- id: minicpm-o-4.5
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: MiniCPM-o 4.5
+  languages:
+  - en
+  - zh
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 19992345428
+  params: 9000000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/openbmb/MiniCPM-o-4_5
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  - instructions
+  description: 'OpenBMB MiniCPM-o 4.5 (9 B: Whisper-medium, Qwen3-8B, CosyVoice2) in its full-duplex mode: it listens and
+    decides once a second whether to speak, and talks while it keeps listening (its as_duplex() API), English and Chinese,
+    voice from a reference recording (three of the model''s own: ht, system, system-2); the session''s instructions are
+    its system prompt. Vision is not used. Its model code is remote code: it runs only after you opt in (bolo models config
+    minicpm-o-4.5 --set allow_remote_code=true), checked file by file. Runs in bolo''s small server on OpenBMB''s code (bolo
+    components install minicpm-o; NVIDIA GPU). Apache-2.0. About a second of latency by design.'
+  source_url: https://huggingface.co/openbmb/MiniCPM-o-4_5
+  validated: untested
+  requires:
+  - minicpm-o
+  source:
+    urls:
+    - path: configuration_minicpmo.py
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/configuration_minicpmo.py
+      size: 10135
+      sha256: b0c56c192d4aa57d3dc358338a4a93413b8b68e7c7a7c5b82a5af35afab1d86a
+    - path: modeling_minicpmo.py
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/modeling_minicpmo.py
+      size: 214356
+      sha256: 25359f891d1aa81de16b51a24a97b8c8262b83ce3920c36b92be441fde8e4282
+    - path: modeling_navit_siglip.py
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/modeling_navit_siglip.py
+      size: 42559
+      sha256: 1a40a58cb7dfa93f723685f860d1cf3caf3a0ecf52b7904db0c4007aacd1536f
+    - path: processing_minicpmo.py
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/processing_minicpmo.py
+      size: 67284
+      sha256: 3a1f017339b92c2fa768d7737db76cc4689d2280b68a71866b06f7dedc8ac1c2
+    - path: tokenization_minicpmo_fast.py
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/tokenization_minicpmo_fast.py
+      size: 3249
+      sha256: c9c71d0d7ef0c113829e2d810619c9e0a69cffe04c732c4d80599b40a33bc7bf
+    - path: utils.py
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/utils.py
+      size: 95702
+      sha256: 0372698343830d4a96524f56a91a8cabf628fd7c57dde8b25db43eed1f6042c1
+    - path: config.json
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/config.json
+      size: 6439
+      sha256: b0c03cf9f0cfc1178ade50e4ba62727ca7a77aa6a6a71eda6668d8f289e96c1d
+    - path: tokenizer_config.json
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/tokenizer_config.json
+      size: 101726
+      sha256: cb1325fdb3b0b9f38b64607399d3e163fbe32bf49c273c229755a0dbce83f813
+    - path: preprocessor_config.json
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/preprocessor_config.json
+      size: 842
+      sha256: 10350f12d5636b24e19265d72c5543b462251f54ca18afaa147f6f2ece9591e0
+    - path: generation_config.json
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/generation_config.json
+      size: 178
+      sha256: cf29e6aecb72503bd220cccb6d86bde84a9f57e77c741dedb8670036106e2119
+    - path: added_tokens.json
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/added_tokens.json
+      size: 2706
+      sha256: 34d823f7a691ddec4816ac5dfe5fc487963e3d75ab3be374590c02fc0a7fa3f5
+    - path: special_tokens_map.json
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/special_tokens_map.json
+      size: 12002
+      sha256: a119f5bb22d8818d33514e0b58a224c111bb8e7aa1702d625a23fbe82e6e86b5
+    - path: tokenizer.json
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/tokenizer.json
+      size: 11437712
+      sha256: 6d55eb34389b8c87403763cc1d80447d91c85c7cd39cd5e3c0dc2d49edad989d
+    - path: vocab.json
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/vocab.json
+      size: 2776833
+      sha256: ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910
+    - path: merges.txt
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/merges.txt
+      size: 1402109
+      sha256: ac8ff86a72bee70828fbc1119bc4398c6f3a9a6e490d7b0dbe917be025478bd0
+    - path: model.safetensors.index.json
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/model.safetensors.index.json
+      size: 117202
+      sha256: e578de05a95804bb15237a6fd7c236414e0160cd76751da82c9f7f0d134596e7
+    - path: model-00001-of-00004.safetensors
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/model-00001-of-00004.safetensors
+      size: 5273477136
+      sha256: 30c40b9a10386c1bc404568d8829e5aada2e3501d9de6fb46ff80451aff7e077
+    - path: model-00002-of-00004.safetensors
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/model-00002-of-00004.safetensors
+      size: 5301855080
+      sha256: fe0faef420aca8f771bec1f9fcfaae01206c56b8e64e4429a1ff500c962fbf96
+    - path: model-00003-of-00004.safetensors
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/model-00003-of-00004.safetensors
+      size: 5301855048
+      sha256: 5d0b20153f9bfa88ebcd1cb6bbd5b7cac4c217b3cafb137a291a1b380d8b7821
+    - path: model-00004-of-00004.safetensors
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/model-00004-of-00004.safetensors
+      size: 2866549964
+      sha256: f61addf4747c94fedcaee059e5d9918ed15543beec494404139a99f2f86c9b31
+    - path: assets/token2wav/campplus.onnx
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/assets/token2wav/campplus.onnx
+      size: 28303423
+      sha256: a6ac6a63997761ae2997373e2ee1c47040854b4b759ea41ec48e4e42df0f4d73
+    - path: assets/token2wav/flow.pt
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/assets/token2wav/flow.pt
+      size: 623466603
+      sha256: 15ccff24256ff61537c7f8b51e025116b83405f3fb017b54b008fc97da115446
+    - path: assets/token2wav/flow.yaml
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/assets/token2wav/flow.yaml
+      size: 1099
+      sha256: 723295d37bf11f5f1b896ca4f2f4c81ebc2fbb3e51b753c2507ef8461c751486
+    - path: assets/token2wav/hift.pt
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/assets/token2wav/hift.pt
+      size: 83390254
+      sha256: 3386cc880324d4e98e05987b99107f49e40ed925b8ecc87c1f4939432d429879
+    - path: assets/token2wav/speech_tokenizer_v2_25hz.onnx
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/assets/token2wav/speech_tokenizer_v2_25hz.onnx
+      size: 496082973
+      sha256: d43342aa12163a80bf07bffb94c9de2e120a8df2f9917cd2f642e7f4219c6f71
+    - path: assets/HT_ref_audio.wav
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/assets/HT_ref_audio.wav
+      size: 192590
+      sha256: cb8f06ba5080cdf548969138881fb8ad8b04e2516108f4e08ba0363b68b613ea
+    - path: assets/system_ref_audio.wav
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/assets/system_ref_audio.wav
+      size: 539032
+      sha256: 2c4109b2d685e1923ed66433eb08c92047a1f67510629a27edf49af4e5c606dd
+    - path: assets/system_ref_audio_2.wav
+      url: https://huggingface.co/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/assets/system_ref_audio_2.wav
+      size: 341192
+      sha256: 4a65d17099239711601cb17e28b7aa7b6149acd153b92fd0366c23902bd4f687
+  options:
+    repo: openbmb/MiniCPM-o-4_5
+    server: minicpm-o
+    build: pytorch
+    model_file: model.safetensors.index.json
+    voice_files:
+      ht: assets/HT_ref_audio.wav
+      system: assets/system_ref_audio.wav
+      system-2: assets/system_ref_audio_2.wav
+    voice_param: voice
+    default_voice: ht
+    instructions_param: text_prompt
+    remote_code:
+      revision: fb09628e98b1f55d8d5b863e0eccfcdd11bff499
+      reviewed: '2026-11-17: configuration_minicpmo.py, modeling_minicpmo.py (the MiniCPMO model, its Whisper audio encoder,
+        SigLIP vision, the TTS head and the MiniCPMODuplex wrapper), modeling_navit_siglip.py, processing_minicpmo.py, tokenization_minicpmo_fast.py
+        and utils.py. Network: utils.py downloads a content item given as a URL (chat inputs, not used by the duplex mode)
+        and init_tts calls snapshot_download for assets/token2wav only when that folder is missing (bolo pulls it). Files:
+        some chat paths write temporary WAV files. It imports flag_gems when installed. No subprocesses. auto_map entries
+        point at the repository''s own files.'
+      files:
+        configuration_minicpmo.py: b0c56c192d4aa57d3dc358338a4a93413b8b68e7c7a7c5b82a5af35afab1d86a
+        modeling_minicpmo.py: 25359f891d1aa81de16b51a24a97b8c8262b83ce3920c36b92be441fde8e4282
+        modeling_navit_siglip.py: 1a40a58cb7dfa93f723685f860d1cf3caf3a0ecf52b7904db0c4007aacd1536f
+        processing_minicpmo.py: 3a1f017339b92c2fa768d7737db76cc4689d2280b68a71866b06f7dedc8ac1c2
+        tokenization_minicpmo_fast.py: c9c71d0d7ef0c113829e2d810619c9e0a69cffe04c732c4d80599b40a33bc7bf
+        utils.py: 0372698343830d4a96524f56a91a8cabf628fd7c57dde8b25db43eed1f6042c1
+        config.json: b0c03cf9f0cfc1178ade50e4ba62727ca7a77aa6a6a71eda6668d8f289e96c1d
+        tokenizer_config.json: cb1325fdb3b0b9f38b64607399d3e163fbe32bf49c273c229755a0dbce83f813
+        preprocessor_config.json: 10350f12d5636b24e19265d72c5543b462251f54ca18afaa147f6f2ece9591e0
+    sha256:
+      assets/token2wav/flow.yaml: 723295d37bf11f5f1b896ca4f2f4c81ebc2fbb3e51b753c2507ef8461c751486
+    hardware:
+      gpu: required
+      vram_gb: 24
+      note: 'estimate: 9 B in bfloat16 with token2wav'
+  voices:
+  - id: ht
+    name: ht
+  - id: system
+    name: system
+  - id: system-2
+    name: system-2

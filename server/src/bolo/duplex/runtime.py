@@ -264,6 +264,41 @@ SERVERS[FREEZE_OMNI] = Server(
         "Socket.IO, not Kyutai's protocol (bolo.duplex.freeze_omni). Non-commercial licence."
     ),
 )
+MINICPM_O = "minicpm-o"
+SERVERS[MINICPM_O] = Server(
+    id=MINICPM_O,
+    name="MiniCPM-o 4.5 duplex server (bolo's, on the model's own code)",
+    license="Apache-2.0 (bolo's server and minicpmo-utils; the model's remote code and weights are Apache-2.0)",
+    license_url="https://huggingface.co/openbmb/MiniCPM-o-4_5",
+    homepage="https://github.com/OpenBMB/MiniCPM-o",
+    builds={
+        PYTORCH: Build(
+            PYTORCH,
+            "1.0.6",
+            _LINUX_WIN,
+            torch="torch==2.8.0 torchaudio==2.8.0",
+            torch_index="https://download.pytorch.org/whl/cu128",
+            python="3.10",
+            packages=(
+                "transformers==4.51.0",
+                "accelerate==1.10.1",
+                "minicpmo-utils[all]==1.0.6",
+                "sphn==0.2.1",
+                "websockets==15.0.1",
+                "soundfile==0.12.1",
+            ),
+            imports=("transformers", "stepaudio2", "sphn", "websockets"),
+            note="NVIDIA GPU with about 24 GB (bfloat16, 9 B); the model card's tested set: Python 3.10, transformers 4.51.0",
+        ),
+    },
+    defaults={"linux-x86_64": PYTORCH, "windows-x86_64": PYTORCH},
+    description=(
+        "An environment for MiniCPM-o 4.5's full-duplex mode: PyTorch, transformers 4.51.0 and OpenBMB's minicpmo-utils "
+        "(token2wav), in which bolo runs a small server of its own (bolo/duplex/servers/minicpmo_duplex.py) that "
+        "drives the model's as_duplex() API and speaks Kyutai's protocol. The model's code is remote code: it runs "
+        "only after you opt in for the model (allow_remote_code)."
+    ),
+)
 COMPONENTS = tuple(SERVERS)
 
 
@@ -394,7 +429,7 @@ def _install_python(
     if job is not None:
         job.progress = 0.2
     if build.torch:
-        cmd = [*pip, build.torch]
+        cmd = [*pip, *build.torch.split()]
         if build.torch_index and not platform_key().startswith("darwin"):
             cmd += ["--index-url", build.torch_index]
         _check(run, cmd, f"installing {build.torch}")
@@ -403,8 +438,9 @@ def _install_python(
     source: Path | None = None
     if build.wheel is not None:
         install = [str(fetch(build.wheel, work))]
+    elif build.git is None:
+        install = []  # only the pinned packages
     else:
-        assert build.git is not None
         url, commit, sub = build.git
         checkout = target / "src" if build.requirements else work / "src"
         _check(run, ["git", "clone", "--quiet", url, str(checkout)], f"git clone {url}")
@@ -623,7 +659,11 @@ def launch(settings: Settings, spec: ModelSpec, path: Path, port: int, extra_arg
     run_dir = Path(settings.data_dir) / "run" / "duplex" / spec.id
     run_dir.mkdir(parents=True, exist_ok=True)
     files = {k: str(path / str(opts[k])) for k in ("model_file", "mimi_file", "tokenizer_file") if opts.get(k)}
-    needed = ("model_file",) if server in (FLM_AUDIO, FREEZE_OMNI) else ("model_file", "mimi_file", "tokenizer_file")
+    needed = (
+        ("model_file",)
+        if server in (FLM_AUDIO, FREEZE_OMNI, MINICPM_O)
+        else ("model_file", "mimi_file", "tokenizer_file")
+    )
     for key in needed:
         if key not in files or not Path(files[key]).is_file():
             raise FileNotFoundError(f"model '{spec.id}': its {key} ({files.get(key)}) is missing; pull the model again")
@@ -677,6 +717,12 @@ def launch(settings: Settings, spec: ModelSpec, path: Path, port: int, extra_arg
             device = _torch_device(settings, spec, server)
             # its loaders take folders: the model's own (config.json, the weights, the tokenizer, Mimi's file)
             args = ["--device", device, "--model-path", str(path), "--mimi-path", str(path)]
+        elif server == MINICPM_O:
+            module = str(Path(__file__).with_name("servers") / "minicpmo_duplex.py")
+            device = _torch_device(settings, spec, server)
+            args = ["--device", device, "--model-path", str(path)]
+            for name, rel in (opts.get("voice_files") or {}).items():
+                args += ["--voice", f"{name}={rel}"]
         elif server == FREEZE_OMNI:
             module = "bin/server.py"
             sessions = max(1, int(getattr(settings, "duplex_max_sessions", 1)))
