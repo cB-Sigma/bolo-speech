@@ -30,8 +30,6 @@ the OpenAI audio and Realtime APIs. On top of speech-to-text and text-to-speech 
 
 - **Ollama-style model scheduling**: each model on the GPU when it fits and on the CPU when it does not, split
   across both when it half-fits, unloaded after a keep-alive; `bolo ps` shows where everything runs.
-- **Telephony**: answers and places phone calls through Twilio, Plivo, Telnyx, Exotel or SIP, with barge-in,
-  transfers and per-call latency.
 - **Speaker diarization and speaker-attributed transcription**: who spoke when, and each speaker's words
   transcribed separately, overlaps included, without PyTorch.
 - **Voice cloning with a voice library**: save a voice once with recorded consent, use it with any cloning model,
@@ -43,6 +41,8 @@ the OpenAI audio and Realtime APIs. On top of speech-to-text and text-to-speech 
 - **Voice agents**: three pipelines (recogniser → your language model → voice, an audio language model, or one
   speech-to-speech model) over the Realtime API and WebRTC, with turn detection and tools.
 - **Latency you can see**: a phase-by-phase trace of every request, micro-batching and backpressure under load.
+- **Telephony**, as an extra: answers and places phone calls through Twilio, Plivo, Telnyx, Exotel or SIP, with barge-in,
+  transfers and per-call latency.
 
 It runs on the CPU, and on an NVIDIA GPU or through DirectML when there is one. A web console comes with it, and a
 [live demo](https://cb-sigma.github.io/bolo/) runs models in your browser with nothing to install. bolo is alpha:
