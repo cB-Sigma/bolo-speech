@@ -33,6 +33,9 @@ Reported: accuracy at 0.5, the share of each class called right, AUC (how well f
 apart at any threshold), median probabilities and milliseconds per call (``load_average`` says how busy the machine
 was).
 
+**turn-large**: audio models only, a larger set: 60 English and 30 Hindi finished sentences in four English and two
+Hindi Kokoro voices, each with two unfinished cuts (at the quietest 20 ms near 35 % and 65 % of the speech).
+
 **embed**: speaker embedders on the repository's clips (whose voices are known: the Kokoro voices of the samples,
 the console's cloning samples) plus three sentences in each of eight Kokoro voices, and, with ``--librispeech``,
 real read speech (LibriSpeech dev-clean, 16 speakers, 5 utterances each, as ``tools/calibrate_similarity.py pick``
@@ -317,6 +320,151 @@ def quiet_cut(audio: np.ndarray, share: float) -> int:
     return (k + 1) * 320
 
 
+#: more finished sentences for the larger audio-only set (``turn-large``)
+TURN_EN_MORE = [
+    "I need to reschedule my appointment to Thursday afternoon.",
+    "Could you check if the doctor is available next week?",
+    "My internet has been down since this morning.",
+    "Please add milk, eggs and bread to my shopping list.",
+    "How much does the premium plan cost per month?",
+    "I was charged twice for the same order.",
+    "Can you tell me the balance on my savings account?",
+    "The driver called but I couldn't pick up the phone.",
+    "What time does the last train to Pune leave?",
+    "I'd like to speak to someone about a refund.",
+    "Please cancel the meeting with the marketing team.",
+    "Do you have this shirt in a larger size?",
+    "My password reset link doesn't seem to work.",
+    "Book a cab to the airport for six in the morning.",
+    "Is breakfast included in the room rate?",
+    "I forgot my card at the restaurant last night.",
+    "Remind me to water the plants every Sunday.",
+    "How do I update the address on my account?",
+    "The heater in my room is making a strange noise.",
+    "Can you play something relaxing for the evening?",
+    "We will need a table for six people on Saturday.",
+    "What documents do I need to open a new account?",
+    "My parcel shows delivered but I never received it.",
+    "Please transfer me to the billing department.",
+    "I think there is a mistake in my last invoice.",
+    "Could you read out today's top news headlines?",
+    "How long will the repair take to finish?",
+    "I would like to upgrade my phone plan today.",
+    "The app keeps crashing when I open the camera.",
+    "Tell me a quick recipe for dinner tonight.",
+    "Send a message to Anita saying I'll be late.",
+    "Which platform does the Shatabdi Express leave from?",
+    "My flight was cancelled and I need another one.",
+    "Can I pay the remaining amount in instalments?",
+    "Please turn the temperature down by two degrees.",
+    "When does the pharmacy near the station close?",
+    "I'd like to return the shoes I bought last week.",
+    "Is there any discount for senior citizens?",
+    "How many steps did I walk yesterday?",
+    "Let me know when the package is out for delivery.",
+]
+TURN_HI_MORE = [
+    "मुझे कल डॉक्टर से मिलने का समय चाहिए।",
+    "मेरे खाते में पैसे अभी तक नहीं आए हैं।",
+    "क्या आप मेरा टिकट रद्द कर सकते हैं?",
+    "आज रात के खाने के लिए कुछ बताइए।",
+    "मेरा फ़ोन बार बार बंद हो जाता है।",
+    "स्टेशन तक जाने के लिए टैक्सी बुला दीजिए।",
+    "इस महीने का बिजली का बिल कितना है?",
+    "मुझे अपना पासवर्ड बदलना है।",
+    "क्या कल बैंक खुला रहेगा?",
+    "मेरी माँ को शाम सात बजे फ़ोन करने की याद दिलाना।",
+    "होटल में नाश्ता शामिल है या नहीं?",
+    "मेरा पार्सल गलत पते पर चला गया है।",
+    "कृपया मुझे बिलिंग विभाग से जोड़ दीजिए।",
+    "दिल्ली के लिए अगली ट्रेन कब है?",
+    "मुझे इस कमीज़ का बड़ा साइज़ चाहिए।",
+    "क्या मैं बाकी पैसे किस्तों में दे सकता हूँ?",
+    "आज के मुख्य समाचार सुनाइए।",
+    "मेरे कमरे का एसी ठीक से काम नहीं कर रहा।",
+    "शनिवार को छह लोगों के लिए मेज़ बुक कर दीजिए।",
+    "मेरी उड़ान रद्द हो गई है, दूसरी चाहिए।",
+    "दवा की दुकान कितने बजे बंद होती है?",
+    "मुझे पिछले हफ्ते के जूते वापस करने हैं।",
+    "क्या बुज़ुर्गों के लिए कोई छूट है?",
+    "जब पार्सल निकले तो मुझे बता देना।",
+]
+TURN_LARGE_VOICES = {"en": ["af_heart", "am_michael", "bf_emma", "bm_george"], "hi": ["hf_alpha", "hm_omega"]}
+#: where the unfinished clips of the larger set are cut (share of the speech)
+TURN_LARGE_CUTS = (0.35, 0.65)
+
+
+async def turn_set_large(core: Bolo, voice_model: str) -> list[dict[str, Any]]:
+    """Audio only: every finished sentence (``TURN_EN``/``TURN_HI`` and the ``*_MORE`` lists), each in turn by one
+    of four English or two Hindi voices, and two unfinished cuts of each."""
+    items: list[dict[str, Any]] = []
+    tail = np.zeros(int(0.2 * SR), dtype=np.float32)
+    sets = (("en", [f for f, _ in TURN_EN] + TURN_EN_MORE), ("hi", [f for f, _ in TURN_HI] + TURN_HI_MORE))
+    for lang, sentences in sets:
+        voices = TURN_LARGE_VOICES[lang]
+        for i, full in enumerate(sentences):
+            voice = voices[i % len(voices)]
+            audio, rate = await core.synthesize_all(full, model=voice_model, voice=voice)
+            x = resample(np.asarray(audio, dtype=np.float32), rate, SR)
+            items.append(
+                {"lang": lang, "finished": True, "text": full, "voice": voice, "audio": np.concatenate([x, tail])}
+            )
+            for share in TURN_LARGE_CUTS:
+                cut = x[: quiet_cut(x, share)]
+                items.append(
+                    {"lang": lang, "finished": False, "text": f"{full} (cut at {share:.0%})", "voice": voice,
+                     "audio": np.concatenate([cut, tail])}
+                )  # fmt: skip
+    return items
+
+
+async def measure_turn_large(core: Bolo, names: list[str], remove: bool, voice_model: str) -> dict[str, Any]:
+    """The larger audio-only set; per model and language accuracy, AUC and the probabilities (for paired
+    comparisons)."""
+    items = await turn_set_large(core, voice_model)
+    await core.manager.unload(voice_model)
+    out: dict[str, Any] = {}
+    for name in names:
+        spec = core.resolve(name, "turn")
+        if not core.store.is_installed(spec.id):
+            await core.pull_and_wait(spec.id)
+        result: dict[str, Any] = {}
+        async with core.manager.use(spec.id) as entry:
+            await entry.queue.submit("turn", items[0]["audio"])  # warm-up
+            probs, ms = [], []
+            for it in items:
+                t0 = time.perf_counter()
+                p, _ = await entry.queue.submit("turn", it["audio"])
+                ms.append((time.perf_counter() - t0) * 1000)
+                probs.append(float(p))
+        for lang in ("en", "hi"):
+            idx = [i for i, it in enumerate(items) if it["lang"] == lang]
+            result[lang] = {
+                **turn_scores([items[i] for i in idx], [probs[i] for i in idx]),
+                "median_ms": round(float(np.median([ms[i] for i in idx])), 1),
+                "probabilities": [round(probs[i], 3) for i in idx],
+            }
+        print(spec.id, json.dumps({k: {m: v for m, v in r.items() if m != "probabilities"} for k, r in result.items()}),
+              file=sys.stderr)  # fmt: skip
+        await core.manager.unload(spec.id)
+        if remove:
+            await core.remove(spec.id)
+        out[spec.id] = result
+    return {
+        "set": {
+            "sentences": {"en": len(TURN_EN) + len(TURN_EN_MORE), "hi": len(TURN_HI) + len(TURN_HI_MORE)},
+            "audio": f"synthesised by {voice_model}, voices {TURN_LARGE_VOICES} in turn; each finished sentence and "
+            f"two unfinished cuts of it, at the quietest 20 ms near {TURN_LARGE_CUTS} of the speech; 0.2 s of "
+            "silence after each",
+        },
+        "items": [
+            {"lang": it["lang"], "finished": it["finished"], "voice": it["voice"], "text": it["text"]} for it in items
+        ],
+        "threshold": 0.5,
+        "models": out,
+    }
+
+
 async def turn_set(core: Bolo, voice_model: str) -> list[dict[str, Any]]:
     """Finished and unfinished utterances: audio (16 kHz, 0.2 s of silence after, as a Realtime session hands
     over) and text."""
@@ -557,7 +705,7 @@ def _rss() -> int:
 
 async def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("what", choices=["vad", "turn", "embed"])
+    ap.add_argument("what", choices=["vad", "turn", "turn-large", "embed"])
     ap.add_argument("models", nargs="+")
     ap.add_argument("--out", required=True)
     ap.add_argument("--remove", action="store_true", help="delete each model after measuring it")
@@ -574,6 +722,8 @@ async def main() -> None:
             result = await measure_vad(core, args.models, args.remove)
         elif args.what == "turn":
             result = await measure_turn(core, args.models, args.remove, args.voice_model)
+        elif args.what == "turn-large":
+            result = await measure_turn_large(core, args.models, args.remove, args.voice_model)
         else:
             result = await measure_embed(core, args.models, args.remove, args.voice_model, args.librispeech)
     finally:

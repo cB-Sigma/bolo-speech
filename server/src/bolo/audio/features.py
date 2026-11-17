@@ -169,3 +169,59 @@ def nemo_log_mel(audio: FloatArray, n_mels: int = NEMO_MELS) -> FloatArray:
     stream = NemoLogMel(n_mels)
     head = stream.push(audio)
     return np.concatenate([head, stream.finish()]) if len(audio) else head
+
+
+# ---------------------------------------------------------------------------------------------------
+# Kaldi filterbank (speaker embedders: 3D-Speaker and WeSpeaker CAM++ run by ONNX Runtime)
+# ---------------------------------------------------------------------------------------------------
+KALDI_WIN = 400
+KALDI_N_FFT = 512
+_KALDI_FILTERS: dict[tuple[int, float], np.ndarray] = {}
+
+
+def _kaldi_mel_filters(n_mels: int, high_freq: float) -> np.ndarray:
+    """Kaldi's triangular mel filters (mel = 1127 ln(1 + f / 700), 20 Hz to ``high_freq``), ``(n_fft // 2 + 1, n_mels)``."""
+    key = (n_mels, high_freq)
+    if key not in _KALDI_FILTERS:
+
+        def mel(f: np.ndarray) -> np.ndarray:
+            return 1127.0 * np.log(1.0 + f / 700.0)
+
+        edges = np.linspace(mel(np.array(20.0)), mel(np.array(high_freq)), n_mels + 2)
+        bins = mel(np.arange(KALDI_N_FFT // 2 + 1) * RATE / KALDI_N_FFT)
+        filters = np.zeros((KALDI_N_FFT // 2 + 1, n_mels))
+        for i in range(n_mels):
+            left, centre, right = edges[i], edges[i + 1], edges[i + 2]
+            filters[:, i] = np.maximum(
+                0.0, np.minimum((bins - left) / (centre - left), (right - bins) / (right - centre))
+            )
+        _KALDI_FILTERS[key] = filters
+    return _KALDI_FILTERS[key]
+
+
+def kaldi_fbank(
+    audio: FloatArray, *, n_mels: int = 80, high_freq: float = 0.0, scale: float = 1.0, mean_norm: bool = True
+) -> FloatArray:
+    """Log mel filterbank as Kaldi computes it (torchaudio.compliance.kaldi.fbank with dither 0): 25 ms Povey windows
+    every 10 ms without padding at the edges, DC removed, pre-emphasis 0.97, a 512-point power spectrum, ``n_mels``
+    bands from 20 Hz to ``high_freq`` (0 or less: that much below 8 kHz). ``scale`` multiplies the samples first
+    (WeSpeaker uses 16-bit sample values, 3D-Speaker -1..1); ``mean_norm`` subtracts each band's mean over the
+    recording. Shape ``(frames, n_mels)``, float32."""
+    x = np.asarray(audio, dtype=np.float64) * scale
+    count = 1 + (len(x) - KALDI_WIN) // HOP if len(x) >= KALDI_WIN else 0
+    if count <= 0:
+        return np.zeros((0, n_mels), dtype=np.float32)
+    top = high_freq if high_freq > 0 else RATE / 2 + high_freq
+    filters = _kaldi_mel_filters(n_mels, top)
+    window = (0.5 - 0.5 * np.cos(2 * np.pi * np.arange(KALDI_WIN) / (KALDI_WIN - 1))) ** 0.85
+    out = np.empty((count, n_mels))
+    for first in range(0, count, _BLOCK_FRAMES):
+        n = min(_BLOCK_FRAMES, count - first)
+        frames = x[np.arange(KALDI_WIN)[None, :] + HOP * (first + np.arange(n))[:, None]]
+        frames = frames - frames.mean(axis=1, keepdims=True)
+        frames = np.concatenate([frames[:, :1] * (1 - 0.97), frames[:, 1:] - 0.97 * frames[:, :-1]], axis=1)
+        power = np.abs(np.fft.rfft(frames * window, KALDI_N_FFT, axis=1)) ** 2
+        out[first : first + n] = np.log(np.maximum(power @ filters, np.finfo(np.float32).eps))
+    if mean_norm:
+        out -= out.mean(axis=0, keepdims=True)
+    return out.astype(np.float32)

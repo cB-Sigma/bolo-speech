@@ -129,7 +129,7 @@ class OnnxRuntimeEngine(Engine):
     kinds = (
         "smart_turn", "text_turn", "nemotron_diarization", "dicow_onnx", "lfm3_audio_onnx", "marblenet_vad",
         "deepfilternet3_stream",
-        "whisper_lid", "onnx_lid", "onnx_speaker_embedding",
+        "whisper_lid", "onnx_lid", "onnx_speaker_embedding", "fbank_speaker_embedding",
     )  # fmt: skip
 
     def status(self) -> EngineStatus:
@@ -174,6 +174,10 @@ class OnnxRuntimeEngine(Engine):
             from bolo.engines.text_turn import TextTurn
 
             return TextTurn(path, spec, opts)
+        if kind == "fbank_speaker_embedding":
+            from bolo.engines.speaker_embedding import FbankSpeakerEmbedding
+
+            return FbankSpeakerEmbedding(path, spec, opts)
         if kind == "onnx_speaker_embedding":
             from bolo.engines.speaker_embedding import OnnxSpeakerEmbedding
 

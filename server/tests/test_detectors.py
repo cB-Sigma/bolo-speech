@@ -277,3 +277,18 @@ def test_the_embedding_route_takes_any_embedder(live: LiveServer) -> None:
         assert body["data"][0]["embedding"]
     r = httpx.post(live.url + "/v1/audio/speech/embedding", files={"file": wav_file(1.0)}, data={"model": "fake-tts"})
     assert r.status_code == 400 and "speaker-embedding" in r.json()["error"]["message"]
+
+
+def test_kaldi_filterbank_frames_and_bands() -> None:
+    from bolo.audio.features import kaldi_fbank
+
+    t = np.arange(16000) / 16000
+    tone = (0.3 * np.sin(2 * np.pi * 300 * t)).astype(np.float32)
+    feats = kaldi_fbank(tone)
+    assert feats.shape == (98, 80) and feats.dtype == np.float32  # 1 + (16000 - 400) // 160 frames, no padding
+    np.testing.assert_allclose(feats.mean(axis=0), 0.0, atol=1e-4)  # the mean over the recording is removed
+    raw = kaldi_fbank(tone, mean_norm=False)
+    assert int(np.argmax(raw[50])) < 15, "a 300 Hz tone sits in the low bands"
+    # 16-bit sample values only move every band by the same amount
+    np.testing.assert_allclose(kaldi_fbank(tone, scale=32768.0), feats, atol=1e-3)
+    assert kaldi_fbank(tone[:300]).shape == (0, 80)

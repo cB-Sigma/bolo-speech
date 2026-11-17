@@ -102,8 +102,10 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   take any of them or a diarization model; another kind of model is refused with `400`. Measured on the
   repository's clips with eight Kokoro voices and on LibriSpeech dev-clean (docs/measurements/speaker-embedders.json):
   equal error rate on LibriSpeech 0.6 % for ERes2Net (the default, unchanged), 0 % for `campplus-zh-en` and
-  `titanet-small`, 1.3 % for ECAPA-TDNN, 3.3 % for WeSpeaker ResNet34; the two VoxCeleb CAM++ exports were close to
-  chance (docs/models.md, "Speaker embedding").
+  `titanet-small`, 0.2 to 0.3 % for the two VoxCeleb CAM++ models, 1.3 % for ECAPA-TDNN, 3.3 % for WeSpeaker
+  ResNet34 (docs/models.md, "Speaker embedding"). The VoxCeleb CAM++ models run in bolo's ONNX Runtime (1.29 or
+  newer) with a new Kaldi filterbank (`kaldi_fbank`, kind `fbank_speaker_embedding`): the ONNX Runtime 1.28 inside
+  sherpa-onnx 2.0.1 computes their graph wrong (near-chance scores).
 - **Live demo: the repetition guard for the recognisers in the page.** Finals of the in-browser recogniser go
   through the server's repetition guard (`max_repeats`, default 4, `0` off): a phrase repeated back to back more
   often than that, inside one final or running on from the finals before it, is cut to one copy, and a final that

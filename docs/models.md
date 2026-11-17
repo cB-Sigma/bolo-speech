@@ -1034,9 +1034,9 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `campplus-voxceleb` | - | realtime | - | 30 MB | Apache-2.0 | **CPU** · RTF 0.082 |
+| `campplus-voxceleb` | - | realtime | - | 30 MB | Apache-2.0 | **CPU** · RTF 0.130 |
 | `campplus-zh-en` | - | realtime | - | 28 MB | Apache-2.0 | **CPU** · RTF 0.122 |
-| `wespeaker-campplus-voxceleb` | - | realtime | - | 29 MB | CC-BY-4.0 | **CPU** · RTF 0.073 |
+| `wespeaker-campplus-voxceleb` | - | realtime | - | 29 MB | CC-BY-4.0 | **CPU** · RTF 0.116 |
 
 #### WeSpeaker ResNet
 
@@ -2178,9 +2178,9 @@ answer `POST /v1/audio/speech/embedding` (`model`); diarization pipelines carry 
 | id | model | numbers | download | runtime | licence |
 | --- | --- | --- | --- | --- | --- |
 | `eres2net-voxceleb` | 3D-Speaker ERes2Net, VoxCeleb (the embedder of the default `pyannote-3.0-eres2net`, same file) | 192 | 26 MB | sherpa-onnx | Apache-2.0 |
-| `campplus-voxceleb` | 3D-Speaker CAM++, VoxCeleb | 512 | 30 MB | sherpa-onnx | Apache-2.0 |
+| `campplus-voxceleb` | 3D-Speaker CAM++, VoxCeleb | 512 | 30 MB | onnxruntime (1.29 or newer), bolo's Kaldi filterbank | Apache-2.0 |
 | `campplus-zh-en` | 3D-Speaker CAM++, about 200 k Chinese and English speakers | 192 | 28 MB | sherpa-onnx | Apache-2.0 |
-| `wespeaker-campplus-voxceleb` | WeSpeaker CAM++, VoxCeleb | 512 | 29 MB | sherpa-onnx | CC-BY-4.0 |
+| `wespeaker-campplus-voxceleb` | WeSpeaker CAM++, VoxCeleb | 512 | 29 MB | onnxruntime (1.29 or newer), bolo's Kaldi filterbank | CC-BY-4.0 |
 | `wespeaker-resnet34-voxceleb` | WeSpeaker ResNet34, VoxCeleb (the embedder of `pyannote-3.0-wespeaker-resnet34`) | 256 | 27 MB | sherpa-onnx | CC-BY-4.0 |
 | `titanet-small` | NVIDIA TitaNet-small (the embedder of `pyannote-3.0-titanet-small`) | 192 | 40 MB | sherpa-onnx | CC-BY-4.0 |
 | `ecapa-tdnn-voxceleb` | SpeechBrain ECAPA-TDNN, VoxCeleb 1+2; third-party ONNX export with the front-end inside | 192 | 42 MB | onnxruntime | Apache-2.0 |
@@ -2195,19 +2195,25 @@ utterances each (the set `tools/calibrate_similarity.py` uses), 160 and 3000 pai
 | embedder | synthetic: same / different (median) | EER | LibriSpeech: same / different (median) | different p95 | EER | same / different at 0.5 | RTF |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `eres2net-voxceleb` (and `pyannote-3.0-eres2net`) | 0.83 / 0.08 | 0.3 % | 0.80 / 0.11 | 0.36 | 0.6 % | 99.4 % / 0.1 % | 0.27 |
-| `campplus-voxceleb` | 0.60 / 0.37 | 41 % | 0.57 / 0.43 | 0.85 | 43 % | 58 % / 43 % | 0.10 |
+| `campplus-voxceleb` | 0.85 / 0.10 | 0 % | 0.81 / 0.13 | 0.37 | 0.3 % | 99.4 % / 0.1 % | 0.07 |
 | `campplus-zh-en` | 0.91 / 0.25 | 0 % | 0.82 / 0.10 | 0.32 | **0 %** | 100 % / 0.2 % | 0.12 |
-| `wespeaker-campplus-voxceleb` | 0.58 / 0.53 | 43 % | 0.67 / 0.58 | 0.84 | 40 % | 78 % / 66 % | 0.11 |
+| `wespeaker-campplus-voxceleb` | 0.86 / 0.14 | 0.8 % | 0.82 / 0.14 | 0.41 | 0.2 % | 100 % / 0.7 % | 0.07 |
 | `wespeaker-resnet34-voxceleb` | 0.92 / 0.53 | 4.8 % | 0.89 / 0.54 | 0.74 | 3.3 % | 100 % / 63 % | 0.15 |
 | `titanet-small` | 0.91 / 0.27 | 2.0 % | 0.84 / 0.06 | 0.28 | **0 %** | 100 % / 0.1 % | 0.09 |
 | `ecapa-tdnn-voxceleb` | 0.84 / 0.12 | 0 % | 0.76 / 0.10 | 0.31 | 1.3 % | 97.5 % / 0 % | 0.16 |
 
 RTF: embedding time over 732 s of audio on the shared 4-vCPU Xeon (load average about 15, so treat it as
 relative). The standalone `eres2net-voxceleb` gave exactly the numbers of the diarization entry it comes from.
-CAM++ trained on 200 k speakers (`campplus-zh-en`), TitaNet-small and ECAPA-TDNN told the speakers apart as well as
-ERes2Net or better; WeSpeaker ResNet34 separates well but on its own scale (different people around 0.54, so
-bolo's 0.5 line does not fit it). Both VoxCeleb CAM++ exports came out close to chance in both sets (AUC 0.57 to
-0.66); they run, but we found no reason to use them and did not find the cause. The verdicts ("same speaker" at
+CAM++ (all three), TitaNet-small and ECAPA-TDNN told the speakers apart as well as ERes2Net or better; WeSpeaker
+ResNet34 separates well but on its own scale (different people around 0.54, so bolo's 0.5 line does not fit it).
+
+The two VoxCeleb CAM++ files first came out close to chance (equal error rate 40 to 43 %) when sherpa-onnx ran
+them. The cause is the ONNX Runtime inside sherpa-onnx 2.0.1, version 1.28: the same graph with the same Kaldi
+features gives the near-chance embeddings in onnxruntime 1.28.0 and right ones in 1.29, 1.30, 1.31 and 1.32, with
+graph optimisations on or off (checked on LibriSpeech dev-clean; ERes2Net and the zh-en CAM++ are not affected).
+So these two run in bolo's own ONNX Runtime (1.29 or newer; an older one is refused with a message) with bolo's
+Kaldi filterbank (`bolo.audio.features.kaldi_fbank`: 80 bands, Povey window, mean over the recording removed;
+WeSpeaker's model gets 16-bit sample values, 3D-Speaker's -1..1), and the numbers above are from that path. The verdicts ("same speaker" at
 0.50, "similar" at 0.30) are calibrated for ERes2Net only (`calibrated` in answers is true for
 `pyannote-3.0-eres2net` and `eres2net-voxceleb`); the default stays ERes2Net.
 

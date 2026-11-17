@@ -231,7 +231,7 @@ speed factor (no benchmark) and every engine taken as installed:
 | Text to speech, Hindi, voice-over | `kokoro-v1.0` | usable | 0.76 (0.38 to 1.52) | measured, scaled |
 | Speaker diarization | `nemotron-3-diarization` | comfortable | 0.039 (0.019 to 0.078) | measured, scaled |
 
-**A small board: 4 ARM cores with NEON only, 4 GB (Raspberry Pi 4 class)** (speed factor 0.30; of 487 entries: 111 comfortable, 135 usable, 117 slow, 99 unlikely to fit, 23 cloud, 2 not available yet)
+**A small board: 4 ARM cores with NEON only, 4 GB (Raspberry Pi 4 class)** (speed factor 0.30; of 487 entries: 110 comfortable, 136 usable, 117 slow, 99 unlikely to fit, 23 cloud, 2 not available yet)
 
 | For | Default pick | Fit | Expected RTF (range) | Basis |
 | --- | --- | --- | --- | --- |
@@ -242,7 +242,7 @@ speed factor (no benchmark) and every engine taken as installed:
 | Text to speech, Hindi, voice-over | `piper-hi-in-rohan-medium` | comfortable | 0.31 (0.15 to 0.61) | measured, scaled |
 | Speaker diarization | `nemotron-3-diarization` | comfortable | 0.13 (0.065 to 0.26) | measured, scaled |
 
-**A container: 1.5 cores of an AVX2 server, 2 GB memory limit** (speed factor 0.32; of 487 entries: 129 comfortable, 122 usable, 86 slow, 125 unlikely to fit, 23 cloud, 2 not available yet)
+**A container: 1.5 cores of an AVX2 server, 2 GB memory limit** (speed factor 0.32; of 487 entries: 128 comfortable, 123 usable, 86 slow, 125 unlikely to fit, 23 cloud, 2 not available yet)
 
 | For | Default pick | Fit | Expected RTF (range) | Basis |
 | --- | --- | --- | --- | --- |

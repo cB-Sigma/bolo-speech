@@ -199,7 +199,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | TTS | LFM3-Audio 2B | 1 | ar, da, de, el, en, es, fi, fr +10 | 0 | - |
 | SEPARATION | VoxLock | 1 | en | 1 | 0.460 (`voxlock-int8`) |
 | SPEAKER-EMBEDDING | ERes2Net | 1 | - | 1 | 0.259 (`eres2net-voxceleb`) |
-| SPEAKER-EMBEDDING | CAM++ | 3 | - | 3 | 0.073 (`wespeaker-campplus-voxceleb`) |
+| SPEAKER-EMBEDDING | CAM++ | 3 | - | 3 | 0.116 (`wespeaker-campplus-voxceleb`) |
 | SPEAKER-EMBEDDING | WeSpeaker ResNet | 1 | - | 1 | 0.126 (`wespeaker-resnet34-voxceleb`) |
 | SPEAKER-EMBEDDING | TitaNet | 1 | - | 1 | 0.068 (`titanet-small`) |
 | SPEAKER-EMBEDDING | ECAPA-TDNN | 1 | - | 1 | 0.203 (`ecapa-tdnn-voxceleb`) |

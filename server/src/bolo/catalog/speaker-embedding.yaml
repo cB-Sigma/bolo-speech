@@ -3,6 +3,8 @@
 # POST /v1/audio/speech/embedding (model); diarization entries carry an embedder of their own.
 # * sherpa-onnx runs the exports csukuangfj/speaker-embedding-models publishes (with the metadata sherpa-onnx reads).
 #   ERes2Net, TitaNet-small and WeSpeaker ResNet34 are the very files of the pyannote-3.0-* diarization entries.
+# * The two VoxCeleb CAM++ files run in ONNX Runtime (1.29 or newer) with bolo's Kaldi filterbank: ONNX Runtime 1.28,
+#   which sherpa-onnx 2.0.1 bundles, computes their graph wrong (near-chance scores; 1.29 to 1.32 are right).
 # * ECAPA-TDNN from SpeechBrain runs in ONNX Runtime directly (bolo.engines.speaker_embedding): a third-party export
 #   whose graph takes the waveform (SpeechBrain's filterbank front-end is inside it).
 # Every file is pinned by sha256.
@@ -44,23 +46,25 @@
   - cam++-voxceleb
   - 3dspeaker-campplus-voxceleb
   task: speaker-embedding
-  engine: sherpa-onnx
-  kind: speaker_embedding
+  engine: onnxruntime
+  kind: fbank_speaker_embedding
   family: CAM++
   languages: []
   tier: realtime
   size_bytes: 29596978
   license: Apache-2.0
-  description: CAM++ (context-aware masking) from Alibaba's 3D-Speaker, trained on VoxCeleb (512 numbers per voice).
+  description: 'CAM++ (context-aware masking) from Alibaba''s 3D-Speaker, trained on VoxCeleb (512 numbers per voice).
+    Run by ONNX Runtime (1.29 or newer) with bolo''s Kaldi filterbank: in sherpa-onnx 2.0.1, whose bundled ONNX
+    Runtime 1.28 computes this graph wrong, it scored near chance.'
   source_url: https://github.com/modelscope/3D-Speaker
   validated: cpu
   measured:
-    rtf: 0.08205
+    rtf: 0.12958
     audio_s: 5.9
-    load_s: 0.79
-    memory_mb: 30
+    load_s: 0.44
+    memory_mb: 61
     threads: 4
-    engine: sherpa-onnx 2.0.1
+    engine: onnxruntime 1.32.0
     hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
     date: '2026-11-17'
   source:
@@ -71,6 +75,7 @@
       sha256: 357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b
   options:
     file: 3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx
+    scale: 1.0
 - id: campplus-zh-en
   aliases:
   - 3dspeaker-campplus-zh-en-advanced
@@ -105,24 +110,25 @@
     file: 3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx
 - id: wespeaker-campplus-voxceleb
   task: speaker-embedding
-  engine: sherpa-onnx
-  kind: speaker_embedding
+  engine: onnxruntime
+  kind: fbank_speaker_embedding
   family: CAM++
   languages: []
   tier: realtime
   size_bytes: 29292684
   license: CC-BY-4.0
-  description: CAM++ trained by the WeSpeaker project on VoxCeleb (WeSpeaker publishes its VoxCeleb models under
-    the dataset's CC-BY-4.0), 512 numbers per voice.
+  description: 'CAM++ trained by the WeSpeaker project on VoxCeleb (WeSpeaker publishes its VoxCeleb models under
+    the dataset''s CC-BY-4.0), 512 numbers per voice. Run by ONNX Runtime (1.29 or newer) with bolo''s Kaldi filterbank:
+    in sherpa-onnx 2.0.1, whose bundled ONNX Runtime 1.28 computes this graph wrong, it scored near chance.'
   source_url: https://github.com/wenet-e2e/wespeaker
   validated: cpu
   measured:
-    rtf: 0.07329
+    rtf: 0.11588
     audio_s: 5.9
-    load_s: 1.34
-    memory_mb: 29
+    load_s: 0.35
+    memory_mb: 32
     threads: 4
-    engine: sherpa-onnx 2.0.1
+    engine: onnxruntime 1.32.0
     hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
     date: '2026-11-17'
   source:
@@ -133,6 +139,7 @@
       sha256: c46fad10b5f81e1aa4a60c162714208577093655076c5450f8c469e522ec54ef
   options:
     file: wespeaker_en_voxceleb_CAM++.onnx
+    scale: 32768.0
 - id: wespeaker-resnet34-voxceleb
   aliases:
   - wespeaker-resnet34
