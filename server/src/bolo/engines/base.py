@@ -174,6 +174,12 @@ class STTModel(Model):
     #: streaming models with a pre-roll: quieter speech is raised to about this level (dBFS) before the recogniser
     #: hears it, one gain per utterance (the VAD hears it as received); None leaves the level alone
     stream_speech_dbfs: float | None = None
+    #: streaming models with a pre-roll: the encoder's chunk (seconds; 0 when not known), and the audio a stream has
+    #: heard when it is restarted, before the first sample it is given. A small streaming transducer keeps or loses a
+    #: first word by where in a chunk the word starts; with the chunk known, a live session decodes each utterance
+    #: from two pre-rolls, one of them aligned to a chunk, and takes the result whose start is fuller
+    stream_chunk_s: float = 0.0
+    stream_primed_s: float = 0.0
     #: languages the model can be told to use; empty means fixed or automatic
     languages: tuple[str, ...] = ()
     supports_translate: bool = False

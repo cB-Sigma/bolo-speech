@@ -1,6 +1,6 @@
 """How live transcription starts an utterance: first word right, a stray token before it, word error rate.
 
-    BOLO_DATA_DIR=... python tools/measure_stream_onset.py --out FILE [--session PATH] [--seeds 1,2,3,4]
+    BOLO_DATA_DIR=... python tools/measure_stream_onset.py --out FILE [--session PATH] [--seeds 1,2,3,4] [--only TEXT,...]
     python tools/measure_stream_onset.py --table LABEL=FILE [LABEL=FILE ...]
 
 Each take goes through a live session's own processor (``bolo.streaming.session``) with the real Silero VAD, one
@@ -247,6 +247,8 @@ async def measure(args: argparse.Namespace) -> None:
     for seed in (int(s) for s in args.seeds.split(",")):
         takes += [t for pause, g in ((True, "quietword"), (False, "soft300")) if g in groups
                   for t in quiet_word_takes(data, seed, pause)]  # fmt: skip
+    if args.only:  # e.g. "en-short/burst/,en-short/-40dB/roomNone,en-long/-40dB/roomNone": the laptop's cases alone
+        takes = [t for t in takes if any(part in t.name for part in args.only.split(","))]
     core = Bolo(Settings(data_dir=data, auto_pull=False, stt_ttl_s=-1, tts_ttl_s=-1))
     await core.start()
     rows = []
@@ -294,6 +296,7 @@ def main() -> None:
     ap.add_argument("--models", default=",".join(MODELS))
     ap.add_argument("--groups", default="laptop,quietword,soft300")
     ap.add_argument("--seeds", default="1,2,3,4", help="room and level draws for the quietword and soft300 takes")
+    ap.add_argument("--only", help="only the takes whose name has one of these (comma-separated) in it")
     ap.add_argument("--table", nargs="+", metavar="LABEL=FILE", help="print a before/after table of results")
     args = ap.parse_args()
     if args.table:

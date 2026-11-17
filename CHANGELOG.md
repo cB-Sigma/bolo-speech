@@ -26,6 +26,32 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   CUDA, DirectML, Vulkan, WSL2, Chrome and Edge), collected in docs/status.md, "A Windows 11 laptop", and keep Apple
   Silicon, ROCm and discrete Radeon cards, native Linux GPUs, several NVIDIA GPUs, arm64 and phones as untested.
 
+### Fixed
+
+- **Live transcription: "Good morning" after a burst of noise, and speech 40 dB down** (found on a Windows laptop
+  with 0.6.3, the samples sent over `/api/v1/stt/stream` in 100 ms pieces: `zipformer-en-20m-streaming` gave "in
+  could you tell me..." for en-short with an 80 ms burst 0.3 s before it, and "ular" at -40 dB, where Moonshine lost
+  the start). The burst was not raised, did not reset the stream and did not set the gain (0 dB in every take): Silero
+  reported the start on the burst, the fresh stream began half a second before that, and "Good morning" came 0.4 s
+  later into it than without the burst. The 20M Zipformer keeps or loses a first word by where in its 0.32 s encoder
+  chunks the word starts: "Good morning" 0.05 s into a chunk was kept, 0.2 s in it was "in", which a file with half a
+  second of digital silence before the speech also gave; "Speech servers" the other way round. A stream now opens
+  once the speech's vowels have arrived (at most 0.5 s after the start the VAD reported), and a model that gives its
+  encoder chunk (`stream_chunk_s`, 0.32 for the 20M Zipformer) decodes each utterance twice, from a pre-roll that puts
+  the speech 0.05 s into a chunk and from the pre-roll as before, and takes the one with more words before the two
+  first agree. At -40 dB the VAD was the cause: Silero reported no start, or one seconds late, for speech near -55
+  dBFS; the recognisers' gain cap was not reached first. The VAD (only the VAD) now hears quiet input raised so its
+  loudest recent frame is near -30 dBFS, never so far that the room goes above -65 dBFS, so by 25 dB at most after
+  digital silence and not at all over a microphone's own noise near -60 dBFS. Over a room at -60 dBFS a clip 40 dB down
+  has its speech about 6 dB above the room, and neither model gets anything from it: that is the models' limit.
+  `tools/measure_stream_onset.py`, 252 takes per model, 547c42d -> now, first word right, takes with a stray token,
+  word error rate:
+  - Zipformer: samples as they are 29/36 -> 31/36 (en-short after a burst 0/3 -> 3/3, en-long after a burst 3/3 ->
+    1/3); 30 dB down 7/12 -> 10/12; 40 dB down 1/12 -> 5/12 (en-short "" -> "good morning could you..."); quiet first
+    word 42/96 -> 52/96; first 300 ms quieter 38/96 -> 52/96; stray tokens 0 -> 0; WER 0.136 -> 0.100.
+  - Moonshine: 40 dB down 2/12 -> 6/12; the rest as it was (samples 36/36, quiet first word 68/96, first 300 ms
+    quieter 73/96); stray tokens 2 -> 2; WER 0.072 -> 0.062.
+
 ## [0.6.3] - 2026-11-17
 
 ### Fixed

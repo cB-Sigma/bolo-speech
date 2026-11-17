@@ -26,9 +26,11 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import difflib
 import logging
 import re
 import time
+from collections import deque
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -84,6 +86,14 @@ ONSET_FLOOR_DB = -70.0  # quieter than this is never taken for speech
 DIGITAL_SILENCE_DB = -90.0  # quieter frames count as this level: a file's silent lead-in is a very quiet room
 ONSET_VOICED_S = 0.04  # voiced frames a stretch of sound before the reported start needs to be taken for speech
 VOICED_R = 0.5  # normalised autocorrelation at the pitch period that makes a frame voiced
+PENDING_S = 0.5  # how long a fresh stream waits for a vowel after the VAD reports a start
+LEAD_BACK_S = 0.1  # how far before the start the VAD reported the speech's first vowel is looked for
+CHUNK_LEAD_S = 0.05  # where in an encoder chunk a first word is kept best (see aligned_preroll)
+# Quiet input is raised for the VAD (only): see InputLevel
+VAD_SPEECH_DBFS = -30.0  # the loudest recent frame is raised to this
+VAD_ROOM_DBFS = -65.0  # the room is raised no higher than this: a microphone's own noise is not raised at all
+VAD_PEAK_WINDOW_S = 10.0
+VAD_ROOM_WINDOW_S = 30.0
 
 
 @dataclass
@@ -451,6 +461,7 @@ class _Processor:
         self.detector = detector
         self.pos = 0  # samples seen (16 kHz)
         self.first_partial_pending = True
+        self.input_level = InputLevel()
 
     async def audio(self, samples: FloatArray, recv_t: float) -> None:
         raise NotImplementedError
@@ -464,6 +475,10 @@ class _Processor:
         trace = self.s.trace
         assert trace is not None
         t = trace.now()
+        self.input_level.push(samples)
+        gain = self.input_level.vad_gain()
+        if gain != 1.0:
+            samples = np.clip(samples * gain, -1.0, 1.0).astype(np.float32)
         events = self.detector.accept(samples)
         trace.add_phase("vad", t, trace.now())
         return events
@@ -475,6 +490,39 @@ def frame_rms(samples: FloatArray) -> FloatArray:
     frames = np.asarray(samples[: n * FRAME], dtype=np.float64).reshape(n, FRAME)
     rms: FloatArray = np.sqrt(np.mean(np.square(frames), axis=1))
     return rms
+
+
+class InputLevel:
+    """The levels of the input's recent 20 ms frames, and the gain the VAD hears it with.
+
+    Silero hears speech below about -50 dBFS poorly or not at all: a clip 40 dB down after digital silence (speech
+    near -55 dBFS) gave no start, or one seconds late, and the recogniser lost the start or everything. The VAD (only
+    the VAD; the recogniser has its own gain) is given quiet input raised so its loudest recent frame reaches
+    ``VAD_SPEECH_DBFS``, and never so far that the room (the quietest tenth of the frames, digital silence counted as
+    ``DIGITAL_SILENCE_DB``) goes above ``VAD_ROOM_DBFS``, so by 25 dB at most: a microphone's own noise, near -60
+    dBFS, is not raised at all, and the VAD does not start taking a quiet room for speech. Input at an ordinary level
+    is not touched either. At -40 dB over a room at -60 dBFS (speech about 6 dB above the room) nothing is raised:
+    there the speech is at the noise floor of a real microphone, and neither Silero nor the recognisers find it."""
+
+    def __init__(self) -> None:
+        self.peak: deque[float] = deque(maxlen=int(VAD_PEAK_WINDOW_S * SR) // FRAME)
+        self.room: deque[float] = deque(maxlen=int(VAD_ROOM_WINDOW_S * SR) // FRAME)
+        self.rest = np.zeros(0, dtype=np.float32)
+
+    def push(self, samples: FloatArray) -> None:
+        x = np.concatenate([self.rest, samples]) if len(self.rest) else samples
+        n = len(x) // FRAME
+        self.rest = np.array(x[n * FRAME :], dtype=np.float32)
+        db = np.maximum(20.0 * np.log10(frame_rms(x[: n * FRAME]) + 1e-9), DIGITAL_SILENCE_DB)
+        self.peak.extend(db.tolist())
+        self.room.extend(db.tolist())
+
+    def vad_gain(self) -> float:
+        if len(self.room) < 5:  # too little heard to tell the room from speech
+            return 1.0
+        room = float(np.percentile(np.fromiter(self.room, dtype=np.float64), 10))
+        db = min(VAD_SPEECH_DBFS - max(self.peak), VAD_ROOM_DBFS - room)
+        return float(10.0 ** (db / 20.0)) if db > 0.0 else 1.0
 
 
 def speech_level(samples: FloatArray) -> float:
@@ -622,6 +670,58 @@ def without_stray_letter(text: str, words: list[Word]) -> tuple[str, list[Word]]
     return rest.strip(), words
 
 
+def speech_lead(audio: FloatArray, onset: int, room_db: float) -> int | None:
+    """Where the sound of the speech that starts at or after ``audio[onset]`` begins: the first voiced frames
+    (``ONSET_VOICED_S``) louder than the room (``room_db``) by ``ONSET_MARGIN_DB``, from ``LEAD_BACK_S`` before
+    ``onset`` on, and the sound right before them with no pause (the hiss of an "s"); None when ``audio`` has no
+    such frames yet."""
+    a0 = max(0, onset - int(LEAD_BACK_S * SR))
+    seg = audio[a0:]
+    db = 20.0 * np.log10(frame_rms(seg) + 1e-9)
+    loud = db > max(room_db + ONSET_MARGIN_DB, ONSET_FLOOR_DB)
+    ok = voiced(seg) & loud
+    need = int(ONSET_VOICED_S * SR) // FRAME
+    if len(ok) < need:
+        return None
+    hits = np.nonzero(np.convolve(ok.astype(np.int32), np.ones(need, dtype=np.int32), mode="valid") >= need)[0]
+    if len(hits) == 0:
+        return None
+    k = int(hits[0])
+    while k > 0 and loud[k - 1]:
+        k -= 1
+    return a0 + k * FRAME
+
+
+def aligned_preroll(n: int, primed_s: float, chunk_s: float) -> int:
+    """The shortest pre-roll of at least ``n`` samples that puts the speech after it ``CHUNK_LEAD_S`` into one of the
+    recogniser's encoder chunks (``chunk_s`` long, counted from the ``primed_s`` it hears when a stream opens);
+    ``n`` when the chunk is not known."""
+    if chunk_s <= 0:
+        return n
+    c = round(chunk_s * SR)
+    return n + (round((CHUNK_LEAD_S - primed_s) * SR) - n) % c
+
+
+def better_start(main: StreamResult, alt: StreamResult, shift_s: float) -> StreamResult:
+    """Of an utterance decoded twice, ``main`` from a pre-roll aligned to the encoder's chunks and ``alt`` from the
+    pre-roll asked for: ``main`` when it has more words before the two first agree (a stray letter at the start not
+    counted; with nothing in common, more words in all), else ``alt``, its word times moved by ``shift_s`` (where its
+    stream began, less where the main one did).
+
+    The 20M Zipformer keeps or loses a first word by where in its 0.32 s encoder chunks the word starts, and which
+    place keeps it differs from word to word: "Good morning" was kept 0.05 s into a chunk and lost 0.2 s in ("in could
+    you tell me"), "Speech servers" the other way round ("servers are judged"). Where the two first agree ("could
+    you", "servers are") the one with more before it has the first word; what they make of the rest of a long
+    utterance differs by a word here and there and says nothing about its start."""
+    m = without_stray_letter(main.text.strip(), [])[0].lower().split()
+    a = without_stray_letter(alt.text.strip(), [])[0].lower().split()
+    blocks = [b for b in difflib.SequenceMatcher(None, m, a, autojunk=False).get_matching_blocks() if b.size]
+    agree = next((b for b in blocks if b.size >= 2), blocks[0] if blocks else None)
+    if (agree.a > agree.b) if agree is not None else (len(m) > len(a)):
+        return main
+    return StreamResult(alt.text, [Word(w.w, w.t0 + shift_s, w.t1 + shift_s) for w in alt.words])
+
+
 class PreRoll:
     """The newest ``seconds`` of audio, with the stream position where it ends."""
 
@@ -666,10 +766,19 @@ class _NativeProcessor(_Processor):
         super().__init__(session, entry, stt, detector)
         self.stream: STTStream = stt.create_stream(session.cfg.language)
         self.gated = detector is not None and stt.stream_preroll_s > 0
+        # a model whose encoder chunk is known decodes each utterance twice: from a pre-roll aligned to a chunk (the
+        # main stream) and from the pre-roll asked for (this one); the result whose start is fuller is taken
+        # (better_start). The 20M Zipformer, the one model that gives its chunk, is small enough for the cost.
+        self.alt: STTStream | None = None
+        if self.gated and stt.stream_chunk_s > 0:
+            self.alt = stt.create_stream(session.cfg.language)
+        self.alt_base = 0  # stream position where the second stream began
         self.preroll_n = int(stt.stream_preroll_s * SR)
         # a VAD reports a start after it (a neural one by a few hundred milliseconds, the energy fallback by up to its
-        # patience), so more than the pre-roll is held
-        self.preroll = PreRoll(stt.stream_preroll_s + VAD_LAG_S) if self.gated else None
+        # patience), so more than the pre-roll is held; and more again while a stream waits for a vowel (PENDING_S),
+        # with room for a pre-roll lengthened to an encoder chunk
+        self.preroll = PreRoll(stt.stream_preroll_s + VAD_LAG_S + PENDING_S + 0.5) if self.gated else None
+        self.pending: int | None = None  # where the VAD heard speech start, while the stream waits for a vowel
         self.listening = not self.gated  # the recogniser is hearing the audio
         self.target_dbfs = stt.stream_speech_dbfs if self.gated else None
         self.gain = 1.0  # applied to what the recogniser hears in this utterance
@@ -686,9 +795,23 @@ class _NativeProcessor(_Processor):
         return start / SR
 
     async def _step(self) -> tuple[StreamResult, bool]:
-        (result, endpoint), info = await self.entry.queue.submit("stream", self.stream)
+        if self.alt is None:
+            (result, endpoint), info = await self.entry.queue.submit("stream", self.stream)
+        else:
+            main, other = await asyncio.gather(
+                self.entry.queue.submit("stream", self.stream), self.entry.queue.submit("stream", self.alt)
+            )
+            (result, endpoint), info = main
+            second: StreamResult = other[0][0]
+            result = better_start(result, second, (self.alt_base - self.base) / SR)
         self.s.note_job(info.queue_ms, info.run_ms, info.batch_size, info.started, info.finished)
         return result, bool(endpoint)
+
+    def _result(self) -> StreamResult:
+        result = self.stream.result()
+        if self.alt is not None:
+            result = better_start(result, self.alt.result(), (self.alt_base - self.base) / SR)
+        return result
 
     async def audio(self, samples: FloatArray, recv_t: float) -> None:
         # Audio that queued up while the model was busy arrives here in one piece, possibly with one utterance's end
@@ -704,26 +827,33 @@ class _NativeProcessor(_Processor):
             if ev.kind == "speech_end":
                 self.speech_end = ev.sample
                 if self.gated:
+                    if not self.listening:
+                        self._hold(samples[done:cut], first + cut)
+                        done = cut
+                        if self.pending is not None:  # what the VAD heard, voiced or not, is decoded as before
+                            self._listen(force=True)
                     if self.listening:  # the recogniser hears up to where the speech ended, then finishes
                         await self._feed(samples[done:cut], recv_t, vad_end=True)
                         self.listening = False
-                    else:
-                        self._hold(samples[done:cut], first + cut)
                     done = cut
                 else:
                     ended = True
             elif ev.kind == "speech_start":
                 if self.gated:
-                    if not self.listening:
+                    if not self.listening and self.pending is None:
                         self._hold(samples[done:cut], first + cut)
                         done = cut
-                        self._listen(ev.sample, samples[done:])
+                        self.pending = ev.sample
                 elif ended:
                     await self._feed(samples[done:cut], recv_t, vad_end=True)
                     done, ended = cut, False
                 self.speech_start = max(self.base, ev.sample)
         if not self.listening:
             self._hold(samples[done:], self.pos)
+            if self.pending is not None:
+                self._listen(force=False)
+                if self.listening:
+                    await self._feed(samples[:0], recv_t, vad_end=False)
         elif ended or done == 0 or done < len(samples):
             await self._feed(samples[done:], recv_t, vad_end=ended)
 
@@ -731,28 +861,58 @@ class _NativeProcessor(_Processor):
         assert self.preroll is not None
         self.preroll.push(samples, end)
 
-    def _listen(self, speech_at: int, ahead: FloatArray) -> None:
-        """The VAD heard speech start at ``speech_at``: a fresh stream hears the pre-roll before the speech.
+    def _listen(self, force: bool) -> None:
+        """The VAD heard speech start at ``self.pending``: a fresh stream hears the pre-roll before the speech.
 
-        The speech may have begun before ``speech_at`` (a quiet first word the VAD missed): the pre-roll is counted
-        from where it began, and that word is raised to the level of the rest. ``ahead`` is the audio received after
-        the pre-roll; with the speech heard so far it sets the utterance's gain (the detector reports a start a few
-        hundred milliseconds after it, so there is some)."""
+        The speech may have begun before the reported start (a quiet first word the VAD missed): the pre-roll is
+        counted from where it began, and that word is raised to the level of the rest. The VAD may also have reported
+        the start on a burst of noise or a click before the speech: the stream opens once the audio held has the
+        speech's voiced frames in it (:func:`speech_lead`), ``PENDING_S`` after the reported start without them, or
+        (``force``) when the VAD hears the speech end. The pre-roll is made just long enough that the speech falls
+        where the recogniser's encoder chunks keep a first word (:func:`aligned_preroll`). What was heard after the
+        reported start sets the utterance's gain."""
         pre = self.preroll
-        assert pre is not None
-        room = room_level(pre.buf[: max(0, speech_at - pre.start)])
-        onset = pre.start + speech_onset(pre.buf, speech_at - pre.start)
-        audio, start = pre.take(since=onset - self.preroll_n)
-        self.stream.restart()
-        self.base = self.fed = start
-        self.listening = True
-        heard = sounding(np.concatenate([audio[max(0, speech_at - start) :], ahead]), room)
-        audio = lift_onset(audio, max(0, onset - start), max(0, speech_at - start), heard)
+        assert pre is not None and self.pending is not None
+        speech_at = min(self.pending, pre.end)
+        at = speech_at - pre.start
+        room = room_level(pre.buf[: max(0, at)])
+        onset = speech_onset(pre.buf, at)
+        lead = speech_lead(pre.buf, onset, room)
+        if lead is None:
+            if not force and pre.end - speech_at < int(PENDING_S * SR):
+                return  # nothing voiced yet: wait for it
+            lead = onset
+        self.pending = None
+        # the pre-roll is counted from the quiet word found before the reported start, else from the speech's sound
+        first = pre.start + (min(onset, lead) if onset < at else lead)
+        lead += pre.start  # stream positions from here on
+        since = lead - aligned_preroll(lead - first + self.preroll_n, self.stt.stream_primed_s, self.stt.stream_chunk_s)
+        # the second stream's as before: from the reported start or the quiet word, no further back than what is held
+        alt_since = max(pre.start, pre.start + onset - self.preroll_n)
+        lowest = min(since, alt_since) if self.alt is not None else since
+        audio, start = pre.take(since=lowest)
+        if start > lowest:  # less held than that: digital silence before it, as a fresh stream's own priming is
+            audio = np.concatenate([np.zeros(start - lowest, dtype=np.float32), audio])
+        heard = sounding(audio[speech_at - lowest :], room)
+        audio = lift_onset(audio, first - lowest, speech_at - lowest, heard)
         if self.target_dbfs is not None:
             self.gain = speech_gain(heard, self.target_dbfs)
-        self._accept(audio)
+        self.stream.restart()
+        self.base = self.fed = since
+        self.listening = True
+        alt_audio = None
+        if self.alt is not None:
+            self.alt.restart()
+            self.alt_base = alt_since
+            alt_audio = audio[alt_since - lowest :]
+        self._accept(audio[since - lowest :], alt_audio)
 
-    def _accept(self, samples: FloatArray) -> None:
+    def _accept(self, samples: FloatArray, alt: FloatArray | None = None) -> None:
+        """The recognisers hear ``samples`` (the second stream ``alt`` instead, when given), with the gain."""
+        if self.alt is not None:
+            alt = samples if alt is None else alt
+            if len(alt):
+                self.alt.accept(np.clip(alt * self.gain, -1.0, 1.0).astype(np.float32) if self.gain != 1.0 else alt)
         if len(samples) == 0:
             return
         if self.gain != 1.0:
@@ -781,10 +941,10 @@ class _NativeProcessor(_Processor):
     async def _finish_utterance(self, recv_t: float, pad: bool) -> None:
         if pad:
             # flush the model's look-ahead so the last word is not held back
-            self.stream.accept(np.zeros(int(TAIL_PAD_S * SR), dtype=np.float32))
+            self._flush()
             result, _ = await self._step()
         else:
-            result = self.stream.result()
+            result = self._result()
         text = result.text.strip()
         base = self.base / SR
         words = [Word(w.w, w.t0 + base, w.t1 + base) for w in result.words] if self.s.cfg.word_timestamps else []
@@ -802,6 +962,8 @@ class _NativeProcessor(_Processor):
             await self.s.send_final(text, self._t0(), end / SR, recv_t, words, None, audio)
         self.kept = []
         self.stream.reset()
+        if self.alt is not None:
+            self.alt.reset()
         self.base = self.fed
         self.speech_start = None
         self.speech_end = None
@@ -809,11 +971,22 @@ class _NativeProcessor(_Processor):
         self.stability.reset()
         self.first_partial_pending = True
 
+    def _flush(self) -> None:
+        """Padding after the speech, so the model's look-ahead does not hold its last word back."""
+        pad = np.zeros(int(TAIL_PAD_S * SR), dtype=np.float32)
+        self.stream.accept(pad)
+        if self.alt is not None:
+            self.alt.accept(pad)
+
     async def finalize(self, recv_t: float, reason: str) -> None:
+        if self.pending is not None and not self.listening:
+            self._listen(force=True)
         if reason == "stop":
             if self.listening:
-                self.stream.accept(np.zeros(int(TAIL_PAD_S * SR), dtype=np.float32))
+                self._flush()
                 self.stream.finish()
+                if self.alt is not None:
+                    self.alt.finish()
                 await self._step()
                 await self._finish_utterance(recv_t, pad=False)
         elif self.listening:

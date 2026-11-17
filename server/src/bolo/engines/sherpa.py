@@ -383,6 +383,9 @@ class SherpaOnlineSTT(STTModel):
         # Browsers' automatic gain control leaves speech around -30 dBFS; these models were trained on louder audio.
         level = opts.options.get("stream_speech_dbfs", spec.get("stream_speech_dbfs", -20.0))
         self.stream_speech_dbfs = None if level is None else float(level)
+        # the encoder's chunk (decode_chunk_len in a Zipformer's metadata, at 10 ms a frame) for the catalog to give
+        self.stream_chunk_s = float(opts.options.get("stream_chunk_s", spec.get("stream_chunk_s", 0.0)))
+        self.stream_primed_s = PRIME_S  # restart() gives a fresh stream this much digital silence first
         endpoint: dict[str, Any] = {
             "enable_endpoint_detection": True,
             "rule1_min_trailing_silence": 2.4,

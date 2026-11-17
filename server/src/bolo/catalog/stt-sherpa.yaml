@@ -1855,6 +1855,7 @@
     - decoder*.int8.onnx
   options:
     decoding_method: modified_beam_search
+    stream_chunk_s: 0.32
 - id: zipformer-en-streaming
   task: stt
   engine: sherpa-onnx
