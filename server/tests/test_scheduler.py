@@ -96,7 +96,8 @@ async def test_kinds_are_not_mixed_in_a_batch() -> None:
 
 async def test_linger_waits_for_a_fuller_batch() -> None:
     rec = Recorder(0.01)
-    q = ModelQueue("m", {"batch": rec}, max_batch=3, max_wait_ms=80)
+    # a long linger, so that Windows' coarse sleeps (about 15 ms steps) leave a wide margin either way
+    q = ModelQueue("m", {"batch": rec}, max_batch=3, max_wait_ms=400)
     t0 = time.perf_counter()
     futs = [asyncio.ensure_future(q.submit("batch", 0))]
     await asyncio.sleep(0.02)
@@ -104,10 +105,10 @@ async def test_linger_waits_for_a_fuller_batch() -> None:
     await asyncio.sleep(0.02)
     futs.append(asyncio.ensure_future(q.submit("batch", 2)))
     await asyncio.gather(*futs)
-    assert [len(b) for b in rec.batches] == [3]  # the batch filled before the 80 ms linger ended
-    assert time.perf_counter() - t0 < 0.075
+    assert [len(b) for b in rec.batches] == [3]  # the batch filled before the 400 ms linger ended
+    assert time.perf_counter() - t0 < 0.3  # it ran as soon as it was full, not after the linger
     await q.submit("batch", 9)  # a lone job waits out the linger
-    assert q.stats.queue_ms.quantile(1.0) == pytest.approx(80, abs=25)
+    assert q.stats.queue_ms.quantile(1.0) == pytest.approx(400, abs=100)
     await q.close()
 
 
