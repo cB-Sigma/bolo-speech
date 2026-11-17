@@ -11,6 +11,19 @@ from bolo import __version__
 from conftest import LiveServer, wav_file
 
 
+def _built_in() -> set[str]:
+    """Catalog entries that need no download (bolo's own detectors; WebRTC VAD once its package is installed)."""
+    import importlib.util
+
+    ids = {"energy-vad"}
+    if importlib.util.find_spec("webrtcvad") is not None:
+        ids |= {"webrtc-vad", "webrtc-vad-aggressive"}
+    return ids
+
+
+BUILT_IN = _built_in()
+
+
 def test_info_and_health(live: LiveServer) -> None:
     info = httpx.get(live.url + "/api/v1/info").json()
     assert info["name"] == "bolo" and info["version"] == __version__
@@ -53,7 +66,7 @@ def test_catalog_shape_and_filters(live: LiveServer) -> None:
         "fake-separation-blind",
         "fake-denoise",
         "fake-denoise-48k",
-    }
+    } | BUILT_IN
     not_installed = httpx.get(live.url + "/api/v1/catalog", params={"installed": "false", "task": "vad"}).json()[
         "models"
     ]

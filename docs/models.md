@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-349 models: 136 validated on CPU by the maintainers, 213 untested. 22 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
+356 models: 143 validated on CPU by the maintainers, 213 untested. 22 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
 
 ### Speech to text
 
@@ -648,6 +648,33 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `silero-vad` | - | realtime | - | 2 MB | MIT | **CPU** · RTF 0.006 |
 | `silero-vad-v5` | - | realtime | - | 2 MB | MIT | **CPU** · RTF 0.006 |
+| `silero-vad-v6` | - | realtime | - | 2 MB | MIT | **CPU** · RTF 0.013 |
+
+#### TEN VAD
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ten-vad` | - | realtime | - | 0 MB | Apache-2.0 with Agora's additional conditions (own applic… ⚠ | **CPU** · RTF 0.009 |
+| `ten-vad-int8` | - | realtime | - | 0 MB | Apache-2.0 with Agora's additional conditions (own applic… ⚠ | **CPU** · RTF 0.017 |
+
+#### MarbleNet VAD
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `marblenet-vad` | - | realtime | - | 0 MB | NVIDIA Open Model License | **CPU** · RTF 0.069 |
+
+#### WebRTC VAD
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `webrtc-vad` | - | realtime | - | 0 MB | BSD-3-Clause (WebRTC) + MIT (webrtcvad-wheels binding) | **CPU** · RTF 0.000 |
+| `webrtc-vad-aggressive` | - | realtime | - | 0 MB | BSD-3-Clause (WebRTC) + MIT (webrtcvad-wheels binding) | **CPU** · RTF 0.000 |
+
+#### Energy VAD
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `energy-vad` | - | realtime | - | 0 MB | Apache-2.0 | **CPU** · RTF 0.000 |
 
 ### Speaker diarization
 
@@ -1537,6 +1564,67 @@ defaults zero a speaker's track wherever that speaker is judged silent;
 check with perfect tracks handed over in the wrong order confirmed that
 bolo gives each diarized speaker their own track, aligned to the sample.
 
+## Voice-activity detection
+
+The voice-activity detector finds speech for long-file segmentation (`vad_filter`), for
+`POST /v1/audio/speech/timestamps` and for the end of a turn in Realtime sessions. The `default_vad` setting
+chooses it for the server (default `silero-vad`); a request to the timestamps route can name another in
+`model`, and a Realtime session in `turn_detection.vad_model` (a bolo extension). Every detector takes the same
+parameters (threshold, minimum silence, minimum and maximum speech, padding) and gives the same speech segments.
+
+| id | what it is | download | runtime | licence |
+| --- | --- | --- | --- | --- |
+| `silero-vad` (default) | Silero VAD v4 | 2 MB | sherpa-onnx | MIT |
+| `silero-vad-v5`, `silero-vad-v6` | Silero VAD v5, v6.2.3 | 2 MB | sherpa-onnx | MIT |
+| `ten-vad`, `ten-vad-int8` | TEN VAD (Agora), sherpa-onnx's export | 0.3 / 0.1 MB | sherpa-onnx | Apache-2.0 **with conditions** (below) ⚠ |
+| `marblenet-vad` | NVIDIA Frame-VAD Multilingual MarbleNet v2.0, 91.5 k parameters, third-party ONNX export | 0.4 MB | onnxruntime (`turn` extra) | NVIDIA Open Model License |
+| `webrtc-vad`, `webrtc-vad-aggressive` | WebRTC's Gaussian-mixture detector, mode 2 and 3 | none | `webrtcvad` extra | BSD-3-Clause + MIT |
+| `energy-vad` | bolo's adaptive energy detector (also the fallback when no neural detector can run) | none | built in | Apache-2.0 |
+
+Downloads are pinned by SHA-256 (Silero v4 and v5 by their repository commit). TEN VAD's licence is
+Apache-2.0 plus Agora's conditions: you may deploy it, commercially too, only for your own applications and
+their direct end users, not in a way that competes with Agora's offerings or lets third parties build or deploy
+applications. That can cover a speech server offered to others; read the licence file (downloaded with the
+model) before you use it. MarbleNet's network looks about 1.4 s either side of a frame, so a live stream is
+scored with 0.4 s of look-ahead (option `lookahead_s`): its decisions agree with whole-file scoring on 99 % of
+frames, and they arrive 0.4 s later than the other detectors' (the table's last but one column).
+
+**Measured** (docs/measurements/vad-detectors.json, `server/tools/measure_detectors.py vad`): bolo's three
+sample clips and the console's three cloning samples (synthetic speech from Kokoro and SYSPIN voices, English and
+Hindi), each at -20 dBFS, joined with 1 to 3 s of silence into a 74 s stream (54 s of it speech by the reference
+below), clean and with added sound: white noise at 10 and 0 dB SNR, pink noise at 5 dB, low rumble (brown noise)
+at 0 dB, the speech 30 dB quieter in faint white noise, gliding harmonic tones (a stand-in for music) and clicks
+in the gaps between clips. The reference is each clip's 10 ms frames within 40 dB of its peak, with pauses
+under 0.3 s filled in. Every detector ran with threshold 0.5, 0.3 s minimum silence, 0.25 s minimum speech and no
+padding, fed 20 ms at a time as in a live session. Frame accuracy (share of 10 ms frames classified as the
+reference says; 0.73 is what calling everything speech scores):
+
+| detector | clean | white 10 dB | white 0 dB | pink 5 dB | rumble 0 dB | quiet speech | tones in gaps | clicks in gaps | mean of the 7 noisy | start / end reported after | RTF |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `energy-vad` | 0.99 | 0.73 | 0.73 | 0.73 | 0.73 | 0.49 | 0.79 | 0.97 | **0.74** | 0.26 s / 0.29 s | 0.0008 |
+| `webrtc-vad` | 0.93 | 0.95 | 0.73 | 0.73 | 0.94 | 0.95 | 0.74 | 0.87 | **0.85** | 0.25 s / 0.40 s | 0.0008 |
+| `webrtc-vad-aggressive` | 0.94 | 0.94 | 0.73 | 0.87 | 0.95 | 0.38 | 0.76 | 0.89 | **0.79** | 0.27 s / 0.36 s | 0.0008 |
+| `silero-vad` | 0.96 | 0.92 | 0.74 | 0.90 | 0.95 | 0.87 | 0.90 | 0.96 | **0.89** | 0.35 s / 0.32 s | 0.0109 |
+| `silero-vad-v5` | 0.95 | 0.92 | 0.92 | 0.92 | 0.94 | 0.92 | 0.92 | 0.94 | **0.93** | 0.32 s / 0.38 s | 0.0125 |
+| `silero-vad-v6` | 0.93 | 0.93 | 0.92 | 0.93 | 0.93 | 0.93 | 0.92 | 0.93 | **0.93** | 0.30 s / 0.39 s | 0.0146 |
+| `ten-vad` | 0.92 | 0.71 | 0.69 | 0.66 | 0.92 | 0.70 | 0.87 | 0.92 | **0.78** | 0.39 s / 0.36 s | 0.0106 |
+| `ten-vad-int8` | 0.93 | 0.68 | 0.69 | 0.61 | 0.92 | 0.68 | 0.86 | 0.92 | **0.77** | 0.39 s / 0.36 s | 0.0147 |
+| `marblenet-vad` | 0.93 | 0.92 | 0.92 | 0.92 | 0.93 | 0.92 | 0.93 | 0.93 | **0.92** | 0.71 s / 0.73 s | 0.0137 |
+
+"Start / end reported after": median time from the reference start (end) of a clip to the event, in the clean
+stream; the end includes the 0.3 s of silence every detector waits for. RTF on one thread of a shared 4-vCPU Xeon.
+The JSON has speech recall, false alarms and segment counts per condition.
+
+What it says: the energy detector is perfect on clean synthetic speech and useless in steady noise (it calls
+all of it speech). WebRTC is nearly free and copes with moderate noise, but at 0 dB white or pink noise and with
+tones it also calls everything speech; mode 3 loses quiet speech. Silero v5 and v6 and MarbleNet hardly moved
+across the conditions (0.92 to 0.95); Silero v4, the default, was the best of the neural detectors on clean audio
+but fell to 0.74 in white noise at 0 dB, where it missed a third of the speech. TEN VAD missed a third of the
+speech in white and pink noise and with quiet speech. So the default stays `silero-vad`, which bolo's endpointing
+was tuned with; for noisy lines set `default_vad = "silero-vad-v5"` (or v6, or `marblenet-vad` where 0.4 s more
+latency does not matter). The test is small and synthetic (TTS voices, synthetic noise): it shows the direction,
+not the size, of the differences on real recordings.
+
 ## Denoising
 
 `denoise` (configuration.md, "Denoising") runs a speech-enhancement model
@@ -2344,10 +2432,16 @@ copied when the entry was written. Things to watch:
   commercial use allowed; whoever redistributes the model files must include the agreement and the
   model's notices; suing over patents or copyright in the model ends the licence. The catalog uses a
   third-party ONNX conversion (onnx-community); see "Speaker diarization" above.
-* **TEN VAD** is not in the catalog: its licence adds field-of-use conditions
-  to Apache-2.0, and the ONNX file in its repository does not load in
-  sherpa-onnx without added metadata. The loader kind (`ten_vad`) exists for
-  people who have a compatible file.
+* **TEN VAD** (`ten-vad`, `ten-vad-int8`) is Apache-2.0 with Agora's additional conditions: deployment only for
+  your own applications and their direct end users, not in a way that competes with Agora's offerings or lets
+  third parties develop or deploy applications; derivative works stay under the same terms. `commercial_use` is
+  false because of those conditions. The files are the ones sherpa-onnx publishes (the ONNX file in TEN's
+  repository lacks the metadata sherpa-onnx reads).
+* **MarbleNet** (`marblenet-vad`) is under the NVIDIA Open Model License: commercial use allowed; suing over the
+  model ends the licence; redistributors keep NVIDIA's notice. The catalog uses a third-party ONNX export of
+  NVIDIA's .nemo checkpoint.
+* **WebRTC VAD** (`webrtc-vad`) is BSD-3-Clause code in an MIT-licensed binding (`webrtcvad-wheels`); nothing is
+  downloaded.
 * **Gated** entries (`gated: true`: Indic Parler-TTS, IndicF5, SraVaani, AI4Bharat's official
   IndicConformer) are never downloaded without a Hugging Face token; using one without a token
   answers `401 model_gated` with the model page to accept the terms on. All four also need the

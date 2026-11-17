@@ -236,6 +236,11 @@ def test_every_packaged_entry_is_well_formed() -> None:
             assert s.engine == "remote" and s.license_url and s.size_bytes == 0, s.id
             assert not (s.source.repo or s.source.urls), s.id
             continue
+        if s.builtin:  # nothing to download: code that is part of bolo or of a Python package (WebRTC VAD)
+            assert s.engine in ("builtin", "webrtcvad") and s.size_bytes == 0, s.id
+            assert not (s.source.repo or s.source.urls), s.id
+            assert s.description and s.source_url.startswith("https://"), s.id
+            continue
         if s.source.repo:
             assert len(s.source.revision) == 40, f"{s.id}: revisions are pinned to a commit"
             assert "espeak-ng-data/*" in s.source.exclude or s.engine != "sherpa-onnx" or s.source.include, s.id

@@ -20,6 +20,8 @@ BUILTIN_ENGINES: dict[str, str] = {
     "kokoro-onnx": "bolo.engines.kokoro_onnx:KokoroOnnxEngine",
     "whisper.cpp": "bolo.engines.whispercpp:WhisperCppEngine",
     "onnxruntime": "bolo.engines.onnx_turn:OnnxRuntimeEngine",
+    "webrtcvad": "bolo.engines.frame_vad:WebRtcVadEngine",
+    "builtin": "bolo.engines.builtin:BuiltinEngine",
     "tts-server": "bolo.engines.tts_server:TTSServerEngine",
     "remote": "bolo.engines.remote:RemoteEngine",
     "fake": "bolo.engines.fake:FakeEngine",

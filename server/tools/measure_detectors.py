@@ -1,0 +1,296 @@
+"""Measure voice-activity detectors, end-of-turn models and speaker embedders on the CPU (docs/measurements/).
+
+    BOLO_DATA_DIR=... python tools/measure_detectors.py vad --out FILE MODEL [MODEL ...]
+
+Every model goes through bolo's own code path (``bolo pull``, the model manager, the same detector objects a
+Realtime session gets). ``--remove`` deletes each downloaded model after it was measured.
+
+**vad**: bolo's three sample clips (``bolo/samples``, synthesised speech) and the three clone samples of the web
+console (``bolo/_ui/clone``) are joined into one 68 s stream with 1 to 3 s of silence between them, and the stream
+is measured clean and with added noise:
+
+* white noise at 10 dB and 0 dB SNR, pink noise at 5 dB, low rumble (brown noise) at 0 dB, the speech 30 dB
+  quieter (-45 dBFS speech in faint white noise), and non-speech sounds in the gaps only: harmonic tones that
+  glide in pitch (a stand-in for music) and short clicks.
+
+The reference: the 10 ms frames of each clip within 40 dB of the clip's peak, with pauses shorter than 0.3 s
+filled in (the detectors are asked to bridge those). Detectors run with threshold 0.5, 0.3 s minimum silence,
+0.25 s minimum speech and no padding, fed 20 ms at a time as in a live session. Reported per condition: frame
+accuracy, speech recall (share of speech frames detected), false alarms (share of non-speech frames called
+speech), the number of segments (the reference has six), and how long after the audio the start and the end of
+each clip were reported (median; the end includes the 0.3 s of silence the detector waits for). ``rtf`` is the
+detector's time over the stream's duration, clean condition.
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import contextlib
+import itertools
+import json
+import os
+import platform
+import sys
+import time
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+from bolo.audio import decode_audio
+from bolo.audio.resample import resample
+from bolo.config import load_settings
+from bolo.core import Bolo
+from bolo.engines.base import VadParams
+
+SR = 16000
+HERE = Path(__file__).resolve().parent.parent / "src" / "bolo"
+CLIPS = [
+    HERE / "samples" / "en-short.wav",
+    HERE / "samples" / "en-long.wav",
+    HERE / "samples" / "hi-short.wav",
+    HERE / "_ui" / "clone" / "kokoro-am-michael.mp3",
+    HERE / "_ui" / "clone" / "syspin-en-female.mp3",
+    HERE / "_ui" / "clone" / "syspin-hi-male.mp3",
+]
+GAPS_S = [1.5, 2.0, 3.0, 1.0, 2.5, 2.0, 1.5]
+FRAME = 160  # 10 ms reference frames
+
+
+def cpu_name() -> str:
+    with contextlib.suppress(OSError):
+        for line in Path("/proc/cpuinfo").read_text(encoding="utf-8").splitlines():
+            if line.startswith("model name"):
+                return line.split(":", 1)[1].strip()
+    return platform.processor() or platform.platform()
+
+
+def hardware() -> str:
+    return f"{os.cpu_count()} vCPU {platform.machine()} ({cpu_name()}), no GPU"
+
+
+# ---------------------------------------------------------------------------------------------------
+# VAD
+# ---------------------------------------------------------------------------------------------------
+def load_clip(path: Path) -> np.ndarray:
+    x, rate = decode_audio(path.read_bytes(), filename=path.name)
+    return resample(np.asarray(x, dtype=np.float32), rate, SR)
+
+
+def speech_frames(x: np.ndarray) -> np.ndarray:
+    """10 ms frames within 40 dB of the clip's peak, with pauses shorter than 0.3 s filled in."""
+    frames = len(x) // FRAME
+    rms = np.sqrt(np.mean(x[: frames * FRAME].reshape(frames, FRAME).astype(np.float64) ** 2, axis=1) + 1e-12)
+    loud = 20 * np.log10(rms / rms.max()) > -40.0
+    idx = np.nonzero(loud)[0]
+    for a, b in itertools.pairwise(idx):
+        if 1 < b - a <= 30:
+            loud[a:b] = True
+    return loud
+
+
+def build_stream() -> tuple[np.ndarray, list[tuple[int, int]], np.ndarray]:
+    """The test stream, each clip's (first, last) speech sample and the 10 ms speech reference."""
+    parts: list[np.ndarray] = []
+    spans: list[tuple[int, int]] = []
+    marks: list[np.ndarray] = []
+    for i, path in enumerate(CLIPS):
+        gap = np.zeros(int(GAPS_S[i] * SR), dtype=np.float32)
+        x = load_clip(path)
+        x = x / max(1e-6, float(np.sqrt(np.mean(x**2)))) * 10 ** (-20 / 20)  # every clip at -20 dBFS RMS
+        x = x[: len(x) // FRAME * FRAME].astype(np.float32)
+        loud = speech_frames(x)
+        pos = sum(len(p) for p in parts) + len(gap)
+        idx = np.nonzero(loud)[0]
+        spans.append((pos + int(idx[0]) * FRAME, pos + (int(idx[-1]) + 1) * FRAME))
+        parts += [gap, x]
+        marks += [np.zeros(len(gap) // FRAME, dtype=bool), loud]
+    tail = np.zeros(int(GAPS_S[-1] * SR), dtype=np.float32)
+    parts.append(tail)
+    marks.append(np.zeros(len(tail) // FRAME, dtype=bool))
+    return np.concatenate(parts), spans, np.concatenate(marks)
+
+
+def coloured(n: int, kind: str, rng: np.random.Generator) -> np.ndarray:
+    white = rng.standard_normal(n)
+    if kind == "white":
+        return white
+    spectrum = np.fft.rfft(white)
+    f = np.fft.rfftfreq(n, 1 / SR)
+    f[0] = f[1]
+    spectrum /= np.sqrt(f) if kind == "pink" else f
+    out = np.fft.irfft(spectrum, n)
+    return out / out.std()
+
+
+def at_snr(speech: np.ndarray, noise: np.ndarray, snr_db: float, spans: list[tuple[int, int]]) -> np.ndarray:
+    power = np.mean(np.concatenate([speech[a:b] for a, b in spans]) ** 2)
+    noise = noise * np.sqrt(power / np.mean(noise**2) / 10 ** (snr_db / 10))
+    return (speech + noise).astype(np.float32)
+
+
+def gap_sounds(stream: np.ndarray, spans: list[tuple[int, int]], kind: str, rng: np.random.Generator) -> np.ndarray:
+    out = stream.copy()
+    edges = [0, *[x for span in spans for x in span], len(stream)]
+    for a, b in zip(edges[0::2], edges[1::2], strict=True):
+        a, b = a + SR // 5, b - SR // 5  # keep clear of the speech
+        if b - a < SR // 2:
+            continue
+        t = np.arange(b - a) / SR
+        if kind == "tones":
+            f0 = 220 * 2 ** (np.cumsum(rng.uniform(-1, 1, b - a)) / SR)  # a gliding pitch
+            phase = 2 * np.pi * np.cumsum(f0) / SR
+            sound = sum(np.sin(k * phase) / k for k in range(1, 6))
+            out[a:b] += (0.05 * sound * np.minimum(1, np.minimum(t, t[::-1]) * 20)).astype(np.float32)
+        else:
+            for c in rng.integers(a, b - 400, 6):
+                out[c : c + 400] += (0.3 * rng.standard_normal(400) * np.exp(-np.arange(400) / 60)).astype(np.float32)
+    return out
+
+
+def conditions(stream: np.ndarray, spans: list[tuple[int, int]]) -> dict[str, np.ndarray]:
+    rng = np.random.default_rng(7)
+    n = len(stream)
+    quiet = stream * 10 ** (-30 / 20)
+    return {
+        "clean": stream,
+        "white noise 10 dB SNR": at_snr(stream, coloured(n, "white", rng), 10, spans),
+        "white noise 0 dB SNR": at_snr(stream, coloured(n, "white", rng), 0, spans),
+        "pink noise 5 dB SNR": at_snr(stream, coloured(n, "pink", rng), 5, spans),
+        "low rumble (brown noise) 0 dB SNR": at_snr(stream, coloured(n, "brown", rng), 0, spans),
+        "quiet speech (-50 dBFS) in faint white noise, 20 dB SNR": at_snr(quiet, coloured(n, "white", rng), 20, spans),
+        "gliding harmonic tones in the gaps": gap_sounds(stream, spans, "tones", rng),
+        "clicks in the gaps": gap_sounds(stream, spans, "clicks", rng),
+    }
+
+
+def score_vad(detector: Any, audio: np.ndarray, spans: list[tuple[int, int]], ref: np.ndarray) -> dict[str, Any]:
+    step = 320
+    events: list[tuple[str, int, int]] = []  # kind, sample, samples fed when it was reported
+    started = time.perf_counter()
+    for off in range(0, len(audio), step):
+        for ev in detector.accept(audio[off : off + step]):
+            events.append((ev.kind, ev.sample, min(off + step, len(audio))))
+    for ev in detector.flush():
+        events.append((ev.kind, ev.sample, len(audio)))
+    took = time.perf_counter() - started
+    frames = len(audio) // FRAME
+    hyp = np.zeros(frames, dtype=bool)
+    ref = ref[:frames]
+    segments: list[tuple[int, int, int, int]] = []
+    open_at: tuple[int, int] | None = None
+    for kind, sample, fed in events:
+        if kind == "speech_start":
+            open_at = (sample, fed)
+        elif kind == "speech_end" and open_at is not None:
+            segments.append((open_at[0], sample, open_at[1], fed))
+            hyp[open_at[0] // FRAME : sample // FRAME] = True
+            open_at = None
+    start_delay, end_delay = [], []
+    for a, b in spans:
+        hits = [s for s in segments if s[0] < b and s[1] > a]
+        if hits and hits[0][0] >= a - SR // 2 and hits[-1][1] <= b + SR:  # a segment that is about this clip
+            start_delay.append((hits[0][2] - a) / SR)
+            end_delay.append((hits[-1][3] - b) / SR)
+    speech, silence = ref.sum(), (~ref).sum()
+    return {
+        "frame_accuracy": round(float((hyp == ref).mean()), 4),
+        "speech_recall": round(float((hyp & ref).sum() / speech), 4),
+        "false_alarm": round(float((hyp & ~ref).sum() / silence), 4),
+        "segments": len(segments),
+        "start_reported_after_s": round(float(np.median(start_delay)), 3) if start_delay else None,
+        "end_reported_after_s": round(float(np.median(end_delay)), 3) if end_delay else None,
+        "clips_missed": sum(1 for a, b in spans if not any(s[0] < b and s[1] > a for s in segments)),
+        "seconds": round(took, 4),
+    }
+
+
+async def measure_vad(core: Bolo, names: list[str], remove: bool) -> dict[str, Any]:
+    stream, spans, ref = build_stream()
+    conds = conditions(stream, spans)
+    params = VadParams(threshold=0.5, min_silence_s=0.3, min_speech_s=0.25, max_speech_s=30.0, speech_pad_s=0.0)
+    out: dict[str, Any] = {}
+    for name in names:
+        spec = core.resolve(name, "vad")
+        if not spec.builtin and not core.store.is_installed(spec.id):
+            await core.pull_and_wait(spec.id)
+        rss = _rss()
+        load_started = time.perf_counter()
+        await core.vad_detector(params, spec.id)  # loads the model
+        load_s = time.perf_counter() - load_started
+        results: dict[str, Any] = {}
+        for label, audio in conds.items():
+            detector, used = await core.vad_detector(params, spec.id)
+            assert used == spec.id, used
+            results[label] = score_vad(detector, audio, spans, ref)
+        clean = results["clean"]
+        noisy = [r for k, r in results.items() if k != "clean"]
+        out[spec.id] = {
+            "load_s": round(load_s, 3),
+            "memory_mb": round(max(0, _rss() - rss) / 1e6),
+            "rtf": round(clean["seconds"] / (len(stream) / SR), 5),
+            "frame_accuracy_clean": clean["frame_accuracy"],
+            "frame_accuracy_noisy_mean": round(float(np.mean([r["frame_accuracy"] for r in noisy])), 4),
+            "conditions": results,
+        }
+        print(spec.id, json.dumps({k: v for k, v in out[spec.id].items() if k != "conditions"}), file=sys.stderr)
+        await core.manager.unload(spec.id)
+        if remove and not spec.builtin:
+            await core.remove(spec.id)
+    return {
+        "stream_s": round(len(stream) / SR, 2),
+        "clips": [str(p.relative_to(HERE)) for p in CLIPS],
+        "reference": "10 ms frames of each clip within 40 dB of the clip's peak, pauses under 0.3 s filled in",
+        "reference_speech_s": round(float(ref.sum()) * FRAME / SR, 2),
+        "params": {"threshold": 0.5, "min_silence_s": 0.3, "min_speech_s": 0.25, "speech_pad_s": 0.0},
+        "feed": "20 ms pieces, as a live session",
+        "models": out,
+    }
+
+
+def _rss() -> int:
+    import psutil
+
+    return int(psutil.Process().memory_info().rss)
+
+
+async def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("what", choices=["vad"])
+    ap.add_argument("models", nargs="+")
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--remove", action="store_true", help="delete each model after measuring it")
+    ap.add_argument("--threads", type=int, default=4)
+    args = ap.parse_args()
+    settings = load_settings()
+    settings.threads = args.threads
+    core = Bolo(settings)
+    await core.start()
+    try:
+        result = await measure_vad(core, args.models, args.remove)
+    finally:
+        await core.stop()
+    import importlib.metadata as md
+
+    versions = {}
+    for pkg in ("sherpa-onnx", "onnxruntime", "webrtcvad-wheels"):
+        with contextlib.suppress(md.PackageNotFoundError):
+            versions[pkg] = md.version(pkg)
+    result = {
+        "what": args.what,
+        "hardware": hardware(),
+        "python": platform.python_version(),
+        "packages": versions,
+        "date": time.strftime("%Y-%m-%d"),
+        **result,
+    }
+    path = Path(args.out)
+    previous = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    if previous.get("models"):
+        result["models"] = {**previous["models"], **result["models"]}
+    path.write_text(json.dumps(result, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

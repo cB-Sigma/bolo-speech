@@ -27,6 +27,10 @@ or optional extras and keep their own licences:
     kokoro-onnx (MIT; depends on phonemizer, GPL-3.0-or-later; not part of
       the "all" extra)
 
+    webrtcvad-wheels (MIT; contains the WebRTC voice-activity detector,
+      BSD-3-Clause)                 https://github.com/daanzu/py-webrtcvad-wheels
+      optional "webrtcvad" extra, not part of "all"
+
   Phonemiser
     uccharan (Apache-2.0; English data derived from CMUdict, BSD-2-Clause;
       Kokoro English dictionaries from misaki, Apache-2.0)
@@ -60,6 +64,15 @@ or optional extras and keep their own licences:
   Copyright 2026 The HuggingFace Inc. team); its log-mel front-end
   (server/src/bolo/audio/features.py) is bolo's own implementation of NeMo's
   published preprocessing.
+
+  Optional voice-activity detectors, downloaded by the user on request and
+  not distributed with bolo: Silero VAD (MIT); TEN VAD (Agora; Apache-2.0
+  with additional conditions: deployment only for the deployer's own
+  applications and their direct end users, not in a way that competes with
+  Agora's offerings or lets third parties build or deploy applications; see
+  its LICENSE file, downloaded with the model); NVIDIA Frame-VAD Multilingual
+  MarbleNet v2.0 (NVIDIA Open Model License) in a third-party ONNX export,
+  whose log-mel front-end is computed by bolo's own code.
 
   eSpeak NG (GPL-3.0-or-later, https://github.com/espeak-ng/espeak-ng) is an
   OPTIONAL component. It is NOT bundled with bolo, not linked into it, not a

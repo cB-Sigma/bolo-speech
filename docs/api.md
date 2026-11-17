@@ -546,7 +546,7 @@ For clients written against speaches; details and differences are in
 | `GET /v1/audio/models`, `GET /v1/audio/voices` | installed text-to-speech models / their voices. Extension: each voice has `blendable` (true for the voices of a model that blends voices), and saved blends are listed with their model, with `blend` set |
 | `GET /api/ps` | `{"models": [ids in memory]}` |
 | `POST /api/ps/{id}` / `DELETE /api/ps/{id}` | load (`201`, `409` if loaded) / unload (`200`, `404`, `409` if busy) |
-| `POST /v1/audio/speech/timestamps` | multipart `file` (+ `threshold`, `min_silence_duration_ms`, `min_speech_duration_ms`, `max_speech_duration_s`, `speech_pad_ms`) → `[{"start": ms, "end": ms}]` |
+| `POST /v1/audio/speech/timestamps` | multipart `file` (+ `model`: any `vad` model of the catalog, else `default_vad`; `threshold`, `min_silence_duration_ms`, `min_speech_duration_ms`, `max_speech_duration_s`, `speech_pad_ms`) → `[{"start": ms, "end": ms}]` |
 | `POST /v1/audio/speech/embedding` | multipart `file` (+ `model`) → the speaker embedding, see below |
 | `GET /health` | `{"message": "OK"}` |
 

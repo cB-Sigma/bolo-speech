@@ -275,7 +275,10 @@ class ModelManager:
                 else None
             )
             return provider is not None and provider.configured
-        return spec.builtin or self.store.is_installed(spec.id) or remote_url(self.settings, spec) is not None
+        if spec.builtin:
+            # nothing to download; a detector from an optional package (WebRTC VAD) is there once the package is
+            return spec.engine in ("fake", "builtin") or self.engines.status(spec.engine).available
+        return self.store.is_installed(spec.id) or remote_url(self.settings, spec) is not None
 
     def ttl_for(self, spec: ModelSpec, entry: LoadedModel | None = None) -> float:
         """Seconds a model stays loaded once idle (-1: forever). The first that is set wins: the keep-alive of the

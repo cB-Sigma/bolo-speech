@@ -1,0 +1,832 @@
+{
+ "what": "vad",
+ "hardware": "4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU",
+ "python": "3.12.3",
+ "packages": {
+  "sherpa-onnx": "2.0.1",
+  "onnxruntime": "1.32.0",
+  "webrtcvad-wheels": "2.0.14.post1"
+ },
+ "date": "2026-11-17",
+ "stream_s": 73.92,
+ "clips": [
+  "samples/en-short.wav",
+  "samples/en-long.wav",
+  "samples/hi-short.wav",
+  "_ui/clone/kokoro-am-michael.mp3",
+  "_ui/clone/syspin-en-female.mp3",
+  "_ui/clone/syspin-hi-male.mp3"
+ ],
+ "reference": "10 ms frames of each clip within 40 dB of the clip's peak, pauses under 0.3 s filled in",
+ "reference_speech_s": 54.28,
+ "params": {
+  "threshold": 0.5,
+  "min_silence_s": 0.3,
+  "min_speech_s": 0.25,
+  "speech_pad_s": 0.0
+ },
+ "feed": "20 ms pieces, as a live session",
+ "models": {
+  "energy-vad": {
+   "load_s": 0.016,
+   "memory_mb": 1,
+   "rtf": 0.00082,
+   "frame_accuracy_clean": 0.9922,
+   "frame_accuracy_noisy_mean": 0.7408,
+   "conditions": {
+    "clean": {
+     "frame_accuracy": 0.9922,
+     "speech_recall": 0.9926,
+     "false_alarm": 0.0092,
+     "segments": 19,
+     "start_reported_after_s": 0.255,
+     "end_reported_after_s": 0.295,
+     "clips_missed": 0,
+     "seconds": 0.0603
+    },
+    "white noise 10 dB SNR": {
+     "frame_accuracy": 0.7343,
+     "speech_recall": 1.0,
+     "false_alarm": 1.0,
+     "segments": 3,
+     "start_reported_after_s": null,
+     "end_reported_after_s": null,
+     "clips_missed": 0,
+     "seconds": 0.0295
+    },
+    "white noise 0 dB SNR": {
+     "frame_accuracy": 0.7343,
+     "speech_recall": 1.0,
+     "false_alarm": 1.0,
+     "segments": 3,
+     "start_reported_after_s": null,
+     "end_reported_after_s": null,
+     "clips_missed": 0,
+     "seconds": 0.0419
+    },
+    "pink noise 5 dB SNR": {
+     "frame_accuracy": 0.7343,
+     "speech_recall": 1.0,
+     "false_alarm": 1.0,
+     "segments": 3,
+     "start_reported_after_s": null,
+     "end_reported_after_s": null,
+     "clips_missed": 0,
+     "seconds": 0.0342
+    },
+    "low rumble (brown noise) 0 dB SNR": {
+     "frame_accuracy": 0.7286,
+     "speech_recall": 0.939,
+     "false_alarm": 0.8529,
+     "segments": 4,
+     "start_reported_after_s": null,
+     "end_reported_after_s": null,
+     "clips_missed": 0,
+     "seconds": 0.0387
+    },
+    "quiet speech (-50 dBFS) in faint white noise, 20 dB SNR": {
+     "frame_accuracy": 0.4881,
+     "speech_recall": 0.3029,
+     "false_alarm": 0.0,
+     "segments": 24,
+     "start_reported_after_s": 0.38,
+     "end_reported_after_s": -0.875,
+     "clips_missed": 0,
+     "seconds": 0.039
+    },
+    "gliding harmonic tones in the gaps": {
+     "frame_accuracy": 0.7944,
+     "speech_recall": 0.9937,
+     "false_alarm": 0.7566,
+     "segments": 14,
+     "start_reported_after_s": null,
+     "end_reported_after_s": null,
+     "clips_missed": 0,
+     "seconds": 0.0401
+    },
+    "clicks in the gaps": {
+     "frame_accuracy": 0.9713,
+     "speech_recall": 0.993,
+     "false_alarm": 0.0886,
+     "segments": 21,
+     "start_reported_after_s": 0.255,
+     "end_reported_after_s": 0.305,
+     "clips_missed": 0,
+     "seconds": 0.0403
+    }
+   }
+  },
+  "webrtc-vad": {
+   "load_s": 0.011,
+   "memory_mb": 0,
+   "rtf": 0.00085,
+   "frame_accuracy_clean": 0.9343,
+   "frame_accuracy_noisy_mean": 0.8451,
+   "conditions": {
+    "clean": {
+     "frame_accuracy": 0.9343,
+     "speech_recall": 0.9974,
+     "false_alarm": 0.2403,
+     "segments": 8,
+     "start_reported_after_s": 0.25,
+     "end_reported_after_s": 0.395,
+     "clips_missed": 0,
+     "seconds": 0.0626
+    },
+    "white noise 10 dB SNR": {
+     "frame_accuracy": 0.9532,
+     "speech_recall": 0.9644,
+     "false_alarm": 0.0779,
+     "segments": 17,
+     "start_reported_after_s": 0.265,
+     "end_reported_after_s": 0.255,
+     "clips_missed": 0,
+     "seconds": 0.0621
+    },
+    "white noise 0 dB SNR": {
+     "frame_accuracy": 0.7343,
+     "speech_recall": 1.0,
+     "false_alarm": 1.0,
+     "segments": 3,
+     "start_reported_after_s": null,
+     "end_reported_after_s": null,
+     "clips_missed": 0,
+     "seconds": 0.0581
+    },
+    "pink noise 5 dB SNR": {
+     "frame_accuracy": 0.7343,
+     "speech_recall": 1.0,
+     "false_alarm": 1.0,
+     "segments": 3,
+     "start_reported_after_s": null,
+     "end_reported_after_s": null,
+     "clips_missed": 0,
+     "seconds": 0.0609
+    },
+    "low rumble (brown noise) 0 dB SNR": {
+     "frame_accuracy": 0.9389,
+     "speech_recall": 0.9952,
+     "false_alarm": 0.2169,
+     "segments": 9,
+     "start_reported_after_s": 0.255,
+     "end_reported_after_s": 0.37,
+     "clips_missed": 0,
+     "seconds": 0.0626
+    },
+    "quiet speech (-50 dBFS) in faint white noise, 20 dB SNR": {
+     "frame_accuracy": 0.9478,
+     "speech_recall": 0.9578,
+     "false_alarm": 0.0799,
+     "segments": 18,
+     "start_reported_after_s": 0.295,
+     "end_reported_after_s": 0.265,
+     "clips_missed": 0,
+     "seconds": 0.0576
+    },
+    "gliding harmonic tones in the gaps": {
+     "frame_accuracy": 0.7419,
+     "speech_recall": 0.9945,
+     "false_alarm": 0.9562,
+     "segments": 3,
+     "start_reported_after_s": null,
+     "end_reported_after_s": null,
+     "clips_missed": 0,
+     "seconds": 0.0571
+    },
+    "clicks in the gaps": {
+     "frame_accuracy": 0.8653,
+     "speech_recall": 0.9974,
+     "false_alarm": 0.5,
+     "segments": 9,
+     "start_reported_after_s": 0.25,
+     "end_reported_after_s": 0.38,
+     "clips_missed": 0,
+     "seconds": 0.0564
+    }
+   }
+  },
+  "webrtc-vad-aggressive": {
+   "load_s": 0.01,
+   "memory_mb": 0,
+   "rtf": 0.00075,
+   "frame_accuracy_clean": 0.9405,
+   "frame_accuracy_noisy_mean": 0.7901,
+   "conditions": {
+    "clean": {
+     "frame_accuracy": 0.9405,
+     "speech_recall": 0.9812,
+     "false_alarm": 0.1721,
+     "segments": 11,
+     "start_reported_after_s": 0.265,
+     "end_reported_after_s": 0.36,
+     "clips_missed": 0,
+     "seconds": 0.0552
+    },
+    "white noise 10 dB SNR": {
+     "frame_accuracy": 0.9413,
+     "speech_recall": 0.937,
+     "false_alarm": 0.0468,
+     "segments": 20,
+     "start_reported_after_s": 0.315,
+     "end_reported_after_s": 0.255,
+     "clips_missed": 0,
+     "seconds": 0.0597
+    },
+    "white noise 0 dB SNR": {
+     "frame_accuracy": 0.7343,
+     "speech_recall": 1.0,
+     "false_alarm": 1.0,
+     "segments": 3,
+     "start_reported_after_s": null,
+     "end_reported_after_s": null,
+     "clips_missed": 0,
+     "seconds": 0.043
+    },
+    "pink noise 5 dB SNR": {
+     "frame_accuracy": 0.8715,
+     "speech_recall": 0.974,
+     "false_alarm": 0.4119,
+     "segments": 15,
+     "start_reported_after_s": 0.34,
+     "end_reported_after_s": 0.24,
+     "clips_missed": 0,
+     "seconds": 0.0323
+    },
+    "low rumble (brown noise) 0 dB SNR": {
+     "frame_accuracy": 0.9527,
+     "speech_recall": 0.9831,
+     "false_alarm": 0.1314,
+     "segments": 13,
+     "start_reported_after_s": 0.27,
+     "end_reported_after_s": 0.32,
+     "clips_missed": 0,
+     "seconds": 0.0379
+    },
+    "quiet speech (-50 dBFS) in faint white noise, 20 dB SNR": {
+     "frame_accuracy": 0.3826,
+     "speech_recall": 0.1592,
+     "false_alarm": 0.0,
+     "segments": 13,
+     "start_reported_after_s": 0.935,
+     "end_reported_after_s": -1.36,
+     "clips_missed": 2,
+     "seconds": 0.0421
+    },
+    "gliding harmonic tones in the gaps": {
+     "frame_accuracy": 0.7589,
+     "speech_recall": 0.9836,
+     "false_alarm": 0.862,
+     "segments": 9,
+     "start_reported_after_s": null,
+     "end_reported_after_s": null,
+     "clips_missed": 0,
+     "seconds": 0.0421
+    },
+    "clicks in the gaps": {
+     "frame_accuracy": 0.8896,
+     "speech_recall": 0.9843,
+     "false_alarm": 0.3722,
+     "segments": 14,
+     "start_reported_after_s": 0.26,
+     "end_reported_after_s": 0.36,
+     "clips_missed": 0,
+     "seconds": 0.0864
+    }
+   }
+  },
+  "silero-vad": {
+   "load_s": 0.147,
+   "memory_mb": 62,
+   "rtf": 0.01091,
+   "frame_accuracy_clean": 0.9568,
+   "frame_accuracy_noisy_mean": 0.8892,
+   "conditions": {
+    "clean": {
+     "frame_accuracy": 0.9568,
+     "speech_recall": 0.9683,
+     "false_alarm": 0.0748,
+     "segments": 17,
+     "start_reported_after_s": 0.35,
+     "end_reported_after_s": 0.315,
+     "clips_missed": 0,
+     "seconds": 0.8064
+    },
+    "white noise 10 dB SNR": {
+     "frame_accuracy": 0.9198,
+     "speech_recall": 0.9475,
+     "false_alarm": 0.1568,
+     "segments": 13,
+     "start_reported_after_s": 0.44,
+     "end_reported_after_s": 0.395,
+     "clips_missed": 0,
+     "seconds": 1.173
+    },
+    "white noise 0 dB SNR": {
+     "frame_accuracy": 0.7423,
+     "speech_recall": 0.689,
+     "false_alarm": 0.1105,
+     "segments": 16,
+     "start_reported_after_s": 0.695,
+     "end_reported_after_s": 0.255,
+     "clips_missed": 0,
+     "seconds": 0.7062
+    },
+    "pink noise 5 dB SNR": {
+     "frame_accuracy": 0.8958,
+     "speech_recall": 0.986,
+     "false_alarm": 0.3534,
+     "segments": 7,
+     "start_reported_after_s": 0.39,
+     "end_reported_after_s": 0.73,
+     "clips_missed": 0,
+     "seconds": 0.9573
+    },
+    "low rumble (brown noise) 0 dB SNR": {
+     "frame_accuracy": 0.9468,
+     "speech_recall": 0.9613,
+     "false_alarm": 0.0932,
+     "segments": 16,
+     "start_reported_after_s": 0.38,
+     "end_reported_after_s": 0.315,
+     "clips_missed": 0,
+     "seconds": 0.8836
+    },
+    "quiet speech (-50 dBFS) in faint white noise, 20 dB SNR": {
+     "frame_accuracy": 0.8654,
+     "speech_recall": 0.9924,
+     "false_alarm": 0.4857,
+     "segments": 5,
+     "start_reported_after_s": 0.43,
+     "end_reported_after_s": 1.12,
+     "clips_missed": 0,
+     "seconds": 1.2702
+    },
+    "gliding harmonic tones in the gaps": {
+     "frame_accuracy": 0.898,
+     "speech_recall": 0.9451,
+     "false_alarm": 0.2322,
+     "segments": 17,
+     "start_reported_after_s": 0.48,
+     "end_reported_after_s": 0.79,
+     "clips_missed": 0,
+     "seconds": 0.9504
+    },
+    "clicks in the gaps": {
+     "frame_accuracy": 0.956,
+     "speech_recall": 0.9672,
+     "false_alarm": 0.0748,
+     "segments": 17,
+     "start_reported_after_s": 0.38,
+     "end_reported_after_s": 0.315,
+     "clips_missed": 0,
+     "seconds": 0.806
+    }
+   }
+  },
+  "silero-vad-v5": {
+   "load_s": 3.231,
+   "memory_mb": 17,
+   "rtf": 0.01249,
+   "frame_accuracy_clean": 0.9453,
+   "frame_accuracy_noisy_mean": 0.9275,
+   "conditions": {
+    "clean": {
+     "frame_accuracy": 0.9453,
+     "speech_recall": 0.9808,
+     "false_alarm": 0.1527,
+     "segments": 13,
+     "start_reported_after_s": 0.315,
+     "end_reported_after_s": 0.375,
+     "clips_missed": 0,
+     "seconds": 0.9234
+    },
+    "white noise 10 dB SNR": {
+     "frame_accuracy": 0.9203,
+     "speech_recall": 0.9729,
+     "false_alarm": 0.2251,
+     "segments": 10,
+     "start_reported_after_s": 0.37,
+     "end_reported_after_s": 0.425,
+     "clips_missed": 0,
+     "seconds": 1.2357
+    },
+    "white noise 0 dB SNR": {
+     "frame_accuracy": 0.9215,
+     "speech_recall": 0.9707,
+     "false_alarm": 0.2144,
+     "segments": 11,
+     "start_reported_after_s": 0.39,
+     "end_reported_after_s": 0.455,
+     "clips_missed": 0,
+     "seconds": 1.0535
+    },
+    "pink noise 5 dB SNR": {
+     "frame_accuracy": 0.9232,
+     "speech_recall": 0.9709,
+     "false_alarm": 0.2088,
+     "segments": 11,
+     "start_reported_after_s": 0.41,
+     "end_reported_after_s": 0.445,
+     "clips_missed": 0,
+     "seconds": 0.8922
+    },
+    "low rumble (brown noise) 0 dB SNR": {
+     "frame_accuracy": 0.937,
+     "speech_recall": 0.9805,
+     "false_alarm": 0.1833,
+     "segments": 11,
+     "start_reported_after_s": 0.365,
+     "end_reported_after_s": 0.37,
+     "clips_missed": 0,
+     "seconds": 1.1466
+    },
+    "quiet speech (-50 dBFS) in faint white noise, 20 dB SNR": {
+     "frame_accuracy": 0.9249,
+     "speech_recall": 0.9654,
+     "false_alarm": 0.1869,
+     "segments": 12,
+     "start_reported_after_s": 0.42,
+     "end_reported_after_s": 0.375,
+     "clips_missed": 0,
+     "seconds": 0.9687
+    },
+    "gliding harmonic tones in the gaps": {
+     "frame_accuracy": 0.9209,
+     "speech_recall": 0.9834,
+     "false_alarm": 0.252,
+     "segments": 12,
+     "start_reported_after_s": 0.315,
+     "end_reported_after_s": 0.695,
+     "clips_missed": 0,
+     "seconds": 1.3964
+    },
+    "clicks in the gaps": {
+     "frame_accuracy": 0.9449,
+     "speech_recall": 0.9803,
+     "false_alarm": 0.1527,
+     "segments": 13,
+     "start_reported_after_s": 0.315,
+     "end_reported_after_s": 0.375,
+     "clips_missed": 0,
+     "seconds": 0.8909
+    }
+   }
+  },
+  "silero-vad-v6": {
+   "load_s": 2.489,
+   "memory_mb": 1,
+   "rtf": 0.01456,
+   "frame_accuracy_clean": 0.9341,
+   "frame_accuracy_noisy_mean": 0.9281,
+   "conditions": {
+    "clean": {
+     "frame_accuracy": 0.9341,
+     "speech_recall": 0.9856,
+     "false_alarm": 0.2082,
+     "segments": 10,
+     "start_reported_after_s": 0.305,
+     "end_reported_after_s": 0.39,
+     "clips_missed": 0,
+     "seconds": 1.076
+    },
+    "white noise 10 dB SNR": {
+     "frame_accuracy": 0.9276,
+     "speech_recall": 0.9788,
+     "false_alarm": 0.2138,
+     "segments": 11,
+     "start_reported_after_s": 0.32,
+     "end_reported_after_s": 0.405,
+     "clips_missed": 0,
+     "seconds": 1.0656
+    },
+    "white noise 0 dB SNR": {
+     "frame_accuracy": 0.9218,
+     "speech_recall": 0.9777,
+     "false_alarm": 0.2327,
+     "segments": 9,
+     "start_reported_after_s": 0.42,
+     "end_reported_after_s": 0.485,
+     "clips_missed": 0,
+     "seconds": 1.2526
+    },
+    "pink noise 5 dB SNR": {
+     "frame_accuracy": 0.9332,
+     "speech_recall": 0.9781,
+     "false_alarm": 0.1909,
+     "segments": 11,
+     "start_reported_after_s": 0.39,
+     "end_reported_after_s": 0.415,
+     "clips_missed": 0,
+     "seconds": 0.8835
+    },
+    "low rumble (brown noise) 0 dB SNR": {
+     "frame_accuracy": 0.934,
+     "speech_recall": 0.9853,
+     "false_alarm": 0.2077,
+     "segments": 10,
+     "start_reported_after_s": 0.32,
+     "end_reported_after_s": 0.395,
+     "clips_missed": 0,
+     "seconds": 0.929
+    },
+    "quiet speech (-50 dBFS) in faint white noise, 20 dB SNR": {
+     "frame_accuracy": 0.9283,
+     "speech_recall": 0.9737,
+     "false_alarm": 0.197,
+     "segments": 11,
+     "start_reported_after_s": 0.345,
+     "end_reported_after_s": 0.365,
+     "clips_missed": 0,
+     "seconds": 0.852
+    },
+    "gliding harmonic tones in the gaps": {
+     "frame_accuracy": 0.9177,
+     "speech_recall": 0.9856,
+     "false_alarm": 0.2699,
+     "segments": 10,
+     "start_reported_after_s": 0.315,
+     "end_reported_after_s": 0.625,
+     "clips_missed": 0,
+     "seconds": 0.8037
+    },
+    "clicks in the gaps": {
+     "frame_accuracy": 0.9341,
+     "speech_recall": 0.9856,
+     "false_alarm": 0.2082,
+     "segments": 10,
+     "start_reported_after_s": 0.305,
+     "end_reported_after_s": 0.39,
+     "clips_missed": 0,
+     "seconds": 0.7678
+    }
+   }
+  },
+  "ten-vad": {
+   "load_s": 2.766,
+   "memory_mb": 2,
+   "rtf": 0.01064,
+   "frame_accuracy_clean": 0.9221,
+   "frame_accuracy_noisy_mean": 0.7819,
+   "conditions": {
+    "clean": {
+     "frame_accuracy": 0.9221,
+     "speech_recall": 0.974,
+     "false_alarm": 0.2215,
+     "segments": 8,
+     "start_reported_after_s": 0.39,
+     "end_reported_after_s": 0.365,
+     "clips_missed": 0,
+     "seconds": 0.7864
+    },
+    "white noise 10 dB SNR": {
+     "frame_accuracy": 0.7097,
+     "speech_recall": 0.7137,
+     "false_alarm": 0.3014,
+     "segments": 9,
+     "start_reported_after_s": 0.86,
+     "end_reported_after_s": 0.57,
+     "clips_missed": 1,
+     "seconds": 0.7785
+    },
+    "white noise 0 dB SNR": {
+     "frame_accuracy": 0.6899,
+     "speech_recall": 0.8646,
+     "false_alarm": 0.7928,
+     "segments": 4,
+     "start_reported_after_s": null,
+     "end_reported_after_s": null,
+     "clips_missed": 1,
+     "seconds": 1.3057
+    },
+    "pink noise 5 dB SNR": {
+     "frame_accuracy": 0.6645,
+     "speech_recall": 0.6107,
+     "false_alarm": 0.1869,
+     "segments": 10,
+     "start_reported_after_s": 0.94,
+     "end_reported_after_s": 0.63,
+     "clips_missed": 2,
+     "seconds": 0.6816
+    },
+    "low rumble (brown noise) 0 dB SNR": {
+     "frame_accuracy": 0.9196,
+     "speech_recall": 0.969,
+     "false_alarm": 0.2169,
+     "segments": 9,
+     "start_reported_after_s": 0.355,
+     "end_reported_after_s": 0.41,
+     "clips_missed": 0,
+     "seconds": 0.7327
+    },
+    "quiet speech (-50 dBFS) in faint white noise, 20 dB SNR": {
+     "frame_accuracy": 0.7039,
+     "speech_recall": 0.6592,
+     "false_alarm": 0.1726,
+     "segments": 10,
+     "start_reported_after_s": 1.28,
+     "end_reported_after_s": 0.4,
+     "clips_missed": 1,
+     "seconds": 0.8622
+    },
+    "gliding harmonic tones in the gaps": {
+     "frame_accuracy": 0.8697,
+     "speech_recall": 0.9414,
+     "false_alarm": 0.3284,
+     "segments": 10,
+     "start_reported_after_s": 0.59,
+     "end_reported_after_s": 0.88,
+     "clips_missed": 0,
+     "seconds": 0.7464
+    },
+    "clicks in the gaps": {
+     "frame_accuracy": 0.9159,
+     "speech_recall": 0.9762,
+     "false_alarm": 0.251,
+     "segments": 8,
+     "start_reported_after_s": 0.375,
+     "end_reported_after_s": 0.365,
+     "clips_missed": 0,
+     "seconds": 0.7421
+    }
+   }
+  },
+  "ten-vad-int8": {
+   "load_s": 2.026,
+   "memory_mb": 1,
+   "rtf": 0.01475,
+   "frame_accuracy_clean": 0.9259,
+   "frame_accuracy_noisy_mean": 0.7651,
+   "conditions": {
+    "clean": {
+     "frame_accuracy": 0.9259,
+     "speech_recall": 0.9796,
+     "false_alarm": 0.2225,
+     "segments": 8,
+     "start_reported_after_s": 0.39,
+     "end_reported_after_s": 0.365,
+     "clips_missed": 0,
+     "seconds": 1.0902
+    },
+    "white noise 10 dB SNR": {
+     "frame_accuracy": 0.6784,
+     "speech_recall": 0.6511,
+     "false_alarm": 0.2459,
+     "segments": 9,
+     "start_reported_after_s": 0.86,
+     "end_reported_after_s": -0.48,
+     "clips_missed": 1,
+     "seconds": 1.0314
+    },
+    "white noise 0 dB SNR": {
+     "frame_accuracy": 0.6894,
+     "speech_recall": 0.8639,
+     "false_alarm": 0.7928,
+     "segments": 4,
+     "start_reported_after_s": null,
+     "end_reported_after_s": null,
+     "clips_missed": 1,
+     "seconds": 1.3784
+    },
+    "pink noise 5 dB SNR": {
+     "frame_accuracy": 0.6128,
+     "speech_recall": 0.5236,
+     "false_alarm": 0.1405,
+     "segments": 11,
+     "start_reported_after_s": 0.94,
+     "end_reported_after_s": 0.63,
+     "clips_missed": 2,
+     "seconds": 0.7779
+    },
+    "low rumble (brown noise) 0 dB SNR": {
+     "frame_accuracy": 0.9188,
+     "speech_recall": 0.9679,
+     "false_alarm": 0.2169,
+     "segments": 9,
+     "start_reported_after_s": 0.355,
+     "end_reported_after_s": 0.41,
+     "clips_missed": 0,
+     "seconds": 0.9017
+    },
+    "quiet speech (-50 dBFS) in faint white noise, 20 dB SNR": {
+     "frame_accuracy": 0.6784,
+     "speech_recall": 0.6245,
+     "false_alarm": 0.1726,
+     "segments": 10,
+     "start_reported_after_s": 1.35,
+     "end_reported_after_s": 0.4,
+     "clips_missed": 1,
+     "seconds": 0.8437
+    },
+    "gliding harmonic tones in the gaps": {
+     "frame_accuracy": 0.86,
+     "speech_recall": 0.9326,
+     "false_alarm": 0.3406,
+     "segments": 11,
+     "start_reported_after_s": 0.59,
+     "end_reported_after_s": 0.96,
+     "clips_missed": 0,
+     "seconds": 1.1022
+    },
+    "clicks in the gaps": {
+     "frame_accuracy": 0.9179,
+     "speech_recall": 0.9794,
+     "false_alarm": 0.252,
+     "segments": 8,
+     "start_reported_after_s": 0.375,
+     "end_reported_after_s": 0.365,
+     "clips_missed": 0,
+     "seconds": 1.0741
+    }
+   }
+  },
+  "marblenet-vad": {
+   "load_s": 0.076,
+   "memory_mb": 14,
+   "rtf": 0.0137,
+   "frame_accuracy_clean": 0.928,
+   "frame_accuracy_noisy_mean": 0.9246,
+   "conditions": {
+    "clean": {
+     "frame_accuracy": 0.928,
+     "speech_recall": 0.9779,
+     "false_alarm": 0.2098,
+     "segments": 8,
+     "start_reported_after_s": 0.715,
+     "end_reported_after_s": 0.73,
+     "clips_missed": 0,
+     "seconds": 1.0129
+    },
+    "white noise 10 dB SNR": {
+     "frame_accuracy": 0.9226,
+     "speech_recall": 0.97,
+     "false_alarm": 0.2082,
+     "segments": 8,
+     "start_reported_after_s": 0.735,
+     "end_reported_after_s": 0.665,
+     "clips_missed": 0,
+     "seconds": 1.2002
+    },
+    "white noise 0 dB SNR": {
+     "frame_accuracy": 0.9232,
+     "speech_recall": 0.9549,
+     "false_alarm": 0.1645,
+     "segments": 11,
+     "start_reported_after_s": 0.785,
+     "end_reported_after_s": 0.715,
+     "clips_missed": 0,
+     "seconds": 0.9466
+    },
+    "pink noise 5 dB SNR": {
+     "frame_accuracy": 0.9199,
+     "speech_recall": 0.9724,
+     "false_alarm": 0.2251,
+     "segments": 7,
+     "start_reported_after_s": 0.75,
+     "end_reported_after_s": 0.665,
+     "clips_missed": 0,
+     "seconds": 1.1016
+    },
+    "low rumble (brown noise) 0 dB SNR": {
+     "frame_accuracy": 0.9278,
+     "speech_recall": 0.9768,
+     "false_alarm": 0.2077,
+     "segments": 8,
+     "start_reported_after_s": 0.735,
+     "end_reported_after_s": 0.73,
+     "clips_missed": 0,
+     "seconds": 1.071
+    },
+    "quiet speech (-50 dBFS) in faint white noise, 20 dB SNR": {
+     "frame_accuracy": 0.9232,
+     "speech_recall": 0.9696,
+     "false_alarm": 0.2052,
+     "segments": 8,
+     "start_reported_after_s": 0.735,
+     "end_reported_after_s": 0.665,
+     "clips_missed": 0,
+     "seconds": 1.1214
+    },
+    "gliding harmonic tones in the gaps": {
+     "frame_accuracy": 0.9275,
+     "speech_recall": 0.9777,
+     "false_alarm": 0.2113,
+     "segments": 8,
+     "start_reported_after_s": 0.695,
+     "end_reported_after_s": 0.715,
+     "clips_missed": 0,
+     "seconds": 1.1905
+    },
+    "clicks in the gaps": {
+     "frame_accuracy": 0.9283,
+     "speech_recall": 0.9779,
+     "false_alarm": 0.2088,
+     "segments": 8,
+     "start_reported_after_s": 0.735,
+     "end_reported_after_s": 0.73,
+     "clips_missed": 0,
+     "seconds": 1.0438
+    }
+   }
+  }
+ }
+}

@@ -6,9 +6,10 @@ Whisper-tiny encoder with a classification head and expects the input of Whisper
 peak and scaled to roughly [-1, 1].
 
 :class:`NemoLogMel` is the front-end of NeMo's speech models as used by Nemotron-3-Diarization
-(:mod:`bolo.engines.nemotron`): pre-emphasis 0.97, a 25 ms symmetric Hann window inside a 512-point
-FFT every 10 ms, zero-padded centred frames, 128 Slaney-scale mel bands, natural log with a 2^-24
-guard and no normalisation. It works on whole recordings and on audio that arrives piece by piece,
+(:mod:`bolo.engines.nemotron`) and the MarbleNet voice-activity detector (:mod:`bolo.engines.frame_vad`):
+pre-emphasis 0.97, a 25 ms symmetric Hann window inside a 512-point FFT every 10 ms, zero-padded centred
+frames, 128 (Nemotron) or 80 (MarbleNet) Slaney-scale mel bands, natural log with a 2^-24 guard and no
+normalisation. It works on whole recordings and on audio that arrives piece by piece,
 giving the same frames either way.
 """
 
@@ -90,18 +91,26 @@ NEMO_LOG_GUARD = 2.0**-24
 # symmetric Hann window of 400 samples, centred in the 512-point frame (as torch.stft pads a short window)
 _NEMO_WINDOW = np.zeros(NEMO_N_FFT)
 _NEMO_WINDOW[(NEMO_N_FFT - NEMO_WIN) // 2 : (NEMO_N_FFT + NEMO_WIN) // 2] = np.hanning(NEMO_WIN)
-_NEMO_FILTERS = mel_filterbank(NEMO_MELS, NEMO_N_FFT).astype(np.float32).astype(np.float64)
+_NEMO_FILTERS = {NEMO_MELS: mel_filterbank(NEMO_MELS, NEMO_N_FFT).astype(np.float32).astype(np.float64)}
 _BLOCK_FRAMES = 2000  # frames per FFT block: bounds the memory used on long recordings
 
 
-def _nemo_frames(padded: np.ndarray, first: int, count: int) -> FloatArray:
+def _nemo_filters(n_mels: int) -> np.ndarray:
+    filters = _NEMO_FILTERS.get(n_mels)
+    if filters is None:
+        filters = _NEMO_FILTERS[n_mels] = mel_filterbank(n_mels, NEMO_N_FFT).astype(np.float32).astype(np.float64)
+    return filters
+
+
+def _nemo_frames(padded: np.ndarray, first: int, count: int, n_mels: int = NEMO_MELS) -> FloatArray:
     """Log-mel frames ``first .. first + count - 1`` of a pre-emphasised signal already padded by ``n_fft // 2``."""
-    out = np.empty((count, NEMO_MELS), dtype=np.float32)
+    filters = _nemo_filters(n_mels)
+    out = np.empty((count, n_mels), dtype=np.float32)
     for a in range(0, count, _BLOCK_FRAMES):
         n = min(_BLOCK_FRAMES, count - a)
         index = np.arange(NEMO_N_FFT)[None, :] + HOP * (first + a + np.arange(n))[:, None]
         power = np.abs(np.fft.rfft(padded[index] * _NEMO_WINDOW, axis=1)) ** 2
-        out[a : a + n] = np.log(power @ _NEMO_FILTERS + NEMO_LOG_GUARD)
+        out[a : a + n] = np.log(power @ filters + NEMO_LOG_GUARD)
     return out
 
 
@@ -111,10 +120,12 @@ class NemoLogMel:
     Frame ``t`` covers samples ``t * 160 - 256 .. t * 160 + 255`` (zero before the start), so it is ready once
     ``t * 160 + 256`` samples have arrived. :meth:`push` returns the frames that became ready; :meth:`finish`
     returns the rest, ``len(audio) // 160`` frames in all, which is also what :func:`nemo_log_mel` gives.
-    Only the samples still needed are kept, so a stream of any length uses constant memory.
+    Only the samples still needed are kept, so a stream of any length uses constant memory. ``n_mels`` is 128
+    (Nemotron-3-Diarization) or 80 (MarbleNet VAD).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, n_mels: int = NEMO_MELS) -> None:
+        self.n_mels = n_mels
         self._buf = np.zeros(NEMO_N_FFT // 2, dtype=np.float64)  # the zero padding of the first frames
         self._buf_start = -(NEMO_N_FFT // 2)  # sample index (of the audio) of _buf[0]
         self._last = 0.0  # last raw sample, for the pre-emphasis across pieces
@@ -142,9 +153,9 @@ class NemoLogMel:
 
     def _take(self, count: int) -> FloatArray:
         if count <= 0:
-            return np.zeros((0, NEMO_MELS), dtype=np.float32)
+            return np.zeros((0, self.n_mels), dtype=np.float32)
         offset = self.frames_out * HOP - (NEMO_N_FFT // 2) - self._buf_start
-        frames = _nemo_frames(self._buf[offset:], 0, count)
+        frames = _nemo_frames(self._buf[offset:], 0, count, self.n_mels)
         self.frames_out += count
         drop = self.frames_out * HOP - (NEMO_N_FFT // 2) - self._buf_start
         if drop > 0:
@@ -153,8 +164,8 @@ class NemoLogMel:
         return frames
 
 
-def nemo_log_mel(audio: FloatArray) -> FloatArray:
-    """NeMo log-mel features of a whole recording, shape ``(len(audio) // 160, 128)``, float32."""
-    stream = NemoLogMel()
+def nemo_log_mel(audio: FloatArray, n_mels: int = NEMO_MELS) -> FloatArray:
+    """NeMo log-mel features of a whole recording, shape ``(len(audio) // 160, n_mels)``, float32."""
+    stream = NemoLogMel(n_mels)
     head = stream.push(audio)
     return np.concatenate([head, stream.finish()]) if len(audio) else head

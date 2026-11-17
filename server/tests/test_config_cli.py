@@ -114,7 +114,8 @@ def test_cli_version_and_help(capsys: pytest.CaptureFixture[str]) -> None:
 
 def test_cli_list_show(cli_env: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["list"]) == 0
-    assert "no models installed" in capsys.readouterr().out
+    out = capsys.readouterr().out  # nothing downloaded: only the detectors that are part of bolo
+    assert "energy-vad" in out and "silero-vad" not in out and "moonshine" not in out
     assert main(["list", "--fake-engine"]) == 0
     out = capsys.readouterr().out
     assert "fake-stt" in out and "moonshine" not in out

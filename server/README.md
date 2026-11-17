@@ -188,9 +188,13 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | TTS | MeloTTS | 1 | en | 1 | 0.278 (`melo-tts-en`) |
 | TTS | VITS | 26 | bho, bn, en, gu, hi, hne, kn, mag +4 | 4 | 0.046 (`mimic3-gu-cmu-indic`) |
 | TURN | Smart Turn | 1 | ar, bn, da, de, en, es, fi, fr +15 | 0 | - |
-| VAD | Silero VAD | 2 | - | 2 | 0.006 (`silero-vad-v5`) |
+| VAD | Silero VAD | 3 | - | 3 | 0.006 (`silero-vad-v5`) |
+| VAD | TEN VAD | 2 | - | 2 | 0.009 (`ten-vad`) |
+| VAD | MarbleNet VAD | 1 | - | 1 | 0.069 (`marblenet-vad`) |
+| VAD | WebRTC VAD | 2 | - | 2 | 0.000 (`webrtc-vad-aggressive`) |
+| VAD | Energy VAD | 1 | - | 1 | 0.000 (`energy-vad`) |
 
-**349 models in the catalog, 136 validated on CPU, 213 untested**, plus 22 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md).
+**356 models in the catalog, 143 validated on CPU, 213 untested**, plus 22 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

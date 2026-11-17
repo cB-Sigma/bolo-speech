@@ -1,4 +1,14 @@
-# Voice-activity detectors.
+# Voice-activity detectors (task vad): the default_vad setting, the model field of POST /v1/audio/speech/timestamps
+# and turn_detection.vad_model of a Realtime session choose one.
+# * Silero and TEN VAD run in sherpa-onnx. TEN VAD's files are the ones sherpa-onnx publishes (its asr-models
+#   release; they carry the metadata sherpa-onnx reads), with the licence file of the TEN repository.
+# * NVIDIA Frame-VAD Multilingual MarbleNet v2.0 runs in ONNX Runtime (bolo.engines.frame_vad). NVIDIA publishes only
+#   a .nemo checkpoint; the file is a third-party ONNX export of it (the network without the audio front-end, which
+#   bolo computes: 80-band NeMo log-mel).
+# * WebRTC's detector is a Gaussian mixture model inside the webrtcvad-wheels package (pip install
+#   'bolo-speech[webrtcvad]'): nothing is downloaded, the package version is the pin.
+# * energy-vad is bolo's own adaptive energy detector (bolo.streaming.vad.EnergyVad), also the fallback when no
+#   neural detector can be used.
 
 - id: silero-vad
   aliases:
@@ -86,3 +96,233 @@
     - '*.srt'
   options:
     file: silero_vad_v5.onnx
+- id: silero-vad-v6
+  aliases:
+  - silero_vad_v6
+  task: vad
+  engine: sherpa-onnx
+  kind: silero_vad
+  family: Silero VAD
+  languages: []
+  tier: realtime
+  size_bytes: 2328599
+  params: 2200000
+  license: MIT
+  license_url: https://github.com/snakers4/silero-vad/blob/5cd7945676eb32225748052e2e6a0580e4686a08/LICENSE
+  description: Silero VAD v6 (release v6.2.3, ONNX), the file published in the Silero repository. Same interface
+    as v5.
+  source_url: https://github.com/snakers4/silero-vad
+  validated: cpu
+  measured:
+    rtf: 0.0134
+    audio_s: 15.6
+    load_s: 0.26
+    memory_mb: 23
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+  source:
+    urls:
+    - path: silero_vad.onnx
+      url: https://raw.githubusercontent.com/snakers4/silero-vad/5cd7945676eb32225748052e2e6a0580e4686a08/src/silero_vad/data/silero_vad.onnx
+      size: 2327524
+      sha256: 1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3
+    - path: LICENSE
+      url: https://raw.githubusercontent.com/snakers4/silero-vad/5cd7945676eb32225748052e2e6a0580e4686a08/LICENSE
+      size: 1075
+      sha256: 2e63e9a38b6e8fc0c7bc37ce174caca1862870856c6daf5697cfb785e925520b
+  options:
+    file: silero_vad.onnx
+- id: ten-vad
+  aliases:
+  - ten_vad
+  task: vad
+  engine: sherpa-onnx
+  kind: ten_vad
+  family: TEN VAD
+  languages: []
+  tier: realtime
+  size_bytes: 334457
+  license: Apache-2.0 with Agora's additional conditions (own applications only; no use competing with Agora)
+  license_url: https://huggingface.co/TEN-framework/ten-vad/blob/bda8ffc78b1846c5c7cbd38f04e52deff49de707/LICENSE
+  commercial_use: false
+  description: 'TEN VAD by Agora: a small frame-level detector (16 ms frames) built for conversational agents, run
+    by sherpa-onnx. Licence: Apache-2.0 with additional conditions. You may deploy it, commercially too, only to
+    build and run your own applications for yourself and your direct end users; you may not deploy it in a way that
+    competes with Agora''s offerings or that lets third parties develop or deploy applications (a speech server
+    offered to others can fall under that). Derivative works stay under the same terms. Read the licence before
+    you use it; bolo does not judge your use.'
+  source_url: https://github.com/TEN-framework/ten-vad
+  validated: cpu
+  measured:
+    rtf: 0.00915
+    audio_s: 15.6
+    load_s: 0.02
+    memory_mb: 8
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+  source:
+    urls:
+    - path: ten-vad.onnx
+      url: https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/ten-vad.onnx
+      size: 332211
+      sha256: 718cb7eef47e3cf5ddbe7e967a7503f46b8b469c0706872f494dfa921b486206
+    - path: LICENSE
+      url: https://huggingface.co/TEN-framework/ten-vad/resolve/bda8ffc78b1846c5c7cbd38f04e52deff49de707/LICENSE
+      size: 2246
+      sha256: fed83607bfd6a119f9c1c705e784593a6f013c87d00ea9205a2ef83e3dc0bbb4
+  options:
+    file: ten-vad.onnx
+- id: ten-vad-int8
+  task: vad
+  engine: sherpa-onnx
+  kind: ten_vad
+  family: TEN VAD
+  languages: []
+  tier: realtime
+  size_bytes: 131780
+  license: Apache-2.0 with Agora's additional conditions (own applications only; no use competing with Agora)
+  license_url: https://huggingface.co/TEN-framework/ten-vad/blob/bda8ffc78b1846c5c7cbd38f04e52deff49de707/LICENSE
+  commercial_use: false
+  description: TEN VAD with int8 weights (sherpa-onnx's export), under the same licence and conditions as ten-vad.
+  source_url: https://github.com/TEN-framework/ten-vad
+  validated: cpu
+  measured:
+    rtf: 0.01714
+    audio_s: 15.6
+    load_s: 0.01
+    memory_mb: 0
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+  source:
+    urls:
+    - path: ten-vad.int8.onnx
+      url: https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/ten-vad.int8.onnx
+      size: 129534
+      sha256: 880c072f188efa169ea028b2159d1b3a438e153d080b87eac31b74ecad511e61
+    - path: LICENSE
+      url: https://huggingface.co/TEN-framework/ten-vad/resolve/bda8ffc78b1846c5c7cbd38f04e52deff49de707/LICENSE
+      size: 2246
+      sha256: fed83607bfd6a119f9c1c705e784593a6f013c87d00ea9205a2ef83e3dc0bbb4
+  options:
+    file: ten-vad.int8.onnx
+- id: marblenet-vad
+  aliases:
+  - frame-vad-multilingual-marblenet-v2.0
+  task: vad
+  engine: onnxruntime
+  kind: marblenet_vad
+  family: MarbleNet VAD
+  languages: []
+  tier: realtime
+  size_bytes: 370126
+  params: 91500
+  license: NVIDIA Open Model License
+  license_url: https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/
+  description: 'NVIDIA Frame-VAD Multilingual MarbleNet v2.0: a 91.5 k-parameter convolutional detector that gives
+    a speech probability for every 20 ms frame, trained with white and real-world noise and with non-speech sounds
+    (coughs, laughter, breathing) in many languages. NVIDIA publishes a .nemo checkpoint only; the file here is
+    a third-party ONNX export of it (TigreGotico/frame-vad-marblenet-onnx). Its convolutions look about 1.4 s either
+    side of a frame, so live audio is scored with 0.4 s of look-ahead (option lookahead_s): its decisions then agree
+    with whole-file scoring on 99 % of frames, and come 0.4 s after the audio. NVIDIA Open Model License: commercial
+    use allowed; the licence ends for whoever sues over the model, and redistributors must keep NVIDIA''s notice.'
+  source_url: https://huggingface.co/nvidia/Frame_VAD_Multilingual_MarbleNet_v2.0
+  validated: cpu
+  measured:
+    rtf: 0.06862
+    audio_s: 15.6
+    load_s: 0.02
+    memory_mb: 10
+    threads: 4
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+  source:
+    urls:
+    - path: marblenet.onnx
+      url: https://huggingface.co/TigreGotico/frame-vad-marblenet-onnx/resolve/e8786fe74e055954901eb553cc9c3145323981cc/marblenet.onnx
+      size: 370126
+      sha256: 4ad3364be94d462b5fd4fa39910c24967dbb9dba436e27bcff7a88359515e491
+  options:
+    file: marblenet.onnx
+    lookahead_s: 0.4
+    context_s: 1.6
+- id: webrtc-vad
+  aliases:
+  - webrtcvad
+  task: vad
+  engine: webrtcvad
+  kind: webrtc_vad
+  family: WebRTC VAD
+  languages: []
+  tier: realtime
+  builtin: true
+  license: BSD-3-Clause (WebRTC) + MIT (webrtcvad-wheels binding)
+  description: 'The voice-activity detector of the WebRTC project (a Gaussian mixture model on six sub-band energies),
+    through the webrtcvad-wheels package: no model file, microseconds per frame, a yes/no answer per 20 ms frame.
+    Aggressiveness mode 2 of 0 (keeps the most audio as speech) to 3 (drops the most noise). Needs pip install ''bolo-speech[webrtcvad]''.'
+  source_url: https://github.com/daanzu/py-webrtcvad-wheels
+  validated: cpu
+  measured:
+    rtf: 0.00016
+    audio_s: 15.6
+    load_s: 0.0
+    memory_mb: 0
+    threads: 4
+    engine: webrtcvad 2.0.14.post1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+  options:
+    mode: 2
+- id: webrtc-vad-aggressive
+  task: vad
+  engine: webrtcvad
+  kind: webrtc_vad
+  family: WebRTC VAD
+  languages: []
+  tier: realtime
+  builtin: true
+  license: BSD-3-Clause (WebRTC) + MIT (webrtcvad-wheels binding)
+  description: The WebRTC detector in its most aggressive mode (3), which drops more noise and more quiet speech.
+    Needs pip install 'bolo-speech[webrtcvad]'.
+  source_url: https://github.com/daanzu/py-webrtcvad-wheels
+  validated: cpu
+  measured:
+    rtf: 0.00014
+    audio_s: 15.6
+    load_s: 0.0
+    memory_mb: 0
+    threads: 4
+    engine: webrtcvad 2.0.14.post1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+  options:
+    mode: 3
+- id: energy-vad
+  task: vad
+  engine: builtin
+  kind: energy_vad
+  family: Energy VAD
+  languages: []
+  tier: realtime
+  builtin: true
+  license: Apache-2.0
+  description: bolo's adaptive energy detector (a level above a tracked noise floor, with hang-over). Part of bolo;
+    nothing to download. It is what bolo falls back to when no neural detector can be used; choose it by name to
+    use it on purpose. Hears loud noise as speech.
+  source_url: https://github.com/cB-Sigma/bolo
+  validated: cpu
+  measured:
+    rtf: 0.00019
+    audio_s: 15.6
+    load_s: 0.0
+    memory_mb: 0
+    threads: 4
+    engine: builtin 0.6.6
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'

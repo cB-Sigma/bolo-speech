@@ -66,8 +66,11 @@ av = ["av>=12"]
 wyoming = ["wyoming>=1.6"]
 # WebRTC transport of the Realtime API (aiortc is BSD-3-Clause; it brings PyAV for Opus)
 webrtc = ["aiortc>=1.9", "av>=12"]
-# end-of-turn detection for Realtime sessions (semantic_vad). faster-whisper already brings onnxruntime.
+# end-of-turn detection for Realtime sessions (semantic_vad) and the MarbleNet voice-activity detector.
+# faster-whisper already brings onnxruntime.
 turn = ["onnxruntime>=1.17"]
+# the WebRTC voice-activity detector (webrtcvad-wheels is MIT; the WebRTC code inside is BSD-3-Clause)
+webrtcvad = ["webrtcvad-wheels>=2.0.14"]
 # Orpheus-family voices (Svara, Veena, Orpheus, snorTTS) on llama.cpp: the SNAC audio decoder runs in onnxruntime
 orpheus = ["onnxruntime>=1.17"]
 # LFM3-Audio in this process (speech-to-speech and text-to-speech without llama-server): the model's ONNX graphs
@@ -166,7 +169,7 @@ module = [
   "sherpa_onnx.*", "faster_whisper.*", "ctranslate2.*", "soundfile.*", "soxr.*", "av.*",
   "moonshine_onnx.*", "kokoro_onnx.*", "pywhispercpp.*", "wyoming.*", "whisper_normalizer.*",
   "onnxruntime.*", "tomli.*", "aiortc.*", "uccharan.*", "tokenizers.*", "sipmessage.*", "onnx.*", "pynvml.*",
-  "opentelemetry.*",
+  "opentelemetry.*", "webrtcvad.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"

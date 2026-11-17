@@ -407,6 +407,12 @@ class RealtimeSession:
                 merged.setdefault("silence_duration_ms", int(self.core.settings.endpoint_silence_ms))
                 merged.setdefault("create_response", True)
                 merged.setdefault("interrupt_response", True)
+                # bolo extension: the voice-activity detector of this session (default: the default_vad setting)
+                if merged.get("vad_model") is not None:
+                    try:
+                        merged["vad_model"] = self.core.resolve(str(merged["vad_model"]), "vad").id
+                    except BoloError as exc:
+                        raise RealtimeError(exc.message, param="session.audio.input.turn_detection.vad_model") from exc
                 self.turn_detection = merged
             else:
                 raise RealtimeError(
@@ -527,7 +533,10 @@ class RealtimeSession:
                 min_silence_s=min(silence_s, SEMANTIC_PAUSE_S) if self._semantic else silence_s,
                 max_speech_s=self.core.settings.max_utterance_s * 3,
             )
-            self._detector, self._vad_name = await self.core.vad_detector(params, fallback=True)
+            vad_model = td.get("vad_model")
+            self._detector, self._vad_name = await self.core.vad_detector(
+                params, str(vad_model) if vad_model else None, fallback=True
+            )
         return self._detector
 
     async def _on_append(self, event: dict[str, Any]) -> None:

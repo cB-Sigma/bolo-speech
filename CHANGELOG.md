@@ -8,6 +8,20 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **More voice-activity detectors, chosen by name.** `silero-vad-v6` (MIT), `ten-vad` and `ten-vad-int8` (TEN VAD:
+  Apache-2.0 with Agora's conditions, labelled `commercial_use: false`: only for your own applications, not in a way
+  that competes with Agora), `marblenet-vad` (NVIDIA Frame-VAD Multilingual MarbleNet v2.0, NVIDIA Open Model
+  License, a third-party ONNX export run by ONNX Runtime with bolo's NeMo log-mel front-end), `webrtc-vad` and
+  `webrtc-vad-aggressive` (WebRTC's detector, BSD-3-Clause, through the new `webrtcvad` extra; nothing to download)
+  and `energy-vad` (bolo's own energy detector, built in). Downloads are pinned by SHA-256. Any of them works as
+  `default_vad`, as `model` of `POST /v1/audio/speech/timestamps` and, new, per Realtime session as
+  `turn_detection.vad_model` (bolo extension). Detectors that score frames (WebRTC, MarbleNet) share one segmenter
+  with Silero's parameters (threshold with hysteresis, minimum silence and speech, maximum speech, padding).
+  Measured on a 74 s stream of the repository's samples, clean and with seven kinds of added noise
+  (docs/measurements/vad-detectors.json, `server/tools/measure_detectors.py`): mean frame accuracy over the noisy
+  conditions 0.93 for Silero v5 and v6, 0.92 for MarbleNet (0.4 s later), 0.89 for the default Silero v4, 0.85 for
+  WebRTC, 0.78 for TEN VAD and 0.74 for the energy detector. The default stays `silero-vad`, the best of them on
+  clean audio (docs/models.md, "Voice-activity detection").
 - **Console: voice blends and the language decision.** The text-to-speech page has a "Blend voices" panel for models
   with `voice-blending` (Kokoro): pick up to 8 of the model's voices with weights, see the blend as it is sent
   (`af_bella(0.7)+af_sky(0.3)`) and keep it in the voice library under a name. Saved blends are listed in the library
