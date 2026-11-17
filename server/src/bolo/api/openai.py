@@ -30,6 +30,8 @@ from bolo.errors import BoloError, InvalidRequest, ModelNotFound
 from bolo.keepalive import request_keep_alive
 from bolo.obs.trace import Trace
 from bolo.separate import SeparateOptions
+from bolo.stt_options import OptionError
+from bolo.stt_options import from_form as decode_options_from_form
 from bolo.text.formats import to_srt, to_vtt
 
 router = APIRouter()
@@ -146,6 +148,8 @@ def _verbose(t: Transcript, task: str, word_level: bool, segment_level: bool) ->
         "duration": round(t.duration, 3),
         "text": t.text,
     }
+    if t.language_probability is not None:
+        out["language_probability"] = t.language_probability
     if word_level:
         speaker_of = {id(w): s.speaker for s in t.segments for w in s.words if s.speaker}
         out["words"] = [
@@ -374,6 +378,11 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
         samples, rate = await read_upload(core, file)
         trace.restart()
         vad_raw = form.get("vad_filter")
+        try:
+            decode = decode_options_from_form(form)
+        except OptionError as exc:
+            raise InvalidRequest(str(exc), param=exc.name) from exc
+        decode.pop("vad_filter", None)  # read as before, below
         kwargs: dict[str, Any] = {
             "model": spec.id,
             "language": str(form.get("language") or "") or None,
@@ -386,6 +395,7 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
             "trace": trace,
             "diarize": diarize,
             "separate": separate,
+            "options": decode,
         }
     except BoloError as exc:
         trace.finish("error", exc.message)
@@ -469,8 +479,14 @@ async def create_transcription(request: Request) -> Response:
     ``response_format`` (json, text, srt, vtt, verbose_json), ``temperature``,
     ``timestamp_granularities[]`` (word, segment) and ``stream``.
 
-    Extensions: ``vad_filter`` (force or disable silence removal) and ``hotwords``; with diarization,
-    ``separate_overlaps=true`` transcribes overlapped speech from one separated track per speaker.
+    Extensions: ``vad_filter`` (force or disable silence removal), ``vad_parameters`` (an object: ``threshold``,
+    ``min_speech_duration_ms``, ``max_speech_duration_s``, ``min_silence_duration_ms``, ``speech_pad_ms``),
+    ``chunk_length`` and ``hotwords``; Whisper decoding: ``condition_on_previous_text``, ``repetition_penalty``,
+    ``no_repeat_ngram_size``, ``compression_ratio_threshold``, ``log_prob_threshold``, ``no_speech_threshold``,
+    ``temperature_increment_on_fallback`` and ``hallucination_silence_threshold``; ``max_repeats`` (the repetition
+    guard: a phrase repeated back to back more often than this is cut to one copy; 0 turns it off). Options a model
+    cannot honour are listed in the ``x-bolo-ignored-options`` header. With diarization, ``separate_overlaps=true``
+    transcribes overlapped speech from one separated track per speaker.
     """
     return await _transcribe_endpoint(request, "transcribe")
 

@@ -18,6 +18,12 @@ from bolo.engines.base import Engine, EngineStatus, LoadOptions, Model, Segment,
 class WhisperCppSTT(STTModel):
     max_chunk_s = 30.0
     supports_translate = True
+    #: whisper.cpp's own parameters for these (no_context, temperature_inc, logprob_thold, no_speech_thold);
+    #: it has no repetition penalty, n-gram ban, hallucination-silence check or chunk length, and its entropy
+    #: threshold measures something else than a compression ratio, so those are reported as ignored
+    decode_options = (
+        "condition_on_previous_text", "temperature_increment_on_fallback", "log_prob_threshold", "no_speech_threshold",
+    )  # fmt: skip
 
     def __init__(self, path: Path, spec: dict[str, Any], opts: LoadOptions) -> None:
         from pywhispercpp.model import Model as CppModel
@@ -36,6 +42,16 @@ class WhisperCppSTT(STTModel):
                 kwargs["language"] = r.language.split("-")[0]
             if r.prompt:
                 kwargs["initial_prompt"] = r.prompt
+            opts = r.options
+            if opts.get("condition_on_previous_text") is not None:
+                kwargs["no_context"] = not opts["condition_on_previous_text"]
+            for name, param in (
+                ("temperature_increment_on_fallback", "temperature_inc"),
+                ("log_prob_threshold", "logprob_thold"),
+                ("no_speech_threshold", "no_speech_thold"),
+            ):
+                if opts.get(name) is not None:
+                    kwargs[param] = float(opts[name])
             segs = self.model.transcribe(r.samples, **kwargs)
             segments = [Segment(s.t0 / 100.0, s.t1 / 100.0, s.text.strip()) for s in segs if s.text.strip()]
             out.append(STTResult(" ".join(s.text for s in segments), r.language, segments))

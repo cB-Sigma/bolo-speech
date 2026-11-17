@@ -104,6 +104,8 @@ class STTRequest:
     hotwords: str | None = None
     #: label speakers in the model itself (only set for models with ``native_diarization``)
     diarize: bool = False
+    #: decoding options the model honours (``STTModel.decode_options``; names and meanings in bolo.stt_options)
+    options: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -114,6 +116,8 @@ class STTResult:
     words: list[Word] = field(default_factory=list)
     #: what the request cost at a cloud provider (:class:`bolo.providers.Usage`; remote engine only)
     usage: Any = None
+    #: how sure the model was of ``language`` when it detected it (0..1); None when it does not say
+    language_probability: float | None = None
 
 
 @dataclass
@@ -189,6 +193,9 @@ class STTModel(Model):
     #: the model labels speakers itself (a cloud recogniser with diarization): a request's ``diarize`` is then
     #: passed to it as ``STTRequest.diarize`` instead of cutting the audio at bolo's speaker turns
     native_diarization: bool = False
+    #: decoding options (``bolo.stt_options.ENGINE_OPTIONS``) ``transcribe`` honours in ``STTRequest.options``;
+    #: bolo passes only these and reports the others as ignored
+    decode_options: tuple[str, ...] = ()
 
     @abc.abstractmethod
     def transcribe(self, requests: list[STTRequest]) -> list[STTResult]:

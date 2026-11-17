@@ -271,6 +271,60 @@ class ModelSettingsRequest(BaseModel):
     batch_size: int | None = Field(
         default=None, ge=0, description="llama.cpp models: batch size (-b); 0: llama-server's default."
     )
+    # speech to text: decoding defaults of the model (bolo.stt_options); a request's own value wins
+    condition_on_previous_text: bool | None = Field(
+        default=None,
+        description="Whisper models: give the decoder the text of the previous window as its prompt (faster-whisper "
+        "and whisper.cpp; bolo's default is false, which avoids most repetition loops).",
+    )
+    repetition_penalty: float | None = Field(
+        default=None, description="faster-whisper: penalty on tokens already generated (> 0; 1 is off, 1.1 to 1.3 "
+        "is a usual value against loops).",
+    )  # fmt: skip
+    no_repeat_ngram_size: int | None = Field(
+        default=None, description="faster-whisper: never repeat an n-gram of this many tokens (0 to 100; 0 is off)."
+    )
+    compression_ratio_threshold: float | None = Field(
+        default=None,
+        description="faster-whisper: a window whose text compresses better than this (gzip ratio; default 2.4) is "
+        "decoded again at a higher temperature; needs temperature_increment_on_fallback.",
+    )
+    log_prob_threshold: float | None = Field(
+        default=None, description="Whisper models: average log probability below which a window counts as failed "
+        "(-100 to 0; default -1).",
+    )  # fmt: skip
+    no_speech_threshold: float | None = Field(
+        default=None, description="Whisper models: a window more likely silence than this (0 to 1; default 0.6) with "
+        "a low log probability is dropped.",
+    )  # fmt: skip
+    temperature_increment_on_fallback: float | None = Field(
+        default=None,
+        description="Whisper models: retry a failed window at this much higher temperature, up to 1 (0 to 1; bolo's "
+        "faster-whisper default is 0, no retries; whisper.cpp's own default is 0.2).",
+    )
+    hallucination_silence_threshold: float | None = Field(
+        default=None,
+        description="faster-whisper: skip silent stretches longer than this many seconds when a hallucination is "
+        "suspected (computes word timings).",
+    )
+    chunk_length: int | None = Field(
+        default=None, description="Longest piece of audio decoded at once, in seconds (1 to 30; default 30)."
+    )
+    vad_filter: bool | None = Field(
+        default=None,
+        description="Remove silence before decoding: true always, false never; unset: only for audio longer than the "
+        "model's window.",
+    )
+    vad_parameters: dict[str, Any] | None = Field(
+        default=None,
+        description="Silence removal tuning: threshold, min_speech_duration_ms, max_speech_duration_s, "
+        "min_silence_duration_ms, speech_pad_ms.",
+    )
+    max_repeats: int | None = Field(
+        default=None,
+        description="Repetition guard: a phrase (1 to 8 words) repeated back to back more often than this is cut to "
+        "one copy, and so is a run of identical segments (default 4; 0 turns it off).",
+    )
 
 
 @router.get("/models/{model_id:path}/settings", tags=["native"], summary="Settings pinned for one model")
@@ -310,6 +364,13 @@ async def put_model_settings(request: Request, model_id: str, body: ModelSetting
         raise InvalidRequest(str(exc), param=str(exc).split(":", 1)[0]) from exc
     if values.get("kv_cache_type") is not None:
         values["kv_cache_type"] = str(values["kv_cache_type"]).strip().lower()
+    from bolo.stt_options import OptionError
+    from bolo.stt_options import check as check_decode_options
+
+    try:
+        values = check_decode_options(values)
+    except OptionError as exc:
+        raise InvalidRequest(str(exc), param=exc.name) from exc
     for name in values.get("fallback") or []:
         other = core.resolve(name, spec.task)  # unknown model or wrong task: 404 / 400
         if other.id == spec.id:

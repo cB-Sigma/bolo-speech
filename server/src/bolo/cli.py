@@ -511,6 +511,8 @@ def _model_setting(key: str, raw: str) -> Any:
     """A ``--set key=value`` of ``bolo models config``, as the type the setting takes."""
     from bolo.keepalive import parse_keep_alive
     from bolo.llama_args import check_tuning
+    from bolo.stt_options import DECODE_SETTINGS
+    from bolo.stt_options import check as check_decode_options
 
     if key in _INT_SETTINGS:
         value: Any = int(raw)
@@ -521,6 +523,9 @@ def _model_setting(key: str, raw: str) -> Any:
     elif key == "keep_alive":
         parse_keep_alive(raw)
         value = raw
+    elif key in DECODE_SETTINGS:
+        value = json.loads(raw) if key == "vad_parameters" else raw
+        return check_decode_options({key: value})[key]
     else:
         value = raw.strip().lower() if key in ("device", "flash_attention", "kv_cache_type") else raw
     check_tuning({key: value})

@@ -102,6 +102,10 @@ class FakeSTT(STTModel):
         self.max_chunk_s = float(opts.get("max_chunk_s", 30.0))
         self.words_per_second = float(opts.get("words_per_second", 2.5))
         self.fail_on = opts.get("fail_on")
+        #: a request with this prompt gets Whisper's loop: its words, then "the" forty times
+        self.loop_on = opts.get("loop_on", "loop")
+        self.decode_options = tuple(opts.get("decode_options", self._all_options()))
+        self.seen_options: list[dict[str, Any]] = []  # STTRequest.options of every request
         self.languages = ("en", "hi")
         self.supports_word_timestamps = True
         self.supports_translate = True
@@ -112,9 +116,16 @@ class FakeSTT(STTModel):
         if self.load_delay_s:
             time.sleep(self.load_delay_s)
 
+    @staticmethod
+    def _all_options() -> tuple[str, ...]:
+        from bolo.stt_options import ENGINE_OPTIONS
+
+        return tuple(ENGINE_OPTIONS)
+
     def transcribe(self, requests: list[STTRequest]) -> list[STTResult]:
         with self._lock:
             self.calls.append(len(requests))
+            self.seen_options.extend(dict(r.options) for r in requests)
             self.concurrent += 1
             self.max_concurrent = max(self.max_concurrent, self.concurrent)
         try:
@@ -126,10 +137,20 @@ class FakeSTT(STTModel):
                     raise RuntimeError("fake engine failure requested")
                 seconds = len(r.samples) / self.sample_rate
                 words = fake_words(seconds, self.words_per_second)
+                if self.loop_on and r.prompt == self.loop_on:
+                    t = words[-1].t1 if words else 0.0
+                    step = max(seconds - t, 0.1) / 40
+                    words = words + [Word("the", t + i * step, t + (i + 1) * step) for i in range(40)]
                 text = " ".join(w.w for w in words)
                 seg = Segment(0.0, seconds, text, words if r.word_timestamps else [])
                 out.append(
-                    STTResult(text, r.language or "en", [seg] if text else [], words if r.word_timestamps else [])
+                    STTResult(
+                        text,
+                        r.language or "en",
+                        [seg] if text else [],
+                        words if r.word_timestamps else [],
+                        language_probability=None if r.language else 0.97,
+                    )
                 )
             return out
         finally:

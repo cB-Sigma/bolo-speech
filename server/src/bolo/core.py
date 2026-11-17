@@ -89,6 +89,17 @@ from bolo.separate import SeparateOptions, SeparationResult, check_request, is_n
 from bolo.separate import separate as run_separation
 from bolo.store import HubClient, ModelStore
 from bolo.streaming.vad import EnergyVad, FallbackVad, detect_segments, merge_segments
+from bolo.stt_options import (
+    DECODE_SETTINGS,
+    DEFAULT_MAX_REPEATS,
+    ENGINE_OPTIONS,
+    VAD_IGNORED_KEYS,
+    OptionError,
+    drop_repeated_segments,
+    trim_repeats,
+    vad_params,
+)
+from bolo.stt_options import check as check_decode_options
 from bolo.telephony.manager import TelephonyManager
 from bolo.text import langdetect, packs, phonemize
 from bolo.text.phonemize import strip_overrides
@@ -123,6 +134,8 @@ class Transcript:
     model: str = ""
     #: what ``separate_overlaps`` did (the response's ``separation`` object), when it was asked for
     separation: dict[str, Any] | None = None
+    #: how sure the model was of ``language`` when it detected it (0..1), when it says
+    language_probability: float | None = None
 
 
 @dataclass
@@ -834,6 +847,36 @@ class Bolo:
         return self.catalog.add_adhoc(spec)
 
     # ------------------------------------------------------------------
+    # decoding options of speech to text (bolo.stt_options)
+    # ------------------------------------------------------------------
+    def decode_options(self, spec: ModelSpec, given: dict[str, Any] | None = None) -> dict[str, Any]:
+        """The decoding options a request to ``spec`` runs with: ``given`` (the request's), then the values pinned
+        for the model, then its catalog ``options``. A pinned or catalog value that is out of range is left out, with
+        a warning in the log."""
+        out: dict[str, Any] = {}
+        for source, values in (("catalog", spec.options), ("pinned", self.store.model_settings(spec.id))):
+            for key in DECODE_SETTINGS:
+                if values.get(key) is None:
+                    continue
+                try:
+                    _merge_options(out, check_decode_options({key: values[key]}))
+                except OptionError as exc:
+                    log.warning("%s: %s setting %s ignored: %s", spec.id, source, key, exc)
+        _merge_options(out, {k: v for k, v in (given or {}).items() if v is not None})
+        return out
+
+    @staticmethod
+    def _note_ignored(trace: Trace, model_id: str, ignored: list[str]) -> None:
+        """Decoding options the model cannot honour: in the trace (and the x-bolo-ignored-options header)."""
+        if not ignored:
+            trace.extra.pop("ignored_options", None)
+            return
+        trace.extra["ignored_options"] = sorted(set(ignored))
+        log.info(
+            "%s: options ignored (this model does not support them): %s", model_id, ", ".join(sorted(set(ignored)))
+        )
+
+    # ------------------------------------------------------------------
     # fallback
     # ------------------------------------------------------------------
     def fallback_ids(self, spec: ModelSpec) -> list[str]:
@@ -1175,8 +1218,12 @@ class Bolo:
         diarize: DiarizeOptions | None = None,
         separate: SeparateOptions | None = None,
         record: bool = True,
+        options: dict[str, Any] | None = None,
     ) -> Transcript:
         """Transcribe a complete recording. Long audio is split at pauses and decoded in batches.
+
+        ``options`` are decoding options (bolo.stt_options), already checked; the model's pinned and catalog values
+        fill in the ones not given.
 
         ``record=False`` keeps the trace out of the request log (interim decodes of a live utterance).
         When the model has a ``fallback`` list and is unavailable (its engine, an overloaded queue, a cloud
@@ -1192,7 +1239,7 @@ class Bolo:
                     samples, sample_rate, candidate, trace, more,
                     language=language, task=task, prompt=prompt, word_timestamps=word_timestamps,
                     temperature=temperature, hotwords=hotwords, vad_filter=vad_filter, on_segment=on_segment,
-                    diarize=diarize, separate=separate, record=record,
+                    diarize=diarize, separate=separate, record=record, options=options or {},
                 )  # fmt: skip
             except BoloError as exc:
                 if not (more and fallback_worthy(exc)) or trace.status != "running":
@@ -1219,6 +1266,7 @@ class Bolo:
         diarize: DiarizeOptions | None,
         separate: SeparateOptions | None,
         record: bool,
+        options: dict[str, Any],
     ) -> Transcript:
         """One model's attempt. With ``more`` (a fallback is left), an availability error leaves the trace open."""
         handed_on = False
@@ -1256,7 +1304,22 @@ class Bolo:
                             samples = resample(samples, sample_rate, stt.sample_rate)
                     samples = np.ascontiguousarray(samples, dtype=np.float32)
                 sr = stt.sample_rate
+                decode = self.decode_options(spec, options)
+                ignored = [k for k in ENGINE_OPTIONS if k in decode and k not in stt.decode_options]
+                ignored = [k for k in ignored if k != "chunk_length"]  # bolo cuts the audio to it in any case
+                if vad_filter is None:
+                    # vad_parameters given with the request ask for the filter; pinned ones only tune it
+                    vad_filter = decode.get("vad_filter", True if options.get("vad_parameters") else None)
+                vad_given = dict(decode.get("vad_parameters") or {})
+                ignored += [f"vad_parameters.{k}" for k in VAD_IGNORED_KEYS if k in vad_given]
+                max_chunk_s = stt.max_chunk_s
+                if decode.get("chunk_length"):
+                    max_chunk_s = min(max_chunk_s, float(decode["chunk_length"]))
+                engine_options = {k: v for k, v in decode.items() if k in stt.decode_options}
+                max_repeats = int(decode.get("max_repeats", DEFAULT_MAX_REPEATS))
                 if diarize is not None and stt.speaker_conditioned:
+                    ignored += [k for k in decode if k in ENGINE_OPTIONS or k.startswith("vad_")]
+                    self._note_ignored(trace, spec.id, ignored)
                     if separate is not None:
                         raise _conditioned_separation(spec.id)
                     mode = str(spec.options.get("conditioning", "turns"))
@@ -1268,7 +1331,10 @@ class Bolo:
                         temperature=temperature, on_segment=on_segment,
                     )  # fmt: skip
                 else:
-                    use_vad = vad_filter if vad_filter is not None else duration > stt.max_chunk_s
+                    if vad_filter is False and options.get("vad_parameters"):
+                        ignored.append("vad_parameters")
+                    self._note_ignored(trace, spec.id, ignored)
+                    use_vad = vad_filter if vad_filter is not None else duration > max_chunk_s
                     chunks: list[tuple[int, int]]
                     speakers: list[str] | None = None
                     overlapped: list[bool] | None = None
@@ -1291,7 +1357,7 @@ class Bolo:
                         raw = await self._speaker_turns(samples, diarize, trace)
                         overlaps = find_overlaps(raw)
                         diarize.overlaps = overlaps
-                        turns = merge_turns(raw, max_len_s=stt.max_chunk_s, keep_overlap=diarize.keep_overlap)
+                        turns = merge_turns(raw, max_len_s=max_chunk_s, keep_overlap=diarize.keep_overlap)
                         chunks = [(int(t.start * sr), min(len(samples), int(t.end * sr))) for t in turns]
                         speakers = [diarize.label(t.speaker) for t in turns]
                         overlapped = [any(o.start < t.end and o.end > t.start for o in overlaps) for t in turns]
@@ -1300,7 +1366,7 @@ class Bolo:
                         if separate is not None:
                             separation, plan = await self._separated_plan(
                                 samples, sr, raw, overlaps, turns, separate, trace,
-                                narrowband=sample_rate < 16000, max_chunk_s=stt.max_chunk_s,
+                                narrowband=sample_rate < 16000, max_chunk_s=max_chunk_s,
                                 diarization_model=diarize.model,
                             )  # fmt: skip
                             if plan is not None:
@@ -1310,11 +1376,14 @@ class Bolo:
                                 sources = [self._track_audio(separation, c, sr) for c in plan]
                     elif use_vad:
                         with trace.phase("vad"):
-                            detector, _ = await self.vad_detector(
-                                VadParams(min_silence_s=0.3, max_speech_s=stt.max_chunk_s)
-                            )
+                            params = vad_params(VadParams(min_silence_s=0.3, max_speech_s=max_chunk_s), vad_given)
+                            params.max_speech_s = min(params.max_speech_s, max_chunk_s)
+                            detector, _ = await self.vad_detector(params)
                             speech = await asyncio.to_thread(detect_segments, detector, samples)
-                            chunks = merge_segments(speech, len(samples), sample_rate=sr, max_chunk_s=stt.max_chunk_s)
+                            pad = {"pad_s": params.speech_pad_s} if "speech_pad_ms" in vad_given else {}
+                            chunks = merge_segments(
+                                speech, len(samples), sample_rate=sr, max_chunk_s=max_chunk_s, **pad
+                            )
                     elif len(samples) < int(0.05 * sr):
                         chunks = []
                     else:
@@ -1323,7 +1392,8 @@ class Bolo:
                         entry, stt, samples, chunks, trace,
                         language=language, task=task, prompt=prompt, word_timestamps=word_timestamps,
                         temperature=temperature, hotwords=hotwords, on_segment=on_segment, speakers=speakers,
-                        overlapped=overlapped, sources=sources, diarize=native,
+                        overlapped=overlapped, sources=sources, diarize=native, options=engine_options,
+                        max_repeats=max_repeats,
                     )  # fmt: skip
                 transcript.duration = duration
                 transcript.model = spec.id
@@ -1372,11 +1442,14 @@ class Bolo:
         overlapped: list[bool] | None = None,
         sources: list[FloatArray | None] | None = None,
         diarize: bool = False,
+        options: dict[str, Any] | None = None,
+        max_repeats: int = DEFAULT_MAX_REPEATS,
     ) -> Transcript:
         """Decode ``chunks`` (sample ranges of ``samples``). ``sources[i]``, when given, is the audio to decode
         for chunk ``i`` instead of the mixture (a separated track); it is placed at the chunk's start. ``diarize``
         asks a model with native diarization for speaker labels (kept from its segments when ``speakers`` is
-        not given)."""
+        not given). ``options`` go to the model as they are (the ones it honours); ``max_repeats`` is the
+        repetition guard (bolo.stt_options.trim_repeats; 0: off)."""
         sr = stt.sample_rate
 
         def audio(index: int, a: int, b: int) -> FloatArray:
@@ -1388,7 +1461,17 @@ class Bolo:
             asyncio.ensure_future(
                 entry.queue.submit(
                     "batch",
-                    STTRequest(audio(i, a, b), language, task, prompt, word_timestamps, temperature, hotwords, diarize),
+                    STTRequest(
+                        audio(i, a, b),
+                        language,
+                        task,
+                        prompt,
+                        word_timestamps,
+                        temperature,
+                        hotwords,
+                        diarize,
+                        options=dict(options or {}),
+                    ),
                 )
             )
             for i, (a, b) in enumerate(chunks)
@@ -1396,6 +1479,8 @@ class Bolo:
         segments: list[Segment] = []
         words: list[Word] = []
         detected: str | None = language
+        probability: float | None = None
+        trimmed = 0
         first_start: float | None = None
         last_finish = submitted
         usage = Usage()
@@ -1410,10 +1495,23 @@ class Bolo:
                     first_start = info.started
                 last_finish = max(last_finish, info.finished)
                 offset = a / sr
-                detected = detected or result.language
+                if detected is None and result.language:
+                    detected, probability = result.language, result.language_probability
+                elif probability is None and result.language_probability is not None and result.language == detected:
+                    probability = result.language_probability
                 chunk_segments = result.segments or (
                     [Segment(0.0, (_b - a) / sr, result.text, result.words)] if result.text.strip() else []
                 )
+                if max_repeats > 0:
+                    guarded = drop_repeated_segments(chunk_segments, max_repeats)
+                    trimmed += sum(len(s.text.split()) for s in chunk_segments) - sum(
+                        len(s.text.split()) for s in guarded
+                    )
+                    chunk_segments = []
+                    for seg in guarded:
+                        seg, cut = trim_repeats(seg, max_repeats)
+                        trimmed += cut
+                        chunk_segments.append(seg)
                 for seg in chunk_segments:
                     shifted = Segment(
                         seg.start + offset,
@@ -1447,9 +1545,14 @@ class Bolo:
             trace.add_phase("decode", start, last_finish)
             self.traces.observe_latency(entry.id, "stt", queue_ms=(start - submitted) * 1000.0)
         self._note_usage(trace, usage)
+        if trimmed:
+            trace.extra["repeats_trimmed"] = trimmed
+            log.info(
+                "%s: the repetition guard removed %d repeated words (max_repeats=%d)", entry.id, trimmed, max_repeats
+            )
         with trace.phase("finalize"):
             text = " ".join(s.text for s in segments).strip()
-        return Transcript(text, detected, 0.0, segments, words)
+        return Transcript(text, detected, 0.0, segments, words, language_probability=probability)
 
     async def _decode_speakers(
         self,
@@ -2179,9 +2282,19 @@ def wordlist_support() -> bool:
     return uccharan_module() is not None
 
 
+def _merge_options(into: dict[str, Any], values: dict[str, Any]) -> None:
+    """``values`` over ``into``; ``vad_parameters`` are merged key by key."""
+    for key, value in values.items():
+        if key == "vad_parameters" and isinstance(into.get(key), dict):
+            into[key] = {**into[key], **value}
+        else:
+            into[key] = value
+
+
 def fallback_headers(trace: Trace) -> dict[str, str]:
     """Response headers that say which model answered: ``x-bolo-model`` always, ``x-bolo-fallback`` when it was
-    not the one asked for, ``x-bolo-estimated-cost`` when the provider's price table knows the model."""
+    not the one asked for, ``x-bolo-estimated-cost`` when the provider's price table knows the model,
+    ``x-bolo-ignored-options`` when the model could not honour some decoding options."""
     headers = {"x-bolo-model": trace.model}
     cloned = trace.extra.get("voice")
     if isinstance(cloned, dict) and cloned.get("cloned"):
@@ -2200,6 +2313,9 @@ def fallback_headers(trace: Trace) -> dict[str, str]:
     cost = trace.extra.get("cost")
     if isinstance(cost, dict):
         headers["x-bolo-estimated-cost"] = f"{cost.get('amount')} {cost.get('currency')}"
+    ignored = trace.extra.get("ignored_options")
+    if ignored:
+        headers["x-bolo-ignored-options"] = ", ".join(ignored)
     return headers
 
 

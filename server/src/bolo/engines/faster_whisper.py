@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 import re
 from pathlib import Path
@@ -29,10 +30,28 @@ _NO_CUDA = re.compile(
     r"cublas|cudnn|cudart|nvrtc|cannot be loaded|is not found|CUDA driver|no CUDA-capable|compiled with CUDA", re.I
 )
 
+#: decoding options the batched pipeline applies the same way as one-at-a-time decoding; a request with any other
+#: option is decoded on its own
+_BATCHABLE = ("repetition_penalty", "no_repeat_ngram_size")
+
+
+def _temperatures(start: float, increment: float | None) -> float | list[float]:
+    """``temperature``, or with a fallback increment the temperatures faster-whisper retries at when a window fails
+    ``compression_ratio_threshold`` or ``log_prob_threshold`` (as in OpenAI's Whisper: 0.0, 0.2, ... 1.0)."""
+    if not increment:
+        return start
+    steps = round((1.0 - start) / increment) if start < 1.0 else 0
+    return [round(start + i * increment, 4) for i in range(steps + 1)] or [start]
+
 
 class FasterWhisperSTT(STTModel):
     max_chunk_s = 30.0
     supports_word_timestamps = True
+    decode_options = (
+        "condition_on_previous_text", "repetition_penalty", "no_repeat_ngram_size", "compression_ratio_threshold",
+        "log_prob_threshold", "no_speech_threshold", "temperature_increment_on_fallback",
+        "hallucination_silence_threshold", "chunk_length",
+    )  # fmt: skip
 
     def __init__(self, path: Path, spec: dict[str, Any], opts: LoadOptions) -> None:
         from faster_whisper import BatchedInferencePipeline, WhisperModel
@@ -98,23 +117,46 @@ class FasterWhisperSTT(STTModel):
         return lang.split("-")[0].lower() if lang else None
 
     def _one(self, req: STTRequest) -> STTResult:
-        segments, info = self.model.transcribe(
+        opts = req.options
+        model = self.model
+        kwargs: dict[str, Any] = {
+            k: opts[k]
+            for k in (
+                "repetition_penalty", "no_repeat_ngram_size", "compression_ratio_threshold", "log_prob_threshold",
+                "no_speech_threshold", "hallucination_silence_threshold",
+            )
+            if opts.get(k) is not None
+        }  # fmt: skip
+        if opts.get("chunk_length"):
+            # faster-whisper keeps chunk_length on the model's feature extractor (it changes it for every later
+            # call): this request gets its own copy of the model object, which shares the weights
+            model = copy.copy(self.model)
+            model.feature_extractor = copy.copy(self.model.feature_extractor)
+            kwargs["chunk_length"] = int(opts["chunk_length"])
+        # the hallucination check needs word timings; they are computed then, and returned only when asked for
+        timed = req.word_timestamps or opts.get("hallucination_silence_threshold") is not None
+        segments, info = model.transcribe(
             req.samples,
             language=self._language(req),
             task=req.task,
             beam_size=self.beam_size,
-            temperature=req.temperature,
+            temperature=_temperatures(req.temperature, opts.get("temperature_increment_on_fallback")),
             initial_prompt=req.prompt,
             hotwords=req.hotwords,
-            word_timestamps=req.word_timestamps,
-            condition_on_previous_text=False,
+            word_timestamps=timed,
+            condition_on_previous_text=bool(opts.get("condition_on_previous_text", False)),
             vad_filter=False,
-            without_timestamps=not req.word_timestamps,
+            without_timestamps=not timed,
+            **kwargs,
         )
         out: list[Segment] = []
         words: list[Word] = []
         for seg in segments:
-            seg_words = [Word(w.word.strip(), float(w.start), float(w.end)) for w in (seg.words or [])]
+            seg_words = (
+                [Word(w.word.strip(), float(w.start), float(w.end)) for w in (seg.words or [])]
+                if req.word_timestamps
+                else []
+            )
             words.extend(seg_words)
             out.append(
                 Segment(
@@ -122,7 +164,7 @@ class FasterWhisperSTT(STTModel):
                 )
             )
         text = " ".join(s.text for s in out).strip()
-        return STTResult(text, info.language, out, words)
+        return STTResult(text, info.language, out, words, language_probability=_probability(info))
 
     def _batch(self, requests: list[STTRequest], language: str, task: str) -> list[STTResult]:
         """Decode several utterances in one batched CTranslate2 call.
@@ -153,6 +195,7 @@ class FasterWhisperSTT(STTModel):
             temperature=requests[0].temperature,
             initial_prompt=requests[0].prompt,
             hotwords=requests[0].hotwords,
+            **{k: v for k, v in requests[0].options.items() if k in _BATCHABLE and v is not None},
         )
         buckets: list[list[Segment]] = [[] for _ in requests]
         for seg in segments:
@@ -176,20 +219,31 @@ class FasterWhisperSTT(STTModel):
                     seg.no_speech_prob,
                 )
             )
-        return [STTResult(" ".join(s.text for s in b).strip(), info.language, b, []) for b in buckets]
+        return [
+            STTResult(
+                " ".join(s.text for s in b).strip(), info.language, b, [], language_probability=_probability(info)
+            )
+            for b in buckets
+        ]
 
     def transcribe(self, requests: list[STTRequest]) -> list[STTResult]:
         results: list[STTResult | None] = [None] * len(requests)
-        groups: dict[tuple[str, str], list[int]] = {}
+        groups: dict[tuple[str, str, tuple[tuple[str, Any], ...]], list[int]] = {}
         for i, r in enumerate(requests):
             lang = self._language(r)
-            batchable = lang is not None and not r.word_timestamps and len(r.samples) >= self.sample_rate // 2
+            options = tuple(sorted((k, v) for k, v in r.options.items() if v is not None))
+            batchable = (
+                lang is not None
+                and not r.word_timestamps
+                and len(r.samples) >= self.sample_rate // 2
+                and all(k in _BATCHABLE for k, _ in options)
+            )
             if batchable and len(requests) > 1:
                 assert lang is not None
-                groups.setdefault((lang, r.task), []).append(i)
+                groups.setdefault((lang, r.task, options), []).append(i)
             else:
                 results[i] = self._one(r)
-        for (lang, task), idxs in groups.items():
+        for (lang, task, _options), idxs in groups.items():
             if len(idxs) == 1:
                 results[idxs[0]] = self._one(requests[idxs[0]])
                 continue
@@ -200,6 +254,11 @@ class FasterWhisperSTT(STTModel):
     def close(self) -> None:
         del self.batched
         del self.model
+
+
+def _probability(info: Any) -> float | None:
+    value = getattr(info, "language_probability", None)
+    return round(float(value), 4) if value is not None else None
 
 
 class FasterWhisperEngine(Engine):

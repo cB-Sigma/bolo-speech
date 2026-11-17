@@ -35,6 +35,7 @@ import httpx
 
 from bolo import logs
 from bolo.errors import DownloadError, FilesInUse, GatedModel, ModelNotFound
+from bolo.stt_options import DECODE_SETTINGS
 
 log = logging.getLogger("bolo.store")
 
@@ -406,6 +407,7 @@ class ModelStore:
     MODEL_SETTINGS = (
         "phonemizer", "text_normalizer", "wordlists", "fallback", "romanised", "device", "keep_alive",
         "num_parallel", "max_queue", "flash_attention", "kv_cache_type", "context_size", "batch_size",
+        *DECODE_SETTINGS,
     )  # fmt: skip
 
     def model_settings(self, model_id: str | None = None) -> dict[str, Any]:
