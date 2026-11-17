@@ -14,6 +14,12 @@ the catalog. Each has the concrete reason and what would change it.
 | Resemble Enhance ([ResembleAI/resemble-enhance](https://huggingface.co/ResembleAI/resemble-enhance)) | MIT | 713 MB | the `resemble-enhance` package pins torch 2.1.1, deepspeed 0.12.4 and gradio 4.8; the enhancer is a DeepSpeed checkpoint with no ONNX export; over the 500 MB this project tries on its shared test machine. |
 | DeepFilterNet 2 (`models/DeepFilterNet2_onnx.tar.gz` of [Rikorose/DeepFilterNet](https://github.com/Rikorose/DeepFilterNet) 0.5.6) | MIT or Apache-2.0 | 9 MB | the official ONNX export is three graphs (encoder, ERB decoder, deep-filter decoder) that need DeepFilterNet's own STFT, ERB features, normalisation and deep filtering around them (libDF); bolo has none of that. DeepFilterNet 3 is in the catalog (`deepfilternet3`) as torchDF's single streaming graph, which carries all of it. |
 
+## Text-to-speech
+
+| model | licence | size | why it is not in the catalog |
+| --- | --- | --- | --- |
+| MiraTTS on audio.cpp ([YatharthS/MiraTTS](https://huggingface.co/YatharthS/MiraTTS) at `ff750bd7`) | CC-BY-NC-SA-4.0 | 1.6 GB | audio.cpp runs it (`mira_tts` family, experimental there), but only from a GGUF made with audio.cpp's own converter (`tools/community_models/convert_mira_tts.py`, then `audiocpp_gguf --family mira_tts`), and nobody publishes that file: audio.cpp's model repository (`audio-cpp/audio.cpp-gguf`, checked 2026-11-17) has no MiraTTS, and the GGUFs on the Hub (`Mungert/MiraTTS-GGUF`, `mradermacher/MiraTTS-GGUF`, `eugenehp/miratts`) hold only the Qwen2 language model, without the speaker encoder, DAC decoder and upsampler audio.cpp needs. Anyone with the converted folder can still use it: `bolo pull ./dir` with `runtime: audio.cpp`, `family: mira_tts`. A published audio.cpp package would bring it back. |
+
 ## Full-duplex speech-to-speech
 
 The full-duplex models that run are in the catalog (models.md, "Full-duplex models"). These were looked at and are

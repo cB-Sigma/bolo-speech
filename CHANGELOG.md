@@ -357,6 +357,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   final changes; a final that only repeats earlier ones is not sent (an empty `completed` transcript in the Realtime
   API); partials and Realtime deltas are not trimmed. The model's pinned `max_repeats` applies, and Whisper options
   pinned on a model now reach its live decodes as well.
+- Soprano 1.1 80M and Fish Audio Drama 3 on llama.cpp run: `soprano-1.1-80m-llamacpp` and `fish-drama-3-llamacpp`
+  now download ggml-org's conversions for upstream llama.cpp (`ggml-org/Soprano-1.1-80M-GGUF` Q8_0 + F16 mmproj,
+  139 MB; `ggml-org/drama-3-GGUF` Q4_K_M + BF16 mmproj, 23.5 GB), pinned by revision with the files' sha256 checked
+  on download, instead of being `pending`. Soprano was run here through llama-server b12375 on CPU (RTF 1.24 with one
+  thread on a shared machine; its speech transcribed back word for word); Drama 3 was not run (it needs a large GPU).
+  `mira-tts-audiocpp` is no longer in the catalog: audio.cpp needs a GGUF made with its own converter and nobody
+  publishes one (docs/models-unsupported.md). No text-to-speech server entry is `pending` any more.
 
 ### Fixed
 

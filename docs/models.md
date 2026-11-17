@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-431 models: 163 validated on CPU by the maintainers, 268 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
+433 models: 164 validated on CPU by the maintainers, 269 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -524,8 +524,8 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `pocket-tts-it-llamacpp` (Kyutai Pocket TTS (Italian)) | it | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | **CPU** · RTF 0.397 · first audio 1327 ms · round-trip WER 38.9% · cloned voice: speaker similarity 0.38 |
 | `pocket-tts-pt-llamacpp` (Kyutai Pocket TTS (Portuguese)) | pt | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | **CPU** · RTF 0.631 · first audio 2262 ms · round-trip WER 41.7% · cloned voice: speaker similarity 0.32 |
 | `lfm3-audio-2b-llamacpp` (LFM3-Audio 2B) | en, ar, da, de, el, es +12 | accuracy | - | 1.4 GB | LFM Open License v1.0 ⚠ · runs on llama-server · GPU recommended | untested |
-| `soprano-1.1-80m-llamacpp` (Soprano 1.1 80M) | en | balanced | - | 0 MB | Apache-2.0 · runs on llama-server | not yet published |
-| `fish-drama-3-llamacpp` (Fish Audio Drama 3) | - | accuracy | - | 22.5 GB | Fish Audio Community License 1.0 ⚠ · runs on llama-server · GPU required | not yet published |
+| `soprano-1.1-80m-llamacpp` (Soprano 1.1 80M) | en | balanced | - | 146 MB | Apache-2.0 · runs on llama-server | **CPU** · RTF 1.239 · first audio 6024 ms · round-trip WER 0.0% |
+| `fish-drama-3-llamacpp` (Fish Audio Drama 3) | - | accuracy | - | 23.5 GB | Fish Audio Community License 1.0 ⚠ · runs on llama-server · GPU required | untested |
 
 #### External TTS server: audio.cpp
 
@@ -571,7 +571,6 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `echo-tts-audiocpp` (Echo-TTS) | en | accuracy | - | 3.0 GB | CC-BY-NC-SA-4.0 ⚠ · runs on audio.cpp · GPU recommended | untested |
 | `lfm3-audio-2b-audiocpp` (LFM3-Audio 2B) | en, ar, da, de, el, es +12 | accuracy | - | 2.2 GB | LFM Open License v1.0 ⚠ · runs on audio.cpp · GPU recommended | untested |
 | `indextts-2.5-audiocpp` (IndexTTS-2.5) | en, ar, es, ja, zh | accuracy | - | 3.5 GB | bilibili Model Use License ⚠ · runs on audio.cpp · GPU recommended | untested |
-| `mira-tts-audiocpp` (MiraTTS) | en | accuracy | - | 1.6 GB | CC-BY-NC-SA-4.0 ⚠ · runs on audio.cpp · GPU recommended | not yet published |
 
 #### External TTS server: tontaube
 
@@ -1036,7 +1035,6 @@ models below were checked against their model cards and licence files on 2026-11
 | `f5-tts-v1-base` | CC-BY-NC-4.0 weights, MIT code (no) | bolo-torch, `f5-tts` kind with `layout: f5-tts` on the `f5-tts` package (`bolo-torch[f5-original]`); voices are bolo's reference clips or `voices_dir` | catalogued |
 | `indic-speak` | Indic Open Model License v1.0, gated (conditional: hosting it as an API for others needs Bodhan AI's approval, size thresholds, use policy) | bolo-torch, `indic-speak` kind running the repository's own `inference.py` (`bolo-torch[indic-speak]`) | catalogued; the loader follows the model card, the gated code was not read |
 | `indextts-2.5-audiocpp` | bilibili Model Use License (conditional) | tts-server, audio.cpp `index_tts2` family, `IndexTTS2.5-GGUF` q8_0 | catalogued |
-| `mira-tts-audiocpp` | CC-BY-NC-SA-4.0 (no) | tts-server, audio.cpp `mira_tts` family | pending: audio.cpp publishes no package; convert it with audio.cpp's tools and register the folder |
 | `spark-tts-0.5b` | CC-BY-NC-SA-4.0 (no) | none yet: no ggml/ONNX runtime runs the BiCodec decoder, and the reference code is not packaged | catalogued, not runnable (bolo-torch answers "not implemented") |
 | `maskgct` | CC-BY-NC-4.0 (no) | none yet: Amphion's code is not packaged (the PyPI `maskgct` wrapper is a third-party GPL-3.0 project) | catalogued, not runnable |
 | `diarizen-wavlm-large-s80-md-v2` | CC-BY-NC-4.0, PLDA CC-BY-4.0 (no) | none yet: bolo-torch has no DiariZen loader (its inference code is not packaged), and the community ONNX export needs a VBx/PLDA pipeline that sherpa-onnx lacks | catalogued, not runnable |
@@ -2473,7 +2471,7 @@ returns it as `hardware`.
 
 | Runtime | Entries | Licences (commercial use) |
 | --- | --- | --- |
-| llama-server | Chatterbox Multilingual V3 (23 languages incl. **Hindi**), Chatterbox Turbo, Qwen3-TTS 1.7B Base, Pocket TTS (en, de, es, fr, it, pt), LFM3-Audio 2B; *pending*: Soprano 1.1 (no GGUF + mmproj pair published: convert it with llama.cpp's converter), Fish Drama 3 (the only GGUF was made with a llama.cpp branch) | MIT, Apache-2.0, CC-BY-4.0 (yes); LFM Open License (only under USD 10M revenue), Fish Audio Community License (revenue threshold) - marked `commercial_use: false` |
+| llama-server | Chatterbox Multilingual V3 (23 languages incl. **Hindi**), Chatterbox Turbo, Qwen3-TTS 1.7B Base, Pocket TTS (en, de, es, fr, it, pt), LFM3-Audio 2B; Soprano 1.1 80M and Fish Drama 3 (ggml-org's conversions) | MIT, Apache-2.0, CC-BY-4.0 (yes); LFM Open License (only under USD 10M revenue), Fish Audio Community License (revenue threshold) - marked `commercial_use: false` |
 | tontaube | TontaubeV1.1 int4 (GPU or x86-64 CPU) and full precision (vLLM, 24 GiB GPU); en, de first, es, fr, it, nl, pt | Tontaube Community Model License 1.0: free below EUR 200,000 group revenue with "Powered by TontaubeV1", research and testing free, a speech-generation service always needs a commercial licence - marked `commercial_use: false` |
 | audio.cpp | **Hindi**: Chatterbox Multilingual (V3 talker), VoxCPM2, NVIDIA Magpie Multilingual 357M, MOSS-TTS Local v1.5, FireRedTTS3, Kitten TTS 2, Supertonic 3, sanoTTS (Hindi voice), XTTS v2, Voxtral TTS; and CosyVoice3, Maya1, Qwen3-TTS (0.6B Base, 1.7B CustomVoice), Pocket TTS, Soprano 1.1, Chatterbox Turbo, MOSS-TTS Nano, OmniVoice, Fish Audio S2 Pro, Fish Drama 3, Higgs TTS 3, IndexTTS-2, VibeVoice 1.5B, OuteTTS 1.0, NeuTTS 2E, Ming 3.0 TTS, BreezeTTS 2, KugelAudio, ZONOS3-Mini, dots.tts, Irodori-TTS, MioTTS, Gradium Phonon, Audio8 TTS, Confucius4-TTS, Plapre 3, Echo-TTS, LFM3-Audio | per audio.cpp's `docs/model_licenses.md`: MIT, Apache-2.0, CC-BY-4.0, NVIDIA Open Model License, OpenRAIL-M, GPL-3.0 (yes); CC-BY-NC(-SA), Fish, Boson, BreezeBlue, Coqui (no); bilibili, Stellon, NeuTTS, LFM (conditional, marked `false`) |
 

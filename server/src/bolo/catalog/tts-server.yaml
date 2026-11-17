@@ -8,8 +8,8 @@
 # (bolo/samples, made with Kokoro voices), sent to the server as the voice to imitate.
 # Sources, read 2026-11-14: llama.cpp tools/tts/README.md and tools/server/README.md (build b12375); audio.cpp
 # README, app/server/README.md, app/server/api.md, model_specs/*.json and docs/model_licenses.md (v0.9.4); the
-# Hugging Face API for every file (size, revision). validated: untested unless measured. status: pending where the
-# files the runtime needs are not published.
+# Hugging Face API for every file (size, revision). validated: untested unless measured. Every entry's files are
+# published; models whose runtime files nobody publishes are in docs/models-unsupported.md instead.
 - id: chatterbox-multilingual-v3-llamacpp
   task: tts
   engine: tts-server
@@ -469,32 +469,46 @@
   languages: [en]
   tier: balanced
   sample_rate: 32000
-  size_bytes: 0
+  size_bytes: 145742432
   license: Apache-2.0
   license_url: https://huggingface.co/ekwek/Soprano-1.1-80M
   commercial_use: true
   gated: false
   features: []
-  description: 'Soprano 1.1 80M (English, fixed voice) on llama.cpp. Pending: no GGUF + mmproj pair for upstream llama.cpp
-    is published; convert ekwek/Soprano-1.1-80M with llama.cpp''s convert_hf_to_gguf.py (model and --mmproj, including decoder.pth)
-    and register the folder, or use soprano-1.1-80m-audiocpp. Normalised English text only.'
+  description: 'Soprano 1.1 80M (English, fixed voice) as converted by ggml-org (from ekwek/Soprano-1.1-80M at the
+    revision in source_url), on llama.cpp. Normalised English text only: spell out numbers. Small enough for a CPU. Runs
+    in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).'
   source_url: https://huggingface.co/ekwek/Soprano-1.1-80M
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 1.239
+    ttfa_ms: 6024
+    audio_s: 6.08
+    round_trip_wer: 0.0
+    threads: 1
+    engine: llama.cpp b12375 llama-server (upstream release build, CPU), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+    note: 'bolo speak, two English sentences, first request after bolo started the server (the time to first audio
+      includes starting llama-server). Round trip by moonshine-tiny-en: the transcript matched the text word for word.
+      The machine was shared (load average about 15 on 4 vCPU): with 4 threads llama.cpp''s waiting worker threads made
+      it about 50 times slower, so it ran with threads = 1; llama-tts alone with one thread took 3.45 s for 2.62 s of
+      audio.'
   requires: [llama-server]
   source:
-    repo: ekwek/Soprano-1.1-80M
-    revision: 27b5a5f5f541a1db3a51d6fd1b0fc7147b92cd01
-    include: ['*']
+    repo: ggml-org/Soprano-1.1-80M-GGUF
+    revision: 29f9f7b1871033ff9f35aa08cc6c44d2f324809a
+    # LFS sha256 at this revision (checked on download): Q8_0 749b45e4cfec..., mmproj 6ffe378cf5a8...
+    include: [Soprano-1.1-80M-Q8_0.gguf, mmproj-Soprano-1.1-80M-F16.gguf]
   options:
     runtime: llama-server
-    model_file: soprano.gguf
+    model_file: Soprano-1.1-80M-Q8_0.gguf
     cloning: false
     send_language: false
-    hardware: {gpu: optional, vram_gb: 0.5, note: small enough for a CPU}
-    mmproj_file: mmproj-soprano.gguf
+    hardware: {gpu: optional, vram_gb: 0.7, note: small enough for a CPU}
+    mmproj_file: mmproj-Soprano-1.1-80M-F16.gguf
   voices:
   - {id: default, name: Model default, server_voice: ''}
-  status: pending
 - id: fish-drama-3-llamacpp
   task: tts
   engine: tts-server
@@ -503,33 +517,36 @@
   languages: []
   tier: accuracy
   sample_rate: 44100
-  size_bytes: 22484399200
+  size_bytes: 23498697920
   license: Fish Audio Community License 1.0
   license_url: https://huggingface.co/fishaudio/drama-3/blob/main/LICENSE
   commercial_use: false
   gated: false
   features: []
-  description: 'Fish Audio Drama 3 (35 B mixture of experts, 3 B active; speaker tags <|speaker:N|> in the text), the best
-    open model on the Artificial Analysis TTS arena. Licence: Fish Audio Community License (commercial use only under its
-    revenue threshold; treated here as non-commercial). Pending: this GGUF was built with a llama.cpp branch and is not
-    confirmed to load in upstream llama-server; about 22.5 GB, needs a large GPU.'
+  description: 'Fish Audio Drama 3 (35 B mixture of experts, 3 B active; speaker tags <|speaker:0|> to <|speaker:15|> in
+    the text give each character its own voice), as converted by ggml-org (Q4_K_M, from fishaudio/drama-3 at
+    78e5ab79e49a), on llama.cpp. Licence: Fish Audio Community License (research and non-commercial use; commercial use
+    only below its revenue threshold, and never as a hosted text-to-speech service for others without a separate
+    licence; treated here as non-commercial). About 23.5 GB: needs a large GPU, or a lot of RAM and patience with layers
+    on the CPU. Runs in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting
+    tts_servers).'
   source_url: https://huggingface.co/fishaudio/drama-3
   validated: untested
   requires: [llama-server]
   source:
-    repo: EryriLabs/drama-3-llamacpp-GGUF
-    revision: 2dd2bbcda0dc5189e883014bddaf21e457025a09
-    include: [drama-3-q4k-experts-q8-backbone.gguf, drama-3-mmproj-q8_0.gguf]
+    repo: ggml-org/drama-3-GGUF
+    revision: b11e7887a6cca16f1aa06a2555ece8ad38dad37f
+    # LFS sha256 at this revision (checked on download): Q4_K_M 5b727d669a7a..., mmproj c29b9c90cf18...
+    include: [drama-3-Q4_K_M.gguf, mmproj-drama-3-BF16.gguf]
   options:
     runtime: llama-server
-    model_file: drama-3-q4k-experts-q8-backbone.gguf
+    model_file: drama-3-Q4_K_M.gguf
     cloning: false
     send_language: false
-    hardware: {gpu: required, vram_gb: 29.7, note: 'approximate: weights x 1.3 + 0.5 GB'}
-    mmproj_file: drama-3-mmproj-q8_0.gguf
+    hardware: {gpu: required, vram_gb: 31.0, note: 'approximate: weights x 1.3 + 0.5 GB'}
+    mmproj_file: mmproj-drama-3-BF16.gguf
   voices:
   - {id: default, name: Model default, server_voice: ''}
-  status: pending
 - id: chatterbox-multilingual-audiocpp
   task: tts
   engine: tts-server
@@ -2063,46 +2080,6 @@
     send_language: true
     hardware: {gpu: recommended, vram_gb: 5.1, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
     language_option: true
-  voices:
-  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
-  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
-- id: mira-tts-audiocpp
-  task: tts
-  engine: tts-server
-  kind: tts-server
-  family: MiraTTS
-  languages: [en]
-  tier: accuracy
-  sample_rate: 48000
-  size_bytes: 1570670804
-  license: CC-BY-NC-SA-4.0
-  license_url: https://huggingface.co/YatharthS/MiraTTS
-  commercial_use: false
-  gated: false
-  features: [voice-cloning]
-  description: 'MiraTTS (Qwen2 speech-token generator, speaker encoder, DAC decoder and learned upsampler, 48 kHz) on
-    audio.cpp (mira_tts, experimental there). Clones a voice from reference audio; it needs one for every request, so
-    its voices are bolo''s reference clips. Non-commercial, share-alike weights. Pending: audio.cpp publishes no
-    package for it; convert the checkpoint with audio.cpp''s tools/community_models/convert_mira_tts.py and audiocpp_gguf
-    (--family mira_tts, bf16) into a folder holding mira-tts.gguf with config.json and the tokenizer files, and
-    register that folder (bolo pull ./dir).'
-  source_url: https://huggingface.co/YatharthS/MiraTTS
-  validated: untested
-  requires: [audio.cpp]
-  status: pending
-  source:
-    repo: YatharthS/MiraTTS
-    revision: ff750bd74e7b2a2d9313873d583df34a91ed7d8a
-    exclude: ['*.wav', .gitattributes]
-  options:
-    runtime: audio.cpp
-    family: mira_tts
-    model_file: mira-tts.gguf
-    server_model: mira-tts-audiocpp
-    cloning: true
-    send_language: false
-    stream: true
-    hardware: {gpu: recommended, vram_gb: 2.5, note: 'approximate: weights x 1.3 + 0.5 GB; audio.cpp validated it on CUDA'}
   voices:
   - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
   - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
