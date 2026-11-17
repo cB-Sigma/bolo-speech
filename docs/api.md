@@ -254,6 +254,13 @@ of a little bit of ..." for 223 words in each silent window around the real sent
 left only the sentence; with silence removal on (the default for audio longer than `chunk_length`) the answer was the
 sentence alone, at a `language_probability` of 0.99 instead of 0.31.
 
+The same with whisper.cpp (`ggml-tiny.bin`, CPU): the `en-short` sentence said eight times over (24 s, 88 words),
+sent with `vad_filter=false`, `temperature_increment_on_fallback=0` and the guard off, came back as 175 words: two
+copies of the sentence, then "Good morning." about sixty times, in a segment that ended at 40 s, after the end of the
+audio. With the guard at its default the same output is 47 words. whisper.cpp's own fallback default (0.2) gave 66
+words with no loop on that clip, but took longer: on a shared four-core machine both decodes took 11 to 16 minutes
+for the 24 s, where faster-whisper took about 1.5 s.
+
 From the OpenAI SDK:
 
 ```python
