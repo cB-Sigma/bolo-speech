@@ -148,7 +148,7 @@ WebSocket subprotocols `realtime` and `openai-insecure-api-key.<key>`.
 
 | Client event | Behaviour |
 | --- | --- |
-| `session.update` | `type` (`realtime` \| `transcription`), `instructions`, `output_modalities` (`["audio"]` or `["text"]`), `audio.input.format` / `audio.output.format` (`audio/pcm` at 24 kHz, `audio/pcmu`, `audio/pcma`), `audio.input.transcription` (`model`, `language`, `prompt`), `audio.input.turn_detection` (`server_vad` with `threshold`, `silence_duration_ms`, `prefix_padding_ms`, `create_response`, `interrupt_response`; `semantic_vad` with `eagerness`, see below; or `null`), `audio.output.voice`, `audio.output.speed`, `tools` (functions), `tool_choice`, `max_output_tokens` |
+| `session.update` | `type` (`realtime` \| `transcription`), `instructions`, `output_modalities` (`["audio"]` or `["text"]`), `audio.input.format` / `audio.output.format` (`audio/pcm` at 24 kHz, `audio/pcmu`, `audio/pcma`), `audio.input.transcription` (`model`, `language`, `prompt`), `audio.input.noise_reduction` (`{"type": "near_field"}` or `"far_field"`: the default denoiser before transcription; `null`: the server's default; see below), `audio.input.denoise` (bolo extension: `true`, `false`, a strength between 0 and 1, a model id, or `{"model", "strength"}`; wins over `noise_reduction`), `audio.input.turn_detection` (`server_vad` with `threshold`, `silence_duration_ms`, `prefix_padding_ms`, `create_response`, `interrupt_response`; `semantic_vad` with `eagerness`, see below; or `null`), `audio.output.voice`, `audio.output.speed`, `tools` (functions), `tool_choice`, `max_output_tokens` |
 | `input_audio_buffer.append` / `.commit` / `.clear` | base64 audio in the session's input format; manual commit when turn detection is off |
 | `conversation.item.create` | user/assistant/system messages (`input_text`, `input_audio` with base64 audio that is transcribed, `output_text`), `function_call`, `function_call_output` |
 | `conversation.item.delete` / `.retrieve` / `.truncate` | `truncate` cuts an assistant message's transcript to the sentences that had started playing before `audio_end_ms`, so the model does not "remember" words the user never heard |
@@ -465,7 +465,10 @@ WebSocket transport with `audio/pcmu` still works as before
 ### What is different from OpenAI, or missing
 
 * A cascade by default; speech-to-speech only through an opt-in pipeline
-  (above). No emotional prosody control, no noise reduction. `semantic_vad` is an acoustic end-of-turn model added to
+  (above). No emotional prosody control. `noise_reduction` runs bolo's denoiser (GTCRN by default) over each
+  user turn before bolo's recogniser hears it; `near_field` and `far_field` are treated alike, the voice-activity
+  detector and turn detection hear the original audio, and an audio-in or speech-to-speech model gets the original
+  audio too. It can make transcripts worse on clean audio (configuration.md, "Denoising"). `semantic_vad` is an acoustic end-of-turn model added to
   silence detection (above), not OpenAI's.
 * Input transcription events are always sent (bolo has to transcribe anyway).
 * Not implemented: OpenAI's SIP connector (bolo has its own telephony, [telephony.md](telephony.md)), MCP tools, image input, `prompt`

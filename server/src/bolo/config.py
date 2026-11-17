@@ -42,6 +42,13 @@ class Settings:
     api_key: str | None = None
     cors_origins: list[str] = field(default_factory=list)
     ui: bool = True
+    #: serve the web console on a port of its own, so the API port can be exposed alone (behind a firewall, a
+    #: proxy): the API stays on ``port`` and no longer serves the console. Unset: both on ``port``; 0: no console
+    console_port: int | None = None
+    console_host: str | None = None  # where the console's port listens; unset: ``host``
+    #: the API address the console calls when it has a port of its own (for a proxy or TLS in front of the API);
+    #: unset: the host the browser loaded the console from, at ``port``
+    console_api_url: str | None = None
     cross_origin_isolation: bool = True  # COOP/COEP on the console so in-browser WebAssembly can use threads
     max_upload_mb: int = 200
     #: who turns text into phonemes for Piper, Kitten, Matcha and Kokoro voices: "auto" (uccharan where it covers
@@ -93,6 +100,12 @@ class Settings:
     separation_sample_max_s: float = 10.0
     #: give up separating after this many seconds per request; what was not separated is transcribed as before
     separation_timeout_s: float = 300.0
+    #: speech-enhancement model used when transcription asks for ``denoise`` without naming one
+    default_denoise: str = "gtcrn-simple"
+    #: denoise audio before speech recognition unless a request, a model pin or the catalog says otherwise: "off",
+    #: "on", a strength between 0 and 1 (the denoised audio mixed with the original) or a denoise model id.
+    #: Off by default: denoising can hurt clean audio and recognisers trained on noisy data (docs/configuration.md)
+    denoise: str = "off"
     #: end-of-turn model used by Realtime sessions that ask for turn_detection.type = "semantic_vad"
     default_turn: str = "smart-turn-v3"
     preload: list[str] = field(default_factory=list)
@@ -258,6 +271,14 @@ class Settings:
     #: OTEL_* variables (bolo.obs.otel)
     otel: bool | None = None
     fake_engine: bool = False
+
+    def console_mode(self) -> str:
+        """Where the web console is served: "same" (on the API's port), "separate" (on ``console_port``) or "off"."""
+        if not self.ui or self.console_port == 0:
+            return "off"
+        if self.console_port is None or (self.console_port == self.port and self.console_host in (None, self.host)):
+            return "same"
+        return "separate"
 
     def resolved_threads(self) -> int:
         if self.threads > 0:
@@ -570,4 +591,13 @@ def load_settings(
         raise ValueError("log_max_mb must be >= 1 and log_backups >= 0")
     if settings.max_batch < 1:
         raise ValueError("max_batch must be >= 1")
+    if settings.console_port is not None and not 0 <= settings.console_port <= 65535:
+        raise ValueError(f"console_port must be between 0 and 65535, got {settings.console_port}")
+    from bolo.denoise import parse_denoise
+    from bolo.errors import BoloError
+
+    try:
+        parse_denoise(settings.denoise)
+    except BoloError as exc:
+        raise ValueError(exc.message) from exc
     return settings

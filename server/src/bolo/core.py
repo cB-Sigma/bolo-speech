@@ -31,6 +31,8 @@ from bolo.audio.resample import resample
 from bolo.catalog import Catalog, ModelSpec
 from bolo.components import ComponentManager
 from bolo.config import Settings
+from bolo.denoise import DenoiseOptions, parse_denoise
+from bolo.denoise import apply as apply_denoise
 from bolo.diarize import (
     CONDITIONING,
     DiarizeOptions,
@@ -460,6 +462,7 @@ class Bolo:
                 ],
             },
             "separation": self._separation_capability(),
+            "denoise": self._denoise_capability(),
             "voices": {
                 "endpoint": "/api/v1/voices",
                 "openai": ["/v1/audio/voices", "/v1/audio/voice_consents"],
@@ -537,6 +540,25 @@ class Bolo:
             "min_sample_rate": 16000,
             "context_s": s.separation_context_s,
             "min_overlap_s": s.separation_min_overlap_s,
+        }
+
+    def _denoise_capability(self) -> dict[str, Any]:
+        s = self.settings
+        spec = self.catalog.resolve(s.default_denoise)
+        installed = bool(spec and self.manager.is_installed(spec))
+        engine_ok = bool(spec and self.engines.status(spec.engine).available)
+        try:
+            default = parse_denoise(s.denoise)
+        except BoloError:
+            default = None
+        return {
+            "available": bool(spec) and engine_ok and (installed or s.auto_pull),
+            "installed": installed,
+            "default_model": spec.id if spec else None,
+            "http": {"transcriptions": "denoise=true | <strength 0-1> | <model>", "translations": "denoise=..."},
+            "realtime": "session.audio.input.noise_reduction or session.audio.input.denoise",
+            "default_on": bool(default and default.enabled),
+            "setting": s.denoise,
         }
 
     def note_separation(self, result: SeparationResult) -> None:
@@ -788,6 +810,7 @@ class Bolo:
                 "diarization": s.default_diarization,
                 "turn": s.default_turn,
                 "separation": s.default_separation,
+                "denoise": s.default_denoise,
             }
             name = defaults[task]
         elif name == "realtime":
@@ -1200,6 +1223,40 @@ class Bolo:
     # ------------------------------------------------------------------
     # speech to text
     # ------------------------------------------------------------------
+    def denoise_plan(self, spec: ModelSpec, requested: DenoiseOptions | None) -> DenoiseOptions | None:
+        """The denoiser to run before ``spec`` hears the audio (model resolved), or None.
+
+        The request decides when it says anything; then the model's pin, its catalog option ``denoise`` and the
+        ``denoise`` setting. An unknown model in the request is an error; in a pin or a setting it is logged and
+        denoising is skipped, so that a stale default never fails requests."""
+        opts, source = requested, "request"
+        if opts is None:
+            sources = (
+                ("model pin", self.store.model_settings(spec.id).get("denoise")),
+                ("catalog", spec.options.get("denoise")),
+                ("setting", self.settings.denoise),
+            )
+            for source, raw in sources:
+                try:
+                    opts = parse_denoise(raw)
+                except BoloError as exc:
+                    log.warning("ignoring the denoise %s of '%s': %s", source, spec.id, exc.message)
+                    continue
+                if opts is not None:
+                    break
+        if opts is None or not opts.enabled or opts.strength <= 0:
+            return None
+        try:
+            model = self.resolve(opts.model, "denoise")
+        except BoloError as exc:
+            if source == "request":
+                if exc.param in (None, "model"):
+                    exc.param = "denoise"
+                raise
+            log.warning("denoising skipped for '%s' (%s): %s", spec.id, source, exc.message)
+            return None
+        return DenoiseOptions(model=model.id, strength=opts.strength)
+
     async def transcribe(
         self,
         samples: FloatArray,
@@ -1217,6 +1274,7 @@ class Bolo:
         on_segment: Callable[[Segment], Awaitable[None]] | None = None,
         diarize: DiarizeOptions | None = None,
         separate: SeparateOptions | None = None,
+        denoise: DenoiseOptions | None = None,
         record: bool = True,
         options: dict[str, Any] | None = None,
     ) -> Transcript:
@@ -1224,6 +1282,8 @@ class Bolo:
 
         ``options`` are decoding options (bolo.stt_options), already checked; the model's pinned and catalog values
         fill in the ones not given.
+        ``denoise`` (bolo.denoise) asks for noise suppression before recognition; None leaves it to the model's pin,
+        its catalog entry and the ``denoise`` setting.
 
         ``record=False`` keeps the trace out of the request log (interim decodes of a live utterance).
         When the model has a ``fallback`` list and is unavailable (its engine, an overloaded queue, a cloud
@@ -1239,7 +1299,7 @@ class Bolo:
                     samples, sample_rate, candidate, trace, more,
                     language=language, task=task, prompt=prompt, word_timestamps=word_timestamps,
                     temperature=temperature, hotwords=hotwords, vad_filter=vad_filter, on_segment=on_segment,
-                    diarize=diarize, separate=separate, record=record, options=options or {},
+                    diarize=diarize, separate=separate, denoise=denoise, record=record, options=options or {},
                 )  # fmt: skip
             except BoloError as exc:
                 if not (more and fallback_worthy(exc)) or trace.status != "running":
@@ -1265,6 +1325,7 @@ class Bolo:
         on_segment: Callable[[Segment], Awaitable[None]] | None,
         diarize: DiarizeOptions | None,
         separate: SeparateOptions | None,
+        denoise: DenoiseOptions | None,
         record: bool,
         options: dict[str, Any],
     ) -> Transcript:
@@ -1286,6 +1347,7 @@ class Bolo:
                     raise _conditioned_separation(spec.id)
                 check_request(sample_rate, separate)
                 self.resolve(separate.model, "separation")
+            cleanup = self.denoise_plan(spec, denoise)
             if diarize is not None and conditioned and not diarize.model and spec.options.get("diarization_model"):
                 # a speaker-conditioned model brings the diarizer it works best with, unless the request names one
                 diarize.model = str(spec.options["diarization_model"])
@@ -1304,6 +1366,8 @@ class Bolo:
                             samples = resample(samples, sample_rate, stt.sample_rate)
                     samples = np.ascontiguousarray(samples, dtype=np.float32)
                 sr = stt.sample_rate
+                if cleanup is not None:
+                    samples = await apply_denoise(self, samples, sr, cleanup, trace)
                 decode = self.decode_options(spec, options)
                 ignored = [k for k in ENGINE_OPTIONS if k in decode and k not in stt.decode_options]
                 ignored = [k for k in ignored if k != "chunk_length"]  # bolo cuts the audio to it in any case
@@ -2310,6 +2374,15 @@ def fallback_headers(trace: Trace) -> dict[str, str]:
     if isinstance(record, dict) and record.get("attempts"):
         first = record["attempts"][0]
         headers["x-bolo-fallback"] = f"{record['requested']} -> {trace.model}; reason={first.get('code')}"
+    cleanup = trace.extra.get("denoise")
+    if isinstance(cleanup, dict) and cleanup.get("model"):
+        if cleanup.get("status") == "skipped":
+            headers["x-bolo-denoise"] = f"skipped; model={cleanup['model']}"
+        else:
+            strength = float(cleanup.get("strength", 1.0))
+            headers["x-bolo-denoise"] = (
+                str(cleanup["model"]) if strength >= 1.0 else f"{cleanup['model']}; strength={strength:g}"
+            )
     cost = trace.extra.get("cost")
     if isinstance(cost, dict):
         headers["x-bolo-estimated-cost"] = f"{cost.get('amount')} {cost.get('currency')}"

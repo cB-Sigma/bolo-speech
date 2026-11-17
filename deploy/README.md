@@ -43,6 +43,25 @@ running container from the console or with
 environment must be writable; the change is lost when the container is
 replaced). See `docs/models.md` for which voices need it.
 
+## The console on its own port
+
+By default one port serves the API and the web console. To expose only the API (a firewall rule, a port mapping, a
+proxy) and keep the console private, give the console a port of its own:
+
+```bash
+bolo serve --host 0.0.0.0 --port 8000 --console-port 8001 --console-host 127.0.0.1 --api-key "$KEY"
+# or BOLO_CONSOLE_PORT=8001 BOLO_CONSOLE_HOST=127.0.0.1, or console_port = 8001 in bolo.toml
+```
+
+Port 8000 then answers the API only (`/` is a 404 there); port 8001 serves only the console (its `/api/...` paths
+are 404s that point at the API). The console page is told to call the API at its own host name on port 8000, and
+the API accepts cross-origin requests from the console's origin (any host name at port 8001; only `localhost`,
+`127.0.0.1` and `[::1]` when the console listens on loopback), so nothing else needs configuring. Behind a proxy or
+TLS, tell the console where the API is with `--console-api-url https://speech.example.com` (`BOLO_CONSOLE_API_URL`);
+if the console is then served from an origin other than port 8001, add it with `--cors-origin`. The console still
+needs the API key to do anything (it asks for it, and keeps it in the browser). `--console-port 0` or `--no-console`
+serves no console at all. In Docker, publish only the port you want reachable (`-p 8000:8000`).
+
 For voice agents (`/v1/realtime` conversations, audio in `/v1/chat/completions`)
 point bolo at a language model: `BOLO_LLM_BASE_URL=http://ollama:11434/v1` and
 `BOLO_LLM_MODEL=llama3.2`. See `docs/voice-agents.md`.

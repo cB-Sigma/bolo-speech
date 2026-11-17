@@ -1,0 +1,168 @@
+{
+ "what": "Word error rate of two recognisers on the repository's two English samples (en-short, en-long; 47 words) with noise added, transcribed with denoise off, with gtcrn-simple at full strength and at strength 0.5",
+ "date": "2026-11-17",
+ "hardware": "4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 4-17)",
+ "threads": 2,
+ "software": {
+  "sherpa-onnx": "2.0.1",
+  "denoiser": "gtcrn-simple (gtcrn_simple.onnx, 16 kHz)"
+ },
+ "noise": "white and pink noise (generated, seed 7), applause and a train (LibreOffice gallery sounds, 11.025 kHz, looped and resampled to 16 kHz), mixed at 10, 5 and 0 dB SNR over the whole clip",
+ "normalisation": "lower case, punctuation removed; WER over both clips together (jiwer)",
+ "denoiser_rtf": {
+  "value": [
+   0.06,
+   0.13
+  ],
+  "note": "seconds of CPU per second of audio, one thread, 71 s of speech; 0.06 at light load, 0.12 to 0.13 with the machine's load average at 17"
+ },
+ "results": {
+  "moonshine-v2-tiny-en": {
+   "clean": {
+    "off": 0.064,
+    "gtcrn": 0.021,
+    "gtcrn@0.5": 0.064
+   },
+   "white@10dB": {
+    "off": 0.17,
+    "gtcrn": 0.128,
+    "gtcrn@0.5": 0.064
+   },
+   "white@5dB": {
+    "off": 0.489,
+    "gtcrn": 0.277,
+    "gtcrn@0.5": 0.298
+   },
+   "white@0dB": {
+    "off": 0.596,
+    "gtcrn": 0.723,
+    "gtcrn@0.5": 0.617
+   },
+   "pink@10dB": {
+    "off": 0.043,
+    "gtcrn": 0.021,
+    "gtcrn@0.5": 0.085
+   },
+   "pink@5dB": {
+    "off": 0.085,
+    "gtcrn": 0.106,
+    "gtcrn@0.5": 0.128
+   },
+   "pink@0dB": {
+    "off": 0.596,
+    "gtcrn": 0.553,
+    "gtcrn@0.5": 0.34
+   },
+   "applause@10dB": {
+    "off": 0.191,
+    "gtcrn": 0.085,
+    "gtcrn@0.5": 0.085
+   },
+   "applause@5dB": {
+    "off": 0.319,
+    "gtcrn": 0.149,
+    "gtcrn@0.5": 0.106
+   },
+   "applause@0dB": {
+    "off": 0.468,
+    "gtcrn": 0.191,
+    "gtcrn@0.5": 0.383
+   },
+   "train@10dB": {
+    "off": 0.085,
+    "gtcrn": 0.021,
+    "gtcrn@0.5": 0.064
+   },
+   "train@5dB": {
+    "off": 0.298,
+    "gtcrn": 0.128,
+    "gtcrn@0.5": 0.17
+   },
+   "train@0dB": {
+    "off": 0.468,
+    "gtcrn": 0.426,
+    "gtcrn@0.5": 0.404
+   }
+  },
+  "whisper-base": {
+   "clean": {
+    "off": 0.0,
+    "gtcrn": 0.0,
+    "gtcrn@0.5": 0.0
+   },
+   "white@10dB": {
+    "off": 0.064,
+    "gtcrn": 0.149,
+    "gtcrn@0.5": 0.043
+   },
+   "white@5dB": {
+    "off": 0.17,
+    "gtcrn": 0.766,
+    "gtcrn@0.5": 0.255
+   },
+   "white@0dB": {
+    "off": 0.766,
+    "gtcrn": 0.872,
+    "gtcrn@0.5": 0.404
+   },
+   "pink@10dB": {
+    "off": 0.0,
+    "gtcrn": 0.085,
+    "gtcrn@0.5": 0.021
+   },
+   "pink@5dB": {
+    "off": 0.043,
+    "gtcrn": 0.234,
+    "gtcrn@0.5": 0.085
+   },
+   "pink@0dB": {
+    "off": 0.426,
+    "gtcrn": 0.511,
+    "gtcrn@0.5": 0.255
+   },
+   "applause@10dB": {
+    "off": 0.021,
+    "gtcrn": 0.043,
+    "gtcrn@0.5": 0.0
+   },
+   "applause@5dB": {
+    "off": 0.043,
+    "gtcrn": 0.085,
+    "gtcrn@0.5": 0.043
+   },
+   "applause@0dB": {
+    "off": 0.085,
+    "gtcrn": 0.106,
+    "gtcrn@0.5": 0.085
+   },
+   "train@10dB": {
+    "off": 0.043,
+    "gtcrn": 0.043,
+    "gtcrn@0.5": 0.021
+   },
+   "train@5dB": {
+    "off": 0.064,
+    "gtcrn": 0.085,
+    "gtcrn@0.5": 0.064
+   },
+   "train@0dB": {
+    "off": 0.128,
+    "gtcrn": 0.234,
+    "gtcrn@0.5": 0.128
+   }
+  }
+ },
+ "mean_over_noisy_conditions": {
+  "moonshine-v2-tiny-en": {
+   "off": 0.317,
+   "gtcrn": 0.234,
+   "gtcrn@0.5": 0.229
+  },
+  "whisper-base": {
+   "off": 0.154,
+   "gtcrn": 0.268,
+   "gtcrn@0.5": 0.117
+  }
+ },
+ "caveat": "47 words of synthetic (Kokoro) speech: a direction, not a benchmark. The noisy conditions are artificial mixes."
+}

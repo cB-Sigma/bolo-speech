@@ -220,7 +220,7 @@ written by `server/tools/gen_docs.py` from the catalog, with the heuristic
 speed factor (no benchmark) and every engine taken as installed:
 
 <!-- BEGIN GENERATED: example-machines -->
-**The reference machine: 4 x86-64 cores with AVX-512 and AMX, 16 GB, no GPU** (speed factor 1.00; of 373 entries: 204 comfortable, 62 usable, 60 slow, 19 unlikely to fit, 22 cloud, 6 not available yet)
+**The reference machine: 4 x86-64 cores with AVX-512 and AMX, 16 GB, no GPU** (speed factor 1.00; of 374 entries: 205 comfortable, 62 usable, 60 slow, 19 unlikely to fit, 22 cloud, 6 not available yet)
 
 | For | Default pick | Fit | Expected RTF (range) | Basis |
 | --- | --- | --- | --- | --- |
@@ -231,7 +231,7 @@ speed factor (no benchmark) and every engine taken as installed:
 | Text to speech, Hindi, voice-over | `kokoro-v1.0` | usable | 0.76 (0.38 to 1.52) | measured, scaled |
 | Speaker diarization | `nemotron-3-diarization` | comfortable | 0.039 (0.019 to 0.078) | measured, scaled |
 
-**A small board: 4 ARM cores with NEON only, 4 GB (Raspberry Pi 4 class)** (speed factor 0.30; of 373 entries: 80 comfortable, 107 usable, 99 slow, 59 unlikely to fit, 22 cloud, 6 not available yet)
+**A small board: 4 ARM cores with NEON only, 4 GB (Raspberry Pi 4 class)** (speed factor 0.30; of 374 entries: 81 comfortable, 107 usable, 99 slow, 59 unlikely to fit, 22 cloud, 6 not available yet)
 
 | For | Default pick | Fit | Expected RTF (range) | Basis |
 | --- | --- | --- | --- | --- |
@@ -242,7 +242,7 @@ speed factor (no benchmark) and every engine taken as installed:
 | Text to speech, Hindi, voice-over | `piper-hi-in-rohan-medium` | comfortable | 0.31 (0.15 to 0.61) | measured, scaled |
 | Speaker diarization | `nemotron-3-diarization` | comfortable | 0.13 (0.065 to 0.26) | measured, scaled |
 
-**A container: 1.5 cores of an AVX2 server, 2 GB memory limit** (speed factor 0.32; of 373 entries: 96 comfortable, 96 usable, 72 slow, 81 unlikely to fit, 22 cloud, 6 not available yet)
+**A container: 1.5 cores of an AVX2 server, 2 GB memory limit** (speed factor 0.32; of 374 entries: 97 comfortable, 96 usable, 72 slow, 81 unlikely to fit, 22 cloud, 6 not available yet)
 
 | For | Default pick | Fit | Expected RTF (range) | Basis |
 | --- | --- | --- | --- | --- |
@@ -253,7 +253,7 @@ speed factor (no benchmark) and every engine taken as installed:
 | Text to speech, Hindi, voice-over | `piper-hi-in-rohan-medium` | comfortable | 0.29 (0.14 to 0.58) | measured, scaled |
 | Speaker diarization | `nemotron-3-diarization` | comfortable | 0.12 (0.061 to 0.24) | measured, scaled |
 
-**A workstation: 16 AVX2 cores, 64 GB, an NVIDIA GPU with 24 GB, `device = "cuda"`** (speed factor 0.70; of 373 entries: 200 comfortable, 144 usable, 1 unlikely to fit, 22 cloud, 6 not available yet)
+**A workstation: 16 AVX2 cores, 64 GB, an NVIDIA GPU with 24 GB, `device = "cuda"`** (speed factor 0.70; of 374 entries: 201 comfortable, 144 usable, 1 unlikely to fit, 22 cloud, 6 not available yet)
 
 | For | Default pick | Fit | Expected RTF (range) | Basis |
 | --- | --- | --- | --- | --- |

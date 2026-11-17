@@ -1,0 +1,42 @@
+# Speech enhancement (task: denoise), used by the `denoise` option of transcription and Realtime sessions.
+
+- id: gtcrn-simple
+  aliases: [gtcrn]
+  task: denoise
+  engine: sherpa-onnx
+  kind: gtcrn
+  family: GTCRN
+  languages: []
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 535638
+  params: 48200
+  license: MIT
+  license_url: https://github.com/Xiaobin-Rong/gtcrn/blob/main/LICENSE
+  description: 'Noise suppression with GTCRN (grouped temporal convolutional recurrent network, ICASSP 2024), a
+    0.5 MB single-graph model that runs in sherpa-onnx at 16 kHz, far faster than real time on one CPU thread.
+    Trained by its authors on public noisy-speech sets (DNS Challenge, VCTK-DEMAND); it removes steady and slowly
+    varying background noise. It also removes parts of speech: in our test it helped Moonshine and hurt Whisper,
+    so it is opt-in and best tried at a strength below 1 first (docs/models.md, "Denoising").'
+  source_url: https://github.com/Xiaobin-Rong/gtcrn
+  validated: cpu
+  measured:
+    rtf: 0.06
+    rtf_note: seconds of CPU per second of audio on one thread at light load; 0.12 to 0.13 with the load average at 17
+    wer_note: 'mean WER over 12 noisy mixes, moonshine-v2-tiny-en: 0.317 off, 0.234 on; whisper-base: 0.154 off, 0.268
+      on, 0.117 at strength 0.5'
+    audio_s: 14.8
+    threads: 1
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 4-17)
+    date: '2026-11-17'
+    test_audio: bolo's en-short and en-long samples with white, pink, applause and train noise at 10, 5 and 0 dB SNR
+      (docs/measurements/denoise.json)
+  source:
+    urls:
+    - path: gtcrn_simple.onnx
+      url: https://github.com/k2-fsa/sherpa-onnx/releases/download/speech-enhancement-models/gtcrn_simple.onnx
+      size: 535638
+      sha256: e77603ac0c23dac3227dd2d7135b3a585cbee2679048aecfa886657d3ae1b534
+  options:
+    model: gtcrn_simple.onnx

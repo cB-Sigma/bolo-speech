@@ -432,6 +432,16 @@ class SeparationModel(Model):
         raise NotImplementedError(f"{type(self).__name__} is a {self.mode} separator")
 
 
+class DenoiseModel(Model):
+    """Speech enhancement: noise removed from a recording, voice kept. Audio in and out at ``sample_rate``."""
+
+    task = "denoise"
+
+    @abc.abstractmethod
+    def denoise(self, samples: FloatArray) -> FloatArray:
+        """The enhanced recording (mono float32 at ``sample_rate``), as long as the input."""
+
+
 class TurnModel(Model):
     """End-of-turn detection: has the speaker finished, or only paused?"""
 

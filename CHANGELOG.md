@@ -92,6 +92,20 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - The same options as per-model defaults: catalog `options`, or pinned with `PUT /api/v1/models/{id}/settings`
   and `bolo models config <id> --set key=value`. The request wins over the pin, the pin over the catalog.
 - `verbose_json` has `language_probability` when the model detected the language (faster-whisper).
+- Denoising before speech recognition: `denoise` on `POST /v1/audio/transcriptions` and `/v1/audio/translations`
+  (`true`, `false`, a strength between 0 and 1 that mixes the denoised audio with the original, or a model id;
+  `denoise_strength`), on Realtime sessions (OpenAI's `audio.input.noise_reduction`, and bolo's
+  `audio.input.denoise`), as a pin per model (`bolo models config <id> --set denoise=0.5`,
+  `PUT /api/v1/models/{id}/settings`) and as a server setting (`denoise`, off by default; `default_denoise`). The
+  model runs at its own sample rate; the response header `x-bolo-denoise` says what ran, and a denoiser that cannot
+  run is skipped with a warning. New catalog task `denoise` with `gtcrn-simple` (GTCRN, MIT, 0.5 MB, sherpa-onnx, RTF
+  about 0.06 on one CPU thread). It is opt-in because it can hurt: on noisy mixes of the repository's samples it
+  lowered `moonshine-v2-tiny-en`'s word error rate from 31.7% to 23.4% and raised `whisper-base`'s from 15.4% to
+  26.8% (11.7% at strength 0.5); docs/models.md, "Denoising".
+- `bolo serve --console-port N` (`console_port`, `BOLO_CONSOLE_PORT`) serves the web console on a port of its own
+  while the API keeps `--port`, so the API can be exposed alone; `--console-host` and `--console-api-url` set where
+  the console listens and which API address it calls. The API accepts the console's cross-origin requests by
+  itself. `--console-port 0` or `--no-console` serves no console. The default is unchanged: both on one port.
 
 ## [0.6.6] - 2026-11-17
 

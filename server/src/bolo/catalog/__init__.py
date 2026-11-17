@@ -18,7 +18,7 @@ import yaml
 
 from bolo.store import Source
 
-TASKS = ("stt", "tts", "vad", "diarization", "turn", "translation", "separation")
+TASKS = ("stt", "tts", "vad", "diarization", "turn", "translation", "separation", "denoise")
 TIERS = ("realtime", "balanced", "accuracy")
 VALIDATED = ("cpu", "untested")
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
@@ -288,6 +288,16 @@ FAKE_MODELS: list[dict[str, Any]] = [
         "family": "Fake", "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
         "options": {"mode": "blind"},
         "description": "Test blind separator: one track per strong tone. Not real speech separation.",
+    },
+    {
+        "id": "fake-denoise", "task": "denoise", "engine": "fake", "kind": "fake-denoise", "family": "Fake",
+        "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
+        "description": "Test denoiser: removes frequency bins weaker than a few times the median. Not real enhancement.",
+    },
+    {
+        "id": "fake-denoise-48k", "task": "denoise", "engine": "fake", "kind": "fake-denoise", "family": "Fake",
+        "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True, "options": {"sample_rate": 48000},
+        "description": "Test denoiser that works at 48 kHz, like full-band enhancement models.",
     },
     {
         "id": "fake-turn", "task": "turn", "engine": "fake", "kind": "fake-turn", "family": "Fake", "languages": [],

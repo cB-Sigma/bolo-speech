@@ -23,6 +23,7 @@ import numpy as np
 
 from bolo import __version__
 from bolo.engines.base import (
+    DenoiseModel,
     DiarizationModel,
     DiarizationResult,
     Engine,
@@ -500,13 +501,39 @@ class FakeTurn(TurnModel):
         return 0.95 if sound_s >= self.min_complete_s else 0.05
 
 
+class FakeDenoiser(DenoiseModel):
+    """Spectral gate: frequency bins weaker than a few times the median are removed (tests only).
+
+    Steady tones survive and broadband noise mostly goes, which is enough to see that the audio was changed.
+    Remembers the length and rate of every call."""
+
+    def __init__(self, opts: dict[str, Any]) -> None:
+        self.sample_rate = int(opts.get("sample_rate", 16000))
+        self.gate = float(opts.get("gate", 4.0))
+        self.fail = bool(opts.get("fail", False))
+        self.calls: list[tuple[int, int]] = []  # (samples, sample rate) per call
+        self._lock = threading.Lock()
+
+    def denoise(self, samples: FloatArray) -> FloatArray:
+        if self.fail:
+            raise RuntimeError("fake denoiser failure requested")
+        with self._lock:
+            self.calls.append((len(samples), self.sample_rate))
+        if len(samples) == 0:
+            return samples.astype(np.float32)
+        spectrum = np.fft.rfft(samples)
+        magnitude = np.abs(spectrum)
+        spectrum[magnitude < self.gate * float(np.median(magnitude))] = 0
+        return np.fft.irfft(spectrum, len(samples)).astype(np.float32)
+
+
 class FakeEngine(Engine):
     id = "fake"
     name = "Fake engine (testing)"
     license = "Apache-2.0"
     kinds = (
         "fake-stt", "fake-stt-streaming", "fake-stt-speakers", "fake-tts", "fake-vad", "fake-diarization", "fake-turn",
-        "fake-separation",
+        "fake-separation", "fake-denoise",
     )  # fmt: skip
 
     def __init__(self) -> None:
@@ -534,6 +561,8 @@ class FakeEngine(Engine):
             model = FakeTurn(merged)
         elif kind == "fake-separation":
             model = FakeSeparation(merged)
+        elif kind == "fake-denoise":
+            model = FakeDenoiser(merged)
         else:
             raise ValueError(f"fake engine cannot load kind {kind!r}")
         self.loaded.append(model)

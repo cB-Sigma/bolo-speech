@@ -53,6 +53,7 @@ from bolo.agents import speak_stream
 from bolo.audio.codecs import alaw_decode, alaw_encode, float_to_pcm16, mulaw_decode, mulaw_encode, pcm16_to_float
 from bolo.audio.encode import encode_audio
 from bolo.audio.resample import StreamResampler, resample
+from bolo.denoise import DenoiseOptions, parse_denoise
 from bolo.engines.base import FloatArray, VadDetector, VadParams
 from bolo.errors import BoloError, EngineUnavailable
 from bolo.obs.trace import Trace, preview
@@ -177,6 +178,10 @@ class RealtimeSession:
         self.in_codec, self.in_rate, self.in_format = _format(None, "")
         self.out_codec, self.out_rate, self.out_format = _format(None, "")
         self.transcription: dict[str, Any] = {"model": s.default_realtime_stt, "language": None, "prompt": None}
+        #: OpenAI's session.audio.input.noise_reduction ({"type": "near_field" | "far_field"} or null) and bolo's
+        #: session.audio.input.denoise; either turns on the denoiser before transcription (None: the defaults)
+        self.noise_reduction: dict[str, Any] | None = None
+        self.denoise: DenoiseOptions | None = None
         self.turn_detection: dict[str, Any] | None = {
             "type": "server_vad", "threshold": 0.5, "prefix_padding_ms": 300,
             "silence_duration_ms": int(s.endpoint_silence_ms), "create_response": True, "interrupt_response": True,
@@ -241,7 +246,8 @@ class RealtimeSession:
     def session_object(self) -> dict[str, Any]:
         audio_in: dict[str, Any] = {
             "format": self.in_format,
-            "noise_reduction": None,
+            "noise_reduction": self.noise_reduction,
+            "denoise": self.denoise.to_dict() if self.denoise is not None else None,  # bolo extension
             "transcription": {k: v for k, v in self.transcription.items() if v is not None},
             "turn_detection": self.turn_detection,
         }
@@ -386,6 +392,8 @@ class RealtimeSession:
                 "language": cfg.get("language"),
                 "prompt": cfg.get("prompt"),
             }
+        if "noise_reduction" in audio_in or "denoise" in audio_in:
+            self._configure_denoise(audio_in)
         if "turn_detection" in audio_in:
             td = audio_in["turn_detection"]
             if td is None:
@@ -468,6 +476,34 @@ class RealtimeSession:
                 self.max_output_tokens = session["max_output_tokens"]
             if session.get("model"):
                 self.model = session["model"]
+
+    def _configure_denoise(self, audio_in: dict[str, Any]) -> None:
+        """``noise_reduction`` (OpenAI: any type turns the default denoiser on; null leaves the server's default) and
+        ``denoise`` (bolo: true, false, a strength, a model id or {model, strength}), which wins when both are given."""
+        if "noise_reduction" in audio_in:
+            nr = audio_in["noise_reduction"]
+            if nr is None:
+                self.noise_reduction = None
+                if "denoise" not in audio_in:
+                    self.denoise = None
+            elif isinstance(nr, dict) and nr.get("type") in ("near_field", "far_field"):
+                self.noise_reduction = {"type": nr["type"]}
+                if "denoise" not in audio_in:
+                    self.denoise = DenoiseOptions()
+            else:
+                raise RealtimeError(
+                    'noise_reduction must be null or {"type": "near_field" | "far_field"}',
+                    param="session.audio.input.noise_reduction",
+                )
+        if "denoise" in audio_in:
+            param = "session.audio.input.denoise"
+            try:
+                opts = parse_denoise(audio_in["denoise"], param=param)
+                if opts is not None and opts.enabled and opts.model:
+                    self.core.resolve(opts.model, "denoise")
+            except BoloError as exc:
+                raise RealtimeError(exc.message, param=param) from exc
+            self.denoise = opts
 
     # -- audio input ----------------------------------------------------------
     def _decode(self, payload: bytes) -> FloatArray:
@@ -677,6 +713,7 @@ class RealtimeSession:
                 result = await self.core.transcribe(
                     self._slice(start, end), SR, model=cfg["model"], language=cfg.get("language"),
                     prompt=cfg.get("prompt"), vad_filter=False, trace=Trace("stt", self.transport, ""), record=False,
+                    denoise=self.denoise,
                 )  # fmt: skip
             except BoloError:
                 continue  # the final decode reports the error
@@ -792,7 +829,13 @@ class RealtimeSession:
         t0 = trace.now()
         try:
             result = await self.core.transcribe(
-                audio, SR, model=cfg["model"], language=cfg.get("language"), prompt=cfg.get("prompt"), trace=sub
+                audio,
+                SR,
+                model=cfg["model"],
+                language=cfg.get("language"),
+                prompt=cfg.get("prompt"),
+                trace=sub,
+                denoise=self.denoise,
             )
         except BoloError as exc:
             await self.send(
@@ -844,7 +887,11 @@ class RealtimeSession:
                         raise RealtimeError("content audio is not valid base64", param="item.content") from exc
                     audio = resample(self._decode(raw), self.in_rate, SR)
                     result = await self.core.transcribe(
-                        audio, SR, model=self.transcription["model"], language=self.transcription.get("language")
+                        audio,
+                        SR,
+                        model=self.transcription["model"],
+                        language=self.transcription.get("language"),
+                        denoise=self.denoise,
                     )
                     part["transcript"] = result.text
                     part.pop("audio", None)

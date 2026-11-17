@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-348 models: 135 validated on CPU by the maintainers, 213 untested. 22 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
+349 models: 136 validated on CPU by the maintainers, 213 untested. 22 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
 
 ### Speech to text
 
@@ -706,6 +706,14 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `voxlock-int8` | en | balanced | - | 81 MB | Apache-2.0 | **CPU** · RTF 0.460 |
+
+### Denoising
+
+#### GTCRN
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `gtcrn-simple` | - | realtime | - | 1 MB | MIT | **CPU** · RTF 0.060 |
 
 ⚠ = the licence restricts commercial use. RTF = processing time / audio duration (lower is faster).
 <!-- END GENERATED: models -->
@@ -1528,6 +1536,36 @@ defaults zero a speaker's track wherever that speaker is judged silent;
 `leakage_removal: false` (a bolo-torch option) did better here. A
 check with perfect tracks handed over in the wrong order confirmed that
 bolo gives each diarized speaker their own track, aligned to the sample.
+
+## Denoising
+
+`denoise` (configuration.md, "Denoising") runs a speech-enhancement model
+before the recogniser. The catalog has one: **`gtcrn-simple`**, GTCRN
+(Rong et al., ICASSP 2024; MIT licence; 48 thousand parameters, 0.5 MB),
+the ONNX export sherpa-onnx publishes. It runs at 16 kHz in sherpa-onnx, no
+PyTorch; other rates are resampled to it and back. On one thread of a
+shared 4-vCPU Xeon it took 0.06 s per second of audio at light load and
+0.12 to 0.13 s with the machine's load average at 17.
+
+**Measured** (docs/measurements/denoise.json): the repository's two English
+samples (47 words of synthetic speech) mixed with white noise, pink noise,
+applause and a passing train at 10, 5 and 0 dB SNR, twelve noisy mixes in
+all; word error rate over both clips.
+
+| recogniser | clean, off / on | mean of 12 noisy mixes: off | on | on, strength 0.5 |
+| --- | --- | --- | --- | --- |
+| `moonshine-v2-tiny-en` | 6.4% / 2.1% | 31.7% | 23.4% | 22.9% |
+| `whisper-base` | 0% / 0% | 15.4% | 26.8% | 11.7% |
+
+GTCRN at full strength helped the small Moonshine model on 10 of the 12
+mixes (applause at 0 dB: 46.8% to 19.1%) and hurt Whisper base on 11 of
+them, helping on none (white noise at 5 dB: 17.0% to 76.6%, where Whisper dropped
+most of a sentence). Whisper was trained on large amounts of noisy audio
+and copes with noise better than with the artefacts enhancement leaves.
+Mixing half of the original back (`denoise=0.5`) was the better setting for
+both. This is a small, synthetic test: it shows the direction, not the
+size, of the effect on your audio. Measure before you turn denoising on for
+a model or the server.
 
 ## Word timestamps
 

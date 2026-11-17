@@ -24,6 +24,7 @@ from bolo.api.common import get_core, parse_bool, read_upload, sse
 from bolo.audio import decode_audio, resample
 from bolo.audio.encode import StreamEncoder, normalize_format
 from bolo.core import Bolo, SynthChunk, Transcript, fallback_headers
+from bolo.denoise import parse_denoise
 from bolo.diarize import DiarizeOptions, KnownSpeaker
 from bolo.engines.base import Segment
 from bolo.errors import BoloError, InvalidRequest, ModelNotFound
@@ -361,10 +362,17 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
             raise InvalidRequest("temperature must be a number", param="temperature") from exc
         model = str(form.get("model") or "") or None
         # extension (Ollama's keep_alive): how long the model stays loaded after this request
-        request_keep_alive(form.get("keep_alive"), ("stt", "diarization", "separation"))
+        request_keep_alive(form.get("keep_alive"), ("stt", "diarization", "separation", "denoise"))
         diarize = await _diarize_options(form, fmt, model, task)
         separate = separate_options(form)
+        denoise = parse_denoise(form.get("denoise"), strength=form.get("denoise_strength"))
         spec = core.resolve(model, "stt")
+        if denoise is not None and denoise.enabled and denoise.model:
+            try:
+                core.resolve(denoise.model, "denoise")  # unknown denoiser: fail before reading the upload
+            except BoloError as exc:
+                exc.param = "denoise"
+                raise
         if diarize is not None:
             core.resolve(diarize.model, "diarization")  # unknown diarization model: fail before reading the upload
         if separate is not None:
@@ -396,6 +404,7 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
             "diarize": diarize,
             "separate": separate,
             "options": decode,
+            "denoise": denoise,
         }
     except BoloError as exc:
         trace.finish("error", exc.message)
@@ -487,6 +496,10 @@ async def create_transcription(request: Request) -> Response:
     guard: a phrase repeated back to back more often than this is cut to one copy; 0 turns it off). Options a model
     cannot honour are listed in the ``x-bolo-ignored-options`` header. With diarization, ``separate_overlaps=true``
     transcribes overlapped speech from one separated track per speaker.
+    ``denoise`` runs a speech-enhancement model first: ``true``, ``false``, a strength between 0 and 1 (the
+    denoised audio mixed with the original) or a denoise model id; ``denoise_strength`` sets the strength
+    separately. Unset: the model's pin, then the server's ``denoise`` setting (off by default). The response
+    header ``x-bolo-denoise`` names what ran. Denoising can make clean audio worse.
     """
     return await _transcribe_endpoint(request, "transcribe")
 

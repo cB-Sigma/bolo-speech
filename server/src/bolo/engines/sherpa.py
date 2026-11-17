@@ -29,6 +29,7 @@ import numpy as np
 
 from bolo import ort_providers
 from bolo.engines.base import (
+    DenoiseModel,
     DiarizationModel,
     Engine,
     EngineStatus,
@@ -81,6 +82,7 @@ TTS_KINDS = ("vits", "kokoro", "matcha", "kitten")
 VAD_KINDS = ("silero_vad", "ten_vad")
 DIARIZATION_KINDS = ("pyannote_diarization",)
 SEPARATION_KINDS = ("voxlock",)
+DENOISE_KINDS = ("gtcrn",)
 
 
 def find_file(path: Path, *patterns: str, required: bool = True, prefer_int8: bool = True) -> str:
@@ -942,6 +944,33 @@ class SherpaVoxLock(SeparationModel):
             self._extractors.pop(key, None)
 
 
+class SherpaDenoiser(DenoiseModel):
+    """Speech enhancement with sherpa-onnx's offline denoiser (GTCRN: one ONNX graph of about 0.5 MB)."""
+
+    def __init__(self, path: Path, spec: dict[str, Any], opts: LoadOptions) -> None:
+        import sherpa_onnx as so
+
+        model = find_file(path, str(spec.get("model", "*.onnx")), "*.onnx")
+        config = so.OfflineSpeechDenoiserModelConfig(
+            gtcrn=so.OfflineSpeechDenoiserGtcrnModelConfig(model=model),
+            num_threads=opts.threads,
+            provider=sherpa_provider(opts.device),
+        )
+        self._denoiser = so.OfflineSpeechDenoiser(so.OfflineSpeechDenoiserConfig(model=config))
+        self.sample_rate = int(self._denoiser.sample_rate)
+
+    def denoise(self, samples: FloatArray) -> FloatArray:
+        out = self._denoiser(np.ascontiguousarray(samples, dtype=np.float32), self.sample_rate)
+        audio = np.asarray(out.samples, dtype=np.float32)
+        if int(out.sample_rate) != self.sample_rate:
+            from bolo.audio.resample import resample
+
+            audio = resample(audio, int(out.sample_rate), self.sample_rate)
+        if len(audio) < len(samples):  # the model works in whole frames: the last few milliseconds come back short
+            audio = np.pad(audio, (0, len(samples) - len(audio)))
+        return np.ascontiguousarray(audio[: len(samples)], dtype=np.float32)
+
+
 #: what sherpa-onnx says on standard error when it was asked for an accelerator it was not built with
 SHERPA_CPU_FALLBACK = re.compile(r"fallback to cpu|SHERPA_ONNX_ENABLE_GPU", re.IGNORECASE)
 
@@ -951,7 +980,7 @@ class SherpaOnnxEngine(Engine):
     name = "sherpa-onnx"
     license = "Apache-2.0"
     url = "https://github.com/k2-fsa/sherpa-onnx"
-    kinds = OFFLINE_KINDS + ONLINE_KINDS + TTS_KINDS + VAD_KINDS + DIARIZATION_KINDS + SEPARATION_KINDS
+    kinds = OFFLINE_KINDS + ONLINE_KINDS + TTS_KINDS + VAD_KINDS + DIARIZATION_KINDS + SEPARATION_KINDS + DENOISE_KINDS
 
     def status(self) -> EngineStatus:
         try:
@@ -998,4 +1027,6 @@ class SherpaOnnxEngine(Engine):
             return SherpaDiarization(kind, path, spec, opts)
         if kind in SEPARATION_KINDS:
             return SherpaVoxLock(path, spec, opts)
+        if kind in DENOISE_KINDS:
+            return SherpaDenoiser(path, spec, opts)
         raise ValueError(f"sherpa-onnx engine cannot load kind {kind!r}")

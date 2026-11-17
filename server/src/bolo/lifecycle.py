@@ -36,6 +36,7 @@ from bolo.catalog import Catalog, ModelSpec
 from bolo.config import Settings
 from bolo.engines import EngineRegistry
 from bolo.engines.base import (
+    DenoiseModel,
     DiarizationModel,
     LoadOptions,
     Model,
@@ -735,6 +736,10 @@ class ModelManager:
             max_batch["enrol"] = 1
             max_batch["extract"] = 1
             max_batch["separate"] = 1
+        elif isinstance(model, DenoiseModel):
+            denoiser = model
+            handlers["denoise"] = lambda items: [denoiser.denoise(item) for item in items]
+            max_batch["denoise"] = 1
         elif isinstance(model, TurnModel):
             turn = model
             handlers["turn"] = lambda items: [turn.probability(item) for item in items]

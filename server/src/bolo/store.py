@@ -406,7 +406,7 @@ class ModelStore:
     # -- per-model settings chosen by the user (model-settings.json) ------
     MODEL_SETTINGS = (
         "phonemizer", "text_normalizer", "wordlists", "fallback", "romanised", "device", "keep_alive",
-        "num_parallel", "max_queue", "flash_attention", "kv_cache_type", "context_size", "batch_size",
+        "num_parallel", "max_queue", "flash_attention", "kv_cache_type", "context_size", "batch_size", "denoise",
         *DECODE_SETTINGS,
     )  # fmt: skip
 

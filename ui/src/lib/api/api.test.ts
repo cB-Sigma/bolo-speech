@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api, ApiError, NetworkError } from './client'
-import { apiUrl, pageBase, setApiKey, setServerBase, setTransport, wsUrl } from './config'
+import { apiUrl, metaBase, pageBase, serverBase, setApiKey, setServerBase, setTransport, wsUrl } from './config'
 import { openEventStream, SseParser } from './sse'
 import type { ServerEvent } from './types'
 
@@ -16,6 +16,25 @@ describe('URL building', () => {
     expect(pageBase({ origin: 'http://h:8000', pathname: '/' })).toBe('http://h:8000/')
     expect(pageBase({ origin: 'http://h', pathname: '/bolo/' })).toBe('http://h/bolo/')
     expect(pageBase({ origin: 'http://h', pathname: '/bolo/index.html' })).toBe('http://h/bolo/')
+  })
+  it('reads the API address a console-only port gives the page', () => {
+    const loc = { protocol: 'http:', hostname: 'box.lan' }
+    expect(metaBase(':8000', loc)).toBe('http://box.lan:8000/')
+    expect(metaBase(':8000', { protocol: 'https:', hostname: '[::1]' })).toBe('https://[::1]:8000/')
+    expect(metaBase('https://api.example.test/speech', loc)).toBe('https://api.example.test/speech/')
+    expect(metaBase('', loc)).toBeNull()
+    expect(metaBase(null, loc)).toBeNull()
+    const meta = document.createElement('meta')
+    meta.name = 'bolo-api'
+    meta.content = 'http://127.0.0.1:8000/'
+    document.head.appendChild(meta)
+    try {
+      expect(serverBase()).toBe('http://127.0.0.1:8000/')
+      setServerBase('http://other.test/') // the stored choice wins
+      expect(serverBase()).toBe('http://other.test/')
+    } finally {
+      meta.remove()
+    }
   })
   it('resolves API paths under a sub-path and encodes the query', () => {
     setServerBase('https://example.test/speech')

@@ -21,7 +21,10 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `port` | `8000` | `--port` | HTTP port |
 | `api_key` | none | `--api-key` | if set, required as `Authorization: Bearer <key>` (or `X-API-Key`, or `?api_key=` for WebSockets and SSE) |
 | `cors_origins` | `[]` | `--cors-origin` (repeatable) | allowed browser origins; `*` allows any |
-| `ui` | `true` | `--no-ui` | serve the web console at `/` |
+| `ui` | `true` | `--no-ui`, `--no-console` | serve the web console at `/` |
+| `console_port` | unset | `--console-port` | serve the web console on this port of its own; the API stays on `port` and no longer serves the console. Unset: both on `port`. `0`: no console (like `ui = false`). See deploy/README.md, "The console on its own port" |
+| `console_host` | unset (`host`) | `--console-host` | bind address of the console's port |
+| `console_api_url` | unset | `--console-api-url` | the API address the console calls when it has a port of its own (a proxy or TLS in front of the API). Unset: the host the browser opened the console from, at `port`. Other origins than the console's need `cors_origins` |
 | `cross_origin_isolation` | `true` | | send COOP/COEP headers with the console so its in-browser WebAssembly recogniser can use threads. API responses are not affected. Turn off if you embed the console in another site's frame |
 | `max_upload_mb` | `200` | | largest accepted audio upload |
 | `data_dir` | `~/.cache/bolo` (`$XDG_CACHE_HOME/bolo`) | `--data-dir` | models and the blob cache |
@@ -45,6 +48,8 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `separation_min_overlap_s` | `0.5` | | overlaps shorter than this are left alone |
 | `separation_sample_max_s` | `10` | | at most this much of a speaker's speech without overlap is used as their voice sample (VoxLock needs 3 s and uses the loudest 3 s of it) |
 | `separation_timeout_s` | `300` | | stop separating after this long per request; what was not separated is transcribed from the mixture and the response says `reason: "timeout"` |
+| `default_denoise` | `gtcrn-simple` | | speech-enhancement model used by `denoise` when it names no model (pulled on first use, 0.5 MB) |
+| `denoise` | `off` | | denoise audio before speech recognition unless a request or a model pin says otherwise: `off`, `on`, a strength between 0 and 1 (the denoised audio mixed with the original at that weight) or a denoise model id. See "Denoising" below: it can make clean audio worse |
 | `default_turn` | `smart-turn-v3` | | end-of-turn model for Realtime sessions that ask for `semantic_vad` (pulled on first use; without it `semantic_vad` is plain silence detection) |
 | `plugins` | `[]` | | out-of-process engine plugins, `name=command args` each (docs/plugins.md) |
 | `plugin_entry_points` | `true` | | also use plugins installed as packages (entry-point group `bolo.engines`) |
@@ -730,6 +735,35 @@ NSSM or WinSW as the service, and `sc.exe` for its recovery settings.
 of the setting and was seen on a Windows 11 laptop: a crashed `bolo serve` was not started again. The PowerShell
 loop, the task that starts it, the NSSM and WinSW services and the `sc.exe failure` settings have not been run by
 the maintainers yet.
+
+## Denoising
+
+`denoise` runs a speech-enhancement model over the audio before the
+recogniser hears it: on a transcription request (`denoise=true`, a
+strength such as `denoise=0.5`, or a model id; api.md), on a Realtime
+session (`noise_reduction` or `denoise`; realtime.md), as a pin per
+speech-to-text model (`bolo models config whisper-base --set denoise=0.5`,
+`PUT /api/v1/models/{id}/settings` with `{"denoise": 0.5}`), as a catalog
+option (`options.denoise`) or for the whole server (`denoise = "on"`,
+`BOLO_DENOISE=on`). The first of request, pin, catalog option and setting
+that says anything decides; `denoise=false` in a request turns it off
+whatever the defaults say.
+
+The default denoiser is GTCRN (`gtcrn-simple`, MIT, 0.5 MB, 16 kHz) on
+sherpa-onnx; any `task: denoise` model of the catalog can be named. It runs
+at the model's own sample rate (the audio is resampled to it and back) and
+costs about 0.06 to 0.13 s of one CPU core per second of audio.
+
+**It is off by default for a reason.** Denoising removes some of the
+speech along with the noise. It helps on loud, steady background noise and
+with small recognisers; it can make transcripts worse on clean or mildly
+noisy audio, and with recognisers trained on noisy data. Whisper is one: in
+our measurement (models.md, "Denoising") GTCRN made `whisper-base` worse
+on most noisy clips while it made `moonshine-v2-tiny-en` better. Measure on
+your own audio before turning it on for a model or the server; a strength
+below 1 (`0.5`) is a gentler middle way. A denoiser that cannot run is
+skipped with a warning and the original audio is transcribed; the response
+header `x-bolo-denoise` and the request's trace say what ran.
 
 ## Coming from Ollama
 

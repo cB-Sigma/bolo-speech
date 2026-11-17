@@ -325,6 +325,11 @@ class ModelSettingsRequest(BaseModel):
         description="Repetition guard: a phrase (1 to 8 words) repeated back to back more often than this is cut to "
         "one copy, and so is a run of identical segments (default 4; 0 turns it off).",
     )
+    denoise: bool | float | str | None = Field(
+        default=None,
+        description="Speech-to-text models: denoise audio before this model hears it unless the request says "
+        "otherwise: true, false, a strength between 0 and 1 or a denoise model id; null removes the pin.",
+    )
 
 
 @router.get("/models/{model_id:path}/settings", tags=["native"], summary="Settings pinned for one model")
@@ -371,6 +376,16 @@ async def put_model_settings(request: Request, model_id: str, body: ModelSetting
         values = check_decode_options(values)
     except OptionError as exc:
         raise InvalidRequest(str(exc), param=exc.name) from exc
+    if values.get("denoise") is not None:
+        from bolo.denoise import parse_denoise
+
+        opts = parse_denoise(values["denoise"])
+        if opts is not None and opts.enabled and opts.model:
+            try:
+                core.resolve(opts.model, "denoise")
+            except BoloError as exc:
+                exc.param = "denoise"
+                raise
     for name in values.get("fallback") or []:
         other = core.resolve(name, spec.task)  # unknown model or wrong task: 404 / 400
         if other.id == spec.id:

@@ -8,6 +8,7 @@ has not built the UI) a small placeholder page explains what is going on.
 
 from __future__ import annotations
 
+import html
 import mimetypes
 from importlib import resources
 from pathlib import Path
@@ -84,13 +85,26 @@ def _file_response(path: Path, root: Path) -> Response:
     return FileResponse(path, media_type=media_type, headers={"Cache-Control": cache})
 
 
+def _index(request: Request, path: Path, root: Path) -> Response:
+    """``index.html``; on a console-only port, with a ``<meta name="bolo-api">`` that tells the page where the API is."""
+    pointer = getattr(request.app.state, "console_api", None)
+    if not pointer:
+        return _file_response(path, root)
+    text = path.read_text(encoding="utf-8")
+    meta = f'<meta name="bolo-api" content="{html.escape(pointer, quote=True)}" />'
+    text = text.replace("</head>", f"  {meta}\n  </head>", 1) if "</head>" in text else meta + text
+    return HTMLResponse(text, headers={"Cache-Control": "no-cache"})
+
+
 @router.get("/{path:path}", include_in_schema=False)
 async def console(request: Request, path: str) -> Response:
     if path.startswith(_RESERVED):
+        pointer = getattr(request.app.state, "console_api", None)
+        where = f"; this port serves only the web console, the API is at {pointer}" if pointer else ""
         return JSONResponse(
             {
                 "error": {
-                    "message": f"Unknown path '/{path}'",
+                    "message": f"Unknown path '/{path}'{where}",
                     "type": "invalid_request_error",
                     "param": None,
                     "code": "not_found",
@@ -103,12 +117,14 @@ async def console(request: Request, path: str) -> Response:
     if path:
         candidate = (root / path).resolve()
         if candidate.is_file() and root in candidate.parents:
+            if candidate.name == "index.html":
+                return _isolate(request, _index(request, candidate, root))
             return _isolate(request, _file_response(candidate, root))
         if "." in path.rsplit("/", 1)[-1]:
             return Response(status_code=404)  # a missing asset is a 404, not the SPA shell
     index = root / "index.html"
     if index.is_file():
-        return _isolate(request, _file_response(index, root))
+        return _isolate(request, _index(request, index, root))
     base = str(request.base_url).rstrip("/")
     return _isolate(
         request, HTMLResponse(PLACEHOLDER.format(version=__version__, base=base), headers={"Cache-Control": "no-cache"})

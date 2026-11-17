@@ -85,10 +85,15 @@ def create_app(settings: Settings | None = None, core: Bolo | None = None) -> Fa
     )
     app.state.core = core
 
-    if settings.cors_origins:
+    from bolo.api.console import console_origin_regex
+
+    # with the console on a port of its own, the API answers its cross-origin requests
+    console_origins = None if "*" in settings.cors_origins else console_origin_regex(settings)
+    if settings.cors_origins or console_origins:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=settings.cors_origins,
+            allow_origin_regex=console_origins,
             allow_methods=["*"],
             allow_headers=["*"],
             expose_headers=[
@@ -100,6 +105,7 @@ def create_app(settings: Settings | None = None, core: Bolo | None = None) -> Fa
                 "x-bolo-estimated-cost",
                 "x-bolo-separation",
                 "x-bolo-ignored-options",
+                "x-bolo-denoise",
                 "x-bolo-voice",
                 "x-bolo-cloned",
                 "x-bolo-blend",
@@ -148,6 +154,6 @@ def create_app(settings: Settings | None = None, core: Bolo | None = None) -> Fa
     app.include_router(realtime.router)
     app.include_router(telephony.router, dependencies=protected)
     app.include_router(telephony.public_router)
-    if settings.ui:
+    if settings.console_mode() == "same":  # "separate": bolo.api.console serves it on console_port
         app.include_router(static.router)
     return app

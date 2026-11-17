@@ -69,6 +69,10 @@ def _table(rows: list[list[str]], headers: list[str]) -> str:
 
 
 # -- serve ----------------------------------------------------------------
+def _hostport(host: str, port: int) -> str:
+    return f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
 
@@ -78,24 +82,45 @@ def cmd_serve(args: argparse.Namespace) -> int:
         args,
         ("host", "port", "api_key", "preload", "cors_origins", "wyoming", "wyoming_host", "wyoming_port", "auto_pull",
          "ui", "default_stt", "default_tts", "default_realtime_stt", "memory_budget_mb", "batch_wait_ms", "max_queue",
-         "llm_base_url", "llm_model", "llm_api_key", "num_parallel", "gpus", "gpu_spread", "log_file"),
+         "llm_base_url", "llm_model", "llm_api_key", "num_parallel", "gpus", "gpu_spread", "log_file", "console_port",
+         "console_host", "console_api_url"),
     )  # fmt: skip
     from bolo import logs, procs
 
     log_file = logs.configure(settings)
     procs.install_hooks()  # from the main thread: children are stopped at exit and on SIGHUP
+    from bolo.api.console import console_host, create_console_app, serve_both, servers, uvicorn_kwargs
+
     app = create_app(settings)
-    where = f"http://{settings.host}:{settings.port}"
-    print(f"bolo {__version__} listening on {where}  (console: {where}/  API docs: {where}/docs)", file=sys.stderr)
+    where = f"http://{_hostport(settings.host, settings.port)}"
+    mode = settings.console_mode()
+    if mode == "same":
+        print(f"bolo {__version__} listening on {where}  (console: {where}/  API docs: {where}/docs)", file=sys.stderr)
+    elif mode == "off":
+        print(f"bolo {__version__} listening on {where}  (API docs: {where}/docs; no web console)", file=sys.stderr)
+    else:
+        at = f"http://{_hostport(console_host(settings), int(settings.console_port or 0))}"
+        api = settings.console_api_url or f"port {settings.port} of the host it is opened from"
+        print(f"bolo {__version__} API listening on {where}  (API docs: {where}/docs)", file=sys.stderr)
+        print(f"web console listening on {at}/  (its API: {api})", file=sys.stderr)
     if log_file is not None:
         print(f"log file: {log_file} (`bolo logs -f` follows it)", file=sys.stderr)
     if settings.host not in ("127.0.0.1", "localhost", "::1") and not settings.api_key:
         print("warning: listening on a non-loopback address without an API key", file=sys.stderr)
-    config = uvicorn.Config(
-        app, host=settings.host, port=settings.port, log_level=settings.log_level.lower(), ws_max_size=16 * 1024 * 1024
-    )
+    config = uvicorn.Config(app, host=settings.host, port=settings.port, **uvicorn_kwargs(settings))
     logs.attach_file_handler("uvicorn", "uvicorn.error", "uvicorn.access")  # uvicorn's loggers skip the root logger
-    uvicorn.Server(config).run()
+    if mode != "separate":
+        uvicorn.Server(config).run()
+        return 0
+    console = uvicorn.Config(
+        create_console_app(app.state.core),
+        host=console_host(settings),
+        port=int(settings.console_port or 0),
+        **uvicorn_kwargs(settings),
+    )
+    import asyncio
+
+    asyncio.run(serve_both(*servers(config, console)))
     return 0
 
 
@@ -526,6 +551,15 @@ def _model_setting(key: str, raw: str) -> Any:
     elif key in DECODE_SETTINGS:
         value = json.loads(raw) if key == "vad_parameters" else raw
         return check_decode_options({key: value})[key]
+    elif key == "denoise":
+        from bolo.denoise import parse_denoise
+        from bolo.errors import BoloError
+
+        try:
+            parse_denoise(raw)
+        except BoloError as exc:
+            raise ValueError(exc.message) from exc
+        value = raw.strip()
     else:
         value = raw.strip().lower() if key in ("device", "flash_attention", "kv_cache_type") else raw
     check_tuning({key: value})
@@ -1201,7 +1235,7 @@ def cmd_telephony(args: argparse.Namespace) -> int:
 _TASK_TITLES = {
     "stt": "Speech to text", "tts": "Text to speech", "diarization": "Speaker diarization",
     "vad": "Voice-activity detection", "turn": "End-of-turn detection", "separation": "Overlapped-speech separation",
-    "speech-to-speech": "Speech to speech",
+    "denoise": "Denoising", "speech-to-speech": "Speech to speech",
 }  # fmt: skip
 
 
@@ -1794,8 +1828,15 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--no-auto-pull", dest="auto_pull", action="store_const", const=False, default=None,
                    help="never download a model on first use")  # fmt: skip
     s.add_argument(
-        "--no-ui", dest="ui", action="store_const", const=False, default=None, help="do not serve the web console"
-    )
+        "--no-ui", "--no-console", dest="ui", action="store_const", const=False, default=None,
+        help="do not serve the web console",
+    )  # fmt: skip
+    s.add_argument("--console-port", dest="console_port", type=int, default=None,
+                   help="serve the web console on this port and only the API on --port (0: no console)")  # fmt: skip
+    s.add_argument("--console-host", dest="console_host", default=None,
+                   help="bind address of the console's port (default: --host)")  # fmt: skip
+    s.add_argument("--console-api-url", dest="console_api_url", default=None,
+                   help="the API address the console calls (default: the console's host at --port)")  # fmt: skip
     s.add_argument("--default-stt", dest="default_stt", default=None)
     s.add_argument("--default-realtime-stt", dest="default_realtime_stt", default=None)
     s.add_argument("--default-tts", dest="default_tts", default=None)

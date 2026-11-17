@@ -3,8 +3,11 @@
  *
  * The console is a static bundle served by the bolo server itself, possibly
  * under a sub-path, so by default the API base is the directory the page was
- * loaded from. `VITE_BOLO_SERVER` (build time) or the `bolo.server` local
- * storage key (run time) can point it at another origin.
+ * loaded from. When the server gives the console a port of its own
+ * (`bolo serve --console-port`), the page carries `<meta name="bolo-api">`:
+ * either `:<port>` (this page's host at the API's port) or a full URL.
+ * `VITE_BOLO_SERVER` (build time) or the `bolo.server` local storage key
+ * (run time) can point it at another origin; the local storage key wins.
  */
 
 export interface Transport {
@@ -43,9 +46,31 @@ export function pageBase(loc: Pick<Location, 'origin' | 'pathname'> = globalThis
   return `${loc.origin}${dir}`
 }
 
+/** The API base a `<meta name="bolo-api">` value names: `:<port>` on this page's host, or a URL. */
+export function metaBase(
+  content: string | null | undefined,
+  loc: Pick<Location, 'protocol' | 'hostname'> = globalThis.location,
+): string | null {
+  const value = content?.trim()
+  if (!value) return null
+  if (/^:\d+$/.test(value)) {
+    const host = loc.hostname.includes(':') && !loc.hostname.startsWith('[') ? `[${loc.hostname}]` : loc.hostname
+    return `${loc.protocol}//${host}${value}/`
+  }
+  return value.endsWith('/') ? value : `${value}/`
+}
+
+function pageMeta(): string | null {
+  try {
+    return globalThis.document?.querySelector('meta[name="bolo-api"]')?.getAttribute('content') ?? null
+  } catch {
+    return null
+  }
+}
+
 export function serverBase(): string {
   const stored = safeStorage()?.getItem(SERVER_STORAGE)
-  const configured = stored || (import.meta.env.VITE_BOLO_SERVER as string | undefined)
+  const configured = stored || metaBase(pageMeta()) || (import.meta.env.VITE_BOLO_SERVER as string | undefined)
   if (configured) return configured.endsWith('/') ? configured : `${configured}/`
   return pageBase()
 }

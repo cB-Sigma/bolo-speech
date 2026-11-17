@@ -239,10 +239,10 @@ def test_every_packaged_entry_is_well_formed() -> None:
         if s.source.repo:
             assert len(s.source.revision) == 40, f"{s.id}: revisions are pinned to a commit"
             assert "espeak-ng-data/*" in s.source.exclude or s.engine != "sherpa-onnx" or s.source.include, s.id
-        else:  # plain URLs: the revision is part of the URL and the large files carry a checksum
+        else:  # plain URLs: the revision is part of the URL, or the file's content is pinned by its checksum
             assert s.source.urls, s.id
             for u in s.source.urls:
-                assert re.search(r"/resolve/[0-9a-f]{40}/", u["url"]) or (u.get("extract") and u.get("sha256")), s.id
+                assert re.search(r"/resolve/[0-9a-f]{40}/", u["url"]) or u.get("sha256"), s.id
                 assert u.get("sha256") or (u.get("size") or 0) < 1_000_000, f"{s.id}: {u['path']} needs a sha256"
         assert s.size_bytes > 100_000, s.id
         assert s.description and s.source_url.startswith("https://"), s.id
@@ -254,7 +254,7 @@ def test_every_packaged_entry_is_well_formed() -> None:
         if "non-commercial" in s.license.lower() or "-nc" in s.license.lower():
             assert s.commercial_use is False, s.id
     tasks = {s.task for s in specs}
-    assert tasks == {"stt", "tts", "vad", "diarization", "turn", "separation"}
+    assert tasks == {"stt", "tts", "vad", "diarization", "turn", "separation", "denoise"}
     needs = [s for s in specs if s.needs_phonemes]
     assert len(needs) >= 80 and all(s.task == "tts" for s in needs)
     assert not [s.id for s in specs if s.family == "Kokoro" and s.requires]  # the default voice needs nothing extra
