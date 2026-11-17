@@ -62,6 +62,21 @@ BUNDLES: dict[str, dict[str, Any]] = {
             },
         ],
     },  # fmt: skip
+    "spark-tts": {
+        "about": "Spark-TTS: the BiCodec audio tokenizer and decoder (wav2vec 2.0 features, ECAPA speaker encoder, "
+        "Vocos-style decoder) and its token maps; the language model is a plain Qwen2.5 checkpoint for transformers",
+        "extra": "spark-tts",
+        "paths": [""],
+        "parts": [
+            {
+                "repo": "SparkAudio/Spark-TTS", "commit": "2f1ea9082400547242641f5271b6f941c9f439d1",
+                "license": "Apache-2.0 (code; the Spark-TTS-0.5B weights are CC-BY-NC-SA-4.0)",
+                "license_url": "https://github.com/SparkAudio/Spark-TTS/blob/2f1ea9082400547242641f5271b6f941c9f439d1/LICENSE",
+                "dest": "",
+                "include": ["LICENSE", "sparktts/**.py"],
+            },
+        ],
+    },  # fmt: skip
     "kimi-audio": {
         "about": "Kimi-Audio: kimia_infer (prompt format, Whisper features, the streaming flow-matching detokenizer "
         "and BigVGAN vocoder) with the GLM-4-Voice speech tokenizer it imports (a git submodule of Kimi-Audio)",

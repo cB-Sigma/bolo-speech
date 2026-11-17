@@ -386,6 +386,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   at a pinned commit in an environment of their own (`plugin_install` has the command). Measured here through
   `POST /api/v1/diarize`: DER 5.0 % on the demo's two-voice dialogue (community-1: 6.05 %), RTF 12.4 on the shared
   4-vCPU machine; licence labelled CC-BY-NC-4.0 (PLDA CC-BY-4.0), `commercial_use: false`.
+- Spark-TTS 0.5B runs: `spark-tts-0.5b` (alias `spark-tts`) is a runnable text-to-speech model on the torch plugin
+  (kind `spark-tts`, extra `spark-tts`): the authors' recipe with their BiCodec code from GitHub at a pinned commit,
+  created voices `female` and `male` (speed as the model's speed level) and cloned voices `heart` and `michael`
+  (bolo's reference clips). Not run here (3.9 GB; wiring tested with fakes, the BiCodec code with random weights);
+  licence labelled CC-BY-NC-SA-4.0, `commercial_use: false`.
 ### Fixed
 
 - `test_gated_entries_explain_what_to_do` failed whenever bolo-torch was installed next to the server: the test's

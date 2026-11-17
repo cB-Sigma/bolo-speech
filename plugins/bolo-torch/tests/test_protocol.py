@@ -143,6 +143,9 @@ def test_catalog_entries_use_kinds_the_plugin_knows() -> None:
     # the authors' code at the commit the loader accepts, and nothing that is not runnable
     assert diarizen.runnable and diarizen.source.revision and len(diarizen.source.revision) == 40
     assert f"DiariZen@{DIARIZEN_COMMIT}" in str(diarizen.options["plugin_install"])
+    spark = next(s for s in entries if s.kind == "spark-tts")
+    assert spark.runnable and "code install spark-tts" in str(spark.options["plugin_install"])
+    assert {v["id"] for v in spark.voices} == {"female", "male", "heart", "michael"}
     for spec in [*diarizers.values(), *(s for s in entries if s.id == "pixit-ami")]:
         # pinned pipeline and sub-models, with the hashes the plugin checks again before pyannote reads anything
         assert spec.gated and len(spec.source.revision or "") == 40, spec.id

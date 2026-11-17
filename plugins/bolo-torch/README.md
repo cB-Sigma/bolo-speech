@@ -19,6 +19,7 @@ the console, the OpenAI-compatible API) works as for bolo's own engines.
 | `indic-speak` | TTS | Bodhan AI Indic-Speak, 3B Llama + SNAC + Vocos, 22 Indian languages and English | `indic-speak` | Indic Open Model License v1.0 (conditional) | yes | **no** |
 | `veena` | TTS | Maya Research Veena, 3B Llama + SNAC, Hindi and English | `orpheus` | Apache-2.0 | no | **no** (only the SNAC decoder) |
 | `svara-tts-v1` | TTS | Kenpath Svara v1, 3B Llama + SNAC, 19 languages, 38 voices | `orpheus` | Apache-2.0 | no | **no** (only the SNAC decoder) |
+| `spark-tts-0.5b` | TTS | SparkAudio Spark-TTS 0.5B, English and Chinese, created voices (female, male) and voice cloning | `spark-tts` + the authors' BiCodec code (bundle `spark-tts`) | CC-BY-NC-SA-4.0 (non-commercial) | no | **no** (fakes; BiCodec code with random weights) |
 | `sepformer-whamr16k` | separation | SpeechBrain SepFormer, WHAMR!, 16 kHz, 2 speakers | `sepformer` | Apache-2.0 (WSJ0 data, see below) | no | CPU, see below |
 | `sepformer-whamr` | separation | SpeechBrain SepFormer, WHAMR!, 8 kHz, 2 speakers | `sepformer` | Apache-2.0 (WSJ0 data, see below) | no | CPU, see below |
 | `pixit-ami` | separation | pyannote PixIT `speech-separation-ami-1.0`, diarization + separation | `pyannote` | MIT | yes (two repositories) | CPU, see below |
@@ -44,6 +45,15 @@ The pyannote diarizers are bolo `diarization` models: `POST /api/v1/diarize` wit
 transcriptions. bolo's own diarization runs pyannote's segmentation model exported to ONNX with its own embeddings and
 clustering; these run pyannote.audio's pipelines unchanged, for pyannote's exact results. See "pyannote speaker
 diarization" below.
+
+Spark-TTS 0.5B (`spark-tts-0.5b`, kind `spark-tts`) follows the authors' `cli/SparkTTS.py`: its language model
+(Qwen2.5-0.5B, `LLM/`) through transformers' `AutoModelForCausalLM`, sampling as theirs (temperature 0.8, top-k 50,
+top-p 0.95), and the BiCodec tokenizer and decoder from github.com/SparkAudio/Spark-TTS (Apache-2.0) at a pinned
+commit (bundle `spark-tts`, see "Inference code from GitHub"). Two kinds of voice: *created* voices (`female`,
+`male`: a gender and a pitch level, with the request's `speed` as one of the model's five speed levels), for which
+the model writes the voice tokens itself, and *cloned* voices (`heart`, `michael`: bolo's reference clips, or
+`voices_dir`), whose voice tokens come from the reference recording with its transcript. 16 kHz, one sentence at a
+time. Weights CC-BY-NC-SA-4.0: not for commercial use. Not run here (3.9 GB).
 
 DiariZen (`diarizen-wavlm-large-s80-md-v2`, kind `diarizen`) is a bolo `diarization` model too, run by the authors'
 own `DiariZenPipeline` (github.com/BUTSpeechFIT/DiariZen, MIT) on their fork of pyannote.audio 3.1.1 (in the same
@@ -239,7 +249,8 @@ Extras: `parler` (Parler-TTS), `f5` (IndicF5), `f5-original` (the original F5-TT
 package, which pins its own libraries: give it its own environment), `indic-speak` (transformers 5 and SNAC),
 `orpheus` (Veena, Svara), `sepformer`, `pyannote` (PixIT, pyannote speaker diarization),
 `dicow` (DiCoW, SE-DiCoW: transformers 4.55 and pandas), `diarizen` (DiariZen: toml, accelerate, scipy, torchaudio
-below 2.9; with the authors' two packages from GitHub, see above), `omni` (Qwen2.5-Omni and Qwen3-Omni: transformers 4.57
+below 2.9; with the authors' two packages from GitHub, see above), `spark-tts` (Spark-TTS: transformers, einops, einx,
+omegaconf, soxr, torchaudio; the BiCodec code is the bundle `spark-tts`), `omni` (Qwen2.5-Omni and Qwen3-Omni: transformers 4.57
 or later, accelerate, torchvision), `step-audio-2` (Step-Audio 2 mini: transformers 4.49.0, which the authors use, and
 token2wav's libraries: s3tokenizer, onnxruntime, hyperpyyaml, diffusers, torchaudio, librosa), `glm-4-voice` (GLM-4-Voice: transformers 4.44.1, diffusers 0.27.2 with huggingface-hub below 0.26, conformer,
 hyperpyyaml, hydra-core, lightning, tiktoken, bitsandbytes, as in the authors' requirements), `kimi-audio`
@@ -299,6 +310,7 @@ refused at load.
 | --- | --- | --- |
 | `step-audio-2` | stepfun-ai/Step-Audio2 @ `76e272b56c39` (`utils.py`, `token2wav.py`, `cosyvoice2/`, part of `flashcosyvoice/`, the two prompt voices) | Apache-2.0 |
 | `glm-4-voice` | THUDM/GLM-4-Voice @ `eb00ce9142e8` (`speech_tokenizer/`, `flow_inference.py`, `cosyvoice/`) and shivammehta25/Matcha-TTS @ `dd9105b34bf2` (`matcha/`, its submodule) | Apache-2.0; MIT |
+| `spark-tts` | SparkAudio/Spark-TTS @ `2f1ea9082400` (`sparktts/`: BiCodec, its modules and token maps) | Apache-2.0 |
 | `kimi-audio` | MoonshotAI/Kimi-Audio @ `349251e1d8f4` (`kimia_infer/`) and THUDM/GLM-4-Voice @ `eb00ce9142e8` (`speech_tokenizer/` in `kimia_infer/models/tokenizer/glm4`, its submodule) | MIT (stated in README and pyproject; no LICENSE file; Qwen-derived code Apache-2.0); Apache-2.0 |
 
 ## Speech-to-speech models on a Windows laptop with an NVIDIA GPU
@@ -398,6 +410,62 @@ text-to-speech for one, which needs a voice installed. The first request loads t
 * Errors to expect and their fixes: `component_missing` (install the extra in the plugin's environment, or
   flash-attn), `device 'cuda' was requested but this torch build sees no CUDA device` (install the CUDA torch wheel
   in the plugin's environment), out of memory (`quantization=int4` for GLM-4-Voice, or a smaller model).
+
+## Spark-TTS and DiariZen on a Windows laptop with an NVIDIA GPU
+
+DiariZen ran here on a CPU only; Spark-TTS was not run (3.9 GB). Steps to run both on the GPU, from a checkout:
+
+**1. bolo**, as above (`git clone https://github.com/cB-Sigma/bolo C:\bolo-src`, `C:\bolo-env`).
+
+**2. One plugin environment per model** (DiariZen's pyannote.audio fork must not meet other pyannote versions):
+
+```powershell
+py -3.12 -m venv C:\bolo-tts\spark
+C:\bolo-tts\spark\Scripts\pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+C:\bolo-tts\spark\Scripts\pip install C:\bolo-src\server "C:\bolo-src\plugins\bolo-torch[spark-tts]"
+C:\bolo-tts\spark\Scripts\bolo-torch code install spark-tts      # sparktts at the pinned commit, sha256-checked
+
+py -3.12 -m venv C:\bolo-tts\diarizen
+C:\bolo-tts\diarizen\Scripts\pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu126
+C:\bolo-tts\diarizen\Scripts\pip install C:\bolo-src\server "C:\bolo-src\plugins\bolo-torch[diarizen]" `
+  "pyannote.audio @ git+https://github.com/BUTSpeechFIT/DiariZen@844f5555b0a98acd0931511fc641a8c5b8ba92c7#subdirectory=pyannote-audio" `
+  "diarizen @ git+https://github.com/BUTSpeechFIT/DiariZen@844f5555b0a98acd0931511fc641a8c5b8ba92c7"
+C:\bolo-tts\diarizen\Scripts\bolo-torch doctor                  # cuda_available: true
+```
+
+(The DiariZen line needs git on PATH: Git for Windows.)
+
+**3. Serve with one of them**, on the GPU:
+
+```powershell
+$env:BOLO_PLUGINS = "torch=C:\bolo-tts\spark\Scripts\python.exe -m bolo_torch"   # or ...\diarizen\...
+$env:BOLO_DEVICE = "cuda"; $env:BOLO_TORCH_DEVICE = "cuda"
+C:\bolo-env\Scripts\bolo pull spark-tts-0.5b        # 3.9 GB; or: bolo pull diarizen (278 MB)
+C:\bolo-env\Scripts\bolo serve
+```
+
+**4. Try them** (second window):
+
+```powershell
+# Spark-TTS: a created voice, a faster one, and a cloned one
+curl.exe -s http://127.0.0.1:8000/v1/audio/speech -H "Content-Type: application/json" `
+  -d '{"model":"spark-tts-0.5b","voice":"female","input":"The quick brown fox jumps over the lazy dog."}' -o female.wav
+curl.exe -s http://127.0.0.1:8000/v1/audio/speech -H "Content-Type: application/json" `
+  -d '{"model":"spark-tts-0.5b","voice":"male","speed":1.4,"input":"This one should be noticeably faster."}' -o male.wav
+curl.exe -s http://127.0.0.1:8000/v1/audio/speech -H "Content-Type: application/json" `
+  -d '{"model":"spark-tts-0.5b","voice":"heart","input":"Cloned from bolo''s English reference clip."}' -o heart.wav
+# DiariZen: the demo dialogue (two voices taking turns)
+curl.exe -s http://127.0.0.1:8000/api/v1/diarize -F model=diarizen -F file=@C:\bolo-src\server\src\bolo\_ui\diarization\two-speakers-en.mp3
+```
+
+**What to check.** Spark-TTS: each file speaks the text (`bolo transcribe -m whisper-base female.wav`), `female`
+and `male` differ, `heart` sounds like `C:\bolo-src\server\src\bolo\samples\en-short.wav`, and a Chinese sentence
+works; the log shows `spark-tts inference code: SparkAudio/Spark-TTS@2f1ea9082400`. Note the first-audio time and
+RTF that bolo logs, and `bolo ps` (on `cuda`, about 4 GB). DiariZen: speakers `A` and `B` taking seven turns, as on the
+CPU here (DER 5.0 % against the clip's script); the time should be well under the 27 s of audio (on the CPU it took
+337 s). Errors to expect: `component_missing` naming the commit (install the two DiariZen packages exactly as above),
+`device 'cuda' was requested but this torch build sees no CUDA device` (the CUDA torch wheel is missing in that
+environment).
 
 ## GPUs
 
@@ -582,8 +650,13 @@ docs/measurements/dicow-conditioned.json.
   synthetic voice pair, and on single-speaker audio against plain Whisper large-v3-turbo; on CPUs without AMX /
   AVX512-BF16 only float32 speed was measured (forced on this machine). DiCoW gives no word timestamps.
 * Telephone (8 kHz) recordings with the 8 kHz SepFormer; real meeting audio with any separator.
-* `sravaani-1.0` and `indicconformer-600m-official`: not implemented. `spark-tts-0.5b` and `maskgct` are
-  catalogued but not implemented (no packaged inference code).
+* `sravaani-1.0` and `indicconformer-600m-official`: not implemented. `maskgct` is catalogued but not implemented
+  (no packaged inference code).
+* `spark-tts-0.5b`: the weights (3.9 GB) were not downloaded. Tested with fakes of transformers' classes and of
+  `BiCodecTokenizer`; the bundle was downloaded and matched its pins here, and the authors' BiCodec code from it ran
+  with random weights through the plugin's `tokenize` / `detokenize` (32 voice tokens, 50 semantic tokens per
+  second, 320 samples per token), so the shapes are the real ones. Speech quality, the created voices' pitch levels
+  and Chinese were not heard.
 * DiariZen on a GPU, on real meetings, with torch 2.9 or later (torchaudio 2.9 reads audio through torchcodec, which
   the extra keeps out), and on Windows (the install needs git).
 * `glm-4-voice-9b`: tested with fakes of ChatGLM, its tokenizer, `WhisperVQEncoder`, the feature extractor and
@@ -623,11 +696,12 @@ card before commercial use.
 | MiniCPM-o 2.6 | Apache-2.0 | Weights and code (the repository's remote code) per the model card; an optional registration questionnaire. |
 | Kimi-Audio 7B Instruct | MIT | Per the model card; the model is built on Qwen2.5-7B (Apache-2.0). Its code repository has no LICENSE file: README and pyproject say MIT, Qwen-derived code Apache-2.0. Uses glm-4-voice-tokenizer, whose weights are under the glm-4-voice License (commercial use after registering with Zhipu): check that before commercial use. |
 | Step-Audio 2 mini | Apache-2.0 | Model and code (the model repository's remote code, the Step-Audio2 repository's token2wav) under Apache-2.0. |
+| Spark-TTS 0.5B | CC-BY-NC-SA-4.0 | **Not for commercial use**; derivatives share alike. Code (`sparktts`): Apache-2.0. The language model is fine-tuned from Qwen2.5-0.5B (Apache-2.0); the tokenizer uses `wav2vec2-large-xlsr-53` (Apache-2.0), shipped in the model repository. |
 | DiariZen v2 (`BUT-FIT/diarizen-wavlm-large-s80-md-v2`) | CC-BY-NC-4.0 | **Not for commercial use** (the authors apply NC because some training sets forbid commercial use). The PLDA files are CC-BY-4.0. Code (DiariZen and its pyannote.audio fork): MIT. Downloads `pyannote/wespeaker-voxceleb-resnet34-LM` (CC-BY-4.0). |
 | PixIT `speech-separation-ami-1.0` | MIT | Gated (both repositories). Downloads `speechbrain/spkrec-ecapa-voxceleb` (Apache-2.0) and `microsoft/wavlm-large` (no licence stated on its model card; check before commercial use). |
 
-Apart from GLM-4-Voice (commercial use after registration) and DiariZen (non-commercial), no model here is marked
-non-commercial by its publisher; the SepFormer training-data caveat above is the one to
+Apart from GLM-4-Voice (commercial use after registration), Spark-TTS and DiariZen (non-commercial), no model here
+is marked non-commercial by its publisher; the SepFormer training-data caveat above is the one to
 weigh for commercial use. Nothing is downloaded unless you ask for that model.
 
 ## Development

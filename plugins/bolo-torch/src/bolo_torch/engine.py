@@ -29,6 +29,7 @@ LOADERS: dict[str, tuple[str, str]] = {
     "dicow": ("bolo_torch.models.dicow", "load"),
     "pyannote-diarization": ("bolo_torch.models.diarization", "load"),
     "diarizen": ("bolo_torch.models.diarizen", "load"),
+    "spark-tts": ("bolo_torch.models.spark_tts", "load"),
     "demucs-denoiser": ("bolo_torch.models.denoise", "load_demucs"),
     "qwen-omni": ("bolo_torch.models.omni", "load"),
     "step-audio-2": ("bolo_torch.models.step_audio", "load"),
@@ -43,7 +44,6 @@ LOADERS: dict[str, tuple[str, str]] = {
 NOT_IMPLEMENTED = {
     "sravaani": "SraVaani (TorchScript STT)",
     "indicconformer-official": "IndicConformer official",
-    "spark-tts": "Spark-TTS (no packaged inference code)",
     "maskgct": "MaskGCT (no packaged inference code)",
     "moshi": "Moshi (full-duplex: bolo runs it in Kyutai's own server, not in this plugin; set s2s_model to a moshiko- "
     "or moshika- catalog entry, docs/voice-agents.md, 'Full-duplex models')",

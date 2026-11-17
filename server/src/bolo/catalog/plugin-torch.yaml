@@ -744,8 +744,7 @@
     - {id: zaid, name: Zaid, language: ur-IN}
     - {id: saba, name: Saba, language: ur-IN}
 - id: spark-tts-0.5b
-  runnable: false
-  not_runnable_reason: no runtime bolo can use runs this model yet
+  aliases: [spark-tts]
   task: tts
   engine: plugin:torch
   kind: spark-tts
@@ -760,11 +759,12 @@
   commercial_use: false
   gated: false
   features: [voice-cloning]
-  description: 'SparkAudio Spark-TTS 0.5B (Qwen2.5-0.5B writing BiCodec tokens), English and Chinese, voice cloning
-    and controllable voice creation. Non-commercial, share-alike weights. Not runnable yet: no runtime bolo can use runs it.
-    llama.cpp and audio.cpp have no Spark-TTS family (the GGUF conversions on the Hub hold only the language model,
-    not the BiCodec decoder), and the reference code (github.com/SparkAudio/Spark-TTS) is not a package bolo-torch
-    can depend on.'
+  description: 'SparkAudio Spark-TTS 0.5B (Qwen2.5-0.5B writing BiCodec tokens), English and Chinese. Created voices
+    (female, male: a gender and a pitch level, the speed level from the request) and voice cloning from a reference
+    recording (bolo''s clips heart and michael, or voices_dir). Runs the authors'' recipe through the torch plugin: the
+    language model with transformers, the BiCodec tokenizer and decoder from github.com/SparkAudio/Spark-TTS
+    (Apache-2.0) at a pinned commit, each file checked by sha256. Non-commercial, share-alike weights. 3.9 GB; a GPU is
+    recommended. Untested here (wiring tested with fakes and the authors'' BiCodec code with random weights).'
   source_url: https://huggingface.co/SparkAudio/Spark-TTS-0.5B
   validated: untested
   source:
@@ -772,7 +772,14 @@
     revision: 642071559bfc6346c2359d19dcb6be3f9dd8a05d
     exclude: ['src/*', .gitattributes]
   options:
-    plugin_install: not supported by bolo-torch yet (no packaged inference code)
+    plugin_install: pip install "bolo-torch[spark-tts]" (the bolo PyTorch engine plugin, plugins/bolo-torch), then
+      bolo-torch code install spark-tts (github.com/SparkAudio/Spark-TTS at a pinned commit; a load also installs it)
+    hardware: {gpu: recommended, vram_gb: 4.0, note: 'the language model in bfloat16, BiCodec and wav2vec 2.0 in float32'}
+  voices:
+  - {id: female, name: Female (created), gender: f, spark_gender: female, pitch: moderate}
+  - {id: male, name: Male (created), gender: m, spark_gender: male, pitch: moderate}
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
 - id: maskgct
   runnable: false
   not_runnable_reason: no ggml or ONNX runtime has this model, and its inference code is not packaged

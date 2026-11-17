@@ -782,7 +782,7 @@ in the id, aliases, family, engine, languages, licence or description.
   "available": true,                  // false while a required component is not installed
   "status": null,                     // "pending": described but its files are not published yet (see below)
   "runnable": true,                   // false: no runtime bolo has can run this model yet …
-  "not_runnable_reason": null,        // … and why (spark-tts-0.5b, maskgct)
+  "not_runnable_reason": null,        // … and why (maskgct)
   "cloud": false,                     // true: a paid cloud API (engine "remote"); nothing is downloaded
   "notice": null,                     // cloud models: "paid cloud API; audio leaves this server"
   "provider": null,                   // cloud models: {"name","kind","model","configured","price"}

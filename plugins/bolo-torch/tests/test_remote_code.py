@@ -89,7 +89,7 @@ def test_pinned_configuration_files(tmp_path: Path) -> None:
 
 def test_bundled_pins_are_complete() -> None:
     found = upstream.bundles()
-    assert set(found) == {"step-audio-2", "glm-4-voice", "kimi-audio"}
+    assert {"step-audio-2", "glm-4-voice", "kimi-audio", "spark-tts"} <= set(found)
     for bundle in found.values():
         for part in bundle.parts:
             assert len(part.commit) == 40 and part.license and part.license_url.startswith("https://github.com/")

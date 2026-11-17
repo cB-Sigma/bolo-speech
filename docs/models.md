@@ -394,7 +394,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `spark-tts-0.5b` | en, zh | accuracy | - | 3.9 GB | CC-BY-NC-SA-4.0 ⚠ · needs plugin torch | not runnable yet |
+| `spark-tts-0.5b` | en, zh | accuracy | - | 3.9 GB | CC-BY-NC-SA-4.0 ⚠ · needs plugin torch | untested |
 
 #### MaskGCT
 
@@ -1071,7 +1071,7 @@ models below were checked against their model cards and licence files on 2026-11
 | `f5-tts-v1-base` | CC-BY-NC-4.0 weights, MIT code (no) | bolo-torch, `f5-tts` kind with `layout: f5-tts` on the `f5-tts` package (`bolo-torch[f5-original]`); voices are bolo's reference clips or `voices_dir` | catalogued |
 | `indic-speak` | Indic Open Model License v1.0, gated (conditional: hosting it as an API for others needs Bodhan AI's approval, size thresholds, use policy) | bolo-torch, `indic-speak` kind running the repository's own `inference.py` (`bolo-torch[indic-speak]`) | catalogued; the loader follows the model card, the gated code was not read |
 | `indextts-2.5-audiocpp` | bilibili Model Use License (conditional) | tts-server, audio.cpp `index_tts2` family, `IndexTTS2.5-GGUF` q8_0 | catalogued |
-| `spark-tts-0.5b` | CC-BY-NC-SA-4.0 (no) | none yet: no ggml/ONNX runtime runs the BiCodec decoder, and the reference code is not packaged | catalogued, not runnable (bolo-torch answers "not implemented") |
+| `spark-tts-0.5b` | CC-BY-NC-SA-4.0 (no) | bolo-torch, `spark-tts` kind: the authors' recipe, BiCodec code from github.com/SparkAudio/Spark-TTS at a pinned commit (bundle `spark-tts`) | runnable, untested (fakes; BiCodec code with random weights) |
 | `maskgct` | CC-BY-NC-4.0 (no) | none yet: Amphion's code is not packaged (the PyPI `maskgct` wrapper is a third-party GPL-3.0 project) | catalogued, not runnable |
 | `diarizen-wavlm-large-s80-md-v2` | CC-BY-NC-4.0, PLDA CC-BY-4.0 (no) | bolo-torch, `diarizen` kind: the authors' `DiariZenPipeline` and pyannote.audio fork from github.com/BUTSpeechFIT/DiariZen at a pinned commit (`bolo-torch[diarizen]`, own environment) | measured on CPU (DER 5.0 % on the demo dialogue, RTF 12.4) |
 | `mms-lid-126`, `mms-lid-4017` | CC-BY-NC-4.0 (no) | ONNX Runtime, `onnx_lid` kind on Xenova's int8 exports | runnable, not measured (978 MB); "Language identification" below |

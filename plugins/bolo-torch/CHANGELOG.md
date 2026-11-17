@@ -6,6 +6,12 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ### Added
 
+- **Spark-TTS 0.5B** (kind `spark-tts`, extra `spark-tts`, code bundle `spark-tts`): the authors' recipe
+  (`cli/SparkTTS.py`): the Qwen2.5-0.5B language model through transformers with their sampling, and the BiCodec
+  tokenizer and decoder from github.com/SparkAudio/Spark-TTS at a pinned commit (20 files, sha256-pinned). Created
+  voices (gender and pitch level; the request's speed as one of five speed levels) and cloned voices (bolo's
+  reference clips or `voices_dir`, with their transcripts). Tested with fakes; the bundle's BiCodec code ran here
+  with random weights through the plugin's token paths. Weights CC-BY-NC-SA-4.0.
 - **DiariZen** (kind `diarizen`, extra `diarizen`): BUT-FIT's DiariZen v2 diarization through the authors' own
   `DiariZenPipeline` and their pyannote.audio 3.1.1 fork, both installed from github.com/BUTSpeechFIT/DiariZen at a
   pinned commit (the loader refuses any other commit, read from pip's `direct_url.json`), in an environment of their

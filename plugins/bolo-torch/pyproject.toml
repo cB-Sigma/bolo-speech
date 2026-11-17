@@ -106,6 +106,13 @@ speechbrain = ["speechbrain>=1.0", "torchaudio>=2.1"]
 # those in the same command, in an environment of their own (the fork replaces pyannote.audio), see README.md.
 # torchaudio 2.9 reads audio only through torchcodec, which the pipeline's torchaudio.load does not expect.
 diarizen = ["toml", "accelerate>=0.33", "scipy", "soundfile>=0.12.1", "torchaudio>=2.1,<2.9"]
+# Spark-TTS 0.5B: the libraries of the authors' sparktts package (BiCodec), which the plugin installs itself from
+# github.com/SparkAudio/Spark-TTS at a pinned commit (`bolo-torch code install spark-tts`). The language model is a
+# plain Qwen2 checkpoint; the authors use transformers 4.46.2.
+spark-tts = [
+  "transformers>=4.46", "einops>=0.8", "einx>=0.3", "omegaconf>=2.3", "safetensors", "soundfile>=0.12.1", "soxr",
+  "torchaudio>=2.1", "tqdm", "packaging",
+]
 dev = ["pytest>=8", "pytest-timeout>=2.3", "ruff>=0.8", "mypy>=1.13", "build", "twine"]
 
 [project.scripts]

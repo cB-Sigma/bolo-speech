@@ -1,0 +1,39 @@
+{
+ "name": "spark-tts",
+ "about": "Spark-TTS: the BiCodec audio tokenizer and decoder (wav2vec 2.0 features, ECAPA speaker encoder, Vocos-style decoder) and its token maps; the language model is a plain Qwen2.5 checkpoint for transformers",
+ "extra": "spark-tts",
+ "paths": [
+  ""
+ ],
+ "parts": [
+  {
+   "repo": "SparkAudio/Spark-TTS",
+   "commit": "2f1ea9082400547242641f5271b6f941c9f439d1",
+   "license": "Apache-2.0 (code; the Spark-TTS-0.5B weights are CC-BY-NC-SA-4.0)",
+   "license_url": "https://github.com/SparkAudio/Spark-TTS/blob/2f1ea9082400547242641f5271b6f941c9f439d1/LICENSE",
+   "dest": "",
+   "files": {
+    "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "sparktts/models/audio_tokenizer.py": "0fef1978c09a2b39f254b9c5e0cf575c3e166dd30f3e284e8060a18ecc6efc40",
+    "sparktts/models/bicodec.py": "8ba3c18741e3da37c08e965b9832446d2b3ba2dc6453cc9f73c484d4d95bf3b8",
+    "sparktts/modules/blocks/layers.py": "d17de631c79a325e24329f6d417fb41a526b4af460265babecd55b8b6e3ef892",
+    "sparktts/modules/blocks/samper.py": "c79a90d57d47d976e879e507a996b10b0294fd26a1b4ef5fea64caf3f1e9dd38",
+    "sparktts/modules/blocks/vocos.py": "06987a50d6cf3beda78faac947c82abf6457e4152c9dab21d2bcf3e8dd129f87",
+    "sparktts/modules/encoder_decoder/feat_decoder.py": "4b022f3b223b741c6013a0a739ee636b1f7be6862552e83cd6632175c7c1eb5a",
+    "sparktts/modules/encoder_decoder/feat_encoder.py": "3505e5667d0200c73d96eac8738567969e749d9afb0a77bf076d6d96f7bc71fe",
+    "sparktts/modules/encoder_decoder/wave_generator.py": "9412849733c5698e6cf0f858653e99104a9803d50c9b9c9d47815efc711af818",
+    "sparktts/modules/fsq/finite_scalar_quantization.py": "d3da4fdd5e4ca211adf9e2f34b2faef83ab160622a50b79bfd499b9c0c81a9ad",
+    "sparktts/modules/fsq/residual_fsq.py": "ca8771abf27ce99cb0a57d0897270fa818e3e49e18df9aa955e27c5eaf18be4d",
+    "sparktts/modules/speaker/ecapa_tdnn.py": "2a5862b8ec6334be68aab2ec324ab9106b242d7f7ad72ffca65183cf0799196c",
+    "sparktts/modules/speaker/perceiver_encoder.py": "6462fd9e4e04029bb14e80c736d35b1a3d23cf5cc2e0461d1a532da7096755c4",
+    "sparktts/modules/speaker/pooling_layers.py": "d39715e36c9c7625f9ed6495fa32ad5c6ff35682ecf07df936a6e5161dcdd3a8",
+    "sparktts/modules/speaker/speaker_encoder.py": "adadd4c85537e778594d6a590d760629bcc4adb212d1a51da7d5d9ca57d45aa2",
+    "sparktts/modules/vq/factorized_vector_quantize.py": "a72bde5e47de81f36f16ba9d9687804d0d93820143ab2ec2e222985d310fd1be",
+    "sparktts/utils/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sparktts/utils/audio.py": "f7cb4ecff0bd158fff2f72da055207b052c24b3e3f77aafe07f1d3a7c5850ff9",
+    "sparktts/utils/file.py": "a22c02107b11389c624c62141f9ab68f98a110d66b4875b78e687e55cdbcc160",
+    "sparktts/utils/token_parser.py": "c864ed59380998947c8b46f85785e34c5c8155153323be41c96e343d45bce502"
+   }
+  }
+ ]
+}
