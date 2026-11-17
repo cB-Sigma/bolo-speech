@@ -6,6 +6,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-11-17
+
 ### Fixed
 
 - Live demo and console, "Your device": a WebGPU adapter request or storage estimate the browser never answered (seen
