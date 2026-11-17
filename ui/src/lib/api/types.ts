@@ -103,6 +103,20 @@ export interface Capabilities {
     sip?: { enabled?: boolean; listening?: boolean; port?: number }
     [k: string]: unknown
   }
+  /** OpenTelemetry export of the request traces (newer servers). Read-only: set by the `otel` setting and `OTEL_*`. */
+  opentelemetry?: {
+    /** Spans are being exported. */
+    enabled?: boolean
+    /** Switched on (setting or an OTLP endpoint in the environment), whether or not it could start. */
+    switched_on?: boolean
+    installed?: boolean
+    endpoint?: string | null
+    protocol?: string | null
+    service_name?: string | null
+    exported?: number
+    install?: string | null
+    [k: string]: unknown
+  }
   /** Hardware detection and model recommendations. They advise; `restricts` is always false. */
   recommendations?: {
     hardware?: string
@@ -1131,8 +1145,36 @@ export interface SavedVoice {
   score?: VoiceScore
 }
 
+/** A saved blend of a model's own voices (`"kind": "blend"`): no recording, no consent, no score. */
+export interface SavedBlend {
+  id: string
+  object: 'voice'
+  kind: 'blend'
+  name: string
+  description: string | null
+  language: string | null
+  /** `af_bella(0.7)+af_sky(0.3)`, normalised weights. */
+  blend: string
+  voices: { voice: string; weight: number }[]
+  /** The model the blend is for. */
+  default_model: string | null
+  created_at: string
+  audio_url: null
+}
+
+/** `POST /v1/audio/speech/embedding`: OpenAI's embeddings shape. */
+export interface SpeakerEmbedding {
+  object: 'list'
+  data: { object: 'embedding'; embedding: number[]; index: number }[]
+  model: string
+  usage?: { prompt_tokens: number; total_tokens: number }
+}
+
 export interface VoiceList {
   voices: SavedVoice[]
+  /** Saved blends, apart from the recordings (newer servers). */
+  blends?: SavedBlend[]
+  blending_models?: string[]
   cloning_models: string[]
   consent: Record<string, string>
   similarity: { embedding_model: string; same_speaker: number; similar: number; calibration?: Record<string, unknown> }

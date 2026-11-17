@@ -7,6 +7,7 @@ import {
   Play,
   Repeat2,
   Square,
+  Tag,
   TriangleAlert,
   Volume2,
 } from 'lucide-react'
@@ -63,6 +64,15 @@ import { isDemo } from '@/lib/api/config'
 import { detectSupport } from '@/lib/support'
 import { BrowserTts } from './tts-browser'
 import { VoiceClonePanel, type CloneReference } from '@/components/tts/voice-clone'
+import { startingBlend, VoiceBlendPanel } from '@/components/tts/voice-blend'
+import {
+  blendString,
+  canBlend,
+  languageSummary,
+  languageWarning,
+  parseLanguageHeader,
+  type BlendPart,
+} from '@/lib/blend'
 import { dataUrlToBlob, type VoiceSource } from '@/components/voices/new-voice-dialog'
 import { useVoices } from '@/components/voices/use-voices'
 import { VoiceLibrary } from '@/components/voices/voice-library'
@@ -98,6 +108,8 @@ const FALLBACK_TEXTS: Sample[] = [
 ]
 
 const idle = new Store<TtsState>(emptyTts())
+/** The voice choice that names no voice: the server picks one for the language it detects. */
+const AUTO_VOICE = 'auto'
 
 export default function TtsPage() {
   const [mode, setMode] = useState<'server' | 'browser'>(isDemo ? 'browser' : 'server')
@@ -151,6 +163,11 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
   // Saved voices (the server's library): one can stand in for the model's voice when the model clones voices.
   const library = useVoices()
   const [savedId, setSavedId] = useState<string | null>(null)
+  // Blends of the model's own voices (Kokoro): built here, or saved in the library.
+  const [blending, setBlending] = useState(false)
+  const [parts, setParts] = useState<BlendPart[]>([])
+  const [blendId, setBlendId] = useState<string | null>(null)
+  const [detect, setDetect] = useState(true)
   const [toSave, setToSave] = useState<VoiceSource | null>(null)
   const listNames = (wordLists.data?.wordlists ?? []).map((l) => l.name)
   const chosenLists = lists.filter((n) => listNames.includes(n))
@@ -170,6 +187,16 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
   const roman = romanisedCap && ROMANISED_MODES.includes(romanised as RomanisedMode) ? romanised : ''
   const saved = canClone(model) && savedId ? (library.data?.voices.find((v) => v.id === savedId) ?? null) : null
   const clone = canClone(model) && cloning && !saved
+  const blends = canBlend(model)
+  // A blend names voices of the model: parts naming voices it lacks start over from its first two.
+  const blendParts =
+    parts.length && parts.every((x) => voices.some((v) => v.id === x.voice)) ? parts : startingBlend(voices)
+  const blendSpelled = blends && blending && !clone ? blendString(blendParts) : ''
+  const savedBlend =
+    blends && blendId && !blendSpelled ? (library.data?.blends?.find((b) => b.id === blendId) ?? null) : null
+  // "From the text": no voice is named, so the server picks one that speaks the language it detects.
+  const autoVoice = multilingual && p.ttsVoice === AUTO_VOICE && detect && !lang
+  const voiceSent = blendSpelled || (savedBlend ? savedBlend.id : saved ? saved.id : autoVoice ? undefined : voice?.id)
   const cloneReady = !clone || reference != null
   const requestOptions = {
     language: lang || undefined,
@@ -179,6 +206,7 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
     inputFormat: ssml ? ('ssml' as const) : undefined,
     wordlists: chosenLists.length ? chosenLists : undefined,
     romanised: roman || undefined,
+    detectLanguage: detect ? undefined : false,
   }
   const forcedHttp = clone || ssml
   const fromServer = (samples.data?.samples ?? []).filter((s) => s.kind === 'text')
@@ -198,7 +226,7 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
     void previewRef.current?.dispose()
     const s = new TtsSession({
       model: model.id,
-      voice: saved ? saved.id : voice?.id,
+      voice: voiceSent,
       text: text.trim(),
       transport,
       ...requestOptions,
@@ -275,6 +303,10 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
 
   const hasAudio = state.audioSeconds > 0 && state.totalMs != null
   const savedChoices = canClone(model) ? (library.data?.voices ?? []) : []
+  const blendChoices = blends ? (library.data?.blends ?? []) : []
+  const reported = state.reported
+  const decision = parseLanguageHeader(reported?.language)
+  const decisionWarning = languageWarning(decision)
   const components = useComponents().data?.components
   // Known up front from the catalog, or learnt the hard way from a `component_missing` error.
   const missing =
@@ -296,21 +328,42 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
       />
       <div className="flex items-center gap-1">
         <Select
-          value={saved ? `saved:${saved.id}` : (voice?.id ?? undefined)}
+          value={
+            savedBlend
+              ? `blend:${savedBlend.id}`
+              : saved
+                ? `saved:${saved.id}`
+                : autoVoice
+                  ? AUTO_VOICE
+                  : (voice?.id ?? undefined)
+          }
           onValueChange={(v) => {
             if (v.startsWith('saved:')) {
               setSavedId(v.slice(6))
+              setBlendId(null)
+              return
+            }
+            if (v.startsWith('blend:')) {
+              setBlendId(v.slice(6))
+              setSavedId(null)
               return
             }
             setSavedId(null)
+            setBlendId(null)
             setPref('ttsVoice', v)
           }}
-          disabled={busy || (voices.length === 0 && !savedChoices.length) || clone}
+          disabled={busy || (voices.length === 0 && !savedChoices.length) || clone || Boolean(blendSpelled)}
         >
           <SelectTrigger className="h-8 w-48" aria-label="Voice" data-testid="voice-picker">
             <SelectValue placeholder={voices.length ? 'Voice' : 'Default voice'} />
           </SelectTrigger>
           <SelectContent position="popper" align="start" className="max-h-72">
+            {multilingual && (
+              <SelectItem value={AUTO_VOICE} disabled={!detect || Boolean(lang)}>
+                From the text
+                <span className="ml-2 text-xs text-muted-foreground">a voice of the detected language</span>
+              </SelectItem>
+            )}
             {voices.map((v) => (
               <SelectItem key={v.id} value={v.id}>
                 {v.name}
@@ -332,6 +385,18 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
                 ))}
               </SelectGroup>
             )}
+            {blendChoices.length > 0 && (
+              <SelectGroup>
+                {(voices.length > 0 || savedChoices.length > 0) && <SelectSeparator />}
+                <SelectLabel className="text-xs">Saved blends</SelectLabel>
+                {blendChoices.map((b) => (
+                  <SelectItem key={b.id} value={`blend:${b.id}`}>
+                    {b.name}
+                    <span className="ml-2 num text-xs text-muted-foreground">blend</span>
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            )}
           </SelectContent>
         </Select>
         <Tooltip>
@@ -340,7 +405,9 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
               variant="outline"
               size="icon"
               onClick={preview}
-              disabled={!voice || busy || model?.available === false || saved != null}
+              disabled={
+                !voice || busy || model?.available === false || saved != null || savedBlend != null || !!blendSpelled
+              }
               aria-label="Preview this voice"
             >
               <Volume2 />
@@ -501,6 +568,22 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
                   data-testid="tts-ssml"
                 />
               </label>
+              {multilingual && !lang && (
+                <label
+                  className="flex h-8 items-center gap-2 rounded-lg border border-input px-2.5 text-xs dark:bg-input/30"
+                  title="Without a language, guess it from the text and, unless you named a voice, pick a voice that speaks it"
+                >
+                  Detect language
+                  <Switch
+                    checked={detect}
+                    onCheckedChange={setDetect}
+                    size="sm"
+                    disabled={busy}
+                    aria-label="Detect the language from the text"
+                    data-testid="tts-detect-language"
+                  />
+                </label>
+              )}
               {wordLists.offered && (
                 <WordListSelect names={listNames} value={chosenLists} onChange={setLists} disabled={busy} />
               )}
@@ -537,6 +620,11 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
               {romanisedCap && romanisedNote && (roman === 'auto' || roman === 'on') && (
                 <span className="text-xs text-warning-text" data-testid="tts-romanised-note">
                   {romanisedNote}
+                </span>
+              )}
+              {multilingual && !lang && detect && !forcedHttp && transport === 'websocket' && (
+                <span className="text-xs text-muted-foreground" data-testid="tts-detect-note">
+                  The WebSocket does not detect the language; chunked HTTP does.
                 </span>
               )}
               {forcedHttp && (
@@ -608,6 +696,29 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
             />
           )}
 
+          {blends && model && (
+            <VoiceBlendPanel
+              model={model.id}
+              voices={voices}
+              enabled={blending}
+              onEnabledChange={(on) => {
+                setBlending(on)
+                if (on) {
+                  setBlendId(null)
+                  setSavedId(null)
+                }
+              }}
+              parts={blendParts}
+              onPartsChange={setParts}
+              canSave={library.offered}
+              onSaved={(b) => {
+                setBlending(false)
+                setBlendId(b.id)
+              }}
+              disabled={busy}
+            />
+          )}
+
           {library.offered && (
             <VoiceLibrary
               model={model?.id ?? null}
@@ -619,6 +730,15 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
               }}
               pending={toSave}
               onPendingClear={() => setToSave(null)}
+              canBlend={blends && model?.installed === true}
+              selectedBlend={savedBlend?.id ?? null}
+              onSelectBlend={(id) => {
+                setBlendId(id)
+                if (id) {
+                  setBlending(false)
+                  setSavedId(null)
+                }
+              }}
               disabled={busy}
             />
           )}
@@ -726,6 +846,67 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
               </>
             )}
           </Panel>
+
+          {state.status !== 'idle' && (
+            <Panel
+              title="What the server decided"
+              description={state.transport === 'http' ? 'From the response headers' : 'Over the WebSocket'}
+              data-testid="tts-decided"
+            >
+              {state.transport !== 'http' ? (
+                <p className="text-[13px] leading-5 text-muted-foreground">
+                  The WebSocket reports no headers: switch the transport to chunked HTTP to see the voice, blend and
+                  language the server used (and to have the language detected from the text).
+                </p>
+              ) : !reported ? (
+                <p className="text-[13px] leading-5 text-muted-foreground">Waiting for the response.</p>
+              ) : (
+                <div className="grid gap-3">
+                  <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
+                    {reported.model && (
+                      <>
+                        <dt className="text-muted-foreground">Model</dt>
+                        <dd className="text-right num break-all">{reported.model}</dd>
+                      </>
+                    )}
+                    {reported.voice && (
+                      <>
+                        <dt className="text-muted-foreground">Saved voice</dt>
+                        <dd className="text-right num break-all">{reported.voice}</dd>
+                      </>
+                    )}
+                    {reported.blend && (
+                      <>
+                        <dt className="text-muted-foreground">Blend</dt>
+                        <dd className="text-right num break-all" data-testid="tts-blend-header">
+                          {reported.blend}
+                        </dd>
+                      </>
+                    )}
+                    <dt className="text-muted-foreground">Language</dt>
+                    <dd className="text-right" data-testid="tts-language-header">
+                      {decision ? languageSummary(decision) : 'not reported'}
+                    </dd>
+                  </dl>
+                  {reported.fallback && (
+                    <p className="text-xs text-warning-text">Another model answered: {reported.fallback}</p>
+                  )}
+                  {decisionWarning && (
+                    <Alert data-testid="tts-language-mismatch">
+                      <TriangleAlert />
+                      <AlertTitle>The voice may not speak this text&apos;s language</AlertTitle>
+                      <AlertDescription>{decisionWarning}</AlertDescription>
+                    </Alert>
+                  )}
+                  {decision && (
+                    <p className="flex items-center gap-1.5 num text-[11px] text-muted-foreground">
+                      <Tag className="size-3" aria-hidden /> x-bolo-language: {reported.language}
+                    </p>
+                  )}
+                </div>
+              )}
+            </Panel>
+          )}
 
           <Panel title="Reading the numbers" bodyClassName="grid gap-2.5 text-[13px] leading-5 text-muted-foreground">
             <p>

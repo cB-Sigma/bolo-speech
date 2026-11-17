@@ -19,11 +19,13 @@ import type {
   ProviderUpdate,
   RequestTrace,
   Sample,
+  SavedBlend,
   SavedVoice,
   ServerInfo,
   SetupPlan,
   SetupUse,
   SimulationReport,
+  SpeakerEmbedding,
   SpeedInfo,
   Stats,
   Task,
@@ -268,6 +270,10 @@ export const api = {
     id: string,
     changes: Partial<Pick<SavedVoice, 'name' | 'description' | 'language' | 'transcript' | 'default_model'>>,
   ) => json<SavedVoice>(`api/v1/voices/${encodeURIComponent(id)}`, { method: 'PATCH', json: changes }),
+  /** Saves a blend of a model's voices (`af_bella(0.7)+af_sky(0.3)`) under a name. No recording, no consent. */
+  createBlend: (b: { name: string; blend: string; model?: string; description?: string }) =>
+    json<SavedBlend>('api/v1/voices/blends', { method: 'POST', json: b }),
+  /** Deletes a saved voice or a saved blend. */
   deleteVoice: (id: string) =>
     json<{ id: string; deleted: boolean }>(`api/v1/voices/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   /** The cleaned reference recording (WAV). */
@@ -284,6 +290,14 @@ export const api = {
   async exportVoices(ids?: string[]): Promise<Blob> {
     const res = await request('api/v1/voices/export', { query: { ids: ids?.length ? ids.join(',') : undefined } })
     return res.blob()
+  },
+  /** The speaker embedding of a recording (unit length: the cosine of two is their dot product). */
+  async speakerEmbedding(file: Blob, name: string, model?: string, signal?: AbortSignal): Promise<SpeakerEmbedding> {
+    const form = new FormData()
+    form.set('file', file, name)
+    if (model) form.set('model', model)
+    const res = await request('v1/audio/speech/embedding', { method: 'POST', body: form, signal })
+    return res.json() as Promise<SpeakerEmbedding>
   },
   bench: (req: BenchRequest) => json<{ job_id: string }>('api/v1/bench', { method: 'POST', json: req }),
   benchJob: (jobId: string, signal?: AbortSignal) => api.job<BenchResult>(jobId, signal),
@@ -397,5 +411,7 @@ export interface SpeechBody {
   normalize?: boolean | string
   /** Romanised text: `off`, `auto` or `on` (omitted: the model's setting, else the server's). */
   romanised?: string
+  /** Guess the language from the text when none is given (the server's default is true). */
+  detect_language?: boolean
   pronunciations?: { word: string; ipa?: string; say?: string; lang?: string; match?: string }[]
 }

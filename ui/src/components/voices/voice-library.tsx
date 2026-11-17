@@ -1,4 +1,4 @@
-import { Check, Download, Gauge, Plus, Square, Trash2, TriangleAlert, Volume2 } from 'lucide-react'
+import { Blend, Check, Download, Gauge, Plus, Square, Trash2, TriangleAlert, Volume2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Empty, Panel } from '@/components/panel'
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { describeError } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
-import type { SavedVoice } from '@/lib/api/types'
+import type { SavedBlend, SavedVoice } from '@/lib/api/types'
 import { download } from '@/lib/bench'
 import { fmtSeconds, languageName } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -17,7 +17,8 @@ import { CONSENT_LABEL, scoreFor, scoreText, scoreTone, useVoiceMutations, useVo
 /**
  * The server's saved voices: play a reference, use it as the voice of the playground, score how much a model's
  * clone sounds like it, save a new one, delete one. `model` is the playground's model; voices can be used and
- * scored only when it clones voices (`canUse`).
+ * scored only when it clones voices (`canUse`). Saved blends (a mix of a model's own voices) are listed apart:
+ * no recording and no consent; they can be used when the model blends voices (`canBlend`).
  */
 export function VoiceLibrary({
   model,
@@ -26,11 +27,17 @@ export function VoiceLibrary({
   onSelect,
   pending,
   onPendingClear,
+  canBlend = false,
+  selectedBlend = null,
+  onSelectBlend,
   disabled,
   className,
 }: {
   model: string | null
   canUse: boolean
+  canBlend?: boolean
+  selectedBlend?: string | null
+  onSelectBlend?: (id: string | null) => void
   selected: string | null
   onSelect: (id: string | null) => void
   /** A recording handed over by the clone panel, to save as a voice. */
@@ -47,6 +54,8 @@ export function VoiceLibrary({
   const audio = useRef<HTMLAudioElement | null>(null)
   const list = voices.data?.voices ?? []
   const cloning = voices.data?.cloning_models ?? []
+  const blends = voices.data?.blends ?? []
+  const blending = voices.data?.blending_models ?? []
 
   useEffect(() => () => audio.current?.pause(), [])
 
@@ -73,18 +82,21 @@ export function VoiceLibrary({
     }
   }
 
-  const del = (v: SavedVoice) => {
+  const del = (v: SavedVoice | SavedBlend) => {
     if (confirming !== v.id) {
       setConfirming(v.id)
       return
     }
     setConfirming(null)
+    const blend = 'kind' in v && v.kind === 'blend'
     remove.mutate(v.id, {
       onSuccess: () => {
         if (selected === v.id) onSelect(null)
-        toast.success(`Deleted the voice ${v.name}`)
+        if (selectedBlend === v.id) onSelectBlend?.(null)
+        toast.success(`Deleted the ${blend ? 'blend' : 'voice'} ${v.name}`)
       },
-      onError: (err) => toast.error('Could not delete the voice', { description: describeError(err) }),
+      onError: (err) =>
+        toast.error(`Could not delete the ${blend ? 'blend' : 'voice'}`, { description: describeError(err) }),
     })
   }
 
@@ -114,7 +126,7 @@ export function VoiceLibrary({
       description={
         voices.isLoading
           ? 'Loading…'
-          : `${list.length} voice${list.length === 1 ? '' : 's'} on the server · for models that clone voices`
+          : `${list.length} voice${list.length === 1 ? '' : 's'} on the server · for models that clone voices${blends.length ? ` · ${blends.length} blend${blends.length === 1 ? '' : 's'}` : ''}`
       }
       className={className}
       data-testid="voice-library"
@@ -260,6 +272,83 @@ export function VoiceLibrary({
             )
           })}
         </ul>
+      )}
+      {blends.length > 0 && (
+        <div className="mt-4 grid gap-1.5" data-testid="blend-list">
+          <h3 className="eyebrow">Saved blends</h3>
+          {!canBlend && (
+            <p className="text-[13px] leading-5 text-muted-foreground" data-testid="blend-library-hint">
+              {model ? (
+                <>
+                  <span className="num">{model}</span> does not blend voices.{' '}
+                </>
+              ) : null}
+              {blending.length
+                ? `Choose one that does to use these: ${blending.join(', ')}.`
+                : 'Blends are spoken by models that blend voices (Kokoro).'}
+            </p>
+          )}
+          <ul className="grid gap-1.5">
+            {blends.map((b) => {
+              const active = selectedBlend === b.id
+              const other = canBlend && model && b.default_model && b.default_model !== model
+              return (
+                <li
+                  key={b.id}
+                  className={cn(
+                    'flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-2.5 py-1.5',
+                    active ? 'border-primary/60 bg-primary/5' : 'border-border',
+                  )}
+                  data-testid={`blend-${b.id}`}
+                >
+                  <Blend className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 text-[13px]">
+                      <span className="truncate font-medium">{b.name}</span>
+                      <span className="num text-xs text-muted-foreground">{b.id}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                      <code className="num break-all">{b.blend}</code>
+                      {b.language && <span>{languageName(b.language)}</span>}
+                      {b.default_model && (
+                        <span className={cn('num', other && 'text-warning-text')}>
+                          {other ? `made for ${b.default_model}` : b.default_model}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={active ? 'secondary' : 'outline'}
+                    className="h-7"
+                    onClick={() => onSelectBlend?.(active ? null : b.id)}
+                    disabled={!canBlend || !onSelectBlend || disabled}
+                    data-testid={`use-blend-${b.id}`}
+                  >
+                    {active ? (
+                      <>
+                        <Check /> In use
+                      </>
+                    ) : (
+                      'Use'
+                    )}
+                  </Button>
+                  <Button
+                    size={confirming === b.id ? 'sm' : 'icon-sm'}
+                    variant={confirming === b.id ? 'destructive' : 'ghost'}
+                    className={confirming === b.id ? 'h-7' : undefined}
+                    onClick={() => del(b)}
+                    onBlur={() => setConfirming((c) => (c === b.id ? null : c))}
+                    disabled={disabled}
+                    aria-label={confirming === b.id ? `Confirm deleting ${b.name}` : `Delete ${b.name}`}
+                  >
+                    {confirming === b.id ? 'Delete?' : <Trash2 />}
+                  </Button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
       )}
       {(dialog || pending != null) && (
         <NewVoiceDialog

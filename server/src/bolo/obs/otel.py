@@ -24,10 +24,12 @@ standard variables the OpenTelemetry SDK reads: ``OTEL_SERVICE_NAME`` (default
 
 from __future__ import annotations
 
+import importlib.util
 import logging
 import os
 from collections.abc import Callable, Mapping
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from bolo.obs.trace import Trace
 
@@ -71,6 +73,51 @@ def wanted(setting: bool | None, environ: Mapping[str, str] | None = None) -> bo
     if env.get("OTEL_SDK_DISABLED", "").strip().lower() == "true":
         return False
     return any(env.get(name) for name in ENDPOINT_VARS)
+
+
+def _redact(url: str) -> str:
+    """An endpoint without the credentials a URL may carry (``user:pass@``) or its query string."""
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return ""
+    host = parts.hostname or ""
+    if parts.port is not None:
+        host = f"{host}:{parts.port}"
+    if not parts.scheme or not host:
+        return ""
+    return urlunsplit((parts.scheme, host, parts.path, "", ""))
+
+
+def describe(
+    setting: bool | None, export: OtelExport | None, environ: Mapping[str, str] | None = None
+) -> dict[str, Any]:
+    """What ``GET /api/v1/info`` says about export (``capabilities.opentelemetry``): whether it is switched on and
+    running, and where the spans go. Read-only; never a header value or a credential."""
+    env = os.environ if environ is None else environ
+    switched_on = wanted(setting, env)
+    installed = importlib.util.find_spec("opentelemetry") is not None and (
+        importlib.util.find_spec("opentelemetry.sdk") is not None
+    )
+    protocol = (
+        env.get("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL") or env.get("OTEL_EXPORTER_OTLP_PROTOCOL") or ""
+    ).strip() or "http/protobuf"
+    raw = next((env[name] for name in ENDPOINT_VARS if env.get(name)), None)
+    endpoint = _redact(raw) if raw else None
+    if endpoint is None and switched_on:
+        endpoint = "http://localhost:4317" if protocol == "grpc" else "http://localhost:4318"
+    return {
+        "enabled": export is not None,
+        "switched_on": switched_on,
+        "setting": setting,
+        "installed": installed,
+        "install": None if installed else INSTALL_HINT,
+        "endpoint": endpoint if switched_on else None,
+        "endpoint_source": ("environment" if raw else "default") if switched_on else None,
+        "protocol": protocol if switched_on else None,
+        "service_name": (env.get("OTEL_SERVICE_NAME") or "bolo") if switched_on else None,
+        "exported": export.exported if export is not None else 0,
+    }
 
 
 def attributes(trace: Trace, device: str | None) -> dict[str, Any]:

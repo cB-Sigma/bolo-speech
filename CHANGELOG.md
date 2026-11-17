@@ -8,6 +8,17 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Console: voice blends and the language decision.** The text-to-speech page has a "Blend voices" panel for models
+  with `voice-blending` (Kokoro): pick up to 8 of the model's voices with weights, see the blend as it is sent
+  (`af_bella(0.7)+af_sky(0.3)`) and keep it in the voice library under a name. Saved blends are listed in the library
+  apart from the recordings (no consent, no audio) and can be used, or chosen in the voice picker, or deleted. A
+  "Detect language" switch sends `detect_language`, and the voice picker offers "From the text" (no voice named, so
+  the server picks one that speaks the detected language). After synthesis over chunked HTTP a "What the server
+  decided" panel shows `x-bolo-model`, `x-bolo-voice`, `x-bolo-blend` and `x-bolo-language` in words, with a warning
+  when a named voice speaks another language than the text.
+- `GET /api/v1/info` reports OpenTelemetry export under `capabilities.opentelemetry` (switched on, running, endpoint
+  without credentials or query string, protocol, service name, spans exported), read-only; the console's Connect
+  screen shows it.
 - **pyannote's own PyTorch diarization pipelines** through the bolo-torch plugin, for pyannote's exact results:
   `pyannote-speaker-diarization-3.1` (MIT pipeline and segmentation, CC-BY-4.0 WeSpeaker embedding and PLDA files)
   and `pyannote-speaker-diarization-community-1` (CC-BY-4.0), both gated (accept the conditions on Hugging Face and

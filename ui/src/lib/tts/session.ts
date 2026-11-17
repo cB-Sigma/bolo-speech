@@ -46,6 +46,30 @@ export interface TtsState {
   starvedMs: number
   /** ms after the request at which playback began. */
   playStartMs: number | null
+  /** What the server reported in the response headers (chunked HTTP only; the WebSocket sends none). */
+  reported: TtsReported | null
+}
+
+/** The `x-bolo-*` headers of a synthesis response. */
+export interface TtsReported {
+  model: string | null
+  /** `x-bolo-blend`: the blend as spoken, normalised weights. */
+  blend: string | null
+  /** `x-bolo-voice`: the saved voice or saved blend used. */
+  voice: string | null
+  /** `x-bolo-language`, raw (see `parseLanguageHeader`). */
+  language: string | null
+  fallback: string | null
+}
+
+export function reportedFrom(headers: Headers): TtsReported {
+  return {
+    model: headers.get('x-bolo-model'),
+    blend: headers.get('x-bolo-blend'),
+    voice: headers.get('x-bolo-voice'),
+    language: headers.get('x-bolo-language'),
+    fallback: headers.get('x-bolo-fallback'),
+  }
 }
 
 export const emptyTts = (): TtsState => ({
@@ -64,6 +88,7 @@ export const emptyTts = (): TtsState => ({
   underruns: 0,
   starvedMs: 0,
   playStartMs: null,
+  reported: null,
 })
 
 export interface TtsOptions {
@@ -86,6 +111,8 @@ export interface TtsOptions {
   wordlists?: string[]
   /** Romanised text: `off`, `auto` or `on`; omitted means the voice's setting. */
   romanised?: string
+  /** False turns off guessing the language from the text (chunked HTTP; the server's default is on). */
+  detectLanguage?: boolean
 }
 
 /** Finds the PCM payload of a WAV stream once enough header bytes have arrived. */
@@ -342,6 +369,7 @@ export class TtsSession {
       inputFormat,
       wordlists,
       romanised,
+      detectLanguage,
     } = this.opts
     this.abort = new AbortController()
     try {
@@ -358,9 +386,11 @@ export class TtsSession {
           input_format: inputFormat && inputFormat !== 'text' ? inputFormat : undefined,
           wordlists: wordlists?.length ? wordlists : undefined,
           romanised,
+          detect_language: detectLanguage === false ? false : undefined,
         },
         this.abort.signal,
       )
+      this.store.patch({ reported: reportedFrom(res.headers) })
       if (!res.body) throw new Error('The server sent no audio')
       const reader = res.body.getReader()
       let head: Uint8Array = new Uint8Array(0)

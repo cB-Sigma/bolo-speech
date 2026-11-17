@@ -29,6 +29,32 @@ def test_switched_on_by_the_setting_or_an_endpoint_variable() -> None:
     assert otel.setup(None, environ={}) is None  # off: nothing is imported or started
 
 
+def test_info_says_whether_export_is_on_and_where_to(live: LiveServer) -> None:
+    off = otel.describe(None, None, {})
+    assert off["switched_on"] is False and off["enabled"] is False
+    assert off["endpoint"] is None and off["protocol"] is None and off["exported"] == 0
+    on = otel.describe(
+        None,
+        None,
+        {
+            "OTEL_EXPORTER_OTLP_ENDPOINT": "https://user:secret@collector.example:4318/otlp?token=x",
+            "OTEL_SERVICE_NAME": "bolo-eu1",
+            "OTEL_EXPORTER_OTLP_HEADERS": "authorization=Bearer abc",
+        },
+    )
+    assert on["switched_on"] is True and on["enabled"] is False  # switched on, but nothing started here
+    assert on["endpoint"] == "https://collector.example:4318/otlp" and on["endpoint_source"] == "environment"
+    assert on["protocol"] == "http/protobuf" and on["service_name"] == "bolo-eu1"
+    assert "secret" not in str(on) and "abc" not in str(on) and "token" not in str(on)
+    grpc = otel.describe(True, None, {"OTEL_EXPORTER_OTLP_PROTOCOL": "grpc"})
+    assert grpc["endpoint"] == "http://localhost:4317" and grpc["endpoint_source"] == "default"
+    assert otel.describe(False, None, {"OTEL_EXPORTER_OTLP_ENDPOINT": "http://c:4318"})["switched_on"] is False
+    info = httpx.get(f"{live.url}/api/v1/info").json()
+    described = info["capabilities"]["opentelemetry"]
+    assert set(described) >= {"enabled", "switched_on", "endpoint", "protocol", "service_name", "exported"}
+    assert described["enabled"] is (live.core.otel is not None)
+
+
 def test_missing_extra_gives_one_clear_warning(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:

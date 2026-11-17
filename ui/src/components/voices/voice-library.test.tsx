@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { newVoiceForm } from '@/lib/api/client'
 import { setServerBase, setTransport } from '@/lib/api/config'
-import type { SavedVoice, ServerInfo } from '@/lib/api/types'
+import type { SavedBlend, SavedVoice, ServerInfo } from '@/lib/api/types'
+import { VoiceBlendPanel } from '@/components/tts/voice-blend'
 import { dataUrlToBlob } from './new-voice-dialog'
 import { scoreText, scoreTone, voicesAnnounced } from './use-voices'
 import { VoiceLibrary } from './voice-library'
@@ -13,6 +14,8 @@ import { VoiceLibrary } from './voice-library'
 /** A stand-in for the server's voice routes: enough of `/api/v1/voices` for the library. */
 function fakeServer() {
   const voices: SavedVoice[] = []
+  const blends: SavedBlend[] = []
+  const blendBodies: unknown[] = []
   const forms: FormData[] = []
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -37,7 +40,33 @@ function fakeServer() {
     const method = init?.method ?? 'GET'
     if (path === 'api/v1/info') return json({ capabilities: { voices: { endpoint: '/api/v1/voices' } } })
     if (path === 'api/v1/voices' && method === 'GET') {
-      return json({ voices, cloning_models: ['pocket-tts-en-llamacpp'], consent: {}, similarity: {} })
+      return json({
+        voices,
+        blends,
+        cloning_models: ['pocket-tts-en-llamacpp'],
+        blending_models: ['kokoro-v1.0-int8'],
+        consent: {},
+        similarity: {},
+      })
+    }
+    if (path === 'api/v1/voices/blends' && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { name: string; blend: string; model: string }
+      blendBodies.push(body)
+      const b: SavedBlend = {
+        id: body.name.toLowerCase().replace(/\s+/g, '-'),
+        object: 'voice',
+        kind: 'blend',
+        name: body.name,
+        description: null,
+        language: 'en-US',
+        blend: body.blend,
+        voices: [],
+        default_model: body.model,
+        created_at: '2026-11-17T00:00:00Z',
+        audio_url: null,
+      }
+      blends.push(b)
+      return json(b, 201)
     }
     if (path === 'api/v1/voices' && method === 'POST') {
       const form = init?.body as FormData
@@ -53,8 +82,9 @@ function fakeServer() {
     }
     const m = /^api\/v1\/voices\/([^/]+)(\/score)?$/.exec(path)
     if (m && method === 'DELETE') {
-      voices.splice(
-        voices.findIndex((v) => v.id === m[1]),
+      const list: { id: string }[] = blends.some((b) => b.id === m[1]) ? blends : voices
+      list.splice(
+        list.findIndex((v) => v.id === m[1]),
         1,
       )
       return json({ id: m[1], deleted: true })
@@ -67,7 +97,7 @@ function fakeServer() {
     }
     return json({ error: { message: 'not found' } }, 404)
   }
-  return { voices, forms, make, fetch }
+  return { voices, blends, blendBodies, forms, make, fetch }
 }
 
 let server: ReturnType<typeof fakeServer>
@@ -198,5 +228,113 @@ describe('VoiceLibrary', () => {
     const dialog = await screen.findByTestId('new-voice-dialog')
     expect(within(dialog).getByTestId('new-voice-source')).toHaveTextContent('Recorded here.wav · 7.5 s')
     expect(within(dialog).getByDisplayValue('hello there')).toBeInTheDocument()
+  })
+})
+
+describe('saved blends', () => {
+  const blend = (id: string, model = 'kokoro-v1.0-int8'): SavedBlend => ({
+    id,
+    object: 'voice',
+    kind: 'blend',
+    name: 'Warm Mix',
+    description: null,
+    language: 'en-US',
+    blend: 'af_bella(0.7)+af_sky(0.3)',
+    voices: [],
+    default_model: model,
+    created_at: '2026-11-17T00:00:00Z',
+    audio_url: null,
+  })
+
+  it('lists blends apart from the recordings, without consent, and uses or deletes one', async () => {
+    server.blends.push(blend('warm-mix'))
+    let chosen: string | null = null
+    wrap(
+      <VoiceLibrary
+        model="kokoro-v1.0-int8"
+        canUse={false}
+        canBlend
+        selected={null}
+        onSelect={() => undefined}
+        onSelectBlend={(id) => {
+          chosen = id
+        }}
+      />,
+    )
+    const row = await screen.findByTestId('blend-warm-mix')
+    expect(row).toHaveTextContent('af_bella(0.7)+af_sky(0.3)')
+    expect(within(row).queryByText('This is my voice')).not.toBeInTheDocument()
+    expect(within(row).queryByRole('button', { name: /Play the reference/ })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('blend-library-hint')).not.toBeInTheDocument()
+    await userEvent.click(within(row).getByTestId('use-blend-warm-mix'))
+    expect(chosen).toBe('warm-mix')
+    await userEvent.click(within(row).getByRole('button', { name: 'Delete Warm Mix' }))
+    await userEvent.click(within(row).getByRole('button', { name: 'Confirm deleting Warm Mix' }))
+    await waitFor(() => expect(screen.queryByTestId('blend-warm-mix')).not.toBeInTheDocument())
+  })
+
+  it('says which models speak blends when this one cannot, and flags a blend made for another model', async () => {
+    server.blends.push(blend('warm-mix', 'kokoro-82m'))
+    const { unmount } = wrap(
+      <VoiceLibrary model="piper-en" canUse={false} selected={null} onSelect={() => undefined} />,
+    )
+    expect(await screen.findByTestId('blend-library-hint')).toHaveTextContent(
+      'piper-en does not blend voices. Choose one that does to use these: kokoro-v1.0-int8.',
+    )
+    expect(screen.getByTestId('use-blend-warm-mix')).toBeDisabled()
+    unmount()
+    wrap(<VoiceLibrary model="kokoro-v1.0-int8" canUse={false} canBlend selected={null} onSelect={() => undefined} />)
+    expect(await screen.findByText('made for kokoro-82m')).toBeInTheDocument()
+  })
+
+  it('builds a blend, shows how it is spelled and saves it', async () => {
+    const voices = [
+      { id: 'af_bella', name: 'Bella', language: 'en-US' },
+      { id: 'af_sky', name: 'Sky', language: 'en-US' },
+      { id: 'bf_emma', name: 'Emma', language: 'en-GB' },
+    ]
+    let parts = [
+      { voice: 'af_bella', weight: 0.7 },
+      { voice: 'af_sky', weight: 0.3 },
+    ]
+    let saved: SavedBlend | null = null
+    const client = new QueryClient()
+    const view = () => (
+      <QueryClientProvider client={client}>
+        <VoiceBlendPanel
+          model="kokoro-v1.0-int8"
+          voices={voices}
+          enabled
+          onEnabledChange={() => undefined}
+          parts={parts}
+          onPartsChange={(p) => {
+            parts = p
+            rerender(view())
+          }}
+          canSave
+          onSaved={(b) => {
+            saved = b
+          }}
+        />
+      </QueryClientProvider>
+    )
+    const { rerender } = render(view())
+    expect(screen.getByTestId('blend-string')).toHaveTextContent('af_bella(0.7)+af_sky(0.3)')
+    await userEvent.click(screen.getByTestId('blend-add'))
+    expect(parts).toEqual([
+      { voice: 'af_bella', weight: 0.7 },
+      { voice: 'af_sky', weight: 0.3 },
+      { voice: 'bf_emma', weight: 0.5 },
+    ])
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Emma from the blend' }))
+    expect(parts).toHaveLength(2)
+    await userEvent.type(screen.getByPlaceholderText('Warm mix'), 'Warm Mix')
+    await userEvent.click(screen.getByTestId('blend-save'))
+    await waitFor(() => expect(saved?.id).toBe('warm-mix'))
+    expect(server.blendBodies[0]).toEqual({
+      name: 'Warm Mix',
+      blend: 'af_bella(0.7)+af_sky(0.3)',
+      model: 'kokoro-v1.0-int8',
+    })
   })
 })

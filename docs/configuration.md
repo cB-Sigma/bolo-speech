@@ -444,6 +444,10 @@ request path; an unreachable collector costs a log line, not latency. `/metrics`
 stream are unchanged. When export is switched on but the extra is missing, bolo logs one warning naming the package
 and carries on without it. Only traces are exported: metrics stay on Prometheus `/metrics`, and the log is not sent.
 
+`GET /api/v1/info` says whether export is on and where to (`capabilities.opentelemetry`: `switched_on`, `enabled`,
+`endpoint` without credentials or query string, `protocol`, `service_name`, `exported` spans); the console shows it
+on its Connect screen. Header values are never reported.
+
 ## Windows
 
 What differs on Windows (CI runs the server's tests on `windows-latest`; the CPU, CUDA, DirectML and Vulkan notes below were found on a Windows 11 laptop with an RTX 3060 Laptop GPU and Radeon integrated graphics, whose numbers are in [status.md](status.md#a-windows-11-laptop)):

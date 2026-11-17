@@ -508,6 +508,8 @@ class Bolo:
             "llm": {"configured": llm["configured"], "base_url": llm["base_url"], "model": llm["model"]},
             # phone calls (docs/telephony.md)
             "telephony": self.telephony.capability(),
+            # OpenTelemetry export of the request traces (docs/configuration.md, "OpenTelemetry"); read-only
+            "opentelemetry": otel.describe(s.otel, self.otel),
             # hardware detection and model recommendations (docs/recommendations.md): advice, never a restriction
             "recommendations": {
                 "hardware": "/api/v1/hardware",

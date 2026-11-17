@@ -15,6 +15,7 @@ import { useSupport } from '@/hooks/use-support'
 import { ComponentsCard } from '@/components/component-install'
 import { NeedsServer } from '@/components/demo'
 import { getApiKey, isDemo, serverBase } from '@/lib/api/config'
+import type { Capabilities } from '@/lib/api/types'
 import { prefs } from '@/lib/prefs'
 import { buildSnippets } from '@/lib/snippets'
 import { cn } from '@/lib/utils'
@@ -67,6 +68,32 @@ function Check3({ ok, label, children }: { ok: boolean | null; label: string; ch
         <p className="text-xs leading-4 text-muted-foreground">{children}</p>
       </div>
     </li>
+  )
+}
+
+/** Whether request traces are exported over OTLP, and where to. Read-only: set on the server. */
+export function OtelStatus({ otel }: { otel: Capabilities['opentelemetry'] }) {
+  if (!otel) return <span className="text-muted-foreground">not reported by this server</span>
+  if (!otel.switched_on) {
+    return <span title="Set OTEL_EXPORTER_OTLP_ENDPOINT (or the setting otel) on the server to export traces">Off</span>
+  }
+  if (!otel.enabled) {
+    return (
+      <span className="text-warning-text" title={otel.install ?? undefined}>
+        Switched on, not running{otel.install ? ` (install: ${otel.install})` : ''}
+      </span>
+    )
+  }
+  return (
+    <span className="block truncate num" title={`${otel.endpoint ?? ''} · ${otel.protocol ?? ''}`}>
+      On · {otel.endpoint?.replace(/^https?:\/\//, '') ?? 'default endpoint'}
+      <span className="text-muted-foreground">
+        {' '}
+        · {otel.protocol}
+        {otel.service_name && otel.service_name !== 'bolo' ? ` · ${otel.service_name}` : ''}
+        {otel.exported != null ? ` · ${otel.exported} spans` : ''}
+      </span>
+    </span>
   )
 }
 
@@ -208,6 +235,10 @@ export default function ConnectPage() {
                   <dt className="text-muted-foreground">Data directory</dt>
                   <dd className="truncate text-right num" title={info.data.data_dir}>
                     {info.data.data_dir}
+                  </dd>
+                  <dt className="text-muted-foreground">OpenTelemetry</dt>
+                  <dd className="min-w-0 text-right" data-testid="otel-status">
+                    <OtelStatus otel={info.data.capabilities?.opentelemetry} />
                   </dd>
                   <dt className="text-muted-foreground">Authentication</dt>
                   <dd className="flex items-center justify-end gap-2 text-right">

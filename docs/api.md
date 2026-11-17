@@ -651,7 +651,12 @@ curl -s localhost:8000/v1/audio/speech/embedding -F file=@a.wav | jq '.data[0].e
    "telephony": {"endpoint": "/api/v1/telephony", "providers": ["twilio", "plivo", "telnyx", "exotel"],
                  "configured": [], "exposed": [], "validate_signatures": true, "agents": 0, "outbound": true,
                  "simulator": "/api/v1/telephony/simulate",
-                 "sip": {"enabled": false, "listening": false, "port": 5060}}}}
+                 "sip": {"enabled": false, "listening": false, "port": 5060}},
+   // OpenTelemetry export (configuration.md, "OpenTelemetry"), read-only: "switched_on" by the setting otel or an
+   // OTLP endpoint variable, "enabled" once spans are being exported; the endpoint without credentials or query
+   "opentelemetry": {"enabled": true, "switched_on": true, "setting": null, "installed": true, "install": null,
+                     "endpoint": "http://collector:4318", "endpoint_source": "environment",
+                     "protocol": "http/protobuf", "service_name": "bolo", "exported": 42}}}
 ```
 
 ### `GET /api/v1/catalog?task=&q=&installed=`
