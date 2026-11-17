@@ -268,6 +268,19 @@ Values out of range are refused with `400` naming the field (`param`). Each opti
 pinned with `PUT /api/v1/models/{id}/settings` (or `bolo models config <id> --set repetition_penalty=1.2`) or set in
 the catalog entry's `options`; a request's value wins over the pin, the pin over the catalog.
 
+**Per-request options apply to file transcription** (`POST /v1/audio/transcriptions` and translations). Live sessions
+(`WS /api/v1/stt/stream`, the Realtime API) have no request form: for streaming, pin the options on the model with
+`PUT /api/v1/models/{id}/settings`. Whisper options pinned there reach every live decode of the model, and a pinned
+`max_repeats` sets the live guard.
+
+In a live session the guard also works across utterances, since a loop can run on from one final into the next. Each
+new final is checked together with the end of the finals already sent, and only the new final is changed: text a
+client already has as a final is never rewritten. So up to `max_repeats` copies of a phrase can go out before it is
+recognised as a loop, and the copies after that are dropped. A final that is nothing but such copies is not sent (as
+for an utterance that decodes to nothing; in the Realtime API the item's `completed` transcript is empty). Partials,
+and the Realtime API's `delta` events, are not trimmed: they are provisional, and the final (or `completed.transcript`)
+is the authoritative text. The request log counts what was dropped (`repeats_trimmed`).
+
 | Option | faster-whisper | whisper.cpp | other engines |
 | --- | --- | --- | --- |
 | `condition_on_previous_text` | yes | yes (`no_context`) | ignored |
@@ -275,6 +288,10 @@ the catalog entry's `options`; a request's value wins over the pin, the pin over
 | `log_prob_threshold`, `no_speech_threshold`, `temperature_increment_on_fallback` | yes | yes (`logprob_thold`, `no_speech_thold`, `temperature_inc`) | ignored |
 | `chunk_length` | yes (bolo's cut and the model's window) | bolo's cut | bolo's cut |
 | `vad_filter`, `vad_parameters`, `max_repeats` | yes (applied by bolo) | yes | yes |
+
+whisper.cpp: bolo passes every parameter it sets (language, prompt, task, temperature and the options above) on
+every request. pywhispercpp keeps a parameter from one call for all later ones, so before this a request's
+`language` or `prompt` carried over to the requests after it.
 
 An option the model cannot honour does not fail the request: it is dropped, named in the response header
 `x-bolo-ignored-options` (comma-separated) and in the request log (`ignored_options`), and logged at `INFO`.
@@ -1272,6 +1289,10 @@ Realtime transcription. Query parameters:
 | `diarize` | `false` | add a `speaker` label (`A`, `B`, …) to every final; optional `max_speakers`. See [Speaker diarization](#speaker-diarization) |
 | `endpointing` | `balanced` | how long a pause ends an utterance: `fast` (250 ms), `balanced` (500 ms), `patient` (900 ms). The server default is `endpoint_silence_ms` |
 | `endpoint_ms` | - | the same as an exact number of milliseconds (100 to 5000); wins over `endpointing` |
+
+Whisper decoding options (`repetition_penalty`, `condition_on_previous_text`, ...) and the repetition guard's
+`max_repeats` are not query parameters: pin them on the model with `PUT /api/v1/models/{id}/settings` (see
+[Decoding options and repetition loops](#decoding-options-and-repetition-loops)).
 
 Client → server:
 

@@ -5,6 +5,11 @@ audio stream with **any** speech-to-text model in the catalog. This page
 explains how, what latency to expect, and which knobs matter. The wire
 format is in [api.md](api.md#ws-apiv1sttstream).
 
+Per-request Whisper options (`repetition_penalty`, `condition_on_previous_text`, `max_repeats`, ...) apply to file
+transcription; for streaming, pin them on the model with `PUT /api/v1/models/{id}/settings` (api.md, "Decoding options
+and repetition loops"). The repetition guard checks each final against the finals sent before it and never rewrites
+one that was sent; partials are not trimmed.
+
 ## Two ways to be realtime
 
 **Native streaming** (`"mode": "native"` in the `ready` message). Models
@@ -155,7 +160,10 @@ machinery, with OpenAI's event names: while the user speaks,
 `conversation.item.input_audio_transcription.delta` events carry the words
 that have settled (two consecutive decodes agree), and after the end of
 speech the remainder and a `completed` event with the whole transcript.
-Deltas only ever append. Measured with a 12-second sample
+Deltas only ever append. Per-request Whisper options apply to file transcription only; for streaming, pin them on the
+model with `PUT /api/v1/models/{id}/settings` (`repetition_penalty`, `condition_on_previous_text`, `max_repeats`
+...; api.md, "Decoding options and repetition loops"). The repetition guard runs across utterances here too: a
+transcript that only repeats the ones before it comes back empty, and deltas are never trimmed. Measured with a 12-second sample
 (`docs/measurements/realtime-transcript-deltas.json`):
 
 | Model | Deltas | Of them before the end of speech | First delta after speech start |

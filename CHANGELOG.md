@@ -146,6 +146,18 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   while the API keeps `--port`, so the API can be exposed alone; `--console-host` and `--console-api-url` set where
   the console listens and which API address it calls. The API accepts the console's cross-origin requests by
   itself. `--console-port 0` or `--no-console` serves no console. The default is unchanged: both on one port.
+- The repetition guard on live transcripts (`WS /api/v1/stt/stream` and the Realtime API): each final is checked
+  together with the finals already sent, so a loop that runs on from one utterance into the next is cut. Only the new
+  final changes; a final that only repeats earlier ones is not sent (an empty `completed` transcript in the Realtime
+  API); partials and Realtime deltas are not trimmed. The model's pinned `max_repeats` applies, and Whisper options
+  pinned on a model now reach its live decodes as well.
+
+### Fixed
+
+- whisper.cpp: a request's `language`, `prompt` or decoding options stayed set for every later request
+  (pywhispercpp keeps parameters between calls). Every request now sets all of them, from the model's defaults where
+  it gives none, and calls are serialised. A real-model test (`tests/test_real_whispercpp.py`, opt-in) checks each
+  option reaches whisper.cpp and does not carry over.
 
 ## [0.6.6] - 2026-11-17
 
