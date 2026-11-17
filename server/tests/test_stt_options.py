@@ -348,3 +348,22 @@ def test_faster_whisper_batches_only_requests_with_the_same_batchable_options() 
     assert len(results) == 3
     assert len(stt.batched.calls) == 1 and stt.batched.calls[0]["repetition_penalty"] == 1.1
     assert len(stt.model.calls) == 1 and stt.model.calls[0]["condition_on_previous_text"] is True
+
+
+def test_segment_and_word_times_stay_within_the_audio(live: LiveServer, monkeypatch: pytest.MonkeyPatch) -> None:
+    spec = live.core.catalog.resolve("fake-stt")
+    assert spec is not None
+    monkeypatch.setitem(spec.options, "overrun_s", 16.0)  # the model says its segment ends 16 s after the audio
+    r = httpx.post(
+        live.url + "/v1/audio/transcriptions",
+        data={"model": "fake-stt", "response_format": "verbose_json", "timestamp_granularities[]": ["word", "segment"]},
+        files={"file": ("a.wav", wav_bytes(6.0), "audio/wav")},
+        timeout=30,
+    )
+    doc = r.json()
+    assert doc["segments"][-1]["end"] == 6.0 and doc["words"][-1]["end"] == 6.0
+    assert all(w["start"] <= w["end"] <= 6.0 for w in doc["words"])
+    # cut into pieces: each piece's times stay within that piece
+    long = _post(live, 24.0, chunk_length=10, response_format="verbose_json").json()
+    assert len(long["segments"]) >= 3
+    assert all(s["end"] - s["start"] <= 10.0 + 1e-6 and s["end"] <= 24.0 for s in long["segments"])

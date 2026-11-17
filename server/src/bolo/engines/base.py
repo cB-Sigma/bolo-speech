@@ -18,6 +18,7 @@ A loaded model implements one of four small interfaces:
 from __future__ import annotations
 
 import abc
+import threading
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -106,6 +107,9 @@ class STTRequest:
     diarize: bool = False
     #: decoding options the model honours (``STTModel.decode_options``; names and meanings in bolo.stt_options)
     options: dict[str, Any] = field(default_factory=dict)
+    #: set when the client that asked has gone (``ModelQueue.submit`` cancelled): an engine that can stop part-way
+    #: checks it and returns what it has; its result is discarded either way
+    abort: threading.Event = field(default_factory=threading.Event, compare=False, repr=False)
 
 
 @dataclass

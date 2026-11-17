@@ -504,7 +504,7 @@ async def load(request: Request, model_id: str, keep_alive: str | None = None) -
     core.require_components(core.manager.resolve(model_id))
     entry = await core.manager.load(model_id)
     core.manager.set_keep_alive(entry, seconds)
-    if seconds == 0 and entry.active == 0:
+    if seconds == 0 and not entry.busy:
         await core.manager.unload(entry.id, reason="keep_alive 0")
         return JSONResponse({"id": entry.id, "loaded": False, "load_ms": round(entry.load_ms, 1)})
     out: dict[str, Any] = {

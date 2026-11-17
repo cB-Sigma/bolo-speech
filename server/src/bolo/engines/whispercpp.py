@@ -69,8 +69,11 @@ class WhisperCppSTT(STTModel):
             ):
                 if opts.get(name) is not None:
                     kwargs[param] = float(opts[name])
+            if r.abort.is_set():  # the client went away while this waited
+                out.append(STTResult("", r.language))
+                continue
             with self._lock:
-                segs = self.model.transcribe(r.samples, **kwargs)
+                segs = self.model.transcribe(r.samples, abort_callback=r.abort.is_set, **kwargs)
             segments = [Segment(s.t0 / 100.0, s.t1 / 100.0, s.text.strip()) for s in segs if s.text.strip()]
             out.append(STTResult(" ".join(s.text for s in segments), str(kwargs["language"] or "") or None, segments))
         return out

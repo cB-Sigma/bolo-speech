@@ -107,6 +107,12 @@ class FakeSTT(STTModel):
         self.loop_on = opts.get("loop_on", "loop")
         self.decode_options = tuple(opts.get("decode_options", self._all_options()))
         self.seen_options: list[dict[str, Any]] = []  # STTRequest.options of every request
+        #: honours STTRequest.abort (option ``abortable``); ``aborted`` counts the decodes it stopped part-way
+        self.abortable = bool(opts.get("abortable", True))
+        #: seconds past the end of the audio the fake places its segment's end and last word (a model without word
+        #: timings that overruns, as whisper.cpp does in a loop)
+        self.overrun_s = float(opts.get("overrun_s", 0.0))
+        self.aborted = 0
         self.languages = ("en", "hi")
         self.supports_word_timestamps = True
         self.supports_translate = True
@@ -131,7 +137,15 @@ class FakeSTT(STTModel):
             self.max_concurrent = max(self.max_concurrent, self.concurrent)
         try:
             longest = max((len(r.samples) for r in requests), default=0) / self.sample_rate
-            time.sleep(self.base_delay_s + self.delay_per_audio_s * longest)
+            delay = self.base_delay_s + self.delay_per_audio_s * longest
+            if self.abortable:  # stops early when every request of the batch was given up
+                deadline = time.monotonic() + delay
+                while time.monotonic() < deadline and not all(r.abort.is_set() for r in requests):
+                    time.sleep(0.01)
+                if all(r.abort.is_set() for r in requests):
+                    self.aborted += 1
+            else:
+                time.sleep(delay)
             out: list[STTResult] = []
             for r in requests:
                 if self.fail_on is not None and r.prompt == self.fail_on:
@@ -142,8 +156,11 @@ class FakeSTT(STTModel):
                     t = words[-1].t1 if words else 0.0
                     step = max(seconds - t, 0.1) / 40
                     words = words + [Word("the", t + i * step, t + (i + 1) * step) for i in range(40)]
+                if self.overrun_s and words:
+                    last = words[-1]
+                    words = [*words[:-1], Word(last.w, last.t0, last.t1 + self.overrun_s)]
                 text = " ".join(w.w for w in words)
-                seg = Segment(0.0, seconds, text, words if r.word_timestamps else [])
+                seg = Segment(0.0, seconds + self.overrun_s, text, words if r.word_timestamps else [])
                 out.append(
                     STTResult(
                         text,

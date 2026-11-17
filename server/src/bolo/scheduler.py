@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import threading
 import time
 from collections import deque
 from collections.abc import Callable
@@ -99,9 +100,17 @@ class ModelQueue:
         self.inflight = 0
         #: the jobs a worker is running now (closing the queue answers any it has to abandon)
         self._running: set[_Job] = set()
+        #: ``time.perf_counter()`` when the last job finished running: a model is idle from then, not from when the
+        #: request that started it went away
+        self.last_done = time.perf_counter()
         self.stats = QueueStats()
 
     # -- introspection ----------------------------------------------------
+    @property
+    def busy(self) -> bool:
+        """Work is running or waiting: also a job whose client went away, which the engine may still be running."""
+        return self.inflight > 0 or any(not j.cancelled for j in self._pending)
+
     @property
     def depth(self) -> int:
         return len(self._pending)
@@ -182,6 +191,11 @@ class ModelQueue:
             return await job.future
         except asyncio.CancelledError:
             job.cancelled = True
+            # an engine that can stop part-way (whisper.cpp, faster-whisper between segments) reads this flag; the
+            # result of one that cannot is discarded when it comes back (the future is cancelled)
+            abort = getattr(payload, "abort", None)
+            if isinstance(abort, threading.Event):
+                abort.set()
             with contextlib.suppress(ValueError):
                 self._pending.remove(job)
             self.stats.cancelled += 1
@@ -284,6 +298,7 @@ class ModelQueue:
         finally:
             self.inflight -= len(batch)
             self._running.difference_update(batch)
+            self.last_done = time.perf_counter()
         st = self.stats
         st.batches += 1
         st.batched_jobs += len(batch)

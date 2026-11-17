@@ -151,7 +151,9 @@ class FasterWhisperSTT(STTModel):
         )
         out: list[Segment] = []
         words: list[Word] = []
-        for seg in segments:
+        for seg in segments:  # faster-whisper decodes a window at a time, as this loop asks for the next segment
+            if req.abort.is_set():  # the client went away: stop at this window (the result is discarded)
+                break
             seg_words = (
                 [Word(w.word.strip(), float(w.start), float(w.end)) for w in (seg.words or [])]
                 if req.word_timestamps

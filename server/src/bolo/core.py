@@ -1578,12 +1578,19 @@ class Bolo:
                         seg, cut = trim_repeats(seg, max_repeats)
                         trimmed += cut
                         chunk_segments.append(seg)
+                # a model without word timings can place a segment past the end of what it heard (whisper.cpp's
+                # loop ended at 40 s on 24 s of audio): times are kept within the audio of this chunk
+                heard_s = len(audio(index, a, _b)) / sr
+
+                def within(t: float, limit: float = heard_s) -> float:
+                    return min(max(t, 0.0), limit)
+
                 for seg in chunk_segments:
                     shifted = Segment(
-                        seg.start + offset,
-                        seg.end + offset,
+                        within(seg.start) + offset,
+                        within(seg.end) + offset,
                         seg.text.strip(),
-                        [Word(w.w, w.t0 + offset, w.t1 + offset) for w in seg.words],
+                        [Word(w.w, within(w.t0) + offset, within(w.t1) + offset) for w in seg.words],
                         seg.avg_logprob,
                         seg.no_speech_prob,
                         speakers[index] if speakers else seg.speaker,
@@ -1600,7 +1607,7 @@ class Bolo:
                 if not result.segments:
                     pass
                 elif not words and result.words:
-                    words.extend(Word(w.w, w.t0 + offset, w.t1 + offset) for w in result.words)
+                    words.extend(Word(w.w, within(w.t0) + offset, within(w.t1) + offset) for w in result.words)
         except BaseException:
             for fut in pending:
                 fut.cancel()

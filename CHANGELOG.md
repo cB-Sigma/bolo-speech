@@ -198,6 +198,15 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - The `en-us` and `hi` language packs read "needed by 0 models". That is right (American English and Hindi are part
   of uccharan, so their packs are never needed, and Bhojpuri, Maithili and Magahi use Hindi's built-in data), but it
   read like a broken count: the console now says "built in, not needed · used by N models".
+- A model could be unloaded as idle while it was still decoding: when a client disconnected, its request let go of
+  the model at once, but the engine went on decoding in its worker thread, and after the idle time (`keep_alive`,
+  `stt_ttl_s`, ...) the model was unloaded under it (seen with whisper.cpp, whose decode ran on for minutes). A model
+  now counts as in use while its queue has work running or waiting, and its idle time starts when the last decode
+  ends; this applies to idle unloading, `keep_alive: 0`, eviction to make room and moving off a lost GPU. A
+  disconnected client's decode is stopped where the engine can stop part-way (whisper.cpp through its abort
+  callback, faster-whisper at the next 30 s window); elsewhere it runs to the end and its result is discarded.
+- Segment and word times are kept within the audio that was decoded: a model without word timings could place a
+  segment's end past the end of the recording (whisper.cpp ended one at 40 s on 24 s of audio).
 
 ## [0.6.6] - 2026-11-17
 

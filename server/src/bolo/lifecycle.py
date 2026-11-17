@@ -135,8 +135,20 @@ class LoadedModel:
         """On an accelerator whose memory use could not be measured (not unified memory, where that is known)."""
         return self.vram_source == "plan"
 
+    @property
+    def busy(self) -> bool:
+        """In use: a request holds it (``active``), or its queue has work running or waiting. A request whose client
+        disconnected no longer holds the model, but the engine may still be decoding it; the model must not be
+        unloaded under that work."""
+        queue = self.queue
+        return self.active > 0 or bool(queue is not None and queue.busy)
+
     def idle_s(self) -> float:
-        return 0.0 if self.active else time.perf_counter() - self.last_used
+        """Seconds since the model was last in use (since its last request ended or its last job finished)."""
+        if self.busy:
+            return 0.0
+        done = self.queue.last_done if self.queue is not None else 0.0
+        return time.perf_counter() - max(self.last_used, done)
 
 
 @dataclass
@@ -372,7 +384,7 @@ class ModelManager:
             # let the requests using it finish first (on a GPU that is gone they may fail; one stuck in the driver
             # is given up on after MOVE_WAIT_S, and the queue then fails it rather than leave it waiting)
             deadline = time.monotonic() + MOVE_WAIT_S
-            while entry.active > 0 and time.monotonic() < deadline:  # noqa: ASYNC110 (a deadline)
+            while entry.busy and time.monotonic() < deadline:  # noqa: ASYNC110 (a deadline)
                 await asyncio.sleep(0.05)
             if self.loaded.get(entry.id) is entry:
                 await self.unload(entry.id, reason="GPU lost")
@@ -645,7 +657,7 @@ class ModelManager:
             if whole or p.operator_layers or not p.measured or p.device in ("remote", "cloud"):
                 return p
             idle = sorted(
-                (m for m in self.loaded.values() if m.active == 0 and m.vram_bytes > 0), key=lambda m: m.last_used
+                (m for m in self.loaded.values() if not m.busy and m.vram_bytes > 0), key=lambda m: m.last_used
             )
             # evict only when unloading every idle GPU-resident model would make this one fit whole
             if not idle or self._place_gpus(spec, device, self._vram_by_gpu(idle)).cpu_bytes > 0:
@@ -952,7 +964,7 @@ class ModelManager:
             return too_many or too_big
 
         while over():
-            idle = sorted((m for m in self.loaded.values() if m.active == 0), key=lambda m: m.last_used)
+            idle = sorted((m for m in self.loaded.values() if not m.busy), key=lambda m: m.last_used)
             if not idle:
                 if not self.loaded:
                     log.warning("model %s alone exceeds the memory budget; loading it anyway", spec.id)
@@ -1070,7 +1082,7 @@ class ModelManager:
         finally:
             entry.active -= 1
             entry.last_used = time.perf_counter()
-            if entry.active == 0 and entry.keep_alive_s == 0 and self.loaded.get(entry.id) is entry:
+            if not entry.busy and entry.keep_alive_s == 0 and self.loaded.get(entry.id) is entry:
                 with contextlib.suppress(Exception):
                     await self.unload(entry.id, reason="keep_alive 0")
 
@@ -1082,7 +1094,7 @@ class ModelManager:
                 continue
             entry.keep_alive_s = seconds
             entry.last_used = time.perf_counter()
-            if seconds == 0 and entry.active == 0:
+            if seconds == 0 and not entry.busy:
                 with contextlib.suppress(Exception):
                     await self.unload(model_id, reason="keep_alive 0")
 
@@ -1103,7 +1115,7 @@ class ModelManager:
         gone: list[str] = []
         for entry in list(self.loaded.values()):
             ttl = self.ttl_for(entry.spec, entry)
-            if ttl >= 0 and entry.active == 0 and entry.idle_s() >= ttl:
+            if ttl >= 0 and not entry.busy and entry.idle_s() >= ttl:
                 await self.unload(entry.id, reason="idle")
                 gone.append(entry.id)
         return gone
