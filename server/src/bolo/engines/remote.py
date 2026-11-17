@@ -2,8 +2,8 @@
 
 A catalog entry with ``engine: remote`` names a provider (``options.provider``, an entry of the ``providers``
 setting) and the provider's model (``options.model``). The provider's ``kind`` picks the adapter
-(:mod:`bolo.remote`): ``openai-compatible``, ``sarvam``, ``elevenlabs`` or ``deepgram``. Nothing is downloaded:
-such a model counts as installed as soon as its provider is configured.
+(:mod:`bolo.remote`): ``openai-compatible``, ``sarvam``, ``elevenlabs``, ``deepgram`` or ``soniox``. Nothing is
+downloaded: such a model counts as installed as soon as its provider is configured.
 
 To the rest of bolo these are ordinary models. Recognition gets 16 kHz audio (bolo decoded, resampled and, for
 long recordings or diarization, cut it first) and sends each piece as a WAV file; synthesis gets the prepared
@@ -81,6 +81,8 @@ class RemoteSTT(STTModel):
         self.max_chunk_s = float(spec.get("max_chunk_s") or adapter.max_chunk_s)
         self.supports_translate = adapter.supports_translate
         self.supports_word_timestamps = adapter.supports_word_timestamps
+        #: the provider labels speakers itself: a request's diarization is left to it (see Bolo._transcribe_once)
+        self.native_diarization = adapter.supports_diarization and spec.get("provider_diarization") is not False
         self.upload_format = "flac" if str(spec.get("upload_format") or "wav") == "flac" else "wav"
         try:
             self.streaming = adapter.live(None) is not None
@@ -110,6 +112,7 @@ class RemoteSTT(STTModel):
                 r.word_timestamps,
                 r.temperature,
                 r.hotwords,
+                r.diarize and self.native_diarization,
             )
             try:
                 result = self.adapter.transcribe(req, usage)
@@ -184,6 +187,16 @@ class RemoteStream(STTStream):
             return
         self._usage.requests = 1
         self._usage.first_byte_ms = (time.perf_counter() - t0) * 1000.0
+        try:
+            hello = self.protocol.start()
+            if hello is not None:
+                ws.send(hello)
+        except Exception as exc:
+            self._fail(f"{where}: the streaming socket refused the start message ({type(exc).__name__}: {exc})")
+            self.model.registry.record(self._usage, error="start failed")
+            with contextlib.suppress(Exception):
+                ws.close()
+            return
         reader = threading.Thread(target=self._read, args=(ws,), name="bolo-remote-live-read", daemon=True)
         reader.start()
         last = last_ping = time.monotonic()
@@ -214,7 +227,7 @@ class RemoteStream(STTStream):
         finally:
             with contextlib.suppress(Exception):
                 bye = self.protocol.close()
-                if bye:
+                if bye is not None:
                     ws.send(bye)
             with contextlib.suppress(Exception):
                 ws.close()
@@ -388,7 +401,7 @@ class RemoteTTS(TTSModel):
 
 class RemoteEngine(Engine):
     id = ENGINE_ID
-    name = "Cloud speech APIs (OpenAI-compatible, Sarvam, ElevenLabs, Deepgram)"
+    name = "Cloud speech APIs (OpenAI-compatible, Sarvam, ElevenLabs, Deepgram, Soniox)"
     license = "Apache-2.0 (bolo's client); each provider's terms apply to its API"
     url = "https://github.com/cb-Sigma/bolo/blob/main/docs/providers.md"
     kinds = ("remote-stt", "remote-tts")

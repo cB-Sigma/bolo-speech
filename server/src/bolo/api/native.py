@@ -321,7 +321,7 @@ async def put_model_settings(request: Request, model_id: str, body: ModelSetting
 
 class ProviderRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: str | None = Field(default=None, description="openai-compatible, sarvam, elevenlabs or deepgram.")
+    kind: str | None = Field(default=None, description="openai-compatible, sarvam, elevenlabs, deepgram or soniox.")
     base_url: str | None = Field(default=None, description="Default: the provider's own address.")
     api_key: str | None = Field(
         default=None,

@@ -118,7 +118,7 @@ def read_pcm_stream(
 
 
 def error_message(body: bytes, status: int) -> str:
-    """The human-readable part of a provider's error body (the shapes of the four families bolo talks to)."""
+    """The human-readable part of a provider's error body (the shapes of the families bolo talks to)."""
     with contextlib.suppress(ValueError, AttributeError, TypeError):
         doc = json.loads(body)
         if isinstance(doc, dict):
@@ -155,6 +155,8 @@ class RemoteRequest:
     word_timestamps: bool = False
     temperature: float = 0.0
     hotwords: str | None = None
+    #: label speakers at the provider (only sent to adapters with ``supports_diarization``)
+    diarize: bool = False
 
     @property
     def filename(self) -> str:
@@ -193,6 +195,10 @@ class LiveProtocol(abc.ABC):
     def keepalive(self) -> str | None:
         return None
 
+    def start(self) -> str | None:
+        """The first frame after connecting (a provider's start or configuration message), if it needs one."""
+        return None
+
     def finalize(self) -> str | None:
         """Ask for the text of everything sent so far (end of input)."""
         return None
@@ -210,6 +216,8 @@ class Adapter(abc.ABC):
     max_chunk_s: float = 600.0
     supports_translate: bool = False
     supports_word_timestamps: bool = False
+    #: the provider labels speakers itself (a request's diarization is then left to it)
+    supports_diarization: bool = False
 
     def __init__(self, provider: ProviderConfig, model: str, spec: dict[str, Any], *, timeout_s: float = 60.0) -> None:
         self.provider = provider

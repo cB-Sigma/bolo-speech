@@ -1,6 +1,6 @@
 """Stand-ins for the cloud speech APIs the ``remote`` engine talks to (CI has no network and no keys).
 
-One HTTP server answers the routes of all four API families, each with its own authentication header:
+One HTTP server answers the routes of all five API families, each with its own authentication header:
 
 =================  ==========================================================  ===========================
 family             routes                                                      key header
@@ -12,6 +12,9 @@ sarvam             ``POST /speech-to-text``, ``/speech-to-text-translate``,    `
 elevenlabs         ``GET /v2/voices``, ``POST /v1/speech-to-text``,            ``xi-api-key``
                    ``/v1/text-to-speech/{voice}/stream``
 deepgram           ``GET /v1/projects``, ``POST /v1/listen``                   ``Authorization: Token``
+soniox             under ``/soniox``: ``GET /v1/models``, ``POST /v1/files``,  ``Authorization: Bearer``
+                   ``POST /v1/transcriptions``, ``GET /v1/transcriptions/{id}``
+                   (and ``/transcript``), ``DELETE`` of both
 =================  ==========================================================  ===========================
 
 Recognition answers ``"heard <seconds> seconds"`` (plus the language it was told); synthesis answers a tone of
@@ -19,7 +22,13 @@ Recognition answers ``"heard <seconds> seconds"`` (plus the language it was told
 answer slow (to test timeouts), and the text ``bad request`` is refused with 400. Every request is recorded in
 ``requests`` (method, path, query, headers, form fields or JSON body).
 
-:class:`FakeLiveServer` is the WebSocket side: Deepgram's ``/v1/listen`` and Sarvam's ``/speech-to-text/ws``.
+:class:`FakeLiveServer` is the WebSocket side: Deepgram's ``/v1/listen``, Sarvam's ``/speech-to-text/ws`` and
+Soniox's ``/transcribe-websocket``.
+
+Soniox's routes live under ``/soniox`` here (its ``/v1/models`` would otherwise meet OpenAI's): a test points the
+provider's ``base_url`` at ``<url>/soniox``. A transcription is ``queued``, then ``processing``, then
+``completed`` on the third look (``soniox_fail`` makes it end in ``error`` instead); its transcript is made of
+pieces of words, as Soniox's tokens are.
 """
 
 from __future__ import annotations
@@ -30,6 +39,7 @@ import io
 import json
 import threading
 import time
+import uuid
 from email.parser import BytesParser
 from email.policy import HTTP
 from http import HTTPStatus
@@ -74,6 +84,34 @@ def seconds_of(audio: bytes) -> float:
         return max(0.0, (len(audio) - 44) / 32000.0)
 
 
+def soniox_tokens(secs: float, config: dict[str, Any]) -> list[dict[str, Any]]:
+    """``heard <secs> seconds.`` as Soniox's tokens: pieces of words, a leading space starting a word."""
+    pieces = [["He", "ard"], [f" {secs:.1f}"], [" sec", "onds", "."]]
+    step = secs / 3
+    hints = config.get("language_hints") or []
+    tokens: list[dict[str, Any]] = []
+    for i, word in enumerate(pieces):
+        t0 = i * step
+        for j, text in enumerate(word):
+            a = t0 + step * j / len(word)
+            tok: dict[str, Any] = {
+                "text": text, "start_ms": round(a * 1000), "end_ms": round((a + step / len(word)) * 1000),
+                "confidence": 0.93,
+            }  # fmt: skip
+            if config.get("enable_speaker_diarization"):
+                tok["speaker"] = "1" if i == 0 else "2"
+            if config.get("enable_language_identification"):
+                tok["language"] = hints[0] if hints else "hi"
+            if config.get("translation"):
+                tok["translation_status"] = "original"
+            tokens.append(tok)
+    if config.get("translation"):
+        for text in ["Trans", "lated", f" {secs:.1f}", " seconds"]:
+            tokens.append({"text": text, "confidence": 0.9, "translation_status": "translation", "language": "en",
+                           "source_language": hints[0] if hints else "hi"})  # fmt: skip
+    return tokens
+
+
 def parse_multipart(content_type: str, body: bytes) -> tuple[dict[str, Any], dict[str, bytes]]:
     """Form fields (a repeated name becomes a list) and files of a multipart body."""
     message = BytesParser(policy=HTTP).parsebytes(b"Content-Type: " + content_type.encode() + b"\r\n\r\n" + body)
@@ -106,6 +144,10 @@ class FakeProviders:
         self.fail_always: int | None = None
         self.delay_s = 0.0
         self.retry_after: str | None = None
+        #: Soniox: uploaded files, transcriptions, and (error_type, message) to fail the next transcription with
+        self.soniox_files: dict[str, bytes] = {}
+        self.soniox_jobs: dict[str, dict[str, Any]] = {}
+        self.soniox_fail: tuple[str, str] | None = None
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -147,10 +189,16 @@ class FakeProviders:
                     self._json(code, {"err_code": "ERROR", "err_msg": message, "request_id": "r"}, headers)
                 elif family == "sarvam":
                     self._json(code, {"error": {"message": message, "code": "invalid_request_error"}}, headers)
+                elif family == "soniox":
+                    self._json(code, {"status_code": code, "error_type": "invalid_request" if code == 400 else "error",
+                                      "message": message, "validation_errors": [], "request_id": "r",
+                                      "more_info": "https://docs.soniox.com/api-reference/errors"}, headers)  # fmt: skip
                 else:
                     self._json(code, {"error": {"message": message, "type": "invalid_request_error"}}, headers)
 
             def _family(self, path: str) -> str:
+                if path.startswith("/soniox/"):
+                    return "soniox"
                 if path.startswith(("/v1/audio", "/v1/models")):
                     return "openai"
                 if path.startswith(("/speech-to-text", "/text-to-speech")):
@@ -166,6 +214,7 @@ class FakeProviders:
                     "sarvam": h.get("api-subscription-key") == outer.key,
                     "elevenlabs": h.get("xi-api-key") == outer.key,
                     "deepgram": h.get("Authorization") == f"Token {outer.key}",
+                    "soniox": h.get("Authorization") == f"Bearer {outer.key}",
                 }[family]
 
             def _handle(self, method: str) -> None:
@@ -205,6 +254,9 @@ class FakeProviders:
                     return
                 audio = files.get("file", body if family == "deepgram" else b"")
                 secs = seconds_of(audio) if audio else 0.0
+                if family == "soniox":
+                    self._soniox(method, path[len("/soniox") :], doc, files)
+                    return
                 # ---- OpenAI-compatible ---------------------------------------------------------------
                 if path == "/v1/models":
                     self._json(200, {"object": "list", "data": [{"id": "whisper-1"}, {"id": "gpt-4o-mini-tts"}]})
@@ -331,8 +383,78 @@ class FakeProviders:
                 else:
                     self._error(family, 404, f"no route {path}")
 
+            def _soniox(self, method: str, path: str, doc: dict[str, Any], files: dict[str, bytes]) -> None:
+                parts = path.strip("/").split("/")
+                if method == "GET" and path == "/v1/models":
+                    self._json(200, {"models": [
+                        {"id": "stt-async-v6", "name": "Speech-to-Text Async v6", "transcription_mode": "async",
+                         "languages": [{"code": "en", "name": "English"}], "aliased_model_id": None},
+                        {"id": "stt-rt-v6", "name": "Speech-to-Text Real-time v6", "transcription_mode": "real_time",
+                         "languages": [{"code": "en", "name": "English"}], "aliased_model_id": None},
+                    ]})  # fmt: skip
+                elif method == "POST" and path == "/v1/files":
+                    file_id = str(uuid.uuid4())
+                    outer.soniox_files[file_id] = files.get("file", b"")
+                    self._json(201, {"id": file_id, "filename": "audio.wav", "size": len(files.get("file", b"")),
+                                     "created_at": "2026-11-17T00:00:00Z"})  # fmt: skip
+                elif method == "POST" and path == "/v1/transcriptions":
+                    if doc.get("file_id") not in outer.soniox_files:
+                        self._error("soniox", 400, "file_id is not a file of this project")
+                        return
+                    if doc.get("model", "").startswith("stt-rt-"):
+                        self._error("soniox", 400, f"model {doc['model']} is a real-time model")
+                        return
+                    job_id = str(uuid.uuid4())
+                    outer.soniox_jobs[job_id] = {"config": doc, "looks": 0, "fail": outer.soniox_fail}
+                    outer.soniox_fail = None
+                    self._json(201, self._job(job_id))
+                elif len(parts) >= 3 and parts[:2] == ["v1", "transcriptions"] and parts[2] in outer.soniox_jobs:
+                    job_id = parts[2]
+                    job = outer.soniox_jobs[job_id]
+                    if method == "DELETE":
+                        if job["looks"] < 2:
+                            self._error("soniox", 409, "the transcription is still processing")
+                            return
+                        del outer.soniox_jobs[job_id]
+                        self._send(204, b"", "application/json")
+                    elif len(parts) == 4 and parts[3] == "transcript":
+                        if self._job(job_id)["status"] != "completed":
+                            self._error("soniox", 409, "invalid transcription state")
+                            return
+                        secs = seconds_of(outer.soniox_files.get(job["config"]["file_id"], b""))
+                        tokens = soniox_tokens(secs, job["config"])
+                        text = "".join(t["text"] for t in tokens if t.get("translation_status") != "translation")
+                        self._json(200, {"id": job_id, "text": text, "tokens": tokens})
+                    else:
+                        job["looks"] += 1
+                        self._json(200, self._job(job_id))
+                elif method == "DELETE" and len(parts) == 3 and parts[:2] == ["v1", "files"]:
+                    if outer.soniox_files.pop(parts[2], None) is None:
+                        self._error("soniox", 404, "file not found")
+                        return
+                    self._send(204, b"", "application/json")
+                else:
+                    self._error("soniox", 404, f"no route {path}")
+
+            def _job(self, job_id: str) -> dict[str, Any]:
+                job = outer.soniox_jobs[job_id]
+                config = job["config"]
+                status = ("queued", "processing", "completed")[min(2, job["looks"])]
+                error = job["fail"] if status == "completed" else None
+                return {
+                    "id": job_id, "status": "error" if error else status, "created_at": "2026-11-17T00:00:00Z",
+                    "model": config.get("model"), "file_id": config.get("file_id"), "filename": "audio.wav",
+                    "language_hints": config.get("language_hints"),
+                    "enable_speaker_diarization": bool(config.get("enable_speaker_diarization")),
+                    "enable_language_identification": bool(config.get("enable_language_identification")),
+                    "error_type": error[0] if error else None, "error_message": error[1] if error else None,
+                }  # fmt: skip
+
             def do_GET(self) -> None:
                 self._handle("GET")
+
+            def do_DELETE(self) -> None:
+                self._handle("DELETE")
 
             def do_POST(self) -> None:
                 self._handle("POST")
@@ -354,18 +476,22 @@ class FakeProviders:
         self.httpd.shutdown()
         self.httpd.server_close()
 
-    def last(self, path: str) -> dict[str, Any]:
-        return next(r for r in reversed(self.requests) if r["path"].startswith(path))
+    def last(self, path: str, method: str | None = None) -> dict[str, Any]:
+        return next(r for r in reversed(self.requests) if r["path"].startswith(path) and method in (None, r["method"]))
 
     def count(self, path: str) -> int:
         return sum(1 for r in self.requests if r["path"].startswith(path))
 
 
 class FakeLiveServer:
-    """Deepgram's live socket (``/v1/listen``) and Sarvam's (``/speech-to-text/ws``).
+    """Deepgram's live socket (``/v1/listen``), Sarvam's (``/speech-to-text/ws``) and Soniox's
+    (``/transcribe-websocket``).
 
     Deepgram: an interim ``Results`` per 0.5 s of audio; after 0.4 s of silence (zeros) or ``Finalize`` a final
-    one with ``speech_final``. Sarvam: one ``data`` message per ``flush`` (or after 0.4 s of silence)."""
+    one with ``speech_final``. Sarvam: one ``data`` message per ``flush`` (or after 0.4 s of silence). Soniox: a
+    start message first (kept in ``configs``); per 0.5 s of audio the final token ``heard`` (once) and non-final
+    tokens; after 0.4 s of silence the rest as final tokens and ``<end>``, after ``finalize`` the same with
+    ``<fin>``; an empty text frame ends the stream with ``finished``."""
 
     def __init__(self, key: str = KEY) -> None:
         self.key = key
@@ -373,6 +499,7 @@ class FakeLiveServer:
         self.paths: list[str] = []
         self.headers: list[dict[str, str]] = []
         self.control: list[str] = []
+        self.configs: list[dict[str, Any]] = []
         self.loop: asyncio.AbstractEventLoop | None = None
         self._ready = threading.Event()
         self._stop: asyncio.Future[None] | None = None
@@ -396,11 +523,12 @@ class FakeLiveServer:
         self.paths.append(request.path)
         self.headers.append(dict(request.headers.raw_items()))
         deepgram = request.path.startswith("/v1/listen")
-        ok = (
-            request.headers.get("Authorization") == f"Token {self.key}"
-            if deepgram
-            else request.headers.get("Api-Subscription-Key") == self.key
-        )
+        if request.path.startswith("/transcribe-websocket"):
+            ok = request.headers.get("Authorization") == f"Bearer {self.key}"
+        elif deepgram:
+            ok = request.headers.get("Authorization") == f"Token {self.key}"
+        else:
+            ok = request.headers.get("Api-Subscription-Key") == self.key
         if not ok:
             return connection.respond(HTTPStatus.UNAUTHORIZED, "Invalid credentials\n")
         return None
@@ -415,6 +543,9 @@ class FakeLiveServer:
 
     async def _session(self, ws: ServerConnection) -> None:
         assert ws.request is not None
+        if ws.request.path.startswith("/transcribe-websocket"):
+            await self._soniox(ws)
+            return
         deepgram = ws.request.path.startswith("/v1/listen")
         speech = 0.0  # seconds of non-silent audio in the open utterance
         silence = 0.0
@@ -475,3 +606,73 @@ class FakeLiveServer:
                 }))  # fmt: skip
             if silence >= 0.4:
                 await final()
+
+    async def _soniox(self, ws: ServerConnection) -> None:
+        first = await ws.recv()
+        if not isinstance(first, str):
+            await ws.send(json.dumps({"tokens": [], "error_code": 400, "error_type": "invalid_request",
+                                      "error_message": "Start request expected."}))  # fmt: skip
+            return
+        self.configs.append(json.loads(first))
+        speech = silence = total = reported = 0.0
+        heard_sent = False  # the first word went out as a final token already
+
+        def tokens(start: float, final: bool) -> list[dict[str, Any]]:
+            words = ([] if heard_sent else ["heard"]) + [f" {speech:.1f}", " sec", "onds"]
+            return [
+                {"text": w, "start_ms": round(start * 1000), "end_ms": round(total * 1000), "confidence": 0.9,
+                 "is_final": final}
+                for w in words
+            ]  # fmt: skip
+
+        async def final(marker: str) -> None:
+            nonlocal speech, silence, reported, heard_sent
+            if speech > 0:
+                done = tokens(total - speech, True) + [{"text": marker, "is_final": True}]
+                await ws.send(json.dumps({"tokens": done, "final_audio_proc_ms": round(total * 1000),
+                                          "total_audio_proc_ms": round(total * 1000)}))  # fmt: skip
+            elif marker == "<fin>":
+                await ws.send(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
+            speech, silence, reported, heard_sent = 0.0, 0.0, 0.0, False
+
+        async for message in ws:
+            if isinstance(message, str):
+                if message == "":
+                    self.control.append("end")
+                    await final("<end>")
+                    await ws.send(
+                        json.dumps(
+                            {
+                                "tokens": [],
+                                "final_audio_proc_ms": round(total * 1000),
+                                "total_audio_proc_ms": round(total * 1000),
+                                "finished": True,
+                            }
+                        )
+                    )
+                    break
+                kind = str(json.loads(message).get("type"))
+                self.control.append(kind)
+                if kind == "finalize":
+                    await final("<fin>")
+                continue
+            x = np.frombuffer(message, dtype="<i2")
+            secs = len(x) / 16000
+            total += secs
+            if len(x) and np.abs(x).max() > 300:
+                speech += secs
+                silence = 0.0
+            else:
+                silence += secs
+            if speech - reported >= 0.5:
+                reported = speech
+                out = []
+                if not heard_sent:
+                    out.append({"text": "heard", "start_ms": round((total - speech) * 1000), "end_ms": 0,
+                                "confidence": 0.9, "is_final": True})  # fmt: skip
+                    heard_sent = True
+                out += [{"text": " hear", "is_final": False}, {"text": "ing", "is_final": False}]
+                await ws.send(json.dumps({"tokens": out, "final_audio_proc_ms": 0,
+                                          "total_audio_proc_ms": round(total * 1000)}))  # fmt: skip
+            if silence >= 0.4 and speech > 0:
+                await final("<end>")

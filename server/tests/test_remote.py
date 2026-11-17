@@ -55,6 +55,7 @@ def with_providers(settings: Settings, cloud: FakeProviders, live_url: str | Non
         "sarvam": {"base_url": cloud.url, "api_key": KEY, "prices": {"saaras:v4": {"per_hour": 30, "currency": "INR"}}},
         "elevenlabs": {"base_url": cloud.url, "api_key": KEY},
         "deepgram": {"base_url": live_url or cloud.url, "api_key": KEY},
+        "soniox": {"base_url": live_url or cloud.url + "/soniox", "api_key": KEY},
     }
     return settings
 
@@ -192,13 +193,14 @@ def test_cloud_entries_of_the_catalog() -> None:
     for m in cloud_models:
         assert m.engine == "remote" and m.kind == f"remote-{m.task}" and m.validated == "untested"
         assert m.license_url and m.license_url.startswith("https://") and "cloud API" in m.license
-        assert m.options["provider"] in ("openai", "sarvam", "elevenlabs", "deepgram") and m.options["model"]
+        assert m.options["provider"] in ("openai", "sarvam", "elevenlabs", "deepgram", "soniox") and m.options["model"]
         api = m.to_api()
         assert api["cloud"] is True and api["notice"] == "paid cloud API; audio leaves this server"
         assert "leaves this server" in m.description and m.languages
     ids = {m.id for m in cloud_models}
     assert {"openai-whisper-1", "openai-gpt-4o-mini-tts", "sarvam-saaras-v4", "sarvam-bulbul-v3",
-            "elevenlabs-flash-v2.5", "elevenlabs-scribe-v3", "deepgram-nova-3"} <= ids  # fmt: skip
+            "elevenlabs-flash-v2.5", "elevenlabs-scribe-v3", "deepgram-nova-3", "soniox-stt-async-v6",
+            "soniox-stt-rt-v6"} <= ids  # fmt: skip
     bulbul = next(m for m in cloud_models if m.id == "sarvam-bulbul-v4-flash")
     assert len(bulbul.voices) > 200 and {"shubh_enhi_ads", "kavitha_te_narration"} <= {v["id"] for v in bulbul.voices}
 
@@ -526,6 +528,170 @@ async def test_sarvam_live_socket(settings: Settings, cloud: FakeProviders, live
     assert live_socket.headers[0]["Api-Subscription-Key"] == KEY
 
 
+# -- Soniox -------------------------------------------------------------------------------------------------------
+def test_soniox_recorded_audio(srv: LiveServer, cloud: FakeProviders) -> None:
+    r = transcribe(
+        srv, "soniox-stt-async-v6", language="en", prompt="A call about bolo.", hotwords="Bolo, New Delhi",
+        response_format="verbose_json", **{"timestamp_granularities[]": "word"},
+    )  # fmt: skip
+    assert r.status_code == 200, r.text
+    doc = r.json()
+    # Soniox's pieces of words ("He", "ard") are joined into words; a leading space starts the next one
+    assert doc["text"] == "Heard 2.0 seconds." and [w["word"] for w in doc["words"]] == ["Heard", "2.0", "seconds."]
+    assert doc["language"] == "english" and doc["words"][2]["end"] == pytest.approx(2.0, abs=0.01)
+    upload = cloud.last("/soniox/v1/files", "POST")
+    assert upload["headers"]["Authorization"] == f"Bearer {KEY}" and upload["form"]["file.content_type"] == "audio/wav"
+    body = cloud.last("/soniox/v1/transcriptions", "POST")["json"]
+    assert body == {
+        "model": "stt-async-v6", "language_hints": ["en"], "enable_language_identification": True,
+        "context": {"text": "A call about bolo.", "terms": ["Bolo", "New Delhi"]}, "file_id": body["file_id"],
+    }  # fmt: skip
+    # queued, processing, completed: two polls; then the transcription and the file are deleted
+    polls = [q for q in cloud.requests if q["method"] == "GET" and q["path"].count("/") == 4]
+    assert len(polls) == 2 and not cloud.soniox_jobs and not cloud.soniox_files
+    assert [q["method"] for q in cloud.requests if q["method"] == "DELETE"] == ["DELETE", "DELETE"]
+    trace = trace_of(srv, r)
+    # upload, create, two polls, transcript (the deletes are not counted)
+    assert trace["provider"]["kind"] == "soniox" and trace["provider"]["requests"] == 5
+    # no language: Soniox identifies it per token; the language most of the text is in is answered
+    r = transcribe(srv, "soniox-stt-async-v6", response_format="verbose_json")
+    assert (
+        r.json()["language"] == "hindi"
+        and "language_hints" not in cloud.last("/soniox/v1/transcriptions", "POST")["json"]
+    )
+    # the live entry sends recorded audio to the async model of the same generation
+    r = transcribe(srv, "soniox-stt-rt-v6")
+    assert r.status_code == 200 and cloud.last("/soniox/v1/transcriptions", "POST")["json"]["model"] == "stt-async-v6"
+    # translation to English: Soniox's translated tokens
+    r = transcribe(srv, "soniox-stt-async-v6", endpoint="translations")
+    assert r.status_code == 200 and r.json()["text"] == "Translated 2.0 seconds"
+    assert cloud.last("/soniox/v1/transcriptions", "POST")["json"]["translation"] == {
+        "type": "one_way",
+        "target_language": "en",
+    }
+    test = httpx.post(f"{srv.url}/api/v1/providers/soniox/test").json()
+    assert test["ok"] and test["checked"] == "credentials" and "2 models" in test["message"]
+
+
+def test_soniox_labels_speakers_itself(srv: LiveServer, cloud: FakeProviders) -> None:
+    r = transcribe(srv, "soniox-stt-async-v6", language="en", response_format="diarized_json")
+    assert r.status_code == 200, r.text
+    segments = r.json()["segments"]
+    assert [(s["speaker"], s["text"]) for s in segments] == [("A", "Heard"), ("B", "2.0 seconds.")]
+    assert segments[1]["start"] == pytest.approx(0.667, abs=0.01)
+    assert cloud.last("/soniox/v1/transcriptions", "POST")["json"]["enable_speaker_diarization"] is True
+    assert trace_of(srv, r)["diarization_model"] == "provider"
+    r = transcribe(
+        srv, "soniox-stt-async-v6", language="en", diarize="true", response_format="verbose_json",
+        **{"timestamp_granularities[]": ["word", "segment"]},
+    )  # fmt: skip
+    assert [w.get("speaker") for w in r.json()["words"]] == ["A", "B", "B"]
+    # without diarization, nothing about speakers is asked for or answered
+    r = transcribe(srv, "soniox-stt-async-v6", language="en", response_format="verbose_json")
+    assert "enable_speaker_diarization" not in cloud.last("/soniox/v1/transcriptions", "POST")["json"]
+    assert all("speaker" not in s for s in r.json()["segments"])
+    # a named diarization model is bolo's: the recording is cut at its turns as for any recogniser
+    r = transcribe(srv, "soniox-stt-async-v6", language="en", diarize="true", diarization_model="fake-diarization")
+    assert r.status_code == 200, r.text
+    assert "enable_speaker_diarization" not in cloud.last("/soniox/v1/transcriptions", "POST")["json"]
+
+
+def test_soniox_errors(settings: Settings, cloud: FakeProviders) -> None:
+    from bolo.errors import ProviderTimeout
+    from bolo.remote import RemoteRequest, make_adapter
+
+    with_providers(settings, cloud)
+    server = LiveServer(settings)
+    server.start()
+    try:
+        cloud.soniox_fail = ("audio_decode_error", f"the audio could not be decoded (key {KEY})")
+        r = transcribe(server, "soniox-stt-async-v6")
+        assert r.status_code == 400 and "audio_decode_error" in r.text and KEY not in r.text
+        cloud.soniox_fail = ("internal_error", "try again")
+        r = transcribe(server, "soniox-stt-async-v6")
+        assert r.status_code == 502 and r.json()["error"]["code"] == "provider_error"
+        assert not cloud.soniox_files  # cleaned up after a failure too
+        cloud.retry_after = "3"
+        cloud.fail = [429]
+        r = transcribe(server, "soniox-stt-async-v6")
+        assert r.status_code == 429 and r.headers["retry-after"] == "3"
+        cloud.fail = [402]
+        r = transcribe(server, "soniox-stt-async-v6")
+        assert r.status_code == 502 and "(402)" in r.json()["error"]["message"]
+        cloud.fail = [401]
+        r = transcribe(server, "soniox-stt-async-v6")
+        assert r.status_code == 502 and r.json()["error"]["code"] == "provider_auth" and KEY not in r.text
+    finally:
+        server.stop()
+    # a transcription that takes longer than the model allows
+    cfg = ProviderConfig.from_dict("soniox", settings.providers["soniox"])
+    adapter = make_adapter(cfg, "stt-async-v6", {"poll_timeout_s": 0.1})
+    try:
+        usage = adapter.new_usage()
+        with pytest.raises(ProviderTimeout, match="had not finished"):
+            adapter.transcribe(RemoteRequest(wav_bytes(1.0), "audio/wav", 1.0), usage)
+    finally:
+        adapter.close()
+    assert not cloud.soniox_files  # the upload is removed even so (the transcription cannot be, while it runs)
+
+
+async def test_soniox_live_socket(settings: Settings, cloud: FakeProviders, live_socket: FakeLiveServer) -> None:
+    with_providers(settings, cloud)
+    settings.providers["soniox"]["base_url"] = live_socket.url
+    server = LiveServer(settings)
+    server.start()
+    try:
+        messages = await run_live(server, "soniox-stt-rt-v6", "&language=en")
+        for _ in range(100):
+            if "end" in live_socket.control:
+                break
+            await asyncio.sleep(0.05)
+        stats = httpx.get(f"{server.url}/api/v1/stats").json()["providers"]
+    finally:
+        server.stop()
+    partials = [m["text"] for m in messages if m["type"] == "partial"]
+    finals = [m for m in messages if m["type"] == "final"]
+    # final tokens are held until Soniox's <end>, shown with the non-final ones in the meantime
+    assert partials and partials[0] == "heard hearing"
+    assert len(finals) == 1 and finals[0]["text"].startswith("heard 2.") and finals[0]["text"].endswith(" seconds")
+    assert (
+        live_socket.paths[0] == "/transcribe-websocket" and live_socket.headers[0]["Authorization"] == f"Bearer {KEY}"
+    )
+    assert live_socket.configs[0] == {
+        "model": "stt-rt-v6", "audio_format": "pcm_s16le", "sample_rate": 16000, "num_channels": 1,
+        "language_hints": ["en"], "enable_endpoint_detection": True,
+    }  # fmt: skip
+    assert KEY not in json.dumps(live_socket.configs) and "end" in live_socket.control
+    assert stats and any(s["provider"] == "soniox" and s["audio_seconds"] >= 2.9 for s in stats)
+
+
+def test_soniox_tokens() -> None:
+    from bolo.remote.soniox import SonioxLive, tokens_to_words, transcript_to_result
+
+    words = tokens_to_words([{"text": "東", "start_ms": 0, "end_ms": 100}, {"text": "京", "start_ms": 100,
+                             "end_ms": 200}, {"text": "Hel", "start_ms": 300, "end_ms": 350},
+                             {"text": "lo", "start_ms": 350, "end_ms": 400}, {"text": ",", "start_ms": 400,
+                             "end_ms": 410}, {"text": " you", "start_ms": 500, "end_ms": 600}])  # fmt: skip
+    assert [(w.w, w.t0, w.t1) for w, _ in words] == [
+        ("東", 0.0, 0.1), ("京", 0.1, 0.2), ("Hello,", 0.3, 0.41), ("you", 0.5, 0.6),
+    ]  # fmt: skip
+    result = transcript_to_result({"text": "", "tokens": [
+        {"text": "नमस्ते", "start_ms": 0, "end_ms": 500, "language": "hi", "speaker": "2"},
+        {"text": " ok", "start_ms": 600, "end_ms": 700, "language": "en", "speaker": "2"},
+        {"text": "<end>", "is_final": True},
+    ]}, None, False)  # fmt: skip
+    assert result.text == "नमस्ते ok" and result.language == "hi" and result.segments[0].speaker == "B"
+    live = object.__new__(SonioxLive)
+    live._final = []
+    assert live.parse(json.dumps({"tokens": [], "error_code": 503, "error_type": "service_unavailable",
+                                  "error_message": "Cannot continue request (code 11)."}))[0].kind == "error"  # fmt: skip
+    events = live.parse(json.dumps({"tokens": [{"text": "Hi", "is_final": True}, {"text": " the", "is_final": False}]}))
+    assert [(e.kind, e.text) for e in events] == [("interim", "Hi the")]
+    events = live.parse(json.dumps({"tokens": [{"text": " there", "is_final": True, "start_ms": 10, "end_ms": 20},
+                                               {"text": "<fin>", "is_final": True}]}))  # fmt: skip
+    assert [(e.kind, e.text) for e in events] == [("final", "Hi there"), ("endpoint", "")]
+
+
 # -- errors and keys ----------------------------------------------------------------------------------------------
 def test_provider_errors_are_mapped(srv: LiveServer, cloud: FakeProviders) -> None:
     cloud.retry_after = "7"
@@ -544,7 +710,7 @@ def test_provider_errors_are_mapped(srv: LiveServer, cloud: FakeProviders) -> No
         if status == 429:
             assert r.headers["retry-after"] == "7"
     for model, path in [("sarvam-saaras-v4", "/speech-to-text"), ("deepgram-nova-3", "/v1/listen"),
-                        ("elevenlabs-scribe-v3", "/v1/speech-to-text")]:  # fmt: skip
+                        ("elevenlabs-scribe-v3", "/v1/speech-to-text"), ("soniox-stt-async-v6", "/soniox/v1/files")]:  # fmt: skip
         cloud.fail = [500]
         r = transcribe(srv, model)
         assert r.status_code == 502 and "simulated failure 500" in r.json()["error"]["message"], (model, path)
@@ -943,7 +1109,7 @@ def test_console_flags(live: LiveServer, settings: Settings, tmp_path: Path, llm
     caps = info["capabilities"]
     assert caps["wordlists"]["endpoint"] == "/api/v1/wordlists" and isinstance(caps["wordlists"]["available"], bool)
     assert caps["wordlists"]["request_fields"] == ["wordlists", "pronunciations"]
-    assert caps["providers"]["kinds"] == ["openai-compatible", "sarvam", "elevenlabs", "deepgram"]
+    assert caps["providers"]["kinds"] == ["openai-compatible", "sarvam", "elevenlabs", "deepgram", "soniox"]
     assert caps["providers"]["editable"] is True and caps["providers"]["configured"] == []
     pipelines = caps["realtime"]["pipelines"]
     assert pipelines["cascade"] == {"configured": False, "available": False}

@@ -184,7 +184,7 @@ class Settings:
     tts_server_timeout_s: float = 300.0  # longest wait for the next bytes of a synthesis response
 
     # -- cloud providers (engine remote; docs/providers.md) --------------------------------------
-    #: name -> {kind, base_url, api_key, options, prices}. kind: openai-compatible, sarvam, elevenlabs or deepgram.
+    #: name -> {kind, base_url, api_key, options, prices}. kind: openai-compatible, sarvam, elevenlabs, deepgram or soniox.
     #: In a file: a [providers.<name>] table per provider. In the environment: BOLO_PROVIDERS (JSON), or
     #: BOLO_PROVIDER_<NAME>_KIND / _BASE_URL / _API_KEY. Keys are never logged or returned by any API.
     providers: dict[str, Any] = field(default_factory=dict)

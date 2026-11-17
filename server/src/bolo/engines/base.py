@@ -102,6 +102,8 @@ class STTRequest:
     word_timestamps: bool = False
     temperature: float = 0.0
     hotwords: str | None = None
+    #: label speakers in the model itself (only set for models with ``native_diarization``)
+    diarize: bool = False
 
 
 @dataclass
@@ -184,6 +186,9 @@ class STTModel(Model):
     languages: tuple[str, ...] = ()
     supports_translate: bool = False
     supports_word_timestamps: bool = False
+    #: the model labels speakers itself (a cloud recogniser with diarization): a request's ``diarize`` is then
+    #: passed to it as ``STTRequest.diarize`` instead of cutting the audio at bolo's speaker turns
+    native_diarization: bool = False
 
     @abc.abstractmethod
     def transcribe(self, requests: list[STTRequest]) -> list[STTResult]:

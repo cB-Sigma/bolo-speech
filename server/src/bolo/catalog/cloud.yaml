@@ -1714,3 +1714,183 @@
     provider_kind: deepgram
     model: nova-2
     workers: 4
+- id: soniox-stt-async-v6
+  task: stt
+  engine: remote
+  kind: remote-stt
+  family: Soniox (cloud)
+  languages:
+  - af
+  - sq
+  - ar
+  - az
+  - eu
+  - be
+  - bn
+  - bs
+  - bg
+  - ca
+  - zh
+  - hr
+  - cs
+  - da
+  - nl
+  - en
+  - et
+  - fi
+  - fr
+  - gl
+  - de
+  - el
+  - gu
+  - he
+  - hi
+  - hu
+  - id
+  - it
+  - ja
+  - kn
+  - kk
+  - ko
+  - lv
+  - lt
+  - mk
+  - ms
+  - ml
+  - mr
+  - 'no'
+  - fa
+  - pl
+  - pt
+  - pa
+  - ro
+  - ru
+  - sr
+  - sk
+  - sl
+  - es
+  - sw
+  - sv
+  - tl
+  - ta
+  - te
+  - th
+  - tr
+  - uk
+  - ur
+  - vi
+  - cy
+  tier: accuracy
+  streaming: false
+  sample_rate: 16000
+  license: Soniox Terms of Service (paid cloud API)
+  license_url: https://soniox.com/policies/terms-of-service
+  cloud: true
+  features:
+  - timestamps
+  - telephony
+  - hotwords
+  - translate
+  - language-detect
+  - speaker-labels
+  description: 'Soniox stt-async-v6 (recorded audio, Soniox''s async API): 60 languages, word timestamps, speaker
+    labels from Soniox (diarize=true), language identification, hotwords and prompt as context, translation to
+    English. Paid cloud API: the audio leaves this server.'
+  source_url: https://docs.soniox.com/stt/models
+  validated: untested
+  options:
+    provider: soniox
+    provider_kind: soniox
+    model: stt-async-v6
+    live: false
+    workers: 4
+- id: soniox-stt-rt-v6
+  task: stt
+  engine: remote
+  kind: remote-stt
+  family: Soniox (cloud)
+  languages:
+  - af
+  - sq
+  - ar
+  - az
+  - eu
+  - be
+  - bn
+  - bs
+  - bg
+  - ca
+  - zh
+  - hr
+  - cs
+  - da
+  - nl
+  - en
+  - et
+  - fi
+  - fr
+  - gl
+  - de
+  - el
+  - gu
+  - he
+  - hi
+  - hu
+  - id
+  - it
+  - ja
+  - kn
+  - kk
+  - ko
+  - lv
+  - lt
+  - mk
+  - ms
+  - ml
+  - mr
+  - 'no'
+  - fa
+  - pl
+  - pt
+  - pa
+  - ro
+  - ru
+  - sr
+  - sk
+  - sl
+  - es
+  - sw
+  - sv
+  - tl
+  - ta
+  - te
+  - th
+  - tr
+  - uk
+  - ur
+  - vi
+  - cy
+  tier: realtime
+  streaming: true
+  sample_rate: 16000
+  license: Soniox Terms of Service (paid cloud API)
+  license_url: https://soniox.com/policies/terms-of-service
+  cloud: true
+  features:
+  - timestamps
+  - telephony
+  - hotwords
+  - translate
+  - language-detect
+  - speaker-labels
+  description: 'Soniox stt-rt-v6: live recognition over Soniox''s WebSocket (interim text, Soniox''s endpoint
+    detection); recorded audio and Realtime turns go to stt-async-v6. Paid cloud API: the audio leaves this
+    server.'
+  source_url: https://docs.soniox.com/api-reference/stt/websocket-api
+  validated: untested
+  options:
+    provider: soniox
+    provider_kind: soniox
+    model: stt-rt-v6
+    async_model: stt-async-v6
+    workers: 4

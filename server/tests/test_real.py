@@ -996,6 +996,7 @@ CLOUD_KEYS = {
     "sarvam": ("SARVAM_API_KEY", "BOLO_PROVIDER_SARVAM_API_KEY"),
     "elevenlabs": ("ELEVENLABS_API_KEY", "BOLO_PROVIDER_ELEVENLABS_API_KEY"),
     "deepgram": ("DEEPGRAM_API_KEY", "BOLO_PROVIDER_DEEPGRAM_API_KEY"),
+    "soniox": ("SONIOX_API_KEY", "BOLO_PROVIDER_SONIOX_API_KEY"),
 }
 
 
@@ -1090,6 +1091,32 @@ async def test_cloud_deepgram(cloud_core: Bolo) -> None:
         finally:
             stream.close()
     print(f"\ndeepgram live: {live_text!r}")
+    assert word_error_rate(LIBRISPEECH_REF, live_text) < 0.25
+
+
+@needs_cloud("soniox")
+async def test_cloud_soniox(cloud_core: Bolo) -> None:
+    check = await asyncio.to_thread(cloud_core.providers.test, "soniox")
+    assert check["ok"] and check["checked"] == "credentials", check
+    samples, rate = librispeech(real_settings().data_dir)
+    heard = await cloud_core.transcribe(samples, rate, model="soniox-stt-async-v6", word_timestamps=True)
+    print(f"\nsoniox: {heard.text!r} ({heard.language})")
+    assert word_error_rate(LIBRISPEECH_REF, heard.text) < 0.15 and len(heard.words) > 10
+    assert heard.language == "en" and heard.words[-1].t1 <= len(samples) / rate + 0.5
+    # the live socket, at the pace of a microphone
+    async with cloud_core.manager.use("soniox-stt-rt-v6") as entry:
+        stream = entry.model.create_stream("en")  # type: ignore[attr-defined]
+        try:
+            audio = resample(samples, rate, 16000)
+            for off in range(0, len(audio), 1600):
+                stream.accept(audio[off : off + 1600])
+                await asyncio.sleep(0.1)
+            stream.finish()
+            await asyncio.to_thread(stream.settle)
+            live_text = stream.result().text
+        finally:
+            stream.close()
+    print(f"\nsoniox live: {live_text!r}")
     assert word_error_rate(LIBRISPEECH_REF, live_text) < 0.25
 
 

@@ -1273,7 +1273,18 @@ class Bolo:
                     speakers: list[str] | None = None
                     overlapped: list[bool] | None = None
                     sources: list[FloatArray | None] | None = None
-                    if diarize is not None:
+                    # a recogniser that labels speakers itself (Soniox) is asked to, unless the request needs
+                    # bolo's diarizer: a named diarization model, known speakers or overlap separation
+                    native = (
+                        diarize is not None
+                        and stt.native_diarization
+                        and separate is None
+                        and not diarize.model
+                        and not diarize.known
+                    )
+                    if native:
+                        trace.extra["diarization_model"] = "provider"
+                    if diarize is not None and not native:
                         # Cut at the speaker turns and transcribe each turn: the speaker of every
                         # piece of text is then known without needing word timestamps. Stretches where two
                         # people talk at once are marked on the segments (keep_overlap: see DiarizeOptions).
@@ -1312,7 +1323,7 @@ class Bolo:
                         entry, stt, samples, chunks, trace,
                         language=language, task=task, prompt=prompt, word_timestamps=word_timestamps,
                         temperature=temperature, hotwords=hotwords, on_segment=on_segment, speakers=speakers,
-                        overlapped=overlapped, sources=sources,
+                        overlapped=overlapped, sources=sources, diarize=native,
                     )  # fmt: skip
                 transcript.duration = duration
                 transcript.model = spec.id
@@ -1360,9 +1371,12 @@ class Bolo:
         speakers: list[str] | None = None,
         overlapped: list[bool] | None = None,
         sources: list[FloatArray | None] | None = None,
+        diarize: bool = False,
     ) -> Transcript:
         """Decode ``chunks`` (sample ranges of ``samples``). ``sources[i]``, when given, is the audio to decode
-        for chunk ``i`` instead of the mixture (a separated track); it is placed at the chunk's start."""
+        for chunk ``i`` instead of the mixture (a separated track); it is placed at the chunk's start. ``diarize``
+        asks a model with native diarization for speaker labels (kept from its segments when ``speakers`` is
+        not given)."""
         sr = stt.sample_rate
 
         def audio(index: int, a: int, b: int) -> FloatArray:
@@ -1374,7 +1388,7 @@ class Bolo:
             asyncio.ensure_future(
                 entry.queue.submit(
                     "batch",
-                    STTRequest(audio(i, a, b), language, task, prompt, word_timestamps, temperature, hotwords),
+                    STTRequest(audio(i, a, b), language, task, prompt, word_timestamps, temperature, hotwords, diarize),
                 )
             )
             for i, (a, b) in enumerate(chunks)
@@ -1408,7 +1422,7 @@ class Bolo:
                         [Word(w.w, w.t0 + offset, w.t1 + offset) for w in seg.words],
                         seg.avg_logprob,
                         seg.no_speech_prob,
-                        speakers[index] if speakers else None,
+                        speakers[index] if speakers else seg.speaker,
                         bool(overlapped and overlapped[index]),
                         bool(sources and sources[index] is not None),
                     )

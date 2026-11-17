@@ -34,20 +34,28 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("bolo.providers")
 
-KINDS = ("openai-compatible", "sarvam", "elevenlabs", "deepgram")
+KINDS = ("openai-compatible", "sarvam", "elevenlabs", "deepgram", "soniox")
 DEFAULT_BASE_URLS = {
     "openai-compatible": "https://api.openai.com/v1",
     "sarvam": "https://api.sarvam.ai",
     "elevenlabs": "https://api.elevenlabs.io",
     "deepgram": "https://api.deepgram.com",
+    "soniox": "https://api.soniox.com",
 }
 #: provider names whose kind need not be spelled out
-KIND_BY_NAME = {"openai": "openai-compatible", "sarvam": "sarvam", "elevenlabs": "elevenlabs", "deepgram": "deepgram"}
+KIND_BY_NAME = {
+    "openai": "openai-compatible",
+    "sarvam": "sarvam",
+    "elevenlabs": "elevenlabs",
+    "deepgram": "deepgram",
+    "soniox": "soniox",
+}
 TERMS = {
     "openai-compatible": "https://openai.com/policies/services-agreement/",
     "sarvam": "https://www.sarvam.ai/terms-of-service",
     "elevenlabs": "https://elevenlabs.io/terms-of-use",
     "deepgram": "https://deepgram.com/terms",
+    "soniox": "https://soniox.com/policies/terms-of-service",
 }
 LOOPBACK = ("127.0.0.1", "localhost", "::1")
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,39}$")
