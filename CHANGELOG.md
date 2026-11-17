@@ -6,6 +6,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-11-17
+
 ### Added
 
 - Real-model test: `nemotron-3-diarization` on the demo's two-voice dialogue (`two-speakers-en`, the first 20.8 s
