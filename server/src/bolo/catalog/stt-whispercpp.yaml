@@ -1,0 +1,773 @@
+# Whisper models in ggml format for whisper.cpp, run by the whisper.cpp engine (pywhispercpp; bolo-speech[whispercpp]).
+# Files from https://huggingface.co/ggerganov/whisper.cpp (MIT, like OpenAI's Whisper weights), pinned to commit
+# 5359861c739e955e79d9a303bcbc70fb988958b1 with their size and SHA-256 from the Hugging Face API, read 2026-11-17.
+# The quantised files (q5_0, q5_1, q8_0) are whisper.cpp's own quantisations of the same weights: smaller and faster
+# on a CPU, a little less accurate. whisper.cpp gives no word timestamps here; segments carry times.
+# A multilingual model detects the language when a request names none; the .en models are English only.
+
+- id: whispercpp-tiny
+  aliases: [ggml-tiny]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: &whisper_languages [en, zh, de, es, ru, ko, fr, ja, pt, tr, pl, ca, nl, ar, sv, it, id, hi, fi, vi, he, uk, el, ms, cs, ro, da, hu, ta, 'no', th, ur, hr, bg, lt, la, mi, ml, cy, sk, te, fa, lv, bn, sr, az, sl, kn, et, mk, br, eu, is, hy, ne, mn, bs, kk, sq, sw, gl, mr, pa, si, km, sn, yo, so, af, oc, ka, be, tg, sd, gu, am, yi, lo, uz, fo, ht, ps, tk, nn, mt, sa, lb, my, bo, tl, mg, as, tt, haw, ln, ha, ba, jw, su, yue]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 77691713
+  params: 39000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, translate, language-detect]
+  description: 'Whisper tiny in ggml format for whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-tiny.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-tiny.bin
+      size: 77691713
+      sha256: be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21
+  options:
+    file: ggml-tiny.bin
+- id: whispercpp-tiny-q5_1
+  aliases: [ggml-tiny-q5_1]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: *whisper_languages
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 32152673
+  params: 39000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, translate, language-detect]
+  description: 'Whisper tiny in ggml format for whisper.cpp, 5-bit (q5_1) quantised by whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-tiny-q5_1.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-tiny-q5_1.bin
+      size: 32152673
+      sha256: 818710568da3ca15689e31a743197b520007872ff9576237bda97bd1b469c3d7
+  options:
+    file: ggml-tiny-q5_1.bin
+- id: whispercpp-tiny-q8_0
+  aliases: [ggml-tiny-q8_0]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: *whisper_languages
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 43537433
+  params: 39000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, translate, language-detect]
+  description: 'Whisper tiny in ggml format for whisper.cpp, 8-bit (q8_0) quantised by whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-tiny-q8_0.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-tiny-q8_0.bin
+      size: 43537433
+      sha256: c2085835d3f50733e2ff6e4b41ae8a2b8d8110461e18821b09a15c40c42d1cca
+  options:
+    file: ggml-tiny-q8_0.bin
+- id: whispercpp-tiny.en
+  aliases: [ggml-tiny.en]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: [en]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 77704715
+  params: 39000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation]
+  description: 'Whisper tiny.en in ggml format for whisper.cpp. English only.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-tiny.en.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-tiny.en.bin
+      size: 77704715
+      sha256: 921e4cf8686fdd993dcd081a5da5b6c365bfde1162e72b08d75ac75289920b1f
+  options:
+    file: ggml-tiny.en.bin
+    english_only: true
+- id: whispercpp-tiny.en-q5_1
+  aliases: [ggml-tiny.en-q5_1]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: [en]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 32166155
+  params: 39000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation]
+  description: 'Whisper tiny.en in ggml format for whisper.cpp, 5-bit (q5_1) quantised by whisper.cpp. English only.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-tiny.en-q5_1.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-tiny.en-q5_1.bin
+      size: 32166155
+      sha256: c77c5766f1cef09b6b7d47f21b546cbddd4157886b3b5d6d4f709e91e66c7c2b
+  options:
+    file: ggml-tiny.en-q5_1.bin
+    english_only: true
+- id: whispercpp-tiny.en-q8_0
+  aliases: [ggml-tiny.en-q8_0]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: [en]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 43550795
+  params: 39000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation]
+  description: 'Whisper tiny.en in ggml format for whisper.cpp, 8-bit (q8_0) quantised by whisper.cpp. English only.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-tiny.en-q8_0.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-tiny.en-q8_0.bin
+      size: 43550795
+      sha256: 5bc2b3860aa151a4c6e7bb095e1fcce7cf12c7b020ca08dcec0c6d018bb7dd94
+  options:
+    file: ggml-tiny.en-q8_0.bin
+    english_only: true
+- id: whispercpp-base
+  aliases: [ggml-base]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: *whisper_languages
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 147951465
+  params: 74000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, translate, language-detect]
+  description: 'Whisper base in ggml format for whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-base.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.bin
+      size: 147951465
+      sha256: 60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe
+  options:
+    file: ggml-base.bin
+- id: whispercpp-base-q5_1
+  aliases: [ggml-base-q5_1]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: *whisper_languages
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 59707625
+  params: 74000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, translate, language-detect]
+  description: 'Whisper base in ggml format for whisper.cpp, 5-bit (q5_1) quantised by whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-base-q5_1.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base-q5_1.bin
+      size: 59707625
+      sha256: 422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898
+  options:
+    file: ggml-base-q5_1.bin
+- id: whispercpp-base-q8_0
+  aliases: [ggml-base-q8_0]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: *whisper_languages
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 81768585
+  params: 74000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, translate, language-detect]
+  description: 'Whisper base in ggml format for whisper.cpp, 8-bit (q8_0) quantised by whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-base-q8_0.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base-q8_0.bin
+      size: 81768585
+      sha256: c577b9a86e7e048a0b7eada054f4dd79a56bbfa911fbdacf900ac5b567cbb7d9
+  options:
+    file: ggml-base-q8_0.bin
+- id: whispercpp-base.en
+  aliases: [ggml-base.en]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: [en]
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 147964211
+  params: 74000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation]
+  description: 'Whisper base.en in ggml format for whisper.cpp. English only.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-base.en.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.en.bin
+      size: 147964211
+      sha256: a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002
+  options:
+    file: ggml-base.en.bin
+    english_only: true
+- id: whispercpp-base.en-q5_1
+  aliases: [ggml-base.en-q5_1]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: [en]
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 59721011
+  params: 74000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation]
+  description: 'Whisper base.en in ggml format for whisper.cpp, 5-bit (q5_1) quantised by whisper.cpp. English only.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-base.en-q5_1.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.en-q5_1.bin
+      size: 59721011
+      sha256: 4baf70dd0d7c4247ba2b81fafd9c01005ac77c2f9ef064e00dcf195d0e2fdd2f
+  options:
+    file: ggml-base.en-q5_1.bin
+    english_only: true
+- id: whispercpp-base.en-q8_0
+  aliases: [ggml-base.en-q8_0]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: [en]
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 81781811
+  params: 74000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation]
+  description: 'Whisper base.en in ggml format for whisper.cpp, 8-bit (q8_0) quantised by whisper.cpp. English only.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-base.en-q8_0.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.en-q8_0.bin
+      size: 81781811
+      sha256: a4d4a0768075e13cfd7e19df3ae2dbc4a68d37d36a7dad45e8410c9a34f8c87e
+  options:
+    file: ggml-base.en-q8_0.bin
+    english_only: true
+- id: whispercpp-small
+  aliases: [ggml-small]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: *whisper_languages
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 487601967
+  params: 244000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, translate, language-detect]
+  description: 'Whisper small in ggml format for whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-small.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-small.bin
+      size: 487601967
+      sha256: 1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b
+  options:
+    file: ggml-small.bin
+- id: whispercpp-small-q5_1
+  aliases: [ggml-small-q5_1]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: *whisper_languages
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 190085487
+  params: 244000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, translate, language-detect]
+  description: 'Whisper small in ggml format for whisper.cpp, 5-bit (q5_1) quantised by whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-small-q5_1.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-small-q5_1.bin
+      size: 190085487
+      sha256: ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb
+  options:
+    file: ggml-small-q5_1.bin
+- id: whispercpp-small-q8_0
+  aliases: [ggml-small-q8_0]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: *whisper_languages
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 264464607
+  params: 244000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, translate, language-detect]
+  description: 'Whisper small in ggml format for whisper.cpp, 8-bit (q8_0) quantised by whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-small-q8_0.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-small-q8_0.bin
+      size: 264464607
+      sha256: 49c8fb02b65e6049d5fa6c04f81f53b867b5ec9540406812c643f177317f779f
+  options:
+    file: ggml-small-q8_0.bin
+- id: whispercpp-small.en
+  aliases: [ggml-small.en]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: [en]
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 487614201
+  params: 244000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation]
+  description: 'Whisper small.en in ggml format for whisper.cpp. English only.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-small.en.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-small.en.bin
+      size: 487614201
+      sha256: c6138d6d58ecc8322097e0f987c32f1be8bb0a18532a3f88f734d1bbf9c41e5d
+  options:
+    file: ggml-small.en.bin
+    english_only: true
+- id: whispercpp-small.en-q5_1
+  aliases: [ggml-small.en-q5_1]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: [en]
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 190098681
+  params: 244000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation]
+  description: 'Whisper small.en in ggml format for whisper.cpp, 5-bit (q5_1) quantised by whisper.cpp. English only.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-small.en-q5_1.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-small.en-q5_1.bin
+      size: 190098681
+      sha256: bfdff4894dcb76bbf647d56263ea2a96645423f1669176f4844a1bf8e478ad30
+  options:
+    file: ggml-small.en-q5_1.bin
+    english_only: true
+- id: whispercpp-small.en-q8_0
+  aliases: [ggml-small.en-q8_0]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: [en]
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 264477561
+  params: 244000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation]
+  description: 'Whisper small.en in ggml format for whisper.cpp, 8-bit (q8_0) quantised by whisper.cpp. English only.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-small.en-q8_0.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-small.en-q8_0.bin
+      size: 264477561
+      sha256: 67a179f608ea6114bd3fdb9060e762b588a3fb3bd00c4387971be4d177958067
+  options:
+    file: ggml-small.en-q8_0.bin
+    english_only: true
+- id: whispercpp-medium
+  aliases: [ggml-medium]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: *whisper_languages
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 1533763059
+  params: 769000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, translate, language-detect]
+  description: 'Whisper medium in ggml format for whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-medium.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-medium.bin
+      size: 1533763059
+      sha256: 6c14d5adee5f86394037b4e4e8b59f1673b6cee10e3cf0b11bbdbee79c156208
+  options:
+    file: ggml-medium.bin
+- id: whispercpp-medium-q5_0
+  aliases: [ggml-medium-q5_0]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: *whisper_languages
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 539212467
+  params: 769000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, translate, language-detect]
+  description: 'Whisper medium in ggml format for whisper.cpp, 5-bit (q5_0) quantised by whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-medium-q5_0.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-medium-q5_0.bin
+      size: 539212467
+      sha256: 19fea4b380c3a618ec4723c3eef2eb785ffba0d0538cf43f8f235e7b3b34220f
+  options:
+    file: ggml-medium-q5_0.bin
+- id: whispercpp-medium-q8_0
+  aliases: [ggml-medium-q8_0]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: *whisper_languages
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 823369779
+  params: 769000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, translate, language-detect]
+  description: 'Whisper medium in ggml format for whisper.cpp, 8-bit (q8_0) quantised by whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-medium-q8_0.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-medium-q8_0.bin
+      size: 823369779
+      sha256: 42a1ffcbe4167d224232443396968db4d02d4e8e87e213d3ee2e03095dea6502
+  options:
+    file: ggml-medium-q8_0.bin
+- id: whispercpp-medium.en
+  aliases: [ggml-medium.en]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: [en]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 1533774781
+  params: 769000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation]
+  description: 'Whisper medium.en in ggml format for whisper.cpp. English only.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-medium.en.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-medium.en.bin
+      size: 1533774781
+      sha256: cc37e93478338ec7700281a7ac30a10128929eb8f427dda2e865faa8f6da4356
+  options:
+    file: ggml-medium.en.bin
+    english_only: true
+- id: whispercpp-medium.en-q5_0
+  aliases: [ggml-medium.en-q5_0]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: [en]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 539225533
+  params: 769000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation]
+  description: 'Whisper medium.en in ggml format for whisper.cpp, 5-bit (q5_0) quantised by whisper.cpp. English only.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-medium.en-q5_0.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-medium.en-q5_0.bin
+      size: 539225533
+      sha256: 76733e26ad8fe1c7a5bf7531a9d41917b2adc0f20f2e4f5531688a8c6cd88eb0
+  options:
+    file: ggml-medium.en-q5_0.bin
+    english_only: true
+- id: whispercpp-medium.en-q8_0
+  aliases: [ggml-medium.en-q8_0]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: [en]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 823382461
+  params: 769000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation]
+  description: 'Whisper medium.en in ggml format for whisper.cpp, 8-bit (q8_0) quantised by whisper.cpp. English only.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-medium.en-q8_0.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-medium.en-q8_0.bin
+      size: 823382461
+      sha256: 43fa2cd084de5a04399a896a9a7a786064e221365c01700cea4666005218f11c
+  options:
+    file: ggml-medium.en-q8_0.bin
+    english_only: true
+- id: whispercpp-large-v3
+  aliases: [ggml-large-v3]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: *whisper_languages
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 3095033483
+  params: 1550000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, translate, language-detect]
+  description: 'Whisper large-v3 in ggml format for whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-large-v3.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3.bin
+      size: 3095033483
+      sha256: 64d182b440b98d5203c4f9bd541544d84c605196c4f7b845dfa11fb23594d1e2
+  options:
+    file: ggml-large-v3.bin
+- id: whispercpp-large-v3-q5_0
+  aliases: [ggml-large-v3-q5_0]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: *whisper_languages
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 1081140203
+  params: 1550000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, translate, language-detect]
+  description: 'Whisper large-v3 in ggml format for whisper.cpp, 5-bit (q5_0) quantised by whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given.'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-large-v3-q5_0.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-q5_0.bin
+      size: 1081140203
+      sha256: d75795ecff3f83b5faa89d1900604ad8c780abd5739fae406de19f23ecd98ad1
+  options:
+    file: ggml-large-v3-q5_0.bin
+- id: whispercpp-large-v3-turbo
+  aliases: [ggml-large-v3-turbo]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: *whisper_languages
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 1624555275
+  params: 809000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, language-detect]
+  description: 'Whisper large-v3-turbo in ggml format for whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given. Not trained for translation (OpenAI''s turbo model).'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-large-v3-turbo.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo.bin
+      size: 1624555275
+      sha256: 1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69
+  options:
+    file: ggml-large-v3-turbo.bin
+- id: whispercpp-large-v3-turbo-q5_0
+  aliases: [ggml-large-v3-turbo-q5_0]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: *whisper_languages
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 574041195
+  params: 809000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, language-detect]
+  description: 'Whisper large-v3-turbo in ggml format for whisper.cpp, 5-bit (q5_0) quantised by whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given. Not trained for translation (OpenAI''s turbo model).'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-large-v3-turbo-q5_0.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo-q5_0.bin
+      size: 574041195
+      sha256: 394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2
+  options:
+    file: ggml-large-v3-turbo-q5_0.bin
+- id: whispercpp-large-v3-turbo-q8_0
+  aliases: [ggml-large-v3-turbo-q8_0]
+  task: stt
+  engine: whisper.cpp
+  kind: whispercpp
+  family: Whisper
+  languages: *whisper_languages
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 874188075
+  params: 809000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, language-detect]
+  description: 'Whisper large-v3-turbo in ggml format for whisper.cpp, 8-bit (q8_0) quantised by whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given. Not trained for translation (OpenAI''s turbo model).'
+  source_url: https://huggingface.co/ggerganov/whisper.cpp
+  validated: untested
+  source:
+    urls:
+    - path: ggml-large-v3-turbo-q8_0.bin
+      url: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo-q8_0.bin
+      size: 874188075
+      sha256: 317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1
+  options:
+    file: ggml-large-v3-turbo-q8_0.bin

@@ -202,7 +202,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | SPEAKER-EMBEDDING | WeSpeaker ResNet | 1 | - | 1 | 0.126 (`wespeaker-resnet34-voxceleb`) |
 | SPEAKER-EMBEDDING | TitaNet | 1 | - | 1 | 0.068 (`titanet-small`) |
 | SPEAKER-EMBEDDING | ECAPA-TDNN | 1 | - | 1 | 0.203 (`ecapa-tdnn-voxceleb`) |
-| STT | Whisper | 38 | af, am, ar, as, az, ba, be, bg +92 | 20 | 0.081 (`faster-whisper-tiny.en`) |
+| STT | Whisper | 67 | af, am, ar, as, az, ba, be, bg +92 | 20 | 0.081 (`faster-whisper-tiny.en`) |
 | STT | Voxtral | 2 | de, en, es, fr, hi, it, nl, pt | 1 | 1.980 (`voxtral-mini-3b-llamacpp`) |
 | STT | Moonshine | 11 | ar, en, es, ja, ko, uk, vi, zh | 4 | 0.033 (`moonshine-tiny-en`) |
 | STT | Parakeet | 7 | bg, cs, da, de, el, en, es, et +17 | 4 | 0.030 (`parakeet-tdt-ctc-110m`) |
@@ -234,7 +234,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | VAD | WebRTC VAD | 2 | - | 2 | 0.000 (`webrtc-vad-aggressive`) |
 | VAD | Energy VAD | 1 | - | 1 | 0.000 (`energy-vad`) |
 
-**433 models in the catalog, 164 validated on CPU, 269 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**462 models in the catalog, 164 validated on CPU, 298 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

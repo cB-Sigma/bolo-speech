@@ -179,7 +179,7 @@ warn_unused_ignores = false
 [[tool.mypy.overrides]]
 module = [
   "sherpa_onnx.*", "faster_whisper.*", "ctranslate2.*", "soundfile.*", "soxr.*", "av.*",
-  "moonshine_onnx.*", "kokoro_onnx.*", "pywhispercpp.*", "wyoming.*", "whisper_normalizer.*",
+  "moonshine_onnx.*", "kokoro_onnx.*", "pywhispercpp.*", "_pywhispercpp", "wyoming.*", "whisper_normalizer.*",
   "onnxruntime.*", "tomli.*", "aiortc.*", "uccharan.*", "tokenizers.*", "sipmessage.*", "onnx.*", "pynvml.*",
   "opentelemetry.*", "webrtcvad.*", "sphn.*", "torch.*", "transformers.*",
 ]

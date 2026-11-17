@@ -39,12 +39,18 @@ class WhisperCppSTT(STTModel):
         files = sorted(path.glob(str(wanted) if wanted else "*.bin"))
         if not files:
             raise FileNotFoundError(f"no ggml model (*.bin) in {path}")
-        self.model = CppModel(str(files[0]), n_threads=opts.threads, print_progress=False, print_realtime=False)
+        self.model: Any = CppModel(str(files[0]), n_threads=opts.threads, print_progress=False, print_realtime=False)
         # pywhispercpp keeps every parameter given to transcribe() for all later calls: a request's language, prompt
         # or option would carry over to the next request. Each call sets all of these, from the model's own
         # defaults read here unless the request gives one, under a lock (the parameters belong to the model object)
         current = self.model.get_params()
         self._defaults: dict[str, Any] = {k: current[k] for k in _PER_REQUEST if k in current}
+        # whisper.cpp's own default language is "en": a multilingual model is told to detect the language instead
+        # when a request gives none; an English-only model (*.en) keeps "en" and cannot translate
+        self.english_only = bool(spec.get("english_only")) or ".en" in files[0].name
+        self._defaults["language"] = "en" if self.english_only else "auto"
+        self.supports_translate = not self.english_only
+        self.languages = ("en",) if self.english_only else ()
         self._lock = threading.Lock()
 
     def transcribe(self, requests: list[STTRequest]) -> list[STTResult]:
@@ -74,9 +80,21 @@ class WhisperCppSTT(STTModel):
                 continue
             with self._lock:
                 segs = self.model.transcribe(r.samples, abort_callback=r.abort.is_set, **kwargs)
+                language = self._language_used(str(kwargs["language"] or ""))
             segments = [Segment(s.t0 / 100.0, s.t1 / 100.0, s.text.strip()) for s in segs if s.text.strip()]
-            out.append(STTResult(" ".join(s.text for s in segments), str(kwargs["language"] or "") or None, segments))
+            out.append(STTResult(" ".join(s.text for s in segments), language, segments))
         return out
+
+    def _language_used(self, asked: str) -> str | None:
+        """The language of the last decode: the one asked for, or the one whisper.cpp detected (``auto``)."""
+        if asked and asked != "auto":
+            return asked
+        try:
+            import _pywhispercpp as pw
+
+            return str(pw.whisper_lang_str(pw.whisper_full_lang_id(self.model._ctx))) or None
+        except Exception:  # an older binding without these: the language stays unknown
+            return None
 
 
 class WhisperCppEngine(Engine):

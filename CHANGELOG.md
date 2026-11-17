@@ -364,6 +364,15 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   thread on a shared machine; its speech transcribed back word for word); Drama 3 was not run (it needs a large GPU).
   `mira-tts-audiocpp` is no longer in the catalog: audio.cpp needs a GGUF made with its own converter and nobody
   publishes one (docs/models-unsupported.md). No text-to-speech server entry is `pending` any more.
+- **whisper.cpp models in the catalog**: 29 `whispercpp-*` entries (tiny, base, small, medium and their `.en`
+  versions, large-v3, large-v3-turbo; full precision and whisper.cpp's q5_0/q5_1/q8_0 quantisations) from
+  ggerganov/whisper.cpp on Hugging Face, MIT, each pinned to a commit with its size and SHA-256, so
+  `bolo pull whispercpp-base-q5_1` works (needs `bolo-speech[whispercpp]`). Marked untested: `whispercpp-tiny` was
+  run through the catalog by the opt-in real-model test, but no speed or accuracy was measured. docs/models.md,
+  "Whisper on whisper.cpp".
+- whisper.cpp: a multilingual model detects the language when the request names none, and the response reports the
+  detected language (whisper.cpp's own default was English for every request); `.en` models stay English and
+  cannot translate.
 
 ### Fixed
 

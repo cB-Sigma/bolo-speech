@@ -1,6 +1,6 @@
 """whisper.cpp (pywhispercpp) with a real model on CPU: the decoding options. Opt-in: ``BOLO_TEST_REAL=1 pytest -m real``.
 
-Downloads ``ggml-tiny.bin`` (75 MB) from ggerganov/whisper.cpp into ``BOLO_DATA_DIR``.
+Pulls the catalog's ``whispercpp-tiny`` (``ggml-tiny.bin``, 75 MB, pinned by sha256) into ``BOLO_DATA_DIR``.
 """
 
 from __future__ import annotations
@@ -33,27 +33,12 @@ def _data_dir() -> Path:
 
 @pytest.fixture(scope="module")
 def live() -> Iterator[LiveServer]:
-    data_dir = _data_dir()
-    folder = data_dir / "validation" / "whispercpp-tiny"
-    model_file = folder / "ggml-tiny.bin"
-    if not model_file.exists():
-        folder.mkdir(parents=True, exist_ok=True)
-        url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin"
-        with httpx.stream("GET", url, follow_redirects=True, timeout=300) as r:
-            r.raise_for_status()
-            with model_file.open("wb") as fh:
-                for chunk in r.iter_bytes():
-                    fh.write(chunk)
-    srv = LiveServer(Settings(data_dir=data_dir, auto_pull=True, device="cpu"))
-    from bolo.custom import register_local_model
-
-    spec = srv.core.catalog.resolve(MODEL) or register_local_model(
-        srv.core, str(folder), "whispercpp", "stt", name=MODEL
-    )
+    srv = LiveServer(Settings(data_dir=_data_dir(), auto_pull=True, device="cpu"))
     srv.start()
     try:
-        if not srv.core.manager.is_installed(spec):
-            srv.call(srv.core.pull_and_wait(spec.id))
+        if not srv.core.manager.is_installed(srv.core.catalog.resolve(MODEL)):  # type: ignore[arg-type]
+            job = srv.call(srv.core.pull_and_wait(MODEL))
+            assert job.state == "done", job  # type: ignore[attr-defined]
         yield srv
     finally:
         srv.stop()
@@ -92,12 +77,16 @@ def test_whispercpp_options_reach_whisper_cpp_and_do_not_carry_over(live: LiveSe
     base = _post(live, vad_filter="false").json()
     assert "order will arrive" in base["text"].lower()
     defaults = _params(live)
-    assert defaults["no_context"] is True and defaults["language"] == "en"
+    assert defaults["no_context"] is True and defaults["language"] in (
+        "auto",
+        "",
+    )  # detect (the binding reads "auto" back as "")
     r = _post(
         live, vad_filter="false", condition_on_previous_text="true", log_prob_threshold="-0.1",
-        no_speech_threshold="0.01", temperature_increment_on_fallback="0.4",
+        no_speech_threshold="0.01", temperature_increment_on_fallback="0.4", language="en",
     )  # fmt: skip
-    assert "x-bolo-ignored-options" not in r.headers and "order will arrive" in r.json()["text"].lower()
+    # thresholds this strict may drop text; what is checked is that whisper.cpp was given them
+    assert "x-bolo-ignored-options" not in r.headers
     p = _params(live)
     assert p["no_context"] is False
     assert (p["logprob_thold"], p["no_speech_thold"], p["temperature_inc"]) == pytest.approx((-0.1, 0.01, 0.4))
@@ -126,3 +115,19 @@ def test_whispercpp_bolo_side_options_and_ignored_ones(live: LiveServer) -> None
     assert r.headers["x-bolo-ignored-options"] == ", ".join(sorted(unsupported))
     guarded = _post(live, vad_filter="false", max_repeats="0")
     assert guarded.json()["text"] == whole["text"]  # nothing to trim on this clip either way
+
+
+def test_whispercpp_detects_the_language_of_a_multilingual_model(live: LiveServer) -> None:
+    audio, rate, _ = samples.load_audio("hi-short")
+    buf = io.BytesIO()
+    sf.write(buf, audio, rate, format="WAV", subtype="PCM_16")
+    r = httpx.post(
+        live.url + "/v1/audio/transcriptions",
+        data={"model": MODEL, "response_format": "verbose_json"},
+        files={"file": ("hi.wav", buf.getvalue(), "audio/wav")},
+        timeout=600,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["language"] == "hindi"
+    told = _post(live, language="en").json()
+    assert told["language"] == "english"

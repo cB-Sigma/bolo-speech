@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-433 models: 164 validated on CPU by the maintainers, 269 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+462 models: 164 validated on CPU by the maintainers, 298 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -195,6 +195,35 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `whisper-distil-small.en` | en | balanced | pseudo | 299 MB | MIT | **CPU** · RTF 0.131 · WER 3.1% |
 | `whisper-distil-medium.en` | en | balanced | pseudo | 573 MB | MIT | untested |
 | `whisper-distil-large-v2` | en | accuracy | pseudo | 983 MB | MIT | untested |
+| `whispercpp-tiny` | en, zh, de, es, ru, ko +94 | realtime | pseudo | 78 MB | MIT | untested |
+| `whispercpp-tiny-q5_1` | en, zh, de, es, ru, ko +94 | realtime | pseudo | 32 MB | MIT | untested |
+| `whispercpp-tiny-q8_0` | en, zh, de, es, ru, ko +94 | realtime | pseudo | 44 MB | MIT | untested |
+| `whispercpp-tiny.en` | en | realtime | pseudo | 78 MB | MIT | untested |
+| `whispercpp-tiny.en-q5_1` | en | realtime | pseudo | 32 MB | MIT | untested |
+| `whispercpp-tiny.en-q8_0` | en | realtime | pseudo | 44 MB | MIT | untested |
+| `whispercpp-base` | en, zh, de, es, ru, ko +94 | balanced | pseudo | 148 MB | MIT | untested |
+| `whispercpp-base-q5_1` | en, zh, de, es, ru, ko +94 | balanced | pseudo | 60 MB | MIT | untested |
+| `whispercpp-base-q8_0` | en, zh, de, es, ru, ko +94 | balanced | pseudo | 82 MB | MIT | untested |
+| `whispercpp-base.en` | en | balanced | pseudo | 148 MB | MIT | untested |
+| `whispercpp-base.en-q5_1` | en | balanced | pseudo | 60 MB | MIT | untested |
+| `whispercpp-base.en-q8_0` | en | balanced | pseudo | 82 MB | MIT | untested |
+| `whispercpp-small` | en, zh, de, es, ru, ko +94 | balanced | pseudo | 488 MB | MIT | untested |
+| `whispercpp-small-q5_1` | en, zh, de, es, ru, ko +94 | balanced | pseudo | 190 MB | MIT | untested |
+| `whispercpp-small-q8_0` | en, zh, de, es, ru, ko +94 | balanced | pseudo | 264 MB | MIT | untested |
+| `whispercpp-small.en` | en | balanced | pseudo | 488 MB | MIT | untested |
+| `whispercpp-small.en-q5_1` | en | balanced | pseudo | 190 MB | MIT | untested |
+| `whispercpp-small.en-q8_0` | en | balanced | pseudo | 264 MB | MIT | untested |
+| `whispercpp-medium` | en, zh, de, es, ru, ko +94 | accuracy | pseudo | 1.5 GB | MIT | untested |
+| `whispercpp-medium-q5_0` | en, zh, de, es, ru, ko +94 | accuracy | pseudo | 539 MB | MIT | untested |
+| `whispercpp-medium-q8_0` | en, zh, de, es, ru, ko +94 | accuracy | pseudo | 823 MB | MIT | untested |
+| `whispercpp-medium.en` | en | accuracy | pseudo | 1.5 GB | MIT | untested |
+| `whispercpp-medium.en-q5_0` | en | accuracy | pseudo | 539 MB | MIT | untested |
+| `whispercpp-medium.en-q8_0` | en | accuracy | pseudo | 823 MB | MIT | untested |
+| `whispercpp-large-v3` | en, zh, de, es, ru, ko +94 | accuracy | pseudo | 3.1 GB | MIT | untested |
+| `whispercpp-large-v3-q5_0` | en, zh, de, es, ru, ko +94 | accuracy | pseudo | 1.1 GB | MIT | untested |
+| `whispercpp-large-v3-turbo` | en, zh, de, es, ru, ko +94 | accuracy | pseudo | 1.6 GB | MIT | untested |
+| `whispercpp-large-v3-turbo-q5_0` | en, zh, de, es, ru, ko +94 | accuracy | pseudo | 574 MB | MIT | untested |
+| `whispercpp-large-v3-turbo-q8_0` | en, zh, de, es, ru, ko +94 | accuracy | pseudo | 874 MB | MIT | untested |
 
 #### Voxtral
 
@@ -2612,6 +2641,30 @@ snorTTS-Indic are labelled Apache-2.0 but are Llama 3.2 3B derivatives
 repository is gated (click-through), the Unsloth GGUF used here is not. Veena's
 tokenizer has 11 speaker tokens; the card documents 4 voices (kavya, agastya,
 maitri, vinaya), which are the catalogued ones.
+
+## Whisper on whisper.cpp
+
+The `whispercpp-*` entries are OpenAI's Whisper in ggml format for whisper.cpp, from
+[ggerganov/whisper.cpp](https://huggingface.co/ggerganov/whisper.cpp) (MIT), each one file pinned to a commit with its
+size and SHA-256: tiny, base, small and medium (also as `.en`, English only), large-v3 and large-v3-turbo, each
+full-precision and in whisper.cpp's own 5-bit (`q5_0`/`q5_1`) and 8-bit (`q8_0`) quantisations, which are smaller and
+faster on a CPU and a little less accurate. They need `pip install 'bolo-speech[whispercpp]'` (pywhispercpp, MIT):
+
+```bash
+bolo pull whispercpp-base-q5_1
+curl -s localhost:8000/v1/audio/transcriptions -F model=whispercpp-base-q5_1 -F file=@clip.wav
+```
+
+A multilingual model detects the language when the request names none (whisper.cpp's own default would be English);
+`.en` models are English only and cannot translate, and large-v3-turbo was not trained for translation. whisper.cpp
+gives segment times but no word timestamps here. The Whisper decoding options it honours are listed in api.md,
+"Decoding options and repetition loops". A client that disconnects stops its decode (whisper.cpp's abort callback).
+
+What was run: `whispercpp-tiny` pulled through the catalog and run by `tests/test_real_whispercpp.py` (opt-in): the
+decoding options reach whisper.cpp and do not carry over to the next request, silence removal and the ignored-options
+header work, and the Hindi sample with no language given came back as Hindi. No speed or accuracy was measured on a
+quiet machine, so every entry is marked untested; on a shared four-core machine whisper.cpp was far slower than
+faster-whisper on the same audio (api.md, "Decoding options and repetition loops").
 
 ## Voxtral speech-to-text on llama.cpp
 
