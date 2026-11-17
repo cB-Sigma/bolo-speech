@@ -253,7 +253,7 @@ speed factor (no benchmark) and every engine taken as installed:
 | Text to speech, Hindi, voice-over | `piper-hi-in-rohan-medium` | comfortable | 0.29 (0.14 to 0.58) | measured, scaled |
 | Speaker diarization | `nemotron-3-diarization` | comfortable | 0.12 (0.061 to 0.24) | measured, scaled |
 
-**A workstation: 16 AVX2 cores, 64 GB, an NVIDIA GPU with 24 GB, `device = "cuda"`** (speed factor 0.70; of 367 entries: 182 comfortable, 158 usable, 1 unlikely to fit, 20 cloud, 6 not available yet)
+**A workstation: 16 AVX2 cores, 64 GB, an NVIDIA GPU with 24 GB, `device = "cuda"`** (speed factor 0.70; of 367 entries: 200 comfortable, 140 usable, 1 unlikely to fit, 20 cloud, 6 not available yet)
 
 | For | Default pick | Fit | Expected RTF (range) | Basis |
 | --- | --- | --- | --- | --- |

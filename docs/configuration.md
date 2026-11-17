@@ -457,7 +457,7 @@ bolo doctor        # "onnxruntime: onnxruntime-directml 1.24.4; providers Dml, C
 ```
 
 In a plain virtual environment: `pip uninstall -y onnxruntime onnxruntime-gpu onnxruntime-directml`, then
-`pip install onnxruntime-directml`. (This recipe has not been run on Windows by the maintainers yet.) `bolo doctor` warns when more than one of these packages is installed, and when
+`pip install onnxruntime-directml`. (Run on a Windows 11 laptop with onnxruntime-directml 1.24.4: see [status](status.md).) `bolo doctor` warns when more than one of these packages is installed, and when
 `device` asks for a provider the installed ONNX Runtime lacks. There is no `directml` extra: pip and uv cannot
 replace a dependency's `onnxruntime` with `onnxruntime-directml`, so an extra would install both. On 2026-11-16
 `onnxruntime-directml` was at 1.24.4 while `onnxruntime` was at 1.32.0; the in-process speech-to-speech model needs
