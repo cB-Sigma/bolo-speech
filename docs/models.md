@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-375 models: 143 validated on CPU by the maintainers, 232 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
+375 models: 144 validated on CPU by the maintainers, 231 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
 
 ### Speech to text
 
@@ -200,7 +200,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `voxtral-mini-3b-llamacpp` (Voxtral) | en, es, fr, pt, hi, de +2 | accuracy | pseudo | 3.0 GB | Apache-2.0 · runs on llama-server · GPU recommended | untested |
+| `voxtral-mini-3b-llamacpp` (Voxtral) | en, es, fr, pt, hi, de +2 | accuracy | pseudo | 3.2 GB | Apache-2.0 · runs on llama-server · GPU recommended | **CPU** · RTF 1.980 · WER 2.8% |
 | `voxtral-small-24b-llamacpp` (Voxtral) | en, es, fr, pt, hi, de +2 | accuracy | pseudo | 15.7 GB | Apache-2.0 · runs on llama-server · GPU required | untested |
 
 #### Moonshine
@@ -1718,7 +1718,7 @@ a model or the server.
 | transducer and CTC models through sherpa-onnx (Zipformer, Parakeet, NeMo, IndicConformer, SenseVoice, …) | yes, from the token times the decoder reports |
 | Whisper through sherpa-onnx (`whisper-*`) | **no** with the exports in the catalog: token times need a model exported with cross-attention outputs. sherpa-onnx 2.0.1 supports such exports, and a catalog entry for one can switch them on with the option `token_timestamps: true`; we checked that the stock `whisper-tiny` export reports none |
 | Moonshine | **no**: the runtime exposes no token times, and we did not add a forced aligner |
-| Voxtral on llama.cpp (`voxtral-*-llamacpp`) | **no**: the model writes text only. `verbose_json` segments are the pieces of speech bolo cut the audio into (at most 30 s each), not times the model reported |
+| Voxtral on llama.cpp (`voxtral-*-llamacpp`) | **no**: the model writes text only. `verbose_json` segments are the pieces of speech bolo cut the audio into (at most 15 s each), not times the model reported |
 
 A cheap forced aligner (CTC alignment of the transcript against a small CTC
 model) was considered for both and not built: sherpa-onnx's offline
@@ -2058,16 +2058,16 @@ maitri, vinaya), which are the catalogued ones.
 
 Mistral's Voxtral (Apache-2.0) puts a Whisper large-v3 style audio encoder in
 front of a Mistral language model. llama.cpp runs both (the `voxtral`
-projector of libmtmd, in the pinned build b12375), so bolo serves Voxtral
-without PyTorch: kind **`voxtral-llamacpp`** of the `tts-server` engine
-(`server/src/bolo/engines/voxtral_llamacpp.py`, catalog
-`server/src/bolo/catalog/stt-llamacpp.yaml`). The llama-server is managed or
-operator-run as for every `tts-server` model (`bolo components install
-llama-server`, or `tts_servers = ["voxtral-mini-3b-llamacpp=http://host:port"]`).
+projector of libmtmd, in the pinned build b12375: no new llama-server pin was
+needed), so bolo serves Voxtral without PyTorch: kind **`voxtral-llamacpp`**
+of the `tts-server` engine (`server/src/bolo/engines/voxtral_llamacpp.py`,
+catalog `server/src/bolo/catalog/stt-llamacpp.yaml`). The llama-server is
+managed or operator-run as for every `tts-server` model (`bolo components
+install llama-server`, or `tts_servers = ["voxtral-mini-3b-llamacpp=http://host:port"]`).
 
 | id | files | notes |
 | --- | --- | --- |
-| `voxtral-mini-3b-llamacpp` | IQ4_XS language model (bartowski) + Q8_0 audio encoder (ggml-org), 3.0 GB | run on CPU, see below |
+| `voxtral-mini-3b-llamacpp` | Q4_K_M language model + Q8_0 audio encoder (ggml-org), 3.2 GB | run on CPU, see below |
 | `voxtral-small-24b-llamacpp` | Q4_K_M language model + F16 audio encoder (bartowski), 15.7 GB | catalogued, not run; wants a GPU with about 20 GB |
 
 How a request runs:
@@ -2084,24 +2084,54 @@ How a request runs:
   translation mode, so treat it as instruction-following rather than a trained
   translation task.
 * **Long audio** is cut at pauses by bolo's voice-activity detection into
-  pieces of at most 30 s (`max_chunk_s`), one request each.
+  pieces of at most 15 s (`max_chunk_s`), one request each. 15 s rather than
+  Whisper's 30 s window: on a 28.6 s piece holding three utterances the model
+  transcribed the first, then commented on it, and dropped the other two.
+  The catalog entries also set `queue_timeout_s: 0`, so that the pieces of a
+  long recording, which are queued together, are not refused after the usual
+  30 s wait.
 * **Timestamps** are not available from the model. `verbose_json` segments
   are those pieces, with their real start and end in the audio; there are no
   word timestamps.
-* The prompts are built by bolo, not by the GGUF's chat template: the
-  bartowski conversion carries another model's template (a Devstral system
-  prompt), so `/v1/chat/completions` and llama-server's own
-  `/v1/audio/transcriptions` would not use Voxtral's format with it. The media
-  marker is read from `GET /props` (llama-server makes it random).
-* Decoding is greedy unless the request sets a temperature; the token budget
-  is 12 tokens per second of audio plus 32 (options `tokens_per_s`,
-  `max_new_tokens`). Managed servers get `-c 4096`: llama-server's default
-  context for this GGUF (32 k) would reserve about 4 GB of KV cache, and 30 s of
-  audio is 375 tokens.
+* **Stops.** On llama.cpp the model sometimes goes on after the transcript as
+  if answering a chat message ("Here's a breakdown of what you're saying: ..."),
+  always after a blank line; a transcript has none, so generation stops at
+  `\n\n` (option `stop`). The token budget is 12 tokens per second of audio
+  plus 32 (options `tokens_per_s`, `max_new_tokens`). Decoding is greedy unless
+  the request sets a temperature.
+* The prompts are built by bolo, not by the GGUF's chat template: the GGUF
+  files carry another model's template (a Devstral system prompt), so
+  `/v1/chat/completions` and llama-server's own `/v1/audio/transcriptions`
+  would not use Voxtral's format with them. The media marker is read from
+  `GET /props` (llama-server makes it random).
+* Managed servers get `-c 4096`: llama-server's default context for this GGUF
+  (32 k) would reserve about 4 GB of KV cache.
 
 ### What was run
 
-Not measured yet: `voxtral-mini-3b-llamacpp` is `validated: untested` until a measured run is recorded.
+On the shared 4-vCPU Xeon (no GPU, load average 10-16 from other jobs during
+every run), llama.cpp b12375 CPU release started by bolo with 4 threads,
+`voxtral-mini-3b-llamacpp`:
+
+| sample | audio | RTF | result |
+| --- | --- | --- | --- |
+| en-short | 3.0 s | 7.1 | "Good morning! Could you tell me when my order will arrive?" (exact) |
+| en-long | 11.8 s | 1.98 | "Speech servers are judged by how quickly first sound arrives. A good one starts speaking before it has finished reading, keeps a steady pace under load, and tells you honestly how long each step took." (WER 2.8 %: "the" dropped) |
+| hi-short (Hindi) | 4.1 s | 4.9 | "नमस्ते आप कैसे हैं? आज मौसम बहुत अच्छा है।" (exact but for a comma) |
+| en-long, translated | 11.8 s | 3.4 | the same English text, with "the" |
+
+Loading took 41.7 s (llama-server start, weights read from disk), and the
+llama-server process peaked at 5.7 GB resident. The times varied widely with
+the machine's load (the same 3 s sample took RTF 7 in one run and 103 in
+another), so take them as an upper bound. Short pieces cost almost as much as
+30 s ones, because the encoder pads every piece to a 30 s window.
+
+Quantisations tried: the community IQ4_XS files (bartowski's, with an
+importance matrix, and mradermacher's static one) with the same audio encoder
+answered the 3 s question ("To provide an accurate estimate ... I need a bit
+more information") instead of transcribing it, in transcription mode and with
+a "transcribe" instruction alike; ggml-org's Q4_K_M transcribed it. That is why
+the entry uses ggml-org's files although they are 0.2 GB larger.
 
 ## Indian languages
 

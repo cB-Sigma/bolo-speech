@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import time
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
@@ -869,10 +870,11 @@ async def test_pocket_tts_on_a_managed_llama_server() -> None:
         await core.stop()
 
 
+@pytest.mark.timeout(5400)  # a 3 B model and a Whisper-large encoder on a CPU: minutes per sample on a busy machine
 async def test_voxtral_mini_large_on_a_managed_llama_server() -> None:
     """Voxtral Mini 3B on a managed llama-server (3.0 GB download; "large": left out of `-k "not large"`): bolo's
     English and Hindi samples transcribed with their language, en-long translated, and a 40 s recording made of the
-    samples with pauses, which is cut into pieces of at most 30 s."""
+    samples with pauses, which is cut into pieces of at most 15 s."""
     from bolo import samples
     from bolo.tts_runtimes import find_binary
 
@@ -883,7 +885,9 @@ async def test_voxtral_mini_large_on_a_managed_llama_server() -> None:
     core = Bolo(settings)
     await core.start()
     try:
+        started = time.perf_counter()
         await core.manager.load(model)  # pull + start the server; not part of the timing
+        print(f"\n{model}: loaded in {time.perf_counter() - started:.1f} s")
         for sample_id, max_wer in (("en-short", 0.15), ("en-long", 0.15), ("hi-short", 0.5)):
             audio, rate, meta = samples.load_audio(sample_id)
             trace = Trace("stt", "bench", model)
@@ -900,8 +904,8 @@ async def test_voxtral_mini_large_on_a_managed_llama_server() -> None:
         joined = np.concatenate([x for p in parts for x in (p.astype(np.float32), pause)])
         long_result = await core.transcribe(joined, rate, model=model, language="en")
         print(f"\n{model} {len(joined) / rate:.1f} s: {len(long_result.segments)} segments | {long_result.text}")
-        assert len(joined) / rate > 40 and len(long_result.segments) >= 2
-        assert all(s.end - s.start <= 30.5 for s in long_result.segments)
+        assert len(joined) / rate > 40 and len(long_result.segments) >= 3
+        assert all(s.end - s.start <= 15.5 for s in long_result.segments)
         assert "order will arrive" in long_result.text.lower() and not long_result.words
     finally:
         await core.stop()

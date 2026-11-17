@@ -74,7 +74,7 @@ def test_transcription_against_the_fake_server(server: FakeVoxtralServer) -> Non
     assert len(server.requests) == 2  # nothing is sent for a piece shorter than 50 ms
     body = server.requests[0]["body"]
     assert body["temperature"] == 0.0 and body["top_k"] == 1 and body["n_predict"] == 56
-    assert body["cache_prompt"] is False and body["stream"] is False
+    assert body["cache_prompt"] is False and body["stream"] is False and body["stop"] == ["\n\n"]
     sent = base64.b64decode(body["prompt"]["multimodal_data"][0])
     with wave.open(io.BytesIO(sent)) as w:
         assert w.getframerate() == 16000 and w.getnframes() == 32000
@@ -87,11 +87,12 @@ def test_transcription_against_the_fake_server(server: FakeVoxtralServer) -> Non
 
 
 def test_options_and_errors(server: FakeVoxtralServer) -> None:
-    model = model_for(server, translate=False, tokens_per_s=2.0, max_new_tokens=40, request={"seed": 7})
+    model = model_for(server, translate=False, tokens_per_s=2.0, max_new_tokens=40, request={"seed": 7}, stop=[])
     with pytest.raises(InvalidRequest, match="cannot translate"):
         model.transcribe([STTRequest(tone(1.0), task="translate")])
     model.transcribe([STTRequest(tone(10.0))])
     assert server.requests[-1]["body"]["n_predict"] == 40 and server.requests[-1]["body"]["seed"] == 7
+    assert "stop" not in server.requests[-1]["body"]
     model.marker = "<wrong>"  # a marker the server does not know: refused with 400
     with pytest.raises(InvalidRequest, match="refused the request"):
         model.transcribe([STTRequest(tone(1.0))])
@@ -141,6 +142,7 @@ def entry(model_id: str) -> dict[str, Any]:
             "mmproj_file": "mm.gguf",
             "context_size": 4096,
             "max_chunk_s": 5.0,
+            "queue_timeout_s": 0,
         },
     }
 
@@ -153,6 +155,10 @@ def test_transcription_api_through_an_operator_run_server(settings: Settings, se
     try:
         info = httpx.get(f"{srv.url}/api/v1/models/voxtral-remote").json()
         assert info["installed"] is True and info["available"] is True
+        # the pieces of a long recording may wait as long as the model needs (catalog option queue_timeout_s: 0)
+        manager, catalog = srv.core.manager, srv.core.catalog
+        assert manager.queue_timeout(catalog.resolve("voxtral-remote")) == 0.0  # type: ignore[arg-type]
+        assert manager.queue_timeout(catalog.resolve("fake-stt")) == settings.queue_timeout_s  # type: ignore[arg-type]
         r = httpx.post(
             f"{srv.url}/v1/audio/transcriptions",
             data={"model": "voxtral-remote", "language": "fr", "response_format": "verbose_json"},
@@ -247,11 +253,16 @@ def test_catalog_entries() -> None:
         assert "translate" in s.features and "timestamps" not in s.features
         assert set(s.languages) == {"en", "es", "fr", "pt", "hi", "de", "nl", "it"}
         assert s.options["model_file"] in s.source.include and s.options["context_size"] == 4096
+        assert s.options["queue_timeout_s"] == 0 and s.options["max_chunk_s"] == 15.0
         assert len(s.source.revision) == 40
         files = [*s.source.include, *(u["path"] for u in s.source.urls)]
         assert s.options["mmproj_file"] in files
         assert all(len(u["sha256"]) == 64 and u["size"] > 0 for u in s.source.urls)
     mini = specs["voxtral-mini-3b-llamacpp"]
-    assert mini.size_bytes <= 3_000_000_000 and "word timestamps are unavailable" in mini.description
+    assert (
+        mini.size_bytes < 3_200_000_000
+        and mini.source.repo == "ggml-org/Voxtral-Mini-3B-2507-GGUF"
+        and "word timestamps are unavailable" in mini.description
+    )
     assert specs["voxtral-small-24b-llamacpp"].options["hardware"]["gpu"] == "required"
     assert "voxtral-llamacpp" in TTSServerEngine.kinds

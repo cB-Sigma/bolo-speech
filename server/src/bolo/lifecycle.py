@@ -754,7 +754,7 @@ class ModelManager:
             max_batch=max_batch,
             max_wait_ms=s.batch_wait_ms,
             max_queue=self.max_queue(spec),
-            queue_timeout_s=s.queue_timeout_s,
+            queue_timeout_s=self.queue_timeout(spec),
         )
 
     def _pinned_int(self, spec: ModelSpec, keys: tuple[str, ...]) -> int | None:
@@ -774,6 +774,12 @@ class ModelManager:
         older name ``workers``), else the ``num_parallel`` setting (``workers`` when that is 0)."""
         value = self._pinned_int(spec, ("num_parallel", "workers"))
         return max(1, value if value is not None and value > 0 else self.settings.parallel())
+
+    def queue_timeout(self, spec: ModelSpec) -> float:
+        """Seconds a request may wait for the model before 429: the catalog's ``queue_timeout_s`` (0: no limit; for
+        slow models whose long recordings queue many pieces at once), else the setting."""
+        value = self._pinned_int(spec, ("queue_timeout_s",))
+        return float(value) if value is not None and value >= 0 else self.settings.queue_timeout_s
 
     def max_queue(self, spec: ModelSpec) -> int:
         """Requests that may wait for the model before 429: a pin, the catalog's ``max_queue``, else the setting."""

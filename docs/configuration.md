@@ -94,7 +94,7 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `max_batch` | `8` | `--max-batch` | largest micro-batch |
 | `batch_wait_ms` | `0` | `--batch-wait-ms` | linger for a fuller batch (adds latency; see architecture.md) |
 | `max_queue` | `64` | `--max-queue` | requests waiting per model before `429`, like `OLLAMA_MAX_QUEUE` (which counts the whole server). A model can have its own (`options.max_queue`, or a pin) |
-| `queue_timeout_s` | `30` | | fail jobs that waited longer than this |
+| `queue_timeout_s` | `30` | | fail jobs that waited longer than this; a catalog entry can set its own (`options.queue_timeout_s`, 0: no limit), as the slow Voxtral entries do |
 | `partial_interval_ms` | `350` | | how often a pseudo-streaming session re-decodes for a partial |
 | `endpoint_silence_ms` | `500` | | trailing silence that ends an utterance. Per stream: `?endpointing=fast\|balanced\|patient` or `?endpoint_ms=` (see realtime.md for the trade-off) |
 | `max_utterance_s` | `20` | | force a final after this much continuous speech |

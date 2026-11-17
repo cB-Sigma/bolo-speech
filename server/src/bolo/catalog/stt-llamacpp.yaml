@@ -16,7 +16,7 @@
   languages: [en, es, fr, pt, hi, de, nl, it]
   tier: accuracy
   sample_rate: 16000
-  size_bytes: 2988421984
+  size_bytes: 3188716000
   params: 4700000000
   license: Apache-2.0
   license_url: https://huggingface.co/mistralai/Voxtral-Mini-3B-2507
@@ -25,29 +25,44 @@
   features: [punctuation, translate, long-form]
   description: 'Mistral Voxtral Mini 3B (2507): an audio encoder (Whisper large-v3 based) in front of a 3 B language
     model, transcribing English, Spanish, French, Portuguese, Hindi, German, Dutch and Italian with punctuation and
-    casing, and translating them into English. Runs on llama.cpp (IQ4_XS weights and the Q8_0 audio encoder, 3.0 GB)
+    casing, and translating them into English. Runs on llama.cpp (Q4_K_M weights and the Q8_0 audio encoder from ggml-org, 3.2 GB)
     in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).
     No timestamps from the model: verbose_json segments are the stretches of speech bolo cut the audio into (at most
-    30 s each), and word timestamps are unavailable. Slow on a CPU; a GPU is recommended.'
+    15 s each), and word timestamps are unavailable. Slow on a CPU; a GPU is recommended.'
   source_url: https://huggingface.co/mistralai/Voxtral-Mini-3B-2507
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 1.98
+    wer: 0.028
+    audio_s: 11.82
+    load_s: 41.7
+    memory_mb: 5665
+    threads: 4
+    engine: llama.cpp b12375 llama-server (upstream release build, CPU), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+    test_audio: bolo sample en-long
+    note: 'On a machine shared with other jobs (load average 10-16 on 4 vCPUs), so the times are pessimistic and
+      varied widely between runs. en-long (11.8 s) RTF 1.98, WER 2.8 % (one word dropped); en-short (3 s) RTF 7.1,
+      exact; hi-short (4.1 s, Hindi) RTF 4.9, exact; en-long translated (into English, the same text) RTF 3.4. Short
+      pieces cost almost as much as 30 s ones: the encoder pads every piece to a 30 s window. memory_mb is the
+      llama-server process at its peak. With bartowski''s and mradermacher''s IQ4_XS files instead, the 3 s question
+      was answered rather than transcribed. docs/models.md, "Voxtral speech-to-text on llama.cpp".'
   requires: [llama-server]
   source:
-    repo: bartowski/mistralai_Voxtral-Mini-3B-2507-GGUF
-    revision: 1d0032d997b7f72804d356fc790486e6d697cea5
-    include: [mistralai_Voxtral-Mini-3B-2507-IQ4_XS.gguf]
-    urls:
-    - path: mmproj-Voxtral-Mini-3B-2507-Q8_0.gguf
-      url: https://huggingface.co/ggml-org/Voxtral-Mini-3B-2507-GGUF/resolve/20616573013f28229fff61de74359d3eeff61f6a/mmproj-Voxtral-Mini-3B-2507-Q8_0.gguf
-      size: 715714080
-      sha256: 4f24c4ef3ce929d02ed9d1cfb050ae9a7365f057c0ddec0d489580982ebe0d02
+    repo: ggml-org/Voxtral-Mini-3B-2507-GGUF
+    revision: 20616573013f28229fff61de74359d3eeff61f6a
+    include: [Voxtral-Mini-3B-2507-Q4_K_M.gguf, mmproj-Voxtral-Mini-3B-2507-Q8_0.gguf]
   options:
     runtime: llama-server
-    model_file: mistralai_Voxtral-Mini-3B-2507-IQ4_XS.gguf
+    model_file: Voxtral-Mini-3B-2507-Q4_K_M.gguf
     mmproj_file: mmproj-Voxtral-Mini-3B-2507-Q8_0.gguf
-    # 30 s of audio is 375 tokens; llama-server's default (the GGUF's 32 k) would reserve about 4 GB of KV cache
+    # llama-server's default context (the GGUF's 32 k) would reserve about 4 GB of KV cache; a piece needs a few hundred
     context_size: 4096
-    max_chunk_s: 30.0
+    # pieces of up to 15 s: on a 28.6 s piece of three utterances the model transcribed the first and dropped the rest
+    max_chunk_s: 15.0
+    # a long recording queues all its pieces at once, and each can take minutes on a busy CPU: no queue limit
+    queue_timeout_s: 0
     hardware: {gpu: recommended, vram_gb: 4.4, note: 'approximate: weights x 1.3 + 0.5 GB'}
 - id: voxtral-small-24b-llamacpp
   aliases: [voxtral-small, voxtral-small-24b]
@@ -82,5 +97,6 @@
     model_file: mistralai_Voxtral-Small-24B-2507-Q4_K_M.gguf
     mmproj_file: mmproj-mistralai_Voxtral-Small-24B-2507-f16.gguf
     context_size: 4096
-    max_chunk_s: 30.0
+    max_chunk_s: 15.0
+    queue_timeout_s: 0
     hardware: {gpu: required, vram_gb: 20.9, note: 'approximate: weights x 1.3 + 0.5 GB'}

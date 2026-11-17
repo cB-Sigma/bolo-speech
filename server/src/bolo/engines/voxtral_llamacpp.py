@@ -23,7 +23,9 @@ What the model does not give: timestamps. Segment times are those of the pieces 
 cut at pauses by voice-activity detection into pieces of at most ``max_chunk_s``), and word timestamps are
 unavailable. The OpenAI ``prompt`` is not used (transcription mode takes no text). Decoding is greedy unless the
 request sets a temperature; the token budget follows the length of the audio (``tokens_per_s`` per second plus
-32, at most ``max_new_tokens``), which stops a model that repeats itself.
+32, at most ``max_new_tokens``), which stops a model that repeats itself, and generation stops at a blank line
+(``stop``): on llama.cpp the model sometimes goes on after the transcript as if answering a chat message, and a
+transcript has no blank line.
 """
 
 from __future__ import annotations
@@ -101,7 +103,7 @@ class VoxtralLlamaCpp(STTModel):
         self.process = process
         self._base_url = (base_url or (process.base_url if process else "")).rstrip("/")
         self.sample_rate = SAMPLE_RATE
-        self.max_chunk_s = float(spec.get("max_chunk_s") or 30.0)
+        self.max_chunk_s = float(spec.get("max_chunk_s") or 15.0)
         self.languages = languages
         self.tokens_per_s = float(spec.get("tokens_per_s", 12.0))
         self.max_new_tokens = int(spec.get("max_new_tokens", 4096))
@@ -109,6 +111,9 @@ class VoxtralLlamaCpp(STTModel):
         self.supports_translate = self.translate
         self.request_extra = dict(spec.get("request") or {})
         self.marker = str(spec.get("media_marker") or "")
+        #: llama.cpp's Voxtral can carry on after the transcript as if chatting ("Here's a breakdown..."), always
+        #: after a blank line; a transcript has none, so generation stops there
+        self.stop = [str(x) for x in spec.get("stop", ["\n\n"]) or []]
         api_key = api_key or (process.api_key if process is not None else None)
         self._client = httpx.Client(
             headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
@@ -177,6 +182,8 @@ class VoxtralLlamaCpp(STTModel):
             "stream": False,
             "cache_prompt": False,
         }
+        if self.stop:
+            body["stop"] = list(self.stop)
         if not req.temperature:
             body["top_k"] = 1
         body.update(self.request_extra)
