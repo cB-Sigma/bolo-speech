@@ -27,12 +27,13 @@ LOADERS: dict[str, tuple[str, str]] = {
     "sepformer": ("bolo_torch.models.separation", "load_sepformer"),
     "pixit": ("bolo_torch.models.separation", "load_pixit"),
     "dicow": ("bolo_torch.models.dicow", "load"),
+    "pyannote-diarization": ("bolo_torch.models.diarization", "load"),
 }
 #: kinds the catalog lists for this plugin that are not implemented yet
 NOT_IMPLEMENTED = {
     "sravaani": "SraVaani (TorchScript STT)",
     "indicconformer-official": "IndicConformer official",
-    "diarizen": "DiariZen diarization (the plugin protocol has no diarization request yet)",
+    "diarizen": "DiariZen diarization (no packaged inference code)",
     "spark-tts": "Spark-TTS (no packaged inference code)",
     "maskgct": "MaskGCT (no packaged inference code)",
 }

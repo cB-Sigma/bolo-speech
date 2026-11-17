@@ -77,13 +77,47 @@ async def test_plugin_models_through_the_scheduler(plugin_settings: Settings) ->
         assert (
             proc.running
             and proc.hello["protocol"] == 1
-            and proc.hello["kinds"] == ["fake-stt", "fake-tts", "fake-separation", "fake-stt-speakers"]
+            and proc.hello["kinds"]
+            == ["fake-stt", "fake-tts", "fake-separation", "fake-stt-speakers", "fake-diarization"]
         )
         assert len(proc.handles) == 2
         assert core.engines.status("plugin:ref").available
     finally:
         await core.stop()
     assert not core.engines.get("plugin:ref").process.running  # type: ignore[union-attr]
+
+
+async def test_plugin_diarization_through_the_scheduler(plugin_settings: Settings) -> None:
+    """A diarization model in a plugin (ops ``diarize`` and ``embed``): bolo's speaker turns, speaker counts and
+    voice prints as for its own diarizers."""
+    from bolo.diarize import DiarizeOptions, KnownSpeaker
+
+    core = Bolo(plugin_settings)
+    core.catalog.add(
+        ModelSpec.from_dict(
+            {
+                "id": "plug-diar", "task": "diarization", "engine": "plugin:ref", "kind": "fake-diarization",
+                "family": "Fake", "languages": [], "license": "Apache-2.0", "builtin": True, "sample_rate": 16000,
+            }
+        )
+    )  # fmt: skip
+    await core.start()
+    try:
+        rate = 16000
+        t = np.arange(rate) / rate
+        low, high, gap = 0.3 * np.sin(2 * np.pi * 200 * t), 0.3 * np.sin(2 * np.pi * 600 * t), np.zeros(rate // 2)
+        audio = np.concatenate([low, gap, high, gap, low, gap, high]).astype(np.float32)
+        turns = await core.diarize(audio, rate, DiarizeOptions(model="plug-diar"))
+        assert [x.speaker for x in turns] == [0, 1, 0, 1] and abs(turns[1].start - 1.5) < 0.1
+        one = await core.diarize(audio, rate, DiarizeOptions(model="plug-diar", max_speakers=1))
+        assert {x.speaker for x in one} == {0}  # bolo asks the plugin again with num_speakers
+        opts = DiarizeOptions(model="plug-diar", known=[KnownSpeaker("Asha", high.astype(np.float32))])
+        await core.diarize(audio, rate, opts)
+        assert opts.names[1] == "Asha"  # the plugin's embeddings name a known voice
+        model = core.manager.loaded["plug-diar"].model
+        assert type(model).__name__ == "PluginDiarization"
+    finally:
+        await core.stop()
 
 
 async def test_crash_restart_and_reload(plugin_settings: Settings) -> None:

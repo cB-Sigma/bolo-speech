@@ -416,8 +416,138 @@
   source:
     repo: pyannote/speech-separation-ami-1.0
     revision: 9486b106945ae0cc0784041a08bfcdba5edadfb9
+    urls:
+    - path: segmentation/pytorch_model.bin
+      url: https://huggingface.co/pyannote/separation-ami-1.0/resolve/4d38e95cfd067c894b8b60b00761831fb01e4a8c/pytorch_model.bin
+      size: 1277290690
+      sha256: 3c94804b873ecc6c972dd095f1c33a4f9a5c9802dabf0275067ecbdcf76bf024
   options:
     plugin_install: pip install "bolo-torch[pyannote]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    repo: pyannote/speech-separation-ami-1.0
+    also_gated: [pyannote/separation-ami-1.0]
+    revisions:
+      pyannote/separation-ami-1.0: 4d38e95cfd067c894b8b60b00761831fb01e4a8c
+    sha256:
+      config.yaml: 141e143ae24f691e4e9d0b8c4dc5f57e25a9d4333995d8c57c50095c50dcfa63
+      segmentation/pytorch_model.bin: 3c94804b873ecc6c972dd095f1c33a4f9a5c9802dabf0275067ecbdcf76bf024
+- id: pyannote-speaker-diarization-3.1
+  aliases: [pyannote/speaker-diarization-3.1]
+  task: diarization
+  engine: plugin:torch
+  kind: pyannote-diarization
+  family: pyannote (PyTorch)
+  languages: []
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 32819555
+  license: MIT (pipeline, segmentation-3.0) + CC-BY-4.0 (WeSpeaker embedding, community-1 PLDA)
+  license_url: https://huggingface.co/pyannote/speaker-diarization-3.1
+  gated: true
+  description: 'pyannote speaker-diarization-3.1, the original PyTorch pipeline (pyannote.audio): segmentation-3.0,
+    WeSpeaker ResNet34 embeddings, agglomerative clustering. The same segmentation model as bolo''s ONNX
+    diarization, but pyannote''s own embedding, clustering and post-processing, for pyannote''s exact results. Gated:
+    accept the conditions of pyannote/speaker-diarization-3.1, pyannote/segmentation-3.0 and (pyannote.audio 4 loads
+    its PLDA files for every pipeline) pyannote/speaker-diarization-community-1, and set HF_TOKEN. bolo downloads the
+    pipeline configuration and the sub-models at pinned revisions (32.8 MB). Needs PyTorch and pyannote.audio
+    (torch engine plugin, pyannote extra).'
+  source_url: https://huggingface.co/pyannote/speaker-diarization-3.1
+  validated: cpu
+  measured:
+    rtf: 0.906
+    der: 0.0605
+    der_collar_250ms: 0.0047
+    load_s: 7.5
+    audio_s: 27.2
+    threads: 4
+    engine: bolo-torch (unreleased, after 0.1.4), torch 2.15.0+cpu, pyannote.audio 4.1.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+    test_audio: the demo's two-voice dialogue (two SYSPIN voices taking turns, server/src/bolo/_ui/diarization)
+    note: 'Two speakers, no confusion: missed 3.8 %, false alarm 2.3 % (first 20.8 s: DER 4.9 %), the same turns
+      through bolo (POST /api/v1/diarize path) as from pyannote directly. Core ONNX diarization on the same clip:
+      pyannote-3.0-eres2net DER 5.9 % (RTF 0.23), nemotron-3-diarization 5.9 % (RTF 0.06). Slower than real time
+      under load on this shared machine (RTF 0.9-1.5).'
+  source:
+    repo: pyannote/speaker-diarization-3.1
+    revision: 84fd25912480287da0247647c3d2b4853cb3ee5d
+    include: [config.yaml]
+    urls:
+    - path: segmentation/pytorch_model.bin
+      url: https://huggingface.co/pyannote/segmentation-3.0/resolve/e66f3d3b9eb0873085418a7b813d3b369bf160bb/pytorch_model.bin
+      size: 5905440
+      sha256: da85c29829d4002daedd676e012936488234d9255e65e86dfab9bec6b1729298
+    - path: embedding/pytorch_model.bin
+      url: https://huggingface.co/pyannote/wespeaker-voxceleb-resnet34-LM/resolve/837717ddb9ff5507820346191109dc79c958d614/pytorch_model.bin
+      size: 26645418
+      sha256: 366edf44f4c80889a3eb7a9d7bdf02c4aede3127f7dd15e274dcdb826b143c56
+    - path: plda/plda.npz
+      url: https://huggingface.co/pyannote/speaker-diarization-community-1/resolve/3533c8cf8e369892e6b79ff1bf80f7b0286a54ee/plda/plda.npz
+      size: 133852
+      sha256: 9b77bcd840692710dd3496f62ecfeed8d8e5f002fd991b785079b244eab7d255
+    - path: plda/xvec_transform.npz
+      url: https://huggingface.co/pyannote/speaker-diarization-community-1/resolve/3533c8cf8e369892e6b79ff1bf80f7b0286a54ee/plda/xvec_transform.npz
+      size: 134376
+      sha256: 325f1ce8e48f7e55e9c8aa47e05d2766b7c48c4b25b8de8dd751e7a4cc5fbe8f
+  options:
+    plugin_install: pip install "bolo-torch[pyannote]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    repo: pyannote/speaker-diarization-3.1
+    also_gated: [pyannote/segmentation-3.0, pyannote/speaker-diarization-community-1]
+    sha256:
+      config.yaml: 04ad9cd59a93c3a7c754200ecc9e1c4ba87bf1657ef8a4debf7555e711daeeda
+      segmentation/pytorch_model.bin: da85c29829d4002daedd676e012936488234d9255e65e86dfab9bec6b1729298
+      embedding/pytorch_model.bin: 366edf44f4c80889a3eb7a9d7bdf02c4aede3127f7dd15e274dcdb826b143c56
+      plda/plda.npz: 9b77bcd840692710dd3496f62ecfeed8d8e5f002fd991b785079b244eab7d255
+      plda/xvec_transform.npz: 325f1ce8e48f7e55e9c8aa47e05d2766b7c48c4b25b8de8dd751e7a4cc5fbe8f
+- id: pyannote-speaker-diarization-community-1
+  aliases: [pyannote/speaker-diarization-community-1]
+  task: diarization
+  engine: plugin:torch
+  kind: pyannote-diarization
+  family: pyannote (PyTorch)
+  languages: []
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 32821421
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/pyannote/speaker-diarization-community-1
+  gated: true
+  description: 'pyannote speaker-diarization-community-1 (pyannote.audio 4): segmentation, WeSpeaker embeddings
+    and VBx clustering with a PLDA, all in one repository. pyannote reports lower DER than 3.1 on most of its
+    benchmarks (AMI SDM 19.9 % against 22.7 %). Option exclusive: true returns its exclusive diarization (one speaker
+    at a time). CC-BY-4.0 (attribution). Gated: accept the conditions of pyannote/speaker-diarization-community-1
+    (it asks for contact details) and set HF_TOKEN. Needs PyTorch and pyannote.audio 4 (torch engine plugin,
+    pyannote extra).'
+  source_url: https://huggingface.co/pyannote/speaker-diarization-community-1
+  validated: cpu
+  measured:
+    rtf: 0.876
+    der: 0.0605
+    der_collar_250ms: 0.0047
+    load_s: 8.2
+    audio_s: 27.2
+    threads: 4
+    engine: bolo-torch (unreleased, after 0.1.4), torch 2.15.0+cpu, pyannote.audio 4.1.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+    test_audio: the demo's two-voice dialogue (two SYSPIN voices taking turns, server/src/bolo/_ui/diarization)
+    note: 'Two speakers, no confusion: missed 3.8 %, false alarm 2.3 % (first 20.8 s: DER 4.9 %), the same turns
+      through bolo (POST /api/v1/diarize path) as from pyannote directly. Core ONNX diarization on the same clip:
+      pyannote-3.0-eres2net DER 5.9 % (RTF 0.23), nemotron-3-diarization 5.9 % (RTF 0.06). Slower than real time
+      under load on this shared machine (RTF 0.9-1.5).'
+  source:
+    repo: pyannote/speaker-diarization-community-1
+    revision: 3533c8cf8e369892e6b79ff1bf80f7b0286a54ee
+    include: [config.yaml, segmentation/pytorch_model.bin, embedding/pytorch_model.bin, plda/plda.npz,
+      plda/xvec_transform.npz]
+  options:
+    plugin_install: pip install "bolo-torch[pyannote]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    repo: pyannote/speaker-diarization-community-1
+    sha256:
+      config.yaml: 5ce2bfa9a938dc132cec1172592d65173cbb8f444ea1e4133f10f9391de155be
+      segmentation/pytorch_model.bin: 7ad24338d844fb95985486eb1a464e32d229f6d7a03c9abe60f978bacf3f816e
+      embedding/pytorch_model.bin: 6f10ff60898a1d185fa22e1d11e0bfa8a92efec811f11bca48cb8cafebefd929
+      plda/plda.npz: 9b77bcd840692710dd3496f62ecfeed8d8e5f002fd991b785079b244eab7d255
+      plda/xvec_transform.npz: 325f1ce8e48f7e55e9c8aa47e05d2766b7c48c4b25b8de8dd751e7a4cc5fbe8f
 - id: dicow-v3.3
   aliases: [dicow]
   task: stt
@@ -674,7 +804,7 @@
     plugin_install: not supported by bolo-torch yet (no packaged inference code)
 - id: diarizen-wavlm-large-s80-md-v2
   runnable: false
-  not_runnable_reason: bolo's engine plugins cannot serve diarization models yet
+  not_runnable_reason: bolo-torch has no DiariZen loader yet
   task: diarization
   engine: plugin:torch
   kind: diarizen
@@ -691,7 +821,7 @@
   description: 'BUT-FIT DiariZen (v2): end-to-end neural diarization on a pruned WavLM Large with Conformer layers (up
     to four overlapping speakers), then speaker embeddings and VBx clustering, built on pyannote. The model card reports
     DER 13.9 % on AMI against 22.4 % for pyannote 3.1 (collar 0). Non-commercial (CC-BY-NC-4.0; the PLDA files are
-    CC-BY-4.0). Not runnable yet: bolo''s engine plugins cannot serve diarization models yet, and the community ONNX export
+    CC-BY-4.0). Not runnable yet: bolo-torch has no DiariZen loader (its inference code is not packaged), and the community ONNX export
     (christopherthompson81/diarizen_onnx, CC-BY-NC-4.0) needs a VBx/PLDA clustering pipeline that sherpa-onnx does not
     have.'
   source_url: https://huggingface.co/BUT-FIT/diarizen-wavlm-large-s80-md-v2
@@ -701,4 +831,4 @@
     revision: 027b3e221b9d81dce2be794084f1dbd3ba2da403
     exclude: [.gitattributes]
   options:
-    plugin_install: not supported by bolo-torch yet (the plugin protocol has no diarization request)
+    plugin_install: not supported by bolo-torch yet (no DiariZen loader)

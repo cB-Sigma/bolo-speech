@@ -19,7 +19,7 @@ from typing import Any
 import numpy as np
 from bolo.engines.base import FloatArray, SeparationModel
 
-from bolo_torch.runtime import LoadContext, ModelGated, PluginError, gated_message, hf_token, model_dir, require
+from bolo_torch.runtime import LoadContext, PluginError, model_dir, require
 
 SR = 16000
 
@@ -150,23 +150,12 @@ def _speechbrain_fetch_shim() -> None:
 def load_pixit(ctx: LoadContext) -> PixIT:
     import torch
 
-    audio = require("pyannote.audio", "pyannote")
+    from bolo_torch.models.diarization import load_pipeline
+
     repo = str(ctx.option("repo", "pyannote/speech-separation-ami-1.0"))
-    root = model_dir(ctx.path, {**ctx.options, "repo": repo})
-    config = root / "config.yaml"
-    source = str(config) if config.is_file() else repo
     _speechbrain_fetch_shim()
-    params = inspect.signature(audio.Pipeline.from_pretrained).parameters
-    auth = {"token": hf_token()} if "token" in params else {"use_auth_token": hf_token()}
-    try:
-        pipeline = audio.Pipeline.from_pretrained(source, **auth)
-    except Exception as exc:
-        text = f"{type(exc).__name__}: {exc}"
-        if any(s in text for s in ("401", "403", "GatedRepo", "gated", "restricted")):
-            raise ModelGated(gated_message("pyannote/separation-ami-1.0")) from exc
-        raise
-    if pipeline is None:  # pyannote 3.x returns None (and prints a notice) when a download is refused
-        raise ModelGated(gated_message("pyannote/separation-ami-1.0"))
+    # built from the checked configuration (bolo_torch.pyannote_config): pyannote's own classes, pinned sub-models
+    pipeline = load_pipeline(ctx, repo, [str(r) for r in ctx.option("also_gated", ["pyannote/separation-ami-1.0"])])
     leakage = ctx.option("leakage_removal")
     if leakage is not None:  # the pipeline's default (true) zeroes a track wherever its speaker is judged silent
         params = pipeline.parameters(instantiated=True)

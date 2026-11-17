@@ -43,6 +43,8 @@ class TorchServer(_Server):
                 self.synthesize(rid, message)
             elif op in ("separate", "enrol", "extract", "release"):
                 self.separation(rid, op, message, payload)
+            elif op in ("diarize", "embed") and hasattr(self, "diarization"):  # bolo 0.6.7 and later
+                self.diarization(rid, op, message, payload)
             else:
                 self.fail(rid, "unknown_op", f"unknown op {op!r}")
         except Exception as exc:

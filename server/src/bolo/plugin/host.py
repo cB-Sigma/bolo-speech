@@ -2,7 +2,7 @@
 
 A plugin engine appears in the registry as ``plugin:<name>`` and is used by catalog entries with
 ``engine: plugin:<name>``. Its models implement the ordinary :class:`STTModel` / :class:`TTSModel`
-interfaces, so the scheduler, queues, traces and metrics treat them like built-in models; every
+interfaces (and :class:`DiarizationModel` / :class:`SeparationModel`), so the scheduler, queues, traces and metrics treat them like built-in models; every
 call is forwarded to the plugin process (see :mod:`bolo.plugin.protocol`).
 
 Process lifecycle (:class:`PluginProcess`):
@@ -39,6 +39,8 @@ from typing import Any
 
 from bolo import procs
 from bolo.engines.base import (
+    DiarizationModel,
+    DiarizationResult,
     Engine,
     EngineStatus,
     FloatArray,
@@ -47,6 +49,7 @@ from bolo.engines.base import (
     Segment,
     SeparationModel,
     SpeakerRequest,
+    SpeakerTurn,
     STTModel,
     STTRequest,
     STTResult,
@@ -514,6 +517,42 @@ class PluginSeparation(_PluginModelMixin, SeparationModel):
             self.process.request({"op": "release", "handle": self._handle, "key": key}, timeout=30)
 
 
+class PluginDiarization(_PluginModelMixin, DiarizationModel):
+    """A diarization model in a plugin: ops ``diarize`` (speaker turns) and ``embed`` (a voice print, which bolo
+    uses to name known speakers, tidy up speakers and assign separated tracks)."""
+
+    def __init__(self, process: PluginProcess, load_message: dict[str, Any]) -> None:
+        self.process, self._load_message, self._handle, self._generation = process, load_message, None, 0
+        self._ensure_loaded()
+
+    def _apply_load_reply(self, reply: dict[str, Any]) -> None:
+        info = reply.get("info") or {}
+        self.sample_rate = int(reply.get("sample_rate") or 16000)
+        self.consolidate_default = bool(info.get("consolidate_default", True))
+
+    def diarize_detailed(
+        self, samples: FloatArray, num_speakers: int | None = None, threshold: float | None = None
+    ) -> DiarizationResult:
+        handle = self._ensure_loaded()
+        message = {"op": "diarize", "handle": handle, "num_speakers": num_speakers, "threshold": threshold}
+        # a whole recording in one request: allow longer than for a batch of short chunks
+        seconds = len(samples) / 16000
+        timeout = max(self.process.config.request_timeout_s, 10.0 * seconds)
+        reply = self.process.request(message, audio_bytes(samples), timeout=timeout)
+        turns = [SpeakerTurn(float(t[0]), float(t[1]), int(t[2])) for t in reply.get("turns", [])]
+        return DiarizationResult(sorted(turns, key=lambda t: (t.start, t.end)))
+
+    def diarize(
+        self, samples: FloatArray, num_speakers: int | None = None, threshold: float | None = None
+    ) -> list[SpeakerTurn]:
+        return self.diarize_detailed(samples, num_speakers, threshold).turns
+
+    def embed(self, samples: FloatArray) -> FloatArray:
+        handle = self._ensure_loaded()
+        _, payload = self.process.request_with_payload({"op": "embed", "handle": handle}, audio_bytes(samples))
+        return audio_from_bytes(payload)
+
+
 class PluginEngine(Engine):
     """The registry's face of one plugin (``plugin:<name>``)."""
 
@@ -547,7 +586,9 @@ class PluginEngine(Engine):
             return PluginTTS(self.process, message)
         if task == "separation":
             return PluginSeparation(self.process, message)
-        raise EngineUnavailable(f"plugins can serve stt, tts and separation models, not {task!r}")
+        if task == "diarization":
+            return PluginDiarization(self.process, message)
+        raise EngineUnavailable(f"plugins can serve stt, tts, separation and diarization models, not {task!r}")
 
     def shutdown(self) -> None:
         self.process.stop()

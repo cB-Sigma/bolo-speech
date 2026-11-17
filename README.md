@@ -154,6 +154,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | STT | IndicConformer | 27 | as, bn, brx, doi, gu, hi, kn, kok +14 | 20 | 0.060 (`indicconformer-ta-community`) |
 | SEPARATION | SepFormer | 2 | en | 2 | 1.440 (`sepformer-whamr`) |
 | SEPARATION | PixIT | 1 | en | 1 | 5.690 (`pixit-ami`) |
+| DIARIZATION | pyannote (PyTorch) | 2 | - | 2 | 0.876 (`pyannote-speaker-diarization-community-1`) |
 | STT | DiCoW | 3 | en | 3 | 0.453 (`dicow-v3.3`) |
 | TTS | Indic-Speak | 1 | as, bn, brx, doi, en, gu, hi, kn +15 | 0 | - |
 | TTS | Spark-TTS | 1 | en, zh | 0 | - |
@@ -186,7 +187,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | TURN | Smart Turn | 1 | ar, bn, da, de, en, es, fi, fr +15 | 0 | - |
 | VAD | Silero VAD | 2 | - | 2 | 0.006 (`silero-vad-v5`) |
 
-**344 models in the catalog, 133 validated on CPU, 211 untested**, plus 20 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**346 models in the catalog, 135 validated on CPU, 211 untested**, plus 20 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

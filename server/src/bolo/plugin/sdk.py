@@ -23,6 +23,7 @@ from typing import IO, Any
 import numpy as np
 
 from bolo.engines.base import (
+    DiarizationModel,
     Engine,
     LoadOptions,
     Model,
@@ -107,6 +108,8 @@ class _Server:
                 self.synthesize(rid, message)
             elif op in ("separate", "enrol", "extract", "release"):
                 self.separation(rid, op, message, payload)
+            elif op in ("diarize", "embed"):
+                self.diarization(rid, op, message, payload)
             else:
                 self.fail(rid, "unknown_op", f"unknown op {op!r}")
         except Exception as exc:
@@ -130,6 +133,8 @@ class _Server:
             info["voices"] = [v.to_dict() for v in model.voices]
         if isinstance(model, SeparationModel):
             info.update(mode=model.mode, min_sample_s=model.min_sample_s)
+        if isinstance(model, DiarizationModel):
+            info["consolidate_default"] = bool(model.consolidate_default)
         if isinstance(model, STTModel):
             info.update(
                 languages=list(model.languages), max_batch=model.max_batch,
@@ -201,6 +206,21 @@ class _Server:
         else:
             model.release(key)
             self.reply(rid)
+
+    def diarization(self, rid: str, op: str, m: dict[str, Any], payload: bytes) -> None:
+        model = self.model(m)
+        if not isinstance(model, DiarizationModel):
+            raise TypeError("this model does not diarize")
+        audio = audio_from_bytes(payload)
+        if op == "embed":
+            self.send({"id": rid, "ok": True}, audio_bytes(np.asarray(model.embed(audio), dtype=np.float32)))
+            return
+        num = m.get("num_speakers")
+        threshold = m.get("threshold")
+        result = model.diarize_detailed(
+            audio, int(num) if num else None, float(threshold) if threshold is not None else None
+        )
+        self.reply(rid, turns=[[t.start, t.end, t.speaker] for t in result.turns])
 
     def synthesize(self, rid: str, m: dict[str, Any]) -> None:
         model = self.model(m)

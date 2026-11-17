@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-344 models: 133 validated on CPU by the maintainers, 211 untested. 20 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
+346 models: 135 validated on CPU by the maintainers, 211 untested. 20 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
 
 ### Speech to text
 
@@ -650,6 +650,13 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `nemotron-3-diarization` | - | balanced | - | 147 MB | OpenMDW-1.1 | **CPU** · RTF 0.039 · DER 24.1% on AMI meeting excerpts |
+
+#### pyannote (PyTorch)
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `pyannote-speaker-diarization-3.1` | - | balanced | - | 33 MB | MIT (pipeline, segmentation-3.0) + CC-BY-4.0 (WeSpeaker e… · needs plugin torch · gated | **CPU** · RTF 0.906 · DER 6.0% on a two-voice test clip |
+| `pyannote-speaker-diarization-community-1` | - | balanced | - | 33 MB | CC-BY-4.0 · needs plugin torch · gated | **CPU** · RTF 0.876 · DER 6.0% on a two-voice test clip |
 
 #### DiariZen
 

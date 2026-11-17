@@ -109,7 +109,7 @@ warn_unused_ignores = false
 [[tool.mypy.overrides]]
 module = [
   "parler_tts.*", "speechbrain.*", "pyannote.*", "snac.*", "transformers.*", "soxr.*", "soundfile.*",
-  "huggingface_hub.*", "torchaudio.*",
+  "huggingface_hub.*", "torchaudio.*", "yaml.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"

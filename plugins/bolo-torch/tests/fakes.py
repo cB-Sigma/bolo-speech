@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 import torch
 
+from bolo_torch.models.diarization import PyannoteDiarization
 from bolo_torch.models.dicow import Backend, DecodedSegment, DiCoW
 from bolo_torch.models.parler import ParlerTTS
 from bolo_torch.models.separation import SepFormer
@@ -113,3 +114,82 @@ class FakeDiCoWBackend(Backend):
 
 def load_fake_dicow(ctx: LoadContext) -> DiCoW:
     return DiCoW(FakeDiCoWBackend())
+
+
+# -- pyannote speaker diarization ----------------------------------------------------------------------
+
+
+class _Segment:
+    def __init__(self, start: float, end: float) -> None:
+        self.start, self.end = start, end
+
+
+class FakeAnnotation:
+    """What pyannote's ``Annotation.itertracks(yield_label=True)`` yields: (segment, track, label)."""
+
+    def __init__(self, tracks: list[tuple[float, float, str]]) -> None:
+        self.tracks = tracks
+
+    def itertracks(self, yield_label: bool = False) -> Any:
+        for i, (start, end, label) in enumerate(self.tracks):
+            yield _Segment(start, end), i, label
+
+    def labels(self) -> list[str]:
+        return sorted({t[2] for t in self.tracks})
+
+
+class FakeDiarizeOutput:
+    def __init__(self, regular: FakeAnnotation, exclusive: FakeAnnotation) -> None:
+        self.speaker_diarization = regular
+        self.exclusive_speaker_diarization = exclusive
+
+
+class FakePipeline:
+    """A pyannote.audio 4 pipeline (``DiarizeOutput``) or, with ``legacy``, a 3.x one (an ``Annotation``)."""
+
+    def __init__(
+        self,
+        tracks: list[tuple[float, float, str]],
+        exclusive: list[tuple[float, float, str]] | None = None,
+        legacy: bool = False,
+    ) -> None:
+        self.tracks = tracks
+        self.exclusive = exclusive if exclusive is not None else tracks
+        self.legacy = legacy
+        self.calls: list[tuple[dict[str, Any], dict[str, Any]]] = []
+        self.device: Any = None
+
+    def to(self, device: Any) -> FakePipeline:
+        self.device = device
+        return self
+
+    def __call__(self, file: dict[str, Any], **kwargs: Any) -> Any:
+        self.calls.append((file, kwargs))
+        if self.legacy:
+            return FakeAnnotation(self.tracks)
+        return FakeDiarizeOutput(FakeAnnotation(self.tracks), FakeAnnotation(self.exclusive))
+
+
+class FakeEmbedding:
+    """A speaker embedding model: (batch, channel, samples) in, (batch, 4) out (mean, energy, ...)."""
+
+    min_num_samples = 640
+
+    def __init__(self) -> None:
+        self.seen: list[int] = []
+
+    def __call__(self, waveforms: torch.Tensor) -> np.ndarray:
+        assert waveforms.ndim == 3
+        self.seen.append(int(waveforms.shape[-1]))
+        x = waveforms[0, 0].numpy()
+        return np.array([[float(np.mean(x)) + 0.1, float(np.mean(x**2)) + 0.2, 0.3, len(x) / 16000]])
+
+
+fake_embedding = FakeEmbedding()
+
+
+def load_fake_pyannote(ctx: LoadContext) -> PyannoteDiarization:
+    """Speaker turns from the catalog option ``tracks`` ([start, end, label] lists)."""
+    tracks = [(float(a), float(b), str(c)) for a, b, c in ctx.options.get("tracks", [])]
+    speakers = {k: int(ctx.options[k]) for k in ("num_speakers", "min_speakers", "max_speakers") if k in ctx.options}
+    return PyannoteDiarization(FakePipeline(tracks), FakeEmbedding(), speakers)
