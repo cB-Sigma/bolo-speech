@@ -44,6 +44,9 @@ embed      ``handle``; a stretch of one voice follows (16 kHz)          the unit
                                                                         follows (float32)
 denoise    ``handle``; the recording follows (at the model's            the enhanced recording follows,
            ``sample_rate``)                                             as long as the input
+lid        ``handle``; the recording follows (16 kHz)                     ``languages``: list of
+                                                                        ``[code, probability]``, most
+                                                                        likely first
 respond    ``handle``, ``turns``: list of ``{role, text, n, call_id,     ``sample_rate``, ``chunks``,
            tool_calls}``, ``instructions``, ``tools``,                    ``cancelled`` (chunks before)
            ``tool_choice``, ``voice``, ``max_output_tokens``,
@@ -60,7 +63,8 @@ conditioned recognition of a whole recording, bolo sends it only to such models)
 (``"blind"``: answers ``separate``; ``"target"``: answers ``enrol``/``extract``/``release``) and
 ``min_sample_s`` (seconds of voice a target model needs); a diarization model (task ``diarization``, bolo 0.6.7)
 gives ``consolidate_default`` (false: bolo does not merge or drop its speakers); a speech-to-speech model (task
-``speech-to-speech``, bolo 0.6.7) gives ``voices`` and ``supports_tools``. The model keeps no conversation: each
+``speech-to-speech``, bolo 0.6.7) gives ``voices`` and ``supports_tools``; a language identifier (task ``lid``,
+bolo 0.6.7) gives ``labels`` (the language codes it can answer) and ``max_s`` (the seconds of audio it looks at). The model keeps no conversation: each
 ``respond`` carries the whole conversation (user turns as audio or text, the model's earlier answers as text, tool
 results), and the answer streams back as chunks at the model's ``sample_rate``. ``placement`` in a ``load``
 request (bolo 0.5) is
@@ -74,7 +78,8 @@ version it will use (at most bolo's). A plugin that cannot speak any version bol
 with ``ok: false``. New optional members may be added within a version, and new ops that bolo
 only sends to models announcing them in ``info`` (``speakers``, added in bolo 0.3; ``diarize`` and ``embed`` are sent only to models loaded with task
 ``diarization``, bolo 0.6.7; ``denoise`` only to models loaded with task ``denoise``, bolo 0.6.7; ``respond`` only
-to models loaded with task ``speech-to-speech``, bolo 0.6.7); anything
+to models loaded with task ``speech-to-speech``, bolo 0.6.7; ``lid`` only to models loaded with task ``lid``, bolo
+0.6.7); anything
 incompatible gets a new version number.
 """
 

@@ -218,12 +218,17 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   computed in NumPy), `ambernet-langid` (NVIDIA AmberNet, NGC Terms of Use, marked not for commercial use),
   `whisper-tiny-lid` and `whisper-base-lid` (MIT: Whisper's own language detection with probabilities, on
   sherpa-onnx's int8 Whisper graphs), all run in ONNX Runtime and measured; `mms-lid-126` and `mms-lid-4017`
-  (CC-BY-NC-4.0, int8 ONNX, 978 MB, runnable but not measured); and, not runnable yet,
-  `voxlect-indic-lid-whisper-small` (OpenRAIL), `voxlect-indic-lid-mms-lid-256` (CC-BY-NC-4.0) and `lid-indic-vaani`
-  (Apache-2.0). On the repository's English and Hindi clips and 39 clips synthesised with bolo's voices in 13 Indian
-  languages, the VoxLingua107 model was right on 11/11 and 33/39 (it does not know Odia and heard Urdu as Hindi) at
-  RTF 0.11 on one thread; Whisper base 11/11 and 24/39 at 0.61 (docs/models.md, "Language identification";
-  docs/measurements/lid.json).
+  (CC-BY-NC-4.0, int8 ONNX, 978 MB, runnable but not measured); and on the torch engine plugin, Indian-specific:
+  `voxlect-indic-lid-whisper-small` (OpenRAIL, the 22 scheduled languages and English), `voxlect-indic-lid-mms-lid-256`
+  (CC-BY-NC-4.0, 3.9 GB, not measured), `lid-indic-vaani` (Apache-2.0, five languages), `indic-slid-mhubert` and
+  `indic-slid-mhubert-task2` (CC-BY-NC-SA-4.0). On the repository's English and Hindi clips and 39 clips synthesised
+  with bolo's voices in 13 Indian languages, the VoxLingua107 model was right on 11/11 and 33/39 (it does not know
+  Odia and heard Urdu as Hindi) at RTF 0.11 on one thread; the Voxlect model 35/39, Odia included, but it heard every
+  Hindi clip as Urdu; Whisper base 11/11 and 24/39 at 0.61 (docs/models.md, "Language identification";
+  docs/measurements/lid.json). Identifiers that state no licence are listed in docs/models-unsupported.md.
+- Plugin protocol: op `lid` for models loaded with task `lid` (`info.labels`, `info.max_s`); the SDK and the
+  reference plugin serve it, and bolo-torch has three language-identification kinds (`voxlect-lid`,
+  `speechbrain-lid`, `hf-audio-classification`; extras `voxlect`, `speechbrain`).
 - **Console: voice blends and the language decision.** The text-to-speech page has a "Blend voices" panel for models
   with `voice-blending` (Kokoro): pick up to 8 of the model's voices with weights, see the blend as it is sent
   (`af_bella(0.7)+af_sky(0.3)`) and keep it in the voice library under a name. Saved blends are listed in the library

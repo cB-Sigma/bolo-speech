@@ -53,3 +53,18 @@ The text-reading end-of-turn models bolo does run are the Namo Turn Detectors (`
 | LFM3-Audio 2B full-duplex adapter ([MAdel121/LFM3-Audio-2B-Full-Duplex](https://huggingface.co/MAdel121/LFM3-Audio-2B-Full-Duplex)) | LFM Open License v1.0 | 0.1 GB (+ the base model) | a third-party LoRA adapter with its own Python package in the model repository, not from the base model's authors; not checked further. |
 | OSUM-EChat, LLaMA-Omni2 | Apache-2.0 | 1 to 25 GB | not full-duplex (turn-based speech conversation); out of scope for this table. |
 
+## Language identification
+
+Every language identifier that states a licence is in the catalog and runs (docs/models.md, "Language
+identification"). These were found and left out because their repositories state no licence at all: with no
+terms, nobody has been given the right to copy or use the weights, so bolo can neither download them for you nor
+label them. They are fine-tunes for the 22 scheduled languages (no English) with transformers' audio-classification
+classes, which bolo-torch's `hf-audio-classification` kind would load as they are; a licence added upstream is all it
+takes to catalogue them.
+
+| model | licence | size | why it is not in the catalog |
+| --- | --- | --- | --- |
+| [radioduran/indic-language-identification](https://huggingface.co/radioduran/indic-language-identification) (HuBERT) | none stated | 379 MB | no licence on the model card or in the repository |
+| [PremKumar12/indic-language-identification](https://huggingface.co/PremKumar12/indic-language-identification) (HuBERT) | none stated | 378 MB | no licence on the model card or in the repository |
+| [ansc00053/indic-language-identification](https://huggingface.co/ansc00053/indic-language-identification) (wav2vec 2.0) | none stated | 1.3 GB | no licence on the model card or in the repository |
+| [vensti14/indic-SLID-improved](https://huggingface.co/vensti14/indic-SLID-improved) (wav2vec 2.0) | none stated | 1.3 GB | no licence on the model card or in the repository |

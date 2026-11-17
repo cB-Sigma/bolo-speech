@@ -87,6 +87,7 @@ async def test_plugin_models_through_the_scheduler(plugin_settings: Settings) ->
                 "fake-diarization",
                 "fake-denoise",
                 "fake-s2s",
+                "fake-lid",
             ]
         )
         assert len(proc.handles) == 2
@@ -125,6 +126,34 @@ async def test_plugin_diarization_through_the_scheduler(plugin_settings: Setting
         assert opts.names[1] == "Asha"  # the plugin's embeddings name a known voice
         model = core.manager.loaded["plug-diar"].model
         assert type(model).__name__ == "PluginDiarization"
+    finally:
+        await core.stop()
+
+
+async def test_plugin_language_identification(plugin_settings: Settings) -> None:
+    """A language identifier in a plugin (op ``lid``): its labels and window come with the load, the identify
+    answer is the plugin's, and routing uses it like a built-in one."""
+    core = Bolo(plugin_settings)
+    core.catalog.add(
+        ModelSpec.from_dict(
+            {
+                "id": "plug-lid", "task": "lid", "engine": "plugin:ref", "kind": "fake-lid", "family": "Fake",
+                "languages": ["en", "hi", "ta", "fr"], "license": "Apache-2.0", "builtin": True,
+                "options": {"max_s": 12},
+            }
+        )
+    )  # fmt: skip
+    core.settings.default_lid = "plug-lid"
+    await core.start()
+    try:
+        rate = 16000
+        t = np.arange(2 * rate) / rate
+        tamil = (0.3 * np.sin(2 * np.pi * 660 * t)).astype(np.float32)
+        result = await core.identify_language(tamil, rate)
+        assert result.model == "plug-lid" and result.language == "ta" and abs(result.probability - 0.9) < 1e-6
+        model = core.manager.loaded["plug-lid"].model
+        assert type(model).__name__ == "PluginLid" and model.labels == ["en", "hi", "ta", "fr"] and model.max_s == 12
+        assert result.heard_s == 2.0
     finally:
         await core.stop()
 

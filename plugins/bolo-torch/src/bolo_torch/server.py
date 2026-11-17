@@ -49,6 +49,8 @@ class TorchServer(_Server):
                 self.respond(rid, message, payload)
             elif op == "denoise" and hasattr(self, "denoise"):  # bolo 0.6.7 and later
                 self.denoise(rid, message, payload)
+            elif op == "lid" and hasattr(self, "lid"):  # bolo 0.6.7 and later
+                self.lid(rid, message, payload)
             else:
                 self.fail(rid, "unknown_op", f"unknown op {op!r}")
         except Exception as exc:

@@ -202,6 +202,10 @@ definitions are in `server/src/bolo/plugin/protocol.py`.
 | `dicow-v3.3` (BUT-FIT DiCoW) | STT, diarization-conditioned (speaker request) | `dicow` | CC-BY-4.0 | no | RTF 0.45 with Nemotron diarization (bf16, AMX); AMI cpWER 69 → 26 % |
 | `se-dicow` (BUT-FIT SE-DiCoW) | STT, diarization-conditioned, self-enrolment | `dicow` | Apache-2.0 | no | RTF 0.59 with Nemotron diarization (bf16); AMI cpWER 69 → 25 % |
 | `demucs-dns48`, `demucs-dns64`, `demucs-master64`, `demucs-valentini-nc` (Facebook Research Demucs denoiser) | denoise (16 kHz) | `demucs-denoiser` | **CC-BY-NC-4.0, not for commercial use** | no | docs/models.md, "Denoising" |
+| `voxlect-indic-lid-whisper-small` (Voxlect) | language identification, 22 Indian languages and English (op `lid`) | `voxlect` | OpenRAIL | no | RTF 0.56 (1 thread); 35 of 39 synthesised Indian clips |
+| `voxlect-indic-lid-mms-lid-256` (Voxlect) | language identification, the same languages | `voxlect` | **CC-BY-NC-4.0, not for commercial use** | no | not run (3.9 GB) |
+| `lid-indic-vaani` (SpeechBrain ECAPA-TDNN) | language identification, en/hi/mr/ta/te | `speechbrain` | Apache-2.0 | no | RTF 0.13 (1 thread); 19 of 23 clips in its languages |
+| `indic-slid-mhubert`, `indic-slid-mhubert-task2` (mHuBERT-147) | language identification, 22 Indian languages | `voxlect` | **CC-BY-NC-SA-4.0, not for commercial use** | no | RTF 0.23 (1 thread); 31 of 39 synthesised Indian clips |
 | `qwen2.5-omni-3b-torch` | speech-to-speech (text and speech out) | `omni` | Qwen Research License (non-commercial) | no | not run (12 GB; fakes only) |
 | `qwen2.5-omni-7b-torch` | speech-to-speech | `omni` | Apache-2.0 | no | not run (22 GB; fakes only) |
 | `qwen3-omni-30b-a3b-instruct-torch` | speech-to-speech, speech out in 10 languages | `omni` | Apache-2.0 | no | not run (70 GB; fakes only) |

@@ -34,6 +34,9 @@ LOADERS: dict[str, tuple[str, str]] = {
     "glm-4-voice": ("bolo_torch.models.glm_voice", "load"),
     "kimi-audio": ("bolo_torch.models.kimi_audio", "load"),
     "minicpm-o": ("bolo_torch.models.minicpm_o", "load"),
+    "voxlect-lid": ("bolo_torch.models.lid", "load_voxlect"),
+    "speechbrain-lid": ("bolo_torch.models.lid", "load_speechbrain"),
+    "hf-audio-classification": ("bolo_torch.models.lid", "load_hf_classifier"),
 }
 #: kinds the catalog lists for this plugin that are not implemented yet
 NOT_IMPLEMENTED = {

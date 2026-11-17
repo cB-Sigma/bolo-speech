@@ -1,8 +1,9 @@
 # Spoken-language identification (task: lid): which language a recording is in. Used by POST /v1/audio/language
 # and by language routing (a transcription with model "auto" and no language goes to a recogniser for the language
-# heard; bolo.lid, docs/api.md "Language identification and routing"). The runnable ones run in ONNX Runtime
-# (bolo.engines.lid_onnx). Licences differ: MMS-LID and its fine-tunes are non-commercial, AmberNet is under
-# NVIDIA's NGC Terms of Use.
+# heard; bolo.lid, docs/api.md "Language identification and routing"). Most run in ONNX Runtime
+# (bolo.engines.lid_onnx); the Voxlect, SpeechBrain and mHuBERT ones on the torch engine plugin
+# (plugins/bolo-torch, bolo_torch.models.lid). Licences differ: MMS-LID and its fine-tunes and the mHuBERT ones are
+# non-commercial, AmberNet is under NVIDIA's NGC Terms of Use. Models that cannot run: docs/models-unsupported.md.
 
 - id: voxlingua107-ecapa
   aliases: [speechbrain/lang-id-voxlingua107-ecapa, voxlingua107]
@@ -495,9 +496,7 @@
     normalize: true
     max_s: 20
 - id: voxlect-indic-lid-whisper-small
-  runnable: false
-  not_runnable_reason: its classification head is defined in the Voxlect code, which no runtime bolo has can run yet
-  aliases: [tiantiaf/voxlect-indic-lid-whisper-small]
+  aliases: [tiantiaf/voxlect-indic-lid-whisper-small, voxlect-indic-lid]
   task: lid
   engine: plugin:torch
   kind: voxlect-lid
@@ -505,27 +504,49 @@
   languages: [as, bn, brx, doi, en, gu, hi, kn, ks, kok, mai, ml, mni, mr, ne, or, pa, sa, sat, sd, ta, te, ur]
   tier: balanced
   sample_rate: 16000
-  size_bytes: 361769712
+  size_bytes: 361771921
   params: 90000000
   license: OpenRAIL
   license_url: https://huggingface.co/tiantiaf/voxlect-indic-lid-whisper-small
-  description: 'Voxlect''s language identifier for India: Whisper small''s encoder with a classification head, fine-tuned on
-    AI4Bharat IndicVoices and Common Voice for the 22 scheduled languages and English: Assamese, Bengali, Bodo,
-    Dogri, Gujarati, Hindi, Kannada, Kashmiri, Konkani, Maithili, Malayalam, Manipuri, Marathi, Nepali, Odia,
-    Punjabi, Sanskrit, Santali, Sindhi, Tamil, Telugu and Urdu. OpenRAIL licence on the model card (use
-    restrictions apply). Not runnable yet: the model is a PyTorch class from the Voxlect repository
-    (github.com/tiantiaf0627/voxlect), which is not a package bolo-torch can depend on, and there is no ONNX
-    export.'
+  description: 'Voxlect''s language identifier for India: Whisper small''s encoder (with LoRA adapters) and a small
+    convolutional head, fine-tuned on AI4Bharat IndicVoices and Common Voice for the 22 scheduled languages and
+    English: Assamese, Bengali, Bodo, Dogri, Gujarati, Hindi, Kannada, Kashmiri, Konkani, Maithili, Malayalam,
+    Manipuri, Marathi, Nepali, Odia, Punjabi, Sanskrit, Santali, Sindhi, Tamil, Telugu and Urdu. The only
+    identifier here that knows all of them. OpenRAIL licence on the model card (use restrictions apply). The
+    Voxlect code carries its own licence and bolo-torch does not use it: it rebuilds the model from
+    transformers'' Whisper encoder and the checkpoint''s weights). Hears the first 15 s. Runs on the torch
+    engine plugin.'
   source_url: https://huggingface.co/tiantiaf/voxlect-indic-lid-whisper-small
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 0.558
+    rtf_note: median wall time per second of audio heard, one thread, clips of 2.4 to 30 s
+    load_s: 10.0
+    threads: 1
+    engine: bolo-torch 0.1.4, torch 2.15.0+cpu, transformers 4.57.6
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 14-18)
+    date: '2026-11-17'
+    test_audio: 50 clips, docs/measurements/lid.json
+    note: 'top-1 language right on 35 of 39 synthesised clips in 13 Indian languages, Odia included (it heard the three
+      Hindi clips as Urdu, one Assamese as Bengali), and on 6 of the repository''s 11 English and Hindi clips
+      (Hindi heard as Urdu, two English clips as Urdu and Manipuri); docs/measurements/lid.json'
   source:
-    repo: tiantiaf/voxlect-indic-lid-whisper-small
-    revision: 1792f34d4a5c71d9a61583aaf98b7226eaaaa916
+    urls:
+    - path: model.safetensors
+      url: https://huggingface.co/tiantiaf/voxlect-indic-lid-whisper-small/resolve/1792f34d4a5c71d9a61583aaf98b7226eaaaa916/model.safetensors
+      size: 361769712
+      sha256: c2f17fad2f8a2cd52b8a09d3bb2cd2e33945465c88ba6431eded146ad8c78db4
+    - path: config.json
+      url: https://huggingface.co/tiantiaf/voxlect-indic-lid-whisper-small/resolve/1792f34d4a5c71d9a61583aaf98b7226eaaaa916/config.json
+      size: 242
+    - path: backbone/config.json
+      url: https://huggingface.co/openai/whisper-small/resolve/973afd24965f72e36ca33b3055d56a652f456b4d/config.json
+      size: 1967
   options:
-    plugin_install: not supported by bolo-torch yet (no packaged inference code)
+    plugin_install: pip install "bolo-torch[voxlect]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    labels: [as, bn, brx, doi, en, gu, hi, kn, ks, kok, mai, ml, mni, mr, ne, or, pa, sa, sat, sd, ta, te, ur]
+    max_s: 15
 - id: voxlect-indic-lid-mms-lid-256
-  runnable: false
-  not_runnable_reason: its classification head is defined in the Voxlect code, which no runtime bolo has can run yet
   aliases: [tiantiaf/voxlect-indic-lid-mms-lid-256]
   task: lid
   engine: plugin:torch
@@ -534,25 +555,36 @@
   languages: [as, bn, brx, doi, en, gu, hi, kn, ks, kok, mai, ml, mni, mr, ne, or, pa, sa, sat, sd, ta, te, ur]
   tier: accuracy
   sample_rate: 16000
-  size_bytes: 3896915664
+  size_bytes: 3896922455
   params: 1000000000
   license: CC-BY-NC-4.0
   license_url: https://huggingface.co/tiantiaf/voxlect-indic-lid-mms-lid-256
   commercial_use: false
-  description: 'Voxlect''s language identifier for India built on MMS-LID-256 (1 B parameters), fine-tuned on AI4Bharat
-    IndicVoices and Common Voice for the 22 scheduled languages and English. Non-commercial (CC-BY-NC-4.0, from
-    MMS). Not runnable yet: a PyTorch class from the Voxlect repository, not a package bolo-torch can depend on,
-    3.9 GB.'
+  description: 'Voxlect''s language identifier for India built on MMS-LID-256 (wav2vec 2.0, 1 B parameters, with LoRA
+    adapters), fine-tuned on AI4Bharat IndicVoices and Common Voice for the 22 scheduled languages and English.
+    Non-commercial (CC-BY-NC-4.0, from MMS). bolo-torch rebuilds it from transformers'' wav2vec 2.0 model and
+    the checkpoint''s weights, mixing the hidden states of all layers with the checkpoint''s learnt weights as
+    Voxlect does. Not run here: 3.9 GB, over this project''s limit for measured runs; the same loader runs the
+    measured whisper-small variant.'
   source_url: https://huggingface.co/tiantiaf/voxlect-indic-lid-mms-lid-256
   validated: untested
   source:
-    repo: tiantiaf/voxlect-indic-lid-mms-lid-256
-    revision: 827a6c2fca5ce4bf966d2302d9b941ec6121ab15
+    urls:
+    - path: model.safetensors
+      url: https://huggingface.co/tiantiaf/voxlect-indic-lid-mms-lid-256/resolve/827a6c2fca5ce4bf966d2302d9b941ec6121ab15/model.safetensors
+      size: 3896915664
+      sha256: a747786f8d028c6fe2f05ea2be10a04f9d6267cfbac535638cac37b4098a828d
+    - path: config.json
+      url: https://huggingface.co/tiantiaf/voxlect-indic-lid-mms-lid-256/resolve/827a6c2fca5ce4bf966d2302d9b941ec6121ab15/config.json
+      size: 184
+    - path: backbone/config.json
+      url: https://huggingface.co/facebook/mms-lid-256/resolve/edc73fd00996e671dfc59d16436a29b12b10588a/config.json
+      size: 6607
   options:
-    plugin_install: not supported by bolo-torch yet (no packaged inference code)
+    plugin_install: pip install "bolo-torch[voxlect]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    labels: [as, bn, brx, doi, en, gu, hi, kn, ks, kok, mai, ml, mni, mr, ne, or, pa, sa, sat, sd, ta, te, ur]
+    max_s: 15
 - id: lid-indic-vaani
-  runnable: false
-  not_runnable_reason: a SpeechBrain classifier, which bolo-torch does not run yet, and no ONNX export exists
   aliases: [panchajanya-ai/lid_Indic_Vaani]
   task: lid
   engine: plugin:torch
@@ -561,18 +593,113 @@
   languages: [en, hi, mr, ta, te]
   tier: realtime
   sample_rate: 16000
-  size_bytes: 83323014
+  size_bytes: 83318996
   params: 21000000
   license: Apache-2.0
   license_url: https://huggingface.co/panchajanya-ai/lid_Indic_Vaani
   description: 'A five-language identifier for India (English, Hindi, Marathi, Tamil, Telugu): SpeechBrain''s CommonLanguage
     ECAPA-TDNN fine-tuned by panchajanya-ai, presumably on the Vaani data its name refers to (the model card
-    does not say). Apache-2.0. Not runnable yet: bolo-torch has no SpeechBrain classifier and there is no ONNX
-    export.'
+    does not say). Apache-2.0. bolo-torch builds it from SpeechBrain''s own classes (its hub loader would look
+    for the files in another repository) and turns the classifier''s cosine scores into probabilities with a
+    softmax at scale 30.'
   source_url: https://huggingface.co/panchajanya-ai/lid_Indic_Vaani
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 0.13
+    rtf_note: median wall time per second of audio heard, one thread, clips of 2.4 to 30 s
+    load_s: 2.3
+    threads: 1
+    engine: bolo-torch 0.1.4, torch 2.15.0+cpu, speechbrain 1.1.2
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 14-18)
+    date: '2026-11-17'
+    test_audio: 50 clips, docs/measurements/lid.json
+    note: 'top-1 language right on 19 of the 23 clips in its five languages (three English clips heard as Hindi or
+      Marathi, one Marathi as Hindi); it answers one of its five for everything else;
+      docs/measurements/lid.json'
   source:
     repo: panchajanya-ai/lid_Indic_Vaani
     revision: 338cd6ab84ec3bcc94ed5afe2ea8998b48525dcf
+    include: [embedding_model.ckpt, classifier.ckpt, language_encoder.txt]
   options:
-    plugin_install: not supported by bolo-torch yet (no SpeechBrain models)
+    plugin_install: pip install "bolo-torch[speechbrain]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    labels_file: language_encoder.txt
+    n_mels: 80
+    scale: 30
+- id: indic-slid-mhubert
+  aliases: [Saad-Wazir24/indic-slid-mhubert]
+  task: lid
+  engine: plugin:torch
+  kind: hf-audio-classification
+  family: mHuBERT-147 SLID
+  languages: [as, bn, brx, doi, gu, hi, kn, kok, ks, mai, ml, mni, mr, ne, or, pa, sa, sat, sd, ta, te, ur]
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 378325139
+  params: 94000000
+  license: CC-BY-NC-SA-4.0
+  license_url: https://huggingface.co/Saad-Wazir24/indic-slid-mhubert
+  commercial_use: false
+  description: 'mHuBERT-147 (utter-project) fine-tuned to tell the 22 scheduled languages apart (no English), by Saad-Wazir24;
+    the model card reports about 61 % accuracy on its own, unnamed evaluation set and says nothing of the
+    training data. Non-commercial, share-alike (CC-BY-NC-SA-4.0). A plain transformers audio classifier, loaded
+    with transformers'' Auto classes on the torch engine plugin.'
+  source_url: https://huggingface.co/Saad-Wazir24/indic-slid-mhubert
+  validated: cpu
+  measured:
+    rtf: 0.23
+    rtf_note: median wall time per second of audio heard, one thread, clips of 2.4 to 30 s
+    load_s: 4.9
+    threads: 1
+    engine: bolo-torch 0.1.4, torch 2.15.0+cpu, transformers 4.57.6
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 14-18)
+    date: '2026-11-17'
+    test_audio: 50 clips, docs/measurements/lid.json
+    note: 'top-1 language right on 31 of 39 synthesised clips in 13 Indian languages (it heard the Hindi clips as Urdu,
+      two Marathi as Sanskrit and the Odia ones as Bengali or Assamese), with low confidence (0.2 to 0.3 for the
+      top language); docs/measurements/lid.json'
+  source:
+    repo: Saad-Wazir24/indic-slid-mhubert
+    revision: ad37ba79fafab5ebc3c0df1d8847731de9b9a26d
+    include: [model.safetensors, config.json, preprocessor_config.json]
+  options:
+    plugin_install: pip install "bolo-torch[voxlect]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    max_s: 30
+- id: indic-slid-mhubert-task2
+  aliases: [Saad-Wazir24/indic-slid-mhubert-task2]
+  task: lid
+  engine: plugin:torch
+  kind: hf-audio-classification
+  family: mHuBERT-147 SLID
+  languages: [as, bn, brx, doi, gu, hi, kn, kok, ks, mai, ml, mni, mr, ne, or, pa, sa, sat, sd, ta, te, ur]
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 378325139
+  params: 94000000
+  license: CC-BY-NC-SA-4.0
+  license_url: https://huggingface.co/Saad-Wazir24/indic-slid-mhubert-task2
+  commercial_use: false
+  description: 'mHuBERT-147 (utter-project) fine-tuned to tell the 22 scheduled languages apart (no English), by Saad-Wazir24
+    (a second training run of indic-slid-mhubert); the model card reports about 61 % accuracy on its own,
+    unnamed evaluation set and says nothing of the training data. Non-commercial, share-alike (CC-BY-NC-SA-4.0).
+    A plain transformers audio classifier, loaded with transformers'' Auto classes on the torch engine plugin.'
+  source_url: https://huggingface.co/Saad-Wazir24/indic-slid-mhubert-task2
+  validated: cpu
+  measured:
+    rtf: 0.226
+    rtf_note: median wall time per second of audio heard, one thread, clips of 2.4 to 30 s
+    load_s: 3.8
+    threads: 1
+    engine: bolo-torch 0.1.4, torch 2.15.0+cpu, transformers 4.57.6
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 14-18)
+    date: '2026-11-17'
+    test_audio: 50 clips, docs/measurements/lid.json
+    note: 'top-1 language right on 31 of 39 synthesised clips in 13 Indian languages (it heard the Hindi clips as Urdu,
+      the Odia ones as Bengali, one Telugu clip as Kannada and one Marathi as Gujarati), with low confidence
+      (0.2 to 0.3 for the top language); docs/measurements/lid.json'
+  source:
+    repo: Saad-Wazir24/indic-slid-mhubert-task2
+    revision: 26b2db9d66bb63fce0df058eb7ae05481eba431c
+    include: [model.safetensors, config.json, preprocessor_config.json]
+  options:
+    plugin_install: pip install "bolo-torch[voxlect]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    max_s: 30

@@ -172,8 +172,9 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | LID | Whisper | 2 | af, am, ar, as, az, ba, be, bg +91 | 2 | 0.301 (`whisper-tiny-lid`) |
 | LID | AmberNet | 1 | ab, af, am, ar, as, az, ba, be +99 | 1 | 0.104 (`ambernet-langid`) |
 | LID | MMS-LID | 2 | aaa, aab, aac, aad, aaf, aai, aal, aar +4008 | 0 | - |
-| LID | Voxlect | 2 | as, bn, brx, doi, en, gu, hi, kn +15 | 0 | - |
-| LID | SpeechBrain ECAPA-TDNN | 1 | en, hi, mr, ta, te | 0 | - |
+| LID | Voxlect | 2 | as, bn, brx, doi, en, gu, hi, kn +15 | 1 | 0.558 (`voxlect-indic-lid-whisper-small`) |
+| LID | SpeechBrain ECAPA-TDNN | 1 | en, hi, mr, ta, te | 1 | 0.130 (`lid-indic-vaani`) |
+| LID | mHuBERT-147 SLID | 2 | as, bn, brx, doi, gu, hi, kn, kok +14 | 2 | 0.226 (`indic-slid-mhubert-task2`) |
 | TTS | Parler-TTS | 2 | as, bn, brx, doi, en, gu, hi, hne +13 | 2 | 4.540 (`parler-tts-tiny-v1`) |
 | TTS | F5-TTS | 2 | as, bn, en, gu, hi, kn, ml, mr +5 | 1 | 119.700 (`indic-f5`) |
 | TTS | Veena | 1 | en, hi | 0 | - |
@@ -234,7 +235,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | VAD | WebRTC VAD | 2 | - | 2 | 0.000 (`webrtc-vad-aggressive`) |
 | VAD | Energy VAD | 1 | - | 1 | 0.000 (`energy-vad`) |
 
-**462 models in the catalog, 164 validated on CPU, 298 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md).
+**464 models in the catalog, 168 validated on CPU, 296 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

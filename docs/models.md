@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-462 models: 164 validated on CPU by the maintainers, 298 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+464 models: 168 validated on CPU by the maintainers, 296 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -859,14 +859,21 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `voxlect-indic-lid-whisper-small` | as, bn, brx, doi, en, gu +17 | balanced | - | 362 MB | OpenRAIL · needs plugin torch | not runnable yet |
-| `voxlect-indic-lid-mms-lid-256` | as, bn, brx, doi, en, gu +17 | accuracy | - | 3.9 GB | CC-BY-NC-4.0 ⚠ · needs plugin torch | not runnable yet |
+| `voxlect-indic-lid-whisper-small` | as, bn, brx, doi, en, gu +17 | balanced | - | 362 MB | OpenRAIL · needs plugin torch | **CPU** · RTF 0.558 |
+| `voxlect-indic-lid-mms-lid-256` | as, bn, brx, doi, en, gu +17 | accuracy | - | 3.9 GB | CC-BY-NC-4.0 ⚠ · needs plugin torch | untested |
 
 #### SpeechBrain ECAPA-TDNN
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `lid-indic-vaani` | en, hi, mr, ta, te | realtime | - | 83 MB | Apache-2.0 · needs plugin torch | not runnable yet |
+| `lid-indic-vaani` | en, hi, mr, ta, te | realtime | - | 83 MB | Apache-2.0 · needs plugin torch | **CPU** · RTF 0.130 |
+
+#### mHuBERT-147 SLID
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `indic-slid-mhubert` | as, bn, brx, doi, gu, hi +16 | balanced | - | 378 MB | CC-BY-NC-SA-4.0 ⚠ · needs plugin torch | **CPU** · RTF 0.230 |
+| `indic-slid-mhubert-task2` | as, bn, brx, doi, gu, hi +16 | balanced | - | 378 MB | CC-BY-NC-SA-4.0 ⚠ · needs plugin torch | **CPU** · RTF 0.226 |
 
 ### Speech to speech (Realtime speech-to-speech pipeline)
 
@@ -1068,7 +1075,8 @@ models below were checked against their model cards and licence files on 2026-11
 | `maskgct` | CC-BY-NC-4.0 (no) | none yet: Amphion's code is not packaged (the PyPI `maskgct` wrapper is a third-party GPL-3.0 project) | catalogued, not runnable |
 | `diarizen-wavlm-large-s80-md-v2` | CC-BY-NC-4.0, PLDA CC-BY-4.0 (no) | none yet: bolo-torch has no DiariZen loader (its inference code is not packaged), and the community ONNX export needs a VBx/PLDA pipeline that sherpa-onnx lacks | catalogued, not runnable |
 | `mms-lid-126`, `mms-lid-4017` | CC-BY-NC-4.0 (no) | ONNX Runtime, `onnx_lid` kind on Xenova's int8 exports | runnable, not measured (978 MB); "Language identification" below |
-| `voxlect-indic-lid-mms-lid-256` | CC-BY-NC-4.0 (no) | none yet: a PyTorch class from the Voxlect repository | catalogued, not runnable |
+| `voxlect-indic-lid-mms-lid-256` | CC-BY-NC-4.0 (no) | bolo-torch, `voxlect-lid` kind (`bolo-torch[voxlect]`) | runnable, not measured (3.9 GB) |
+| `indic-slid-mhubert`, `indic-slid-mhubert-task2` | CC-BY-NC-SA-4.0 (no) | bolo-torch, `hf-audio-classification` kind | measured |
 | `ambernet-langid` | NVIDIA NGC Terms of Use (not an open licence) | ONNX Runtime, `onnx_lid` kind | measured |
 | `breeze-tts-2-audiocpp`, `indextts-2-audiocpp`, `omnivoice-audiocpp`, `voxtral-4b-tts-audiocpp`, `higgs-tts-3-4b-audiocpp`, `fish-audio-s2-pro-audiocpp`, … | non-commercial or conditional | tts-server (audio.cpp, llama-server) | catalogued earlier |
 
@@ -2238,9 +2246,10 @@ licence, and none is left out for its licence:
 | `whisper-base-lid` | MIT (yes) | 160 MB | 99 | the same | measured |
 | `mms-lid-126` | CC-BY-NC-4.0 (no) | 978 MB | 126, Odia among them | ONNX Runtime (Xenova's int8 export of facebook/mms-lid-126) | runnable, not measured (too large for the test machine's 500 MB budget) |
 | `mms-lid-4017` | CC-BY-NC-4.0 (no) | 978 MB | 4017, among them Bhojpuri, Maithili, Magahi, Chhattisgarhi, Bodo, Manipuri, Santali, Konkani, Kashmiri | the same | runnable, not measured |
-| `voxlect-indic-lid-whisper-small` | OpenRAIL (yes, with use restrictions) | 362 MB | the 22 scheduled languages and English | none yet: a PyTorch class from the Voxlect repository | catalogued, not runnable |
-| `voxlect-indic-lid-mms-lid-256` | CC-BY-NC-4.0 (no) | 3.9 GB | the same | none yet | catalogued, not runnable |
-| `lid-indic-vaani` | Apache-2.0 (yes) | 83 MB | English, Hindi, Marathi, Tamil, Telugu | none yet: a SpeechBrain classifier, no ONNX export | catalogued, not runnable |
+| `voxlect-indic-lid-whisper-small` | OpenRAIL (yes, with use restrictions) | 362 MB | the 22 scheduled languages and English | torch plugin (`bolo-torch[voxlect]`): Whisper small's encoder and Voxlect's head, rebuilt from transformers' classes | measured |
+| `voxlect-indic-lid-mms-lid-256` | CC-BY-NC-4.0 (no) | 3.9 GB | the same | torch plugin (`bolo-torch[voxlect]`), MMS-LID-256's wav2vec 2.0 encoder | runnable, not measured (too large) |
+| `lid-indic-vaani` | Apache-2.0 (yes) | 83 MB | English, Hindi, Marathi, Tamil, Telugu | torch plugin (`bolo-torch[speechbrain]`), SpeechBrain ECAPA-TDNN | measured |
+| `indic-slid-mhubert`, `indic-slid-mhubert-task2` | CC-BY-NC-SA-4.0 (no) | 378 MB each | the 22 scheduled languages (no English) | torch plugin (`bolo-torch[voxlect]`), transformers' HuBERT audio classifier | measured |
 
 Whisper's language detection is used on its own: the encoder hears the
 first 30 seconds and the decoder, given only the start-of-transcript
@@ -2250,8 +2259,12 @@ sherpa-onnx has a spoken-language-identification API for the same
 models, but it returns only the top language, without probabilities, so
 bolo runs the two graphs in ONNX Runtime itself. AI4Bharat publishes no
 audio language identifier (IndicLID is for text); the Indian-specific
-identifiers on Hugging Face are Voxlect's (catalogued above) and a few
-small fine-tunes without a licence, which are not catalogued.
+identifiers on Hugging Face are Voxlect's, a SpeechBrain fine-tune and a
+few mHuBERT and wav2vec 2.0 fine-tunes, all above except the ones that
+state no licence ([models-unsupported.md](models-unsupported.md)). The
+Voxlect models are rebuilt by bolo-torch from transformers' encoder classes
+and the checkpoints' weights (the LoRA adapters merged in), since their
+own code is not a package.
 
 **Measured** (docs/measurements/lid.json; one thread of a shared 4-vCPU
 Xeon, load average 14 to 18). The repository has recorded test speech
@@ -2269,10 +2282,18 @@ their accuracy on your audio.
 | `ambernet-langid` | 10/11 | 33/39 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 0/3 | 3/3 | 0/3 | 3/3 | 0.104 |
 | `whisper-base-lid` | 11/11 | 24/39 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 1/3 | 0/3 | 3/3 | 3/3 | 1/3 | 1/3 | 0/3 | 0/3 | 0.608 |
 | `whisper-tiny-lid` | 11/11 | 19/39 | 3/3 | 3/3 | 3/3 | 2/3 | 2/3 | 0/3 | 2/3 | 3/3 | 1/3 | 0/3 | 0/3 | 0/3 | 0/3 | 0.301 |
+| `voxlect-indic-lid-whisper-small` | 6/11 | 35/39 | 0/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 2/3 | 0.558 |
+| `indic-slid-mhubert` | 0/11 (no English) | 31/39 | 0/3 | 3/3 | 3/3 | 3/3 | 1/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 0/3 | 3/3 | 0.231 |
+| `indic-slid-mhubert-task2` | 0/11 (no English) | 31/39 | 0/3 | 3/3 | 3/3 | 2/3 | 2/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 | 0/3 | 3/3 | 0.226 |
+| `lid-indic-vaani` | 8/11 | 11/39 (knows 4 of the 13) | 3/3 | - | 3/3 | 3/3 | 2/3 | - | - | - | - | - | - | - | - | 0.130 |
 
 * **Odia** is not among the languages of VoxLingua107, AmberNet or Whisper:
-  those models answer Bengali or Assamese. Only the MMS-LID entries know it.
-* **Urdu** was heard as Hindi by every model (Whisper base got one of three).
+  those models answer Bengali or Assamese. The Voxlect model knew all three
+  Odia clips; the mHuBERT ones, which list Odia, still answered Bengali.
+* **Urdu and Hindi**: the VoxLingua107, AmberNet and Whisper models heard
+  Urdu as Hindi (Whisper base got one of three); the Voxlect and mHuBERT
+  models, trained on Indian speech, did the opposite and heard every Hindi
+  clip as Urdu, with the Urdu clips right.
   Spoken everyday Urdu and Hindi are close to one language; the difference
   is mostly in the script, which speech does not have. Route both to a
   recogniser that writes the script you want (`language_routes`).
@@ -2286,6 +2307,14 @@ their accuracy on your audio.
   always pays for 30 s of encoder work, so it is the slowest per clip.
   It is the identifier to use when you want exactly Whisper's view of the
   language (it is what a Whisper recogniser would detect by itself).
+
+* The Voxlect model (Whisper small) is the best on the Indian clips apart
+  from Hindi, the slowest after Whisper base (it always encodes 15 s), and
+  the only one that knows Bodo, Dogri, Kashmiri, Konkani, Maithili, Manipuri
+  and Santali besides MMS-LID-4017; none of those could be tested here
+  (there are no voices for them). The mHuBERT models answer with low
+  confidence (0.2 to 0.3 for the top language), so routing with
+  `lid_min_probability` 0.5 would always fall back to `default_stt`.
 
 `voxlingua107-ecapa` is the default (`default_lid`): permissive licence,
 the best results here and about a tenth of a second per second of audio

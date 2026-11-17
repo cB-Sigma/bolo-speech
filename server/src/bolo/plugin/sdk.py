@@ -27,6 +27,7 @@ from bolo.engines.base import (
     DenoiseModel,
     DiarizationModel,
     Engine,
+    LidModel,
     LoadOptions,
     Model,
     SeparationModel,
@@ -116,6 +117,8 @@ class _Server:
                 self.diarization(rid, op, message, payload)
             elif op == "denoise":
                 self.denoise(rid, message, payload)
+            elif op == "lid":
+                self.lid(rid, message, payload)
             elif op == "respond":
                 self.respond(rid, message, payload)
             else:
@@ -145,6 +148,8 @@ class _Server:
             info["consolidate_default"] = bool(model.consolidate_default)
         if isinstance(model, SpeechToSpeechModel):
             info.update(voices=[v.to_dict() for v in model.voices], supports_tools=bool(model.supports_tools))
+        if isinstance(model, LidModel):
+            info.update(labels=list(model.labels), max_s=float(model.max_s))
         if isinstance(model, STTModel):
             info.update(
                 languages=list(model.languages), max_batch=model.max_batch,
@@ -238,6 +243,13 @@ class _Server:
             raise TypeError("this model does not denoise")
         enhanced = np.asarray(model.denoise(audio_from_bytes(payload)), dtype=np.float32)
         self.send({"id": rid, "ok": True}, audio_bytes(enhanced))
+
+    def lid(self, rid: str, m: dict[str, Any], payload: bytes) -> None:
+        model = self.model(m)
+        if not isinstance(model, LidModel):
+            raise TypeError("this model does not identify languages")
+        found = model.identify(audio_from_bytes(payload))
+        self.reply(rid, languages=[[str(code), float(p)] for code, p in found])
 
     def respond(self, rid: str, m: dict[str, Any], payload: bytes) -> None:
         model = self.model(m)

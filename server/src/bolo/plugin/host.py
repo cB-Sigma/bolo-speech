@@ -49,6 +49,7 @@ from bolo.engines.base import (
     Engine,
     EngineStatus,
     FloatArray,
+    LidModel,
     LoadOptions,
     Model,
     Segment,
@@ -584,6 +585,25 @@ class PluginDenoise(_PluginModelMixin, DenoiseModel):
         return np.ascontiguousarray(out[: len(samples)], dtype=np.float32)
 
 
+class PluginLid(_PluginModelMixin, LidModel):
+    """A language identifier in a plugin: op ``lid``, 16 kHz audio in, ``[code, probability]`` pairs out."""
+
+    def __init__(self, process: PluginProcess, load_message: dict[str, Any]) -> None:
+        self.process, self._load_message, self._handle, self._generation = process, load_message, None, 0
+        self._ensure_loaded()
+
+    def _apply_load_reply(self, reply: dict[str, Any]) -> None:
+        info = reply.get("info") or {}
+        self.sample_rate = int(reply.get("sample_rate") or 16000)
+        self.labels = [str(x) for x in info.get("labels") or []]
+        self.max_s = float(info.get("max_s") or 30.0)
+
+    def identify(self, samples: FloatArray) -> list[tuple[str, float]]:
+        handle = self._ensure_loaded()
+        reply = self.process.request({"op": "lid", "handle": handle}, audio_bytes(samples))
+        return [(str(code), float(p)) for code, p in reply.get("languages") or []]
+
+
 class PluginS2S(_PluginModelMixin, SpeechToSpeechModel):
     """A speech-to-speech model in a plugin: op ``respond`` (the whole conversation in, the answer streamed back)."""
 
@@ -660,8 +680,10 @@ class PluginEngine(Engine):
             return PluginDenoise(self.process, message)
         if task == "speech-to-speech":
             return PluginS2S(self.process, message)
+        if task == "lid":
+            return PluginLid(self.process, message)
         raise EngineUnavailable(
-            f"plugins can serve stt, tts, separation, diarization, denoise and speech-to-speech models, not {task!r}"
+            f"plugins can serve stt, tts, separation, diarization, denoise, speech-to-speech and lid models, not {task!r}"
         )
 
     def shutdown(self) -> None:

@@ -41,6 +41,13 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
   with the conversation prefilled (`mode: stream`, default) or `chat()` (`mode: chat`, and text-only answers). Refuses
   to load when Vocos or the ChatTTS tokenizer is missing, instead of letting its code download them. Tested with fakes
   only.
+- **Spoken-language identifiers** (bolo task `lid`), served through the protocol's new `lid` op (needs a bolo that
+  sends it): `voxlect-lid` (Voxlect's classifiers for India, rebuilt from transformers' Whisper or wav2vec 2.0
+  encoder and the checkpoint's weights with the LoRA products merged, without the Voxlect code; `voxlect` extra),
+  `speechbrain-lid` (SpeechBrain ECAPA-TDNN classifiers built from SpeechBrain's classes, without its hub loader;
+  `speechbrain` extra) and `hf-audio-classification` (any transformers audio classifier whose labels are languages,
+  Auto classes, no remote code). Run here: `voxlect-indic-lid-whisper-small`, `lid-indic-vaani`, `indic-slid-mhubert`
+  and `indic-slid-mhubert-task2`.
 
 - **Demucs denoiser** (`kind: demucs-denoiser`, `demucs-denoiser` extra): `demucs-dns48`, `demucs-dns64`,
   `demucs-master64` and `demucs-valentini-nc` from facebookresearch/denoiser as bolo `denoise` models, served through

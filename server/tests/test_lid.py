@@ -113,9 +113,9 @@ def test_identify_endpoint(lid_live: LiveServer) -> None:
     assert body["probability"] == pytest.approx(0.9)
     assert body["languages"][0]["language"] == "hi" and len(body["languages"]) == 2
     assert body["duration"] == pytest.approx(2.0, abs=0.01)
-    assert body["recogniser"] == {
-        "model": "fake-stt", "reason": "recommended", "language": "hi", "recommended": None, "detail": None,
-    }  # fmt: skip
+    rec = body["recogniser"]
+    assert (rec["model"], rec["reason"], rec["language"], rec["detail"]) == ("fake-stt", "recommended", "hi", None)
+    # (rec["recommended"] names a real Hindi recogniser once the background advice is ready: timing-dependent)
     assert r.headers["x-bolo-model"] == "fake-lid"
     trace = httpx.get(lid_live.url + "/api/v1/requests/" + r.headers["x-request-id"]).json()
     assert trace["kind"] == "lid" and trace["model"] == "fake-lid" and trace["status"] == "ok"
