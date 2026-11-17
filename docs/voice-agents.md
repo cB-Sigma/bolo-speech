@@ -257,7 +257,7 @@ items, user transcripts from its own STT, and traces.
 | --- | --- | --- | --- | --- |
 | `cascade` (default) | bolo's STT | the `llm_*` chat-completions model | bolo's TTS | `llm_base_url` |
 | `audio-llm` | the model itself (the turn's audio as `input_audio`, WAV) | an audio-understanding model, `audio_llm_*` (falls back to `llm_*`) | bolo's TTS | a chat-completions server that takes `input_audio` |
-| `speech-to-speech` | the model itself (16 kHz PCM, streamed while the user speaks; for turn-based models, sent when the turn ends) | a speech-to-speech model | the same model | `s2s_server_url`, or `s2s_model` + llama-server, or `s2s_model = "lfm3-audio-2b-onnx"` + `bolo-speech[s2s]`, or `s2s_model` naming a turn-based model of an engine plugin |
+| `speech-to-speech` | the model itself (16 kHz PCM, streamed while the user speaks; for turn-based models, sent when the turn ends) | a speech-to-speech model | the same model | `s2s_server_url`, or `s2s_model` + llama-server, or `s2s_model = "lfm3-audio-2b-onnx"` + `bolo-speech[s2s]`, or `s2s_model` naming a turn-based model of an engine plugin ; or a full-duplex model (below: it hears everything, all the time, and answers by itself) |
 
 **`audio-llm`.** The latest user turn is sent to the model as audio, earlier
 turns as their transcripts (or as audio while a transcript is missing; the
@@ -397,6 +397,89 @@ voice names are not sent (LFM3's voices are `female` and `male`); upstream
 token usage is output tokens only. Tested against a scripted fake
 llama-server, **not against a real LFM3-Audio model.**
 
+### Full-duplex models: Moshi, Hibiki, PersonaPlex
+
+A *full-duplex* model listens and speaks at the same time, frame by frame (Moshi: 80 ms frames, about 200 ms of
+latency on a GPU). There are no turns: it decides itself when to answer, keeps listening while it talks, and stops
+(or not) when you talk over it. In bolo such a model is the `speech-to-speech` pipeline's model: set `s2s_model` to a
+catalog entry with the feature `full-duplex` and every Realtime session (WebSocket or WebRTC) of that pipeline talks
+to it. Turn-based models and the other pipelines are unchanged.
+
+```toml
+realtime_pipeline = "speech-to-speech"
+s2s_model = "moshiko-pytorch-q8"        # or moshika-*, hibiki-*, personaplex-7b-v1 ... (models.md)
+```
+
+```bash
+bolo components install moshi          # Kyutai's server: PyTorch + CUDA on Linux/Windows, MLX on Apple silicon
+bolo pull moshiko-pytorch-q8           # 8.4 GB, CC-BY-4.0, files pinned by SHA-256
+bolo serve
+```
+
+| Models | Server (component) | Builds | Conversations at once |
+| --- | --- | --- | --- |
+| Moshi (`moshiko-*`, `moshika-*`: bf16, q8, MLX q4/q8/bf16, candle q8/bf16), Hibiki 1B/2B | Kyutai's `moshi` (MIT; Rust server MIT/Apache-2.0) | `pytorch` (moshi 0.2.13, PyTorch 2.9.1 CUDA 12.8; NVIDIA GPU), `mlx` (moshi_mlx 0.3.0; Apple silicon), `candle` (moshi-backend 0.6.4, `cargo install`; CUDA, Metal or CPU) | PyTorch and MLX: 1 (the server holds one connection; a second one waits, so bolo refuses it with `overloaded`). candle: `duplex_max_sessions` (each one more stream on the GPU; the server ends a connection after 360 s) |
+| Hibiki-Zero 3B | Kyutai's `hibiki-zero` (MIT), pinned commit | `pytorch` | 1 |
+| PersonaPlex (`personaplex-7b-v1`, `personaplex-rl-seamless`) | NVIDIA's `personaplex` (MIT), pinned commit | `pytorch` (PyTorch 2.4.1 CUDA 12.4) | 1 |
+
+bolo installs each server in a virtual environment of its own under `<data_dir>/components/<id>/<version>/<build>`
+(with `uv` when it is on `PATH`, which fetches Python 3.12; else bolo's own Python, 3.10 to 3.12), starts it on a
+loopback port when the first session needs it, gives it the files bolo pulled (`HF_HUB_OFFLINE=1`: the server
+downloads nothing), and stops it with bolo. One server process serves every session; a 7 B model takes 8 to 24 GB of
+GPU memory, so bolo never starts one process per session. The MLX server keeps the model's state from one connection
+to the next, so bolo stops it after each conversation and the next one starts it afresh (a few seconds of loading).
+`duplex_server_url` points bolo at a server you run instead (`http://host:8998`, or `https://` for the Rust server's
+own certificate). Kyutai's Python servers synchronise CUDA while warming up and PersonaPlex's binds every interface
+and asks the Hub for `config.json` at each start; bolo starts the Python servers through a few lines of launcher that
+pin the bind address to `127.0.0.1`, answer the Hub from disk and skip the synchronisation on a CPU (`device = "cpu"`,
+far from real time for 7 B models). Only Kyutai's servers are touched this way, never their code.
+
+**How the session maps onto the Realtime API** (`bolo/duplex/bridge.py`):
+
+| Realtime | Full-duplex model |
+| --- | --- |
+| `input_audio_buffer.append` / the WebRTC track | every sample goes to the model as it arrives (16 kHz → 24 kHz, Ogg Opus), speech or not; if the client falls more than `duplex_jitter_ms` (200) behind the clock, bolo sends silence so the model keeps running |
+| `input_audio_buffer.speech_started` / `speech_stopped`, input items, `input_audio_transcription.*` | from bolo's VAD and STT, as in every pipeline; they do **not** cancel the model's answer |
+| `response.created` … `response.done` | one per stretch of the model's speech: it starts at the model's first word or when its audio rises above about -40 dBFS (with 160 ms before), and ends after `duplex_silence_ms` (800) without either |
+| `response.output_audio.delta` | the model's audio (24 kHz), in the session's output format; over WebRTC on the outgoing track |
+| `response.output_audio_transcript.delta` | the model's text tokens as they come (`response.output_text.delta` with `output_modalities: ["text"]`) |
+| `response.cancel`, `output_audio_buffer.clear` | ends the current response as `cancelled` and drops what the model says until its next pause; the model itself keeps running |
+| `response.create`, `conversation.item.create` (user text, tool results) | refused (`unsupported`): the model answers speech, by itself |
+| `instructions`, `voice` | PersonaPlex only: its text prompt and voice prompt (`NATF0` … `VARM4`; OpenAI voice names mean the default `NATF2`), fixed when the conversation opens |
+| `session.duplex` (bolo extension) | sampling options for the Rust server's query string (`text_temperature`, `text_topk`, `audio_temperature`, `audio_topk`, `pad_mult`, `repetition_penalty`, ...); the Python servers ignore them |
+| closing the session | closes the model's WebSocket; the server is free for the next conversation |
+
+Use echo cancellation (browsers do by default) or headphones: the model hears whatever the microphone picks up,
+its own voice included. Traces are recorded per response (`full_duplex: true`, `started_after_user_ms`).
+
+**Adding a full-duplex model.** A model whose server speaks Kyutai's protocol needs only a catalog entry (task
+`speech-to-speech`, engine `duplex`, kind `kyutai`, features `[speech-to-speech, full-duplex]`, options `server`,
+`build`, `model_file`, `mimi_file`, `tokenizer_file`, and `config_file`, `voice_param`, `instructions_param` where the
+server takes them) and, for a new server, a `Server` in `bolo/duplex/runtime.py` (what to install, pinned, and how to
+start it). Anything else implements the interface in `bolo/duplex/base.py` and is returned by
+`bolo/duplex/manager.py` for its catalog kind:
+
+```python
+class DuplexSession:                  # one live conversation
+    input_rate: int                   # the sample rate push() takes (Moshi: 24000)
+    frame_samples: int                # the model's step (Moshi: 1920)
+    async def push(self, samples): ...           # the caller's audio, any amount, mono float32
+    def events(self): ...                        # async iterator: DuplexAudio, DuplexText, ... then one DuplexEnd
+    async def close(self): ...                   # end it; events() then ends with DuplexEnd("closed")
+
+class DuplexBackend:                  # one per server
+    max_sessions: int
+    async def open(self, config: DuplexConfig) -> DuplexSession: ...   # instructions, voice, options
+    async def close(self): ...
+```
+
+The bridge does the rest (the clock, responses, transcripts, cancellation, WebRTC). `tests/fake_kyutai_server.py`
+is a stand-in server with the real framing (Kyutai's `sphn` when installed, else bolo's own Ogg Opus) for tests.
+What ran: the bridge, the Kyutai client and the managed-server path against that fake, and bolo's Ogg Opus against
+Kyutai's `sphn` both ways. **No real Moshi, Hibiki or PersonaPlex model was run** (the smallest is 4.8 GB and they
+want a GPU); [models.md](models.md#full-duplex-models) has a checklist for a first run on a Windows machine with an
+NVIDIA GPU.
+
 ### Browsers: WebRTC and ephemeral keys
 
 `POST /v1/realtime/calls` is the WebRTC transport of the same sessions
@@ -505,7 +588,7 @@ WebSocket transport with `audio/pcmu` still works as before
 ### What is different from OpenAI, or missing
 
 * A cascade by default; speech-to-speech only through an opt-in pipeline
-  (above). No emotional prosody control. `noise_reduction` runs bolo's denoiser (GTCRN by default) over each
+  (above), full-duplex models included (they answer by themselves: no `response.create`). No emotional prosody control. `noise_reduction` runs bolo's denoiser (GTCRN by default) over each
   user turn before bolo's recogniser hears it; `near_field` and `far_field` are treated alike, the voice-activity
   detector and turn detection hear the original audio, and an audio-in or speech-to-speech model gets the original
   audio too. It can make transcripts worse on clean audio (configuration.md, "Denoising"). `semantic_vad` is an acoustic end-of-turn model added to

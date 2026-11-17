@@ -8,6 +8,40 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Full-duplex speech-to-speech models: Moshi, Hibiki, Hibiki-Zero and PersonaPlex** (`s2s_model` naming one, with
+  `realtime_pipeline = "speech-to-speech"`). A full-duplex model hears and speaks at once and answers by itself; a
+  shared layer, `bolo.duplex`, runs any such model behind Realtime (WebSocket) and WebRTC sessions: every sample of
+  the caller's audio goes to the model as it arrives (silence fed on the clock when the client falls behind,
+  `duplex_jitter_ms`), its speech is cut into Realtime responses at pauses (`duplex_silence_ms`) with its text tokens
+  as transcript deltas, bolo's VAD and STT still report and transcribe the user without cancelling the model,
+  `response.cancel` / `output_audio_buffer.clear` end the current answer, `response.create` and text items are
+  refused, and closing the session frees the model. The backend interface (`DuplexBackend`, `DuplexSession`) is
+  documented for adding models (docs/voice-agents.md, "Full-duplex models").
+- Kyutai's WebSocket protocol (`/api/chat`: handshake, Ogg Opus audio both ways, text tokens, metadata, errors) as the
+  first backend, with bolo's own Ogg framing and libopus through PyAV (new extra `duplex`), checked against Kyutai's
+  `sphn` both ways; servers that speak it are managed components: `bolo components install moshi` (Kyutai's PyTorch
+  server, moshi 0.2.13 with PyTorch 2.9.1 for CUDA 12.8, the default on Linux and Windows; `--flavour mlx`,
+  moshi_mlx 0.3.0, the default on Apple silicon; `--flavour candle`, moshi-backend 0.6.4 built with cargo), `bolo
+  components install hibiki-zero` and `bolo components install personaplex` (pinned git commits), each in an
+  environment of its own, wheels and crates pinned by SHA-256. bolo starts the server on a loopback port with the
+  model files it pulled (nothing downloaded by the server), one process for all sessions; the PyTorch and MLX
+  servers hold one conversation at a time (a second session is refused with `overloaded`), the Rust server
+  `duplex_max_sessions`; the MLX server is restarted after each conversation (it keeps its state). Or point
+  `duplex_server_url` at a server you run.
+- Catalog (task `speech-to-speech`, feature `full-duplex`, engine `duplex`), all runnable: Moshi as `moshiko-*` /
+  `moshika-*` in Kyutai's bf16 and q8 PyTorch, q4, q8 and bf16 MLX and q8 and bf16 candle builds (CC-BY-4.0); Hibiki
+  1B and 2B (PyTorch, MLX; French to English, CC-BY-4.0) and Hibiki-Zero 3B (four languages to English,
+  CC-BY-NC-SA-4.0); NVIDIA PersonaPlex 7B (NVIDIA Open Model License, gated; its role from the session's
+  instructions, 18 voices) and Kyutai's `personaplex-rl-seamless` fine-tune (CC-BY-NC-4.0 with the NVIDIA licence).
+  They replace the two Moshi entries that were listed as not runnable. docs/models-unsupported.md lists the
+  full-duplex models that cannot run, with the reason.
+- Settings `duplex_server_url`, `duplex_max_sessions`, `duplex_server_args`, `duplex_start_timeout_s`,
+  `duplex_silence_ms`, `duplex_jitter_ms`; session field `full_duplex` and bolo extension `session.duplex` (sampling
+  options for the Rust server).
+
+  Tested with a fake Kyutai server that speaks the real framing (Kyutai's sphn); **no real Moshi, Hibiki or PersonaPlex
+  model was run** (the smallest download is 4.8 GB and they need a GPU). docs/models.md has the steps for a first run
+  on a Windows machine with an NVIDIA GPU.
 - **Remote code as an explicit, pinned opt-in per model.** A catalog entry whose model exists only as Python in its
   Hugging Face repository (transformers' `trust_remote_code`) pins it in `options.remote_code`: the reviewed commit
   (the entry's source revision), what the review found, and the sha256 of every `.py` file and of every JSON file

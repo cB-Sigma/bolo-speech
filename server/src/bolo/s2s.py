@@ -40,6 +40,10 @@ That is :class:`S2SConversation`, opened per Realtime session by an :class:`S2SB
   not while the user speaks.
 
 Nothing in the session logic depends on which of these answers.
+
+Full-duplex models (catalog task ``speech-to-speech`` with the feature ``full-duplex``: Moshi, Hibiki, PersonaPlex)
+are not turn-based and are not an :class:`S2SBackend`: :meth:`S2SManager.duplex` builds their
+:class:`bolo.duplex.base.DuplexBackend` and :mod:`bolo.duplex.bridge` runs them in the Realtime session.
 """
 
 from __future__ import annotations
@@ -65,6 +69,7 @@ from bolo.errors import ComponentMissing, EngineUnavailable, InvalidRequest
 if TYPE_CHECKING:
     from bolo.catalog import ModelSpec
     from bolo.core import Bolo
+    from bolo.duplex.base import DuplexBackend
     from bolo.engines.base import SpeechToSpeechModel
     from bolo.engines.tts_server import ServerProcess
 
@@ -674,6 +679,7 @@ class S2SManager:
     def __init__(self, core: Bolo) -> None:
         self.core = core
         self._backend: S2SBackend | None = None
+        self._duplex: DuplexBackend | None = None
         self._lock = asyncio.Lock()
         #: where the managed llama-server's layers went (bolo.placement), once one was started
         self.placement: Any = None
@@ -684,12 +690,48 @@ class S2SManager:
                 self._backend = await self._build()
             return self._backend
 
+    # -- full-duplex models (bolo.duplex) ------------------------------------------------------------------------
+    def duplex_spec(self) -> ModelSpec | None:
+        """The catalog entry of ``s2s_model`` when it is a full-duplex model, else None."""
+        from bolo.duplex.base import FULL_DUPLEX
+
+        name = self.core.settings.s2s_model
+        spec = self.core.catalog.resolve(name) if name else None
+        return spec if spec is not None and spec.task == S2S_TASK and FULL_DUPLEX in spec.features else None
+
+    @property
+    def full_duplex(self) -> bool:
+        """Realtime sessions of the speech-to-speech pipeline run the full-duplex bridge (bolo.duplex.bridge)."""
+        return self.duplex_spec() is not None
+
+    def model_name(self) -> str:
+        return str(self.core.settings.s2s_model or "speech-to-speech")
+
+    async def duplex(self) -> DuplexBackend:
+        """The full-duplex backend (built once): a server at duplex_server_url, else the model's own server."""
+        async with self._lock:
+            if self._duplex is None:
+                from bolo.duplex.manager import build_backend
+
+                spec = self.duplex_spec()
+                if spec is None:
+                    raise InvalidRequest(f"s2s_model '{self.core.settings.s2s_model}' is not a full-duplex model")
+                self._duplex = await build_backend(self.core, spec)
+            return self._duplex
+
     def describe(self) -> dict[str, Any]:
         s = self.core.settings
         out: dict[str, Any] = {"model": s.s2s_model, "url": s.s2s_server_url}
         configured, available, reason = self._readiness()
         # `configured`: the settings name something that can answer; `available`: a session can use it now
         out.update(configured=configured, available=available, reason=reason)
+        duplex = self.duplex_spec()
+        # a full-duplex model hears and speaks at once: no turns, the model's own barge-in (bolo.duplex.bridge)
+        out["full_duplex"] = duplex is not None
+        if duplex is not None:
+            out.update(url=s.duplex_server_url, features=list(duplex.features), license=duplex.license)
+        if self._duplex is not None:
+            out.update(self._duplex.describe())
         if self._backend is not None:
             out.update(self._backend.describe())
         if self.placement is not None:
@@ -706,6 +748,11 @@ class S2SManager:
         from bolo.tts_runtimes import LLAMA, find_binary
 
         s = self.core.settings
+        duplex = self.duplex_spec()
+        if duplex is not None:
+            from bolo.duplex.manager import readiness
+
+            return readiness(self.core, duplex)
         if s.s2s_server_url:
             return True, True, None
         cloud = self._cloud()
@@ -834,6 +881,9 @@ class S2SManager:
         backend, self._backend = self._backend, None
         if backend is not None:
             await backend.close()
+        duplex, self._duplex = self._duplex, None
+        if duplex is not None:
+            await duplex.close()
 
 
 def managed_llama_server(

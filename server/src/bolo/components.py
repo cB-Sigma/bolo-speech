@@ -15,6 +15,10 @@
   ``tts-server`` engine starts for its models (bolo.tts_runtimes). Installable here as pinned upstream release
   archives checked against their SHA-256, or provided by the operator (a setting, PATH, or a running server
   named in ``tts_servers``, in which case the model does not need the binary at all).
+* **Full-duplex model servers** (``moshi``: Kyutai's PyTorch, MLX and Rust servers, MIT / Apache-2.0;
+  ``personaplex``: NVIDIA's PersonaPlex server, MIT): the servers of Moshi, Hibiki and PersonaPlex
+  (bolo.duplex.runtime), each build in a virtual environment (or cargo root) of its own, pinned by version and
+  SHA-256 (a git commit for PersonaPlex). Several GB: PyTorch with CUDA.
 """
 
 from __future__ import annotations
@@ -33,6 +37,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from bolo import tts_runtimes
+from bolo.duplex import runtime as duplex_runtime
 from bolo.errors import BoloError, InvalidRequest, ModelNotFound
 from bolo.jobs import Job
 from bolo.text import packs, phonemize, romanised
@@ -106,6 +111,8 @@ class ComponentManager:
         self.core = core
         #: replaced in tests; returns (exit code, output)
         self.run_installer: Callable[[list[str]], tuple[int, str]] = self._run
+        #: the steps of installing a full-duplex server (uv / pip / git / cargo); replaced in tests
+        self.run_duplex_step: Callable[[list[str]], tuple[int, str]] = duplex_runtime.run_command
 
     @staticmethod
     def _run(cmd: list[str]) -> tuple[int, str]:
@@ -279,8 +286,13 @@ class ComponentManager:
             elif phonemize.select(profile, language) is None:
                 return phonemize.missing_hint(profile, language)
         for item in self._component_requires(spec):
-            if self.is_installed(item):
+            if item in duplex_runtime.COMPONENTS:  # the build the model runs on, not any build
+                if duplex_runtime.missing_reason(self.core.settings, spec) is None:
+                    continue
+            elif self.is_installed(item):
                 continue
+            if item in duplex_runtime.COMPONENTS:
+                return duplex_runtime.missing_reason(self.core.settings, spec) or f"it needs the component '{item}'"
             if item in tts_runtimes.RUNTIMES:
                 info = tts_runtimes.RUNTIME_INFO[item]
                 return (
@@ -334,6 +346,8 @@ class ComponentManager:
             return self.core.engines.status(component).available
         if component in tts_runtimes.RUNTIMES:
             return tts_runtimes.find_binary(self.core.settings, component)[0] is not None
+        if component in duplex_runtime.COMPONENTS:
+            return bool(duplex_runtime.installed_flavours(self.core.settings, component))
         return False
 
     def plugin_ids(self) -> list[str]:
@@ -396,6 +410,7 @@ class ComponentManager:
         )
         out.extend(self.pack_status())
         out.extend(self.runtime_status())
+        out.extend(self.duplex_status())
         for plugin in self.plugin_ids():
             st = self.core.engines.status(plugin)
             hint = next(
@@ -641,6 +656,58 @@ class ComponentManager:
             )
         return out
 
+    # -- full-duplex model servers (bolo.duplex.runtime) ----------------------------------------------------------
+    def duplex_blocked_reason(self, component: str, flavour: str | None = None) -> str | None:
+        s = self.core.settings
+        if s.host not in LOOPBACK and not s.api_key:
+            return "installing components is never allowed on a non-loopback address without an API key"
+        if s.allow_component_install is False:
+            return "the operator disabled component installation (allow_component_install = false)"
+        return duplex_runtime.blocked_reason(component, flavour)
+
+    def duplex_status(self) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for component in duplex_runtime.COMPONENTS:
+            info = duplex_runtime.SERVERS[component]
+            state = duplex_runtime.status(self.core.settings, component)
+            installed = bool(state["flavours"])
+            blocked = self.duplex_blocked_reason(component)
+            unsupported = duplex_runtime.unsupported_reason(component)
+            wanted = state["wanted_flavour"]
+            build = info.builds.get(wanted or "")
+            out.append(
+                {
+                    "id": component,
+                    "name": info.name,
+                    "kind": "duplex-server",
+                    "installed": installed,
+                    "source": "bolo" if installed else None,
+                    "version": ", ".join(f"{f} {info.builds[f].version}" for f in state["flavours"]) or None,
+                    "license": info.license,
+                    "license_url": info.license_url,
+                    "required_by_count": self.required_by(component),
+                    "installable": blocked is None and (wanted not in state["flavours"]),
+                    "install_blocked_reason": None if installed else blocked,
+                    "available": unsupported is None,
+                    "unavailable_reason": unsupported,
+                    "flavour": wanted if wanted in state["flavours"] else (state["flavours"] or [None])[0],
+                    "flavours": state["flavours"],
+                    "wanted_flavour": wanted,
+                    "builds": state["builds"],
+                    "manual_command": f"bolo components install {component}"
+                    + (
+                        ""
+                        if not build
+                        else f" (the {build.id} build; --flavour picks another: {', '.join(info.builds)})"
+                    ),
+                    "path": state["path"],
+                    "servers": [self.core.settings.duplex_server_url] if self.core.settings.duplex_server_url else [],
+                    "release": None,
+                    "description": info.description,
+                }
+            )
+        return out
+
     def install_runtime_blocking(self, runtime: str, job: Job | None = None, flavour: str | None = None) -> str | None:
         """Download the pinned release archive for this platform, check its SHA-256 and unpack it into the folder of
         its build (``flavour``, else the one ``device`` asks for: ``<runtime>/<version>/cpu|cuda|vulkan``)."""
@@ -727,7 +794,12 @@ class ComponentManager:
         """Delete a downloaded uccharan pack from uccharan's cache; the only components removed from the API."""
         name = packs.pack_of(component)
         if name is None:
-            if component in PACKAGES or component in tts_runtimes.RUNTIMES or component.startswith(PLUGIN_PREFIX):
+            if (
+                component in PACKAGES
+                or component in tts_runtimes.RUNTIMES
+                or component in duplex_runtime.COMPONENTS
+                or component.startswith(PLUGIN_PREFIX)
+            ):
                 raise InvalidRequest(f"only uccharan's language packs can be removed from the API ({component})")
             raise ModelNotFound(f"unknown component '{component}'")
         blocked = self.pack_blocked_reason()
@@ -745,8 +817,23 @@ class ComponentManager:
     def start_install(self, component: str, accept_license: bool, flavour: str | None = None) -> Job:
         """Start installing ``component``; ``flavour`` (``cpu``, ``cuda``, ``vulkan``) picks the build of
         llama-server or audio.cpp, which is otherwise the one ``device`` asks for."""
+        if component in duplex_runtime.COMPONENTS:
+            blocked = self.duplex_blocked_reason(component, flavour)
+            if blocked:
+                raise InvalidRequest(f"cannot install {component}: {blocked}")
+            job = self.core.jobs.create("install", component)
+            build = duplex_runtime.build_of(component, flavour)
+            if build is not None and build.id in duplex_runtime.installed_flavours(self.core.settings, component):
+                job.state, job.progress = "done", 1.0
+                return job
+            task = asyncio.create_task(self._install(job, flavour), name=f"bolo-install-{component}")
+            self.core._tasks.append(task)
+            task.add_done_callback(lambda t: self.core._tasks.remove(t) if t in self.core._tasks else None)
+            return job
         if flavour is not None and component not in tts_runtimes.RUNTIMES:
-            raise InvalidRequest(f"{component} has no builds to choose from (flavour is for llama-server, audio.cpp)")
+            raise InvalidRequest(
+                f"{component} has no builds to choose from (flavour is for llama-server, audio.cpp, moshi, personaplex)"
+            )
         if flavour is not None and flavour not in tts_runtimes.FLAVOURS:
             raise InvalidRequest(f"unknown flavour {flavour!r}: one of {', '.join(tts_runtimes.FLAVOURS)}")
         if component in tts_runtimes.RUNTIMES:
@@ -858,6 +945,11 @@ class ComponentManager:
         """Install the component's package and activate it. Returns an error message, or None on success."""
         if component in tts_runtimes.RUNTIMES:
             return self.install_runtime_blocking(component, job, flavour)
+        if component in duplex_runtime.COMPONENTS:
+            return duplex_runtime.install(
+                self.core.settings, component, flavour, duplex_runtime.default_fetch(self.core.store),
+                self.run_duplex_step, job,
+            )  # fmt: skip
         if component.startswith(XLIT_PREFIX):
             return romanised.install_pack(component[len(XLIT_PREFIX) :])
         name = packs.pack_of(component)

@@ -23,6 +23,7 @@ BUILTIN_ENGINES: dict[str, str] = {
     "webrtcvad": "bolo.engines.frame_vad:WebRtcVadEngine",
     "builtin": "bolo.engines.builtin:BuiltinEngine",
     "tts-server": "bolo.engines.tts_server:TTSServerEngine",
+    "duplex": "bolo.engines.duplex:DuplexEngine",
     "rnnoise": "bolo.engines.denoisers:RNNoiseEngine",
     "remote": "bolo.engines.remote:RemoteEngine",
     "fake": "bolo.engines.fake:FakeEngine",

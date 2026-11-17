@@ -24,7 +24,10 @@ extension ``session.pipeline``) change what answers a conversation turn:
   in place of STT → LLM; bolo's TTS still speaks the answer.
 * ``speech-to-speech``: a speech-to-speech model (:mod:`bolo.s2s`, first
   backend llama-server's ``/v1/realtime`` with LFM3-Audio) hears the turn and
-  answers with speech and tool calls.
+  answers with speech and tool calls. When ``s2s_model`` is a *full-duplex*
+  model (Moshi, Hibiki, PersonaPlex), the model hears everything and speaks
+  when it chooses; :mod:`bolo.duplex.bridge` maps that onto this event set
+  (there are no turns for bolo to detect, and barge-in is the model's own).
 
 In every pipeline bolo keeps the session itself: authentication, codecs and
 resampling, turn detection and barge-in, conversation items, transcripts of the
@@ -64,6 +67,7 @@ from bolo.stt_options import DEFAULT_MAX_REPEATS, RepeatGuard
 if TYPE_CHECKING:
     from bolo.catalog import ModelSpec
     from bolo.core import Bolo
+    from bolo.duplex.bridge import DuplexBridge
 
 log = logging.getLogger("bolo.realtime")
 
@@ -228,6 +232,12 @@ class RealtimeSession:
         self._s2s_broken = False
         # audio-llm pipeline: the audio of recent user turns, by item id
         self._user_audio: dict[str, FloatArray] = {}
+        # speech-to-speech with a full-duplex model (bolo.duplex.bridge): the bridge, opened with the first audio;
+        # options for the model (bolo extension session.duplex: sampling options of Kyutai's servers); when the
+        # user last stopped speaking (for the traces)
+        self._duplex: DuplexBridge | None = None
+        self.duplex_options: dict[str, Any] = {}
+        self._user_stopped_at: float | None = None
 
     # -- plumbing -----------------------------------------------------------
     async def send(self, type_: str, **fields: Any) -> None:
@@ -285,6 +295,9 @@ class RealtimeSession:
             "max_output_tokens": self.max_output_tokens,
             "truncation": "auto",
             "pipeline": self.pipeline,  # bolo extension
+            # bolo extension: the speech-to-speech model hears and speaks at once (no turns; bolo.duplex.bridge)
+            "full_duplex": self.full_duplex,
+            "duplex": self.duplex_options,
         }
 
     async def start(self) -> None:
@@ -306,6 +319,10 @@ class RealtimeSession:
         if conv is not None:
             with contextlib.suppress(Exception):
                 await conv.close()
+        bridge, self._duplex = self._duplex, None
+        if bridge is not None:
+            with contextlib.suppress(Exception):
+                await bridge.close()
 
     async def _work(self) -> None:
         """Turns (commit → transcribe → respond) run one at a time, in order."""
@@ -492,6 +509,15 @@ class RealtimeSession:
                 self.max_output_tokens = session["max_output_tokens"]
             if session.get("model"):
                 self.model = session["model"]
+            if "duplex" in session:
+                options = session["duplex"] or {}
+                if not isinstance(options, dict):
+                    raise RealtimeError("duplex must be an object of model options", param="session.duplex")
+                if self._duplex is not None and self._duplex.model is not None and options != self.duplex_options:
+                    raise RealtimeError(
+                        "the full-duplex model's options are fixed once audio has started", param="session.duplex"
+                    )
+                self.duplex_options = dict(options)
 
     def _configure_denoise(self, audio_in: dict[str, Any]) -> None:
         """``noise_reduction`` (OpenAI: any type turns the default denoiser on; null leaves the server's default) and
@@ -565,13 +591,16 @@ class RealtimeSession:
             return
         self._buf = np.concatenate([self._buf, samples]) if len(self._buf) else samples.copy()
         self._pos += len(samples)
+        duplex = self.full_duplex
+        if duplex:  # the model hears everything, as it arrives
+            await self._duplex_bridge().push(samples)
         detector = await self._ensure_detector()
         if detector is None:
             if len(self._buf) > MAX_BUFFER_S * SR:
                 raise RealtimeError(
                     "the input audio buffer is full; commit or clear it", code="input_audio_buffer_full"
                 )
-            if self._s2s_mode:
+            if self._s2s_mode and not duplex:
                 await self._s2s_forward(self._commit_from)
             return
         prefix = int(float((self.turn_detection or {}).get("prefix_padding_ms", 300)) * SR / 1000)
@@ -587,13 +616,14 @@ class RealtimeSession:
                     audio_start_ms=self._ms(self._speech_start),
                     item_id=self._pending_item,
                 )
-                if (self.turn_detection or {}).get("interrupt_response", True):
+                if (self.turn_detection or {}).get("interrupt_response", True) and not duplex:
+                    # (a full-duplex model hears the user itself and decides whether to stop)
                     await self._cancel_response("turn_detected")
                 await self._stop_partials()
                 self._partial_task = asyncio.create_task(
                     self._partials(self._pending_item, self._speech_start), name="bolo-realtime-partials"
                 )
-                if self._s2s_mode:
+                if self._s2s_mode and not duplex:
                     self._s2s_broken = False
                     await self._s2s_forward(self._speech_start)
             elif ev.kind == "speech_end" and self._speech_start is not None:
@@ -608,7 +638,7 @@ class RealtimeSession:
                 await self._end_turn(self._held_end)
             else:
                 self._held_end = None
-        if self._s2s_mode and self._speech_start is not None:
+        if self._s2s_mode and not duplex and self._speech_start is not None:
             await self._s2s_forward(self._speech_start)
         self._trim()
 
@@ -616,6 +646,26 @@ class RealtimeSession:
     @property
     def _s2s_mode(self) -> bool:
         return self.kind == "realtime" and self.pipeline == "speech-to-speech"
+
+    @property
+    def full_duplex(self) -> bool:
+        """The session's speech-to-speech model is full-duplex (bolo.duplex): it hears and speaks at once."""
+        return self._s2s_mode and self.core.s2s.full_duplex
+
+    def _duplex_bridge(self) -> DuplexBridge:
+        if self._duplex is None:
+            from bolo.duplex.bridge import DuplexBridge
+
+            s = self.core.settings
+            self._duplex = DuplexBridge(self, silence_ms=s.duplex_silence_ms, jitter_ms=s.duplex_jitter_ms)
+        return self._duplex
+
+    def duplex_since_user_ms(self) -> float | None:
+        """Milliseconds since the user last stopped speaking (None: not within 10 s, or still speaking)."""
+        if self._user_stopped_at is None or self._speech_start is not None:
+            return None
+        ms = (time.perf_counter() - self._user_stopped_at) * 1000.0
+        return round(ms, 1) if ms <= 10000 else None
 
     async def _s2s_conversation(self) -> S2SConversation:
         async with self._s2s_lock:
@@ -704,6 +754,8 @@ class RealtimeSession:
     @property
     def responding(self) -> bool:
         """A response is being generated, or a committed turn is waiting for its transcript and response."""
+        if self._duplex is not None and self._duplex.speaking:
+            return True
         return (self._response is not None and not self._response.done()) or not self._turns.empty() or self._busy
 
     async def interrupt(self, reason: str = "client_cancelled") -> None:
@@ -723,6 +775,7 @@ class RealtimeSession:
         item_id = self._pending_item or new_id("item")
         await self._stop_partials()
         await self.send("input_audio_buffer.speech_stopped", audio_end_ms=self._ms(end), item_id=item_id)
+        self._user_stopped_at = time.perf_counter()
         trace = self._agent_trace()
         if self._turn_checks:
             spec = self._turn_spec()
@@ -845,6 +898,8 @@ class RealtimeSession:
             if auto_response is not None
             else bool((self.turn_detection or {}).get("create_response", True))
         )
+        if self.full_duplex:
+            respond = False  # the model answers by itself; the turn only gets its item and transcript
         trace.audio_seconds = len(audio) / SR
 
         async def turn() -> None:
@@ -979,7 +1034,12 @@ class RealtimeSession:
             **{k: v for k, v in item.items() if k != "id"},
         }
         previous = self.items[-1]["id"] if self.items else None
-        if self._s2s_mode:
+        if self.full_duplex and (kind == "function_call_output" or item.get("role") == "user"):
+            raise RealtimeError(
+                "the full-duplex model hears speech only: it takes no text messages or tool results",
+                code="unsupported", param="item",
+            )  # fmt: skip
+        if self._s2s_mode and not self.full_duplex:
             await self._s2s_item(stored)
         self.items.append(stored)
         await self.send("conversation.item.added", item=stored, previous_item_id=previous)
@@ -1030,6 +1090,11 @@ class RealtimeSession:
     async def _on_response_create(self, event: dict[str, Any]) -> None:
         if self.kind != "realtime":
             raise RealtimeError("transcription sessions cannot create responses", code="unsupported")
+        if self.full_duplex:
+            raise RealtimeError(
+                "the full-duplex model speaks by itself, when it chooses: responses cannot be requested",
+                code="unsupported",
+            )
         params = event.get("response") if isinstance(event.get("response"), dict) else {}
         trace = self._agent_trace()
 
@@ -1039,11 +1104,17 @@ class RealtimeSession:
         await self._turns.put(turn)
 
     async def _on_response_cancel(self, event: dict[str, Any]) -> None:
+        if self.full_duplex:
+            if self._duplex is None or not await self._duplex.cancel("client_cancelled"):
+                raise RealtimeError("there is no response in progress", code="response_cancel_not_active")
+            return
         if self._response is None or self._response.done():
             raise RealtimeError("there is no response in progress", code="response_cancel_not_active")
         await self._cancel_response("client_cancelled")
 
     async def _cancel_response(self, reason: str) -> None:
+        if self._duplex is not None:
+            await self._duplex.cancel(reason)
         task = self._response
         if task is None or task.done():
             return

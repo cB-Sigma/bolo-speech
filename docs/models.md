@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-406 models: 156 validated on CPU by the maintainers, 250 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
+425 models: 156 validated on CPU by the maintainers, 269 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
 
 ### Speech to text
 
@@ -856,6 +856,47 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 ### Speech to speech (Realtime speech-to-speech pipeline)
 
+#### Moshi
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `moshiko-pytorch-bf16` | en | realtime | - | 15.8 GB | CC-BY-4.0 | untested |
+| `moshiko-pytorch-q8` | en | realtime | - | 8.4 GB | CC-BY-4.0 | untested |
+| `moshiko-mlx-q4` | en | realtime | - | 5.2 GB | CC-BY-4.0 | untested |
+| `moshiko-mlx-q8` | en | realtime | - | 8.6 GB | CC-BY-4.0 | untested |
+| `moshiko-mlx-bf16` | en | realtime | - | 15.8 GB | CC-BY-4.0 | untested |
+| `moshiko-candle-q8` | en | realtime | - | 8.6 GB | CC-BY-4.0 | untested |
+| `moshiko-candle-bf16` | en | realtime | - | 15.8 GB | CC-BY-4.0 | untested |
+| `moshika-pytorch-bf16` | en | realtime | - | 15.8 GB | CC-BY-4.0 | untested |
+| `moshika-pytorch-q8` | en | realtime | - | 8.4 GB | CC-BY-4.0 | untested |
+| `moshika-mlx-q4` | en | realtime | - | 5.2 GB | CC-BY-4.0 | untested |
+| `moshika-mlx-q8` | en | realtime | - | 8.6 GB | CC-BY-4.0 | untested |
+| `moshika-mlx-bf16` | en | realtime | - | 15.8 GB | CC-BY-4.0 | untested |
+| `moshika-candle-q8` | en | realtime | - | 8.6 GB | CC-BY-4.0 | untested |
+| `moshika-candle-bf16` | en | realtime | - | 15.8 GB | CC-BY-4.0 | untested |
+
+#### Hibiki
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `hibiki-1b-pytorch-bf16` | fr, en | realtime | - | 4.0 GB | CC-BY-4.0 | untested |
+| `hibiki-2b-pytorch-bf16` | fr, en | realtime | - | 6.0 GB | CC-BY-4.0 | untested |
+| `hibiki-1b-mlx-bf16` | fr, en | realtime | - | 4.0 GB | CC-BY-4.0 | untested |
+| `hibiki-2b-mlx-bf16` | fr, en | realtime | - | 6.6 GB | CC-BY-4.0 | untested |
+
+#### Hibiki-Zero
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `hibiki-zero-3b-pytorch-bf16` | fr, es, pt, de, en | realtime | - | 6.6 GB | CC-BY-NC-SA-4.0 ⚠ | untested |
+
+#### PersonaPlex
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `personaplex-7b-v1` | en | realtime | - | 17.1 GB | NVIDIA Open Model License · gated | untested |
+| `personaplex-rl-seamless` | en | realtime | - | 17.1 GB | CC-BY-NC-4.0 and NVIDIA Open Model License ⚠ · gated | untested |
+
 #### Qwen2.5-Omni 3B
 
 | id | languages | tier | streaming | download | licence | validated |
@@ -873,13 +914,6 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `qwen3-omni-30b-a3b-instruct-torch` | en, zh, fr, de, ru, it +4 | accuracy | - | 70.5 GB | Apache-2.0 · needs plugin torch | untested |
-
-#### Moshi
-
-| id | languages | tier | streaming | download | licence | validated |
-| --- | --- | --- | --- | --- | --- | --- |
-| `moshiko-pytorch-bf16` | en | realtime | - | 15.8 GB | CC-BY-4.0 · needs plugin torch | not runnable yet |
-| `moshika-pytorch-bf16` | en | realtime | - | 15.8 GB | CC-BY-4.0 · needs plugin torch | not runnable yet |
 
 #### GLM-4-Voice
 
@@ -996,7 +1030,7 @@ are listed like the rest and marked ⚠. Checked against the model cards, LICENS
 | `qwen2.5-omni-3b-torch` | speech-to-speech | Qwen Research License (no) | 12.0 GB | bolo-torch (`omni` extra), transformers | turn-based, answer comes back whole | runnable, untested (fakes only) |
 | `qwen2.5-omni-7b-torch` | speech-to-speech | Apache-2.0 (yes) | 22.4 GB | bolo-torch, transformers; a 24 GB GPU | turn-based | runnable, untested (fakes only) |
 | `qwen3-omni-30b-a3b-instruct-torch` | speech-to-speech | Apache-2.0 (yes) | 70.5 GB | bolo-torch, transformers 4.57+; about 79 GB of GPU memory | turn-based | runnable, untested (fakes only) |
-| `moshiko-pytorch-bf16`, `moshika-pytorch-bf16` | speech-to-speech | CC-BY-4.0 (yes, with attribution) | 15.8 GB each | Kyutai's PyTorch, MLX (`moshiko-mlx-q4`, 5.2 GB) and Rust/candle (`moshiko-candle-q8`, 8.6 GB) runtimes | **full-duplex** (listens while it speaks, 80 ms frames) | not runnable: bolo's interface and the plugin's `respond` op are turn-based |
+| `moshiko-*`, `moshika-*` (14 builds), `hibiki-*` (5), `personaplex-7b-v1`, `personaplex-rl-seamless` | speech-to-speech | see [Full-duplex models](#full-duplex-models) | 4.0 to 17.1 GB | Kyutai's and NVIDIA's servers, which bolo installs and starts | **full-duplex** (listens while it speaks, 80 ms frames) | runnable, untested (fakes only) |
 | `glm-4-voice-9b` | speech-to-speech | ⚠ glm-4-voice License: academic use free; **commercial use only after registering with Zhipu** (open.bigmodel.cn/mla/form, then free), "Built with glm-4", Chinese law | 21.1 GB (model, glm-4-voice-tokenizer, glm-4-voice-decoder) | bolo-torch (`glm-4-voice` extra): ChatGLM remote code (opt-in), tokenizer and decoder from github.com/THUDM/GLM-4-Voice at a pinned commit; 24 GB GPU in bfloat16, about 9 GB with `quantization: int4` | turn-based; text and speech interleaved and streamed, first audio after 25 speech tokens (about 2 s of speech) | runnable, untested (fakes only) |
 | `minicpm-o-2.6` | speech-to-speech | Apache-2.0 (yes; registration optional) | 17.4 GB | trust_remote_code only; llama.cpp runs its vision part, not its audio | turn-based and a live mode | not runnable: bolo-torch does not run remote code |
 | `step-audio-2-mini` | speech-to-speech | Apache-2.0 (yes) | 17.9 GB | bolo-torch (`step-audio-2` extra): the model's remote code (opt-in) and token2wav from github.com/stepfun-ai/Step-Audio2 at a pinned commit; a 24 GB NVIDIA GPU | turn-based; text streamed, speech in 25-token pieces (first audio after about 1 s of speech), tool calls | runnable, untested (fakes only) |
@@ -1023,10 +1057,64 @@ and with a system prompt asking it to answer the customer's question it gave the
 answer. So the wiring works end to end, and this model is a poor audio-llm through llama-server's chat endpoint.
 First token after 59 to 84 s and the whole reply after 153 to 184 s on that overloaded machine: not a measure of
 the model. Nothing else in the table above was downloaded: the Qwen-Omni,
-Moshi, GLM, MiniCPM, Step-Audio and Kimi weights are 12 to 70 GB and the test machine had about 6 GB of disk and
+Moshi, Hibiki, PersonaPlex, GLM, MiniCPM, Step-Audio and Kimi weights are 12 to 70 GB and the test machine had about 6 GB of disk and
 no GPU. The bolo-torch Qwen-Omni loader, the plugin's `respond` op and bolo's turn-based backend were tested with
 fake model objects, and the managed audio-llm server with a stand-in for llama-server.
 
+### Full-duplex models
+
+These hear and speak at the same time; voice-agents.md, "Full-duplex models", explains how a Realtime session runs
+them. Each runs in its own server, a component bolo installs (`bolo components install <server>`, pinned versions,
+SHA-256 for downloads, a pinned commit for git sources) and starts on a loopback port. Weights are pinned by revision
+and SHA-256 like every catalog entry. Code licences: Kyutai's `moshi` and `moshi_mlx` packages MIT, `moshi-backend`
+MIT or Apache-2.0, `hibiki-zero` MIT, NVIDIA's `personaplex` MIT.
+
+| id | Server, build | Weights licence (commercial use) | Download | Needs |
+| --- | --- | --- | --- | --- |
+| `moshiko-pytorch-bf16`, `moshika-pytorch-bf16` | `moshi`, pytorch | CC-BY-4.0 (yes, credit Kyutai) | 15.8 GB | NVIDIA GPU, 24 GB |
+| `moshiko-pytorch-q8`, `moshika-pytorch-q8` | `moshi`, pytorch (bitsandbytes int8) | CC-BY-4.0 (yes) | 8.4 GB | NVIDIA GPU, about 12 GB (estimate) |
+| `moshiko-mlx-q4`, `moshika-mlx-q4` / `-q8` / `moshiko-mlx-bf16`, `moshika-mlx-bf16` | `moshi`, mlx | CC-BY-4.0 (yes) | 5.2 / 8.6 / 15.8 GB | Apple silicon, about 6 / 10 / 18 GB |
+| `moshiko-candle-q8`, `moshika-candle-q8` / `-bf16` | `moshi`, candle (`--flavour candle`, built with cargo) | CC-BY-4.0 (yes) | 8.6 / 15.8 GB | CUDA or Metal; the CPU build runs but far below real time |
+| `hibiki-1b-pytorch-bf16`, `hibiki-2b-pytorch-bf16` | `moshi`, pytorch | CC-BY-4.0 (yes) | 4.0 / 6.0 GB | NVIDIA GPU; French speech in, English speech and text out |
+| `hibiki-1b-mlx-bf16`, `hibiki-2b-mlx-bf16` | `moshi`, mlx | CC-BY-4.0 (yes) | 4.0 / 6.6 GB | Apple silicon |
+| `hibiki-zero-3b-pytorch-bf16` | `hibiki-zero`, pytorch | ⚠ CC-BY-NC-SA-4.0 (no) | 6.6 GB | NVIDIA GPU; French, Spanish, Portuguese or German in, English out |
+| `personaplex-7b-v1` | `personaplex`, pytorch | NVIDIA Open Model License (yes) | 17.1 GB, gated | NVIDIA GPU, about 24 GB; instructions and 18 voices |
+| `personaplex-rl-seamless` | `personaplex`, pytorch | ⚠ CC-BY-NC-4.0 with the NVIDIA Open Model License (no) | 17.1 GB, gated | as above |
+
+Hibiki's Rust builds (`kyutai/hibiki-1b-rs-q8`, `-rs-q6k`) and other conversions are not in the catalog:
+[models-unsupported.md](models-unsupported.md) says why.
+
+**A first run on a Windows laptop with an NVIDIA GPU** (12 GB of GPU memory or more for the q8 model; 24 GB for bf16
+and PersonaPlex). Nothing here has run on real weights yet; this is the checklist for doing it:
+
+1. Install bolo with the codec and WebRTC: `pip install "bolo-speech[duplex,webrtc]"` (or `uv tool install
+   "bolo-speech[duplex,webrtc]"`), and `uv` (`winget install astral-sh.uv`), which fetches Python 3.12 for the server.
+   Free disk: about 6 GB for the server's environment (PyTorch with CUDA) and 8.4 GB for the model.
+2. `bolo components install moshi` (the pytorch build: moshi 0.2.13, PyTorch 2.9.1 for CUDA 12.8 from
+   download.pytorch.org, bitsandbytes 0.49.2). Check: `bolo components list` shows `moshi installed (bolo, pytorch
+   0.2.13)`, and `%USERPROFILE%\.cache\bolo\components\moshi\0.2.13\pytorch\Scripts\python.exe -c "import
+   torch; print(torch.cuda.is_available())"` prints `True` (else the NVIDIA driver is too old for CUDA 12.8).
+3. `bolo pull moshiko-pytorch-q8` (or `moshika-pytorch-q8` for the female voice).
+4. Put `device = "cuda"`, `realtime_pipeline = "speech-to-speech"` and `s2s_model = "moshiko-pytorch-q8"` in
+   `bolo.toml` (or set `BOLO_DEVICE`, `BOLO_REALTIME_PIPELINE`, `BOLO_S2S_MODEL`) and run `bolo serve`. The first
+   session starts the model's server; loading and warming up
+   takes one to a few minutes (`duplex_start_timeout_s`, 900 s). `GET /api/v1/info` shows
+   `capabilities.realtime.pipelines.speech-to-speech` with `full_duplex: true` and `available: true`.
+5. In the console, open **Conversation**, choose the speech-to-speech pipeline and start a session (WebRTC). Use
+   headphones, or keep the browser's echo cancellation on. Say "Hello, who are you?" and wait.
+6. What to check: an answer within about a second of your question, in Moshi's voice, with its words appearing as
+   the assistant's transcript while it speaks; your own words transcribed as user items; talking over Moshi does
+   not cut it off by itself (it decides whether to stop), while the console's stop button (`response.cancel`) ends the
+   answer at once; `bolo logs` shows `duplex:moshiko-pytorch-q8` ready, and the server's console lines
+   (`frame handled in … ms`: under 80 ms means it keeps up in real time); `nvidia-smi` shows the server's memory;
+   **Requests** in the console has one `agent` trace per answer (`full_duplex`, `started_after_user_ms`, time to
+   first audio). A second session while one runs is refused with `overloaded` (Kyutai's server holds one).
+7. Ending the session frees the server for the next one; stopping bolo stops it. Report back the `frame handled`
+   times, the GPU memory and whether answers came in time.
+
+For PersonaPlex: accept its licence on Hugging Face, set `BOLO_HF_TOKEN`, `bolo components install personaplex`,
+`bolo pull personaplex-7b-v1`, `s2s_model = "personaplex-7b-v1"`, and give the session `instructions` (its role)
+and a `voice` such as `NATM1`. For Hibiki, speak French: it answers with the English translation.
 ## Remote code
 
 Some models exist only as Python files in their own Hugging Face repository: transformers imports and runs those

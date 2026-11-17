@@ -41,8 +41,8 @@ NOT_IMPLEMENTED = {
     "diarizen": "DiariZen diarization (no packaged inference code)",
     "spark-tts": "Spark-TTS (no packaged inference code)",
     "maskgct": "MaskGCT (no packaged inference code)",
-    "moshi": "Moshi (full-duplex: it listens and speaks at once, frame by frame, which the turn-based respond op "
-    "cannot carry)",
+    "moshi": "Moshi (full-duplex: bolo runs it in Kyutai's own server, not in this plugin; set s2s_model to a moshiko- "
+    "or moshika- catalog entry, docs/voice-agents.md, 'Full-duplex models')",
     "minicpm-o": "MiniCPM-o (its model code runs only as trust_remote_code, which bolo-torch does not run)",
 }
 

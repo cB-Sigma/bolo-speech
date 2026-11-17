@@ -251,9 +251,9 @@ def test_every_packaged_entry_is_well_formed() -> None:
                 assert u.get("sha256") or (u.get("size") or 0) < 1_000_000, f"{s.id}: {u['path']} needs a sha256"
         assert s.size_bytes > 100_000, s.id
         assert s.description and s.source_url.startswith("https://"), s.id
-        assert s.engine in ("sherpa-onnx", "faster-whisper", "onnxruntime", "plugin:torch", "tts-server", "rnnoise"), (
-            s.id
-        )
+        assert s.engine in (
+            "sherpa-onnx", "faster-whisper", "onnxruntime", "plugin:torch", "tts-server", "rnnoise", "duplex",
+        ), s.id  # fmt: skip
         if s.task == "tts":
             assert s.sample_rate in (8000, 16000, 22050, 24000, 32000, 44100, 48000), s.id
         if s.validated == "cpu":

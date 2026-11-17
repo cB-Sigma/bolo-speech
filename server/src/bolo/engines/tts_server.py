@@ -160,8 +160,14 @@ class ServerProcess:
         api_key: str | None = None,
         gpu: bool = False,
         flavour: str | None = None,
+        tls: bool = False,
+        ready_any_status: bool = False,
     ) -> None:
         self.name = name
+        #: it serves HTTPS with a certificate of its own on the loopback address (Kyutai's Rust server)
+        self.tls = tls
+        #: ready as soon as it answers HTTP at all (servers without a health endpoint, e.g. Kyutai's)
+        self.ready_any_status = ready_any_status
         #: started for a GPU: a CUDA or Vulkan error on its console means the GPU stopped working (bolo.gpu_health)
         self.gpu = gpu
         #: the build (cpu, cuda, vulkan), for the advice when it does not start
@@ -171,7 +177,7 @@ class ServerProcess:
         self.api_key = api_key
         self.argv = argv
         self.port = port
-        self.base_url = f"http://127.0.0.1:{port}"
+        self.base_url = f"{'https' if tls else 'http'}://127.0.0.1:{port}"
         self.start_timeout_s = start_timeout_s
         self.env = env or {}
         self.health_path = health_path
@@ -264,7 +270,8 @@ class ServerProcess:
     def _wait_ready(self, proc: subprocess.Popen[bytes]) -> None:
         deadline = time.monotonic() + self.start_timeout_s
         url = self.base_url + self.health_path
-        with httpx.Client(timeout=2.0, trust_env=False) as client:
+        # verify=False only for a server bolo started itself on the loopback address with its own certificate
+        with httpx.Client(timeout=2.0, trust_env=False, verify=not self.tls) as client:
             while True:
                 code = proc.poll()
                 if code is not None:
@@ -273,7 +280,8 @@ class ServerProcess:
                     self._crashed(reason)
                     raise EngineUnavailable(f"TTS server '{self.name}' did not start ({reason})")
                 with contextlib.suppress(httpx.HTTPError):
-                    if client.get(url).status_code == 200:
+                    status = client.get(url).status_code
+                    if status == 200 or (self.ready_any_status and status < 500):
                         return
                 if time.monotonic() > deadline:
                     reason = f"not ready after {self.start_timeout_s:.0f} s" + (

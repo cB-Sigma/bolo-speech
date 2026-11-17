@@ -1,0 +1,1314 @@
+# Full-duplex speech-to-speech models (bolo.duplex): each one runs in its own server that bolo installs as a
+# component (moshi, hibiki-zero, personaplex) and starts on a loopback port; Realtime and WebRTC sessions reach it
+# when s2s_model names it. Files pinned by revision and SHA-256.
+- id: moshiko-pytorch-bf16
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Moshi
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 15760697814
+  params: 7690000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/moshiko-pytorch-bf16
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  description: 'Kyutai Moshi with the male voice "Moshiko": a 7 B full-duplex speech-to-speech model (it listens and speaks
+    at once, in 80 ms frames, English only, about 200 ms of latency on a GPU per Kyutai), bf16 weights for Kyutai''s PyTorch
+    server. As s2s_model it answers Realtime and WebRTC sessions by itself: no turn detection, the caller can talk over
+    it. It takes no instructions, text or tools, and has one voice. Runs on Kyutai''s PyTorch server (bolo components install
+    moshi; NVIDIA GPU, Linux or Windows). Weights CC-BY-4.0 (attribution: Kyutai).'
+  source_url: https://huggingface.co/kyutai/moshiko-pytorch-bf16
+  validated: untested
+  requires:
+  - moshi
+  source:
+    urls:
+    - path: model.safetensors
+      url: https://huggingface.co/kyutai/moshiko-pytorch-bf16/resolve/2bfc9ae6e89079a5cc7ed2a68436010d91a3d289/model.safetensors
+      size: 15375500136
+      sha256: 5b835c664f3830bf453808cbca9bfbcc9de332c328cc01cbffdfbaba2a8838a7
+    - path: tokenizer-e351c8d8-checkpoint125.safetensors
+      url: https://huggingface.co/kyutai/moshiko-pytorch-bf16/resolve/2bfc9ae6e89079a5cc7ed2a68436010d91a3d289/tokenizer-e351c8d8-checkpoint125.safetensors
+      size: 384644900
+      sha256: 09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50
+    - path: tokenizer_spm_32k_3.model
+      url: https://huggingface.co/kyutai/moshiko-pytorch-bf16/resolve/2bfc9ae6e89079a5cc7ed2a68436010d91a3d289/tokenizer_spm_32k_3.model
+      size: 552778
+      sha256: 78d4336533ddc26f9acf7250d7fb83492152196c6ea4212c841df76933f18d2d
+  options:
+    repo: kyutai/moshiko-pytorch-bf16
+    server: moshi
+    build: pytorch
+    model_file: model.safetensors
+    mimi_file: tokenizer-e351c8d8-checkpoint125.safetensors
+    tokenizer_file: tokenizer_spm_32k_3.model
+    hardware:
+      gpu: required
+      vram_gb: 24
+      note: 'Kyutai: a 24 GB GPU for bfloat16'
+  voices:
+  - id: moshiko
+    name: Moshiko
+    gender: m
+- id: moshiko-pytorch-q8
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Moshi
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 8393887563
+  params: 7690000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/moshiko-pytorch-q8
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  description: 'Kyutai Moshi with the male voice "Moshiko": a 7 B full-duplex speech-to-speech model (it listens and speaks
+    at once, in 80 ms frames, English only, about 200 ms of latency on a GPU per Kyutai), q8 weights for Kyutai''s PyTorch
+    server. As s2s_model it answers Realtime and WebRTC sessions by itself: no turn detection, the caller can talk over
+    it. It takes no instructions, text or tools, and has one voice. Runs on Kyutai''s PyTorch server (bolo components install
+    moshi; NVIDIA GPU, Linux or Windows). Weights CC-BY-4.0 (attribution: Kyutai).'
+  source_url: https://huggingface.co/kyutai/moshiko-pytorch-q8
+  validated: untested
+  requires:
+  - moshi
+  source:
+    urls:
+    - path: model.q8.safetensors
+      url: https://huggingface.co/kyutai/moshiko-pytorch-q8/resolve/b07c7a4e1ac834b54f48846e25923a965648f8a8/model.q8.safetensors
+      size: 8008688864
+      sha256: 764315d006aa6ba47df96f9f86a3d5d7e3d32ce263754f874e75d046a0e5cd6d
+    - path: tokenizer-e351c8d8-checkpoint125.safetensors
+      url: https://huggingface.co/kyutai/moshiko-pytorch-q8/resolve/b07c7a4e1ac834b54f48846e25923a965648f8a8/tokenizer-e351c8d8-checkpoint125.safetensors
+      size: 384644900
+      sha256: 09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50
+    - path: tokenizer_spm_32k_3.model
+      url: https://huggingface.co/kyutai/moshiko-pytorch-q8/resolve/b07c7a4e1ac834b54f48846e25923a965648f8a8/tokenizer_spm_32k_3.model
+      size: 552778
+      sha256: 78d4336533ddc26f9acf7250d7fb83492152196c6ea4212c841df76933f18d2d
+    - path: config.json
+      url: https://huggingface.co/kyutai/moshiko-pytorch-q8/resolve/b07c7a4e1ac834b54f48846e25923a965648f8a8/config.json
+      size: 1021
+      sha256: b10eac4a22f6dbf231bc1b2cfbd4cc8049142d04dcce85eadb29208b442de231
+  options:
+    repo: kyutai/moshiko-pytorch-q8
+    server: moshi
+    build: pytorch
+    model_file: model.q8.safetensors
+    mimi_file: tokenizer-e351c8d8-checkpoint125.safetensors
+    tokenizer_file: tokenizer_spm_32k_3.model
+    config_file: config.json
+    hardware:
+      gpu: required
+      vram_gb: 12
+      note: 'estimate: 8 GB of int8 weights (bitsandbytes) plus the codec and the cache'
+  voices:
+  - id: moshiko
+    name: Moshiko
+    gender: m
+- id: moshiko-mlx-q4
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Moshi
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 5190742995
+  params: 7690000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/moshiko-mlx-q4
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  description: 'Kyutai Moshi with the male voice "Moshiko": a 7 B full-duplex speech-to-speech model (it listens and speaks
+    at once, in 80 ms frames, English only, about 200 ms of latency on a GPU per Kyutai), q4 weights for Kyutai''s MLX server.
+    As s2s_model it answers Realtime and WebRTC sessions by itself: no turn detection, the caller can talk over it. It takes
+    no instructions, text or tools, and has one voice. Runs on Kyutai''s MLX server (bolo components install moshi; Apple
+    silicon). Weights CC-BY-4.0 (attribution: Kyutai).'
+  source_url: https://huggingface.co/kyutai/moshiko-mlx-q4
+  validated: untested
+  requires:
+  - moshi
+  source:
+    urls:
+    - path: model.q4.safetensors
+      url: https://huggingface.co/kyutai/moshiko-mlx-q4/resolve/18e4df760a34d5977a34517d7d1580e07acbb2f1/model.q4.safetensors
+      size: 4805545317
+      sha256: 7959d590e23c1ebc78cfa3501344a6ff331561aa0cadc4429b733b890bbc919c
+    - path: tokenizer-e351c8d8-checkpoint125.safetensors
+      url: https://huggingface.co/kyutai/moshiko-mlx-q4/resolve/18e4df760a34d5977a34517d7d1580e07acbb2f1/tokenizer-e351c8d8-checkpoint125.safetensors
+      size: 384644900
+      sha256: 09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50
+    - path: tokenizer_spm_32k_3.model
+      url: https://huggingface.co/kyutai/moshiko-mlx-q4/resolve/18e4df760a34d5977a34517d7d1580e07acbb2f1/tokenizer_spm_32k_3.model
+      size: 552778
+      sha256: 78d4336533ddc26f9acf7250d7fb83492152196c6ea4212c841df76933f18d2d
+  options:
+    repo: kyutai/moshiko-mlx-q4
+    server: moshi
+    build: mlx
+    model_file: model.q4.safetensors
+    mimi_file: tokenizer-e351c8d8-checkpoint125.safetensors
+    tokenizer_file: tokenizer_spm_32k_3.model
+    quantized: 4
+    hardware:
+      gpu: required
+      ram_gb: 6
+      note: Apple silicon, unified memory (estimate)
+  voices:
+  - id: moshiko
+    name: Moshiko
+    gender: m
+- id: moshiko-mlx-q8
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Moshi
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 8554003089
+  params: 7690000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/moshiko-mlx-q8
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  description: 'Kyutai Moshi with the male voice "Moshiko": a 7 B full-duplex speech-to-speech model (it listens and speaks
+    at once, in 80 ms frames, English only, about 200 ms of latency on a GPU per Kyutai), q8 weights for Kyutai''s MLX server.
+    As s2s_model it answers Realtime and WebRTC sessions by itself: no turn detection, the caller can talk over it. It takes
+    no instructions, text or tools, and has one voice. Runs on Kyutai''s MLX server (bolo components install moshi; Apple
+    silicon). Weights CC-BY-4.0 (attribution: Kyutai).'
+  source_url: https://huggingface.co/kyutai/moshiko-mlx-q8
+  validated: untested
+  requires:
+  - moshi
+  source:
+    urls:
+    - path: model.q8.safetensors
+      url: https://huggingface.co/kyutai/moshiko-mlx-q8/resolve/1a6fb04736762818deb55715c005155f41d15879/model.q8.safetensors
+      size: 8168805411
+      sha256: ab8213322bae4ae6b1f831897dde6b33134bde9785c3bf403bda8fd8567b6683
+    - path: tokenizer-e351c8d8-checkpoint125.safetensors
+      url: https://huggingface.co/kyutai/moshiko-mlx-q8/resolve/1a6fb04736762818deb55715c005155f41d15879/tokenizer-e351c8d8-checkpoint125.safetensors
+      size: 384644900
+      sha256: 09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50
+    - path: tokenizer_spm_32k_3.model
+      url: https://huggingface.co/kyutai/moshiko-mlx-q8/resolve/1a6fb04736762818deb55715c005155f41d15879/tokenizer_spm_32k_3.model
+      size: 552778
+      sha256: 78d4336533ddc26f9acf7250d7fb83492152196c6ea4212c841df76933f18d2d
+  options:
+    repo: kyutai/moshiko-mlx-q8
+    server: moshi
+    build: mlx
+    model_file: model.q8.safetensors
+    mimi_file: tokenizer-e351c8d8-checkpoint125.safetensors
+    tokenizer_file: tokenizer_spm_32k_3.model
+    quantized: 8
+    hardware:
+      gpu: required
+      ram_gb: 10
+      note: Apple silicon, unified memory (estimate)
+  voices:
+  - id: moshiko
+    name: Moshiko
+    gender: m
+- id: moshiko-mlx-bf16
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Moshi
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 15760894886
+  params: 7690000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/moshiko-mlx-bf16
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  description: 'Kyutai Moshi with the male voice "Moshiko": a 7 B full-duplex speech-to-speech model (it listens and speaks
+    at once, in 80 ms frames, English only, about 200 ms of latency on a GPU per Kyutai), bf16 weights for Kyutai''s MLX
+    server. As s2s_model it answers Realtime and WebRTC sessions by itself: no turn detection, the caller can talk over
+    it. It takes no instructions, text or tools, and has one voice. Runs on Kyutai''s MLX server (bolo components install
+    moshi; Apple silicon). Weights CC-BY-4.0 (attribution: Kyutai).'
+  source_url: https://huggingface.co/kyutai/moshiko-mlx-bf16
+  validated: untested
+  requires:
+  - moshi
+  source:
+    urls:
+    - path: model.safetensors
+      url: https://huggingface.co/kyutai/moshiko-mlx-bf16/resolve/a31ebad976783a3ea356d6beb8b8e826d2d45a68/model.safetensors
+      size: 15375697208
+      sha256: b9a46943f30c38ebed71581b6e4ef89a1285c8d404dc3aea3af1c3efdc7395df
+    - path: tokenizer-e351c8d8-checkpoint125.safetensors
+      url: https://huggingface.co/kyutai/moshiko-mlx-bf16/resolve/a31ebad976783a3ea356d6beb8b8e826d2d45a68/tokenizer-e351c8d8-checkpoint125.safetensors
+      size: 384644900
+      sha256: 09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50
+    - path: tokenizer_spm_32k_3.model
+      url: https://huggingface.co/kyutai/moshiko-mlx-bf16/resolve/a31ebad976783a3ea356d6beb8b8e826d2d45a68/tokenizer_spm_32k_3.model
+      size: 552778
+      sha256: 78d4336533ddc26f9acf7250d7fb83492152196c6ea4212c841df76933f18d2d
+  options:
+    repo: kyutai/moshiko-mlx-bf16
+    server: moshi
+    build: mlx
+    model_file: model.safetensors
+    mimi_file: tokenizer-e351c8d8-checkpoint125.safetensors
+    tokenizer_file: tokenizer_spm_32k_3.model
+    hardware:
+      gpu: required
+      ram_gb: 18
+      note: Apple silicon, unified memory (estimate)
+  voices:
+  - id: moshiko
+    name: Moshiko
+    gender: m
+- id: moshiko-candle-q8
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Moshi
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 8554618382
+  params: 7690000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/moshiko-candle-q8
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  description: 'Kyutai Moshi with the male voice "Moshiko": a 7 B full-duplex speech-to-speech model (it listens and speaks
+    at once, in 80 ms frames, English only, about 200 ms of latency on a GPU per Kyutai), q8 weights for Kyutai''s Rust/candle
+    server. As s2s_model it answers Realtime and WebRTC sessions by itself: no turn detection, the caller can talk over
+    it. It takes no instructions, text or tools, and has one voice. Runs on Kyutai''s Rust/candle server (bolo components
+    install moshi --flavour candle; built with cargo: CUDA, Metal, or the CPU, which is far from real time; several conversations
+    at once, duplex_max_sessions). Weights CC-BY-4.0 (attribution: Kyutai).'
+  source_url: https://huggingface.co/kyutai/moshiko-candle-q8
+  validated: untested
+  requires:
+  - moshi
+  source:
+    urls:
+    - path: model.q8.gguf
+      url: https://huggingface.co/kyutai/moshiko-candle-q8/resolve/21b4ad73214f2e52eaa11a11dd70b23c4c97ea7a/model.q8.gguf
+      size: 8169420704
+      sha256: a48355349fd6199dbf9bd989595b8d6f44e5bc6d8ebeefb95f2e410cce19784e
+    - path: tokenizer-e351c8d8-checkpoint125.safetensors
+      url: https://huggingface.co/kyutai/moshiko-candle-q8/resolve/21b4ad73214f2e52eaa11a11dd70b23c4c97ea7a/tokenizer-e351c8d8-checkpoint125.safetensors
+      size: 384644900
+      sha256: 09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50
+    - path: tokenizer_spm_32k_3.model
+      url: https://huggingface.co/kyutai/moshiko-candle-q8/resolve/21b4ad73214f2e52eaa11a11dd70b23c4c97ea7a/tokenizer_spm_32k_3.model
+      size: 552778
+      sha256: 78d4336533ddc26f9acf7250d7fb83492152196c6ea4212c841df76933f18d2d
+  options:
+    repo: kyutai/moshiko-candle-q8
+    server: moshi
+    build: candle
+    model_file: model.q8.gguf
+    mimi_file: tokenizer-e351c8d8-checkpoint125.safetensors
+    tokenizer_file: tokenizer_spm_32k_3.model
+    hardware:
+      gpu: recommended
+      vram_gb: 10
+      note: estimate; CUDA or Metal build, the CPU build is far from real time
+  voices:
+  - id: moshiko
+    name: Moshiko
+    gender: m
+- id: moshiko-candle-bf16
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Moshi
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 15760892982
+  params: 7690000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/moshiko-candle-bf16
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  description: 'Kyutai Moshi with the male voice "Moshiko": a 7 B full-duplex speech-to-speech model (it listens and speaks
+    at once, in 80 ms frames, English only, about 200 ms of latency on a GPU per Kyutai), bf16 weights for Kyutai''s Rust/candle
+    server. As s2s_model it answers Realtime and WebRTC sessions by itself: no turn detection, the caller can talk over
+    it. It takes no instructions, text or tools, and has one voice. Runs on Kyutai''s Rust/candle server (bolo components
+    install moshi --flavour candle; built with cargo: CUDA, Metal, or the CPU, which is far from real time; several conversations
+    at once, duplex_max_sessions). Weights CC-BY-4.0 (attribution: Kyutai).'
+  source_url: https://huggingface.co/kyutai/moshiko-candle-bf16
+  validated: untested
+  requires:
+  - moshi
+  source:
+    urls:
+    - path: model.safetensors
+      url: https://huggingface.co/kyutai/moshiko-candle-bf16/resolve/50c436c9849a20685a47f087dc243f6bddac207b/model.safetensors
+      size: 15375695304
+      sha256: db0746f2c297fa3f49a2cd31737d169fa51f16e23ff3ee38917d7edc22cab2e1
+    - path: tokenizer-e351c8d8-checkpoint125.safetensors
+      url: https://huggingface.co/kyutai/moshiko-candle-bf16/resolve/50c436c9849a20685a47f087dc243f6bddac207b/tokenizer-e351c8d8-checkpoint125.safetensors
+      size: 384644900
+      sha256: 09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50
+    - path: tokenizer_spm_32k_3.model
+      url: https://huggingface.co/kyutai/moshiko-candle-bf16/resolve/50c436c9849a20685a47f087dc243f6bddac207b/tokenizer_spm_32k_3.model
+      size: 552778
+      sha256: 78d4336533ddc26f9acf7250d7fb83492152196c6ea4212c841df76933f18d2d
+  options:
+    repo: kyutai/moshiko-candle-bf16
+    server: moshi
+    build: candle
+    model_file: model.safetensors
+    mimi_file: tokenizer-e351c8d8-checkpoint125.safetensors
+    tokenizer_file: tokenizer_spm_32k_3.model
+    hardware:
+      gpu: required
+      vram_gb: 18
+      note: estimate
+  voices:
+  - id: moshiko
+    name: Moshiko
+    gender: m
+- id: moshika-pytorch-bf16
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Moshi
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 15760697814
+  params: 7690000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/moshika-pytorch-bf16
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  description: 'Kyutai Moshi with the female voice "Moshika": a 7 B full-duplex speech-to-speech model (it listens and speaks
+    at once, in 80 ms frames, English only, about 200 ms of latency on a GPU per Kyutai), bf16 weights for Kyutai''s PyTorch
+    server. As s2s_model it answers Realtime and WebRTC sessions by itself: no turn detection, the caller can talk over
+    it. It takes no instructions, text or tools, and has one voice. Runs on Kyutai''s PyTorch server (bolo components install
+    moshi; NVIDIA GPU, Linux or Windows). Weights CC-BY-4.0 (attribution: Kyutai).'
+  source_url: https://huggingface.co/kyutai/moshika-pytorch-bf16
+  validated: untested
+  requires:
+  - moshi
+  source:
+    urls:
+    - path: model.safetensors
+      url: https://huggingface.co/kyutai/moshika-pytorch-bf16/resolve/a49141e28b3d9c947cf9aa5314431e1b11cbd2f5/model.safetensors
+      size: 15375500136
+      sha256: e0a5a1c79010680eb916adb940ee8567978c78902c5a6b743c79202e75858712
+    - path: tokenizer-e351c8d8-checkpoint125.safetensors
+      url: https://huggingface.co/kyutai/moshika-pytorch-bf16/resolve/a49141e28b3d9c947cf9aa5314431e1b11cbd2f5/tokenizer-e351c8d8-checkpoint125.safetensors
+      size: 384644900
+      sha256: 09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50
+    - path: tokenizer_spm_32k_3.model
+      url: https://huggingface.co/kyutai/moshika-pytorch-bf16/resolve/a49141e28b3d9c947cf9aa5314431e1b11cbd2f5/tokenizer_spm_32k_3.model
+      size: 552778
+      sha256: 78d4336533ddc26f9acf7250d7fb83492152196c6ea4212c841df76933f18d2d
+  options:
+    repo: kyutai/moshika-pytorch-bf16
+    server: moshi
+    build: pytorch
+    model_file: model.safetensors
+    mimi_file: tokenizer-e351c8d8-checkpoint125.safetensors
+    tokenizer_file: tokenizer_spm_32k_3.model
+    hardware:
+      gpu: required
+      vram_gb: 24
+      note: 'Kyutai: a 24 GB GPU for bfloat16'
+  voices:
+  - id: moshika
+    name: Moshika
+    gender: f
+- id: moshika-pytorch-q8
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Moshi
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 8393887563
+  params: 7690000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/moshika-pytorch-q8
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  description: 'Kyutai Moshi with the female voice "Moshika": a 7 B full-duplex speech-to-speech model (it listens and speaks
+    at once, in 80 ms frames, English only, about 200 ms of latency on a GPU per Kyutai), q8 weights for Kyutai''s PyTorch
+    server. As s2s_model it answers Realtime and WebRTC sessions by itself: no turn detection, the caller can talk over
+    it. It takes no instructions, text or tools, and has one voice. Runs on Kyutai''s PyTorch server (bolo components install
+    moshi; NVIDIA GPU, Linux or Windows). Weights CC-BY-4.0 (attribution: Kyutai).'
+  source_url: https://huggingface.co/kyutai/moshika-pytorch-q8
+  validated: untested
+  requires:
+  - moshi
+  source:
+    urls:
+    - path: model.q8.safetensors
+      url: https://huggingface.co/kyutai/moshika-pytorch-q8/resolve/79c2f71d93e98f4fac4fba1ceaf8e1901fdae6cc/model.q8.safetensors
+      size: 8008688864
+      sha256: b86f2cf5f0c18fd7ff8304cf57898816369436cb31957759793c37f78aa026b7
+    - path: tokenizer-e351c8d8-checkpoint125.safetensors
+      url: https://huggingface.co/kyutai/moshika-pytorch-q8/resolve/79c2f71d93e98f4fac4fba1ceaf8e1901fdae6cc/tokenizer-e351c8d8-checkpoint125.safetensors
+      size: 384644900
+      sha256: 09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50
+    - path: tokenizer_spm_32k_3.model
+      url: https://huggingface.co/kyutai/moshika-pytorch-q8/resolve/79c2f71d93e98f4fac4fba1ceaf8e1901fdae6cc/tokenizer_spm_32k_3.model
+      size: 552778
+      sha256: 78d4336533ddc26f9acf7250d7fb83492152196c6ea4212c841df76933f18d2d
+    - path: config.json
+      url: https://huggingface.co/kyutai/moshika-pytorch-q8/resolve/79c2f71d93e98f4fac4fba1ceaf8e1901fdae6cc/config.json
+      size: 1021
+      sha256: b10eac4a22f6dbf231bc1b2cfbd4cc8049142d04dcce85eadb29208b442de231
+  options:
+    repo: kyutai/moshika-pytorch-q8
+    server: moshi
+    build: pytorch
+    model_file: model.q8.safetensors
+    mimi_file: tokenizer-e351c8d8-checkpoint125.safetensors
+    tokenizer_file: tokenizer_spm_32k_3.model
+    config_file: config.json
+    hardware:
+      gpu: required
+      vram_gb: 12
+      note: 'estimate: 8 GB of int8 weights (bitsandbytes) plus the codec and the cache'
+  voices:
+  - id: moshika
+    name: Moshika
+    gender: f
+- id: moshika-mlx-q4
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Moshi
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 5190742995
+  params: 7690000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/moshika-mlx-q4
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  description: 'Kyutai Moshi with the female voice "Moshika": a 7 B full-duplex speech-to-speech model (it listens and speaks
+    at once, in 80 ms frames, English only, about 200 ms of latency on a GPU per Kyutai), q4 weights for Kyutai''s MLX server.
+    As s2s_model it answers Realtime and WebRTC sessions by itself: no turn detection, the caller can talk over it. It takes
+    no instructions, text or tools, and has one voice. Runs on Kyutai''s MLX server (bolo components install moshi; Apple
+    silicon). Weights CC-BY-4.0 (attribution: Kyutai).'
+  source_url: https://huggingface.co/kyutai/moshika-mlx-q4
+  validated: untested
+  requires:
+  - moshi
+  source:
+    urls:
+    - path: model.q4.safetensors
+      url: https://huggingface.co/kyutai/moshika-mlx-q4/resolve/ce562a51ae571c1a7b70e8230b9af53ecc0bee5b/model.q4.safetensors
+      size: 4805545317
+      sha256: f98f2b4055823b2836d24a8db519492e4cf0a9a9f605d7fd1a41f46360457dcf
+    - path: tokenizer-e351c8d8-checkpoint125.safetensors
+      url: https://huggingface.co/kyutai/moshika-mlx-q4/resolve/ce562a51ae571c1a7b70e8230b9af53ecc0bee5b/tokenizer-e351c8d8-checkpoint125.safetensors
+      size: 384644900
+      sha256: 09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50
+    - path: tokenizer_spm_32k_3.model
+      url: https://huggingface.co/kyutai/moshika-mlx-q4/resolve/ce562a51ae571c1a7b70e8230b9af53ecc0bee5b/tokenizer_spm_32k_3.model
+      size: 552778
+      sha256: 78d4336533ddc26f9acf7250d7fb83492152196c6ea4212c841df76933f18d2d
+  options:
+    repo: kyutai/moshika-mlx-q4
+    server: moshi
+    build: mlx
+    model_file: model.q4.safetensors
+    mimi_file: tokenizer-e351c8d8-checkpoint125.safetensors
+    tokenizer_file: tokenizer_spm_32k_3.model
+    quantized: 4
+    hardware:
+      gpu: required
+      ram_gb: 6
+      note: Apple silicon, unified memory (estimate)
+  voices:
+  - id: moshika
+    name: Moshika
+    gender: f
+- id: moshika-mlx-q8
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Moshi
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 8554003089
+  params: 7690000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/moshika-mlx-q8
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  description: 'Kyutai Moshi with the female voice "Moshika": a 7 B full-duplex speech-to-speech model (it listens and speaks
+    at once, in 80 ms frames, English only, about 200 ms of latency on a GPU per Kyutai), q8 weights for Kyutai''s MLX server.
+    As s2s_model it answers Realtime and WebRTC sessions by itself: no turn detection, the caller can talk over it. It takes
+    no instructions, text or tools, and has one voice. Runs on Kyutai''s MLX server (bolo components install moshi; Apple
+    silicon). Weights CC-BY-4.0 (attribution: Kyutai).'
+  source_url: https://huggingface.co/kyutai/moshika-mlx-q8
+  validated: untested
+  requires:
+  - moshi
+  source:
+    urls:
+    - path: model.q8.safetensors
+      url: https://huggingface.co/kyutai/moshika-mlx-q8/resolve/2e5803240d6ea07c0e078baecc4a8fe06358c813/model.q8.safetensors
+      size: 8168805411
+      sha256: 6a8d0888765436ac1bbb4ea2d9b65c0f37bbc2b4c158318b3f1980a9c4f7108c
+    - path: tokenizer-e351c8d8-checkpoint125.safetensors
+      url: https://huggingface.co/kyutai/moshika-mlx-q8/resolve/2e5803240d6ea07c0e078baecc4a8fe06358c813/tokenizer-e351c8d8-checkpoint125.safetensors
+      size: 384644900
+      sha256: 09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50
+    - path: tokenizer_spm_32k_3.model
+      url: https://huggingface.co/kyutai/moshika-mlx-q8/resolve/2e5803240d6ea07c0e078baecc4a8fe06358c813/tokenizer_spm_32k_3.model
+      size: 552778
+      sha256: 78d4336533ddc26f9acf7250d7fb83492152196c6ea4212c841df76933f18d2d
+  options:
+    repo: kyutai/moshika-mlx-q8
+    server: moshi
+    build: mlx
+    model_file: model.q8.safetensors
+    mimi_file: tokenizer-e351c8d8-checkpoint125.safetensors
+    tokenizer_file: tokenizer_spm_32k_3.model
+    quantized: 8
+    hardware:
+      gpu: required
+      ram_gb: 10
+      note: Apple silicon, unified memory (estimate)
+  voices:
+  - id: moshika
+    name: Moshika
+    gender: f
+- id: moshika-mlx-bf16
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Moshi
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 15760894886
+  params: 7690000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/moshika-mlx-bf16
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  description: 'Kyutai Moshi with the female voice "Moshika": a 7 B full-duplex speech-to-speech model (it listens and speaks
+    at once, in 80 ms frames, English only, about 200 ms of latency on a GPU per Kyutai), bf16 weights for Kyutai''s MLX
+    server. As s2s_model it answers Realtime and WebRTC sessions by itself: no turn detection, the caller can talk over
+    it. It takes no instructions, text or tools, and has one voice. Runs on Kyutai''s MLX server (bolo components install
+    moshi; Apple silicon). Weights CC-BY-4.0 (attribution: Kyutai).'
+  source_url: https://huggingface.co/kyutai/moshika-mlx-bf16
+  validated: untested
+  requires:
+  - moshi
+  source:
+    urls:
+    - path: model.safetensors
+      url: https://huggingface.co/kyutai/moshika-mlx-bf16/resolve/03c68ab434ed33ae0716d38b0ee237069477066c/model.safetensors
+      size: 15375697208
+      sha256: 6ee8e3bbc5737ab4a91392b0a8e9d38a79d4e22cac0aadcbc9f432f4dbfcd35f
+    - path: tokenizer-e351c8d8-checkpoint125.safetensors
+      url: https://huggingface.co/kyutai/moshika-mlx-bf16/resolve/03c68ab434ed33ae0716d38b0ee237069477066c/tokenizer-e351c8d8-checkpoint125.safetensors
+      size: 384644900
+      sha256: 09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50
+    - path: tokenizer_spm_32k_3.model
+      url: https://huggingface.co/kyutai/moshika-mlx-bf16/resolve/03c68ab434ed33ae0716d38b0ee237069477066c/tokenizer_spm_32k_3.model
+      size: 552778
+      sha256: 78d4336533ddc26f9acf7250d7fb83492152196c6ea4212c841df76933f18d2d
+  options:
+    repo: kyutai/moshika-mlx-bf16
+    server: moshi
+    build: mlx
+    model_file: model.safetensors
+    mimi_file: tokenizer-e351c8d8-checkpoint125.safetensors
+    tokenizer_file: tokenizer_spm_32k_3.model
+    hardware:
+      gpu: required
+      ram_gb: 18
+      note: Apple silicon, unified memory (estimate)
+  voices:
+  - id: moshika
+    name: Moshika
+    gender: f
+- id: moshika-candle-q8
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Moshi
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 8554618382
+  params: 7690000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/moshika-candle-q8
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  description: 'Kyutai Moshi with the female voice "Moshika": a 7 B full-duplex speech-to-speech model (it listens and speaks
+    at once, in 80 ms frames, English only, about 200 ms of latency on a GPU per Kyutai), q8 weights for Kyutai''s Rust/candle
+    server. As s2s_model it answers Realtime and WebRTC sessions by itself: no turn detection, the caller can talk over
+    it. It takes no instructions, text or tools, and has one voice. Runs on Kyutai''s Rust/candle server (bolo components
+    install moshi --flavour candle; built with cargo: CUDA, Metal, or the CPU, which is far from real time; several conversations
+    at once, duplex_max_sessions). Weights CC-BY-4.0 (attribution: Kyutai).'
+  source_url: https://huggingface.co/kyutai/moshika-candle-q8
+  validated: untested
+  requires:
+  - moshi
+  source:
+    urls:
+    - path: model.q8.gguf
+      url: https://huggingface.co/kyutai/moshika-candle-q8/resolve/4b4a873fc1d3b92ce32b3ae91ff8e95bbb62193f/model.q8.gguf
+      size: 8169420704
+      sha256: 4ff7a871cf427da6e1dca0298c9347ac00860d527b7a60319f62ee6d05810106
+    - path: tokenizer-e351c8d8-checkpoint125.safetensors
+      url: https://huggingface.co/kyutai/moshika-candle-q8/resolve/4b4a873fc1d3b92ce32b3ae91ff8e95bbb62193f/tokenizer-e351c8d8-checkpoint125.safetensors
+      size: 384644900
+      sha256: 09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50
+    - path: tokenizer_spm_32k_3.model
+      url: https://huggingface.co/kyutai/moshika-candle-q8/resolve/4b4a873fc1d3b92ce32b3ae91ff8e95bbb62193f/tokenizer_spm_32k_3.model
+      size: 552778
+      sha256: 78d4336533ddc26f9acf7250d7fb83492152196c6ea4212c841df76933f18d2d
+  options:
+    repo: kyutai/moshika-candle-q8
+    server: moshi
+    build: candle
+    model_file: model.q8.gguf
+    mimi_file: tokenizer-e351c8d8-checkpoint125.safetensors
+    tokenizer_file: tokenizer_spm_32k_3.model
+    hardware:
+      gpu: recommended
+      vram_gb: 10
+      note: estimate; CUDA or Metal build, the CPU build is far from real time
+  voices:
+  - id: moshika
+    name: Moshika
+    gender: f
+- id: moshika-candle-bf16
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Moshi
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 15760892982
+  params: 7690000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/moshika-candle-bf16
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  description: 'Kyutai Moshi with the female voice "Moshika": a 7 B full-duplex speech-to-speech model (it listens and speaks
+    at once, in 80 ms frames, English only, about 200 ms of latency on a GPU per Kyutai), bf16 weights for Kyutai''s Rust/candle
+    server. As s2s_model it answers Realtime and WebRTC sessions by itself: no turn detection, the caller can talk over
+    it. It takes no instructions, text or tools, and has one voice. Runs on Kyutai''s Rust/candle server (bolo components
+    install moshi --flavour candle; built with cargo: CUDA, Metal, or the CPU, which is far from real time; several conversations
+    at once, duplex_max_sessions). Weights CC-BY-4.0 (attribution: Kyutai).'
+  source_url: https://huggingface.co/kyutai/moshika-candle-bf16
+  validated: untested
+  requires:
+  - moshi
+  source:
+    urls:
+    - path: model.safetensors
+      url: https://huggingface.co/kyutai/moshika-candle-bf16/resolve/cbc38d48bcdb49ec7443d74f0fa530a20bebd87b/model.safetensors
+      size: 15375695304
+      sha256: ed3dfa0c48fe00ebe83f2fac2dc517700905840b6264ea9eaa66c57dc457fedf
+    - path: tokenizer-e351c8d8-checkpoint125.safetensors
+      url: https://huggingface.co/kyutai/moshika-candle-bf16/resolve/cbc38d48bcdb49ec7443d74f0fa530a20bebd87b/tokenizer-e351c8d8-checkpoint125.safetensors
+      size: 384644900
+      sha256: 09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50
+    - path: tokenizer_spm_32k_3.model
+      url: https://huggingface.co/kyutai/moshika-candle-bf16/resolve/cbc38d48bcdb49ec7443d74f0fa530a20bebd87b/tokenizer_spm_32k_3.model
+      size: 552778
+      sha256: 78d4336533ddc26f9acf7250d7fb83492152196c6ea4212c841df76933f18d2d
+  options:
+    repo: kyutai/moshika-candle-bf16
+    server: moshi
+    build: candle
+    model_file: model.safetensors
+    mimi_file: tokenizer-e351c8d8-checkpoint125.safetensors
+    tokenizer_file: tokenizer_spm_32k_3.model
+    hardware:
+      gpu: required
+      vram_gb: 18
+      note: estimate
+  voices:
+  - id: moshika
+    name: Moshika
+    gender: f
+- id: hibiki-1b-pytorch-bf16
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Hibiki
+  languages:
+  - fr
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 3985349882
+  params: 1700000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/hibiki-1b-pytorch-bf16
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  - translation
+  description: 'Kyutai Hibiki 1B: simultaneous speech translation from French into English, full-duplex: it listens to French
+    and speaks the English translation (and its text) a few seconds behind, in the speaker''s voice, for as long as the
+    speaker talks. Use it as s2s_model in a Realtime or WebRTC session; it takes no instructions, text or tools. Runs on
+    Kyutai''s PyTorch server (bolo components install moshi; NVIDIA GPU, Linux or Windows). Weights CC-BY-4.0 (attribution:
+    Kyutai).'
+  source_url: https://huggingface.co/kyutai/hibiki-1b-pytorch-bf16
+  validated: untested
+  requires:
+  - moshi
+  source:
+    urls:
+    - path: hibikim-pytorch-37c6cfd6@200.safetensors
+      url: https://huggingface.co/kyutai/hibiki-1b-pytorch-bf16/resolve/65dee9b6a682393d4e9b193ccbe314e401e230c9/hibikim-pytorch-37c6cfd6@200.safetensors
+      size: 3599846096
+      sha256: 2346f38031fb65d24acd418cae3fada30115598400d9a7235498b9e9fe626062
+    - path: mimi-pytorch-e351c8d8@125.safetensors
+      url: https://huggingface.co/kyutai/hibiki-1b-pytorch-bf16/resolve/65dee9b6a682393d4e9b193ccbe314e401e230c9/mimi-pytorch-e351c8d8@125.safetensors
+      size: 384644900
+      sha256: 09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50
+    - path: tokenizer_spm_48k_multi6_2.model
+      url: https://huggingface.co/kyutai/hibiki-1b-pytorch-bf16/resolve/65dee9b6a682393d4e9b193ccbe314e401e230c9/tokenizer_spm_48k_multi6_2.model
+      size: 857314
+      sha256: c22110fb855aa049e17346ea2e88355bdd664f06cbfd09948380ab5e85b39697
+    - path: config.json
+      url: https://huggingface.co/kyutai/hibiki-1b-pytorch-bf16/resolve/65dee9b6a682393d4e9b193ccbe314e401e230c9/config.json
+      size: 1572
+      sha256: 8e8fcbef55fcfe31f1da2de95b8465cd9b3454fa741f263c0faaebccfef215c4
+  options:
+    repo: kyutai/hibiki-1b-pytorch-bf16
+    server: moshi
+    build: pytorch
+    model_file: hibikim-pytorch-37c6cfd6@200.safetensors
+    mimi_file: mimi-pytorch-e351c8d8@125.safetensors
+    tokenizer_file: tokenizer_spm_48k_multi6_2.model
+    config_file: config.json
+    hardware:
+      gpu: required
+      vram_gb: 6
+      note: estimate (bfloat16)
+- id: hibiki-2b-pytorch-bf16
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Hibiki
+  languages:
+  - fr
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 5960266814
+  params: 2700000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/hibiki-2b-pytorch-bf16
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  - translation
+  description: 'Kyutai Hibiki 2B: simultaneous speech translation from French into English, full-duplex: it listens to French
+    and speaks the English translation (and its text) a few seconds behind, in the speaker''s voice, for as long as the
+    speaker talks. Use it as s2s_model in a Realtime or WebRTC session; it takes no instructions, text or tools. Runs on
+    Kyutai''s PyTorch server (bolo components install moshi; NVIDIA GPU, Linux or Windows). Weights CC-BY-4.0 (attribution:
+    Kyutai).'
+  source_url: https://huggingface.co/kyutai/hibiki-2b-pytorch-bf16
+  validated: untested
+  requires:
+  - moshi
+  source:
+    urls:
+    - path: hibiki-pytorch-ccef4858@200.safetensors
+      url: https://huggingface.co/kyutai/hibiki-2b-pytorch-bf16/resolve/bd71144c96f26040612f6414716f5f48ee4fce69/hibiki-pytorch-ccef4858@200.safetensors
+      size: 5574762720
+      sha256: 0847a768f01f3e78c42ddb779e7aa9c610b7bab71306a71d62d98a7d9cff3bdb
+    - path: mimi-pytorch-e351c8d8@125.safetensors
+      url: https://huggingface.co/kyutai/hibiki-2b-pytorch-bf16/resolve/bd71144c96f26040612f6414716f5f48ee4fce69/mimi-pytorch-e351c8d8@125.safetensors
+      size: 384644900
+      sha256: 09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50
+    - path: tokenizer_spm_48k_multi6_2.model
+      url: https://huggingface.co/kyutai/hibiki-2b-pytorch-bf16/resolve/bd71144c96f26040612f6414716f5f48ee4fce69/tokenizer_spm_48k_multi6_2.model
+      size: 857314
+      sha256: c22110fb855aa049e17346ea2e88355bdd664f06cbfd09948380ab5e85b39697
+    - path: config.json
+      url: https://huggingface.co/kyutai/hibiki-2b-pytorch-bf16/resolve/bd71144c96f26040612f6414716f5f48ee4fce69/config.json
+      size: 1880
+      sha256: 71b0151d6187b764b7a76a73ae9b60c942ab5fa4a69c67773f9ba24f2a555ed1
+  options:
+    repo: kyutai/hibiki-2b-pytorch-bf16
+    server: moshi
+    build: pytorch
+    model_file: hibiki-pytorch-ccef4858@200.safetensors
+    mimi_file: mimi-pytorch-e351c8d8@125.safetensors
+    tokenizer_file: tokenizer_spm_48k_multi6_2.model
+    config_file: config.json
+    hardware:
+      gpu: required
+      vram_gb: 10
+      note: estimate (bfloat16)
+- id: hibiki-1b-mlx-bf16
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Hibiki
+  languages:
+  - fr
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 3985546802
+  params: 1700000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/hibiki-1b-mlx-bf16
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  - translation
+  description: 'Kyutai Hibiki 1B: simultaneous speech translation from French into English, full-duplex: it listens to French
+    and speaks the English translation (and its text) a few seconds behind, in the speaker''s voice, for as long as the
+    speaker talks. Use it as s2s_model in a Realtime or WebRTC session; it takes no instructions, text or tools. Runs on
+    Kyutai''s MLX server (bolo components install moshi; Apple silicon). Weights CC-BY-4.0 (attribution: Kyutai).'
+  source_url: https://huggingface.co/kyutai/hibiki-1b-mlx-bf16
+  validated: untested
+  requires:
+  - moshi
+  source:
+    urls:
+    - path: hibiki-mlx-dc2cf5a5@80.safetensors
+      url: https://huggingface.co/kyutai/hibiki-1b-mlx-bf16/resolve/b3d6291f3dcf7954e1a502e4d66f32e3556f17ae/hibiki-mlx-dc2cf5a5@80.safetensors
+      size: 3600043224
+      sha256: 2d1baa58b2003aef24a034cdec5bc8c6b4c6d14d0d50e530c42708e62e0b30d9
+    - path: mimi-dbaa9758@125.safetensors
+      url: https://huggingface.co/kyutai/hibiki-1b-mlx-bf16/resolve/b3d6291f3dcf7954e1a502e4d66f32e3556f17ae/mimi-dbaa9758@125.safetensors
+      size: 384644900
+      sha256: 31c14cf365353131094e8248150c6fe58e8642cf91899c50d9e450f861630e55
+    - path: tokenizer_spm_48k_multi6_2.model
+      url: https://huggingface.co/kyutai/hibiki-1b-mlx-bf16/resolve/b3d6291f3dcf7954e1a502e4d66f32e3556f17ae/tokenizer_spm_48k_multi6_2.model
+      size: 857314
+      sha256: c22110fb855aa049e17346ea2e88355bdd664f06cbfd09948380ab5e85b39697
+    - path: config.json
+      url: https://huggingface.co/kyutai/hibiki-1b-mlx-bf16/resolve/b3d6291f3dcf7954e1a502e4d66f32e3556f17ae/config.json
+      size: 1364
+      sha256: fa60fd34d98db63cf7673766c3053b56370aa0385c5e3e8d2922bed163bb3758
+  options:
+    repo: kyutai/hibiki-1b-mlx-bf16
+    server: moshi
+    build: mlx
+    model_file: hibiki-mlx-dc2cf5a5@80.safetensors
+    mimi_file: mimi-dbaa9758@125.safetensors
+    tokenizer_file: tokenizer_spm_48k_multi6_2.model
+    config_file: config.json
+    hardware:
+      gpu: required
+      ram_gb: 6
+      note: Apple silicon, unified memory (estimate); Kyutai runs it on an iPhone
+- id: hibiki-2b-mlx-bf16
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Hibiki
+  languages:
+  - fr
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 6584458695
+  params: 2700000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/hibiki-2b-mlx-bf16
+  commercial_use: true
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  - translation
+  description: 'Kyutai Hibiki 2B: simultaneous speech translation from French into English, full-duplex: it listens to French
+    and speaks the English translation (and its text) a few seconds behind, in the speaker''s voice, for as long as the
+    speaker talks. Use it as s2s_model in a Realtime or WebRTC session; it takes no instructions, text or tools. Runs on
+    Kyutai''s MLX server (bolo components install moshi; Apple silicon). Weights CC-BY-4.0 (attribution: Kyutai).'
+  source_url: https://huggingface.co/kyutai/hibiki-2b-mlx-bf16
+  validated: untested
+  requires:
+  - moshi
+  source:
+    urls:
+    - path: hibiki-mlx-220b12c0@200.safetensors
+      url: https://huggingface.co/kyutai/hibiki-2b-mlx-bf16/resolve/290f1d4bc7aed6730648068bb4f813914b76470c/hibiki-mlx-220b12c0@200.safetensors
+      size: 6198954768
+      sha256: c4f264068e13326ad0fa94acd923763f3a6d99adb8a1d5c34de107059669d6e4
+    - path: mimi-dbaa9758@125.safetensors
+      url: https://huggingface.co/kyutai/hibiki-2b-mlx-bf16/resolve/290f1d4bc7aed6730648068bb4f813914b76470c/mimi-dbaa9758@125.safetensors
+      size: 384644900
+      sha256: 31c14cf365353131094e8248150c6fe58e8642cf91899c50d9e450f861630e55
+    - path: tokenizer_spm_48k_multi6_2.model
+      url: https://huggingface.co/kyutai/hibiki-2b-mlx-bf16/resolve/290f1d4bc7aed6730648068bb4f813914b76470c/tokenizer_spm_48k_multi6_2.model
+      size: 857314
+      sha256: c22110fb855aa049e17346ea2e88355bdd664f06cbfd09948380ab5e85b39697
+    - path: config.json
+      url: https://huggingface.co/kyutai/hibiki-2b-mlx-bf16/resolve/290f1d4bc7aed6730648068bb4f813914b76470c/config.json
+      size: 1713
+      sha256: aa7d1a7ed782e8ec628b8290f988c4a3f5743ecf26e90b604070302e96d907c6
+  options:
+    repo: kyutai/hibiki-2b-mlx-bf16
+    server: moshi
+    build: mlx
+    model_file: hibiki-mlx-220b12c0@200.safetensors
+    mimi_file: mimi-dbaa9758@125.safetensors
+    tokenizer_file: tokenizer_spm_48k_multi6_2.model
+    config_file: config.json
+    hardware:
+      gpu: required
+      ram_gb: 10
+      note: Apple silicon, unified memory (estimate)
+- id: hibiki-zero-3b-pytorch-bf16
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: Hibiki-Zero
+  languages:
+  - fr
+  - es
+  - pt
+  - de
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 6648924233
+  params: 3000000000
+  license: CC-BY-NC-SA-4.0
+  license_url: https://huggingface.co/kyutai/hibiki-zero-3b-pytorch-bf16
+  commercial_use: false
+  gated: false
+  features:
+  - speech-to-speech
+  - full-duplex
+  - translation
+  description: 'Kyutai Hibiki-Zero 3B: simultaneous speech translation from French, Spanish, Portuguese or German into English
+    (speech in the speaker''s voice, and text), full-duplex, one speaker and language per session. Runs on Kyutai''s Hibiki-Zero
+    server (bolo components install hibiki-zero; NVIDIA GPU). Weights CC-BY-NC-SA-4.0: non-commercial, share-alike.'
+  source_url: https://huggingface.co/kyutai/hibiki-zero-3b-pytorch-bf16
+  validated: untested
+  requires:
+  - hibiki-zero
+  source:
+    urls:
+    - path: hibiki-pytorch-77f82164@110.safetensors
+      url: https://huggingface.co/kyutai/hibiki-zero-3b-pytorch-bf16/resolve/73175ce6243f8ad66b2138b0264a80044b35c1bd/hibiki-pytorch-77f82164@110.safetensors
+      size: 6263420344
+      sha256: cd78e453b3b80299255bea02be439bcc2552b57c03cd82dbf0e9792e20100db8
+    - path: mimi-pytorch-e351c8d8@125.safetensors
+      url: https://huggingface.co/kyutai/hibiki-zero-3b-pytorch-bf16/resolve/73175ce6243f8ad66b2138b0264a80044b35c1bd/mimi-pytorch-e351c8d8@125.safetensors
+      size: 384644900
+      sha256: 09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50
+    - path: tokenizer_spm_48k_multi6_2.model
+      url: https://huggingface.co/kyutai/hibiki-zero-3b-pytorch-bf16/resolve/73175ce6243f8ad66b2138b0264a80044b35c1bd/tokenizer_spm_48k_multi6_2.model
+      size: 857314
+      sha256: c22110fb855aa049e17346ea2e88355bdd664f06cbfd09948380ab5e85b39697
+    - path: config.json
+      url: https://huggingface.co/kyutai/hibiki-zero-3b-pytorch-bf16/resolve/73175ce6243f8ad66b2138b0264a80044b35c1bd/config.json
+      size: 1675
+      sha256: a99f354a6131034b688fc9f91c889dc10e7eeff96ce65e94447be33d1be325a5
+  options:
+    repo: kyutai/hibiki-zero-3b-pytorch-bf16
+    server: hibiki-zero
+    build: pytorch
+    model_file: hibiki-pytorch-77f82164@110.safetensors
+    mimi_file: mimi-pytorch-e351c8d8@125.safetensors
+    tokenizer_file: tokenizer_spm_48k_multi6_2.model
+    config_file: config.json
+    hardware:
+      gpu: required
+      vram_gb: 10
+      note: estimate (float16, 3 B)
+- id: personaplex-7b-v1
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: PersonaPlex
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 17134167199
+  params: 7700000000
+  license: NVIDIA Open Model License
+  license_url: https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/
+  commercial_use: true
+  gated: true
+  features:
+  - speech-to-speech
+  - full-duplex
+  - instructions
+  description: 'NVIDIA PersonaPlex 7B: a full-duplex conversation model built on Moshi whose role is set by the session''s
+    instructions (a text prompt, e.g. a customer-service persona) and whose voice is one of 18 voice prompts (session voice,
+    default NATF2), both fixed when the conversation starts. English. Runs on NVIDIA''s PersonaPlex server (bolo components
+    install personaplex; NVIDIA GPU). Gated on Hugging Face: accept the licence and set BOLO_HF_TOKEN. Weights under the
+    NVIDIA Open Model License (commercial use allowed), derived from Moshi (CC-BY-4.0).'
+  source_url: https://huggingface.co/nvidia/personaplex-7b-v1
+  validated: untested
+  requires:
+  - personaplex
+  source:
+    repo: nvidia/personaplex-7b-v1
+    revision: fdaf4090a61cb315c138a1faee287ffd6c716309
+    include:
+    - model.safetensors
+    - tokenizer-e351c8d8-checkpoint125.safetensors
+    - tokenizer_spm_32k_3.model
+    - voices.tgz
+  options:
+    repo: nvidia/personaplex-7b-v1
+    server: personaplex
+    build: pytorch
+    model_file: model.safetensors
+    mimi_file: tokenizer-e351c8d8-checkpoint125.safetensors
+    tokenizer_file: tokenizer_spm_32k_3.model
+    voices_archive: voices.tgz
+    voice_param: voice_prompt
+    voice_suffix: .pt
+    default_voice: NATF2
+    instructions_param: text_prompt
+    hardware:
+      gpu: required
+      vram_gb: 24
+      note: bfloat16 7 B; NVIDIA's server can offload layers to the CPU (duplex_server_args = ["--cpu-offload"], with accelerate
+        installed in its environment)
+  voices:
+  - id: NATF0
+    name: NATF0
+    gender: f
+  - id: NATF1
+    name: NATF1
+    gender: f
+  - id: NATF2
+    name: NATF2
+    gender: f
+  - id: NATF3
+    name: NATF3
+    gender: f
+  - id: NATM0
+    name: NATM0
+    gender: m
+  - id: NATM1
+    name: NATM1
+    gender: m
+  - id: NATM2
+    name: NATM2
+    gender: m
+  - id: NATM3
+    name: NATM3
+    gender: m
+  - id: VARF0
+    name: VARF0
+    gender: f
+  - id: VARF1
+    name: VARF1
+    gender: f
+  - id: VARF2
+    name: VARF2
+    gender: f
+  - id: VARF3
+    name: VARF3
+    gender: f
+  - id: VARF4
+    name: VARF4
+    gender: f
+  - id: VARM0
+    name: VARM0
+    gender: m
+  - id: VARM1
+    name: VARM1
+    gender: m
+  - id: VARM2
+    name: VARM2
+    gender: m
+  - id: VARM3
+    name: VARM3
+    gender: m
+  - id: VARM4
+    name: VARM4
+    gender: m
+- id: personaplex-rl-seamless
+  task: speech-to-speech
+  engine: duplex
+  kind: kyutai
+  family: PersonaPlex
+  languages:
+  - en
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 17134167223
+  params: 7700000000
+  license: CC-BY-NC-4.0 and NVIDIA Open Model License
+  license_url: https://huggingface.co/kyutai/personaplex-rl-seamless
+  commercial_use: false
+  gated: true
+  features:
+  - speech-to-speech
+  - full-duplex
+  - instructions
+  description: 'Kyutai''s fine-tune of NVIDIA PersonaPlex 7B (reinforcement learning on Meta''s Seamless Interaction conversations),
+    full-duplex, English, with PersonaPlex''s text and voice prompts. Runs on NVIDIA''s PersonaPlex server (bolo components
+    install personaplex; NVIDIA GPU). Gated on Hugging Face: accept the terms and set BOLO_HF_TOKEN. Licensed under CC-BY-NC-4.0
+    together with the NVIDIA Open Model License: non-commercial.'
+  source_url: https://huggingface.co/kyutai/personaplex-rl-seamless
+  validated: untested
+  requires:
+  - personaplex
+  source:
+    repo: kyutai/personaplex-rl-seamless
+    revision: 3fa800309a4b743a8a6d764253eb45def0334afc
+    include:
+    - model.safetensors
+    - tokenizer-e351c8d8-checkpoint125.safetensors
+    - tokenizer_spm_32k_3.model
+    - voices.tgz
+  options:
+    repo: kyutai/personaplex-rl-seamless
+    server: personaplex
+    build: pytorch
+    model_file: model.safetensors
+    mimi_file: tokenizer-e351c8d8-checkpoint125.safetensors
+    tokenizer_file: tokenizer_spm_32k_3.model
+    voices_archive: voices.tgz
+    voice_param: voice_prompt
+    voice_suffix: .pt
+    default_voice: NATF2
+    instructions_param: text_prompt
+    hardware:
+      gpu: required
+      vram_gb: 24
+      note: bfloat16 7 B; NVIDIA's server can offload layers to the CPU (duplex_server_args = ["--cpu-offload"], with accelerate
+        installed in its environment)
+  voices:
+  - id: NATF0
+    name: NATF0
+    gender: f
+  - id: NATF1
+    name: NATF1
+    gender: f
+  - id: NATF2
+    name: NATF2
+    gender: f
+  - id: NATF3
+    name: NATF3
+    gender: f
+  - id: NATM0
+    name: NATM0
+    gender: m
+  - id: NATM1
+    name: NATM1
+    gender: m
+  - id: NATM2
+    name: NATM2
+    gender: m
+  - id: NATM3
+    name: NATM3
+    gender: m
+  - id: VARF0
+    name: VARF0
+    gender: f
+  - id: VARF1
+    name: VARF1
+    gender: f
+  - id: VARF2
+    name: VARF2
+    gender: f
+  - id: VARF3
+    name: VARF3
+    gender: f
+  - id: VARF4
+    name: VARF4
+    gender: f
+  - id: VARM0
+    name: VARM0
+    gender: m
+  - id: VARM1
+    name: VARM1
+    gender: m
+  - id: VARM2
+    name: VARM2
+    gender: m
+  - id: VARM3
+    name: VARM3
+    gender: m
+  - id: VARM4
+    name: VARM4
+    gender: m

@@ -76,6 +76,12 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `s2s_server_api_key` | unset | | sent as `Authorization: Bearer …` to `s2s_server_url` |
 | `s2s_parallel` | `2` | | sessions the managed server holds at once (`llama-server --parallel`; one slot per session) |
 | `s2s_server_args` | `[]` | | extra command-line arguments for the managed server (bolo adds `-ngl N`, the layers that fit in free accelerator memory, when `device` is not `cpu` and the arguments have no `-ngl`) |
+| `duplex_server_url` | none | | a server you run that speaks Kyutai's full-duplex WebSocket protocol (`http://host:8998` or `ws://host:8998/api/chat`; `https://` for the Rust server), used when `s2s_model` names a full-duplex model; unset: bolo starts the model's server itself (voice-agents.md, "Full-duplex models") |
+| `duplex_max_sessions` | `1` | | conversations at once with a full-duplex model: the Rust (`candle`) server and `duplex_server_url`; Kyutai's PyTorch and MLX servers and NVIDIA's PersonaPlex server always hold one |
+| `duplex_server_args` | `[]` | | extra command-line arguments for the managed full-duplex server (e.g. `["--half"]` for Kyutai's PyTorch server on a GPU without bfloat16, `["--cpu-offload"]` for PersonaPlex) |
+| `duplex_start_timeout_s` | `900` | | how long the managed full-duplex server may take to load and warm up |
+| `duplex_silence_ms` | `800` | | a full-duplex model's speech is cut into Realtime responses at pauses this long |
+| `duplex_jitter_ms` | `200` | | how far the caller's audio may lag the clock before bolo feeds the full-duplex model silence (it steps once per 80 ms of input, so it would stall) |
 | `allow_component_install` | unset | | whether optional components (eSpeak NG) may be installed through the API. Unset: allowed on a loopback bind or when an API key is set. Never allowed on a non-loopback bind without a key |
 | `preload` | `[]` | `--preload` (repeatable) | models to load at startup; `/readyz` waits for them |
 | `keep_alive` | `5m` | | how long a model stays loaded once idle, as in Ollama: seconds (`300`) or a duration (`"30s"`, `"5m"`, `"1h30m"`); `0` unloads a model as soon as the request using it ends; a negative value (`-1`) keeps models loaded until they are unloaded on purpose or evicted. A request's own `keep_alive` (api.md, "Keep-alive") and the per-task values below override it. Environment: `BOLO_KEEP_ALIVE`. Ollama's `OLLAMA_KEEP_ALIVE` is deliberately not read: bolo often runs next to an Ollama whose setting is meant for Ollama |

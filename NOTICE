@@ -5,7 +5,8 @@ This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 
 bolo's own source code contains no third-party source code, except the copy
 of uccharan in ui/src/vendor/uccharan (see "Web console: speech synthesis in
-the browser" below). It talks to the
+the browser" below) and the parts of Kyutai's moshi named under "Full-duplex
+speech models". It talks to the
 following components, which are installed separately as Python dependencies
 or optional extras and keep their own licences:
 
@@ -40,6 +41,22 @@ or optional extras and keep their own licences:
   Optional protocol and codec libraries
     wyoming (MIT)                   https://github.com/OHF-Voice/wyoming
     PyAV (BSD-3-Clause; its wheels bundle FFmpeg libraries, LGPL-2.1-or-later)
+
+  Full-duplex speech models (bolo.duplex)
+    bolo.duplex.kyutai speaks Kyutai's WebSocket protocol for Moshi
+    (message kinds and framing as documented in rust/protocol.md of
+    https://github.com/kyutai-labs/moshi), and bolo.duplex.runtime carries the
+    Moshi 7B language-model configuration values of moshi.models.loaders
+    (moshi 0.2.13). Both are adapted from Kyutai's moshi, Copyright (c)
+    Kyutai, licensed MIT (Python) and Apache-2.0 (Rust). The servers bolo
+    installs on request keep their own licences and are not distributed with
+    bolo: Kyutai's moshi and moshi_mlx (MIT), moshi-backend (MIT or
+    Apache-2.0), hibiki-zero (MIT), and NVIDIA's PersonaPlex server (MIT; a
+    fork of Kyutai's moshi). The tests use Kyutai's sphn (MIT or Apache-2.0).
+    Model weights are downloaded by the user: Moshi and Hibiki CC-BY-4.0
+    (credit Kyutai), Hibiki-Zero CC-BY-NC-SA-4.0, PersonaPlex the NVIDIA Open
+    Model License, Kyutai's PersonaPlex fine-tune CC-BY-NC-4.0 with the NVIDIA
+    Open Model License.
 
   Speaker diarization uses the pyannote segmentation-3.0 model (MIT) in its
   ONNX export and a 3D-Speaker ERes2Net speaker-embedding model (Apache-2.0),

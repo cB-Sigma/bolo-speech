@@ -206,7 +206,7 @@ definitions are in `server/src/bolo/plugin/protocol.py`.
 | `qwen2.5-omni-7b-torch` | speech-to-speech | `omni` | Apache-2.0 | no | not run (22 GB; fakes only) |
 | `qwen3-omni-30b-a3b-instruct-torch` | speech-to-speech, speech out in 10 languages | `omni` | Apache-2.0 | no | not run (70 GB; fakes only) |
 | `sravaani-1.0`, `indicconformer-600m-official` | STT | - | MIT | yes | not implemented in bolo-torch yet |
-| `moshiko-pytorch-bf16`, `moshika-pytorch-bf16`, `glm-4-voice-9b`, `minicpm-o-2.6`, `step-audio-2-mini`, `kimi-audio-7b-instruct` | speech-to-speech | - | CC-BY-4.0, glm-4-voice License, Apache-2.0, MIT | no | not runnable yet (full-duplex, or no packaged inference code; models.md) |
+| `glm-4-voice-9b`, `minicpm-o-2.6`, `step-audio-2-mini`, `kimi-audio-7b-instruct` | speech-to-speech | - | glm-4-voice License, Apache-2.0, MIT | no | not runnable yet (no packaged inference code; models.md) |
 
 Install (CPU): `pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu`, then
 `pip install "bolo-torch[parler,sepformer]"` with the extras you need. `parler` needs a

@@ -3683,7 +3683,7 @@
        }
       ],
       "title": "Flavour",
-      "description": "llama-server, audio.cpp: the build, `cpu`, `cuda` or `vulkan` (default: `device`'s)"
+      "description": "llama-server, audio.cpp: the build, `cpu`, `cuda` or `vulkan` (default: `device`'s); moshi: `pytorch`, `mlx` or `candle` (default: the platform's); personaplex: `pytorch`"
      }
     },
     "type": "object",

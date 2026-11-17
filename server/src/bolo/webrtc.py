@@ -164,8 +164,10 @@ class Call:
         if kind == "response.done" and (event.get("response") or {}).get("status") == "cancelled":
             self._clear_output()
         self._deliver(json.dumps(event, ensure_ascii=False))
-        if kind == "input_audio_buffer.speech_started" and (self.session.turn_detection or {}).get(
-            "interrupt_response", True
+        if (
+            kind == "input_audio_buffer.speech_started"
+            and (self.session.turn_detection or {}).get("interrupt_response", True)
+            and not self.session.full_duplex  # a full-duplex model hears the caller and decides itself
         ):
             self._clear_output()  # barge-in also silences audio that was generated but not played yet
 

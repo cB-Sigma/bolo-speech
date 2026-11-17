@@ -733,7 +733,11 @@ curl -s localhost:8000/v1/audio/speech/embedding -F file=@a.wav | jq '.data[0].e
                   "audio-llm": {"configured": false, "available": false, "base_url": null, "model": null},
                   "speech-to-speech": {"configured": true, "available": false,
                                        "reason": "llama-server is not installed (bolo components install llama-server)",
-                                       "model": "lfm3-audio-2b-llamacpp", "url": null}}},
+                                       "model": "lfm3-audio-2b-llamacpp", "url": null,
+                                       // a full-duplex s2s_model (Moshi, Hibiki, PersonaPlex): it hears and speaks at
+                                       // once, with features, license and, once a session opened it, the backend's
+                                       // runtime, max_sessions and active_sessions (voice-agents.md)
+                                       "full_duplex": false}}},
    "chat_completions": {"endpoint": "/v1/chat/completions", "available": false, "audio": false},
    "llm": {"configured": false, "base_url": null, "model": null},
    // phone calls (telephony.md): "exposed" lists the providers whose webhook and stream routes answer
@@ -750,7 +754,7 @@ curl -s localhost:8000/v1/audio/speech/embedding -F file=@a.wav | jq '.data[0].e
 
 ### `GET /api/v1/catalog?task=&q=&installed=`
 
-`task`: `stt`, `tts`, `vad`, `diarization`, `turn` (end-of-turn models), `separation` (overlapped-speech separation), `denoise`, `speech-to-speech` (turn-based conversation models for the Realtime `speech-to-speech` pipeline), `audio-llm` (models that hear audio and answer in text, for the `audio-llm` pipeline). `q`: space-separated words that must all appear
+`task`: `stt`, `tts`, `vad`, `diarization`, `turn` (end-of-turn models), `separation` (overlapped-speech separation), `denoise`, `speech-to-speech` (conversation models for the Realtime `speech-to-speech` pipeline: turn-based, or full-duplex with the feature `full-duplex`), `audio-llm` (models that hear audio and answer in text, for the `audio-llm` pipeline). `q`: space-separated words that must all appear
 in the id, aliases, family, engine, languages, licence or description.
 `installed`: `true` / `false`.
 
@@ -1205,7 +1209,9 @@ estimated cost when the provider's price table knows the model),
 another model answered; `model` is then the one that answered), and on
 voice-agent traces (`kind: "agent"`) `pipeline`: which pipeline answered the
 turn (`cascade`, `audio-llm`, `speech-to-speech`; `transcription` for a
-transcription-only session; `cascade` for `/v1/chat/completions`). See
+transcription-only session; `cascade` for `/v1/chat/completions`), with
+`full_duplex: true` and `started_after_user_ms` for each answer of a
+full-duplex model. See
 [providers.md](providers.md#traces-metrics-and-cost-estimates).
 
 Phase names: speech-to-text `queue`, `resample`, `vad`, `decode`, `finalize`;

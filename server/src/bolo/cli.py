@@ -1111,13 +1111,18 @@ def cmd_components(args: argparse.Namespace) -> int:
                 print(f"             install: {c['manual_command']}")
         return 0
     from bolo import tts_runtimes
+    from bolo.duplex import runtime as duplex_runtime
 
     listed = manager.pack_status()
     packs = tuple(c["id"] for c in listed if c["license"] != "Apache-2.0")
-    installable = ("espeak-ng", "uccharan", *tts_runtimes.RUNTIMES, *(c["id"] for c in listed))
+    installable = (
+        "espeak-ng", "uccharan", *tts_runtimes.RUNTIMES, *duplex_runtime.COMPONENTS, *(c["id"] for c in listed),
+    )  # fmt: skip
     if args.component not in installable:
         print(f"error: unknown component '{args.component}' (installable: {', '.join(installable)})", file=sys.stderr)
         return 1
+    if args.component in duplex_runtime.COMPONENTS:
+        return _install_duplex_server(manager, args.component, args.flavour)
     runtime = args.component in tts_runtimes.RUNTIMES
     unsupported = tts_runtimes.unsupported_reason(args.component) if runtime else None
     if unsupported:
@@ -1125,7 +1130,10 @@ def cmd_components(args: argparse.Namespace) -> int:
         return 1
     built = args.component in ("llama-server", "audio.cpp")
     if args.flavour and not built:
-        print(f"error: --flavour is for llama-server and audio.cpp, not {args.component}", file=sys.stderr)
+        print(
+            f"error: --flavour is for llama-server, audio.cpp, moshi and personaplex, not {args.component}",
+            file=sys.stderr,
+        )
         return 1
     if built and args.flavour is None:
         note = tts_runtimes.missing_build_note(args.component, manager.core.settings.device)
@@ -1171,6 +1179,28 @@ def cmd_components(args: argparse.Namespace) -> int:
         print(f"installed {args.component} (SHA-256 checked)")
         return 0
     print(f"installed {args.component}; voices that need it are now available")
+    return 0
+
+
+def _install_duplex_server(manager: Any, component: str, flavour: str | None) -> int:
+    """``bolo components install moshi|personaplex [--flavour pytorch|mlx|candle]``."""
+    from bolo.duplex import runtime as duplex_runtime
+
+    build = duplex_runtime.build_of(component, flavour)
+    if build is not None and build.id in duplex_runtime.installed_flavours(manager.core.settings, component):
+        print(f"{component} ({build.id} build) is already installed")
+        return 0
+    blocked = manager.duplex_blocked_reason(component, flavour)
+    if blocked:
+        print(f"error: cannot install {component}: {blocked}", file=sys.stderr)
+        return 1
+    assert build is not None
+    print(f"installing the {build.id} build of {component} ({build.note}); this downloads several GB", file=sys.stderr)
+    error = manager.install_blocking(component=component, flavour=build.id)
+    if error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    print(f"installed {component} ({build.id} build); the full-duplex models that run on it are now available")
     return 0
 
 
@@ -2067,10 +2097,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.add_argument(
         "--flavour",
-        choices=["cpu", "cuda", "vulkan"],
+        choices=["cpu", "cuda", "vulkan", "pytorch", "mlx", "candle"],
         default=None,
         help="llama-server, audio.cpp: the build to install (default: the one `device` asks for; each build has its "
-        "own folder, and the one matching `device` runs)",
+        "own folder, and the one matching `device` runs); moshi: pytorch (NVIDIA GPU, the default on Linux and "
+        "Windows), mlx (Apple silicon, the default there) or candle (Rust, built with cargo); personaplex: pytorch",
     )
     s.set_defaults(func=cmd_components)
 

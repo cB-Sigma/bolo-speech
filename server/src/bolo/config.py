@@ -181,6 +181,15 @@ class Settings:
     s2s_server_api_key: str | None = None  # sent as "Authorization: Bearer ..." to s2s_server_url
     s2s_parallel: int = 2  # sessions the managed server holds at once (llama-server --parallel)
     s2s_server_args: list[str] = field(default_factory=list)  # extra arguments for the managed server
+    #: full-duplex speech-to-speech models (s2s_model naming a catalog entry with the feature full-duplex: Moshi,
+    #: Hibiki, PersonaPlex; bolo.duplex). duplex_server_url names a server you run that speaks Kyutai's WebSocket
+    #: protocol (http(s)://host:port or ws(s)://host:port/api/chat); else bolo starts the model's server itself
+    duplex_server_url: str | None = None
+    duplex_max_sessions: int = 1  # conversations at once (Kyutai's Python and MLX servers hold one, always)
+    duplex_server_args: list[str] = field(default_factory=list)  # extra arguments for the managed server
+    duplex_start_timeout_s: float = 900.0  # loading a 7 B model can take minutes
+    duplex_silence_ms: int = 800  # the model's speech is cut into responses at pauses this long
+    duplex_jitter_ms: int = 200  # the caller's audio may lag the clock this much before the model is fed silence
 
     # -- other protocols --------------------------------------------------
     wyoming: bool = False

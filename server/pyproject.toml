@@ -66,6 +66,10 @@ av = ["av>=12"]
 wyoming = ["wyoming>=1.6"]
 # WebRTC transport of the Realtime API (aiortc is BSD-3-Clause; it brings PyAV for Opus)
 webrtc = ["aiortc>=1.9", "av>=12"]
+# full-duplex speech-to-speech models (Moshi, Hibiki, PersonaPlex; bolo.duplex): their servers send Ogg Opus, which
+# bolo frames itself and codes with libopus through PyAV. The servers themselves are components
+# (`bolo components install moshi`), each in an environment of its own.
+duplex = ["av>=12"]
 # end-of-turn detection for Realtime sessions (semantic_vad) and the MarbleNet voice-activity detector.
 # faster-whisper already brings onnxruntime; tokenizers (Apache-2.0) is for the end-of-turn models that read text.
 turn = ["onnxruntime>=1.17", "tokenizers>=0.20"]
@@ -110,6 +114,8 @@ dev = [
   "openai>=1.60",
   "websockets>=13",
   "jiwer>=3",
+  # Kyutai's Ogg Opus library (MIT or Apache-2.0): the fake full-duplex server speaks the real framing with it
+  "sphn>=0.2,<0.3",
   "ruff>=0.8",
   "mypy>=1.13",
   "types-PyYAML",

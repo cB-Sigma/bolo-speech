@@ -93,9 +93,10 @@ which is not in the extra: `pip install flash-attn --no-build-isolation` on Linu
 WSL2). Not run here.
 
 The catalog also lists `sravaani-1.0` and `indicconformer-600m-official` for this plugin, and the speech-to-speech
-models `moshiko-pytorch-bf16` / `moshika-pytorch-bf16` (full-duplex) and `minicpm-o-2.6` (each with the reason it
-cannot run yet). bolo-torch does
-not implement them yet; loading one answers `400 invalid_request` saying so.
+model `minicpm-o-2.6` (with the reason it cannot run yet). bolo-torch does
+not implement it yet; loading it answers `400 invalid_request` saying so. Moshi, Hibiki and PersonaPlex
+(full-duplex) are not plugin models: bolo runs them in their own servers (bolo's docs/voice-agents.md, "Full-duplex
+models").
 
 ### How each family runs
 

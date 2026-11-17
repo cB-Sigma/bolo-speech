@@ -33,6 +33,8 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
   remote code opt-in, the speech tokenizer from the pinned folder instead of the Hub, `_generate_loop` run one step at
   a time: text streamed, speech through `detokenize_streaming` in 30-token chunks, cancel between steps. CUDA only, with
   a clear error elsewhere and a hint for flash-attn. Tested with fakes only.
+- The `moshi` kind's message says where Moshi runs now: in Kyutai's own server, which bolo starts for a full-duplex
+  `s2s_model` (not in this plugin).
 
 - **Demucs denoiser** (`kind: demucs-denoiser`, `demucs-denoiser` extra): `demucs-dns48`, `demucs-dns64`,
   `demucs-master64` and `demucs-valentini-nc` from facebookresearch/denoiser as bolo `denoise` models, served through
