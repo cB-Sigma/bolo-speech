@@ -8,6 +8,10 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- docs/models-unsupported.md, "Full-duplex speech-to-speech": the full-duplex models looked at and not in the catalog,
+  each with the reason (no weights published: SALMONN-omni, OmniFlatten, SyncLLM, LSLM, Covo-Audio-Chat-FD,
+  RoboEgo; not wired yet: DuplexOmni, BayLing-Duplex, VITA-1.5; file-to-file only: NTPP, Hibiki's Rust builds).
+
 - **MiniCPM-o 4.5 as a full-duplex model** (`minicpm-o-4.5`, Apache-2.0): it listens and decides once a second
   whether to speak (its `as_duplex()` API). The component `minicpm-o` is an environment with PyTorch 2.8.0,
   transformers 4.51.0 and minicpmo-utils 1.0.6 in which bolo runs a small server of its own that drives that API and
