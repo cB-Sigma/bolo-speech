@@ -199,7 +199,7 @@ async def test_a_loaded_model_gets_its_fallback_hook(core: Bolo) -> None:
 
 async def test_end_of_turn_survives_a_model_error(core: Bolo, monkeypatch: pytest.MonkeyPatch) -> None:
     turn = spec("broken-turn", "fake", "fake-turn", task="turn")
-    monkeypatch.setattr(core, "turn_model", lambda: turn)
+    monkeypatch.setattr(core, "turn_model", lambda name=None: turn)
 
     class Boom:
         def __init__(self, *_: Any) -> None:
