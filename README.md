@@ -25,14 +25,24 @@
   <a href="https://cb-sigma.github.io/bolo/"><img src="docs/assets/brand/button-live-demo.png" alt="Try the live demo" width="233"></a>
 </p>
 
-**bolo** (बोलो, "speak") pulls speech models by name, like Ollama does for language models, and serves them:
+**bolo** (बोलो, "speak") pulls speech models by name, like Ollama does for language models, and serves them over
+the OpenAI audio and Realtime APIs. On top of speech-to-text and text-to-speech it has:
 
-- **Transcribe** files or live audio, in 22 Indian languages and many more, with word timings and subtitles.
-- **Speak** text in hundreds of voices, streamed as it is made; numbers, dates and names read properly.
-- **Talk**: voice agents over the OpenAI Realtime API, with your own language model behind them.
-- **Answer phone calls** through Twilio, Plivo, Telnyx, Exotel or SIP.
-- **Tell speakers apart** and transcribe each one, and **clone a voice** with recorded consent.
-- **Use cloud models too** (OpenAI, Sarvam, ElevenLabs, Deepgram) behind the same API, with fallback either way.
+- **Ollama-style model scheduling**: each model on the GPU when it fits and on the CPU when it does not, split
+  across both when it half-fits, unloaded after a keep-alive; `bolo ps` shows where everything runs.
+- **Telephony**: answers and places phone calls through Twilio, Plivo, Telnyx, Exotel or SIP, with barge-in,
+  transfers and per-call latency.
+- **Speaker diarization and speaker-attributed transcription**: who spoke when, and each speaker's words
+  transcribed separately, overlaps included, without PyTorch.
+- **Voice cloning with a voice library**: save a voice once with recorded consent, use it with any cloning model,
+  and get a speaker-similarity score for each clone.
+- **Indian languages**: speech recognition for all 22 scheduled languages, voices for 15 of them, 8 kHz telephone
+  audio, and romanised input ("mujhe kal jana hai") written in the right script.
+- **Cloud models next to local ones**: OpenAI, Sarvam, ElevenLabs and Deepgram behind the same API, with
+  automatic fallback in either direction.
+- **Voice agents**: three pipelines (recogniser → your language model → voice, an audio language model, or one
+  speech-to-speech model) over the Realtime API and WebRTC, with turn detection and tools.
+- **Latency you can see**: a phase-by-phase trace of every request, micro-batching and backpressure under load.
 
 It runs on the CPU, and on an NVIDIA GPU or through DirectML when there is one. A web console comes with it, and a
 [live demo](https://cb-sigma.github.io/bolo/) runs models in your browser with nothing to install. bolo is alpha:
