@@ -80,6 +80,11 @@ const PROVIDER_KINDS = [
     terms_url: 'https://elevenlabs.io/terms-of-use',
   },
   { kind: 'deepgram', default_base_url: 'https://api.deepgram.com', terms_url: 'https://deepgram.com/terms' },
+  {
+    kind: 'soniox',
+    default_base_url: 'https://api.soniox.com',
+    terms_url: 'https://soniox.com/policies/terms-of-service',
+  },
 ]
 
 export interface MockFlags {

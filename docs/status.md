@@ -81,9 +81,9 @@ GPU runs of the catalog models not named above; and cloud providers with real ac
   speak those protocols; the SIP endpoint is tested against the test-suite's own SIP user agent, not against a
   trunk, a PBX or a softphone. [telephony.md](telephony.md#what-was-verified-and-what-was-not) lists, provider by
   provider, what was read and what was assumed. The G.711 paths are tested end to end with synthesised speech.
-- **Cloud accounts.** Nothing was run against OpenAI, Sarvam, ElevenLabs or Deepgram: there were no keys where
-  bolo is developed. The adapters follow each provider's documentation as read on 2026-11-14 and are tested
-  against stand-ins written from the same documentation
+- **Cloud accounts.** Nothing was run against OpenAI, Sarvam, ElevenLabs, Deepgram or Soniox: there were no keys
+  where bolo is developed. The adapters follow each provider's documentation as read on 2026-11-14 (Soniox on
+  2026-11-17) and are tested against stand-ins written from the same documentation
   ([providers.md](providers.md#what-was-verified-and-what-was-not)). Cost estimates use prices you enter; none
   are shipped.
 - **The live demo on real devices.** The demo's end-to-end tests run in headless Chromium on a desktop CPU (the

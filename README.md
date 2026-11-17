@@ -36,7 +36,7 @@ the OpenAI audio and Realtime APIs. On top of speech-to-text and text-to-speech 
   and get a speaker-similarity score for each clone.
 - **Indian languages**: speech recognition for all 22 scheduled languages, voices for 15 of them, 8 kHz telephone
   audio, and romanised input ("mujhe kal jana hai") written in the right script.
-- **Cloud models next to local ones**: OpenAI, Sarvam, ElevenLabs and Deepgram behind the same API, with
+- **Cloud models next to local ones**: OpenAI, Sarvam, ElevenLabs, Deepgram and Soniox behind the same API, with
   automatic fallback in either direction.
 - **Voice agents**: three pipelines (recogniser → your language model → voice, an audio language model, or one
   speech-to-speech model) over the Realtime API and WebRTC, with turn detection and tools.
@@ -119,7 +119,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | **Realtime speech-to-text** | true streaming models, and stabilised partial results for models that were never designed to stream; endpointing you can tune | [realtime.md](docs/realtime.md) |
 | **Voice agents, three pipelines** | the OpenAI Realtime API (`WS /v1/realtime`, WebRTC at `/v1/realtime/calls`) and audio in `/v1/chat/completions`, with turn detection, barge-in, tools and per-turn traces. `cascade`: bolo's recogniser → your language model → bolo's voice. `audio-llm`: a model that hears the audio itself, bolo speaks. `speech-to-speech`: one model hears and speaks, behind a llama-server, a cloud Realtime API, or **in bolo's own process** (`lfm3-audio-2b-onnx`) | [voice-agents.md](docs/voice-agents.md) |
 | **Phone calls** | Twilio Media Streams, Plivo audio streams, Telnyx media streaming and the Exotel Voicebot applet connected to named agents; an experimental inbound SIP endpoint. Greeting, barge-in, key presses, hang-up and transfer, outbound calls with voicemail handling, signed webhooks, call records with a latency breakdown, a call simulator | [telephony.md](docs/telephony.md) |
-| **Cloud providers next to local models** | OpenAI, Sarvam, ElevenLabs, Deepgram or any OpenAI-compatible server behind the same routes, with bolo's diarization, word lists, telephony formats, traces and cost estimates on top, and **fallback** between local and cloud models in either direction. Audio leaves the server only when you name such a model | [providers.md](docs/providers.md) |
+| **Cloud providers next to local models** | OpenAI, Sarvam, ElevenLabs, Deepgram, Soniox or any OpenAI-compatible server behind the same routes, with bolo's diarization, word lists, telephony formats, traces and cost estimates on top, and **fallback** between local and cloud models in either direction. Audio leaves the server only when you name such a model | [providers.md](docs/providers.md) |
 | **Who said what** | speaker diarization without PyTorch (pyannote segmentation with speaker embeddings, or NVIDIA's overlap-aware Nemotron), as `diarized_json`, in subtitles, on words and on live transcripts; known speakers named from reference recordings. **Speaker-attributed recognition**: DiCoW transcribes each speaker of a conversation separately, overlaps included, in the core (`dicow-v3.3-onnx`) or through the torch plugin | [models.md](docs/models.md#speaker-diarization-1) |
 | **Voice cloning with a voice library** | save a person's voice once (cleaned, checked, **consent required** and recorded), then name it as the `voice` of any cloning model, OpenAI's custom-voice shape included; cloned speech is labelled; a speaker-similarity score, calibrated on real speech, says how alike the clone is; Tontaube, Chatterbox, Qwen3-TTS, Pocket TTS and more | [voices.md](docs/voices.md) |
 | **A model catalog** | pull by name, with licences and gating on every entry and what was actually measured; `hf:owner/repo`, any Piper voice by name, local directories and URLs for everything else | [models.md](docs/models.md), [below](#models-and-licences) |
@@ -144,6 +144,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | TTS | ElevenLabs (cloud) | 3 | ar, bg, cs, da, de, el, en, es +24 | 0 | - |
 | STT | ElevenLabs (cloud) | 2 | af, am, ar, as, az, ba, be, bg +92 | 0 | - |
 | STT | Deepgram (cloud) | 2 | af, ar, as, be, bg, bn, bs, ca +53 | 0 | - |
+| STT | Soniox (cloud) | 2 | af, ar, az, be, bg, bn, bs, ca +52 | 0 | - |
 | DIARIZATION | pyannote + speaker embeddings | 3 | - | 1 | 0.106 (`pyannote-3.0-eres2net`) |
 | DIARIZATION | Nemotron diarization | 1 | - | 1 | 0.039 (`nemotron-3-diarization`) |
 | TTS | Parler-TTS | 2 | as, bn, brx, doi, en, gu, hi, hne +13 | 2 | 4.540 (`parler-tts-tiny-v1`) |
@@ -187,7 +188,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | TURN | Smart Turn | 1 | ar, bn, da, de, en, es, fi, fr +15 | 0 | - |
 | VAD | Silero VAD | 2 | - | 2 | 0.006 (`silero-vad-v5`) |
 
-**346 models in the catalog, 135 validated on CPU, 211 untested**, plus 20 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**346 models in the catalog, 135 validated on CPU, 211 untested**, plus 22 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.
@@ -319,7 +320,7 @@ All tables, the method and what batching does and does not buy on CPU: [docs/per
 - **The live demo on phones.** Its tests run in headless Chromium on a desktop CPU, and it was run in Chrome and Edge (WebGPU included) on the Windows laptop; the GPU/CPU split and phone limits are tested with a faked device, not on an iPhone or an Android phone.
 - **Voice cloning beyond 14 models on CPU.** Cloning was measured on CPU for 14 models (Pocket TTS, Chatterbox Turbo, Qwen3-TTS, MOSS-TTS Nano, XTTS v2, Plapre 3, OmniVoice) with two LibriSpeech speakers; the other cloning entries and Tontaube were not run; on a GPU only Pocket TTS was cloned (llama.cpp's CUDA build, on the Windows laptop); and the speaker-similarity thresholds are calibrated on read English speech only.
 - **Phone providers.** No real call was made and no provider account was used: Twilio, Plivo, Telnyx and Exotel are implemented from their documentation and tested against fake providers; SIP against the test-suite's own user agent.
-- **Cloud providers.** Nothing was run against OpenAI, Sarvam, ElevenLabs or Deepgram; the adapters follow their documentation and are tested against stand-ins.
+- **Cloud providers.** Nothing was run against OpenAI, Sarvam, ElevenLabs, Deepgram or Soniox; the adapters follow their documentation and are tested against stand-ins.
 - **Most of the catalog.** About two thirds of the entries are marked untested: their files were checked and a sibling of the same architecture was run.
 - **Accuracy.** Error rates come from small samples; they show that a pipeline works, not how good a model is.
 - **Voice agents with a capable language model; browsers over WebRTC; Home Assistant; the speech-to-speech model at conversational speed** (0.4 to 0.5× real time on four shared cores).

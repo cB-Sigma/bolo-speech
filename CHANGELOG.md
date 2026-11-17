@@ -46,6 +46,18 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   like any saved voice (without `model`, the blend's model answers). A saved blend is marked `"kind": "blend"`,
   listed under `blends` in `GET /api/v1/voices` (apart from the recordings), needs no recording and no consent,
   and goes into exports.
+- **Soniox as a cloud provider** (`kind = "soniox"`, `[providers.soniox]` or `BOLO_PROVIDER_SONIOX_API_KEY`):
+  speech-to-text only. `soniox-stt-async-v6` transcribes recordings through Soniox's async API (upload, create,
+  poll, read the transcript, then delete the transcription and the file at Soniox) with word timestamps, language
+  identification, hotwords and prompt as context, and translation to English. `soniox-stt-rt-v6` uses Soniox's
+  WebSocket on the STT WebSocket, with interim text and Soniox's endpoint detection; its recorded audio goes to
+  `stt-async-v6`. Errors map as for the other providers (401 `provider_auth`, 429 with retry, timeouts 504, 402
+  as `provider_error`), and fallback works both ways. Paid cloud API; audio leaves this server. Not yet run
+  against a real Soniox account: tested against a stand-in written from Soniox's documentation.
+- **Speaker labels from the recogniser itself**: with `diarize=true` or `diarized_json`, a cloud recogniser that
+  labels speakers (Soniox) is asked to, instead of cutting the recording at bolo's speaker turns; no local
+  diarization model is needed. Naming `diarization_model`, giving known speakers or asking for overlap
+  separation still uses bolo's diarizer.
 
 ## [0.6.6] - 2026-11-17
 

@@ -9,9 +9,9 @@ marks such models `cloud: true`, the console labels them, and nothing is ever se
 unless a request names a cloud model, a cloud model is set as a default, or a model's `fallback`
 list names one.
 
-What is on this page was read from each provider's documentation on **2026-11-14**. Nothing was
-run against a real account: there were no keys where bolo is developed, and the test-suite uses
-stand-ins for the four APIs (`server/tests/fake_providers.py`). The opt-in real tests are
+What is on this page was read from each provider's documentation on **2026-11-14** (Soniox's on
+**2026-11-17**). Nothing was run against a real account: there were no keys where bolo is
+developed, and the test-suite uses stand-ins for the five APIs (`server/tests/fake_providers.py`). The opt-in real tests are
 described at the end. Where the documentation left something open, it says so under
 "Not verified".
 
@@ -38,11 +38,12 @@ A provider has a name, a `kind`, a base URL, an API key, options and an optional
 | `sarvam` | Sarvam AI (Saaras, Bulbul) | `https://api.sarvam.ai` | `api-subscription-key: <key>` |
 | `elevenlabs` | ElevenLabs (text to speech, Scribe) | `https://api.elevenlabs.io` | `xi-api-key: <key>` |
 | `deepgram` | Deepgram (Nova) | `https://api.deepgram.com` | `Authorization: Token <key>` |
+| `soniox` | Soniox (speech-to-text: async API and live WebSocket) | `https://api.soniox.com` (the live socket: `wss://stt-rt.soniox.com`) | `Authorization: Bearer <key>` |
 
 In the configuration file, one table per provider:
 
 ```toml
-[providers.openai]                 # the names openai, sarvam, elevenlabs and deepgram imply their kind
+[providers.openai]                 # the names openai, sarvam, elevenlabs, deepgram and soniox imply their kind
 api_key = "…"
 
 [providers.sarvam]
@@ -119,9 +120,11 @@ soon as its provider is configured**, and `GET /v1/models` lists it from then on
 | `elevenlabs-flash-v2.5`, `elevenlabs-multilingual-v2`, `elevenlabs-v3` | `eleven_…` | TTS | the voices of your account, by id or name; the catalog entry lists them once the model has been loaded |
 | `elevenlabs-scribe-v3`, `elevenlabs-scribe-v2` | `scribe_…` | STT | word timestamps, hotwords (billed at a surcharge by ElevenLabs) |
 | `deepgram-nova-3`, `deepgram-nova-2` | `nova-…` | STT | batch and live (Deepgram's streaming socket, with interim text) |
+| `soniox-stt-async-v6` | `stt-async-v6` | STT | recorded audio (Soniox's async API): word timestamps, speaker labels, language identification, translation to English |
+| `soniox-stt-rt-v6` | `stt-rt-v6` | STT | live (Soniox's WebSocket, with interim text); recorded audio and Realtime turns go to `stt-async-v6` |
 
 An entry looks for a provider with the name in its `options.provider` (`openai`, `sarvam`,
-`elevenlabs`, `deepgram`). If you called the account something else, the first configured
+`elevenlabs`, `deepgram`, `soniox`). If you called the account something else, the first configured
 provider of the same kind at the vendor's own address is used.
 
 ### Any other model: `provider:model`
@@ -166,6 +169,7 @@ Catalog `options` of an `engine: remote` entry (and of `options.models.<model>` 
 | `sarvam`: `mode`, `keyterms`, `with_timestamps`, `legacy_translate`, `live`, `language_field`, `enable_preprocessing`, `max_chars` | see `bolo/remote/sarvam.py` |
 | `elevenlabs`: `send_language`, `apply_text_normalization`, `provider_sample_rate` | see `bolo/remote/elevenlabs.py` |
 | `deepgram`: `language`, `detect_language`, `smart_format`, `hotwords_field`, `live`, `endpointing_ms` | see `bolo/remote/deepgram.py` |
+| `soniox`: `async_model`, `live_model`, `live`, `language_hints`, `language_hints_strict`, `language_identification`, `speaker_diarization`, `provider_diarization`, `context`, `translate`, `translate_to`, `poll_interval_s`, `poll_timeout_s`, `keep_files`, `realtime_url`, `endpoint_delay_ms`, `live_request` | see `bolo/remote/soniox.py` and [Soniox](#soniox) below (these also work as provider options) |
 
 ## What bolo adds on top
 
@@ -181,7 +185,8 @@ ones local models use:
   bolo's VAD and sent in pieces (several at a time), with segment times of the whole recording.
 - **Diarization.** `diarize=true` / `diarized_json` cut the recording at bolo's speaker turns and
   send each turn to the provider, so any cloud recogniser gets speaker labels, known speakers and
-  overlap marks.
+  overlap marks. Soniox labels speakers itself: for its models the request is passed on as
+  `enable_speaker_diarization` and Soniox's labels are used (see [Soniox](#soniox)).
 - **Word lists and text normalisation.** Text for a cloud voice is prepared like text for any
   voice that reads text: SSML subset, pronunciation word lists (as spoken forms or respellings),
   and uccharan's normalisation of numbers, dates, money and so on (bolo's light normaliser without
@@ -196,8 +201,8 @@ ones local models use:
   conversation sessions (`STT → language model → TTS`) take cloud models: set
   `default_realtime_stt` / `default_realtime_tts`, or name the model in the session
   (`audio.input.transcription.model`). bolo keeps turn detection, barge-in and the codecs.
-  Deepgram (and Sarvam's streaming entry) use the provider's live socket on the STT WebSocket,
-  with interim text. Other cloud recognisers get one request per utterance, when bolo's VAD hears
+  Deepgram, Soniox (`soniox-stt-rt-v6`) and Sarvam's streaming entry use the provider's live
+  socket on the STT WebSocket, with interim text. Other cloud recognisers get one request per utterance, when bolo's VAD hears
   it end: bolo's usual interim text (repeated decodes of the growing utterance) is switched off
   for cloud models, because every decode would be billed. The model option `interim_decodes`
   switches it back on. Realtime sessions use the batch route too: one request per turn (plus the
@@ -213,15 +218,16 @@ one request per turn; the transcript arrives when the turn ends).
 
 Speech to text (`/v1/audio/transcriptions`, the STT WebSocket, Realtime sessions):
 
-| bolo | openai-compatible | sarvam | elevenlabs | deepgram |
-| --- | --- | --- | --- | --- |
-| `language` (`hi`, `hi-IN`) | `language` (`hi`) | `language_code` (`hi-IN`; `unknown` when absent; `or` → `od-IN`); **400** for a language Sarvam lacks | `language_code` (`hi`) | `language` as given (`en-IN` stays); none → `detect_language=true` |
-| `prompt` | `prompt` | **400** (only the older translate route takes one) | **400** | **400** |
-| `hotwords` (comma or line separated) | appended to `prompt`; `keywords[]` for `gpt-transcribe` | `keyterms` (JSON, 50 × 64 characters) with `saaras:v4`; **400** otherwise | `keyterms` | `keyterm` (Nova-3) or `keywords` |
-| `timestamp_granularities[]=word` | `verbose_json` + `timestamp_granularities[]` (`whisper-1`); **400** for the `gpt-4o` models | **400**: phrase-level times only (`with_timestamps`, returned as segments) | always returned | always returned |
-| `temperature` | `temperature` | not sent | `temperature` | not sent |
-| translation (`/v1/audio/translations`) | `/audio/translations` (`whisper-1`); **400** otherwise | `mode=translate` | **400** | **400** |
-| `response_format` (json, text, srt, vtt, verbose_json, diarized_json), `stream` | rendered by bolo from the provider's text, segments and words | same | same | same |
+| bolo | openai-compatible | sarvam | elevenlabs | deepgram | soniox |
+| --- | --- | --- | --- | --- | --- |
+| `language` (`hi`, `hi-IN`) | `language` (`hi`) | `language_code` (`hi-IN`; `unknown` when absent; `or` → `od-IN`); **400** for a language Sarvam lacks | `language_code` (`hi`) | `language` as given (`en-IN` stays); none → `detect_language=true` | `language_hints: ["hi"]`; language identification on, and the answer's language is the one most of the text is in |
+| `prompt` | `prompt` | **400** (only the older translate route takes one) | **400** | **400** | `context.text` |
+| `hotwords` (comma or line separated) | appended to `prompt`; `keywords[]` for `gpt-transcribe` | `keyterms` (JSON, 50 × 64 characters) with `saaras:v4`; **400** otherwise | `keyterms` | `keyterm` (Nova-3) or `keywords` | `context.terms` |
+| `timestamp_granularities[]=word` | `verbose_json` + `timestamp_granularities[]` (`whisper-1`); **400** for the `gpt-4o` models | **400**: phrase-level times only (`with_timestamps`, returned as segments) | always returned | always returned | always returned (Soniox's tokens joined into words) |
+| `temperature` | `temperature` | not sent | `temperature` | not sent | not sent |
+| `diarize`, `diarized_json` | bolo's speaker turns | same | same | same | `enable_speaker_diarization`; Soniox's labels (`1`, `2` → `A`, `B`) |
+| translation (`/v1/audio/translations`) | `/audio/translations` (`whisper-1`); **400** otherwise | `mode=translate` | **400** | **400** | `translation: {type: one_way, target_language: en}` |
+| `response_format` (json, text, srt, vtt, verbose_json, diarized_json), `stream` | rendered by bolo from the provider's text, segments and words | same | same | same | same |
 
 Text to speech (`/v1/audio/speech`, the TTS WebSocket, voice agents):
 
@@ -237,6 +243,44 @@ Text to speech (`/v1/audio/speech`, the TTS WebSocket, voice agents):
 "**400**" means a clear `invalid_request` that names the parameter. Set `ignore_unsupported` on
 the model (or the provider) to have such options dropped instead.
 
+### Soniox
+
+Recorded audio goes through Soniox's async API in three steps: the audio is uploaded
+(`POST /v1/files`), a transcription is created (`POST /v1/transcriptions`) and polled
+(`GET /v1/transcriptions/{id}`, every 0.25 s at first, then up to every 2 s) until it is
+`completed`, and the transcript is read (`GET /v1/transcriptions/{id}/transcript`). bolo then
+deletes the transcription and the uploaded file at Soniox (set `keep_files` to leave them). The
+wait is bounded by `poll_timeout_s` (default: 60 s plus the length of the audio, at least 120 s);
+past it the request answers 504 `provider_timeout`. A transcription that ends in `error` answers
+400 when Soniox says the audio or the request was at fault, 502 otherwise. Each step is a request
+on the trace (`provider.requests`); the deletes are not counted.
+
+- **Words.** Soniox answers in tokens, pieces of words with times in milliseconds; a token that
+  starts with a space starts a new word (in Chinese, Japanese and Thai each character is a word).
+  Segments end at a change of speaker or at the end of a sentence.
+- **Speakers.** With `diarize=true` or `diarized_json`, Soniox is asked to label speakers
+  (`enable_speaker_diarization`) and its labels `1`, `2`, … become `A`, `B`, … on segments and
+  words; no local diarization model is loaded (the trace says `diarization_model: provider`).
+  bolo's own diarizer is used instead when the request names one (`diarization_model`), gives
+  known speakers, or asks for overlap separation; `num_speakers`, `min_speakers` and
+  `max_speakers` have no Soniox equivalent and are not sent. Recordings longer than
+  `max_chunk_s` (an hour by default; Soniox takes up to five) are sent in pieces, and Soniox
+  numbers the speakers of each piece on its own: raise `max_chunk_s` for long diarized
+  recordings. The model option `speaker_diarization` asks for labels on every request;
+  `provider_diarization: false` always uses bolo's diarizer.
+- **Languages.** `language` becomes a hint (`language_hints`; `language_hints_strict` makes
+  Soniox keep to it). Language identification is on by default (`language_identification`);
+  the answer's `language` is the one most of the text is in.
+- **Live.** `soniox-stt-rt-v6` opens `wss://stt-rt.soniox.com/transcribe-websocket` with the key
+  in the `Authorization` header (never in the start message), sends 16 kHz PCM, and asks for
+  Soniox's endpoint detection. Final tokens are held until Soniox's `<end>` or `<fin>` token and
+  then handed on as one final text; until then they are shown with the non-final tokens as
+  interim text. A provider at another address takes its socket at `<base_url>/transcribe-websocket`
+  (or at `realtime_url`). Live speaker labels and per-token languages are not passed on yet.
+- **Realtime sessions** use the async route, one transcription per turn: three requests and a
+  short wait for every turn. For conversations, a recogniser with a single-request batch route
+  (OpenAI, Deepgram) answers sooner; `soniox-stt-rt-v6` on the STT WebSocket is the live option.
+
 ## Errors
 
 | The provider answered | bolo answers | `code` |
@@ -245,7 +289,8 @@ the model (or the provider) to have such options dropped instead.
 | 401, 403 | 502 | `provider_auth` |
 | 404 | 502 (unknown model or voice, or a wrong address) | `provider_error` |
 | 408, 504, or no answer within `provider_timeout_s` | 504 | `provider_timeout` |
-| 429 | 429, with the provider's `Retry-After` | `overloaded` |
+| 429 | 429, with the provider's `Retry-After` (1 s when it sends none, as Soniox documents none) | `overloaded` |
+| 402 (Soniox: balance or budget exhausted) | 502 | `provider_error` |
 | other 5xx, a broken connection | 502 | `provider_error` |
 | (no provider entry, or no key) | 503 | `provider_not_configured` |
 
@@ -367,7 +412,7 @@ and OpenAI's Realtime *transcription* sessions as a live socket for the STT WebS
 | `GET /api/v1/providers/{name}` | one provider |
 | `PUT /api/v1/providers/{name}` `{kind?, base_url?, api_key?, clear_api_key?, options?, prices?}` | adds or changes a stored provider. `api_key` is write-only: absent or empty keeps the stored key, `clear_api_key: true` removes it. Loaded models of the provider are unloaded so the change takes effect. `400` for a provider that comes from the configuration, an unknown kind or field, or when editing is not allowed |
 | `DELETE /api/v1/providers/{name}` | `204`; `400` for a provider from the configuration |
-| `POST /api/v1/providers/{name}/test` | one cheap request with the stored key: `{name, ok, message, code, checked: "credentials"\|"reachability", latency_ms}`. `credentials`: the key was accepted (OpenAI-compatible: `GET /models`; ElevenLabs: `GET /v2/voices`; Deepgram: `GET /v1/projects`). `reachability`: the address answered and did not refuse the key, but nothing proves the key (Sarvam documents no free read-only request; a refused key is still reported as a failure) |
+| `POST /api/v1/providers/{name}/test` | one cheap request with the stored key: `{name, ok, message, code, checked: "credentials"\|"reachability", latency_ms}`. `credentials`: the key was accepted (OpenAI-compatible: `GET /models`; ElevenLabs: `GET /v2/voices`; Deepgram: `GET /v1/projects`; Soniox: `GET /v1/models`). `reachability`: the address answered and did not refuse the key, but nothing proves the key (Sarvam documents no free read-only request; a refused key is still reported as a failure) |
 
 Events: `provider` `{name, event: "saved"|"removed"}` on `GET /api/v1/events`.
 
@@ -380,6 +425,7 @@ Read on 2026-11-14:
 | OpenAI | the API reference as typed in the `openai` Python package 3.51.0 (generated from OpenAI's OpenAPI description); `developers.openai.com/api/docs/guides/realtime-websocket` | routes, fields, model names and announced shutdown dates, the 13 voice names, `pcm` at 24 kHz, speed 0.25 to 4.0, 4096 characters, streaming event names, Realtime session shape (`type: realtime`, `output_modalities`, `audio.input/output.format`, `turn_detection`), the WebSocket address and header |
 | Sarvam | `docs.sarvam.ai/api-reference-docs/` (speech-to-text/transcribe, speech-to-text-translate/translate, text-to-speech/convert, the two WebSocket references) | routes, `api-subscription-key`, `saaras:v4` and `saaras:v3`, modes, the 23 and 11 language codes, `keyterms`, phrase-level timestamps, the 30-second note, `bulbul:v2` / `v3` / `v4-flash`, all speaker names, `pace` ranges, sample rates, character limits, the streaming message shapes |
 | ElevenLabs | `elevenlabs.io/docs/api-reference/` (text-to-speech/stream, speech-to-text/convert, voices/search), `elevenlabs.io/docs/overview/models` | routes, `xi-api-key`, `output_format` values, body fields, `scribe_v3` / `scribe_v2`, word objects, the voice listing, model ids, the 32 language codes of Flash v2.5 |
+| Soniox (read 2026-11-17) | `docs.soniox.com` (API reference: files, transcriptions, models, the WebSocket API, errors; guides: async transcription, models, supported languages, context, manual finalization, endpoint detection, connection keepalive, WebSocket authentication) | the three-step async flow and its routes, `Authorization: Bearer` for REST and the live socket, `stt-async-v6` / `stt-rt-v6` (v5 deprecated for 2026-12-15), the 60 language codes, request fields, token fields (`start_ms`, `end_ms`, `speaker`, `language`, `translation_status`), the start message, `finalize` / `keepalive` / empty-frame messages, `<end>` and `<fin>`, error codes and bodies |
 | Deepgram | `developers.deepgram.com` (reference: listen-pre-recorded, listen-streaming, manage/projects/list; the pre-recorded guide; models and languages overview) | routes, `Authorization: Token`, the raw-audio upload, query parameters, `keyterm` against `keywords`, the response paths, the live socket's parameters and messages, Nova-3 and Nova-2 language codes |
 
 Not verified, or taken from memory:
@@ -399,6 +445,11 @@ Not verified, or taken from memory:
 - ElevenLabs: the limits of `voice_settings.speed`, and the ids of the stock voices (the
   catalog lists no voices; they are read from the account). The 29 languages of Multilingual v2
   are the 32 of Flash v2.5 without Hungarian, Norwegian and Vietnamese, from memory.
+- Soniox: the shape of a whole async transcript was taken from the field list and a two-token example;
+  how translated tokens are ordered in an async transcript, which `error_type` values a failed
+  transcription carries (bolo answers 400 for `invalid_request`, `audio_decode_error` and
+  `invalid_audio`, and 502 for the rest), and whether the live socket refuses a bad key at the
+  handshake or with an error message were not shown. No `Retry-After` is documented for 429.
 - The terms links in the licence field: Sarvam's, ElevenLabs' and Deepgram's pages were opened
   today; OpenAI's (`openai.com/policies/services-agreement/`) refused automated reading and is
   from memory.
@@ -407,14 +458,14 @@ Not verified, or taken from memory:
 ## Real tests
 
 `server/tests/test_real.py` has one test per provider (`test_cloud_openai`, `test_cloud_sarvam`,
-`test_cloud_elevenlabs`, `test_cloud_deepgram`): the connection test, a speak-then-transcribe
-round trip with a word-error-rate bound, word timestamps, translation, and Deepgram's live
-socket. They are skipped unless both are true:
+`test_cloud_elevenlabs`, `test_cloud_deepgram`, `test_cloud_soniox`): the connection test, a
+speak-then-transcribe round trip with a word-error-rate bound, word timestamps, translation, and
+Deepgram's and Soniox's live sockets. They are skipped unless both are true:
 
 ```bash
 export BOLO_TEST_REAL=1
 export OPENAI_API_KEY=…        # or BOLO_PROVIDER_OPENAI_API_KEY; likewise SARVAM_API_KEY,
-                               # ELEVENLABS_API_KEY, DEEPGRAM_API_KEY
+                               # ELEVENLABS_API_KEY, DEEPGRAM_API_KEY, SONIOX_API_KEY
 pytest -m real -k cloud
 ```
 

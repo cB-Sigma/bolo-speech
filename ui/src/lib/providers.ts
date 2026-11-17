@@ -6,6 +6,7 @@ export const PROVIDER_KIND_LABEL: Record<string, string> = {
   sarvam: 'Sarvam',
   elevenlabs: 'ElevenLabs',
   deepgram: 'Deepgram',
+  soniox: 'Soniox',
 }
 
 export const PROVIDER_KIND_NOTE: Record<string, string> = {
@@ -13,6 +14,7 @@ export const PROVIDER_KIND_NOTE: Record<string, string> = {
   sarvam: 'Indian-language recognition (Saaras) and voices (Bulbul).',
   elevenlabs: 'Voices and Scribe recognition.',
   deepgram: 'Nova recognition, batch and live.',
+  soniox: 'Recognition of recordings and live audio, with speaker labels.',
 }
 
 export const PROVIDER_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,39}$/

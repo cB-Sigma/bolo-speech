@@ -467,8 +467,8 @@ export default function ProvidersPage() {
     return (
       <Page title="Providers">
         <NeedsServer title="Cloud providers are set up on a bolo server">
-          A server can hand requests to cloud speech APIs (OpenAI, Sarvam, ElevenLabs, Deepgram) next to the models it
-          runs itself. This demo runs in your browser only and talks to none of them.
+          A server can hand requests to cloud speech APIs (OpenAI, Sarvam, ElevenLabs, Deepgram, Soniox) next to the
+          models it runs itself. This demo runs in your browser only and talks to none of them.
         </NeedsServer>
       </Page>
     )

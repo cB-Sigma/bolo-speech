@@ -522,7 +522,8 @@ curl -s localhost:8000/v1/audio/speech/embedding -F file=@a.wav | jq '.data[0].e
    // no transliterator; "languages" have a pack in that uccharan, "installed" are the packs on this machine
    "romanised": {"available": true, "reason": null, "modes": ["off", "auto", "on"], "languages": ["hi"],
                  "installed": ["hi"], "default": "off", "request_field": "romanised", "pin_per_model": true},
-   "providers": {"endpoint": "/api/v1/providers", "kinds": ["openai-compatible", "sarvam", "elevenlabs", "deepgram"],
+   "providers": {"endpoint": "/api/v1/providers",
+                 "kinds": ["openai-compatible", "sarvam", "elevenlabs", "deepgram", "soniox"],
                  "editable": true, "edit_blocked_reason": null, "configured": ["openai"],
                  "adhoc_models": "<provider>:<model>", "fallback": true, "cost_estimates": false},
    "diarization": {"available": true, "installed": false, "default_model": "pyannote-3.0-eres2net",

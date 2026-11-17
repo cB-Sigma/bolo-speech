@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-346 models: 135 validated on CPU by the maintainers, 211 untested. 20 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
+346 models: 135 validated on CPU by the maintainers, 211 untested. 22 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
 
 ### Speech to text
 
@@ -99,6 +99,13 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `deepgram-nova-3` | af, ar, hy, as, eu, be +55 | realtime | native | none (cloud API) | Deepgram Terms of Service (paid cloud API) · [terms](https://deepgram.com/terms) · needs provider `deepgram` | untested |
 | `deepgram-nova-2` | bg, ca, zh, cs, da, nl +27 | realtime | native | none (cloud API) | Deepgram Terms of Service (paid cloud API) · [terms](https://deepgram.com/terms) · needs provider `deepgram` | untested |
+
+#### Soniox (cloud)
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `soniox-stt-async-v6` | af, sq, ar, az, eu, be +54 | accuracy | pseudo | none (cloud API) | Soniox Terms of Service (paid cloud API) · [terms](https://soniox.com/policies/terms-of-service) · needs provider `soniox` | untested |
+| `soniox-stt-rt-v6` | af, sq, ar, az, eu, be +54 | realtime | native | none (cloud API) | Soniox Terms of Service (paid cloud API) · [terms](https://soniox.com/policies/terms-of-service) · needs provider `soniox` | untested |
 
 #### SraVaani
 

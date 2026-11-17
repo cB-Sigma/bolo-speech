@@ -3925,7 +3925,7 @@
        }
       ],
       "title": "Kind",
-      "description": "openai-compatible, sarvam, elevenlabs or deepgram."
+      "description": "openai-compatible, sarvam, elevenlabs, deepgram or soniox."
      },
      "base_url": {
       "anyOf": [
