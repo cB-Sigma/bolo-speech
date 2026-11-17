@@ -116,6 +116,8 @@ dev = [
   "jiwer>=3",
   # Kyutai's Ogg Opus library (MIT or Apache-2.0): the fake full-duplex server speaks the real framing with it
   "sphn>=0.2,<0.3",
+  # python-socketio's server (MIT) stands in for Freeze-Omni's Flask-SocketIO server in the tests
+  "python-socketio>=5.11",
   "ruff>=0.8",
   "mypy>=1.13",
   "types-PyYAML",

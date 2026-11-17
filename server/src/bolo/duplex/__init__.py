@@ -5,6 +5,7 @@
   cancellation), shared by every backend.
 * :mod:`bolo.duplex.kyutai`: the backend for servers that speak Kyutai's WebSocket protocol (Moshi, Hibiki,
   PersonaPlex), with :mod:`bolo.duplex.ogg_opus` for its audio framing.
+* :mod:`bolo.duplex.freeze_omni`: the backend for Tencent's Freeze-Omni server (Socket.IO, :mod:`bolo.duplex.socketio`).
 * :mod:`bolo.duplex.runtime`: installing and starting those servers (components ``moshi`` and ``personaplex``).
 * :mod:`bolo.duplex.manager`: which backend serves ``s2s_model``.
 """
@@ -16,6 +17,7 @@ from bolo.duplex.base import (
     DuplexConfig,
     DuplexEnd,
     DuplexEvent,
+    DuplexInterrupt,
     DuplexSession,
     DuplexText,
 )
@@ -27,6 +29,7 @@ __all__ = [
     "DuplexConfig",
     "DuplexEnd",
     "DuplexEvent",
+    "DuplexInterrupt",
     "DuplexSession",
     "DuplexText",
 ]

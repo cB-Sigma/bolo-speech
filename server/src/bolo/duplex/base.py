@@ -48,6 +48,12 @@ class DuplexText:
 
 
 @dataclass
+class DuplexInterrupt:
+    """The model stopped speaking because the caller talked over it (models whose server says so, e.g. Freeze-Omni's
+    ``stop_tts``): what it said but was not played yet should be dropped."""
+
+
+@dataclass
 class DuplexEnd:
     """The model ended the conversation: ``"closed"`` (the session was closed), ``"ended"`` (the model stopped,
     e.g. it reached its maximum length) or ``"failed"`` (with ``error``)."""
@@ -56,7 +62,7 @@ class DuplexEnd:
     error: str | None = None
 
 
-DuplexEvent = DuplexAudio | DuplexText | DuplexEnd
+DuplexEvent = DuplexAudio | DuplexText | DuplexInterrupt | DuplexEnd
 
 
 @dataclass

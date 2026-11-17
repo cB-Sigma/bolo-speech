@@ -20,7 +20,7 @@ class DuplexEngine(Engine):
     name = "Full-duplex model servers (Kyutai protocol)"
     license = "MIT (Kyutai's moshi, NVIDIA's personaplex); Apache-2.0 or MIT (moshi-backend)"
     url = "https://github.com/kyutai-labs/moshi"
-    kinds = ("kyutai",)
+    kinds = ("kyutai", "freeze-omni")
 
     def status(self) -> EngineStatus:
         try:

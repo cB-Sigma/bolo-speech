@@ -8,6 +8,15 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **FLM-Audio and Freeze-Omni as full-duplex models.** `flm-audio` (CofeAI, English and Chinese, Kyutai's protocol;
+  weights with no licence stated, research use only per the model card) on CofeAI's server, and `freeze-omni`
+  (Tencent, around a frozen Qwen2-7B-Instruct, its own voice-activity detection decides when to answer and when it was
+  interrupted; Freeze-Omni License, academic and research use only) on Tencent's Socket.IO server, through a second
+  backend with a small Socket.IO client of bolo's own; the model's own interruptions end the current response as
+  `cancelled` (`turn_detected`). Components `flm-audio` and `freeze-omni`: pinned commits run from their checkouts
+  after installing their pinned requirements with PyTorch. Tested with fakes only (Freeze-Omni's against
+  python-socketio's server).
+
 - **Full-duplex speech-to-speech models: Moshi, Hibiki, Hibiki-Zero and PersonaPlex** (`s2s_model` naming one, with
   `realtime_pipeline = "speech-to-speech"`). A full-duplex model hears and speaks at once and answers by itself; a
   shared layer, `bolo.duplex`, runs any such model behind Realtime (WebSocket) and WebRTC sessions: every sample of

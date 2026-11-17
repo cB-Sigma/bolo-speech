@@ -78,6 +78,11 @@ class Build:
     torch_index: str | None = None  # PyTorch's own index for the CUDA build
     packages: tuple[str, ...] = ()
     python: str = "3.12"
+    #: a server that is not a package: its checkout is kept (``<build folder>/src``) and run from there, after
+    #: ``pip install -r`` of this requirements file of the checkout
+    requirements: str | None = None
+    #: modules the install check imports (from the checkout for ``requirements`` builds)
+    imports: tuple[str, ...] = ("moshi", "sphn")
     #: the Rust build: the crate archive and its binary
     crate: Pinned | None = None
     binary: str | None = None
@@ -202,6 +207,61 @@ SERVERS[HIBIKI_ZERO] = Server(
         "Kyutai's server for Hibiki-Zero, simultaneous speech translation from French, Spanish, Portuguese and German "
         "into English (speech and text). bolo installs kyutai-labs/hibiki-zero at a pinned commit with PyTorch and "
         "starts it on a loopback port."
+    ),
+)
+FLM_AUDIO = "flm-audio"
+SERVERS[FLM_AUDIO] = Server(
+    id=FLM_AUDIO,
+    name="CofeAI FLM-Audio server (flmaudio.server)",
+    license="Apache-2.0 (code; the FLM-Audio weights state no licence and are for research use only)",
+    license_url="https://github.com/cofe-ai/flm-audio/blob/main/LICENSE",
+    homepage="https://github.com/cofe-ai/flm-audio",
+    builds={
+        PYTORCH: Build(
+            PYTORCH,
+            "41d768c9",
+            _LINUX_WIN,
+            git=("https://github.com/cofe-ai/flm-audio.git", "41d768c9f61d954907c1c518709f2d9239de46a8", "."),
+            torch="torch==2.6.0",
+            torch_index="https://download.pytorch.org/whl/cu124",
+            requirements="requirements-server.txt",
+            imports=("flmaudio.models", "sphn"),
+            note="NVIDIA GPU with about 24 GB (a 7 B model in bfloat16); its server synchronises CUDA while warming up",
+        ),
+    },
+    defaults={"linux-x86_64": PYTORCH, "windows-x86_64": PYTORCH},
+    description=(
+        "CofeAI's server for FLM-Audio, a full-duplex English and Chinese conversation model on Mimi that speaks "
+        "Kyutai's protocol. bolo clones cofe-ai/flm-audio at a pinned commit, installs its requirements with PyTorch "
+        "and runs it from the checkout on a loopback port."
+    ),
+)
+FREEZE_OMNI = "freeze-omni"
+SERVERS[FREEZE_OMNI] = Server(
+    id=FREEZE_OMNI,
+    name="Tencent Freeze-Omni server (bin/server.py, Socket.IO)",
+    license="Freeze-Omni License: academic, research and education use only (code and weights)",
+    license_url="https://github.com/VITA-MLLM/Freeze-Omni/blob/main/License.txt",
+    homepage="https://github.com/VITA-MLLM/Freeze-Omni",
+    builds={
+        PYTORCH: Build(
+            PYTORCH,
+            "163a2488",
+            _LINUX_WIN,
+            git=("https://github.com/VITA-MLLM/Freeze-Omni.git", "163a24880e533b2a07038fb8dcfe02dbbb8457e6", "."),
+            torch="torch==2.2.0",
+            torch_index="https://download.pytorch.org/whl/cu121",
+            python="3.10",
+            requirements="requirements.txt",
+            imports=("flask_socketio", "torchaudio"),
+            note="NVIDIA GPU (its code calls .cuda()); Qwen2-7B-Instruct in bfloat16 wants about 24 GB",
+        ),
+    },
+    defaults={"linux-x86_64": PYTORCH, "windows-x86_64": PYTORCH},
+    description=(
+        "Tencent's server for Freeze-Omni, a speech-to-speech model on a frozen Qwen2-7B-Instruct that listens while "
+        "it speaks and is interrupted by the caller (its own voice-activity detection and state prediction). It speaks "
+        "Socket.IO, not Kyutai's protocol (bolo.duplex.freeze_omni). Non-commercial licence."
     ),
 )
 COMPONENTS = tuple(SERVERS)
@@ -340,24 +400,27 @@ def _install_python(
         _check(run, cmd, f"installing {build.torch}")
     if job is not None:
         job.progress = 0.6
+    source: Path | None = None
     if build.wheel is not None:
-        package = str(fetch(build.wheel, work))
+        install = [str(fetch(build.wheel, work))]
     else:
         assert build.git is not None
         url, commit, sub = build.git
-        checkout = work / "src"
+        checkout = target / "src" if build.requirements else work / "src"
         _check(run, ["git", "clone", "--quiet", url, str(checkout)], f"git clone {url}")
         _check(run, ["git", "-C", str(checkout), "checkout", "--quiet", commit], f"git checkout {commit}")
         code, head = run(["git", "-C", str(checkout), "rev-parse", "HEAD"])
         if code != 0 or head.strip() != commit:
             raise RuntimeError(f"{url} is not at the pinned commit {commit} (got {head.strip()[:40]})")
-        package = str(checkout / sub)
-    _check(run, [*pip, package, *build.packages], "installing the server package")
-    module = "moshi_mlx" if build.id == MLX else "moshi"
-    _check(run, [str(python), "-c", f"import {module}, sphn; print({module}.__version__)"], "checking the install")
-    if build.git is not None and build.git[2] == ".":
-        name = Path(build.git[0]).stem.replace("-", "_")
-        _check(run, [str(python), "-c", f"import {name}"], f"checking {name}")
+        if build.requirements:
+            source = checkout / sub
+            install = ["-r", str(source / build.requirements)]
+        else:
+            install = [str(checkout / sub)]
+    _check(run, [*pip, *install, *build.packages], "installing the server package")
+    names = ", ".join(build.imports)
+    prelude = f"import sys; sys.path.insert(0, {str(source)!r}); " if source is not None else ""
+    _check(run, [str(python), "-c", f"{prelude}import {names}"], f"checking the install (import {names})")
 
 
 def _install_crate(
@@ -427,19 +490,24 @@ import json, runpy, sys
 
 spec = json.loads(sys.argv[1])
 sys.argv = [spec["module"], *spec["args"]]
+if spec.get("cwd"):
+    import os
 
-import aiohttp.web
+    os.chdir(spec["cwd"])
+    sys.path.insert(0, spec["cwd"])
+try:
+    import aiohttp.web
 
-_run_app = aiohttp.web.run_app
+    _run_app = aiohttp.web.run_app
 
+    def run_app(app, *args, **kwargs):
+        kwargs["host"] = spec["host"]
+        kwargs["port"] = spec["port"]
+        return _run_app(app, *args, **kwargs)
 
-def run_app(app, *args, **kwargs):
-    kwargs["host"] = spec["host"]
-    kwargs["port"] = spec["port"]
-    return _run_app(app, *args, **kwargs)
-
-
-aiohttp.web.run_app = run_app
+    aiohttp.web.run_app = run_app
+except ImportError:
+    pass
 try:
     import huggingface_hub
 
@@ -456,7 +524,10 @@ if spec.get("cpu"):
     import torch
 
     torch.cuda.synchronize = lambda *a, **k: None
-runpy.run_module(spec["module"], run_name="__main__", alter_sys=True)
+if spec["module"].endswith(".py"):
+    runpy.run_path(spec["module"], run_name="__main__")
+else:
+    runpy.run_module(spec["module"], run_name="__main__", alter_sys=True)
 """
 
 
@@ -552,9 +623,12 @@ def launch(settings: Settings, spec: ModelSpec, path: Path, port: int, extra_arg
     run_dir = Path(settings.data_dir) / "run" / "duplex" / spec.id
     run_dir.mkdir(parents=True, exist_ok=True)
     files = {k: str(path / str(opts[k])) for k in ("model_file", "mimi_file", "tokenizer_file") if opts.get(k)}
-    for key in ("model_file", "mimi_file", "tokenizer_file"):
+    needed = ("model_file",) if server in (FLM_AUDIO, FREEZE_OMNI) else ("model_file", "mimi_file", "tokenizer_file")
+    for key in needed:
         if key not in files or not Path(files[key]).is_file():
             raise FileNotFoundError(f"model '{spec.id}': its {key} ({files.get(key)}) is missing; pull the model again")
+    files.setdefault("mimi_file", "")
+    files.setdefault("tokenizer_file", "")
     repo = str(opts.get("repo") or "")
     env = {"HF_HUB_OFFLINE": "1", "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8", "HF_HUB_DISABLE_TELEMETRY": "1"}
     extra = [str(a) for a in opts.get("server_args") or []] + [str(a) for a in extra_args]
@@ -598,6 +672,18 @@ def launch(settings: Settings, spec: ModelSpec, path: Path, port: int, extra_arg
             if opts.get("quantized"):
                 args += ["-q", str(int(opts["quantized"]))]
             restart, gpu = True, True  # the MLX server keeps the model's state from one connection to the next
+        elif server == FLM_AUDIO:
+            module = "flmaudio.server"
+            device = _torch_device(settings, spec, server)
+            # its loaders take folders: the model's own (config.json, the weights, the tokenizer, Mimi's file)
+            args = ["--device", device, "--model-path", str(path), "--mimi-path", str(path)]
+        elif server == FREEZE_OMNI:
+            module = "bin/server.py"
+            sessions = max(1, int(getattr(settings, "duplex_max_sessions", 1)))
+            args = ["--model_path", str(path / "checkpoints"), "--llm_path", str(path / "Qwen2-7B-Instruct"),
+                    "--max_users", str(sessions), "--llm_exec_nums", str(sessions), "--timeout", "3600",
+                    "--top_p", "0.8", "--top_k", "20", "--temperature", "0.8"]  # fmt: skip
+            tls = True  # its server makes a self-signed certificate and serves https only
         elif server == HIBIKI_ZERO:
             module = "hibiki_zero.run"
             device = _torch_device(settings, spec, server)
@@ -637,20 +723,21 @@ def launch(settings: Settings, spec: ModelSpec, path: Path, port: int, extra_arg
             gpu = device != "cpu"
             if opts.get("config_file"):
                 local["config.json"] = str(path / str(opts["config_file"]))
-        local.update({Path(v).name: v for v in files.values()})
+        local.update({Path(v).name: v for v in files.values() if v})
         script = run_dir / "bolo_launch.py"
         script.write_text(LAUNCHER, encoding="utf-8")
-        host = ["--host", "127.0.0.1", "--port", str(port)]
+        flag = "--ip" if server == FREEZE_OMNI else "--host"
+        host = [flag, "127.0.0.1", "--port", str(port)]
         # (hibiki_zero.run takes its options after the command name, serve)
         full = [*args[:1], *host, *args[1:], *extra] if module == "hibiki_zero.run" else [*host, *args, *extra]
-        launch_spec = {
-            "module": module,
-            "args": full,
-            "host": "127.0.0.1",
-            "port": port,
-            "files": local,
-            "cpu": not gpu,
-        }
+        launch_spec: dict[str, Any] = {
+            "module": module, "args": full, "host": "127.0.0.1", "port": port, "files": local, "cpu": not gpu,
+        }  # fmt: skip
+        build_info = SERVERS[server].builds[build]
+        if build_info.requirements:  # run from the kept checkout
+            launch_spec["cwd"] = str(
+                install_dir(settings, server, build) / "src" / (build_info.git or ("", "", "."))[2]
+            )
         argv = [str(exe), "-I", "-u", str(script), json.dumps(launch_spec)]
     process = ServerProcess(
         f"duplex:{spec.id}", argv, port, start_timeout_s=float(getattr(settings, "duplex_start_timeout_s", 900.0)),

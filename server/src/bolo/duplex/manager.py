@@ -14,7 +14,9 @@ if TYPE_CHECKING:
 
 #: catalog ``kind`` of the models that speak Kyutai's WebSocket protocol (bolo.duplex.kyutai)
 KYUTAI_KIND = "kyutai"
-KINDS = (KYUTAI_KIND,)
+#: Tencent's Freeze-Omni server (Socket.IO; bolo.duplex.freeze_omni)
+FREEZE_OMNI_KIND = "freeze-omni"
+KINDS = (KYUTAI_KIND, FREEZE_OMNI_KIND)
 
 
 def _codec_missing() -> str | None:
@@ -49,6 +51,7 @@ def readiness(core: Bolo, spec: ModelSpec) -> tuple[bool, bool, str | None]:
 
 async def build_backend(core: Bolo, spec: ModelSpec) -> DuplexBackend:
     from bolo.duplex import runtime
+    from bolo.duplex.freeze_omni import FreezeOmniBackend
     from bolo.duplex.kyutai import KyutaiBackend
     from bolo.engines.tts_server import free_port
 
@@ -64,7 +67,12 @@ async def build_backend(core: Bolo, spec: ModelSpec) -> DuplexBackend:
         "voice_suffix": str(spec.options.get("voice_suffix") or ""), "default_voice": spec.options.get("default_voice"),
         "instructions_param": spec.options.get("instructions_param"),
     }  # fmt: skip
-    if s.duplex_server_url:
+    if spec.kind == FREEZE_OMNI_KIND:
+        if s.duplex_server_url:
+            return FreezeOmniBackend(
+                s.duplex_server_url, model=spec.id, max_sessions=s.duplex_max_sessions, runtime="external"
+            )
+    elif s.duplex_server_url:
         return KyutaiBackend(s.duplex_server_url, max_sessions=s.duplex_max_sessions, runtime="external", **common)
     problem = runtime.missing_reason(s, spec)
     if problem:
@@ -77,6 +85,10 @@ async def build_backend(core: Bolo, spec: ModelSpec) -> DuplexBackend:
         )
     except (ValueError, FileNotFoundError) as exc:
         raise EngineUnavailable(str(exc)) from exc
+    if spec.kind == FREEZE_OMNI_KIND:
+        return FreezeOmniBackend(
+            process=launch.process, model=spec.id, max_sessions=launch.max_sessions, runtime=launch.runtime
+        )
     return KyutaiBackend(
         process=launch.process, max_sessions=launch.max_sessions, restart_after_session=launch.restart_after_session,
         runtime=launch.runtime, **common,

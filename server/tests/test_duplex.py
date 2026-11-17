@@ -338,7 +338,7 @@ def test_catalog_entries() -> None:
         server, build = rt.server_of(s)
         assert build in rt.SERVERS[server].builds and s.requires == [server], s.id
         names = {u["path"] for u in s.source.urls} or set(s.source.include)
-        assert {s.options["model_file"], s.options["mimi_file"], s.options["tokenizer_file"]} <= names, s.id
+        assert {s.options[k] for k in ("model_file", "mimi_file", "tokenizer_file") if k in s.options} <= names, s.id
         assert all(u["sha256"] for u in s.source.urls) and s.license and s.license_url, s.id
     assert next(s for s in specs if s.id == "hibiki-zero-3b-pytorch-bf16").commercial_use is False
     assert next(s for s in specs if s.id == "personaplex-7b-v1").gated is True
@@ -360,6 +360,7 @@ def _model_dir(tmp_path: Path, spec: Any) -> Path:
     path.mkdir(parents=True)
     for key in ("model_file", "mimi_file", "tokenizer_file", "config_file"):
         if spec.options.get(key):
+            (path / spec.options[key]).parent.mkdir(parents=True, exist_ok=True)
             (path / spec.options[key]).write_text("{}", encoding="utf-8")
     return path
 
@@ -558,3 +559,133 @@ async def test_managed_server_end_to_end(settings: Settings, tmp_path: Path, mon
 
 def test_fake_server_main_is_importable() -> None:
     assert callable(main)
+
+
+# -- Freeze-Omni (Socket.IO) and FLM-Audio ---------------------------------------------------------------------------
+@pytest.fixture
+def freeze() -> Iterator[Any]:
+    pytest.importorskip("socketio")
+    from fake_freeze_omni_server import FakeFreezeOmniServer
+
+    server = FakeFreezeOmniServer().start()
+    try:
+        yield server
+    finally:
+        server.stop()
+
+
+def test_socketio_url_and_attachments() -> None:
+    from bolo.duplex.socketio import _fill, socketio_url
+
+    assert socketio_url("https://h:1/") == "wss://h:1/socket.io/?EIO=4&transport=websocket"
+    assert _fill(["audio", {"_placeholder": True, "num": 0}], [b"x"]) == ["audio", b"x"]
+
+
+async def test_freeze_omni_session(freeze: Any) -> None:
+    from bolo.duplex import DuplexInterrupt
+    from bolo.duplex.freeze_omni import FreezeOmniBackend
+
+    backend = FreezeOmniBackend(freeze.url, model="freeze-omni")
+    session = await backend.open(DuplexConfig(instructions="You are a tour guide."))
+    assert freeze.prompts == ["You are a tour guide."]
+    speech = np.concatenate([speechlike(0.5, 16000), np.zeros(8000, dtype=np.float32)])
+    await _feed(session, speech, 320)
+    audio = 0
+    async with asyncio.timeout(10):
+        events = session.events()
+        while audio < 2400 * 3:
+            await _feed(session, np.zeros(640, dtype=np.float32), 320)  # its server answers one piece per event
+            event = await anext(events)
+            if isinstance(event, DuplexAudio):
+                assert event.sample_rate == 24000
+                audio += len(event.samples)
+        await _feed(session, speechlike(0.1, 16000), 320)
+        while not isinstance(event, DuplexInterrupt):
+            event = await anext(events)
+    await session.close()
+    await asyncio.sleep(0.3)
+    state = freeze.sessions[0]
+    assert state["started"] == 1 and state["interrupted"] == 1 and state["closed"] and backend.active == 0
+
+
+async def test_freeze_omni_in_a_realtime_session(settings: Settings, freeze: Any) -> None:
+    settings.s2s_model = "freeze-omni"
+    settings.duplex_server_url = freeze.url
+    settings.duplex_silence_ms = 400
+    srv = LiveServer(settings)
+    srv.start()
+    try:
+        ws = await connect(srv)
+        try:
+            await update(ws, {**SESSION, "instructions": "Be brief."})
+            for chunk in b64_pcm24(_speech_then_quiet(0.6, 1.5)):
+                await ws.send(json.dumps({"type": "input_audio_buffer.append", "audio": chunk}))
+            await until(ws, "response.output_audio.delta", timeout=20)
+            for chunk in b64_pcm24(speechlike(0.3, 24000)):  # the caller talks over it: the model stops itself
+                await ws.send(json.dumps({"type": "input_audio_buffer.append", "audio": chunk}))
+            done = (await until(ws, "response.done", timeout=20))[-1]["response"]
+        finally:
+            await ws.close()
+    finally:
+        srv.stop()
+    assert done["status"] == "cancelled" and done["status_details"]["reason"] == "turn_detected"
+    assert freeze.prompts == ["Be brief."] and freeze.sessions[0]["interrupted"] == 1
+
+
+def test_flm_audio_and_freeze_omni_launch(settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from bolo.catalog import Catalog
+
+    monkeypatch.setattr(rt, "platform_key", lambda: "windows-x86_64")
+    settings.device = "cuda"
+    catalog = Catalog.load(None)
+    _install_fake(settings, "flm-audio", "pytorch")
+    flm = catalog.resolve("flm-audio")
+    assert flm is not None and flm.commercial_use is False
+    path = _model_dir(tmp_path, flm)
+    run = json.loads(rt.launch(settings, flm, path, 11, []).process.argv[4])
+    assert run["module"] == "flmaudio.server" and run["cwd"].endswith(
+        str(Path("flm-audio") / "41d768c9" / "pytorch" / "src")
+    )
+    assert run["args"][run["args"].index("--model-path") + 1] == str(path)
+    _install_fake(settings, "freeze-omni", "pytorch")
+    fz = catalog.resolve("freeze-omni")
+    assert fz is not None and fz.kind == "freeze-omni"
+    path = _model_dir(tmp_path, fz)
+    settings.duplex_max_sessions = 2
+    launch = rt.launch(settings, fz, path, 12, [])
+    run = json.loads(launch.process.argv[4])
+    args = run["args"]
+    assert run["module"] == "bin/server.py" and args[:4] == ["--ip", "127.0.0.1", "--port", "12"]
+    assert (
+        args[args.index("--llm_path") + 1] == str(path / "Qwen2-7B-Instruct")
+        and args[args.index("--max_users") + 1] == "2"
+    )
+    assert launch.process.base_url == "https://127.0.0.1:12" and launch.max_sessions == 2
+    assert any(u["path"].startswith("Qwen2-7B-Instruct/model-") for u in fz.source.urls)
+
+
+def test_install_from_a_checkout(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(rt, "platform_key", lambda: "linux-x86_64")
+    monkeypatch.setattr(rt.shutil, "which", lambda name: f"/usr/bin/{name}" if name in ("uv", "git") else None)
+    commands: list[list[str]] = []
+
+    def run(cmd: list[str]) -> tuple[int, str]:
+        commands.append(cmd)
+        if cmd[1] == "venv":
+            python = rt._venv_python(Path(cmd[-1]))
+            python.parent.mkdir(parents=True, exist_ok=True)
+            python.write_text("", encoding="utf-8")
+        if cmd[-1] == "HEAD":
+            return 0, "163a24880e533b2a07038fb8dcfe02dbbb8457e6\n"
+        return 0, ""
+
+    assert rt.install(settings, "freeze-omni", None, lambda p, f: f / p.name, run) is None
+    venv = next(c for c in commands if c[1] == "venv")
+    assert venv[venv.index("--python") + 1] == "3.10"
+    clone = next(c for c in commands if c[:2] == ["git", "clone"])
+    assert clone[-1].endswith(str(Path("freeze-omni") / "163a2488" / "pytorch" / "src"))  # kept: it runs from there
+    reqs = next(c for c in commands if "-r" in c)
+    assert reqs[reqs.index("-r") + 1].endswith("requirements.txt")
+    assert "torch==2.2.0" in next(c for c in commands if "--index-url" in c)
+    check = commands[-1]
+    assert "sys.path.insert" in check[-1] and "import flask_socketio, torchaudio" in check[-1]

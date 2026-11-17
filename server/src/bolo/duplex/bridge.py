@@ -41,7 +41,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from bolo.audio.resample import StreamResampler
-from bolo.duplex.base import DuplexAudio, DuplexConfig, DuplexEnd, DuplexSession, DuplexText
+from bolo.duplex.base import DuplexAudio, DuplexConfig, DuplexEnd, DuplexInterrupt, DuplexSession, DuplexText
 from bolo.engines.base import FloatArray
 from bolo.errors import BoloError
 from bolo.obs.trace import preview
@@ -178,6 +178,9 @@ class DuplexBridge:
                     await self._audio(event)
                 elif isinstance(event, DuplexText):
                     await self._text(event.text)
+                elif isinstance(event, DuplexInterrupt):
+                    # the model stopped because the caller talked over it: what it said and was not played goes
+                    await self._finish("cancelled", "turn_detected")
                 elif isinstance(event, DuplexEnd):
                     await self._finish("completed")
                     if event.reason != "closed" and not self._closed:
@@ -230,6 +233,7 @@ class DuplexBridge:
             await self._finish("completed")
 
     async def _text(self, text: str) -> None:
+        text = text.replace("\r", " ").replace("\n", " ")  # FLM-Audio ends each answer's text with a newline
         self._last_active = self._out_pos
         if self._muted:
             return
