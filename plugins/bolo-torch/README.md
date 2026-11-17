@@ -22,12 +22,20 @@ the console, the OpenAI-compatible API) works as for bolo's own engines.
 | `sepformer-whamr16k` | separation | SpeechBrain SepFormer, WHAMR!, 16 kHz, 2 speakers | `sepformer` | Apache-2.0 (WSJ0 data, see below) | no | CPU, see below |
 | `sepformer-whamr` | separation | SpeechBrain SepFormer, WHAMR!, 8 kHz, 2 speakers | `sepformer` | Apache-2.0 (WSJ0 data, see below) | no | CPU, see below |
 | `pixit-ami` | separation | pyannote PixIT `speech-separation-ami-1.0`, diarization + separation | `pyannote` | MIT | yes (two repositories) | CPU, see below |
+| `pyannote-speaker-diarization-3.1` | diarization | pyannote `speaker-diarization-3.1`, the original PyTorch pipeline | `pyannote` | MIT (pipeline, segmentation) + CC-BY-4.0 (WeSpeaker embedding, PLDA files) | yes (three repositories) | CPU, see below |
+| `pyannote-speaker-diarization-community-1` | diarization | pyannote `speaker-diarization-community-1` (VBx clustering) | `pyannote` | CC-BY-4.0 | yes | CPU, see below |
 | `dicow-v3.3` | STT, diarization-conditioned | BUT-FIT DiCoW v3.3: Whisper large-v3-turbo told who talks when | `dicow` | CC-BY-4.0 | no | CPU, see below |
 | `se-dicow` | STT, diarization-conditioned | BUT-FIT SE-DiCoW: DiCoW with self-enrolment | `dicow` | Apache-2.0 | no | CPU, see below |
 
 The separation models are bolo `separation` models in "blind" mode: bolo uses them for `separate_overlaps=true`
 on diarized transcription and on `POST /api/v1/diarize`, and assigns their tracks to its own diarized speakers.
 They can also be run without bolo: `bolo-torch separate mix.wav -m sepformer-whamr16k -o out/`.
+
+The pyannote diarizers are bolo `diarization` models: `POST /api/v1/diarize` with `model=pyannote-speaker-diarization-3.1`
+(or `-community-1`), or `diarization_model=...` with `diarize=true` / `response_format=diarized_json` on
+transcriptions. bolo's own diarization runs pyannote's segmentation model exported to ONNX with its own embeddings and
+clustering; these run pyannote.audio's pipelines unchanged, for pyannote's exact results. See "pyannote speaker
+diarization" below.
 
 The DiCoW models are bolo `stt` models that are *speaker-conditioned*: in a diarized transcription
 (`diarize=true` or `response_format=diarized_json`) bolo diarizes the recording (with
@@ -84,6 +92,34 @@ not implement them yet; loading one answers `400 invalid_request` saying so.
   ECAPA embedding was not honoured in that path (the current `main` was downloaded). Option `leakage_removal`
   overrides the pipeline's setting (default true), which zeroes a track wherever its speaker is judged silent.
 
+* **pyannote speaker diarization** (`kind: pyannote-diarization`): `Pipeline.from_pretrained` on a checked copy
+  of the pipeline configuration (see "Configuration guard" below), run on the 16 kHz recording bolo sends. bolo
+  downloads everything at pinned revisions with sha256: for 3.1 the configuration, `pyannote/segmentation-3.0`
+  (5.9 MB), `pyannote/wespeaker-voxceleb-resnet34-LM` (26.6 MB) and community-1's two PLDA files (0.3 MB:
+  pyannote.audio 4 loads a PLDA for every speaker-diarization pipeline, agglomerative clustering included, and
+  would otherwise fetch community-1's latest revision); for community-1 its configuration, segmentation,
+  embedding and PLDA (32.8 MB). Nothing is downloaded at load time. Turns come back in bolo's format (speakers
+  numbered in order of appearance); `num_speakers` of a request goes to the pipeline, the catalog options
+  `num_speakers` / `min_speakers` / `max_speakers` are passed on every call, and a request's `min_speakers` /
+  `max_speakers` make bolo ask again with that number when the pipeline's count is outside them. `threshold` is
+  ignored (pyannote's tuned clustering parameters apply) and bolo's speaker clean-up is off for these models.
+  Voice prints for known speakers and overlap separation come from the pipeline's own embedding model
+  (`pipeline._embedding`, unit length). Option `exclusive: true` returns community-1's exclusive diarization (no
+  overlapping turns). pyannote.audio 4 sends usage metrics to pyannote's servers by default; the plugin sets
+  `PYANNOTE_METRICS_ENABLED=false` unless you set it yourself (PixIT too).
+* **Configuration guard** (pyannote diarization and PixIT). pyannote builds a pipeline from what `config.yaml`
+  names: it imports the class in `pipeline.name`, any `preprocessors`, and downloads the sub-models it lists from
+  their latest revision, and it unpickles model checkpoints. A changed or malicious repository could make it run any
+  installed callable. The plugin never gives pyannote the file: it checks the sha256 of the configuration and the
+  sub-model files against the catalog, parses the configuration with `yaml.safe_load`, accepts only
+  `pyannote.audio.pipelines.SpeakerDiarization` / `SpeechSeparation`, the clustering names
+  `AgglomerativeClustering` / `VBxClustering`, plain parameter values (no `name`, `_target_` or dotted paths, no
+  `preprocessors`) and sub-models that are folders bolo downloaded or Hub repositories pinned to a commit, and
+  hands pyannote the checked dictionary with every sub-model resolved. Anything else is refused (`400
+  invalid_request`, saying what) before pyannote is imported. Without a model folder from bolo the plugin downloads
+  a pipeline only at a commit given in the option `revision`. PixIT's separation model
+  (`pyannote/separation-ami-1.0`, 1.3 GB) is now part of the catalog download, pinned and hashed; the WavLM it
+  builds on is still fetched by the model itself (not pinned by bolo).
 * **DiCoW** (BUT-FIT, `BUT-FIT/DiCoW_v3_3`; Whisper large-v3-turbo with frame-level diarization-dependent
   transformations, FDDT). For each diarized speaker the plugin builds the four-class STNO mask (silence / only the
   target / only others / target in overlap) every 20 ms from the activity bolo sends, with the formula of BUT's
@@ -121,14 +157,14 @@ pip install ./server "./plugins/bolo-torch[parler,sepformer]"
 
 Extras: `parler` (Parler-TTS), `f5` (IndicF5), `f5-original` (the original F5-TTS checkpoints, on the `f5-tts`
 package, which pins its own libraries: give it its own environment), `indic-speak` (transformers 5 and SNAC),
-`orpheus` (Veena, Svara), `sepformer`, `pyannote` (PixIT),
+`orpheus` (Veena, Svara), `sepformer`, `pyannote` (PixIT, pyannote speaker diarization),
 `dicow` (DiCoW, SE-DiCoW: transformers 4.55 and pandas). DiCoW uses the plugin
 protocol's `speakers` request (bolo 0.2.0 or later).
 Installed in bolo's environment, the plugin is found through its entry point (`bolo.engines: torch`) and
 `bolo doctor` lists `plugin:torch`. Check the plugin's own environment with `bolo-torch doctor`.
 
 **Some extras do not mix.** `parler-tts` 0.2.3 pins `transformers==4.46.1`, while `pyannote.audio[separation]`
-needs `transformers>=4.48.3` and DiCoW's model code needs transformers 4.55. Put PixIT in a second environment and point bolo at it (a configured command wins
+needs `transformers>=4.48.3` and DiCoW's model code needs transformers 4.55. Put PixIT and the pyannote diarizers in a second environment and point bolo at it (a configured command wins
 over the entry point):
 
 ```bash
@@ -181,15 +217,25 @@ Catalog `options` the plugin reads: `device`, `dtype`, `seed`, `max_chars` (sent
 
 ## Gated models
 
-Indic Parler-TTS, IndicF5 and PixIT are gated on Hugging Face. To use them:
+Indic Parler-TTS, IndicF5, PixIT and the pyannote diarizers are gated on Hugging Face. To use them:
 
 1. Sign in to Hugging Face and accept the conditions on each model page:
    [ai4bharat/indic-parler-tts](https://huggingface.co/ai4bharat/indic-parler-tts),
-   [ai4bharat/IndicF5](https://huggingface.co/ai4bharat/IndicF5), and for PixIT **both**
+   [ai4bharat/IndicF5](https://huggingface.co/ai4bharat/IndicF5), for PixIT **both**
    [pyannote/speech-separation-ami-1.0](https://huggingface.co/pyannote/speech-separation-ami-1.0) and
-   [pyannote/separation-ami-1.0](https://huggingface.co/pyannote/separation-ami-1.0).
-2. Create a read token at https://huggingface.co/settings/tokens and set `HF_TOKEN` (or `BOLO_HF_TOKEN`) in the
-   environment bolo runs in; the plugin inherits it.
+   [pyannote/separation-ami-1.0](https://huggingface.co/pyannote/separation-ami-1.0); for
+   `pyannote-speaker-diarization-3.1` **all three** of
+   [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1),
+   [pyannote/segmentation-3.0](https://huggingface.co/pyannote/segmentation-3.0) and
+   [pyannote/speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1)
+   (its PLDA files, which pyannote.audio 4 loads for 3.1 as well); for `pyannote-speaker-diarization-community-1`
+   the last one. pyannote's forms ask for your company or university, website or use case, and pyannote may email
+   you about its products.
+2. Create a read token at https://huggingface.co/settings/tokens and set `BOLO_HF_TOKEN` (or `HF_TOKEN`) in the
+   environment bolo runs in; bolo uses it for its download and the plugin inherits it. For example:
+   `BOLO_HF_TOKEN=hf_... BOLO_PLUGINS="torch=/opt/bolo-torch-pyannote/bin/python -m bolo_torch" bolo serve`, then
+   `bolo pull pyannote-speaker-diarization-3.1` and
+   `curl -F file=@meeting.wav -F model=pyannote-speaker-diarization-3.1 localhost:8000/api/v1/diarize`.
 
 Without access, bolo's own download answers `401 model_gated`; a download the plugin makes (PixIT's second
 repository, a tokenizer) answers the same, with the repository to accept, instead of a generic 503.
@@ -241,6 +287,28 @@ afternoon of 2026-11-13; it was reworked afterwards (it now also weighs each tra
 speech) and checked with perfect tracks, so this single observation may no longer apply. The word-error
 evaluation of both separators through the current bolo is in docs/models.md, "Overlapping speech".
 
+### pyannote speaker diarization
+
+2026-11-17, same machine type, torch 2.15.0+cpu, pyannote.audio 4.1.0. DER through bolo (`Bolo.diarize`, the
+path of `POST /api/v1/diarize`) after bolo downloaded the catalog entries with a token; load time and RTF from the
+loader run directly at 4 threads while the machine was quiet (load average below 2). The demo's two-voice dialogue (two SYSPIN voices taking turns, 27.2 s; reference turns from its script,
+frame DER without collar; the clip and reference of bolo's `test_nemotron_separates_the_demo_dialogue`):
+
+| Diarizer | DER | Missed | False alarm | Confusion | Speakers | Load | RTF |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `pyannote-speaker-diarization-3.1` | 6.05 % | 3.8 % | 2.3 % | 0 | 2 | 7.5 s | 0.91 |
+| `pyannote-speaker-diarization-community-1` | 6.05 % | 3.8 % | 2.3 % | 0 | 2 | 8.2 s | 0.88 |
+| bolo's `pyannote-3.0-eres2net` (ONNX, default) | 5.87 % | 3.6 % | 2.3 % | 0 | 2 | | 0.23 |
+| bolo's `nemotron-3-diarization` (ONNX) | 5.87 % | 5.1 % | 0.8 % | 0 | 2 | | 0.06 |
+
+Both PyTorch pipelines found the same seven turns, identical through bolo and from pyannote called directly, and
+identical from run to run. On the first 20.8 s: 3.1 4.93 %, ONNX default 4.93 %, Nemotron 5.22 %. With a 250 ms
+collar all are under 1 %. `num_speakers=3` gave three speakers and `max_speakers=1` one. The machine was shared
+(load average up to 17 on 4 cores); through bolo under that load the RTFs were 1.0-1.5 (3.1, 4 threads) and 4.1
+(community-1, 2 threads), and one run at 4 threads stalled for minutes inside the segmentation LSTM under that load (lower `BOLO_TORCH_THREADS` on a busy
+machine). One clean synthetic dialogue: it shows the pipelines run and agree, not which is better on meetings
+(pyannote's model cards: AMI SDM DER 22.7 % for 3.1, 19.9 % for community-1).
+
 ### DiCoW
 
 2026-11-14, same machine type (it has AMX, so DiCoW ran in bfloat16), bolo and the plugin at 2 threads, the
@@ -267,7 +335,12 @@ docs/measurements/dicow-conditioned.json.
 
 * **Veena and Svara** end to end: the language models were not downloaded (7.6 GB / 13.2 GB, no GPU here). The
   prompt layouts, token-to-SNAC mapping and streaming are unit-tested with fakes; the SNAC decoder ran for real.
-* **PixIT** on real meeting audio, and with pyannote.audio 3.x (it ran with 4.0.7 and the shim above). Before
+* **PixIT** on real meeting audio, and with pyannote.audio 3.x (it ran with 4.0.7 and the shim above). PixIT
+  through the configuration guard (and with its separation model from bolo's pinned download) was tested with
+  fakes only; it was not loaded for real after that change.
+* **pyannote diarization** with pyannote.audio 3.x (the pipeline outputs of 3.x are handled, untested), on GPU or
+  MPS, on real meetings or calls, and `min_speakers` above the count found through bolo (that run stalled under
+  machine load, see above). Before
   `pyannote/separation-ami-1.0` was accepted for the test account, loading it came back through bolo as
   `401 model_gated` naming that repository.
 * GPU (CUDA, MPS), float16, bfloat16 other than DiCoW on CPU, Python 3.10, 3.11 and 3.13 for the plugin (it ran
@@ -277,8 +350,7 @@ docs/measurements/dicow-conditioned.json.
   AVX512-BF16 only float32 speed was measured (forced on this machine). DiCoW gives no word timestamps.
 * Telephone (8 kHz) recordings with the 8 kHz SepFormer; real meeting audio with any separator.
 * `sravaani-1.0` and `indicconformer-600m-official`: not implemented. `spark-tts-0.5b`, `maskgct` and
-  `diarizen-wavlm-large-s80-md-v2` are catalogued but not implemented (no packaged inference code; the plugin
-  protocol has no diarization request).
+  `diarizen-wavlm-large-s80-md-v2` are catalogued but not implemented (no packaged inference code).
 * `f5-tts-v1-base` and `indic-speak`: unit-tested with fake backends only; the weights (1.3 GB / 7.1 GB, Indic-Speak
   gated) were not downloaded, and Indic-Speak's `inference.py` (gated) was not read.
 
@@ -297,6 +369,8 @@ card before commercial use.
 | SepFormer WHAMR! (8 kHz, 16 kHz) | Apache-2.0 | Trained on WHAMR!, built from WSJ0 (LDC licence, research use) and WHAM! noise (CC-BY-NC-4.0): a provenance risk for commercial use. |
 | DiCoW v3.3 | CC-BY-4.0 | Attribution to BUT Speech@FIT (cite the DiCoW and SE-DiCoW papers, model card). Fine-tuned from Whisper large-v3-turbo (MIT) on AMI and NOTSOFAR-1 (CC BY 4.0), LibriMix and synthetic LibriSpeech mixtures (LibriSpeech CC BY 4.0; LibriMix's noisy variants use WHAM! noise, CC-BY-NC-4.0, and which variants were used is not stated: unverified). The model repository's Python code is under the repository's licence; BUT's inference code (`BUTSpeechFIT/DiCoW`) is Apache-2.0. |
 | SE-DiCoW | Apache-2.0 | Same base model and training-data notes as DiCoW v3.3. |
+| pyannote speaker-diarization-3.1 | MIT | Gated (with `pyannote/segmentation-3.0`, MIT, gated). Downloads `pyannote/wespeaker-voxceleb-resnet34-LM` (CC-BY-4.0, WeSpeaker trained on VoxCeleb) and the PLDA files of community-1 (CC-BY-4.0, gated). |
+| pyannote speaker-diarization-community-1 | CC-BY-4.0 | Gated (asks for contact details). Attribution required. |
 | PixIT `speech-separation-ami-1.0` | MIT | Gated (both repositories). Downloads `speechbrain/spkrec-ecapa-voxceleb` (Apache-2.0) and `microsoft/wavlm-large` (no licence stated on its model card; check before commercial use). |
 
 No model here is marked non-commercial by its publisher; the SepFormer training-data caveat above is the one to

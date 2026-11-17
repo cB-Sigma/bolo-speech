@@ -51,7 +51,8 @@ shutdown   -                                                            - (then 
 conditioned recognition of a whole recording, bolo sends it only to such models); a separation model (task ``separation``) gives ``mode``
 (``"blind"``: answers ``separate``; ``"target"``: answers ``enrol``/``extract``/``release``) and
 ``min_sample_s`` (seconds of voice a target model needs); a diarization model (task ``diarization``, bolo 0.6.7)
-gives ``consolidate_default`` (false: bolo does not merge or drop its speakers unless the request asks). ``placement`` in a ``load`` request (bolo 0.5) is
+gives ``consolidate_default`` (false: bolo does not merge or drop its speakers). ``placement`` in a ``load``
+request (bolo 0.5) is
 ``{"device_map": "auto", "max_memory": {"0": bytes, "cpu": bytes}}`` when bolo's scheduler found less free
 accelerator memory than the model needs: a plugin that can split the model (accelerate's ``device_map``) may use it,
 and answers with ``info.placement`` = ``{"gpu_bytes", "cpu_bytes", "device_map"}``; a plugin that cannot ignores

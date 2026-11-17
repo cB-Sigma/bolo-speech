@@ -4,6 +4,25 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Added
+
+- **pyannote speaker diarization** (`kind: pyannote-diarization`, `pyannote` extra): `pyannote-speaker-diarization-3.1`
+  and `pyannote-speaker-diarization-community-1` as bolo `diarization` models, served through the protocol's new
+  `diarize` and `embed` ops (needs a bolo that sends them). Turns in bolo's format, `num_speakers` from the request,
+  `num_speakers` / `min_speakers` / `max_speakers` / `exclusive` from the catalog, voice prints from the pipeline's
+  own embedding model, device cpu/cuda/mps as for every model.
+- **Configuration guard** for pyannote pipelines (diarization and PixIT): the plugin never hands pyannote a
+  `config.yaml`. It checks the files' sha256 against the catalog, parses the configuration with `yaml.safe_load`,
+  allows only `pyannote.audio.pipelines.SpeakerDiarization` / `SpeechSeparation`, the clustering names
+  `AgglomerativeClustering` / `VBxClustering`, plain parameter values and sub-models that bolo downloaded or that
+  are pinned to a commit, and passes pyannote the checked dictionary. Anything else (another class, `os.system`,
+  `preprocessors`, `_target_`, an unpinned repository) is refused before pyannote is imported.
+
+### Changed
+
+- PixIT loads its separation model from bolo's pinned download (or the pinned revision) instead of the Hub's
+  latest, and pyannote.audio 4's usage metrics are off unless `PYANNOTE_METRICS_ENABLED` is set.
+
 ## [0.1.4] - 2026-11-16
 
 Windows: the fast tests run on Windows in CI. Installs with bolo 0.6.

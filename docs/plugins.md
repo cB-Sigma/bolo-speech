@@ -114,11 +114,20 @@ messages before its final reply. Replies to different requests may interleave.
 | `enrol` | `handle`, `key` + a voice sample (16 kHz) | - |
 | `extract` | `handle`, `key` + the mixture (16 kHz) | the enrolled voice's track |
 | `release` | `handle`, `key` | - |
+| `diarize` | `handle`, `num_speakers`, `threshold` (either may be null) + the recording (16 kHz) | `turns`: `[[start, end, speaker], ...]` |
+| `embed` | `handle` + one voice (16 kHz) | the unit-length speaker embedding (float32) |
 | `cancel` | `target` (id of a running request) | - |
 | `shutdown` | - | - (the process exits) |
 
 A separation model's `load` reply carries `info.mode` (`"blind"`: answers `separate`; `"target"`:
 answers `enrol` / `extract` / `release`) and `info.min_sample_s`.
+
+A diarization model (`task: diarization`, bolo 0.6.7 and later) answers `diarize` with its speaker turns (speakers
+numbered from 0; bolo renumbers them in order of appearance) and `embed` with a voice print, which bolo uses for
+known speakers, its speaker clean-up and assigning separated tracks. `info.consolidate_default: false` turns bolo's
+speaker clean-up off for the model, keeping its own speaker count. `min_speakers` / `max_speakers` are bolo's: it
+asks again with `num_speakers` when the count falls outside them. In a plugin built on bolo's SDK, the model is a
+`DiarizationModel`.
 
 A speech-recognition model whose `load` reply says `info.speaker_conditioned: true` is a
 diarization-conditioned (target-speaker) recogniser. For a diarized transcription bolo then does not
@@ -145,7 +154,7 @@ code is a `503 engine_unavailable` naming the code. bolo's SDK reports an except
 name; bolo-torch sends the code of its own errors instead.
 
 Compatibility: new optional members, and new ops that bolo sends only to models announcing them in
-`info` (`speakers`), can appear within version 1; an incompatible change gets
+`info` (`speakers`) or loaded for a new task (`diarize`, `embed`), can appear within version 1; an incompatible change gets
 version 2, and bolo will keep speaking version 1 to plugins that answer `hello` with 1. The exact
 definitions are in `server/src/bolo/plugin/protocol.py`.
 
@@ -164,13 +173,15 @@ definitions are in `server/src/bolo/plugin/protocol.py`.
 | `sepformer-whamr16k` | separation (blind, 2 speakers, 16 kHz) | `sepformer` | Apache-2.0, WSJ0-derived data | no | RTF 3.7 |
 | `sepformer-whamr` | separation (blind, 2 speakers, 8 kHz) | `sepformer` | Apache-2.0, WSJ0-derived data | no | RTF 1.4 |
 | `pixit-ami` (pyannote PixIT) | separation with diarization | `pyannote` | MIT | yes (two repositories) | RTF 5.7; little gain on a synthetic mix |
+| `pyannote-speaker-diarization-3.1` | diarization (pyannote's PyTorch pipeline) | `pyannote` | MIT + CC-BY-4.0 (embedding, PLDA) | yes (three repositories) | RTF 0.9; DER 6.0 % on the demo dialogue (ONNX default 5.9 %) |
+| `pyannote-speaker-diarization-community-1` | diarization (VBx clustering) | `pyannote` | CC-BY-4.0 | yes | RTF 0.9; DER 6.0 % on the demo dialogue |
 | `dicow-v3.3` (BUT-FIT DiCoW) | STT, diarization-conditioned (speaker request) | `dicow` | CC-BY-4.0 | no | RTF 0.45 with Nemotron diarization (bf16, AMX); AMI cpWER 69 → 26 % |
 | `se-dicow` (BUT-FIT SE-DiCoW) | STT, diarization-conditioned, self-enrolment | `dicow` | Apache-2.0 | no | RTF 0.59 with Nemotron diarization (bf16); AMI cpWER 69 → 25 % |
 | `sravaani-1.0`, `indicconformer-600m-official` | STT | - | MIT | yes | not implemented in bolo-torch yet |
 
 Install (CPU): `pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu`, then
 `pip install "bolo-torch[parler,sepformer]"` with the extras you need. `parler` needs a
-different `transformers` version from `pyannote` and `dicow`; run PixIT from a second environment with
+different `transformers` version from `pyannote` and `dicow`; run PixIT and the pyannote diarizers from a second environment with
 `BOLO_PLUGINS="torch=/path/to/env/bin/python -m bolo_torch"`. GPUs: set `BOLO_TORCH_DEVICE=auto`
 (bolo's own `device` setting defaults to `cpu`); no GPU was used in testing. Details, measurements
 and licences: [plugins/bolo-torch/README.md](../plugins/bolo-torch/README.md).

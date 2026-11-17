@@ -72,7 +72,7 @@ to the speaker name (`amy`).
 | `POST /v1/chat/completions` (audio in/out, proxied to an LLM) | yes | yes; `CHAT_COMPLETION_BASE_URL` / `CHAT_COMPLETION_API_KEY` are read (see [voice-agents.md](voice-agents.md)) |
 | `WS /v1/realtime` (OpenAI Realtime API) | yes | yes, over WebSocket, with the GA event names |
 | `POST /v1/realtime` (WebRTC) | yes | **different route**: OpenAI's current `POST /v1/realtime/calls` (SDP offer in, answer out; extra `webrtc`), plus `POST /v1/realtime/client_secrets`. Tested with a WebRTC library, not with browsers |
-| `POST /v1/audio/diarization` | yes (pyannote, needs PyTorch) | **different route**: `POST /api/v1/diarize`, or `diarize=true` / `diarized_json` on transcriptions (ONNX pipeline, no PyTorch) |
+| `POST /v1/audio/diarization` | yes (pyannote, needs PyTorch) | **different route**: `POST /api/v1/diarize`, or `diarize=true` / `diarized_json` on transcriptions (ONNX pipeline, no PyTorch). pyannote's own PyTorch pipeline is available through the bolo-torch plugin: `model=pyannote-speaker-diarization-3.1` (or `-community-1`), [models.md](models.md#pyannotes-pytorch-pipelines-bolo-torch) |
 | `POST /v1/audio/speech/embedding` | yes | yes; same form (`file`, `model`) and response. The embedder is bolo's (ERes2Net from its default diarization model, 192 numbers), not speaches' WeSpeaker ResNet34, so vectors from the two servers cannot be compared with each other; speaches' model id falls back to bolo's default |
 | Gradio UI at `/` | yes | replaced by bolo's web console |
 | OpenTelemetry export | yes | yes, traces (extra `otel`): `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_SERVICE_NAME` are read, one span per request with a child per phase. OTLP/HTTP by default; speaches' gRPC endpoint (port 4317) needs `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` and `opentelemetry-exporter-otlp-proto-grpc`. Metrics stay on Prometheus `/metrics`; no auto-instrumentation of FastAPI or HTTP clients ([configuration.md](configuration.md#opentelemetry)) |
@@ -113,7 +113,10 @@ different ports.
 * **No PyTorch.** bolo never imports torch, which is why the image is small.
   Diarization uses pyannote's segmentation model exported to ONNX with a
   separate speaker-embedding model, not the `pyannote.audio` pipeline, so
-  results will differ from speaches'.
+  results will differ from speaches'. For pyannote's own results install the
+  bolo-torch plugin (`pip install "bolo-torch[pyannote]"`, with PyTorch) and
+  use `pyannote-speaker-diarization-3.1`; it runs out of process, so bolo
+  itself still does not import torch.
 * **Piper voices outside uccharan's languages need a component speaches bundles.**
   speaches installs the GPL `piper-tts` package, which contains espeak-ng.
   bolo does not ship espeak-ng: install it once (console button, `bolo

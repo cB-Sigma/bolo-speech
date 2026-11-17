@@ -711,7 +711,7 @@ models below were checked against their model cards and licence files on 2026-11
 | `mira-tts-audiocpp` | CC-BY-NC-SA-4.0 (no) | tts-server, audio.cpp `mira_tts` family | pending: audio.cpp publishes no package; convert it with audio.cpp's tools and register the folder |
 | `spark-tts-0.5b` | CC-BY-NC-SA-4.0 (no) | none yet: no ggml/ONNX runtime runs the BiCodec decoder, and the reference code is not packaged | catalogued, not runnable (bolo-torch answers "not implemented") |
 | `maskgct` | CC-BY-NC-4.0 (no) | none yet: Amphion's code is not packaged (the PyPI `maskgct` wrapper is a third-party GPL-3.0 project) | catalogued, not runnable |
-| `diarizen-wavlm-large-s80-md-v2` | CC-BY-NC-4.0, PLDA CC-BY-4.0 (no) | none yet: engine plugins cannot serve diarization, and the community ONNX export needs a VBx/PLDA pipeline that sherpa-onnx lacks | catalogued, not runnable |
+| `diarizen-wavlm-large-s80-md-v2` | CC-BY-NC-4.0, PLDA CC-BY-4.0 (no) | none yet: bolo-torch has no DiariZen loader (its inference code is not packaged), and the community ONNX export needs a VBx/PLDA pipeline that sherpa-onnx lacks | catalogued, not runnable |
 | `breeze-tts-2-audiocpp`, `indextts-2-audiocpp`, `omnivoice-audiocpp`, `voxtral-4b-tts-audiocpp`, `higgs-tts-3-4b-audiocpp`, `fish-audio-s2-pro-audiocpp`, … | non-commercial or conditional | tts-server (audio.cpp, llama-server) | catalogued earlier |
 
 Speech-to-speech: `s2s_model` (default `lfm3-audio-2b-llamacpp`, LFM Open License v1.0: commercial use only
@@ -870,7 +870,8 @@ not affected: espeak-ng reads digits and foreign words for them.
 
 ## Speaker diarization
 
-Two kinds of diarizer are in the catalog, both without PyTorch:
+Two kinds of diarizer are in bolo's core, both without PyTorch (pyannote's own PyTorch pipelines run on the
+bolo-torch plugin, [below](#pyannotes-pytorch-pipelines-bolo-torch)):
 
 * **`pyannote-3.0-eres2net`** (the default) and its siblings: pyannote's
   segmentation-3.0 model finds up to three local speakers per 10 s window,
@@ -956,6 +957,53 @@ recordings made by joining six excerpts of one meeting):
 for the int8 graph: that was each excerpt in one ONNX pass, without the chunk
 loop, against the chunked reference; repeated here, 0.015 and 98.8 %. With
 the same chunking the two agree to 0.0009.)
+
+### pyannote's PyTorch pipelines (bolo-torch)
+
+bolo's default diarizer runs pyannote's segmentation-3.0 model exported to ONNX, with its own embedding model,
+clustering and clean-up, so its turns are not pyannote's. For pyannote's exact results the
+[bolo-torch](../plugins/bolo-torch/README.md) plugin runs the original `pyannote.audio` pipelines as bolo
+`diarization` models: `POST /api/v1/diarize` with `model=...`, or `diarization_model=...` with `diarize=true` /
+`response_format=diarized_json` on `/v1/audio/transcriptions`.
+
+| id | pipeline | licence | gated | downloads (pinned, sha256) |
+| --- | --- | --- | --- | --- |
+| `pyannote-speaker-diarization-3.1` | `pyannote/speaker-diarization-3.1`: segmentation-3.0, WeSpeaker ResNet34, agglomerative clustering | MIT (pipeline, segmentation) + CC-BY-4.0 (WeSpeaker embedding, PLDA files) | yes: the pipeline, `pyannote/segmentation-3.0`, and `pyannote/speaker-diarization-community-1` (pyannote.audio 4 loads its PLDA files for every pipeline) | config.yaml, `segmentation-3.0` (5.9 MB), `wespeaker-voxceleb-resnet34-LM` (26.6 MB), community-1's PLDA (0.3 MB) |
+| `pyannote-speaker-diarization-community-1` | `pyannote/speaker-diarization-community-1`: segmentation, WeSpeaker embedding, VBx clustering with a PLDA | CC-BY-4.0 (attribution) | yes (it asks for contact details) | the repository's config.yaml, segmentation, embedding and PLDA (32.8 MB) |
+
+* **Setup.** `pip install "bolo-torch[pyannote]"` with PyTorch (plugins/bolo-torch/README.md; the `pyannote`
+  extra does not share an environment with `parler`). Accept the conditions on each gated model page, create a read
+  token and set `BOLO_HF_TOKEN` (or `HF_TOKEN`) for bolo; without access the load answers `401 model_gated` naming
+  the repositories.
+* **Requests.** `num_speakers` goes to the pipeline. `min_speakers` / `max_speakers` work as for every diarizer:
+  when the pipeline's own count falls outside them, bolo runs it again with that number of speakers (catalog
+  options `num_speakers`, `min_speakers`, `max_speakers` are handed to the pipeline on every call). `threshold` is
+  not used: pyannote's tuned clustering parameters apply. bolo's speaker clean-up (api.md, "How many speakers") does
+  not run: pyannote's speaker count stands. Known speakers, overlap reports and `separate_overlaps` use the pipeline's own speaker
+  embedding. Option `exclusive: true` (community-1) returns its exclusive diarization, one speaker at a time.
+  `device` is bolo's (`BOLO_TORCH_DEVICE=auto` for CUDA or MPS).
+* **Safety.** pyannote builds a pipeline from whatever `config.yaml` names. bolo-torch reads the file itself with
+  `yaml.safe_load`, checks its sha256 against the catalog, accepts only pyannote's own pipeline classes and
+  clustering names, plain parameter values and sub-models that bolo downloaded at pinned revisions, and gives
+  pyannote the checked dictionary, never the file. The same guard covers PixIT. pyannote.audio 4's usage metrics
+  (sent to pyannote's servers by default) are switched off unless `PYANNOTE_METRICS_ENABLED` is set.
+* **Measured** (2026-11-17, the demo's two-voice dialogue, 27.2 s, reference turns from its script, frame DER without
+  collar; 4 vCPU Xeon, 4 threads, torch 2.15.0+cpu, pyannote.audio 4.1.0):
+
+| diarizer | DER | missed | false alarm | confusion | speakers | RTF |
+| --- | --- | --- | --- | --- | --- | --- |
+| `pyannote-speaker-diarization-3.1` (PyTorch) | 6.05 % | 3.8 % | 2.3 % | 0 | 2 | 0.91 |
+| `pyannote-speaker-diarization-community-1` (PyTorch) | 6.05 % | 3.8 % | 2.3 % | 0 | 2 | 0.88 |
+| `pyannote-3.0-eres2net` (ONNX, default) | 5.87 % | 3.6 % | 2.3 % | 0 | 2 | 0.23 |
+| `nemotron-3-diarization` (ONNX) | 5.87 % | 5.1 % | 0.8 % | 0 | 2 | 0.06 |
+
+  The two PyTorch pipelines gave the same seven turns, through bolo as when called directly; on the first 20.8 s
+  3.1 scored 4.93 %, the ONNX default 4.93 % and Nemotron 5.22 %. With a 250 ms collar every diarizer is under 1 %.
+  One clean synthetic dialogue says nothing about meetings: pyannote reports community-1 ahead of 3.1 on most of its
+  benchmarks (AMI SDM 19.9 % against 22.7 %, model card). The machine was shared with other jobs (load average up
+  to 17 on 4 cores): the PyTorch RTFs above are from quiet moments; through bolo under load they were 1.0-1.5 (3.1)
+  and 4.1 (community-1, 2 threads), and a run at 4 threads
+  stalled for minutes in the segmentation LSTM (thread oversubscription; fewer `BOLO_TORCH_THREADS` helps).
 
 ### Measured: Nemotron against clustering
 

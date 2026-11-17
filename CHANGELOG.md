@@ -8,6 +8,24 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **pyannote's own PyTorch diarization pipelines** through the bolo-torch plugin, for pyannote's exact results:
+  `pyannote-speaker-diarization-3.1` (MIT pipeline and segmentation, CC-BY-4.0 WeSpeaker embedding and PLDA files)
+  and `pyannote-speaker-diarization-community-1` (CC-BY-4.0), both gated (accept the conditions on Hugging Face and
+  set `BOLO_HF_TOKEN`). They are ordinary `diarization` models: `POST /api/v1/diarize`, `diarize=true` and
+  `diarized_json` transcriptions, `num_speakers` / `min_speakers` / `max_speakers`, known speakers. bolo downloads
+  the pipeline configuration and every sub-model (segmentation, embedding, PLDA, 33 MB) at pinned revisions with
+  sha256. On the demo's two-voice dialogue both gave DER 6.05 % (the ONNX default 5.87 %, Nemotron 5.87 %) at RTF
+  about 0.9 on 4 CPU threads (docs/models.md, "pyannote's PyTorch pipelines").
+- Plugin protocol: ops `diarize` and `embed` for models loaded with task `diarization` (docs/plugins.md); the SDK
+  and the reference plugin serve them. Engine plugins can now serve diarization models.
+- bolo-torch builds pyannote pipelines (the new diarizers and PixIT) only from a checked copy of `config.yaml`:
+  read with `yaml.safe_load`, sha256 checked against the catalog, only pyannote's own pipeline classes and
+  clustering names, plain parameter values and pinned sub-models; anything else is refused before pyannote is
+  imported. PixIT's separation model is now part of its pinned, hashed catalog download. pyannote.audio 4's usage
+  metrics are off unless `PYANNOTE_METRICS_ENABLED` is set.
+
+### Added
+
 - **`POST /v1/audio/speech/embedding`**, speaches' speaker-embedding route: multipart `file` (and `model`) in, the
   speaker embedding out in the shape of OpenAI's embeddings response. The embedder is the one that scores cloned
   voices (`voice_similarity_model`, else the default diarization model's ERes2Net, 192 numbers); speaches' own model

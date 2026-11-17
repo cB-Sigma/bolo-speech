@@ -134,7 +134,7 @@ class PyannoteDiarization(DiarizationModel):
     """A pyannote.audio speaker diarization pipeline as a bolo diarization model (16 kHz)."""
 
     sample_rate = SR
-    #: the pipeline's own speaker count stands: bolo does not merge or drop speakers unless the request asks
+    #: the pipeline's own speaker count stands: bolo's speaker clean-up does not merge or drop speakers
     consolidate_default = False
 
     def __init__(
