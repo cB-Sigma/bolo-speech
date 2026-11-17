@@ -479,6 +479,53 @@ def test_packs_are_components(
     assert f"language packs ({len(CONTENT)};" in out and "uccharan-ur" in out and "(on request only)" in out
 
 
+def test_pack_counts_built_in_packs_and_removal(live: LiveServer, fake: Any) -> None:
+    """Who needs each pack (in the catalog and among installed models), built-in packs as such, and removal."""
+    import json
+
+    fake.packs.PACKS["hi"] = ("0" * 64, 2)  # uccharan lists its built-in data as packs too
+    core = live.core
+    add_voice(core, "fake-de-one", "de")
+    add_voice(core, "fake-de-two", "de")
+    for model_id, language in (("fake-hi", "hi"), ("fake-bho", "bho"), ("fake-mai", "mai")):
+        add_voice(core, model_id, language)
+    folder = core.store.model_dir("fake-de-one")
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "manifest.json").write_text(json.dumps({"id": "fake-de-one", "complete": True, "files": []}))
+
+    def listing() -> dict[str, Any]:
+        return {c["id"]: c for c in httpx.get(live.url + "/api/v1/components").json()["components"]}
+
+    listed = listing()
+    de = listed["uccharan-de"]
+    assert de["required_by_count"] >= 2 and de["required_by_installed_count"] == 1 and de["built_in"] is False
+    assert de["removable"] is False  # not installed
+    hi = listed["uccharan-hi"]
+    # Hindi's data is part of uccharan: never needed, but Hindi, Bhojpuri and Maithili voices read with it
+    assert hi["built_in"] is True and hi["required_by_count"] == 0 and hi["required_by_installed_count"] == 0
+    assert hi["used_by_count"] >= 3 and hi["removable"] is False
+
+    # a downloaded pack this server has not loaded can be removed; a loaded one only after a restart
+    target = fake.packs.cache_dir()
+    target.mkdir(parents=True, exist_ok=True)
+    (target / "da.ucd").write_bytes(CONTENT["da"])
+    assert listing()["uccharan-da"]["removable"] is True
+    assert httpx.delete(live.url + "/api/v1/components/uccharan-da").status_code == 204
+    assert not (target / "da.ucd").exists() and listing()["uccharan-da"]["installed"] is False
+    again = httpx.delete(live.url + "/api/v1/components/uccharan-da")
+    assert again.status_code == 400 and "not installed" in again.json()["error"]["message"]
+    packs.install("nb")
+    assert listing()["uccharan-nb"]["removable"] is False
+    loaded = httpx.delete(live.url + "/api/v1/components/uccharan-nb")
+    assert loaded.status_code == 400 and "restart" in loaded.json()["error"]["message"]
+    assert (target / "nb.ucd").is_file()
+    builtin = httpx.delete(live.url + "/api/v1/components/uccharan-hi")
+    assert builtin.status_code == 400
+    other = httpx.delete(live.url + "/api/v1/components/espeak-ng")
+    assert other.status_code == 400 and "only uccharan's language packs" in other.json()["error"]["message"]
+    assert httpx.delete(live.url + "/api/v1/components/nothing").status_code == 404
+
+
 def test_auto_download_setting() -> None:
     assert Settings().uccharan_auto_download is True
     assert load_settings(env={"BOLO_UCCHARAN_AUTO_DOWNLOAD": "false"}).uccharan_auto_download is False

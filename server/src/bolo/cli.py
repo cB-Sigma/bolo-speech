@@ -1074,7 +1074,14 @@ def cmd_components(args: argparse.Namespace) -> int:
         for c in manager.status():
             build = f", {c['flavour']} build" if c.get("flavour") else ""
             state = f"installed ({c['source']}, {c['version']}{build})" if c["installed"] else "not installed"
-            print(f"{c['id']:<12} {state:<40} {c['license']:<18} needed by {c['required_by_count']} catalog models")
+            need = (
+                f"built in, not needed (used by {c.get('used_by_count') or 0} catalog models)"
+                if c.get("built_in")
+                else f"needed by {c['required_by_count']} catalog models"
+            )
+            print(f"{c['id']:<12} {state:<40} {c['license']:<18} {need}")
+            if c.get("built_in"):
+                continue
             if c.get("available") is False:
                 print(f"             unavailable here: {c['unavailable_reason']}")
             elif not c["installed"] and c.get("kind") in ("phonemizer", "language-pack"):

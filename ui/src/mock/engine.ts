@@ -87,6 +87,20 @@ const PROVIDER_KINDS = [
   },
 ]
 
+/** uccharan 0.6's packs: name, size, catalog models that need it, installed models that need it. */
+const MOCK_PACKS: [string, number, number, number][] = [
+  ['ca', 194_000, 1, 0], ['cs', 77_000, 1, 0], ['da', 657_000, 1, 0], ['de', 372_000, 3, 1],
+  ['en-gb', 707_000, 8, 1], ['en-us', 727_000, 19, 0], ['fi', 136_000, 1, 0], ['fr', 181_000, 5, 0],
+  ['hi', 2_000, 5, 0], ['hu', 44_000, 1, 0], ['it', 188_000, 4, 1], ['kokoro-en-gb', 2_066_000, 2, 0],
+  ['kokoro-en-us', 1_914_000, 2, 0], ['nb', 99_000, 1, 0], ['nl', 242_000, 2, 0], ['pl', 239_000, 2, 0],
+  ['pt', 215_000, 1, 0], ['pt-br', 170_000, 3, 0], ['ro', 308_000, 1, 0], ['sd', 119_000, 0, 0],
+  ['sv', 171_000, 1, 0], ['tr', 230_000, 2, 0], ['ur', 542_000, 2, 0], ['wikipron-en-gb', 728_000, 0, 0],
+  ['wikipron-en-us', 741_000, 0, 0], ['wikipron-hi', 321_000, 0, 0], ['xlit-bn', 7_836_000, 0, 0],
+  ['xlit-gu', 5_951_000, 0, 0], ['xlit-hi', 8_666_000, 0, 0], ['xlit-kn', 6_651_000, 0, 0],
+  ['xlit-ml', 6_378_000, 0, 0], ['xlit-mr', 7_355_000, 0, 0], ['xlit-pa', 3_132_000, 0, 0],
+  ['xlit-ta', 7_039_000, 0, 0], ['xlit-te', 7_025_000, 0, 0],
+] // prettier-ignore
+
 export interface MockFlags {
   /** Start with eSpeak NG already installed. */
   espeak?: boolean
@@ -123,6 +137,8 @@ export class MockServer {
   private pendingTimeouts = new Set<ReturnType<typeof setTimeout>>()
   liveStreams = 0
   private espeak = false
+  /** uccharan's language packs that are on the mock server. */
+  private packsInstalled = new Set(['fr', 'en-gb'])
   /** Phone calls: providers, agents, numbers and calls. */
   telephony = new MockTelephony()
   /** The machine the mock runs on, and how fast it is against the reference machine. */
@@ -678,12 +694,49 @@ export class MockServer {
         manual_command: 'pip install espeakng-loader',
         description: 'Text-to-phoneme front end used by Piper and Kokoro voices.',
       },
+      ...MOCK_PACKS.map(([name, size, needed, mine]): Component => {
+        const installed = this.packsInstalled.has(name)
+        const builtIn = name === 'en-us' || name === 'hi'
+        const shareAlike = /^(wikipron|xlit)-/.test(name)
+        const language = name.replace(/^(kokoro|wikipron|xlit)-/, '')
+        return {
+          id: `uccharan-${name}`,
+          name: `uccharan language pack '${name}' (${language})`,
+          kind: 'language-pack',
+          installed,
+          source: installed ? 'uccharan' : null,
+          version: installed ? '0.6.6' : null,
+          license: shareAlike ? 'CC BY-SA 4.0' : 'Apache-2.0',
+          license_url: 'https://github.com/cb-Sigma/uccharan/blob/main/DATA_LICENSES.md',
+          built_in: builtIn,
+          required_by_count: builtIn ? 0 : needed,
+          required_by_installed_count: builtIn ? 0 : mine,
+          used_by_count: builtIn ? needed : null,
+          removable: installed && !builtIn,
+          installable: !installed && !this.flags.noInstall,
+          install_blocked_reason: this.flags.noInstall
+            ? 'The server was started with component installs disabled.'
+            : null,
+          manual_command: `python -m uccharan.packs ${name}`,
+          size_bytes: size,
+          languages: [language],
+          description: `uccharan's ${name} pack.`,
+        }
+      }),
     ]
   }
 
+  removeComponent(id: string): void {
+    const name = id.replace(/^uccharan-/, '')
+    if (!this.packsInstalled.has(name)) throw new HttpError(400, `cannot remove ${id}: it is not installed`)
+    this.packsInstalled.delete(name)
+    this.emit({ type: 'component', id, event: 'removed' })
+  }
+
   installComponent(id: string, accept: boolean): Job {
-    if (id !== 'espeak-ng') throw new HttpError(404, `Unknown component: ${id}`)
-    if (!accept) throw new HttpError(422, 'accept_license must be true')
+    const pack = MOCK_PACKS.find(([name]) => `uccharan-${name}` === id)
+    if (id !== 'espeak-ng' && !pack) throw new HttpError(404, `Unknown component: ${id}`)
+    if (id === 'espeak-ng' && !accept) throw new HttpError(422, 'accept_license must be true')
     if (this.flags.noInstall) throw new HttpError(403, 'The server was started with component installs disabled.')
     const job: Job = {
       id: `j_${this.jobSeq++}`,
@@ -698,7 +751,8 @@ export class MockServer {
       job.progress = Math.min(1, job.progress + 0.12 + this.rand() * 0.1)
       if (job.progress >= 1) {
         job.state = 'done'
-        this.espeak = true
+        if (pack) this.packsInstalled.add(pack[0])
+        else this.espeak = true
         this.applyComponents()
         this.emit({ type: 'job', ...job })
         this.emit({ type: 'component', id, event: 'installed' })

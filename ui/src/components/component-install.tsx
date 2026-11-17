@@ -1,9 +1,25 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { Check, CircleCheck, CircleDashed, Copy, ExternalLink, PackagePlus, Puzzle } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import {
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CircleAlert,
+  CircleCheck,
+  CircleDashed,
+  Copy,
+  ExternalLink,
+  PackagePlus,
+  Puzzle,
+  Search,
+  Trash2,
+} from 'lucide-react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Panel } from '@/components/panel'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import {
   Dialog,
   DialogContent,
@@ -18,6 +34,22 @@ import { describeError, useComponents } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { isDemo } from '@/lib/api/config'
 import type { Component } from '@/lib/api/types'
+import { fmtBytes } from '@/lib/format'
+import {
+  defaultFilter,
+  filterPacks,
+  isLanguagePack,
+  isMissing,
+  needText,
+  packCode,
+  packName,
+  pageOf,
+  readPacksOpen,
+  summarize,
+  summaryText,
+  writePacksOpen,
+  type PackFilter,
+} from '@/lib/language-packs'
 import { cn } from '@/lib/utils'
 
 /** One sentence on what a component is, that it is optional, and how it is licensed. */
@@ -103,6 +135,34 @@ function CopyCommand({ command }: { command: string }) {
   )
 }
 
+class InstallFailed extends Error {}
+
+/** Starts a server-side install and follows its job until it is done (throws with the job's error). */
+export async function installAndWait(id: string, onProgress?: (progress: number) => void): Promise<void> {
+  const { job_id } = await api.installComponent(id)
+  for (let failures = 0; ;) {
+    await new Promise((r) => setTimeout(r, 400))
+    try {
+      const job = await api.job(job_id)
+      failures = 0
+      if (job.state === 'error') throw new InstallFailed(job.error ?? 'The install failed.')
+      if (job.state === 'done') return
+      onProgress?.(job.progress ?? 0)
+    } catch (err) {
+      if (err instanceof InstallFailed || ++failures >= 5) throw err
+    }
+  }
+}
+
+/** After an install or removal: the component list, the catalog (which models are usable) and the server info. */
+function refreshAfterComponentChange(qc: ReturnType<typeof useQueryClient>) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: ['components'] }),
+    qc.invalidateQueries({ queryKey: ['catalog'] }),
+    qc.invalidateQueries({ queryKey: ['info'] }),
+  ])
+}
+
 type Phase = { step: 'confirm' } | { step: 'running'; progress: number } | { step: 'error'; message: string }
 
 /**
@@ -132,24 +192,8 @@ export function InstallComponentDialog({
   const install = async () => {
     setPhase({ step: 'running', progress: 0 })
     try {
-      const { job_id } = await api.installComponent(component.id)
-      for (let failures = 0; ;) {
-        await new Promise((r) => setTimeout(r, 400))
-        try {
-          const job = await api.job(job_id)
-          failures = 0
-          if (job.state === 'error') throw new InstallFailed(job.error ?? 'The install failed.')
-          if (job.state === 'done') break
-          if (alive.current) setPhase({ step: 'running', progress: job.progress ?? 0 })
-        } catch (err) {
-          if (err instanceof InstallFailed || ++failures >= 5) throw err
-        }
-      }
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['components'] }),
-        qc.invalidateQueries({ queryKey: ['catalog'] }),
-        qc.invalidateQueries({ queryKey: ['info'] }),
-      ])
+      await installAndWait(component.id, (progress) => alive.current && setPhase({ step: 'running', progress }))
+      await refreshAfterComponentChange(qc)
       toast.success(`${component.name} installed`, { description: 'Models that need it can be used now.' })
       if (alive.current) {
         setPhase({ step: 'confirm' })
@@ -232,8 +276,6 @@ export function InstallComponentDialog({
   )
 }
 
-class InstallFailed extends Error {}
-
 /**
  * Inline (never modal) notice for a model that cannot run until an optional
  * component is installed: what the component is, and either an install button
@@ -307,17 +349,19 @@ export function ComponentInstallButton({
   component,
   label,
   className,
+  size = 'sm',
 }: {
   component: Component
   label?: string
   className?: string
+  size?: 'sm' | 'xs'
 }) {
   const [open, setOpen] = useState(false)
   if (isDemo || component.installed || !component.installable) return null
   return (
     <>
       <Button
-        size="sm"
+        size={size}
         variant="outline"
         className={className}
         onClick={() => setOpen(true)}
@@ -422,6 +466,265 @@ function ComponentRow({ c, detailed }: { c: Component; detailed?: boolean }) {
   )
 }
 
+function PackRow({ c }: { c: Component }) {
+  const qc = useQueryClient()
+  const [removing, setRemoving] = useState(false)
+  const name = packName(c)
+  const missing = isMissing(c)
+  const Icon = c.installed ? CircleCheck : missing ? CircleAlert : CircleDashed
+  const status = c.installed ? 'Installed' : missing ? 'Needed, not installed' : 'Not installed'
+  const remove = async () => {
+    setRemoving(true)
+    try {
+      await api.removeComponent(c.id)
+      await refreshAfterComponentChange(qc)
+      toast.success(`${name} pack removed`)
+    } catch (err) {
+      toast.error(`Could not remove the ${name} pack`, { description: describeError(err) })
+    } finally {
+      setRemoving(false)
+    }
+  }
+  const meta = [
+    needText(c),
+    c.size_bytes ? fmtBytes(c.size_bytes) : null,
+    /^cc[ -]by[ -]sa/i.test(c.license) ? c.license : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  return (
+    <li className="flex min-h-10 items-center gap-2.5 py-1.5" data-testid={`component-${c.id}`}>
+      <Icon
+        className={cn(
+          'size-4 shrink-0',
+          c.installed ? 'text-good-text' : missing ? 'text-warning-text' : 'text-muted-foreground',
+        )}
+        aria-label={status}
+        role="img"
+      />
+      <div className="min-w-0 flex-1 @lg/packs:flex @lg/packs:items-baseline @lg/packs:gap-3">
+        <div className="flex min-w-0 items-baseline gap-1.5 @lg/packs:w-64 @lg/packs:shrink-0">
+          <span className="truncate text-[13px] font-medium" title={c.name}>
+            {name}
+          </span>
+          <span className="shrink-0 num text-[11px] text-muted-foreground">{packCode(c)}</span>
+        </div>
+        <div className="truncate text-xs leading-4 text-muted-foreground" title={meta}>
+          {meta}
+        </div>
+      </div>
+      {c.installed ? (
+        c.removable && !isDemo ? (
+          <Button
+            size="xs"
+            variant="ghost"
+            className="shrink-0 text-muted-foreground"
+            onClick={() => void remove()}
+            disabled={removing}
+            aria-label={`Remove the ${name} pack`}
+            data-testid={`remove-${c.id}`}
+          >
+            <Trash2 /> {removing ? 'Removing…' : 'Remove'}
+          </Button>
+        ) : null
+      ) : c.installable ? (
+        <ComponentInstallButton component={c} label="Install" size="xs" className="shrink-0" />
+      ) : !isDemo && !c.built_in ? (
+        <span className="shrink-0 text-xs text-muted-foreground" title={c.install_blocked_reason ?? c.manual_command}>
+          Manual
+        </span>
+      ) : null}
+    </li>
+  )
+}
+
+const FILTER_LABEL: Record<PackFilter, string> = { needed: 'Needed', installed: 'Installed', all: 'All' }
+
+/** The packs as a compact list: search, Needed / Installed / All, pages of eight, and "Install needed". */
+function PackList({ packs }: { packs: Component[] }) {
+  const qc = useQueryClient()
+  const [filter, setFilter] = useState<PackFilter>(() => defaultFilter(packs))
+  const [query, setQuery] = useState('')
+  const [page, setPage] = useState(0)
+  const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null)
+  const shown = filterPacks(packs, filter, query)
+  const p = pageOf(shown, page)
+  const summary = summarize(packs)
+  const toInstall = summary.mine ? packs.filter((c) => isMissing(c) && c.installable && !needsLicenceAcceptance(c)) : []
+  const installNeeded = async () => {
+    setBulk({ done: 0, total: toInstall.length })
+    let failed = 0
+    for (const [i, c] of toInstall.entries()) {
+      try {
+        await installAndWait(c.id)
+      } catch (err) {
+        failed++
+        toast.error(`Could not install the ${packName(c)} pack`, { description: describeError(err) })
+      }
+      setBulk({ done: i + 1, total: toInstall.length })
+    }
+    await refreshAfterComponentChange(qc)
+    setBulk(null)
+    if (failed < toInstall.length) {
+      const n = toInstall.length - failed
+      toast.success(`${n} language pack${n === 1 ? '' : 's'} installed`)
+    }
+  }
+  const counts: Record<PackFilter, number> = {
+    needed: summary.needed,
+    installed: summary.installed,
+    all: summary.total,
+  }
+  return (
+    <div className="@container/packs mt-2 grid grid-cols-[minmax(0,1fr)] gap-2" data-testid="language-pack-list">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-0 flex-1 basis-40">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
+          <Input
+            type="search"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setPage(0)
+            }}
+            placeholder="Search packs"
+            aria-label="Search language packs"
+            className="h-7 pl-7 text-xs md:text-xs"
+          />
+        </div>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          value={filter}
+          onValueChange={(v) => {
+            if (v) {
+              setFilter(v as PackFilter)
+              setPage(0)
+            }
+          }}
+          aria-label="Show"
+        >
+          {(['needed', 'installed', 'all'] as const).map((f) => (
+            <ToggleGroupItem key={f} value={f} className="px-2 text-xs" data-testid={`packs-filter-${f}`}>
+              {FILTER_LABEL[f]} <span className="num text-muted-foreground">{counts[f]}</span>
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
+      {toInstall.length > 0 && !isDemo && (
+        <Button
+          size="sm"
+          className="justify-self-start"
+          onClick={() => void installNeeded()}
+          disabled={bulk !== null}
+          data-testid="install-needed-packs"
+        >
+          <PackagePlus />
+          {bulk
+            ? `Installing ${Math.min(bulk.done + 1, bulk.total)} of ${bulk.total}…`
+            : `Install needed (${toInstall.length})`}
+        </Button>
+      )}
+      {p.items.length ? (
+        <ul className="divide-y divide-border" aria-label="Language packs">
+          {p.items.map((c) => (
+            <PackRow key={c.id} c={c} />
+          ))}
+        </ul>
+      ) : (
+        <p className="py-3 text-xs text-muted-foreground">
+          {query
+            ? `No pack matches “${query}”.`
+            : filter === 'needed'
+              ? 'No model installed here needs a pack.'
+              : 'None.'}
+        </p>
+      )}
+      {p.total > 0 && (
+        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          <span className="num" aria-live="polite" data-testid="packs-range">
+            {p.from}–{p.to} of {p.total}
+          </span>
+          {p.pages > 1 && (
+            <span className="flex gap-1">
+              <Button
+                size="icon-xs"
+                variant="outline"
+                onClick={() => setPage(p.page - 1)}
+                disabled={p.page === 0}
+                aria-label="Previous page"
+              >
+                <ChevronLeft />
+              </Button>
+              <Button
+                size="icon-xs"
+                variant="outline"
+                onClick={() => setPage(p.page + 1)}
+                disabled={p.page >= p.pages - 1}
+                aria-label="Next page"
+              >
+                <ChevronRight />
+              </Button>
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * uccharan's language packs as one row: how many are installed and needed, with the list behind View (closed by
+ * default, remembered in this browser). With `collapsible` false the list is always shown (Components page).
+ */
+export function LanguagePacks({ packs, collapsible = true }: { packs: Component[]; collapsible?: boolean }) {
+  const [open, setOpen] = useState(() => !collapsible || readPacksOpen())
+  const listId = useId()
+  const summary = summarize(packs)
+  const toggle = () => {
+    setOpen(!open)
+    writePacksOpen(!open)
+  }
+  return (
+    <li className="py-2.5" data-testid="language-packs">
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          {collapsible && <span className="text-[13px] font-medium">Language packs</span>}
+          <p
+            className={cn('text-xs leading-5', summary.missing ? 'text-warning-text' : 'text-muted-foreground')}
+            data-testid="language-packs-summary"
+          >
+            {summaryText(summary)}
+          </p>
+        </div>
+        {collapsible && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="shrink-0"
+            onClick={toggle}
+            aria-expanded={open}
+            aria-controls={listId}
+            data-testid="language-packs-toggle"
+          >
+            {open ? 'Hide' : 'View'}
+            <ChevronDown className={cn('transition-transform', open && 'rotate-180')} aria-hidden />
+          </Button>
+        )}
+      </div>
+      {open && (
+        <div id={listId}>
+          <PackList packs={packs} />
+        </div>
+      )}
+    </li>
+  )
+}
+
 /** Compact list of optional components: status, where it came from, licence, and who needs it. */
 export function ComponentsCard({
   className,
@@ -439,6 +742,10 @@ export function ComponentsCard({
   const q = useComponents()
   const list = (q.data?.components ?? []).filter((c) => !kind || componentKind(c) === kind)
   if (!q.isLoading && !q.isError && list.length === 0) return null
+  const packs = list.filter(isLanguagePack)
+  // the packs (35 or more) are one row, where the first of them was
+  const firstPack = list.findIndex(isLanguagePack)
+  const rows = list.filter((c) => !isLanguagePack(c))
   const body = q.isLoading ? (
     <Skeleton className="h-10 w-full" />
   ) : q.isError ? (
@@ -446,9 +753,11 @@ export function ComponentsCard({
   ) : (
     <>
       <ul className="divide-y divide-border">
-        {list.map((c) => (
+        {rows.slice(0, firstPack < 0 ? rows.length : firstPack).map((c) => (
           <ComponentRow key={c.id} c={c} detailed={detailed} />
         ))}
+        {packs.length > 0 && <LanguagePacks packs={packs} collapsible={kind !== 'language-pack'} />}
+        {firstPack >= 0 && rows.slice(firstPack).map((c) => <ComponentRow key={c.id} c={c} detailed={detailed} />)}
       </ul>
       {isDemo && (
         <p className="mt-1 text-xs leading-5 text-muted-foreground">

@@ -47,6 +47,14 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   conditions 0.93 for Silero v5 and v6, 0.92 for MarbleNet (0.4 s later), 0.89 for the default Silero v4, 0.85 for
   WebRTC, 0.78 for TEN VAD and 0.74 for the energy detector. The default stays `silero-vad`, the best of them on
   clean audio (docs/models.md, "Voice-activity detection").
+- **Console: language packs in one row.** The "Optional components" list on Connect and Models showed each of
+  uccharan's ~35 language packs as a card of its own (the Connect column was about 4,800 px tall). The packs are now
+  one row, "Language packs · 2 of 35 installed · 1 needed by your models", closed by default (the choice is kept in
+  the browser). View opens a compact list, one line per pack: search, Needed / Installed / All, eight per page,
+  packs needed by installed models first, Install or Remove on each and "Install needed (N)" for all of them. The
+  Components page shows the same list, open.
+- `GET /api/v1/components`: language packs carry `required_by_installed_count`, `built_in`, `used_by_count` and
+  `removable`; `DELETE /api/v1/components/uccharan-<pack>` removes a downloaded pack this server has not loaded.
 - **Console: voice blends and the language decision.** The text-to-speech page has a "Blend voices" panel for models
   with `voice-blending` (Kokoro): pick up to 8 of the model's voices with weights, see the blend as it is sent
   (`af_bella(0.7)+af_sky(0.3)`) and keep it in the voice library under a name. Saved blends are listed in the library
@@ -183,6 +191,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   (pywhispercpp keeps parameters between calls). Every request now sets all of them, from the model's defaults where
   it gives none, and calls are serialised. A real-model test (`tests/test_real_whispercpp.py`, opt-in) checks each
   option reaches whisper.cpp and does not carry over.
+- The `en-us` and `hi` language packs read "needed by 0 models". That is right (American English and Hindi are part
+  of uccharan, so their packs are never needed, and Bhojpuri, Maithili and Magahi use Hindi's built-in data), but it
+  read like a broken count: the console now says "built in, not needed · used by N models".
 
 ## [0.6.6] - 2026-11-17
 

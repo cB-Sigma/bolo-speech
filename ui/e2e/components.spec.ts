@@ -113,3 +113,26 @@ test.describe('optional components (eSpeak NG)', () => {
     }
   })
 })
+
+test.describe('language packs', () => {
+  test('Connect: one summary row, a paged list behind View, at desktop and phone width', async ({ page }) => {
+    for (const viewport of [
+      { width: 1400, height: 1000 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(viewport)
+      await open(page, '/connect')
+      const packs = page.getByTestId('language-packs')
+      await expect(packs.getByTestId('language-packs-summary')).toContainText('2 of 35 installed')
+      await expect(page.getByTestId('component-uccharan-de')).toHaveCount(0)
+      await packs.getByRole('button', { name: 'View' }).click()
+      await expect(page.getByTestId('component-uccharan-de')).toContainText('German')
+      await page.getByTestId('packs-filter-all').click()
+      await expect(packs.getByTestId('language-pack-list').getByRole('listitem')).toHaveCount(8)
+      await expect(packs.getByTestId('packs-range')).toHaveText('1–8 of 35')
+      await expectNoHorizontalScroll(page)
+      await expectNoA11yViolations(page)
+      await packs.getByRole('button', { name: 'Hide' }).click()
+    }
+  })
+})

@@ -55,6 +55,8 @@ LATIN_SCRIPT = frozenset(
 SHARED_TABLE = {"fr-be": "fr", "fr-ch": "fr"}
 #: packs that are part of the wheel's own data (listed in PACKS, never needed)
 BUILT_IN = frozenset(("en-us", "hi"))
+#: the uccharan languages that read with a built-in pack's data: Bhojpuri, Maithili and Magahi use Hindi's
+BUILT_IN_USERS = {"en-us": frozenset(("en-us",)), "hi": frozenset(("hi", "bho", "mai", "mag"))}
 
 LANGUAGE_NAMES = {
     "ca": "Catalan", "cs": "Czech", "da": "Danish", "de": "German", "en-gb": "British English",
@@ -404,6 +406,32 @@ def download(name: str, on_bytes: Callable[[int], None] | None = None) -> Path:
     except OSError as exc:
         raise PackMissing(f"could not write uccharan's language pack '{name}' to {target_dir}: {exc}") from exc
     return target
+
+
+def removable(name: str) -> str | None:
+    """Why the pack cannot be removed (None: it can): only a downloaded copy in uccharan's cache that this
+    process has not loaded is removed; built-in packs and copies in ``$UCCHARAN_DATA_DIR`` stay."""
+    if name in BUILT_IN:
+        return "it is part of uccharan itself"
+    if name in _loaded:
+        return "this server has loaded it; restart the server first"
+    folder = cache_dir()
+    if folder is None or not (folder / f"{name}.ucd").is_file():
+        return "it is not in uccharan's cache (a copy in UCCHARAN_DATA_DIR is managed by the operator)"
+    return None
+
+
+def remove(name: str) -> None:
+    """Delete the pack's downloaded copy from uccharan's cache (see :func:`removable`)."""
+    with _pack_lock(name):
+        reason = removable(name)
+        if reason is not None:
+            raise ValueError(f"uccharan's pack '{name}' cannot be removed: {reason}")
+        folder = cache_dir()
+        assert folder is not None
+        (folder / f"{name}.ucd").unlink(missing_ok=True)
+        with _lock:
+            _present.discard(name)
 
 
 def install(name: str, on_bytes: Callable[[int], None] | None = None) -> None:

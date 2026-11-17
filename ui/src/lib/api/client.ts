@@ -207,6 +207,8 @@ export const api = {
       method: 'POST',
       json: { accept_license: true },
     }),
+  /** Deletes a downloaded language pack (the only components the server removes). */
+  removeComponent: (id: string) => json<void>(`api/v1/components/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   modelSettings: (id: string, signal?: AbortSignal) =>
     json<{ model: string; settings: Record<string, unknown> }>(`api/v1/models/${encodeURIComponent(id)}/settings`, {
       signal,

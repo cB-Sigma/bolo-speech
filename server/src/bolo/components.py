@@ -456,7 +456,12 @@ class ComponentManager:
                     "version": version if installed else None,
                     "license": romanised.PACK_LICENSE,
                     "license_url": "https://github.com/cb-Sigma/uccharan/blob/main/DATA_LICENSES.md",
+                    "built_in": False,
                     "required_by_count": 0,
+                    "required_by_installed_count": 0,
+                    "removable": installed
+                    and blocked is None
+                    and self.pack_remove_reason(romanised.pack_name(language)) is None,
                     "installable": blocked is None and not installed,
                     "install_blocked_reason": None if installed else blocked,
                     "manual_command": romanised.manual_command(language),
@@ -473,9 +478,13 @@ class ComponentManager:
             )
         return out
 
-    def pack_users(self) -> dict[str, int]:
-        """How many catalog models need each uccharan pack (through uccharan, as this installation phonemises)."""
+    def pack_users(self) -> tuple[dict[str, int], dict[str, int]]:
+        """How many catalog models need each uccharan pack (through uccharan, as this installation phonemises), and
+        how many of the installed ones do. A built-in pack (``en-us``, ``hi``) is never needed: it counts the models
+        that read with its data instead."""
         counts: dict[str, int] = {}
+        mine: dict[str, int] = {}
+        installed = {str(m.get("id")) for m in self.core.store.installed()}
         for spec in self.core.catalog.all():
             if spec.status == "pending":
                 continue
@@ -487,16 +496,20 @@ class ComponentManager:
                 if target is None or UCCHARAN not in phonemize.candidates(*target):
                     continue
                 tag = phonemize.uccharan_language(*target)
-                if tag is not None:
-                    names.update(packs.static_needs(tag, target[0]))
+                if tag is None:
+                    continue
+                names.update(packs.static_needs(tag, target[0]))
+                names.update(name for name, users in packs.BUILT_IN_USERS.items() if tag in users)
             for name in names:
                 counts[name] = counts.get(name, 0) + 1
-        return counts
+                if spec.id in installed:
+                    mine[name] = mine.get(name, 0) + 1
+        return counts, mine
 
     def language_pack_status(self, blocked: str | None) -> list[dict[str, Any]]:
         """uccharan's packs other than the romanised-text ones (those are listed by :meth:`pack_status`)."""
         version = packs.version()
-        users = self.pack_users() if packs.table() else {}
+        users, mine = self.pack_users() if packs.table() else ({}, {})
         out: list[dict[str, Any]] = []
         for pack in packs.all_packs():
             if pack.name.startswith(romanised.PACK_PREFIX):
@@ -515,7 +528,13 @@ class ComponentManager:
                     "license_url": packs.LICENSE_URL,
                     "size_bytes": pack.size,
                     "sha256": pack.sha256,
-                    "required_by_count": users.get(pack.name, 0),
+                    # a built-in pack is never needed (its data is part of uccharan): used_by_count counts the
+                    # models that read with that data instead
+                    "built_in": pack.name in packs.BUILT_IN,
+                    "required_by_count": 0 if pack.name in packs.BUILT_IN else users.get(pack.name, 0),
+                    "required_by_installed_count": 0 if pack.name in packs.BUILT_IN else mine.get(pack.name, 0),
+                    "used_by_count": users.get(pack.name, 0) if pack.name in packs.BUILT_IN else None,
+                    "removable": installed and blocked is None and self.pack_remove_reason(pack.name) is None,
                     "installable": blocked is None and not installed,
                     "install_blocked_reason": None if installed else blocked,
                     "manual_command": packs.manual_command(pack.name),
@@ -695,6 +714,32 @@ class ComponentManager:
         shutil.rmtree(target, ignore_errors=True)
         tmp.rename(target)
         return None
+
+    # -- remove -----------------------------------------------------------
+    @staticmethod
+    def pack_remove_reason(name: str) -> str | None:
+        """Why a pack's file cannot be deleted now (None: it can), see ``packs.removable``."""
+        if name.startswith(romanised.PACK_PREFIX) and name in romanised._loaded:
+            return "this server has loaded it; restart the server first"
+        return packs.removable(name)
+
+    def remove_pack(self, component: str) -> None:
+        """Delete a downloaded uccharan pack from uccharan's cache; the only components removed from the API."""
+        name = packs.pack_of(component)
+        if name is None:
+            if component in PACKAGES or component in tts_runtimes.RUNTIMES or component.startswith(PLUGIN_PREFIX):
+                raise InvalidRequest(f"only uccharan's language packs can be removed from the API ({component})")
+            raise ModelNotFound(f"unknown component '{component}'")
+        blocked = self.pack_blocked_reason()
+        reason = blocked or (None if self.is_installed(component) else "it is not installed")
+        reason = reason or self.pack_remove_reason(name)
+        if reason is not None:
+            raise InvalidRequest(f"cannot remove {component}: {reason}")
+        try:
+            packs.remove(name)
+        except (ValueError, OSError) as exc:
+            raise InvalidRequest(f"cannot remove {component}: {exc}") from exc
+        self.core.events.publish("component", {"id": component, "event": "removed"})
 
     # -- install ----------------------------------------------------------
     def start_install(self, component: str, accept_license: bool, flavour: str | None = None) -> Job:

@@ -688,6 +688,16 @@ async def install_component(request: Request, component_id: str, body: InstallRe
     return JSONResponse({"job_id": job.id}, status_code=202)
 
 
+@router.delete(
+    "/components/{component_id}", status_code=204, tags=["native"], summary="Remove a downloaded language pack"
+)
+async def remove_component(request: Request, component_id: str) -> Response:
+    """Deletes one of uccharan's packs (``uccharan-de``) from uccharan's cache. Only packs can be removed here, and
+    only ones this server has not loaded (``removable`` in the component list); others answer 400."""
+    get_core(request).components.remove_pack(component_id)
+    return Response(status_code=204)
+
+
 @router.get("/stats", tags=["native"], summary="Live server statistics")
 async def stats(request: Request) -> JSONResponse:
     return JSONResponse(get_core(request).stats())

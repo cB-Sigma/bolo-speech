@@ -715,6 +715,15 @@ export interface Component {
   path?: string | null
   servers?: string[]
   release?: { version: string; url: string; sha256: string } | null
+  /** language-pack components (newer servers): part of uccharan itself, so never needed. */
+  built_in?: boolean
+  /** language-pack components: how many models installed here need the pack. */
+  required_by_installed_count?: number
+  /** built-in language packs: how many catalog models read with that data. */
+  used_by_count?: number | null
+  /** language-pack components: a downloaded copy the server can delete. */
+  removable?: boolean
+  size_bytes?: number | null
 }
 
 /** Server-sent events on `/api/v1/events`. */

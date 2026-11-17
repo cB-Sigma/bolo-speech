@@ -12,7 +12,7 @@ const KIND_ORDER = ['phonemizer', 'language-pack', 'tts-server', 'engine-plugin'
 const KIND_NOTE: Record<string, string> = {
   phonemizer: 'Turn text into the phonemes many voices read. uccharan covers English and Hindi; eSpeak NG the rest.',
   'language-pack':
-    'Data for romanised text: an Indian language typed in Latin letters is written in its own script before a voice reads it. Share-alike data (CC BY-SA 4.0), installed only when you ask.',
+    "uccharan's word tables for the languages that are not part of it (downloaded the first time a voice needs one), Kokoro dictionaries, and share-alike data for improved mode and romanised text (CC BY-SA 4.0, installed only when you ask).",
   'tts-server':
     'Separate speech servers for the voices marked llama.cpp or audio.cpp. bolo starts them itself, or connects to one you run (setting tts_servers).',
   'engine-plugin': 'Out-of-process engines for models that need PyTorch. Installed as Python packages by the operator.',

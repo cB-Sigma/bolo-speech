@@ -87,6 +87,7 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `POST` | `/api/v1/diarize` | Speaker diarization: who spoke when |
 | `GET` | `/api/v1/components` | Optional components (uccharan, espeak-ng, TTS servers, engine plugins) |
 | `POST` | `/api/v1/components/{component_id}/install` | Install an optional component |
+| `DELETE` | `/api/v1/components/{component_id}` | Remove a downloaded language pack |
 | `GET` | `/api/v1/stats` | Live server statistics |
 | `GET` | `/api/v1/requests` | Recent request traces, newest first |
 | `GET` | `/api/v1/requests/{request_id}` | One request trace |
@@ -1762,6 +1763,15 @@ used without a restart. Install one ahead of time with
 `POST /api/v1/components/uccharan-de/install`, `POST /api/v1/models/pull` with
 `{"id": "uccharan-de"}`, `bolo pull uccharan-de` or `bolo components install uccharan-de`; without
 bolo, `python -m uccharan.packs de`.
+
+Pack items also carry `required_by_count` (catalog models that need the pack),
+`required_by_installed_count` (those of them installed here), `built_in` and `used_by_count`. American
+English (`en-us`) and Hindi (`hi`) are part of uccharan itself: their packs are listed but never needed
+(`built_in: true`, `required_by_count: 0`), and `used_by_count` counts the models that read with that data
+instead (for `hi`, also the Bhojpuri, Maithili and Magahi voices). `removable` is true for a pack bolo
+downloaded into uccharan's cache that this server has not loaded; `DELETE /api/v1/components/uccharan-de`
+deletes that file (`204`). A pack the server has loaded is removable after a restart; built-in packs, copies
+in `$UCCHARAN_DATA_DIR` and every other kind of component answer `400`.
 
 The `wikipron-*` packs (Wiktionary pronunciations for uccharan's improved mode) and the
 `xlit-*` packs (data for the `romanised` option of text-to-speech) are licensed CC BY-SA 4.0:

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { ComponentNotice, componentSentence, ComponentsCard } from '@/components/component-install'
@@ -138,5 +138,86 @@ describe('ComponentNotice and ComponentsCard', () => {
     expect(row).toHaveTextContent('Not installed')
     expect(row).toHaveTextContent('needed by 2 models')
     expect(screen.getByRole('link', { name: 'GPL-3.0-or-later' })).toBeInTheDocument()
+  })
+})
+
+describe('language packs', () => {
+  beforeEach(() => localStorage.removeItem('bolo.languagePacks.open'))
+
+  it('are one collapsed row with a summary, opened with View and remembered', async () => {
+    const { unmount } = wrap(<ComponentsCard />)
+    const summary = await screen.findByTestId('language-packs-summary')
+    expect(summary).toHaveTextContent('2 of 35 installed · 3 needed by your models, 2 missing')
+    expect(screen.queryByTestId('language-pack-list')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('component-uccharan-de')).not.toBeInTheDocument()
+    expect(screen.getByTestId('component-espeak-ng')).toBeInTheDocument()
+    const toggle = screen.getByTestId('language-packs-toggle')
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('language-pack-list')).toBeInTheDocument()
+    unmount()
+    wrap(<ComponentsCard />)
+    expect(await screen.findByTestId('language-pack-list')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /Hide/ }))
+    expect(screen.queryByTestId('language-pack-list')).not.toBeInTheDocument()
+  })
+
+  it('lists needed packs first, filters, searches and pages eight at a time', async () => {
+    localStorage.setItem('bolo.languagePacks.open', '1')
+    wrap(<ComponentsCard />)
+    const list = await screen.findByTestId('language-pack-list')
+    // "Needed" is the default while models here need packs: missing ones first
+    let rows = within(list).getAllByRole('listitem')
+    expect(rows.map((r) => r.dataset.testid)).toEqual([
+      'component-uccharan-de',
+      'component-uccharan-it',
+      'component-uccharan-en-gb',
+    ])
+    expect(rows[0]).toHaveTextContent('needed by 3 models (1 installed)')
+    expect(screen.getByTestId('install-needed-packs')).toHaveTextContent('Install needed (2)')
+
+    await userEvent.click(screen.getByTestId('packs-filter-all'))
+    rows = within(list).getAllByRole('listitem')
+    expect(rows).toHaveLength(8)
+    expect(screen.getByTestId('packs-range')).toHaveTextContent('1–8 of 35')
+    expect(screen.getByRole('button', { name: 'Previous page' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Next page' }))
+    expect(screen.getByTestId('packs-range')).toHaveTextContent('9–16 of 35')
+    for (let i = 0; i < 3; i++) await userEvent.click(screen.getByRole('button', { name: 'Next page' }))
+    expect(screen.getByTestId('packs-range')).toHaveTextContent('33–35 of 35')
+    expect(screen.getByRole('button', { name: 'Next page' })).toBeDisabled()
+    // built-in packs say so, last
+    expect(screen.getByTestId('component-uccharan-hi')).toHaveTextContent('built in, not needed · used by 5 models')
+
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search language packs' }), 'german')
+    expect(screen.getByTestId('packs-range')).toHaveTextContent('1–1 of 1')
+    expect(within(list).getAllByRole('listitem')[0]).toHaveTextContent('German')
+
+    await userEvent.clear(screen.getByRole('searchbox'))
+    await userEvent.click(screen.getByTestId('packs-filter-installed'))
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map((r) => r.dataset.testid),
+    ).toEqual(['component-uccharan-en-gb', 'component-uccharan-fr'])
+  })
+
+  it('installs every needed pack, and removes one', async () => {
+    localStorage.setItem('bolo.languagePacks.open', '1')
+    wrap(<ComponentsCard />)
+    await userEvent.click(await screen.findByTestId('install-needed-packs'))
+    await waitFor(
+      () => expect(screen.getByTestId('language-packs-summary')).toHaveTextContent('4 of 35 installed · 3 needed'),
+      { timeout: 10_000 },
+    )
+    expect(screen.getByTestId('language-packs-summary')).not.toHaveTextContent('missing')
+    expect(screen.queryByTestId('install-needed-packs')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByTestId('remove-uccharan-de'))
+    await waitFor(() =>
+      expect(screen.getByTestId('language-packs-summary')).toHaveTextContent(
+        '3 of 35 installed · 3 needed by your models, 1 missing',
+      ),
+    )
   })
 })

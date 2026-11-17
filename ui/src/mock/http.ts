@@ -213,6 +213,11 @@ export async function handleRequest(
       const body = JSON.parse(String(init?.body ?? '{}')) as { accept_license?: boolean }
       return json({ job_id: server.installComponent(install[1] as string, body.accept_license === true).id }, 202)
     }
+    const component = /^\/api\/v1\/components\/([\w.-]+)$/.exec(path)
+    if (component && method === 'DELETE') {
+      server.removeComponent(component[1] as string)
+      return new Response(null, { status: 204 })
+    }
     if (path === '/api/v1/samples') return json({ samples: SAMPLES })
     const sample = /^\/api\/v1\/samples\/([\w-]+)\.wav$/.exec(path)
     if (sample) {
