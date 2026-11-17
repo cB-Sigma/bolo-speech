@@ -771,6 +771,14 @@ faster-whisper. `num_parallel`, `max_queue` and the four llama.cpp settings can
 also be pinned with `PUT /api/v1/models/{id}/settings` (or
 `bolo models config <id> --set key=value`), which wins over the catalog.
 
+Speech-to-text models also take decoding defaults in `options`: `condition_on_previous_text`,
+`repetition_penalty`, `no_repeat_ngram_size`, `compression_ratio_threshold`, `log_prob_threshold`,
+`no_speech_threshold`, `temperature_increment_on_fallback`, `hallucination_silence_threshold`, `chunk_length`,
+`vad_filter`, `vad_parameters` and `max_repeats` (api.md, "Decoding options and repetition loops"). They can be
+pinned the same way (`bolo models config faster-whisper-small --set repetition_penalty=1.2`, or
+`--set 'vad_parameters={"threshold": 0.6}'`); a request's own value wins. A catalog value out of range is skipped
+with a warning in the log.
+
 `fallback` (a list of model ids of the same task) names what answers instead
 when the model is unavailable, overloaded or, for a cloud model, its provider
 fails; the setting `fallbacks` and a pin through

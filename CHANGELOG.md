@@ -77,6 +77,21 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   no model and no new dependency. An unsure guess keeps the default. An explicit voice or language is never
   changed. The response header `x-bolo-language` reports the decision (`hi-IN; source=detected; detected=hi;
   script=Devanagari; voice=hf_alpha`); `detect_language: false` turns it off.
+- **Whisper decoding options and a repetition guard** on `POST /v1/audio/transcriptions` (and translations), as
+  form fields or, from the OpenAI SDKs, `extra_body`: `condition_on_previous_text` (still off by default),
+  `repetition_penalty`, `no_repeat_ngram_size`, `compression_ratio_threshold`, `log_prob_threshold`,
+  `no_speech_threshold`, `temperature_increment_on_fallback`, `hallucination_silence_threshold`, `chunk_length`
+  and `vad_parameters` (`threshold`, `min_speech_duration_ms`, `max_speech_duration_s`, `min_silence_duration_ms`,
+  `speech_pad_ms`). faster-whisper honours all of them; whisper.cpp the ones it has a parameter for
+  (`condition_on_previous_text`, `log_prob_threshold`, `no_speech_threshold`,
+  `temperature_increment_on_fallback`); silence removal and `chunk_length` are applied by bolo for every engine.
+  Options a model cannot honour are dropped and named in the `x-bolo-ignored-options` header and the request log.
+  Values out of range get a `400` naming the field.
+- `max_repeats` (default 4): a phrase repeated back to back more often than this in a segment ("the the the ...")
+  is cut to one copy, and so is a run of identical segments; `0` turns it off.
+- The same options as per-model defaults: catalog `options`, or pinned with `PUT /api/v1/models/{id}/settings`
+  and `bolo models config <id> --set key=value`. The request wins over the pin, the pin over the catalog.
+- `verbose_json` has `language_probability` when the model detected the language (faster-whisper).
 
 ## [0.6.6] - 2026-11-17
 

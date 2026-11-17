@@ -179,7 +179,7 @@
      "openai"
     ],
     "summary": "Transcribe audio",
-    "description": "Multipart form: ``file``, ``model``, optional ``language``, ``prompt``,\n``response_format`` (json, text, srt, vtt, verbose_json), ``temperature``,\n``timestamp_granularities[]`` (word, segment) and ``stream``.\n\nExtensions: ``vad_filter`` (force or disable silence removal) and ``hotwords``; with diarization,\n``separate_overlaps=true`` transcribes overlapped speech from one separated track per speaker.",
+    "description": "Multipart form: ``file``, ``model``, optional ``language``, ``prompt``,\n``response_format`` (json, text, srt, vtt, verbose_json), ``temperature``,\n``timestamp_granularities[]`` (word, segment) and ``stream``.\n\nExtensions: ``vad_filter`` (force or disable silence removal), ``vad_parameters`` (an object: ``threshold``,\n``min_speech_duration_ms``, ``max_speech_duration_s``, ``min_silence_duration_ms``, ``speech_pad_ms``),\n``chunk_length`` and ``hotwords``; Whisper decoding: ``condition_on_previous_text``, ``repetition_penalty``,\n``no_repeat_ngram_size``, ``compression_ratio_threshold``, ``log_prob_threshold``, ``no_speech_threshold``,\n``temperature_increment_on_fallback`` and ``hallucination_silence_threshold``; ``max_repeats`` (the repetition\nguard: a phrase repeated back to back more often than this is cut to one copy; 0 turns it off). Options a model\ncannot honour are listed in the ``x-bolo-ignored-options`` header. With diarization, ``separate_overlaps=true``\ntranscribes overlapped speech from one separated track per speaker.",
     "operationId": "create_transcription_v1_audio_transcriptions_post",
     "responses": {
      "200": {
@@ -3819,6 +3819,151 @@
       ],
       "title": "Batch Size",
       "description": "llama.cpp models: batch size (-b); 0: llama-server's default."
+     },
+     "condition_on_previous_text": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Condition On Previous Text",
+      "description": "Whisper models: give the decoder the text of the previous window as its prompt (faster-whisper and whisper.cpp; bolo's default is false, which avoids most repetition loops)."
+     },
+     "repetition_penalty": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Repetition Penalty",
+      "description": "faster-whisper: penalty on tokens already generated (> 0; 1 is off, 1.1 to 1.3 is a usual value against loops)."
+     },
+     "no_repeat_ngram_size": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "No Repeat Ngram Size",
+      "description": "faster-whisper: never repeat an n-gram of this many tokens (0 to 100; 0 is off)."
+     },
+     "compression_ratio_threshold": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Compression Ratio Threshold",
+      "description": "faster-whisper: a window whose text compresses better than this (gzip ratio; default 2.4) is decoded again at a higher temperature; needs temperature_increment_on_fallback."
+     },
+     "log_prob_threshold": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Log Prob Threshold",
+      "description": "Whisper models: average log probability below which a window counts as failed (-100 to 0; default -1)."
+     },
+     "no_speech_threshold": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "No Speech Threshold",
+      "description": "Whisper models: a window more likely silence than this (0 to 1; default 0.6) with a low log probability is dropped."
+     },
+     "temperature_increment_on_fallback": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Temperature Increment On Fallback",
+      "description": "Whisper models: retry a failed window at this much higher temperature, up to 1 (0 to 1; bolo's faster-whisper default is 0, no retries; whisper.cpp's own default is 0.2)."
+     },
+     "hallucination_silence_threshold": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hallucination Silence Threshold",
+      "description": "faster-whisper: skip silent stretches longer than this many seconds when a hallucination is suspected (computes word timings)."
+     },
+     "chunk_length": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Chunk Length",
+      "description": "Longest piece of audio decoded at once, in seconds (1 to 30; default 30)."
+     },
+     "vad_filter": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Vad Filter",
+      "description": "Remove silence before decoding: true always, false never; unset: only for audio longer than the model's window."
+     },
+     "vad_parameters": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Vad Parameters",
+      "description": "Silence removal tuning: threshold, min_speech_duration_ms, max_speech_duration_s, min_silence_duration_ms, speech_pad_ms."
+     },
+     "max_repeats": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Repeats",
+      "description": "Repetition guard: a phrase (1 to 8 words) repeated back to back more often than this is cut to one copy, and so is a run of identical segments (default 4; 0 turns it off)."
      }
     },
     "additionalProperties": false,

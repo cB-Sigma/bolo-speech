@@ -208,7 +208,17 @@ Multipart form.
 | `num_speakers`, `min_speakers`, `max_speakers` | - | extension, with diarization: fix or bound the number of speakers |
 | `separate_overlaps` | `false` | extension, with diarization: transcribe overlapped speech from one separated track per speaker (see [Separating overlapping speech](#speaker-diarization)); `separation_model`, `separation_context_s`, `separation_min_overlap_s`, `separation_allow_narrowband` |
 | `vad_filter` | auto | extension. `true` forces silence removal before decoding; by default VAD is used only to split audio longer than the model's window |
+| `vad_parameters` | - | extension. Tunes the silence removal, as a JSON object or as bracketed fields (`vad_parameters[threshold]=0.6`, which is how the OpenAI SDKs send a nested `extra_body` object): `threshold` (0 to 1, default 0.5), `min_speech_duration_ms`, `max_speech_duration_s`, `min_silence_duration_ms` (default 300), `speech_pad_ms` (default 150). Given without `vad_filter`, it switches the filter on. `neg_threshold` is accepted and ignored |
+| `chunk_length` | `30` | extension. Longest piece of audio decoded at once, in seconds (1 to 30): longer audio is cut at pauses into pieces of at most this length, for every engine; faster-whisper also uses it as its own window |
 | `hotwords` | - | extension, passed to engines that support it |
+| `condition_on_previous_text` | `false` | extension, Whisper models: give the decoder the text of the previous window. Off by default: it is the main cause of repetition loops on long audio |
+| `repetition_penalty` | `1` | extension, faster-whisper: penalty on tokens already generated (greater than 0; 1 is off; 1.1 to 1.3 is a usual value against loops) |
+| `no_repeat_ngram_size` | `0` | extension, faster-whisper: never generate the same n-gram of this many tokens twice (0 to 100; 0 is off) |
+| `compression_ratio_threshold` | `2.4` | extension, faster-whisper: a window whose text compresses better than this (gzip ratio) is decoded again at a higher temperature; has an effect only with `temperature_increment_on_fallback` |
+| `log_prob_threshold`, `no_speech_threshold` | `-1`, `0.6` | extension, Whisper models: a window with an average log probability under the first fails (and is retried at a higher temperature, with `temperature_increment_on_fallback`); one that is also more likely silence than the second is dropped |
+| `temperature_increment_on_fallback` | `0` | extension, Whisper models: retry a failed window at this much higher temperature, up to 1 (0 to 1). faster-whisper does not retry by default; whisper.cpp's own default, 0.2, applies when it is not given |
+| `hallucination_silence_threshold` | - | extension, faster-whisper: when a hallucination is suspected, skip silent stretches longer than this many seconds (computes word timings, so decoding is a little slower) |
+| `max_repeats` | `4` | extension, every engine: the repetition guard. A phrase of 1 to 8 words (16 characters in scripts written without spaces) repeated back to back more than this many times in a segment is cut to one copy, and so is a run of more than this many identical segments. `0` turns it off |
 
 Responses:
 
@@ -223,6 +233,43 @@ Responses:
                "temperature": 0.0, "avg_logprob": -0.21, "compression_ratio": 0.0, "no_speech_prob": 0.01}],
  "usage": {"type": "duration", "seconds": 3}}
 ```
+
+`verbose_json` also has `language_probability` (0 to 1) when the model detected the language itself and says how
+sure it was (faster-whisper; 1.0 when `language` was given to it).
+
+#### Decoding options and repetition loops
+
+Whisper can loop ("the the the ...") on silence, music and long recordings. bolo's defaults already avoid most of
+it: `condition_on_previous_text` is off, audio longer than the model's window is cut at pauses, and the repetition
+guard (`max_repeats`) trims what still gets through. When loops remain, in that order of cost:
+`repetition_penalty=1.1` to `1.3`, `no_repeat_ngram_size=3`, `vad_filter=true`, and
+`temperature_increment_on_fallback=0.2` with `compression_ratio_threshold` (which decodes failed windows again). With
+`condition_on_previous_text=true` keep the guard on. From the OpenAI SDK:
+
+```python
+client.audio.transcriptions.create(
+    model="faster-whisper-small", file=f, response_format="verbose_json",
+    extra_body={"repetition_penalty": 1.2, "no_repeat_ngram_size": 3, "vad_filter": True,
+                "vad_parameters": {"threshold": 0.5, "min_silence_duration_ms": 500, "speech_pad_ms": 200}},
+)
+```
+
+Values out of range are refused with `400` naming the field (`param`). Each option can also be a model's default:
+pinned with `PUT /api/v1/models/{id}/settings` (or `bolo models config <id> --set repetition_penalty=1.2`) or set in
+the catalog entry's `options`; a request's value wins over the pin, the pin over the catalog.
+
+| Option | faster-whisper | whisper.cpp | other engines |
+| --- | --- | --- | --- |
+| `condition_on_previous_text` | yes | yes (`no_context`) | ignored |
+| `repetition_penalty`, `no_repeat_ngram_size`, `compression_ratio_threshold`, `hallucination_silence_threshold` | yes | ignored (no such parameter) | ignored |
+| `log_prob_threshold`, `no_speech_threshold`, `temperature_increment_on_fallback` | yes | yes (`logprob_thold`, `no_speech_thold`, `temperature_inc`) | ignored |
+| `chunk_length` | yes (bolo's cut and the model's window) | bolo's cut | bolo's cut |
+| `vad_filter`, `vad_parameters`, `max_repeats` | yes (applied by bolo) | yes | yes |
+
+An option the model cannot honour does not fail the request: it is dropped, named in the response header
+`x-bolo-ignored-options` (comma-separated) and in the request log (`ignored_options`), and logged at `INFO`.
+faster-whisper decodes requests with options other than `repetition_penalty` and `no_repeat_ngram_size` one at a
+time instead of in a batch with others. Speaker-conditioned models (DiCoW) ignore the Whisper options.
 
 `text`, `srt` and `vtt` return plain text. Fields bolo cannot fill honestly
 are present with neutral values (`tokens: []`, `compression_ratio: 0.0`;
@@ -692,6 +739,7 @@ was used by name and is not a curated entry.
 | `PUT /api/v1/models/{id}/settings` `{"device": "cpu", "keep_alive": "30m"}` | pins where the model runs (overrides the `device` setting for it; it still goes on the CPU when it does not fit on the accelerator) and how long it stays loaded once idle (overrides `keep_alive` and the per-task TTLs; `-1` keeps it loaded). `null` removes a pin. Takes effect at the next load |
 | `PUT /api/v1/models/{id}/settings` `{"num_parallel": 2, "max_queue": 16}` | requests the model works on at once and requests that may wait before `429` (override the settings `num_parallel` and `max_queue` and the catalog's options; configuration.md, "Parallel requests and queues"). Takes effect at the next load |
 | `PUT /api/v1/models/{id}/settings` `{"flash_attention": "on", "kv_cache_type": "q8_0", "context_size": 4096, "batch_size": 512}` | llama.cpp voices: what the llama-server bolo starts for the model gets (`-fa`, `--cache-type-k/-v`, `-c`, `-b`), over the `llama_*` settings and the catalog's options; arguments in `tts_server_args` win. `400` for an unknown cache type or flash-attention value. Takes effect at the next load. CLI: `bolo models config <id> --set kv_cache_type=q8_0` |
+| `PUT /api/v1/models/{id}/settings` `{"repetition_penalty": 1.2, "vad_parameters": {"threshold": 0.6}}` | speech-to-text decoding defaults of the model: `condition_on_previous_text`, `repetition_penalty`, `no_repeat_ngram_size`, `compression_ratio_threshold`, `log_prob_threshold`, `no_speech_threshold`, `temperature_increment_on_fallback`, `hallucination_silence_threshold`, `chunk_length`, `vad_filter`, `vad_parameters`, `max_repeats` (see [Decoding options](#decoding-options-and-repetition-loops)). A request's own value wins; `400` for a value out of range. Takes effect at once |
 | `PUT /api/v1/models/{id}/settings` `{"phonemizer": "espeak-ng"}` | pins the phonemiser of a voice (`null` removes the pin); stored in `<data_dir>/model-settings.json`, shown as `settings` in catalog entries, announced as a `model` event with `"event":"settings"`. `400` for a model that reads characters, or uccharan on a language it does not cover. CLI: `bolo models config <id> --phonemizer X` / `--clear` |
 
 Pulling an installed model yields a job that is already `done`. Pulling a

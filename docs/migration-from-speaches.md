@@ -58,7 +58,7 @@ to the speaker name (`amy`).
 
 | Endpoint | speaches | bolo |
 | --- | --- | --- |
-| `POST /v1/audio/transcriptions` | yes | yes; same form fields including `stream`, `timestamp_granularities[]`, `hotwords`; `vad_filter` is an explicit option (see below) |
+| `POST /v1/audio/transcriptions` | yes | yes; same form fields including `stream`, `timestamp_granularities[]`, `hotwords`, `vad_parameters` and the faster-whisper decoding options; `vad_filter` is an explicit option (see below) |
 | `POST /v1/audio/translations` | yes | yes (multilingual Whisper models) |
 | `POST /v1/audio/speech` | yes | yes; `response_format` mp3, opus, aac, flac, wav, pcm; `stream_format` audio/sse; `sample_rate`; `speed` |
 | `GET /v1/models`, `GET /v1/models/{id}` | yes | yes (installed models; same extra fields `language`, `task`) |
@@ -99,7 +99,12 @@ different ports.
 * **Default decoding.** bolo's faster-whisper engine uses greedy decoding
   (`beam_size` 1) and `condition_on_previous_text=false` by default, trading a
   little accuracy for speed and for immunity to repetition loops on long
-  audio. Set `options: {beam_size: 5}` on a model to change it.
+  audio. Set `options: {beam_size: 5}` on a model to change it. The decoding options
+  (`condition_on_previous_text`, `repetition_penalty`, `no_repeat_ngram_size`,
+  `compression_ratio_threshold`, `hallucination_silence_threshold`, `vad_parameters`,
+  `chunk_length`, ...) are accepted per request under the same names, and
+  `verbose_json` has `language_probability`; see api.md, "Decoding options and
+  repetition loops".
 * **Piper voices** run through sherpa-onnx, not the GPL `piper-tts` package
   that speaches depends on (see
   [models.md](models.md#licences-and-the-espeak-ng-question)). Voices in
