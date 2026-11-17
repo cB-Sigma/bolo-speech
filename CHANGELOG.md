@@ -61,6 +61,15 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   the audio received. `examples/webrtc_browser.html` does the same in one self-contained page. Tested in headless
   Chromium against a real `bolo serve` (`npm run e2e:webrtc`, `docs/measurements/webrtc-browser.json`); Chrome and
   Edge themselves are next.
+- **Voxtral speech-to-text on llama.cpp** (Mistral, Apache-2.0), without PyTorch: `voxtral-mini-3b-llamacpp` (IQ4_XS
+  weights and the Q8_0 audio encoder, 3.0 GB) and `voxtral-small-24b-llamacpp` (Q4_K_M, 15.7 GB; catalogued, not run,
+  wants a GPU with about 20 GB). New kind `voxtral-llamacpp` of the `tts-server` engine: bolo starts llama-server with
+  the model and its audio encoder (`bolo components install llama-server`; the pinned build b12375 already has
+  Voxtral's audio projector) or uses one you run (`tts_servers`). Transcription uses Voxtral's own transcription mode
+  with the request's language (`lang:<code>[TRANSCRIBE]`); translation into English is an instruction in the chat
+  format; long audio is cut at pauses into pieces of at most 30 s. The model gives no timestamps: `verbose_json`
+  segments are those pieces, and word timestamps are unavailable. docs/models.md, "Voxtral speech-to-text on
+  llama.cpp".
 
 ## [0.6.6] - 2026-11-17
 

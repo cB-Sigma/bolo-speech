@@ -883,6 +883,7 @@ class ModelManager:
         if spec.engine == "tts-server":
             model_opts.setdefault("model_aliases", list(spec.aliases))
             model_opts.setdefault("sample_rate", spec.sample_rate)
+            model_opts.setdefault("languages", list(spec.languages))
         with cuda_libs.watch() as watched:  # an accelerator the runtime did not start (bolo.cuda_libs)
             model = engine.load(spec.kind, spec.task, self.store.model_dir(spec.id), model_opts, opts)
             if isinstance(model, TTSModel):

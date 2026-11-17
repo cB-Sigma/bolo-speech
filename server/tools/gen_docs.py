@@ -120,7 +120,7 @@ def group(spec: ModelSpec) -> str:
     """The heading a model is listed under: its family, or one heading per external TTS server runtime."""
     if spec.kind == "orpheus-llamacpp":
         return "Orpheus family on llama.cpp (SNAC in onnxruntime)"
-    if spec.engine == "tts-server":
+    if spec.engine == "tts-server" and spec.task == "tts":
         return f"External TTS server: {spec.options.get('runtime')}"
     return spec.family
 

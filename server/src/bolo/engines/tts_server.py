@@ -25,7 +25,8 @@ style), the sliders ``rate`` (0-4), ``pause`` (0-4), ``pitch_range`` (0-5), ``pi
 
 The kind ``orpheus-llamacpp`` (Orpheus, Veena, Svara, snorTTS) uses the same llama-server management but its
 own client, :mod:`bolo.engines.orpheus_llamacpp`: bolo builds the prompt, streams token ids from ``/completion``
-and decodes the SNAC codes with onnxruntime.
+and decodes the SNAC codes with onnxruntime. The kind ``voxtral-llamacpp`` (Voxtral speech-to-text) does the same
+with :mod:`bolo.engines.voxtral_llamacpp`: audio in, text out through ``/completion``.
 
 Other per-entry options: ``cloning`` (the model takes a reference recording), ``reference_text`` (false: never send
 the reference's transcript, for audio.cpp families that refuse it), ``send_language`` (tell the server
@@ -736,7 +737,7 @@ class TTSServerEngine(Engine):
     name = "External TTS server (llama-server, audio.cpp)"
     license = "MIT (llama.cpp) / Apache-2.0 (audio.cpp)"
     url = "https://github.com/ggml-org/llama.cpp"
-    kinds = ("tts-server", "orpheus-llamacpp")
+    kinds = ("tts-server", "orpheus-llamacpp", "voxtral-llamacpp")
 
     def __init__(self) -> None:
         self.settings: Settings | None = None
@@ -762,6 +763,13 @@ class TTSServerEngine(Engine):
         return url_for(self._settings(), [*names, str(spec.get("runtime") or LLAMA)])
 
     def load(self, kind: str, task: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Model:
+        if kind == "voxtral-llamacpp":
+            # Voxtral speech-to-text: bolo builds the prompts, llama-server runs the model (bolo.engines.voxtral_llamacpp)
+            if task != "stt":
+                raise EngineUnavailable(f"the voxtral-llamacpp kind is a speech-to-text model, not {task!r}")
+            from bolo.engines.voxtral_llamacpp import load_model as load_voxtral
+
+            return load_voxtral(self, path, spec, opts)
         if task != "tts":
             raise EngineUnavailable(f"the tts-server engine serves text-to-speech models, not {task!r}")
         if kind == "orpheus-llamacpp":

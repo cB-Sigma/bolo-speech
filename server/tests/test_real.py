@@ -869,6 +869,44 @@ async def test_pocket_tts_on_a_managed_llama_server() -> None:
         await core.stop()
 
 
+async def test_voxtral_mini_large_on_a_managed_llama_server() -> None:
+    """Voxtral Mini 3B on a managed llama-server (3.0 GB download; "large": left out of `-k "not large"`): bolo's
+    English and Hindi samples transcribed with their language, en-long translated, and a 40 s recording made of the
+    samples with pauses, which is cut into pieces of at most 30 s."""
+    from bolo import samples
+    from bolo.tts_runtimes import find_binary
+
+    model = "voxtral-mini-3b-llamacpp"
+    settings = _llama_server_settings()
+    if find_binary(settings, "llama-server")[0] is None:
+        pytest.skip("needs llama-server: bolo components install llama-server, or BOLO_LLAMA_SERVER_BIN")
+    core = Bolo(settings)
+    await core.start()
+    try:
+        await core.manager.load(model)  # pull + start the server; not part of the timing
+        for sample_id, max_wer in (("en-short", 0.15), ("en-long", 0.15), ("hi-short", 0.5)):
+            audio, rate, meta = samples.load_audio(sample_id)
+            trace = Trace("stt", "bench", model)
+            result = await core.transcribe(audio, rate, model=model, language=meta["language"], trace=trace)
+            wer = word_error_rate(meta["text"], result.text, meta["language"])
+            print(f"\n{model} {sample_id}: RTF {trace.rtf:.3f}, WER {wer:.3f} | {result.text}")
+            assert wer <= max_wer
+        audio, rate, meta = samples.load_audio("en-long")
+        translated = await core.transcribe(audio, rate, model=model, language="en", task="translate")
+        print(f"\n{model} translate en-long: {translated.text}")
+        assert word_error_rate(meta["text"], translated.text, "en") <= 0.5
+        pause = np.zeros(int(rate * 1.0), dtype=np.float32)
+        parts = [samples.load_audio(i)[0] for i in ("en-long", "en-short", "en-long", "en-short", "en-long")]
+        joined = np.concatenate([x for p in parts for x in (p.astype(np.float32), pause)])
+        long_result = await core.transcribe(joined, rate, model=model, language="en")
+        print(f"\n{model} {len(joined) / rate:.1f} s: {len(long_result.segments)} segments | {long_result.text}")
+        assert len(joined) / rate > 40 and len(long_result.segments) >= 2
+        assert all(s.end - s.start <= 30.5 for s in long_result.segments)
+        assert "order will arrive" in long_result.text.lower() and not long_result.words
+    finally:
+        await core.stop()
+
+
 async def test_saved_voice_clone_and_speaker_similarity() -> None:
     """A saved voice made from one of bolo's reference clips (Kokoro's michael, not a real person), cloned by Pocket
     TTS on a managed llama-server and scored with the speaker-embedding model: the clone must be closer to its own

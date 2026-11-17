@@ -1,0 +1,86 @@
+# Speech-to-text models run by llama.cpp's server: the tts-server engine's llama-server management
+# (bolo/engines/tts_server.py) with the Voxtral client of bolo/engines/voxtral_llamacpp.py. bolo starts llama-server
+# with the language model (-m) and its audio encoder (-mm) for the model in use (bolo components install llama-server,
+# or the setting llama_server_bin), or forwards to one the operator runs (setting tts_servers, "<model id>=<url>").
+# Requests go to POST /completion in Voxtral's transcription format (lang:<code>[TRANSCRIBE]); translation is an
+# instruction in the chat format. The model gives no timestamps: segment times are the stretches of speech bolo cut
+# the audio into (voice-activity detection, at most max_chunk_s each), and word timestamps are unavailable.
+# Sources, read 2026-11-17: the Mistral model cards, llama.cpp build b12375 (libmtmd has the voxtral projector), the
+# Hugging Face API for every file (size, revision, SHA-256).
+- id: voxtral-mini-3b-llamacpp
+  aliases: [voxtral-mini, voxtral-mini-3b]
+  task: stt
+  engine: tts-server
+  kind: voxtral-llamacpp
+  family: Voxtral
+  languages: [en, es, fr, pt, hi, de, nl, it]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 2988421984
+  params: 4700000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/mistralai/Voxtral-Mini-3B-2507
+  commercial_use: true
+  gated: false
+  features: [punctuation, translate, long-form]
+  description: 'Mistral Voxtral Mini 3B (2507): an audio encoder (Whisper large-v3 based) in front of a 3 B language
+    model, transcribing English, Spanish, French, Portuguese, Hindi, German, Dutch and Italian with punctuation and
+    casing, and translating them into English. Runs on llama.cpp (IQ4_XS weights and the Q8_0 audio encoder, 3.0 GB)
+    in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).
+    No timestamps from the model: verbose_json segments are the stretches of speech bolo cut the audio into (at most
+    30 s each), and word timestamps are unavailable. Slow on a CPU; a GPU is recommended.'
+  source_url: https://huggingface.co/mistralai/Voxtral-Mini-3B-2507
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: bartowski/mistralai_Voxtral-Mini-3B-2507-GGUF
+    revision: 1d0032d997b7f72804d356fc790486e6d697cea5
+    include: [mistralai_Voxtral-Mini-3B-2507-IQ4_XS.gguf]
+    urls:
+    - path: mmproj-Voxtral-Mini-3B-2507-Q8_0.gguf
+      url: https://huggingface.co/ggml-org/Voxtral-Mini-3B-2507-GGUF/resolve/20616573013f28229fff61de74359d3eeff61f6a/mmproj-Voxtral-Mini-3B-2507-Q8_0.gguf
+      size: 715714080
+      sha256: 4f24c4ef3ce929d02ed9d1cfb050ae9a7365f057c0ddec0d489580982ebe0d02
+  options:
+    runtime: llama-server
+    model_file: mistralai_Voxtral-Mini-3B-2507-IQ4_XS.gguf
+    mmproj_file: mmproj-Voxtral-Mini-3B-2507-Q8_0.gguf
+    # 30 s of audio is 375 tokens; llama-server's default (the GGUF's 32 k) would reserve about 4 GB of KV cache
+    context_size: 4096
+    max_chunk_s: 30.0
+    hardware: {gpu: recommended, vram_gb: 4.4, note: 'approximate: weights x 1.3 + 0.5 GB'}
+- id: voxtral-small-24b-llamacpp
+  aliases: [voxtral-small, voxtral-small-24b]
+  task: stt
+  engine: tts-server
+  kind: voxtral-llamacpp
+  family: Voxtral
+  languages: [en, es, fr, pt, hi, de, nl, it]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 15718099904
+  params: 24300000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/mistralai/Voxtral-Small-24B-2507
+  commercial_use: true
+  gated: false
+  features: [punctuation, translate, long-form]
+  description: 'Mistral Voxtral Small 24B (2507): the same audio encoder in front of Mistral Small 3.1 (24 B), more
+    accurate than Voxtral Mini on the same eight languages. Q4_K_M weights and the F16 audio encoder (15.7 GB) on
+    llama.cpp, in a llama-server that bolo starts or one you run (setting tts_servers). Needs a GPU with about 20 GB
+    of memory to run well; on a CPU it is far slower than real time. No timestamps from the model (see
+    voxtral-mini-3b-llamacpp). Not run by the maintainers.'
+  source_url: https://huggingface.co/mistralai/Voxtral-Small-24B-2507
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: bartowski/mistralai_Voxtral-Small-24B-2507-GGUF
+    revision: c596289d4e0370c44a65cb4add1da125dd0a2342
+    include: [mistralai_Voxtral-Small-24B-2507-Q4_K_M.gguf, mmproj-mistralai_Voxtral-Small-24B-2507-f16.gguf]
+  options:
+    runtime: llama-server
+    model_file: mistralai_Voxtral-Small-24B-2507-Q4_K_M.gguf
+    mmproj_file: mmproj-mistralai_Voxtral-Small-24B-2507-f16.gguf
+    context_size: 4096
+    max_chunk_s: 30.0
+    hardware: {gpu: required, vram_gb: 20.9, note: 'approximate: weights x 1.3 + 0.5 GB'}
