@@ -18,7 +18,9 @@ import yaml
 
 from bolo.store import Source
 
-TASKS = ("stt", "tts", "vad", "diarization", "turn", "translation", "separation", "denoise")
+TASKS = (
+    "stt", "tts", "vad", "diarization", "turn", "translation", "separation", "denoise", "speech-to-speech", "audio-llm",
+)  # fmt: skip
 TIERS = ("realtime", "balanced", "accuracy")
 VALIDATED = ("cpu", "untested")
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
@@ -308,6 +310,12 @@ FAKE_MODELS: list[dict[str, Any]] = [
         "id": "fake-turn-text", "task": "turn", "engine": "fake", "kind": "fake-turn-text", "family": "Fake",
         "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True, "options": {"input": "text"},
         "description": "Test end-of-turn model that reads text: a turn is finished once it holds eight words.",
+    },
+    {
+        "id": "fake-s2s", "task": "speech-to-speech", "engine": "fake", "kind": "fake-s2s", "family": "Fake",
+        "languages": ["en"], "tier": "realtime", "sample_rate": 24000, "license": "Apache-2.0", "builtin": True,
+        "features": ["speech-to-speech", "tool-calls"],
+        "description": "Test speech-to-speech model: answers with what it heard (a word and a tone at a time).",
     },
     {
         "id": "fake-vad", "task": "vad", "engine": "fake", "kind": "fake-vad", "family": "Fake", "languages": [],

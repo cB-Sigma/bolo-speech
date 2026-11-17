@@ -13,6 +13,7 @@ A loaded model implements one of four small interfaces:
   :class:`STTStream` objects that can be advanced together in one batch
 * :class:`TTSModel` – synthesis that yields audio in pieces
 * :class:`VADModel` – factories for stateful speech detectors
+* :class:`SpeechToSpeechModel` – a turn-based spoken conversation (the ``speech-to-speech`` pipeline)
 """
 
 from __future__ import annotations
@@ -550,6 +551,65 @@ class TurnModel(Model):
     def probability_text(self, text: str) -> float:
         """Probability (0..1) that an utterance with this transcript is a finished turn (models that read text)."""
         raise NotImplementedError(f"{type(self).__name__} judges audio, not text")
+
+
+@dataclass
+class ConversationTurn:
+    """One turn of a conversation with a speech-to-speech model.
+
+    ``role`` is "user" (``audio``: the turn as spoken, 16 kHz mono; or ``text``), "assistant" (what the model
+    answered, as text, and the tool calls it made) or "tool" (``text``: the result of the call ``call_id``)."""
+
+    role: str
+    text: str = ""
+    audio: FloatArray | None = None
+    call_id: str | None = None
+    #: assistant turns: ``{"call_id", "name", "arguments"}`` per tool call
+    tool_calls: list[dict[str, str]] = field(default_factory=list)
+
+
+@dataclass
+class ConversationRequest:
+    """Everything a turn-based speech-to-speech model needs to answer: the whole conversation so far, every time."""
+
+    turns: list[ConversationTurn]
+    instructions: str | None = None
+    #: function tools as the Realtime API describes them (``{"type": "function", "name", "description", "parameters"}``)
+    tools: list[dict[str, Any]] = field(default_factory=list)
+    tool_choice: str = "auto"
+    voice: str | None = None
+    max_output_tokens: int | None = None
+    #: False: text only (a ``["text"]`` session)
+    audio_out: bool = True
+
+
+@dataclass
+class ConversationChunk:
+    """A piece of the answer: text, audio at the model's ``sample_rate``, or a tool call."""
+
+    text: str = ""
+    audio: FloatArray | None = None
+    tool_call: dict[str, str] | None = None
+
+
+class SpeechToSpeechModel(Model):
+    """A model that hears speech and answers in speech (and text), one turn at a time.
+
+    The caller keeps the conversation and sends all of it with each request; the model keeps no state between
+    requests, so it can serve any number of conversations. Full-duplex models (that listen while they speak, frame
+    by frame) do not fit this interface."""
+
+    task = "speech-to-speech"
+    sample_rate = 24000
+    voices: tuple[Voice, ...] = ()
+    #: whether ``tools`` reach the model (False: they are ignored and no tool calls come back)
+    supports_tools: bool = False
+
+    @abc.abstractmethod
+    def respond(
+        self, request: ConversationRequest, cancelled: Callable[[], bool] | None = None
+    ) -> Iterator[ConversationChunk]:
+        """The answer to the conversation in ``request``, in pieces. Stops early once ``cancelled()`` is true."""
 
 
 class Engine(abc.ABC):

@@ -261,7 +261,17 @@ def test_every_packaged_entry_is_well_formed() -> None:
         if "non-commercial" in s.license.lower() or "-nc" in s.license.lower():
             assert s.commercial_use is False, s.id
     tasks = {s.task for s in specs}
-    assert tasks == {"stt", "tts", "vad", "diarization", "turn", "separation", "denoise"}
+    assert tasks == {
+        "stt",
+        "tts",
+        "vad",
+        "diarization",
+        "turn",
+        "separation",
+        "denoise",
+        "audio-llm",
+        "speech-to-speech",
+    }
     needs = [s for s in specs if s.needs_phonemes]
     assert len(needs) >= 80 and all(s.task == "tts" for s in needs)
     assert not [s.id for s in specs if s.family == "Kokoro" and s.requires]  # the default voice needs nothing extra

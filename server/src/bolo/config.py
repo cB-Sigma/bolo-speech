@@ -153,10 +153,13 @@ class Settings:
     #: speech-to-speech model hears and answers; bolo keeps turn detection, barge-in, codecs and transcripts)
     realtime_pipeline: str = "cascade"
     #: audio-llm: an OpenAI-compatible chat-completions endpoint whose model takes input_audio (llama-server with
-    #: Gemma 4 E2B/E4B or Ultravox); unset: llm_base_url / llm_model / llm_api_key
+    #: Gemma 4 E2B/E4B or Ultravox); unset: llm_base_url / llm_model / llm_api_key. Without audio_llm_base_url, an
+    #: audio_llm_model naming a catalog entry of task audio-llm is served by a llama-server bolo starts
     audio_llm_base_url: str | None = None
     audio_llm_model: str | None = None
     audio_llm_api_key: str | None = None
+    audio_llm_parallel: int = 2  # sessions the managed audio-llm server answers at once (llama-server --parallel)
+    audio_llm_server_args: list[str] = field(default_factory=list)  # extra arguments for that managed server
     #: audio-llm and speech-to-speech: also transcribe the user's turns with bolo's STT (transcript events and
     #: conversation history), in parallel with the response
     realtime_transcribe_user: bool = True

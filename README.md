@@ -137,6 +137,13 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 <!-- BEGIN GENERATED: models-summary -->
 | Task | Family | Models | Languages | Validated on CPU | Best measured RTF |
 | --- | --- | --- | --- | --- | --- |
+| AUDIO-LLM | LFM2.5-Audio 1.5B | 1 | en | 0 | - |
+| AUDIO-LLM | Ultravox 0.5 | 1 | ar, de, en, es, fr, hi, it, ja +7 | 0 | - |
+| AUDIO-LLM | Qwen2.5-Omni 3B | 1 | en, zh | 0 | - |
+| AUDIO-LLM | Qwen2.5-Omni 7B | 1 | en, zh | 0 | - |
+| AUDIO-LLM | Qwen3-Omni 30B-A3B | 1 | ar, de, en, es, fr, id, it, ja +10 | 0 | - |
+| AUDIO-LLM | Gemma 4 E2B | 1 | en | 0 | - |
+| AUDIO-LLM | Gemma 4 E4B | 1 | en | 0 | - |
 | STT | OpenAI (cloud) | 4 | af, am, ar, as, az, ba, be, bg +92 | 0 | - |
 | TTS | OpenAI (cloud) | 3 | af, am, ar, as, az, ba, be, bg +92 | 0 | - |
 | STT | Sarvam (cloud) | 3 | as, bn, brx, doi, en, gu, hi, kn +15 | 0 | - |
@@ -169,6 +176,14 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | TTS | Spark-TTS | 1 | en, zh | 0 | - |
 | TTS | MaskGCT | 1 | de, en, fr, ja, ko, zh | 0 | - |
 | DIARIZATION | DiariZen | 1 | - | 0 | - |
+| SPEECH-TO-SPEECH | Qwen2.5-Omni 3B | 1 | en, zh | 0 | - |
+| SPEECH-TO-SPEECH | Qwen2.5-Omni 7B | 1 | en, zh | 0 | - |
+| SPEECH-TO-SPEECH | Qwen3-Omni 30B-A3B | 1 | de, en, es, fr, it, ja, ko, pt +2 | 0 | - |
+| SPEECH-TO-SPEECH | Moshi | 2 | en | 0 | - |
+| SPEECH-TO-SPEECH | GLM-4-Voice | 1 | en, zh | 0 | - |
+| SPEECH-TO-SPEECH | MiniCPM-o 2.6 | 1 | en, zh | 0 | - |
+| SPEECH-TO-SPEECH | Step-Audio 2 | 1 | en, zh | 0 | - |
+| SPEECH-TO-SPEECH | Kimi-Audio | 1 | en, zh | 0 | - |
 | TTS | LFM3-Audio 2B | 1 | ar, da, de, el, en, es, fi, fr +10 | 0 | - |
 | SEPARATION | VoxLock | 1 | en | 1 | 0.460 (`voxlock-int8`) |
 | STT | Whisper | 38 | af, am, ar, as, az, ba, be, bg +92 | 20 | 0.081 (`faster-whisper-tiny.en`) |
@@ -205,7 +220,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | VAD | WebRTC VAD | 2 | - | 2 | 0.000 (`webrtc-vad-aggressive`) |
 | VAD | Energy VAD | 1 | - | 1 | 0.000 (`energy-vad`) |
 
-**385 models in the catalog, 151 validated on CPU, 234 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**401 models in the catalog, 151 validated on CPU, 250 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

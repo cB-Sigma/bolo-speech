@@ -23,6 +23,8 @@ import numpy as np
 
 from bolo import __version__
 from bolo.engines.base import (
+    ConversationChunk,
+    ConversationRequest,
     DenoiseModel,
     DiarizationModel,
     DiarizationResult,
@@ -36,6 +38,7 @@ from bolo.engines.base import (
     SpeakerActivity,
     SpeakerRequest,
     SpeakerTurn,
+    SpeechToSpeechModel,
     StreamResult,
     STTModel,
     STTRequest,
@@ -565,13 +568,66 @@ class FakeDenoiser(DenoiseModel):
         return np.fft.irfft(spectrum, len(samples)).astype(np.float32)
 
 
+class FakeS2S(SpeechToSpeechModel):
+    """A turn-based speech-to-speech model for tests: a pure function of the conversation.
+
+    * the last turn is a tool result      -> "The tool said: <text>."
+    * tools offered and "weather" asked   -> a ``get_weather`` tool call
+    * the last user turn is text          -> "You said: <text>."
+    * the last user turn is audio         -> "I heard <n.n> seconds."
+
+    The text comes word by word, each word followed by a tone (0.1 s per word at 24 kHz) unless the request is text
+    only. Remembers every request."""
+
+    supports_tools = True
+
+    def __init__(self, opts: dict[str, Any]) -> None:
+        self.sample_rate = int(opts.get("sample_rate", 24000))
+        self.word_delay_s = float(opts.get("word_delay_s", 0.01))
+        self.voices = (Voice("fake", "Fake"),)
+        self.requests: list[ConversationRequest] = []
+
+    @staticmethod
+    def answer(request: ConversationRequest) -> tuple[str, dict[str, str] | None]:
+        if not request.turns:
+            return "Hello.", None
+        last = request.turns[-1]
+        if last.role == "tool":
+            return f"The tool said: {last.text}.", None
+        users = [t for t in request.turns if t.role == "user"]
+        user = users[-1] if users else last
+        if request.tools and request.tool_choice != "none" and "weather" in user.text.lower():
+            name = str(request.tools[0].get("name") or "get_weather")
+            return "", {"call_id": f"call_{len(request.turns)}", "name": name, "arguments": '{"city": "Pune"}'}
+        if user.audio is not None and len(user.audio):
+            return f"I heard {len(user.audio) / 16000:.1f} seconds.", None
+        return f"You said: {user.text}.", None
+
+    def respond(
+        self, request: ConversationRequest, cancelled: Callable[[], bool] | None = None
+    ) -> Iterator[ConversationChunk]:
+        self.requests.append(request)
+        text, call = self.answer(request)
+        if call is not None:
+            yield ConversationChunk(tool_call=call)
+            return
+        n = int(0.1 * self.sample_rate)
+        t = np.arange(n, dtype=np.float32) / self.sample_rate
+        for i, word in enumerate(text.split(" ")):
+            if cancelled is not None and cancelled():
+                return
+            time.sleep(self.word_delay_s)
+            tone = (0.2 * np.sin(2 * np.pi * (220 + 20 * i) * t)).astype(np.float32) if request.audio_out else None
+            yield ConversationChunk(text=word if i == 0 else " " + word, audio=tone)
+
+
 class FakeEngine(Engine):
     id = "fake"
     name = "Fake engine (testing)"
     license = "Apache-2.0"
     kinds = (
         "fake-stt", "fake-stt-streaming", "fake-stt-speakers", "fake-tts", "fake-vad", "fake-diarization", "fake-turn",
-        "fake-turn-text", "fake-separation", "fake-denoise",
+        "fake-turn-text", "fake-separation", "fake-denoise", "fake-s2s",
     )  # fmt: skip
 
     def __init__(self) -> None:
@@ -603,6 +659,8 @@ class FakeEngine(Engine):
             model = FakeSeparation(merged)
         elif kind == "fake-denoise":
             model = FakeDenoiser(merged)
+        elif kind == "fake-s2s":
+            model = FakeS2S(merged)
         else:
             raise ValueError(f"fake engine cannot load kind {kind!r}")
         self.loaded.append(model)

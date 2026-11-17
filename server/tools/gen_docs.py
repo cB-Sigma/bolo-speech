@@ -46,6 +46,8 @@ TASK_TITLES = {
     "turn": "End-of-turn detection",
     "separation": "Overlapped-speech separation",
     "denoise": "Denoising",
+    "speech-to-speech": "Speech to speech (Realtime speech-to-speech pipeline)",
+    "audio-llm": "Audio-in language models (Realtime audio-llm pipeline)",
 }
 
 
@@ -74,8 +76,10 @@ def langs(spec: ModelSpec, limit: int = 6) -> str:
 def measured(spec: ModelSpec) -> str:
     if spec.status == "pending":
         return "not yet published"
+    if not spec.runnable:
+        return "not runnable yet"
     if spec.validated != "cpu":
-        return "untested"
+        return "ran once here (shared CPU), not measured" if spec.measured else "untested"
     m = spec.measured
     bits = [f"RTF {m['rtf']:.3f}"]
     if "ttfa_ms" in m:
@@ -147,8 +151,8 @@ def models_table(specs: list[ModelSpec]) -> str:
         )
         + "\n"
     )
-    for task in ("stt", "tts", "vad", "diarization", "turn", "separation", "denoise"):
-        out.append(f"### {TASK_TITLES[task]}\n")
+    for task, title in TASK_TITLES.items():
+        out.append(f"### {title}\n")
         for family, items in by_task[task].items():
             out.append(f"#### {family}\n")
             out.append("| id | languages | tier | streaming | download | licence | validated |")
@@ -179,7 +183,7 @@ def summary_table(specs: list[ModelSpec]) -> str:
             ", ".join(all_langs[:8]) + (f" +{len(all_langs) - 8}" if len(all_langs) > 8 else "") if all_langs else "-"
         )
         valid = [s for s in items if s.validated == "cpu"]
-        best = min((s.measured["rtf"] for s in valid), default=None)
+        best = min((s.measured["rtf"] for s in valid if "rtf" in s.measured), default=None)
         best_id = next((s.id for s in valid if s.measured["rtf"] == best), "")
         out.append(
             f"| {task.upper()} | {family} | {len(items)} | {lang_text} | {len(valid)} | "

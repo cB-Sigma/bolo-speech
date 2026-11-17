@@ -41,6 +41,8 @@ import numpy as np
 
 from bolo import procs
 from bolo.engines.base import (
+    ConversationChunk,
+    ConversationRequest,
     DenoiseModel,
     DiarizationModel,
     DiarizationResult,
@@ -53,6 +55,7 @@ from bolo.engines.base import (
     SeparationModel,
     SpeakerRequest,
     SpeakerTurn,
+    SpeechToSpeechModel,
     STTModel,
     STTRequest,
     STTResult,
@@ -67,6 +70,7 @@ from bolo.plugin.protocol import (
     audio_from_bytes,
     read_message,
     speaker_payload,
+    turns_message,
     write_message,
 )
 
@@ -312,10 +316,10 @@ class PluginProcess:
             self._calls.pop(rid, None)
 
     def stream(
-        self, message: dict[str, Any], cancelled: Callable[[], bool] | None = None
+        self, message: dict[str, Any], cancelled: Callable[[], bool] | None = None, payload: bytes | None = None
     ) -> Iterator[tuple[dict[str, Any], bytes]]:
         """Chunks of a streaming request; the final reply is yielded last."""
-        rid, call = self._send(message)
+        rid, call = self._send(message, payload)
         sent_cancel = False
         try:
             while True:
@@ -580,6 +584,43 @@ class PluginDenoise(_PluginModelMixin, DenoiseModel):
         return np.ascontiguousarray(out[: len(samples)], dtype=np.float32)
 
 
+class PluginS2S(_PluginModelMixin, SpeechToSpeechModel):
+    """A speech-to-speech model in a plugin: op ``respond`` (the whole conversation in, the answer streamed back)."""
+
+    def __init__(self, process: PluginProcess, load_message: dict[str, Any]) -> None:
+        self.process, self._load_message, self._handle, self._generation = process, load_message, None, 0
+        self._ensure_loaded()
+
+    def _apply_load_reply(self, reply: dict[str, Any]) -> None:
+        info = reply.get("info") or {}
+        self.sample_rate = int(reply.get("sample_rate") or 24000)
+        self.supports_tools = bool(info.get("supports_tools"))
+        self.voices = tuple(
+            Voice(str(v["id"]), str(v.get("name", "")), str(v.get("language", "")), str(v.get("gender", "")), i)
+            for i, v in enumerate(info.get("voices") or [])
+        )
+
+    def respond(
+        self, request: ConversationRequest, cancelled: Callable[[], bool] | None = None
+    ) -> Iterator[ConversationChunk]:
+        handle = self._ensure_loaded()
+        turns, payload = turns_message(request.turns)
+        message = {
+            "op": "respond", "handle": handle, "turns": turns, "instructions": request.instructions,
+            "tools": request.tools, "tool_choice": request.tool_choice, "voice": request.voice,
+            "max_output_tokens": request.max_output_tokens, "audio_out": request.audio_out,
+        }  # fmt: skip
+        for reply, data in self.process.stream(message, cancelled, payload or None):
+            if "chunk" not in reply:
+                return
+            call = reply.get("tool_call")
+            yield ConversationChunk(
+                text=str(reply.get("text") or ""),
+                audio=audio_from_bytes(data) if data else None,
+                tool_call={k: str(v) for k, v in call.items()} if isinstance(call, dict) else None,
+            )
+
+
 class PluginEngine(Engine):
     """The registry's face of one plugin (``plugin:<name>``)."""
 
@@ -617,7 +658,11 @@ class PluginEngine(Engine):
             return PluginDiarization(self.process, message)
         if task == "denoise":
             return PluginDenoise(self.process, message)
-        raise EngineUnavailable(f"plugins can serve stt, tts, separation, diarization and denoise models, not {task!r}")
+        if task == "speech-to-speech":
+            return PluginS2S(self.process, message)
+        raise EngineUnavailable(
+            f"plugins can serve stt, tts, separation, diarization, denoise and speech-to-speech models, not {task!r}"
+        )
 
     def shutdown(self) -> None:
         self.process.stop()

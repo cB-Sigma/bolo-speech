@@ -23,6 +23,7 @@ from typing import IO, Any
 import numpy as np
 
 from bolo.engines.base import (
+    ConversationRequest,
     DenoiseModel,
     DiarizationModel,
     Engine,
@@ -31,6 +32,7 @@ from bolo.engines.base import (
     SeparationModel,
     SpeakerActivity,
     SpeakerRequest,
+    SpeechToSpeechModel,
     STTModel,
     STTRequest,
     STTResult,
@@ -42,6 +44,7 @@ from bolo.plugin.protocol import (
     audio_from_bytes,
     read_message,
     split_speaker_payload,
+    turns_from_message,
     write_message,
 )
 
@@ -113,6 +116,8 @@ class _Server:
                 self.diarization(rid, op, message, payload)
             elif op == "denoise":
                 self.denoise(rid, message, payload)
+            elif op == "respond":
+                self.respond(rid, message, payload)
             else:
                 self.fail(rid, "unknown_op", f"unknown op {op!r}")
         except Exception as exc:
@@ -138,6 +143,8 @@ class _Server:
             info.update(mode=model.mode, min_sample_s=model.min_sample_s)
         if isinstance(model, DiarizationModel):
             info["consolidate_default"] = bool(model.consolidate_default)
+        if isinstance(model, SpeechToSpeechModel):
+            info.update(voices=[v.to_dict() for v in model.voices], supports_tools=bool(model.supports_tools))
         if isinstance(model, STTModel):
             info.update(
                 languages=list(model.languages), max_batch=model.max_batch,
@@ -231,6 +238,30 @@ class _Server:
             raise TypeError("this model does not denoise")
         enhanced = np.asarray(model.denoise(audio_from_bytes(payload)), dtype=np.float32)
         self.send({"id": rid, "ok": True}, audio_bytes(enhanced))
+
+    def respond(self, rid: str, m: dict[str, Any], payload: bytes) -> None:
+        model = self.model(m)
+        if not isinstance(model, SpeechToSpeechModel):
+            raise TypeError("this model does not hold spoken conversations")
+        limit = m.get("max_output_tokens")
+        request = ConversationRequest(
+            turns_from_message(list(m.get("turns") or []), payload), instructions=m.get("instructions"),
+            tools=list(m.get("tools") or []), tool_choice=str(m.get("tool_choice") or "auto"), voice=m.get("voice"),
+            max_output_tokens=int(limit) if isinstance(limit, int) else None, audio_out=bool(m.get("audio_out", True)),
+        )  # fmt: skip
+        seq = 0
+        for chunk in model.respond(request, lambda: rid in self.cancelled):
+            if rid in self.cancelled:
+                break
+            message: dict[str, Any] = {"id": rid, "chunk": seq}
+            if chunk.text:
+                message["text"] = chunk.text
+            if chunk.tool_call:
+                message["tool_call"] = dict(chunk.tool_call)
+            audio = audio_bytes(chunk.audio) if chunk.audio is not None and len(chunk.audio) else None
+            self.send(message, audio)
+            seq += 1
+        self.reply(rid, sample_rate=model.sample_rate, chunks=seq, cancelled=rid in self.cancelled)
 
     def synthesize(self, rid: str, m: dict[str, Any]) -> None:
         model = self.model(m)

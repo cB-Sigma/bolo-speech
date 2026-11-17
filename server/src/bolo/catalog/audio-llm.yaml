@@ -1,0 +1,277 @@
+# Audio-in language models for the Realtime `audio-llm` pipeline (task audio-llm): the model hears the user's turn
+# (input_audio in /v1/chat/completions) and writes the answer, which bolo's TTS speaks. bolo runs them on llama.cpp's
+# server (bolo.audio_llm: `audio_llm_model = "<id>"` without audio_llm_base_url; bolo components install
+# llama-server), with the language model (-m) and its audio encoder (-mm). None of them speaks through llama-server:
+# llama.cpp has no audio output for these models, so they are not speech-to-speech models here.
+# Sources, read 2026-11-17: the model cards, the Hugging Face API for every file (size, revision, SHA-256), and
+# llama.cpp build b12375 (libmtmd has the projectors ultravox, qwen2.5o, qwen3a, lfm2a and gemma4a; the GGUF headers
+# of these mmproj files say clip.has_audio_encoder = true).
+- id: lfm2.5-audio-1.5b-llamacpp
+  task: audio-llm
+  engine: tts-server
+  kind: llama-audio-llm
+  family: LFM2.5-Audio 1.5B
+  languages: [en]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 915262016
+  params: 1500000000
+  license: LFM Open License v1.0
+  license_url: https://huggingface.co/LiquidAI/LFM2.5-Audio-1.5B-GGUF/blob/7d525f883a077e20afb782f2ff618edcae0e39e4/LICENSE
+  commercial_use: false
+  gated: false
+  features: [audio-in]
+  description: 'Liquid''s LFM2.5-Audio 1.5B hearing speech (English), the smallest model here (4-bit weights and audio
+    encoder, 0.9 GB). Upstream llama.cpp runs its audio input only (marked experimental by llama.cpp); the model''s
+    own speech output needs Liquid''s separate runner and is not used. Ran here through bolo''s managed llama-server:
+    it transcribed the question instead of answering it, even when told to answer, so it is a weak choice for the
+    audio-llm pipeline. Commercial use is conditional: licensed only to organisations under USD 10M yearly revenue,
+    treated here as non-commercial.'
+  source_url: https://huggingface.co/LiquidAI/LFM2.5-Audio-1.5B
+  validated: untested
+  measured:
+    engine: llama.cpp b12375 llama-server (upstream release build, CPU), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    threads: 4
+    date: '2026-11-17'
+    note: 'bolo''s managed llama-server (audio_llm_model), en-short.wav (3 s, "Good morning. Could you tell me when my
+      order will arrive?"): with "Perform ASR." the sentence back; with a shop-assistant system prompt asking for an
+      answer, the sentence back again ("Good morning! Could you tell me when my order will arrive?"). First token 59
+      to 84 s, the whole reply 153 to 184 s, on a machine with a load of 11 to 18 from other jobs: not representative
+      of the model''s speed.'
+  requires: [llama-server]
+  source:
+    urls:
+    - path: LFM2.5-Audio-1.5B-Q4_0.gguf
+      url: https://huggingface.co/LiquidAI/LFM2.5-Audio-1.5B-GGUF/resolve/7d525f883a077e20afb782f2ff618edcae0e39e4/LFM2.5-Audio-1.5B-Q4_0.gguf
+      size: 695750880
+      sha256: 3583bee853be20331ca342b0593fefd8acc43fb61a41ec6f1a1dc7465823e0d8
+    - path: mmproj-LFM2.5-Audio-1.5B-Q4_0.gguf
+      url: https://huggingface.co/LiquidAI/LFM2.5-Audio-1.5B-GGUF/resolve/7d525f883a077e20afb782f2ff618edcae0e39e4/mmproj-LFM2.5-Audio-1.5B-Q4_0.gguf
+      size: 219511136
+      sha256: 6b483682c263b100f8cc8022d61507e446b1d320b9febc328e7960f72d03f7ea
+  options:
+    runtime: llama-server
+    model_file: LFM2.5-Audio-1.5B-Q4_0.gguf
+    mmproj_file: mmproj-LFM2.5-Audio-1.5B-Q4_0.gguf
+    context_size: 8192
+    hardware: {gpu: optional, ram_gb: 1.8, note: 'built for CPUs and phones'}
+- id: ultravox-0.5-llama-3.2-1b-llamacpp
+  task: audio-llm
+  engine: tts-server
+  kind: llama-audio-llm
+  family: Ultravox 0.5
+  languages: [en, ar, de, es, fr, hi, it, ja, nl, pt, ru, sv, tr, uk, zh]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 2178818080
+  license: MIT (adapter) + Llama 3.2 Community License
+  license_url: https://huggingface.co/fixie-ai/ultravox-v0_5-llama-3_2-1b
+  commercial_use: true
+  gated: false
+  features: [audio-in]
+  description: 'Fixie Ultravox 0.5: a Whisper large-v3 encoder and projector (f16, MIT) in front of Llama 3.2 1B
+    Instruct (Q4_K_M), answering spoken questions in text. Commercial use follows the Llama 3.2 Community License
+    (attribution, "Built with Llama", a separate licence above 700 M monthly users, Meta''s acceptable-use policy).
+    Languages are those of the Ultravox training data; quality outside English was not checked. 2.2 GB. Untested
+    here.'
+  source_url: https://huggingface.co/fixie-ai/ultravox-v0_5-llama-3_2-1b
+  validated: untested
+  requires: [llama-server]
+  source:
+    urls:
+    - path: Llama-3.2-1B-Instruct-Q4_K_M.gguf
+      url: https://huggingface.co/ggml-org/ultravox-v0_5-llama-3_2-1b-GGUF/resolve/5390c7c41cbd6f261f7f205fc0c5ae61bbdca650/Llama-3.2-1B-Instruct-Q4_K_M.gguf
+      size: 807694464
+      sha256: 6f85a640a97cf2bf5b8e764087b1e83da0fdb51d7c9fab7d0fece9385611df83
+    - path: mmproj-ultravox-v0_5-llama-3_2-1b-f16.gguf
+      url: https://huggingface.co/ggml-org/ultravox-v0_5-llama-3_2-1b-GGUF/resolve/5390c7c41cbd6f261f7f205fc0c5ae61bbdca650/mmproj-ultravox-v0_5-llama-3_2-1b-f16.gguf
+      size: 1371123616
+      sha256: b34dde1835752949d6b960528269af93c92fec91c61ea0534fcc73f96c1ed8b2
+  options:
+    runtime: llama-server
+    model_file: Llama-3.2-1B-Instruct-Q4_K_M.gguf
+    mmproj_file: mmproj-ultravox-v0_5-llama-3_2-1b-f16.gguf
+    context_size: 8192
+    hardware: {gpu: optional, ram_gb: 3.0, note: 'approximate: weights x 1.3 + 0.5 GB'}
+- id: qwen2.5-omni-3b-llamacpp
+  task: audio-llm
+  engine: tts-server
+  kind: llama-audio-llm
+  family: Qwen2.5-Omni 3B
+  languages: [en, zh]
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 3642962976
+  license: Qwen Research License
+  license_url: https://huggingface.co/Qwen/Qwen2.5-Omni-3B/blob/main/LICENSE
+  commercial_use: false
+  gated: false
+  features: [audio-in]
+  description: 'Qwen2.5-Omni 3B (Thinker only) hearing speech and answering in text, Q4_K_M weights and the Q8_0
+    audio and vision encoder (3.6 GB). Research licence: no commercial use. llama.cpp does not run the model''s
+    Talker, so it does not speak here; bolo-torch''s qwen2.5-omni-3b-torch does. Untested here (too large for the
+    test machine''s disk).'
+  source_url: https://huggingface.co/Qwen/Qwen2.5-Omni-3B
+  validated: untested
+  requires: [llama-server]
+  source:
+    urls:
+    - path: Qwen2.5-Omni-3B-Q4_K_M.gguf
+      url: https://huggingface.co/ggml-org/Qwen2.5-Omni-3B-GGUF/resolve/75f1b73b657a50f5092502799457ccb4a4a1f9df/Qwen2.5-Omni-3B-Q4_K_M.gguf
+      size: 2104931648
+      sha256: 4b0bd358c1e9ec55dd3055ef6d71c958c821533d85916a10cfa89c4552a86e29
+    - path: mmproj-Qwen2.5-Omni-3B-Q8_0.gguf
+      url: https://huggingface.co/ggml-org/Qwen2.5-Omni-3B-GGUF/resolve/75f1b73b657a50f5092502799457ccb4a4a1f9df/mmproj-Qwen2.5-Omni-3B-Q8_0.gguf
+      size: 1538031328
+      sha256: 4e6c816cd33f7298d07cb780c136a396631e50e62f6501660271f8c6e302e565
+  options:
+    runtime: llama-server
+    model_file: Qwen2.5-Omni-3B-Q4_K_M.gguf
+    mmproj_file: mmproj-Qwen2.5-Omni-3B-Q8_0.gguf
+    context_size: 8192
+    hardware: {gpu: recommended, vram_gb: 5.2, note: 'approximate: weights x 1.3 + 0.5 GB'}
+- id: qwen2.5-omni-7b-llamacpp
+  task: audio-llm
+  engine: tts-server
+  kind: llama-audio-llm
+  family: Qwen2.5-Omni 7B
+  languages: [en, zh]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 6231560864
+  license: Apache-2.0
+  license_url: https://huggingface.co/Qwen/Qwen2.5-Omni-7B/blob/main/LICENSE
+  commercial_use: true
+  gated: false
+  features: [audio-in]
+  description: 'Qwen2.5-Omni 7B (Thinker only) hearing speech and answering in text, Q4_K_M weights and the Q8_0
+    audio and vision encoder (6.2 GB). The original model is Apache-2.0 (its repository''s LICENSE); the GGUF
+    repository''s card says "qwen-research", which is the 3B model''s licence. No speech output on llama.cpp; see
+    qwen2.5-omni-7b-torch. Untested here.'
+  source_url: https://huggingface.co/Qwen/Qwen2.5-Omni-7B
+  validated: untested
+  requires: [llama-server]
+  source:
+    urls:
+    - path: Qwen2.5-Omni-7B-Q4_K_M.gguf
+      url: https://huggingface.co/ggml-org/Qwen2.5-Omni-7B-GGUF/resolve/89b785438c8901d4635e42f50480ba5985a1bbf1/Qwen2.5-Omni-7B-Q4_K_M.gguf
+      size: 4683072384
+      sha256: 09883dff531dc56923a041c9c99c7c779e26ffde32caa83adeeb7502ec3b50fe
+    - path: mmproj-Qwen2.5-Omni-7B-Q8_0.gguf
+      url: https://huggingface.co/ggml-org/Qwen2.5-Omni-7B-GGUF/resolve/89b785438c8901d4635e42f50480ba5985a1bbf1/mmproj-Qwen2.5-Omni-7B-Q8_0.gguf
+      size: 1548488480
+      sha256: 4a7bc5478a2ec8c5d186d63532eb22e75b79ba75ec3c0ce821676157318ef4ad
+  options:
+    runtime: llama-server
+    model_file: Qwen2.5-Omni-7B-Q4_K_M.gguf
+    mmproj_file: mmproj-Qwen2.5-Omni-7B-Q8_0.gguf
+    context_size: 8192
+    hardware: {gpu: recommended, vram_gb: 8.6, note: 'approximate: weights x 1.3 + 0.5 GB'}
+- id: qwen3-omni-30b-a3b-instruct-llamacpp
+  task: audio-llm
+  engine: tts-server
+  kind: llama-audio-llm
+  family: Qwen3-Omni 30B-A3B
+  languages: [en, zh, ko, ja, de, ru, it, fr, es, pt, ms, nl, id, tr, vi, yue, ar, ur]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 19882074080
+  license: Apache-2.0
+  license_url: https://huggingface.co/Qwen/Qwen3-Omni-30B-A3B-Instruct
+  commercial_use: true
+  gated: false
+  features: [audio-in]
+  description: 'Qwen3-Omni 30B-A3B Instruct (mixture of experts, about 3 B active; Thinker only) hearing speech in 19
+    languages and answering in text, Q4_K_M weights and the Q8_0 audio and vision encoder (19.9 GB). No speech
+    output on llama.cpp; see qwen3-omni-30b-a3b-instruct-torch. Needs about 24 GB of memory. Untested here.'
+  source_url: https://huggingface.co/Qwen/Qwen3-Omni-30B-A3B-Instruct
+  validated: untested
+  requires: [llama-server]
+  source:
+    urls:
+    - path: Qwen3-Omni-30B-A3B-Instruct-Q4_K_M.gguf
+      url: https://huggingface.co/ggml-org/Qwen3-Omni-30B-A3B-Instruct-GGUF/resolve/6e35a28f4a19b18730f8949b0c579c6429649ab8/Qwen3-Omni-30B-A3B-Instruct-Q4_K_M.gguf
+      size: 18557053952
+      sha256: d9e2876556e7873e02c0359f832432ee2d67ab7dd0cee3efe0f77fd7a1f4dd85
+    - path: mmproj-Qwen3-Omni-30B-A3B-Instruct-Q8_0.gguf
+      url: https://huggingface.co/ggml-org/Qwen3-Omni-30B-A3B-Instruct-GGUF/resolve/6e35a28f4a19b18730f8949b0c579c6429649ab8/mmproj-Qwen3-Omni-30B-A3B-Instruct-Q8_0.gguf
+      size: 1325020128
+      sha256: 1104376db833f1e89c84834144ac3863340c2cd1ddaeddb39cb0247fb5c20c8d
+  options:
+    runtime: llama-server
+    model_file: Qwen3-Omni-30B-A3B-Instruct-Q4_K_M.gguf
+    mmproj_file: mmproj-Qwen3-Omni-30B-A3B-Instruct-Q8_0.gguf
+    context_size: 8192
+    hardware: {gpu: recommended, vram_gb: 24, note: 'approximate: weights x 1.2; mixture of experts, so a CPU with enough memory also works'}
+- id: gemma-4-e2b-it-llamacpp
+  task: audio-llm
+  engine: tts-server
+  kind: llama-audio-llm
+  family: Gemma 4 E2B
+  languages: [en]
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 3398849280
+  license: Apache-2.0
+  license_url: https://huggingface.co/google/gemma-4-E2B-it
+  commercial_use: true
+  gated: false
+  features: [audio-in]
+  description: 'Google Gemma 4 E2B instruct hearing speech and answering in text, Q4_0 weights and the Q8_0 audio
+    and vision encoder (3.4 GB). Multilingual text model; how well it understands speech outside English was not
+    measured, so only English is listed. Untested here.'
+  source_url: https://huggingface.co/google/gemma-4-E2B-it
+  validated: untested
+  requires: [llama-server]
+  source:
+    urls:
+    - path: gemma-4-E2B-it-Q4_0.gguf
+      url: https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/resolve/2a8538c2e2d4687953a86c422c7c623cfd022880/gemma-4-E2B-it-Q4_0.gguf
+      size: 2841481184
+      sha256: 8e30dff3ac4c8434c49a7036fa15564bdbb6044e42bf04550bf1a096ad7e6a52
+    - path: mmproj-gemma-4-E2B-it-Q8_0.gguf
+      url: https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/resolve/2a8538c2e2d4687953a86c422c7c623cfd022880/mmproj-gemma-4-E2B-it-Q8_0.gguf
+      size: 557368096
+      sha256: 042cc2561806cd3b5cb5efb25cab76911e3100c43cc09d854904f921924b1429
+  options:
+    runtime: llama-server
+    model_file: gemma-4-E2B-it-Q4_0.gguf
+    mmproj_file: mmproj-gemma-4-E2B-it-Q8_0.gguf
+    context_size: 8192
+    hardware: {gpu: optional, ram_gb: 4.5, note: 'approximate: weights x 1.3'}
+- id: gemma-4-e4b-it-llamacpp
+  task: audio-llm
+  engine: tts-server
+  kind: llama-audio-llm
+  family: Gemma 4 E4B
+  languages: [en]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 5150682240
+  license: Apache-2.0
+  license_url: https://huggingface.co/google/gemma-4-E4B-it
+  commercial_use: true
+  gated: false
+  features: [audio-in]
+  description: 'Google Gemma 4 E4B instruct hearing speech and answering in text, Q4_0 weights and the Q8_0 audio
+    and vision encoder (5.2 GB). Multilingual text model; speech outside English not measured. Untested here.'
+  source_url: https://huggingface.co/google/gemma-4-E4B-it
+  validated: untested
+  requires: [llama-server]
+  source:
+    urls:
+    - path: gemma-4-E4B-it-Q4_0.gguf
+      url: https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/8903cb408c7df39cde2ed15fac397e6d7be92951/gemma-4-E4B-it-Q4_0.gguf
+      size: 4590807392
+      sha256: a555b900214b477d8880e7832e0b8925e139b0159640036b09fe472b6f2097f2
+    - path: mmproj-gemma-4-E4B-it-Q8_0.gguf
+      url: https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/8903cb408c7df39cde2ed15fac397e6d7be92951/mmproj-gemma-4-E4B-it-Q8_0.gguf
+      size: 559874848
+      sha256: 9257f21a0f5358204b4a612cff83fad2e56412f4f607f0049331ce60c0cf9d34
+  options:
+    runtime: llama-server
+    model_file: gemma-4-E4B-it-Q4_0.gguf
+    mmproj_file: mmproj-gemma-4-E4B-it-Q8_0.gguf
+    context_size: 8192
+    hardware: {gpu: recommended, vram_gb: 6.7, note: 'approximate: weights x 1.3'}

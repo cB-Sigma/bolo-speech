@@ -44,7 +44,9 @@ class FakeLLM:
                 self.wfile.write(body)
 
             def do_GET(self) -> None:
-                if self.path.endswith("/models"):
+                if self.path == "/health":  # as llama-server answers once its model is loaded
+                    self._json(200, {"status": "ok"})
+                elif self.path.endswith("/models"):
                     self._json(200, {"object": "list", "data": [{"id": "fake-llm", "object": "model"}]})
                 else:
                     self._json(404, {"error": {"message": "not found"}})
@@ -160,6 +162,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="a deterministic OpenAI-compatible chat server for tests")
     parser.add_argument("--port", type=int, default=8090)
-    server = FakeLLM(port=parser.parse_args().port)
+    # llama-server's command line, when it stands in for a llama-server bolo starts: other arguments are ignored
+    args, _ = parser.parse_known_args()
+    server = FakeLLM(port=args.port)
     print(f"fake language model at {server.url}", flush=True)
     server.server.serve_forever()

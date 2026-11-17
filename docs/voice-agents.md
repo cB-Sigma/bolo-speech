@@ -257,7 +257,7 @@ items, user transcripts from its own STT, and traces.
 | --- | --- | --- | --- | --- |
 | `cascade` (default) | bolo's STT | the `llm_*` chat-completions model | bolo's TTS | `llm_base_url` |
 | `audio-llm` | the model itself (the turn's audio as `input_audio`, WAV) | an audio-understanding model, `audio_llm_*` (falls back to `llm_*`) | bolo's TTS | a chat-completions server that takes `input_audio` |
-| `speech-to-speech` | the model itself (16 kHz PCM, streamed while the user speaks) | a speech-to-speech model | the same model | `s2s_server_url`, or `s2s_model` + llama-server, or `s2s_model = "lfm3-audio-2b-onnx"` + `bolo-speech[s2s]` |
+| `speech-to-speech` | the model itself (16 kHz PCM, streamed while the user speaks; for turn-based models, sent when the turn ends) | a speech-to-speech model | the same model | `s2s_server_url`, or `s2s_model` + llama-server, or `s2s_model = "lfm3-audio-2b-onnx"` + `bolo-speech[s2s]`, or `s2s_model` naming a turn-based model of an engine plugin |
 
 **`audio-llm`.** The latest user turn is sent to the model as audio, earlier
 turns as their transcripts (or as audio while a transcript is missing; the
@@ -277,6 +277,22 @@ was **not measured**.
 realtime_pipeline = "audio-llm"
 audio_llm_base_url = "http://127.0.0.1:8081/v1"   # llama-server -hf ggml-org/gemma-4-E4B-it-GGUF --port 8081
 ```
+
+Or let bolo run the model: without `audio_llm_base_url`, an `audio_llm_model` that names a catalog entry of task
+`audio-llm` is pulled (pinned files, SHA-256 checked) and served by a llama-server bolo starts on a loopback port with
+a random API key and `--parallel audio_llm_parallel`, placed on the GPU or the CPU like the speech-to-speech server,
+restarted after a crash and stopped with bolo (`bolo components install llama-server` first). The catalog has
+LFM2.5-Audio 1.5B, Ultravox 0.5 (Llama 3.2 1B), Qwen2.5-Omni 3B and 7B, Qwen3-Omni 30B-A3B and Gemma 4 E2B and
+E4B, each with its licence ([models.md](models.md#speech-to-speech-and-audio-in-models)). On llama.cpp these hear
+but do not speak (the Qwen-Omni Talker does not run there), so bolo's TTS speaks their answers.
+
+```toml
+realtime_pipeline = "audio-llm"
+audio_llm_model = "ultravox-0.5-llama-3.2-1b-llamacpp"   # 2.2 GB, MIT + Llama 3.2 Community License
+```
+
+Only `lfm2.5-audio-1.5b-llamacpp` was run here, on an overloaded CPU: the managed server started and the model
+heard the question, but it transcribed it instead of answering (models.md has the details).
 
 **`speech-to-speech`.** The model behind it is a small backend interface in
 `bolo/s2s.py` (append the turn's audio, commit, add user text or a tool
@@ -341,6 +357,16 @@ question; the two 4-bit quantisations differ, so longer texts drift apart
 after some tens of tokens. Without `bolo-speech[s2s]` a speech-to-speech session
 answers 424 (`component_missing`) with the command to run, and
 `GET /api/v1/info` shows the pipeline as configured but not available.
+
+**Turn-based models in an engine plugin.** A catalog entry with `task: speech-to-speech` (for example bolo-torch's
+Qwen2.5-Omni and Qwen3-Omni, see [models.md](models.md#speech-to-speech-and-audio-in-models)) is loaded by bolo's
+model manager like any other model (GPU/CPU placement, keep-alive, unloading when idle) and answers over the plugin
+protocol's `respond` op ([plugins.md](plugins.md)). Such a model keeps no state: bolo keeps the conversation (the
+user's turns as audio, the last eight spoken turns, the model's answers as text, tool calls and their results) and
+sends all of it with every response, so one copy serves every session. Unlike llama-server's realtime mode the
+turn's audio reaches the model only when the turn ends, so the time to first audio includes the whole prefill.
+Text, audio and tool calls (when the model supports tools) stream back as the model produces them; a barge-in stops
+it before its next piece. Tested with a fake model in a plugin process.
 
 A cloud model can stand in the same place: `s2s_model = "openai:gpt-realtime-2.1"`
 (`<provider>:<model>`, a provider of kind `openai-compatible` from the

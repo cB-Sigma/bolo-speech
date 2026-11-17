@@ -10,12 +10,15 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
 from bolo.config import Settings
 from bolo.errors import LLMError, LLMNotConfigured
+
+if TYPE_CHECKING:
+    from bolo.audio_llm import ManagedAudioLLM
 
 
 class LLMClient:
@@ -57,8 +60,12 @@ class LLMClient:
             detail = body.decode(errors="replace")[:300]
         return f"the language model endpoint answered HTTP {status}: {detail}"
 
+    async def prepare(self) -> None:
+        """Make the endpoint ready before a request (a managed server is started here)."""
+
     async def request(self, body: dict[str, Any]) -> httpx.Response:
         """POST a non-streaming chat completion and return the upstream response as is."""
+        await self.prepare()
         url = self.base_url + "/chat/completions"
         try:
             async with httpx.AsyncClient(timeout=self._timeout()) as client:
@@ -75,6 +82,7 @@ class LLMClient:
 
     async def raw_stream(self, body: dict[str, Any]) -> AsyncIterator[bytes]:
         """Stream the upstream SSE bytes untouched (used when proxying)."""
+        await self.prepare()
         url = self.base_url + "/chat/completions"
         try:
             async with httpx.AsyncClient(timeout=self._timeout()) as client:
@@ -88,6 +96,7 @@ class LLMClient:
 
     async def stream_chat(self, body: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
         """Stream a chat completion as parsed ``chat.completion.chunk`` objects."""
+        await self.prepare()
         url = self.base_url + "/chat/completions"
         try:
             async with httpx.AsyncClient(timeout=self._timeout()) as client:
@@ -141,20 +150,39 @@ class LLMClient:
 class AudioLLMClient(LLMClient):
     """The model of the Realtime ``audio-llm`` pipeline: a chat-completions endpoint that takes ``input_audio``
     content (llama-server with Gemma 4 E2B/E4B, Ultravox, Qwen2.5-Omni, ...). Falls back to the ``llm_*``
-    settings for whatever ``audio_llm_*`` leaves unset."""
+    settings for whatever ``audio_llm_*`` leaves unset. Without ``audio_llm_base_url``, an ``audio_llm_model`` that
+    names a catalog entry of task ``audio-llm`` is served by a llama-server bolo starts (:mod:`bolo.audio_llm`)."""
+
+    def __init__(self, settings: Settings, managed: ManagedAudioLLM | None = None) -> None:
+        super().__init__(settings)
+        self.managed = managed
+        self._managed_url: str | None = None
+        self._managed_key: str | None = None
+
+    def _managed_spec(self) -> Any:
+        return self.managed.spec() if self.managed is not None else None
 
     @property
     def configured(self) -> bool:
-        return bool(self.settings.audio_llm_base_url or self.settings.llm_base_url)
+        return bool(self.settings.audio_llm_base_url or self._managed_spec() or self.settings.llm_base_url)
+
+    async def prepare(self) -> None:
+        if self.managed is not None and self._managed_spec() is not None:
+            self._managed_url, self._managed_key = await self.managed.base_url()
+        else:
+            self._managed_url = self._managed_key = None
 
     @property
     def base_url(self) -> str:
+        if self._managed_url and self._managed_spec() is not None:
+            return self._managed_url
         url = self.settings.audio_llm_base_url or self.settings.llm_base_url
         if not url:
             raise LLMNotConfigured(
-                "the audio-llm pipeline needs an audio-understanding model: set audio_llm_base_url (and "
-                "audio_llm_model) to a chat-completions endpoint that accepts input_audio, for example a llama-server "
-                "started with -hf ggml-org/gemma-4-E4B-it-GGUF"
+                "the audio-llm pipeline needs an audio-understanding model: set audio_llm_model to an audio-llm "
+                "model of the catalog (bolo runs it on llama-server), or audio_llm_base_url (and audio_llm_model) "
+                "to a chat-completions endpoint that accepts input_audio, for example a llama-server started with "
+                "-hf ggml-org/gemma-4-E4B-it-GGUF"
             )
         return url.rstrip("/")
 
@@ -164,12 +192,24 @@ class AudioLLMClient(LLMClient):
 
     def headers(self) -> dict[str, str]:
         h = {"Content-Type": "application/json"}
-        key = self.settings.audio_llm_api_key if self.settings.audio_llm_base_url else self.settings.llm_api_key
+        if self._managed_url and self._managed_spec() is not None:
+            key = self._managed_key
+        elif self.settings.audio_llm_base_url:
+            key = self.settings.audio_llm_api_key
+        else:
+            key = self.settings.llm_api_key
         if key:
             h["Authorization"] = f"Bearer {key}"
         return h
 
     def describe(self) -> dict[str, Any]:
+        spec = self._managed_spec()
+        if spec is not None and self.managed is not None:
+            available, reason = self.managed.readiness()
+            return {
+                "configured": True, "base_url": self._managed_url, "model": spec.id, "available": available,
+                "reason": reason, **self.managed.describe(),
+            }  # fmt: skip
         return {
             "configured": self.configured,
             "base_url": self.settings.audio_llm_base_url or self.settings.llm_base_url,

@@ -70,6 +70,31 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   Components page shows the same list, open.
 - `GET /api/v1/components`: language packs carry `required_by_installed_count`, `built_in`, `used_by_count` and
   `removable`; `DELETE /api/v1/components/uccharan-<pack>` removes a downloaded pack this server has not loaded.
+- **Turn-based speech-to-speech models behind the `speech-to-speech` pipeline**, loaded by bolo's model manager:
+  catalog task `speech-to-speech`, `s2s_model = "<id>"`. bolo keeps the conversation (the user's turns as audio,
+  the last eight spoken turns; the model's answers as text; tool calls and results) and sends all of it with every
+  response, so the model keeps no state and one copy serves every session; text, audio and tool calls stream back,
+  a barge-in stops the model before its next piece. The audio of a turn goes to the model once the turn ends.
+  Plugin protocol: op `respond` for models loaded with task `speech-to-speech` (docs/plugins.md), `info.voices` and
+  `info.supports_tools`; the SDK's `SpeechToSpeechModel` (`respond(ConversationRequest, cancelled)`), the reference
+  plugin's `fake-s2s` and the fake engine's `fake-s2s` model. Tested with those fakes only.
+- **More speech-to-speech and audio-in models in the catalog, each with its licence** (non-commercial ones marked,
+  none left out; docs/models.md, "Speech-to-speech and audio-in models"). New catalog tasks `speech-to-speech` and
+  `audio-llm` (`/api/v1/catalog?task=`). Speech-to-speech on bolo-torch (`omni` extra): `qwen2.5-omni-3b-torch`
+  (Qwen Research License, non-commercial), `qwen2.5-omni-7b-torch` and `qwen3-omni-30b-a3b-instruct-torch`
+  (Apache-2.0). Listed with the reason they cannot run yet: Kyutai Moshi (`moshiko-` / `moshika-pytorch-bf16`,
+  CC-BY-4.0; full-duplex, which bolo's turn-based interface cannot carry), `glm-4-voice-9b` (glm-4-voice License,
+  commercial use after registration), `minicpm-o-2.6` (Apache-2.0; remote code only), `step-audio-2-mini`
+  (Apache-2.0) and `kimi-audio-7b-instruct` (MIT; no packaged inference code). Audio-in models on llama-server:
+  `lfm2.5-audio-1.5b-llamacpp` (LFM Open License, conditional), `ultravox-0.5-llama-3.2-1b-llamacpp` (MIT + Llama 3.2
+  Community License), `qwen2.5-omni-3b-llamacpp` (Qwen Research License), `qwen2.5-omni-7b-llamacpp`,
+  `qwen3-omni-30b-a3b-instruct-llamacpp`, `gemma-4-e2b-it-llamacpp` and `gemma-4-e4b-it-llamacpp` (Apache-2.0),
+  every file pinned by revision and SHA-256. Only `lfm2.5-audio-1.5b-llamacpp` was run (it heard the question but
+  transcribed it instead of answering); the others are untested.
+- **The `audio-llm` pipeline's model on a llama-server bolo starts**: without `audio_llm_base_url`, an
+  `audio_llm_model` naming a catalog entry of task `audio-llm` is pulled and served by a managed llama-server
+  (loopback port, random API key, `--parallel audio_llm_parallel`, `audio_llm_server_args`, GPU/CPU placement,
+  restarted after a crash, stopped with bolo). `GET /api/v1/info` reports it under the `audio-llm` pipeline.
 - **Console: voice blends and the language decision.** The text-to-speech page has a "Blend voices" panel for models
   with `voice-blending` (Kokoro): pick up to 8 of the model's voices with weights, see the blend as it is sent
   (`af_bella(0.7)+af_sky(0.3)`) and keep it in the voice library under a name. Saved blends are listed in the library

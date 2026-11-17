@@ -581,7 +581,7 @@ def speaks(spec: ModelSpec, language: str | None) -> bool:
 
 def in_task(spec: ModelSpec, task: str, s2s_model: str | None = None) -> bool:
     if task == S2S:
-        return S2S in spec.features or (s2s_model is not None and spec.id == s2s_model)
+        return S2S in spec.features or spec.task == S2S or (s2s_model is not None and spec.id == s2s_model)
     return spec.task == task
 
 

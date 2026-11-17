@@ -8,7 +8,8 @@ float32 samples. Standard error is free for the plugin's own logging (bolo forwa
 Every request carries an ``id`` (a string chosen by bolo); every reply to it carries the same
 ``id``. A request is answered by exactly one final message (``"ok": true`` with results, or
 ``"ok": false`` with ``"error": {"code", "message"}``); ``synthesize`` sends any number of
-``{"id", "chunk": seq, "bytes": n}`` messages before its final one. Replies to different requests
+``{"id", "chunk": seq, "bytes": n}`` messages before its final one; ``respond`` sends chunks that may also carry
+``text`` (a piece of the answer's text) or ``tool_call`` (``{call_id, name, arguments}``), with or without audio. Replies to different requests
 may interleave: a plugin may work on several requests at once, but need not.
 
 Requests (``op``):
@@ -43,6 +44,11 @@ embed      ``handle``; a stretch of one voice follows (16 kHz)          the unit
                                                                         follows (float32)
 denoise    ``handle``; the recording follows (at the model's            the enhanced recording follows,
            ``sample_rate``)                                             as long as the input
+respond    ``handle``, ``turns``: list of ``{role, text, n, call_id,     ``sample_rate``, ``chunks``,
+           tool_calls}``, ``instructions``, ``tools``,                    ``cancelled`` (chunks before)
+           ``tool_choice``, ``voice``, ``max_output_tokens``,
+           ``audio_out``; the audio of the turns follows,
+           concatenated (``n`` samples each, 16 kHz)
 cancel     ``target`` (the id of a running request)                     -
 shutdown   -                                                            - (then the process exits)
 ========== ============================================================ ==============================
@@ -53,7 +59,10 @@ shutdown   -                                                            - (then 
 conditioned recognition of a whole recording, bolo sends it only to such models); a separation model (task ``separation``) gives ``mode``
 (``"blind"``: answers ``separate``; ``"target"``: answers ``enrol``/``extract``/``release``) and
 ``min_sample_s`` (seconds of voice a target model needs); a diarization model (task ``diarization``, bolo 0.6.7)
-gives ``consolidate_default`` (false: bolo does not merge or drop its speakers). ``placement`` in a ``load``
+gives ``consolidate_default`` (false: bolo does not merge or drop its speakers); a speech-to-speech model (task
+``speech-to-speech``, bolo 0.6.7) gives ``voices`` and ``supports_tools``. The model keeps no conversation: each
+``respond`` carries the whole conversation (user turns as audio or text, the model's earlier answers as text, tool
+results), and the answer streams back as chunks at the model's ``sample_rate``. ``placement`` in a ``load``
 request (bolo 0.5) is
 ``{"device_map": "auto", "max_memory": {"0": bytes, "cpu": bytes}}`` when bolo's scheduler found less free
 accelerator memory than the model needs: a plugin that can split the model (accelerate's ``device_map``) may use it,
@@ -64,7 +73,8 @@ Versioning: bolo sends the highest version it speaks in ``hello``; the plugin an
 version it will use (at most bolo's). A plugin that cannot speak any version bolo knows answers
 with ``ok: false``. New optional members may be added within a version, and new ops that bolo
 only sends to models announcing them in ``info`` (``speakers``, added in bolo 0.3; ``diarize`` and ``embed`` are sent only to models loaded with task
-``diarization``, bolo 0.6.7; ``denoise`` only to models loaded with task ``denoise``, bolo 0.6.7); anything
+``diarization``, bolo 0.6.7; ``denoise`` only to models loaded with task ``denoise``, bolo 0.6.7; ``respond`` only
+to models loaded with task ``speech-to-speech``, bolo 0.6.7); anything
 incompatible gets a new version number.
 """
 
@@ -75,7 +85,7 @@ from typing import IO, Any
 
 import numpy as np
 
-from bolo.engines.base import FloatArray
+from bolo.engines.base import ConversationTurn, FloatArray
 
 PROTOCOL_VERSION = 1
 MAX_LINE = 16 * 1024 * 1024
@@ -137,3 +147,41 @@ def split_speaker_payload(payload: bytes, n: int, frames: int, speakers: int) ->
     if len(data) != n + frames * speakers:
         raise ProtocolError(f"speakers payload holds {len(data)} values, expected {n} + {frames} x {speakers}")
     return data[:n], data[n:].reshape(frames, speakers)
+
+
+def turns_message(turns: list[ConversationTurn]) -> tuple[list[dict[str, Any]], bytes]:
+    """The ``turns`` of a ``respond`` request and its payload (the audio of the turns, 16 kHz, concatenated)."""
+    items: list[dict[str, Any]] = []
+    audio: list[bytes] = []
+    for t in turns:
+        n = 0 if t.audio is None else len(t.audio)
+        item: dict[str, Any] = {"role": t.role, "text": t.text, "n": n}
+        if t.call_id:
+            item["call_id"] = t.call_id
+        if t.tool_calls:
+            item["tool_calls"] = [dict(c) for c in t.tool_calls]
+        items.append(item)
+        if t.audio is not None and n:
+            audio.append(audio_bytes(t.audio))
+    return items, b"".join(audio)
+
+
+def turns_from_message(items: list[dict[str, Any]], payload: bytes) -> list[ConversationTurn]:
+    """The conversation of a ``respond`` request (the inverse of :func:`turns_message`)."""
+    data = audio_from_bytes(payload)
+    need = sum(int(i.get("n") or 0) for i in items)
+    if need != len(data):
+        raise ProtocolError(f"respond payload holds {len(data)} samples, the turns {need}")
+    turns: list[ConversationTurn] = []
+    offset = 0
+    for i in items:
+        n = int(i.get("n") or 0)
+        turns.append(
+            ConversationTurn(
+                role=str(i.get("role") or "user"), text=str(i.get("text") or ""),
+                audio=data[offset : offset + n] if n else None, call_id=i.get("call_id"),
+                tool_calls=[{k: str(v) for k, v in c.items()} for c in i.get("tool_calls") or []],
+            )
+        )  # fmt: skip
+        offset += n
+    return turns

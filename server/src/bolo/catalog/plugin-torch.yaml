@@ -832,3 +832,296 @@
     exclude: [.gitattributes]
   options:
     plugin_install: not supported by bolo-torch yet (no DiariZen loader)
+# Speech-to-speech models (task speech-to-speech): turn-based conversation over the plugin protocol's respond op,
+# behind the Realtime speech-to-speech pipeline (s2s_model = "<id>"). Sources, read 2026-11-17: the model cards and
+# LICENSE files at the pinned revisions, the Hugging Face API (sizes), transformers' Qwen2.5-Omni and Qwen3-Omni
+# classes. None of them was run here (each download is 12 GB or more and the test machine has no GPU).
+- id: qwen2.5-omni-3b-torch
+  task: speech-to-speech
+  engine: plugin:torch
+  kind: qwen-omni
+  family: Qwen2.5-Omni 3B
+  languages: [en, zh]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 11990000000
+  license: Qwen Research License
+  license_url: https://huggingface.co/Qwen/Qwen2.5-Omni-3B/blob/f75b40e3da2003cdd6e1829b1f420ca70797c34e/LICENSE
+  commercial_use: false
+  gated: false
+  features: [speech-to-speech]
+  description: 'Qwen2.5-Omni 3B: hears the conversation (each turn''s audio) and answers in text and speech (Thinker and
+    Talker, 24 kHz, voices Chelsie and Ethan), through transformers in the torch plugin. Turn-based: the answer comes
+    back whole when generation ends, so the first audio waits for the whole answer; no tool calls. Speech output in
+    English and Chinese. Research licence: no commercial use. bfloat16 weights, about 11 GB of memory; a GPU is
+    recommended. Untested here (wiring tested with fake model objects).'
+  source_url: https://huggingface.co/Qwen/Qwen2.5-Omni-3B
+  validated: untested
+  source:
+    repo: Qwen/Qwen2.5-Omni-3B
+    revision: f75b40e3da2003cdd6e1829b1f420ca70797c34e
+    exclude: ['*.png', '*.jpg', '*.mp4', '*.wav', .gitattributes]
+  options:
+    plugin_install: pip install "bolo-torch[omni]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    family: qwen2.5-omni
+    dtype: bfloat16
+    max_new_tokens: 512
+    hardware: {gpu: recommended, vram_gb: 11, ram_gb: 12, note: 'approximate: bfloat16 weights; slow on a CPU'}
+  voices:
+  - {id: Chelsie, name: Chelsie, gender: f}
+  - {id: Ethan, name: Ethan, gender: m}
+- id: qwen2.5-omni-7b-torch
+  task: speech-to-speech
+  engine: plugin:torch
+  kind: qwen-omni
+  family: Qwen2.5-Omni 7B
+  languages: [en, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 22380000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/Qwen/Qwen2.5-Omni-7B/blob/ae9e1690543ffd5c0221dc27f79834d0294cba00/LICENSE
+  commercial_use: true
+  gated: false
+  features: [speech-to-speech]
+  description: 'Qwen2.5-Omni 7B: hears the conversation and answers in text and speech (24 kHz, voices Chelsie and
+    Ethan), through transformers in the torch plugin. Turn-based, the answer comes back whole; no tool calls. Speech
+    output in English and Chinese. Apache-2.0. bfloat16 weights, about 22 GB of memory: a GPU with 24 GB or more.
+    Untested here (wiring tested with fake model objects).'
+  source_url: https://huggingface.co/Qwen/Qwen2.5-Omni-7B
+  validated: untested
+  source:
+    repo: Qwen/Qwen2.5-Omni-7B
+    revision: ae9e1690543ffd5c0221dc27f79834d0294cba00
+    exclude: ['*.png', '*.jpg', '*.mp4', '*.wav', .gitattributes]
+  options:
+    plugin_install: pip install "bolo-torch[omni]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    family: qwen2.5-omni
+    dtype: bfloat16
+    max_new_tokens: 512
+    hardware: {gpu: required, vram_gb: 24, note: 'approximate: bfloat16 weights plus activations'}
+  voices:
+  - {id: Chelsie, name: Chelsie, gender: f}
+  - {id: Ethan, name: Ethan, gender: m}
+- id: qwen3-omni-30b-a3b-instruct-torch
+  task: speech-to-speech
+  engine: plugin:torch
+  kind: qwen-omni
+  family: Qwen3-Omni 30B-A3B
+  languages: [en, zh, fr, de, ru, it, es, pt, ja, ko]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 70530000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/Qwen/Qwen3-Omni-30B-A3B-Instruct
+  commercial_use: true
+  gated: false
+  features: [speech-to-speech]
+  description: 'Qwen3-Omni 30B-A3B Instruct (mixture of experts, about 3 B active): hears speech in 19 languages and
+    answers in text and speech in 10 (English, Chinese, French, German, Russian, Italian, Spanish, Portuguese,
+    Japanese, Korean; voices Ethan, Chelsie and Aiden, 24 kHz), through transformers 4.57+ in the torch plugin.
+    Turn-based, the answer comes back whole; no tool calls. Apache-2.0. bfloat16 weights, 70 GB: one 80 GB GPU or
+    several (bolo''s placement splits it with accelerate). Untested here (wiring tested with fake model objects).'
+  source_url: https://huggingface.co/Qwen/Qwen3-Omni-30B-A3B-Instruct
+  validated: untested
+  source:
+    repo: Qwen/Qwen3-Omni-30B-A3B-Instruct
+    revision: 26291f793822fb6be9555850f06dfe95f2d7e695
+    exclude: ['*.png', '*.jpg', '*.mp4', '*.wav', .gitattributes]
+  options:
+    plugin_install: pip install "bolo-torch[omni]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    family: qwen3-omni
+    dtype: bfloat16
+    max_new_tokens: 512
+    hardware: {gpu: required, vram_gb: 79, note: 'model card: about 79 GB for 15 s of video in bfloat16'}
+  voices:
+  - {id: Ethan, name: Ethan, gender: m}
+  - {id: Chelsie, name: Chelsie, gender: f}
+  - {id: Aiden, name: Aiden, gender: m}
+- id: moshiko-pytorch-bf16
+  runnable: false
+  not_runnable_reason: 'full-duplex model: it listens and speaks at once in 80 ms frames, which bolo''s turn-based
+    speech-to-speech interface cannot carry'
+  task: speech-to-speech
+  engine: plugin:torch
+  kind: moshi
+  family: Moshi
+  languages: [en]
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 15760000000
+  params: 7700000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/moshiko-pytorch-bf16
+  commercial_use: true
+  gated: false
+  features: [speech-to-speech, full-duplex]
+  description: 'Kyutai Moshi (male voice "Moshiko"): a 7 B full-duplex speech-to-speech model on the Mimi codec (24 kHz,
+    12.5 frames a second), English only, about 200 ms of latency on a GPU per Kyutai. CC-BY-4.0 weights (attribution).
+    Kyutai''s own runtimes: PyTorch (the moshi package, a 24 GB GPU), MLX on Apple silicon (kyutai/moshiko-mlx-q4,
+    5.2 GB) and Rust/candle (kyutai/moshiko-candle-q8, 8.6 GB). Not runnable yet: it listens while it speaks, frame
+    by frame, and bolo''s speech-to-speech interface (and the plugin protocol''s respond op) is turn-based, with
+    bolo''s own turn detection; it needs a duplex streaming op first.'
+  source_url: https://huggingface.co/kyutai/moshiko-pytorch-bf16
+  validated: untested
+  source:
+    repo: kyutai/moshiko-pytorch-bf16
+    revision: 2bfc9ae6e89079a5cc7ed2a68436010d91a3d289
+    exclude: [.gitattributes]
+  options:
+    plugin_install: not supported by bolo-torch yet (full-duplex; no duplex streaming op)
+    hardware: {gpu: required, vram_gb: 24, note: 'PyTorch, bfloat16; the MLX and candle builds need less'}
+- id: moshika-pytorch-bf16
+  runnable: false
+  not_runnable_reason: 'full-duplex model: it listens and speaks at once in 80 ms frames, which bolo''s turn-based
+    speech-to-speech interface cannot carry'
+  task: speech-to-speech
+  engine: plugin:torch
+  kind: moshi
+  family: Moshi
+  languages: [en]
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 15760000000
+  params: 7700000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/kyutai/moshika-pytorch-bf16
+  commercial_use: true
+  gated: false
+  features: [speech-to-speech, full-duplex]
+  description: 'Kyutai Moshi with the female voice "Moshika": as moshiko-pytorch-bf16 (full-duplex, English,
+    CC-BY-4.0; MLX and Rust/candle builds from Kyutai). Not runnable yet: full-duplex, see moshiko-pytorch-bf16.'
+  source_url: https://huggingface.co/kyutai/moshika-pytorch-bf16
+  validated: untested
+  source:
+    repo: kyutai/moshika-pytorch-bf16
+    revision: a49141e28b3d9c947cf9aa5314431e1b11cbd2f5
+    exclude: [.gitattributes]
+  options:
+    plugin_install: not supported by bolo-torch yet (full-duplex; no duplex streaming op)
+    hardware: {gpu: required, vram_gb: 24, note: 'PyTorch, bfloat16; the MLX and candle builds need less'}
+- id: glm-4-voice-9b
+  runnable: false
+  not_runnable_reason: its speech tokenizer and flow-matching decoder run only from the GLM-4-Voice repository's code
+  task: speech-to-speech
+  engine: plugin:torch
+  kind: glm-4-voice
+  family: GLM-4-Voice
+  languages: [zh, en]
+  tier: accuracy
+  sample_rate: 22050
+  size_bytes: 19090000000
+  params: 9000000000
+  license: glm-4-voice License
+  license_url: https://huggingface.co/zai-org/glm-4-voice-9b/blob/352e5a64063448d5e46394753fb65bf1dbab975b/LICENSE
+  commercial_use: false
+  gated: false
+  features: [speech-to-speech]
+  description: 'Zhipu GLM-4-Voice 9B: Chinese and English spoken conversation (text and speech tokens interleaved,
+    streaming), with emotion, speed and dialect control. Licence: free for academic research; commercial use only
+    after registering with Zhipu (then free), "Built with glm-4" attribution, Chinese law; treated here as
+    non-commercial. Not runnable yet: besides these 19 GB it needs the glm-4-voice-tokenizer (Whisper-based) and
+    glm-4-voice-decoder (flow matching + HiFi-GAN) repositories and the inference code of github.com/THUDM/GLM-4-Voice,
+    which is not a package bolo-torch can depend on; a GPU with about 20 GB (bfloat16).'
+  source_url: https://huggingface.co/zai-org/glm-4-voice-9b
+  validated: untested
+  source:
+    repo: zai-org/glm-4-voice-9b
+    revision: 352e5a64063448d5e46394753fb65bf1dbab975b
+    exclude: [.gitattributes]
+  options:
+    plugin_install: not supported by bolo-torch yet (no packaged inference code)
+    hardware: {gpu: required, vram_gb: 20, note: bfloat16}
+- id: minicpm-o-2.6
+  runnable: false
+  not_runnable_reason: its model code runs only as trust_remote_code, which bolo-torch does not run
+  task: speech-to-speech
+  engine: plugin:torch
+  kind: minicpm-o
+  family: MiniCPM-o 2.6
+  languages: [en, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 17430000000
+  params: 8000000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/openbmb/MiniCPM-o-2_6
+  commercial_use: true
+  gated: false
+  features: [speech-to-speech]
+  description: 'OpenBMB MiniCPM-o 2.6 (8 B: SigLIP, Whisper-medium encoder, Qwen2.5-7B and a ChatTTS-based speech
+    decoder): English and Chinese spoken conversation with voice cloning and a live streaming mode; weights and code
+    under Apache-2.0 per the model card (registration optional). Not runnable yet: its modelling code exists only as
+    trust_remote_code in the repository, which bolo-torch does not execute, and llama.cpp runs only its vision part
+    (no MiniCPM audio projector in libmtmd). About 18 GB in bfloat16; the card''s int4 build needs about 9 GB of GPU
+    memory.'
+  source_url: https://huggingface.co/openbmb/MiniCPM-o-2_6
+  validated: untested
+  source:
+    repo: openbmb/MiniCPM-o-2_6
+    revision: cf0b69a6118cd3b2c90bb37f3f4366e2fba802ab
+    exclude: ['assets/*', .gitattributes]
+  options:
+    plugin_install: not supported by bolo-torch yet (remote code only)
+    hardware: {gpu: required, vram_gb: 18, note: 'bfloat16; int4 about 9 GB'}
+- id: step-audio-2-mini
+  runnable: false
+  not_runnable_reason: its inference code and token2wav decoder run only from the Step-Audio2 repository's code
+  task: speech-to-speech
+  engine: plugin:torch
+  kind: step-audio-2
+  family: Step-Audio 2
+  languages: [en, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 17880000000
+  params: 8000000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/stepfun-ai/Step-Audio-2-mini
+  commercial_use: true
+  gated: false
+  features: [speech-to-speech, tool-calls]
+  description: 'StepFun Step-Audio 2 mini (8 B, on Qwen2.5-7B): English and Chinese spoken conversation with
+    paralinguistic understanding and tool calls; speech out through a CosyVoice-style token2wav decoder. Apache-2.0.
+    Not runnable yet: the inference code and token2wav live in github.com/stepfun-ai/Step-Audio2, not a package
+    bolo-torch can depend on. About 18 GB in bfloat16; a GPU is needed.'
+  source_url: https://huggingface.co/stepfun-ai/Step-Audio-2-mini
+  validated: untested
+  source:
+    repo: stepfun-ai/Step-Audio-2-mini
+    revision: e36fdd5d71e0ea22f09dd94bbab9bfc544ca1e36
+    exclude: ['assets/*', .gitattributes]
+  options:
+    plugin_install: not supported by bolo-torch yet (no packaged inference code)
+    hardware: {gpu: required, vram_gb: 20, note: bfloat16}
+- id: kimi-audio-7b-instruct
+  runnable: false
+  not_runnable_reason: it needs the kimia_infer code of the Kimi-Audio repository and flash-attn on a GPU
+  task: speech-to-speech
+  engine: plugin:torch
+  kind: kimi-audio
+  family: Kimi-Audio
+  languages: [en, zh]
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 42600000000
+  params: 7000000000
+  license: MIT
+  license_url: https://huggingface.co/moonshotai/Kimi-Audio-7B-Instruct
+  commercial_use: true
+  gated: false
+  features: [speech-to-speech]
+  description: 'Moonshot Kimi-Audio 7B Instruct (on Qwen2.5-7B, with a Whisper encoder and a flow-matching detokenizer):
+    English and Chinese spoken conversation, recognition and audio understanding. MIT per the model card. Not
+    runnable yet: inference needs the kimia_infer code of github.com/MoonshotAI/Kimi-Audio (not a package bolo-torch
+    can depend on) and flash-attn, so an NVIDIA GPU; the repository is 42.6 GB (the detokenizer included), about 24 GB
+    of GPU memory.'
+  source_url: https://huggingface.co/moonshotai/Kimi-Audio-7B-Instruct
+  validated: untested
+  source:
+    repo: moonshotai/Kimi-Audio-7B-Instruct
+    revision: 9a82a84c37ad9eb1307fb6ed8d7b397862ef9e6b
+    exclude: [.gitattributes]
+  options:
+    plugin_install: not supported by bolo-torch yet (no packaged inference code)
+    hardware: {gpu: required, vram_gb: 24, note: 'bfloat16, flash-attn'}

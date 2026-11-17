@@ -32,6 +32,13 @@ That is :class:`S2SConversation`, opened per Realtime session by an :class:`S2SB
   process: the audio of a turn is evaluated while the user speaks, and text and 24 kHz audio come out as they are
   generated. One model in memory serves all sessions, which take turns step by step.
 
+* :class:`ModelS2SBackend`: a turn-based speech-to-speech model loaded by bolo's model manager
+  (:class:`bolo.engines.base.SpeechToSpeechModel`, catalog task ``speech-to-speech``), in practice one served by
+  an engine plugin such as bolo-torch (Qwen2.5-Omni, Qwen3-Omni) over the plugin protocol's ``respond`` op. bolo
+  keeps the conversation (the user's turns as audio, the model's answers as text, tool results) and sends all of
+  it with every response; the model keeps nothing between turns. The audio of a turn is sent once the turn ends,
+  not while the user speaks.
+
 Nothing in the session logic depends on which of these answers.
 """
 
@@ -44,19 +51,21 @@ import contextlib
 import json
 import logging
 import secrets
-from collections.abc import AsyncGenerator
+import threading
+from collections.abc import AsyncGenerator, AsyncIterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from bolo.engines.base import FloatArray
+from bolo.engines.base import ConversationChunk, ConversationRequest, ConversationTurn, FloatArray
 from bolo.errors import ComponentMissing, EngineUnavailable, InvalidRequest
 
 if TYPE_CHECKING:
     from bolo.catalog import ModelSpec
     from bolo.core import Bolo
+    from bolo.engines.base import SpeechToSpeechModel
     from bolo.engines.tts_server import ServerProcess
 
 log = logging.getLogger("bolo.s2s")
@@ -66,6 +75,8 @@ OPENAI_VOICES = {"alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "no
 INPUT_RATE = 16000
 #: catalog ``kind`` of the models :mod:`bolo.s2s_onnx` runs in this process
 ONNX_KIND = "lfm3_audio_onnx"
+#: catalog task of turn-based speech-to-speech models loaded by the model manager (:class:`ModelS2SBackend`)
+S2S_TASK = "speech-to-speech"
 
 
 # -- what a response is made of ----------------------------------------------------------------------------------
@@ -515,6 +526,147 @@ class OpenAIRealtimeBackend(LlamaRealtimeBackend):
         return update
 
 
+# -- a turn-based model loaded by bolo's model manager (plugins) ---------------------------------------------------
+class ModelS2SConversation(S2SConversation):
+    """A conversation bolo keeps for a :class:`~bolo.engines.base.SpeechToSpeechModel`, which is stateless."""
+
+    def __init__(self, backend: ModelS2SBackend, config: S2SConfig) -> None:
+        self.backend = backend
+        self.config = config
+        self.output_rate = backend.output_rate
+        self.turns: list[ConversationTurn] = []
+        self._pending: list[FloatArray] = []
+        self._closed = False
+
+    async def append_audio(self, samples16: FloatArray) -> None:
+        if len(samples16):
+            self._pending.append(np.asarray(samples16, dtype=np.float32).copy())
+
+    async def commit(self) -> None:
+        if self._pending:
+            self.turns.append(ConversationTurn("user", audio=np.concatenate(self._pending).astype(np.float32)))
+            self._pending = []
+            self._forget_old_audio()
+
+    async def add_text(self, text: str) -> None:
+        await self.commit()  # audio heard before the text is its own turn
+        self.turns.append(ConversationTurn("user", text=text))
+
+    async def add_tool_output(self, call_id: str, output: str) -> None:
+        self.turns.append(ConversationTurn("tool", text=output, call_id=call_id))
+
+    def _forget_old_audio(self) -> None:
+        """Keep the audio of the last ``max_audio_turns`` spoken turns; older spoken turns leave the conversation."""
+        keep = self.backend.max_audio_turns
+        spoken = [i for i, t in enumerate(self.turns) if t.role == "user" and t.audio is not None]
+        drop = set(spoken[:-keep]) if keep > 0 and len(spoken) > keep else set()
+        if drop:
+            self.turns = [t for i, t in enumerate(self.turns) if i not in drop]
+
+    async def respond(
+        self, *, modalities: list[str], max_output_tokens: Any = None, tool_choice: Any = None
+    ) -> AsyncGenerator[S2SEvent, None]:
+        if self._closed:
+            raise EngineUnavailable("the speech-to-speech conversation is closed")
+        cfg = self.config
+        limit = max_output_tokens if max_output_tokens is not None else cfg.max_output_tokens
+        choice = tool_choice if tool_choice is not None else cfg.tool_choice
+        request = ConversationRequest(
+            list(self.turns), instructions=cfg.instructions, tools=list(cfg.tools),
+            tool_choice=choice if choice in ("auto", "none", "required") else "auto",
+            voice=cfg.voice if cfg.voice and cfg.voice.lower() not in OPENAI_VOICES else None,
+            max_output_tokens=limit if isinstance(limit, int) else None, audio_out="audio" in modalities,
+        )  # fmt: skip
+        loop = asyncio.get_running_loop()
+        items: asyncio.Queue[ConversationChunk | BaseException | None] = asyncio.Queue()
+        stop = threading.Event()
+        text: list[str] = []
+        calls: list[dict[str, str]] = []
+        status = "completed"
+
+        def put(item: ConversationChunk | BaseException | None) -> None:
+            loop.call_soon_threadsafe(items.put_nowait, item)
+
+        def work(model: SpeechToSpeechModel) -> None:
+            try:
+                for chunk in model.respond(request, stop.is_set):
+                    put(chunk)
+                    if stop.is_set():
+                        break
+            except BaseException as exc:  # reported to the session as a failed response
+                put(exc)
+            finally:
+                put(None)
+
+        try:
+            async with self.backend.model() as model:
+                self.output_rate = model.sample_rate
+                worker = asyncio.ensure_future(asyncio.to_thread(work, model))
+                while True:
+                    item = await items.get()
+                    if item is None:
+                        break
+                    if isinstance(item, BaseException):
+                        message = getattr(item, "message", None) or f"{type(item).__name__}: {item}"
+                        status = "failed"
+                        yield ResponseEnd("failed", error=str(message))
+                        return
+                    if item.text:
+                        text.append(item.text)
+                        yield TextDelta(item.text)
+                    if item.audio is not None and len(item.audio):
+                        yield AudioDelta(np.asarray(item.audio, dtype=np.float32), model.sample_rate)
+                    if item.tool_call:
+                        call = item.tool_call
+                        cid = str(call.get("call_id") or f"call_{secrets.token_hex(8)}")
+                        calls.append({"call_id": cid, "name": str(call.get("name") or ""),
+                                      "arguments": str(call.get("arguments") or "{}")})  # fmt: skip
+                        yield ToolCall(cid, calls[-1]["name"], calls[-1]["arguments"])
+                await worker
+        except (asyncio.CancelledError, GeneratorExit):
+            status = "cancelled"  # barge-in: the model stops before its next piece
+            raise
+        finally:
+            stop.set()
+            if text or calls:  # what the model said (up to a barge-in) is part of the conversation
+                self.turns.append(ConversationTurn("assistant", text="".join(text), tool_calls=calls))
+        if status == "completed":
+            yield ResponseEnd("completed")
+
+    async def close(self) -> None:
+        self._closed = True
+        self.turns = []
+        self._pending = []
+
+
+class ModelS2SBackend(S2SBackend):
+    """A :class:`~bolo.engines.base.SpeechToSpeechModel` loaded (and unloaded when idle) by bolo's model manager."""
+
+    name = "model"
+
+    def __init__(self, core: Bolo, spec: ModelSpec, *, max_audio_turns: int = 8) -> None:
+        self.core = core
+        self.spec = spec
+        self.max_audio_turns = max_audio_turns
+        self.output_rate = int(spec.sample_rate or 24000)
+
+    def describe(self) -> dict[str, Any]:
+        return {"backend": self.name, "model": self.spec.id, "engine": self.spec.engine, "managed": True}
+
+    @contextlib.asynccontextmanager
+    async def model(self) -> AsyncIterator[SpeechToSpeechModel]:
+        from bolo.engines.base import SpeechToSpeechModel
+
+        async with self.core.manager.use(self.spec.id) as entry:
+            model = entry.model
+            if not isinstance(model, SpeechToSpeechModel):
+                raise EngineUnavailable(f"model '{self.spec.id}' did not load as a speech-to-speech model")
+            yield model
+
+    async def open(self, config: S2SConfig) -> S2SConversation:
+        return ModelS2SConversation(self, config)
+
+
 # -- which backend a server uses ----------------------------------------------------------------------------------
 class S2SManager:
     """Builds the backend of the ``speech-to-speech`` pipeline once, from the settings (see docs/configuration.md)."""
@@ -566,6 +718,15 @@ class S2SManager:
         spec = self.core.catalog.resolve(s.s2s_model) if s.s2s_model else None
         if spec is None:
             return False, False, "s2s_model does not name a catalog model or a <provider>:<model>"
+        if spec.task == S2S_TASK:
+            if not spec.runnable:
+                return True, False, f"model '{spec.id}' cannot run yet: {spec.not_runnable_reason}"
+            status = self.core.engines.status(spec.engine)
+            if not status.available:
+                return True, False, f"engine {spec.engine} is not available ({status.reason})"
+            if not (self.core.store.is_installed(spec.id) or spec.builtin or (s.auto_pull and not spec.gated)):
+                return True, False, f"model '{spec.id}' is not installed"
+            return True, True, None
         if spec.kind == ONNX_KIND:
             from bolo.s2s_onnx import INSTALL_HINT, missing_packages
 
@@ -610,6 +771,14 @@ class S2SManager:
         options = spec.options
         if spec.kind == ONNX_KIND:
             return await self._build_onnx(spec)
+        if spec.task == S2S_TASK:
+            if not spec.runnable:
+                raise EngineUnavailable(f"model '{spec.id}' cannot run yet: {spec.not_runnable_reason}")
+            backend = ModelS2SBackend(self.core, spec)
+            # load now: a missing plugin or package answers here and not in the middle of the first turn
+            async with backend.model() as loaded:
+                backend.output_rate = loaded.sample_rate
+            return backend
         if spec.engine != "tts-server" or str(options.get("runtime") or "llama-server") != "llama-server":
             raise InvalidRequest(
                 f"model '{spec.id}' is not a speech-to-speech model; s2s_model must name a llama-server model such as "
@@ -647,46 +816,75 @@ class S2SManager:
         return backend
 
     def _process(self, name: str, path: Path, options: dict[str, Any]) -> ServerProcess:
-
-        from bolo.engines.base import LoadOptions
-        from bolo.engines.tts_server import ServerProcess, free_port, llama_server_args, server_env
-        from bolo.tts_runtimes import LLAMA, RUNTIME_INFO, find_binary, flavour_of
-
         s = self.core.settings
-        binary, _source = find_binary(s, LLAMA)
-        if binary is None:
-            raise ComponentMissing(
-                f"the speech-to-speech model '{name}' runs on {RUNTIME_INFO[LLAMA].name}, which is not installed: run "
-                f"`bolo components install llama-server`, set llama_server_bin, or set s2s_server_url to a running "
-                "llama-server"
-            )
-        model_file = path / str(options.get("model_file") or "")
-        if not options.get("model_file") or not model_file.is_file():
-            raise EngineUnavailable(f"model '{name}': the GGUF file {model_file} is missing; pull the model again")
-        port = free_port()
-        key = secrets.token_hex(16)
-        argv = [str(binary), "-m", str(model_file), "--host", "127.0.0.1", "--port", str(port), "--api-key", key]
-        if options.get("mmproj_file"):
-            argv += ["-mm", str(path / str(options["mmproj_file"]))]
-        extra = [str(a) for a in options.get("server_args") or []] + list(s.s2s_server_args)
-        self.placement = p = self.core.manager.place_llama_server(name, path, options, extra)
-        opts = LoadOptions(
-            threads=s.resolved_threads(), device=p.device,
-            gpu_layers=p.gpu_layers if p.split == "layers" and not p.operator_layers else None,
-            gpus=list(p.gpus) if p.device.startswith("cuda") else [], tensor_split=p.tensor_split,
-            main_gpu=p.main_gpu, visible_gpus=max(1, len(self.core.manager.accel.cuda_devices())),
-        )  # fmt: skip
-        # flash attention, KV cache type, context and batch size: pinned for the model, its catalog options, settings
-        tuning = {**options, **self.core.store.model_settings(name)}
-        argv += llama_server_args(s, tuning, opts, extra, parallel=max(1, s.s2s_parallel))
-        flavour = flavour_of(s, LLAMA, binary)
-        env = server_env(binary, flavour)
-        return ServerProcess(
-            f"s2s:{name}", argv + extra, port, start_timeout_s=s.tts_server_start_timeout_s, env=env, api_key=key,
-            gpu=p.device.split(":", 1)[0] != "cpu", flavour=flavour,
-        )  # fmt: skip
+        process, self.placement = managed_llama_server(
+            self.core,
+            f"s2s:{name}",
+            name,
+            path,
+            options,
+            list(s.s2s_server_args),
+            parallel=s.s2s_parallel,
+            what="speech-to-speech model",
+            fallback="or set s2s_server_url to a running llama-server",
+        )
+        return process
 
     async def close(self) -> None:
         backend, self._backend = self._backend, None
         if backend is not None:
             await backend.close()
+
+
+def managed_llama_server(
+    core: Bolo,
+    label: str,
+    name: str,
+    path: Path,
+    options: dict[str, Any],
+    extra_args: list[str],
+    *,
+    parallel: int,
+    what: str,
+    fallback: str,
+) -> tuple[ServerProcess, Any]:
+    """A llama-server bolo starts on a loopback port with a random API key for the catalog model ``name`` (its
+    GGUF ``options.model_file`` and, if any, ``options.mmproj_file`` in ``path``), placed by the model manager.
+    Returns the (not yet started) process and its placement."""
+    from bolo.engines.base import LoadOptions
+    from bolo.engines.tts_server import ServerProcess, free_port, llama_server_args, server_env
+    from bolo.tts_runtimes import LLAMA, RUNTIME_INFO, find_binary, flavour_of
+
+    s = core.settings
+    binary, _source = find_binary(s, LLAMA)
+    if binary is None:
+        raise ComponentMissing(
+            f"the {what} '{name}' runs on {RUNTIME_INFO[LLAMA].name}, which is not installed: run "
+            f"`bolo components install llama-server`, set llama_server_bin, {fallback}"
+        )
+    model_file = path / str(options.get("model_file") or "")
+    if not options.get("model_file") or not model_file.is_file():
+        raise EngineUnavailable(f"model '{name}': the GGUF file {model_file} is missing; pull the model again")
+    port = free_port()
+    key = secrets.token_hex(16)
+    argv = [str(binary), "-m", str(model_file), "--host", "127.0.0.1", "--port", str(port), "--api-key", key]
+    if options.get("mmproj_file"):
+        argv += ["-mm", str(path / str(options["mmproj_file"]))]
+    extra = [str(a) for a in options.get("server_args") or []] + [str(a) for a in extra_args]
+    p = core.manager.place_llama_server(name, path, options, extra)
+    opts = LoadOptions(
+        threads=s.resolved_threads(), device=p.device,
+        gpu_layers=p.gpu_layers if p.split == "layers" and not p.operator_layers else None,
+        gpus=list(p.gpus) if p.device.startswith("cuda") else [], tensor_split=p.tensor_split,
+        main_gpu=p.main_gpu, visible_gpus=max(1, len(core.manager.accel.cuda_devices())),
+    )  # fmt: skip
+    # flash attention, KV cache type, context and batch size: pinned for the model, its catalog options, settings
+    tuning = {**options, **core.store.model_settings(name)}
+    argv += llama_server_args(s, tuning, opts, extra, parallel=max(1, parallel))
+    flavour = flavour_of(s, LLAMA, binary)
+    env = server_env(binary, flavour)
+    process = ServerProcess(
+        label, argv + extra, port, start_timeout_s=s.tts_server_start_timeout_s, env=env, api_key=key,
+        gpu=p.device.split(":", 1)[0] != "cpu", flavour=flavour,
+    )  # fmt: skip
+    return process, p

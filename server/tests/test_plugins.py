@@ -78,7 +78,15 @@ async def test_plugin_models_through_the_scheduler(plugin_settings: Settings) ->
             proc.running
             and proc.hello["protocol"] == 1
             and proc.hello["kinds"]
-            == ["fake-stt", "fake-tts", "fake-separation", "fake-stt-speakers", "fake-diarization", "fake-denoise"]
+            == [
+                "fake-stt",
+                "fake-tts",
+                "fake-separation",
+                "fake-stt-speakers",
+                "fake-diarization",
+                "fake-denoise",
+                "fake-s2s",
+            ]
         )
         assert len(proc.handles) == 2
         assert core.engines.status("plugin:ref").available
@@ -116,6 +124,86 @@ async def test_plugin_diarization_through_the_scheduler(plugin_settings: Setting
         assert opts.names[1] == "Asha"  # the plugin's embeddings name a known voice
         model = core.manager.loaded["plug-diar"].model
         assert type(model).__name__ == "PluginDiarization"
+    finally:
+        await core.stop()
+
+
+def test_respond_turns_roundtrip() -> None:
+    from bolo.engines.base import ConversationTurn
+
+    turns = [
+        ConversationTurn("user", audio=np.linspace(-1, 1, 5, dtype=np.float32)),
+        ConversationTurn("assistant", text="Hi.", tool_calls=[{"call_id": "c1", "name": "f", "arguments": "{}"}]),
+        ConversationTurn("tool", text="42", call_id="c1"),
+        ConversationTurn("user", audio=np.ones(3, dtype=np.float32)),
+    ]
+    items, payload = protocol.turns_message(turns)
+    assert [i["n"] for i in items] == [5, 0, 0, 3] and len(payload) == 32
+    back = protocol.turns_from_message(items, payload)
+    assert back[1].tool_calls == turns[1].tool_calls and back[2].call_id == "c1"
+    assert np.array_equal(back[0].audio, turns[0].audio) and np.array_equal(back[3].audio, turns[3].audio)  # type: ignore[arg-type]
+    with pytest.raises(protocol.ProtocolError):
+        protocol.turns_from_message(items, payload[:-4])
+
+
+async def test_plugin_speech_to_speech(plugin_settings: Settings) -> None:
+    """A turn-based speech-to-speech model in a plugin (op ``respond``) behind the speech-to-speech pipeline: bolo
+    keeps the conversation and sends it whole every turn; text, audio and tool calls come back; barge-in stops it."""
+    import asyncio
+
+    from bolo.s2s import AudioDelta, ModelS2SBackend, ResponseEnd, S2SConfig, TextDelta, ToolCall
+
+    core = Bolo(plugin_settings)
+    core.catalog.add(
+        ModelSpec.from_dict(
+            {
+                "id": "plug-s2s", "task": "speech-to-speech", "engine": "plugin:ref", "kind": "fake-s2s",
+                "family": "Fake", "languages": ["en"], "license": "Apache-2.0", "builtin": True,
+                "sample_rate": 24000, "features": ["speech-to-speech"], "options": {"word_delay_s": 0.05},
+            }
+        )
+    )  # fmt: skip
+    core.settings.s2s_model = "plug-s2s"
+    await core.start()
+    try:
+        assert core.s2s.describe()["available"]
+        backend = await core.s2s.backend()
+        assert isinstance(backend, ModelS2SBackend) and backend.output_rate == 24000
+        tools = [{"type": "function", "name": "get_weather", "parameters": {"type": "object"}}]
+        conv = await backend.open(S2SConfig(instructions="Be brief.", tools=tools))
+        await conv.append_audio(np.zeros(8000, dtype=np.float32))
+        await conv.append_audio(np.zeros(8000, dtype=np.float32))
+        await conv.commit()
+        events = [e async for e in conv.respond(modalities=["audio", "text"])]
+        text = "".join(e.text for e in events if isinstance(e, TextDelta))
+        assert text == "I heard 1.0 seconds."
+        audio = [e for e in events if isinstance(e, AudioDelta)]
+        assert audio and audio[0].sample_rate == 24000 and len(audio[0].samples) == 2400
+        assert isinstance(events[-1], ResponseEnd) and events[-1].status == "completed"
+
+        await conv.add_text("What is the weather?")
+        events = [e async for e in conv.respond(modalities=["audio"])]
+        call = next(e for e in events if isinstance(e, ToolCall))
+        assert call.name == "get_weather" and call.arguments == '{"city": "Pune"}'
+        await conv.add_tool_output(call.call_id, "sunny")
+        events = [e async for e in conv.respond(modalities=["text"])]
+        assert "".join(e.text for e in events if isinstance(e, TextDelta)) == "The tool said: sunny."
+        assert not any(isinstance(e, AudioDelta) for e in events)  # a text-only response
+        roles = [t.role for t in conv.turns]  # type: ignore[attr-defined]
+        assert roles == ["user", "assistant", "user", "assistant", "tool", "assistant"]
+
+        # barge-in: closing the response stops the plugin's generation (op cancel)
+        await conv.add_text("one two three four five six seven eight nine ten")
+        gen = conv.respond(modalities=["audio"])
+        first = await gen.__anext__()
+        assert isinstance(first, TextDelta)
+        await gen.aclose()
+        await asyncio.sleep(0.3)
+        said = conv.turns[-1]  # type: ignore[attr-defined]
+        assert said.role == "assistant" and said.text.startswith("You") and not said.text.endswith("ten.")
+        await conv.close()
+        model = core.manager.loaded["plug-s2s"].model
+        assert type(model).__name__ == "PluginS2S" and model.supports_tools  # type: ignore[attr-defined]
     finally:
         await core.stop()
 

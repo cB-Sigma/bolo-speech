@@ -28,6 +28,7 @@ from bolo import __version__, logs, ort_providers
 from bolo.audio.decode import decode_audio
 from bolo.audio.encode import encode_audio
 from bolo.audio.resample import resample
+from bolo.audio_llm import ManagedAudioLLM
 from bolo.catalog import Catalog, ModelSpec
 from bolo.components import ComponentManager
 from bolo.config import Settings
@@ -180,7 +181,7 @@ class Bolo:
         # uccharan's language packs: downloaded by bolo, on first use, as a pull job (bolo.text.packs)
         packs.configure(s.uccharan_auto_download, reporter=self)
         self.llm = LLMClient(s)
-        self.audio_llm = AudioLLMClient(s)
+        self.audio_llm = AudioLLMClient(s, ManagedAudioLLM(self))
         #: the backend of the Realtime speech-to-speech pipeline (built on first use)
         self.s2s = S2SManager(self)
         #: ephemeral Realtime keys: value -> (expiry as epoch seconds, session configuration)
@@ -278,6 +279,9 @@ class Bolo:
             await self.telephony.close()
         with contextlib.suppress(Exception):
             await self.s2s.close()
+        if self.audio_llm.managed is not None:
+            with contextlib.suppress(Exception):
+                await self.audio_llm.managed.close()
         await self.manager.close()
         if self.otel is not None:  # send the spans still queued, without waiting long for a collector that is gone
             with contextlib.suppress(Exception):
@@ -498,7 +502,7 @@ class Bolo:
                 # per pipeline: `configured` (its settings are in place) and `available` (a session can use it now)
                 "pipelines": {
                     "cascade": {"configured": llm["configured"], "available": llm["configured"]},
-                    "audio-llm": {**audio_llm, "available": bool(audio_llm["configured"])},
+                    "audio-llm": {"available": bool(audio_llm["configured"]), **audio_llm},
                     "speech-to-speech": s2s,
                 },
             },

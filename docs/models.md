@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-385 models: 151 validated on CPU by the maintainers, 234 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
+401 models: 151 validated on CPU by the maintainers, 250 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
 
 ### Speech to text
 
@@ -365,13 +365,13 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `spark-tts-0.5b` | en, zh | accuracy | - | 3.9 GB | CC-BY-NC-SA-4.0 ⚠ · needs plugin torch | untested |
+| `spark-tts-0.5b` | en, zh | accuracy | - | 3.9 GB | CC-BY-NC-SA-4.0 ⚠ · needs plugin torch | not runnable yet |
 
 #### MaskGCT
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `maskgct` | en, zh, ja, ko, fr, de | accuracy | - | 6.6 GB | CC-BY-NC-4.0 ⚠ · needs plugin torch | untested |
+| `maskgct` | en, zh, ja, ko, fr, de | accuracy | - | 6.6 GB | CC-BY-NC-4.0 ⚠ · needs plugin torch | not runnable yet |
 
 #### LFM3-Audio 2B
 
@@ -383,16 +383,16 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `mms-tts-pan` | pa | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
-| `mms-tts-ory` | or | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
-| `mms-tts-asm` | as | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
-| `mms-tts-dgo` | doi | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
-| `mms-tts-mai` | mai | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
-| `mms-tts-mag` | mag | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
-| `mms-tts-hne` | hne | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
+| `mms-tts-pan` | pa | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | ran once here (shared CPU), not measured |
+| `mms-tts-ory` | or | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | ran once here (shared CPU), not measured |
+| `mms-tts-asm` | as | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | ran once here (shared CPU), not measured |
+| `mms-tts-dgo` | doi | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | ran once here (shared CPU), not measured |
+| `mms-tts-mai` | mai | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | ran once here (shared CPU), not measured |
+| `mms-tts-mag` | mag | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | ran once here (shared CPU), not measured |
+| `mms-tts-hne` | hne | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | ran once here (shared CPU), not measured |
 | `mms-tts-awa` | awa | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
 | `mms-tts-bgc` | bgc | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
-| `mms-tts-urd` | ur | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
+| `mms-tts-urd` | ur | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | ran once here (shared CPU), not measured |
 | `mms-tts-hin` | hi | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
 | `mms-tts-ben` | bn | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
 | `mms-tts-guj` | gu | balanced | - | 114 MB | CC-BY-NC-4.0 ⚠ | untested |
@@ -703,7 +703,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `diarizen-wavlm-large-s80-md-v2` | - | accuracy | - | 278 MB | CC-BY-NC-4.0 (segmentation) + CC-BY-4.0 (PLDA) ⚠ · needs plugin torch | untested |
+| `diarizen-wavlm-large-s80-md-v2` | - | accuracy | - | 278 MB | CC-BY-NC-4.0 (segmentation) + CC-BY-4.0 (PLDA) ⚠ · needs plugin torch | not runnable yet |
 
 ### End-of-turn detection
 
@@ -715,7 +715,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `smart-turn-v3.1` | ar, bn, da, de, en, es +17 | realtime | - | 9 MB | BSD-2-Clause | **CPU** · RTF 0.070 |
 | `smart-turn-v3.0` | ar, bn, da, de, en, es +17 | realtime | - | 9 MB | BSD-2-Clause | **CPU** · RTF 0.043 |
 | `smart-turn-v3-fp32` | ar, bn, da, de, en, es +17 | realtime | - | 32 MB | BSD-2-Clause | **CPU** · RTF 0.064 |
-| `smart-turn-v2` | en, de, es, fr, hi, it +8 | balanced | - | 379 MB | BSD-2-Clause | untested |
+| `smart-turn-v2` | en, de, es, fr, hi, it +8 | balanced | - | 379 MB | BSD-2-Clause | not runnable yet |
 
 #### Namo Turn Detector
 
@@ -728,14 +728,14 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `livekit-turn-detector` | en, es, fr, de, it, pt +8 | balanced | - | 408 MB | LiveKit Model License (use only together with the LiveKit… ⚠ | untested |
-| `livekit-turn-detector-en` | en | balanced | - | 169 MB | LiveKit Model License (use only together with the LiveKit… ⚠ | untested |
+| `livekit-turn-detector` | en, es, fr, de, it, pt +8 | balanced | - | 408 MB | LiveKit Model License (use only together with the LiveKit… ⚠ | not runnable yet |
+| `livekit-turn-detector-en` | en | balanced | - | 169 MB | LiveKit Model License (use only together with the LiveKit… ⚠ | not runnable yet |
 
 #### TEN Turn Detection
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `ten-turn-detection` | en, zh | accuracy | - | 15.2 GB | Apache-2.0 with Agora's additional conditions (not on end… ⚠ | untested |
+| `ten-turn-detection` | en, zh | accuracy | - | 15.2 GB | Apache-2.0 with Agora's additional conditions (not on end… ⚠ | not runnable yet |
 
 #### Silence only
 
@@ -796,7 +796,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `deepfilternet3` | - | balanced | - | 16 MB | MIT OR Apache-2.0 | untested |
-| `deepfilternet2` | - | balanced | - | 9 MB | MIT OR Apache-2.0 | untested |
+| `deepfilternet2` | - | balanced | - | 9 MB | MIT OR Apache-2.0 | not runnable yet |
 
 #### RNNoise
 
@@ -817,15 +817,110 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `clearvoice-frcrn-se-16k` | - | balanced | - | 161 MB | Apache-2.0 · needs plugin torch | untested |
-| `clearvoice-mossformer2-se-48k` | - | accuracy | - | 222 MB | Apache-2.0 · needs plugin torch | untested |
-| `clearvoice-mossformergan-se-16k` | - | accuracy | - | 39 MB | Apache-2.0 · needs plugin torch | untested |
+| `clearvoice-frcrn-se-16k` | - | balanced | - | 161 MB | Apache-2.0 · needs plugin torch | not runnable yet |
+| `clearvoice-mossformer2-se-48k` | - | accuracy | - | 222 MB | Apache-2.0 · needs plugin torch | not runnable yet |
+| `clearvoice-mossformergan-se-16k` | - | accuracy | - | 39 MB | Apache-2.0 · needs plugin torch | not runnable yet |
 
 #### Resemble Enhance
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `resemble-enhance` | - | accuracy | - | 713 MB | MIT · needs plugin torch | untested |
+| `resemble-enhance` | - | accuracy | - | 713 MB | MIT · needs plugin torch | not runnable yet |
+
+### Speech to speech (Realtime speech-to-speech pipeline)
+
+#### Qwen2.5-Omni 3B
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `qwen2.5-omni-3b-torch` | en, zh | balanced | - | 12.0 GB | Qwen Research License ⚠ · needs plugin torch | untested |
+
+#### Qwen2.5-Omni 7B
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `qwen2.5-omni-7b-torch` | en, zh | accuracy | - | 22.4 GB | Apache-2.0 · needs plugin torch | untested |
+
+#### Qwen3-Omni 30B-A3B
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `qwen3-omni-30b-a3b-instruct-torch` | en, zh, fr, de, ru, it +4 | accuracy | - | 70.5 GB | Apache-2.0 · needs plugin torch | untested |
+
+#### Moshi
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `moshiko-pytorch-bf16` | en | realtime | - | 15.8 GB | CC-BY-4.0 · needs plugin torch | not runnable yet |
+| `moshika-pytorch-bf16` | en | realtime | - | 15.8 GB | CC-BY-4.0 · needs plugin torch | not runnable yet |
+
+#### GLM-4-Voice
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `glm-4-voice-9b` | zh, en | accuracy | - | 19.1 GB | glm-4-voice License ⚠ · needs plugin torch | not runnable yet |
+
+#### MiniCPM-o 2.6
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `minicpm-o-2.6` | en, zh | accuracy | - | 17.4 GB | Apache-2.0 · needs plugin torch | not runnable yet |
+
+#### Step-Audio 2
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `step-audio-2-mini` | en, zh | accuracy | - | 17.9 GB | Apache-2.0 · needs plugin torch | not runnable yet |
+
+#### Kimi-Audio
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `kimi-audio-7b-instruct` | en, zh | accuracy | - | 42.6 GB | MIT · needs plugin torch | not runnable yet |
+
+### Audio-in language models (Realtime audio-llm pipeline)
+
+#### LFM2.5-Audio 1.5B
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `lfm2.5-audio-1.5b-llamacpp` (LFM2.5-Audio 1.5B) | en | realtime | - | 915 MB | LFM Open License v1.0 ⚠ · runs on llama-server | ran once here (shared CPU), not measured |
+
+#### Ultravox 0.5
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ultravox-0.5-llama-3.2-1b-llamacpp` (Ultravox 0.5) | en, ar, de, es, fr, hi +9 | realtime | - | 2.2 GB | MIT (adapter) + Llama 3.2 Community License · runs on llama-server | untested |
+
+#### Qwen2.5-Omni 3B
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `qwen2.5-omni-3b-llamacpp` (Qwen2.5-Omni 3B) | en, zh | balanced | - | 3.6 GB | Qwen Research License ⚠ · runs on llama-server · GPU recommended | untested |
+
+#### Qwen2.5-Omni 7B
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `qwen2.5-omni-7b-llamacpp` (Qwen2.5-Omni 7B) | en, zh | accuracy | - | 6.2 GB | Apache-2.0 · runs on llama-server · GPU recommended | untested |
+
+#### Qwen3-Omni 30B-A3B
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `qwen3-omni-30b-a3b-instruct-llamacpp` (Qwen3-Omni 30B-A3B) | en, zh, ko, ja, de, ru +12 | accuracy | - | 19.9 GB | Apache-2.0 · runs on llama-server · GPU recommended | untested |
+
+#### Gemma 4 E2B
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `gemma-4-e2b-it-llamacpp` (Gemma 4 E2B) | en | balanced | - | 3.4 GB | Apache-2.0 · runs on llama-server | untested |
+
+#### Gemma 4 E4B
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `gemma-4-e4b-it-llamacpp` (Gemma 4 E4B) | en | accuracy | - | 5.2 GB | Apache-2.0 · runs on llama-server · GPU recommended | untested |
 
 ⚠ = the licence restricts commercial use. RTF = processing time / audio duration (lower is faster).
 <!-- END GENERATED: models -->
@@ -855,6 +950,52 @@ below USD 10M yearly revenue) is used only by the opt-in `speech-to-speech` Real
 Runtime (`pip install "bolo-speech[s2s]"`, no llama-server; the same licence): name it as `s2s_model`, or use it
 as a text-to-speech voice. Its files (2.7 GB) are pinned by SHA-256. On 4 shared CPU cores it generates
 speech at 0.4 to 0.5 times real time, so it wants a faster CPU or a GPU.
+
+## Speech-to-speech and audio-in models
+
+Three ways to hold a spoken conversation (voice-agents.md, "Pipelines"): bolo's recogniser, a language model and
+a voice (`cascade`); a model that hears the user and writes the answer, which a bolo voice speaks (`audio-llm`);
+or one model that hears and speaks (`speech-to-speech`). Every entry states its licence; the non-commercial ones
+are listed like the rest and marked ⚠. Checked against the model cards, LICENSE files and the Hugging Face API on
+2026-11-17.
+
+| id | Pipeline | Licence (commercial use) | Download | Runtime | Duplex | State |
+| --- | --- | --- | --- | --- | --- | --- |
+| `lfm3-audio-2b-llamacpp` | speech-to-speech | LFM Open License v1.0 (only below USD 10M revenue) | 1.4 GB | llama-server `/v1/realtime` (bolo starts it) | turn-based, audio streamed while the user speaks | runnable, untested |
+| `lfm3-audio-2b-onnx` | speech-to-speech | LFM Open License v1.0 (as above) | 2.7 GB | ONNX Runtime in bolo's process | as above | runnable; 0.4-0.5x real time on 4 shared cores |
+| `qwen2.5-omni-3b-torch` | speech-to-speech | Qwen Research License (no) | 12.0 GB | bolo-torch (`omni` extra), transformers | turn-based, answer comes back whole | runnable, untested (fakes only) |
+| `qwen2.5-omni-7b-torch` | speech-to-speech | Apache-2.0 (yes) | 22.4 GB | bolo-torch, transformers; a 24 GB GPU | turn-based | runnable, untested (fakes only) |
+| `qwen3-omni-30b-a3b-instruct-torch` | speech-to-speech | Apache-2.0 (yes) | 70.5 GB | bolo-torch, transformers 4.57+; about 79 GB of GPU memory | turn-based | runnable, untested (fakes only) |
+| `moshiko-pytorch-bf16`, `moshika-pytorch-bf16` | speech-to-speech | CC-BY-4.0 (yes, with attribution) | 15.8 GB each | Kyutai's PyTorch, MLX (`moshiko-mlx-q4`, 5.2 GB) and Rust/candle (`moshiko-candle-q8`, 8.6 GB) runtimes | **full-duplex** (listens while it speaks, 80 ms frames) | not runnable: bolo's interface and the plugin's `respond` op are turn-based |
+| `glm-4-voice-9b` | speech-to-speech | glm-4-voice License (academic; commercial after registering with Zhipu) | 19.1 GB + tokenizer and decoder | the GLM-4-Voice repository's code | turn-based, streaming | not runnable: no packaged inference code |
+| `minicpm-o-2.6` | speech-to-speech | Apache-2.0 (yes; registration optional) | 17.4 GB | trust_remote_code only; llama.cpp runs its vision part, not its audio | turn-based and a live mode | not runnable: bolo-torch does not run remote code |
+| `step-audio-2-mini` | speech-to-speech | Apache-2.0 (yes) | 17.9 GB | the Step-Audio2 repository's code and token2wav | turn-based, tool calls | not runnable: no packaged inference code |
+| `kimi-audio-7b-instruct` | speech-to-speech | MIT (yes) | 42.6 GB | kimia_infer (the Kimi-Audio repository) and flash-attn | turn-based | not runnable: no packaged inference code, NVIDIA GPU only |
+| `lfm2.5-audio-1.5b-llamacpp` | audio-llm | LFM Open License v1.0 (only below USD 10M revenue) | 915 MB | llama-server (bolo starts it) | - | **ran here** (see below) |
+| `ultravox-0.5-llama-3.2-1b-llamacpp` | audio-llm | MIT adapter + Llama 3.2 Community License (yes, with Meta's conditions) | 2.2 GB | llama-server | - | runnable, untested |
+| `qwen2.5-omni-3b-llamacpp` | audio-llm | Qwen Research License (no) | 3.6 GB | llama-server (text out only: llama.cpp has no Talker) | - | runnable, untested |
+| `qwen2.5-omni-7b-llamacpp` | audio-llm | Apache-2.0 (yes) | 6.2 GB | llama-server | - | runnable, untested |
+| `qwen3-omni-30b-a3b-instruct-llamacpp` | audio-llm | Apache-2.0 (yes) | 19.9 GB | llama-server | - | runnable, untested |
+| `gemma-4-e2b-it-llamacpp`, `gemma-4-e4b-it-llamacpp` | audio-llm | Apache-2.0 (yes) | 3.4 / 5.2 GB | llama-server | - | runnable, untested |
+
+What llama.cpp b12375 (bolo's pinned llama-server) does with audio: its multimodal library has audio encoders
+for Ultravox, Qwen2-Audio, Qwen2.5-Omni, Qwen3-Omni, LFM2/LFM2.5-Audio, Voxtral, Gemma 4, GLM's ASR models,
+Granite Speech and others, so these hear `input_audio` in `/v1/chat/completions`; the GGUF headers of the mmproj
+files above say `clip.has_audio_encoder = true`. Its realtime conversation mode (`/v1/realtime`, speech out) needs
+an audio generation head in the mmproj, which the LFM3-Audio family has; Qwen-Omni's Talker, LFM2.5-Audio's
+vocoder (Liquid's own runner) and the others have none on llama.cpp, so on llama-server they are audio-in models.
+
+**What ran here.** `lfm2.5-audio-1.5b-llamacpp` (915 MB) on llama-server b12375 (CPU build), started by bolo for
+`audio_llm_model` (`-m`, `-mm`, `-t 4 --parallel 1 -c 8192`, loopback port, random API key), on a 4-core Xeon shared
+with other jobs (load 11 to 18). It loaded (llama.cpp marks its audio input experimental) and heard `en-short.wav`
+("Good morning. Could you tell me when my order will arrive?", 3 s): with "Perform ASR." it gave the sentence back,
+and with a system prompt asking it to answer the customer's question it gave the sentence back again instead of an
+answer. So the wiring works end to end, and this model is a poor audio-llm through llama-server's chat endpoint.
+First token after 59 to 84 s and the whole reply after 153 to 184 s on that overloaded machine: not a measure of
+the model. Nothing else in the table above was downloaded: the Qwen-Omni,
+Moshi, GLM, MiniCPM, Step-Audio and Kimi weights are 12 to 70 GB and the test machine had about 6 GB of disk and
+no GPU. The bolo-torch Qwen-Omni loader, the plugin's `respond` op and bolo's turn-based backend were tested with
+fake model objects, and the managed audio-llm server with a stand-in for llama-server.
 
 ## Models outside the catalog
 

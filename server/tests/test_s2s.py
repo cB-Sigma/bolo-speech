@@ -200,6 +200,44 @@ async def test_speech_to_speech_barge_in(s2s: LiveServer, upstream: FakeRealtime
     assert second[-1]["response"]["output"][0]["content"][0]["transcript"].startswith("I heard 1.")
 
 
+async def test_speech_to_speech_turn_based_model(settings: Settings) -> None:
+    """A turn-based speech-to-speech model loaded by bolo itself (the fake engine's fake-s2s; plugin models such as
+    bolo-torch's Qwen-Omni work the same way): bolo sends the turn's audio once the turn ends and keeps the
+    conversation."""
+    settings.s2s_model = "fake-s2s"
+    srv = LiveServer(settings)
+    srv.start()
+    try:
+        info = httpx.get(srv.url + "/api/v1/info").json()
+        pipeline = info["capabilities"]["realtime"]["pipelines"]["speech-to-speech"]
+        assert pipeline["available"] and pipeline["configured"]
+        ws = await connect(srv)
+        try:
+            await update(
+                ws,
+                {"type": "realtime", "pipeline": "speech-to-speech", "tools": TOOLS,
+                 "audio": {"input": {"turn_detection": {"type": "server_vad", "silence_duration_ms": 300}}}},
+            )  # fmt: skip
+            for chunk in b64_pcm24(2.0):
+                await ws.send(json.dumps({"type": "input_audio_buffer.append", "audio": chunk}))
+            events = await until(ws, "response.done")
+            item = {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "weather?"}]}
+            await ws.send(json.dumps({"type": "conversation.item.create", "item": item}))
+            await ws.send(json.dumps({"type": "response.create"}))
+            second = await until(ws, "response.done")
+        finally:
+            await ws.close()
+    finally:
+        srv.stop()
+    done = next(e for e in events if e["type"] == "response.done")["response"]
+    transcript = done["output"][0]["content"][0]["transcript"]
+    assert done["status"] == "completed" and transcript.startswith("I heard ") and transcript.endswith(" seconds.")
+    assert 2.0 <= float(transcript.split()[2]) <= 2.8
+    assert any(e["type"] == "response.output_audio.delta" for e in events)
+    call = next(e for e in second if e["type"] == "response.output_item.done")["item"]
+    assert call["type"] == "function_call" and call["name"] == "get_weather"
+
+
 async def test_pipeline_validation_and_unreachable_backend(settings: Settings) -> None:
     settings.s2s_server_url = "http://127.0.0.1:9"  # nothing listens there
     srv = LiveServer(settings)
@@ -296,3 +334,47 @@ async def test_audio_llm_pipeline(agent: LiveServer) -> None:
     # the next request still carries that turn as audio (it is the latest heard turn), then the text
     assert second["messages"][-1] == {"role": "user", "content": "and then?"}
     assert isinstance(second["messages"][-3]["content"], list)
+
+
+async def test_managed_audio_llm(settings: Settings, tmp_path: Path) -> None:
+    """audio_llm_model naming a catalog audio-llm entry: bolo pulls nothing it has, starts llama-server for it (here a
+    stand-in) with the model and its audio encoder, and sends the audio-llm pipeline's turns there."""
+    from bolo.catalog import ModelSpec
+    from bolo.core import Bolo
+
+    binary = fake_program(tmp_path / "bin" / "llama-server", f"import sys\nsys.path.insert(0, {str(HERE)!r})\n"
+                          "import runpy\nrunpy.run_path(sys.path[0] + '/fake_llm.py', run_name='__main__')\n")  # fmt: skip
+    settings.llama_server_bin = str(binary)
+    settings.audio_llm_model = "test-audio-llm"
+    settings.audio_llm_parallel = 3
+    core = Bolo(settings)
+    core.catalog.add(
+        ModelSpec.from_dict(
+            {
+                "id": "test-audio-llm", "task": "audio-llm", "engine": "tts-server", "kind": "llama-audio-llm",
+                "family": "Test", "languages": ["en"], "license": "Apache-2.0", "source": {"repo": "x/y"},
+                "requires": ["llama-server"],
+                "options": {"runtime": "llama-server", "model_file": "m.gguf", "mmproj_file": "mm.gguf"},
+            }
+        )
+    )  # fmt: skip
+    files = tmp_path / "gguf"
+    files.mkdir()
+    (files / "m.gguf").write_bytes(b"GGUF")
+    (files / "mm.gguf").write_bytes(b"GGUF")
+    core.store.register_local("test-audio-llm", files)
+    try:
+        described = core.audio_llm.describe()
+        assert described["configured"] and described["model"] == "test-audio-llm" and described["managed"]
+        reply = await core.audio_llm.chat({"model": "test-audio-llm", "messages": [{"role": "user", "content": "hi"}]})
+        assert reply["choices"][0]["message"]["content"].startswith("You said: hi.")
+        process = core.audio_llm.managed.process  # type: ignore[union-attr]
+        assert process is not None and process.running and process.api_key
+        argv = process.argv
+        assert argv[argv.index("-m") + 1].endswith("m.gguf") and argv[argv.index("-mm") + 1].endswith("mm.gguf")
+        assert argv[argv.index("--parallel") + 1] == "3"
+        assert core.audio_llm.headers()["Authorization"] == f"Bearer {process.api_key}"
+        assert core.audio_llm.describe()["process"]["running"]
+    finally:
+        await core.stop()
+    assert not process.running
