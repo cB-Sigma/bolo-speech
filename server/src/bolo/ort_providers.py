@@ -184,6 +184,13 @@ def exact_int8(options: Any) -> Any:
     up to 0.57 on such CPUs. With this option ONNX Runtime converts the int8 weights to uint8 at load time there
     (uint8 x uint8 has no such overflow); on CPUs with VNNI, on other architectures and for float graphs it changes
     nothing. A stand-in without ``add_session_config_entry`` (tests) is returned as it is."""
+    get = getattr(options, "get_session_config_entry", None)
+    if get is not None:
+        try:
+            if get(X64_QUANT_PRECISION) == "1":
+                return options  # set already (session_options, then create_session): ONNX Runtime warns on a second set
+        except Exception:
+            pass  # not set: ONNX Runtime raises for a missing key
     add = getattr(options, "add_session_config_entry", None)
     if add is not None:
         add(X64_QUANT_PRECISION, "1")

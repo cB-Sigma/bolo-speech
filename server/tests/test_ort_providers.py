@@ -240,3 +240,25 @@ def test_doctor_and_server_warn_once_when_cuda_was_dropped(
     with caplog.at_level(logging.WARNING, logger="bolo.core"):
         asyncio.run(start())
     assert sum("no CUDA provider" in r.getMessage() for r in caplog.records) == 1
+
+
+def test_exact_int8_is_set_once() -> None:
+    """session_options() sets the option and create_session sets it on the options it is given: the second set made
+    ONNX Runtime print "Config with key [session.x64quantprecision] already exists" for every session."""
+    pytest.importorskip("onnxruntime")
+    from bolo.ort_providers import X64_QUANT_PRECISION, exact_int8, session_options
+
+    calls: list[str] = []
+    opts = session_options()
+    real_add = opts.add_session_config_entry
+
+    class Watch:
+        def get_session_config_entry(self, key: str) -> str:
+            return str(opts.get_session_config_entry(key))
+
+        def add_session_config_entry(self, key: str, value: str) -> None:
+            calls.append(key)
+            real_add(key, value)
+
+    exact_int8(Watch())
+    assert calls == [] and opts.get_session_config_entry(X64_QUANT_PRECISION) == "1"

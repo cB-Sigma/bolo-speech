@@ -6,6 +6,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- Every ONNX Runtime session printed "Config with key [session.x64quantprecision] already exists" to the console:
+  the exact-int8 option was set twice (by `session_options()` and again by `create_session`). It is set once.
+
 ## [0.6.4] - 2026-11-17
 
 ### Added
