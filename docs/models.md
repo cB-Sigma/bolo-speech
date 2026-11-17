@@ -2462,6 +2462,12 @@ the machine's load (the same 3 s sample took RTF 7 in one run and 103 in
 another), so take them as an upper bound. Short pieces cost almost as much as
 30 s ones, because the encoder pads every piece to a 30 s window.
 
+Not verified end to end: a 46 s recording of the samples with pauses, cut into
+15 s pieces through bolo (`test_real.py::test_voxtral_mini_large_on_a_managed_llama_server`),
+did not finish on the overloaded machine: generation fell to about 0.1 token
+per second and one piece passed the 600 s request timeout (option `timeout_s`).
+The cutting itself is covered by the tests with a stand-in server.
+
 Quantisations tried: the community IQ4_XS files (bartowski's, with an
 importance matrix, and mradermacher's static one) with the same audio encoder
 answered the 3 s question ("To provide an accurate estimate ... I need a bit
