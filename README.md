@@ -415,6 +415,7 @@ Windows PowerShell 5.1 drops the double quotes inside an argument it passes to a
 | [docs/plugins.md](docs/plugins.md) | engine plugins and bolo-torch |
 | [docs/architecture.md](docs/architecture.md) | how the server is built |
 | [docs/performance.md](docs/performance.md), [docs/status.md](docs/status.md), [docs/comparison.md](docs/comparison.md) | measurements, what was and was not tested, alternatives |
+| [docs/roadmap.md](docs/roadmap.md) | what is planned and not done yet |
 | [docs/migration-from-speaches.md](docs/migration-from-speaches.md) | coming from speaches |
 | [deploy/README.md](deploy/README.md), [examples/](examples/) | containers and units; client examples |
 | [CHANGELOG.md](CHANGELOG.md) | what changed in each release |

@@ -415,6 +415,7 @@ Windows PowerShell 5.1 drops the double quotes inside an argument it passes to a
 | [docs/plugins.md](https://github.com/cB-Sigma/bolo/blob/main/docs/plugins.md) | engine plugins and bolo-torch |
 | [docs/architecture.md](https://github.com/cB-Sigma/bolo/blob/main/docs/architecture.md) | how the server is built |
 | [docs/performance.md](https://github.com/cB-Sigma/bolo/blob/main/docs/performance.md), [docs/status.md](https://github.com/cB-Sigma/bolo/blob/main/docs/status.md), [docs/comparison.md](https://github.com/cB-Sigma/bolo/blob/main/docs/comparison.md) | measurements, what was and was not tested, alternatives |
+| [docs/roadmap.md](https://github.com/cB-Sigma/bolo/blob/main/docs/roadmap.md) | what is planned and not done yet |
 | [docs/migration-from-speaches.md](https://github.com/cB-Sigma/bolo/blob/main/docs/migration-from-speaches.md) | coming from speaches |
 | [deploy/README.md](https://github.com/cB-Sigma/bolo/blob/main/deploy/README.md), [examples/](https://github.com/cB-Sigma/bolo/tree/main/examples/) | containers and units; client examples |
 | [CHANGELOG.md](https://github.com/cB-Sigma/bolo/blob/main/CHANGELOG.md) | what changed in each release |
