@@ -49,7 +49,9 @@ needs_uccharan = pytest.mark.skipif(get_uccharan() is None, reason="needs ucchar
 
 def real_settings() -> Settings:
     data_dir = Path(os.environ.get("BOLO_DATA_DIR", Path.home() / ".cache" / "bolo"))
-    return Settings(data_dir=data_dir, auto_pull=True, stt_ttl_s=-1, tts_ttl_s=-1)
+    # BOLO_DEVICE as the server reads it, so that `BOLO_DEVICE=dml:1 pytest ...` runs where it says
+    device = os.environ.get("BOLO_DEVICE") or "cpu"
+    return Settings(data_dir=data_dir, auto_pull=True, stt_ttl_s=-1, tts_ttl_s=-1, device=device)
 
 
 @pytest.fixture

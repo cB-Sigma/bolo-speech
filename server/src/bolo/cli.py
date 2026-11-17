@@ -649,7 +649,7 @@ def format_ps(doc: dict[str, Any], verbose: bool = False) -> str:
         for m in doc.get("models") or []
         if (m.get("placement") or {}).get("notice")
     ]
-    lines += [f"note: {n}" for n in notices] if verbose else []
+    lines += [f"note: {n}" for n in notices]  # always: they say where a model really runs
     return "\n".join(lines)
 
 

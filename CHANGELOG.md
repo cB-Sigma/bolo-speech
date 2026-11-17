@@ -6,6 +6,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- `bolo ps` prints each model's placement notice (for example that DirectML runs Nemotron's Gelu nodes on the CPU,
+  or that a provider fell back) without `-v`; the API already returned them.
+- The real-model tests read `BOLO_DEVICE` (they always ran on the CPU), so `BOLO_DEVICE=dml:1 pytest ...` runs where it
+  says.
+
 ## [0.6.5] - 2026-11-17
 
 ### Fixed
