@@ -193,3 +193,16 @@ def load_fake_pyannote(ctx: LoadContext) -> PyannoteDiarization:
     tracks = [(float(a), float(b), str(c)) for a, b, c in ctx.options.get("tracks", [])]
     speakers = {k: int(ctx.options[k]) for k in ("num_speakers", "min_speakers", "max_speakers") if k in ctx.options}
     return PyannoteDiarization(FakePipeline(tracks), FakeEmbedding(), speakers)
+
+
+def load_fake_demucs(ctx: Any) -> Any:
+    """The Demucs denoiser wrapper around a network that halves its input."""
+    import torch
+
+    from bolo_torch.models.denoise import DemucsDenoiser
+
+    class Half(torch.nn.Module):
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return 0.5 * x
+
+    return DemucsDenoiser(Half(), "cpu")

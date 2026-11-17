@@ -12,6 +12,7 @@ from bolo.catalog import Catalog
 from bolo.engines.base import (
     ConversationRequest,
     ConversationTurn,
+    DenoiseModel,
     DiarizationModel,
     LoadOptions,
     SeparationModel,
@@ -43,7 +44,7 @@ def test_hello_and_tts_through_the_host(engine: PluginEngine, tmp_path: Path) ->
     assert isinstance(model, TTSModel)
     assert engine.process.hello["name"] == "torch" and engine.process.hello["protocol"] == 1
     assert engine.process.hello["kinds"] == [
-        "parler-tts", "sepformer", "gated", "dicow", "pyannote-diarization", "qwen-omni",
+        "parler-tts", "sepformer", "gated", "dicow", "pyannote-diarization", "qwen-omni", "demucs-denoiser",
     ]  # fmt: skip
     assert model.sample_rate == 44100 and [v.id for v in model.voices] == ["divya", "rohit"]
     chunks = list(model.synthesize("पहला वाक्य। दूसरा वाक्य।", "rohit"))
@@ -84,6 +85,15 @@ def test_diarization_through_the_host(engine: PluginEngine, tmp_path: Path) -> N
     assert result.activity is None
     vec = model.embed(tone(1.0))
     assert vec.dtype == np.float32 and vec.shape == (4,) and abs(float(np.linalg.norm(vec)) - 1.0) < 1e-5
+    model.close()
+
+
+def test_denoise_through_the_host(engine: PluginEngine, tmp_path: Path) -> None:
+    model = engine.load("demucs-denoiser", "denoise", tmp_path, {}, LoadOptions(threads=1))
+    assert isinstance(model, DenoiseModel) and model.task == "denoise" and model.sample_rate == 16000
+    x = tone(0.7)
+    y = model.denoise(x)
+    assert len(y) == len(x) and np.allclose(y, 0.5 * x, atol=1e-6)
     model.close()
 
 
