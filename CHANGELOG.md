@@ -65,6 +65,16 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   speech comes in 30-token chunks. The download now includes the pinned glm-4-voice-tokenizer, which kimia_infer
   otherwise fetches unpinned from the Hub. Remote code opt-in. Fakes only.
 
+- **Speaker embedders as models of their own** (task `speaker-embedding`): `eres2net-voxceleb`, `campplus-voxceleb`,
+  `campplus-zh-en` (3D-Speaker, Apache-2.0), `wespeaker-campplus-voxceleb`, `wespeaker-resnet34-voxceleb` (WeSpeaker,
+  CC-BY-4.0), `titanet-small` (NVIDIA, CC-BY-4.0), all run by sherpa-onnx, and `ecapa-tdnn-voxceleb` (SpeechBrain's
+  ECAPA-TDNN, Apache-2.0, a third-party ONNX export run by ONNX Runtime). Pinned by SHA-256. `POST
+  /v1/audio/speech/embedding` (`model`), speaker similarity of cloned voices and the `voice_similarity_model` setting
+  take any of them or a diarization model; another kind of model is refused with `400`. Measured on the
+  repository's clips with eight Kokoro voices and on LibriSpeech dev-clean (docs/measurements/speaker-embedders.json):
+  equal error rate on LibriSpeech 0.6 % for ERes2Net (the default, unchanged), 0 % for `campplus-zh-en` and
+  `titanet-small`, 1.3 % for ECAPA-TDNN, 3.3 % for WeSpeaker ResNet34; the two VoxCeleb CAM++ exports were close to
+  chance (docs/models.md, "Speaker embedding").
 - **More denoisers, chosen and pulled like any other model** (`denoise=<model id>` on transcriptions, Realtime
   sessions, pins and the `denoise` setting; `bolo list`, `bolo pull`, recommendations). Every entry states its licence;
   non-commercial ones are in, marked. Runnable: **DPDFNet** (Ceva, Apache-2.0; `dpdfnet-baseline`, `dpdfnet2`,
@@ -97,14 +107,14 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   (`tokenizers` joins the `turn` extra); and `silence-only`, no model, which makes `semantic_vad` behave like
   `server_vad`. A session chooses its model with the bolo extension `turn_detection.turn_model` (default
   `default_turn`); traces name the model, and a text model's checks record the text and the decode time;
-  `capabilities.realtime.semantic_vad.input` says `audio` or `text`. Catalogued with their terms but not run
-  (`runnable: false`, with the reason): `smart-turn-v2` (PyTorch weights only), `livekit-turn-detector` and
-  `livekit-turn-detector-en` (LiveKit Model License: only with the LiveKit Agents framework) and
-  `ten-turn-detection` (a 7.6 B model; Apache-2.0 plus Agora's conditions in its GitHub licence). Downloads are pinned
+  `capabilities.realtime.semantic_vad.input` says `audio` or `text`. Downloads are pinned
   by SHA-256. Measured on a scripted set of 20 English and 6 Hindi finished and unfinished utterances
   (docs/measurements/turn-detectors.json): on English, accuracy 0.63 for the default `smart-turn-v3`, 0.80 for its
   float32 build, 0.98 for `namo-turn-en` on clean text (0.85 without final punctuation), chance for
   `namo-turn-multilingual`. The default stays `smart-turn-v3` (docs/models.md, "End-of-turn detection").
+  Smart Turn v2 (PyTorch weights only), LiveKit's turn detector (licence: only with the LiveKit Agents framework) and
+  TEN Turn Detection (a 7.6 B model) cannot run in bolo and are not catalog entries: the new
+  docs/models-unsupported.md lists them with the reasons.
 - **More voice-activity detectors, chosen by name.** `silero-vad-v6` (MIT), `ten-vad` and `ten-vad-int8` (TEN VAD:
   Apache-2.0 with Agora's conditions, labelled `commercial_use: false`: only for your own applications, not in a way
   that competes with Agora), `marblenet-vad` (NVIDIA Frame-VAD Multilingual MarbleNet v2.0, NVIDIA Open Model

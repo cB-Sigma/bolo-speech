@@ -269,7 +269,7 @@ async def speaker_similarity(core: Bolo, model: str, text: str, voice: str | Non
         return {"similarity": None, "note": "the voice has no reference recording to compare with; bench a saved voice"}
     name = similarity.embedding_model(core)
     try:
-        if not core.manager.is_installed(core.resolve(name, "diarization")):
+        if not core.manager.is_installed(similarity.embedder(core, name)):
             return {
                 "similarity": None,
                 "note": f"the speaker-embedding model {name} is not installed (bolo pull {name})",

@@ -58,6 +58,7 @@ def test_catalog_shape_and_filters(live: LiveServer) -> None:
             "lid",
             "speech-to-speech",
             "audio-llm",
+            "speaker-embedding",
         )
         assert isinstance(m["requires"], list) and isinstance(m["available"], bool)
     tts = httpx.get(live.url + "/api/v1/catalog", params={"task": "tts"}).json()["models"]
@@ -72,6 +73,7 @@ def test_catalog_shape_and_filters(live: LiveServer) -> None:
         "fake-vad",
         "fake-turn",
         "fake-turn-text",
+        "fake-speaker-embedding",
         "fake-diarization",
         "fake-diarization-overlap",
         "fake-separation",

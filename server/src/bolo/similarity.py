@@ -1,8 +1,9 @@
 """Speaker similarity: how much a synthesised voice sounds like its reference.
 
-The score is the cosine similarity of two speaker embeddings, computed by the speaker-embedding model of a
-diarization pipeline (setting ``voice_similarity_model``; default: the default diarization model, whose ERes2Net
-embedder from 3D-Speaker was trained on VoxCeleb). It reuses what diarization uses to name known speakers.
+The score is the cosine similarity of two speaker embeddings, computed by a speaker embedder: a ``speaker-embedding``
+model (ERes2Net, CAM++, ECAPA-TDNN, ...) or the embedder of a diarization pipeline (setting
+``voice_similarity_model``; default: the default diarization model, whose ERes2Net embedder from 3D-Speaker was
+trained on VoxCeleb). It reuses what diarization uses to name known speakers.
 
 What the numbers mean was measured, not assumed (docs/measurements/speaker-similarity-calibration.json): with
 the ERes2Net embedder on LibriSpeech dev-clean (CC BY 4.0, real read speech, 16 speakers, 5 utterances each),
@@ -24,6 +25,7 @@ from bolo.engines.base import FloatArray
 from bolo.errors import InvalidRequest
 
 if TYPE_CHECKING:
+    from bolo.catalog import ModelSpec
     from bolo.core import Bolo
 
 EMBEDDING_RATE = 16000
@@ -31,6 +33,10 @@ EMBEDDING_RATE = 16000
 SAME_SPEAKER = 0.50
 #: at or above (and below SAME_SPEAKER): a resemblance, but real different-speaker pairs reach this too
 SIMILAR = 0.30
+#: tasks whose models embed speakers
+EMBEDDING_TASKS = ("speaker-embedding", "diarization")
+#: models that embed with the calibrated ERes2Net file (the diarization pipeline and the same file on its own)
+CALIBRATED = ("pyannote-3.0-eres2net", "eres2net-voxceleb")
 #: measured with pyannote-3.0-eres2net (ERes2Net, 3D-Speaker) on LibriSpeech dev-clean; see the module docs
 CALIBRATION: dict[str, Any] = {
     "embedding_model": "pyannote-3.0-eres2net",
@@ -65,11 +71,25 @@ def embedding_model(core: Bolo) -> str:
     return str(core.settings.voice_similarity_model or core.settings.default_diarization)
 
 
+def embedder(core: Bolo, name: str | None = None) -> ModelSpec:
+    """The model that embeds speakers: ``name`` (a ``speaker-embedding`` or ``diarization`` model), else the
+    ``voice_similarity_model`` setting, else the default diarization model."""
+    name = name or embedding_model(core)
+    found = core.catalog.resolve(name)
+    task = found.task if found is not None and found.task in EMBEDDING_TASKS else "speaker-embedding"
+    if found is not None and found.task not in EMBEDDING_TASKS:
+        raise InvalidRequest(
+            f"model '{found.id}' is a {found.task} model; speaker embeddings come from speaker-embedding or "
+            "diarization models",
+            param="model",
+        )
+    return core.resolve(name, task)
+
+
 def available(core: Bolo) -> bool:
     """True when the embedding model is installed (or can be pulled on first use)."""
-    name = embedding_model(core)
     try:
-        spec = core.resolve(name, "diarization")
+        spec = embedder(core)
     except Exception:
         return False
     return bool(core.manager.is_installed(spec) or core.settings.auto_pull)
@@ -77,8 +97,7 @@ def available(core: Bolo) -> bool:
 
 async def embed(core: Bolo, samples: FloatArray, sample_rate: int, model: str | None = None) -> FloatArray:
     """The speaker embedding of a recording (resampled to 16 kHz, at most ``MAX_EMBED_S`` seconds)."""
-    name = model or embedding_model(core)
-    spec = core.resolve(name, "diarization")
+    spec = embedder(core, model)
     x = resample(np.asarray(samples, dtype=np.float32), sample_rate, EMBEDDING_RATE)[
         : int(MAX_EMBED_S * EMBEDDING_RATE)
     ]
@@ -95,17 +114,16 @@ async def score(
     core: Bolo, a: FloatArray, rate_a: int, b: FloatArray, rate_b: int, model: str | None = None
 ) -> dict[str, Any]:
     """Cosine similarity of the speakers of two recordings, with the verdict and the embedding model."""
-    name = model or embedding_model(core)
-    ea = await embed(core, a, rate_a, name)
-    eb = await embed(core, b, rate_b, name)
+    used = embedder(core, model).id
+    ea = await embed(core, a, rate_a, used)
+    eb = await embed(core, b, rate_b, used)
     value = round(cosine(ea, eb), 4)
-    used = core.resolve(name, "diarization").id
     return {
         "similarity": value,
         "verdict": verdict(value),
         "embedding_model": used,
         # the verdict's thresholds were measured with this model only; others have their own scale
-        "calibrated": used == CALIBRATION["embedding_model"],
+        "calibrated": used in CALIBRATED,
     }
 
 

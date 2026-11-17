@@ -1,0 +1,235 @@
+# Speaker embedders on their own (task speaker-embedding): one vector per stretch of speech; the cosine of two is how
+# alike the voices sound. Any of them can score cloned voices (setting voice_similarity_model) and answer
+# POST /v1/audio/speech/embedding (model); diarization entries carry an embedder of their own.
+# * sherpa-onnx runs the exports csukuangfj/speaker-embedding-models publishes (with the metadata sherpa-onnx reads).
+#   ERes2Net, TitaNet-small and WeSpeaker ResNet34 are the very files of the pyannote-3.0-* diarization entries.
+# * ECAPA-TDNN from SpeechBrain runs in ONNX Runtime directly (bolo.engines.speaker_embedding): a third-party export
+#   whose graph takes the waveform (SpeechBrain's filterbank front-end is inside it).
+# Every file is pinned by sha256.
+
+- id: eres2net-voxceleb
+  aliases:
+  - 3dspeaker-eres2net-voxceleb
+  task: speaker-embedding
+  engine: sherpa-onnx
+  kind: speaker_embedding
+  family: ERes2Net
+  languages: []
+  tier: realtime
+  size_bytes: 26485263
+  license: Apache-2.0
+  description: ERes2Net from Alibaba's 3D-Speaker, trained on VoxCeleb (192 numbers per voice). The embedder of
+    pyannote-3.0-eres2net, on its own; the model bolo's same-speaker thresholds were calibrated with (docs/measurements/speaker-similarity-calibration.json).
+  source_url: https://github.com/modelscope/3D-Speaker
+  validated: cpu
+  measured:
+    rtf: 0.25926
+    audio_s: 5.9
+    load_s: 0.47
+    memory_mb: 68
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+  source:
+    urls:
+    - path: 3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx
+      url: https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/0743f301363dec56491a490f6d6cbc9d67f9a3bf/3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx
+      size: 26485263
+      sha256: c59158379255ad66e161679cca6af8d52d51e389e3224ab7d7a7baae295c2db5
+  options:
+    file: 3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx
+- id: campplus-voxceleb
+  aliases:
+  - cam++-voxceleb
+  - 3dspeaker-campplus-voxceleb
+  task: speaker-embedding
+  engine: sherpa-onnx
+  kind: speaker_embedding
+  family: CAM++
+  languages: []
+  tier: realtime
+  size_bytes: 29596978
+  license: Apache-2.0
+  description: CAM++ (context-aware masking) from Alibaba's 3D-Speaker, trained on VoxCeleb (512 numbers per voice).
+  source_url: https://github.com/modelscope/3D-Speaker
+  validated: cpu
+  measured:
+    rtf: 0.08205
+    audio_s: 5.9
+    load_s: 0.79
+    memory_mb: 30
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+  source:
+    urls:
+    - path: 3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx
+      url: https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/0743f301363dec56491a490f6d6cbc9d67f9a3bf/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx
+      size: 29596978
+      sha256: 357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b
+  options:
+    file: 3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx
+- id: campplus-zh-en
+  aliases:
+  - 3dspeaker-campplus-zh-en-advanced
+  task: speaker-embedding
+  engine: sherpa-onnx
+  kind: speaker_embedding
+  family: CAM++
+  languages: []
+  tier: realtime
+  size_bytes: 28281164
+  license: Apache-2.0
+  description: CAM++ from 3D-Speaker trained on about 200 thousand Chinese and English speakers ("common, advanced"
+    in 3D-Speaker's naming), 192 numbers per voice.
+  source_url: https://github.com/modelscope/3D-Speaker
+  validated: cpu
+  measured:
+    rtf: 0.122
+    audio_s: 5.9
+    load_s: 0.76
+    memory_mb: 28
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+  source:
+    urls:
+    - path: 3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx
+      url: https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/0743f301363dec56491a490f6d6cbc9d67f9a3bf/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx
+      size: 28281164
+      sha256: aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2
+  options:
+    file: 3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx
+- id: wespeaker-campplus-voxceleb
+  task: speaker-embedding
+  engine: sherpa-onnx
+  kind: speaker_embedding
+  family: CAM++
+  languages: []
+  tier: realtime
+  size_bytes: 29292684
+  license: CC-BY-4.0
+  description: CAM++ trained by the WeSpeaker project on VoxCeleb (WeSpeaker publishes its VoxCeleb models under
+    the dataset's CC-BY-4.0), 512 numbers per voice.
+  source_url: https://github.com/wenet-e2e/wespeaker
+  validated: cpu
+  measured:
+    rtf: 0.07329
+    audio_s: 5.9
+    load_s: 1.34
+    memory_mb: 29
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+  source:
+    urls:
+    - path: wespeaker_en_voxceleb_CAM++.onnx
+      url: https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/0743f301363dec56491a490f6d6cbc9d67f9a3bf/wespeaker_en_voxceleb_CAM++.onnx
+      size: 29292684
+      sha256: c46fad10b5f81e1aa4a60c162714208577093655076c5450f8c469e522ec54ef
+  options:
+    file: wespeaker_en_voxceleb_CAM++.onnx
+- id: wespeaker-resnet34-voxceleb
+  aliases:
+  - wespeaker-resnet34
+  task: speaker-embedding
+  engine: sherpa-onnx
+  kind: speaker_embedding
+  family: WeSpeaker ResNet
+  languages: []
+  tier: realtime
+  size_bytes: 26534365
+  license: CC-BY-4.0
+  description: WeSpeaker's ResNet34 trained on VoxCeleb (256 numbers per voice); the embedder of pyannote-3.0-wespeaker-resnet34,
+    on its own.
+  source_url: https://github.com/wenet-e2e/wespeaker
+  validated: cpu
+  measured:
+    rtf: 0.12607
+    audio_s: 5.9
+    load_s: 0.31
+    memory_mb: 27
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+  source:
+    urls:
+    - path: wespeaker_en_voxceleb_resnet34.onnx
+      url: https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/0743f301363dec56491a490f6d6cbc9d67f9a3bf/wespeaker_en_voxceleb_resnet34.onnx
+      size: 26534365
+      sha256: 5ef208a9da1453335308a6b6f4e6dfbd7e183a38b604de0a57664f45d257fe94
+  options:
+    file: wespeaker_en_voxceleb_resnet34.onnx
+- id: titanet-small
+  aliases:
+  - nemo-titanet-small
+  task: speaker-embedding
+  engine: sherpa-onnx
+  kind: speaker_embedding
+  family: TitaNet
+  languages: []
+  tier: realtime
+  size_bytes: 40257283
+  license: CC-BY-4.0
+  description: NVIDIA TitaNet-small (NeMo), trained on VoxCeleb, Fisher, Switchboard and other English sets (192
+    numbers per voice); the embedder of pyannote-3.0-titanet-small, on its own.
+  source_url: https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/titanet_small
+  validated: cpu
+  measured:
+    rtf: 0.06823
+    audio_s: 5.9
+    load_s: 0.42
+    memory_mb: 60
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+  source:
+    urls:
+    - path: nemo_en_titanet_small.onnx
+      url: https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/0743f301363dec56491a490f6d6cbc9d67f9a3bf/nemo_en_titanet_small.onnx
+      size: 40257283
+      sha256: ad4a1802485d8b34c722d2a9d04249662f2ece5d28a7a039063ca22f515a789e
+  options:
+    file: nemo_en_titanet_small.onnx
+- id: ecapa-tdnn-voxceleb
+  aliases:
+  - speechbrain-ecapa-voxceleb
+  - spkrec-ecapa-voxceleb
+  task: speaker-embedding
+  engine: onnxruntime
+  kind: onnx_speaker_embedding
+  family: ECAPA-TDNN
+  languages: []
+  tier: realtime
+  size_bytes: 42324080
+  params: 20800000
+  license: Apache-2.0
+  description: SpeechBrain's ECAPA-TDNN speaker model (spkrec-ecapa-voxceleb, trained on VoxCeleb 1 and 2; 192 numbers
+    per voice). SpeechBrain publishes PyTorch checkpoints only; the file here is a third-party ONNX export (Pawls2theWall/equivl-ecapa-voxceleb-onnx)
+    with the filterbank front-end and mean normalisation inside the graph and float16 weights computed in float32,
+    whose author reports a cosine of 1.00000 to SpeechBrain's own embeddings on 42 clips.
+  source_url: https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb
+  validated: cpu
+  measured:
+    rtf: 0.2026
+    audio_s: 5.9
+    load_s: 0.38
+    memory_mb: 133
+    threads: 4
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-17'
+  source:
+    urls:
+    - path: model_fp16.onnx
+      url: https://huggingface.co/Pawls2theWall/equivl-ecapa-voxceleb-onnx/resolve/4393ad2afd9af3621bcf602ac49e380c9de8306b/model_fp16.onnx
+      size: 42324080
+      sha256: c59760b0a30dd905e3757cbb9ddf5dde22f9a099dc3e74de77c263cbb202e67c
+  options:
+    file: model_fp16.onnx

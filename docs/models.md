@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-425 models: 156 validated on CPU by the maintainers, 269 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
+428 models: 163 validated on CPU by the maintainers, 265 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)). 3 more are described but not yet published (fish-drama-3-llamacpp, mira-tts-audiocpp, soprano-1.1-80m-llamacpp).
 
 ### Speech to text
 
@@ -715,7 +715,6 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `smart-turn-v3.1` | ar, bn, da, de, en, es +17 | realtime | - | 9 MB | BSD-2-Clause | **CPU** · RTF 0.070 |
 | `smart-turn-v3.0` | ar, bn, da, de, en, es +17 | realtime | - | 9 MB | BSD-2-Clause | **CPU** · RTF 0.043 |
 | `smart-turn-v3-fp32` | ar, bn, da, de, en, es +17 | realtime | - | 32 MB | BSD-2-Clause | **CPU** · RTF 0.064 |
-| `smart-turn-v2` | en, de, es, fr, hi, it +8 | balanced | - | 379 MB | BSD-2-Clause | not runnable yet |
 
 #### Namo Turn Detector
 
@@ -723,19 +722,6 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `namo-turn-en` | en | realtime | - | 139 MB | Apache-2.0 | **CPU** · RTF 0.011 |
 | `namo-turn-multilingual` | ar, bn, da, de, en, es +17 | balanced | - | 343 MB | Apache-2.0 | **CPU** · RTF 0.024 |
-
-#### LiveKit turn detector
-
-| id | languages | tier | streaming | download | licence | validated |
-| --- | --- | --- | --- | --- | --- | --- |
-| `livekit-turn-detector` | en, es, fr, de, it, pt +8 | balanced | - | 408 MB | LiveKit Model License (use only together with the LiveKit… ⚠ | not runnable yet |
-| `livekit-turn-detector-en` | en | balanced | - | 169 MB | LiveKit Model License (use only together with the LiveKit… ⚠ | not runnable yet |
-
-#### TEN Turn Detection
-
-| id | languages | tier | streaming | download | licence | validated |
-| --- | --- | --- | --- | --- | --- | --- |
-| `ten-turn-detection` | en, zh | accuracy | - | 15.2 GB | Apache-2.0 with Agora's additional conditions (not on end… ⚠ | not runnable yet |
 
 #### Silence only
 
@@ -982,6 +968,40 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `gemma-4-e4b-it-llamacpp` (Gemma 4 E4B) | en | accuracy | - | 5.2 GB | Apache-2.0 · runs on llama-server · GPU recommended | untested |
+
+### Speaker embedding
+
+#### ERes2Net
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `eres2net-voxceleb` | - | realtime | - | 26 MB | Apache-2.0 | **CPU** · RTF 0.259 |
+
+#### CAM++
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `campplus-voxceleb` | - | realtime | - | 30 MB | Apache-2.0 | **CPU** · RTF 0.082 |
+| `campplus-zh-en` | - | realtime | - | 28 MB | Apache-2.0 | **CPU** · RTF 0.122 |
+| `wespeaker-campplus-voxceleb` | - | realtime | - | 29 MB | CC-BY-4.0 | **CPU** · RTF 0.073 |
+
+#### WeSpeaker ResNet
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `wespeaker-resnet34-voxceleb` | - | realtime | - | 27 MB | CC-BY-4.0 | **CPU** · RTF 0.126 |
+
+#### TitaNet
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `titanet-small` | - | realtime | - | 40 MB | CC-BY-4.0 | **CPU** · RTF 0.068 |
+
+#### ECAPA-TDNN
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ecapa-tdnn-voxceleb` | - | realtime | - | 42 MB | Apache-2.0 | **CPU** · RTF 0.203 |
 
 ⚠ = the licence restricts commercial use. RTF = processing time / audio duration (lower is faster).
 <!-- END GENERATED: models -->
@@ -2029,8 +2049,8 @@ turn detection"). `default_turn` chooses it (default `smart-turn-v3`), a session
 overrides it. Smart Turn listens to the last eight seconds of audio; the Namo models read the transcript, which
 the session decodes at the pause with its transcription model; `silence-only` is no model (the pause ends the
 turn). LiveKit's turn detector (licence: only with the LiveKit Agents framework), TEN Turn Detection (a 7.6 B
-language model, 15 GB) and Smart Turn v2 (PyTorch weights only) are in the catalog with `runnable: false` and
-the reason.
+language model, 15 GB) and Smart Turn v2 (PyTorch weights only) cannot run in bolo and are not in the catalog;
+[models-unsupported.md](models-unsupported.md) gives the reasons.
 
 **Measured** (docs/measurements/turn-detectors.json, `server/tools/measure_detectors.py turn`). The repository has
 no end-of-turn test data, so the set is scripted for this test: 20 English and 6 Hindi sentences a voice agent
@@ -2063,6 +2083,58 @@ was at chance on this set (its logits stayed close to zero; it reproduces the di
 examples, weakly); do not use it without testing on your own data. The default stays `smart-turn-v3`: it hears
 any language without a decode, and the set is too small and too clean to justify a switch; `smart-turn-v3-fp32`
 (32 MB) or, for English agents, `namo-turn-en` are worth trying.
+
+**In a live session** (docs/measurements/turn-text-realtime.json): a Realtime transcription session with
+`moonshine-tiny-en` and `namo-turn-en`, the English sample sent in real time. At each pause the session decoded the
+utterance and asked the model (0.5 to 1.3 s of decoding on the busy machine, the model's own call on top). The
+recogniser wrote the 60 % cut as "Good morning. could you tell me?", with a question mark, so the model called it
+finished (1.00) and the turn was split, as with `server_vad`; Smart Turn kept that turn together
+(voice-agents.md). The whole sentence, transcribed "... when my order will arise?", got 0.48 and was held open for
+the full 3 s pause. So a text model is only as good as the words and punctuation the recogniser writes at the
+pause, and costs a decode per pause.
+
+## Speaker embedding
+
+A speaker embedder turns a stretch of speech into a vector; the cosine of two vectors says how alike the voices
+sound. bolo uses one to score cloned voices ([voices.md](voices.md), setting `voice_similarity_model`) and to
+answer `POST /v1/audio/speech/embedding` (`model`); diarization pipelines carry their own. Every
+`speaker-embedding` entry, and every diarization model (its embedder), is accepted by both.
+
+| id | model | numbers | download | runtime | licence |
+| --- | --- | --- | --- | --- | --- |
+| `eres2net-voxceleb` | 3D-Speaker ERes2Net, VoxCeleb (the embedder of the default `pyannote-3.0-eres2net`, same file) | 192 | 26 MB | sherpa-onnx | Apache-2.0 |
+| `campplus-voxceleb` | 3D-Speaker CAM++, VoxCeleb | 512 | 30 MB | sherpa-onnx | Apache-2.0 |
+| `campplus-zh-en` | 3D-Speaker CAM++, about 200 k Chinese and English speakers | 192 | 28 MB | sherpa-onnx | Apache-2.0 |
+| `wespeaker-campplus-voxceleb` | WeSpeaker CAM++, VoxCeleb | 512 | 29 MB | sherpa-onnx | CC-BY-4.0 |
+| `wespeaker-resnet34-voxceleb` | WeSpeaker ResNet34, VoxCeleb (the embedder of `pyannote-3.0-wespeaker-resnet34`) | 256 | 27 MB | sherpa-onnx | CC-BY-4.0 |
+| `titanet-small` | NVIDIA TitaNet-small (the embedder of `pyannote-3.0-titanet-small`) | 192 | 40 MB | sherpa-onnx | CC-BY-4.0 |
+| `ecapa-tdnn-voxceleb` | SpeechBrain ECAPA-TDNN, VoxCeleb 1+2; third-party ONNX export with the front-end inside | 192 | 42 MB | onnxruntime | Apache-2.0 |
+
+**Measured** (docs/measurements/speaker-embedders.json, `server/tools/measure_detectors.py embed`): every pair of
+clips scored, same speaker against different speakers. Two sets: (a) the repository's clips (the three samples,
+the console's three cloning samples) and three sentences in each of eight Kokoro voices, 30 clips, 37
+same-voice and 398 different-voice pairs; (b) real read speech, LibriSpeech dev-clean, 16 speakers with 5
+utterances each (the set `tools/calibrate_similarity.py` uses), 160 and 3000 pairs. EER: the equal error rate;
+"at 0.5": the share of pairs at or above bolo's "same speaker" line.
+
+| embedder | synthetic: same / different (median) | EER | LibriSpeech: same / different (median) | different p95 | EER | same / different at 0.5 | RTF |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `eres2net-voxceleb` (and `pyannote-3.0-eres2net`) | 0.83 / 0.08 | 0.3 % | 0.80 / 0.11 | 0.36 | 0.6 % | 99.4 % / 0.1 % | 0.27 |
+| `campplus-voxceleb` | 0.60 / 0.37 | 41 % | 0.57 / 0.43 | 0.85 | 43 % | 58 % / 43 % | 0.10 |
+| `campplus-zh-en` | 0.91 / 0.25 | 0 % | 0.82 / 0.10 | 0.32 | **0 %** | 100 % / 0.2 % | 0.12 |
+| `wespeaker-campplus-voxceleb` | 0.58 / 0.53 | 43 % | 0.67 / 0.58 | 0.84 | 40 % | 78 % / 66 % | 0.11 |
+| `wespeaker-resnet34-voxceleb` | 0.92 / 0.53 | 4.8 % | 0.89 / 0.54 | 0.74 | 3.3 % | 100 % / 63 % | 0.15 |
+| `titanet-small` | 0.91 / 0.27 | 2.0 % | 0.84 / 0.06 | 0.28 | **0 %** | 100 % / 0.1 % | 0.09 |
+| `ecapa-tdnn-voxceleb` | 0.84 / 0.12 | 0 % | 0.76 / 0.10 | 0.31 | 1.3 % | 97.5 % / 0 % | 0.16 |
+
+RTF: embedding time over 732 s of audio on the shared 4-vCPU Xeon (load average about 15, so treat it as
+relative). The standalone `eres2net-voxceleb` gave exactly the numbers of the diarization entry it comes from.
+CAM++ trained on 200 k speakers (`campplus-zh-en`), TitaNet-small and ECAPA-TDNN told the speakers apart as well as
+ERes2Net or better; WeSpeaker ResNet34 separates well but on its own scale (different people around 0.54, so
+bolo's 0.5 line does not fit it). Both VoxCeleb CAM++ exports came out close to chance in both sets (AUC 0.57 to
+0.66); they run, but we found no reason to use them and did not find the cause. The verdicts ("same speaker" at
+0.50, "similar" at 0.30) are calibrated for ERes2Net only (`calibrated` in answers is true for
+`pyannote-3.0-eres2net` and `eres2net-voxceleb`); the default stays ERes2Net.
 
 ## Denoising
 
@@ -2994,13 +3066,8 @@ copied when the entry was written. Things to watch:
   NVIDIA's .nemo checkpoint.
 * **WebRTC VAD** (`webrtc-vad`) is BSD-3-Clause code in an MIT-licensed binding (`webrtcvad-wheels`); nothing is
   downloaded.
-* **LiveKit's turn detector** (`livekit-turn-detector`, `livekit-turn-detector-en`) is under the LiveKit Model
-  License: use only together with the LiveKit Agents framework, not on its own or in another framework, and its
-  outputs may not be used to improve other models. bolo is another framework, so the entries are `runnable: false`
-  (the files can still be pulled, for use where the licence allows it).
-* **TEN Turn Detection** (`ten-turn-detection`): its Hugging Face card says Apache-2.0; the licence file of its
-  GitHub repository adds Agora's conditions (not on end-user devices; own applications only; nothing that competes
-  with Agora). Not runnable in bolo (a 7.6-billion-parameter model).
+* LiveKit's turn detector and TEN Turn Detection are not in the catalog: see
+  [models-unsupported.md](models-unsupported.md) for their licences and why bolo does not run them.
 * **Namo Turn Detector** (`namo-turn-en`, `namo-turn-multilingual`) is Apache-2.0.
 * **Gated** entries (`gated: true`: Indic Parler-TTS, IndicF5, SraVaani, AI4Bharat's official
   IndicConformer) are never downloaded without a Hugging Face token; using one without a token

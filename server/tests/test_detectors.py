@@ -1,5 +1,5 @@
-"""Detectors chosen by name: voice activity (frame-probability detectors, WebRTC, MarbleNet, the energy detector)
-and end of turn (silence only, models that read the transcript)."""
+"""Models chosen by name: voice activity (frame-probability detectors, WebRTC, MarbleNet, the energy detector), end
+of turn (silence only, models that read the transcript) and speaker embedders on their own."""
 
 from __future__ import annotations
 
@@ -226,3 +226,54 @@ async def test_semantic_vad_with_a_text_model_decodes_at_the_pause(settings: Set
         assert model.texts and all(isinstance(t, str) and t for t in model.texts)  # type: ignore[attr-defined]
     finally:
         live.stop()
+
+
+# -- speaker embedders -------------------------------------------------------------------------------
+def test_speaker_embedders_are_catalog_entries_of_their_own() -> None:
+    catalog = Catalog.load(None)
+    embedders = {s.id: s for s in catalog.all() if s.task == "speaker-embedding"}
+    assert {
+        "eres2net-voxceleb", "campplus-voxceleb", "wespeaker-resnet34-voxceleb", "titanet-small", "ecapa-tdnn-voxceleb",
+    } <= set(embedders)  # fmt: skip
+    for spec in embedders.values():
+        assert spec.source.urls and all(len(str(u.get("sha256", ""))) == 64 for u in spec.source.urls), spec.id
+    # the standalone ERes2Net is the very file the default diarization pipeline embeds with
+    pipeline = catalog.resolve("pyannote-3.0-eres2net")
+    assert pipeline is not None
+    shas = {u["sha256"] for u in pipeline.source.urls}
+    assert embedders["eres2net-voxceleb"].source.urls[0]["sha256"] in shas
+
+
+async def test_similarity_accepts_embedders_and_diarizers_by_name(core: Bolo) -> None:
+    from bolo import similarity
+    from bolo.errors import InvalidRequest
+
+    assert similarity.embedder(core).id == "fake-diarization"  # the default diarization model's embedder
+    assert similarity.embedder(core, "fake-speaker-embedding").task == "speaker-embedding"
+    a = speechlike(1.0)
+    vector = await similarity.embed(core, a, 16000, "fake-speaker-embedding")
+    assert abs(float(np.linalg.norm(vector)) - 1.0) < 1e-5
+    result = await similarity.score(core, a, 16000, a, 16000, model="fake-speaker-embedding")
+    assert result["embedding_model"] == "fake-speaker-embedding" and result["similarity"] > 0.99
+    assert result["calibrated"] is False
+    with pytest.raises(InvalidRequest, match="speaker-embedding or diarization"):
+        similarity.embedder(core, "fake-stt")
+
+
+def test_the_embedding_route_takes_any_embedder(live: LiveServer) -> None:
+    import httpx
+
+    from conftest import wav_file
+
+    for model in ("fake-speaker-embedding", "fake-diarization", "", "pyannote/wespeaker-voxceleb-resnet34-LM"):
+        r = httpx.post(
+            live.url + "/v1/audio/speech/embedding",
+            files={"file": wav_file(1.0)},
+            data={"model": model} if model else {},
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["model"] == (model if model.startswith("fake-") else "fake-diarization")
+        assert body["data"][0]["embedding"]
+    r = httpx.post(live.url + "/v1/audio/speech/embedding", files={"file": wav_file(1.0)}, data={"model": "fake-tts"})
+    assert r.status_code == 400 and "speaker-embedding" in r.json()["error"]["message"]

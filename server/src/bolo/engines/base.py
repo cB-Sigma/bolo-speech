@@ -406,6 +406,16 @@ class DiarizationModel(Model):
         """A unit-length speaker embedding for one stretch of speech."""
 
 
+class SpeakerEmbeddingModel(Model):
+    """A speaker embedder on its own: one vector per stretch of speech; the cosine of two is the similarity."""
+
+    task = "speaker-embedding"
+
+    @abc.abstractmethod
+    def embed(self, samples: FloatArray) -> FloatArray:
+        """A unit-length speaker embedding for one stretch of 16 kHz speech."""
+
+
 class SeparationModel(Model):
     """Target-speaker extraction: keep one voice of a mixture, given a short sample of that voice.
 

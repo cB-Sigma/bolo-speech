@@ -37,6 +37,7 @@ from bolo.engines.base import (
     Segment,
     SeparationModel,
     SpeakerActivity,
+    SpeakerEmbeddingModel,
     SpeakerRequest,
     SpeakerTurn,
     SpeechToSpeechModel,
@@ -426,9 +427,7 @@ class FakeDiarization(DiarizationModel):
         return float(np.argmax(spectrum) * 16000 / len(samples))
 
     def embed(self, samples: FloatArray) -> FloatArray:
-        pitch = self._pitch(samples)
-        angle = (np.pi / 2) * round(min(max((pitch - 100.0) / 400.0, 0.0), 1.0) * 4) / 4  # five well separated "voices"
-        return np.array([np.cos(angle), np.sin(angle)], dtype=np.float32)
+        return pitch_voice(self._pitch(samples))
 
     def diarize(
         self, samples: FloatArray, num_speakers: int | None = None, threshold: float | None = None
@@ -524,6 +523,19 @@ class FakeTurn(TurnModel):
         sound_s = float(np.sum(np.sqrt(np.mean(frames**2, axis=1)) > 0.01)) * 0.02 if len(frames) else 0.0
         self.calls.append(sound_s)
         return 0.95 if sound_s >= self.min_complete_s else 0.05
+
+
+def pitch_voice(pitch: float) -> FloatArray:
+    """The fake models' voice print: the dominant pitch as a direction in two dimensions."""
+    angle = (np.pi / 2) * round(min(max((pitch - 100.0) / 400.0, 0.0), 1.0) * 4) / 4  # five well separated "voices"
+    return np.array([np.cos(angle), np.sin(angle)], dtype=np.float32)
+
+
+class FakeSpeakerEmbedding(SpeakerEmbeddingModel):
+    """The fake diarizer's voice print on its own (tests only)."""
+
+    def embed(self, samples: FloatArray) -> FloatArray:
+        return pitch_voice(FakeDiarization._pitch(samples))
 
 
 class FakeTextTurn(TurnModel):
@@ -661,7 +673,7 @@ class FakeEngine(Engine):
     license = "Apache-2.0"
     kinds = (
         "fake-stt", "fake-stt-streaming", "fake-stt-speakers", "fake-tts", "fake-vad", "fake-diarization", "fake-turn",
-        "fake-turn-text", "fake-separation", "fake-denoise", "fake-s2s", "fake-lid",
+        "fake-turn-text", "fake-separation", "fake-denoise", "fake-s2s", "fake-lid", "fake-speaker-embedding",
     )  # fmt: skip
 
     def __init__(self) -> None:
@@ -689,6 +701,8 @@ class FakeEngine(Engine):
             model = FakeTurn(merged)
         elif kind == "fake-turn-text":
             model = FakeTextTurn(merged)
+        elif kind == "fake-speaker-embedding":
+            model = FakeSpeakerEmbedding()
         elif kind == "fake-separation":
             model = FakeSeparation(merged)
         elif kind == "fake-denoise":

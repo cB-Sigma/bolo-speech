@@ -1,0 +1,105 @@
+{
+ "what": "a Realtime transcription session (WebSocket) with turn_detection semantic_vad and default_turn namo-turn-en, against server_vad (500 ms)",
+ "recogniser": "moonshine-tiny-en",
+ "turn_model": "namo-turn-en",
+ "audio": "bolo/samples/en-short.wav ('Good morning. Could you tell me when my order will arrive?') at 24 kHz, sent in 100 ms pieces in real time; whole, and with 0.9 s of silence inserted at the quietest 20 ms near 60 % and 35 % of the clip; 6 s of silence after",
+ "hardware": "4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average about 13)",
+ "date": "2026-11-17",
+ "note": "checks: what the session recorded on each turn's trace: the text decoded at the pause, the model's probability, the decode time and the whole check time. A turn the model called unfinished (probability below 0.5) stays open until the speaker goes on or the pause reaches 3 s (eagerness auto).",
+ "results": {
+  "whole sentence | server_vad": {
+   "turns": 1,
+   "speech_stopped_audio_end_ms": [
+    3700
+   ],
+   "transcripts": [
+    "Good morning. could you tell me when my order will arise?"
+   ]
+  },
+  "whole sentence | semantic_vad": {
+   "turns": 1,
+   "speech_stopped_audio_end_ms": [
+    3708
+   ],
+   "transcripts": [
+    "Good morning. could you tell me when my order will arise?"
+   ]
+  },
+  "0.9 s pause after 60 % | server_vad": {
+   "turns": 2,
+   "speech_stopped_audio_end_ms": [
+    2324,
+    4596
+   ],
+   "transcripts": [
+    "Good morning. could you tell me?",
+    "When my order will arise,"
+   ]
+  },
+  "0.9 s pause after 60 % | semantic_vad": {
+   "turns": 2,
+   "speech_stopped_audio_end_ms": [
+    2332,
+    4604
+   ],
+   "transcripts": [
+    "Good morning. could you tell me?",
+    "When my order will arise,"
+   ]
+  },
+  "0.9 s pause after 35 % | server_vad": {
+   "turns": 2,
+   "speech_stopped_audio_end_ms": [
+    1524,
+    4596
+   ],
+   "transcripts": [
+    "Good morning.",
+    "Could you tell me when my order will arise?"
+   ]
+  },
+  "0.9 s pause after 35 % | semantic_vad": {
+   "turns": 2,
+   "speech_stopped_audio_end_ms": [
+    1532,
+    4604
+   ],
+   "transcripts": [
+    "Good morning.",
+    "Could you tell me when my order will arise?"
+   ]
+  }
+ },
+ "checks": [
+  {
+   "probability": 0.477,
+   "ms": 4006.0,
+   "text": "Good morning. could you tell me when my order will arise?",
+   "decode_ms": 1349.7
+  },
+  {
+   "probability": 1.0,
+   "ms": 985.0,
+   "text": "Good morning. could you tell me?",
+   "decode_ms": 732.9
+  },
+  {
+   "probability": 0.996,
+   "ms": 1145.3,
+   "text": "When my order will arise,",
+   "decode_ms": 795.4
+  },
+  {
+   "probability": 1.0,
+   "ms": 693.8,
+   "text": "Good morning.",
+   "decode_ms": 521.9
+  },
+  {
+   "probability": 0.999,
+   "ms": 1590.1,
+   "text": "Could you tell me when my order will arise?",
+   "decode_ms": 1333.6
+  }
+ ]
+}

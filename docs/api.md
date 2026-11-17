@@ -654,8 +654,12 @@ has the shape of OpenAI's embeddings response, as speaches answers:
 
 * `file`: the audio (any format the transcription route takes; raw PCM as
   `audio/pcm` too). At least half a second; a longer clip uses its first 30 s.
-* `model`: a diarization model in bolo's catalog, whose speaker-embedding
-  model is used. Default: the one that scores cloned voices
+* `model`: a `speaker-embedding` model of bolo's catalog (`eres2net-voxceleb`,
+  `campplus-voxceleb`, `campplus-zh-en`, `wespeaker-campplus-voxceleb`,
+  `wespeaker-resnet34-voxceleb`, `titanet-small`, `ecapa-tdnn-voxceleb`;
+  docs/models.md, "Speaker embedding") or a diarization model, whose
+  speaker-embedding model is used. Any other kind of model is refused (`400`).
+  Default: the one that scores cloned voices
   (`voice_similarity_model`, else `default_diarization`, which is
   `pyannote-3.0-eres2net`: ERes2Net from 3D-Speaker, 192 numbers). A model id
   bolo does not know, such as speaches'

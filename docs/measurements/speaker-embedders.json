@@ -1,0 +1,396 @@
+{
+ "what": "embed",
+ "hardware": "4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU",
+ "python": "3.12.3",
+ "packages": {
+  "sherpa-onnx": "2.0.1",
+  "onnxruntime": "1.32.0",
+  "webrtcvad-wheels": "2.0.14.post1",
+  "tokenizers": "0.23.3"
+ },
+ "date": "2026-11-17",
+ "load_average": 14.9,
+ "clips": {
+  "repository": {
+   "samples/en-short.wav": "kokoro:af_heart",
+   "samples/en-long.wav": "kokoro:am_michael",
+   "samples/hi-short.wav": "kokoro:hf_alpha",
+   "_ui/clone/kokoro-am-michael.mp3": "kokoro:am_michael",
+   "_ui/clone/syspin-en-female.mp3": "syspin-en-female",
+   "_ui/clone/syspin-hi-male.mp3": "syspin-hi-male"
+  },
+  "kokoro": "kokoro-v1.0-int8, voices ['af_heart', 'af_bella', 'af_nicole', 'am_michael', 'am_adam', 'bf_emma', 'bm_george', 'hf_alpha'], three sentences each",
+  "librispeech": "LibriSpeech dev-clean (CC BY 4.0): 16 speakers, 5 utterances of 4 to 15 s each, as picked by tools/calibrate_similarity.py"
+ },
+ "audio_s": 731.7,
+ "models": {
+  "eres2net-voxceleb": {
+   "dimensions": 192,
+   "rtf": 0.268,
+   "load_s": 0.45,
+   "memory_mb": 68,
+   "repository clips and Kokoro voices": {
+    "same_speaker": {
+     "pairs": 37,
+     "min": 0.74,
+     "median": 0.828,
+     "p95": 0.891,
+     "max": 0.898
+    },
+    "different_speaker": {
+     "pairs": 398,
+     "min": -0.121,
+     "median": 0.083,
+     "p95": 0.397,
+     "max": 0.76
+    },
+    "eer": 0.003,
+    "auc": 0.9997,
+    "same_at_or_above_0.5": 1.0,
+    "different_at_or_above_0.5": 0.03
+   },
+   "LibriSpeech dev-clean": {
+    "same_speaker": {
+     "pairs": 160,
+     "min": 0.451,
+     "median": 0.797,
+     "p95": 0.896,
+     "max": 0.929
+    },
+    "different_speaker": {
+     "pairs": 3000,
+     "min": -0.296,
+     "median": 0.114,
+     "p95": 0.356,
+     "max": 0.53
+    },
+    "eer": 0.006,
+    "auc": 1.0,
+    "same_at_or_above_0.5": 0.994,
+    "different_at_or_above_0.5": 0.001
+   }
+  },
+  "campplus-voxceleb": {
+   "dimensions": 512,
+   "rtf": 0.0988,
+   "load_s": 1.09,
+   "memory_mb": 30,
+   "repository clips and Kokoro voices": {
+    "same_speaker": {
+     "pairs": 37,
+     "min": 0.115,
+     "median": 0.603,
+     "p95": 0.909,
+     "max": 0.944
+    },
+    "different_speaker": {
+     "pairs": 398,
+     "min": -0.119,
+     "median": 0.372,
+     "p95": 0.889,
+     "max": 0.96
+    },
+    "eer": 0.41,
+    "auc": 0.6228,
+    "same_at_or_above_0.5": 0.595,
+    "different_at_or_above_0.5": 0.412
+   },
+   "LibriSpeech dev-clean": {
+    "same_speaker": {
+     "pairs": 160,
+     "min": 0.079,
+     "median": 0.574,
+     "p95": 0.929,
+     "max": 0.974
+    },
+    "different_speaker": {
+     "pairs": 3000,
+     "min": -0.139,
+     "median": 0.43,
+     "p95": 0.852,
+     "max": 0.953
+    },
+    "eer": 0.426,
+    "auc": 0.6589,
+    "same_at_or_above_0.5": 0.575,
+    "different_at_or_above_0.5": 0.426
+   }
+  },
+  "campplus-zh-en": {
+   "dimensions": 192,
+   "rtf": 0.115,
+   "load_s": 1.02,
+   "memory_mb": 43,
+   "repository clips and Kokoro voices": {
+    "same_speaker": {
+     "pairs": 37,
+     "min": 0.817,
+     "median": 0.908,
+     "p95": 0.937,
+     "max": 0.947
+    },
+    "different_speaker": {
+     "pairs": 398,
+     "min": -0.076,
+     "median": 0.253,
+     "p95": 0.537,
+     "max": 0.803
+    },
+    "eer": 0.0,
+    "auc": 1.0,
+    "same_at_or_above_0.5": 1.0,
+    "different_at_or_above_0.5": 0.088
+   },
+   "LibriSpeech dev-clean": {
+    "same_speaker": {
+     "pairs": 160,
+     "min": 0.617,
+     "median": 0.82,
+     "p95": 0.911,
+     "max": 0.931
+    },
+    "different_speaker": {
+     "pairs": 3000,
+     "min": -0.208,
+     "median": 0.096,
+     "p95": 0.323,
+     "max": 0.564
+    },
+    "eer": 0.0,
+    "auc": 1.0,
+    "same_at_or_above_0.5": 1.0,
+    "different_at_or_above_0.5": 0.002
+   }
+  },
+  "wespeaker-campplus-voxceleb": {
+   "dimensions": 512,
+   "rtf": 0.1125,
+   "load_s": 2.56,
+   "memory_mb": 39,
+   "repository clips and Kokoro voices": {
+    "same_speaker": {
+     "pairs": 37,
+     "min": 0.212,
+     "median": 0.584,
+     "p95": 0.882,
+     "max": 0.925
+    },
+    "different_speaker": {
+     "pairs": 398,
+     "min": 0.204,
+     "median": 0.533,
+     "p95": 0.846,
+     "max": 0.978
+    },
+    "eer": 0.432,
+    "auc": 0.5654,
+    "same_at_or_above_0.5": 0.703,
+    "different_at_or_above_0.5": 0.595
+   },
+   "LibriSpeech dev-clean": {
+    "same_speaker": {
+     "pairs": 160,
+     "min": 0.235,
+     "median": 0.667,
+     "p95": 0.914,
+     "max": 0.975
+    },
+    "different_speaker": {
+     "pairs": 3000,
+     "min": 0.045,
+     "median": 0.583,
+     "p95": 0.838,
+     "max": 0.965
+    },
+    "eer": 0.4,
+    "auc": 0.6351,
+    "same_at_or_above_0.5": 0.775,
+    "different_at_or_above_0.5": 0.664
+   }
+  },
+  "wespeaker-resnet34-voxceleb": {
+   "dimensions": 256,
+   "rtf": 0.1498,
+   "load_s": 0.52,
+   "memory_mb": 64,
+   "repository clips and Kokoro voices": {
+    "same_speaker": {
+     "pairs": 37,
+     "min": 0.761,
+     "median": 0.916,
+     "p95": 0.957,
+     "max": 0.96
+    },
+    "different_speaker": {
+     "pairs": 398,
+     "min": 0.352,
+     "median": 0.532,
+     "p95": 0.79,
+     "max": 0.886
+    },
+    "eer": 0.048,
+    "auc": 0.9936,
+    "same_at_or_above_0.5": 1.0,
+    "different_at_or_above_0.5": 0.678
+   },
+   "LibriSpeech dev-clean": {
+    "same_speaker": {
+     "pairs": 160,
+     "min": 0.667,
+     "median": 0.892,
+     "p95": 0.947,
+     "max": 0.959
+    },
+    "different_speaker": {
+     "pairs": 3000,
+     "min": 0.271,
+     "median": 0.542,
+     "p95": 0.736,
+     "max": 0.851
+    },
+    "eer": 0.033,
+    "auc": 0.9953,
+    "same_at_or_above_0.5": 1.0,
+    "different_at_or_above_0.5": 0.627
+   }
+  },
+  "titanet-small": {
+   "dimensions": 192,
+   "rtf": 0.0862,
+   "load_s": 1.05,
+   "memory_mb": 41,
+   "repository clips and Kokoro voices": {
+    "same_speaker": {
+     "pairs": 37,
+     "min": 0.705,
+     "median": 0.911,
+     "p95": 0.941,
+     "max": 0.944
+    },
+    "different_speaker": {
+     "pairs": 398,
+     "min": -0.114,
+     "median": 0.269,
+     "p95": 0.567,
+     "max": 0.821
+    },
+    "eer": 0.02,
+    "auc": 0.9981,
+    "same_at_or_above_0.5": 1.0,
+    "different_at_or_above_0.5": 0.136
+   },
+   "LibriSpeech dev-clean": {
+    "same_speaker": {
+     "pairs": 160,
+     "min": 0.532,
+     "median": 0.836,
+     "p95": 0.911,
+     "max": 0.94
+    },
+    "different_speaker": {
+     "pairs": 3000,
+     "min": -0.308,
+     "median": 0.06,
+     "p95": 0.283,
+     "max": 0.555
+    },
+    "eer": 0.0,
+    "auc": 1.0,
+    "same_at_or_above_0.5": 1.0,
+    "different_at_or_above_0.5": 0.001
+   }
+  },
+  "ecapa-tdnn-voxceleb": {
+   "dimensions": 192,
+   "rtf": 0.1591,
+   "load_s": 0.52,
+   "memory_mb": 104,
+   "repository clips and Kokoro voices": {
+    "same_speaker": {
+     "pairs": 37,
+     "min": 0.73,
+     "median": 0.845,
+     "p95": 0.886,
+     "max": 0.897
+    },
+    "different_speaker": {
+     "pairs": 398,
+     "min": -0.101,
+     "median": 0.122,
+     "p95": 0.388,
+     "max": 0.721
+    },
+    "eer": 0.0,
+    "auc": 1.0,
+    "same_at_or_above_0.5": 1.0,
+    "different_at_or_above_0.5": 0.03
+   },
+   "LibriSpeech dev-clean": {
+    "same_speaker": {
+     "pairs": 160,
+     "min": 0.269,
+     "median": 0.756,
+     "p95": 0.878,
+     "max": 0.917
+    },
+    "different_speaker": {
+     "pairs": 3000,
+     "min": -0.178,
+     "median": 0.105,
+     "p95": 0.314,
+     "max": 0.477
+    },
+    "eer": 0.013,
+    "auc": 0.9991,
+    "same_at_or_above_0.5": 0.975,
+    "different_at_or_above_0.5": 0.0
+   }
+  },
+  "pyannote-3.0-eres2net": {
+   "dimensions": 192,
+   "rtf": 0.1555,
+   "load_s": 1.03,
+   "memory_mb": 32,
+   "repository clips and Kokoro voices": {
+    "same_speaker": {
+     "pairs": 37,
+     "min": 0.74,
+     "median": 0.828,
+     "p95": 0.891,
+     "max": 0.898
+    },
+    "different_speaker": {
+     "pairs": 398,
+     "min": -0.121,
+     "median": 0.083,
+     "p95": 0.397,
+     "max": 0.76
+    },
+    "eer": 0.003,
+    "auc": 0.9997,
+    "same_at_or_above_0.5": 1.0,
+    "different_at_or_above_0.5": 0.03
+   },
+   "LibriSpeech dev-clean": {
+    "same_speaker": {
+     "pairs": 160,
+     "min": 0.451,
+     "median": 0.797,
+     "p95": 0.896,
+     "max": 0.929
+    },
+    "different_speaker": {
+     "pairs": 3000,
+     "min": -0.296,
+     "median": 0.114,
+     "p95": 0.356,
+     "max": 0.53
+    },
+    "eer": 0.006,
+    "auc": 1.0,
+    "same_at_or_above_0.5": 0.994,
+    "different_at_or_above_0.5": 0.001
+   }
+  }
+ }
+}

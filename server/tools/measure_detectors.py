@@ -2,6 +2,7 @@
 
     BOLO_DATA_DIR=... python tools/measure_detectors.py vad --out FILE MODEL [MODEL ...]
     BOLO_DATA_DIR=... python tools/measure_detectors.py turn --out FILE MODEL [MODEL ...]
+    BOLO_DATA_DIR=... python tools/measure_detectors.py embed --librispeech DIR --out FILE MODEL [MODEL ...]
 
 Every model goes through bolo's own code path (``bolo pull``, the model manager, the same detector objects a
 Realtime session gets). ``--remove`` deletes each downloaded model after it was measured.
@@ -32,6 +33,12 @@ Reported: accuracy at 0.5, the share of each class called right, AUC (how well f
 apart at any threshold), median probabilities and milliseconds per call (``load_average`` says how busy the machine
 was).
 
+**embed**: speaker embedders on the repository's clips (whose voices are known: the Kokoro voices of the samples,
+the console's cloning samples) plus three sentences in each of eight Kokoro voices, and, with ``--librispeech``,
+real read speech (LibriSpeech dev-clean, 16 speakers, 5 utterances each, as ``tools/calibrate_similarity.py pick``
+writes it). Every pair of clips is scored (cosine of the embeddings): same speaker against different speakers,
+with the equal error rate, AUC and the shares at or above bolo's 0.5 "same speaker" threshold. ``rtf``: embedding
+time over the audio's duration.
 """
 
 from __future__ import annotations
@@ -418,6 +425,130 @@ async def measure_turn(core: Bolo, names: list[str], remove: bool, voice_model: 
     }
 
 
+# ---------------------------------------------------------------------------------------------------
+# speaker embedders
+# ---------------------------------------------------------------------------------------------------
+#: the repository's clips and whose voice each is
+EMBED_CLIPS = {
+    "samples/en-short.wav": "kokoro:af_heart",
+    "samples/en-long.wav": "kokoro:am_michael",
+    "samples/hi-short.wav": "kokoro:hf_alpha",
+    "_ui/clone/kokoro-am-michael.mp3": "kokoro:am_michael",
+    "_ui/clone/syspin-en-female.mp3": "syspin-en-female",
+    "_ui/clone/syspin-hi-male.mp3": "syspin-hi-male",
+}
+EMBED_VOICES = ["af_heart", "af_bella", "af_nicole", "am_michael", "am_adam", "bf_emma", "bm_george", "hf_alpha"]
+EMBED_SENTENCES = [
+    "The train to the city leaves every twenty minutes from the second platform.",
+    "Please remember to bring your identity card and a copy of the signed form.",
+    "We walked along the river until the sun went down behind the old mill.",
+]
+
+
+async def embed_set(core: Bolo, voice_model: str, librispeech: str | None) -> list[tuple[str, str, np.ndarray]]:
+    """(source, speaker, 16 kHz audio) for every clip."""
+    clips: list[tuple[str, str, np.ndarray]] = []
+    for rel, speaker in EMBED_CLIPS.items():
+        clips.append((f"repo:{rel}", speaker, load_clip(HERE / rel)))
+    for voice in EMBED_VOICES:
+        for i, text in enumerate(EMBED_SENTENCES):
+            audio, rate = await core.synthesize_all(text, model=voice_model, voice=voice)
+            clips.append((f"{voice_model}:{voice}:{i}", f"kokoro:{voice}", resample(np.asarray(audio), rate, SR)))
+    if librispeech:
+        meta = json.loads(Path(librispeech, "meta.json").read_text(encoding="utf-8"))
+        for spk, files in meta["kept"].items():
+            for f in files:
+                clips.append((f"librispeech:{f}", f"librispeech:{spk}", load_clip(Path(librispeech, f))))
+    return clips
+
+
+def eer(same: list[float], diff: list[float]) -> float:
+    """Equal error rate: the threshold where as many same-speaker pairs fall below as different ones reach it."""
+    best = 1.0
+    for t in sorted(set(same) | set(diff)):
+        miss = float(np.mean(np.array(same) < t))
+        false = float(np.mean(np.array(diff) >= t))
+        best = min(best, max(miss, false))
+    return round(best, 3)
+
+
+def pair_stats(vectors: dict[int, np.ndarray], clips: list[tuple[str, str, np.ndarray]], group: str) -> dict[str, Any]:
+    from bolo import similarity
+
+    def kind(source: str) -> str:
+        return "librispeech" if source.startswith("librispeech:") else "synthetic"
+
+    keys = [i for i, c in enumerate(clips) if kind(c[0]) == group]
+    same, diff = [], []
+    for a, b in itertools.combinations(keys, 2):
+        (same if clips[a][1] == clips[b][1] else diff).append(similarity.cosine(vectors[a], vectors[b]))
+    if not same or not diff:
+        return {}
+
+    def stats(v: list[float]) -> dict[str, float]:
+        x = np.array(v)
+        return {
+            "pairs": len(v), "min": round(float(x.min()), 3), "median": round(float(np.median(x)), 3),
+            "p95": round(float(np.percentile(x, 95)), 3), "max": round(float(x.max()), 3),
+        }  # fmt: skip
+
+    return {
+        "same_speaker": stats(same),
+        "different_speaker": stats(diff),
+        "eer": eer(same, diff),
+        "auc": round(auc(same, diff), 4),
+        "same_at_or_above_0.5": round(float(np.mean(np.array(same) >= 0.5)), 3),
+        "different_at_or_above_0.5": round(float(np.mean(np.array(diff) >= 0.5)), 3),
+    }
+
+
+async def measure_embed(
+    core: Bolo, names: list[str], remove: bool, voice_model: str, librispeech: str | None
+) -> dict[str, Any]:
+    from bolo import similarity
+
+    clips = await embed_set(core, voice_model, librispeech)
+    await core.manager.unload(voice_model)
+    total_s = sum(len(c[2]) for c in clips) / SR
+    out: dict[str, Any] = {}
+    for name in names:
+        spec = similarity.embedder(core, name)
+        if not core.store.is_installed(spec.id):
+            await core.pull_and_wait(spec.id)
+        await similarity.embed(core, clips[0][2], SR, spec.id)  # loads the model
+        loaded = core.manager.loaded.get(spec.id)
+        vectors: dict[int, np.ndarray] = {}
+        started = time.perf_counter()
+        for i, (_src, _spk, audio) in enumerate(clips):
+            vectors[i] = await similarity.embed(core, audio, SR, spec.id)
+        took = time.perf_counter() - started
+        result: dict[str, Any] = {
+            "dimensions": len(vectors[0]),
+            "rtf": round(took / total_s, 4),
+            "load_s": round(loaded.load_ms / 1000, 2) if loaded else None,
+            "memory_mb": round(loaded.memory_bytes / 1e6) if loaded else None,
+            "repository clips and Kokoro voices": pair_stats(vectors, clips, "synthetic"),
+            "LibriSpeech dev-clean": pair_stats(vectors, clips, "librispeech") if librispeech else None,
+        }
+        print(spec.id, json.dumps(result)[:500], file=sys.stderr)
+        out[spec.id] = result
+        await core.manager.unload(spec.id)
+        if remove:
+            await core.remove(spec.id)
+    return {
+        "clips": {
+            "repository": EMBED_CLIPS,
+            "kokoro": f"{voice_model}, voices {EMBED_VOICES}, three sentences each",
+            "librispeech": "LibriSpeech dev-clean (CC BY 4.0): 16 speakers, 5 utterances of 4 to 15 s each, as picked by "
+            "tools/calibrate_similarity.py"
+            if librispeech
+            else None,
+        },
+        "audio_s": round(total_s, 1),
+        "models": out,
+    }
+
+
 def _rss() -> int:
     import psutil
 
@@ -426,12 +557,13 @@ def _rss() -> int:
 
 async def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("what", choices=["vad", "turn"])
+    ap.add_argument("what", choices=["vad", "turn", "embed"])
     ap.add_argument("models", nargs="+")
     ap.add_argument("--out", required=True)
     ap.add_argument("--remove", action="store_true", help="delete each model after measuring it")
     ap.add_argument("--threads", type=int, default=4)
     ap.add_argument("--voice-model", default="kokoro-v1.0-int8", help="installed voice for the synthesised test speech")
+    ap.add_argument("--librispeech", help="embed: a folder written by tools/calibrate_similarity.py pick")
     args = ap.parse_args()
     settings = load_settings()
     settings.threads = args.threads
@@ -440,8 +572,10 @@ async def main() -> None:
     try:
         if args.what == "vad":
             result = await measure_vad(core, args.models, args.remove)
-        else:
+        elif args.what == "turn":
             result = await measure_turn(core, args.models, args.remove, args.voice_model)
+        else:
+            result = await measure_embed(core, args.models, args.remove, args.voice_model, args.librispeech)
     finally:
         await core.stop()
     import importlib.metadata as md

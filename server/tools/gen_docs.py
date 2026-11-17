@@ -49,6 +49,7 @@ TASK_TITLES = {
     "lid": "Language identification",
     "speech-to-speech": "Speech to speech (Realtime speech-to-speech pipeline)",
     "audio-llm": "Audio-in language models (Realtime audio-llm pipeline)",
+    "speaker-embedding": "Speaker embedding",
 }
 
 

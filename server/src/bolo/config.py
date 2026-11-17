@@ -127,7 +127,7 @@ class Settings:
     stt_ttl_s: float | None = None  # unset: keep_alive
     tts_ttl_s: float | None = None  # unset: keep_alive
     vad_ttl_s: float | None = -1.0  # -1: never unload
-    diarization_ttl_s: float | None = None  # unset: keep_alive (also separation models)
+    diarization_ttl_s: float | None = None  # unset: keep_alive (also separation and speaker-embedding models)
 
     # -- language model for voice agents (any OpenAI-compatible chat-completions endpoint) --
     llm_base_url: str | None = None  # e.g. http://127.0.0.1:11434/v1 (Ollama)

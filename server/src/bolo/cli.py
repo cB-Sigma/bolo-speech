@@ -1293,6 +1293,7 @@ _TASK_TITLES = {
     "stt": "Speech to text", "tts": "Text to speech", "diarization": "Speaker diarization",
     "vad": "Voice-activity detection", "turn": "End-of-turn detection", "separation": "Overlapped-speech separation",
     "denoise": "Denoising", "lid": "Language identification", "speech-to-speech": "Speech to speech",
+    "speaker-embedding": "Speaker embedding",
 }  # fmt: skip
 
 

@@ -297,8 +297,41 @@ async def validate_turn(core: Bolo, spec: Any, synth: dict[str, Any]) -> dict[st
     }
 
 
+async def validate_speaker_embedding(core: Bolo, spec: Any, synth: dict[str, Any]) -> dict[str, Any]:
+    """Embeddings of the two halves of the test speech (one voice) and of the speech played 40 % faster and lower
+    (another "voice"): unit vectors come back, the halves score higher than the changed voice."""
+    from bolo import similarity
+    from bolo.audio.resample import resample
+
+    audio, rate, _text, _voice = sample_speech(synth)
+    speech = np.ascontiguousarray(resample(audio, rate, 16000), dtype=np.float32)
+    half = len(speech) // 2
+    other = resample(speech, 16000, 11500)  # played at 16 kHz: slower and lower
+    await similarity.embed(core, speech, 16000, spec.id)  # warm-up (includes loading)
+    best = float("inf")
+    for _ in range(3):
+        t0 = time.perf_counter()
+        a = await similarity.embed(core, speech[:half], 16000, spec.id)
+        b = await similarity.embed(core, speech[half:], 16000, spec.id)
+        best = min(best, time.perf_counter() - t0)
+    c = await similarity.embed(core, other, 16000, spec.id)
+    same, changed = similarity.cosine(a, b), similarity.cosine(a, c)
+    if not same > changed:
+        raise RuntimeError(f"two halves of one voice scored {same:.3f}, below the changed voice ({changed:.3f})")
+    return {
+        "rtf": round(best / (len(speech) / 16000), 5),
+        "audio_s": round(len(speech) / 16000, 1),
+        "dimensions": len(a),
+        "same_voice": round(same, 3),
+        "changed_voice": round(changed, 3),
+    }
+
+
 #: which validator checks a model of each task
-VALIDATORS = {"stt": "stt", "tts": "tts", "vad": "vad", "diarization": "diarization", "turn": "turn"}
+VALIDATORS = {
+    "stt": "stt", "tts": "tts", "vad": "vad", "diarization": "diarization", "turn": "turn",
+    "speaker-embedding": "speaker-embedding",
+}  # fmt: skip
 
 
 async def validate(
@@ -315,6 +348,8 @@ async def validate(
         return await validate_diarization(core, spec, synth)
     if kind == "turn":
         return await validate_turn(core, spec, synth)
+    if kind == "speaker-embedding":
+        return await validate_speaker_embedding(core, spec, synth)
     raise RuntimeError(f"no validation for {spec.task} models yet")
 
 

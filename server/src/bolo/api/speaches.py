@@ -193,9 +193,10 @@ async def speech_embedding(request: Request) -> JSONResponse:
     embeddings response: ``{"object": "list", "data": [{"object": "embedding", "embedding": [...], "index": 0}],
     "model": ..., "usage": {"prompt_tokens": n, "total_tokens": n}}`` (``n``: samples at 16 kHz, as speaches counts).
 
-    The embedder is the speaker-embedding model of a diarization pipeline, the one that scores cloned voices
-    (setting ``voice_similarity_model``, else ``default_diarization``). A ``model`` that is not in bolo's catalog
-    (speaches' ``pyannote/wespeaker-voxceleb-resnet34-LM``, for one) uses that default. The vector is unit length;
+    ``model`` is any ``speaker-embedding`` model of the catalog (``eres2net-voxceleb``, ``campplus-voxceleb``,
+    ``ecapa-tdnn-voxceleb``, ...) or a diarization model, whose embedder is used. Without one: the embedder that scores
+    cloned voices (setting ``voice_similarity_model``, else ``default_diarization``). A ``model`` that is not in
+    bolo's catalog (speaches' ``pyannote/wespeaker-voxceleb-resnet34-LM``, for one) uses that default. The vector is unit length;
     the cosine of two of them is the speaker similarity. Clips longer than 30 s use their first 30 s."""
     core = get_core(request)
     form = await request.form()
@@ -205,8 +206,7 @@ async def speech_embedding(request: Request) -> JSONResponse:
     model = str(form.get("model") or "") or None
     if model and core.catalog.resolve(model) is None:
         model = None  # speaches clients send its own embedding model's id
-    name = model or similarity.embedding_model(core)
-    spec = core.resolve(name, "diarization")
+    spec = similarity.embedder(core, model)
     samples, rate = await read_upload(core, file)
     trace = Trace("embedding", "http", spec.id)
     trace.audio_seconds = len(samples) / rate if rate else 0.0

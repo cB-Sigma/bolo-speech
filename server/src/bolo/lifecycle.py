@@ -42,6 +42,7 @@ from bolo.engines.base import (
     LoadOptions,
     Model,
     SeparationModel,
+    SpeakerEmbeddingModel,
     STTModel,
     STTStream,
     TTSModel,
@@ -313,6 +314,7 @@ class ModelManager:
             "vad": s.vad_ttl_s,
             "diarization": s.diarization_ttl_s,
             "separation": s.diarization_ttl_s,
+            "speaker-embedding": s.diarization_ttl_s,
         }
         ttl = ttls.get(spec.task)
         if ttl is not None:
@@ -743,6 +745,10 @@ class ModelManager:
             handlers["embed"] = lambda items: [diarizer.embed(item) for item in items]
             max_batch["diarize"] = 1
             max_batch["diarize_detailed"] = 1
+            max_batch["embed"] = 8
+        elif isinstance(model, SpeakerEmbeddingModel):
+            embedder = model
+            handlers["embed"] = lambda items: [embedder.embed(item) for item in items]
             max_batch["embed"] = 8
         elif isinstance(model, SeparationModel):
             separator = model

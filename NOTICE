@@ -61,7 +61,11 @@ or optional extras and keep their own licences:
   Speaker diarization uses the pyannote segmentation-3.0 model (MIT) in its
   ONNX export and a 3D-Speaker ERes2Net speaker-embedding model (Apache-2.0),
   both run by sherpa-onnx. Model files are downloaded by the user, not
-  distributed with bolo.
+  distributed with bolo. Optional speaker embedders, downloaded the same way:
+  3D-Speaker ERes2Net and CAM++ (Apache-2.0), WeSpeaker CAM++ and ResNet34
+  (CC-BY-4.0), NVIDIA TitaNet-small (CC-BY-4.0), all in sherpa-onnx's
+  exports, and SpeechBrain's ECAPA-TDNN (Apache-2.0) in a third-party ONNX
+  export run by ONNX Runtime.
 
   The optional diarization model "nemotron-3-diarization" is NVIDIA
   Nemotron-3-Diarization (https://huggingface.co/nvidia/Nemotron-3-Diarization),
@@ -148,10 +152,7 @@ Voices converted by this project
     feature computation (server/src/bolo/audio/features.py) is its own
     implementation of the published algorithm. Other optional end-of-turn
     models: VideoSDK's Namo Turn Detector v1 (Apache-2.0), run with the
-    tokenizers library (Apache-2.0). The catalog also describes LiveKit's
-    turn detector (LiveKit Model License: use only together with the
-    LiveKit Agents framework) and TEN Turn Detection (Apache-2.0 with
-    Agora's additional conditions); bolo does not run either.
+    tokenizers library (Apache-2.0).
 
 Web console: speech synthesis in the browser
     The console (and the live demo) can run text-to-speech voices in the

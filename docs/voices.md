@@ -171,8 +171,10 @@ records it; the rest is up to whoever runs the server.
 
 bolo scores a clone with the speaker-embedding model its diarization uses
 (the default diarization model, ERes2Net from 3D-Speaker; setting
-`voice_similarity_model`): the cosine similarity between the embeddings of
-the reference and of the synthesised speech, from -1 to 1.
+`voice_similarity_model`, which also takes any `speaker-embedding` model:
+ERes2Net, CAM++, WeSpeaker ResNet34, TitaNet-small, ECAPA-TDNN; see
+[models.md](models.md#speaker-embedding)): the cosine similarity between the
+embeddings of the reference and of the synthesised speech, from -1 to 1.
 
 | Score | Verdict | What real recordings did (LibriSpeech dev-clean, 16 speakers) |
 | --- | --- | --- |

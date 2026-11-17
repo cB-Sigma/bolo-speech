@@ -194,6 +194,11 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | SPEECH-TO-SPEECH | Kimi-Audio | 1 | en, zh | 0 | - |
 | TTS | LFM3-Audio 2B | 1 | ar, da, de, el, en, es, fi, fr +10 | 0 | - |
 | SEPARATION | VoxLock | 1 | en | 1 | 0.460 (`voxlock-int8`) |
+| SPEAKER-EMBEDDING | ERes2Net | 1 | - | 1 | 0.259 (`eres2net-voxceleb`) |
+| SPEAKER-EMBEDDING | CAM++ | 3 | - | 3 | 0.073 (`wespeaker-campplus-voxceleb`) |
+| SPEAKER-EMBEDDING | WeSpeaker ResNet | 1 | - | 1 | 0.126 (`wespeaker-resnet34-voxceleb`) |
+| SPEAKER-EMBEDDING | TitaNet | 1 | - | 1 | 0.068 (`titanet-small`) |
+| SPEAKER-EMBEDDING | ECAPA-TDNN | 1 | - | 1 | 0.203 (`ecapa-tdnn-voxceleb`) |
 | STT | Whisper | 38 | af, am, ar, as, az, ba, be, bg +92 | 20 | 0.081 (`faster-whisper-tiny.en`) |
 | STT | Voxtral | 2 | de, en, es, fr, hi, it, nl, pt | 1 | 1.980 (`voxtral-mini-3b-llamacpp`) |
 | STT | Moonshine | 11 | ar, en, es, ja, ko, uk, vi, zh | 4 | 0.033 (`moonshine-tiny-en`) |
@@ -217,10 +222,8 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | TTS | Matcha-TTS | 2 | en, zh | 1 | 0.205 (`matcha-en-ljspeech`) |
 | TTS | MeloTTS | 1 | en | 1 | 0.278 (`melo-tts-en`) |
 | TTS | VITS | 26 | bho, bn, en, gu, hi, hne, kn, mag +4 | 4 | 0.046 (`mimic3-gu-cmu-indic`) |
-| TURN | Smart Turn | 5 | ar, bn, da, de, en, es, fi, fr +15 | 4 | 0.043 (`smart-turn-v3.0`) |
+| TURN | Smart Turn | 4 | ar, bn, da, de, en, es, fi, fr +15 | 4 | 0.043 (`smart-turn-v3.0`) |
 | TURN | Namo Turn Detector | 2 | ar, bn, da, de, en, es, fi, fr +15 | 2 | 0.011 (`namo-turn-en`) |
-| TURN | LiveKit turn detector | 2 | de, en, es, fr, hi, id, it, ja +6 | 0 | - |
-| TURN | TEN Turn Detection | 1 | en, zh | 0 | - |
 | TURN | Silence only | 1 | - | 1 | 0.000 (`silence-only`) |
 | VAD | Silero VAD | 3 | - | 3 | 0.006 (`silero-vad-v5`) |
 | VAD | TEN VAD | 2 | - | 2 | 0.009 (`ten-vad`) |
@@ -228,7 +231,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | VAD | WebRTC VAD | 2 | - | 2 | 0.000 (`webrtc-vad-aggressive`) |
 | VAD | Energy VAD | 1 | - | 1 | 0.000 (`energy-vad`) |
 
-**425 models in the catalog, 156 validated on CPU, 269 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**428 models in the catalog, 163 validated on CPU, 265 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

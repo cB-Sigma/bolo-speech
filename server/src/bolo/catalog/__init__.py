@@ -20,7 +20,7 @@ from bolo.store import Source
 
 TASKS = (
     "stt", "tts", "vad", "diarization", "turn", "translation", "separation", "denoise", "lid", "speech-to-speech",
-    "audio-llm",
+    "audio-llm", "speaker-embedding",
 )  # fmt: skip
 TIERS = ("realtime", "balanced", "accuracy")
 VALIDATED = ("cpu", "untested")
@@ -353,6 +353,11 @@ FAKE_MODELS: list[dict[str, Any]] = [
         "languages": ["en"], "tier": "realtime", "sample_rate": 24000, "license": "Apache-2.0", "builtin": True,
         "features": ["speech-to-speech", "tool-calls"],
         "description": "Test speech-to-speech model: answers with what it heard (a word and a tone at a time).",
+    },
+    {
+        "id": "fake-speaker-embedding", "task": "speaker-embedding", "engine": "fake", "kind": "fake-speaker-embedding",
+        "family": "Fake", "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
+        "description": "Test speaker embedder: the dominant pitch as a direction in two dimensions (as fake-diarization).",
     },
     {
         "id": "fake-vad", "task": "vad", "engine": "fake", "kind": "fake-vad", "family": "Fake", "languages": [],

@@ -871,6 +871,7 @@ class Bolo:
                 "separation": s.default_separation,
                 "denoise": s.default_denoise,
                 "lid": s.default_lid,
+                "speaker-embedding": "eres2net-voxceleb",
             }
             name = defaults[task]
         elif name == "realtime":

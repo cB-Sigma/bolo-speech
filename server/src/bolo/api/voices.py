@@ -73,7 +73,7 @@ async def _analyse_speakers(core: Bolo, voice: SavedVoice) -> None:
     """Warn when the reference sounds like more than one person: windows compared with each other, by the
     speaker-embedding model, only when it is installed (never downloaded for this)."""
     try:
-        spec = core.resolve(similarity.embedding_model(core), "diarization")
+        spec = similarity.embedder(core)
         if not core.manager.is_installed(spec):
             return
         samples, rate = decode_audio(voice.reference_bytes())

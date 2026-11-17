@@ -39,6 +39,7 @@ from bolo.engines.base import (
     Model,
     Segment,
     SeparationModel,
+    SpeakerEmbeddingModel,
     SpeakerTurn,
     StreamResult,
     STTModel,
@@ -84,6 +85,7 @@ VAD_KINDS = ("silero_vad", "ten_vad")
 DIARIZATION_KINDS = ("pyannote_diarization",)
 SEPARATION_KINDS = ("voxlock",)
 DENOISE_KINDS = ("gtcrn", "dpdfnet")
+SPEAKER_EMBEDDING_KINDS = ("speaker_embedding",)
 
 
 def find_file(path: Path, *patterns: str, required: bool = True, prefer_int8: bool = True) -> str:
@@ -869,12 +871,37 @@ class SherpaDiarization(DiarizationModel):
         return turns
 
     def embed(self, samples: FloatArray) -> FloatArray:
-        stream = self._extractor.create_stream()
-        stream.accept_waveform(self.sample_rate, samples)
-        stream.input_finished()
-        vector = np.asarray(self._extractor.compute(stream), dtype=np.float32)
-        norm = float(np.linalg.norm(vector))
-        return (vector / norm).astype(np.float32) if norm > 0 else vector
+        return _embed(self._extractor, self.sample_rate, samples)
+
+
+def _embed(extractor: Any, sample_rate: int, samples: FloatArray) -> FloatArray:
+    """A unit-length embedding from a sherpa-onnx speaker-embedding extractor."""
+    stream = extractor.create_stream()
+    stream.accept_waveform(sample_rate, samples)
+    stream.input_finished()
+    vector = np.asarray(extractor.compute(stream), dtype=np.float32)
+    norm = float(np.linalg.norm(vector))
+    out: FloatArray = (vector / norm).astype(np.float32) if norm > 0 else vector
+    return out
+
+
+class SherpaSpeakerEmbedding(SpeakerEmbeddingModel):
+    """A speaker-embedding model on its own (3D-Speaker, WeSpeaker and NeMo exports with sherpa-onnx's metadata)."""
+
+    def __init__(self, path: Path, spec: dict[str, Any], opts: LoadOptions) -> None:
+        import sherpa_onnx
+
+        model = find_file(path, str(spec.get("file", "*.onnx")), "*.onnx", prefer_int8=False)
+        config = sherpa_onnx.SpeakerEmbeddingExtractorConfig(
+            model=model, num_threads=opts.threads, provider=sherpa_provider(opts.device)
+        )
+        if not config.validate():
+            raise ValueError(f"sherpa-onnx rejected the speaker-embedding model {Path(model).name}")
+        self._extractor = sherpa_onnx.SpeakerEmbeddingExtractor(config)
+        self.dimensions = int(self._extractor.dim)
+
+    def embed(self, samples: FloatArray) -> FloatArray:
+        return _embed(self._extractor, self.sample_rate, samples)
 
 
 class SherpaVoxLock(SeparationModel):
@@ -1044,7 +1071,16 @@ class SherpaOnnxEngine(Engine):
     name = "sherpa-onnx"
     license = "Apache-2.0"
     url = "https://github.com/k2-fsa/sherpa-onnx"
-    kinds = OFFLINE_KINDS + ONLINE_KINDS + TTS_KINDS + VAD_KINDS + DIARIZATION_KINDS + SEPARATION_KINDS + DENOISE_KINDS
+    kinds = (
+        OFFLINE_KINDS
+        + ONLINE_KINDS
+        + TTS_KINDS
+        + VAD_KINDS
+        + DIARIZATION_KINDS
+        + SEPARATION_KINDS
+        + DENOISE_KINDS
+        + SPEAKER_EMBEDDING_KINDS
+    )
 
     def status(self) -> EngineStatus:
         try:
@@ -1093,4 +1129,6 @@ class SherpaOnnxEngine(Engine):
             return SherpaVoxLock(path, spec, opts)
         if kind in DENOISE_KINDS:
             return SherpaDenoiser(kind, path, spec, opts)
+        if kind in SPEAKER_EMBEDDING_KINDS:
+            return SherpaSpeakerEmbedding(path, spec, opts)
         raise ValueError(f"sherpa-onnx engine cannot load kind {kind!r}")
