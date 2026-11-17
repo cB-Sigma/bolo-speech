@@ -6,6 +6,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-11-17
+
 ### Fixed
 
 - Every ONNX Runtime session printed "Config with key [session.x64quantprecision] already exists" to the console:
