@@ -636,11 +636,13 @@ async def test_a_click_a_chunk_aligned_pre_roll_reaches_back_over_is_not_heard(
     click, but the main stream's pre-roll, lengthened to put the speech CHUNK_LEAD_S into an encoder chunk, began
     0.65 s before the speech and so over the click, and the 20M Zipformer wrote "ular good morning". Both streams
     now hear the same as without the click: digital silence before the speech."""
-    heard: list[np.ndarray] = []
+    # the audio each stream heard, in order (not the pieces it came in: paced in real time, how a send is cut
+    # into pieces depends on the machine's timer, and Windows' is coarser)
+    heard: dict[int, list[np.ndarray]] = {}
     accept = fake._FakeStream.accept
 
     def recording(self: fake._FakeStream, samples: FloatArray) -> None:
-        heard.append(np.array(samples))
+        heard.setdefault(id(self), []).append(np.array(samples))
         accept(self, samples)
 
     monkeypatch.setattr(fake._FakeStream, "accept", recording)
@@ -658,5 +660,6 @@ async def test_a_click_a_chunk_aligned_pre_roll_reaches_back_over_is_not_heard(
         assert len(finals) == 1
         # the main stream began before the click ended: its pre-roll reaches back over it
         assert finals[0]["words"][0]["t0"] < 0.58
-        results.append((finals[0]["text"], [w["t0"] for w in finals[0]["words"]], [h.tobytes() for h in heard]))
+        streams = [np.concatenate(pieces).tobytes() for pieces in heard.values()]
+        results.append((finals[0]["text"], [w["t0"] for w in finals[0]["words"]], streams))
     assert results[0] == results[1]  # with the click, the recognisers heard and wrote exactly what they did without
