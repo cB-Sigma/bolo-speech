@@ -31,13 +31,13 @@ def test_streaming_prefills_the_conversation() -> None:
     chunks = list(model.respond(request))
     assert "".join(c.text for c in chunks) == "part0 part1 part2 " and all(c.audio is not None for c in chunks)
     sessions = {s for s, _ in fake.prefilled}
-    assert len(sessions) == 1 and fake.resets == 1 and fake.generated[0]["session_id"] in sessions
+    assert len(sessions) == 1 and fake.resets == 1 and fake.generate_calls[0]["session_id"] in sessions
     msgs = [m for _, m in fake.prefilled]
     assert msgs[0]["content"][-1] == "Be brief." and msgs[0]["content"][1] is model.references["male"]
     assert [len(m["content"][0]) for m in msgs[1:4]] == [16000, 16000, 8000]  # speech one second at a time
     assert msgs[4] == {"role": "assistant", "content": ["<|im_end|>\n<|im_start|>assistant\nHello.<|im_end|>\n"]}
     assert msgs[5] == {"role": "user", "content": ["And now?"]}
-    assert fake.generated[0]["max_new_tokens"] == 256 and fake.generated[0]["generate_audio"] is True
+    assert fake.generate_calls[0]["max_new_tokens"] == 256 and fake.generate_calls[0]["generate_audio"] is True
     assert model.sample_rate == 24000 and [v.id for v in model.voices] == ["female", "male"]
 
 

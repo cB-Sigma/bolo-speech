@@ -289,7 +289,7 @@ class MiniCPMoFake:
 
         self.pieces = pieces
         self.prefilled: list[tuple[str, dict[str, Any]]] = []
-        self.generated: list[dict[str, Any]] = []
+        self.generate_calls: list[dict[str, Any]] = []
         self.chats: list[dict[str, Any]] = []
         self.resets = 0
         self.out = types.SimpleNamespace
@@ -307,7 +307,7 @@ class MiniCPMoFake:
         self.prefilled.append((session_id, msgs[0]))
 
     def streaming_generate(self, session_id: str, tokenizer: Any, **kwargs: Any) -> Any:
-        self.generated.append({"session_id": session_id, **kwargs})
+        self.generate_calls.append({"session_id": session_id, **kwargs})
         for i in range(self.pieces):
             text = f"part{i} " + ("<|tts_eos|>" if i == self.pieces - 1 else "")
             yield self.out(text=text, audio_wav=np.full(24000 // 2, 0.3, dtype=np.float32), sampling_rate=24000)

@@ -238,6 +238,11 @@ class ModelSettingsRequest(BaseModel):
         description="Pin where the model runs: cpu, cuda, cuda:1, coreml, auto, ... (overrides the `device` setting "
         "for this model; it still goes on the CPU when it does not fit on the accelerator); null removes the pin.",
     )
+    quantization: str | None = Field(
+        default=None,
+        description="Plugin models that can load quantized: how (GLM-4-Voice on bolo-torch: int4, bitsandbytes NF4); "
+        "overrides the catalog's option; null removes the pin. Takes effect at the next load.",
+    )
     allow_remote_code: bool | None = Field(
         default=None,
         description="Opt in to the Python code of the model's own repository (Hugging Face remote code) for this "

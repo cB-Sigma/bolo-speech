@@ -19,7 +19,7 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
   verify`; a load installs a missing bundle (`BOLO_TORCH_CODE_AUTO_INSTALL=0` turns that off) into
   `BOLO_TORCH_CODE_DIR` and checks every file before importing.
 - **Step-Audio 2 mini** (`kind: step-audio-2`, `step-audio-2` extra): the authors' prompt format, the model's remote
-  code (opt-in), token2wav from stepfun-ai/Step-Audio2 at a pinned commit; text streamed as generated, tool calls
+  code (opt-in), token2wav from stepfun-ai/Step-Audio2 at a pinned commit; text streamed as the model writes it, tool calls
   from `<tool_call>` blocks, speech in pieces of 25 speech tokens (first audio after about 1 s of speech), voices
   `female` and `male`, cancel inside generation. Without CUDA it answers in text only, with a warning. Tested with
   fakes only.
@@ -35,6 +35,7 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
   a clear error elsewhere and a hint for flash-attn. Tested with fakes only.
 - The `moshi` kind's message says where Moshi runs now: in Kyutai's own server, which bolo starts for a full-duplex
   `s2s_model` (not in this plugin).
+- README: running the four speech-to-speech models on a Windows laptop with an NVIDIA GPU, step by step.
 - **MiniCPM-o 2.6** (`kind: minicpm-o`, `minicpm-o` extra): the model card's recipe on the repository's remote code
   (opt-in, pinned): `init_tts`, the audio-assistant system prompt with the card's reference voices, the streaming API
   with the conversation prefilled (`mode: stream`, default) or `chat()` (`mode: chat`, and text-only answers). Refuses

@@ -1150,6 +1150,10 @@ and PersonaPlex). Nothing here has run on real weights yet; this is the checklis
 For PersonaPlex: accept its licence on Hugging Face, set `BOLO_HF_TOKEN`, `bolo components install personaplex`,
 `bolo pull personaplex-7b-v1`, `s2s_model = "personaplex-7b-v1"`, and give the session `instructions` (its role)
 and a `voice` such as `NATM1`. For Hibiki, speak French: it answers with the English translation.
+Running the four bolo-torch speech-to-speech models on a Windows laptop with an NVIDIA GPU (what fits in 8, 12,
+16 and 24 GB, install, pull, a test request, what to check): plugins/bolo-torch/README.md, "Speech-to-speech models
+on a Windows laptop with an NVIDIA GPU".
+
 ## Remote code
 
 Some models exist only as Python files in their own Hugging Face repository: transformers imports and runs those

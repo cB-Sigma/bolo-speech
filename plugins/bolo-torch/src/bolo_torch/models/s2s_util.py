@@ -153,7 +153,7 @@ def parse_tool_call(body: str, number: int) -> dict[str, str] | None:
 
 
 class ToolCallFilter:
-    """Splits generated text into what is said and the tool calls in ``<tool_call>...</tool_call>`` blocks."""
+    """Splits the model's text into what is said and the tool calls in ``<tool_call>...</tool_call>`` blocks."""
 
     def __init__(self) -> None:
         self.buffer = ""

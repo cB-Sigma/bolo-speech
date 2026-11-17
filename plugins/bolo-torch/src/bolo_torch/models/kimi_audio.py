@@ -8,7 +8,7 @@ token streams) and the streaming flow-matching detokenizer with its BigVGAN voco
 
 * each step samples a text token and a speech token (``KimiASampler``, the sampling of the authors' ``infer.py``);
   the speech stream starts ``kimia_mimo_audiodelaytokens`` steps after the text stream;
-* text goes out as it is generated, until the text stream's end token;
+* text goes out as the model writes it, until the text stream's end token;
 * speech tokens (from ``kimia_token_offset`` up) go to ``detokenize_streaming`` 30 at a time, as
   ``KimiAudio.detokenize_audio`` does (12.5 tokens a second, upsampled 4 times): the first audio after the delay and
   30 speech tokens (about 2.4 s of speech);

@@ -78,6 +78,10 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   card's audio-assistant prompt and streaming API (text and 24 kHz speech piece by piece), or `mode: chat`; voices
   `female`, `male`, `default_female`. The download now keeps the voices, Vocos and the ChatTTS tokenizer (its code
   fetched them unpinned when they were missing). Fakes only.
+- Per-model setting `quantization` (`bolo models config <id> --set quantization=int4`, `PUT .../settings`), sent to
+  plugin models that can load quantized; GLM-4-Voice takes `int4`.
+- plugins/bolo-torch/README.md: running the four bolo-torch speech-to-speech models on a Windows laptop with an
+  NVIDIA GPU (what fits in 8, 12, 16 and 24 GB, install, pull, opt-in, a test request, what to check).
 
 - **Speaker embedders as models of their own** (task `speaker-embedding`): `eres2net-voxceleb`, `campplus-voxceleb`,
   `campplus-zh-en` (3D-Speaker, Apache-2.0), `wespeaker-campplus-voxceleb`, `wespeaker-resnet34-voxceleb` (WeSpeaker,

@@ -8,12 +8,12 @@ What runs, in the authors' recipe (github.com/stepfun-ai/Step-Audio2, ``stepaudi
 * the prompt of ``StepAudio2.apply_chat_template``: ``<|BOT|>role\\n ... <|EOT|>`` per message, each 25 s piece
   of a user turn's 16 kHz audio as a 128-bin log-mel spectrogram with ``<audio_patch>`` placeholders, tools as a
   ``tool_json_schemas`` message, tool results as an ``input`` message, and ``<tts_start>`` to ask for speech;
-* generated ids below 151688 are text, ids above 151695 are speech tokens (minus 151696; 6561 and up are
+* new ids below 151688 are text, ids above 151695 are speech tokens (minus 151696; 6561 and up are
   padding), turned into 24 kHz audio by the repository's ``Token2wav.stream`` (CosyVoice 2 flow matching and
   HiFT) in pieces of 25 tokens plus its 3-token look-ahead, as ``examples-vllm-stream.py`` does;
 * the voice is the timbre of a prompt recording: ``female`` (default) or ``male``, the repository's two.
 
-Streaming: text goes out as it is generated; the first audio after the first 28 speech tokens (about 1 s of
+Streaming: text goes out as the model writes it; the first audio after the first 28 speech tokens (about 1 s of
 speech). The model's ``forward`` keeps no key-value cache (each new token reprocesses the whole conversation), so a
 long conversation slows every token down. token2wav calls ``.cuda()``: without an NVIDIA GPU the model answers in
 text only (a warning says so). A cancel stops generation at the next token.

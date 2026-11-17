@@ -12,7 +12,7 @@ The authors' recipe (github.com/THUDM/GLM-4-Voice at the pinned commit: ``web_de
 * speech tokens go to the flow-matching decoder with HiFi-GAN (``glm-4-voice-decoder``, ``AudioDecoder.token2wav``)
   in blocks of 25, 50, 100, 150 and then 200 tokens, each block conditioned on what came before; 22.05 kHz.
 
-Streaming: text as it is generated; the first audio after 25 speech tokens (about 2 s of speech at 12.5 tokens a
+Streaming: text as the model writes it; the first audio after 25 speech tokens (about 2 s of speech at 12.5 tokens a
 second), which come after the first 13 text tokens. One voice. The model's earlier answers go back as their text
 (bolo keeps no speech tokens of them), so the model sees its own past turns without their audio tokens.
 ``quantization: int4`` (bitsandbytes NF4, as the authors' ``model_server.py --dtype int4``) brings the language model

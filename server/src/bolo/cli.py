@@ -563,6 +563,8 @@ def _model_setting(key: str, raw: str) -> Any:
     elif key == "keep_alive":
         parse_keep_alive(raw)
         value = raw
+    elif key == "quantization":
+        return raw.strip().lower()
     elif key == "allow_remote_code":
         lowered = raw.strip().lower()
         if lowered not in ("true", "false", "1", "0", "yes", "no", "on", "off"):

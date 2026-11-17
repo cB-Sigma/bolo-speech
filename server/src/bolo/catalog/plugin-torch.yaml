@@ -954,9 +954,9 @@
   gated: false
   features: [speech-to-speech]
   description: 'Zhipu GLM-4-Voice 9B: Chinese and English spoken conversation, text and speech tokens interleaved,
-    through the torch plugin. Text streams as it is generated; speech from its flow-matching decoder with HiFi-GAN
+    through the torch plugin. Text streams as the model writes it; speech from its flow-matching decoder with HiFi-GAN
     (22.05 kHz, one voice) in blocks of 25, 50, 100, 150 and 200 speech tokens, so the first audio comes after about
-    2 s of generated speech. LICENCE: the weights are free for academic research only; commercial use needs a
+    2 s of speech. LICENCE: the weights are free for academic research only; commercial use needs a
     registration with Zhipu first (https://open.bigmodel.cn/mla/form, then free of charge), and products must show
     "Built with glm-4" and ship the licence; no military or illegal use; Chinese law. Marked non-commercial here
     until you register. The download is 21 GB: the model, glm-4-voice-tokenizer (Whisper-based speech tokenizer) and
@@ -1087,9 +1087,9 @@
   gated: false
   features: [speech-to-speech, tool-calls]
   description: 'StepFun Step-Audio 2 mini (8 B, on Qwen2.5-7B): English and Chinese spoken conversation with
-    paralinguistic understanding and tool calls, through the torch plugin. Text streams as it is generated; speech
+    paralinguistic understanding and tool calls, through the torch plugin. Text streams as the model writes it; speech
     from its token2wav decoder (CosyVoice 2 flow matching + HiFT, 24 kHz, voices female and male) in pieces of 25
-    speech tokens, so the first audio comes after about 1 s of generated speech. The model code keeps no key-value
+    speech tokens, so the first audio comes after about 1 s of speech. The model code keeps no key-value
     cache, so each token reprocesses the whole conversation: long conversations get slow. Remote code: its modelling
     code is Python in the model repository, which runs only after you opt in for this model (allow_remote_code,
     pinned files; see docs/models.md, "Remote code"); token2wav comes from github.com/stepfun-ai/Step-Audio2
@@ -1141,8 +1141,8 @@
   features: [speech-to-speech]
   description: 'Moonshot Kimi-Audio 7B Instruct (on Qwen2.5-7B, with a Whisper large-v3 encoder, GLM-4-Voice speech
     tokens and a streaming flow-matching detokenizer with BigVGAN): English and Chinese spoken conversation, through
-    the torch plugin. The plugin runs the authors'' generation loop step by step: text streams as it is generated,
-    speech in chunks of 30 speech tokens (24 kHz), the first after about 2.4 s of generated speech. Remote code: its
+    the torch plugin. The plugin runs the authors'' generation loop step by step: text streams as the model writes it,
+    speech in chunks of 30 speech tokens (24 kHz), the first after about 2.4 s of speech. Remote code: its
     modelling code and tokenizer are Python in the model repository, which run only after you opt in for this model
     (allow_remote_code; docs/models.md, "Remote code"); the rest comes from github.com/MoonshotAI/Kimi-Audio (MIT)
     at a pinned commit. MIT per the model card (code derived from Qwen2.5: Apache-2.0). NVIDIA GPU only (its code

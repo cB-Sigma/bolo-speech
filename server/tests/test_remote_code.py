@@ -89,6 +89,11 @@ async def test_plugin_gets_the_setting_never_the_catalogs(settings: Settings, mo
         core.store.set_model_settings("rc-voice", {"allow_remote_code": True})
         await core.synthesize_all("Hello.", model="rc-voice")
         assert seen[-1]["allow_remote_code"] is True and seen[-1]["remote_code"]["revision"] == REV
+        assert "quantization" not in seen[-1]
+        await core.manager.unload("rc-voice")
+        core.store.set_model_settings("rc-voice", {"quantization": "int4"})  # a pin reaches the plugin's options
+        await core.synthesize_all("Hello.", model="rc-voice")
+        assert seen[-1]["quantization"] == "int4"
     finally:
         await core.stop()
 

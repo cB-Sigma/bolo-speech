@@ -62,9 +62,9 @@ speech ("You are Qwen, a virtual human ...") with the session's instructions aft
 speech, comes back in one piece when generation ends; tools are not passed. None of them was run here: the
 downloads are 12 to 70 GB.
 
-Step-Audio 2 mini (`step-audio-2-mini`, kind `step-audio-2`) streams: its text as it is generated, tool calls as
+Step-Audio 2 mini (`step-audio-2-mini`, kind `step-audio-2`) streams: its text as the model writes it, tool calls as
 they close, and speech from the authors' token2wav decoder in pieces of 25 speech tokens (the first after about 1 s
-of generated speech). It needs two things beyond the extra: the model's own code from its Hugging Face repository,
+of speech). It needs two things beyond the extra: the model's own code from its Hugging Face repository,
 which runs only after you opt in for this model (`bolo models config step-audio-2-mini --set allow_remote_code=true`;
 see "Remote code" below), and token2wav from github.com/stepfun-ai/Step-Audio2 (Apache-2.0) at a pinned commit, which
 the plugin installs (see "Inference code from GitHub" below). token2wav calls `.cuda()`: without an NVIDIA GPU the
@@ -77,8 +77,8 @@ interleaved in one stream, and speech through `glm-4-voice-decoder` (`AudioDecod
 HiFi-GAN, 22.05 kHz) in blocks of 25, 50, 100, 150 and 200 tokens, each conditioned on the earlier ones. The first
 audio comes after 25 speech tokens (about 2 s of speech). The model's own code (ChatGLM) is remote code (opt in per
 model); the tokenizer and decoder code comes from github.com/THUDM/GLM-4-Voice and Matcha-TTS at pinned commits
-(bundle `glm-4-voice`). `quantization: int4` loads the language model with bitsandbytes NF4, as the authors'
-`model_server.py --dtype int4`. **Licence:** the weights are under the glm-4-voice License: free for academic
+(bundle `glm-4-voice`). `quantization: int4` (or `bolo models config glm-4-voice-9b --set quantization=int4`) loads the language model with
+bitsandbytes NF4, as the authors' `model_server.py --dtype int4`. **Licence:** the weights are under the glm-4-voice License: free for academic
 research, commercial use only after registering with Zhipu (https://open.bigmodel.cn/mla/form, then free), "Built
 with glm-4" shown in the product, Chinese law. bolo marks it non-commercial, and `bolo pull` and every load print
 this. Not run here.
@@ -86,7 +86,7 @@ this. Not run here.
 Kimi-Audio 7B Instruct (`kimi-audio-7b-instruct`, kind `kimi-audio`) is built by the authors' `kimia_infer`
 (`KimiAudio`: the language model, the prompt manager with GLM-4-Voice speech tokens and Whisper large-v3 features,
 the streaming detokenizer and BigVGAN vocoder), installed from github.com/MoonshotAI/Kimi-Audio at a pinned commit.
-The plugin runs `KimiAudio._generate_loop` one step at a time, so text streams as it is generated and speech goes out
+The plugin runs `KimiAudio._generate_loop` one step at a time, so text streams as the model writes it and speech goes out
 in chunks of 30 speech tokens through `detokenize_streaming` (24 kHz; first audio after about 2.4 s of speech). Its
 prompt manager loads the speech tokenizer by name from the Hub (any revision); the plugin gives it the copy bolo
 pinned and downloaded with the model instead. NVIDIA GPU only (its code uses `torch.cuda` and imports flash-attn,
@@ -277,6 +277,104 @@ refused at load.
 | `step-audio-2` | stepfun-ai/Step-Audio2 @ `76e272b56c39` (`utils.py`, `token2wav.py`, `cosyvoice2/`, part of `flashcosyvoice/`, the two prompt voices) | Apache-2.0 |
 | `glm-4-voice` | THUDM/GLM-4-Voice @ `eb00ce9142e8` (`speech_tokenizer/`, `flow_inference.py`, `cosyvoice/`) and shivammehta25/Matcha-TTS @ `dd9105b34bf2` (`matcha/`, its submodule) | Apache-2.0; MIT |
 | `kimi-audio` | MoonshotAI/Kimi-Audio @ `349251e1d8f4` (`kimia_infer/`) and THUDM/GLM-4-Voice @ `eb00ce9142e8` (`speech_tokenizer/` in `kimia_infer/models/tokenizer/glm4`, its submodule) | MIT (stated in README and pyproject; no LICENSE file; Qwen-derived code Apache-2.0); Apache-2.0 |
+
+## Speech-to-speech models on a Windows laptop with an NVIDIA GPU
+
+None of the four models below was run here (no GPU, about 5 GB of disk). These are the steps to run each for real,
+from a checkout of the bolo repository (the remote-code opt-in and these loaders are not in a released bolo-torch
+yet).
+
+**What fits.** Approximate GPU memory with a short conversation; laptop GPUs have 8 GB (RTX 4060/4070 Laptop), 12 GB
+(RTX 4080/5070 Ti Laptop), 16 GB (RTX 4090/5080 Laptop) or 24 GB (RTX 5090 Laptop).
+
+| Model | Needs | 8 GB | 12 GB | 16 GB | 24 GB |
+| --- | --- | --- | --- | --- | --- |
+| `glm-4-voice-9b` | about 22 GB in bfloat16; about 9 GB with `quantization=int4` | no | yes, int4 | yes, int4 | yes, bfloat16 |
+| `step-audio-2-mini` | about 20 GB (17 GB of weights and token2wav) | no | no | only split (part on the CPU, slow) | yes |
+| `minicpm-o-2.6` | about 18 GB | no | no | only split (part on the CPU, slow) | yes |
+| `kimi-audio-7b-instruct` | 24 GB or more, no split, 48 GB of RAM to load | no | no | no | at the limit |
+
+A split happens when bolo's scheduler finds too little free GPU memory (`bolo ps` shows it); it was tested with fakes
+only. Close other GPU programs first and check free memory with `nvidia-smi`.
+
+**1. bolo, from a checkout** (PowerShell; Python 3.12 from python.org, git):
+
+```powershell
+git clone https://github.com/cB-Sigma/bolo C:\bolo-src
+py -3.12 -m venv C:\bolo-env
+C:\bolo-env\Scripts\pip install "C:\bolo-src\server[all,cuda]"
+```
+
+**2. The plugin, in an environment of its own per model** (their transformers versions differ). For GLM-4-Voice:
+
+```powershell
+py -3.12 -m venv C:\bolo-s2s\glm
+C:\bolo-s2s\glm\Scripts\pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+C:\bolo-s2s\glm\Scripts\pip install C:\bolo-src\server "C:\bolo-src\plugins\bolo-torch[glm-4-voice]"
+C:\bolo-s2s\glm\Scripts\bolo-torch doctor                    # cuda_available: true, "glm-4-voice": true
+C:\bolo-s2s\glm\Scripts\bolo-torch code install glm-4-voice  # GLM-4-Voice + Matcha-TTS code, sha256-checked
+```
+
+For the others the extra and the bundle change: `step-audio-2` (`bolo-torch code install step-audio-2`),
+`minicpm-o` (no bundle: the model is all remote code). Kimi-Audio also needs flash-attn, which has no official
+Windows build: run steps 1 to 5 under WSL2 (Ubuntu, `python3.12 -m venv`, the same commands with Linux paths) and add
+`pip install flash-attn --no-build-isolation` (it compiles against the CUDA toolkit 12.x; `pip install ninja` first)
+or install a prebuilt flash-attn wheel that matches your Python, torch and CUDA versions; then
+`bolo-torch code install kimi-audio`.
+
+**3. Point bolo at that environment**, on the GPU:
+
+```powershell
+$env:BOLO_PLUGINS = "torch=C:\bolo-s2s\glm\Scripts\python.exe -m bolo_torch"
+$env:BOLO_DEVICE = "cuda"
+$env:BOLO_TORCH_DEVICE = "cuda"
+C:\bolo-env\Scripts\bolo doctor                # lists plugin:torch as available
+```
+
+**4. Pull, read the remote code, opt in.** No Hugging Face token is needed for these four.
+
+```powershell
+C:\bolo-env\Scripts\bolo pull glm-4-voice-9b   # 21 GB; warns that the model runs remote code; prints the licence note
+C:\bolo-env\Scripts\bolo show glm-4-voice-9b   # "Remote code": the files, the commit, what the review found
+C:\bolo-env\Scripts\bolo models config glm-4-voice-9b --set allow_remote_code=true
+C:\bolo-env\Scripts\bolo models config glm-4-voice-9b --set quantization=int4   # on 12 or 16 GB
+```
+
+Downloads: `step-audio-2-mini` 17.9 GB, `minicpm-o-2.6` 17.4 GB, `kimi-audio-7b-instruct` 44.1 GB. GLM-4-Voice's
+licence allows commercial use only after registering with Zhipu (https://open.bigmodel.cn/mla/form).
+
+**5. Serve and talk to it** through the Realtime API's speech-to-speech pipeline:
+
+```powershell
+$env:BOLO_REALTIME_PIPELINE = "speech-to-speech"
+$env:BOLO_S2S_MODEL = "glm-4-voice-9b"
+C:\bolo-env\Scripts\bolo serve
+# in a second window
+C:\bolo-env\Scripts\pip install openai soundfile numpy
+C:\bolo-env\Scripts\python C:\bolo-src\examples\realtime_agent.py question.wav --out reply.wav
+```
+
+`question.wav` is a short spoken question in English (or Chinese); without a file the script asks bolo's
+text-to-speech for one, which needs a voice installed. The first request loads the model (minutes for 20 GB).
+
+**What to check.**
+
+* bolo's log: `remote code: <model> imports Python files from its own model repository (...)` once per load (and
+  for GLM-4-Voice the licence note); no `remote_code_refused` (if it appears, the message says what to do: the opt-in
+  is missing, or the folder is not the pinned revision, or a file changed).
+* `reply.wav` holds a spoken answer that fits the question, and the script prints the answer's text and the
+  latency figures of the turn. Expect the first audio after about 1 s of the model's speech for Step-Audio 2,
+  2 s for GLM-4-Voice, 2.4 s for Kimi-Audio, plus the time those tokens take on your GPU; MiniCPM-o streams in
+  pieces; Step-Audio 2 slows down as the conversation grows (its model keeps no key-value cache).
+* `C:\bolo-env\Scripts\bolo ps`: the model on `cuda`, its GPU memory; `nvidia-smi` agrees.
+* Talk over the answer (barge-in, with a microphone client such as `examples/webrtc_browser.html`): the answer
+  stops within a token or a speech chunk.
+* Voices: `--voice male` with Step-Audio 2 and MiniCPM-o (`female`, `male`; MiniCPM-o also `default_female`).
+* Step-Audio 2 tool calls: give the session a function tool; check the `<tool_call>` format the model writes (the
+  plugin expects `function`, the name and JSON arguments on separate lines, or a JSON object).
+* Errors to expect and their fixes: `component_missing` (install the extra in the plugin's environment, or
+  flash-attn), `device 'cuda' was requested but this torch build sees no CUDA device` (install the CUDA torch wheel
+  in the plugin's environment), out of memory (`quantization=int4` for GLM-4-Voice, or a smaller model).
 
 ## GPUs
 

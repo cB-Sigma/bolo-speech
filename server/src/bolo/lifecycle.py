@@ -914,6 +914,8 @@ class ModelManager:
         # remote code runs only on the operator's opt-in for this model, never on a catalog entry's say-so
         if spec.engine.startswith("plugin:"):
             model_opts["allow_remote_code"] = remote_code.allowed(pins)
+            if pins.get("quantization"):  # a plugin model that can load quantized (GLM-4-Voice: int4)
+                model_opts["quantization"] = str(pins["quantization"])
         if remote_code.pin(spec) is not None:
             log.warning("%s", remote_code.notice(spec, pins))
         if spec.voices:
