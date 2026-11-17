@@ -92,7 +92,7 @@ PIXIT_REV = "4d38e95cfd067c894b8b60b00761831fb01e4a8c"
 def model_folder(tmp_path: Path, config: str, subfolders: tuple[str, ...] = ()) -> Path:
     root = tmp_path / "model"
     root.mkdir(parents=True)
-    (root / "config.yaml").write_text(config, encoding="utf-8")
+    (root / "config.yaml").write_bytes(config.encode("utf-8"))  # byte for byte (no CRLF on Windows)
     for sub in subfolders:
         (root / sub).mkdir(parents=True)
         (root / sub / "pytorch_model.bin").write_bytes(b"weights")
