@@ -6,6 +6,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+## [0.6.9] - 2026-11-18
+
 ### Security
 
 - **Console build tooling: `npm audit` down from 22 alerts (13 high, 9 moderate) to 18 (all high).** vite 8.3.8,
