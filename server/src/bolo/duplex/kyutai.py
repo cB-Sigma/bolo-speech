@@ -63,6 +63,17 @@ def chat_url(url: str) -> str:
     return url if urlsplit(url).path not in ("", "/") else url + "/api/chat"
 
 
+#: SentencePiece's start and end of sequence, which Hibiki's server sends as text tokens of their own
+_SEQUENCE_MARKS = ("<s>", "</s>")
+
+
+def clean_text(text: str) -> str:
+    """A text token as people should read it: without the sequence marks ``<s>`` and ``</s>``."""
+    for mark in _SEQUENCE_MARKS:
+        text = text.replace(mark, "")
+    return text
+
+
 class KyutaiSession(DuplexSession):
     input_rate = SAMPLE_RATE
     frame_samples = FRAME
@@ -91,7 +102,7 @@ class KyutaiSession(DuplexSession):
                     if len(pcm):
                         await self._queue.put(DuplexAudio(pcm, SAMPLE_RATE))
                 elif kind == MSG_TEXT:
-                    text = payload.decode("utf-8", errors="replace")
+                    text = clean_text(payload.decode("utf-8", errors="replace"))
                     if text:
                         await self._queue.put(DuplexText(text))
                 elif kind == MSG_ERROR:

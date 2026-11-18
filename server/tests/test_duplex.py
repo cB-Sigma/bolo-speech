@@ -145,6 +145,25 @@ async def test_kyutai_session(use_sphn: bool, rust: bool) -> None:
         server.stop()
 
 
+async def test_hibiki_sequence_marks_are_not_in_the_transcript() -> None:
+    """Hibiki's server sends SentencePiece's <s> and </s> as text tokens; the transcript leaves them out."""
+    server = FakeKyutaiServer(reply=("<s>", " Bonjour", ".", "</s>")).start()
+    try:
+        session = await KyutaiBackend(server.url, model=MODEL).open(DuplexConfig())
+        await _feed(session, _speech_then_quiet())
+        text = ""
+        async with asyncio.timeout(10):
+            async for event in session.events():
+                if isinstance(event, DuplexText):
+                    text += event.text
+                if text.endswith("."):
+                    break
+        await session.close()
+        assert text == " Bonjour."
+    finally:
+        server.stop()
+
+
 async def test_kyutai_sessions_are_limited_and_a_busy_server_is_reported(fake: FakeKyutaiServer) -> None:
     backend = KyutaiBackend(fake.url, model=MODEL, max_sessions=1)
     first = await backend.open(DuplexConfig())
