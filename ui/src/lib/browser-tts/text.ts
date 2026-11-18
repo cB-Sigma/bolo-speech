@@ -38,7 +38,7 @@ export interface KokoroVoiceConfig {
   inference: { noise_scale: number; length_scale: number; noise_scale_w: number }
 }
 
-/** tiny-voca: phonemes and stress from dizione (under Pyodide), voice F2 or M2 by index. */
+/** tiny-voca: phonemes and stress from dizione (its TypeScript port), voice F2 or M2 by index. */
 export interface TinyVocaVoiceConfig {
   kind: 'tiny-voca'
   sample_rate: number

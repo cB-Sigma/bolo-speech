@@ -42,6 +42,15 @@ export function boloVersion(): string | null {
   }
 }
 
+/**
+ * Files outside the console the dev server and the tests may read: the console itself and the tables of dizione,
+ * which the browser demo's tiny-voca phonemiser takes from bolo's copy (server/src/bolo/vendor/dizione/data).
+ */
+export const FS_ALLOW = [
+  import.meta.dirname,
+  path.resolve(import.meta.dirname, '../server/src/bolo/vendor/dizione/data'),
+]
+
 /** Where the live demo is published; used for absolute social-preview URLs. */
 const DEMO_URL = 'https://cb-sigma.github.io/bolo-speech/'
 
@@ -102,7 +111,7 @@ export default defineConfig(({ mode }) => {
           : {}),
     },
     worker: { format: 'es' as const, plugins: () => [dropOrtWasm()] },
-    server: { host: '127.0.0.1', headers: isolation, proxy: mock || demo ? undefined : proxy },
+    server: { host: '127.0.0.1', headers: isolation, proxy: mock || demo ? undefined : proxy, fs: { allow: FS_ALLOW } },
     preview: { host: '127.0.0.1', headers: isolation },
     build: {
       outDir: mock ? 'dist-mock' : demo ? 'dist-demo' : path.resolve(import.meta.dirname, '../server/src/bolo/_ui'),

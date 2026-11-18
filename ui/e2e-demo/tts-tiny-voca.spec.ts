@@ -4,7 +4,7 @@ import { openDemo } from './open'
 test.describe('tiny-voca with its phonemiser from the internet', () => {
   test.skip(
     !process.env.BOLO_E2E_NETWORK,
-    'set BOLO_E2E_NETWORK=1 to fetch tiny-voca from Hugging Face and Pyodide from jsDelivr',
+    'set BOLO_E2E_NETWORK=1 to fetch tiny-voca and its phonemiser data from Hugging Face',
   )
 
   for (const voice of ['tiny-voca-f2', 'tiny-voca-m2']) {
