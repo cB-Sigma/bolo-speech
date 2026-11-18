@@ -104,11 +104,17 @@ jobs:
           /tmp/clean/bin/bolo doctor
       - name: Transcribe a sample on the CPU and through CoreML
         run: |
+          # pulled beforehand, so a download problem shows here and not as an HTTP status below
+          BOLO_DATA_DIR=/tmp/bolo-data /tmp/clean/bin/bolo pull moonshine-tiny-en
           for device in cpu coreml; do
             BOLO_DATA_DIR=/tmp/bolo-data BOLO_DEVICE=$device /tmp/clean/bin/bolo serve --port 8765 > /tmp/serve-$device.log 2>&1 &
             for i in $(seq 1 60); do curl -fsS http://127.0.0.1:8765/healthz > /dev/null && break || sleep 1; done
-            curl -fsS -X POST http://127.0.0.1:8765/v1/audio/transcriptions \
-              -F model=moonshine-tiny-en -F file=@src/bolo/samples/en-short.wav -o /tmp/text-$device.json
+            if ! curl -sS --fail-with-body -X POST http://127.0.0.1:8765/v1/audio/transcriptions \
+              -F model=moonshine-tiny-en -F file=@src/bolo/samples/en-short.wav -o /tmp/text-$device.json; then
+              echo "== $device: the answer"; cat /tmp/text-$device.json; echo
+              echo "== $device: the server's log"; cat /tmp/serve-$device.log
+              exit 1
+            fi
             echo "== $device: transcript"; cat /tmp/text-$device.json; echo
             echo "== $device: where the model runs"; curl -fsS http://127.0.0.1:8765/api/v1/ps; echo
             grep -i "morning" /tmp/text-$device.json
