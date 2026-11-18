@@ -169,6 +169,9 @@ class Placement:
     #: the accelerators the runtime was asked for and did not start (a CUDA library missing, ...): each one's
     #: ``bolo.cuda_libs.ProviderFallback.to_dict()``; set after the load, see :meth:`fell_back`
     provider_fallback: list[dict[str, Any]] | None = None
+    #: what runs the model on that device, for people ("Core ML (sherpa-onnx)", "Metal (MLX)", "CPU"); set after the
+    #: load (:func:`runtime_label`)
+    runtime: str | None = None
 
     @property
     def on_gpu(self) -> bool:
@@ -218,7 +221,48 @@ class Placement:
             out.update(tensor_split=list(self.tensor_split), main_gpu=self.main_gpu)
         if self.provider_fallback:
             out["provider_fallback"] = [dict(f) for f in self.provider_fallback]
+        out["runtime"] = self.runtime
         return out
+
+
+#: the GPU API of each device family, for :func:`runtime_label`
+_API = {"cuda": "CUDA", "rocm": "ROCm", "metal": "Metal", "vulkan": "Vulkan", "dml": "DirectML", "openvino": "OpenVINO"}
+#: the name of each engine's runtime, for :func:`runtime_label`
+_RUNTIME = {
+    "sherpa-onnx": "sherpa-onnx", "faster-whisper": "CTranslate2", "onnxruntime": "ONNX Runtime", "mlx": "MLX",
+    "whisper.cpp": "whisper.cpp", "tts-server": "llama.cpp", "duplex": "duplex server",
+}  # fmt: skip
+
+
+def runtime_label(engine_id: str, device: str | None, options: dict[str, Any] | None = None) -> str:
+    """What runs a model placed on ``device``, in words: ``CPU``, ``Core ML (sherpa-onnx)``, ``MIGraphX (ONNX
+    Runtime)``, ``Metal (MLX)``, ``MPS (PyTorch)``, ``ROCm (llama.cpp)``... Shown by ``bolo ps`` and the console."""
+    fam = family(device)
+    if engine_id in ("remote", "builtin", "webrtcvad", "rnnoise", "fake") or fam in ("", "cpu"):
+        return "CPU" if engine_id not in ("remote",) else "remote"
+    runtime = _RUNTIME.get(engine_id, engine_id)
+    if engine_id.startswith("plugin:"):
+        runtime = "PyTorch"
+        api = {"metal": "MPS", "rocm": "ROCm"}.get(fam, _API.get(fam, fam))
+    elif engine_id == "onnxruntime":
+        from bolo import ort_providers
+
+        first = ort_providers.providers_for(device)[0]
+        name = first[0] if isinstance(first, tuple) else str(first)
+        api = {"Dml": "DirectML", "CoreML": "Core ML", "ROCM": "ROCm"}.get(
+            name.removesuffix("ExecutionProvider"), name.removesuffix("ExecutionProvider")
+        )
+        if api == "CPU":
+            return "CPU"
+    elif engine_id == "sherpa-onnx" and fam == "metal":
+        api = "Core ML"
+    elif engine_id == "tts-server":
+        runtime = str((options or {}).get("runtime") or "llama.cpp")
+        runtime = "llama.cpp" if runtime == "llama-server" else runtime
+        api = _API.get(fam, fam)
+    else:
+        api = _API.get(fam, fam)
+    return f"{api} ({runtime})"
 
 
 # -- llama.cpp: GGUF layers and -ngl ---------------------------------------------------------------------------

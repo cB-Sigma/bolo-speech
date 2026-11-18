@@ -645,7 +645,7 @@ def _gb_pair(used: int | None, total: int | None) -> str:
 
 def format_ps(doc: dict[str, Any], verbose: bool = False) -> str:
     """``bolo ps``: a header line for the machine, then Ollama's columns (MODEL, TASK, SIZE, PROCESSOR, DEVICE, GPU,
-    UNTIL); ``verbose`` adds ACTIVE (requests and sessions using the model), QUEUED (requests waiting for it),
+    UNTIL); ``verbose`` adds RUNTIME (what runs the model there: "Core ML (sherpa-onnx)", "Metal (MLX)"), ACTIVE (requests and sessions using the model), QUEUED (requests waiting for it),
     PARALLEL (``num_parallel``), REQUESTS, latency and real-time factor."""
     system = doc.get("system") or {}
     head = [f"cpu {system.get('cpu_percent', 0)}%", f"rss {_human(system.get('rss_bytes'))}"]
@@ -686,6 +686,7 @@ def format_ps(doc: dict[str, Any], verbose: bool = False) -> str:
         if verbose:
             lat = (m.get("latency_ms") or {}).get("final") or (m.get("latency_ms") or {}).get("ttfa") or {}
             row += [
+                (m.get("placement") or {}).get("runtime") or "-",
                 str(m.get("active", 0)), str(m.get("queued", 0)), str(m.get("num_parallel", "-")),
                 str(m.get("requests", 0)), f"{lat.get('p50', '-')}", f"{(m.get('rtf') or {}).get('p50', '-')}",
                 f"{m.get('idle_s', 0)}s",
@@ -693,7 +694,7 @@ def format_ps(doc: dict[str, Any], verbose: bool = False) -> str:
         rows.append(row)
     headers = ["MODEL", "TASK", "SIZE", "PROCESSOR", "DEVICE", "GPU", "UNTIL"]
     if verbose:
-        headers += ["ACTIVE", "QUEUED", "PARALLEL", "REQUESTS", "P50 MS", "RTF P50", "IDLE"]
+        headers += ["RUNTIME", "ACTIVE", "QUEUED", "PARALLEL", "REQUESTS", "P50 MS", "RTF P50", "IDLE"]
     lines = ["  ".join(head)]
     lines.append(_table(rows, headers) if rows else "no models loaded")
     if health.get("lost"):

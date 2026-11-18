@@ -129,7 +129,7 @@ class ComponentManager:
         """``(profile, language)`` of a voice that reads phonemes, or None (characters or lexicon only)."""
         if spec.needs_phonemes:
             return spec.phoneme_target()
-        if spec.kind == "kokoro" and spec.engine == "sherpa-onnx":
+        if spec.kind == "kokoro" and spec.engine in ("sherpa-onnx", "mlx"):
             prefix = (voice_id or "a")[:1] if spec.options.get("multi_lang") else "a"
             language = KOKORO_LANGUAGES.get(prefix)
             return ("kokoro", language) if language else None

@@ -30,6 +30,16 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   models, packaged voices without a stated licence: marked not for commercial use) and Seed-VC (GPL-3.0, copyleft).
   ElevenLabs' `/v1/speech-to-speech/{voice_id}` answers too. `bolo convert` and a Voice conversion page in the
   console. Run on CPU with OpenVoice v2, MeanVC2 and RVC.
+- **MLX on Apple Silicon: `bolo-speech[mlx]`.** A new in-process engine (`engine: mlx`) runs models on Apple
+  silicon's GPU through MLX: Whisper (`whisper-tiny-mlx`, `whisper-base-mlx`, through mlx-whisper; translation and word
+  timestamps), NVIDIA Parakeet (`parakeet-tdt-ctc-110m-mlx`, through parakeet-mlx; word timestamps) and Kokoro-82M
+  (`kokoro-v1.0-mlx`, through mlx-audio; 41 voices in six languages, voice blends), phonemised by bolo itself so
+  mlx-audio's misaki front end is not needed. The extra is marked for macOS arm64 only. Without Metal the models run on
+  the CPU and their placement says so. Run on the CPU with MLX's Linux wheels; the macOS CI job runs them on Apple
+  silicon. docs/apple-silicon.md.
+- **Where a model runs, in words.** Each loaded model's placement carries `runtime` ("Core ML (sherpa-onnx)",
+  "MIGraphX (ONNX Runtime)", "Metal (MLX)", "MPS (PyTorch)", "ROCm (llama.cpp)", "CPU"): in `GET /api/v1/ps`, the
+  console's Loaded models panel next to the device, and `bolo ps --verbose` (RUNTIME).
 
 ## [0.6.8] - 2026-11-18
 

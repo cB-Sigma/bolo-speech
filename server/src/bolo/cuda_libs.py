@@ -293,7 +293,7 @@ _SHORT = {
 class ProviderFallback:
     """An accelerator a runtime was asked for and did not start: the work runs on the CPU instead."""
 
-    #: "onnxruntime" or "ctranslate2"
+    #: "onnxruntime", "ctranslate2" or "mlx"
     runtime: str
     #: what was asked for: an ONNX Runtime provider ("CUDAExecutionProvider") or a CTranslate2 device ("cuda")
     requested: str
@@ -309,7 +309,9 @@ class ProviderFallback:
     role: str | None = None
 
     def message(self) -> str:
-        name = {"onnxruntime": "ONNX Runtime", "ctranslate2": "CTranslate2"}.get(self.runtime, self.runtime)
+        name = {"onnxruntime": "ONNX Runtime", "ctranslate2": "CTranslate2", "mlx": "MLX"}.get(
+            self.runtime, self.runtime
+        )
         asked = _SHORT.get(self.requested, self.requested)
         why = (
             f" ({', '.join(self.missing)} {'is' if len(self.missing) == 1 else 'are'} missing)" if self.missing else ""

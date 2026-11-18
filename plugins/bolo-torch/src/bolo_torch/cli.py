@@ -95,7 +95,7 @@ def separate(args: argparse.Namespace) -> dict[str, Any]:
 
     from bolo_torch.engine import TorchEngine
     from bolo_torch.models.separation import SR, resample
-    from bolo_torch.runtime import hub_snapshot
+    from bolo_torch.runtime import hub_snapshot, pick_device
 
     entry = SEPARATION_MODELS[args.model]
     t0 = time.perf_counter()
@@ -126,7 +126,8 @@ def separate(args: argparse.Namespace) -> dict[str, Any]:
     duration = len(mono) / SR
     turns = getattr(model, "last_turns", [])
     return {
-        "model": args.model, "device": args.device, "threads": args.threads, "audio_s": round(duration, 2),
+        "model": args.model, "device": args.device, "ran_on": pick_device(args.device), "threads": args.threads,
+        "audio_s": round(duration, 2),
         "download_s": round(t_download, 2), "load_s": round(t_load, 2), "separate_s": round(t_run, 2),
         "rtf": round(t_run / duration, 3) if duration else None, "tracks": files,
         "turns": [[round(s, 2), round(e, 2), k] for s, e, k in turns],

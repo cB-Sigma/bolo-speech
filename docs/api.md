@@ -1115,7 +1115,9 @@ Like Ollama's `/api/ps` (bolo's `/api/ps` is speaches' route, which lists model 
    "vram_source": "process",              // process | dxgi | device | plugin | unified | plan (unknown, e.g. WDDM) | null (CPU)
    "latency_ms": {…}, "rtf": {…},         // as in /api/v1/stats
    "placement": {"device": "cuda:0", "requested": "cuda", "split": "whole", "gpu_bytes": 1610612736,
-                 "cpu_bytes": 0, "processor": "100% GPU", "notice": null, "free_memory_known": true},
+                 "cpu_bytes": 0, "processor": "100% GPU", "notice": null, "free_memory_known": true,
+                 "runtime": "CUDA (sherpa-onnx)"},  // what runs it there: "Core ML (sherpa-onnx)", "Metal (MLX)",
+                 // "MIGraphX (ONNX Runtime)", "MPS (PyTorch)", "ROCm (llama.cpp)", "CPU"; null until loaded
                  // llama.cpp: + "gpu_layers": 19, "total_layers": 29, "operator_layers": false
                  // ONNX Runtime graphs: + "graphs": {"encoder": "cuda:0", "decoder": "cpu"}
                  // always: "gpus": [0], "gpu_bytes_by_gpu": {"0": 1610612736}
@@ -1132,7 +1134,7 @@ Like Ollama's `/api/ps` (bolo's `/api/ps` is speaches' route, which lists model 
                       "total_bytes": 12884901888, "free_bytes": 9556148224, "used_bytes": 3328753664,
                       "unified": false, "utilization": 41.0,
                       "process_bytes": 2147483648,   // held by bolo and the servers and plugins it started
-                      "source": "nvml",               // nvml | nvidia-smi | unified (Apple Silicon) ; [] when unknown
+                      "source": "nvml",               // nvml | nvidia-smi | unified (Apple Silicon) | sysfs (AMD) ; [] when unknown
                       "physical_index": 0,            // NVML's number; "index" is CUDA's (after CUDA_VISIBLE_DEVICES)
                       "uuid": "GPU-5f0c…",
                       "driver_model": null,           // Windows: "WDDM" (process_bytes null), "TCC", "MCDM"

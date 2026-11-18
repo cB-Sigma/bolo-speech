@@ -19,6 +19,7 @@ BUILTIN_ENGINES: dict[str, str] = {
     "moonshine": "bolo.engines.moonshine:MoonshineEngine",
     "kokoro-onnx": "bolo.engines.kokoro_onnx:KokoroOnnxEngine",
     "whisper.cpp": "bolo.engines.whispercpp:WhisperCppEngine",
+    "mlx": "bolo.engines.mlx:MlxEngine",
     "onnxruntime": "bolo.engines.onnx_turn:OnnxRuntimeEngine",
     "webrtcvad": "bolo.engines.frame_vad:WebRtcVadEngine",
     "builtin": "bolo.engines.builtin:BuiltinEngine",

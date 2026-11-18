@@ -67,6 +67,7 @@ from bolo.placement import (
     plan,
     plan_spread,
     processor,
+    runtime_label,
     split_mode,
 )
 from bolo.providers import ProviderRegistry
@@ -946,6 +947,11 @@ class ModelManager:
                 model.warm_up()
         if watched.fallbacks:
             place.fell_back([f.to_dict() for f in watched.fallbacks], watched.notice(), watched.whole)
+        # a model that knows where it runs says so (MLX without Metal runs on the CPU)
+        actual = getattr(model, "device", None)
+        place.runtime = runtime_label(
+            spec.engine, actual if spec.engine == "mlx" and isinstance(actual, str) else place.device, spec.options
+        )
         load_ms = (time.perf_counter() - t0) * 1000.0
         return model, load_ms, self._vram(place)
 

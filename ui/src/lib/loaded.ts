@@ -10,6 +10,8 @@ export interface LoadedRow {
   /** "100% GPU", "100% CPU", "35%/65% CPU/GPU", "remote", "cloud". */
   processor: string
   device: string
+  /** What runs it there: "Core ML (sherpa-onnx)", "Metal (MLX)", "ROCm (llama.cpp)", "CPU"; null from older servers. */
+  runtime: string | null
   onGpu: boolean
   /** On the GPU, but how much memory it took could not be measured (Windows under WDDM): `vram` is the plan. */
   vramUnknown: boolean
@@ -35,7 +37,13 @@ export interface LoadedRow {
 function gpuFor(device: string, gpus: GpuMemory[]): GpuMemory | null {
   const [family = '', index = '0'] = device.toLowerCase().split(':')
   const backend =
-    family === 'cuda' || family === 'gpu' ? 'cuda' : ['coreml', 'mps', 'metal'].includes(family) ? 'metal' : ''
+    family === 'cuda' || family === 'gpu'
+      ? 'cuda'
+      : ['coreml', 'mps', 'metal', 'mlx'].includes(family)
+        ? 'metal'
+        : ['rocm', 'hip', 'migraphx'].includes(family)
+          ? 'rocm'
+          : ''
   if (!backend) return null
   const idx = Number.parseInt(index, 10) || 0
   return gpus.find((g) => g.backend === backend && g.index === idx) ?? null
@@ -61,6 +69,7 @@ export function loadedRows(stats: Stats | null): LoadedRow[] {
         ram: m.ram_bytes ?? Math.max(0, m.memory_bytes - vram),
         processor: m.processor ?? '100% CPU',
         device,
+        runtime: m.placement?.runtime ?? null,
         onGpu: vram > 0 || m.vram_source === 'plan',
         vramUnknown: m.vram_source === 'plan',
         expiresIn,

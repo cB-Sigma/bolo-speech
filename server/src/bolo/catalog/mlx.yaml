@@ -1,0 +1,298 @@
+# Models on MLX, Apple's array framework: the GPU of Apple silicon through Metal (engine: mlx, bolo.engines.mlx).
+# Install with pip install "bolo-speech[mlx]" (macOS on Apple silicon; elsewhere MLX's Linux CPU wheels run them on
+# the CPU, slowly). docs/apple-silicon.md. Repositories pinned to a commit, read from the Hugging Face API on
+# 2026-11-18. Whisper weights are OpenAI's (MIT) converted by the mlx-community organisation; Parakeet is NVIDIA's
+# (CC-BY-4.0); Kokoro-82M is hexgrad's (Apache-2.0).
+
+- id: whisper-tiny-mlx
+  aliases: [mlx-community/whisper-tiny-mlx]
+  task: stt
+  engine: mlx
+  kind: mlx-whisper
+  family: Whisper
+  languages: &whisper_languages [en, zh, de, es, ru, ko, fr, ja, pt, tr, pl, ca, nl, ar, sv, it, id, hi, fi, vi, he, uk, el, ms, cs, ro, da, hu, ta, 'no', th, ur, hr, bg, lt, la, mi, ml, cy, sk, te, fa, lv, bn, sr, az, sl, kn, et, mk, br, eu, is, hy, ne, mn, bs, kk, sq, sw, gl, mr, pa, si, km, sn, yo, so, af, oc, ka, be, tg, sd, gu, am, yi, lo, uz, fo, ht, ps, tk, nn, mt, sa, lb, my, bo, tl, mg, as, tt, haw, ln, ha, ba, jw, su, yue]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 74418802
+  params: 39000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, translate, language-detect, word-timestamps]
+  description: 'Whisper tiny on MLX (Apple silicon GPU, float16), through mlx-whisper. Multilingual (99 languages);
+    detects the language when none is given; word timestamps. Needs bolo-speech[mlx].'
+  source_url: https://huggingface.co/mlx-community/whisper-tiny-mlx
+  validated: cpu
+  measured:
+    rtf: 18.1
+    audio_s: 3.0
+    engine: mlx 0.32.4 (Linux CPU wheel, mlx-cpu), mlx-whisper 0.4.3
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, load average about 20 from other work
+    date: '2026-11-18'
+    note: 'Through bolo''s HTTP API with device = coreml on a machine without Metal: placed on the CPU with a notice. en-short sample, transcript exact. MLX''s Linux CPU back end is far slower than on Apple silicon; not run on a Mac by the maintainers (the macOS CI job runs it).'
+  source:
+    repo: mlx-community/whisper-tiny-mlx
+    revision: 6caf9c55601caafbe6508a8b0d216bdf4783c4e8
+    include: [config.json, weights.npz]
+- id: whisper-base-mlx
+  aliases: [mlx-community/whisper-base-mlx]
+  task: stt
+  engine: mlx
+  kind: mlx-whisper
+  family: Whisper
+  languages: *whisper_languages
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 143724466
+  params: 74000000
+  license: MIT
+  license_url: https://github.com/openai/whisper/blob/main/LICENSE
+  commercial_use: true
+  features: [punctuation, translate, language-detect, word-timestamps]
+  description: 'Whisper base on MLX (Apple silicon GPU, float16), through mlx-whisper. Multilingual (99 languages);
+    detects the language when none is given; word timestamps. Needs bolo-speech[mlx].'
+  source_url: https://huggingface.co/mlx-community/whisper-base-mlx
+  validated: cpu
+  measured:
+    rtf: 20.0
+    audio_s: 3.0
+    engine: mlx 0.32.4 (Linux CPU wheel, mlx-cpu), mlx-whisper 0.4.3
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, load average about 20 from other work
+    date: '2026-11-18'
+    note: 'Loaded by the engine on the CPU, en-short sample, transcript exact. MLX''s Linux CPU back end is far slower
+      than on Apple silicon; not run on a Mac by the maintainers.'
+  source:
+    repo: mlx-community/whisper-base-mlx
+    revision: 1e3e249fb8d01c655324bd6841b1deadffd6d04c
+    include: [config.json, weights.npz]
+- id: parakeet-tdt-ctc-110m-mlx
+  aliases: [mlx-community/parakeet-tdt_ctc-110m]
+  task: stt
+  engine: mlx
+  kind: parakeet-mlx
+  family: Parakeet
+  languages: [en]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 458958626
+  params: 110000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/nvidia/parakeet-tdt_ctc-110m
+  commercial_use: true
+  features: [punctuation, word-timestamps]
+  description: 'NVIDIA Parakeet TDT-CTC 110M (English) on MLX, through parakeet-mlx: punctuated, capitalised
+    transcripts with word timestamps. Needs bolo-speech[mlx].'
+  source_url: https://huggingface.co/mlx-community/parakeet-tdt_ctc-110m
+  validated: cpu
+  measured:
+    rtf: 1.49
+    audio_s: 3.0
+    engine: mlx 0.32.4 (Linux CPU wheel, mlx-cpu), parakeet-mlx 0.7.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, load average about 20 from other work
+    date: '2026-11-18'
+    note: 'Through bolo''s HTTP API (device = coreml, placed on the CPU without Metal): en-short sample, transcript exact, word timestamps. Also the round trip of kokoro-v1.0-mlx (exact). Not run on a Mac by the maintainers (the macOS CI job runs it).'
+  source:
+    repo: mlx-community/parakeet-tdt_ctc-110m
+    revision: d62547387c356a1ab6bb3d85d98b2103f655282e
+    include: [config.json, model.safetensors, tokenizer.model, tokenizer.vocab, vocab.txt]
+- id: kokoro-v1.0-mlx
+  aliases: [mlx-community/Kokoro-82M-bf16]
+  task: tts
+  engine: mlx
+  kind: kokoro
+  family: Kokoro
+  languages: [en, es, fr, hi, it, pt]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 348532623
+  params: 82000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/hexgrad/Kokoro-82M
+  commercial_use: true
+  features: [multi-voice]
+  description: 'Kokoro-82M v1.0 on MLX (Apple silicon GPU, bfloat16), through mlx-audio. bolo phonemises the text
+    (uccharan''s Kokoro front end) and the model reads the phonemes. 41 voices in English, Spanish, French, Hindi,
+    Italian and Portuguese (the Japanese and Chinese voices need a front end bolo does not have). Needs bolo-speech[mlx].'
+  source_url: https://huggingface.co/mlx-community/Kokoro-82M-bf16
+  validated: cpu
+  measured:
+    rtf: 65.6
+    round_trip_wer: 0.0
+    round_trip_stt: parakeet-tdt-ctc-110m-mlx
+    audio_s: 4.0
+    engine: mlx 0.32.4 (Linux CPU wheel, mlx-cpu), mlx-audio 0.6.6, uccharan 0.6.6
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, load average about 20 from other work
+    date: '2026-11-18'
+    note: 'Through bolo''s HTTP API (device = coreml, placed on the CPU without Metal), voice af_heart; a blend (af_heart(0.6)+am_michael(0.4)) and Hindi (hf_alpha) also spoke. Very slow on MLX''s Linux CPU back end; meant for Apple silicon (the macOS CI job runs it).'
+  source:
+    repo: mlx-community/Kokoro-82M-bf16
+    revision: a71e4d38b236d968966a2002c4c895dbd12b1c3c
+    include: [config.json, kokoro-v1_0.safetensors, 'voices/[abefhip]*.safetensors']
+  options:
+    multi_lang: true
+    first_chunk_chars: 48
+  voices:
+  - id: af_heart
+    name: Heart
+    language: en-US
+    gender: f
+  - id: af_alloy
+    name: Alloy
+    language: en-US
+    gender: f
+  - id: af_aoede
+    name: Aoede
+    language: en-US
+    gender: f
+  - id: af_bella
+    name: Bella
+    language: en-US
+    gender: f
+  - id: af_jessica
+    name: Jessica
+    language: en-US
+    gender: f
+  - id: af_kore
+    name: Kore
+    language: en-US
+    gender: f
+  - id: af_nicole
+    name: Nicole
+    language: en-US
+    gender: f
+  - id: af_nova
+    name: Nova
+    language: en-US
+    gender: f
+  - id: af_river
+    name: River
+    language: en-US
+    gender: f
+  - id: af_sarah
+    name: Sarah
+    language: en-US
+    gender: f
+  - id: af_sky
+    name: Sky
+    language: en-US
+    gender: f
+  - id: am_adam
+    name: Adam
+    language: en-US
+    gender: m
+  - id: am_echo
+    name: Echo
+    language: en-US
+    gender: m
+  - id: am_eric
+    name: Eric
+    language: en-US
+    gender: m
+  - id: am_fenrir
+    name: Fenrir
+    language: en-US
+    gender: m
+  - id: am_liam
+    name: Liam
+    language: en-US
+    gender: m
+  - id: am_michael
+    name: Michael
+    language: en-US
+    gender: m
+  - id: am_onyx
+    name: Onyx
+    language: en-US
+    gender: m
+  - id: am_puck
+    name: Puck
+    language: en-US
+    gender: m
+  - id: am_santa
+    name: Santa
+    language: en-US
+    gender: m
+  - id: bf_alice
+    name: Alice
+    language: en-GB
+    gender: f
+  - id: bf_emma
+    name: Emma
+    language: en-GB
+    gender: f
+  - id: bf_isabella
+    name: Isabella
+    language: en-GB
+    gender: f
+  - id: bf_lily
+    name: Lily
+    language: en-GB
+    gender: f
+  - id: bm_daniel
+    name: Daniel
+    language: en-GB
+    gender: m
+  - id: bm_fable
+    name: Fable
+    language: en-GB
+    gender: m
+  - id: bm_george
+    name: George
+    language: en-GB
+    gender: m
+  - id: bm_lewis
+    name: Lewis
+    language: en-GB
+    gender: m
+  - id: ef_dora
+    name: Dora
+    language: es-ES
+    gender: f
+  - id: em_alex
+    name: Alex
+    language: es-ES
+    gender: m
+  - id: ff_siwis
+    name: Siwis
+    language: fr-FR
+    gender: f
+  - id: hf_alpha
+    name: Alpha
+    language: hi-IN
+    gender: f
+  - id: hf_beta
+    name: Beta
+    language: hi-IN
+    gender: f
+  - id: hm_omega
+    name: Omega
+    language: hi-IN
+    gender: m
+  - id: hm_psi
+    name: Psi
+    language: hi-IN
+    gender: m
+  - id: if_sara
+    name: Sara
+    language: it-IT
+    gender: f
+  - id: im_nicola
+    name: Nicola
+    language: it-IT
+    gender: m
+  - id: pf_dora
+    name: Dora
+    language: pt-BR
+    gender: f
+  - id: pm_alex
+    name: Alex
+    language: pt-BR
+    gender: m
+  - id: pm_santa
+    name: Santa
+    language: pt-BR
+    gender: m
+  - id: em_santa
+    name: Santa
+    language: es-ES
+    gender: m

@@ -9,6 +9,7 @@ that model instead of going down with it.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -47,4 +48,9 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))
+    code = main(sys.argv[1:])
+    sys.stdout.flush()
+    sys.stderr.flush()
+    # the verdict is in: leave without the interpreter's teardown, where some native libraries abort while their
+    # worker threads are stopped (MLX's Linux CPU build: "terminate called without an active exception")
+    os._exit(code)

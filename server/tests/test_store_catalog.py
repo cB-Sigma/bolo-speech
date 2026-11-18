@@ -255,7 +255,7 @@ def test_every_packaged_entry_is_well_formed() -> None:
         assert s.description and s.source_url.startswith("https://"), s.id
         assert s.engine in (
             "sherpa-onnx", "faster-whisper", "onnxruntime", "plugin:torch", "tts-server", "rnnoise", "duplex",
-            "whisper.cpp", "builtin",
+            "whisper.cpp", "builtin", "mlx",
         ), s.id  # fmt: skip
         if s.task == "tts":
             assert s.sample_rate in (8000, 16000, 22050, 24000, 32000, 44100, 48000), s.id

@@ -635,6 +635,8 @@ export interface ModelPlacement {
   graphs?: Record<string, string>
   /** CUDA GPUs the weights are on: several for a llama.cpp model spread with --tensor-split. */
   gpus?: number[]
+  /** What runs the model on that device: "Core ML (sherpa-onnx)", "MIGraphX (ONNX Runtime)", "Metal (MLX)", "CPU". */
+  runtime?: string | null
 }
 
 export interface GpuMemory {

@@ -971,7 +971,8 @@ def test_format_ps() -> None:
         },
         "models": [
             {"name": "whisper-large-v3-turbo", "task": "stt", "size": int(1.6 * GB), "processor": "100% GPU",
-             "device": "cuda", "until": "4 minutes from now", "active": 1, "requests": 12, "placement": {}},
+             "device": "cuda", "until": "4 minutes from now", "active": 1, "requests": 12,
+             "placement": {"runtime": "CUDA (CTranslate2)"}},
             {"name": "orpheus-3b-llamacpp", "task": "tts", "size": 3 * GB, "processor": "35%/65% CPU/GPU",
              "device": "cuda", "until": "Forever", "placement": {"notice": "19 of 29 layers on cuda"}},
             {"name": "silero-vad", "task": "vad", "size": 2 * MB, "processor": "100% CPU", "device": "cpu",
@@ -985,8 +986,9 @@ def test_format_ps() -> None:
     assert lines[1].split() == ["MODEL", "TASK", "SIZE", "PROCESSOR", "DEVICE", "GPU", "UNTIL"]
     assert "35%/65% CPU/GPU" in text and "4 minutes from now" in text and "Stopping..." in text
     verbose = cli.format_ps(doc, verbose=True)
+    assert "CUDA (CTranslate2)" in verbose and "CUDA (CTranslate2)" not in text
     assert "ACTIVE" in verbose and "note: orpheus-3b-llamacpp: 19 of 29 layers on cuda" in verbose
-    assert verbose.splitlines()[1].split()[7:10] == ["ACTIVE", "QUEUED", "PARALLEL"]
+    assert verbose.splitlines()[1].split()[7:11] == ["RUNTIME", "ACTIVE", "QUEUED", "PARALLEL"]
     mac = {"system": {"cpu_percent": 1, "rss_bytes": 1, "gpus": [{"index": 0, "name": "Apple GPU (unified memory)",
            "unified": True, "used_bytes": 6 * GB, "total_bytes": 16 * GB}]}, "models": []}  # fmt: skip
     assert "unified memory 6.0/16.0 GB" in cli.format_ps(mac) and "no models loaded" in cli.format_ps(mac)

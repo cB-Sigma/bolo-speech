@@ -346,7 +346,13 @@ export function LoadedModelsPanel({ className }: { className?: string }) {
                         ) : (
                           <> · VRAM {fmtBytes(row.vram)}</>
                         ))}{' '}
-                      · {row.device}
+                      · <span data-testid="model-device">{row.device}</span>
+                      {row.runtime && row.runtime !== 'CPU' && (
+                        <span data-testid="model-runtime" title="What runs the model on this device">
+                          {' '}
+                          · {row.runtime}
+                        </span>
+                      )}
                       {row.gpuIndexes.length > 1 && <> · GPUs {row.gpuIndexes.join(', ')}</>}
                     </span>
                   </div>

@@ -197,6 +197,77 @@ describe('LoadedModelsPanel', () => {
     expect(within(row!).getByTestId('model-memory')).toHaveTextContent('VRAM unknown')
   })
 
+  it('names what runs each model on its device (Core ML, MLX, ROCm)', () => {
+    const placed = (device: string, runtime: string) => ({
+      device,
+      requested: 'auto',
+      split: 'whole' as const,
+      gpu_bytes: 100 * MB,
+      cpu_bytes: 0,
+      processor: '100% GPU',
+      notice: null,
+      runtime,
+    })
+    const apple = {
+      ...stats,
+      system: {
+        ...stats.system,
+        gpus: [
+          {
+            index: 0,
+            vendor: 'apple',
+            name: 'Apple M3 GPU',
+            backend: 'metal',
+            total_bytes: 16 * GB,
+            free_bytes: 8 * GB,
+            used_bytes: 8 * GB,
+            unified: true,
+            utilization: null,
+            process_bytes: null,
+            source: 'unified',
+          },
+        ],
+      },
+      models: [
+        model({
+          id: 'moonshine-tiny-en',
+          size_vram_bytes: 100 * MB,
+          processor: '100% GPU',
+          device: 'coreml',
+          placement: placed('coreml', 'Core ML (sherpa-onnx)'),
+        }),
+        model({
+          id: 'whisper-tiny-mlx',
+          memory_bytes: 50 * MB,
+          size_vram_bytes: 50 * MB,
+          processor: '100% GPU',
+          device: 'coreml',
+          placement: placed('coreml', 'Metal (MLX)'),
+        }),
+        model({ id: 'silero-vad', task: 'vad', memory_bytes: 2 * MB, placement: placed('cpu', 'CPU') }),
+      ],
+    }
+    const rows = loadedRows(apple)
+    expect(rows.map((r) => r.runtime)).toEqual(['Core ML (sherpa-onnx)', 'Metal (MLX)', 'CPU'])
+    expect(rows[0]!.gpu?.name).toBe('Apple M3 GPU')
+    live.store.patch({ stats: apple, history: [{ t: Date.now(), stats: apple }] })
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <LoadedModelsPanel />
+      </QueryClientProvider>,
+    )
+    const [sherpa, mlx, vad] = screen.getAllByTestId('loaded-model')
+    expect(within(sherpa!).getByTestId('model-runtime')).toHaveTextContent('Core ML (sherpa-onnx)')
+    expect(within(mlx!).getByTestId('model-runtime')).toHaveTextContent('Metal (MLX)')
+    expect(within(vad!).queryByTestId('model-runtime')).toBeNull()
+    expect(
+      loadedRows({
+        ...stats,
+        models: [model({ device: 'rocm:0', placement: placed('rocm:0', 'ROCm (llama.cpp)') })],
+      })[0]!.runtime,
+    ).toBe('ROCm (llama.cpp)')
+  })
+
   it('says when the GPU was lost, and which models are still on it', () => {
     const notice = 'GPU LOST (nvidia-smi: No devices were found): reboot to recover; bolo is using the CPU'
     const lost: Stats = {

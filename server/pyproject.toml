@@ -100,6 +100,16 @@ cuda = [
   "nvidia-cublas-cu12; sys_platform == 'win32' or sys_platform == 'linux'",
   "nvidia-cudnn-cu12>=9,<10; sys_platform == 'win32' or sys_platform == 'linux'",
 ]
+# MLX models on Apple silicon's GPU (bolo.engines.mlx, docs/apple-silicon.md): mlx (MIT), mlx-whisper (MIT),
+# parakeet-mlx (Apache-2.0) and mlx-audio (MIT; Kokoro), with uccharan for Kokoro's phonemes. macOS arm64 only:
+# elsewhere the extra installs nothing (MLX's Linux CPU wheels work, `pip install "mlx[cpu]" mlx-whisper ...`)
+mlx = [
+  "mlx>=0.25; sys_platform == 'darwin' and platform_machine == 'arm64'",
+  "mlx-whisper>=0.4.2; sys_platform == 'darwin' and platform_machine == 'arm64'",
+  "parakeet-mlx>=0.3; sys_platform == 'darwin' and platform_machine == 'arm64'",
+  "mlx-audio>=0.2.5; sys_platform == 'darwin' and platform_machine == 'arm64'",
+  "uccharan>=0.6.4,<0.7; sys_platform == 'darwin' and platform_machine == 'arm64'",
+]
 all = [
   "sherpa-onnx>=2.0,<3",
   "uccharan>=0.6.4,<0.7",
@@ -181,7 +191,8 @@ module = [
   "sherpa_onnx.*", "faster_whisper.*", "ctranslate2.*", "soundfile.*", "soxr.*", "av.*",
   "moonshine_onnx.*", "kokoro_onnx.*", "pywhispercpp.*", "_pywhispercpp", "wyoming.*", "whisper_normalizer.*",
   "onnxruntime.*", "tomli.*", "aiortc.*", "uccharan.*", "tokenizers.*", "sipmessage.*", "onnx.*", "pynvml.*",
-  "opentelemetry.*", "webrtcvad.*", "sphn.*", "torch.*", "transformers.*",
+  "opentelemetry.*", "webrtcvad.*", "sphn.*", "torch.*", "transformers.*", "mlx.*", "mlx_whisper.*", "parakeet_mlx.*",
+  "mlx_audio.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"

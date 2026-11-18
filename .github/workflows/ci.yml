@@ -8,7 +8,9 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # a push to main lets the running workflow finish (the next one waits): the macOS and Windows jobs take longer than
+  # the gap between pushes, and were never reaching the end
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -70,7 +72,7 @@ jobs:
   macos:
     name: server on macOS (Apple Silicon, Python 3.12)
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 90
     defaults:
       run:
         working-directory: server
@@ -126,6 +128,60 @@ jobs:
           BOLO_DATA_DIR=/tmp/bolo-data /tmp/clean/bin/bolo components install llama-server
           BOLO_DATA_DIR=/tmp/bolo-data /tmp/clean/bin/bolo doctor | tee /tmp/doctor.txt
           grep -i -E "metal|llama" /tmp/doctor.txt || true
+          echo "== the devices the Metal build sees"
+          "$(find /tmp/bolo-data/components/llama-server -name llama-server -type f | head -1)" --list-devices
+      - name: whisper.cpp (Metal), MLX models and the torch plugin (MPS) with device = auto
+        env:
+          PYTORCH_ENABLE_MPS_FALLBACK: "1"
+        run: |
+          # [whispercpp]: pywhispercpp's macOS arm64 wheel (Metal); [mlx]: mlx, mlx-whisper, parakeet-mlx, mlx-audio
+          /tmp/clean/bin/pip install "$(ls dist/*.whl)[sherpa,whispercpp,mlx]"
+          /tmp/clean/bin/python - <<'PY'
+          import mlx.core as mx
+          print("MLX", mx.__version__, "default device:", mx.default_device(), "Metal:", mx.metal.is_available())
+          import _pywhispercpp as pw
+          print("whisper.cpp:", pw.whisper_print_system_info())
+          PY
+          export BOLO_DATA_DIR=/tmp/bolo-data
+          for m in whispercpp-tiny whisper-tiny-mlx parakeet-tdt-ctc-110m-mlx kokoro-v1.0-mlx; do /tmp/clean/bin/bolo pull $m; done
+          BOLO_DEVICE=auto /tmp/clean/bin/bolo serve --port 8765 > /tmp/serve-auto.log 2>&1 &
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:8765/healthz > /dev/null && break || sleep 1; done
+          fail() { echo "== $1"; cat /tmp/answer; echo; echo "== the server's log"; cat /tmp/serve-auto.log; exit 1; }
+          for m in whispercpp-tiny whisper-tiny-mlx parakeet-tdt-ctc-110m-mlx; do
+            curl -sS --fail-with-body -X POST http://127.0.0.1:8765/v1/audio/transcriptions -F model=$m \
+              -F file=@src/bolo/samples/en-short.wav -o /tmp/answer || fail "$m failed"
+            echo "== $m: $(cat /tmp/answer)"
+            grep -i "morning" /tmp/answer || fail "$m: no 'morning' in the transcript"
+          done
+          curl -sS --fail-with-body -X POST http://127.0.0.1:8765/v1/audio/speech -H 'content-type: application/json' \
+            -d '{"model": "kokoro-v1.0-mlx", "voice": "af_heart", "input": "Good morning. Your order arrives on Friday.", "response_format": "wav"}' \
+            -o /tmp/kokoro.wav || { cp /tmp/kokoro.wav /tmp/answer; fail "kokoro-v1.0-mlx failed"; }
+          curl -sS --fail-with-body -X POST http://127.0.0.1:8765/v1/audio/transcriptions -F model=whisper-tiny-mlx \
+            -F file=@/tmp/kokoro.wav -o /tmp/answer || fail "the round trip failed"
+          echo "== kokoro-v1.0-mlx said: $(cat /tmp/answer)"
+          grep -i "friday" /tmp/answer || fail "Kokoro on MLX: no 'Friday' in the round trip"
+          echo "== where each model runs (device, runtime, notice)"
+          curl -fsS http://127.0.0.1:8765/api/v1/ps | /tmp/clean/bin/python -c "
+          import json, sys
+          for m in json.load(sys.stdin)['models']:
+              p = m.get('placement') or {}
+              print(m['name'], m['processor'], m['device'], p.get('runtime'), p.get('notice') or '')
+          "
+          /tmp/clean/bin/bolo ps --verbose --url http://127.0.0.1:8765
+          kill %1; wait %1 || true
+          echo "== the torch plugin: bolo-torch with SepFormer (separation), device auto (MPS where the runner has it)"
+          /tmp/clean/bin/pip install "../plugins/bolo-torch[sepformer]"
+          /tmp/clean/bin/bolo-torch doctor
+          /tmp/clean/bin/python -c "import torch; print('MPS built:', torch.backends.mps.is_built(), 'available:', torch.backends.mps.is_available())"
+          /tmp/clean/bin/python -c "
+          import numpy as np, soundfile as sf
+          a, r = sf.read('src/bolo/samples/en-short.wav', dtype='float32')
+          b = np.roll(a, r // 2) * 0.8
+          sf.write('/tmp/mix.wav', a + b, r)
+          "
+          /tmp/clean/bin/bolo-torch separate /tmp/mix.wav -o /tmp/separated --device auto | tee /tmp/separated.json
+          /tmp/clean/bin/bolo doctor | tee /tmp/doctor.txt
+          grep -E "pywhispercpp|MLX|torch plugin" /tmp/doctor.txt
 
   windows:
     name: server on Windows (Python 3.12, CPU)
