@@ -660,8 +660,21 @@ are those of the WebSocket (`model`, `intent=transcription`).
 * The reply is played on the answer's audio track.
   `response.output_audio.delta` events are **not** sent; instead
   `output_audio_buffer.started` / `.stopped` / `.cleared` say what the track
-  is doing. On barge-in bolo also drops the audio it has generated but not
-  played yet, so the client has nothing to flush.
+  is doing, each with the `response_id` whose audio it is: when one answer's
+  audio follows another's on the track (an answer after a tool call), the first
+  is reported stopped and the second started when its audio really begins going
+  out. `response.done` comes when the answer has been generated, usually
+  seconds before the track falls silent: "the agent is speaking" is
+  `output_audio_buffer.started` to `.stopped` (or `.cleared`), not
+  `response.created` to `response.done`. On barge-in bolo also drops the audio
+  it has generated but not played yet, so the client has nothing to flush.
+* Over the WebSocket the client plays the audio itself and bolo cannot know
+  when it has finished (as with OpenAI, `output_audio_buffer.*` events are
+  WebRTC only): a client that shows "speaking" should follow its own playback
+  queue. The console does: on when the first audio of an answer is heard, off
+  when its queue has run dry, on barge-in (`input_audio_buffer.speech_started`)
+  or when you stop the answer; audio of an interrupted answer still in flight
+  is not played.
 * Every other event travels as JSON on the data channel the client creates
   (`oai-events`), in both directions.
 

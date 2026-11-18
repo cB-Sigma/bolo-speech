@@ -40,6 +40,16 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- **"Agent is speaking" over WebSocket (bug 18).** The Conversation page turned the indicator off at `response.done`,
+  which arrives when the answer has been generated, often seconds before it has been played, and on with the first
+  audio received rather than heard. Over WebSocket the page plays the audio itself and the server cannot know when
+  it ends, so the indicator now follows the page's own playback queue: on when the first audio is heard, off when the
+  queue has run dry (with a 250 ms grace between sentences), on barge-in or Stop the answer; audio of an interrupted
+  answer still in flight is no longer played. Over WebRTC it follows the server's `output_audio_buffer` events
+  only, and those now carry the right `response_id` for each answer: when an answer's audio follows another's on the
+  track (an answer after a tool call), the first is reported stopped and the second started at the point where its
+  audio begins, instead of one started for both. A vitest covers the indicator's state machine on both transports;
+  not tried in a real browser.
 - **GPU memory is given back after a plugin model fails to load (bug 17).** A bolo-torch load that failed on the GPU
   (out of memory part-way, a broken checkpoint) left its weights, torch's cached blocks and the CUDA context in the
   plugin process: `nvidia-smi` showed the memory held, and later loads had less room. bolo-torch now frees what it can

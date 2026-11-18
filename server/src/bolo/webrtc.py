@@ -53,7 +53,12 @@ CONNECT_TIMEOUT_S = 30.0
 
 
 class OutputTrack(MediaStreamTrack):  # type: ignore[misc]
-    """The assistant's voice: paced 20 ms frames, silence when there is nothing to say."""
+    """The assistant's voice: paced 20 ms frames, silence when there is nothing to say.
+
+    Audio is tagged with the response it belongs to. ``on_started(response_id)`` is called when a response's audio
+    starts going out and ``on_stopped(response_id)`` when it has all gone out: at the boundary in the stream when one
+    response's audio follows another's without a gap (a tool call's answer after "let me check"), not when the next
+    response's audio is queued."""
 
     kind = "audio"
 
@@ -66,28 +71,48 @@ class OutputTrack(MediaStreamTrack):  # type: ignore[misc]
         self.finished = True  # no more audio is coming for the current response
         self.on_started: Any = None
         self.on_stopped: Any = None
+        #: the response whose audio is going out now, and where later responses' audio starts in the queue
+        self.current: str | None = None
+        self._marks: list[tuple[int, str | None]] = []  # (byte offset in _pcm, response id)
+        self._tail: str | None = None  # the response of the last audio queued
 
     @property
     def queued_ms(self) -> int:
         return len(self._pcm) // 2 * 1000 // RATE
 
-    def push(self, samples: np.ndarray, rate: int) -> None:
+    def push(self, samples: np.ndarray, rate: int, response_id: str | None = None) -> None:
         if not len(samples):
             return
         audio = resample(samples, rate, RATE) if rate != RATE else samples
+        if self.playing and response_id != self._tail:
+            self._marks.append((len(self._pcm), response_id))  # this response starts after what is queued
+        self._tail = response_id
         self._pcm += (np.clip(audio, -1.0, 1.0) * 32767.0).astype("<i2").tobytes()
         self.finished = False
         if not self.playing:
             self.playing = True
+            self.current = response_id
             if self.on_started:
-                self.on_started()
+                self.on_started(response_id)
 
     def clear(self) -> int:
         """Drop what has not been played yet (barge-in). Returns how many milliseconds were dropped."""
         dropped = self.queued_ms
         self._pcm.clear()
+        self._marks.clear()
         was_playing, self.playing, self.finished = self.playing, False, True
         return dropped if was_playing else 0
+
+    def _advance(self, n: int) -> None:
+        """``n`` bytes went out: a response whose audio starts within them takes over (stopped, then started)."""
+        while self._marks and self._marks[0][0] <= n:
+            _, nxt = self._marks.pop(0)
+            if self.on_stopped:
+                self.on_stopped(self.current)
+            self.current = nxt
+            if self.on_started:
+                self.on_started(nxt)
+        self._marks = [(at - n, rid) for at, rid in self._marks]
 
     async def recv(self) -> AudioFrame:
         if self.readyState != "live":
@@ -101,10 +126,12 @@ class OutputTrack(MediaStreamTrack):  # type: ignore[misc]
                 await asyncio.sleep(wait)
         chunk = bytes(self._pcm[: FRAME * 2])
         del self._pcm[: FRAME * 2]
+        if self._marks:
+            self._advance(len(chunk))
         if self.playing and not self._pcm and self.finished:
             self.playing = False
             if self.on_stopped:
-                self.on_stopped()
+                self.on_stopped(self.current)
         frame = AudioFrame(format="s16", layout="mono", samples=FRAME)
         frame.planes[0].update(chunk.ljust(FRAME * 2, b"\0"))
         frame.pts = self._timestamp
@@ -129,8 +156,8 @@ class Call:
         self._tasks: list[asyncio.Task[None]] = []
         self._response_id: str | None = None
         self._closed = False
-        self.out.on_started = lambda: self._event("output_audio_buffer.started", response_id=self._response_id)
-        self.out.on_stopped = lambda: self._event("output_audio_buffer.stopped", response_id=self._response_id)
+        self.out.on_started = lambda rid: self._event("output_audio_buffer.started", response_id=rid)
+        self.out.on_stopped = lambda rid: self._event("output_audio_buffer.stopped", response_id=rid)
 
     # -- events to the client ---------------------------------------------------
     def _deliver(self, text: str) -> None:
@@ -157,7 +184,7 @@ class Call:
                 if codec == "alaw"
                 else pcm16_to_float(payload)
             )
-            self.out.push(samples, self.session.out_rate)
+            self.out.push(samples, self.session.out_rate, self._response_id)
             return
         if kind in ("response.output_audio.done", "response.done"):
             self.out.finished = True
@@ -172,8 +199,9 @@ class Call:
             self._clear_output()  # barge-in also silences audio that was generated but not played yet
 
     def _clear_output(self) -> None:
+        playing = self.out.current
         if self.out.clear():
-            self._event("output_audio_buffer.cleared", response_id=self._response_id)
+            self._event("output_audio_buffer.cleared", response_id=playing or self._response_id)
 
     # -- lifecycle --------------------------------------------------------------
     async def answer(self, offer_sdp: str, config: dict[str, Any] | None) -> str:

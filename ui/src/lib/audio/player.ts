@@ -31,6 +31,12 @@ export class GaplessPlayer {
   private streamOpen = true
   private stats: PlayerStats = { queuedSeconds: 0, underruns: 0, starvedMs: 0, startedAt: null }
   onEnded: (() => void) | null = null
+  /** Called when queued audio starts being heard after the queue was empty (the first chunk, or after a gap). */
+  onActive: (() => void) | null = null
+  /** Called when everything queued so far has been played (the stream may still be open). */
+  onIdle: (() => void) | null = null
+  private active = false
+  private activeTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(ctx?: AudioContext) {
     this.ctx = ctx ?? new AudioContext({ latencyHint: 'interactive' })
@@ -79,13 +85,30 @@ export class GaplessPlayer {
       this.nextTime = now + GaplessPlayer.LEAD
     }
     const t0 = this.stats.queuedSeconds
-    src.start(this.nextTime)
+    const startsAt = this.nextTime
+    src.start(startsAt)
     this.nextTime += buffer.duration
     this.stats.queuedSeconds += buffer.duration
     this.sources.add(src)
     src.onended = () => {
       this.sources.delete(src)
-      if (!this.streamOpen && this.sources.size === 0) this.onEnded?.()
+      if (this.sources.size === 0) {
+        this.active = false
+        this.onIdle?.()
+        if (!this.streamOpen) this.onEnded?.()
+      }
+    }
+    if (!this.active) {
+      // audible once the context's clock reaches the chunk's start, not when it is queued
+      this.active = true
+      if (this.activeTimer !== null) clearTimeout(this.activeTimer)
+      this.activeTimer = setTimeout(
+        () => {
+          this.activeTimer = null
+          if (this.active) this.onActive?.()
+        },
+        Math.max(0, (startsAt - now) * 1000),
+      )
     }
     return { t0, dur: buffer.duration, lateMs }
   }
@@ -114,6 +137,9 @@ export class GaplessPlayer {
 
   stop(): void {
     this.streamOpen = false
+    this.active = false
+    if (this.activeTimer !== null) clearTimeout(this.activeTimer)
+    this.activeTimer = null
     for (const s of this.sources) {
       s.onended = null
       try {

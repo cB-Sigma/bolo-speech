@@ -196,7 +196,7 @@ describe('WebRTC helpers', () => {
 
   it('folds the output_audio_buffer events and keeps formats for the WebSocket', () => {
     let s = applyEvent(emptyConversation(), { type: 'output_audio_buffer.started' })
-    expect(s.agentSpeaking).toBe(true)
+    expect(s.events).toEqual(['output_audio_buffer.started']) // the indicator is ./speaking.ts's
     s = applyEvent(s, { type: 'output_audio_buffer.cleared' })
     expect(s.agentSpeaking).toBe(false)
     const ws = sessionUpdate('cascade').session as { audio: { input: { format?: unknown } } }

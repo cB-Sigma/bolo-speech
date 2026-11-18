@@ -8,6 +8,7 @@ import { diag } from '@/lib/diagnostics'
 import type { MicFailure } from '@/lib/mic-help'
 import { MicrophoneError } from '@/lib/audio/capture'
 import { Store } from '@/lib/store'
+import { DRAIN_GRACE_MS, nextSpeaking, type SpeakingInput } from './speaking'
 import { WebRtcLink, type LinkState, type RemoteAudio } from './webrtc'
 
 /**
@@ -230,16 +231,11 @@ export function applyEvent(s: ConversationState, ev: Ev): ConversationState {
         serverFullDuplex: typeof session.full_duplex === 'boolean' ? session.full_duplex : s.serverFullDuplex,
       }
     }
+    // whether the agent is speaking is not decided here: ./speaking.ts, from the transport and the playback
     case 'input_audio_buffer.speech_started':
-      return { ...s, events, userSpeaking: true, agentSpeaking: false }
+      return { ...s, events, userSpeaking: true }
     case 'input_audio_buffer.speech_stopped':
       return { ...s, events, userSpeaking: false }
-    // WebRTC: what the agent's audio track is doing
-    case 'output_audio_buffer.started':
-      return { ...s, events, agentSpeaking: true }
-    case 'output_audio_buffer.stopped':
-    case 'output_audio_buffer.cleared':
-      return { ...s, events, agentSpeaking: false }
     case 'conversation.item.input_audio_transcription.delta': {
       const id = str(ev.item_id)
       return {
@@ -283,7 +279,6 @@ export function applyEvent(s: ConversationState, ev: Ev): ConversationState {
       return {
         ...s,
         events,
-        agentSpeaking: false,
         turns: s.turns.some((t) => t.id === id && t.role === 'assistant')
           ? upsert(s.turns, id, 'assistant', (t) => ({ ...t, final: true, status }))
           : s.turns,
@@ -388,6 +383,11 @@ export class ConversationSession {
   private closed = false
   private speechStoppedAt: number | null = null
   private answered = new Set<string>()
+  /** WebSocket: the response whose audio was queued last, and responses whose audio the page cut off (barge-in,
+   * Stop the answer): deltas of those still in flight are not played. */
+  private playing: string | null = null
+  private cut = new Set<string>()
+  private drainTimer: ReturnType<typeof setTimeout> | null = null
 
   private readonly denoise: RealtimeDenoise | undefined
   private readonly listening: Listening | undefined
@@ -421,11 +421,50 @@ export class ConversationSession {
     } else if (this.ws?.readyState === 1) {
       this.ws.send(JSON.stringify({ type: 'response.cancel' }))
     }
+    this.cutPlayback()
+    this.speaking({ kind: 'interrupted' })
+  }
+
+  /** The agent-speaking indicator after one more input (./speaking.ts). */
+  private speaking(input: SpeakingInput, base?: ConversationState): ConversationState {
+    const s = base ?? this.store.get()
+    const { transport } = s
+    const agentSpeaking = nextSpeaking(s.agentSpeaking, input, transport, this.fullDuplex)
+    const settled = input.kind === 'played' || input.kind === 'interrupted' || !agentSpeaking
+    if (settled && input.kind !== 'drained' && this.drainTimer !== null) {
+      // audio again (or already quiet): the pending "queue ran dry" no longer applies
+      clearTimeout(this.drainTimer)
+      this.drainTimer = null
+    }
+    const next = agentSpeaking === s.agentSpeaking ? s : { ...s, agentSpeaking }
+    if (!base && next !== s) this.store.set(next)
+    return next
+  }
+
+  /** A player whose activity drives the indicator over WebSocket. */
+  private newPlayer(ctx: AudioContext): GaplessPlayer {
+    const player = new GaplessPlayer(ctx)
+    player.onActive = () => {
+      if (this.player === player) this.speaking({ kind: 'played' })
+    }
+    player.onIdle = () => {
+      if (this.player !== player) return
+      if (this.drainTimer !== null) clearTimeout(this.drainTimer)
+      this.drainTimer = setTimeout(() => {
+        this.drainTimer = null
+        if (this.player === player) this.speaking({ kind: 'drained' })
+      }, DRAIN_GRACE_MS)
+    }
+    return player
+  }
+
+  /** Stop what is playing and queued (WebSocket), and play nothing more of that response. */
+  private cutPlayback(): void {
+    if (this.playing) this.cut.add(this.playing)
     if (this.player && this.ctx) {
       this.player.stop()
-      this.player = new GaplessPlayer(this.ctx)
+      this.player = this.newPlayer(this.ctx)
     }
-    this.store.patch({ agentSpeaking: false })
   }
 
   /** Answer an MCP approval request (`mcp_approval_response`): the server runs the call, or tells the model no. */
@@ -468,7 +507,7 @@ export class ConversationSession {
     try {
       this.ctx = new AudioContext({ latencyHint: 'interactive' })
       if (this.ctx.state === 'suspended') void this.ctx.resume().catch(() => undefined)
-      this.player = new GaplessPlayer(this.ctx)
+      this.player = this.newPlayer(this.ctx)
     } catch {
       this.ctx = null
     }
@@ -545,13 +584,10 @@ export class ConversationSession {
     }
     if (ev.type === 'input_audio_buffer.speech_started' && !this.fullDuplex) {
       // Barge-in: drop whatever of the answer is still queued (a full-duplex model decides that itself).
-      if (this.player && this.ctx) {
-        this.player.stop()
-        this.player = new GaplessPlayer(this.ctx)
-      }
+      this.cutPlayback()
     }
     if (ev.type === 'input_audio_buffer.speech_stopped') this.speechStoppedAt = performance.now()
-    let next = applyEvent(before, ev)
+    let next = this.speaking({ kind: 'event', type: ev.type }, applyEvent(before, ev))
     if (ev.type === 'output_audio_buffer.started') {
       // WebRTC: the answer's first audio is on the track now
       const id = typeof ev.response_id === 'string' ? ev.response_id : ''
@@ -562,15 +598,15 @@ export class ConversationSession {
       }
     }
     if (ev.type === 'response.output_audio.delta' && typeof ev.delta === 'string') {
-      this.player?.enqueue(decodeAudioDelta(ev.delta), REALTIME_RATE)
       const id = typeof ev.response_id === 'string' ? ev.response_id : ''
-      if (!this.answered.has(id)) {
-        this.answered.add(id)
-        const ms = this.speechStoppedAt != null ? performance.now() - this.speechStoppedAt : null
-        next = {
-          ...next,
-          agentSpeaking: true,
-          turns: upsert(next.turns, id, 'assistant', (t) => ({ ...t, firstAudioMs: ms })),
+      // audio of an answer the user talked over, still in flight: not played (the indicator stays off)
+      if (!this.cut.has(id)) {
+        this.playing = id
+        this.player?.enqueue(decodeAudioDelta(ev.delta), REALTIME_RATE)
+        if (!this.answered.has(id)) {
+          this.answered.add(id)
+          const ms = this.speechStoppedAt != null ? performance.now() - this.speechStoppedAt : null
+          next = { ...next, turns: upsert(next.turns, id, 'assistant', (t) => ({ ...t, firstAudioMs: ms })) }
         }
       }
     }
@@ -611,6 +647,8 @@ export class ConversationSession {
     await mic?.stop().catch(() => undefined)
     const ctx = this.ctx
     this.ctx = null
+    if (this.drainTimer !== null) clearTimeout(this.drainTimer)
+    this.drainTimer = null
     this.player?.stop()
     this.player = null
     if (ctx && ctx.state !== 'closed') await ctx.close().catch(() => undefined)

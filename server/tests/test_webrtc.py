@@ -258,3 +258,34 @@ async def test_client_secrets_open_sessions_without_the_server_key(settings: Set
         assert transcription["session"]["type"] == "transcription"
     finally:
         srv.stop()
+
+
+async def test_each_response_gets_its_own_started_and_stopped() -> None:
+    """Two answers back to back on the track (a tool call's answer queued behind "let me check"): the first is reported
+    stopped and the second started when its audio really begins going out, not when it is queued, and each event
+    names its own response, as OpenAI's output_audio_buffer events do."""
+    from bolo.webrtc import FRAME, OutputTrack
+
+    track = OutputTrack()
+    events: list[tuple[str, str | None, int]] = []
+    sent = 0
+    track.on_started = lambda rid: events.append(("started", rid, sent))
+    track.on_stopped = lambda rid: events.append(("stopped", rid, sent))
+    tenth = np.full(4800, 0.1, dtype=np.float32)  # 0.1 s at 48 kHz: five frames
+    track.push(tenth, 48000, "resp_a")
+    track.push(tenth, 48000, "resp_b")  # queued while resp_a is going out
+    assert events == [("started", "resp_a", 0)]
+    track.finished = True
+    while track.playing:
+        await track.recv()
+        sent += FRAME
+    assert events == [
+        ("started", "resp_a", 0),
+        ("stopped", "resp_a", 4 * FRAME),  # in the frame that holds resp_a's last samples
+        ("started", "resp_b", 4 * FRAME),
+        ("stopped", "resp_b", 9 * FRAME),
+    ]
+    track.push(tenth, 48000, "resp_c")
+    track.push(tenth, 48000, "resp_d")
+    assert track.clear() > 0 and track.current == "resp_c" and not track.playing  # barge-in: nothing more is reported
+    track.stop()
