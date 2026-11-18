@@ -242,11 +242,17 @@ def load(ctx: LoadContext) -> GlmVoiceS2S:
         import torch
 
         require("bitsandbytes", "glm-4-voice")
+        # when bolo asks for a GPU/CPU split, the 4-bit model is split the same way (what does not fit stays on
+        # the CPU, unquantized); otherwise it loads whole on the device
+        offload = split_kwargs(ctx)
         kwargs["quantization_config"] = transformers.BitsAndBytesConfig(
             load_in_4bit=True, bnb_4bit_use_double_quant=True, bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.bfloat16,
+            bnb_4bit_compute_dtype=torch.bfloat16, llm_int8_enable_fp32_cpu_offload=bool(offload),
         )  # fmt: skip
-        kwargs["device_map"] = {"": 0 if ctx.device == "cuda" else ctx.device}
+        if offload:
+            kwargs.update(offload)
+        else:
+            kwargs["device_map"] = {"": 0 if ctx.device == "cuda" else ctx.device}
     elif quantization:
         raise InvalidRequest(f"unknown quantization {quantization!r} (int4, or none)")
     split = {} if "device_map" in kwargs else split_kwargs(ctx)

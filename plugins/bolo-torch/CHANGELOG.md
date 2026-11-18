@@ -10,6 +10,9 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
   but left accelerate free, so accelerate 1.x was installed, and its dispatch refuses to move a bitsandbytes
   model ("`.to` is not supported for 4-bit or 8-bit bitsandbytes models"). The extras that pin transformers
   4.44 (`glm-4-voice`, `minicpm-o`) now also pin `accelerate<1.0`.
+- **GLM-4-Voice in 4-bit follows bolo's GPU/CPU split.** It was always loaded whole on the GPU, so on a 6 GB card it
+  took 7 GB and spilled into Windows' shared memory. When bolo asks for a split, what does not fit stays on the CPU
+  (bitsandbytes' CPU offload); otherwise it loads whole on the device as before.
 
 ## [0.1.5] - 2026-11-18
 
