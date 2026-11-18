@@ -735,11 +735,19 @@
     converted by ggml-org, on llama.cpp (supported since b12452): speaker tags <|speaker:0|>, <|speaker:1|> in the
     text, bracketed directions such as [whisper] or [laughing], and cloning from a reference clip with its transcript.
     The language is the text''s. Fish Audio Research License: research and non-commercial use; commercial use needs a
-    licence from Fish Audio. Added, not yet run here. About 6.3 GB: a GPU is recommended. Runs in a llama-server that
+    licence from Fish Audio. Run on an M4 Pro with Metal (2026-11-19): intelligible, 2.3 times slower than real time. About 6.3 GB: a GPU is recommended. Runs in a llama-server that
     bolo starts (bolo components install llama-server) or one you run (setting tts_servers).'
   source_url: https://huggingface.co/fishaudio/s2-pro
   validated: untested
   requires: [llama-server]
+  measured:
+    metal:
+      rtf: 2.263
+      audio_s: 6.1
+      engine: llama-server b12521 as bolo 0.6.10 installs it (Metal), device = coreml
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API: one English sentence of 6.1 s, after a warm-up request; transcribed back with whispercpp-small word for word.'
   source:
     repo: ggml-org/s2-pro-GGUF
     revision: 9328989ae2daa49da5ae2da76d63c75a06f26c25

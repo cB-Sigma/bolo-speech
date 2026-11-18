@@ -60,6 +60,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   masks numbers and e-mail addresses only, and names the two that mask names too.
 - **A console test depended on the machine's time zone** (it expected 10:00:00 and saw 15:30:00 in IST): the UI tests
   run in UTC, as CI does.
+- **`bolo torch status` on a Mac said "GPU: none found" and "torch (CPU build)".** PyPI's macOS wheel runs on Apple
+  silicon's GPU through MPS (checked on an M4 Pro: `torch.backends.mps.is_available()`, a matrix product on `mps`).
+  It now reads "GPU: apple Apple M4 Pro GPU (Metal, MPS)" and "torch 2.15.0 (Metal (MPS) build)", and gives no
+  "use a GPU build" advice there (`bolo torch use cpu` installs that same build).
+- **Fish Audio S2 Pro on llama.cpp has been run**: intelligible on an M4 Pro's GPU, 2.3 times slower than real time.
 - **`bolo doctor` on macOS said "CTranslate2 (CUDA devices: 0)".** CTranslate2 has no GPU backend on macOS, so the
   count said nothing; the runtimes line now reads "CTranslate2 4.9.0 (CPU only on macOS)". Other systems still show
   the CUDA device count.

@@ -79,7 +79,24 @@ def test_the_index_follows_the_driver() -> None:
     assert torch_envs.index_for("cuda", Gpu())[0] == "cu130"  # driver unknown: newest first
     assert torch_envs.index_for("rocm", Gpu("amd", None, (6, 4)))[0] == "rocm6.4"
     assert torch_envs.index_for("xpu") == ["xpu"] and torch_envs.index_for("cpu") == ["cpu"]
-    assert torch_envs.detect_gpu(runner, which=lambda name: None) == Gpu()
+    assert torch_envs.detect_gpu(runner, which=lambda name: None, platform="linux") == Gpu()
+
+
+def test_apple_silicon_is_a_gpu_reached_through_mps() -> None:
+    """On an M4 Pro, bolo torch status said "GPU: none found" and "torch 2.15.0 (CPU build)" although PyPI's macOS
+    wheel runs on the GPU through MPS."""
+
+    def runner(cmd: Sequence[str], timeout: float) -> tuple[int, str]:
+        return (0, "Apple M4 Pro\n") if list(cmd)[:2] == ["sysctl", "-n"] else (1, "")
+
+    gpu = torch_envs.detect_gpu(runner, which=lambda name: None, platform="darwin", machine="arm64")
+    assert gpu == Gpu("apple", "Apple M4 Pro GPU (Metal, MPS)") and gpu.target is None  # nothing to install
+    assert torch_envs.detect_gpu(runner, which=lambda name: None, platform="darwin", machine="x86_64") == Gpu()
+    for platform in ("darwin", "macosx-11.0-arm64"):  # sys.platform, and an environment's sysconfig platform
+        assert torch_envs.build_of("2.15.0", platform) == "mps"
+    assert torch_envs.build_label("mps") == "Metal (MPS) build" and torch_envs.family_of("mps") == "cpu"
+    # no "use a GPU build" advice for a Mac: its build already is one
+    assert torch_envs.doctor_lines([], gpu) == []
     with pytest.raises(ValueError):
         torch_envs.index_for("tpu")
 

@@ -121,13 +121,16 @@ def pip_install(python: str) -> list[str]:
 # -- the builds ---------------------------------------------------------------------------------------------------
 def build_of(version: str | None, platform: str = sys.platform) -> str | None:
     """Which build a torch version is: ``cu128``, ``rocm6.4``, ``xpu``, ``cpu``; ``pypi-cuda`` for PyPI's Linux
-    wheel (a CUDA build without a local version), ``cpu`` for PyPI's Windows and macOS wheels. None: no torch."""
+    wheel (a CUDA build without a local version), ``mps`` for PyPI's macOS wheel (it runs on Apple silicon's GPU
+    through Metal), ``cpu`` for PyPI's Windows wheel. None: no torch."""
     if not version:
         return None
     local = version.partition("+")[2]
     if local:
         return local
-    return "pypi-cuda" if platform.startswith("linux") else "cpu"
+    if platform.startswith("linux"):
+        return "pypi-cuda"
+    return "mps" if platform == "darwin" or platform.startswith("macosx") else "cpu"  # sys.platform or sysconfig's
 
 
 def build_label(build: str | None, gpu: str | None = None) -> str:
@@ -136,6 +139,8 @@ def build_label(build: str | None, gpu: str | None = None) -> str:
         return "torch not installed"
     if build == "cpu":
         return "CPU build, GPU not used" if gpu else "CPU build"
+    if build == "mps":
+        return "Metal (MPS) build"
     if build == "pypi-cuda":
         return "CUDA build (PyPI)"
     m = re.fullmatch(r"cu(\d+)(\d)", build)
@@ -149,7 +154,8 @@ def build_label(build: str | None, gpu: str | None = None) -> str:
 
 
 def family_of(build: str | None) -> str | None:
-    """``cuda``, ``rocm``, ``xpu`` or ``cpu`` (the targets of ``bolo torch use``)."""
+    """``cuda``, ``rocm``, ``xpu`` or ``cpu`` (the targets of ``bolo torch use``; macOS's MPS build is what ``cpu``
+    installs there)."""
     if build is None:
         return None
     if build.startswith("cu") or build == "pypi-cuda":
@@ -162,7 +168,7 @@ def family_of(build: str | None) -> str | None:
 # -- the GPU --------------------------------------------------------------------------------------------------------
 @dataclass
 class Gpu:
-    #: "nvidia", "amd" or None (none found)
+    #: "nvidia", "amd", "apple" (Apple silicon: its GPU is reached through MPS, nothing to install) or None
     vendor: str | None = None
     name: str | None = None
     #: the newest CUDA (NVIDIA) or the installed ROCm (AMD) version, (major, minor)
@@ -178,9 +184,15 @@ def _version(text: str) -> tuple[int, int] | None:
     return (int(m[1]), int(m[2])) if m else None
 
 
-def detect_gpu(runner: Runner = run, which: Callable[[str], str | None] = shutil.which) -> Gpu:
+def detect_gpu(
+    runner: Runner = run,
+    which: Callable[[str], str | None] = shutil.which,
+    platform: str = sys.platform,
+    machine: str | None = None,
+) -> Gpu:
     """An NVIDIA GPU through ``nvidia-smi`` (its header names the newest CUDA the driver runs), else an AMD GPU
-    with ROCm (Linux: ``rocminfo``, the version from ``/opt/rocm/.info/version``)."""
+    with ROCm (Linux: ``rocminfo``, the version from ``/opt/rocm/.info/version``), else Apple silicon's GPU on a
+    Mac (named after the chip, ``sysctl machdep.cpu.brand_string``)."""
     if which("nvidia-smi"):
         code, out = runner(["nvidia-smi"], 20.0)
         if code == 0:
@@ -192,7 +204,17 @@ def detect_gpu(runner: Runner = run, which: Callable[[str], str | None] = shutil
         info = Path("/opt/rocm/.info/version")
         version = _version(info.read_text(encoding="utf-8")) if info.is_file() else None
         return Gpu("amd", None, version)
+    if platform == "darwin" and (machine or _machine()) == "arm64":
+        code, out = runner(["sysctl", "-n", "machdep.cpu.brand_string"], 5.0)
+        chip = out.strip() if code == 0 and out.strip() else "Apple silicon"
+        return Gpu("apple", f"{chip} GPU (Metal, MPS)")
     return Gpu()
+
+
+def _machine() -> str:
+    import platform as host
+
+    return host.machine()
 
 
 def index_for(target: str, gpu: Gpu | None = None) -> list[str]:
