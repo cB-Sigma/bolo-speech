@@ -162,6 +162,9 @@ class _Server:
                 info["speaker_conditioned"] = True
             if "request_fields" in vars(type(model)) or "request_fields" in vars(model):
                 info["request_fields"] = list(model.request_fields)
+        fallback = getattr(model, "device_fallback", None)
+        if isinstance(fallback, str) and fallback:  # asked for a GPU the plugin's runtime cannot reach: on the CPU
+            info["device_fallback"] = fallback
         report = getattr(model, "placement_report", None)
         if isinstance(report, dict):  # {"gpu_bytes", "cpu_bytes", "device_map"}: how the model was split
             info["placement"] = report

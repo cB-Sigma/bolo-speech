@@ -293,7 +293,7 @@ _SHORT = {
 class ProviderFallback:
     """An accelerator a runtime was asked for and did not start: the work runs on the CPU instead."""
 
-    #: "onnxruntime", "ctranslate2" or "mlx"
+    #: "onnxruntime", "ctranslate2", "mlx" or "plugin:<name>"
     runtime: str
     #: what was asked for: an ONNX Runtime provider ("CUDAExecutionProvider") or a CTranslate2 device ("cuda")
     requested: str
@@ -312,6 +312,8 @@ class ProviderFallback:
         name = {"onnxruntime": "ONNX Runtime", "ctranslate2": "CTranslate2", "mlx": "MLX"}.get(
             self.runtime, self.runtime
         )
+        if self.runtime.startswith("plugin:"):
+            name = f"the {self.runtime.removeprefix('plugin:')} plugin"
         asked = _SHORT.get(self.requested, self.requested)
         why = (
             f" ({', '.join(self.missing)} {'is' if len(self.missing) == 1 else 'are'} missing)" if self.missing else ""

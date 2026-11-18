@@ -178,6 +178,9 @@ class Model(abc.ABC):
     #: ``bolo.cuda_libs.ProviderFallback.to_dict()`` when the model's runtime gives up its accelerator while serving
     #: and goes on on the CPU, so that its placement says so
     on_fallback: Callable[[dict[str, Any]], None] | None = None
+    #: set by a model loaded on the CPU although a GPU was asked for (an engine plugin whose runtime cannot reach it:
+    #: bolo-torch with device = "rocm" on a CPU build of torch): why; the plugin host reports it as a fallback
+    device_fallback: str | None = None
 
     def close(self) -> None:  # noqa: B027 - optional hook
         """Release native resources."""

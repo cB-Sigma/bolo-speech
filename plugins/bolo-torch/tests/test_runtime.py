@@ -48,8 +48,17 @@ def test_bolo_device_names(monkeypatch: pytest.MonkeyPatch) -> None:
         runtime.pick_device("cpu", {"device": "coreml"})  # asked for by name: an error
     monkeypatch.setattr(torch.version, "hip", None)
     assert runtime.pick_device("rocm") == "cpu"  # a CUDA or CPU build of torch next to an AMD GPU
-    with pytest.raises(InvalidRequest, match="ROCm build"):
-        runtime.pick_device("cpu", {"device": "rocm"})
+    assert "is not a ROCm build" in (runtime.take_device_fallback() or "")
+    # asked for by name (BOLO_TORCH_DEVICE=rocm, a model's option) on a CPU build of torch: the CPU too, with the
+    # reason, as the built-in engines do (docs/rocm.md), not a 400
+    monkeypatch.setenv("BOLO_TORCH_DEVICE", "rocm")
+    assert runtime.pick_device("cpu") == "cpu"
+    note = runtime.take_device_fallback()
+    assert note and "is not a ROCm build" in note and "has no a" not in note
+    assert runtime.take_device_fallback() is None  # said once
+    monkeypatch.delenv("BOLO_TORCH_DEVICE")
+    assert runtime.pick_device("cpu", {"device": "hip"}) == "cpu"
+    assert runtime.pick_device("cpu") == "cpu" and runtime.take_device_fallback() is None  # the CPU was asked for
     monkeypatch.setattr(torch.version, "hip", "6.4.43482")
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     assert runtime.pick_device("rocm") == "cuda" and runtime.pick_device("hip:1") == "cuda:1"

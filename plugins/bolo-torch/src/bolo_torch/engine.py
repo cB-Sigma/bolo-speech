@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import importlib
 import logging
 import time
@@ -12,7 +13,14 @@ from typing import Any
 from bolo.engines.base import Engine, EngineStatus, LoadOptions, Model
 
 from bolo_torch import __version__
-from bolo_torch.runtime import InvalidRequest, LoadContext, pick_device, pick_dtype, set_threads
+from bolo_torch.runtime import (
+    InvalidRequest,
+    LoadContext,
+    pick_device,
+    pick_dtype,
+    set_threads,
+    take_device_fallback,
+)
 
 log = logging.getLogger("bolo_torch")
 
@@ -88,6 +96,10 @@ class TorchEngine(Engine):
         )  # fmt: skip
         t0 = time.perf_counter()
         model = loader(ctx)
+        note = take_device_fallback()
+        if note:  # asked for a GPU this torch cannot reach: bolo moves the model's placement to the CPU and says why
+            with contextlib.suppress(AttributeError):
+                model.device_fallback = note
         log.info(
             "loaded %s (%s) on %s, %s, %d threads in %.1f s",
             ctx.model_id, kind, device, str(dtype).replace("torch.", ""), threads, time.perf_counter() - t0,

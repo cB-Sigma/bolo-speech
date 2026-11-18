@@ -411,3 +411,25 @@ def test_plugins_run_in_python_utf8_mode() -> None:
         model.close()
     finally:
         proc.stop()
+
+
+def test_a_plugin_that_cannot_reach_the_gpu_loads_on_the_cpu_and_says_so() -> None:
+    """A plugin asked for a GPU its runtime cannot reach (bolo-torch with device = "rocm" on a CPU build of torch)
+    loads the model on the CPU and says why; bolo records it as a fallback, which moves the placement to the CPU."""
+    from bolo import cuda_libs
+
+    proc = PluginProcess(PluginConfig("ref", [sys.executable, "-m", "bolo.plugin.reference"]))
+    try:
+        load = {"op": "load", "kind": "fake-tts", "task": "tts", "path": "/nonexistent", "threads": 1}
+        with cuda_libs.watch() as watched:
+            model = host.PluginTTS(proc, {**load, "device": "rocm", "options": {"cpu_only_runtime": True}})
+        assert watched.whole and len(watched.fallbacks) == 1
+        message = watched.notice() or ""
+        assert message.startswith("the ref plugin could not start rocm") and "runs on the CPU" in message
+        assert list(model.synthesize("Still speaking."))
+        model.close()
+        with cuda_libs.watch() as quiet:  # on the CPU as asked: nothing to say
+            host.PluginTTS(proc, {**load, "device": "cpu", "options": {"cpu_only_runtime": True}}).close()
+        assert not quiet.fallbacks
+    finally:
+        proc.stop()

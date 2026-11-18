@@ -60,7 +60,10 @@ class ReferenceEngine(Engine):
         if spec.get("require_utf8_mode") and not sys.flags.utf8_mode:
             raise RuntimeError("not in Python UTF-8 mode: open() without an encoding would use the locale's")
         model = self.fake.load(kind, task, path, spec, opts)
-        return _CrashableTTS(model) if isinstance(model, TTSModel) else model
+        out = _CrashableTTS(model) if isinstance(model, TTSModel) else model
+        if spec.get("cpu_only_runtime") and opts.device != "cpu":  # a runtime that cannot reach the GPU asked for
+            out.device_fallback = f"device {opts.device!r}: this runtime has no GPU support, so it runs on the CPU"
+        return out
 
 
 def main() -> int:

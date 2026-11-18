@@ -395,6 +395,16 @@ class _PluginModelMixin:
             # how the plugin split the model across the GPU and the CPU (optional; bolo 0.5)
             report = (reply.get("info") or {}).get("placement")
             self.placement_report = dict(report) if isinstance(report, dict) else None
+            fallback = (reply.get("info") or {}).get("device_fallback")
+            if isinstance(fallback, str) and fallback:
+                # the plugin runs the model on the CPU although a GPU was asked for (a CPU build of torch with
+                # device = "rocm"): the load moves its placement to the CPU and the notice says why (bolo.cuda_libs)
+                from bolo import cuda_libs
+
+                asked = str(self._load_message.get("device") or "GPU")
+                cuda_libs.record(
+                    cuda_libs.ProviderFallback(f"plugin:{self.process.config.name}", asked, "cpu", [], fallback)
+                )
         return self._handle
 
     def _apply_load_reply(self, reply: dict[str, Any]) -> None:

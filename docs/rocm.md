@@ -52,6 +52,9 @@ whose runtime cannot reach the GPU goes on the CPU with a notice in `bolo ps` an
    pip install "bolo-torch[parler]"
    ```
 
+   With a CPU build of torch, `device = "rocm"` (or `BOLO_TORCH_DEVICE=rocm`, or a model's `device` option) loads
+   the plugin's models on the CPU with a notice saying why (`bolo ps`, `GET /api/v1/ps`), as the built-in engines do.
+
 6. `device = "rocm"` in `bolo.toml` (or `BOLO_DEVICE=rocm`), or leave `device = "auto"`.
 
 Without ROCm an AMD GPU can still run llama-server's Vulkan build (`device = "vulkan"`, Mesa's RADV driver); nothing

@@ -8,6 +8,10 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- **bolo-torch with `device = "rocm"` on a CPU build of torch refused to load.** `BOLO_TORCH_DEVICE=rocm` (or a
+  model's `device` option) answered 400 ("this torch 2.15.0+cpu has no a ROCm build of torch"). The model now loads
+  on the CPU with a warning, as the built-in engines do, and bolo shows why: the plugin reports the fallback with the
+  load, and the model's placement says CPU with a notice (`bolo ps`, `GET /api/v1/ps`).
 - **Plugins run in Python's UTF-8 mode.** Model code that opens a text file without naming an encoding read it with
   the Windows code page and failed (MaskGCT's bundled g2p: `UnicodeDecodeError`); plugin processes now start with
   `PYTHONUTF8=1` unless a plugin's own environment or the user sets it.

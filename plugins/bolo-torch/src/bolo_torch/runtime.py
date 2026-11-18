@@ -130,13 +130,31 @@ def _mps_available(torch: Any) -> bool:
     return bool(mps is not None and mps.is_available())
 
 
+_fallback = threading.local()
+
+
+def take_device_fallback() -> str | None:
+    """Why the last :func:`pick_device` in this thread ran on the CPU instead of the GPU it was asked for (once)."""
+    note: str | None = getattr(_fallback, "note", None)
+    _fallback.note = None
+    return note
+
+
+def _fall_back(note: str) -> str:
+    log.warning("%s", note)
+    _fallback.note = note
+    return "cpu"
+
+
 def pick_device(requested: str | None, options: dict[str, Any] | None = None) -> str:
     """``BOLO_TORCH_DEVICE`` > the model's ``device`` option > bolo's ``device`` setting; ``auto`` detects.
 
     bolo's names for accelerators are accepted too: ``coreml`` / ``metal`` is MPS and ``rocm`` / ``hip`` is
-    ``cuda`` on a ROCm build of torch. Given by bolo (its ``auto`` resolved to the machine's GPU), a torch build
-    that cannot reach that GPU runs on the CPU with a warning instead of failing (a CPU-only torch next to an AMD
-    GPU, a virtual Mac without Metal); asked for by name in ``BOLO_TORCH_DEVICE`` or the model's option, it fails."""
+    ``cuda`` on a ROCm build of torch. A torch build that cannot reach the GPU bolo gave (its ``auto`` resolved to
+    the machine's GPU: a CPU-only torch next to an AMD GPU, a virtual Mac without Metal) runs on the CPU with a
+    warning instead of failing, and so does ``rocm`` asked for by name on a torch without ROCm (docs/rocm.md);
+    :func:`take_device_fallback` says why. ``mps`` or ``coreml`` asked for by name without Metal fails."""
+    _fallback.note = None
     options = options or {}
     chosen = os.environ.get("BOLO_TORCH_DEVICE") or options.get("device")
     from_bolo = not chosen
@@ -149,18 +167,13 @@ def pick_device(requested: str | None, options: dict[str, Any] | None = None) ->
         if alias == "mps" and not _mps_available(torch):
             if not from_bolo:
                 raise InvalidRequest(f"device {choice!r} was requested but Metal (MPS) is not available")
-            log.warning("bolo asked for %s, but this torch sees no Metal (MPS) device: running on the CPU", choice)
-            return "cpu"
+            return _fall_back(f"device {choice!r}: this torch sees no Metal (MPS) device, so the model runs on the CPU")
         if alias == "cuda" and base in ("rocm", "hip") and not (hip and torch.cuda.is_available()):
-            what = "a ROCm build of torch" if not hip else "an AMD GPU"
-            if not from_bolo:
-                raise InvalidRequest(
-                    f"device {choice!r} was requested but this torch {torch.__version__} has no {what} "
-                    "(install torch from https://download.pytorch.org/whl/rocm6.4 or newer: docs/rocm.md)"
-                )
-            log.warning("bolo asked for %s, but this torch (%s) has no %s: running on the CPU", choice,
-                        torch.__version__, what)  # fmt: skip
-            return "cpu"
+            what = "is not a ROCm build" if not hip else "sees no AMD GPU"
+            return _fall_back(
+                f"device {choice!r}: torch {torch.__version__} {what}, so the model runs on the CPU (for the GPU, "
+                "install torch from https://download.pytorch.org/whl/rocm6.4 or newer: docs/rocm.md)"
+            )
         choice = alias + (f":{index}" if index and alias == "cuda" else "")
         base = alias
     if base not in DEVICES:
@@ -174,8 +187,7 @@ def pick_device(requested: str | None, options: dict[str, Any] | None = None) ->
         return "cpu"
     if base == "cuda" and not torch.cuda.is_available():
         if from_bolo and alias is not None:
-            log.warning("bolo asked for %s, but this torch sees no GPU: running on the CPU", choice)
-            return "cpu"
+            return _fall_back(f"device {choice!r}: this torch sees no GPU, so the model runs on the CPU")
         raise InvalidRequest(
             f"device {choice!r} was requested but this torch build sees no CUDA device "
             f"(torch {torch.__version__}; a CPU-only build cannot use a GPU)"
