@@ -543,3 +543,19 @@ def test_threads_do_not_leak_monitors() -> None:
 
     gc.collect()
     assert len(gpu_health._monitors) <= before  # (others may go too)
+
+
+def test_list_devices_may_take_longer_on_macos(tmp_path: Path) -> None:
+    """macOS: Metal loads its library the first time, and the first `llama-server --list-devices` took 11 s and more;
+    bolo doctor gave up at 20 s. On macOS it waits 60 s; elsewhere 20 s as before."""
+    from bolo import hardware as hw
+    from test_hardware import X86_AVX2, FakeHost, cpuinfo
+
+    assert hw.list_devices_timeout("darwin") == 60.0
+    assert hw.list_devices_timeout("linux") == hw.list_devices_timeout("windows") == 20.0
+    binary = fake_binary(tmp_path / "metal", "llama-server")
+    for system, waited in (("darwin", "60 s"), ("linux", "20 s")):
+        host = FakeHost(files={"/proc/cpuinfo": cpuinfo(X86_AVX2, 8)}, cores=8, system=system)
+        host.hangs.add(f"{binary} --list-devices")
+        found = hw.detect(Settings(data_dir=tmp_path / "data", llama_server_bin=str(binary)), host, deep=True)
+        assert f"did not answer within {waited}" in (found.runtimes["llama-server"]["probe_error"] or "")

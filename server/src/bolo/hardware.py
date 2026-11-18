@@ -976,7 +976,9 @@ def _server_runtime(host: Host, settings: Settings | None, runtime: str, deep: b
             env = tts_runtimes.child_env(flavour) if host.system() == "windows" else {}
             devices, why = host.cached(
                 ("list-devices", *_stamp(path), tuple(sorted((env or {}).items()))),
-                lambda: host.probe([str(path), "--list-devices"], timeout=LIST_DEVICES_TIMEOUT_S, env=env or None),
+                lambda: host.probe(
+                    [str(path), "--list-devices"], timeout=list_devices_timeout(host.system()), env=env or None
+                ),
             )
             if why is not None:
                 hint = ""
@@ -999,6 +1001,14 @@ _DEVICE_LINE = re.compile(r"^\s*(CUDA|Vulkan|Metal|MTL|SYCL|ROCm|HIP|OpenCL|BLAS
 
 #: how long ``llama-server --list-devices`` may take (it starts every GPU backend of the build)
 LIST_DEVICES_TIMEOUT_S = 20.0
+#: macOS: Metal loads (and compiles) its shader library the first time a process uses it, and the first
+#: ``--list-devices`` took 11 s and more there
+LIST_DEVICES_TIMEOUT_MACOS_S = 60.0
+
+
+def list_devices_timeout(system: str) -> float:
+    """How long ``--list-devices`` may take on ``system`` (``Host.system()``: "darwin", "linux", "windows")."""
+    return LIST_DEVICES_TIMEOUT_MACOS_S if system == "darwin" else LIST_DEVICES_TIMEOUT_S
 
 
 def _torch_plugin(host: Host, settings: Settings | None, deep: bool) -> dict[str, Any]:

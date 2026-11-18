@@ -35,6 +35,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- **`bolo doctor` on macOS warned that `llama-server --list-devices` did not answer.** Metal loads its library the
+  first time a process uses it, and the first `--list-devices` took 11 s and more; the probe gave up at 20 s. On
+  macOS it now waits up to 60 s; elsewhere 20 s, as before.
 - **`bolo components install minicpm-o` failed its own check on Windows (2 of 2).** minicpmo-utils 1.0.6 pins
   librosa 0.9.0, which imports `pkg_resources`; setuptools 81 dropped it and the component's environment (made with
   uv) had none, so `import librosa` failed and the install was removed. The environment now gets `setuptools<81`
