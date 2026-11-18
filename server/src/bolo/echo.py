@@ -205,8 +205,8 @@ class EchoCancellerModel(Model):
 
 class WebRtcAec3(EchoCancellerModel):
     def __init__(self, spec: dict[str, Any]) -> None:
-        self.id = str(spec.get("id", ""))
-        opts = spec.get("options") or {}
+        self.id = str(spec.get("id") or spec.get("model_id") or "")
+        opts = {**(spec.get("options") or {}), **spec}
         self.delay_ms = int(opts.get("delay_ms", 0))
         self.noise_suppression = bool(opts.get("noise_suppression", False))
         WebRtcAec3Stream()  # fails here, at load, when LiveKit's SDK is missing
@@ -217,8 +217,8 @@ class WebRtcAec3(EchoCancellerModel):
 
 class SpeexAec(EchoCancellerModel):
     def __init__(self, spec: dict[str, Any]) -> None:
-        self.id = str(spec.get("id", ""))
-        opts = spec.get("options") or {}
+        self.id = str(spec.get("id") or spec.get("model_id") or "")
+        opts = {**(spec.get("options") or {}), **spec}
         self.filter_ms = int(opts.get("filter_ms", 400))
         self.preprocess = bool(opts.get("preprocess", True))
         SpeexAecStream(self.filter_ms, self.preprocess)
@@ -231,8 +231,8 @@ class DtlnAec(EchoCancellerModel):
     def __init__(self, path: Path, spec: dict[str, Any], threads: int = 1) -> None:
         import onnxruntime as ort
 
-        self.id = str(spec.get("id", ""))
-        opts = spec.get("options") or {}
+        self.id = str(spec.get("id") or spec.get("model_id") or "")
+        opts = {**(spec.get("options") or {}), **spec}
         so = ort.SessionOptions()
         so.intra_op_num_threads = max(1, int(threads))
         so.inter_op_num_threads = 1
@@ -275,7 +275,7 @@ class FakeEchoCanceller(EchoCancellerModel):
     """Tests: the microphone is muted while there is reference audio (half duplex); counts the reference."""
 
     def __init__(self, spec: dict[str, Any]) -> None:
-        self.id = str(spec.get("id", ""))
+        self.id = str(spec.get("id") or spec.get("model_id") or "")
         self.reference_s = 0.0
 
     def create_stream(self) -> EchoStream:
