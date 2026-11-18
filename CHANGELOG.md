@@ -6,6 +6,16 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Security
+
+- **Console build tooling: `npm audit` down from 22 alerts (13 high, 9 moderate) to 18 (all high).** vite 8.3.8,
+  vitest 5.1.1, eslint 10.15.0, typescript-eslint 8.73.0 and @vitejs/plugin-react 6.3.0; npm overrides take
+  minimatch to 11.0.9 (GHSA-g3hv-75wg-m249) and shadcn's @dotenvx/dotenvx to 2.38.2, which no longer depends on
+  fdir or picomatch. The 18 left all come from picomatch's ReDoS advisory (GHSA-fc5q-39xc-vjpf), which covers every
+  release up to the latest (4.0.7) and has no fix yet; `npm audit fix --force` would only downgrade vite, vitest,
+  typescript-eslint and shadcn. All of it is build and test tooling: nothing ships in the console bundle, which builds
+  byte-for-byte the same. shadcn stays a devDependency because `src/index.css` imports `shadcn/tailwind.css`.
+
 ### Fixed
 
 - **bolo-torch on a CPU-only torch next to an NVIDIA GPU (PyPI's torch on Windows).** With `device = "cuda"` the
