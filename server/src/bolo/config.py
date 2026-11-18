@@ -201,7 +201,7 @@ class Settings:
     plugins: list[str] = field(default_factory=list)
     plugin_entry_points: bool = True  # discover plugins installed as packages (entry-point group bolo.engines)
     plugin_idle_s: float = 300.0  # stop a plugin process when none of its models has been loaded for this long
-    plugin_memory_limit_mb: int = 0  # address-space limit of a plugin process (POSIX); 0: none
+    plugin_memory_limit_mb: int = 0  # memory limit of a plugin process (not applied on macOS); 0: none
     plugin_nice: int = 0  # scheduling niceness added to plugin processes
 
     # -- external TTS servers (engine tts-server: llama-server, audio.cpp; docs/models.md) ---------

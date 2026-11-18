@@ -15,6 +15,9 @@ They are tied to bolo's lifetime and stopped gracefully before they are killed:
 * **macOS** (and Linux as well): children stay in bolo's process group, so Ctrl+C in a terminal and a service
   manager stopping the group reach them, and the children still running are stopped when bolo exits normally
   (``atexit``) and on ``SIGHUP``. A ``kill -9`` of bolo leaves them running on macOS.
+* **Memory limit:** ``RLIMIT_AS`` on Linux; macOS neither enforces ``RLIMIT_AS`` nor accepts one below the
+  address space every process reserves there, so on macOS the limit is not applied (bolo logs that once) and the
+  child starts without it.
 * **Everywhere:** :func:`stop` asks first (``SIGTERM`` / ``CTRL_BREAK_EVENT``) and kills after a grace period.
 
 Only the standard library is used (``ctypes`` on Windows and Linux).
@@ -32,13 +35,14 @@ import signal
 import subprocess
 import sys
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 log = logging.getLogger("bolo.procs")
 
 WINDOWS = sys.platform == "win32"
 LINUX = sys.platform.startswith("linux")
+MACOS = sys.platform == "darwin"
 
 # Windows constants (winbase.h, winnt.h)
 CREATE_NEW_PROCESS_GROUP = 0x00000200
@@ -202,6 +206,19 @@ def _preexec(limits: Limits, parent: int, prctl: Any) -> None:  # pragma: no cov
         resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
 
 
+_warned_macos_memory = False
+
+
+def _no_memory_limit_on_macos() -> None:
+    global _warned_macos_memory
+    if not _warned_macos_memory:
+        _warned_macos_memory = True
+        log.warning(
+            "the memory limit for child processes (plugin_memory_limit_mb) is not applied on macOS, which does not "
+            "enforce an address-space limit; children start without one"
+        )
+
+
 class _Spawner:
     """Starts children from one daemon thread that lives as long as bolo (see PR_SET_PDEATHSIG above)."""
 
@@ -284,6 +301,9 @@ def spawn(argv: list[str], *, limits: Limits | None = None, **kwargs: Any) -> su
                 job.close()
                 job = None
     else:
+        if MACOS and limits.memory_limit_mb > 0:
+            _no_memory_limit_on_macos()
+            limits = replace(limits, memory_limit_mb=0)
         prctl = None
         if LINUX:
             with contextlib.suppress(OSError, AttributeError):

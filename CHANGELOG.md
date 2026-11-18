@@ -466,6 +466,10 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   test keeps it so.
 ### Fixed
 
+- macOS: a plugin worker with a memory limit (`plugin_memory_limit_mb` > 0) did not start ("Exception occurred in
+  preexec_fn"): macOS refuses an address-space limit below what every process reserves there and does not enforce
+  one. On macOS the limit is now not applied (bolo logs that once) and the worker starts; Linux and Windows are
+  unchanged.
 - Console: the Speech to text page scrolled sideways on a phone (178 px at 390 px wide): the folded "Advanced decoding"
   header's one-line summary set the width of the "Who spoke when" panel. The console's mock suite failed on it
   (four tests) and on three tests that had fallen behind the console: the in-browser recogniser list (it has 28

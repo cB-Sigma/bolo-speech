@@ -12,9 +12,9 @@ Process lifecycle (:class:`PluginProcess`):
   process after a back-off (1 s, doubling up to 60 s while crashes keep coming) and loads the
   models again transparently;
 * stopped when no model has been loaded on it for ``plugin_idle_s`` seconds;
-* optional memory limit (``plugin_memory_limit_mb``: the address space, ``RLIMIT_AS``, on POSIX; committed
-  memory through the process's Job Object on Windows) and lower scheduling priority (``plugin_nice``; on Windows
-  any positive value means ``BELOW_NORMAL_PRIORITY_CLASS``);
+* optional memory limit (``plugin_memory_limit_mb``: the address space, ``RLIMIT_AS``, on Linux; committed
+  memory through the process's Job Object on Windows; not applied on macOS) and lower scheduling priority
+  (``plugin_nice``; on Windows any positive value means ``BELOW_NORMAL_PRIORITY_CLASS``);
 * tied to bolo's lifetime and stopped with bolo (bolo.procs: a Job Object on Windows, the parent-death signal on
   Linux).
 """

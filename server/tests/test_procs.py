@@ -124,6 +124,25 @@ def test_children_die_with_a_killed_parent() -> None:
         parent.kill()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX path: Windows limits memory with its Job Object")
+def test_macos_starts_children_without_the_memory_limit(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """macOS refuses an address-space limit in the child (the start failed in ``preexec_fn``): there the child starts
+    without it, the lower priority still applies, and bolo says so once."""
+    monkeypatch.setattr(procs, "MACOS", True)
+    monkeypatch.setattr(procs, "_warned_macos_memory", False)
+    caplog.set_level("WARNING", logger="bolo.procs")
+    code = "import time\nblock = bytearray(600 * 1024 * 1024)\nprint('allocated', flush=True)\ntime.sleep(30)\n"
+    proc = procs.spawn(python(code), limits=procs.Limits(nice=5, memory_limit_mb=400), stdout=subprocess.PIPE)
+    try:
+        assert read_line(proc) == "allocated"
+        assert psutil.Process(proc.pid).nice() >= os.nice(0) + 5
+    finally:
+        procs.stop(proc, timeout=1)
+    assert "not applied on macOS" in caplog.text
+
+
 def test_limits_lower_priority_and_memory() -> None:
     proc = procs.spawn(
         python("""
@@ -139,7 +158,10 @@ def test_limits_lower_priority_and_memory() -> None:
         stdout=subprocess.PIPE,
     )
     try:
-        assert read_line(proc) == "limited"
+        if sys.platform == "darwin":  # macOS enforces no address-space limit: the child starts without one
+            assert read_line(proc) == "allocated"
+        else:
+            assert read_line(proc) == "limited"
         priority = psutil.Process(proc.pid).nice()
         if sys.platform == "win32":
             assert priority == psutil.BELOW_NORMAL_PRIORITY_CLASS  # type: ignore[attr-defined,unused-ignore]

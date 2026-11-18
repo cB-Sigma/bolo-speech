@@ -52,7 +52,7 @@ answered with HTTP 424 `component_missing` and the install hint from the entry's
 | `plugins` | `[]` | `name=command args` per plugin |
 | `plugin_entry_points` | `true` | discover installed plugin packages |
 | `plugin_idle_s` | `300` | stop a plugin process when none of its models has been loaded for this long |
-| `plugin_memory_limit_mb` | `0` (none) | address-space limit of a plugin process (POSIX `RLIMIT_AS`) |
+| `plugin_memory_limit_mb` | `0` (none) | address-space limit of a plugin process (`RLIMIT_AS` on Linux, committed memory on Windows; not applied on macOS) |
 | `plugin_nice` | `0` | added scheduling niceness of plugin processes |
 
 ## What bolo does for a plugin
