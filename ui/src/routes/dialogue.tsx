@@ -9,6 +9,7 @@ import { useVoices } from '@/components/voices/use-voices'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -65,6 +66,7 @@ export default function DialoguePage() {
   const [mode, setMode] = useState<DialogueMode>('auto')
   const [pause, setPause] = useState(300)
   const [instructions, setInstructions] = useState('')
+  const [watermark, setWatermark] = useState(false)
   const [editing, setEditing] = useState<'turns' | 'script'>('turns')
   const [script, setScript] = useState(toScript(STARTER))
   const [busy, setBusy] = useState(false)
@@ -89,6 +91,7 @@ export default function DialoguePage() {
       mode,
       pauseMs: pause,
       instructions: followsInstructions(model) ? instructions : undefined,
+      watermark,
     })
     if (!body.turns.length) {
       toast.error('Add at least one turn with a speaker and text')
@@ -284,6 +287,20 @@ export default function DialoguePage() {
                   Stop
                 </Button>
               )}
+              <label
+                className="flex h-8 items-center gap-2 rounded-lg border border-input px-2.5 text-xs dark:bg-input/30"
+                title="An inaudible mark that says the recording was made by a machine (AudioSeal)"
+              >
+                Watermark
+                <Switch
+                  checked={watermark}
+                  onCheckedChange={setWatermark}
+                  size="sm"
+                  disabled={busy}
+                  aria-label="Add an inaudible watermark"
+                  data-testid="dialogue-watermark"
+                />
+              </label>
               <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 Pause between turns
                 <Input

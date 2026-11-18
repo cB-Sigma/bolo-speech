@@ -27,7 +27,28 @@ def _detect(client: TestClient, audio: bytes, **data: str) -> dict:
     return r.json()
 
 
-def test_cloned_speech_is_marked_by_default_and_plain_speech_is_not(settings: Settings) -> None:
+def test_off_by_default_nothing_is_marked_and_nothing_is_pulled(settings: Settings) -> None:
+    """Watermarking is opt-in: without a request that asks, cloned speech is not marked and the watermark model is
+    never loaded (so never pulled, whatever ``auto_pull`` says)."""
+    assert Settings().watermark == "off"
+    settings.auto_pull = True
+    with _client(settings) as client:
+        settings.watermark_model = "audioseal-16bits"  # not installed: a load would try to pull it
+        ref = "data:audio/wav;base64," + base64.b64encode(tone_wav()).decode()
+        body = {"model": "fake-tts-clone", "input": "Hello.", "response_format": "wav", "reference_audio": ref}
+        r = client.post("/v1/audio/speech", json=body)
+        assert r.status_code == 200 and "x-bolo-watermark" not in r.headers
+        loaded = client.get("/api/v1/ps").json()
+        assert "audioseal" not in str(loaded)
+        pulls = client.get("/api/v1/models/audioseal-16bits").json()
+        assert not pulls.get("installed") and not pulls.get("pulling")
+        settings.watermark_model = "fake-watermark"
+        r = client.post("/v1/audio/speech", json={**body, "watermark": True})
+        assert r.headers["x-bolo-watermark"] == "fake-watermark"
+
+
+def test_the_cloned_policy_marks_cloned_speech_and_plain_speech_is_not(settings: Settings) -> None:
+    settings.watermark = "cloned"
     with _client(settings) as client:
         ref = "data:audio/wav;base64," + base64.b64encode(tone_wav()).decode()
         body = {"model": "fake-tts-clone", "input": "Hello there. How are you?", "response_format": "wav"}

@@ -1039,6 +1039,17 @@ def test_voice_conversion_through_audiocpp(settings: Settings, audiocpp: FakeTTS
         assert r.status_code == 200 and r.headers["x-bolo-target"] == "reference=upload"
         assert audiocpp.requests[-1]["body"]["request"]["options"] == {"seed": "7", "fast": "true"}
 
+        srv.core.settings.watermark_model = "fake-watermark"
+        r = httpx.post(
+            url,
+            files={"file": ("a.wav", source)},
+            data={"model": "vc", "voice": "en-short", "watermark": "on"},
+            timeout=30,
+        )
+        assert r.status_code == 200 and r.headers["x-bolo-watermark"] == "fake-watermark"
+        r = httpx.post(url, files={"file": ("a.wav", source)}, data={"model": "vc", "voice": "en-short"}, timeout=30)
+        assert "x-bolo-watermark" not in r.headers  # off by default
+
         r = httpx.post(url, files={"file": ("a.wav", source)}, data={"model": "vc", "voice": "nobody"}, timeout=30)
         assert r.status_code == 400 and "from a recording" in r.json()["error"]["message"]
 

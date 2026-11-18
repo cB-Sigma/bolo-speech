@@ -63,6 +63,7 @@ async def convert_voice(
     reference: bytes | None = None,
     options: dict[str, Any] | None = None,
     trace: Trace,
+    watermark: Any = None,
 ) -> Conversion:
     """Convert ``samples`` (mono float32 at ``rate``) to the target voice; see the module docstring."""
     from bolo.engines.base import VoiceConversionModel
@@ -97,4 +98,12 @@ async def convert_voice(
             out, _info = await entry.queue.submit("convert", (source, target_audio, model_voice, dict(options or {})))
         out_rate = vc.sample_rate
     trace.extra["voice_conversion"] = {"model": spec.id, **described}
-    return Conversion(np.asarray(out, dtype=np.float32), out_rate, spec.id, described)
+    samples_out = np.asarray(out, dtype=np.float32)
+    # converted speech imitates a voice: under the "cloned" policy it is marked like a cloned voice
+    from bolo.watermark import choose, marker
+
+    async with marker(core, choose(core, watermark, cloned=True)) as mark:
+        if mark is not None:
+            samples_out = await mark.mark(samples_out, out_rate)
+            trace.extra["watermark"] = mark.record()
+    return Conversion(samples_out, out_rate, spec.id, described)

@@ -30,6 +30,7 @@ describe('dialogue', () => {
       mode: undefined,
       pause_ms: 200,
       instructions: undefined,
+      watermark: undefined,
       response_format: 'wav',
     })
   })

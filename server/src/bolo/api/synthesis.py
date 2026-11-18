@@ -56,8 +56,8 @@ class DialogueRequest(BaseModel):
     )
     watermark: bool | str | None = Field(
         default=None,
-        description="As for `/v1/audio/speech`: on, off or a watermark model; unset: the server's policy (a one-take "
-        "dialogue imitates recordings, so it counts as cloned speech).",
+        description="As for `/v1/audio/speech`: on, off or a watermark model; unset: the server's `watermark` setting "
+        "(`off` by default; under `cloned`, a one-take dialogue counts as cloned speech).",
     )
     response_format: str = "wav"
     sample_rate: int | None = None
@@ -166,8 +166,9 @@ async def _voice_conversion(
     trace = Trace("voice-conversion", "http", model or "")
     try:
         result = await convert_voice(
-            core, samples, rate, model=model, voice=voice, reference=reference, options=options, trace=trace
-        )
+            core, samples, rate, model=model, voice=voice, reference=reference, options=options, trace=trace,
+            watermark=form.get("watermark") or None,
+        )  # fmt: skip
         data = await asyncio.to_thread(encode_audio, result.samples, result.sample_rate, fmt, out_rate)
         trace.finish("ok")
     except BoloError as exc:
@@ -183,6 +184,10 @@ async def _voice_conversion(
         "x-sample-rate": str(encoder.sample_rate),
         "x-bolo-target": ", ".join(f"{k}={v}" for k, v in result.target.items()),
     }
+    from bolo.core import fallback_headers
+
+    if "x-bolo-watermark" in (wm := fallback_headers(trace)):
+        headers["x-bolo-watermark"] = wm["x-bolo-watermark"]
     return Response(data, media_type=encoder.media_type, headers=headers)
 
 
@@ -192,7 +197,8 @@ async def voice_conversion(request: Request) -> Response:
     clip ``en-short`` / ``en-long`` / ``hi-short``, or a voice of the model for RVC), or ``reference_audio`` (a
     recording of the target voice, which wins over ``voice``); ``model`` (a ``voice-conversion`` model, default
     ``default_voice_conversion``), ``options`` (JSON: the model's request options, e.g. Seed-VC's
-    ``num_inference_steps``), ``response_format`` (default ``wav``), ``sample_rate``, ``keep_alive``.
+    ``num_inference_steps``), ``watermark`` (``on`` or a watermark model: an inaudible mark on the result; off by
+    default), ``response_format`` (default ``wav``), ``sample_rate``, ``keep_alive``.
 
     Headers: ``x-bolo-model``, ``x-bolo-target`` (``saved=priya``, ``clip=en-short``, ``voice=default`` or
     ``reference=upload``), ``x-sample-rate``."""

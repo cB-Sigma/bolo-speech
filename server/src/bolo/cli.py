@@ -1212,7 +1212,7 @@ def cmd_convert(args: argparse.Namespace) -> int:
             trace = Trace("voice-conversion", "cli", "")
             result = await convert_voice(
                 core, samples, rate, model=args.model, voice=args.voice, reference=reference, options=options,
-                trace=trace,
+                trace=trace, watermark=args.watermark,
             )  # fmt: skip
             trace.finish("ok")
             core.traces.record(trace)
@@ -1220,6 +1220,12 @@ def cmd_convert(args: argparse.Namespace) -> int:
             target = ", ".join(f"{k}={v}" for k, v in result.target.items())
             seconds = len(result.samples) / result.sample_rate
             print(f"wrote {out} ({seconds:.1f}s, {fmt}); {result.model}, target {target}")
+            mark = trace.extra.get("watermark")
+            if isinstance(mark, dict):
+                if mark.get("applied"):
+                    print(f"watermarked with {mark.get('model')}", file=sys.stderr)
+                else:
+                    print(f"warning: not watermarked: {mark.get('model')}: {mark.get('reason')}", file=sys.stderr)
             if args.verbose and trace.total_ms is not None:
                 print(f"[{result.model}] {trace.total_ms:.0f} ms for {trace.audio_seconds:.1f} s", file=sys.stderr)
             return 0
@@ -2172,7 +2178,7 @@ def _doctor_watermark(settings: Settings) -> None:
     from bolo.store import ModelStore
 
     if settings.watermark == "off":
-        print("watermark: off (the watermark setting); requests may still ask for one")
+        print("watermark: off by default (the watermark setting); a request that asks for one gets it")
         return
     spec = Catalog.load(settings.data_dir).resolve(settings.watermark_model)
     if spec is None:
@@ -2622,7 +2628,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.add_argument(
         "--watermark",
-        help="on, off or a watermark model (default: the server's watermark setting; cloned voices are marked)",
+        nargs="?",
+        const="on",
+        metavar="MODEL",
+        help="add an inaudible watermark (AudioSeal; or name a watermark model); off by default",
     )
     s.add_argument(
         "--romanised",
@@ -2654,7 +2663,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="native: the model speaks it in one take; stitched: turn by turn (default: native when it can)",
     )
     s.add_argument("--pause-ms", dest="pause_ms", type=int, default=300, help="silence between stitched turns")
-    s.add_argument("--watermark", help="on, off or a watermark model (default: the server's watermark setting)")
+    s.add_argument(
+        "--watermark",
+        nargs="?",
+        const="on",
+        metavar="MODEL",
+        help="add an inaudible watermark (AudioSeal; or name a watermark model); off by default",
+    )
     s.add_argument("--instructions", help="direction for the delivery, for models that follow it")
     s.add_argument("--format", "-f", help="default: from the output file extension")
     s.add_argument("--sample-rate", dest="sample_rate", type=int)
@@ -2669,6 +2684,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--voice", help="the target: a saved voice, a reference clip (en-short, en-long, hi-short) or a model voice"
     )
     s.add_argument("--reference", help="a recording of the target voice (instead of --voice)")
+    s.add_argument(
+        "--watermark",
+        nargs="?",
+        const="on",
+        metavar="MODEL",
+        help="add an inaudible watermark to the converted speech (AudioSeal; or name a watermark model)",
+    )
     s.add_argument("--options", help="the model's request options as JSON, e.g. '{\"num_inference_steps\": 10}'")
     s.add_argument("--format", "-f", help="default: from the output file extension")
     s.add_argument("--sample-rate", dest="sample_rate", type=int)

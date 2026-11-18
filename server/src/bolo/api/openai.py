@@ -662,8 +662,8 @@ class SpeechRequest(BaseModel):
     watermark: bool | str | None = Field(
         default=None,
         description='An inaudible watermark on the speech: `true` / `"on"` (the server\'s `watermark_model`), `false` / '
-        "`\"off\"`, or a `watermark` model's id. Unset: the server's `watermark` setting (`cloned`: speech in a cloned "
-        "voice is marked). `x-bolo-watermark` names the model that marked it, or says why none could; the speech is "
+        "`\"off\"`, or a `watermark` model's id. Unset: the server's `watermark` setting (`off` by default: nothing "
+        "is marked). `x-bolo-watermark` names the model that marked it, or says why none could; the speech is "
         "never refused for it.",
     )
     response_format: str = "mp3"

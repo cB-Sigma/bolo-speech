@@ -9,6 +9,7 @@ import { dataUrlToBlob } from '@/components/voices/new-voice-dialog'
 import { useVoices } from '@/components/voices/use-voices'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -56,6 +57,7 @@ export default function ConvertPage() {
   const [useUpload, setUseUpload] = useState(false)
   const [reference, setReference] = useState<CloneReference | null>(null)
   const [busy, setBusy] = useState(false)
+  const [watermark, setWatermark] = useState(false)
   const [result, setResult] = useState<Result | null>(null)
   const [recording, setRecording] = useState(false)
   const [elapsed, setElapsed] = useState(0)
@@ -125,6 +127,7 @@ export default function ConvertPage() {
         model: model.id,
         voice: upload ? undefined : chosen,
         reference: upload,
+        watermark,
       })
       const blob = await res.blob()
       setResult({
@@ -271,6 +274,20 @@ export default function ConvertPage() {
             >
               <Play className="fill-current" /> {busy ? 'Converting…' : 'Convert'}
             </Button>
+            <label
+              className="ml-2 inline-flex h-8 items-center gap-2 rounded-lg border border-input px-2.5 text-xs dark:bg-input/30"
+              title="An inaudible mark that says the speech was converted by a machine (AudioSeal)"
+            >
+              Watermark
+              <Switch
+                checked={watermark}
+                onCheckedChange={setWatermark}
+                size="sm"
+                disabled={busy}
+                aria-label="Add an inaudible watermark"
+                data-testid="convert-watermark"
+              />
+            </label>
             {result && (
               <div className="mt-4 grid gap-3" data-testid="convert-result">
                 <audio controls src={result.url} className="w-full" />

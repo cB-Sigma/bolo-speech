@@ -132,9 +132,9 @@ class Settings:
     default_wake_word: str = "kws-zipformer-gigaspeech"
     #: echo cancellation in every Realtime session unless it says otherwise: off, or a model id (or "default")
     echo_cancellation: str = "off"
-    #: watermark synthetic speech (bolo.watermark): "cloned" (speech in a cloned voice), "all" or "off"; a request's
-    #: own ``watermark`` wins
-    watermark: str = "cloned"
+    #: watermark synthetic speech (bolo.watermark) when a request does not say: "off" (the default: only requests that
+    #: ask are marked), "cloned" (speech in a cloned voice) or "all"; a request's own ``watermark`` wins
+    watermark: str = "off"
     #: the watermarker speech is marked with, and the default detector (a ``watermark`` model)
     watermark_model: str = "audioseal-16bits"
     #: the 16-bit payload this server's marks carry ("0"/"1"); detection says whether a mark carries it

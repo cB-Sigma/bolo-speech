@@ -37,7 +37,7 @@ the OpenAI audio and Realtime APIs. On top of speech-to-text and text-to-speech 
 - **Speech directed in words**: `instructions` ("calm, a little amused, speaking slowly") reach every model that
   follows them (Qwen3-TTS CustomVoice, CosyVoice3, FireRedTTS3, OmniVoice, Maya1, Parler-TTS, …), and
   multi-speaker dialogues with a voice per speaker, spoken in one take or turn by turn, and voice conversion (the
-  same words in another voice); cloned speech carries an inaudible watermark (AudioSeal) that bolo can detect.
+  same words in another voice); speech can carry an inaudible watermark (AudioSeal) that bolo detects.
 - **Indian languages**: speech recognition for all 22 scheduled languages, voices for 15 of them, 8 kHz telephone
   audio, and romanised input ("mujhe kal jana hai") written in the right script.
 - **Cloud models next to local ones**: OpenAI, Sarvam, ElevenLabs, Deepgram and Soniox behind the same API, with

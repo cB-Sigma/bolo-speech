@@ -950,15 +950,17 @@ or compressed. The watermarker is a catalog model of the task `watermark`; the d
 Meta's AudioSeal (MIT) as ONNX graphs, so it runs in core bolo without PyTorch. Its mark carries 16 bits: the
 server's `watermark_payload`.
 
-**Which speech is marked.** `watermark` on `POST /v1/audio/speech`, `POST /v1/audio/dialogue`, the TTS
-WebSocket, `bolo speak --watermark` and `bolo dialogue --watermark`: `true` / `"on"` (the server's
-`watermark_model`), `false` / `"off"`, or a watermark model's id. Without it the server's `watermark` setting
-decides: `cloned` (the default) marks speech in a cloned voice (a saved voice, `reference_audio`, a one-take
-dialogue), `all` marks everything, `off` nothing. The answer says what happened: `x-bolo-watermark:
-audioseal-16bits`, or `x-bolo-watermark: unavailable; audioseal-16bits: <why>` when the watermarker could not run
-(not installed with `auto_pull` off, its engine missing). **Speech is never refused for want of a watermark**: it
-goes out unmarked, the server log warns, and `bolo doctor` says so. With `auto_pull` on (the default) the
-watermarker is downloaded the first time it is needed. Streamed speech is marked chunk by chunk, each chunk on the
+**Which speech is marked.** None, unless asked: watermarking is off by default. `watermark` on `POST
+/v1/audio/speech`, `POST /v1/audio/dialogue`, `POST /v1/audio/voice-conversion` and the TTS WebSocket, `--watermark`
+on `bolo speak`, `bolo dialogue` and `bolo convert`, and a checkbox on the console's Text to speech, Dialogue and
+Voice conversion pages: `true` / `"on"` (the server's `watermark_model`), `false` / `"off"`, or a watermark model's
+id. Without it the server's `watermark` setting decides: `off` (the default), `cloned` (speech in a cloned voice: a
+saved voice, `reference_audio`, a one-take dialogue, voice conversion) or `all`. While nothing asks for a mark the
+watermark model is neither loaded nor pulled. The answer says what happened: `x-bolo-watermark: audioseal-16bits`,
+or `x-bolo-watermark: unavailable; audioseal-16bits: <why>` when the watermarker could not run (not installed with
+`auto_pull` off, its engine missing). **Speech is never refused for want of a watermark**: it goes out unmarked, the
+server log warns, and `bolo doctor` says so. With `auto_pull` on (the default) the watermarker is downloaded the
+first time a mark is asked for. Streamed speech is marked chunk by chunk, each chunk on the
 model's 20 ms frame grid counted from the start of the stream (AudioSeal's detector misses a mark that is shifted
 off that grid by a few milliseconds), so the whole recording is found marked.
 
@@ -974,7 +976,7 @@ installed watermarker, the most certain first, each in `results`). Answer:
 `bolo watermark detect clip.wav` prints the same (exit status 0 when marked, 1 when not; `--json`).
 **`POST /v1/audio/watermark`** adds the server's mark to a recording you send (multipart `file`, `model`,
 `response_format`, `sample_rate`); `bolo watermark embed in.wav -o out.wav`. The console has a Watermark page to
-drop a clip on, and a watermark control on Text to speech.
+drop a clip on, and a watermark checkbox on Text to speech, Dialogue and Voice conversion.
 
 **Checked.** The ONNX graphs (DarumaHQ/audioseal-onnx, revision 55477a4) against the PyTorch original
 (`audioseal` 0.2.0, torch 2.15 CPU) on an 11.8 s clip: the generators differ by at most 4.5e-7; audio marked by

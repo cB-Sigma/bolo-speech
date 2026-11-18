@@ -14,6 +14,8 @@ export interface DialogueBody {
   mode?: DialogueMode
   pause_ms?: number
   instructions?: string
+  /** `on`: an inaudible watermark on the recording; left out: the server's setting (off by default). */
+  watermark?: string
   response_format?: string
 }
 
@@ -68,7 +70,7 @@ export function dialogueBody(
   model: string | undefined,
   turns: DialogueTurn[],
   voices: Record<string, string>,
-  opts: { mode?: DialogueMode; pauseMs?: number; instructions?: string } = {},
+  opts: { mode?: DialogueMode; pauseMs?: number; instructions?: string; watermark?: boolean } = {},
 ): DialogueBody {
   const kept = turns.map((t) => ({ speaker: t.speaker.trim(), text: t.text.trim() })).filter((t) => t.speaker && t.text)
   const speakers = speakersOf(kept)
@@ -81,6 +83,7 @@ export function dialogueBody(
     mode: opts.mode && opts.mode !== 'auto' ? opts.mode : undefined,
     pause_ms: opts.pauseMs,
     instructions: opts.instructions?.trim() || undefined,
+    watermark: opts.watermark ? 'on' : undefined,
     response_format: 'wav',
   }
 }

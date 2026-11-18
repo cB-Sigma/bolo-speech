@@ -2,8 +2,8 @@
 
 Speech gets an inaudible watermark (task ``watermark`` models: AudioSeal by default) when the request asks for one
 (``watermark``: ``true`` / ``"on"``, or a watermark model's id) or, without that, when the server's ``watermark``
-setting says so: ``cloned`` (the default: speech in a cloned voice, a saved voice or ``reference_audio``), ``all``
-or ``off``. A watermarker that cannot run (not installed with ``auto_pull`` off, its engine missing) never stops
+setting says so: ``off`` (the default: nothing is marked, and no watermark model is loaded or pulled), ``cloned``
+(speech in a cloned voice, a saved voice or ``reference_audio``) or ``all``. A watermarker that cannot run (not installed with ``auto_pull`` off, its engine missing) never stops
 the speech: it is spoken unmarked and the response says why (``x-bolo-watermark: unavailable; ...``).
 
 The mark is made at the watermarker's rate (16 kHz for AudioSeal): the audio is resampled to it, the mark computed,
@@ -45,7 +45,7 @@ def choose(core: Bolo, requested: Any, cloned: bool) -> str | None:
     else the server's ``watermark`` policy."""
     s = core.settings
     if requested is None or requested == "":
-        policy = s.watermark if s.watermark in POLICIES else "cloned"
+        policy = s.watermark if s.watermark in POLICIES else "off"
         on = policy == "all" or (policy == "cloned" and cloned)
         return s.watermark_model if on else None
     if isinstance(requested, bool):

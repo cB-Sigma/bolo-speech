@@ -162,8 +162,7 @@ export function VoiceClonePanel({
       <div className="grid gap-3">
         <p className="text-[13px] leading-5 text-muted-foreground">
           Give a few seconds (up to 30) of clear speech from one person. It is sent with each request and replaces the
-          chosen voice. Only clone voices you have permission to use: your own, or one whose speaker agreed. Cloned
-          speech carries an inaudible watermark unless the server is set otherwise.
+          chosen voice. Only clone voices you have permission to use: your own, or one whose speaker agreed.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <Button
