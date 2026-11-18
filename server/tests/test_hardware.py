@@ -762,3 +762,22 @@ def test_a_benchmark_survives_the_windows_cpu_name_change(tmp_path: Path) -> Non
 @pytest.mark.parametrize(("threads", "expected"), [(4, 1.0), (8, 1.0), (2, 0.574), (1, 0.330)])
 def test_thread_scale(threads: int, expected: float) -> None:
     assert hw.thread_scale(threads) == pytest.approx(expected, abs=0.001)
+
+
+def test_doctor_says_ctranslate2_runs_on_the_cpu_on_macos(tmp_path: Path) -> None:
+    from bolo import cli
+
+    ct2 = types.SimpleNamespace(__version__="4.9.0", get_cuda_device_count=lambda: 0)
+    mac = FakeHost(
+        system="darwin",
+        machine="arm64",
+        commands={"sysctl -n machdep.cpu.brand_string": "Apple M4 Pro\n"},
+        modules={"ctranslate2": ct2},
+        cores=14,
+    )
+    lines = cli._hardware_lines(hw.detect(settings(tmp_path), mac).to_dict() | {"speed": {}})
+    runtimes = next(line for line in lines if line.startswith("runtimes:"))
+    assert "CTranslate2 4.9.0 (CPU only on macOS)" in runtimes and "CUDA devices" not in runtimes
+    linux = FakeHost(files={"/proc/cpuinfo": cpuinfo(X86_AVX2, 8)}, modules={"ctranslate2": ct2}, cores=8)
+    lines = cli._hardware_lines(hw.detect(settings(tmp_path), linux).to_dict() | {"speed": {}})
+    assert any("CTranslate2 4.9.0 (CUDA devices: 0)" in line for line in lines)

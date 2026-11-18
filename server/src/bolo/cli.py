@@ -1945,10 +1945,14 @@ def _hardware_lines(hw: dict[str, Any]) -> list[str]:
         else "sherpa-onnx not installed"
     )
     ct2 = rt.get("ctranslate2", {})
+    # CTranslate2 has no GPU backend on macOS: a CUDA count of 0 there says nothing.
+    ct2_devices = (
+        "CPU only on macOS"
+        if hw.get("system") == "macos"
+        else f"CUDA devices: {_unknown(ct2.get('cuda_devices'))}"
+    )
     parts.append(
-        f"CTranslate2 {ct2.get('version') or ''} (CUDA devices: {_unknown(ct2.get('cuda_devices'))})"
-        if ct2.get("installed")
-        else "CTranslate2 not installed"
+        f"CTranslate2 {ct2.get('version') or ''} ({ct2_devices})" if ct2.get("installed") else "CTranslate2 not installed"
     )
     torch = rt.get("plugin:torch", {})
     if torch.get("installed"):

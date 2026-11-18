@@ -6,6 +6,12 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`bolo doctor` on macOS said "CTranslate2 (CUDA devices: 0)".** CTranslate2 has no GPU backend on macOS, so the
+  count said nothing; the runtimes line now reads "CTranslate2 4.9.0 (CPU only on macOS)". Other systems still show
+  the CUDA device count.
+
 ## [0.6.10] - 2026-11-18
 
 ### Added
