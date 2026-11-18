@@ -3,15 +3,9 @@
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/banner-dark.png">
       <source media="(prefers-color-scheme: light)" srcset="docs/assets/brand/banner-light.png">
-      <img src="docs/assets/brand/banner-dark.png" alt="bolo: Ollama for speech. Speech-to-text, text-to-speech and voice agents on your own machine." width="100%">
+      <img src="docs/assets/brand/banner-dark.png" alt="bolo · बोलो: Ollama for speech. The open speech stack, running privately on your own machine." width="100%">
     </picture>
   </a>
-</p>
-
-<h3 align="center">Speech-to-text, text-to-speech and voice agents on your own machine.</h3>
-
-<p align="center">
-  One server, a few hundred open models, the APIs your apps already use. No PyTorch. Apache-2.0.
 </p>
 
 <p align="center">
@@ -25,52 +19,74 @@
   <a href="https://cb-sigma.github.io/bolo-speech/"><img src="docs/assets/brand/button-live-demo.png" alt="Try the live demo" width="233"></a>
 </p>
 
-**bolo** (बोलो, "speak") pulls speech models by name, like Ollama does for language models, and serves them over
-the OpenAI audio and Realtime APIs. On top of speech-to-text and text-to-speech it has:
+<table>
+<tr>
+<td width="58%" valign="top">
 
-- **Ollama-style model scheduling**: each model on the GPU when it fits and on the CPU when it does not, split
-  across both when it half-fits, unloaded after a keep-alive; `bolo ps` shows where everything runs.
-- **Speaker diarization and speaker-attributed transcription**: who spoke when, and each speaker's words
-  transcribed separately, overlaps included, without PyTorch.
-- **Voice cloning with a voice library**: save a voice once with recorded consent, use it with any cloning model,
-  and get a speaker-similarity score for each clone.
-- **Speech directed in words**: `instructions` ("calm, a little amused, speaking slowly") reach every model that
-  follows them (Qwen3-TTS CustomVoice, CosyVoice3, FireRedTTS3, OmniVoice, Maya1, Parler-TTS, …), and
-  multi-speaker dialogues with a voice per speaker, spoken in one take or turn by turn, and voice conversion (the
-  same words in another voice); speech can carry an inaudible watermark (AudioSeal) that bolo detects.
-- **Indian languages**: speech recognition for all 22 scheduled languages, voices for 15 of them, 8 kHz telephone
-  audio, and romanised input ("mujhe kal jana hai") written in the right script.
-- **Cloud models next to local ones**: OpenAI, Sarvam, ElevenLabs, Deepgram and Soniox behind the same API, with
-  automatic fallback in either direction.
-- **Voice agents**: three pipelines (recogniser → your language model → voice, an audio language model, or one
-  speech-to-speech model) over the Realtime API and WebRTC, with turn detection and tools.
-- **Audio analysis**: background noise removed from a recording (whole or streamed back) with any of the
-  catalog's denoisers.
-- **Latency you can see**: a phase-by-phase trace of every request, micro-batching and backpressure under load.
-- **Telephony**, as an extra: answers and places phone calls through Twilio, Plivo, Telnyx, Exotel or SIP, with barge-in,
-  transfers and per-call latency.
+**bolo** (बोलो, "speak") pulls speech models by name, like Ollama does for language models, and serves
+them over the OpenAI audio and Realtime APIs. One server, a few hundred open models, a web console.
 
-It runs on the CPU, and on an NVIDIA GPU or through DirectML when there is one; on a Mac with Apple Silicon through Core ML, Metal and MLX; on AMD GPUs through ROCm (not yet run on one). A web console comes with it, and a
-[live demo](https://cb-sigma.github.io/bolo-speech/) runs models in your browser with nothing to install. bolo is alpha:
-[what was tested where](#status).
+- **Speech to text**, live or from a file, with word times, speaker labels, hotwords and redaction.
+- **Text to speech** in dozens of languages, streamed as it is made, with cloning from a saved,
+  consented voice and directions in plain words ("calm, a little amused").
+- **Voice agents and phone calls**: your language model behind a voice, with turn taking and
+  interruptions, over the Realtime API, WebRTC, Twilio, Plivo, Telnyx, Exotel or SIP.
+- **Indian languages**: recognition for all 22 scheduled languages, voices for 15 of them,
+  romanised input ("mujhe kal jana hai") written in the right script.
+- **Your hardware, used well**: each model on the GPU when it fits and on the CPU when it does
+  not, as Ollama does; NVIDIA, Apple silicon (Metal and MLX) and plain CPUs.
+- **Cloud models alongside**: OpenAI, Sarvam, ElevenLabs, Deepgram and Soniox behind the same
+  API, with fallback either way.
 
-<p align="center">
-  <img src="docs/assets/console-playground.gif" alt="Animated capture of the speech-to-text playground: words appear as audio streams in, then the latency timeline shows how long the final transcript took after speech ended" width="900">
-</p>
+No PyTorch needed. Apache-2.0. Alpha: [what was tested where](#status).
 
-<p align="center">
-  <sub>The speech-to-text playground, live against a real server on a 4-core CPU. Lighter text is still changing; solid text is final.</sub>
-</p>
+</td>
+<td width="42%" valign="top">
 
-## Install
+**Install**
 
 ```bash
 uv tool install "bolo-speech[all]"
+```
+
+or `pipx install "bolo-speech[all]"`
+
+Homebrew
+
+```bash
+brew install cb-sigma/tap/bolo
+```
+
+Docker
+
+```bash
+docker run -p 8000:8000 \
+  -v bolo-data:/data \
+  ghcr.io/cb-sigma/bolo-speech
+```
+
+**Run**
+
+```bash
 bolo serve
 ```
 
-Then open <http://127.0.0.1:8000>. Also with `pipx`, `pip`, Homebrew (`brew install cb-sigma/tap/bolo`) and
-Docker; Windows, GPUs and the optional extras: [Installing in more detail](#installing-in-more-detail).
+then open <http://127.0.0.1:8000>.
+
+Apple silicon: add `[mlx]` for MLX models. More: [installing in detail](#installing-in-more-detail).
+
+</td>
+</tr>
+</table>
+
+## See it
+
+<p align="center">
+  <a href="docs/assets/bolo-tour.mp4"><img src="docs/assets/bolo-tour-poster.png" alt="A 93-second tour of the bolo console with sound: a clip transcribed live, Hindi and English speech, the model catalog and the API snippets" width="900"></a>
+</p>
+<p align="center">
+  <sub>Recorded on a MacBook Pro (M4 Pro) on the Apple GPU. The narration is bolo's own voice (kokoro-v1.0-mlx).</sub>
+</p>
 
 ## Quick start
 
