@@ -65,6 +65,11 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("bolo.stream")
 
+
+class ClientDisconnected(Exception):
+    """Raised by a session's ``send`` when the client has gone: the stream ends as cancelled, not as an error."""
+
+
 Send = Callable[[dict[str, Any]], Awaitable[None]]
 
 SR = 16000
@@ -285,6 +290,8 @@ class STTSession:
         except asyncio.CancelledError:
             status, error = "cancelled", "client disconnected"
             raise
+        except ClientDisconnected:  # the client left while a message was on its way to it
+            status, error = "cancelled", "client disconnected"
         except BoloError as exc:
             status, error = "error", exc.message
             self._failed = exc

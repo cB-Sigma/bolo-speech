@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from typing import Any
 
 import httpx
 import numpy as np
@@ -127,6 +128,29 @@ async def test_stt_stream_client_disconnect_is_recorded_as_cancelled(live: LiveS
         await asyncio.sleep(0.05)
     assert r.json()["status"] == "cancelled"
     assert httpx.get(live.url + "/api/v1/stats").json()["active_streams"] == 0
+
+
+async def test_stt_stream_send_to_a_gone_client_is_cancelled_not_an_error(core: Any) -> None:
+    """The client can leave while a message is on its way to it (the WebSocket send fails before the disconnect is
+    read): the stream is recorded as cancelled, as when the disconnect is read first."""
+    from bolo.streaming.session import ClientDisconnected, SessionConfig, STTSession
+
+    sent: list[dict[str, Any]] = []
+
+    async def send(msg: dict[str, Any]) -> None:
+        if msg["type"] not in ("ready",):
+            raise ClientDisconnected("gone")
+        sent.append(msg)
+
+    session = STTSession(core, send, SessionConfig(model="fake-stt-streaming"))
+    await session.start()
+    session.feed(pcm16(speechlike(1.0)))
+    async with asyncio.timeout(10):
+        while session.trace is None or session.trace.status not in ("cancelled", "error", "ok"):
+            await asyncio.sleep(0.02)
+    assert session.trace.status == "cancelled" and session.trace.error == "client disconnected"
+    assert core.active_streams == 0
+    await session.close()
 
 
 async def test_tts_stream_incremental_text(live: LiveServer) -> None:

@@ -20,7 +20,7 @@ from bolo.denoise import parse_denoise
 from bolo.errors import BoloError, InvalidRequest
 from bolo.keepalive import request_keep_alive
 from bolo.obs.trace import Trace
-from bolo.streaming.session import SessionConfig, STTSession
+from bolo.streaming.session import ClientDisconnected, SessionConfig, STTSession
 from bolo.text.romanised import parse_mode as parse_romanised
 from bolo.text.segment import IncrementalSegmenter
 
@@ -138,7 +138,10 @@ async def _stt_stream(ws: WebSocket) -> None:
 
     async def send(msg: dict[str, Any]) -> None:
         async with send_lock:
-            await ws.send_text(json.dumps(msg, ensure_ascii=False))
+            try:
+                await ws.send_text(json.dumps(msg, ensure_ascii=False))
+            except (WebSocketDisconnect, RuntimeError) as exc:  # RuntimeError: sending after the close
+                raise ClientDisconnected(str(exc)) from exc
 
     session: STTSession | None = None
     try:
@@ -185,7 +188,7 @@ async def _stt_stream(ws: WebSocket) -> None:
                 raise InvalidRequest(f"unknown message type {kind!r}")
         with contextlib.suppress(Exception):
             await ws.close()
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, ClientDisconnected):
         if session:
             await session.close()
     except Exception as exc:
