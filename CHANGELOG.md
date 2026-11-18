@@ -29,6 +29,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- **Parakeet on MLX failed on Apple silicon GPUs** with a matmul shape error: the audio was cast to the model's
+  bfloat16 before `get_logmel`, which needs float32. It now gets float32 audio, as parakeet-mlx's own
+  `transcribe` does.
 - **Moshi and Hibiki crashed at start on Windows (no Triton).** Kyutai's PyTorch server compiles its kernels with
   torch.compile, which needs Triton, and PyTorch for Windows has none: `TritonMissing` at start, 3 out of 3. The
   full-duplex servers now start with compile off when Triton (or, on the CPU, a C++ compiler) is missing, and a
