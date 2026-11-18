@@ -1,5 +1,6 @@
 # For tools/voices/convert_whisper.py. Install CPU PyTorch first:
 #   pip install "torch==2.8.*" --index-url https://download.pytorch.org/whl/cpu
-transformers>=4.40,<5
+# 5.10 is the first release without published advisories (save_pretrained path traversal, remote code).
+transformers>=5.10,<6
 ctranslate2>=4.5
 faster-whisper>=1.1

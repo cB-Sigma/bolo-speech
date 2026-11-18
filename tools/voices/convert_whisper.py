@@ -44,24 +44,12 @@ def attribution(model: dict[str, Any]) -> str:
     )
 
 
-def fix_tokenizer_config(path: Path) -> None:
-    """Checkpoints saved by transformers 5 list ``extra_special_tokens``; transformers 4 (what CTranslate2's
-    converter supports) expects a mapping. The tokens are Whisper's standard ones, already in tokenizer.json."""
-    if not path.is_file():
-        return
-    config = json.loads(path.read_text(encoding="utf-8"))
-    if isinstance(config.get("extra_special_tokens"), list):
-        del config["extra_special_tokens"]
-        path.write_text(json.dumps(config, ensure_ascii=False, indent=1), encoding="utf-8")
-
-
 def convert(model: dict[str, Any], work: Path) -> Path:
     src = work / "src"
     src.mkdir(parents=True, exist_ok=True)
     base = f"https://huggingface.co/{model['repo']}/resolve/{model['revision']}"
     for name in model["files"]:
         download(f"{base}/{name}", src / name)
-    fix_tokenizer_config(src / "tokenizer_config.json")
     out = work / model["id"]
     shutil.rmtree(out, ignore_errors=True)
     converter = shutil.which("ct2-transformers-converter") or "ct2-transformers-converter"

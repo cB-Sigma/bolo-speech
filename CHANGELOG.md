@@ -15,6 +15,12 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   release up to the latest (4.0.7) and has no fix yet; `npm audit fix --force` would only downgrade vite, vitest,
   typescript-eslint and shadcn. All of it is build and test tooling: nothing ships in the console bundle, which builds
   byte-for-byte the same. shadcn stays a devDependency because `src/index.css` imports `shadcn/tailwind.css`.
+- **Whisper converter: transformers 5.10 or newer.** `tools/voices/requirements-whisper.txt` asked for
+  transformers 4.x, which has published advisories (remote code execution, a `save_pretrained` path traversal) fixed
+  only in 5.x. CTranslate2 4.9's converter works with transformers 5: whisper-tiny converted with 5.23 gives the same
+  `model.bin`, `config.json` and vocabulary as with 4.57.6, and transcribes the bundled English samples. The
+  workaround for checkpoints saved by transformers 5 (dropping `extra_special_tokens` from `tokenizer_config.json`)
+  is no longer needed and is gone.
 
 ### Fixed
 
