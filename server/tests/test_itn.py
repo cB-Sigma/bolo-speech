@@ -121,3 +121,23 @@ def test_wetext_grammars_from_the_model_directory(tmp_path: Path) -> None:
     shutil.copytree(source, target)
     model = WetextItn(tmp_path, {"language": "en"})
     assert model.normalize("i paid twenty five dollars on march third") == "i paid $25 on march 3"
+
+
+def test_english_clock_times_before_a_time_of_day() -> None:
+    from bolo.engines.text_models import english_clock_times
+
+    # wetext 0.2.1 writes "ten thirty in the morning" as "1030 in the morning" (it takes a clock time only before
+    # "a m" / "p m"); zipformer's transcript of an English recording, through itn-en-wetext, on an M4 Pro
+    assert (
+        english_clock_times("the meeting starts at 1030 in the morning") == "the meeting starts at 10:30 in the morning"
+    )
+    assert english_clock_times("at 730 in the evening, 1145 at night") == "at 7:30 in the evening, 11:45 at night"
+    # not a clock time: left alone
+    for text in (
+        "1999 in the morning",
+        "it costs 1030",
+        "2400 in the morning",
+        "0930 in the morning",
+        "1260 in the morning",
+    ):
+        assert english_clock_times(text) == text

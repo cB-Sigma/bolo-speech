@@ -12,6 +12,7 @@ Both need ``pip install "bolo-speech[itn]"`` (wetext and kaldifst, Apache-2.0).
 from __future__ import annotations
 
 import json
+import re
 import threading
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,15 @@ from bolo.engines.base import Engine, EngineStatus, ItnModel, LoadOptions, Model
 
 INSTALL = 'pip install "bolo-speech[itn]"'
 _wetext_lock = threading.Lock()
+
+#: "1030 in the morning": wetext's English grammar takes a clock time only before "a m" / "p m" and writes "ten
+#: thirty in the morning" as the number 1030; a time of day after the figures says they are a clock time
+_EN_CLOCK = re.compile(r"\b([1-9]|1[0-2])([0-5]\d)(?= (?:in the (?:morning|afternoon|evening)|at night)\b)")
+
+
+def english_clock_times(text: str) -> str:
+    """``1030 in the morning`` -> ``10:30 in the morning``: an hour 1-12 and minutes 00-59 before a time of day."""
+    return _EN_CLOCK.sub(lambda m: f"{m.group(1)}:{m.group(2)}", text)
 
 
 def _find(path: Path, name: str) -> Path:
@@ -63,7 +73,8 @@ class WetextItn(ItnModel):
 
     def normalize(self, text: str) -> str:
         with self._lock:
-            return str(self._normalizer.normalize(text)).strip()
+            out = str(self._normalizer.normalize(text)).strip()
+        return english_clock_times(out) if self.language == "en" else out
 
 
 class RuleFstItn(ItnModel):
