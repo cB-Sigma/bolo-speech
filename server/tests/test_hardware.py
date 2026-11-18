@@ -455,11 +455,13 @@ def test_the_hardware_route_reuses_slow_probes(tmp_path: Path, monkeypatch: pyte
 
     from bolo.api.app import create_app
 
-    calls: list[str] = []
+    calls: list[str] = []  # the slow probe's runs (the fast ones, such as sysctl on macOS, run every time)
 
     def slow(self: hw.Host, argv: list[str], timeout: float = 4.0) -> str | None:
+        if "nvidia-smi" not in argv[0]:
+            return None
         calls.append(" ".join(argv[1:2]))
-        return "RTX 3060, 6144, 5000, 621\n" if "nvidia-smi" in argv[0] else None
+        return "RTX 3060, 6144, 5000, 621\n"
 
     monkeypatch.setattr(hw.Host, "run", slow)
     monkeypatch.setattr(hw.Host, "which", lambda self, name: "/x/nvidia-smi" if name == "nvidia-smi" else None)
