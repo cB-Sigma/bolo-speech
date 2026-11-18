@@ -59,3 +59,14 @@ docs/_*
 
 # wheels for local Docker builds (deploy/wheels/README.md)
 deploy/wheels/*.whl
+
+# Test scratch, local data and anything that can hold credentials: never committed
+.pt/
+.data/
+.basetemp/
+.env
+.env.*
+env.json
+*.pem
+*.key
+.netrc

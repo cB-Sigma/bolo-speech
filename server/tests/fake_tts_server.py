@@ -19,6 +19,7 @@ import base64
 import io
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -242,7 +243,11 @@ def main(argv: list[str]) -> None:
             voices=[v for v in os.environ.get("FAKE_VOICES", "").split(",") if v],
         )  # fmt: skip
     if os.environ.get("FAKE_ENV_FILE"):  # what the server was started with, for the test to read
-        Path(os.environ["FAKE_ENV_FILE"]).write_text(json.dumps(dict(os.environ)), encoding="utf-8")
+        # never a credential on disk: variables whose names look secret are written without their values
+        secretish = re.compile(r"TOKEN|SECRET|PASS|KEY|CREDENTIAL|AUTH|CLIENT_ID|COOKIE", re.I)
+        keep = {"TTS_API_KEY", "REQUIRE_API_KEY"}  # bolo's random per-process key and its switch, which the tests check
+        env = {k: ("<redacted>" if secretish.search(k) and k not in keep else v) for k, v in os.environ.items()}
+        Path(os.environ["FAKE_ENV_FILE"]).write_text(json.dumps(env), encoding="utf-8")
     print("ggml_cuda_init: found 1 CUDA devices:", flush=True)  # every start prints this: not an error
     print(f"fake server listening on {server.port} ({' '.join(argv)})", flush=True)
     server.httpd.serve_forever()
