@@ -254,6 +254,18 @@ pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 pip install "bolo-torch[parler,sepformer]"
 ```
 
+To add model families to an environment that already has a CUDA (or ROCm, XPU) build of torch, use
+`bolo-torch install`, not `pip install "bolo-torch[...]"`:
+
+```bash
+bolo-torch install pyannote             # --dry-run prints the pip command
+```
+
+A plain pip install lets pip take the newest torchaudio, which needs a newer torch than the one installed, and pip
+then replaces your torch with PyPI's, which on Windows is the CPU build: the models run on the CPU. `bolo-torch
+install` pins the installed torch, holds torchaudio and torchvision to its release (a constraints file), and adds
+the PyTorch index the build came from (`+cu128` -> download.pytorch.org/whl/cu128).
+
 From a checkout of the bolo repository:
 
 ```bash

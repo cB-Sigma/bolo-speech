@@ -6,6 +6,7 @@ bolo-torch separate mix.wav -o out/    # speech separation without bolo (SepForm
 bolo-torch code list                   # inference code from GitHub repositories, pinned by commit and sha256
 bolo-torch code install step-audio-2   # download one bundle now (a load also installs it when missing)
 bolo-torch pin-remote-code DIR --revision COMMIT   # the remote_code pin of a downloaded model folder
+bolo-torch install pyannote            # an extra, keeping the torch build already installed (CUDA stays CUDA)
 """
 
 from __future__ import annotations
@@ -160,6 +161,35 @@ def code_command(args: argparse.Namespace) -> int:
     return status
 
 
+def install_command(names: list[str], package: str, dry_run: bool) -> int:
+    """``bolo-torch install``: pip install extras with the installed torch build pinned (bolo_torch.install)."""
+    import subprocess
+
+    from bolo_torch import install
+
+    known = install.extras()
+    unknown = [n for n in names if known and n not in known]
+    if unknown:
+        print(f"error: no extra {', '.join(unknown)}; the extras are {', '.join(known)}", file=sys.stderr)
+        return 2
+    import tempfile
+
+    torch_version = install.installed_torch()
+    with tempfile.TemporaryDirectory() as tmp:
+        constraints = str(Path(tmp) / "torch-constraints.txt")
+        cmd = install.install_command(names, torch_version, constraints, package)
+        if torch_version:
+            lines = install.constraints(
+                torch_version, install.installed("torchaudio"), install.installed("torchvision")
+            )
+            Path(constraints).write_text("\n".join(lines) + "\n", encoding="utf-8")
+            print(f"keeping torch {torch_version} ({', '.join(lines)})", file=sys.stderr)
+        print(" ".join(f'"{c}"' if "[" in c or " " in c else c for c in cmd))
+        if dry_run:
+            return 0
+        return subprocess.run(cmd, check=False).returncode
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="bolo-torch", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -181,7 +211,13 @@ def main(argv: list[str] | None = None) -> int:
     pin = sub.add_parser("pin-remote-code", help="print the remote_code pin of a downloaded model folder")
     pin.add_argument("folder")
     pin.add_argument("--revision", required=True, help="the commit the folder was downloaded at")
+    inst = sub.add_parser("install", help="install extras, keeping the installed torch build (CUDA stays CUDA)")
+    inst.add_argument("extras", nargs="+", help="extras of bolo-torch, e.g. pyannote")
+    inst.add_argument("--package", default="bolo-torch", help="what to install them for (a path for a checkout)")
+    inst.add_argument("--dry-run", action="store_true", help="print the pip command only")
     args = parser.parse_args(argv)
+    if args.command == "install":
+        return install_command(args.extras, args.package, args.dry_run)
     if args.command in (None, "serve"):
         logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(name)s: %(message)s")
         from bolo_torch.engine import TorchEngine

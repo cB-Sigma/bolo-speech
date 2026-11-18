@@ -6,6 +6,11 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ### Fixed
 
+- **Installing an extra replaced a CUDA build of torch with a CPU one.** On Windows with CUDA torch installed,
+  `pip install "bolo-torch[pyannote]"` let pip take the newest torchaudio, which needs a newer torch, so pip
+  installed PyPI's torch 2.15, a CPU build, and pyannote ran on the CPU. A new command, `bolo-torch install
+  <extras>` (`--dry-run` prints it), installs extras with the installed torch pinned, torchaudio and torchvision
+  held to its release, and the PyTorch index of its build (`+cu128`, `+rocm6.4`, `+xpu`, `+cpu`) added.
 - **Step-Audio 2 mini could not load on a GPU under 24 GB.** When bolo split it between the GPU and the CPU, transformers
   refused: "StepAudio2ForCausalLM does not support `device_map='auto'`" (its remote code declares no
   `_no_split_modules`). When a model class names no layers to keep whole, the plugin now builds the model without

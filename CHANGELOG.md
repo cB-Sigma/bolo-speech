@@ -8,6 +8,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- **bolo-torch: installing an extra replaced a CUDA build of torch with a CPU one.** On Windows with CUDA torch installed,
+  `pip install "bolo-torch[pyannote]"` let pip take the newest torchaudio, which needs a newer torch, so pip
+  installed PyPI's torch 2.15, a CPU build, and pyannote ran on the CPU. A new command, `bolo-torch install
+  <extras>` (`--dry-run` prints it), installs extras with the installed torch pinned, torchaudio and torchvision
+  held to its release, and the PyTorch index of its build (`+cu128`, `+rocm6.4`, `+xpu`, `+cpu`) added.
 - **A live conversation's listening model, chosen by name, was silently replaced.** With `vad_model: "webrtc-vad"`
   and webrtcvad-wheels not installed (or a detector or end-of-turn model not downloaded), the session went on with
   the energy detector (or with pauses alone) while `session.updated` still named the model asked for. A `vad_model`
