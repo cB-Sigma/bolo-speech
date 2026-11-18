@@ -226,7 +226,9 @@ export function VoiceCompare({ className, inBrowser = false }: { className?: str
         <div className="flex flex-wrap items-center gap-2">
           <Select value={model} onValueChange={setModel} disabled={busy}>
             <SelectTrigger className="h-8 w-56" aria-label="Embedding model" data-testid="compare-model">
-              <SelectValue />
+              <SelectValue>
+                {inBrowser ? (embedders.find((m) => m.id === model)?.label ?? model) : undefined}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent position="popper" align="start">
               {inBrowser ? (

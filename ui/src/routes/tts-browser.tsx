@@ -550,7 +550,7 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
                   )
                 })}
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+            <div className="mt-3 flex items-start gap-2 text-xs">
               <Switch
                 id="tts-detect-language"
                 checked={detectLang}
@@ -558,7 +558,7 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
                 disabled={busy}
                 data-testid="detect-language"
               />
-              <label htmlFor="tts-detect-language" className="text-muted-foreground">
+              <label htmlFor="tts-detect-language" className="min-w-0 flex-1 text-muted-foreground">
                 Pick the voice from the text: a voice of the language it is written in reads it (the server’s{' '}
                 <span className="font-mono">detect_language</span>)
               </label>

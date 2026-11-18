@@ -16,7 +16,7 @@ test('the repetition guard is set like the server’s max_repeats and kept', asy
   const guard = page.getByTestId('repeat-guard')
   await expect(guard).toContainText('max_repeats')
   const select = guard.getByRole('combobox', { name: 'Repetition guard' })
-  await expect(select).toContainText('4 repeats (default)')
+  await expect(select).toContainText('4 (default)')
   await select.click()
   await page.getByRole('option', { name: 'Off' }).click()
   await expect(select).toContainText('Off')

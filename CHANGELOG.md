@@ -64,7 +64,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   and gave different numbers for several graphs): every one defaults to WebAssembly, WebGPU stays a choice
   (docs/measurements/browser-audio-models.json, docs/ui-server-notes.md "Small audio models in the page"). Left
   out, with the reason shown in the page: the Demucs denoiser, the cloud isolator, MMS-LID, AmberNet, the torch
-  identifiers, WebRTC and MarbleNet VAD, TitaNet, Namo, and the speech-to-speech and full-duplex models.
+  identifiers, WebRTC and MarbleNet VAD, TitaNet, Namo, Smart Turn v2 and TEN Turn Detection (PyTorch, a 7.6 B
+  model), and the speech-to-speech and full-duplex models.
 - **Full-duplex speech-to-speech models: Moshi, Hibiki, Hibiki-Zero and PersonaPlex** (`s2s_model` naming one, with
   `realtime_pipeline = "speech-to-speech"`). A full-duplex model hears and speaks at once and answers by itself; a
   shared layer, `bolo.duplex`, runs any such model behind Realtime (WebSocket) and WebRTC sessions: every sample of

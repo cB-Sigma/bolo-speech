@@ -429,6 +429,13 @@ export const NOT_IN_THE_PAGE: { task: AudioTask; label: string; why: string }[] 
     label: 'Namo Turn Detector',
     why: '136 MB (English) to 309 MB, and it needs a decoded transcript at every pause',
   },
+  { task: 'turn', label: 'Smart Turn v2', why: 'PyTorch weights only (380 MB), run by the server’s torch plugin' },
+  { task: 'turn', label: 'TEN Turn Detection', why: 'a 7.6 B language model: far beyond a browser tab' },
+  {
+    task: 'lid',
+    label: 'Voxlect, SpeechBrain and mHuBERT identifiers',
+    why: 'PyTorch models, run by the server’s torch plugin',
+  },
   {
     task: 'embed',
     label: 'NVIDIA TitaNet-small',

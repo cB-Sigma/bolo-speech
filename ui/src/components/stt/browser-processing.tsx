@@ -80,13 +80,13 @@ export function RepeatGuardOption({ disabled, removed }: { disabled?: boolean; r
           onValueChange={(v) => setPref('browserMaxRepeats', Number(v))}
           disabled={disabled}
         >
-          <SelectTrigger size="sm" className="w-32" aria-label="Repetition guard">
+          <SelectTrigger size="sm" className="w-36" aria-label="Repetition guard">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {REPEAT_CHOICES.map((n) => (
               <SelectItem key={n} value={String(n)}>
-                {n === 0 ? 'Off' : `${n} repeats${n === DEFAULT_MAX_REPEATS ? ' (default)' : ''}`}
+                {n === 0 ? 'Off' : `${n}${n === DEFAULT_MAX_REPEATS ? ' (default)' : ''}`}
               </SelectItem>
             ))}
           </SelectContent>
@@ -136,7 +136,10 @@ export function AudioModelSelect({
   return (
     <Select value={value ?? OFF} onValueChange={(v) => onChange(v === OFF ? null : v)} disabled={disabled}>
       <SelectTrigger size="sm" className={className} aria-label={label}>
-        <SelectValue />
+        {/* The trigger shows the name only; the list shows id, size and licence too. */}
+        <SelectValue>
+          {value ? (audioModelsFor(task).find((m) => m.id === value)?.label ?? value) : offLabel}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent position="popper" align="end" className="w-[min(24rem,calc(100vw-2rem))]">
         {offLabel != null && <SelectItem value={OFF}>{offLabel}</SelectItem>}
@@ -181,7 +184,7 @@ export function DeviceOption({ disabled }: { disabled?: boolean }) {
           onValueChange={(v) => setPref('browserAudioDevice', v as 'auto' | 'wasm' | 'webgpu')}
           disabled={disabled}
         >
-          <SelectTrigger size="sm" className="w-40" aria-label="Where the audio models run">
+          <SelectTrigger size="sm" className="w-48" aria-label="Where the audio models run">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
