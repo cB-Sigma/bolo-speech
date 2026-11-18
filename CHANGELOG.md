@@ -8,6 +8,14 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **New llama.cpp voices, and llama-server b12521.** Kokoro-82M (`kokoro-82m-llamacpp`, its American and British
+  English voices) and tiny-voca (`tiny-voca-llamacpp`, a 4.5 M-parameter English voice, F2 and M2) on llama.cpp, and
+  tiny-voca in process on ONNX Runtime (`tiny-voca-onnx`, the authors' ONNX export with their phonemiser dizione,
+  Apache-2.0, which bolo now carries). All Apache-2.0. The pinned llama-server moves from b12375 to b12521 on every
+  platform (CPU, Vulkan, ROCm, CUDA, Metal; Linux, Windows, macOS); Soprano and Pocket TTS checked on it.
+  ZONOS3-Mini and Fish Audio S2 Pro (non-commercial licence) on llama.cpp are catalogued too, not yet run. Cloning on
+  llama-server now sends the reference's transcript (`speaker_ref_text`) and `speed`, which llama.cpp added.
+
 - **Two more watermarkers: Perth and WavMark, as ONNX.** `perth-onnx` (Resemble AI, MIT; 32 kHz, no payload) and
   `wavmark-onnx` (MIT; a 16-bit payload in each 1.1 s) join AudioSeal as `watermark` models, chosen per request
   (`watermark: perth-onnx`) or in the console's picker. Both were exported to ONNX with their STFT and inverse STFT

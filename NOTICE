@@ -5,8 +5,11 @@ This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 
 bolo's own source code contains no third-party source code, except the copy
 of uccharan in ui/src/vendor/uccharan (see "Web console: speech synthesis in
-the browser" below) and the parts of Kyutai's moshi named under "Full-duplex
-speech models". It talks to the
+the browser" below), the parts of Kyutai's moshi named under "Full-duplex
+speech models", and dizione in server/src/bolo/vendor/dizione: English text to
+phonemes, Copyright Muhammed Nazeem, Apache License 2.0 (its LICENSE is next to
+it), unchanged from https://github.com/n4ze3m/dizione at commit
+8cd889e4de7be6bd1dd2e6891344a0729fa14dd4, used by the tiny-voca voice. It talks to the
 following components, which are installed separately as Python dependencies
 or optional extras and keep their own licences:
 

@@ -636,7 +636,7 @@ toolkit only, the Windows driver serves the GPU) and point bolo at it:
 ```sh
 sudo apt install build-essential cmake git nvidia-cuda-toolkit # Ubuntu's CUDA toolkit; or NVIDIA's own packages
 nvcc --version                                                 # the CUDA toolkit is installed
-git clone --depth 1 --branch b12375 https://github.com/ggml-org/llama.cpp
+git clone --depth 1 --branch b12521 https://github.com/ggml-org/llama.cpp
 cd llama.cpp
 cmake -B build -DGGML_CUDA=ON -DLLAMA_CURL=OFF
 cmake --build build --config Release -j 4 --target llama-server
@@ -649,7 +649,7 @@ memory (it hung); `-j 4` peaked at 2.7 GB and took 13 minutes on an 8-core lapto
 
 Then set `llama_server_bin = "/path/to/llama.cpp/build/bin/llama-server"` in the settings file (or
 `BOLO_LLAMA_SERVER_BIN=...`) and `device = "cuda"`; `bolo components list` shows it as your own binary and
-`bolo doctor` asks it for its devices. b12375 is the version bolo pins and tests; a newer tag usually works. Measured
+`bolo doctor` asks it for its devices. b12521 is the version bolo pins; a newer tag usually works. Measured
 under WSL2 on an RTX 3060 Laptop GPU: Pocket TTS ran at the same speed as the prebuilt Windows CUDA build (real-time
 factor 0.034 against 0.032). The build takes several minutes; `-DCMAKE_CUDA_ARCHITECTURES=86` (your card's compute capability: 86 for RTX 30, 89 for
 RTX 40) makes it shorter. audio.cpp builds the same way (`-DGGML_CUDA=ON`; see its README) for

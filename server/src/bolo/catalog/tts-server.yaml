@@ -509,6 +509,206 @@
     mmproj_file: mmproj-Soprano-1.1-80M-F16.gguf
   voices:
   - {id: default, name: Model default, server_voice: ''}
+- id: tiny-voca-llamacpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: tiny-voca
+  languages: [en]
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 25811168
+  license: Apache-2.0
+  license_url: https://huggingface.co/n4ze3m/tiny-voca
+  commercial_use: true
+  gated: false
+  features: []
+  description: 'tiny-voca (Muhammed Nazeem, Apache-2.0): a 4.5 M-parameter English voice, F2 (female) or M2 (male), 24
+    kHz, as converted by ggml-org (from n4ze3m/tiny-voca), on llama.cpp. The GGUF holds its text front end (the dizione
+    phonemiser''s dictionary and rules): plain English text in, numbers and dates included. Tiny and quick on a CPU. Runs
+    in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting tts_servers).'
+  source_url: https://huggingface.co/n4ze3m/tiny-voca
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: ggml-org/tiny-voca-GGUF
+    revision: 8a785351a6dac0b9168bc14bc5de635a98a7b809
+    include: [tiny-voca-F32.gguf, mmproj-tiny-voca-F32.gguf]
+  options:
+    runtime: llama-server
+    model_file: tiny-voca-F32.gguf
+    mmproj_file: mmproj-tiny-voca-F32.gguf
+    cloning: false
+    send_language: false
+    speed: true
+    hardware: {gpu: optional, vram_gb: 0.1, note: small enough for any CPU}
+  voices:
+  - {id: F2, name: F2 (female), language: en-US, gender: f, server_voice: F2}
+  - {id: M2, name: M2 (male), language: en-US, gender: m, server_voice: M2}
+- id: kokoro-82m-llamacpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Kokoro (llama.cpp)
+  languages: [en]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 270230752
+  license: Apache-2.0
+  license_url: https://huggingface.co/hexgrad/Kokoro-82M
+  commercial_use: true
+  gated: false
+  features: []
+  description: 'Kokoro-82M (hexgrad, Apache-2.0) as converted by ggml-org, on llama.cpp: the same model as bolo''s Kokoro
+    voices on sherpa-onnx, with English text to phonemes inside the GGUF (misaki''s dictionary and a spelling-to-sound
+    model for unknown words). American and British English voices here; its voices of other languages read phonemes
+    only on this route, so use kokoro-v1.0 for them. Runs in a llama-server that bolo starts (bolo components install
+    llama-server) or one you run (setting tts_servers).'
+  source_url: https://huggingface.co/hexgrad/Kokoro-82M
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: ggml-org/Kokoro-82M-GGUF
+    revision: ed4a98eab16351c7d803ff011e88267a5b036666
+    include: [Kokoro-82M-F32.gguf, mmproj-Kokoro-82M-F16.gguf]
+  options:
+    runtime: llama-server
+    model_file: Kokoro-82M-F32.gguf
+    mmproj_file: mmproj-Kokoro-82M-F16.gguf
+    cloning: false
+    send_language: false
+    speed: true
+    hardware: {gpu: optional, vram_gb: 0.5, note: small enough for a CPU}
+  voices:
+  - {id: af_heart, name: Heart, language: en-US, gender: f, server_voice: af_heart}
+  - {id: af_alloy, name: Alloy, language: en-US, gender: f, server_voice: af_alloy}
+  - {id: af_aoede, name: Aoede, language: en-US, gender: f, server_voice: af_aoede}
+  - {id: af_bella, name: Bella, language: en-US, gender: f, server_voice: af_bella}
+  - {id: af_jessica, name: Jessica, language: en-US, gender: f, server_voice: af_jessica}
+  - {id: af_kore, name: Kore, language: en-US, gender: f, server_voice: af_kore}
+  - {id: af_nicole, name: Nicole, language: en-US, gender: f, server_voice: af_nicole}
+  - {id: af_nova, name: Nova, language: en-US, gender: f, server_voice: af_nova}
+  - {id: af_river, name: River, language: en-US, gender: f, server_voice: af_river}
+  - {id: af_sarah, name: Sarah, language: en-US, gender: f, server_voice: af_sarah}
+  - {id: af_sky, name: Sky, language: en-US, gender: f, server_voice: af_sky}
+  - {id: am_adam, name: Adam, language: en-US, gender: m, server_voice: am_adam}
+  - {id: am_echo, name: Echo, language: en-US, gender: m, server_voice: am_echo}
+  - {id: am_eric, name: Eric, language: en-US, gender: m, server_voice: am_eric}
+  - {id: am_fenrir, name: Fenrir, language: en-US, gender: m, server_voice: am_fenrir}
+  - {id: am_liam, name: Liam, language: en-US, gender: m, server_voice: am_liam}
+  - {id: am_michael, name: Michael, language: en-US, gender: m, server_voice: am_michael}
+  - {id: am_onyx, name: Onyx, language: en-US, gender: m, server_voice: am_onyx}
+  - {id: am_puck, name: Puck, language: en-US, gender: m, server_voice: am_puck}
+  - {id: am_santa, name: Santa, language: en-US, gender: m, server_voice: am_santa}
+  - {id: bf_alice, name: Alice, language: en-GB, gender: f, server_voice: bf_alice}
+  - {id: bf_emma, name: Emma, language: en-GB, gender: f, server_voice: bf_emma}
+  - {id: bf_isabella, name: Isabella, language: en-GB, gender: f, server_voice: bf_isabella}
+  - {id: bf_lily, name: Lily, language: en-GB, gender: f, server_voice: bf_lily}
+  - {id: bm_daniel, name: Daniel, language: en-GB, gender: m, server_voice: bm_daniel}
+  - {id: bm_fable, name: Fable, language: en-GB, gender: m, server_voice: bm_fable}
+  - {id: bm_george, name: George, language: en-GB, gender: m, server_voice: bm_george}
+  - {id: bm_lewis, name: Lewis, language: en-GB, gender: m, server_voice: bm_lewis}
+- id: zonos3-mini-llamacpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: ZONOS3-Mini (llama.cpp)
+  languages: [en, de, es, fr, hi, it, ja, ko, pt, te, zh]
+  tier: accuracy
+  sample_rate: 44100
+  size_bytes: 1997229088
+  license: Apache-2.0
+  license_url: https://huggingface.co/Zyphra/ZONOS3-Mini
+  commercial_use: true
+  gated: false
+  features: [voice-cloning]
+  description: 'ZONOS3-Mini (Zyphra, Apache-2.0; a gated DeltaNet / attention MoE backbone of 800 M parameters, 100 M
+    active, and the ZAC codec, 44.1 kHz) as converted by ggml-org, on llama.cpp (supported since b12424): 27 voices of
+    the release (English, German, Spanish, French, Hindi, Italian, Korean, Portuguese, Telugu, Mandarin) and cloning
+    from a reference clip. Numbers are written out for en, fr, de, es, it, pt, ja and zh. Added, not yet run here.
+    Runs in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting
+    tts_servers).'
+  source_url: https://huggingface.co/Zyphra/ZONOS3-Mini
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: ggml-org/ZONOS3-Mini-GGUF
+    revision: 2e7bc4126a2343787298e1a297a3d1c4a13165aa
+    include: [ZONOS3-Mini-Q8_0.gguf, mmproj-ZONOS3-Mini-F32.gguf]
+  options:
+    runtime: llama-server
+    model_file: ZONOS3-Mini-Q8_0.gguf
+    mmproj_file: mmproj-ZONOS3-Mini-F32.gguf
+    cloning: true
+    send_language: true
+    speed: true
+    not_yet_run: true
+    hardware: {gpu: recommended, vram_gb: 3.1, note: 'approximate: weights x 1.3 + 0.5 GB'}
+  voices:
+  - {id: Savannah_en-American_F_1, name: Savannah (en-American), language: en, gender: f, server_voice: Savannah_en-American_F_1}
+  - {id: Cillian_en-Irish_M_1, name: Cillian (en-Irish), language: en, gender: m, server_voice: Cillian_en-Irish_M_1}
+  - {id: Imogen_en-British_F_1, name: Imogen (en-British), language: en, gender: f, server_voice: Imogen_en-British_F_1}
+  - {id: Jett_en-energetic_M_1, name: Jett (en-energetic), language: en, gender: m, server_voice: Jett_en-energetic_M_1}
+  - {id: Morgana_en-witch_F_1, name: Morgana (en-witch), language: en, gender: f, server_voice: Morgana_en-witch_F_1}
+  - {id: Rupert_en-British_M_1, name: Rupert (en-British), language: en, gender: m, server_voice: Rupert_en-British_M_1}
+  - {id: Sakura_en-anime_F_1, name: Sakura (en-anime), language: en, gender: f, server_voice: Sakura_en-anime_F_1}
+  - {id: Thaddeus_en-announcervoice_M_1, name: Thaddeus (en-announcervoice), language: en, gender: m, server_voice: Thaddeus_en-announcervoice_M_1}
+  - {id: Willow_en-asrm_F_1, name: Willow (en-asrm), language: en, gender: f, server_voice: Willow_en-asrm_F_1}
+  - {id: Wyatt_en-American_M_1, name: Wyatt (en-American), language: en, gender: m, server_voice: Wyatt_en-American_M_1}
+  - {id: Gaspard_fr_M_1, name: Gaspard (fr), language: fr, gender: m, server_voice: Gaspard_fr_M_1}
+  - {id: Liesel_de_F_1, name: Liesel (de), language: de, gender: f, server_voice: Liesel_de_F_1}
+  - {id: Wolfgang_de_M_1, name: Wolfgang (de), language: de, gender: m, server_voice: Wolfgang_de_M_1}
+  - {id: Ananya_hi_F_1, name: Ananya (hi), language: hi, gender: f, server_voice: Ananya_hi_F_1}
+  - {id: Arjun_hi_M_1, name: Arjun (hi), language: hi, gender: m, server_voice: Arjun_hi_M_1}
+  - {id: Ginevra_it_F_1, name: Ginevra (it), language: it, gender: f, server_voice: Ginevra_it_F_1}
+  - {id: Lorenzo_it_M_1, name: Lorenzo (it), language: it, gender: m, server_voice: Lorenzo_it_M_1}
+  - {id: Minjun_ko_M_1, name: Minjun (ko), language: ko, gender: m, server_voice: Minjun_ko_M_1}
+  - {id: Seoyeon_ko_F_1, name: Seoyeon (ko), language: ko, gender: f, server_voice: Seoyeon_ko_F_1}
+  - {id: Haoran_zh-energetic_M_1, name: Haoran (zh-energetic), language: zh, gender: m, server_voice: Haoran_zh-energetic_M_1}
+  - {id: Meilin_zh-energetic_F_1, name: Meilin (zh-energetic), language: zh, gender: f, server_voice: Meilin_zh-energetic_F_1}
+  - {id: Leonor_pt_F_1, name: Leonor (pt), language: pt, gender: f, server_voice: Leonor_pt_F_1}
+  - {id: Thiago_pt_M_1, name: Thiago (pt), language: pt, gender: m, server_voice: Thiago_pt_M_1}
+  - {id: Rodrigo_es_M_1, name: Rodrigo (es), language: es, gender: m, server_voice: Rodrigo_es_M_1}
+  - {id: Ximena_es_F_1, name: Ximena (es), language: es, gender: f, server_voice: Ximena_es_F_1}
+  - {id: Chaitanya_te_M_1, name: Chaitanya (te), language: te, gender: m, server_voice: Chaitanya_te_M_1}
+  - {id: Sravya_te_F_1, name: Sravya (te), language: te, gender: f, server_voice: Sravya_te_F_1}
+- id: fish-audio-s2-pro-llamacpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Fish Audio S2 Pro (llama.cpp)
+  languages: []
+  tier: accuracy
+  sample_rate: 44100
+  size_bytes: 6336761184
+  license: Fish Audio Research License
+  license_url: https://huggingface.co/fishaudio/s2-pro/blob/main/LICENSE.md
+  commercial_use: false
+  gated: false
+  features: [voice-cloning]
+  description: 'Fish Audio S2 Pro (a 4 B Qwen3 backbone, a fast AR for the other codes and the Fish DAC, 44.1 kHz) as
+    converted by ggml-org, on llama.cpp (supported since b12452): speaker tags <|speaker:0|>, <|speaker:1|> in the
+    text, bracketed directions such as [whisper] or [laughing], and cloning from a reference clip with its transcript.
+    The language is the text''s. Fish Audio Research License: research and non-commercial use; commercial use needs a
+    licence from Fish Audio. Added, not yet run here. About 6.3 GB: a GPU is recommended. Runs in a llama-server that
+    bolo starts (bolo components install llama-server) or one you run (setting tts_servers).'
+  source_url: https://huggingface.co/fishaudio/s2-pro
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: ggml-org/s2-pro-GGUF
+    revision: 9328989ae2daa49da5ae2da76d63c75a06f26c25
+    include: [s2-pro-Q8_0.gguf, mmproj-s2-pro-BF16.gguf]
+  options:
+    runtime: llama-server
+    model_file: s2-pro-Q8_0.gguf
+    mmproj_file: mmproj-s2-pro-BF16.gguf
+    cloning: true
+    send_language: false
+    not_yet_run: true
+    hardware: {gpu: recommended, vram_gb: 8.7, note: 'approximate: weights x 1.3 + 0.5 GB'}
+  voices:
+  - {id: default, name: Model default, server_voice: ''}
 - id: fish-drama-3-llamacpp
   task: tts
   engine: tts-server

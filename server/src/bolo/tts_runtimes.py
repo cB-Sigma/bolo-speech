@@ -98,82 +98,83 @@ RUNTIME_INFO: dict[str, Runtime] = {
         license="MIT",
         license_url="https://github.com/ggml-org/llama.cpp/blob/master/LICENSE",
         homepage="https://github.com/ggml-org/llama.cpp",
-        version="b12375",
+        version="b12521",
         releases={
             "linux-x86_64": Release(
-                "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-ubuntu-x64.tar.gz",
-                "89fdf5a4066170fa408a5ebe1510b50bd8a5bab750e49ae531bb1d4cdbae65e3",
-                23332809,
+                "https://github.com/ggml-org/llama.cpp/releases/download/b12521/llama-b12521-bin-ubuntu-x64.tar.gz",
+                "ab8343cb39e17a18f183ce0a35543a6c3dcc15fb287f55909dd182cb975e345e",
+                23852655,
             ),
             # the Vulkan build (AMD, Intel and NVIDIA GPUs); it needs the Vulkan loader (libvulkan1) and a driver
             "linux-x86_64-vulkan": Release(
-                "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-ubuntu-vulkan-x64.tar.gz",
-                "e5144c8499399c115c7f5319421942252e9e84bf7d78b46f968cd5dbc769df72",
-                36187166,
+                "https://github.com/ggml-org/llama.cpp/releases/download/b12521/llama-b12521-bin-ubuntu-vulkan-x64.tar.gz",
+                "0278acdb4b12e24f90002039c011038e824d308b9ae5971433b284b1b3b5fc97",
+                36925213,
             ),
             # the ROCm (HIP) build for AMD GPUs (gfx908 to gfx1201: Instinct MI100 to MI350, Radeon RX 5000 to 9000,
             # the Radeon 780M / 890M / 8060S APUs); built against ROCm 10.0 (TheRock), it needs a ROCm runtime on
             # the machine (libamdhip64, hipBLAS, rocBLAS: docs/rocm.md). Pinned, never run by bolo's CI
             "linux-x86_64-rocm": Release(
-                "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-ubuntu-rocm-10.0-x64.tar.gz",
-                "5c497ae8b61166f05fbc252f1e80dd9c16c9c8207361907f979b6227c66f398b",
-                271139915,
+                "https://github.com/ggml-org/llama.cpp/releases/download/b12521/llama-b12521-bin-ubuntu-rocm-10.0-x64.tar.gz",
+                "eabfc90c2e56b460a6fffce12c9b8a5fc88e1d6239905919d8e1cd1362e4bf57",
+                283637915,
             ),
             "linux-aarch64": Release(
-                "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-ubuntu-arm64.tar.gz",
-                "122ae6ea1a24d713ca9a3e9094fcc1c766e6547373a7356f97668f24310daf13",
-                18963094,
+                "https://github.com/ggml-org/llama.cpp/releases/download/b12521/llama-b12521-bin-ubuntu-arm64.tar.gz",
+                "58b79679075d275b5708ab5ededecae83b0d806d3678b08745bd83533be00860",
+                19398256,
             ),
             "darwin-arm64": Release(
-                "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-macos-arm64.tar.gz",
-                "bdd4a9681383933b1323e5351edbaa2501bede6209c3bd4359c5262339299e47",
-                16913580,
+                "https://github.com/ggml-org/llama.cpp/releases/download/b12521/llama-b12521-bin-macos-arm64.tar.gz",
+                "6ebeeea8575081ff968eb1c26f6fffcafe8e3ff2a0fb5d548c0aea7f5575e038",
+                17294048,
             ),
             "darwin-x86_64": Release(
-                "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-macos-x64.tar.gz",
-                "e61d5511936adc349db7af0dd5dec2134a3fde108fb3759782a133bfa0106365",
+                "https://github.com/ggml-org/llama.cpp/releases/download/b12521/llama-b12521-bin-macos-x64.tar.gz",
+                "8f78d3e6d405dac94c539e76834c132bff394ab8835d66f968c6a23eea9dcbe7",
+                13065451,
             ),
             # the Windows CPU build loads the best of its CPU back ends (SSE4.2 to AVX-512) at start-up
             "windows-x86_64": Release(
-                "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-win-cpu-x64.zip",
-                "3aa7046f1b310c404418625d4e7e7b057c2d0e0eef5557925561381373d8f026",
-                25116305,
+                "https://github.com/ggml-org/llama.cpp/releases/download/b12521/llama-b12521-bin-win-cpu-x64.zip",
+                "bd4e093bce292452248c318d4b176fbfebe1ca43a7f3779ebb3846fe7753653e",
+                25555594,
             ),
             "windows-x86_64-cuda": Release(
-                "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-win-cuda-12.4-x64.zip",
-                "8b7bf8f3b5269531cbf00c52e4ee5d8b0c77cb4ea7af694ed3da3a34e47a7099",
-                319401248,
+                "https://github.com/ggml-org/llama.cpp/releases/download/b12521/llama-b12521-bin-win-cuda-12.4-x64.zip",
+                "9ce11d38104c119d039120c219ad521be765e681ac19145e39bd45fe08ead816",
+                364272744,
                 extras=(
                     Release(
-                        "https://github.com/ggml-org/llama.cpp/releases/download/b12375/cudart-llama-bin-win-cuda-12.4-x64.zip",
+                        "https://github.com/ggml-org/llama.cpp/releases/download/b12521/cudart-llama-bin-win-cuda-12.4-x64.zip",
                         "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6",
                         391443627,
                     ),
                 ),
             ),
             "windows-x86_64-vulkan": Release(
-                "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-win-vulkan-x64.zip",
-                "8990615f25d4fa12a7f1d8fc9da995538ce739fec01838f003fa9ff099d643f0",
-                38113510,
+                "https://github.com/ggml-org/llama.cpp/releases/download/b12521/llama-b12521-bin-win-vulkan-x64.zip",
+                "d2498cfdd7973e0c14e832dbd1db7f5d8f409ebb08df27abfc5c54dfc3161c6a",
+                38757221,
             ),
             # the ROCm (HIP) build for Radeon GPUs on Windows: brings its own HIP runtime DLLs (amdhip64_7.dll and
             # the rest, next to llama-server.exe); needs an Adrenalin driver recent enough for ROCm 10. Pinned, never
             # run by bolo's CI
             "windows-x86_64-rocm": Release(
-                "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-win-rocm-10.0-x64.zip",
-                "8875fed51d3226f0e1dec7c35a01a96bec184dff355c5895ef176d6a66d2a58f",
-                280406784,
+                "https://github.com/ggml-org/llama.cpp/releases/download/b12521/llama-b12521-bin-win-rocm-10.0-x64.zip",
+                "adafc904f4fa856ee939014a4ce9b503acef9f6893fbb76c4b8c143bc1f949f2",
+                290515095,
             ),
             "windows-arm64": Release(
-                "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-win-cpu-arm64.zip",
-                "dcbbd1217956893f91714e58bba95fe87dda272a3e72aabe46513a1ce9113cac",
-                13459532,
+                "https://github.com/ggml-org/llama.cpp/releases/download/b12521/llama-b12521-bin-win-cpu-arm64.zip",
+                "409917d3cead74c146e425c1e88b6e638aa83febefde05e5ab0710a459a3330a",
+                13845432,
             ),
         },
         setting="llama_server_bin",
         description=(
             "llama.cpp's HTTP server, which speaks text-to-speech for Chatterbox, Qwen3-TTS, Pocket TTS, Soprano, "
-            "LFM3-Audio and Fish Drama 3 GGUF models. bolo starts it on a loopback port for the model in use, or "
+            "LFM3-Audio, Fish Drama 3, Kokoro and tiny-voca GGUF models. bolo starts it on a loopback port for the model in use, or "
             "connects to one you run (setting tts_servers). The prebuilt release is the CPU build (Metal on Apple "
             "Silicon); device = vulkan installs the Vulkan build on Linux x86-64 and Windows, device = cuda the CUDA 12 "
             "build on Windows, device = rocm the ROCm (HIP) build for AMD GPUs on Linux x86-64 and Windows. llama.cpp publishes no CUDA build for Linux: there, use the Vulkan build or point "

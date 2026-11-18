@@ -95,6 +95,8 @@ def test_speech_through_an_operator_run_llama_server(settings: Settings, llama: 
         r = httpx.post(f"{srv.url}/v1/audio/speech", json={"model": "remote-llama", "input": "Hi.", "voice": "heart"})
         assert r.status_code == 200
         assert base64.b64decode(llama.requests[-1]["body"]["speaker_ref_b64"])[:4] == b"RIFF"
+        # with the clip's transcript, which Qwen3-TTS and Fish Audio S2 Pro put in the prompt
+        assert llama.requests[-1]["body"]["speaker_ref_text"].startswith("Good morning")
 
         # cloning passthrough: the caller's own recording
         ref = base64.b64encode(wav_bytes(2.0)).decode()

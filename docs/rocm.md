@@ -41,7 +41,7 @@ whose runtime cannot reach the GPU goes on the CPU with a notice in `bolo ps` an
    It needs MIGraphX from ROCm (`apt install migraphx` on Ubuntu with AMD's repository). `onnxruntime-rocm` (the ROCm
    provider, last released for ONNX Runtime 1.22) works too; bolo prefers MIGraphX when a build has both.
 4. llama-server's HIP build: `bolo components install llama-server --flavour rocm`. The pinned release (llama.cpp
-   b12375, built against ROCm 10.0) covers gfx908 to gfx1201: Instinct MI100 to MI350, Radeon RX 5000 to 9000 and the
+   b12521, built against ROCm 10.0) covers gfx908 to gfx1201: Instinct MI100 to MI350, Radeon RX 5000 to 9000 and the
    Radeon 780M / 890M / 8060S APUs. On Linux it needs the ROCm runtime libraries (`libamdhip64`, hipBLAS, rocBLAS) on
    the machine; on Windows it brings its own HIP DLLs and needs a recent Adrenalin driver. It goes in its own folder
    (`components/llama-server/<version>/rocm`), next to the CPU and Vulkan builds.

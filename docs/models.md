@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-510 models: 225 validated on CPU by the maintainers, 285 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+515 models: 225 validated on CPU by the maintainers, 290 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -566,6 +566,10 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `pocket-tts-pt-llamacpp` (Kyutai Pocket TTS (Portuguese)) | pt | balanced | - | 219 MB | CC-BY-4.0 · runs on llama-server | **CPU** · RTF 0.631 · first audio 2262 ms · round-trip WER 41.7% · cloned voice: speaker similarity 0.32 |
 | `lfm3-audio-2b-llamacpp` (LFM3-Audio 2B) | en, ar, da, de, el, es +12 | accuracy | - | 1.4 GB | LFM Open License v1.0 ⚠ · runs on llama-server · GPU recommended | untested |
 | `soprano-1.1-80m-llamacpp` (Soprano 1.1 80M) | en | balanced | - | 146 MB | Apache-2.0 · runs on llama-server | **CPU** · RTF 1.239 · first audio 6024 ms · round-trip WER 0.0% |
+| `tiny-voca-llamacpp` (tiny-voca) | en | realtime | - | 26 MB | Apache-2.0 · runs on llama-server | untested |
+| `kokoro-82m-llamacpp` (Kokoro (llama.cpp)) | en | balanced | - | 270 MB | Apache-2.0 · runs on llama-server | untested |
+| `zonos3-mini-llamacpp` (ZONOS3-Mini (llama.cpp)) | en, de, es, fr, hi, it +5 | accuracy | - | 2.0 GB | Apache-2.0 · runs on llama-server · GPU recommended | untested |
+| `fish-audio-s2-pro-llamacpp` (Fish Audio S2 Pro (llama.cpp)) | - | accuracy | - | 6.3 GB | Fish Audio Research License ⚠ · runs on llama-server · GPU recommended | untested |
 | `fish-drama-3-llamacpp` (Fish Audio Drama 3) | - | accuracy | - | 23.5 GB | Fish Audio Community License 1.0 ⚠ · runs on llama-server · GPU required | untested |
 
 #### External TTS server: audio.cpp
@@ -672,6 +676,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `syspin-hne-male` | hne | balanced | - | 114 MB | MIT (weights, IISc SYSPIN); training data SYSPIN corpus, … | untested |
 | `syspin-en-female` | en | balanced | - | 114 MB | MIT (weights, IISc SYSPIN); training data SYSPIN corpus, … | untested |
 | `syspin-en-male` | en | balanced | - | 114 MB | MIT (weights, IISc SYSPIN); training data SYSPIN corpus, … | untested |
+
+#### tiny-voca
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `tiny-voca-onnx` | en | realtime | - | 27 MB | Apache-2.0 | untested |
 
 ### Voice-activity detection
 
@@ -1266,7 +1276,7 @@ are listed like the rest and marked ⚠. Checked against the model cards, LICENS
 | `qwen3-omni-30b-a3b-instruct-llamacpp` | audio-llm | Apache-2.0 (yes) | 19.9 GB | llama-server | - | runnable, untested |
 | `gemma-4-e2b-it-llamacpp`, `gemma-4-e4b-it-llamacpp` | audio-llm | Apache-2.0 (yes) | 3.4 / 5.2 GB | llama-server | - | runnable, untested |
 
-What llama.cpp b12375 (bolo's pinned llama-server) does with audio: its multimodal library has audio encoders
+What llama.cpp b12375 (bolo's pinned llama-server until b12521) does with audio: its multimodal library has audio encoders
 for Ultravox, Qwen2-Audio, Qwen2.5-Omni, Qwen3-Omni, LFM2/LFM2.5-Audio, Voxtral, Gemma 4, GLM's ASR models,
 Granite Speech and others, so these hear `input_audio` in `/v1/chat/completions`; the GGUF headers of the mmproj
 files above say `clip.has_audio_encoder = true`. Its realtime conversation mode (`/v1/realtime`, speech out) needs
@@ -2746,9 +2756,10 @@ in-process. Two ggml runtimes do, and both have an HTTP server:
   `pcm` / `pcm16`, and with `stream: true` sends audio as it is generated;
   `POST /v1/audio/speech` is the OpenAI-shaped variant (only `speed` 1.0).
   One model per process: `llama-server -m model.gguf -mm mmproj.gguf`.
-  Documented speech families (tools/tts/README.md): Qwen3-TTS, Pocket TTS,
-  Soprano, LFM3-Audio, Chatterbox (Turbo and Multilingual V3) and Fish
-  Drama 3. Chatterbox Multilingual's classifier-free guidance runs in
+  Documented speech families (docs/multimodal/tts.md, build b12521): Qwen3-TTS,
+  Pocket TTS, Soprano, LFM3-Audio, Chatterbox (Turbo and Multilingual V3), Fish
+  Drama 3, ZONOS3, Fish Audio S2 Pro, Kokoro, tiny-voca, and the song models
+  YuE2 and MiniMax Music 3 (not speech: not catalogued). Chatterbox Multilingual's classifier-free guidance runs in
   `llama-tts` but not yet in `llama-server`.
 * **audio.cpp's `audiocpp_server`** (Apache-2.0, v0.9.4). `POST
   /v1/audio/speech` with `model` (an id from the server's JSON config),
@@ -2813,7 +2824,7 @@ coming, as engine plugins are. The binary comes from the setting
 `llama_server_bin` / `audiocpp_server_bin`, else from
 
 ```bash
-bolo components install llama-server    # llama.cpp b12375 release (CPU build), SHA-256 checked, 23 MB
+bolo components install llama-server    # llama.cpp b12521 release (CPU build), SHA-256 checked, 24 MB
 bolo components install audio.cpp      # audio.cpp v0.9.4 release (portable CPU build), 70 MB
 ```
 
@@ -2876,8 +2887,8 @@ each.
 
 ### What is catalogued
 
-53 entries (`server/src/bolo/catalog/tts-server.yaml`): 12 for llama-server,
-39 for audio.cpp, 2 for Tontaube. Licences never exclude a model; each entry states
+58 entries (`server/src/bolo/catalog/tts-server.yaml`): 16 for llama-server,
+40 for audio.cpp, 2 for Tontaube. Licences never exclude a model; each entry states
 `license`, `commercial_use` and `gated`, and `options.hardware` gives the GPU
 advice (`optional`, `recommended`, `required`) and an approximate memory need
 (weights x 1.3 + 0.5 GB, an estimate, not a measurement). The catalog API
@@ -2885,7 +2896,7 @@ returns it as `hardware`.
 
 | Runtime | Entries | Licences (commercial use) |
 | --- | --- | --- |
-| llama-server | Chatterbox Multilingual V3 (23 languages incl. **Hindi**), Chatterbox Turbo, Qwen3-TTS 1.7B Base, Pocket TTS (en, de, es, fr, it, pt), LFM3-Audio 2B; Soprano 1.1 80M and Fish Drama 3 (ggml-org's conversions) | MIT, Apache-2.0, CC-BY-4.0 (yes); LFM Open License (only under USD 10M revenue), Fish Audio Community License (revenue threshold) - marked `commercial_use: false` |
+| llama-server | Chatterbox Multilingual V3 (23 languages incl. **Hindi**), Chatterbox Turbo, Qwen3-TTS 1.7B Base, Pocket TTS (en, de, es, fr, it, pt), LFM3-Audio 2B; Soprano 1.1 80M, Fish Drama 3, Kokoro-82M (English voices), tiny-voca, ZONOS3-Mini and Fish Audio S2 Pro (ggml-org's conversions; the last two not yet run) | MIT, Apache-2.0, CC-BY-4.0 (yes); LFM Open License (only under USD 10M revenue), Fish Audio Community License (revenue threshold) - marked `commercial_use: false` |
 | tontaube | TontaubeV1.1 int4 (GPU or x86-64 CPU) and full precision (vLLM, 24 GiB GPU); en, de first, es, fr, it, nl, pt | Tontaube Community Model License 1.0: free below EUR 200,000 group revenue with "Powered by TontaubeV1", research and testing free, a speech-generation service always needs a commercial licence - marked `commercial_use: false` |
 | audio.cpp | **Hindi**: Chatterbox Multilingual (V3 talker), VoxCPM2, NVIDIA Magpie Multilingual 357M, MOSS-TTS Local v1.5, FireRedTTS3, Kitten TTS 2, Supertonic 3, sanoTTS (Hindi voice), XTTS v2, Voxtral TTS; and CosyVoice3, Maya1, Qwen3-TTS (0.6B Base, 1.7B CustomVoice), Pocket TTS, Soprano 1.1, Chatterbox Turbo, MOSS-TTS Nano, OmniVoice, Fish Audio S2 Pro, Fish Drama 3, Higgs TTS 3, IndexTTS-2, VibeVoice 1.5B, OuteTTS 1.0, NeuTTS 2E, Ming 3.0 TTS, BreezeTTS 2, KugelAudio, ZONOS3-Mini, dots.tts, Irodori-TTS, MioTTS, Gradium Phonon, Audio8 TTS, Confucius4-TTS, Plapre 3, Echo-TTS, LFM3-Audio | per audio.cpp's `docs/model_licenses.md`: MIT, Apache-2.0, CC-BY-4.0, NVIDIA Open Model License, OpenRAIL-M, GPL-3.0 (yes); CC-BY-NC(-SA), Fish, Boson, BreezeBlue, Coqui (no); bilibili, Stellon, NeuTTS, LFM (conditional, marked `false`) |
 
@@ -2894,6 +2905,23 @@ above has each one. File lists come from audio.cpp's `model_specs/*.json`
 (default package of each family) and were checked against the Hugging Face
 listing, pinned to a commit. The output rate the catalog states is what bolo
 resamples to; audio.cpp's WAV carries the model's real rate.
+
+**llama-server b12521** (2026-11-18; Kokoro from b12494, tiny-voca from b12497): one short English sentence each,
+on CPU, came back as non-silent audio at the catalog's rate from `soprano-1.1-80m-llamacpp` (32 kHz, 1.3 s),
+`pocket-tts-en-llamacpp` (24 kHz, 1.4 s), `kokoro-82m-llamacpp` (voices `af_heart` and `bm_george`, 24 kHz) and
+`tiny-voca-llamacpp` (voices `F2` and `M2`, 24 kHz). Not run on this build for lack of disk: LFM3-Audio and the
+speech-to-text and audio-in models on llama-server (Voxtral, LFM2.5-Audio).
+
+**Added, not yet run** (`options.not_yet_run: true` in the catalog; files, sizes and revisions checked against Hugging
+Face, voices and options from llama.cpp's docs/multimodal/tts.md, architectures supported by the pinned b12521):
+`zonos3-mini-llamacpp` (ZONOS3-Mini, Apache-2.0, 27 voices of the release, 2.0 GB) and `fish-audio-s2-pro-llamacpp`
+(Fish Audio S2 Pro, Fish Audio Research License: not for commercial use, 6.3 GB).
+
+**tiny-voca in process** (`tiny-voca-onnx`): the authors' ONNX export on ONNX Runtime, no server, with their
+phonemiser dizione (Apache-2.0; bolo carries a copy in `bolo/vendor/dizione`, its data comes with the model). One
+sentence per voice came back as non-silent 24 kHz audio, as loud as the llama.cpp conversion's. The authors' browser
+studio phonemises with the Python dizione under Pyodide (there is no JavaScript port), so the browser demo does not
+have it yet.
 
 **What was run**: `pocket-tts-en-llamacpp` on the upstream llama-server b12375
 release, started by bolo (`bolo components install llama-server`), on the

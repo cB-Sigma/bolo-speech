@@ -42,6 +42,9 @@ or ``{option, with}`` where ``with`` are further options sent alongside (IndexTT
 ``without_reference: true`` sends them only when no reference recording is (FireRedTTS3's voice design). A server
 that refuses the instructions is asked again without them: the speech is never lost to them.
 
+``not_yet_run: true`` marks an entry catalogued from upstream's documentation and file listing but not run here yet
+(nothing reads it; the next verification pass looks for it).
+
 ``dialogue`` (audio.cpp): how the family speaks a multi-speaker script in one take (:mod:`bolo.dialogue`).
 ``vibevoice``: ``Speaker 1: …`` lines and one reference recording per speaker, which audio.cpp reads from files
 (``voice_samples``), so only a server on this machine (managed by bolo, or on a loopback address) takes it;
@@ -602,8 +605,12 @@ class ServerTTS(TTSModel):
                 body["lang"] = language
             if ref_audio is not None:
                 body["speaker_ref_b64"] = base64.b64encode(ref_audio).decode()
+                if ref_text and self.spec.get("reference_text", True):
+                    body["speaker_ref_text"] = ref_text  # put in the prompt by Qwen3-TTS and Fish Audio S2 Pro
             elif send_voice:
                 body["voice"] = send_voice
+            if speed != 1.0:
+                body["speed"] = speed  # models that support it (Kokoro, tiny-voca, ZONOS3); others answer 400
             body.update(extra_fields)
             return body
         body = {"model": self.server_model, "input": text}

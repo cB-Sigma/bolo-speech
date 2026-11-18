@@ -1898,3 +1898,34 @@
       extract: true
   options:
     text_cleaner: multilingual
+
+- id: tiny-voca-onnx
+  aliases: [tiny-voca, n4ze3m/tiny-voca]
+  task: tts
+  engine: onnxruntime
+  kind: tiny_voca_onnx
+  family: tiny-voca
+  languages: [en]
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 26790409
+  license: Apache-2.0
+  license_url: https://huggingface.co/n4ze3m/tiny-voca
+  commercial_use: true
+  description: 'tiny-voca (Muhammed Nazeem, Apache-2.0): a 4.5 M-parameter English voice, F2 (female) or M2 (male), 24
+    kHz, the authors'' ONNX export on ONNX Runtime, in process: no server, no PyTorch. Text to phonemes with the authors''
+    phonemiser, dizione (Apache-2.0, carried by bolo), over the dictionary and the small model for unknown words in the
+    repository''s phonemizer/ folder: numbers, dates, money, units and chat spellings are read out. English only.'
+  source_url: https://huggingface.co/n4ze3m/tiny-voca
+  validated: untested
+  source:
+    repo: n4ze3m/tiny-voca
+    revision: 1e73262226dbf4ef02e9df277e81aaa1db5ce16c
+    include: [onnx/model.onnx, config.json, LICENSE, phonemizer/*]
+  options:
+    model: onnx/model.onnx
+    config: config.json
+    phonemizer: phonemizer
+  voices:
+  - {id: F2, name: F2 (female), language: en-US, gender: f}
+  - {id: M2, name: M2 (male), language: en-US, gender: m}
