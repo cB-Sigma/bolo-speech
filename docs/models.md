@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-490 models: 206 validated on CPU by the maintainers, 284 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+499 models: 215 validated on CPU by the maintainers, 284 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -1159,6 +1159,32 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `dtln-aec-128` | - | realtime | - | 7 MB | MIT | **CPU** · RTF 0.233 |
+
+### Wake words and keyword spotting
+
+#### Zipformer keyword spotter
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `kws-zipformer-gigaspeech` | en | realtime | - | 18 MB | Apache-2.0 | **CPU** · RTF 0.099 |
+| `kws-zipformer-zh-en` | zh, en | realtime | - | 33 MB | Apache-2.0 | **CPU** · RTF 0.083 |
+
+#### openWakeWord
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `openwakeword-hey-jarvis` | en | realtime | - | 4 MB | CC-BY-NC-SA-4.0 ⚠ | **CPU** · RTF 0.098 |
+| `openwakeword-alexa` | en | realtime | - | 3 MB | CC-BY-NC-SA-4.0 ⚠ | **CPU** · RTF 0.095 |
+| `openwakeword-hey-mycroft` | en | realtime | - | 3 MB | CC-BY-NC-SA-4.0 ⚠ | **CPU** · RTF 0.082 |
+
+#### microWakeWord
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `microwakeword-okay-nabu` | en | realtime | - | 0 MB | Apache-2.0 | **CPU** · RTF 0.004 |
+| `microwakeword-hey-jarvis` | en | realtime | - | 0 MB | Apache-2.0 | **CPU** · RTF 0.003 |
+| `microwakeword-hey-mycroft` | en | realtime | - | 0 MB | Apache-2.0 | **CPU** · RTF 0.003 |
+| `microwakeword-alexa` | en | realtime | - | 0 MB | Apache-2.0 | **CPU** · RTF 0.003 |
 
 ⚠ = the licence restricts commercial use. RTF = processing time / audio duration (lower is faster).
 <!-- END GENERATED: models -->

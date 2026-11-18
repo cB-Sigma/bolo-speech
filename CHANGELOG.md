@@ -141,6 +141,15 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   `x-bolo-segments`. `bolo dialogue script.txt --voice Asha=af_heart ...` and a Dialogue page in the console do
   the same. Run on CPU with Kokoro (two voices, stitched) and VibeVoice 1.5B (two voices, one take; slow on a CPU).
   the same. Run on CPU with Kokoro (two voices, stitched).
+- **Wake words and keyword spotting.** A new catalog task, `wake-word`: the sherpa-onnx keyword spotters
+  `kws-zipformer-gigaspeech` (English, any phrase you type; the default) and `kws-zipformer-zh-en` (Chinese and
+  English), openWakeWord's "hey jarvis", "alexa" and "hey mycroft" (the phrase models are CC BY-NC-SA 4.0,
+  labelled non-commercial) and microWakeWord's "okay nabu", "hey jarvis", "hey mycroft" and "alexa" (through
+  pymicro-wakeword). `POST /api/v1/wake` for a recording, `WS /api/v1/wake/stream` live, a Wyoming wake service
+  (`detect`, `detection`, `not-detected`; `<model>:<phrase>` names for your own phrases), `bolo wake FILE` and a
+  Wake word page in the console. `pip install 'bolo-speech[wake]'` adds phrases of your own for the GigaSpeech
+  spotter and microWakeWord. All nine were run on CPU on Piper's voice saying the phrases (docs/api.md, "Wake
+  words", says which each found).
 - **Echo cancellation for voice agents.** `audio.input.echo_cancellation` in a Realtime session (a bolo extension;
   `true`, a model id or `{"model", "delay_ms"}`) removes the agent's own voice from what the session hears, with
   the audio the session sent as the reference, before the voice-activity detector, the recogniser or a

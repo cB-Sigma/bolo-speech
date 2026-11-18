@@ -19,6 +19,7 @@ export type Task =
   | 'voice-conversion'
   | 'align'
   | 'echo-cancellation'
+  | 'wake-word'
 export type Tier = 'realtime' | 'balanced' | 'accuracy'
 export type Validated = 'cpu' | 'untested'
 
@@ -114,6 +115,8 @@ export interface Capabilities {
     transcription_tags?: string[]
     [k: string]: unknown
   }
+  /** Wake words (`POST /api/v1/wake`, `WS /api/v1/wake/stream`, the Wyoming wake service). */
+  wake?: { endpoint?: string; stream?: string; wyoming?: boolean; default_model?: string | null }
   /** Enrolled speakers: verification and identification (`/v1/audio/speakers`), newer servers. */
   speakers?: {
     endpoint?: string
@@ -347,6 +350,9 @@ export interface CatalogModel {
   license_note?: string | null
   /** Languages the model speaks but should not be used for, with the reason; `model=auto` never picks it for them. */
   not_recommended_for?: Record<string, string>
+  /** Wake-word models: the phrases they listen for by default, and whether they take phrases of your own. */
+  wake_phrases?: string[]
+  custom_keywords?: boolean
 }
 
 export interface RemoteCode {

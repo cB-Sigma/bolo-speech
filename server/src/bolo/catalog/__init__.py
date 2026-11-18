@@ -21,7 +21,7 @@ from bolo.store import Source
 TASKS = (
     "stt", "tts", "vad", "diarization", "turn", "translation", "separation", "denoise", "lid", "speech-to-speech",
     "audio-llm", "speaker-embedding", "audio-tagging", "emotion", "voice-conversion", "align", "punctuation",
-    "echo-cancellation",
+    "echo-cancellation", "wake-word",
 )  # fmt: skip
 TIERS = ("realtime", "balanced", "accuracy")
 VALIDATED = ("cpu", "untested")
@@ -268,6 +268,19 @@ class ModelSpec:
             "license_note": self.options.get("license_note"),
             # languages it speaks but should not be used for, with the reason (options.not_recommended_for)
             "not_recommended_for": self.options.get("not_recommended_for") or {},
+            # wake-word models: the phrases it listens for by default, and whether it takes phrases of your own
+            **(
+                {
+                    "wake_phrases": (
+                        [str(self.options["phrase"])]
+                        if self.options.get("phrase")
+                        else [str(k) for k in self.options.get("keywords") or []]
+                    ),
+                    "custom_keywords": "custom-keywords" in features,
+                }
+                if self.task == "wake-word"
+                else {}
+            ),
         }
 
     def _remote_code_api(self, settings: dict[str, Any]) -> dict[str, Any] | None:
@@ -342,6 +355,12 @@ FAKE_MODELS: list[dict[str, Any]] = [
         "id": "fake-denoise-48k", "task": "denoise", "engine": "fake", "kind": "fake-denoise", "family": "Fake",
         "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True, "options": {"sample_rate": 48000},
         "description": "Test denoiser that works at 48 kHz, like full-band enhancement models.",
+    },
+    {
+        "id": "fake-wake", "task": "wake-word", "engine": "fake", "kind": "fake-wake", "family": "Fake",
+        "languages": ["en"], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
+        "features": ["custom-keywords"], "options": {"keywords": {"hey fake": "x"}},
+        "description": "Test wake-word model: hears its phrase in any loud burst. Not real keyword spotting.",
     },
     {
         "id": "fake-echo", "task": "echo-cancellation", "engine": "fake", "kind": "fake-echo", "family": "Fake",

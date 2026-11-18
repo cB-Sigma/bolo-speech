@@ -3586,6 +3586,26 @@
     }
    }
   },
+  "/api/v1/wake": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Wake words and keywords in a recording",
+    "description": "Extension. Which wake words or keywords a recording holds, and when each was heard (seconds from the start,\nat the end of the phrase). Multipart form: ``file``, ``model`` (a ``wake-word`` model; default\n``default_wake_word``), ``keywords`` (phrases to look for, for the models that take them: the sherpa-onnx\nkeyword spotters; several fields or one with commas; default: the model's own phrases), ``threshold`` (0 to 1;\nlower hears more and wakes falsely more) and ``keep_alive``.",
+    "operationId": "wake_api_v1_wake_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
   "/metrics": {
    "get": {
     "tags": [

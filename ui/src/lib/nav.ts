@@ -8,6 +8,7 @@ import {
   Columns3,
   Gauge,
   KeyRound,
+  Radio,
   MessagesSquare,
   Mic,
   Phone,
@@ -32,6 +33,8 @@ export interface NavFeatures {
   keys?: boolean
   /** Enrolled speakers (`/v1/audio/speakers`). */
   speakers?: boolean
+  /** Wake words and keyword spotting (`/api/v1/wake`). */
+  wake?: boolean
 }
 
 export interface NavItem {
@@ -190,6 +193,15 @@ export const NAV: NavItem[] = [
     icon: KeyRound,
     group: 'Server',
     when: (f) => Boolean(f.keys),
+  },
+  {
+    to: '/wake',
+    label: 'Wake word',
+    short: 'Wake',
+    description: 'Listen for wake words, or phrases you type',
+    icon: Radio,
+    group: 'Playground',
+    when: (f) => Boolean(f.wake),
   },
   {
     to: '/analyse',

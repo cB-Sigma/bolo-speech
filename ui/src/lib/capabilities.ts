@@ -280,6 +280,11 @@ export function recommendationsOffered(info: ServerInfo | undefined): boolean {
 }
 
 /** Whether the server has cloud providers (the Providers screen and cost estimates). */
+/** Whether the server spots wake words (`/api/v1/wake`, the Wake word screen). */
+export function wakeOffered(info: ServerInfo | undefined): boolean {
+  return Boolean(info?.capabilities?.wake)
+}
+
 /** Whether the server keeps API keys with scopes, rate limits and quotas (the Keys screen). */
 export function keysOffered(info: ServerInfo | undefined): boolean {
   return Boolean(info?.capabilities?.api_keys)

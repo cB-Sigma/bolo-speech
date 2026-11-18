@@ -32,6 +32,12 @@ can stand in for the separate Whisper and Piper add-ons.
    voice of every installed TTS model. Multi-voice models appear once per
    language (for example `kokoro-v1.0-int8:en-US`) with their voices as speakers.
 
+4. Wake words: with a wake-word model installed (`bolo pull kws-zipformer-gigaspeech`, or
+   `pip install 'bolo-speech[wake]'` for the microWakeWord models), the same entry also offers a wake-word entity,
+   and the assistant's wake word can be detected by bolo for satellites that stream to Home Assistant. A keyword
+   spotter takes a phrase of your own as `<model>:<phrase>` (for example `kws-zipformer-gigaspeech:hey computer`)
+   where a client lets you type the name. The openWakeWord phrase models are CC BY-NC-SA 4.0 (non-commercial).
+
 Notes
 
 * Home Assistant sends a whole voice command, then waits for the transcript,

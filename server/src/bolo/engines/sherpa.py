@@ -92,6 +92,7 @@ AUDIO_TAGGING_KINDS = ("audio_tagging",)
 #: punctuation restoration: CT-Transformer (Chinese and English, punctuation) and a CNN-BiLSTM (English, punctuation
 #: and capital letters)
 PUNCTUATION_KINDS = ("punct_ct_transformer", "punct_cnn_bilstm")
+KWS_KINDS = ("sherpa_kws",)
 
 
 def find_file(path: Path, *patterns: str, required: bool = True, prefer_int8: bool = True) -> str:
@@ -1404,6 +1405,7 @@ class SherpaOnnxEngine(Engine):
         + SPEAKER_EMBEDDING_KINDS
         + AUDIO_TAGGING_KINDS
         + PUNCTUATION_KINDS
+        + KWS_KINDS
     )
 
     def status(self) -> EngineStatus:
@@ -1461,4 +1463,8 @@ class SherpaOnnxEngine(Engine):
             return SherpaAudioTagging(path, spec, opts)
         if kind in PUNCTUATION_KINDS:
             return SherpaPunctuation(kind, path, spec, opts)
+        if kind in KWS_KINDS:
+            from bolo.wake import SherpaKeywordSpotter
+
+            return SherpaKeywordSpotter(path, spec, opts)
         raise ValueError(f"sherpa-onnx engine cannot load kind {kind!r}")

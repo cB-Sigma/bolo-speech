@@ -118,6 +118,7 @@ const TASK_LABEL: Record<Task, string> = {
   'voice-conversion': 'Voice conversion',
   align: 'Forced alignment',
   'echo-cancellation': 'Echo cancellation',
+  'wake-word': 'Wake words',
 }
 const TASK_SHORT: Record<Task, string> = {
   stt: 'STT',
@@ -138,6 +139,7 @@ const TASK_SHORT: Record<Task, string> = {
   'voice-conversion': 'Convert',
   align: 'Align',
   'echo-cancellation': 'Echo',
+  'wake-word': 'Wake',
 }
 const TASK_ORDER: Task[] = [
   'stt',
@@ -155,6 +157,7 @@ const TASK_ORDER: Task[] = [
   'voice-conversion',
   'punctuation',
   'echo-cancellation',
+  'wake-word',
   'speech-to-speech',
   'audio-llm',
   'translation',

@@ -529,6 +529,13 @@ class Bolo:
                 "embedding_model": SAME_FILE.get(*[s.voice_similarity_model or s.default_diarization] * 2),
                 "thresholds": dict(speaker_thresholds),
             },
+            # wake words (docs/api.md, "Wake words")
+            "wake": {
+                "endpoint": "/api/v1/wake",
+                "stream": "/api/v1/wake/stream",
+                "wyoming": True,
+                "default_model": s.default_wake_word,
+            },
             "voices": {
                 "endpoint": "/api/v1/voices",
                 "openai": ["/v1/audio/voices", "/v1/audio/voice_consents"],
@@ -1054,6 +1061,7 @@ class Bolo:
                 "voice-conversion": s.default_voice_conversion,
                 "punctuation": s.default_punctuation,
                 "echo-cancellation": s.default_echo_cancellation,
+                "wake-word": s.default_wake_word,
             }
             name = defaults[task]
         elif name == "realtime":

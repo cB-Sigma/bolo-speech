@@ -1,0 +1,347 @@
+# Wake words and keyword spotting (task wake-word): POST /api/v1/wake, WS /api/v1/wake/stream, the Wyoming wake
+# service, bolo wake (docs/api.md, "Wake words"). bolo.wake runs them.
+# * sherpa-onnx keyword spotters (k2-fsa, Apache-2.0): streaming Zipformer transducers trained to find phrases
+#   given as text. The GigaSpeech one spells English as BPE pieces (any word; custom phrases need sentencepiece,
+#   pip install 'bolo-speech[wake]'); the Chinese-English one spells English from its own lexicon and Chinese as
+#   pinyin (custom Chinese phrases need pypinyin). The phrases they listen for by default are spelled below.
+# * openWakeWord (David Scripka): the melspectrogram and embedding models are Apache-2.0; the pretrained phrase
+#   models are CC BY-NC-SA 4.0 (non-commercial; they were trained partly on data with such terms). Files from the
+#   v0.5.1 release on GitHub.
+# * microWakeWord (Kevin Ahrendt, for ESPHome; Apache-2.0): TensorFlow Lite models made for microcontrollers. The
+#   pymicro-wakeword package (Apache-2.0, pip install 'bolo-speech[wake]') carries the four models and TensorFlow
+#   Lite's runtime: nothing is downloaded, the package version is the pin.
+# Measured on CPU (one thread, on a loaded machine) on Piper (lessac, low) saying "Okay Nabu, set a timer for ten
+# minutes.", "Hey Jarvis, what is the weather like today?", "Alexa, turn on the lights in the kitchen.", "Hey
+# Mycroft, play some music.", "Hey bolo, what time is it?" and a sentence with no wake word, and on the two English
+# samples (37 s with the pauses around each): what each found is in its description. No false detection anywhere.
+
+- id: kws-zipformer-gigaspeech
+  aliases: [sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01, kws-gigaspeech]
+  task: wake-word
+  engine: sherpa-onnx
+  kind: sherpa_kws
+  family: Zipformer keyword spotter
+  languages: [en]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 17626723
+  params: 3300000
+  license: Apache-2.0
+  license_url: https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE
+  features: [streaming, custom-keywords]
+  description: 'A 3.3 M-parameter streaming Zipformer transducer trained on GigaSpeech for keyword spotting
+    (k2-fsa): give any English phrase as text. Found "hey jarvis", "alexa", and "good morning" and "my order" when
+    asked for them; missed "hey mycroft" and "hey bolo". The default spotter.
+    Custom phrases need sentencepiece (pip install ''bolo-speech[wake]'').'
+  source_url: https://k2-fsa.github.io/sherpa/onnx/kws/pretrained_models/index.html
+  validated: cpu
+  measured:
+    rtf: 0.099
+    audio_s: 37.1
+    load_s: 0.2
+    threads: 1
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 20
+    date: '2026-11-18'
+  source:
+    urls:
+    - path: sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.tar.bz2
+      url: https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.tar.bz2
+      size: 17626723
+      sha256: f170013b4716e41b62b9bfd809687c207cef798ef9bc6534d524e17af9b6561a
+      extract: true
+  options:
+    tokens_type: bpe
+    chunk: chunk-16
+    threshold: 0.25
+    keywords:
+      HEY JARVIS: ▁HE Y ▁JA R VI S
+      ALEXA: ▁A LE X A
+      HEY SIRI: ▁HE Y ▁S I RI
+      OK GOOGLE: ▁O K ▁GO O G LE
+      HEY BOLO: ▁HE Y ▁BO LO
+- id: kws-zipformer-zh-en
+  aliases: [sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20, kws-zh-en]
+  task: wake-word
+  engine: sherpa-onnx
+  kind: sherpa_kws
+  family: Zipformer keyword spotter
+  languages: [zh, en]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 32885699
+  params: 3000000
+  license: Apache-2.0
+  license_url: https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE
+  features: [streaming, custom-keywords]
+  description: 'A 3 M-parameter streaming Zipformer keyword spotter for Chinese and English (k2-fsa, 2025): phrases
+    as text, English words from its own pronunciation lexicon (a word it does not know is refused), Chinese as
+    pinyin (custom Chinese phrases need pypinyin). Found "hey jarvis", "alexa" and "good morning" / "my order"
+    when asked for them; missed "turn on the lights". "Mycroft" and "bolo" are not in its lexicon.'
+  source_url: https://k2-fsa.github.io/sherpa/onnx/kws/pretrained_models/index.html
+  validated: cpu
+  measured:
+    rtf: 0.083
+    audio_s: 37.1
+    load_s: 0.3
+    threads: 1
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 20
+    date: '2026-11-18'
+  source:
+    urls:
+    - path: sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20.tar.bz2
+      url: https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20.tar.bz2
+      size: 32885699
+      sha256: 68447f4fbc67e70eee3a93961f36e81e98f47aef73ce7e7ca00885c6cd3616a6
+      extract: true
+  options:
+    tokens_type: phone+ppinyin
+    chunk: chunk-16
+    threshold: 0.25
+    keywords:
+      HEY JARVIS: HH EY1 JH AA1 R V AH0 S
+      ALEXA: AH0 L EH1 K S AH0
+      HEY SIRI: HH EY1 S IH1 R IY0
+      OK GOOGLE: OW1 K EY1 G UW1 G AH0 L
+- id: openwakeword-hey-jarvis
+  aliases: [hey_jarvis_v0.1, openwakeword-hey_jarvis]
+  task: wake-word
+  engine: onnxruntime
+  kind: openwakeword
+  family: openWakeWord
+  languages: [en]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 3685906
+  params: 1300000
+  license: CC-BY-NC-SA-4.0
+  commercial_use: false
+  license_url: https://github.com/dscripka/openWakeWord#license
+  description: 'openWakeWord''s "hey jarvis" (David Scripka): the shared melspectrogram and embedding models
+    (Apache-2.0) and the phrase''s head. The pretrained head is CC BY-NC-SA 4.0: not for commercial use. Fired
+    once on "Hey Jarvis" (0.999), on nothing else.'
+  source_url: https://github.com/dscripka/openWakeWord
+  validated: cpu
+  measured:
+    rtf: 0.098
+    audio_s: 37.1
+    load_s: 0.1
+    threads: 1
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 20
+    date: '2026-11-18'
+  source:
+    urls:
+    - path: melspectrogram.onnx
+      url: https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/melspectrogram.onnx
+      size: 1087958
+      sha256: ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f
+    - path: embedding_model.onnx
+      url: https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/embedding_model.onnx
+      size: 1326578
+      sha256: 70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f
+    - path: hey_jarvis_v0.1.onnx
+      url: https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/hey_jarvis_v0.1.onnx
+      size: 1271370
+      sha256: 94a13cfe60075b132f6a472e7e462e8123ee70861bc3fb58434a73712ee0d2cb
+  options:
+    model: hey_jarvis_v0.1.onnx
+    phrase: hey jarvis
+    threshold: 0.5
+    license_note: 'The pretrained wake-word model is CC BY-NC-SA 4.0 (non-commercial, share-alike); the
+      melspectrogram and embedding models and openWakeWord''s code are Apache-2.0.'
+- id: openwakeword-alexa
+  aliases: [alexa_v0.1]
+  task: wake-word
+  engine: onnxruntime
+  kind: openwakeword
+  family: openWakeWord
+  languages: [en]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 3268782
+  params: 1100000
+  license: CC-BY-NC-SA-4.0
+  commercial_use: false
+  license_url: https://github.com/dscripka/openWakeWord#license
+  description: 'openWakeWord''s "alexa": the shared front-end (Apache-2.0) and the phrase''s head (CC BY-NC-SA
+    4.0: not for commercial use). Fired once on "Alexa", on nothing else.'
+  source_url: https://github.com/dscripka/openWakeWord
+  validated: cpu
+  measured:
+    rtf: 0.095
+    audio_s: 37.1
+    load_s: 0.1
+    threads: 1
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 20
+    date: '2026-11-18'
+  source:
+    urls:
+    - path: melspectrogram.onnx
+      url: https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/melspectrogram.onnx
+      size: 1087958
+      sha256: ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f
+    - path: embedding_model.onnx
+      url: https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/embedding_model.onnx
+      size: 1326578
+      sha256: 70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f
+    - path: alexa_v0.1.onnx
+      url: https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/alexa_v0.1.onnx
+      size: 854246
+      sha256: 6ff566a01d12670e8d9e3c59da32651db1575d17272a601b7f8a39283dfbae3e
+  options:
+    model: alexa_v0.1.onnx
+    phrase: alexa
+    threshold: 0.5
+    license_note: 'The pretrained wake-word model is CC BY-NC-SA 4.0 (non-commercial, share-alike); the
+      melspectrogram and embedding models and openWakeWord''s code are Apache-2.0.'
+- id: openwakeword-hey-mycroft
+  aliases: [hey_mycroft_v0.1, openwakeword-hey_mycroft]
+  task: wake-word
+  engine: onnxruntime
+  kind: openwakeword
+  family: openWakeWord
+  languages: [en]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 3272227
+  params: 1100000
+  license: CC-BY-NC-SA-4.0
+  commercial_use: false
+  license_url: https://github.com/dscripka/openWakeWord#license
+  description: 'openWakeWord''s "hey mycroft": the shared front-end (Apache-2.0) and the phrase''s head (CC BY-NC-SA
+    4.0: not for commercial use). Fired once on "Hey Mycroft", on nothing else.'
+  source_url: https://github.com/dscripka/openWakeWord
+  validated: cpu
+  measured:
+    rtf: 0.082
+    audio_s: 37.1
+    load_s: 0.1
+    threads: 1
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 20
+    date: '2026-11-18'
+  source:
+    urls:
+    - path: melspectrogram.onnx
+      url: https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/melspectrogram.onnx
+      size: 1087958
+      sha256: ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f
+    - path: embedding_model.onnx
+      url: https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/embedding_model.onnx
+      size: 1326578
+      sha256: 70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f
+    - path: hey_mycroft_v0.1.onnx
+      url: https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/hey_mycroft_v0.1.onnx
+      size: 857691
+      sha256: c2a311e8fa1338de89c31b3b46dc4dffd4af2f9a8d6ddead48893c2d301b1f18
+  options:
+    model: hey_mycroft_v0.1.onnx
+    phrase: hey mycroft
+    threshold: 0.5
+    license_note: 'The pretrained wake-word model is CC BY-NC-SA 4.0 (non-commercial, share-alike); the
+      melspectrogram and embedding models and openWakeWord''s code are Apache-2.0.'
+- id: microwakeword-okay-nabu
+  aliases: [okay_nabu, micro-okay-nabu]
+  task: wake-word
+  engine: pymicro-wakeword
+  kind: micro_wakeword
+  family: microWakeWord
+  languages: [en]
+  tier: realtime
+  builtin: true
+  license: Apache-2.0
+  description: 'microWakeWord''s "okay nabu" (Kevin Ahrendt, for ESPHome and Home Assistant), a streaming
+    TensorFlow Lite model made for microcontrollers, through pymicro-wakeword (pip install ''bolo-speech[wake]'').
+    Ran on CPU; it did not fire on Piper''s "Okay Nabu" (a model tuned against false wakes on a device, not for
+    synthetic voices: try it on your own voice), nor on anything else.'
+  source_url: https://github.com/esphome/micro-wake-word-models
+  validated: cpu
+  measured:
+    rtf: 0.004
+    audio_s: 37.1
+    load_s: 0.0
+    threads: 1
+    engine: pymicro-wakeword 2.5.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 20
+    date: '2026-11-18'
+  options:
+    model: okay_nabu
+    phrase: okay nabu
+- id: microwakeword-hey-jarvis
+  aliases: [micro-hey-jarvis]
+  task: wake-word
+  engine: pymicro-wakeword
+  kind: micro_wakeword
+  family: microWakeWord
+  languages: [en]
+  tier: realtime
+  builtin: true
+  license: Apache-2.0
+  description: 'microWakeWord''s "hey jarvis" through pymicro-wakeword (pip install ''bolo-speech[wake]''). Fired
+    once on Piper''s "Hey Jarvis", on nothing else.'
+  source_url: https://github.com/esphome/micro-wake-word-models
+  validated: cpu
+  measured:
+    rtf: 0.003
+    audio_s: 37.1
+    load_s: 0.0
+    threads: 1
+    engine: pymicro-wakeword 2.5.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 20
+    date: '2026-11-18'
+  options:
+    model: hey_jarvis
+    phrase: hey jarvis
+- id: microwakeword-hey-mycroft
+  aliases: [micro-hey-mycroft]
+  task: wake-word
+  engine: pymicro-wakeword
+  kind: micro_wakeword
+  family: microWakeWord
+  languages: [en]
+  tier: realtime
+  builtin: true
+  license: Apache-2.0
+  description: 'microWakeWord''s "hey mycroft" through pymicro-wakeword (pip install ''bolo-speech[wake]''). Fired
+    once on Piper''s "Hey Mycroft", on nothing else.'
+  source_url: https://github.com/esphome/micro-wake-word-models
+  validated: cpu
+  measured:
+    rtf: 0.003
+    audio_s: 37.1
+    load_s: 0.0
+    threads: 1
+    engine: pymicro-wakeword 2.5.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 20
+    date: '2026-11-18'
+  options:
+    model: hey_mycroft
+    phrase: hey mycroft
+- id: microwakeword-alexa
+  aliases: [micro-alexa]
+  task: wake-word
+  engine: pymicro-wakeword
+  kind: micro_wakeword
+  family: microWakeWord
+  languages: [en]
+  tier: realtime
+  builtin: true
+  license: Apache-2.0
+  description: 'microWakeWord''s "alexa" through pymicro-wakeword (pip install ''bolo-speech[wake]''). Fired
+    once on Piper''s "Alexa", on nothing else.'
+  source_url: https://github.com/esphome/micro-wake-word-models
+  validated: cpu
+  measured:
+    rtf: 0.003
+    audio_s: 37.1
+    load_s: 0.0
+    threads: 1
+    engine: pymicro-wakeword 2.5.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 20
+    date: '2026-11-18'
+  options:
+    model: alexa
+    phrase: alexa

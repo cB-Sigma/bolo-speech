@@ -128,6 +128,8 @@ class Settings:
     align_words: bool = True
     #: the echo canceller of Realtime sessions that ask for one (audio.input.echo_cancellation: true)
     default_echo_cancellation: str = "speex-aec"
+    #: wake-word / keyword-spotting model: POST /api/v1/wake, its stream and the Wyoming wake service without a model
+    default_wake_word: str = "kws-zipformer-gigaspeech"
     #: echo cancellation in every Realtime session unless it says otherwise: off, or a model id (or "default")
     echo_cancellation: str = "off"
     #: transcription with the model "auto" and no language: identify the language and send the audio to the best

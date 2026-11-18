@@ -126,6 +126,7 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `GET` | `/api/v1/keys/{key_id}` | One API key and its usage |
 | `PATCH` | `/api/v1/keys/{key_id}` | Change a key's name, scopes, rate limit or quota |
 | `DELETE` | `/api/v1/keys/{key_id}` | Revoke a key (?delete=true removes it and its counters) |
+| `POST` | `/api/v1/wake` | Wake words and keywords in a recording |
 | `GET` | `/api/v1/telephony` | Telephony: providers, webhook URLs, agents, numbers (no secrets) |
 | `GET` | `/api/v1/telephony/agents` | Voice agents that answer and place calls |
 | `GET` | `/api/v1/telephony/agents/{name}` | One voice agent |
@@ -586,6 +587,43 @@ most speech), `emotions` and `audio_events` (seconds of segments each was heard 
 {"text": "...", "segments": [{"start": 0.0, "end": 3.0, "text": "...", "emotion": "happy", "events": ["speech"], ...}],
  "emotion": "happy", "emotions": {"happy": 3.0}, "audio_events": {"speech": 3.0}, ...}
 ```
+
+
+### Wake words: `POST /api/v1/wake`, `WS /api/v1/wake/stream`
+
+Extension: which wake words or keywords a recording or a live stream holds, and when each was heard. Models
+(task `wake-word`, `GET /api/v1/catalog?task=wake-word`; every entry lists its `wake_phrases` and whether it
+takes phrases of your own, `custom_keywords`):
+
+| Model | Phrases | Licence | Runs on |
+| --- | --- | --- | --- |
+| `kws-zipformer-gigaspeech` (default) | any English phrase you give (`keywords`); by default "hey jarvis", "alexa", "hey siri", "ok google", "hey bolo" | Apache-2.0 | sherpa-onnx; phrases of your own need `pip install 'bolo-speech[wake]'` (sentencepiece) |
+| `kws-zipformer-zh-en` | Chinese and English phrases you give (English words from its lexicon; Chinese needs pypinyin) | Apache-2.0 | sherpa-onnx |
+| `openwakeword-hey-jarvis`, `-alexa`, `-hey-mycroft` | the one phrase each was trained on | **CC BY-NC-SA 4.0** (non-commercial) for the phrase models, Apache-2.0 for the shared front-end | ONNX Runtime |
+| `microwakeword-okay-nabu`, `-hey-jarvis`, `-hey-mycroft`, `-alexa` | the one phrase each was trained on | Apache-2.0 | `pip install 'bolo-speech[wake]'` (pymicro-wakeword, TensorFlow Lite) |
+
+`POST /api/v1/wake`, multipart form: `file`, `model` (default `default_wake_word`), `keywords` (phrases, for the
+keyword spotters: several fields or one with commas; default the model's own), `threshold` (0 to 1; lower hears
+more and wakes falsely more) and `keep_alive`.
+
+```jsonc
+{"model": "kws-zipformer-gigaspeech", "keywords": ["hey computer", "lights on"], "detected": true,
+ "detections": [{"keyword": "hey computer", "time": 1.8}], "duration": 4.1}
+// openWakeWord and microWakeWord add "score" (0 to 1) to each detection
+```
+
+`WS /api/v1/wake/stream?model=&keywords=&threshold=&sample_rate=16000&encoding=pcm_s16le` takes binary audio
+(`pcm_s16le` or `pcm_f32le`, mono, any rate from 8 to 48 kHz) and answers `{"type": "ready", "model",
+"keywords"}`, then `{"type": "wake", "keyword", "time", "score"}` for each detection (`time`: seconds of audio
+since the stream started). Text frames: `{"type": "reset"}` listens afresh, `{"type": "stop"}` ends the stream.
+Each utterance of a phrase is one detection. The Wyoming server is a wake service too (below), and from the
+command line: `bolo wake FILE [-m model] [-k "hey computer" -k "lights on"] [--threshold 0.3] [--json]`. The
+console's Wake word page listens to the microphone through the stream.
+
+What the models found on Piper's voice saying each phrase in a sentence (and nothing in sentences without them):
+both keyword spotters found "hey jarvis", "alexa", "good morning" and "my order" and missed "hey mycroft" and
+"hey bolo"; openWakeWord found its three phrases; microWakeWord found "hey jarvis", "hey mycroft" and "alexa" and
+not "okay nabu". A synthetic voice is not your voice: try a model on your own recordings before you rely on it.
 
 ### `POST /v1/audio/speech`
 
@@ -2402,11 +2440,12 @@ buffers) comes on top.
 ## Wyoming protocol
 
 `bolo serve --wyoming` listens on `tcp://127.0.0.1:10300` (`--wyoming-host`,
-`--wyoming-port`). One port serves speech-to-text and text-to-speech.
+`--wyoming-port`). One port serves speech-to-text, text-to-speech and wake words.
 
 | Client sends | bolo answers |
 | --- | --- |
-| `describe` | `info` with one ASR program (installed speech-to-text models) and one TTS program (installed voices; multi-voice models appear once per language as `<model>:<language>` with their voices as speakers) |
+| `describe` | `info` with one ASR program (installed speech-to-text models), one TTS program (installed voices; multi-voice models appear once per language as `<model>:<language>` with their voices as speakers) and one wake program (installed wake-word models, with their phrases) |
+| `detect` (`names`: model ids, or `<model>:<phrase>` for a keyword spotter; none: `default_wake_word`), `audio-start`, `audio-chunk`…, `audio-stop` | `detection` (`name`, `timestamp` in ms since the audio started, `context.keyword`) each time a phrase is heard, and `not-detected` at `audio-stop` when none was |
 | `transcribe` (`name`, `language`), `audio-start`, `audio-chunk`…, `audio-stop` | `transcript-start`, `transcript-chunk` (the text so far, once per decoded piece), `transcript` (`text`, `language`), `transcript-stop`; `info` advertises `supports_transcript_streaming` |
 | `synthesize` (`text`, `voice.name`, `voice.speaker`) | `audio-start`, `audio-chunk`… (16-bit PCM at the voice's rate), `audio-stop` |
 | `synthesize-start`, `synthesize-chunk`…, `synthesize-stop` | audio as sentences complete, then `audio-stop`, `synthesize-stopped` |

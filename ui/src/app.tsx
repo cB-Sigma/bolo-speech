@@ -18,6 +18,7 @@ const WordListsPage = lazy(() => import('./routes/wordlists'))
 const ProvidersPage = lazy(() => import('./routes/providers'))
 const PhonePage = lazy(() => import('./routes/phone'))
 const KeysPage = lazy(() => import('./routes/keys'))
+const WakePage = lazy(() => import('./routes/wake'))
 const ComparePage = lazy(() => import('./routes/compare'))
 const DiarizePage = lazy(() => import('./routes/diarize'))
 const CloneBrowserPage = lazy(() => import('./routes/clone-browser'))
@@ -167,6 +168,14 @@ export function App() {
             element={
               <Suspense fallback={<PageFallback />}>
                 <KeysPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="wake"
+            element={
+              <Suspense fallback={<PageFallback />}>
+                <WakePage />
               </Suspense>
             }
           />

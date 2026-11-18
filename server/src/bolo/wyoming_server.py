@@ -14,6 +14,7 @@ audio…, ``synthesize-stopped``).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -44,11 +45,13 @@ def _require() -> Any:
 
 
 def build_info(core: Bolo) -> Any:
-    from wyoming.info import AsrModel, AsrProgram, Attribution, Info, TtsProgram, TtsVoice, TtsVoiceSpeaker
+    from wyoming.info import AsrModel, AsrProgram, Attribution, Info, TtsProgram, TtsVoice, TtsVoiceSpeaker, WakeProgram
+    from wyoming.info import WakeModel as WyomingWakeModel
 
     attribution = Attribution(name="bolo", url="https://github.com/cB-Sigma/bolo-speech")
     asr_models = []
     voices = []
+    wake_models = []
     for m in core.catalog_api(installed=True):
         origin = Attribution(name=m["family"], url=m["source_url"] or "https://github.com/cB-Sigma/bolo-speech")
         if m["task"] == "stt":
@@ -60,6 +63,19 @@ def build_info(core: Bolo) -> Any:
                     description=m["description"],
                     version=None,
                     languages=m["languages"],
+                )
+            )
+        elif m["task"] == "wake-word":
+            phrases = list(m.get("wake_phrases") or [])
+            wake_models.append(
+                WyomingWakeModel(
+                    name=m["id"],
+                    attribution=origin,
+                    installed=True,
+                    description=f"{m['description']} Licence: {m['license']}.",
+                    version=None,
+                    languages=m["languages"],
+                    phrase=", ".join(phrases).lower() or None,
                 )
             )
         elif m["task"] == "tts":
@@ -119,7 +135,17 @@ def build_info(core: Bolo) -> Any:
             supports_synthesize_streaming=True,
         )
     ]
-    return Info(asr=asr if asr_models else [], tts=tts if voices else [])
+    wake = [
+        WakeProgram(
+            name="bolo",
+            attribution=attribution,
+            installed=True,
+            description="bolo wake words (a keyword spotter takes '<model>:<phrase>' names too)",
+            version=__version__,
+            models=wake_models,
+        )
+    ]
+    return Info(asr=asr if asr_models else [], tts=tts if voices else [], wake=wake if wake_models else [])
 
 
 def parse_voice(core: Bolo, voice: Any) -> tuple[str | None, str | None]:
@@ -145,6 +171,7 @@ def make_handler(core: Bolo) -> Any:
     from wyoming.info import Describe
     from wyoming.server import AsyncEventHandler
     from wyoming.tts import Synthesize, SynthesizeChunk, SynthesizeStart, SynthesizeStop, SynthesizeStopped
+    from wyoming.wake import Detect, Detection, NotDetected
 
     try:  # wyoming >= 1.7
         from wyoming.asr import TranscriptChunk, TranscriptStart, TranscriptStop
@@ -164,6 +191,51 @@ def make_handler(core: Bolo) -> Any:
             self.segmenter: IncrementalSegmenter | None = None
             self.streaming_tts = False
             self.started_audio = False
+            #: wake-word detection (a Detect event came first): name -> detector, and the models kept in use
+            self.wake: dict[str, Any] | None = None
+            self.wake_stack: contextlib.AsyncExitStack | None = None
+            self.wake_samples = 0
+            self.wake_detected = False
+            self.wake_resampler: Any = None
+
+        async def disconnect(self) -> None:
+            await self._end_wake()
+
+        async def _end_wake(self) -> None:
+            for detector in (self.wake or {}).values():
+                with contextlib.suppress(Exception):
+                    detector.close()
+            self.wake = None
+            stack, self.wake_stack = self.wake_stack, None
+            if stack is not None:
+                with contextlib.suppress(Exception):
+                    await stack.aclose()
+
+        async def _start_wake(self, names: list[str]) -> None:
+            """Detectors for the names a Detect event gives: model ids, or '<model>:<phrase>' for a keyword
+            spotter; none: the default wake-word model."""
+            from bolo.wake import WakeModel, parse_keywords
+
+            await self._end_wake()
+            stack = contextlib.AsyncExitStack()
+            detectors: dict[str, Any] = {}
+            try:
+                for name in names or [core.settings.default_wake_word]:
+                    model_name, _, phrase = name.partition(":")
+                    spec = core.resolve(model_name or None, "wake-word")
+                    entry = await stack.enter_async_context(core.manager.use(spec.id))
+                    model = entry.model
+                    if not isinstance(model, WakeModel):
+                        raise BoloError(f"'{spec.id}' is not a wake-word model")
+                    keywords = parse_keywords(phrase) if phrase else None
+                    if keywords and not model.custom_keywords:
+                        raise BoloError(f"'{spec.id}' takes no phrases of its own")
+                    detectors[name] = await asyncio.to_thread(model.create_detector, keywords, None)
+            except BaseException:
+                await stack.aclose()
+                raise
+            self.wake, self.wake_stack = detectors, stack
+            self.wake_samples, self.wake_detected, self.wake_resampler = 0, False, None
 
         async def handle_event(self, event: Event) -> bool:
             try:
@@ -179,13 +251,22 @@ def make_handler(core: Bolo) -> Any:
         async def _handle(self, event: Event) -> bool:
             if Describe.is_type(event.type):
                 await self.write_event(build_info(core).event())
+            elif Detect.is_type(event.type):
+                await self._start_wake(list(Detect.from_event(event).names or []))
             elif Transcribe.is_type(event.type):
+                await self._end_wake()
                 req = Transcribe.from_event(event)
                 self.model = req.name if req.name and core.catalog.resolve(req.name) else None
                 self.language = req.language
             elif AudioStart.is_type(event.type):
                 self.audio = []
                 self.rate = AudioStart.from_event(event).rate
+            elif AudioChunk.is_type(event.type) and self.wake is not None:
+                await self._wake_audio(AudioChunk.from_event(event))
+            elif AudioStop.is_type(event.type) and self.wake is not None:
+                if not self.wake_detected:
+                    await self.write_event(NotDetected().event())
+                await self._end_wake()
             elif AudioChunk.is_type(event.type):
                 chunk = AudioChunk.from_event(event)
                 self.rate = chunk.rate
@@ -243,6 +324,28 @@ def make_handler(core: Bolo) -> Any:
                 self.segmenter = None
                 self.streaming_tts = False
             return True
+
+        async def _wake_audio(self, chunk: Any) -> None:
+            from bolo.audio.resample import StreamResampler
+            from bolo.wake import SR
+
+            if chunk.width != 2:
+                raise BoloError("only 16-bit PCM audio is supported over Wyoming")
+            pcm = np.frombuffer(chunk.audio, dtype="<i2")
+            if chunk.channels > 1:
+                pcm = pcm.reshape(-1, chunk.channels).mean(axis=1).astype("<i2")
+            samples = pcm16_to_float(pcm)
+            if chunk.rate != SR:
+                if self.wake_resampler is None:
+                    self.wake_resampler = StreamResampler(chunk.rate, SR)
+                samples = self.wake_resampler.process(samples)
+            self.wake_samples += len(samples)
+            for name, detector in (self.wake or {}).items():
+                for hit in await asyncio.to_thread(detector.accept, samples):
+                    self.wake_detected = True
+                    await self.write_event(
+                        Detection(name=name, timestamp=int(hit.time * 1000), context={"keyword": hit.keyword}).event()
+                    )
 
         async def _speak(self, text: str, voice: Any, *, first: bool, last: bool) -> None:
             model, voice_id = parse_voice(core, voice)

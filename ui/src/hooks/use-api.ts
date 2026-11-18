@@ -6,6 +6,7 @@ import { isDemo } from '@/lib/api/config'
 import type { Catalog, CatalogModel, Component, Task } from '@/lib/api/types'
 import {
   keysOffered,
+  wakeOffered,
   providersOffered,
   recommendationsOffered,
   telephonyOffered,
@@ -129,6 +130,7 @@ export function useNavFeatures(): NavFeatures {
     telephony: telephonyOffered(info) && !isDemo,
     speakers: Boolean(info?.capabilities?.speakers),
     keys: keysOffered(info) && !isDemo,
+    wake: wakeOffered(info) && !isDemo,
   }
 }
 

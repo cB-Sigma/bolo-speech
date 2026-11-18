@@ -55,6 +55,7 @@ TASK_TITLES = {
     "voice-conversion": "Voice conversion",
     "align": "Forced alignment (word timestamps)",
     "echo-cancellation": "Echo cancellation (voice agents)",
+    "wake-word": "Wake words and keyword spotting",
 }
 
 

@@ -92,6 +92,9 @@ mcp = ["mcp>=1.10"]
 # echo cancellation for voice agents (bolo.echo): SpeexDSP's canceller through pyaec (BSD-3-Clause + MIT) and
 # WebRTC's AEC3 through LiveKit's Python SDK (Apache-2.0 + BSD-3-Clause); DTLN-aec needs only onnxruntime
 aec = ["pyaec>=1.0.1", "livekit>=1.0"]
+# wake words (bolo.wake): sentencepiece (Apache-2.0) spells your own phrases for the GigaSpeech keyword spotter;
+# pymicro-wakeword (Apache-2.0) runs microWakeWord's TensorFlow Lite models and carries them
+wake = ["sentencepiece>=0.2", "pymicro-wakeword>=2.0"]
 # inbound SIP endpoint for trunks and PBXs (sipmessage is BSD-2-Clause, pure Python: it parses and writes SIP messages)
 sip = ["sipmessage>=0.7"]
 text = ["whisper-normalizer>=0.1"]
@@ -209,6 +212,7 @@ module = [
   "mlx_audio.*",
   "mcp.*", "mcp_types.*",
   "pyaec.*", "livekit.*",
+  "pypinyin.*", "pymicro_wakeword.*", "sentencepiece.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"

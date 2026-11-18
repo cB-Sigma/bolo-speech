@@ -138,7 +138,8 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | **Indian languages** | recognition for all 22 scheduled languages, voices for 15 of them and for Bhojpuri, Magahi and Chhattisgarhi, 8 kHz G.711 in and out | [indic-telephony.md](docs/indic-telephony.md) |
 | **A web console** | playgrounds, the catalog, latency dashboards, benchmarks, conversations, calls, served by the same process | [below](#the-console) |
 | **Engine plugins** | models that need another runtime run out of process behind the same API: [bolo-torch](plugins/bolo-torch/README.md) for PyTorch models | [plugins.md](docs/plugins.md) |
-| **Wyoming** | speech-to-text and text-to-speech for Home Assistant on one TCP port | [api.md](docs/api.md#wyoming-protocol), [examples/home_assistant.md](examples/home_assistant.md) |
+| **Wake words** | keyword spotting for any phrase you type (sherpa-onnx), openWakeWord and microWakeWord models, on a recording or a live stream, over Wyoming and from the console | [api.md](docs/api.md#wake-words-post-apiv1wake-ws-apiv1wakestream) |
+| **Wyoming** | speech-to-text, text-to-speech and wake words for Home Assistant on one TCP port | [api.md](docs/api.md#wyoming-protocol), [examples/home_assistant.md](examples/home_assistant.md) |
 | **Ollama-style model scheduling** | each model goes on the GPU when it fits in free VRAM and on the CPU when it does not (llama.cpp models split by layers, ONNX models by graph or cut in two at a layer boundary); several GPUs (`gpus`, `gpu_spread`, `--tensor-split` for llama.cpp); `keep_alive` per request, `num_parallel` and `max_queue` per model, flash attention and a quantized KV cache for llama.cpp voices; `bolo ps` with size, CPU/GPU split, GPU and time until unload, `bolo load` / `stop` / `show` / `rm` / `cp` (presets) / `logs`, a "Loaded models" panel in the console; `OLLAMA_*` variables mapped. GPU side tested with fakes, and with whole models on one laptop's GPU | [configuration.md](docs/configuration.md#gpu-and-cpu-placement), [coming from Ollama](docs/configuration.md#coming-from-ollama), [api.md](docs/api.md#keep-alive) |
 | **API keys per client** | keys with scopes (`stt`, `tts`, `realtime`, `manage`, `admin`), a requests-per-minute rate limit, a daily, monthly or total quota and usage counters, from `bolo keys`, `/api/v1/keys` or the console; only a hash of each key is stored | [api.md](docs/api.md#api-keys-apiv1keys) |
 | **Server behaviour** | per-model queues with micro-batching, backpressure (`429`, not a growing delay), cancellation, lazy loading, idle unloading, a memory budget, resumable verified downloads, Prometheus metrics, and a phase-by-phase trace of every request, exportable to OpenTelemetry | [architecture.md](docs/architecture.md), [configuration.md](docs/configuration.md#opentelemetry) |
@@ -260,8 +261,11 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | VOICE-CONVERSION | Chatterbox VC | 1 | - | 0 | - |
 | VOICE-CONVERSION | RVC | 1 | - | 1 | 6.190 (`rvc-audiocpp`) |
 | VOICE-CONVERSION | Seed-VC | 1 | - | 0 | - |
+| WAKE-WORD | Zipformer keyword spotter | 2 | en, zh | 2 | 0.083 (`kws-zipformer-zh-en`) |
+| WAKE-WORD | openWakeWord | 3 | en | 3 | 0.082 (`openwakeword-hey-mycroft`) |
+| WAKE-WORD | microWakeWord | 4 | en | 4 | 0.003 (`microwakeword-hey-jarvis`) |
 
-**490 models in the catalog, 206 validated on CPU, 284 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**499 models in the catalog, 215 validated on CPU, 284 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.
@@ -333,6 +337,7 @@ Served at `/` by the same process, and as a browser-only [live demo](https://cb-
 | Compare | the same audio or text through several models, local and cloud, side by side |
 | Providers | cloud accounts, keys and cost estimates |
 | API keys | a key for each client, with scopes, a rate limit, a quota and its usage |
+| Wake word | listen to the microphone for wake words or phrases you type, with any wake-word model |
 | Word lists | edit pronunciation lists and preview what each voice receives |
 | Components | optional software (uccharan, its language packs, eSpeak NG, llama-server, audio.cpp, plugins): what is installed, what needs it, one-click install |
 | Connect | client snippets and server details |

@@ -1051,6 +1051,47 @@ def cmd_speakers(args: argparse.Namespace) -> int:
     return asyncio.run(run())
 
 
+def cmd_wake(args: argparse.Namespace) -> int:
+    """``bolo wake FILE``: the wake words or keywords a recording holds, and when."""
+    from bolo.audio import decode_audio
+    from bolo.audio.resample import resample
+    from bolo.wake import SR, WakeModel, detect, parse_keywords, wake_body
+
+    core = _core(args)
+    path = Path(args.file)
+    samples, rate = decode_audio(path.read_bytes(), filename=path.name)
+    if rate != SR:
+        samples = resample(samples, rate, SR)
+    keywords = parse_keywords(args.keyword or None)
+
+    async def run() -> int:
+        await core.start()
+        try:
+            spec = core.resolve(args.model, "wake-word")
+            async with core.manager.use(spec.id) as entry:
+                model = entry.model
+                assert isinstance(model, WakeModel)
+                if keywords and not model.custom_keywords:
+                    print(f"error: {spec.id} hears {', '.join(model.default_keywords)} only", file=sys.stderr)
+                    return 2
+                found = await asyncio.to_thread(detect, model, samples, keywords, args.threshold)
+                body = wake_body(spec.id, model, keywords or model.default_keywords, found, len(samples) / SR)
+            if args.json:
+                print(json.dumps(body, indent=2, ensure_ascii=False))
+                return 0
+            print(f"{spec.id}: listening for {', '.join(body['keywords'])}")
+            for d in body["detections"]:
+                score = f"  ({d['score']:.2f})" if d.get("score") is not None else ""
+                print(f"  {d['time']:7.2f}s  {d['keyword']}{score}")
+            if not body["detections"]:
+                print("  nothing heard")
+            return 0
+        finally:
+            await core.stop()
+
+    return asyncio.run(run())
+
+
 def cmd_speak(args: argparse.Namespace) -> int:
     from bolo.audio.encode import encode_audio
     from bolo.obs.trace import Trace
@@ -1633,7 +1674,7 @@ _TASK_TITLES = {
     "speaker-embedding": "Speaker embedding", "audio-tagging": "Audio tagging", "emotion": "Speech emotion",
     "align": "Forced alignment",
     "punctuation": "Punctuation restoration",
-    "echo-cancellation": "Echo cancellation",
+    "echo-cancellation": "Echo cancellation", "wake-word": "Wake words",
 }  # fmt: skip
 
 
@@ -2433,6 +2474,17 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--model", "-m", help="speaker embedder (default: voice_similarity_model)")
     s.add_argument("--threshold", type=float, help="default: the embedder's measured threshold")
     s.set_defaults(func=cmd_speakers)
+
+    s = sub.add_parser("wake", help="wake words and keywords in an audio file (and when they were said)")
+    _common(s)
+    s.add_argument("file")
+    s.add_argument("--model", "-m", help="a wake-word model (default: the default_wake_word setting)")
+    s.add_argument(
+        "--keyword", "-k", action="append", help="a phrase to look for (repeatable; keyword-spotting models only)"
+    )
+    s.add_argument("--threshold", type=float, help="0 to 1: lower hears more, and wakes falsely more")
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(func=cmd_wake)
 
     s = sub.add_parser("speak", help="synthesise speech to a file")
     _common(s)

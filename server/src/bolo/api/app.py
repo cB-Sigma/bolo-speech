@@ -17,6 +17,7 @@ from bolo import __version__
 from bolo.api import analysis, chat, native, openai, realtime, speaches, static, synthesis, telephony, voices, ws
 from bolo.api import keys as keys_api
 from bolo.api import speakers as speakers_api
+from bolo.api import wake as wake_api
 from bolo.api import wordlists as wordlists_api
 from bolo.api.common import check_auth, error_body, error_response
 from bolo.config import Settings
@@ -156,9 +157,11 @@ def create_app(settings: Settings | None = None, core: Bolo | None = None) -> Fa
     app.include_router(synthesis.router, dependencies=protected)
     app.include_router(speakers_api.router, dependencies=protected)
     app.include_router(keys_api.router, dependencies=protected)
+    app.include_router(wake_api.router, dependencies=protected)
     app.include_router(native.root_router)
     app.include_router(chat.router, dependencies=protected)
     app.include_router(ws.router)
+    app.include_router(wake_api.ws_router)
     app.include_router(realtime.router)
     app.include_router(telephony.router, dependencies=protected)
     app.include_router(telephony.public_router)

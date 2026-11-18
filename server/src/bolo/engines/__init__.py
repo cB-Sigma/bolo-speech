@@ -28,6 +28,7 @@ BUILTIN_ENGINES: dict[str, str] = {
     "rnnoise": "bolo.engines.denoisers:RNNoiseEngine",
     "webrtc-apm": "bolo.echo:WebRtcApmEngine",
     "speexdsp": "bolo.echo:SpeexDspEngine",
+    "pymicro-wakeword": "bolo.wake:MicroWakeWordEngine",
     "remote": "bolo.engines.remote:RemoteEngine",
     "fake": "bolo.engines.fake:FakeEngine",
 }

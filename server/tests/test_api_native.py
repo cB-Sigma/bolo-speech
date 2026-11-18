@@ -18,6 +18,17 @@ def _built_in() -> set[str]:
     ids = {"energy-vad", "silence-only"}
     if importlib.util.find_spec("webrtcvad") is not None:
         ids |= {"webrtc-vad", "webrtc-vad-aggressive"}
+    if importlib.util.find_spec("pyaec") is not None:
+        ids.add("speex-aec")
+    if importlib.util.find_spec("livekit") is not None:
+        ids.add("webrtc-aec3")
+    if importlib.util.find_spec("pymicro_wakeword") is not None:
+        ids |= {
+            "microwakeword-okay-nabu",
+            "microwakeword-hey-jarvis",
+            "microwakeword-hey-mycroft",
+            "microwakeword-alexa",
+        }
     return ids
 
 
@@ -65,6 +76,7 @@ def test_catalog_shape_and_filters(live: LiveServer) -> None:
             "align",
             "punctuation",
             "echo-cancellation",
+            "wake-word",
         )
         assert isinstance(m["requires"], list) and isinstance(m["available"], bool)
     tts = httpx.get(live.url + "/api/v1/catalog", params={"task": "tts"}).json()["models"]
@@ -93,6 +105,8 @@ def test_catalog_shape_and_filters(live: LiveServer) -> None:
         "fake-stt-ta",
         "fake-tagging",
         "fake-emotion",
+        "fake-echo",
+        "fake-wake",
     } | BUILT_IN
     not_installed = httpx.get(live.url + "/api/v1/catalog", params={"installed": "false", "task": "vad"}).json()[
         "models"
