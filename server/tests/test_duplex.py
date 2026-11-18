@@ -101,6 +101,13 @@ async def _feed(session: Any, audio: np.ndarray, chunk: int = 1920) -> None:
         await session.push(audio[i : i + chunk])
 
 
+async def _eventually(condition: Any, timeout_s: float = 10.0) -> None:
+    """Wait until ``condition()`` holds (the fake servers update their state from another thread)."""
+    async with asyncio.timeout(timeout_s):
+        while not condition():
+            await asyncio.sleep(0.02)
+
+
 def _speech_then_quiet(speech_s: float = 0.8, quiet_s: float = 2.0) -> np.ndarray:
     return np.concatenate([speechlike(speech_s, 24000), np.zeros(int(quiet_s * 24000), dtype=np.float32)])
 
@@ -123,14 +130,15 @@ async def test_kyutai_session(use_sphn: bool, rust: bool) -> None:
                 elif isinstance(event, DuplexAudio):
                     assert event.sample_rate == 24000
                     audio += len(event.samples)
-                if text.endswith(".") and audio > 24000:
+                # the server answers each 80 ms of input with 80 ms of output: 2 s back means 2 s of input reached it
+                if text.endswith(".") and audio >= 24000 * 2:
                     break
         assert text == " Hello there."
         await session.close()
         await session.close()  # twice is fine
-        await asyncio.sleep(0.2)
         state = server.connections[0]
-        assert state["closed"] and state["samples"] >= 24000 * 2
+        await _eventually(lambda: state["closed"])
+        assert state["samples"] >= 24000 * 2
         assert state["query"] == {"text_temperature": "0.7", "audio_topk": "100"}
         assert backend.active == 0 and backend.sessions_served == 1
     finally:
@@ -261,9 +269,9 @@ async def test_realtime_session_with_a_full_duplex_model(duplex: LiveServer, fak
     seconds = len(audio) / 2 / 24000
     assert 0.9 <= seconds <= 2.5  # 12 frames of tone, the pre-roll and the pause that ends the response
     assert "response.created" not in types[: types.index("input_audio_buffer.speech_stopped")]
-    await asyncio.sleep(0.5)
     state = fake.connections[0]
-    assert state["closed"] and state["replies"] == 1
+    await _eventually(lambda: state["closed"])
+    assert state["replies"] == 1
     assert state["samples"] > len(_speech_then_quiet(1.0, 0.6)) - 1920  # padding on top of what the client sent
     trace = httpx.get(duplex.url + "/api/v1/requests", params={"kind": "agent"}).json()["requests"][0]
     assert trace["status"] == "ok" and trace["llm_model"] == MODEL and trace["full_duplex"] is True
@@ -527,12 +535,12 @@ async def test_managed_server_end_to_end(settings: Settings, tmp_path: Path, mon
     assert spec is not None
     root = rt.install_dir(settings, "moshi", "pytorch")
     python = rt._venv_python(root)
-    fake_program(
+    launcher = fake_program(
         python,
         f"import sys\nsys.path.insert(0, {str(HERE)!r})\nfrom fake_kyutai_server import main\nmain(sys.argv[1:])\n",
     )
-    if not python.exists():  # Windows: the fake is python.cmd
-        python.write_text("", encoding="utf-8")
+    if launcher != python:  # Windows: the fake is python.exe.cmd, which bolo starts in the interpreter's place
+        monkeypatch.setattr(rt, "_venv_python", lambda root: launcher)
     (root / ".bolo-complete").write_text("{}", encoding="utf-8")
     model_dir = _model_dir(tmp_path, spec)
     monkeypatch.setattr(core.store, "is_installed", lambda name: True)
@@ -603,9 +611,9 @@ async def test_freeze_omni_session(freeze: Any) -> None:
         while not isinstance(event, DuplexInterrupt):
             event = await anext(events)
     await session.close()
-    await asyncio.sleep(0.3)
     state = freeze.sessions[0]
-    assert state["started"] == 1 and state["interrupted"] == 1 and state["closed"] and backend.active == 0
+    await _eventually(lambda: state["closed"])
+    assert state["started"] == 1 and state["interrupted"] == 1 and backend.active == 0
 
 
 async def test_freeze_omni_in_a_realtime_session(settings: Settings, freeze: Any) -> None:
