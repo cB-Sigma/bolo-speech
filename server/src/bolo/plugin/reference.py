@@ -12,6 +12,7 @@ during synthesis.
 from __future__ import annotations
 
 import os
+import sys
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -56,6 +57,8 @@ class ReferenceEngine(Engine):
             os.write(1, b"a native library writing to stdout\n")
         if spec.get("ask_on_load"):
             input("Download the model now? [y/N] ")
+        if spec.get("require_utf8_mode") and not sys.flags.utf8_mode:
+            raise RuntimeError("not in Python UTF-8 mode: open() without an encoding would use the locale's")
         model = self.fake.load(kind, task, path, spec, opts)
         return _CrashableTTS(model) if isinstance(model, TTSModel) else model
 

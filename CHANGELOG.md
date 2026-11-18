@@ -8,6 +8,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- **Plugins run in Python's UTF-8 mode.** Model code that opens a text file without naming an encoding read it with
+  the Windows code page and failed (MaskGCT's bundled g2p: `UnicodeDecodeError`); plugin processes now start with
+  `PYTHONUTF8=1` unless a plugin's own environment or the user sets it.
 - **Whisper through sherpa-onnx cut Tamil, Telugu, Bengali and other scripts short, and `model=auto` sent them
   there.** sherpa-onnx stops Whisper after 6 tokens per second of audio, and Whisper's tokens of these scripts come
   15 to 20 a second, so `whisper-large-v3-turbo` (and the other sherpa-onnx Whisper exports) stopped part-way through

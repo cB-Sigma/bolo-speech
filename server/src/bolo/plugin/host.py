@@ -173,7 +173,9 @@ class PluginProcess:
                 raise EngineUnavailable(
                     f"plugin '{self.config.name}' crashed ({self.last_error or 'exited'}); restarting in {wait:.0f} s"
                 )
-            env = {**os.environ, **self.config.env, "PYTHONUNBUFFERED": "1"}
+            # UTF-8 mode: model code that opens text files without an encoding (common upstream) reads them as
+            # UTF-8 on every platform, not as the Windows code page; a plugin's own env or the user can override it
+            env = {"PYTHONUTF8": "1", **os.environ, **self.config.env, "PYTHONUNBUFFERED": "1"}
             try:
                 self._proc = procs.spawn(
                     self.config.command,

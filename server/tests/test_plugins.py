@@ -398,3 +398,16 @@ def test_model_libraries_cannot_reach_the_protocol_stream() -> None:
         assert proc.request({"op": "health"})["ok"] is True
     finally:
         proc.stop()
+
+
+def test_plugins_run_in_python_utf8_mode() -> None:
+    """Model code that opens text files without an encoding reads UTF-8 on every platform (on Windows it would
+    otherwise use the code page: MaskGCT's bundled g2p failed with UnicodeDecodeError)."""
+    proc = PluginProcess(PluginConfig("ref", [sys.executable, "-m", "bolo.plugin.reference"]))
+    try:
+        load = {"op": "load", "kind": "fake-tts", "task": "tts", "path": "/nonexistent", "threads": 1}
+        model = host.PluginTTS(proc, {**load, "options": {"require_utf8_mode": True}})
+        assert list(model.synthesize("UTF-8 everywhere."))
+        model.close()
+    finally:
+        proc.stop()
