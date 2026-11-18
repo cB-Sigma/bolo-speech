@@ -201,6 +201,13 @@ class Settings:
     endpoint_silence_ms: float = 500.0
     max_utterance_s: float = 20.0
     agreement: int = 2
+    #: Realtime sessions: a user's turn is committed after this many seconds even when the voice-activity detector
+    #: still hears speech (a fan or other steady noise can keep it from ever ending); 0: no limit. Per session: the
+    #: bolo extension turn_detection.max_turn_seconds
+    max_turn_seconds: float = 30.0
+    #: Realtime sessions: end a turn when the input level has stayed this steady for this long while the detector
+    #: still says "speech" (a steady noise, not a voice); 0: off. Per session: turn_detection.noise_plateau_ms
+    turn_noise_plateau_ms: float = 2000.0
 
     #: what answers in Realtime conversation sessions (a session can pick another with the bolo extension
     #: session.pipeline): "cascade" (bolo's STT -> the language model -> bolo's TTS), "audio-llm" (the user's audio

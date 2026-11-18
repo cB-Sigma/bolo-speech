@@ -1,12 +1,16 @@
-import { Ear, Hourglass } from 'lucide-react'
+import { Ear, Hourglass, TimerOff } from 'lucide-react'
 import { CatalogSelect } from '@/components/catalog-select'
 import { Panel } from '@/components/panel'
 import { OptionRow } from '@/components/stt/browser-processing'
+import { Switch } from '@/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useModels } from '@/hooks/use-api'
 import type { ServerInfo } from '@/lib/api/types'
 import { autoPull, readsText } from '@/lib/capabilities'
 import type { ConversationState, Listening } from '@/lib/realtime/session'
+
+/** Choices for `max_turn_seconds` besides the server's own (0: no limit). */
+const TURN_LIMITS = [15, 30, 60, 0] as const
 
 /**
  * How a Realtime session on the server hears the end of a turn (`audio.input.turn_detection`): the voice-activity
@@ -35,6 +39,7 @@ export function ServerListeningPanel({
   const pull = autoPull(info)
   const defaultVad = info?.defaults?.vad
   const semantic = info?.capabilities?.realtime?.semantic_vad
+  const limits = info?.capabilities?.realtime?.turn_limits
   const chosenTurn = turns.find((m) => m.id === value.turnModel)
   const textTurn = chosenTurn ? readsText(chosenTurn) : !value.turnModel && semantic?.input === 'text'
   return (
@@ -124,6 +129,56 @@ export function ServerListeningPanel({
           </p>
         )}
       </OptionRow>
+      <OptionRow
+        testId="server-turn-limit-option"
+        icon={<TimerOff />}
+        title="Longest turn"
+        hint={
+          <>
+            A fan or other steady noise can keep the detector hearing “speech”, so your turn never ends and the agent
+            never answers. The turn is committed after this long anyway (
+            <span className="font-mono">max_turn_seconds</span>), and, with the steady-noise check, as soon as the sound
+            stops rising and falling the way a voice does (<span className="font-mono">noise_plateau_ms</span>,{' '}
+            {limits?.noise_plateau_ms != null ? `${limits.noise_plateau_ms / 1000} s` : 'about 2 s'} on this server).
+            Turn the check off if a quiet voice in a loud room is cut short.
+          </>
+        }
+        control={
+          <div className="grid justify-items-end gap-1.5">
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              value={value.maxTurnSeconds === undefined ? 'default' : String(value.maxTurnSeconds)}
+              onValueChange={(v) =>
+                v && onChange({ ...value, maxTurnSeconds: v === 'default' ? undefined : Number(v) })
+              }
+              aria-label="Longest turn"
+              disabled={disabled}
+              data-testid="max-turn"
+            >
+              <ToggleGroupItem value="default" className="px-2.5 text-xs" title="The server's max_turn_seconds">
+                {limits?.max_turn_seconds ? `Server (${limits.max_turn_seconds} s)` : 'Server'}
+              </ToggleGroupItem>
+              {TURN_LIMITS.map((n) => (
+                <ToggleGroupItem key={n} value={String(n)} className="px-2.5 text-xs" data-testid={`max-turn-${n}`}>
+                  {n === 0 ? 'No limit' : `${n} s`}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Switch
+                checked={value.noisePlateau !== false}
+                onCheckedChange={(on) => onChange({ ...value, noisePlateau: on ? undefined : false })}
+                disabled={disabled}
+                aria-label="Steady-noise check"
+                data-testid="noise-plateau"
+              />
+              Steady-noise check
+            </label>
+          </div>
+        }
+      />
       {reported && (
         <p className="pt-2 text-xs text-muted-foreground" data-testid="server-listening-reported">
           Server: <span className="num">{reported.type}</span>
@@ -131,6 +186,14 @@ export function ServerListeningPanel({
             <>
               {' '}
               · detector <span className="num">{reported.vad_model}</span>
+            </>
+          ) : null}
+          {reported.max_turn_seconds != null ? (
+            <>
+              {' '}
+              · longest turn{' '}
+              <span className="num">{reported.max_turn_seconds ? `${reported.max_turn_seconds} s` : 'no limit'}</span>
+              {reported.noise_plateau_ms === 0 ? ', no steady-noise check' : ''}
             </>
           ) : null}
           {reported.type === 'semantic_vad' && reported.turn_model ? (

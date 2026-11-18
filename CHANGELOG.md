@@ -27,6 +27,17 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   inside the graphs (codebucketsolutions/perth-onnx and codebucketsolutions/wavmark-onnx, with the export script and
   the parity results) and checked against their PyTorch originals in both directions; they run in core bolo without
   PyTorch. Perth was found after MP3, Opus and 16 or 8 kHz resampling on every clip tried. WavMark is slow on a CPU.
+- **A longest turn for live conversations, and a steady-noise check.** In a room with a fan the turn detector could
+  hear "speech" for good: the user's turn never ended and the agent never answered. A Realtime session now commits
+  the turn after `max_turn_seconds` (a new setting, default 30 s; per session the bolo extension
+  `turn_detection.max_turn_seconds`, 0: no limit), and ends it earlier when the input level stays within 1.5 dB for
+  `turn_noise_plateau_ms` (default 2 s; per session `turn_detection.noise_plateau_ms`) while the detector still says
+  "speech": a fan is flat, a voice is not. After such an end the next turn starts when the level rises 6 dB above the
+  noise. The turn's trace says why it ended (`turn_end`), `session.updated` reports both values and
+  `GET /api/v1/info` the server's (`capabilities.realtime.turn_limits`). The console's Conversation page has
+  "Longest turn" and "Steady-noise check" in its Listening panel. Tested with synthetic audio (a voice, then 20 s of
+  steady noise; speech over the noise; noise alone): not yet in a real noisy room.
+
 ### Fixed
 
 - **GPU memory is given back after a plugin model fails to load (bug 17).** A bolo-torch load that failed on the GPU

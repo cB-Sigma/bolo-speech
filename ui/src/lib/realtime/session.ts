@@ -62,7 +62,13 @@ export interface ConversationState {
     with_reference_s?: number
   } | null
   /** The turn detection the server says the session uses (`audio.input.turn_detection`), null until it says. */
-  serverListening: { type: string; vad_model?: string | null; turn_model?: string | null } | null
+  serverListening: {
+    type: string
+    vad_model?: string | null
+    turn_model?: string | null
+    max_turn_seconds?: number
+    noise_plateau_ms?: number
+  } | null
   /** The server says the session talks to a full-duplex model (`session.full_duplex`, a bolo extension). */
   serverFullDuplex: boolean | null
   turns: Turn[]
@@ -144,6 +150,10 @@ export function sessionUpdate(
   // bolo's extensions: the session's voice-activity detector and end-of-turn model; left out, the server's defaults
   if (listening?.vadModel) turn_detection.vad_model = listening.vadModel
   if (listening?.type === 'semantic_vad' && listening.turnModel) turn_detection.turn_model = listening.turnModel
+  // bolo's extensions: end a turn a steady noise keeps open (left out, the server's max_turn_seconds and
+  // turn_noise_plateau_ms settings)
+  if (listening?.maxTurnSeconds !== undefined) turn_detection.max_turn_seconds = listening.maxTurnSeconds
+  if (listening?.noisePlateau === false) turn_detection.noise_plateau_ms = 0
   const input: Record<string, unknown> = pcm ? { format, turn_detection } : { turn_detection }
   // bolo's extension; left out, the server's default (its `denoise` setting) applies
   if (denoise !== undefined) input.denoise = denoise
@@ -176,6 +186,10 @@ export interface Listening {
   type: 'server_vad' | 'semantic_vad'
   vadModel?: string
   turnModel?: string
+  /** `max_turn_seconds`: a turn is committed after this long whatever the detector hears; 0: no limit. */
+  maxTurnSeconds?: number
+  /** `noise_plateau_ms`: false turns the steady-noise check off; left out, the server's default. */
+  noisePlateau?: boolean
 }
 
 /** `audio.input.denoise`: off, or a model and strength (see `realtimeDenoise`). */

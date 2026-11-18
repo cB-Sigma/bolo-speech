@@ -77,6 +77,27 @@ describe('conversation events', () => {
     expect(s.toolCalls.find((c) => c.id === 'm2')).toMatchObject({ status: 'failed', output: 'boom' })
   })
 
+  it('sends the longest turn and the steady-noise check only when chosen', () => {
+    const td = (l?: Parameters<typeof sessionUpdate>[4]) =>
+      (
+        sessionUpdate('cascade', undefined, 'websocket', undefined, l).session.audio as {
+          input: { turn_detection: Record<string, unknown> }
+        }
+      ).input.turn_detection
+    expect(td({ type: 'server_vad' })).toEqual({ type: 'server_vad' })
+    expect(td({ type: 'server_vad', maxTurnSeconds: 15 })).toEqual({ type: 'server_vad', max_turn_seconds: 15 })
+    expect(td({ type: 'semantic_vad', maxTurnSeconds: 0, noisePlateau: false })).toEqual({
+      type: 'semantic_vad',
+      max_turn_seconds: 0,
+      noise_plateau_ms: 0,
+    })
+    const s = applyEvent(emptyConversation(), {
+      type: 'session.updated',
+      session: { audio: { input: { turn_detection: { type: 'server_vad', max_turn_seconds: 30 } } } },
+    })
+    expect(s.serverListening?.max_turn_seconds).toBe(30)
+  })
+
   it('reports a failed response as an error', () => {
     const s = applyEvent(emptyConversation(), {
       type: 'response.done',

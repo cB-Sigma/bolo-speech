@@ -148,7 +148,7 @@ WebSocket subprotocols `realtime` and `openai-insecure-api-key.<key>`.
 
 | Client event | Behaviour |
 | --- | --- |
-| `session.update` | `type` (`realtime` \| `transcription`), `instructions`, `output_modalities` (`["audio"]` or `["text"]`), `audio.input.format` / `audio.output.format` (`audio/pcm` at 24 kHz, `audio/pcmu`, `audio/pcma`), `audio.input.transcription` (`model`, `language`, `prompt`; bolo extensions: `hotwords`, names and terms to favour, whose near-misses in the transcripts are spelt their way unless `hotword_spelling` is `false`, see api.md), `audio.input.noise_reduction` (`{"type": "near_field"}` or `"far_field"`: the default denoiser before transcription; `null`: the server's default; see below), `audio.input.denoise` (bolo extension: `true`, `false`, a strength between 0 and 1, a model id, or `{"model", "strength"}`; wins over `noise_reduction`), `audio.input.echo_cancellation` (bolo extension: `true`, `false`, a model id or `{"model", "delay_ms"}`; see "Echo cancellation" below), `audio.input.turn_detection` (`server_vad` with `threshold`, `silence_duration_ms`, `prefix_padding_ms`, `create_response`, `interrupt_response`; `semantic_vad` with `eagerness`, see below; or `null`; bolo extensions in either: `vad_model`, the voice-activity detector of the session, any `vad` model, default `default_vad`; `turn_model`, the end-of-turn model `semantic_vad` asks, any `turn` model, default `default_turn`; a model named in either is pulled on first use with `auto_pull`, as anywhere else, and never replaced by another: when it cannot be used (its engine is missing, or it is not installed and `auto_pull` is off) `session.update` answers with an `error` naming the parameter, with the code and message loading the model gives), `audio.output.voice`, `audio.output.speed`, `tools` (functions, and MCP servers: below), `tool_choice`, `max_output_tokens` |
+| `session.update` | `type` (`realtime` \| `transcription`), `instructions`, `output_modalities` (`["audio"]` or `["text"]`), `audio.input.format` / `audio.output.format` (`audio/pcm` at 24 kHz, `audio/pcmu`, `audio/pcma`), `audio.input.transcription` (`model`, `language`, `prompt`; bolo extensions: `hotwords`, names and terms to favour, whose near-misses in the transcripts are spelt their way unless `hotword_spelling` is `false`, see api.md), `audio.input.noise_reduction` (`{"type": "near_field"}` or `"far_field"`: the default denoiser before transcription; `null`: the server's default; see below), `audio.input.denoise` (bolo extension: `true`, `false`, a strength between 0 and 1, a model id, or `{"model", "strength"}`; wins over `noise_reduction`), `audio.input.echo_cancellation` (bolo extension: `true`, `false`, a model id or `{"model", "delay_ms"}`; see "Echo cancellation" below), `audio.input.turn_detection` (`server_vad` with `threshold`, `silence_duration_ms`, `prefix_padding_ms`, `create_response`, `interrupt_response`; `semantic_vad` with `eagerness`, see below; or `null`; bolo extensions in either: `vad_model`, the voice-activity detector of the session, any `vad` model, default `default_vad`; `turn_model`, the end-of-turn model `semantic_vad` asks, any `turn` model, default `default_turn`; `max_turn_seconds` and `noise_plateau_ms`, which end a turn a steady noise keeps open (see "Turns that never end" below; 0: off); a model named in either is pulled on first use with `auto_pull`, as anywhere else, and never replaced by another: when it cannot be used (its engine is missing, or it is not installed and `auto_pull` is off) `session.update` answers with an `error` naming the parameter, with the code and message loading the model gives), `audio.output.voice`, `audio.output.speed`, `tools` (functions, and MCP servers: below), `tool_choice`, `max_output_tokens` |
 | `input_audio_buffer.append` / `.commit` / `.clear` | base64 audio in the session's input format; manual commit when turn detection is off |
 | `conversation.item.create` | user/assistant/system messages (`input_text`, `input_audio` with base64 audio that is transcribed, `output_text`), `function_call`, `function_call_output` |
 | `conversation.item.delete` / `.retrieve` / `.truncate` | `truncate` cuts an assistant message's transcript to the sentences that had started playing before `audio_end_ms`, so the model does not "remember" words the user never heard |
@@ -178,6 +178,22 @@ assistant message stays in the history only as far as it had been generated.
 Stop your playback when you see `input_audio_buffer.speech_started`, and send
 `conversation.item.truncate` with how much was actually played if you want
 the history to match what the user heard.
+
+**Turns that never end.** A steady noise (a fan, an air conditioner) can keep
+the voice-activity detector "in speech" for good: the turn is never committed
+and the agent never answers. Two bolo extensions of `turn_detection` end such a
+turn anyway. `noise_plateau_ms` (default 2000, the `turn_noise_plateau_ms`
+setting): when the input level has stayed within 1.5 dB for that long while the
+detector still says "speech", the turn ends where the steady stretch began (a
+voice goes up and down many times a second; a fan does not). The next turn
+starts when the level rises 6 dB above that noise, until the detector reports
+the end of the noise itself. `max_turn_seconds` (default 30, the
+`max_turn_seconds` setting): the turn is committed after that long whatever the
+detector says. `0` turns either off. The trace of a turn ended this way says so
+(`turn_end`: `noise_plateau` or `max_turn_seconds`). A voice only a few dB above
+a loud steady noise can look as flat as the noise: if turns end too early in
+such a room, raise `noise_plateau_ms` or set it to 0 and rely on
+`max_turn_seconds`.
 
 **Semantic turn detection (optional).** `turn_detection: {"type":
 "semantic_vad"}` adds an end-of-turn model: the voice-activity detector

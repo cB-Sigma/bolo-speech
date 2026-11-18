@@ -84,6 +84,8 @@ export interface Capabilities {
     webrtc?: { endpoint?: string; available?: boolean; install?: string | null; ice_servers?: string[] }
     /** The end-of-turn model `semantic_vad` asks by default; `input` says whether it hears audio or reads text. */
     semantic_vad?: { model?: string | null; available?: boolean; installed?: boolean; input?: 'audio' | 'text' | null }
+    /** What ends a turn a steady noise keeps open: the server's `max_turn_seconds` and `turn_noise_plateau_ms`. */
+    turn_limits?: { max_turn_seconds?: number; noise_plateau_ms?: number }
     /** MCP servers as session tools: whether the SDK is installed, the configured servers, whether a URL may be given. */
     mcp?: { available?: boolean; install?: string | null; configured?: string[]; session_urls?: boolean }
     /** Server-side echo cancellation (`audio.input.echo_cancellation`): the default canceller and the setting. */

@@ -64,6 +64,7 @@ from bolo.mcp_tools import McpError, McpServerSpec, McpTool, McpTools, parse_too
 from bolo.obs.trace import Trace, preview
 from bolo.s2s import AudioDelta, ResponseEnd, S2SConfig, S2SConversation, TextDelta, ToolCall
 from bolo.streaming.agreement import LocalAgreement
+from bolo.streaming.turn_guard import TurnGuard
 from bolo.stt_options import DEFAULT_MAX_REPEATS, RepeatGuard
 
 if TYPE_CHECKING:
@@ -216,6 +217,7 @@ class RealtimeSession:
         self.turn_detection: dict[str, Any] | None = {
             "type": "server_vad", "threshold": 0.5, "prefix_padding_ms": 300,
             "silence_duration_ms": int(s.endpoint_silence_ms), "create_response": True, "interrupt_response": True,
+            **self._turn_limits(),
         }  # fmt: skip
         self.items: list[dict[str, Any]] = []
         self._item_audio: dict[
@@ -228,6 +230,8 @@ class RealtimeSession:
         self._pos = 0
         self._detector: VadDetector | None = None
         self._vad_name: str | None = None
+        #: ends a turn the detector keeps open (max_turn_seconds, noise_plateau_ms; bolo.streaming.turn_guard)
+        self._turn_guard: TurnGuard | None = None
         self._speech_start: int | None = None
         self._pending_item: str | None = None
         self._commit_from = 0  # manual mode: start of the uncommitted audio
@@ -475,6 +479,14 @@ class RealtimeSession:
                 merged.setdefault("silence_duration_ms", int(self.core.settings.endpoint_silence_ms))
                 merged.setdefault("create_response", True)
                 merged.setdefault("interrupt_response", True)
+                for key, default in self._turn_limits().items():  # bolo extensions (see _turn_limits)
+                    merged.setdefault(key, default)
+                    value = merged[key]
+                    if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+                        raise RealtimeError(
+                            f"turn_detection.{key} must be a number of at least 0 (0: off)",
+                            param=f"session.audio.input.turn_detection.{key}",
+                        )
                 # bolo extension: the voice-activity detector of this session (default: the default_vad setting)
                 # A model chosen by name is used or refused, never silently replaced by another
                 if merged.get("vad_model") is not None:
@@ -503,6 +515,7 @@ class RealtimeSession:
                     param="session.audio.input.turn_detection",
                 )
             self._detector = None
+            self._turn_guard = None
             self._held_end = None
         if "voice" in audio_out:
             voice = audio_out["voice"]
@@ -633,6 +646,25 @@ class RealtimeSession:
     def _ms(self, sample: int) -> int:
         return int(sample * 1000 / SR)
 
+    def _turn_limits(self) -> dict[str, float]:
+        """The bolo extensions of ``turn_detection`` that end a turn the detector keeps open (a fan, an air
+        conditioner): ``max_turn_seconds`` (the ``max_turn_seconds`` setting) and ``noise_plateau_ms`` (the
+        ``turn_noise_plateau_ms`` setting); 0 turns either off."""
+        s = self.core.settings
+        return {
+            "max_turn_seconds": float(getattr(s, "max_turn_seconds", 30.0)),
+            "noise_plateau_ms": float(getattr(s, "turn_noise_plateau_ms", 2000.0)),
+        }
+
+    def _ensure_guard(self) -> TurnGuard | None:
+        if self.turn_detection is None or self.full_duplex:
+            return None
+        if self._turn_guard is None:
+            td = {**self._turn_limits(), **self.turn_detection}
+            guard = TurnGuard(float(td["max_turn_seconds"]), float(td["noise_plateau_ms"]) / 1000.0)
+            self._turn_guard = guard if guard.enabled else None
+        return self._turn_guard
+
     async def _ensure_detector(self) -> VadDetector | None:
         if self.turn_detection is None:
             return None
@@ -682,29 +714,19 @@ class RealtimeSession:
             if self._s2s_mode and not duplex:
                 await self._s2s_forward(self._commit_from)
             return
-        prefix = int(float((self.turn_detection or {}).get("prefix_padding_ms", 300)) * SR / 1000)
+        guard = self._ensure_guard()
+        # a forced end left the detector in speech (a steady noise): the guard hears the next utterance rise above it
+        onset = guard.feed(samples) if guard is not None else None
         for ev in detector.accept(samples):
+            if guard is not None and guard.armed and (ev.kind == "speech_start" or self._speech_start is None):
+                guard.detector_ended()  # the detector reports turns by itself again
             if ev.kind == "speech_start":
                 if self._held_end is not None and self._speech_start is not None:
                     self._held_end = None  # the speaker went on after a pause: still the same turn
                     continue
-                self._speech_start = max(self._buf_start, ev.sample - prefix)
-                self._pending_item = new_id("item")
-                await self.send(
-                    "input_audio_buffer.speech_started",
-                    audio_start_ms=self._ms(self._speech_start),
-                    item_id=self._pending_item,
-                )
-                if (self.turn_detection or {}).get("interrupt_response", True) and not duplex:
-                    # (a full-duplex model hears the user itself and decides whether to stop)
-                    await self._cancel_response("turn_detected")
-                await self._stop_partials()
-                self._partial_task = asyncio.create_task(
-                    self._partials(self._pending_item, self._speech_start), name="bolo-realtime-partials"
-                )
-                if self._s2s_mode and not duplex:
-                    self._s2s_broken = False
-                    await self._s2s_forward(self._speech_start)
+                if self._speech_start is not None:
+                    continue  # a turn the guard started is open already
+                await self._start_turn(ev.sample, duplex)
             elif ev.kind == "speech_end" and self._speech_start is not None:
                 end = min(ev.sample + int(END_PADDING_S * SR), self._pos)
                 if self._semantic and not await self._turn_complete(end):
@@ -712,14 +734,46 @@ class RealtimeSession:
                     self._hold_until = ev.sample + int(self._max_pause_s() * SR)
                     continue
                 await self._end_turn(end)
+        if onset is not None and self._speech_start is None and guard is not None:
+            await self._start_turn(onset, duplex)
         if self._held_end is not None and self._speech_start is not None and self._pos >= self._hold_until:
             if not detector.in_speech:  # the pause lasted long enough to be the end after all
                 await self._end_turn(self._held_end)
             else:
                 self._held_end = None
+        if guard is not None and self._speech_start is not None:
+            # the detector has kept the turn open too long, or on a level that does not move (a fan): end it anyway
+            forced = guard.check(self._speech_start, self._pos, plateau=detector.in_speech)
+            if forced is not None:
+                reason, end = forced
+                log.info("session %s: turn ended by %s after %.1f s", self.id, reason, (end - self._speech_start) / SR)
+                await self._end_turn(max(end, self._speech_start + 1), reason=reason)
+                if not detector.in_speech:
+                    guard.detector_ended()
         if self._s2s_mode and not duplex and self._speech_start is not None:
             await self._s2s_forward(self._speech_start)
         self._trim()
+
+    async def _start_turn(self, sample: int, duplex: bool) -> None:
+        """The user started speaking at ``sample`` (the detector said so, or the turn guard did)."""
+        prefix = int(float((self.turn_detection or {}).get("prefix_padding_ms", 300)) * SR / 1000)
+        self._speech_start = max(self._buf_start, sample - prefix)
+        self._pending_item = new_id("item")
+        await self.send(
+            "input_audio_buffer.speech_started",
+            audio_start_ms=self._ms(self._speech_start),
+            item_id=self._pending_item,
+        )
+        if (self.turn_detection or {}).get("interrupt_response", True) and not duplex:
+            # (a full-duplex model hears the user itself and decides whether to stop)
+            await self._cancel_response("turn_detected")
+        await self._stop_partials()
+        self._partial_task = asyncio.create_task(
+            self._partials(self._pending_item, self._speech_start), name="bolo-realtime-partials"
+        )
+        if self._s2s_mode and not duplex:
+            self._s2s_broken = False
+            await self._s2s_forward(self._speech_start)
 
     # -- echo cancellation (bolo.echo) ---------------------------------------------
     _echo_pending_reset = False
@@ -901,12 +955,14 @@ class RealtimeSession:
         """Milliseconds of input audio received so far."""
         return self._ms(self._pos)
 
-    async def _end_turn(self, end: int) -> None:
+    async def _end_turn(self, end: int, reason: str | None = None) -> None:
         item_id = self._pending_item or new_id("item")
         await self._stop_partials()
         await self.send("input_audio_buffer.speech_stopped", audio_end_ms=self._ms(end), item_id=item_id)
         self._user_stopped_at = time.perf_counter()
         trace = self._agent_trace()
+        if reason is not None:  # the turn guard ended it, not the detector: max_turn_seconds or noise_plateau
+            trace.extra["turn_end"] = reason
         if self._turn_checks:
             spec = self._turn_spec()
             trace.extra["turn_detection"] = {
