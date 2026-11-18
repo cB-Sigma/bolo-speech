@@ -46,13 +46,15 @@ def ms(seconds: float) -> float:
 
 async def test_stt_decode_phase_matches_engine_delay(core: Bolo) -> None:
     add(core, "t-stt", "fake-stt", base_delay_s=0.400, delay_per_audio_s=0.0)
-    await core.manager.load("t-stt")
+    entry = await core.manager.load("t-stt")
+    started = time.perf_counter()
     trace = Trace("stt", "http", "")
     result = await core.transcribe(speechlike(2.0), 16000, model="t-stt", trace=trace)
     assert result.text == "the quick brown fox jumps"
-    assert phase(trace, "decode") == pytest.approx(400, abs=TOL)
+    ((start, end),) = entry.model.spans  # type: ignore[attr-defined]  # the 400 ms decode, as long as it really took
+    assert phase(trace, "decode") == pytest.approx(ms(end - start), abs=TOL)
     assert phase(trace, "queue") < 25
-    assert trace.final_ms == pytest.approx(400, abs=TOL + 10)
+    assert trace.final_ms == pytest.approx(ms(end - started), abs=TOL + 10)
     assert trace.total_ms == pytest.approx(trace.final_ms, abs=5)
     assert trace.rtf == pytest.approx(trace.total_ms / 1000 / 2.0)
     assert trace.first_partial_ms is None and trace.batch_size == 1
@@ -95,14 +97,16 @@ async def test_stt_batched_requests_share_one_engine_call(core: Bolo) -> None:
     await blocker
     assert entry.model.calls == [1, 4]  # type: ignore[attr-defined]
     assert all(t.batch_size == 4 for t in traces)
-    assert elapsed == pytest.approx(270 + 300, abs=TOL + 30)  # one batched call, not four serial ones
+    _, (start, end) = entry.model.spans  # type: ignore[attr-defined]
+    # one batched call, not four serial ones: the rest of the blocker's call (about 270 ms), then one call (300 ms)
+    assert elapsed == pytest.approx(ms(end - t0), abs=TOL + 30)
     for t in traces:
-        assert phase(t, "decode") == pytest.approx(300, abs=TOL)
+        assert phase(t, "decode") == pytest.approx(ms(end - start), abs=TOL)
 
 
 async def test_long_audio_is_segmented_and_first_segment_time_is_reported(core: Bolo) -> None:
     add(core, "t-long", "fake-stt", base_delay_s=0.250, delay_per_audio_s=0.0, max_batch=1, max_chunk_s=5.0)
-    await core.manager.load("t-long")
+    entry = await core.manager.load("t-long")
     audio = speechlike(12.0, gap_at=(3.5, 8.0))
     seen: list[tuple[float, Segment]] = []
     trace = Trace("stt", "http", "")
@@ -115,8 +119,10 @@ async def test_long_audio_is_segmented_and_first_segment_time_is_reported(core: 
     assert [round(s.start) for s in result.segments] == [0, 4, 9]
     assert phase(trace, "vad") > 0
     assert trace.first_partial_ms == pytest.approx(seen[0][0], abs=5)
-    assert seen[1][0] - seen[0][0] == pytest.approx(250, abs=TOL)  # one engine call per segment (max_batch=1)
-    assert phase(trace, "decode") == pytest.approx(750, abs=TOL + 40)
+    calls = [ms(end - start) for start, end in entry.model.spans]  # type: ignore[attr-defined]  # 250 ms asked
+    assert len(calls) == 3
+    assert seen[1][0] - seen[0][0] == pytest.approx(calls[1], abs=TOL)  # one engine call per segment (max_batch=1)
+    assert phase(trace, "decode") == pytest.approx(sum(calls), abs=TOL + 40)
     assert trace.final_ms > trace.first_partial_ms
 
 
