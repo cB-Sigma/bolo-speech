@@ -49,7 +49,11 @@ async def test_describe_lists_models_and_voices(wyoming_port: int) -> None:
     async with AsyncTcpClient("127.0.0.1", wyoming_port) as client:
         await client.write_event(Describe().event())
         info = Info.from_event((await read_until(client, Info))[-1])
-    assert info.asr[0].name == "bolo" and {m.name for m in info.asr[0].models} == {"fake-stt", "fake-stt-streaming"}
+    assert info.asr[0].name == "bolo" and {m.name for m in info.asr[0].models} == {
+        "fake-stt",
+        "fake-stt-streaming",
+        "fake-stt-ta",
+    }
     assert info.asr[0].models[0].installed and info.asr[0].models[0].languages
     voices = info.tts[0].voices
     assert {v.name for v in voices} == {"fake-tts:en-US", "fake-tts:en-GB", "fake-tts:hi-IN"}
