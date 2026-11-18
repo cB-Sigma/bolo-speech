@@ -113,7 +113,7 @@ from bolo.separate import SeparateOptions, SeparationResult, check_request, is_n
 from bolo.separate import separate as run_separation
 from bolo.speakers import SAME_FILE, SpeakerStore
 from bolo.speakers import THRESHOLDS as speaker_thresholds
-from bolo.store import HubClient, ModelStore
+from bolo.store import HubClient, ModelStore, saved_hf_token
 from bolo.streaming.vad import EnergyVad, FallbackVad, detect_segments, merge_segments
 from bolo.stt_options import (
     DECODE_SETTINGS,
@@ -227,7 +227,7 @@ class Bolo:
         self.jobs = JobStore()
         self.engines = engines or EngineRegistry(include_fake=s.fake_engine, settings=s)
         self.catalog = Catalog.load(s.data_dir, include_fake=s.fake_engine)
-        token = s.hf_token or os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+        token = s.hf_token or os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN") or saved_hf_token()
         self.store = ModelStore(s.data_dir, HubClient(s.hf_endpoint, token))
         for spec in self.catalog.all():  # presets (`bolo cp`) use their model's files
             if spec.preset_of:

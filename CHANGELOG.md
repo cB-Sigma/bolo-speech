@@ -65,6 +65,17 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   It now reads "GPU: apple Apple M4 Pro GPU (Metal, MPS)" and "torch 2.15.0 (Metal (MPS) build)", and gives no
   "use a GPU build" advice there (`bolo torch use cpu` installs that same build).
 - **Fish Audio S2 Pro on llama.cpp has been run**: intelligible on an M4 Pro's GPU, 2.3 times slower than real time.
+- **A gated model pull ignored `hf auth login`.** bolo read the token from `--hf-token`, `BOLO_HF_TOKEN`, `HF_TOKEN`
+  or `HUGGING_FACE_HUB_TOKEN` only, so a pull of pyannote-speaker-diarization-community-1 failed after a login and
+  asked for the token on the command line. The token the Hugging Face CLI saved (`HF_TOKEN_PATH`, `$HF_HOME/token`,
+  `~/.cache/huggingface/token`) is now used last.
+- **docs/plugins.md ran the torch plugin as `python -m bolo_torch.plugin`**, a module that does not exist (the plugin
+  stopped with "No module named bolo_torch.plugin"); it is `python -m bolo_torch`. A plugin test checks the modules the
+  page names.
+- **`bolo ps` showed a plugin model on the CPU that the plugin ran on its GPU** (bolo-torch with
+  `BOLO_TORCH_DEVICE=mps`): a plugin's load reply may now name the device (`info.device`, protocol docs), and bolo
+  moves the placement there. A plugin's own device choice it turned down reads in its own words, not "could not start
+  cpu".
 - **`bolo doctor` on macOS said "CTranslate2 (CUDA devices: 0)".** CTranslate2 has no GPU backend on macOS, so the
   count said nothing; the runtimes line now reads "CTranslate2 4.9.0 (CPU only on macOS)". Other systems still show
   the CUDA device count.

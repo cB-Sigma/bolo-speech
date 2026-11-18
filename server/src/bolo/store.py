@@ -330,6 +330,19 @@ def match_patterns(path: str, include: list[str], exclude: list[str]) -> bool:
     return not any(fnmatch.fnmatch(path, pat) for pat in exclude)
 
 
+def saved_hf_token(environ: dict[str, str] | None = None) -> str | None:
+    """The token ``hf auth login`` (``huggingface-cli login``) saved, read where the Hugging Face libraries read it:
+    ``HF_TOKEN_PATH``, else ``$HF_HOME/token``, else ``~/.cache/huggingface/token``. None when there is none."""
+    env = os.environ if environ is None else environ
+    home = env.get("HF_HOME") or str(Path(env.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "huggingface")
+    path = Path(env.get("HF_TOKEN_PATH") or Path(home) / "token").expanduser()
+    try:
+        token = path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return token or None
+
+
 class HubClient:
     """Minimal Hugging Face Hub client (listing and file URLs only)."""
 

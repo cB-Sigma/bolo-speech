@@ -776,3 +776,23 @@ def test_a_repull_leaves_files_in_place_and_renames_wait_out_sharing_violations(
     manifest = store.pull("my-model", SOURCE)
     assert manifest["complete"] and len(refused) == 2
     assert (store.model_dir("my-model") / "model.int8.onnx").read_bytes() == BIG
+
+
+def test_the_token_hf_auth_login_saved_is_used(tmp_path: Path) -> None:
+    """A gated pull failed after `hf auth login` (it asked for --hf-token or BOLO_HF_TOKEN): the saved token is
+    read where the Hugging Face libraries read it."""
+    from bolo.store import saved_hf_token
+
+    home = tmp_path / "hf"
+    home.mkdir()
+    (home / "token").write_text("hf_saved_by_login\n")
+    assert saved_hf_token({"HF_HOME": str(home)}) == "hf_saved_by_login"
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.write_text("hf_from_token_path")
+    assert saved_hf_token({"HF_HOME": str(home), "HF_TOKEN_PATH": str(elsewhere)}) == "hf_from_token_path"
+    (tmp_path / "huggingface").mkdir()
+    (tmp_path / "huggingface" / "token").write_text("hf_in_the_cache")
+    assert saved_hf_token({"XDG_CACHE_HOME": str(tmp_path)}) == "hf_in_the_cache"  # ~/.cache/huggingface
+    assert saved_hf_token({"HF_HOME": str(tmp_path / "nothing")}) is None
+    (home / "token").write_text("  \n")
+    assert saved_hf_token({"HF_HOME": str(home)}) is None
