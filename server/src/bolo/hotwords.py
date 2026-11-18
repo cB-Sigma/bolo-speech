@@ -31,13 +31,16 @@ _EDGE = re.compile(r"^([^\w]*)(.*?)([^\w]*)$", re.UNICODE)
 
 def phrases(hotwords: str | None) -> list[str]:
     """The hotwords of a request: phrases separated by commas, semicolons, slashes or new lines; the words of a
-    phrase count on their own too (free text such as "Kshitij Wadhwani Zentriva" is a list of names)."""
+    phrase count on their own too (free text such as "Kshitij Wadhwani Zentriva" is a list of names), and so do its
+    runs of adjacent words ("Kshitij Wadhwani"), which a recogniser may write as one word ("Kshetjwadwani")."""
     out: list[str] = []
     for phrase in _SPLIT.split(hotwords or ""):
         phrase = " ".join(phrase.split())
         if not phrase:
             continue
-        for item in [phrase, *(phrase.split() if " " in phrase else [])]:
+        words = phrase.split()
+        runs = [" ".join(words[i : i + n]) for n in range(len(words) - 1, 1, -1) for i in range(len(words) - n + 1)]
+        for item in [phrase, *runs, *(words if len(words) > 1 else [])]:
             if item not in out and len(fold(item)) >= 3:
                 out.append(item)
     return out
@@ -93,6 +96,7 @@ def _plan(tokens: list[str], hotwords: list[str]) -> list[tuple[int, int, str]]:
     """``(start, end, replacement)`` over ``tokens``: the longest hotword first, left to right, never overlapping."""
     cores = [_core(t)[1] for t in tokens]
     taken = [False] * len(tokens)
+    inner = {h for h in hotwords if " " in h and any(h != o and f" {h} " in f" {o} " for o in hotwords)}
     found: list[tuple[int, int, str]] = []
     for hotword in sorted(hotwords, key=lambda h: (-len(h.split()), -len(h))):
         width = len(hotword.split())
@@ -105,6 +109,10 @@ def _plan(tokens: list[str], hotwords: list[str]) -> list[tuple[int, int, str]]:
                 if n > 1 and any(_core(t)[2] for t in tokens[i : i + n - 1]):
                     continue
                 if " ".join(run) == hotword or not matches(" ".join(run), hotword):
+                    continue
+                # a run inside a longer phrase ("Kshitij Wadhwani" of "Kshitij Wadhwani Zentriva") is only for words
+                # heard joined ("Kshetjwadwani"); heard one for one, the word-by-word pass says which word changed
+                if n == width > 1 and hotword in inner:
                     continue
                 found.append((i, i + n, _cased(run, hotword)))
                 taken[i : i + n] = [True] * n

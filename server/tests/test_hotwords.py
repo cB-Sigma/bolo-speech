@@ -12,7 +12,7 @@ import pytest
 import websockets
 
 from bolo.engines.base import Segment, Word
-from bolo.hotwords import Spelling, fold, matches, phrases
+from bolo.hotwords import Spelling, fold, matches, phrases, spell_text, spell_words
 from conftest import LiveServer, speechlike, wav_bytes
 from test_ws import collect, pcm16, stream_audio
 
@@ -24,7 +24,9 @@ def test_the_laptops_example() -> None:
     text, _, changes = spelling.text("Kshitij Waadhwaani at Zentriva Labs")
     assert text == "Kshitij Wadhwani at Zentriva Labs"
     assert changes == [{"from": "Waadhwaani", "to": "Wadhwani"}]
-    assert phrases("Kshitij Wadhwani Zentriva") == ["Kshitij Wadhwani Zentriva", "Kshitij", "Wadhwani", "Zentriva"]
+    assert phrases("Kshitij Wadhwani Zentriva") == [
+        "Kshitij Wadhwani Zentriva", "Kshitij Wadhwani", "Wadhwani Zentriva", "Kshitij", "Wadhwani", "Zentriva"
+    ]  # fmt: skip
     assert fold("Waadhwaani") == fold("Wadhwani") == fold("Vadhvani")
 
 
@@ -94,3 +96,20 @@ async def test_live_stream_finals_spell_hotwords(live: LiveServer) -> None:
     assert final["text"].startswith("the quick Brawn fox")  # "brown" is near "Brawn"; "quick" is not near "Kwik"
     assert final["hotword_spelling"] == [{"from": "brown", "to": "Brawn"}]
     assert [w["w"] for w in final["words"]][:3] == ["the", "quick", "Brawn"]
+
+
+def test_two_names_heard_as_one_word_are_split() -> None:
+    from bolo.engines.base import Word
+
+    hotwords = phrases("Kshitij Wadhwani Zentriva")
+    assert "Kshitij Wadhwani" in hotwords and "Wadhwani Zentriva" in hotwords
+    # whisper-tiny-mlx and parakeet on an M4 Pro: the first and last names run together
+    text, changes = spell_text("a call with Kshetjwadwani from Zentrivar on Monday.", hotwords)
+    assert text == "a call with Kshitij Wadhwani from Zentriva on Monday."
+    assert changes == [{"from": "Kshetjwadwani", "to": "Kshitij Wadhwani"}, {"from": "Zentrivar", "to": "Zentriva"}]
+    words = [Word(" with", 0.0, 0.2, 0.9), Word(" Kshetjwadwani", 0.2, 1.0, 0.6), Word(" from", 1.0, 1.2, 0.9)]
+    out = spell_words(words, hotwords)
+    assert [w.w for w in out] == [" with", " Kshitij", " Wadhwani", " from"]
+    assert (out[1].t0, out[1].t1, out[2].t0, out[2].t1) == pytest.approx((0.2, 0.6, 0.6, 1.0))
+    # a run of one name and an unrelated word stays
+    assert spell_text("He wanted the water at noon.", hotwords)[1] == []
