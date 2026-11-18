@@ -8,6 +8,15 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- **Telugu and Bengali through Whisper on sherpa-onnx.** Telugu text was still cut short: sherpa-onnx cannot hand
+  over Whisper's tokens when one holds part of a character, and the estimate from the text's length (Tamil's 3
+  bytes a token) missed that Telugu, at 1.4 to 2 bytes a token, had filled the limit. The tokens are now counted by
+  encoding the text again with Whisper's own BPE, and all six FLEURS Telugu utterances come back whole. sherpa-onnx
+  also decodes Whisper greedily, with no fallback to a higher temperature, and on Telugu and Bengali it still falls
+  into loops ("న్న్న్...", "নিশান নিশান ..."): a piece that loops is decoded again in halves, a loop left over is cut
+  to one copy, and `whisper-large-v3-turbo` is marked not recommended for Telugu and Bengali, so `model=auto` sends
+  them to another recogniser (faster-whisper's large-v3-turbo, which retries at higher temperatures, or an
+  IndicConformer). The real-speech test now covers Tamil, Telugu and Bengali (`tests/test_real_indic_whisper.py`).
 - **bolo-torch with `device = "rocm"` on a CPU build of torch refused to load.** `BOLO_TORCH_DEVICE=rocm` (or a
   model's `device` option) answered 400 ("this torch 2.15.0+cpu has no a ROCm build of torch"). The model now loads
   on the CPU with a warning, as the built-in engines do, and bolo shows why: the plugin reports the fallback with the

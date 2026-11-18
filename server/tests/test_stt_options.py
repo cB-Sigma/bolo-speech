@@ -476,3 +476,18 @@ def test_sherpa_hotwords_are_written_the_way_the_model_writes(tmp_path: Path) ->
     spm.write_bytes(piece("<blk>", 0.0) + piece("▁THE", -3.5) + piece("S", -2.75) + b"\x12\x02\x08\x01")
     vocab = bpe_vocab_from_tokens(str(tokens), tmp_path / "bpe2.vocab", str(spm))
     assert Path(vocab).read_text("utf-8").splitlines() == ["<blk>\t0", "▁THE\t-3.5", "S\t-2.75"]
+
+
+def test_sherpa_whisper_counts_tokens_and_cuts_loops() -> None:
+    from bolo.engines.sherpa import cut_loops, looping, whisper_pieces, whisper_token_count
+
+    # Whisper's pre-tokeniser: letters, digits and other marks apart; a Telugu vowel sign or virama is not a letter
+    assert whisper_pieces(" Good morning, 25 times") == [" Good", " morning", ",", " 25", " times"]
+    assert whisper_pieces("న్న") == ["న", "్", "న"]
+    ranks = {b"G": 0, b"o": 1, b"d": 2, b"oo": 3, b"Goo": 4, b"Good": 5}
+    assert whisper_token_count("Good", ranks) == 1
+    assert whisper_token_count("Godo", ranks) == 4  # nothing merges
+    assert looping("ব্বে রুপোর বে বে বে বে বে") and looping("శిపర్ల్న్న్న్న్న్న్")
+    assert not looping("no no no") and not looping("1000000 rupees")
+    assert cut_loops("శిపర్ల్న్న్న్న్న్న్ ok") == "శిపర్ల్న్ ok"
+    assert cut_loops("নিশান নিশান নিশান নিশান নিশান নিশান end") == "নিশান end"

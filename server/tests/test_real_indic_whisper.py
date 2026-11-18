@@ -1,12 +1,14 @@
-"""Whisper through sherpa-onnx on real Tamil speech. Opt-in: ``BOLO_TEST_REAL=1 pytest -m real``.
+"""Whisper through sherpa-onnx on real Tamil, Telugu and Bengali speech. Opt-in: ``BOLO_TEST_REAL=1 pytest -m real``.
 
-Regression test: on Tamil (and Telugu, Bengali) ``whisper-large-v3-turbo`` gave text that stopped part-way through the
-sentence or ran into repeated syllables, because sherpa-onnx stops Whisper after 6 tokens per second of audio and
-Whisper's tokens of these scripts come 15 to 20 a second (bolo.engines.sherpa, ``SherpaOfflineSTT._whisper``).
+Regression test: on these languages ``whisper-large-v3-turbo`` gave text that stopped part-way through the sentence
+or ran into repeated syllables. sherpa-onnx stops Whisper after 6 tokens per second of audio and Whisper's tokens of
+these scripts come 15 to 25 a second (bolo.engines.sherpa, ``SherpaOfflineSTT._whisper``, which also counts them
+when sherpa-onnx cannot hand them over); and it decodes greedily, so a loop it falls into is cut to one copy, and
+the catalog marks the model not recommended for Telugu and Bengali, where that still happens.
 
-The audio is the first two utterances of FLEURS ``ta_in`` dev (Google, CC-BY-4.0), read from the start of the
-dataset's pinned archive (about 1.5 MB of it), with their reference transcripts. The model (1 GB) is pulled into
-``BOLO_DATA_DIR``.
+The audio is the first two utterances of FLEURS ``ta_in``, ``te_in`` and ``bn_in`` dev (Google, CC-BY-4.0), read from
+the start of the dataset's pinned archives (about 1.5 MB of each), with their reference transcripts. The model
+(1 GB) is pulled into ``BOLO_DATA_DIR``.
 """
 
 from __future__ import annotations
@@ -31,7 +33,7 @@ pytestmark = [pytest.mark.real, pytest.mark.timeout(3600)]
 pytest.importorskip("sherpa_onnx")
 
 MODEL = "whisper-large-v3-turbo"
-FLEURS = "https://huggingface.co/datasets/google/fleurs/resolve/70bb2e84b976b7e960aa89f1c648e09c59f894dd/data/ta_in"
+FLEURS = "https://huggingface.co/datasets/google/fleurs/resolve/70bb2e84b976b7e960aa89f1c648e09c59f894dd/data"
 CLIPS = 2
 
 
@@ -57,16 +59,18 @@ class _Stream:
         return out
 
 
-def fleurs_tamil(count: int = CLIPS) -> list[tuple[bytes, str]]:
-    """The first ``count`` FLEURS ta_in dev utterances: (WAV bytes, reference transcript), cached on disk."""
-    cache = _data_dir() / "validation" / "fleurs-ta_in-dev"
+def fleurs(config: str, count: int = CLIPS) -> list[tuple[bytes, str]]:
+    """The first ``count`` FLEURS dev utterances of ``config`` (``ta_in``): (WAV bytes, reference transcript),
+    cached on disk."""
+    base = f"{FLEURS}/{config}"
+    cache = _data_dir() / "validation" / f"fleurs-{config}-dev"
     cache.mkdir(parents=True, exist_ok=True)
     tsv = cache / "dev.tsv"
     if not tsv.exists():
-        tsv.write_bytes(httpx.get(f"{FLEURS}/dev.tsv", follow_redirects=True, timeout=120).raise_for_status().content)
+        tsv.write_bytes(httpx.get(f"{base}/dev.tsv", follow_redirects=True, timeout=120).raise_for_status().content)
     wavs = sorted(cache.glob("*.wav"))
     if len(wavs) < count:
-        with httpx.stream("GET", f"{FLEURS}/audio/dev.tar.gz", follow_redirects=True, timeout=120) as r:
+        with httpx.stream("GET", f"{base}/audio/dev.tar.gz", follow_redirects=True, timeout=120) as r:
             r.raise_for_status()
             with tarfile.open(fileobj=_Stream(r.iter_bytes()), mode="r|gz") as archive:  # type: ignore[call-overload]
                 for member in archive:
@@ -81,9 +85,9 @@ def fleurs_tamil(count: int = CLIPS) -> list[tuple[bytes, str]]:
     return [(w.read_bytes(), rows[w.name]) for w in wavs[:count]]
 
 
-def char_error_rate(reference: str, hypothesis: str) -> float:
-    ref = normalize_for_wer(reference, "ta").replace(" ", "")
-    hyp = normalize_for_wer(hypothesis, "ta").replace(" ", "")
+def char_error_rate(reference: str, hypothesis: str, language: str) -> float:
+    ref = normalize_for_wer(reference, language).replace(" ", "")
+    hyp = normalize_for_wer(hypothesis, language).replace(" ", "")
     previous = list(range(len(hyp) + 1))
     for i, r in enumerate(ref, 1):
         current = [i]
@@ -109,21 +113,33 @@ def live() -> Iterator[LiveServer]:
         srv.stop()
 
 
-def test_sherpa_whisper_turbo_gives_whole_tamil_sentences(live: LiveServer) -> None:
+#: language -> (the highest character error rate allowed, or None to ask only for whole text without loops; whether
+#: the catalog recommends the model for it). Measured on these clips: Tamil 0.09 and 0.11, Telugu 0.17 and 0.19,
+#: Bengali 0.33 and 0.59; Telugu and Bengali loop on other FLEURS utterances, so they are not recommended
+LANGUAGES = {"ta": (0.35, True), "te": (0.4, False), "bn": (None, False)}
+
+
+@pytest.mark.parametrize("language", list(LANGUAGES))
+def test_sherpa_whisper_turbo_gives_whole_sentences_without_loops(live: LiveServer, language: str) -> None:
+    spec = live.core.catalog.resolve(MODEL)
+    assert spec is not None
+    max_cer, recommended = LANGUAGES[language]
+    assert (spec.not_recommended(language) is None) == recommended
     results: list[dict[str, Any]] = []
-    for audio, reference in fleurs_tamil():
+    for audio, reference in fleurs(f"{language}_in"):
         r = httpx.post(
             live.url + "/v1/audio/transcriptions",
-            data={"model": MODEL, "language": "ta"},
+            data={"model": MODEL, "language": language},
             files={"file": ("clip.wav", audio, "audio/wav")},
             timeout=1800,
         )
         assert r.status_code == 200, r.text
         text = r.json()["text"]
-        results.append({"text": text, "reference": reference, "cer": char_error_rate(reference, text)})
+        results.append({"text": text, "reference": reference, "cer": char_error_rate(reference, text, language)})
     for res in results:
-        print(f"CER {res['cer']:.3f}: {res['text']}")
+        print(f"{language} CER {res['cer']:.3f}: {res['text']}")
         assert repeated_run(res["text"]) is None, res
         # the whole sentence, not its first half: as long as the reference, give or take
         assert len(res["text"]) >= 0.8 * len(res["reference"]), res
-        assert res["cer"] < 0.35, res
+        if max_cer is not None:
+            assert res["cer"] < max_cer, res

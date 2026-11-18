@@ -967,8 +967,10 @@
   - punctuation
   - translate
   - language-detect
-  description: OpenAI Whisper turbo exported to ONNX (int8) for sherpa-onnx. Multilingual, including Hindi, Bengali,
-    Tamil, Telugu, Marathi, Urdu and other Indian languages; set `language` for best results.
+  description: OpenAI Whisper turbo exported to ONNX (int8) for sherpa-onnx. Multilingual, including Hindi, Tamil,
+    Marathi, Urdu and other Indian languages; set `language` for best results. Not recommended for Telugu and
+    Bengali, where sherpa-onnx's greedy decoding falls into repeated syllables (faster-whisper's large-v3-turbo
+    does not).
   source_url: https://github.com/openai/whisper
   validated: cpu
   measured:
@@ -1000,6 +1002,14 @@
     - '*.mp4'
     - '*.mov'
     - '*.srt'
+  options:
+    not_recommended_for:
+      te: 'sherpa-onnx decodes Whisper greedily, with no fallback to a higher temperature: on FLEURS Telugu one
+        utterance in six ran into a repeated syllable for its last third (character error rate 0.17 to 0.77);
+        use faster-whisper-large-v3-turbo or an IndicConformer'
+      bn: 'sherpa-onnx decodes Whisper greedily, with no fallback to a higher temperature: on FLEURS Bengali one
+        utterance in six looped on a word and a letter for half its length and the others had character error
+        rates of 0.28 to 0.59; use faster-whisper-large-v3-turbo or an IndicConformer'
 - id: whisper-distil-small.en
   aliases:
   - distil-whisper/distil-small.en

@@ -21,6 +21,7 @@ import math
 import re
 import tempfile
 import threading
+import unicodedata
 from collections import OrderedDict
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -207,12 +208,89 @@ def line_is_blank_only(symbols: set[str]) -> bool:
 WHISPER_PAD_S = 29.0
 #: the token limit of a padded piece (6 per second of padded audio, in whole seconds)
 WHISPER_TOKEN_CAP = int(WHISPER_PAD_S) * 6
-#: when sherpa-onnx cannot hand the tokens over (one holds part of a character), their number is estimated from the
-#: text: Whisper's tokens of Tamil text carry about 3.2 bytes of UTF-8 each (measured on FLEURS); 3 errs towards
-#: splitting a piece that did not need it
-WHISPER_BYTES_PER_TOKEN = 3
+#: a piece whose text comes this close to the limit is taken to have reached it (the count of
+#: :func:`whisper_token_count` can be one or two off Whisper's own)
+WHISPER_CAP_MARGIN = 4
 #: a piece shorter than twice this is not split again, even when its text fills the limit
 WHISPER_MIN_PIECE_S = 2.0
+
+
+def _char_class(ch: str) -> str:
+    cat = unicodedata.category(ch)
+    if ch.isspace():
+        return "S"
+    return "L" if cat[0] == "L" else "N" if cat[0] == "N" else "O"
+
+
+def whisper_pieces(text: str) -> list[str]:
+    """``text`` cut the way Whisper's (GPT-2) pre-tokeniser cuts it before BPE: an optional space, then a run of
+    letters, of digits or of other marks. Vowel signs and viramas of Indic scripts are not letters there, so a
+    Telugu or Bengali word falls into several pieces, which is part of why it costs so many tokens."""
+    out: list[str] = []
+    i, n = 0, len(text)
+    while i < n:
+        j = i + 1 if text[i] == " " and i + 1 < n and not text[i + 1].isspace() else i
+        kind = _char_class(text[j])
+        end = j + 1
+        while end < n and _char_class(text[end]) == kind:
+            end += 1
+        out.append(text[i:end])
+        i = end
+    return out
+
+
+def whisper_token_count(text: str, ranks: dict[bytes, int]) -> int:
+    """How many tokens Whisper's byte-level BPE (``ranks``: token bytes -> id, which is its merge rank) spends on
+    ``text``: the pieces' bytes merged pairwise, the lowest-ranked pair first."""
+    total = 0
+    for piece in whisper_pieces(text):
+        parts = [bytes([b]) for b in piece.encode("utf-8")]
+        while len(parts) > 1:
+            best: tuple[int, int] | None = None
+            for i in range(len(parts) - 1):
+                rank = ranks.get(parts[i] + parts[i + 1])
+                if rank is not None and (best is None or rank < best[0]):
+                    best = (rank, i)
+            if best is None:
+                break
+            i = best[1]
+            parts[i : i + 2] = [parts[i] + parts[i + 1]]
+        total += len(parts)
+    return total
+
+
+def whisper_ranks(tokens: str) -> dict[bytes, int]:
+    """A sherpa-onnx Whisper token table (``<base64 bytes> <id>`` a line) as token bytes -> id."""
+    import base64
+    import binascii
+
+    ranks: dict[bytes, int] = {}
+    for line in Path(tokens).read_text("utf-8", errors="replace").splitlines():
+        parts = line.split()
+        if len(parts) != 2 or not parts[1].isdigit():
+            continue
+        try:
+            ranks[base64.b64decode(parts[0], validate=True)] = int(parts[1])
+        except (binascii.Error, ValueError):
+            continue
+    return ranks
+
+
+#: a run of 1 to 12 characters said five times or more back to back ("বে বে বে ...", "ల్ల్ల్ల్..."): greedy decoding
+#: that has fallen into a loop, which sherpa-onnx cannot retry at a higher temperature (bolo's repetition guard
+#: allows four copies of a phrase, too)
+_LOOP = re.compile(r"(\S.{0,11}?)(?:\s*\1){4,}")
+
+
+def cut_loops(text: str) -> str:
+    """``text`` with each loop cut to one copy of what repeats ("న్న్న్న్..." -> "న్"): what is left when a piece too
+    short to split again still loops (bolo's repetition guard catches repeated words, not syllables)."""
+    return _LOOP.sub(lambda m: m.group(1) if any(ch.isalpha() for ch in m.group(1)) else m.group(0), text)
+
+
+def looping(text: str) -> bool:
+    """Whether ``text`` has such a loop (of something with a letter in it: "2000000" is a number)."""
+    return any(any(ch.isalpha() for ch in m.group(1)) for m in _LOOP.finditer(text))
 
 
 def quietest_point(samples: FloatArray, a: int, b: int, sr: int) -> int:
@@ -359,6 +437,7 @@ class SherpaOfflineSTT(STTModel):
         )  # fmt: skip
         self.default_language = str(spec.get("language", ""))
         self._case = "mixed"
+        self._ranks: dict[bytes, int] | None = None
         # hotwords: a transducer decodes them with modified beam search over a context graph of their tokens
         # (a second recogniser, built the first time a request has hotwords; greedy search stays the default)
         self.hotwords = kind in HOTWORD_KINDS and spec.get("hotwords", True) is not False
@@ -497,6 +576,12 @@ class SherpaOfflineSTT(STTModel):
                 results[i] = self._result(s.result, requests[i], lang)
         return [r for r in results if r is not None]
 
+    def _whisper_ranks(self) -> dict[bytes, int]:
+        """Whisper's token table, read the first time a token count is needed (see :meth:`_whisper`)."""
+        if self._ranks is None:
+            self._ranks = whisper_ranks(find_file(self.path, "*tokens.txt"))
+        return self._ranks
+
     def _whisper(self, rec: Any, req: STTRequest, lang: str) -> STTResult:
         """Whisper through sherpa-onnx, given room for every token the speech needs.
 
@@ -505,7 +590,10 @@ class SherpaOfflineSTT(STTModel):
         Telugu, Bengali and others take 15 to 20 a second, so their text was cut off part-way through the
         sentence. Each piece is padded to just under 30 s of audio, which raises the limit to
         :data:`WHISPER_TOKEN_CAP` tokens; a piece whose text still reaches the limit is split at its quietest
-        point and each half decoded again (down to :data:`WHISPER_MIN_PIECE_S`).
+        point and each half decoded again (down to :data:`WHISPER_MIN_PIECE_S`). When sherpa-onnx cannot hand the
+        tokens over (one of them holds part of a character), they are counted by encoding the text again with
+        Whisper's BPE (:func:`whisper_token_count`): Telugu and Bengali spend 1.4 to 2 bytes of UTF-8 a token, so
+        an estimate from the length of the text missed that the limit was reached.
         """
         sr = self.sample_rate
         pieces: list[tuple[str, list[str], list[float], float]] = []  # text, tokens, token starts (s), offset
@@ -527,15 +615,16 @@ class SherpaOfflineSTT(STTModel):
                 count = len(tokens)
             except UnicodeDecodeError:  # a token holding part of a character (Whisper's byte-level vocabulary)
                 tokens = []
-                count = len(str(res.text).encode()) // WHISPER_BYTES_PER_TOKEN
-            if count >= WHISPER_TOKEN_CAP - 2 and (b - a) >= 2 * WHISPER_MIN_PIECE_S * sr:
+                count = whisper_token_count(str(res.text), self._whisper_ranks())
+            full = count >= WHISPER_TOKEN_CAP - WHISPER_CAP_MARGIN
+            if (full or looping(str(res.text))) and (b - a) >= 2 * WHISPER_MIN_PIECE_S * sr:
                 cut = quietest_point(req.samples, a, b, sr)
                 decode(a, cut)
                 decode(cut, b)
                 return
             detected = detected or str(getattr(res, "lang", "") or "")
             starts = [float(t) for t in getattr(res, "timestamps", [])]
-            pieces.append((str(res.text).strip(), tokens, starts, a / sr))
+            pieces.append((cut_loops(str(res.text)).strip(), tokens, starts, a / sr))
 
         decode(0, len(req.samples))
         text = " ".join(p[0] for p in pieces if p[0]).strip()
