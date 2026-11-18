@@ -32,6 +32,7 @@ from bolo.keepalive import request_keep_alive
 from bolo.lid import is_routing_request, route_headers
 from bolo.lid import route as route_language
 from bolo.obs.trace import Trace
+from bolo.punctuation import parse_punctuation
 from bolo.separate import SeparateOptions
 from bolo.stt_options import OptionError
 from bolo.stt_options import from_form as decode_options_from_form
@@ -393,6 +394,13 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
         diarize = await _diarize_options(form, fmt, model, task)
         separate = separate_options(form)
         denoise = parse_denoise(form.get("denoise"), strength=form.get("denoise_strength"))
+        punctuation = parse_punctuation(form.get("punctuation"))
+        if punctuation is not None and punctuation.model:
+            try:
+                core.resolve(punctuation.model, "punctuation")  # unknown model: fail before reading the upload
+            except BoloError as exc:
+                exc.param = "punctuation"
+                raise
         language = str(form.get("language") or "") or None
         # extension: model "auto" without a language identifies the language and picks the recogniser (bolo.lid)
         routing = task == "transcribe" and is_routing_request(core, model, language)
@@ -441,6 +449,7 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
             "separate": separate,
             "options": decode,
             "denoise": denoise,
+            "punctuation": punctuation,
         }
     except BoloError as exc:
         trace.finish("error", exc.message)
@@ -539,6 +548,9 @@ async def create_transcription(request: Request) -> Response:
     denoised audio mixed with the original) or a denoise model id; ``denoise_strength`` sets the strength
     separately. Unset: the model's pin, then the server's ``denoise`` setting (off by default). The response
     header ``x-bolo-denoise`` names what ran. Denoising can make clean audio worse.
+    ``punctuation`` restores punctuation and capital letters afterwards: ``auto`` (only when the recogniser writes
+    none), ``on``, ``off`` or a punctuation model id; unset: the model's pin, then the server's ``punctuation``
+    setting (off by default). The response header ``x-bolo-punctuation`` names what ran.
     """
     return await _transcribe_endpoint(request, "transcribe")
 

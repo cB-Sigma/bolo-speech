@@ -82,6 +82,7 @@ def settings(tmp_path: Path) -> Settings:
         default_realtime_tts="fake-tts",
         default_vad="fake-vad",
         default_diarization="fake-diarization",
+        default_punctuation="fake-punctuation",
         # the fake diarizer's "voices" are two-dimensional and its clips short: no folding of small speakers
         diarization_min_speaker_s=0.0,
         diarization_merge_similarity=0.0,

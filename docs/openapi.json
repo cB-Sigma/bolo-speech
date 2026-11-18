@@ -179,7 +179,7 @@
      "openai"
     ],
     "summary": "Transcribe audio",
-    "description": "Multipart form: ``file``, ``model``, optional ``language``, ``prompt``,\n``response_format`` (json, text, srt, vtt, verbose_json), ``temperature``,\n``timestamp_granularities[]`` (word, segment) and ``stream``.\n\nExtensions: ``vad_filter`` (force or disable silence removal), ``vad_parameters`` (an object: ``threshold``,\n``min_speech_duration_ms``, ``max_speech_duration_s``, ``min_silence_duration_ms``, ``speech_pad_ms``),\n``chunk_length`` and ``hotwords``; Whisper decoding: ``condition_on_previous_text``, ``repetition_penalty``,\n``no_repeat_ngram_size``, ``compression_ratio_threshold``, ``log_prob_threshold``, ``no_speech_threshold``,\n``temperature_increment_on_fallback`` and ``hallucination_silence_threshold``; ``max_repeats`` (the repetition\nguard: a phrase repeated back to back more often than this is cut to one copy; 0 turns it off). Options a model\ncannot honour are listed in the ``x-bolo-ignored-options`` header. With diarization, ``separate_overlaps=true``\ntranscribes overlapped speech from one separated track per speaker.\n``denoise`` runs a speech-enhancement model first: ``true``, ``false``, a strength between 0 and 1 (the\ndenoised audio mixed with the original) or a denoise model id; ``denoise_strength`` sets the strength\nseparately. Unset: the model's pin, then the server's ``denoise`` setting (off by default). The response\nheader ``x-bolo-denoise`` names what ran. Denoising can make clean audio worse.",
+    "description": "Multipart form: ``file``, ``model``, optional ``language``, ``prompt``,\n``response_format`` (json, text, srt, vtt, verbose_json), ``temperature``,\n``timestamp_granularities[]`` (word, segment) and ``stream``.\n\nExtensions: ``vad_filter`` (force or disable silence removal), ``vad_parameters`` (an object: ``threshold``,\n``min_speech_duration_ms``, ``max_speech_duration_s``, ``min_silence_duration_ms``, ``speech_pad_ms``),\n``chunk_length`` and ``hotwords``; Whisper decoding: ``condition_on_previous_text``, ``repetition_penalty``,\n``no_repeat_ngram_size``, ``compression_ratio_threshold``, ``log_prob_threshold``, ``no_speech_threshold``,\n``temperature_increment_on_fallback`` and ``hallucination_silence_threshold``; ``max_repeats`` (the repetition\nguard: a phrase repeated back to back more often than this is cut to one copy; 0 turns it off). Options a model\ncannot honour are listed in the ``x-bolo-ignored-options`` header. With diarization, ``separate_overlaps=true``\ntranscribes overlapped speech from one separated track per speaker.\n``denoise`` runs a speech-enhancement model first: ``true``, ``false``, a strength between 0 and 1 (the\ndenoised audio mixed with the original) or a denoise model id; ``denoise_strength`` sets the strength\nseparately. Unset: the model's pin, then the server's ``denoise`` setting (off by default). The response\nheader ``x-bolo-denoise`` names what ran. Denoising can make clean audio worse.\n``punctuation`` restores punctuation and capital letters afterwards: ``auto`` (only when the recogniser writes\nnone), ``on``, ``off`` or a punctuation model id; unset: the model's pin, then the server's ``punctuation``\nsetting (off by default). The response header ``x-bolo-punctuation`` names what ran.",
     "operationId": "create_transcription_v1_audio_transcriptions_post",
     "responses": {
      "200": {
@@ -5114,6 +5114,21 @@
       ],
       "title": "Max Repeats",
       "description": "Repetition guard: a phrase (1 to 8 words) repeated back to back more often than this is cut to one copy, and so is a run of identical segments (default 4; 0 turns it off)."
+     },
+     "punctuation": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Punctuation",
+      "description": "Speech-to-text models: restore punctuation and capital letters in this model's transcripts unless the request says otherwise: auto (only if it writes none), on, off or a punctuation model id; null removes the pin."
      },
      "denoise": {
       "anyOf": [

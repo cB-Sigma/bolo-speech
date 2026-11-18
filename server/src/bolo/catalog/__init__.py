@@ -20,7 +20,7 @@ from bolo.store import Source
 
 TASKS = (
     "stt", "tts", "vad", "diarization", "turn", "translation", "separation", "denoise", "lid", "speech-to-speech",
-    "audio-llm", "speaker-embedding", "audio-tagging", "emotion", "voice-conversion", "align",
+    "audio-llm", "speaker-embedding", "audio-tagging", "emotion", "voice-conversion", "align", "punctuation",
 )  # fmt: skip
 TIERS = ("realtime", "balanced", "accuracy")
 VALIDATED = ("cpu", "untested")
@@ -351,6 +351,12 @@ FAKE_MODELS: list[dict[str, Any]] = [
         "id": "fake-emotion", "task": "emotion", "engine": "fake", "kind": "fake-emotion", "family": "Fake",
         "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
         "description": "Test emotion model: a low pitch is neutral, a high one happy. Not real emotion recognition.",
+    },
+    {
+        "id": "fake-punctuation", "task": "punctuation", "engine": "fake", "kind": "fake-punctuation",
+        "family": "Fake", "languages": ["en", "hi"], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
+        "features": ["punctuation"],
+        "description": "Test punctuation: a capital first, a comma every four words, a full stop at the end.",
     },
     {
         "id": "fake-lid", "task": "lid", "engine": "fake", "kind": "fake-lid", "family": "Fake",

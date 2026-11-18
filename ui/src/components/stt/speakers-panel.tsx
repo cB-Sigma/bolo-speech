@@ -16,7 +16,7 @@ import { speakerCountProblem, wavSampleRate, type DiarizedResult, type SpeakerCo
 import { cn } from '@/lib/utils'
 import { defaultDenoise, emptyDecoding, type DecodingOptions, type Denoise } from '@/lib/stt-options'
 import { SpeakerResult } from './speaker-result'
-import { DecodingSection, DenoiseControl, RunNotes } from './transcribe-options'
+import { DecodingSection, DenoiseControl, HotwordsField, PunctuationControl, RunNotes } from './transcribe-options'
 
 const PAGE_MODEL = '__page'
 /** `model=auto`: the language identifier hears the recording first and routes it to a recogniser for it. */
@@ -71,6 +71,8 @@ export function SpeakersPanel({
   const [narrowband, setNarrowband] = useState(false)
   const [decoding, setDecoding] = useState<DecodingOptions>(emptyDecoding)
   const [denoise, setDenoise] = useState<Denoise>(defaultDenoise)
+  const [hotwords, setHotwords] = useState('')
+  const [punctuation, setPunctuation] = useState('')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<DiarizedResult | null>(null)
   const [error, setError] = useState<{ message: string; param: string | null } | null>(null)
@@ -135,6 +137,8 @@ export function SpeakersPanel({
         allowNarrowband: separateOn && lowRate && narrowband,
         decoding,
         denoise,
+        hotwords,
+        punctuation,
       })
       setResult(r)
     } catch (err) {
@@ -389,6 +393,8 @@ export function SpeakersPanel({
         </div>
 
         <DenoiseControl value={denoise} onChange={setDenoise} disabled={busy} />
+        <HotwordsField value={hotwords} onChange={setHotwords} disabled={busy} className="max-w-md" />
+        <PunctuationControl value={punctuation} onChange={setPunctuation} disabled={busy} />
         <DecodingSection value={decoding} onChange={setDecoding} disabled={busy} />
 
         <div className="flex flex-wrap items-center gap-2">

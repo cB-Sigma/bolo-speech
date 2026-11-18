@@ -50,6 +50,8 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `separation_timeout_s` | `300` | | stop separating after this long per request; what was not separated is transcribed from the mixture and the response says `reason: "timeout"` |
 | `default_denoise` | `gtcrn-simple` | | speech-enhancement model used by `denoise` when it names no model (pulled on first use, 0.5 MB) |
 | `denoise` | `off` | | denoise audio before speech recognition unless a request or a model pin says otherwise: `off`, `on`, a strength between 0 and 1 (the denoised audio mixed with the original at that weight) or a denoise model id. See "Denoising" below: it can make clean audio worse |
+| `default_punctuation` | `punct-en-cnn-bilstm` | | punctuation model used by `punctuation` when it names no model (pulled on first use, 36 MB) |
+| `punctuation` | `off` | | restore punctuation and capital letters in transcripts unless a request or a model pin says otherwise: `off`, `auto` (only for recognisers that write none), `on` or a punctuation model id. See "Punctuation restoration" below |
 | `default_lid` | `voxlingua107-ecapa` | | spoken-language identifier used by `POST /v1/audio/language` without a model and by language routing (pulled on first use, 87 MB, Apache-2.0). See "Language routing" below |
 | `default_audio_tagging` | `ced-mini` | | sound-event / audio-tagging model used by `POST /v1/audio/tags` without a model (pulled on first use, 10 MB, Apache-2.0; any `audio-tagging` model, models.md) |
 | `default_emotion` | `emotion2vec-plus-base` | | speech-emotion model used by `POST /v1/audio/emotion` without a model (pulled on first use, 373 MB; FunASR Model License 1.1, a custom licence: read it before commercial use; any `emotion` model, models.md) |
@@ -806,6 +808,34 @@ your own audio before turning it on for a model or the server; a strength
 below 1 (`0.5`) is a gentler middle way. A denoiser that cannot run is
 skipped with a warning and the original audio is transcribed; the response
 header `x-bolo-denoise` and the request's trace say what ran.
+
+## Punctuation restoration
+
+Many recognisers write neither punctuation nor capital letters: sherpa-onnx's
+Zipformers (`GOOD MORNING COULD YOU TELL ME`), most CTC models, the streaming
+models. `punctuation` runs a punctuation model over the transcript after
+recognition: on a transcription request (`punctuation=auto|on|off|<model>`;
+api.md), as a pin per speech-to-text model (`bolo models config
+zipformer-en-gigaspeech --set punctuation=auto`, `PUT
+/api/v1/models/{id}/settings` with `{"punctuation": "auto"}`) or for the whole
+server (`punctuation = "auto"`, `BOLO_PUNCTUATION=auto`); from the command line,
+`bolo transcribe --punctuation auto`. The first of request, pin and setting that
+says anything decides. `auto` leaves recognisers that write their own
+punctuation (Whisper, Parakeet, Canary, ...; the `punctuation` feature of their
+catalog entry) alone; `on` runs it on every transcript.
+
+| id | languages | licence | adds | size |
+| --- | --- | --- | --- | --- |
+| `punct-en-cnn-bilstm` (default) | English | Apache-2.0 | punctuation and capital letters | 36 MB |
+| `punct-zh-en-ct-transformer` | Chinese, English | Apache-2.0 | punctuation (Chinese marks in Chinese text, ASCII after English words) | 76 MB |
+
+Both run in sherpa-onnx on the CPU in well under a tenth of a second for a
+hundred words. A transcript in a language the model does not know is returned
+as it was, and the response header `x-bolo-punctuation` says
+`skipped; model=…` (it names the model that ran otherwise). The words stay the
+same, so word timings keep fitting; each word's text takes its punctuation.
+Streamed transcriptions get punctuation in the final text, not in the partial
+segments sent before it.
 
 ## Language routing
 

@@ -38,6 +38,7 @@ from bolo.engines.base import (
     FloatArray,
     LoadOptions,
     Model,
+    PunctuationModel,
     Segment,
     SeparationModel,
     SpeakerEmbeddingModel,
@@ -88,6 +89,9 @@ SEPARATION_KINDS = ("voxlock",)
 DENOISE_KINDS = ("gtcrn", "dpdfnet")
 SPEAKER_EMBEDDING_KINDS = ("speaker_embedding",)
 AUDIO_TAGGING_KINDS = ("audio_tagging",)
+#: punctuation restoration: CT-Transformer (Chinese and English, punctuation) and a CNN-BiLSTM (English, punctuation
+#: and capital letters)
+PUNCTUATION_KINDS = ("punct_ct_transformer", "punct_cnn_bilstm")
 
 
 def find_file(path: Path, *patterns: str, required: bool = True, prefer_int8: bool = True) -> str:
@@ -221,6 +225,116 @@ def quietest_point(samples: FloatArray, a: int, b: int, sr: int) -> int:
     return int(lo + int(np.argmin((frames**2).mean(axis=1))) * frame + frame // 2)
 
 
+#: recognisers whose sherpa-onnx decoder takes hotwords (modified beam search with a context graph)
+HOTWORD_KINDS = ("transducer", "nemo_transducer")
+#: how much a hotword's tokens are favoured (sherpa-onnx's hotwords_score); a phrase can set its own ("Zintrava :3")
+HOTWORDS_SCORE = 4.0
+
+
+def hotword_phrases(text: str | None) -> list[str]:
+    """The phrases of a request's ``hotwords``: separated by commas, semicolons, slashes or new lines."""
+    return [p.strip() for p in re.split(r"[,;/\n]+", text or "") if p.strip()]
+
+
+def token_case(tokens: str) -> str:
+    """``upper`` when a model's token table spells words in capitals only (most English Zipformers), ``lower`` when
+    in small letters only, else ``mixed``: hotwords are written the way the model writes."""
+    pieces = (line.rpartition(" ")[0] for line in Path(tokens).read_text("utf-8", errors="replace").splitlines())
+    letters = "".join(p for p in pieces if not (p.startswith("<") and p.endswith(">")))  # not <blk>, <unk>
+    upper = sum(ch.isupper() for ch in letters)
+    lower = sum(ch.islower() for ch in letters)
+    if upper and not lower:
+        return "upper"
+    if lower and not upper:
+        return "lower"
+    return "mixed"
+
+
+def bpe_vocab_from_tokens(tokens: str, dest: Path, spm_model: str = "") -> str:
+    """A SentencePiece vocabulary (``piece<TAB>score``) for sherpa-onnx to split hotwords into the model's tokens.
+
+    From the model's own ``bpe.model`` when it has one (the scores of a unigram model are what makes the split
+    right: with made-up ones the hotwords of the GigaSpeech Zipformer were never matched); otherwise from
+    ``tokens.txt``, a token's id standing for its merge rank, which is right for SentencePiece BPE models."""
+    pieces = sentencepiece_pieces(Path(spm_model)) if spm_model else []
+    if not pieces:
+        for line in Path(tokens).read_text("utf-8").splitlines():
+            piece, _, index = line.rpartition(" ")
+            if piece and index.strip().lstrip("-").isdigit():
+                pieces.append((piece, -float(index)))
+    dest.write_text("".join(f"{piece}\t{score:.6g}\n" for piece, score in pieces), "utf-8")
+    return str(dest)
+
+
+def _varint(data: bytes, i: int) -> tuple[int, int]:
+    value = shift = 0
+    while True:
+        byte = data[i]
+        i += 1
+        value |= (byte & 0x7F) << shift
+        shift += 7
+        if byte < 0x80:
+            return value, i
+
+
+def _proto_fields(data: bytes) -> Iterator[tuple[int, int, Any]]:
+    """The (field, wire type, value) of a protobuf message: enough to read a SentencePiece model."""
+    i = 0
+    while i < len(data):
+        key, i = _varint(data, i)
+        number, wire = key >> 3, key & 7
+        value: Any
+        if wire == 0:
+            value, i = _varint(data, i)
+        elif wire == 1:
+            value, i = data[i : i + 8], i + 8
+        elif wire == 2:
+            size, i = _varint(data, i)
+            value, i = data[i : i + size], i + size
+        elif wire == 5:
+            value, i = data[i : i + 4], i + 4
+        else:
+            raise ValueError(f"unsupported protobuf wire type {wire}")
+        yield number, wire, value
+
+
+def sentencepiece_pieces(path: Path) -> list[tuple[str, float]]:
+    """The pieces and scores of a SentencePiece model file (``ModelProto.pieces``), read without sentencepiece."""
+    import struct
+
+    out: list[tuple[str, float]] = []
+    try:
+        for number, wire, value in _proto_fields(path.read_bytes()):
+            if number != 1 or wire != 2:
+                continue
+            piece, score = "", 0.0
+            for n2, w2, v2 in _proto_fields(value):
+                if n2 == 1 and w2 == 2:
+                    piece = v2.decode("utf-8")
+                elif n2 == 2 and w2 == 5:
+                    score = struct.unpack("<f", v2)[0]
+            if piece:
+                out.append((piece, score))
+    except (OSError, ValueError, IndexError, UnicodeDecodeError):
+        return []
+    return out
+
+
+def hotwords_for(text: str | None, case: str) -> str:
+    """A request's ``hotwords`` as sherpa-onnx takes them for a stream: phrases joined by ``/``, in the model's case."""
+    phrases = hotword_phrases(text)
+    if case == "upper":
+        phrases = [_case_phrase(p, str.upper) for p in phrases]
+    elif case == "lower":
+        phrases = [_case_phrase(p, str.lower) for p in phrases]
+    return "/".join(phrases)
+
+
+def _case_phrase(phrase: str, change: Callable[[str], str]) -> str:
+    words, _, score = phrase.partition(" :")  # "Zintrava Labs :3" keeps its score as it is
+    return change(words) + (f" :{score}" if score else "")
+
+
 class SherpaOfflineSTT(STTModel):
     def __init__(self, kind: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> None:
         import sherpa_onnx
@@ -243,11 +357,35 @@ class SherpaOfflineSTT(STTModel):
             "whisper", "moonshine", "moonshine_v2", "canary", "paraformer",
         )  # fmt: skip
         self.default_language = str(spec.get("language", ""))
+        self._case = "mixed"
+        # hotwords: a transducer decodes them with modified beam search over a context graph of their tokens
+        # (a second recogniser, built the first time a request has hotwords; greedy search stays the default)
+        self.hotwords = kind in HOTWORD_KINDS and spec.get("hotwords", True) is not False
+        self.request_fields = ("hotwords",) if self.hotwords else ()
+        self._vocab_dir: tempfile.TemporaryDirectory[str] | None = None
         self._lock = threading.Lock()
-        self._recognizers: dict[tuple[str, str], Any] = {}
+        self._recognizers: dict[tuple[str, str, bool], Any] = {}
         self._get(self.default_language, "transcribe")
 
-    def _build(self, language: str, task: str) -> Any:
+    def _hotword_config(self) -> dict[str, Any]:
+        """What a transducer needs to take hotwords: beam search, and how to split them into its tokens."""
+        tokens = find_file(self.path, "tokens.txt")
+        unit = str(self.spec.get("modeling_unit", "bpe"))
+        config: dict[str, Any] = {
+            "decoding_method": "modified_beam_search",
+            "max_active_paths": int(self.spec.get("max_active_paths", 4)),
+            "hotwords_score": float(self.spec.get("hotwords_score", HOTWORDS_SCORE)),
+            "modeling_unit": unit,
+        }
+        if "bpe" in unit:
+            if self._vocab_dir is None:
+                self._vocab_dir = tempfile.TemporaryDirectory(prefix="bolo-hotwords-")
+            spm = find_file(self.path, "bpe.model", required=False)
+            config["bpe_vocab"] = bpe_vocab_from_tokens(tokens, Path(self._vocab_dir.name) / "bpe.vocab", spm)
+        self._case = token_case(tokens)
+        return config
+
+    def _build(self, language: str, task: str, hot: bool = False) -> Any:
         so, p, t = self._so, self.path, self.threads
         common: dict[str, Any] = {"num_threads": t, "provider": self.provider}
         k = self.kind
@@ -284,6 +422,7 @@ class SherpaOfflineSTT(STTModel):
                 joiner=find_file(p, "joiner*.onnx"),
                 tokens=find_file(p, "tokens.txt"),
                 model_type="nemo_transducer" if k == "nemo_transducer" else "transducer",
+                **(self._hotword_config() if hot else {}),
                 **common,
             )
         if k == "canary":
@@ -317,37 +456,39 @@ class SherpaOfflineSTT(STTModel):
             return so.OfflineRecognizer.from_wenet_ctc(model=model, tokens=tokens, **common)
         raise ValueError(f"sherpa-onnx engine cannot load kind {k!r}")
 
-    def _get(self, language: str, task: str) -> Any:
-        """Recognisers are built per (language, task) for models that fix them at construction."""
+    def _get(self, language: str, task: str, hot: bool = False) -> Any:
+        """Recognisers are built per (language, task) for models that fix them at construction, and once more for
+        hotwords (``hot``)."""
         if self.kind not in ("whisper", "sense_voice", "canary"):
             language, task = "", "transcribe"
-        key = (language, task)
+        key = (language, task, hot)
         with self._lock:
             rec = self._recognizers.get(key)
             if rec is None:
                 if len(self._recognizers) >= 3:  # bound memory: drop the oldest non-default variant
                     for old in list(self._recognizers):
-                        if old != (self.default_language, "transcribe"):
+                        if old != (self.default_language, "transcribe", False):
                             del self._recognizers[old]
                             break
-                rec = self._recognizers[key] = self._build(language, task)
+                rec = self._recognizers[key] = self._build(language, task, hot)
             return rec
 
     def transcribe(self, requests: list[STTRequest]) -> list[STTResult]:
         results: list[STTResult | None] = [None] * len(requests)
-        groups: dict[tuple[str, str], list[int]] = {}
+        groups: dict[tuple[str, str, bool], list[int]] = {}
         for i, r in enumerate(requests):
             lang = (r.language or self.default_language or "").split("-")[0].lower()
-            groups.setdefault((lang, r.task), []).append(i)
-        for (lang, task), idxs in groups.items():
-            rec = self._get(lang, task)
+            hot = self.hotwords and bool(hotword_phrases(r.hotwords))
+            groups.setdefault((lang, r.task, hot), []).append(i)
+        for (lang, task, hot), idxs in groups.items():
+            rec = self._get(lang, task, hot)
             if self.kind == "whisper":
                 for i in idxs:
                     results[i] = self._whisper(rec, requests[i], lang)
                 continue
             streams = []
             for i in idxs:
-                s = rec.create_stream()
+                s = rec.create_stream(hotwords_for(requests[i].hotwords, self._case)) if hot else rec.create_stream()
                 s.accept_waveform(self.sample_rate, requests[i].samples)
                 streams.append(s)
             rec.decode_streams(streams)
@@ -429,6 +570,9 @@ class SherpaOfflineSTT(STTModel):
 
     def close(self) -> None:
         self._recognizers.clear()
+        if self._vocab_dir is not None:
+            self._vocab_dir.cleanup()
+            self._vocab_dir = None
 
 
 PRIME_S = 1.0
@@ -1031,6 +1175,57 @@ class SherpaSpeakerEmbedding(SpeakerEmbeddingModel):
         return _embed(self._extractor, self.sample_rate, samples)
 
 
+class SherpaPunctuation(PunctuationModel):
+    """Punctuation restoration: CT-Transformer (``punct_ct_transformer``: Chinese and English, punctuation only) or
+    the English CNN-BiLSTM (``punct_cnn_bilstm``: punctuation and capital letters)."""
+
+    def __init__(self, kind: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> None:
+        import sherpa_onnx as so
+
+        self.kind = kind
+        common: dict[str, Any] = {"num_threads": opts.threads, "provider": sherpa_provider(opts.device)}
+        self._lock = threading.Lock()  # one text at a time: the bindings keep no per-call state, but be safe
+        if kind == "punct_ct_transformer":
+            config = so.OfflinePunctuationConfig(
+                model=so.OfflinePunctuationModelConfig(ct_transformer=find_file(path, "model*.onnx"), **common)
+            )
+            if not config.validate():
+                raise ValueError(f"sherpa-onnx rejected the punctuation model in {path}")
+            offline = so.OfflinePunctuation(config)
+            self._run: Callable[[str], str] = offline.add_punctuation
+        elif kind == "punct_cnn_bilstm":
+            config2 = so.OnlinePunctuationConfig(
+                model_config=so.OnlinePunctuationModelConfig(
+                    cnn_bilstm=find_file(path, "model*.onnx"), bpe_vocab=find_file(path, "bpe.vocab"), **common
+                )
+            )
+            if not config2.validate():
+                raise ValueError(f"sherpa-onnx rejected the punctuation model in {path}")
+            online = so.OnlinePunctuation(config2)
+            self._run = online.add_punctuation_with_case
+        else:
+            raise ValueError(f"sherpa-onnx engine cannot load kind {kind!r}")
+
+    def punctuate(self, text: str) -> str:
+        if not text.strip():
+            return text
+        with self._lock:
+            out = str(self._run(text)).strip()
+        if self.kind == "punct_ct_transformer":
+            out = latin_punctuation(out)
+        return out
+
+
+#: CT-Transformer writes Chinese (full-width) punctuation everywhere; after a Latin letter or digit it becomes the
+#: ASCII mark and a space ("morning。could" -> "morning. could"), so English words stay apart
+_FULL_WIDTH = {"，": ",", "。": ".", "？": "?", "！": "!", "；": ";", "：": ":", "、": ","}
+_AFTER_LATIN = re.compile(r"(?<=[A-Za-z0-9'])([，。？！；：、])\s*")
+
+
+def latin_punctuation(text: str) -> str:
+    return _AFTER_LATIN.sub(lambda m: _FULL_WIDTH[m.group(1)] + " ", text).strip()
+
+
 class SherpaVoxLock(SeparationModel):
     """VoxLock target-speaker extraction (sherpa-onnx 2.0.1+): one extractor per enrolled voice.
 
@@ -1208,6 +1403,7 @@ class SherpaOnnxEngine(Engine):
         + DENOISE_KINDS
         + SPEAKER_EMBEDDING_KINDS
         + AUDIO_TAGGING_KINDS
+        + PUNCTUATION_KINDS
     )
 
     def status(self) -> EngineStatus:
@@ -1263,4 +1459,6 @@ class SherpaOnnxEngine(Engine):
             from bolo.engines.audio_classify import SherpaAudioTagging
 
             return SherpaAudioTagging(path, spec, opts)
+        if kind in PUNCTUATION_KINDS:
+            return SherpaPunctuation(kind, path, spec, opts)
         raise ValueError(f"sherpa-onnx engine cannot load kind {kind!r}")

@@ -582,6 +582,15 @@ def _model_setting(key: str, raw: str) -> Any:
         except BoloError as exc:
             raise ValueError(exc.message) from exc
         value = raw.strip()
+    elif key == "punctuation":
+        from bolo.errors import BoloError
+        from bolo.punctuation import parse_punctuation
+
+        try:
+            parse_punctuation(raw)
+        except BoloError as exc:
+            raise ValueError(exc.message) from exc
+        value = raw.strip()
     else:
         value = raw.strip().lower() if key in ("device", "flash_attention", "kv_cache_type") else raw
     check_tuning({key: value})
@@ -826,6 +835,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
 def cmd_transcribe(args: argparse.Namespace) -> int:
     from bolo.audio import decode_audio
     from bolo.obs.trace import Trace
+    from bolo.punctuation import parse_punctuation
     from bolo.text.formats import to_srt, to_vtt
 
     core = _core(args)
@@ -839,6 +849,7 @@ def cmd_transcribe(args: argparse.Namespace) -> int:
             t = await core.transcribe(
                 samples, rate, model=args.model, language=args.language, trace=trace,
                 task="translate" if args.translate else "transcribe", word_timestamps=args.format == "json",
+                hotwords=args.hotwords, punctuation=parse_punctuation(args.punctuation, "--punctuation"),
             )  # fmt: skip
             if args.format == "srt":
                 print(to_srt(t.segments))
@@ -1621,6 +1632,7 @@ _TASK_TITLES = {
     "denoise": "Denoising", "lid": "Language identification", "speech-to-speech": "Speech to speech",
     "speaker-embedding": "Speaker embedding", "audio-tagging": "Audio tagging", "emotion": "Speech emotion",
     "align": "Forced alignment",
+    "punctuation": "Punctuation restoration",
 }  # fmt: skip
 
 
@@ -2372,6 +2384,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--language", "-l")
     s.add_argument("--translate", action="store_true", help="translate to English (multilingual Whisper models)")
     s.add_argument("--format", "-f", choices=["text", "json", "srt", "vtt"], default="text")
+    s.add_argument("--hotwords", help="names and terms to favour, comma separated (models that take hotwords)")
+    s.add_argument(
+        "--punctuation",
+        help="restore punctuation and capital letters: auto (only if the model writes none), on, off or a "
+        "punctuation model (default: the model's setting, else the `punctuation` setting)",
+    )
     s.add_argument("--verbose", "-v", action="store_true")
     s.set_defaults(func=cmd_transcribe)
 

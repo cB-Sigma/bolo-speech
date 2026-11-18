@@ -79,6 +79,23 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   dev-clean; docs/measurements/speaker-verification.json), listed in docs/api.md with its false rejects and
   identification accuracy. CLI: `bolo speakers list | enrol | verify | identify | rm`; console: a Speakers page.
   Scopes: verifying, identifying, tagging, emotion and denoising need `stt`; enrolling needs `manage`.
+- **Hotwords on sherpa-onnx transducers.** `hotwords` now reach the Zipformer and Parakeet TDT recognisers
+  (`kind: transducer` and `nemo_transducer`): a request with hotwords is decoded with modified beam search biased
+  towards their tokens (`hotwords_score`, 4 by default; a phrase can carry its own, `Zintrava Labs :6`), and without
+  them the model decodes greedily as before. Phrases are written in the model's case and split with its own
+  SentencePiece model, which the Zipformer entries now pull (`bpe.model`). On two synthesised sentences Parakeet TDT
+  110M went from "Kishidwani" and "Anyrud Venkatoreman" to the names spelled right. Models that take no hotwords keep
+  naming them in `x-bolo-ignored-options`. The console's Speech to text page has a Hotwords field; `bolo transcribe
+  --hotwords`.
+- **Punctuation and capital letters for recognisers that write none.** `punctuation` on a transcription (`auto`:
+  only when the recogniser writes no punctuation; `on`; `off`; or a model), as a per-model pin and as the server's
+  `punctuation` setting (off by default), runs a punctuation model over the transcript after recognition: the new
+  `punct-en-cnn-bilstm` (English, punctuation and casing, Apache-2.0, 36 MB, the default) or
+  `punct-zh-en-ct-transformer` (Chinese and English, Apache-2.0, 76 MB), both on sherpa-onnx. Words keep their
+  timings and take their punctuation; `x-bolo-punctuation` names the model, or says it was skipped for a language it
+  does not know. "SPEECH SERVERS ARE JUDGED BY HOW QUICKLY THE FIRST SOUND ARRIVES" from the GigaSpeech Zipformer
+  becomes "Speech servers are judged by how quickly the first sound arrives." Console: a Punctuation control on Speech
+  to text; `bolo transcribe --punctuation auto`.
 
 ## [0.6.8] - 2026-11-18
 

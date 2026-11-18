@@ -3,6 +3,8 @@ silence removal tuning, chunk length and the detected language's probability."""
 
 from __future__ import annotations
 
+import struct
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -451,3 +453,26 @@ def test_word_timestamps_a_model_cannot_give_are_named(live: LiveServer) -> None
         timeout=30,
     )
     assert "x-bolo-ignored-options" not in r.headers and r.json()["words"]
+
+
+def test_sherpa_hotwords_are_written_the_way_the_model_writes(tmp_path: Path) -> None:
+    from bolo.engines.sherpa import bpe_vocab_from_tokens, hotword_phrases, hotwords_for, token_case
+
+    assert hotword_phrases("Zintrava Labs, Kshitij Wadhwani;\nbolo / ") == ["Zintrava Labs", "Kshitij Wadhwani", "bolo"]
+    assert hotwords_for("Zintrava Labs :3, Wadhwani", "upper") == "ZINTRAVA LABS :3/WADHWANI"
+    assert hotwords_for("Zintrava", "mixed") == "Zintrava" and hotwords_for(" , ", "upper") == ""
+    tokens = tmp_path / "tokens.txt"
+    tokens.write_text("<blk> 0\n▁THE 1\nS 2\n  3\n", "utf-8")
+    assert token_case(str(tokens)) == "upper"
+    vocab = bpe_vocab_from_tokens(str(tokens), tmp_path / "bpe.vocab")
+    assert Path(vocab).read_text("utf-8").splitlines() == ["<blk>\t-0", "▁THE\t-1", "S\t-2", " \t-3"]
+    # with the model's own SentencePiece model, its scores (a unigram model's log probabilities) are used
+
+    def piece(text: str, score: float) -> bytes:
+        body = b"\x0a" + bytes([len(text.encode())]) + text.encode() + b"\x15" + struct.pack("<f", score)
+        return b"\x0a" + bytes([len(body)]) + body
+
+    spm = tmp_path / "bpe.model"
+    spm.write_bytes(piece("<blk>", 0.0) + piece("▁THE", -3.5) + piece("S", -2.75) + b"\x12\x02\x08\x01")
+    vocab = bpe_vocab_from_tokens(str(tokens), tmp_path / "bpe2.vocab", str(spm))
+    assert Path(vocab).read_text("utf-8").splitlines() == ["<blk>\t0", "▁THE\t-3.5", "S\t-2.75"]

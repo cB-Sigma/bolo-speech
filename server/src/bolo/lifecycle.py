@@ -43,6 +43,7 @@ from bolo.engines.base import (
     LidModel,
     LoadOptions,
     Model,
+    PunctuationModel,
     SeparationModel,
     SpeakerEmbeddingModel,
     STTModel,
@@ -774,6 +775,10 @@ class ModelManager:
             converter = model
             handlers["convert"] = lambda items: [converter.convert(*item) for item in items]
             max_batch["convert"] = 1
+        elif isinstance(model, PunctuationModel):
+            punctuator = model
+            handlers["punctuate"] = lambda items: [punctuator.punctuate(item) for item in items]
+            max_batch["punctuate"] = 1
         elif isinstance(model, LidModel):
             lid = model
             handlers["lid"] = lambda items: [lid.identify(item) for item in items]

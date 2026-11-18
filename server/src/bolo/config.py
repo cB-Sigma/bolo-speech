@@ -106,6 +106,11 @@ class Settings:
     #: "on", a strength between 0 and 1 (the denoised audio mixed with the original) or a denoise model id.
     #: Off by default: denoising can hurt clean audio and recognisers trained on noisy data (docs/configuration.md)
     denoise: str = "off"
+    #: punctuation model used when transcription asks for ``punctuation`` without naming one
+    default_punctuation: str = "punct-en-cnn-bilstm"
+    #: restore punctuation and capital letters in transcripts unless a request or a model pin says otherwise: "off",
+    #: "auto" (only for recognisers that write none), "on", or a punctuation model id (bolo.punctuation)
+    punctuation: str = "off"
     #: spoken-language identification model: POST /v1/audio/language without a model, and language routing
     default_lid: str = "voxlingua107-ecapa"
     #: sound-event / audio-tagging model: POST /v1/audio/tags without a model
@@ -636,9 +641,11 @@ def load_settings(
         raise ValueError(f"console_port must be between 0 and 65535, got {settings.console_port}")
     from bolo.denoise import parse_denoise
     from bolo.errors import BoloError
+    from bolo.punctuation import parse_punctuation
 
     try:
         parse_denoise(settings.denoise)
+        parse_punctuation(settings.punctuation)
     except BoloError as exc:
         raise ValueError(exc.message) from exc
     return settings

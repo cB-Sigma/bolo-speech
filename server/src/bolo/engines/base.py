@@ -630,6 +630,16 @@ class VoiceConversionModel(Model):
         """``source`` and ``reference`` are mono PCM16 WAV; the converted speech, float32 at ``sample_rate``."""
 
 
+class PunctuationModel(Model):
+    """Punctuation and casing restoration: text as a recogniser that writes none gives it, written properly."""
+
+    task = "punctuation"
+
+    @abc.abstractmethod
+    def punctuate(self, text: str) -> str:
+        """``text`` with punctuation (and, for models that restore it, capital letters) added; the words stay."""
+
+
 class LidModel(Model):
     """Spoken-language identification: which language is spoken in a recording (16 kHz mono in)."""
 

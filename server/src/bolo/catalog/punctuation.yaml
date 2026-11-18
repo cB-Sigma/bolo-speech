@@ -1,0 +1,74 @@
+# Punctuation and casing restoration (task: punctuation), run on a transcript after speech recognition when the
+# request or the server asks for `punctuation` (bolo.punctuation).
+
+- id: punct-en-cnn-bilstm
+  aliases: [punct-en, edge-punct-casing]
+  task: punctuation
+  engine: sherpa-onnx
+  kind: punct_cnn_bilstm
+  family: Edge-Punct-Casing
+  languages: [en]
+  tier: realtime
+  size_bytes: 37302443
+  license: Apache-2.0
+  license_url: https://huggingface.co/frankyoujian/Edge-Punct-Casing
+  features: [punctuation, casing]
+  description: 'English punctuation and capital letters for transcripts that have neither (a CNN-BiLSTM with a
+    unigram BPE vocabulary, Edge-Punct-Casing, exported for sherpa-onnx). Adds commas, full stops and question
+    marks, and capitalises sentence starts, names and "I". Small and fast: the default punctuation model.'
+  source_url: https://github.com/frankyoujian/Edge-Punct-Casing
+  validated: cpu
+  measured:
+    rtf: 0.001
+    rtf_note: seconds per second of the speech the text came from (126 words, about 50 s spoken); 46 ms in all
+    ms_per_100_words: 36.8
+    load_s: 0.25
+    memory_mb: 76
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average about 25)
+    date: '2026-11-18'
+    test_text: an unpunctuated 126-word English transcript
+  source:
+    urls:
+    - path: sherpa-onnx-online-punct-en-2024-08-06.tar.bz2
+      url: https://github.com/k2-fsa/sherpa-onnx/releases/download/punctuation-models/sherpa-onnx-online-punct-en-2024-08-06.tar.bz2
+      size: 30667839
+      sha256: 9f5e5a72c7d2829635bd074fce92b6bbd5b78da8a52e7ad8ed1be933f366b99d
+      extract: true
+
+- id: punct-zh-en-ct-transformer
+  aliases: [ct-transformer-punc, punct-zh-en]
+  task: punctuation
+  engine: sherpa-onnx
+  kind: punct_ct_transformer
+  family: CT-Transformer
+  languages: [zh, en]
+  tier: balanced
+  size_bytes: 79733198
+  license: Apache-2.0
+  license_url: https://modelscope.cn/models/iic/punc_ct-transformer_zh-cn-common-vocab272727-pytorch
+  features: [punctuation]
+  description: 'Chinese and English punctuation (CT-Transformer from FunASR, int8, for sherpa-onnx). Adds commas,
+    full stops and question marks to Chinese, English and mixed text; it does not change capital letters. The
+    choice for Chinese transcripts (SenseVoice and Paraformer without their own punctuation, Zipformer CTC).'
+  source_url: https://github.com/modelscope/FunASR
+  validated: cpu
+  measured:
+    rtf: 0.002
+    rtf_note: seconds per second of the speech the text came from (126 words, about 50 s spoken); 100 ms in all
+    ms_per_100_words: 79.0
+    load_s: 0.91
+    memory_mb: 199
+    threads: 2
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average about 25)
+    date: '2026-11-18'
+    test_text: an unpunctuated 126-word English transcript
+  source:
+    urls:
+    - path: sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12-int8.tar.bz2
+      url: https://github.com/k2-fsa/sherpa-onnx/releases/download/punctuation-models/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12-int8.tar.bz2
+      size: 64717756
+      sha256: c0d5aa5f8eeb686032345e180bedf39319dc2e0556781c6264bcadba8328a6e1
+      extract: true

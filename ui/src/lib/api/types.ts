@@ -11,6 +11,7 @@ export type Task =
   | 'denoise'
   | 'lid'
   | 'speaker-embedding'
+  | 'punctuation'
   | 'speech-to-speech'
   | 'audio-llm'
   | 'audio-tagging'

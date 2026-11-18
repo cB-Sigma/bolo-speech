@@ -48,6 +48,19 @@ describe('transcriptionForm', () => {
     expect(plain.has('diarize')).toBe(false)
     expect(plain.has('language')).toBe(false)
   })
+  it('sends hotwords and punctuation only when they are set', () => {
+    const f = transcriptionForm(blob, 'a', {
+      model: 'm',
+      diarize: false,
+      hotwords: ' Zintrava Labs, Wadhwani ',
+      punctuation: 'auto',
+    })
+    expect(f.get('hotwords')).toBe('Zintrava Labs, Wadhwani')
+    expect(f.get('punctuation')).toBe('auto')
+    const plain = transcriptionForm(blob, 'a', { model: 'm', diarize: false, hotwords: '  ', punctuation: '' })
+    expect(plain.has('hotwords')).toBe(false)
+    expect(plain.has('punctuation')).toBe(false)
+  })
   it('refuses separation without speaker labels', () => {
     expect(() => transcriptionForm(blob, 'a', { model: 'm', diarize: false, separate: true })).toThrow(/diarization/)
   })

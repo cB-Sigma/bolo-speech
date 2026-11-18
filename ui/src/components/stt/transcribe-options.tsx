@@ -110,6 +110,114 @@ export function DenoiseControl({
   )
 }
 
+/**
+ * Punctuation and capital letters restored after recognition: the server's default (off unless the server or the
+ * model's pin says otherwise), off, auto (only for recognisers that write none) or on, with a punctuation model.
+ */
+export function PunctuationControl({
+  value,
+  onChange,
+  disabled,
+  className,
+}: {
+  /** '' server default, 'off', 'auto', 'on' or a punctuation model id (on with that model) */
+  value: string
+  onChange: (v: string) => void
+  disabled?: boolean
+  className?: string
+}) {
+  const id = useId()
+  const info = useInfo()
+  const models = useModels('punctuation').models
+  const mode = value === '' ? 'default' : value === 'off' || value === 'auto' || value === 'on' ? value : 'on'
+  const model = mode === 'on' && value !== 'on' ? value : ''
+  return (
+    <div className={cn('grid gap-1.5', className)} data-testid="punctuation-control">
+      <div className="flex flex-wrap items-center gap-2">
+        <Label className="text-xs" id={`${id}-label`}>
+          Punctuation
+        </Label>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          value={mode}
+          onValueChange={(v) => v && onChange(v === 'default' ? '' : v)}
+          aria-labelledby={`${id}-label`}
+          disabled={disabled}
+        >
+          <ToggleGroupItem value="default" className="px-2.5 text-xs">
+            Server default
+          </ToggleGroupItem>
+          <ToggleGroupItem value="off" className="px-2.5 text-xs">
+            Off
+          </ToggleGroupItem>
+          <ToggleGroupItem value="auto" className="px-2.5 text-xs" data-testid="punctuation-auto">
+            If missing
+          </ToggleGroupItem>
+          <ToggleGroupItem value="on" className="px-2.5 text-xs" data-testid="punctuation-on">
+            Always
+          </ToggleGroupItem>
+        </ToggleGroup>
+        {mode === 'on' && (
+          <CatalogSelect
+            models={models}
+            value={model}
+            onChange={(m) => onChange(m || 'on')}
+            label="Punctuation model"
+            defaultLabel="Default punctuation model"
+            disabled={disabled}
+            autoPull={autoPull(info.data)}
+            className="w-56"
+            testId="punctuation-model"
+          />
+        )}
+      </div>
+      {(mode === 'auto' || mode === 'on') && (
+        <p className="text-xs leading-4 text-muted-foreground">
+          Adds punctuation and capital letters after recognition, for the languages the punctuation model knows
+          (English; Chinese and English). &ldquo;If missing&rdquo; leaves recognisers that write their own alone.
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** Names and terms the recogniser should favour (`hotwords`). */
+export function HotwordsField({
+  value,
+  onChange,
+  disabled,
+  className,
+}: {
+  value: string
+  onChange: (v: string) => void
+  disabled?: boolean
+  className?: string
+}) {
+  const id = useId()
+  return (
+    <div className={cn('grid gap-1.5', className)}>
+      <Label htmlFor={id} className="text-xs">
+        Hotwords
+      </Label>
+      <Input
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Zintrava Labs, Kshitij Wadhwani"
+        disabled={disabled}
+        className="h-8 text-xs"
+        data-testid="hotwords"
+      />
+      <p className="text-xs leading-4 text-muted-foreground">
+        Names and terms to favour, comma separated. Whisper models (faster-whisper, whisper.cpp) and sherpa-onnx
+        transducers (Zipformer, Parakeet TDT) use them; a model that cannot is named under &ldquo;Ignored&rdquo;.
+      </p>
+    </div>
+  )
+}
+
 function TriSelect({
   label,
   value,
@@ -282,6 +390,14 @@ export function RunNotes({ result }: { result: DiarizedResult }) {
   }
   if (result.languageHeader) {
     items.push({ label: 'x-bolo-language', value: result.languageHeader, testId: 'run-language-header' })
+  }
+  if (result.punctuationHeader) {
+    items.push({
+      label: 'Punctuation',
+      value: result.punctuationHeader,
+      warn: result.punctuationHeader.startsWith('skipped'),
+      testId: 'run-punctuation',
+    })
   }
   if (result.denoiseHeader) {
     items.push({

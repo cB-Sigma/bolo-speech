@@ -90,6 +90,10 @@ from bolo.obs.events import EventBus
 from bolo.obs.trace import Trace, TraceStore, preview
 from bolo.providers import KINDS as PROVIDER_KINDS
 from bolo.providers import TERMS, ProviderRegistry, Usage
+from bolo.punctuation import PunctuationOptions
+from bolo.punctuation import apply as apply_punctuation
+from bolo.punctuation import header as punctuation_header
+from bolo.punctuation import plan as punctuation_plan
 from bolo.recommend import ALL_LEVELS as FIT_LEVELS
 from bolo.recommend import TASKS as RECOMMEND_TASKS
 from bolo.recommend import USES as RECOMMEND_USES
@@ -1033,6 +1037,7 @@ class Bolo:
                 "audio-tagging": s.default_audio_tagging,
                 "emotion": s.default_emotion,
                 "voice-conversion": s.default_voice_conversion,
+                "punctuation": s.default_punctuation,
             }
             name = defaults[task]
         elif name == "realtime":
@@ -1528,13 +1533,15 @@ class Bolo:
         denoise: DenoiseOptions | None = None,
         record: bool = True,
         options: dict[str, Any] | None = None,
+        punctuation: PunctuationOptions | None = None,
     ) -> Transcript:
         """Transcribe a complete recording. Long audio is split at pauses and decoded in batches.
 
         ``options`` are decoding options (bolo.stt_options), already checked; the model's pinned and catalog values
         fill in the ones not given.
         ``denoise`` (bolo.denoise) asks for noise suppression before recognition; None leaves it to the model's pin,
-        its catalog entry and the ``denoise`` setting.
+        its catalog entry and the ``denoise`` setting. ``punctuation`` (bolo.punctuation) asks for punctuation to be
+        restored afterwards; None leaves it to the model's pin and the ``punctuation`` setting.
 
         ``record=False`` keeps the trace out of the request log (interim decodes of a live utterance).
         When the model has a ``fallback`` list and is unavailable (its engine, an overloaded queue, a cloud
@@ -1551,6 +1558,7 @@ class Bolo:
                     language=language, task=task, prompt=prompt, word_timestamps=word_timestamps,
                     temperature=temperature, hotwords=hotwords, vad_filter=vad_filter, on_segment=on_segment,
                     diarize=diarize, separate=separate, denoise=denoise, record=record, options=options or {},
+                    punctuation=punctuation,
                 )  # fmt: skip
             except BoloError as exc:
                 if not (more and fallback_worthy(exc)) or trace.status != "running":
@@ -1579,6 +1587,7 @@ class Bolo:
         denoise: DenoiseOptions | None,
         record: bool,
         options: dict[str, Any],
+        punctuation: PunctuationOptions | None = None,
     ) -> Transcript:
         """One model's attempt. With ``more`` (a fallback is left), an availability error leaves the trace open."""
         handed_on = False
@@ -1599,6 +1608,7 @@ class Bolo:
                 check_request(sample_rate, separate)
                 self.resolve(separate.model, "separation")
             cleanup = self.denoise_plan(spec, denoise)
+            punctuate = punctuation_plan(self, spec, punctuation)
             if diarize is not None and conditioned and not diarize.model and spec.options.get("diarization_model"):
                 # a speaker-conditioned model brings the diarizer it works best with, unless the request names one
                 diarize.model = str(spec.options["diarization_model"])
@@ -1725,6 +1735,8 @@ class Bolo:
                     self._note_ignored(trace, spec.id, ignored)
                 transcript.duration = duration
                 transcript.model = spec.id
+                if punctuate is not None and transcript.text.strip():
+                    await apply_punctuation(self, transcript, punctuate, trace)
                 if separation is not None and diarize is not None:
                     transcript.separation = separation.to_dict(diarize.label, duration)
                 trace.mark_final()
@@ -2695,6 +2707,9 @@ def fallback_headers(trace: Trace) -> dict[str, str]:
             headers["x-bolo-denoise"] = (
                 str(cleanup["model"]) if strength >= 1.0 else f"{cleanup['model']}; strength={strength:g}"
             )
+    punctuated = punctuation_header(trace.extra.get("punctuation"))
+    if punctuated:
+        headers["x-bolo-punctuation"] = punctuated
     cost = trace.extra.get("cost")
     if isinstance(cost, dict):
         headers["x-bolo-estimated-cost"] = f"{cost.get('amount')} {cost.get('currency')}"

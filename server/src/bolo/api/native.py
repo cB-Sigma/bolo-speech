@@ -336,6 +336,12 @@ class ModelSettingsRequest(BaseModel):
         description="Repetition guard: a phrase (1 to 8 words) repeated back to back more often than this is cut to "
         "one copy, and so is a run of identical segments (default 4; 0 turns it off).",
     )
+    punctuation: bool | str | None = Field(
+        default=None,
+        description="Speech-to-text models: restore punctuation and capital letters in this model's transcripts "
+        "unless the request says otherwise: auto (only if it writes none), on, off or a punctuation model id; "
+        "null removes the pin.",
+    )
     denoise: bool | float | str | None = Field(
         default=None,
         description="Speech-to-text models: denoise audio before this model hears it unless the request says "
@@ -396,6 +402,16 @@ async def put_model_settings(request: Request, model_id: str, body: ModelSetting
                 core.resolve(opts.model, "denoise")
             except BoloError as exc:
                 exc.param = "denoise"
+                raise
+    if values.get("punctuation") is not None:
+        from bolo.punctuation import parse_punctuation
+
+        punct = parse_punctuation(values["punctuation"])
+        if punct is not None and punct.model:
+            try:
+                core.resolve(punct.model, "punctuation")
+            except BoloError as exc:
+                exc.param = "punctuation"
                 raise
     for name in values.get("fallback") or []:
         other = core.resolve(name, spec.task)  # unknown model or wrong task: 404 / 400

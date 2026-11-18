@@ -24,6 +24,10 @@ export interface TranscribeOptions {
   decoding?: DecodingOptions
   /** Denoising before recognition. */
   denoise?: Denoise
+  /** Names and terms to favour, comma separated (`hotwords`; models that cannot use them say so). */
+  hotwords?: string
+  /** Punctuation restoration afterwards: '' server default, 'off', 'auto', 'on' or a punctuation model id. */
+  punctuation?: string
 }
 
 export interface DiarizedSegment {
@@ -71,6 +75,8 @@ export interface DiarizedResult {
   ignoredOptions?: string | null
   /** `x-bolo-denoise`: the denoiser that ran (or `skipped; ...`). */
   denoiseHeader?: string | null
+  /** `x-bolo-punctuation`: the punctuation model that ran (or `skipped; ...`). */
+  punctuationHeader?: string | null
   /** `x-bolo-separation` response header, when sent. */
   separationHeader?: string | null
   /** `x-request-id`, to find the trace. */
@@ -128,6 +134,8 @@ export function transcriptionForm(file: Blob, name: string, o: TranscribeOptions
   f.set('response_format', o.diarize ? 'diarized_json' : 'verbose_json')
   applyDecoding(f, o.decoding)
   applyDenoise(f, o.denoise)
+  if (o.hotwords?.trim()) f.set('hotwords', o.hotwords.trim())
+  if (o.punctuation) f.set('punctuation', o.punctuation)
   if (!o.diarize) return f
   f.set('diarize', 'true')
   if (o.diarizer) f.set('diarization_model', o.diarizer)
@@ -179,6 +187,7 @@ export function parseTranscription(body: unknown, headers?: Headers): DiarizedRe
     separationHeader: headers?.get('x-bolo-separation') ?? null,
     ignoredOptions: headers?.get('x-bolo-ignored-options') ?? null,
     denoiseHeader: headers?.get('x-bolo-denoise') ?? null,
+    punctuationHeader: headers?.get('x-bolo-punctuation') ?? null,
     requestId: headers?.get('x-request-id') ?? null,
     routeHeader: headers?.get('x-bolo-route') ?? null,
     languageHeader: headers?.get('x-bolo-language') ?? null,

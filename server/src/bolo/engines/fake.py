@@ -37,6 +37,7 @@ from bolo.engines.base import (
     LidModel,
     LoadOptions,
     Model,
+    PunctuationModel,
     Segment,
     SeparationModel,
     SpeakerActivity,
@@ -747,6 +748,25 @@ class FakeAligner(AlignModel):
         return out
 
 
+class FakePunctuation(PunctuationModel):
+    """Punctuation for tests: a capital letter first, commas every four words and a full stop at the end."""
+
+    def __init__(self, opts: dict[str, Any]) -> None:
+        self.fail = bool(opts.get("fail", False))
+        self.calls: list[str] = []
+
+    def punctuate(self, text: str) -> str:
+        if self.fail:
+            raise RuntimeError("fake punctuation failure requested")
+        self.calls.append(text)
+        words = text.split()
+        if not words:
+            return text
+        out = [w + ("," if (i + 1) % 4 == 0 and i + 1 < len(words) else "") for i, w in enumerate(words)]
+        out[0] = out[0][:1].upper() + out[0][1:]
+        return " ".join(out) + "."
+
+
 class FakeEngine(Engine):
     id = "fake"
     name = "Fake engine (testing)"
@@ -756,6 +776,7 @@ class FakeEngine(Engine):
         "fake-turn-text", "fake-separation", "fake-denoise", "fake-s2s", "fake-lid", "fake-speaker-embedding",
         "fake-tagging", "fake-emotion",
         "fake-align",
+        "fake-punctuation",
     )  # fmt: skip
 
     def __init__(self) -> None:
@@ -799,6 +820,8 @@ class FakeEngine(Engine):
             model = FakeEmotion()
         elif kind == "fake-align":
             model = FakeAligner(merged)
+        elif kind == "fake-punctuation":
+            model = FakePunctuation(merged)
         else:
             raise ValueError(f"fake engine cannot load kind {kind!r}")
         self.loaded.append(model)

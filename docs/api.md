@@ -240,10 +240,11 @@ Multipart form.
 | `num_speakers`, `min_speakers`, `max_speakers` | - | extension, with diarization: fix or bound the number of speakers |
 | `separate_overlaps` | `false` | extension, with diarization: transcribe overlapped speech from one separated track per speaker (see [Separating overlapping speech](#speaker-diarization)); `separation_model`, `separation_context_s`, `separation_min_overlap_s`, `separation_allow_narrowband` |
 | `denoise` | server default (off) | extension: run a speech-enhancement model before recognition. `true`, `false`, a strength between 0 and 1 (the denoised audio mixed with the original at that weight) or a denoise model id (`gtcrn-simple`, or any `task: denoise` model of the catalog: `dpdfnet2`, `deepfilternet3`, `rnnoise`, `demucs-dns48`, `elevenlabs-voice-isolator`, ...); `denoise_strength` sets the strength separately. Unset: the model's pin, then the `denoise` setting. The response header `x-bolo-denoise` names what ran (`gtcrn-simple`, `gtcrn-simple; strength=0.5`, or `skipped; model=…` when the denoiser could not run and the original audio was used). Denoising can make clean audio and Whisper's transcripts worse: configuration.md, "Denoising" |
+| `punctuation` | server default (off) | extension: restore punctuation and capital letters after recognition. `auto` (only when the recogniser writes none), `on`, `off` or a punctuation model id (`punct-en-cnn-bilstm`, the default, English, punctuation and casing; `punct-zh-en-ct-transformer`, Chinese and English). Unset: the model's pin, then the `punctuation` setting. The response header `x-bolo-punctuation` names the model that ran, or `skipped; model=…` when the transcript's language is not one it knows: configuration.md, "Punctuation restoration" |
 | `vad_filter` | auto | extension. `true` forces silence removal before decoding; by default VAD is used only to split audio longer than the model's window |
 | `vad_parameters` | - | extension. Tunes the silence removal, as a JSON object or as bracketed fields (`vad_parameters[threshold]=0.6`, which is how the OpenAI SDKs send a nested `extra_body` object): `threshold` (0 to 1, default 0.5), `min_speech_duration_ms`, `max_speech_duration_s`, `min_silence_duration_ms` (default 300), `speech_pad_ms` (default 150). Given without `vad_filter`, it switches the filter on. `neg_threshold` is accepted and ignored |
 | `chunk_length` | `30` | extension. Longest piece of audio decoded at once, in seconds (1 to 30): audio longer than this goes through silence removal and is cut at pauses into pieces of at most this length, for every engine; faster-whisper also uses it as its own window. With `vad_filter=false` nothing is cut, and faster-whisper decodes the audio in windows of this length: short windows of silence are where Whisper hallucinates most, so keep the filter on with a short `chunk_length` |
-| `hotwords` | - | extension: terms to favour (comma or line separated). faster-whisper and whisper.cpp put them into the initial prompt (after `prompt`); cloud providers as in [providers.md](providers.md); a model that cannot use them names `hotwords` in `x-bolo-ignored-options` |
+| `hotwords` | - | extension: terms to favour (comma or line separated). faster-whisper and whisper.cpp put them into the initial prompt (after `prompt`); sherpa-onnx transducers (Zipformer, Parakeet TDT) decode with beam search biased towards them (a phrase can carry its own weight: `Zintrava Labs :6`); cloud providers as in [providers.md](providers.md); a model that cannot use them names `hotwords` in `x-bolo-ignored-options` |
 | `condition_on_previous_text` | `false` | extension, Whisper models: give the decoder the text of the previous window. Off by default: it is the main cause of repetition loops on long audio |
 | `repetition_penalty` | `1` | extension, faster-whisper: penalty on tokens already generated (greater than 0; 1 is off; 1.1 to 1.3 is a usual value against loops) |
 | `no_repeat_ngram_size` | `0` | extension, faster-whisper: never generate the same n-gram of this many tokens twice in a window (0 to 100; 0 is off). It also removes speech that really is repeated: a phrase said several times in one window comes out once |
@@ -341,8 +342,20 @@ time instead of in a batch with others. Speaker-conditioned models (DiCoW) ignor
 
 The same goes for `prompt`, `hotwords` and a `temperature` above 0 when the model does not use them: faster-whisper
 uses all three; whisper.cpp all three (hotwords join the prompt); Voxtral (llama.cpp) only `temperature`; DiCoW only
-`prompt`; the other local recognisers (sherpa-onnx, Moonshine) none. A plugin model says which it uses
+`prompt`; sherpa-onnx transducers (`kind: transducer` and `nemo_transducer`: the Zipformers and Parakeet TDT) only
+`hotwords`; the other local recognisers (other sherpa-onnx models, Moonshine) none. A plugin model says which it uses
 (`request_fields` in its load reply); one that does not is given all three.
+
+Hotwords on sherpa-onnx transducers: a request with `hotwords` is decoded with modified beam search (4 paths) and a
+context graph of the phrases' tokens, so the beam favours them by `hotwords_score` (4 per token by default; a catalog
+or custom entry can set `hotwords_score`, a phrase its own with ` :<score>`). Without hotwords the model decodes
+greedily as before. The phrases are written in the model's case (the English Zipformers spell in capitals) and split
+into its tokens with its own SentencePiece model (`bpe.model`, pulled with the model since this version; a copy
+pulled earlier falls back to an approximation from `tokens.txt`, which matches fewer hotwords: `bolo rm` and
+`bolo pull` it again). Measured on two synthesised sentences with `Kshitij Wadhwani, Zintrava Labs, Anirudh
+Venkataraman` as hotwords: Parakeet TDT 110M went from "Kishidwani" and "Anyrud Venkatoreman" to all three names
+spelled right; the GigaSpeech Zipformer from "ZENTRAVELABS" to "ZINTRAVA LABS", with the two Indian names closer but
+not exact (it cannot spell them from its tokens as easily).
 
 `text`, `srt` and `vtt` return plain text. Fields bolo cannot fill honestly
 are present with neutral values (`tokens: []`, `compression_ratio: 0.0`;
