@@ -314,8 +314,9 @@ time instead of in a batch with others. Speaker-conditioned models (DiCoW) ignor
 `text`, `srt` and `vtt` return plain text. Fields bolo cannot fill honestly
 are present with neutral values (`tokens: []`, `compression_ratio: 0.0`;
 `avg_logprob`/`no_speech_prob` are real only for faster-whisper models).
-Word timestamps need a model with the `timestamps` feature; others return an
-empty `words` list.
+Word timestamps need a model that gives them (docs/models.md, "Word timestamps"); others return an
+empty `words` list and name `timestamp_granularities` in `x-bolo-ignored-options`. Asking for words never changes
+the text.
 
 With `stream=true` the response is `text/event-stream`:
 

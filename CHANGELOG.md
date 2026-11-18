@@ -16,6 +16,10 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   already computed (no second encoder pass), so the transcript is the same by construction.
   `hallucination_silence_threshold` works as before (it decodes with timestamp tokens whether or not words are
   asked for).
+- **whisper.cpp gives word timestamps.** `timestamp_granularities[]=word` returned `"words": []` with whisper.cpp
+  models and did not say so. Words now come from whisper.cpp's token timestamps (`token_timestamps`, computed after
+  decoding, so the text does not change; set per request and not carried over). A model that cannot give word times
+  now names `timestamp_granularities` in `x-bolo-ignored-options`.
 
 ### Added
 

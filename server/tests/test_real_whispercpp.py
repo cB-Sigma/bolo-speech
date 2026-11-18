@@ -131,3 +131,28 @@ def test_whispercpp_detects_the_language_of_a_multilingual_model(live: LiveServe
     assert r.json()["language"] == "hindi"
     told = _post(live, language="en").json()
     assert told["language"] == "english"
+
+
+def test_whispercpp_word_timestamps(live: LiveServer) -> None:
+    """Word timings from whisper.cpp's token timestamps; asking for them does not change the text."""
+    plain = _post(live, vad_filter="false").json()
+    for granularities in ("word", "segment"):
+        r = httpx.post(
+            live.url + "/v1/audio/transcriptions",
+            data={"model": MODEL, "response_format": "verbose_json", "vad_filter": "false",
+                  "timestamp_granularities[]": ["segment", "word"] if granularities == "segment" else ["word"]},
+            files={"file": ("a.wav", CLIP, "audio/wav")},
+            timeout=600,
+        )  # fmt: skip
+        assert r.status_code == 200, r.text
+        assert "x-bolo-ignored-options" not in r.headers
+        doc = r.json()
+        assert doc["text"] == plain["text"]
+        words = doc["words"]
+        assert " ".join(w["word"] for w in words) == doc["text"]
+        starts = [w["start"] for w in words]
+        assert starts == sorted(starts) and all(0.0 <= w["start"] <= w["end"] <= doc["duration"] for w in words)
+        assert 9.0 < words[0]["start"] < 12.0  # the speech starts after 10 s of near-silence
+    assert _params(live)["token_timestamps"] is True
+    _post(live, vad_filter="false")
+    assert _params(live)["token_timestamps"] is False  # not carried over to the next request

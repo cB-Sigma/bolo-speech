@@ -1455,6 +1455,8 @@ class Bolo:
                 decode = self.decode_options(spec, options)
                 ignored = [k for k in ENGINE_OPTIONS if k in decode and k not in stt.decode_options]
                 ignored = [k for k in ignored if k != "chunk_length"]  # bolo cuts the audio to it in any case
+                if word_timestamps and not stt.supports_word_timestamps:
+                    ignored.append("timestamp_granularities")  # no word timings from this model
                 if vad_filter is None:
                     # vad_parameters given with the request ask for the filter; pinned ones only tune it
                     vad_filter = decode.get("vad_filter", True if options.get("vad_parameters") else None)

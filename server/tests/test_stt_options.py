@@ -367,3 +367,24 @@ def test_segment_and_word_times_stay_within_the_audio(live: LiveServer, monkeypa
     long = _post(live, 24.0, chunk_length=10, response_format="verbose_json").json()
     assert len(long["segments"]) >= 3
     assert all(s["end"] - s["start"] <= 10.0 + 1e-6 and s["end"] <= 24.0 for s in long["segments"])
+
+
+def test_word_timestamps_a_model_cannot_give_are_named(live: LiveServer) -> None:
+    assert _post(live).status_code == 200  # loads the model
+    model = live.core.manager.loaded["fake-stt"].model
+    model.supports_word_timestamps = False  # type: ignore[misc]
+    r = httpx.post(
+        live.url + "/v1/audio/transcriptions",
+        data={"model": "fake-stt", "response_format": "verbose_json", "timestamp_granularities[]": "word"},
+        files={"file": ("a.wav", wav_bytes(2.0), "audio/wav")},
+        timeout=30,
+    )
+    assert r.status_code == 200 and r.headers["x-bolo-ignored-options"] == "timestamp_granularities"
+    model.supports_word_timestamps = True  # type: ignore[misc]
+    r = httpx.post(
+        live.url + "/v1/audio/transcriptions",
+        data={"model": "fake-stt", "response_format": "verbose_json", "timestamp_granularities[]": "word"},
+        files={"file": ("a.wav", wav_bytes(2.0), "audio/wav")},
+        timeout=30,
+    )
+    assert "x-bolo-ignored-options" not in r.headers and r.json()["words"]

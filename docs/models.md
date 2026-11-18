@@ -2477,7 +2477,8 @@ language the identifier does not know is routed as its nearest neighbour.
 
 | Models | Word times |
 | --- | --- |
-| faster-whisper (CTranslate2 Whisper) | yes (cross-attention alignment) |
+| faster-whisper (CTranslate2 Whisper) | yes (cross-attention alignment of the transcript, after decoding: the text is the same with or without words) |
+| whisper.cpp (`whispercpp-*`) | yes, from whisper.cpp's token timestamps (computed after decoding: the text is the same) |
 | transducer and CTC models through sherpa-onnx (Zipformer, Parakeet, NeMo, IndicConformer, SenseVoice, …) | yes, from the token times the decoder reports |
 | Whisper through sherpa-onnx (`whisper-*`) | **no** with the exports in the catalog: token times need a model exported with cross-attention outputs. sherpa-onnx 2.0.1 supports such exports, and a catalog entry for one can switch them on with the option `token_timestamps: true`; we checked that the stock `whisper-tiny` export reports none |
 | Moonshine | **no**: the runtime exposes no token times, and we did not add a forced aligner |
@@ -2832,7 +2833,7 @@ curl -s localhost:8000/v1/audio/transcriptions -F model=whispercpp-base-q5_1 -F 
 
 A multilingual model detects the language when the request names none (whisper.cpp's own default would be English);
 `.en` models are English only and cannot translate, and large-v3-turbo was not trained for translation. whisper.cpp
-gives segment times but no word timestamps here. The Whisper decoding options it honours are listed in api.md,
+gives segment times and, with `timestamp_granularities[]=word`, word times from its token timestamps. The Whisper decoding options it honours are listed in api.md,
 "Decoding options and repetition loops". A client that disconnects stops its decode (whisper.cpp's abort callback).
 
 What was run: `whispercpp-tiny` pulled through the catalog and run by `tests/test_real_whispercpp.py` (opt-in): the
