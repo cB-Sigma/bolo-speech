@@ -45,7 +45,7 @@ spec:
         fsGroup: 10001
       containers:
         - name: bolo
-          image: ghcr.io/cb-sigma/bolo:latest
+          image: ghcr.io/cb-sigma/bolo-speech:latest
           args: ["serve"]
           ports:
             - {name: http, containerPort: 8000}
