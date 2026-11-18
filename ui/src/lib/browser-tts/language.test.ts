@@ -44,6 +44,24 @@ describe('the voice for a text, as the server decides it', () => {
     expect(b.switched).toBe(false)
   })
 
+  it('keeps a voice of the same script when only the script was recognised', () => {
+    // Maithili text has no letters or common words of its own in the detector: it reads as Devanagari's first
+    // language, Hindi, and used to swap the Maithili voice for a Hindi one
+    const maithili = BROWSER_VOICES.find((v) => v.language === 'mai')
+    expect(maithili).toBeDefined()
+    const c = voiceForText('हमर नाम सीता अछि। आइ मौसम बड्ड नीक अछि।', maithili as never, BROWSER_VOICES, {
+      follow: true,
+    })
+    expect(c.switched).toBe(false)
+    expect(c.voice.id).toBe(maithili?.id)
+    expect(c.header).toContain('same-script=true')
+    // a Latin-script text still moves to an English voice
+    const e = voiceForText('Hello, how are you doing today? It is a good day.', maithili as never, BROWSER_VOICES, {
+      follow: true,
+    })
+    expect(e.switched).toBe(true)
+  })
+
   it('leaves an unsure text to the voice', () => {
     const c = voiceForText('OK', english, BROWSER_VOICES, { follow: true })
     expect(c.header).toContain('detected=unsure')

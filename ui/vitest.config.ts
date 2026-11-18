@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 import { FS_ALLOW, boloVersion } from './vite.config'
 
+// Clock times in the tests are written in UTC, as CI runs; a machine in another zone (IST on a developer's Mac)
+// would render them hours apart. Set before the test workers start, which inherit it.
+process.env.TZ = 'UTC'
+
 export default defineConfig({
   plugins: [react()],
   define: { 'import.meta.env.VITE_BOLO_VERSION': JSON.stringify(boloVersion()) },

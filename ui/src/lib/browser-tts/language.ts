@@ -40,6 +40,9 @@ export function voiceForText(
   if (!d.language) return keep('voice')
   if (speaks(current, d.language)) return keep(opts.follow ? 'detected' : 'voice')
   if (!opts.follow || opts.blend) return keep('voice', '; mismatch=true')
+  // Only the script was recognised (no letters or common words of one language decided): Maithili, Bhojpuri or
+  // Marathi text reads as the script's first language, Hindi, so a voice of the same script that was picked stays
+  if (!d.reason && d.alternatives.some((lang) => speaks(current, lang))) return keep('voice', '; same-script=true')
   for (const lang of [d.language, ...d.alternatives]) {
     const fit = voices.filter((v) => speaks(v, lang))
     if (!fit.length) continue

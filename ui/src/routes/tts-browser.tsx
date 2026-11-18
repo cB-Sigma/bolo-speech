@@ -288,7 +288,7 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
   const extra = useStore(session?.extra ?? idleExtra)
   const busy = state.status === 'connecting' || state.status === 'synthesizing' || state.status === 'playing'
   const tripRef = useRef(0)
-  const [detectLang, setDetectLang] = useState(true)
+  const [detectLang, setDetectLang] = useState(false)
   const [decision, setDecision] = useState<string | null>(null)
   const [blendOn, setBlendOn] = useState(false)
   const [blendParts, setBlendParts] = useState<BlendPart[]>([])
