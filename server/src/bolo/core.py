@@ -77,6 +77,7 @@ from bolo.errors import (
     Overloaded,
     SynthesisFailed,
 )
+from bolo.hotwords import Spelling, spell_transcript
 from bolo.itn import ItnOptions
 from bolo.itn import apply as apply_itn
 from bolo.itn import header as itn_header
@@ -168,6 +169,8 @@ class Transcript:
     language_probability: float | None = None
     #: what redaction masked (bolo.redact: type, place of the placeholder in ``text``, score, time), when asked for
     redactions: list[dict[str, Any]] | None = None
+    #: hotwords spelt the hotwords' way (bolo.hotwords: ``{"from", "to", "start"}``), when the request had hotwords
+    hotword_spelling: list[dict[str, Any]] | None = None
 
 
 @dataclass
@@ -1629,6 +1632,7 @@ class Bolo:
         target_language: str | None = None,
         redact: RedactOptions | None = None,
         redact_entities: tuple[str, ...] = (),
+        hotword_spelling: bool = True,
     ) -> Transcript:
         """Transcribe a complete recording. Long audio is split at pauses and decoded in batches.
 
@@ -1658,7 +1662,7 @@ class Bolo:
                     temperature=temperature, hotwords=hotwords, vad_filter=vad_filter, on_segment=on_segment,
                     diarize=diarize, separate=separate, denoise=denoise, record=record, options=options or {},
                     punctuation=punctuation, itn=itn, target_language=target_language, redact=redact,
-                    redact_entities=redact_entities,
+                    redact_entities=redact_entities, hotword_spelling=hotword_spelling,
                 )  # fmt: skip
             except BoloError as exc:
                 if not (more and fallback_worthy(exc)) or trace.status != "running":
@@ -1692,6 +1696,7 @@ class Bolo:
         target_language: str | None = None,
         redact: RedactOptions | None = None,
         redact_entities: tuple[str, ...] = (),
+        hotword_spelling: bool = True,
     ) -> Transcript:
         """One model's attempt. With ``more`` (a fallback is left), an availability error leaves the trace open."""
         handed_on = False
@@ -1846,6 +1851,11 @@ class Bolo:
                 transcript.model = spec.id
                 if target:  # a translation is in the language it went into
                     transcript.language = target
+                spelling = Spelling.of(hotwords, hotword_spelling)
+                if spelling is not None:  # the hotwords spelt their way, whatever the engine made of them
+                    transcript.hotword_spelling = spell_transcript(transcript, spelling)
+                    if transcript.hotword_spelling:
+                        trace.extra["hotword_spelling"] = transcript.hotword_spelling
                 if written is not None and transcript.text.strip():  # before punctuation, which sees the figures
                     await apply_itn(self, transcript, spec, written, trace)
                 if punctuate is not None and transcript.text.strip():

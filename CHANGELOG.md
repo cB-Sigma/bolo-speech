@@ -35,6 +35,14 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- **Hotwords were heard but spelt by ear.** With hotwords "Kshitij Wadhwani Zentriva", whispercpp-small wrote
+  "Kshitij Waadhwaani at Zentriva Labs". A pass that works for every engine now writes a transcript's near-misses of
+  the hotwords the hotwords' way (a phonetic folding and a small edit distance, never short or differently starting
+  words, so "wanted" stays "wanted"), keeping punctuation, capitals and word timestamps: for file transcriptions, the
+  finals of `WS /api/v1/stt/stream` (new query parameter `hotwords`) and Realtime transcripts
+  (`session.audio.input.transcription.hotwords`). On by default with hotwords; `hotword_spelling: false` (and
+  `bolo transcribe --no-hotword-spelling`) turns it off. `verbose_json` and the stream's finals list what changed
+  (`hotword_spelling`).
 - **bolo-torch: GLM-4-Voice int4 split across the GPU and the CPU failed with meta tensors.** bolo-torch passed
   `device_map="auto"`, and transformers converts the layers to 4-bit before it resolves that, so the layers bound
   for the CPU became 4-bit there and accelerate's offload could not load them ("Cannot copy out of meta tensor"). The

@@ -445,6 +445,9 @@ class RealtimeSession:
                 "model": model or self.core.settings.default_realtime_stt,
                 "language": cfg.get("language"),
                 "prompt": cfg.get("prompt"),
+                # bolo extensions: names and terms to favour, and their spelling in the transcripts (bolo.hotwords)
+                "hotwords": cfg.get("hotwords") or None,
+                "hotword_spelling": cfg.get("hotword_spelling") is not False,
             }
         if "noise_reduction" in audio_in or "denoise" in audio_in:
             self._configure_denoise(audio_in)
@@ -863,6 +866,7 @@ class RealtimeSession:
             result = await self.core.transcribe(
                 audio, SR, model=cfg["model"], language=cfg.get("language"), prompt=cfg.get("prompt"),
                 vad_filter=False, trace=Trace("stt", self.transport, ""), record=False, denoise=self.denoise,
+                hotwords=cfg.get("hotwords"), hotword_spelling=cfg.get("hotword_spelling", True),
             )  # fmt: skip
         except BoloError as exc:
             log.debug("no transcript for the end-of-turn model: %s", exc.message)
@@ -946,7 +950,8 @@ class RealtimeSession:
                 result = await self.core.transcribe(
                     self._slice(start, end), SR, model=cfg["model"], language=cfg.get("language"),
                     prompt=cfg.get("prompt"), vad_filter=False, trace=Trace("stt", self.transport, ""), record=False,
-                    denoise=self.denoise,
+                    denoise=self.denoise, hotwords=cfg.get("hotwords"),
+                    hotword_spelling=cfg.get("hotword_spelling", True),
                 )  # fmt: skip
             except BoloError:
                 continue  # the final decode reports the error
@@ -1073,6 +1078,8 @@ class RealtimeSession:
                 prompt=cfg.get("prompt"),
                 trace=sub,
                 denoise=self.denoise,
+                hotwords=cfg.get("hotwords"),
+                hotword_spelling=cfg.get("hotword_spelling", True),
             )
         except BoloError as exc:
             await self.send(

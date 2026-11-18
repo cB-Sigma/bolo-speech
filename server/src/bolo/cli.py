@@ -869,7 +869,8 @@ def cmd_transcribe(args: argparse.Namespace) -> int:
             t = await core.transcribe(
                 samples, rate, model=args.model, language=args.language, trace=trace,
                 task="translate" if args.translate or args.target_language else "transcribe", word_timestamps=args.format == "json",
-                hotwords=args.hotwords, punctuation=parse_punctuation(args.punctuation, "--punctuation"),
+                hotwords=args.hotwords, hotword_spelling=not args.no_hotword_spelling,
+                punctuation=parse_punctuation(args.punctuation, "--punctuation"),
                 itn=parse_itn(args.itn, "--itn"),
                 target_language=args.target_language if args.translate or args.target_language else None,
                 redact=parse_redact(args.redact, "--redact"),
@@ -884,6 +885,7 @@ def cmd_transcribe(args: argparse.Namespace) -> int:
                     "text": t.text, "language": t.language, "duration": round(t.duration, 3), "model": t.model,
                     "segments": [{"start": round(s.start, 3), "end": round(s.end, 3), "text": s.text} for s in t.segments],
                     "words": [w.to_dict() for w in t.words],
+                    **({"hotword_spelling": t.hotword_spelling} if t.hotword_spelling is not None else {}),
                     "timing": {"total_ms": trace.total_ms, "rtf": trace.rtf, "phases": [p.to_dict() for p in trace.phases]},
                 }, indent=2, ensure_ascii=False))  # fmt: skip
             else:
@@ -2722,6 +2724,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.add_argument("--format", "-f", choices=["text", "json", "srt", "vtt"], default="text")
     s.add_argument("--hotwords", help="names and terms to favour, comma separated (models that take hotwords)")
+    s.add_argument(
+        "--no-hotword-spelling", dest="no_hotword_spelling", action="store_true",
+        help="leave the transcript's near-misses of the hotwords as heard (by default they are spelt the hotwords' way)",
+    )  # fmt: skip
     s.add_argument(
         "--redact",
         help="mask personal information: on (the default_pii model), off or a pii model (default: the model's "

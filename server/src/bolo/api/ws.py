@@ -93,6 +93,8 @@ def _stt_config(params: Any, base: SessionConfig | None = None) -> SessionConfig
         vad=parse_bool(get("vad"), cfg.vad),
         transport="websocket",
         word_timestamps=parse_bool(get("words"), cfg.word_timestamps),
+        hotwords=get("hotwords") or cfg.hotwords,
+        hotword_spelling=parse_bool(get("hotword_spelling"), cfg.hotword_spelling),
     )
 
 

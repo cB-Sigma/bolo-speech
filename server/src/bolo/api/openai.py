@@ -28,6 +28,7 @@ from bolo.denoise import parse_denoise
 from bolo.diarize import DiarizeOptions, KnownSpeaker
 from bolo.engines.base import FloatArray, Segment
 from bolo.errors import BoloError, InvalidRequest, ModelNotFound, ModelNotInstalled
+from bolo.hotwords import Spelling
 from bolo.itn import parse_itn
 from bolo.keepalive import request_keep_alive
 from bolo.lid import is_routing_request, route_headers
@@ -195,6 +196,8 @@ def _verbose(t: Transcript, task: str, word_level: bool, segment_level: bool) ->
         out["separation"] = t.separation
     if t.redactions is not None:
         out["redactions"] = t.redactions
+    if t.hotword_spelling is not None:
+        out["hotword_spelling"] = t.hotword_spelling
     return out
 
 
@@ -462,6 +465,8 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
             "word_timestamps": "word" in granularities and fmt == "verbose_json",
             "temperature": temperature,
             "hotwords": str(form.get("hotwords") or "") or None,
+            # bolo extension: write the transcript's near-misses of the hotwords the hotwords' way (bolo.hotwords)
+            "hotword_spelling": parse_bool(form.get("hotword_spelling"), True),
             "vad_filter": parse_bool(vad_raw) if vad_raw not in (None, "") else None,
             "trace": trace,
             "diarize": diarize,
@@ -496,8 +501,12 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
 
     counter = 0
 
+    spelling = Spelling.of(kwargs["hotwords"], kwargs["hotword_spelling"])
+
     async def on_segment(seg: Segment) -> None:
         nonlocal first, counter
+        if spelling is not None:  # the deltas as the final text will read
+            seg, _ = spelling.segment(seg)
         delta = seg.text if first else " " + seg.text
         first = False
         if seg.speaker:  # diarized streams carry whole segments, as gpt-4o-transcribe-diarize does

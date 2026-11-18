@@ -55,6 +55,7 @@ from bolo.engines.base import (
     Word,
 )
 from bolo.errors import BoloError, InvalidRequest, Overloaded
+from bolo.hotwords import Spelling
 from bolo.obs.trace import Trace, preview
 from bolo.streaming.agreement import LocalAgreement, PrefixStability
 from bolo.stt_options import DEFAULT_MAX_REPEATS, ENGINE_OPTIONS, RepeatGuard
@@ -120,6 +121,10 @@ class SessionConfig:
     max_speakers: int | None = None
     #: ``denoise`` of the stream (bolo.denoise); None: the model's pin, its catalog option and the server setting
     denoise: DenoiseOptions | None = None
+    #: names and terms to favour (the model gets them when it takes hotwords), and whether the finals' near-misses
+    #: of them are spelt their way (bolo.hotwords)
+    hotwords: str | None = None
+    hotword_spelling: bool = True
 
 
 class STTSession:
@@ -152,6 +157,7 @@ class STTSession:
         #: these are how its Whisper options and the repetition guard are set
         self.decode_options = core.decode_options(self.spec)
         self.guard = RepeatGuard(int(self.decode_options.get("max_repeats", DEFAULT_MAX_REPEATS)))
+        self.spelling = Spelling.of(config.hotwords, config.hotword_spelling)
         #: the denoiser the stream runs before recognition (bolo.denoise.LiveDenoiser), or None
         self.denoise_plan = core.denoise_plan(self.spec, config.denoise)
         self._live: LiveDenoiser | None = None
@@ -471,6 +477,11 @@ class STTSession:
         if not text.strip():  # nothing but a repeat of what was already sent: no final, as for an empty decode
             log.info("%s: the repetition guard dropped a final that only repeated earlier ones", self.spec.id)
             return
+        spelt: list[dict[str, Any]] = []
+        if self.spelling is not None:  # the hotwords their way, whatever the engine made of them
+            text, words, spelt = self.spelling.text(text, words)
+            if spelt:
+                trace.extra.setdefault("hotword_spelling", []).extend(spelt)
         speaker = await self.speaker_for(audio) if audio is not None else None
         t_fin = trace.now()
         latency = (time.perf_counter() - recv_t) * 1000.0
@@ -487,6 +498,8 @@ class STTSession:
         }
         if self._diarizer is not None:
             msg["speaker"] = speaker
+        if spelt:
+            msg["hotword_spelling"] = spelt
         await self._send(msg)
         trace.add_phase("finalize", t_fin, trace.now())
         self.utterances += 1
@@ -1147,7 +1160,13 @@ class _PseudoProcessor(_Processor):
             k: v for k, v in self.s.decode_options.items() if k in ENGINE_OPTIONS and k in self.stt.decode_options
         }
         req = STTRequest(
-            self._slice(start, end).copy(), self.s.cfg.language, "transcribe", None, words, options=options
+            self._slice(start, end).copy(),
+            self.s.cfg.language,
+            "transcribe",
+            None,
+            words,
+            options=options,
+            hotwords=self.s.cfg.hotwords if "hotwords" in self.stt.request_fields else None,
         )
         result, info = await self.entry.queue.submit("batch", req)
         assert isinstance(result, STTResult)

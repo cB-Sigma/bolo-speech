@@ -364,6 +364,20 @@ Venkataraman` as hotwords: Parakeet TDT 110M went from "Kishidwani" and "Anyrud 
 spelled right; the GigaSpeech Zipformer from "ZENTRAVELABS" to "ZINTRAVA LABS", with the two Indian names closer but
 not exact (it cannot spell them from its tokens as easily).
 
+**Hotword spelling.** Whatever the model, a transcript's near-misses of the hotwords are then written the hotwords'
+way (bolo.hotwords): a word, or a run of adjacent words up to a hotword's word count, that comes close to a hotword
+after a phonetic folding (lower case, accents dropped, `aa`/`ee`/`oo` and doubled letters to one, `ph` as `f`, `w` as
+`v`, an `h` after a consonant dropped) within an edit distance of a quarter of its length is replaced by the hotword as
+written. Words of under five letters (folded) must match exactly and the first letter must agree, so real different
+words stay ("wanted" is not "Wadhwani"). Punctuation around a word and all-capital words keep their form, word
+timestamps follow. With `hotwords=Kshitij Wadhwani Zentriva`, whispercpp-small's "Kshitij Waadhwaani at Zentriva
+Labs" becomes "Kshitij Wadhwani at Zentriva Labs". On by default when there are hotwords; `hotword_spelling=false` turns
+it off. `verbose_json` lists the changes (`"hotword_spelling": [{"from": "Waadhwaani", "to": "Wadhwani", "start":
+0.0}]`, an empty list when nothing needed it), the stream's `final` messages too, and `bolo transcribe
+--hotwords ... --no-hotword-spelling` likewise. The same applies to live streams (`hotwords` and `hotword_spelling`
+query parameters of `WS /api/v1/stt/stream`) and Realtime transcripts (`session.audio.input.transcription.hotwords`
+and `.hotword_spelling`, bolo extensions).
+
 `text`, `srt` and `vtt` return plain text. Fields bolo cannot fill honestly
 are present with neutral values (`tokens: []`, `compression_ratio: 0.0`;
 `avg_logprob`/`no_speech_prob` are real only for faster-whisper models).
@@ -1917,6 +1931,7 @@ Realtime transcription. Query parameters:
 | `interim` | `true` | send `partial` messages |
 | `vad` | `true` | detect speech boundaries. With `false`, an utterance ends only on `flush`/`stop` (or the model's own endpointing for native streaming models) |
 | `words` | `true` | include word timestamps in finals when the model has them |
+| `hotwords` | - | names and terms to favour: given to models that take hotwords, and the finals' near-misses of them spelt their way (`hotword_spelling`, default `true`; a final lists what changed in `hotword_spelling`). See "Hotword spelling" under [Decoding options and repetition loops](#decoding-options-and-repetition-loops) |
 | `diarize` | `false` | add a `speaker` label (`A`, `B`, …) to every final; optional `max_speakers`. See [Speaker diarization](#speaker-diarization) |
 | `endpointing` | `balanced` | how long a pause ends an utterance: `fast` (250 ms), `balanced` (500 ms), `patient` (900 ms). The server default is `endpoint_silence_ms` |
 | `endpoint_ms` | - | the same as an exact number of milliseconds (100 to 5000); wins over `endpointing` |
