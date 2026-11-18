@@ -27,6 +27,7 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   inside the graphs (codebucketsolutions/perth-onnx and codebucketsolutions/wavmark-onnx, with the export script and
   the parity results) and checked against their PyTorch originals in both directions; they run in core bolo without
   PyTorch. Perth was found after MP3, Opus and 16 or 8 kHz resampling on every clip tried. WavMark is slow on a CPU.
+
 - **A longest turn for live conversations, and a steady-noise check.** In a room with a fan the turn detector could
   hear "speech" for good: the user's turn never ended and the agent never answered. A Realtime session now commits
   the turn after `max_turn_seconds` (a new setting, default 30 s; per session the bolo extension
@@ -38,8 +39,28 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   "Longest turn" and "Steady-noise check" in its Listening panel. Tested with synthetic audio (a voice, then 20 s of
   steady noise; speech over the noise; noise alone): not yet in a real noisy room.
 
+- **`bolo check <model>`: would a model run here, or on a bigger machine, found out without its weights.** Its
+  runtime (engine, components, a full-duplex server's environment and imports, a bolo-torch environment's loader,
+  libraries and pinned code bundle), every weight file asked for (HEAD) at its pinned revision (there or gated, the
+  size the catalog says) and the advisor's placement here (GPU, split, CPU, refused); exit code 1 and `"ok": false` on
+  any failure, `--json`. `--tiny` builds a transformers-based bolo-torch model from its `config.json` with tiny
+  dimensions and random weights and takes it through bolo-torch's split planning, a bfloat16 load and one forward
+  pass (the three Qwen-Omni entries pass on CPU torch, Qwen3-Omni 30B included); what cannot be built small is skipped,
+  never passed. Also `POST /api/v1/models/{id}/check`, a "Check" button on the console's Models page, and a CI job
+  (not required yet) running `bolo check --all --tiny`.
+
 ### Fixed
 
+- **Interrupting the agent from a browser.** Barge-in worked every time through the API but about one time in four
+  from Chrome and Edge, most likely because the browser's echo canceller and noise suppressor turn the user's voice
+  down while the agent's audio plays. While the agent speaks (bolo counts the audio it sent at the pace the input
+  arrives), a second detector with a lower threshold may now start the user's turn: the new setting
+  `barge_in_threshold` (default 0.3; per session the bolo extension `turn_detection.barge_in_threshold`, 0: off).
+  bolo's own echo canceller (`audio.input.echo_cancellation`) can stand in for the browser's. The console's
+  Conversation page has switches for the browser's echo cancellation, noise suppression and automatic gain (all on
+  by default, with a warning when nothing would cancel the echo) and one for the closer listening. Trade-offs in
+  voice-agents.md, "Interrupting the agent in a browser". Tested on synthetic audio (agent voice and its echo plus
+  quieter user speech, with and without SpeexDSP); not verified in a browser.
 - **"Agent is speaking" over WebSocket (bug 18).** The Conversation page turned the indicator off at `response.done`,
   which arrives when the answer has been generated, often seconds before it has been played, and on with the first
   audio received rather than heard. Over WebSocket the page plays the audio itself and the server cannot know when
@@ -60,18 +81,6 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   much the failed load left, and the process stops as soon as those models unload. After a failed GPU load the free
   memory is read again for `ps` and the next placement. Tested on Linux with the CPU build of torch and a faked
   `torch.cuda`; not run on a real GPU, Windows or macOS.
-
-- **`bolo check <model>`: would a model run here, or on a bigger machine, found out without its weights.** Its
-  runtime (engine, components, a full-duplex server's environment and imports, a bolo-torch environment's loader,
-  libraries and pinned code bundle), every weight file asked for (HEAD) at its pinned revision (there or gated, the
-  size the catalog says) and the advisor's placement here (GPU, split, CPU, refused); exit code 1 and `"ok": false` on
-  any failure, `--json`. `--tiny` builds a transformers-based bolo-torch model from its `config.json` with tiny
-  dimensions and random weights and takes it through bolo-torch's split planning, a bfloat16 load and one forward
-  pass (the three Qwen-Omni entries pass on CPU torch, Qwen3-Omni 30B included); what cannot be built small is skipped,
-  never passed. Also `POST /api/v1/models/{id}/check`, a "Check" button on the console's Models page, and a CI job
-  (not required yet) running `bolo check --all --tiny`.
-
-### Fixed
 
 - **Hotwords were heard but spelt by ear.** With hotwords "Kshitij Wadhwani Zentriva", whispercpp-small wrote
   "Kshitij Waadhwaani at Zentriva Labs". A pass that works for every engine now writes a transcript's near-misses of

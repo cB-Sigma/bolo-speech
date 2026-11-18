@@ -208,6 +208,11 @@ class Settings:
     #: Realtime sessions: end a turn when the input level has stayed this steady for this long while the detector
     #: still says "speech" (a steady noise, not a voice); 0: off. Per session: turn_detection.noise_plateau_ms
     turn_noise_plateau_ms: float = 2000.0
+    #: Realtime sessions: while the agent's audio is playing, a user's turn (and so barge-in) may also start at this
+    #: lower voice-activity threshold: echo cancellers and noise suppressors turn the user down while the agent talks.
+    #: 0, or not below the session's threshold: no separate barge-in threshold. Per session:
+    #: turn_detection.barge_in_threshold
+    barge_in_threshold: float = 0.3
 
     #: what answers in Realtime conversation sessions (a session can pick another with the bolo extension
     #: session.pipeline): "cascade" (bolo's STT -> the language model -> bolo's TTS), "audio-llm" (the user's audio

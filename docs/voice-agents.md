@@ -148,7 +148,7 @@ WebSocket subprotocols `realtime` and `openai-insecure-api-key.<key>`.
 
 | Client event | Behaviour |
 | --- | --- |
-| `session.update` | `type` (`realtime` \| `transcription`), `instructions`, `output_modalities` (`["audio"]` or `["text"]`), `audio.input.format` / `audio.output.format` (`audio/pcm` at 24 kHz, `audio/pcmu`, `audio/pcma`), `audio.input.transcription` (`model`, `language`, `prompt`; bolo extensions: `hotwords`, names and terms to favour, whose near-misses in the transcripts are spelt their way unless `hotword_spelling` is `false`, see api.md), `audio.input.noise_reduction` (`{"type": "near_field"}` or `"far_field"`: the default denoiser before transcription; `null`: the server's default; see below), `audio.input.denoise` (bolo extension: `true`, `false`, a strength between 0 and 1, a model id, or `{"model", "strength"}`; wins over `noise_reduction`), `audio.input.echo_cancellation` (bolo extension: `true`, `false`, a model id or `{"model", "delay_ms"}`; see "Echo cancellation" below), `audio.input.turn_detection` (`server_vad` with `threshold`, `silence_duration_ms`, `prefix_padding_ms`, `create_response`, `interrupt_response`; `semantic_vad` with `eagerness`, see below; or `null`; bolo extensions in either: `vad_model`, the voice-activity detector of the session, any `vad` model, default `default_vad`; `turn_model`, the end-of-turn model `semantic_vad` asks, any `turn` model, default `default_turn`; `max_turn_seconds` and `noise_plateau_ms`, which end a turn a steady noise keeps open (see "Turns that never end" below; 0: off); a model named in either is pulled on first use with `auto_pull`, as anywhere else, and never replaced by another: when it cannot be used (its engine is missing, or it is not installed and `auto_pull` is off) `session.update` answers with an `error` naming the parameter, with the code and message loading the model gives), `audio.output.voice`, `audio.output.speed`, `tools` (functions, and MCP servers: below), `tool_choice`, `max_output_tokens` |
+| `session.update` | `type` (`realtime` \| `transcription`), `instructions`, `output_modalities` (`["audio"]` or `["text"]`), `audio.input.format` / `audio.output.format` (`audio/pcm` at 24 kHz, `audio/pcmu`, `audio/pcma`), `audio.input.transcription` (`model`, `language`, `prompt`; bolo extensions: `hotwords`, names and terms to favour, whose near-misses in the transcripts are spelt their way unless `hotword_spelling` is `false`, see api.md), `audio.input.noise_reduction` (`{"type": "near_field"}` or `"far_field"`: the default denoiser before transcription; `null`: the server's default; see below), `audio.input.denoise` (bolo extension: `true`, `false`, a strength between 0 and 1, a model id, or `{"model", "strength"}`; wins over `noise_reduction`), `audio.input.echo_cancellation` (bolo extension: `true`, `false`, a model id or `{"model", "delay_ms"}`; see "Echo cancellation" below), `audio.input.turn_detection` (`server_vad` with `threshold`, `silence_duration_ms`, `prefix_padding_ms`, `create_response`, `interrupt_response`; `semantic_vad` with `eagerness`, see below; or `null`; bolo extensions in either: `vad_model`, the voice-activity detector of the session, any `vad` model, default `default_vad`; `turn_model`, the end-of-turn model `semantic_vad` asks, any `turn` model, default `default_turn`; `max_turn_seconds` and `noise_plateau_ms`, which end a turn a steady noise keeps open (see "Turns that never end" below; 0: off); `barge_in_threshold`, the lower voice-activity threshold that may start a turn while the agent's audio is playing (default the `barge_in_threshold` setting, 0.3; 0: off; see "Interrupting the agent in a browser"); a model named in either is pulled on first use with `auto_pull`, as anywhere else, and never replaced by another: when it cannot be used (its engine is missing, or it is not installed and `auto_pull` is off) `session.update` answers with an `error` naming the parameter, with the code and message loading the model gives), `audio.output.voice`, `audio.output.speed`, `tools` (functions, and MCP servers: below), `tool_choice`, `max_output_tokens` |
 | `input_audio_buffer.append` / `.commit` / `.clear` | base64 audio in the session's input format; manual commit when turn detection is off |
 | `conversation.item.create` | user/assistant/system messages (`input_text`, `input_audio` with base64 audio that is transcribed, `output_text`), `function_call`, `function_call_output` |
 | `conversation.item.delete` / `.retrieve` / `.truncate` | `truncate` cuts an assistant message's transcript to the sentences that had started playing before `audio_end_ms`, so the model does not "remember" words the user never heard |
@@ -178,6 +178,42 @@ assistant message stays in the history only as far as it had been generated.
 Stop your playback when you see `input_audio_buffer.speech_started`, and send
 `conversation.item.truncate` with how much was actually played if you want
 the history to match what the user heard.
+
+**Interrupting the agent in a browser.** Interrupting worked every time
+through the API but only about one time in four from a browser (Chrome and
+Edge on a Windows laptop, bolo 0.6.8). The likely cause, not yet confirmed in a
+browser: with `echoCancellation`, `noiseSuppression` and `autoGainControl` on
+(the console's defaults, and most pages'), the browser turns the user's voice
+down while the agent's audio plays (double talk), so it no longer reaches the
+voice-activity threshold. The console does not pause or duck the microphone
+while the agent speaks; it sends everything. bolo now does three things:
+
+* While the agent's audio is playing (bolo counts the audio it sent at the pace
+  the input arrives, which is the pace the client plays it, and stops counting
+  on barge-in, `response.cancel` and `output_audio_buffer.clear`), a second
+  detector with the lower `barge_in_threshold` (default 0.3, against the usual
+  0.5) may start the user's turn. Only then: the same quiet voice when the
+  agent is silent is not a turn. The trace of such a turn says `barge_in`.
+* The server's own echo canceller (`audio.input.echo_cancellation`, see "Echo
+  cancellation" below) has the exact reference, the audio bolo sent. With it
+  the browser's canceller can be turned off, so the user is not turned down at
+  all.
+* The console's Conversation page has "Browser microphone processing":
+  switches for the browser's echo cancellation, noise suppression and automatic
+  gain, all on by default.
+
+The trade-offs: a lower `barge_in_threshold` hears quieter interruptions, but
+also more of what is left of the agent's own voice after echo cancellation, so
+on loudspeakers without any canceller the agent may interrupt itself more
+often; raise it, or set 0, if that happens. Turning the browser's echo
+cancellation off without headphones and without the server's canceller makes
+the agent hear itself: the console warns. The server's canceller needs a moment
+to adapt at the start of a conversation (SpeexDSP: about a second) and costs a
+little CPU per session. Turning only noise suppression off is the mildest
+change to try first. Tested with synthetic audio (an agent voice playing with
+its echo in the microphone, plus quieter user speech, with and without SpeexDSP),
+**not yet in Chrome or Edge**: whether the browser's processing is the whole
+cause, and which setting works best there, is still to be measured.
 
 **Turns that never end.** A steady noise (a fan, an air conditioner) can keep
 the voice-activity detector "in speech" for good: the turn is never committed

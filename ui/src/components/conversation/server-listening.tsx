@@ -132,7 +132,7 @@ export function ServerListeningPanel({
       <OptionRow
         testId="server-turn-limit-option"
         icon={<TimerOff />}
-        title="Longest turn"
+        title="Longest turn and interruptions"
         hint={
           <>
             A fan or other steady noise can keep the detector hearing “speech”, so your turn never ends and the agent
@@ -140,7 +140,10 @@ export function ServerListeningPanel({
             <span className="font-mono">max_turn_seconds</span>), and, with the steady-noise check, as soon as the sound
             stops rising and falling the way a voice does (<span className="font-mono">noise_plateau_ms</span>,{' '}
             {limits?.noise_plateau_ms != null ? `${limits.noise_plateau_ms / 1000} s` : 'about 2 s'} on this server).
-            Turn the check off if a quiet voice in a loud room is cut short.
+            Turn the check off if a quiet voice in a loud room is cut short. While the agent speaks, a quieter voice
+            than usual counts as you interrupting (<span className="font-mono">barge_in_threshold</span>
+            {limits?.barge_in_threshold != null ? `, ${limits.barge_in_threshold} on this server` : ''}): echo
+            cancellers turn you down then. Off, only what would start a turn anyway interrupts.
           </>
         }
         control={
@@ -166,6 +169,16 @@ export function ServerListeningPanel({
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Switch
+                checked={value.bargeIn !== false}
+                onCheckedChange={(on) => onChange({ ...value, bargeIn: on ? undefined : false })}
+                disabled={disabled}
+                aria-label="Listen closer while the agent speaks"
+                data-testid="barge-in"
+              />
+              Listen closer while the agent speaks
+            </label>
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <Switch
                 checked={value.noisePlateau !== false}

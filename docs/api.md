@@ -1221,7 +1221,7 @@ FILE...`, `bolo speakers verify SPEAKER FILE` (exit status 1 when it is not them
                 "client_secrets": "/v1/realtime/client_secrets",
                 "transcript_deltas": true,               // user transcripts arrive incrementally
                 "turn_detection": ["server_vad", "semantic_vad"],
-                "turn_limits": {"max_turn_seconds": 30.0, "noise_plateau_ms": 2000.0},   // the settings max_turn_seconds, turn_noise_plateau_ms
+                "turn_limits": {"max_turn_seconds": 30.0, "noise_plateau_ms": 2000.0, "barge_in_threshold": 0.3},   // the settings of those names (turn_noise_plateau_ms)
                 "semantic_vad": {"model": "smart-turn-v3", "available": true, "installed": false},
                 "sip": false,
                 "pipeline": "cascade",                   // the server's default (setting realtime_pipeline)

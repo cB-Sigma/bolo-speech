@@ -13,6 +13,35 @@ export interface AudioSource {
 
 export type BlockHandler = (block: Float32Array) => void
 
+/**
+ * The browser's own processing of the microphone (`getUserMedia` constraints). All three are on by default, which
+ * suits speech recognition. In a conversation they have a cost while the agent speaks: the echo canceller and the
+ * noise suppressor turn the user's voice down during double talk, so interrupting the agent is harder to hear. Off,
+ * the echo canceller must come from elsewhere (headphones, or the server's `echo_cancellation`), or the agent hears
+ * itself.
+ */
+export interface CaptureProcessing {
+  echoCancellation: boolean
+  noiseSuppression: boolean
+  autoGainControl: boolean
+}
+
+export const BROWSER_PROCESSING: CaptureProcessing = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+}
+
+/** The audio constraints for `getUserMedia`. */
+export function audioConstraints(p: CaptureProcessing = BROWSER_PROCESSING): MediaTrackConstraints {
+  return {
+    channelCount: 1,
+    echoCancellation: p.echoCancellation,
+    noiseSuppression: p.noiseSuppression,
+    autoGainControl: p.autoGainControl,
+  }
+}
+
 export class MicrophoneError extends Error {
   readonly kind: MicFailureKind
   readonly failure: MicFailure
@@ -70,7 +99,10 @@ export async function microphoneError(err: unknown, asked: number): Promise<Micr
  * AudioContext is created and resumed in the same turn (iOS Safari keeps a
  * context suspended for good if it was created after the gesture has passed).
  */
-export function openMicrophone(onBlock: BlockHandler): Promise<AudioSource> {
+export function openMicrophone(
+  onBlock: BlockHandler,
+  processing: CaptureProcessing = BROWSER_PROCESSING,
+): Promise<AudioSource> {
   if (!globalThis.isSecureContext && !navigator.mediaDevices?.getUserMedia) {
     return Promise.reject(new MicrophoneError('insecure', SHORT_MESSAGE.insecure))
   }
@@ -81,9 +113,7 @@ export function openMicrophone(onBlock: BlockHandler): Promise<AudioSource> {
   // 1. The permission prompt, synchronously inside the gesture.
   let streamPromise: Promise<MediaStream>
   try {
-    streamPromise = navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-    })
+    streamPromise = navigator.mediaDevices.getUserMedia({ audio: audioConstraints(processing) })
   } catch (err) {
     streamPromise = Promise.reject(err instanceof Error ? err : new Error(String(err)))
   }

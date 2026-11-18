@@ -92,7 +92,8 @@ export function EchoControl({
       {value.mode === 'on' && (
         <p className="text-xs leading-4 text-muted-foreground">
           On the server, with what it sent as the reference. The browser already cancels echo on the microphone; this is
-          for clients that do not.
+          for clients that do not, or for when the browser’s canceller is switched off below (it turns your voice down
+          while the agent speaks).
           {caps.install && ` SpeexDSP and WebRTC AEC3 need ${caps.install} on the server.`}
         </p>
       )}

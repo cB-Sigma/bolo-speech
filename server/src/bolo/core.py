@@ -622,8 +622,13 @@ class Bolo:
                     "session_urls": session_urls_allowed(s, self.keys.enabled),
                 },
                 "turn_detection": ["server_vad", "semantic_vad"],
-                # a turn a steady noise keeps open ends anyway (turn_detection.max_turn_seconds, noise_plateau_ms)
-                "turn_limits": {"max_turn_seconds": s.max_turn_seconds, "noise_plateau_ms": s.turn_noise_plateau_ms},
+                # a turn a steady noise keeps open ends anyway (turn_detection.max_turn_seconds, noise_plateau_ms), and
+                # the lower voice-activity threshold while the agent speaks (turn_detection.barge_in_threshold)
+                "turn_limits": {
+                    "max_turn_seconds": s.max_turn_seconds,
+                    "noise_plateau_ms": s.turn_noise_plateau_ms,
+                    "barge_in_threshold": s.barge_in_threshold,
+                },
                 "semantic_vad": {
                     "model": turn.id if turn else None,
                     "available": self.turn_model() is not None,

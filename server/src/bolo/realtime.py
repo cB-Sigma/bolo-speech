@@ -217,7 +217,7 @@ class RealtimeSession:
         self.turn_detection: dict[str, Any] | None = {
             "type": "server_vad", "threshold": 0.5, "prefix_padding_ms": 300,
             "silence_duration_ms": int(s.endpoint_silence_ms), "create_response": True, "interrupt_response": True,
-            **self._turn_limits(),
+            "barge_in_threshold": float(s.barge_in_threshold), **self._turn_limits(),
         }  # fmt: skip
         self.items: list[dict[str, Any]] = []
         self._item_audio: dict[
@@ -232,6 +232,13 @@ class RealtimeSession:
         self._vad_name: str | None = None
         #: ends a turn the detector keeps open (max_turn_seconds, noise_plateau_ms; bolo.streaming.turn_guard)
         self._turn_guard: TurnGuard | None = None
+        #: barge-in while the agent speaks: a second detector at barge_in_threshold (see _ensure_barge), whether the
+        #: open turn is one it started, and the input sample until which the client is still playing the agent's
+        #: audio (the audio sent, at the pace the input arrives, which is the pace the client plays it)
+        self._barge: VadDetector | None = None
+        self._barge_turn = False
+        self._play_until = 0
+        self.barge_ins = 0
         self._speech_start: int | None = None
         self._pending_item: str | None = None
         self._commit_from = 0  # manual mode: start of the uncommitted audio
@@ -479,6 +486,13 @@ class RealtimeSession:
                 merged.setdefault("silence_duration_ms", int(self.core.settings.endpoint_silence_ms))
                 merged.setdefault("create_response", True)
                 merged.setdefault("interrupt_response", True)
+                merged.setdefault("barge_in_threshold", float(self.core.settings.barge_in_threshold))
+                barge = merged["barge_in_threshold"]
+                if isinstance(barge, bool) or not isinstance(barge, (int, float)) or not 0 <= barge <= 1:
+                    raise RealtimeError(
+                        "turn_detection.barge_in_threshold must be between 0 and 1 (0: as threshold)",
+                        param="session.audio.input.turn_detection.barge_in_threshold",
+                    )
                 for key, default in self._turn_limits().items():  # bolo extensions (see _turn_limits)
                     merged.setdefault(key, default)
                     value = merged[key]
@@ -516,6 +530,7 @@ class RealtimeSession:
                 )
             self._detector = None
             self._turn_guard = None
+            self._barge = None
             self._held_end = None
         if "voice" in audio_out:
             voice = audio_out["voice"]
@@ -665,6 +680,42 @@ class RealtimeSession:
             self._turn_guard = guard if guard.enabled else None
         return self._turn_guard
 
+    @property
+    def agent_speaking(self) -> bool:
+        """The client is still playing audio the session sent (an estimate: the audio's length from when it was sent,
+        at the pace the input arrives; cut short by barge-in, response.cancel and output_audio_buffer.clear)."""
+        return self._pos < self._play_until
+
+    def _stop_playback(self) -> None:
+        """The client stops playing what it has not played yet (barge-in, response.cancel, output_audio_buffer.clear,
+        conversation.item.truncate)."""
+        self._play_until = min(self._play_until, self._pos)
+        if self._echo is not None:
+            self._echo.stop_playback()
+
+    async def _ensure_barge(self) -> VadDetector | None:
+        """While the agent speaks the user is harder to hear: the browser's echo canceller and noise suppressor turn
+        the microphone down during double talk, and what is left of the agent's voice raises the noise floor. A second
+        detector with the lower ``barge_in_threshold`` (bolo extension; the setting of that name) may start the turn
+        then, and only then. None when it would change nothing: interruption off, a full-duplex model, or a barge-in
+        threshold of 0 or not below the threshold."""
+        td = self.turn_detection
+        if td is None or self.full_duplex or not td.get("interrupt_response", True):
+            return None
+        barge = float(td.get("barge_in_threshold") or 0.0)
+        if not 0 < barge < float(td.get("threshold", 0.5)):
+            return None
+        if self._barge is None:
+            silence_s = max(0.1, float(td.get("silence_duration_ms", 500)) / 1000.0)
+            params = VadParams(
+                threshold=barge,
+                min_silence_s=min(silence_s, SEMANTIC_PAUSE_S) if self._semantic else silence_s,
+                max_speech_s=self.core.settings.max_utterance_s * 3,
+            )
+            vad_model = td.get("vad_model")
+            self._barge, _ = await self.core.vad_detector(params, str(vad_model) if vad_model else None, fallback=True)
+        return self._barge
+
     async def _ensure_detector(self) -> VadDetector | None:
         if self.turn_detection is None:
             return None
@@ -701,6 +752,7 @@ class RealtimeSession:
             if canceller is not None:
                 samples = await asyncio.to_thread(canceller.near, samples)
         self._buf = np.concatenate([self._buf, samples]) if len(self._buf) else samples.copy()
+        speaking = self.agent_speaking  # the agent's audio was playing as this piece of input was recorded
         self._pos += len(samples)
         duplex = self.full_duplex
         if duplex:  # the model hears everything, as it arrives
@@ -734,10 +786,25 @@ class RealtimeSession:
                     self._hold_until = ev.sample + int(self._max_pause_s() * SR)
                     continue
                 await self._end_turn(end)
+        barge = await self._ensure_barge()
+        for ev in barge.accept(samples) if barge is not None else []:
+            if ev.kind == "speech_start" and self._speech_start is None and speaking:
+                # the user talks over the agent, too quietly for the detector: interrupt anyway
+                self.barge_ins += 1
+                await self._start_turn(ev.sample, duplex)
+                self._barge_turn = True
+            elif ev.kind == "speech_end" and self._speech_start is not None and self._barge_turn:
+                end = min(ev.sample + int(END_PADDING_S * SR), self._pos)
+                if self._semantic and not await self._turn_complete(end):
+                    self._held_end = end
+                    self._hold_until = ev.sample + int(self._max_pause_s() * SR)
+                    continue
+                await self._end_turn(end)
         if onset is not None and self._speech_start is None and guard is not None:
             await self._start_turn(onset, duplex)
         if self._held_end is not None and self._speech_start is not None and self._pos >= self._hold_until:
-            if not detector.in_speech:  # the pause lasted long enough to be the end after all
+            hearing = detector.in_speech or (self._barge_turn and barge is not None and barge.in_speech)
+            if not hearing:  # the pause lasted long enough to be the end after all
                 await self._end_turn(self._held_end)
             else:
                 self._held_end = None
@@ -766,6 +833,7 @@ class RealtimeSession:
         )
         if (self.turn_detection or {}).get("interrupt_response", True) and not duplex:
             # (a full-duplex model hears the user itself and decides whether to stop)
+            self._stop_playback()  # the client stops playing on speech_started
             await self._cancel_response("turn_detected")
         await self._stop_partials()
         self._partial_task = asyncio.create_task(
@@ -971,8 +1039,11 @@ class RealtimeSession:
                 "checks": self._turn_checks,
             }
             self._turn_checks = []
+        if self._barge_turn:  # started by the barge-in detector while the agent spoke
+            trace.extra["barge_in"] = True
         await self._commit(self._slice(self._speech_start or 0, end), item_id, trace)
         self._speech_start, self._pending_item, self._held_end = None, None, None
+        self._barge_turn = False
 
     async def _stop_partials(self) -> None:
         task, self._partial_task = self._partial_task, None
@@ -1057,8 +1128,7 @@ class RealtimeSession:
 
     async def _on_output_clear(self, event: dict[str, Any]) -> None:
         # WebRTC/SIP only in the reference; over WebSocket the client owns playback. Stop generating.
-        if self._echo is not None:
-            self._echo.stop_playback()
+        self._stop_playback()
         await self._cancel_response("client_cancelled")
 
     async def _commit(self, audio: FloatArray, item_id: str, trace: Trace, auto_response: bool | None = None) -> None:
@@ -1320,8 +1390,7 @@ class RealtimeSession:
         if task is None or task.done():
             return
         self._cancel_reason = reason
-        if self._echo is not None:  # the client stops playing what it has not played yet
-            self._echo.stop_playback()
+        self._stop_playback()  # the client stops playing what it has not played yet
         task.cancel()
         with contextlib.suppress(asyncio.CancelledError, Exception):
             await task
@@ -1372,6 +1441,8 @@ class RealtimeSession:
         return messages
 
     def _encode(self, samples: FloatArray, rate: int) -> str:
+        # the client plays this after what it has queued: the agent speaks until then (for barge-in)
+        self._play_until = max(self._play_until, self._pos) + int(len(samples) * SR / max(1, rate))
         if self._echo is not None:  # the far end, as the client will play it
             self._echo.far(resample(samples, rate, SR))
         x = resample(samples, rate, self.out_rate)

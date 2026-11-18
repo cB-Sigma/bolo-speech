@@ -1,6 +1,7 @@
 import { Info, MessagesSquare, Mic, MicOff, PhoneOff, Square } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { BrowserConversation } from '@/components/conversation/browser-conversation'
+import { CaptureControl } from '@/components/conversation/capture-control'
 import { PipelineModelPanel } from '@/components/conversation/pipeline-model'
 import { PipelinePicker } from '@/components/conversation/pipeline-picker'
 import { ServerListeningPanel } from '@/components/conversation/server-listening'
@@ -19,6 +20,7 @@ import { useComponents, useInfo } from '@/hooks/use-api'
 import { useStore } from '@/hooks/use-store'
 import { useSupport } from '@/hooks/use-support'
 import { isDemo } from '@/lib/api/config'
+import { BROWSER_PROCESSING, type CaptureProcessing } from '@/lib/audio/capture'
 import { defaultPipeline, hasPipelines, pipelineOptions, type PipelineId } from '@/lib/capabilities'
 import { fmtMs } from '@/lib/format'
 import {
@@ -65,6 +67,7 @@ function ServerConversation() {
   const [listening, setListening] = useState<Listening>({ type: 'server_vad' })
   const [mcp, setMcp] = useState<McpChoice>(noMcp)
   const [echo, setEcho] = useState<Echo>(defaultEcho)
+  const [capture, setCapture] = useState<CaptureProcessing>(BROWSER_PROCESSING)
   const [session, setSession] = useState<ConversationSession | null>(null)
   const state = useStore(session?.store ?? idle)
   const active = state.status === 'starting' || state.status === 'live'
@@ -92,6 +95,7 @@ function ServerConversation() {
       fullDuplex,
       tools: pipeline === 'speech-to-speech' ? [] : mcpTools(mcp),
       echo: realtimeEcho(echo),
+      capture,
     })
     void s.start()
     setSession(s)
@@ -165,6 +169,17 @@ function ServerConversation() {
             disabled={active}
             reported={state.serverEcho}
             live={state.status !== 'idle'}
+            className="mt-3"
+          />
+          <CaptureControl
+            value={capture}
+            onChange={setCapture}
+            serverEcho={
+              echo.mode === 'on' ||
+              (echo.mode === 'default' &&
+                (info.data?.capabilities?.realtime?.echo_cancellation?.default ?? 'off') !== 'off')
+            }
+            disabled={active}
             className="mt-3"
           />
           {state.status !== 'idle' && (

@@ -1,5 +1,5 @@
 import { getTransport, wsUrl } from '@/lib/api/config'
-import { openMicrophone, STT_RATE, type AudioSource } from '@/lib/audio/capture'
+import { openMicrophone, STT_RATE, type AudioSource, type CaptureProcessing } from '@/lib/audio/capture'
 import { floatToInt16, int16ToFloat } from '@/lib/audio/pcm'
 import { GaplessPlayer } from '@/lib/audio/player'
 import { Resampler } from '@/lib/audio/resample'
@@ -155,6 +155,9 @@ export function sessionUpdate(
   // turn_noise_plateau_ms settings)
   if (listening?.maxTurnSeconds !== undefined) turn_detection.max_turn_seconds = listening.maxTurnSeconds
   if (listening?.noisePlateau === false) turn_detection.noise_plateau_ms = 0
+  // bolo's extension: no lower voice-activity threshold while the agent speaks (left out, the server's
+  // barge_in_threshold setting)
+  if (listening?.bargeIn === false) turn_detection.barge_in_threshold = 0
   const input: Record<string, unknown> = pcm ? { format, turn_detection } : { turn_detection }
   // bolo's extension; left out, the server's default (its `denoise` setting) applies
   if (denoise !== undefined) input.denoise = denoise
@@ -191,6 +194,8 @@ export interface Listening {
   maxTurnSeconds?: number
   /** `noise_plateau_ms`: false turns the steady-noise check off; left out, the server's default. */
   noisePlateau?: boolean
+  /** `barge_in_threshold`: false hears interruptions at the ordinary threshold only; left out, the server's. */
+  bargeIn?: boolean
 }
 
 /** `audio.input.denoise`: off, or a model and strength (see `realtimeDenoise`). */
@@ -394,18 +399,27 @@ export class ConversationSession {
   private readonly extras: SessionExtras
   /** A full-duplex model keeps talking when the user talks: the page does not cut its audio on speech_started. */
   private readonly fullDuplex: boolean
+  /** The browser's processing of the microphone (undefined: all on). */
+  private readonly capture: CaptureProcessing | undefined
 
   constructor(
     pipeline: PipelineId,
     transport: RealtimeTransport = 'websocket',
     denoise?: RealtimeDenoise,
-    opts: { listening?: Listening; fullDuplex?: boolean; tools?: Record<string, unknown>[]; echo?: RealtimeEcho } = {},
+    opts: {
+      listening?: Listening
+      fullDuplex?: boolean
+      tools?: Record<string, unknown>[]
+      echo?: RealtimeEcho
+      capture?: CaptureProcessing
+    } = {},
   ) {
     this.store = new Store(emptyConversation(pipeline, transport))
     this.denoise = denoise
     this.listening = opts.listening
     this.extras = { tools: opts.tools, echo: opts.echo }
     this.fullDuplex = Boolean(opts.fullDuplex)
+    this.capture = opts.capture
   }
 
   /**
@@ -500,7 +514,7 @@ export class ConversationSession {
     if (transport === 'webrtc') return this.startWebRtc(pipeline, opts.voice)
     let micPromise: Promise<AudioSource>
     try {
-      micPromise = openMicrophone((block) => this.onBlock(block))
+      micPromise = openMicrophone((block) => this.onBlock(block), this.capture)
     } catch (err) {
       micPromise = Promise.reject(err instanceof Error ? err : new Error(String(err)))
     }
@@ -539,7 +553,11 @@ export class ConversationSession {
       onFail: (message, code, mic) => this.fail(message, code ?? null, mic ?? null),
     })
     this.rtc = link
-    return link.start(sessionUpdate(pipeline, voice, 'webrtc', this.denoise, this.listening, this.extras).session)
+    return link.start(
+      sessionUpdate(pipeline, voice, 'webrtc', this.denoise, this.listening, this.extras).session,
+      'bolo',
+      this.capture,
+    )
   }
 
   private openSocket(pipeline: PipelineId, voice?: string): void {

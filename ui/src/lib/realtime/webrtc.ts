@@ -1,5 +1,11 @@
 import { apiUrl, authHeaders, getTransport } from '@/lib/api/config'
-import { MicrophoneError, microphoneError } from '@/lib/audio/capture'
+import {
+  audioConstraints,
+  BROWSER_PROCESSING,
+  MicrophoneError,
+  microphoneError,
+  type CaptureProcessing,
+} from '@/lib/audio/capture'
 import type { MicFailure } from '@/lib/mic-help'
 
 /**
@@ -92,7 +98,11 @@ export class WebRtcLink {
    * Call directly from the tap: the microphone prompt and the audio element are both started before
    * the first `await`, as iOS Safari requires.
    */
-  start(session: Record<string, unknown>, model = 'bolo'): Promise<void> {
+  start(
+    session: Record<string, unknown>,
+    model = 'bolo',
+    processing: CaptureProcessing = BROWSER_PROCESSING,
+  ): Promise<void> {
     if (typeof RTCPeerConnection === 'undefined') {
       this.h.onFail('This browser has no WebRTC (RTCPeerConnection). Use the WebSocket transport.')
       return Promise.resolve()
@@ -105,9 +115,7 @@ export class WebRtcLink {
     const asked = performance.now()
     let micPromise: Promise<MediaStream>
     try {
-      micPromise = navigator.mediaDevices.getUserMedia({
-        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      })
+      micPromise = navigator.mediaDevices.getUserMedia({ audio: audioConstraints(processing) })
     } catch (err) {
       micPromise = Promise.reject(err instanceof Error ? err : new Error(String(err)))
     }
