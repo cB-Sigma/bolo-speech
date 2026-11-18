@@ -754,8 +754,9 @@ Extension. Several speakers, a voice each, spoken as one recording (a podcast, a
 **In one take**: a model whose `features` contain `dialogue` speaks the whole script itself, turn-taking and all.
 Today that is VibeVoice 1.5B on audio.cpp (up to four speakers, each imitated from a recording). audio.cpp reads
 those recordings from files, so this works with an audio.cpp server bolo manages or one on a loopback address;
-otherwise the dialogue is stitched. bolo's side is tested against a stand-in for audio.cpp; a run with the real
-VibeVoice weights has not been made here yet. **Stitched**: any other model (and Fish Audio Drama 3, Higgs TTS 3 or
+otherwise the dialogue is stitched. Run here on a 4-core CPU with the real weights (two speakers from the
+`en-short` and `en-long` clips, each turn in its speaker's voice): about 24 minutes for 2 s of audio on a loaded
+machine, so a GPU is what this model wants. **Stitched**: any other model (and Fish Audio Drama 3, Higgs TTS 3 or
 any voice without a recording) speaks each turn on its own in its speaker's voice, and the turns are joined with
 `pause_ms` of silence, resampled to the first turn's rate.
 
