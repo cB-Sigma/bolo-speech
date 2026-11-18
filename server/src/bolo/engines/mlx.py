@@ -228,9 +228,6 @@ class ParakeetMlxSTT(STTModel):
         self.languages = tuple(spec.get("languages") or ())
 
     def transcribe(self, requests: list[STTRequest]) -> list[STTResult]:
-        import mlx.core as mx
-        from parakeet_mlx.audio import get_logmel
-
         out: list[STTResult] = []
         for r in requests:
             samples = np.asarray(r.samples, dtype=np.float32)
@@ -239,8 +236,7 @@ class ParakeetMlxSTT(STTModel):
                 continue
 
             def run(samples: FloatArray) -> Any:
-                mel = get_logmel(mx.array(samples).astype(self._dtype), self.model.preprocessor_config)
-                return self.model.generate(mel)[0]
+                return self.model.generate(logmel(samples, self.model.preprocessor_config))[0]
 
             aligned = _run(self.gpu, run, samples)
             words = _words(aligned.tokens)
@@ -251,6 +247,17 @@ class ParakeetMlxSTT(STTModel):
             ]
             out.append(STTResult(aligned.text.strip(), r.language, segments, words))
         return out
+
+
+def logmel(samples: FloatArray, config: Any) -> Any:
+    """parakeet-mlx's log-mel features of float32 samples, as its own ``transcribe`` makes them: always from float32
+    audio, whatever the model's dtype. ``get_logmel`` reads its STFT through ``mx.view(x, input dtype)`` and pairs
+    the values up as real and imaginary parts, which holds only for float32 input: bfloat16 samples (the model's dtype
+    on the GPU) gave twice the frequency bins and a matmul shape error against the mel filter bank."""
+    import mlx.core as mx
+    from parakeet_mlx.audio import get_logmel
+
+    return get_logmel(mx.array(np.asarray(samples, dtype=np.float32)), config)
 
 
 def _words(tokens: list[Any]) -> list[Word]:

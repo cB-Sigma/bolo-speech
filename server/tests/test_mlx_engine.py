@@ -99,3 +99,22 @@ def test_onnxruntime_label_names_the_provider(monkeypatch: pytest.MonkeyPatch) -
 def test_placement_carries_the_runtime() -> None:
     p = placement.Placement(device="coreml", runtime="Core ML (sherpa-onnx)")
     assert p.to_dict()["runtime"] == "Core ML (sherpa-onnx)"
+
+
+def test_parakeet_features_come_from_float32_audio_whatever_the_model_dtype() -> None:
+    """parakeet-mlx's get_logmel only pairs STFT values up correctly from float32 audio; on Apple silicon the model is
+    bfloat16, and passing bfloat16 samples failed with a matmul shape error (the macOS CI job). Runs where parakeet-mlx
+    is installed (MLX's Linux CPU wheels included)."""
+    mx = pytest.importorskip("mlx.core")
+    audio = pytest.importorskip("parakeet_mlx.audio")
+    import numpy as np
+
+    config = audio.PreprocessArgs(
+        sample_rate=16000, normalize="per_feature", window_size=0.025, window_stride=0.01, window="hann",
+        features=80, n_fft=512, dither=0.0,
+    )  # fmt: skip
+    samples = (np.random.default_rng(0).standard_normal(16000) * 0.1).astype(np.float32)
+    mel = mlx_engine.logmel(samples, config)
+    assert mel.shape == (1, 101, 80) and mel.dtype == mx.float32
+    with pytest.raises(ValueError, match="matmul"):  # what bolo used to do on the GPU
+        audio.get_logmel(mx.array(samples).astype(mx.bfloat16), config)
