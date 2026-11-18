@@ -189,6 +189,9 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | LID | Voxlect | 2 | as, bn, brx, doi, en, gu, hi, kn +15 | 1 | 0.558 (`voxlect-indic-lid-whisper-small`) |
 | LID | SpeechBrain ECAPA-TDNN | 1 | en, hi, mr, ta, te | 1 | 0.130 (`lid-indic-vaani`) |
 | LID | mHuBERT-147 SLID | 2 | as, bn, brx, doi, gu, hi, kn, kok +14 | 2 | 0.226 (`indic-slid-mhubert-task2`) |
+| STT | Whisper | 69 | af, am, ar, as, az, ba, be, bg +92 | 22 | 0.081 (`faster-whisper-tiny.en`) |
+| STT | Parakeet | 8 | bg, cs, da, de, el, en, es, et +17 | 5 | 0.030 (`parakeet-tdt-ctc-110m`) |
+| TTS | Kokoro | 3 | en, es, fr, hi, it, ja, pt, zh | 3 | 0.759 (`kokoro-v1.0`) |
 | TTS | Parler-TTS | 2 | as, bn, brx, doi, en, gu, hi, hne +13 | 2 | 4.540 (`parler-tts-tiny-v1`) |
 | TTS | F5-TTS | 2 | as, bn, en, gu, hi, kn, ml, mr +5 | 1 | 119.700 (`indic-f5`) |
 | TTS | Veena | 1 | en, hi | 0 | - |
@@ -217,10 +220,8 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | SPEAKER-EMBEDDING | WeSpeaker ResNet | 1 | - | 1 | 0.126 (`wespeaker-resnet34-voxceleb`) |
 | SPEAKER-EMBEDDING | TitaNet | 1 | - | 1 | 0.068 (`titanet-small`) |
 | SPEAKER-EMBEDDING | ECAPA-TDNN | 1 | - | 1 | 0.203 (`ecapa-tdnn-voxceleb`) |
-| STT | Whisper | 67 | af, am, ar, as, az, ba, be, bg +92 | 20 | 0.081 (`faster-whisper-tiny.en`) |
 | STT | Voxtral | 2 | de, en, es, fr, hi, it, nl, pt | 1 | 1.980 (`voxtral-mini-3b-llamacpp`) |
 | STT | Moonshine | 11 | ar, en, es, ja, ko, uk, vi, zh | 4 | 0.033 (`moonshine-tiny-en`) |
-| STT | Parakeet | 7 | bg, cs, da, de, el, en, es, et +17 | 4 | 0.030 (`parakeet-tdt-ctc-110m`) |
 | STT | NeMo FastConformer | 8 | be, de, en, es, fr, hr, it, pl +2 | 3 | 0.334 (`nemo-fastconformer-ctc-en-streaming-480ms`) |
 | STT | Canary | 1 | de, en, es, fr | 1 | 0.358 (`canary-180m-flash`) |
 | STT | Zipformer | 16 | ar, bn, de, en, es, fr, id, ja +5 | 7 | 0.028 (`zipformer-en-gigaspeech`) |
@@ -235,7 +236,6 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | TTS | External TTS server: llama-server | 12 | ar, da, de, el, en, es, fi, fr +15 | 9 | 0.397 (`pocket-tts-it-llamacpp`) |
 | TTS | External TTS server: audio.cpp | 40 | ar, be, bg, bn, cs, da, de, el +41 | 6 | 1.051 (`moss-tts-nano-100m-audiocpp`) |
 | TTS | External TTS server: tontaube | 2 | de, en, es, fr, it, nl, pt | 0 | - |
-| TTS | Kokoro | 2 | en, es, fr, hi, it, ja, pt, zh | 2 | 0.759 (`kokoro-v1.0`) |
 | TTS | KittenTTS | 4 | en | 4 | 0.107 (`kitten-nano-0.8`) |
 | TTS | Matcha-TTS | 2 | en, zh | 1 | 0.205 (`matcha-en-ljspeech`) |
 | TTS | MeloTTS | 1 | en | 1 | 0.278 (`melo-tts-en`) |
@@ -255,7 +255,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | VOICE-CONVERSION | RVC | 1 | - | 1 | 6.190 (`rvc-audiocpp`) |
 | VOICE-CONVERSION | Seed-VC | 1 | - | 0 | - |
 
-**481 models in the catalog, 197 validated on CPU, 284 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**485 models in the catalog, 201 validated on CPU, 284 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

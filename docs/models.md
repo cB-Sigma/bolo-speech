@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-481 models: 197 validated on CPU by the maintainers, 284 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+485 models: 201 validated on CPU by the maintainers, 284 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -107,56 +107,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `soniox-stt-async-v6` | af, sq, ar, az, eu, be +54 | accuracy | pseudo | none (cloud API) | Soniox Terms of Service (paid cloud API) · [terms](https://soniox.com/policies/terms-of-service) · needs provider `soniox` | untested |
 | `soniox-stt-rt-v6` | af, sq, ar, az, eu, be +54 | realtime | native | none (cloud API) | Soniox Terms of Service (paid cloud API) · [terms](https://soniox.com/policies/terms-of-service) · needs provider `soniox` | untested |
 
-#### SraVaani
-
-| id | languages | tier | streaming | download | licence | validated |
-| --- | --- | --- | --- | --- | --- | --- |
-| `sravaani-1.0` | as, bn, en, gu, hi, kn +8 | accuracy | pseudo | 909 MB | MIT · needs plugin torch · gated | untested |
-
-#### IndicConformer
-
-| id | languages | tier | streaming | download | licence | validated |
-| --- | --- | --- | --- | --- | --- | --- |
-| `indicconformer-600m-official` | as, bn, brx, doi, gu, hi +16 | accuracy | pseudo | 2.6 GB | MIT · needs plugin torch · gated | untested |
-| `indicconformer-multi-community` | hi, as, bn, brx, gu, kn +2 | balanced | pseudo | 197 MB | MIT | **CPU** · RTF 0.131 · WER 0.0% |
-| `indicconformer-mai-community` | mai | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.064 · WER 49.6% · CER 11.6% |
-| `indicconformer-hi-community` | hi | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.066 · WER 15.2% · CER 7.0% |
-| `indicconformer-as-community` | as | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.150 · WER 30.8% · CER 14.9% |
-| `indicconformer-bn-community` | bn | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.106 · WER 10.8% · CER 2.5% |
-| `indicconformer-brx-community` | brx | balanced | pseudo | 198 MB | MIT | untested |
-| `indicconformer-doi-community` | doi | balanced | pseudo | 198 MB | MIT | untested |
-| `indicconformer-gu-community` | gu | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.114 · WER 21.7% · CER 5.4% |
-| `indicconformer-kn-community` | kn | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.070 · WER 15.1% · CER 4.8% |
-| `indicconformer-kok-community` | kok | balanced | pseudo | 198 MB | MIT | untested |
-| `indicconformer-ks-community` | ks | balanced | pseudo | 198 MB | MIT | untested |
-| `indicconformer-ml-community` | ml | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.124 · WER 31.4% · CER 8.8% |
-| `indicconformer-mni-community` | mni | balanced | pseudo | 198 MB | MIT | untested |
-| `indicconformer-mr-community` | mr | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.202 · WER 19.3% · CER 4.2% |
-| `indicconformer-ne-community` | ne | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.135 · WER 30.7% · CER 12.7% |
-| `indicconformer-or-community` | or | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.155 · WER 15.5% · CER 4.8% |
-| `indicconformer-pa-community` | pa | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.139 · WER 15.5% · CER 5.3% |
-| `indicconformer-sa-community` | sa | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.127 · WER 44.2% · CER 6.1% |
-| `indicconformer-sat-community` | sat | balanced | pseudo | 198 MB | MIT | untested |
-| `indicconformer-sd-community` | sd | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.109 |
-| `indicconformer-ta-community` | ta | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.060 · WER 25.5% · CER 10.2% |
-| `indicconformer-te-community` | te | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.074 · WER 21.1% · CER 10.4% |
-| `indicconformer-ur-community` | ur | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.143 · WER 18.5% · CER 7.5% |
-| `indicconformer-ta` | ta | balanced | pseudo | 138 MB | MIT | **CPU** · RTF 0.228 · WER 29.0% · CER 10.3% |
-| `indicconformer-te` | te | balanced | pseudo | 138 MB | MIT | **CPU** · RTF 0.262 · WER 21.7% · CER 10.5% |
-| `indicconformer-ml` | ml | balanced | pseudo | 138 MB | MIT | **CPU** · RTF 0.174 · WER 34.3% · CER 9.8% |
-
-#### DiCoW
-
-| id | languages | tier | streaming | download | licence | validated |
-| --- | --- | --- | --- | --- | --- | --- |
-| `dicow-v3.3` | en | accuracy | pseudo | 3.6 GB | CC-BY-4.0 · needs plugin torch | **CPU** · RTF 0.453 |
-| `se-dicow` | en | accuracy | pseudo | 4.4 GB | Apache-2.0 · needs plugin torch | **CPU** · RTF 0.589 |
-| `dicow-v3.3-onnx` | en | accuracy | pseudo | 1.5 GB | CC-BY-4.0 | **CPU** · RTF 0.725 |
-
 #### Whisper
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
+| `whisper-tiny-mlx` | en, zh, de, es, ru, ko +94 | realtime | pseudo | 74 MB | MIT | **CPU** · RTF 18.100 |
+| `whisper-base-mlx` | en, zh, de, es, ru, ko +94 | realtime | pseudo | 144 MB | MIT | **CPU** · RTF 20.000 |
 | `faster-whisper-tiny` | en, zh, de, es, ru, ko +94 | realtime | pseudo | 78 MB | MIT | **CPU** · RTF 0.091 · WER 0.0% |
 | `faster-whisper-tiny.en` | en | realtime | pseudo | 78 MB | MIT | **CPU** · RTF 0.081 · WER 0.0% |
 | `faster-whisper-base` | en, zh, de, es, ru, ko +94 | balanced | pseudo | 148 MB | MIT | **CPU** · RTF 0.152 · WER 0.0% |
@@ -225,6 +181,65 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `whispercpp-large-v3-turbo-q5_0` | en, zh, de, es, ru, ko +94 | accuracy | pseudo | 574 MB | MIT | untested |
 | `whispercpp-large-v3-turbo-q8_0` | en, zh, de, es, ru, ko +94 | accuracy | pseudo | 874 MB | MIT | untested |
 
+#### Parakeet
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `parakeet-tdt-ctc-110m-mlx` | en | realtime | pseudo | 459 MB | CC-BY-4.0 | **CPU** · RTF 1.490 |
+| `parakeet-tdt-0.6b-v2` | en | accuracy | pseudo | 661 MB | CC-BY-4.0 | **CPU** · RTF 0.081 |
+| `parakeet-tdt-0.6b-v3` | bg, hr, cs, da, nl, en +19 | accuracy | pseudo | 671 MB | CC-BY-4.0 | **CPU** · RTF 0.096 |
+| `parakeet-tdt-ctc-110m` | en | balanced | pseudo | 458 MB | CC-BY-4.0 | **CPU** · RTF 0.030 |
+| `parakeet-tdt-110m` | en | balanced | pseudo | 477 MB | CC-BY-4.0 | untested |
+| `parakeet-unified-en-streaming-240ms` | en | realtime | native | 663 MB | CC-BY-4.0 | untested |
+| `parakeet-unified-en-streaming-560ms` | en | realtime | native | 663 MB | CC-BY-4.0 | **CPU** · RTF 4.694 |
+| `parakeet-unified-en-streaming-1120ms` | en | balanced | native | 663 MB | CC-BY-4.0 | untested |
+
+#### SraVaani
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `sravaani-1.0` | as, bn, en, gu, hi, kn +8 | accuracy | pseudo | 909 MB | MIT · needs plugin torch · gated | untested |
+
+#### IndicConformer
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `indicconformer-600m-official` | as, bn, brx, doi, gu, hi +16 | accuracy | pseudo | 2.6 GB | MIT · needs plugin torch · gated | untested |
+| `indicconformer-multi-community` | hi, as, bn, brx, gu, kn +2 | balanced | pseudo | 197 MB | MIT | **CPU** · RTF 0.131 · WER 0.0% |
+| `indicconformer-mai-community` | mai | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.064 · WER 49.6% · CER 11.6% |
+| `indicconformer-hi-community` | hi | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.066 · WER 15.2% · CER 7.0% |
+| `indicconformer-as-community` | as | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.150 · WER 30.8% · CER 14.9% |
+| `indicconformer-bn-community` | bn | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.106 · WER 10.8% · CER 2.5% |
+| `indicconformer-brx-community` | brx | balanced | pseudo | 198 MB | MIT | untested |
+| `indicconformer-doi-community` | doi | balanced | pseudo | 198 MB | MIT | untested |
+| `indicconformer-gu-community` | gu | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.114 · WER 21.7% · CER 5.4% |
+| `indicconformer-kn-community` | kn | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.070 · WER 15.1% · CER 4.8% |
+| `indicconformer-kok-community` | kok | balanced | pseudo | 198 MB | MIT | untested |
+| `indicconformer-ks-community` | ks | balanced | pseudo | 198 MB | MIT | untested |
+| `indicconformer-ml-community` | ml | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.124 · WER 31.4% · CER 8.8% |
+| `indicconformer-mni-community` | mni | balanced | pseudo | 198 MB | MIT | untested |
+| `indicconformer-mr-community` | mr | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.202 · WER 19.3% · CER 4.2% |
+| `indicconformer-ne-community` | ne | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.135 · WER 30.7% · CER 12.7% |
+| `indicconformer-or-community` | or | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.155 · WER 15.5% · CER 4.8% |
+| `indicconformer-pa-community` | pa | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.139 · WER 15.5% · CER 5.3% |
+| `indicconformer-sa-community` | sa | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.127 · WER 44.2% · CER 6.1% |
+| `indicconformer-sat-community` | sat | balanced | pseudo | 198 MB | MIT | untested |
+| `indicconformer-sd-community` | sd | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.109 |
+| `indicconformer-ta-community` | ta | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.060 · WER 25.5% · CER 10.2% |
+| `indicconformer-te-community` | te | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.074 · WER 21.1% · CER 10.4% |
+| `indicconformer-ur-community` | ur | balanced | pseudo | 198 MB | MIT | **CPU** · RTF 0.143 · WER 18.5% · CER 7.5% |
+| `indicconformer-ta` | ta | balanced | pseudo | 138 MB | MIT | **CPU** · RTF 0.228 · WER 29.0% · CER 10.3% |
+| `indicconformer-te` | te | balanced | pseudo | 138 MB | MIT | **CPU** · RTF 0.262 · WER 21.7% · CER 10.5% |
+| `indicconformer-ml` | ml | balanced | pseudo | 138 MB | MIT | **CPU** · RTF 0.174 · WER 34.3% · CER 9.8% |
+
+#### DiCoW
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `dicow-v3.3` | en | accuracy | pseudo | 3.6 GB | CC-BY-4.0 · needs plugin torch | **CPU** · RTF 0.453 |
+| `se-dicow` | en | accuracy | pseudo | 4.4 GB | Apache-2.0 · needs plugin torch | **CPU** · RTF 0.589 |
+| `dicow-v3.3-onnx` | en | accuracy | pseudo | 1.5 GB | CC-BY-4.0 | **CPU** · RTF 0.725 |
+
 #### Voxtral
 
 | id | languages | tier | streaming | download | licence | validated |
@@ -247,18 +262,6 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `moonshine-v2-base-ar` | ar | realtime | pseudo | 141 MB | Moonshine Community License (non-commercial) ⚠ | untested |
 | `moonshine-v2-base-uk` | uk | realtime | pseudo | 141 MB | Moonshine Community License (non-commercial) ⚠ | untested |
 | `moonshine-v2-base-vi` | vi | realtime | pseudo | 141 MB | Moonshine Community License (non-commercial) ⚠ | untested |
-
-#### Parakeet
-
-| id | languages | tier | streaming | download | licence | validated |
-| --- | --- | --- | --- | --- | --- | --- |
-| `parakeet-tdt-0.6b-v2` | en | accuracy | pseudo | 661 MB | CC-BY-4.0 | **CPU** · RTF 0.081 |
-| `parakeet-tdt-0.6b-v3` | bg, hr, cs, da, nl, en +19 | accuracy | pseudo | 671 MB | CC-BY-4.0 | **CPU** · RTF 0.096 |
-| `parakeet-tdt-ctc-110m` | en | balanced | pseudo | 458 MB | CC-BY-4.0 | **CPU** · RTF 0.030 |
-| `parakeet-tdt-110m` | en | balanced | pseudo | 477 MB | CC-BY-4.0 | untested |
-| `parakeet-unified-en-streaming-240ms` | en | realtime | native | 663 MB | CC-BY-4.0 | untested |
-| `parakeet-unified-en-streaming-560ms` | en | realtime | native | 663 MB | CC-BY-4.0 | **CPU** · RTF 4.694 |
-| `parakeet-unified-en-streaming-1120ms` | en | balanced | native | 663 MB | CC-BY-4.0 | untested |
 
 #### NeMo FastConformer
 
@@ -357,6 +360,14 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `elevenlabs-flash-v2.5` | en, ja, zh, de, hi, fr +26 | realtime | - | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` | untested |
 | `elevenlabs-multilingual-v2` | en, ja, zh, de, hi, fr +23 | balanced | - | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` | untested |
 | `elevenlabs-v3` | en, ja, zh, de, hi, fr +26 | balanced | - | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` | untested |
+
+#### Kokoro
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `kokoro-v1.0-mlx` | en, es, fr, hi, it, pt | balanced | - | 349 MB | Apache-2.0 | **CPU** · RTF 65.600 · round-trip WER 0.0% |
+| `kokoro-v1.0-int8` | en, es, fr, hi, it, ja +2 | balanced | - | 172 MB | Apache-2.0 | **CPU** · RTF 0.884 · first audio 2406 ms · round-trip WER 0.0% |
+| `kokoro-v1.0` | en, es, fr, hi, it, ja +2 | accuracy | - | 383 MB | Apache-2.0 | **CPU** · RTF 0.759 · first audio 2004 ms · round-trip WER 0.0% |
 
 #### Parler-TTS
 
@@ -607,13 +618,6 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `tontaube-v1.1-int4` (TontaubeV1.1) | en, de, es, fr, it, nl +1 | accuracy | - | 1.8 GB | Tontaube Community Model License 1.0 ⚠ · runs on tontaube · GPU recommended | untested |
 | `tontaube-v1.1` (TontaubeV1.1) | en, de, es, fr, it, nl +1 | accuracy | - | 6.4 GB | Tontaube Community Model License 1.0 ⚠ · runs on tontaube · GPU required | untested |
-
-#### Kokoro
-
-| id | languages | tier | streaming | download | licence | validated |
-| --- | --- | --- | --- | --- | --- | --- |
-| `kokoro-v1.0-int8` | en, es, fr, hi, it, ja +2 | balanced | - | 172 MB | Apache-2.0 | **CPU** · RTF 0.884 · first audio 2406 ms · round-trip WER 0.0% |
-| `kokoro-v1.0` | en, es, fr, hi, it, ja +2 | accuracy | - | 383 MB | Apache-2.0 | **CPU** · RTF 0.759 · first audio 2004 ms · round-trip WER 0.0% |
 
 #### KittenTTS
 
