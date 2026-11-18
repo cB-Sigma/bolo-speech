@@ -605,6 +605,25 @@ class EmotionModel(AudioClassifierModel):
     task = "emotion"
 
 
+class VoiceConversionModel(Model):
+    """Voice conversion: speech in, the same words out in another voice (bolo.voice_conversion).
+
+    The target is a recording of the voice (``needs_reference``: Chatterbox, OpenVoice v2, Seed-VC, MeanVC2) or
+    one of the model's own voices (``voices``: RVC's packaged voices). Audio out at ``sample_rate``."""
+
+    task = "voice-conversion"
+    #: the model imitates a voice from a recording of it
+    needs_reference: bool = True
+    #: voices of the model itself (RVC), chosen by id instead of a recording
+    voices: tuple[Voice, ...] = ()
+    #: request options the model reads (``("*",)``: any)
+    request_options: tuple[str, ...] = ("*",)
+
+    @abc.abstractmethod
+    def convert(self, source: bytes, reference: bytes | None, voice: str | None, options: dict[str, Any]) -> FloatArray:
+        """``source`` and ``reference`` are mono PCM16 WAV; the converted speech, float32 at ``sample_rate``."""
+
+
 class LidModel(Model):
     """Spoken-language identification: which language is spoken in a recording (16 kHz mono in)."""
 

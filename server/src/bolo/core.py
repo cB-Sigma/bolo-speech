@@ -493,6 +493,12 @@ class Bolo:
                 "windows": True,
                 "transcription_tags": [m.id for m in self.catalog.all() if m.kind == "sense_voice"],
             },
+            # voice conversion (docs/api.md, "Voice conversion")
+            "voice_conversion": {
+                "endpoint": "/v1/audio/voice-conversion",
+                "default_model": s.default_voice_conversion,
+                "models": [m.id for m in self.catalog.all() if m.task == "voice-conversion"],
+            },
             "voices": {
                 "endpoint": "/api/v1/voices",
                 "openai": ["/v1/audio/voices", "/v1/audio/voice_consents"],
@@ -897,6 +903,7 @@ class Bolo:
                 "speaker-embedding": "eres2net-voxceleb",
                 "audio-tagging": s.default_audio_tagging,
                 "emotion": s.default_emotion,
+                "voice-conversion": s.default_voice_conversion,
             }
             name = defaults[task]
         elif name == "realtime":

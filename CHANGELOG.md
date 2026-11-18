@@ -22,6 +22,15 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   Tamil clip with only `whisper-large-v3-turbo` installed: `auto` pulled `indicconformer-ta-community` and answered
   with it.
 
+### Added
+
+- **Voice conversion: `POST /v1/audio/voice-conversion`.** Speech in, the same words out in another voice: a
+  saved voice, a reference clip or an uploaded recording. Five catalog models on audio.cpp, each with its licence:
+  OpenVoice v2's tone colour converter (MIT, the default), MeanVC2 (Apache-2.0), Chatterbox VC (MIT), RVC (MIT base
+  models, packaged voices without a stated licence: marked not for commercial use) and Seed-VC (GPL-3.0, copyleft).
+  ElevenLabs' `/v1/speech-to-speech/{voice_id}` answers too. `bolo convert` and a Voice conversion page in the
+  console. Run on CPU with OpenVoice v2, MeanVC2 and RVC.
+
 ## [0.6.8] - 2026-11-18
 
 ### Fixed

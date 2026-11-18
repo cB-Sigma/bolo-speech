@@ -998,3 +998,65 @@ def test_dialogue_in_one_take_and_stitched(settings: Settings, audiocpp: FakeTTS
         assert r.status_code == 400 and "Nobody" in r.json()["error"]["message"]
     finally:
         srv.stop()
+
+
+def test_voice_conversion_through_audiocpp(settings: Settings, audiocpp: FakeTTSServer) -> None:
+    """``POST /v1/audio/voice-conversion`` sends the source inline to ``/v1/tasks/run`` and the target recording as
+    a file the server reads (a saved voice, a reference clip or an upload); a model with voices of its own (RVC) takes
+    one of them as ``voice_id``; the ElevenLabs route answers too."""
+    settings.tts_servers = [f"vc={audiocpp.url}", f"rvc={audiocpp.url}"]
+    srv = LiveServer(settings)
+    base = {
+        "task": "voice-conversion", "engine": "tts-server", "kind": "tts-server", "family": "Test", "languages": [],
+        "sample_rate": 16000, "license": "MIT", "requires": ["audio.cpp"], "source": {"local": "/nonexistent"},
+    }  # fmt: skip
+    srv.core.catalog.add(
+        ModelSpec.from_dict({**base, "id": "vc", "options": {"runtime": "audio.cpp", "server_model": "ac-model"}})
+    )
+    srv.core.catalog.add(
+        ModelSpec.from_dict(
+            {
+                **base, "id": "rvc", "voices": [{"id": "default"}, {"id": "chocola"}],
+                "options": {"runtime": "audio.cpp", "server_model": "ac-model", "vc_voices": True},
+            }
+        )
+    )  # fmt: skip
+    srv.start()
+    source = wav_bytes(1.0)
+    url = f"{srv.url}/v1/audio/voice-conversion"
+    try:
+        r = httpx.post(url, files={"file": ("a.wav", source)}, data={"model": "vc", "voice": "en-short"}, timeout=30)
+        assert r.status_code == 200, r.text
+        assert r.headers["x-bolo-target"] == "clip=en-short" and r.headers["x-bolo-model"] == "vc"
+        sent = audiocpp.requests[-1]
+        assert sent["path"] == "/v1/tasks/run" and sent["voice_ref_bytes"] > 1000
+        audio, rate = sf.read(io.BytesIO(r.content))
+        assert rate == 16000 and len(audio) == pytest.approx(8000, abs=10)
+
+        files = {"file": ("a.wav", source), "reference_audio": ("ref.wav", source)}
+        data = {"model": "vc", "options": '{"seed": 7, "fast": true}'}
+        r = httpx.post(url, files=files, data=data, timeout=30)
+        assert r.status_code == 200 and r.headers["x-bolo-target"] == "reference=upload"
+        assert audiocpp.requests[-1]["body"]["request"]["options"] == {"seed": "7", "fast": "true"}
+
+        r = httpx.post(url, files={"file": ("a.wav", source)}, data={"model": "vc", "voice": "nobody"}, timeout=30)
+        assert r.status_code == 400 and "from a recording" in r.json()["error"]["message"]
+
+        r = httpx.post(url, files={"file": ("a.wav", source)}, data={"model": "rvc", "voice": "chocola"}, timeout=30)
+        assert r.status_code == 200 and r.headers["x-bolo-target"] == "voice=chocola"
+        sent = audiocpp.requests[-1]["body"]["request"]
+        assert sent["options"] == {"voice_id": "chocola"} and "voice_ref" not in sent
+        r = httpx.post(url, files={"file": ("a.wav", source)}, data={"model": "rvc", "voice": "en-short"}, timeout=30)
+        assert r.status_code == 400 and "its own voices" in r.json()["error"]["message"]
+
+        r = httpx.post(
+            f"{srv.url}/v1/speech-to-speech/en-long",
+            files={"audio": ("a.wav", source)},
+            data={"model_id": "vc", "output_format": "pcm_16000"},
+            timeout=30,
+        )
+        assert r.status_code == 200 and len(r.content) == pytest.approx(16000, abs=40)
+        r = httpx.post(url, data={"model": "vc"}, timeout=30)
+        assert r.status_code == 400
+    finally:
+        srv.stop()

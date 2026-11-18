@@ -52,6 +52,7 @@ TASK_TITLES = {
     "speaker-embedding": "Speaker embedding",
     "audio-tagging": "Audio tagging and sound events",
     "emotion": "Speech emotion",
+    "voice-conversion": "Voice conversion",
 }
 
 

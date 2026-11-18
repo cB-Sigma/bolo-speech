@@ -112,6 +112,8 @@ class Settings:
     default_audio_tagging: str = "ced-mini"
     #: speech-emotion model: POST /v1/audio/emotion without a model
     default_emotion: str = "emotion2vec-plus-base"
+    #: voice-conversion model: POST /v1/audio/voice-conversion without a model (OpenVoice v2, MIT, 66 MB)
+    default_voice_conversion: str = "openvoice-v2-tone-color-audiocpp"
     #: transcription with the model "auto" and no language: identify the language and send the audio to the best
     #: installed recogniser for it (docs/api.md, "Language identification and routing"). Off: "auto" is the default
     language_routing: bool = True

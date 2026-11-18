@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-474 models: 192 validated on CPU by the maintainers, 282 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+479 models: 195 validated on CPU by the maintainers, 284 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -1089,6 +1089,38 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `emotion2vec-plus-base` | - | balanced | - | 373 MB | FunASR Model License 1.1 (custom) | **CPU** · RTF 0.925 |
 | `emotion2vec-plus-large` | - | accuracy | - | 649 MB | FunASR Model License 1.1 (custom) | **CPU** · RTF 0.845 |
+
+### Voice conversion
+
+#### OpenVoice v2 tone colour converter
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `openvoice-v2-tone-color-audiocpp` (OpenVoice v2 tone colour converter) | - | realtime | - | 66 MB | MIT · runs on audio.cpp | **CPU** · RTF 2.930 |
+
+#### MeanVC2
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `meanvc2-audiocpp` (MeanVC2) | - | realtime | - | 342 MB | Apache-2.0 · runs on audio.cpp | **CPU** · RTF 3.750 |
+
+#### Chatterbox VC
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `chatterbox-vc-audiocpp` (Chatterbox VC) | - | accuracy | - | 2.1 GB | MIT · runs on audio.cpp · GPU recommended | untested |
+
+#### RVC
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `rvc-audiocpp` (RVC) | - | balanced | - | 1.3 GB | MIT (base models); packaged voices without a stated licence ⚠ · runs on audio.cpp | **CPU** · RTF 6.190 |
+
+#### Seed-VC
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `seed-vc-audiocpp` (Seed-VC) | - | accuracy | - | 3.1 GB | GPL-3.0 · runs on audio.cpp · GPU recommended | untested |
 
 ⚠ = the licence restricts commercial use. RTF = processing time / audio duration (lower is faster).
 <!-- END GENERATED: models -->

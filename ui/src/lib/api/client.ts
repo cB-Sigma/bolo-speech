@@ -481,6 +481,21 @@ export const api = {
     return request('v1/audio/dialogue', { method: 'POST', json: body, signal })
   },
 
+  /** The same words in another voice (`POST /v1/audio/voice-conversion`). */
+  async convertVoice(
+    source: Blob,
+    opts: { model?: string; voice?: string; reference?: Blob },
+    signal?: AbortSignal,
+  ): Promise<Response> {
+    const form = new FormData()
+    form.set('file', source, 'source.wav')
+    if (opts.model) form.set('model', opts.model)
+    if (opts.voice) form.set('voice', opts.voice)
+    if (opts.reference) form.set('reference_audio', opts.reference, 'reference.wav')
+    form.set('response_format', 'wav')
+    return request('v1/audio/voice-conversion', { method: 'POST', body: form, signal })
+  },
+
   /** One-shot transcription through the OpenAI-compatible route. */
   async transcribe(file: Blob, model: string, language?: string, signal?: AbortSignal): Promise<{ text: string }> {
     const form = new FormData()

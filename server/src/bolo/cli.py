@@ -1021,6 +1021,44 @@ def cmd_dialogue(args: argparse.Namespace) -> int:
     return asyncio.run(run())
 
 
+def cmd_convert(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from bolo.audio.decode import decode_audio
+    from bolo.audio.encode import encode_audio
+    from bolo.obs.trace import Trace
+    from bolo.voice_conversion import convert_voice
+
+    core = _core(args)
+    samples, rate = decode_audio(Path(args.input).read_bytes())
+    reference = Path(args.reference).read_bytes() if args.reference else None
+    options = _json.loads(args.options) if args.options else {}
+    out = Path(args.output)
+    fmt = args.format or (out.suffix.lstrip(".").lower() or "wav")
+
+    async def run() -> int:
+        await core.start()
+        try:
+            trace = Trace("voice-conversion", "cli", "")
+            result = await convert_voice(
+                core, samples, rate, model=args.model, voice=args.voice, reference=reference, options=options,
+                trace=trace,
+            )  # fmt: skip
+            trace.finish("ok")
+            core.traces.record(trace)
+            out.write_bytes(encode_audio(result.samples, result.sample_rate, fmt, args.sample_rate))
+            target = ", ".join(f"{k}={v}" for k, v in result.target.items())
+            seconds = len(result.samples) / result.sample_rate
+            print(f"wrote {out} ({seconds:.1f}s, {fmt}); {result.model}, target {target}")
+            if args.verbose and trace.total_ms is not None:
+                print(f"[{result.model}] {trace.total_ms:.0f} ms for {trace.audio_seconds:.1f} s", file=sys.stderr)
+            return 0
+        finally:
+            await core.stop()
+
+    return asyncio.run(run())
+
+
 def cmd_bench(args: argparse.Namespace) -> int:
     from bolo.bench import run_bench
 
@@ -2296,6 +2334,21 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--format", "-f", help="default: from the output file extension")
     s.add_argument("--sample-rate", dest="sample_rate", type=int)
     s.set_defaults(func=cmd_dialogue)
+
+    s = sub.add_parser("convert", help="say the words of a recording in another voice (voice conversion)")
+    _common(s)
+    s.add_argument("input", help="the speech to convert (WAV, FLAC, MP3, ...)")
+    s.add_argument("--output", "-o", required=True)
+    s.add_argument("--model", "-m", help="a voice-conversion model (default: default_voice_conversion)")
+    s.add_argument(
+        "--voice", help="the target: a saved voice, a reference clip (en-short, en-long, hi-short) or a model voice"
+    )
+    s.add_argument("--reference", help="a recording of the target voice (instead of --voice)")
+    s.add_argument("--options", help="the model's request options as JSON, e.g. '{\"num_inference_steps\": 10}'")
+    s.add_argument("--format", "-f", help="default: from the output file extension")
+    s.add_argument("--sample-rate", dest="sample_rate", type=int)
+    s.add_argument("--verbose", "-v", action="store_true")
+    s.set_defaults(func=cmd_convert)
 
     s = sub.add_parser("bench", help="concurrency sweep against a model (in process)")
     _common(s)

@@ -36,7 +36,8 @@ the OpenAI audio and Realtime APIs. On top of speech-to-text and text-to-speech 
   and get a speaker-similarity score for each clone.
 - **Speech directed in words**: `instructions` ("calm, a little amused, speaking slowly") reach every model that
   follows them (Qwen3-TTS CustomVoice, CosyVoice3, FireRedTTS3, OmniVoice, Maya1, Parler-TTS, …), and
-  multi-speaker dialogues with a voice per speaker, spoken in one take or turn by turn.
+  multi-speaker dialogues with a voice per speaker, spoken in one take or turn by turn, and voice conversion (the
+  same words in another voice).
 - **Indian languages**: speech recognition for all 22 scheduled languages, voices for 15 of them, 8 kHz telephone
   audio, and romanised input ("mujhe kal jana hai") written in the right script.
 - **Cloud models next to local ones**: OpenAI, Sarvam, ElevenLabs, Deepgram and Soniox behind the same API, with
@@ -245,8 +246,13 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | VAD | MarbleNet VAD | 1 | - | 1 | 0.069 (`marblenet-vad`) |
 | VAD | WebRTC VAD | 2 | - | 2 | 0.000 (`webrtc-vad-aggressive`) |
 | VAD | Energy VAD | 1 | - | 1 | 0.000 (`energy-vad`) |
+| VOICE-CONVERSION | OpenVoice v2 tone colour converter | 1 | - | 1 | 2.930 (`openvoice-v2-tone-color-audiocpp`) |
+| VOICE-CONVERSION | MeanVC2 | 1 | - | 1 | 3.750 (`meanvc2-audiocpp`) |
+| VOICE-CONVERSION | Chatterbox VC | 1 | - | 0 | - |
+| VOICE-CONVERSION | RVC | 1 | - | 1 | 6.190 (`rvc-audiocpp`) |
+| VOICE-CONVERSION | Seed-VC | 1 | - | 0 | - |
 
-**474 models in the catalog, 192 validated on CPU, 282 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**479 models in the catalog, 195 validated on CPU, 284 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

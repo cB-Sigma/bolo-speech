@@ -1,15 +1,17 @@
-"""Speech synthesis beyond one voice: multi-speaker dialogues (``POST /v1/audio/dialogue``)."""
+"""Speech synthesis beyond one voice: multi-speaker dialogues (``POST /v1/audio/dialogue``) and voice conversion
+(``POST /v1/audio/voice-conversion``, with ElevenLabs' speech-to-speech route as an alias)."""
 
 from __future__ import annotations
 
 import asyncio
 import json
+from typing import Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from bolo.api.common import get_core
+from bolo.api.common import get_core, read_upload
 from bolo.audio.encode import FORMATS, StreamEncoder, encode_audio, normalize_format
 from bolo.dialogue import MODES, Turn, parse_script, speak_dialogue
 from bolo.errors import BoloError, InvalidRequest
@@ -110,3 +112,103 @@ async def create_dialogue(request: Request, body: DialogueRequest) -> Response:
     if trace.extra.get("instructions"):
         headers["x-bolo-instructions"] = str(trace.extra["instructions"])
     return Response(data, media_type=encoder.media_type, headers=headers)
+
+
+def _form_file(form: Any, *names: str) -> Any:
+    for name in names:
+        value = form.get(name)
+        if value is not None and not isinstance(value, str):
+            return value
+    return None
+
+
+async def _voice_conversion(
+    request: Request, form: Any, voice: str | None, model: str | None, fmt_raw: str
+) -> Response:
+    from bolo.voice_conversion import convert_voice
+
+    core = get_core(request)
+    file = _form_file(form, "file", "audio")
+    if file is None:
+        raise InvalidRequest("a multipart 'file' field with the speech to convert is required", param="file")
+    fmt = normalize_format(fmt_raw)
+    if fmt not in FORMATS:
+        raise InvalidRequest(f"response_format must be one of {', '.join(FORMATS)}", param="response_format")
+    out_rate: int | None = None
+    if form.get("sample_rate"):
+        try:
+            out_rate = int(str(form.get("sample_rate")))
+        except ValueError as exc:
+            raise InvalidRequest("sample_rate must be a whole number of hertz", param="sample_rate") from exc
+        if not 8000 <= out_rate <= 48000:
+            raise InvalidRequest("sample_rate must be between 8000 and 48000", param="sample_rate")
+    options: dict[str, Any] = {}
+    if form.get("options"):
+        try:
+            options = json.loads(str(form.get("options")))
+        except ValueError as exc:
+            raise InvalidRequest("options must be a JSON object", param="options") from exc
+        if not isinstance(options, dict):
+            raise InvalidRequest("options must be a JSON object", param="options")
+    ref_file = _form_file(form, "reference_audio")
+    reference = await ref_file.read() if ref_file is not None else None
+    request_keep_alive(form.get("keep_alive"), ("voice-conversion",))
+    samples, rate = await read_upload(core, file)
+    trace = Trace("voice-conversion", "http", model or "")
+    try:
+        result = await convert_voice(
+            core, samples, rate, model=model, voice=voice, reference=reference, options=options, trace=trace
+        )
+        data = await asyncio.to_thread(encode_audio, result.samples, result.sample_rate, fmt, out_rate)
+        trace.finish("ok")
+    except BoloError as exc:
+        trace.finish("error", exc.message)
+        raise
+    finally:
+        if trace.model:
+            core.traces.record(trace)
+    encoder = StreamEncoder(fmt, result.sample_rate, out_rate)
+    headers = {
+        "x-request-id": trace.id,
+        "x-bolo-model": result.model,
+        "x-sample-rate": str(encoder.sample_rate),
+        "x-bolo-target": ", ".join(f"{k}={v}" for k, v in result.target.items()),
+    }
+    return Response(data, media_type=encoder.media_type, headers=headers)
+
+
+@router.post("/v1/audio/voice-conversion", tags=["native"], summary="Say the same words in another voice")
+async def voice_conversion(request: Request) -> Response:
+    """Extension. Multipart form: ``file`` (the speech to convert), ``voice`` (the target: a saved voice, a reference
+    clip ``en-short`` / ``en-long`` / ``hi-short``, or a voice of the model for RVC), or ``reference_audio`` (a
+    recording of the target voice, which wins over ``voice``); ``model`` (a ``voice-conversion`` model, default
+    ``default_voice_conversion``), ``options`` (JSON: the model's request options, e.g. Seed-VC's
+    ``num_inference_steps``), ``response_format`` (default ``wav``), ``sample_rate``, ``keep_alive``.
+
+    Headers: ``x-bolo-model``, ``x-bolo-target`` (``saved=priya``, ``clip=en-short``, ``voice=default`` or
+    ``reference=upload``), ``x-sample-rate``."""
+    form = await request.form()
+    return await _voice_conversion(
+        request,
+        form,
+        str(form.get("voice") or "") or None,
+        str(form.get("model") or "") or None,
+        str(form.get("response_format") or "wav"),
+    )
+
+
+@router.post("/v1/speech-to-speech/{voice_id}", tags=["native"], summary="Voice conversion (ElevenLabs' route)")
+async def speech_to_speech(request: Request, voice_id: str) -> Response:
+    """ElevenLabs' speech-to-speech route: multipart ``audio``, the target ``voice_id`` in the path (a saved voice
+    or reference clip, as ``voice`` of ``POST /v1/audio/voice-conversion``), ``model_id``; MP3 back unless
+    ``output_format`` (``mp3_44100_128``, ``pcm_16000``, ...: the codec is the part before the first ``_``) says
+    otherwise."""
+    form = await request.form()
+    raw = str(form.get("output_format") or form.get("response_format") or "mp3")
+    return await _voice_conversion(
+        request,
+        form,
+        voice_id,
+        str(form.get("model_id") or form.get("model") or "") or None,
+        raw.split("_", maxsplit=1)[0],
+    )

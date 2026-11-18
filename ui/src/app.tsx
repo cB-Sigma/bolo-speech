@@ -22,6 +22,7 @@ const DiarizePage = lazy(() => import('./routes/diarize'))
 const CloneBrowserPage = lazy(() => import('./routes/clone-browser'))
 const AnalysePage = lazy(() => import('./routes/analyse'))
 const DialoguePage = lazy(() => import('./routes/dialogue'))
+const ConvertPage = lazy(() => import('./routes/convert'))
 
 function PageFallback() {
   return (
@@ -112,6 +113,14 @@ export function App() {
             element={
               <Suspense fallback={<PageFallback />}>
                 <ConnectPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="convert"
+            element={
+              <Suspense fallback={<PageFallback />}>
+                <ConvertPage />
               </Suspense>
             }
           />

@@ -48,6 +48,7 @@ from bolo.engines.base import (
     STTStream,
     TTSModel,
     TurnModel,
+    VoiceConversionModel,
 )
 from bolo.errors import EngineUnavailable, ModelNotFound, ModelNotInstalled, Overloaded
 from bolo.keepalive import REQUEST_KEEP_ALIVE, parse_keep_alive
@@ -767,6 +768,10 @@ class ModelManager:
             classifier = model
             handlers["classify"] = lambda items: [classifier.classify(item) for item in items]
             max_batch["classify"] = 1
+        elif isinstance(model, VoiceConversionModel):
+            converter = model
+            handlers["convert"] = lambda items: [converter.convert(*item) for item in items]
+            max_batch["convert"] = 1
         elif isinstance(model, LidModel):
             lid = model
             handlers["lid"] = lambda items: [lid.identify(item) for item in items]

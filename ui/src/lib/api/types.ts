@@ -15,6 +15,7 @@ export type Task =
   | 'audio-llm'
   | 'audio-tagging'
   | 'emotion'
+  | 'voice-conversion'
 export type Tier = 'realtime' | 'balanced' | 'accuracy'
 export type Validated = 'cpu' | 'untested'
 

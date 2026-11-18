@@ -114,6 +114,7 @@ const TASK_LABEL: Record<Task, string> = {
   'audio-llm': 'Audio-in language models',
   'audio-tagging': 'Sound events',
   emotion: 'Speech emotion',
+  'voice-conversion': 'Voice conversion',
 }
 const TASK_SHORT: Record<Task, string> = {
   stt: 'STT',
@@ -130,6 +131,7 @@ const TASK_SHORT: Record<Task, string> = {
   'audio-llm': 'Audio LLM',
   'audio-tagging': 'Tags',
   emotion: 'Emotion',
+  'voice-conversion': 'Convert',
 }
 const TASK_ORDER: Task[] = [
   'stt',
@@ -143,6 +145,7 @@ const TASK_ORDER: Task[] = [
   'denoise',
   'audio-tagging',
   'emotion',
+  'voice-conversion',
   'speech-to-speech',
   'audio-llm',
   'translation',

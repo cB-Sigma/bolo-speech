@@ -136,8 +136,26 @@ class FakeTTSServer:
                         self._error(404, f"unknown model '{body.get('model')}'")
                         return
                     self._audiocpp(body, text)
+                elif outer.runtime == "audiocpp" and self.path == "/v1/tasks/run":
+                    self._task(body)
                 else:
                     self._error(404, "not found")
+
+            def _task(self, body: dict[str, Any]) -> None:
+                # voice conversion (task vc): the source comes back at half its length, the target noted
+                req = body.get("request") or {}
+                if body.get("model") != outer.model_id:
+                    self._error(404, f"unknown model '{body.get('model')}'")
+                    return
+                if "audio_base64" not in req:
+                    self._error(400, "no audio")
+                    return
+                ref = req.get("voice_ref")
+                outer.requests[-1]["voice_ref_bytes"] = len(Path(ref).read_bytes()) if ref else None
+                x, rate = sf.read(io.BytesIO(base64.b64decode(req["audio_base64"])), dtype="float32")
+                buf = io.BytesIO()
+                sf.write(buf, x[: len(x) // 2], rate, format="WAV", subtype="PCM_16")
+                self._json(200, {"audio": base64.b64encode(buf.getvalue()).decode(), "sample_rate": rate})
 
             def _chunked(self, content_type: str, data: bytes, pieces: int = 4) -> None:
                 self.send_response(200)

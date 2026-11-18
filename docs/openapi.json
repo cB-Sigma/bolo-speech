@@ -2983,6 +2983,67 @@
     }
    }
   },
+  "/v1/audio/voice-conversion": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Say the same words in another voice",
+    "description": "Extension. Multipart form: ``file`` (the speech to convert), ``voice`` (the target: a saved voice, a reference\nclip ``en-short`` / ``en-long`` / ``hi-short``, or a voice of the model for RVC), or ``reference_audio`` (a\nrecording of the target voice, which wins over ``voice``); ``model`` (a ``voice-conversion`` model, default\n``default_voice_conversion``), ``options`` (JSON: the model's request options, e.g. Seed-VC's\n``num_inference_steps``), ``response_format`` (default ``wav``), ``sample_rate``, ``keep_alive``.\n\nHeaders: ``x-bolo-model``, ``x-bolo-target`` (``saved=priya``, ``clip=en-short``, ``voice=default`` or\n``reference=upload``), ``x-sample-rate``.",
+    "operationId": "voice_conversion_v1_audio_voice_conversion_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/speech-to-speech/{voice_id}": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Voice conversion (ElevenLabs' route)",
+    "description": "ElevenLabs' speech-to-speech route: multipart ``audio``, the target ``voice_id`` in the path (a saved voice\nor reference clip, as ``voice`` of ``POST /v1/audio/voice-conversion``), ``model_id``; MP3 back unless\n``output_format`` (``mp3_44100_128``, ``pcm_16000``, ...: the codec is the part before the first ``_``) says\notherwise.",
+    "operationId": "speech_to_speech_v1_speech_to_speech__voice_id__post",
+    "parameters": [
+     {
+      "name": "voice_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Voice Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/keys": {
    "get": {
     "tags": [

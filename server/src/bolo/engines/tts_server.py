@@ -43,6 +43,11 @@ or ``{option, with}`` where ``with`` are further options sent alongside (IndexTT
 ``vibevoice``: ``Speaker 1: …`` lines and one reference recording per speaker, which audio.cpp reads from files
 (``voice_samples``), so only a server on this machine (managed by bolo, or on a loopback address) takes it;
 ``dialogue_speakers`` caps the speakers (4).
+
+Voice conversion (catalog task ``voice-conversion``, audio.cpp only): :class:`ServerVC` runs the family's ``vc`` task
+through ``POST /v1/tasks/run``, the source speech inline and the target voice's recording as a file the server
+reads (so, like dialogues, only from a server on this machine); ``vc_voices: true`` families (RVC) take one of the
+catalog's ``voices`` as ``voice_id`` instead of a recording.
 """
 
 from __future__ import annotations
@@ -78,6 +83,7 @@ from bolo.engines.base import (
     SynthesisExtras,
     TTSModel,
     Voice,
+    VoiceConversionModel,
 )
 from bolo.errors import ComponentMissing, EngineUnavailable, InvalidRequest
 from bolo.llama_args import has_flag
@@ -809,6 +815,124 @@ def llama_server_args(
     return out
 
 
+class ServerVC(VoiceConversionModel):
+    """Voice conversion by an audio.cpp server (``task: vc``): Chatterbox, OpenVoice v2's tone colour converter,
+    RVC, Seed-VC, MeanVC2."""
+
+    def __init__(
+        self, name: str, spec: dict[str, Any], *, base_url: str | None = None, process: ServerProcess | None = None,
+        api_key: str | None = None, timeout_s: float = 300.0,
+    ) -> None:  # fmt: skip
+        self.name = name
+        self.spec = spec
+        self.process = process
+        self._base_url = (base_url or (process.base_url if process else "")).rstrip("/")
+        self.server_model = str(spec.get("server_model") or spec.get("model_id") or name)
+        self.sample_rate = int(spec.get("sample_rate") or 24000)
+        self.needs_reference = not spec.get("vc_voices")
+        self.voices = tuple(
+            Voice(str(v["id"]), str(v.get("name", "")), str(v.get("language", "")), str(v.get("gender", "")), i)
+            for i, v in enumerate(spec.get("voices") or [])
+        )
+        api_key = api_key or (process.api_key if process is not None else None)
+        self._client = httpx.Client(
+            headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
+            timeout=httpx.Timeout(timeout_s, connect=10.0),
+            trust_env=process is None,
+        )
+
+    @property
+    def base_url(self) -> str:
+        return self.process.base_url if self.process is not None else self._base_url
+
+    @property
+    def local(self) -> bool:
+        """The server can read files bolo writes (managed by bolo, or on a loopback address)."""
+        host = httpx.URL(self.base_url).host if self.base_url else ""
+        return self.process is not None or host in ("127.0.0.1", "localhost", "::1")
+
+    def connect(self) -> None:
+        if self.process is not None:
+            self.process.ensure_started()
+        try:
+            resp = self._client.get(self.base_url + "/health", timeout=10.0)
+        except httpx.HTTPError as exc:
+            raise EngineUnavailable(f"the audio.cpp server at {self.base_url} is not reachable ({exc})") from exc
+        if resp.status_code >= 400:
+            raise EngineUnavailable(f"the audio.cpp server at {self.base_url} answered /health with {resp.status_code}")
+
+    def close(self) -> None:
+        if self.process is not None:
+            self.process.stop()
+        self._client.close()
+
+    def convert(self, source: bytes, reference: bytes | None, voice: str | None, options: dict[str, Any]) -> FloatArray:
+        import shutil
+        import tempfile
+
+        request: dict[str, Any] = {"audio_base64": base64.b64encode(source).decode()}
+        merged = {str(k): v for k, v in dict(self.spec.get("request_options") or {}).items()}
+        merged.update({str(k): v for k, v in options.items()})
+        if not self.needs_reference:
+            known = {v.id.lower(): v.id for v in self.voices}
+            chosen = known.get((voice or "").lower()) if voice else (self.voices[0].id if self.voices else None)
+            if voice and chosen is None:
+                raise InvalidRequest(
+                    f"model '{self.name}' has no voice {voice!r} (its voices: {', '.join(known.values())})",
+                    param="voice",
+                )
+            if chosen:
+                merged["voice_id"] = chosen
+        if merged:
+            # audio.cpp's request options are strings on the wire ("1234", "0.3", "true")
+            request["options"] = {k: str(v).lower() if isinstance(v, bool) else str(v) for k, v in merged.items()}
+        folder: Path | None = None
+        try:
+            if self.needs_reference:
+                if reference is None:
+                    raise InvalidRequest(f"model '{self.name}' needs a recording of the target voice", param="voice")
+                if not self.local:
+                    raise InvalidRequest(
+                        f"model '{self.name}' reads the target voice from a file, which only an audio.cpp server on "
+                        "this machine can do",
+                        param="model",
+                    )
+                folder = Path(tempfile.mkdtemp(prefix="bolo-vc-"))
+                target = folder / "target.wav"
+                target.write_bytes(reference)
+                request["voice_ref"] = str(target)
+            if self.process is not None:
+                self.process.ensure_started()
+            try:
+                resp = self._client.post(
+                    self.base_url + "/v1/tasks/run", json={"model": self.server_model, "request": request}
+                )
+            except httpx.HTTPError as exc:
+                if self.process is not None:
+                    self.process.check()
+                raise EngineUnavailable(f"the audio.cpp server at {self.base_url} failed: {exc}") from exc
+        finally:
+            if folder is not None:
+                shutil.rmtree(folder, ignore_errors=True)
+        if resp.status_code >= 400:
+            message = _error_message(resp)
+            if resp.status_code in (400, 422):
+                raise InvalidRequest(f"audio.cpp refused the conversion for '{self.name}': {message}")
+            raise EngineUnavailable(f"audio.cpp failed to convert with '{self.name}' ({resp.status_code}): {message}")
+        try:
+            data = base64.b64decode(resp.json()["audio"])
+        except (ValueError, KeyError, TypeError) as exc:
+            raise EngineUnavailable(f"the audio.cpp server answered without audio for '{self.name}'") from exc
+        import soundfile as sf
+
+        from bolo.audio.resample import resample
+
+        with sf.SoundFile(io.BytesIO(data)) as f:
+            x = f.read(dtype="float32", always_2d=True).mean(axis=1).astype(np.float32)
+            rate = int(f.samplerate)
+        return resample(x, rate, self.sample_rate) if rate != self.sample_rate else x
+
+
 class TTSServerEngine(Engine):
     id = ENGINE_ID
     name = "External TTS server (llama-server, audio.cpp)"
@@ -854,6 +978,8 @@ class TTSServerEngine(Engine):
             from bolo.engines.ten_turn_llamacpp import load_model as load_ten_turn
 
             return load_ten_turn(self, path, spec, opts)
+        if task == "voice-conversion":
+            return self._load_vc(path, spec, opts)
         if task != "tts":
             raise EngineUnavailable(f"the tts-server engine serves text-to-speech models, not {task!r}")
         if kind == "orpheus-llamacpp":
@@ -872,6 +998,24 @@ class TTSServerEngine(Engine):
         else:
             process = self._process(runtime, name, path, spec, opts)
             model = ServerTTS(runtime, name, spec, process=process, timeout_s=s.tts_server_timeout_s)
+        try:
+            model.connect()
+        except BaseException:
+            model.close()
+            raise
+        return model
+
+    def _load_vc(self, path: Path, spec: dict[str, Any], opts: LoadOptions) -> ServerVC:
+        s = self._settings()
+        if str(spec.get("runtime") or LLAMA) != AUDIOCPP:
+            raise EngineUnavailable("voice conversion runs on audio.cpp only")
+        name = str(spec.get("model_id") or path.name)
+        url = self.remote(spec)
+        if url:
+            model = ServerVC(name, spec, base_url=url, api_key=s.tts_server_api_key, timeout_s=s.tts_server_timeout_s)
+        else:
+            process = self._process(AUDIOCPP, name, path, {**spec, "server_task": "vc"}, opts)
+            model = ServerVC(name, spec, process=process, timeout_s=s.tts_server_timeout_s)
         try:
             model.connect()
         except BaseException:
@@ -988,7 +1132,7 @@ class TTSServerEngine(Engine):
             "id": str(spec.get("server_model") or name),
             "family": str(spec.get("family") or ""),
             "path": str(model_path),
-            "task": "tts",
+            "task": str(spec.get("server_task") or "tts"),
             "mode": "streaming" if spec.get("stream") else "offline",
         }
         for key in ("load_options", "session_options", "default_request_options"):

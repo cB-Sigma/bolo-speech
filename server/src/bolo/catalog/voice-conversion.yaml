@@ -1,0 +1,193 @@
+# Voice conversion: speech in, the same words out in another voice (POST /v1/audio/voice-conversion).
+# All run on audio.cpp (task vc), from the audio.cpp GGUF repository pinned to one commit.
+- id: openvoice-v2-tone-color-audiocpp
+  task: voice-conversion
+  engine: tts-server
+  kind: tts-server
+  family: OpenVoice v2 tone colour converter
+  languages: []
+  tier: realtime
+  sample_rate: 22050
+  size_bytes: 65644736
+  license: MIT
+  license_url: https://huggingface.co/myshell-ai/OpenVoiceV2
+  commercial_use: true
+  gated: false
+  features: []
+  description: 'OpenVoice v2''s tone colour converter (MyShell, MIT) on audio.cpp (tone_color_vc): keeps the words,
+    rhythm and intonation of the source and gives them the timbre of the target recording. Any language. Small (66 MB,
+    F16) and quick on a CPU. Needs a recording of the target voice (a saved voice, a reference clip or reference_audio).
+    Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one on this machine.'
+  source_url: https://huggingface.co/myshell-ai/OpenVoiceV2
+  validated: cpu
+  measured:
+    rtf: 2.93
+    audio_s: 11.8
+    threads: 4
+    engine: audio.cpp (built from source, 2026-11-18)
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared with other jobs
+    note: 'en-long clip (male) to the en-short voice (female): pitch 115 -> 188 Hz, words kept (moonshine-tiny-en transcript); time includes loading'
+    date: '2026-11-18'
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: Tone-Color-VC-GGUF
+    include: [tone-color-vc-f16.gguf]
+  options:
+    runtime: audio.cpp
+    family: tone_color_vc
+    server_model: openvoice-v2-tone-color-audiocpp
+    hardware: {gpu: optional, vram_gb: 0.6, note: 'approximate: weights x 1.3 + 0.5 GB'}
+
+- id: meanvc2-audiocpp
+  task: voice-conversion
+  engine: tts-server
+  kind: tts-server
+  family: MeanVC2
+  languages: []
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 342368032
+  license: Apache-2.0
+  license_url: https://huggingface.co/ASLP-lab/MeanVC2
+  commercial_use: true
+  gated: false
+  features: []
+  description: 'MeanVC2 (ASLP-lab, Apache-2.0) on audio.cpp (meanvc2): lightweight zero-shot voice conversion, the
+    120 ms / 40 ms quality path, Q4_K (342 MB). Needs a recording of the target voice. Runs in an audiocpp_server that
+    bolo starts (bolo components install audio.cpp) or one on this machine.'
+  source_url: https://huggingface.co/ASLP-lab/MeanVC2
+  validated: cpu
+  measured:
+    rtf: 3.75
+    audio_s: 11.8
+    threads: 4
+    engine: audio.cpp (built from source, 2026-11-18)
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared with other jobs
+    note: 'en-long clip (male) to the en-short voice (female): pitch 115 -> 193 Hz, words kept (moonshine-tiny-en transcript); time includes loading'
+    date: '2026-11-18'
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: MeanVC2-GGUF
+    include: [meanvc2-120ms-40ms-q4_k.gguf]
+  options:
+    runtime: audio.cpp
+    family: meanvc2
+    server_model: meanvc2-audiocpp
+    hardware: {gpu: optional, vram_gb: 0.9, note: 'approximate: weights x 1.3 + 0.5 GB'}
+
+- id: chatterbox-vc-audiocpp
+  task: voice-conversion
+  engine: tts-server
+  kind: tts-server
+  family: Chatterbox VC
+  languages: []
+  tier: accuracy
+  sample_rate: 24000
+  size_bytes: 2088399204
+  license: MIT
+  license_url: https://huggingface.co/ResembleAI/chatterbox
+  commercial_use: true
+  gated: false
+  features: []
+  description: 'Chatterbox''s voice converter (Resemble AI, MIT) on audio.cpp (chatterbox, task vc): the S3Gen flow
+    model re-speaks the source in the target recording''s voice. The same Q8_0 GGUF as chatterbox-multilingual-audiocpp
+    (2.1 GB). No Perth watermark: audio.cpp has none. Needs a recording of the target voice. Runs in an audiocpp_server
+    that bolo starts (bolo components install audio.cpp) or one on this machine. GPU recommended.'
+  source_url: https://huggingface.co/ResembleAI/chatterbox
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: Chatterbox-GGUF
+    include: [chatterbox-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: chatterbox
+    server_model: chatterbox-vc-audiocpp
+    hardware: {gpu: recommended, vram_gb: 3.2, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}
+
+- id: rvc-audiocpp
+  task: voice-conversion
+  engine: tts-server
+  kind: tts-server
+  family: RVC
+  languages: []
+  tier: balanced
+  sample_rate: 48000
+  size_bytes: 1260187648
+  license: MIT (base models); packaged voices without a stated licence
+  license_url: https://huggingface.co/lj1995/VoiceConversionWebUI
+  commercial_use: false
+  gated: false
+  features: []
+  description: 'RVC (retrieval-based voice conversion; HuBERT content features and RMVPE pitch, MIT) on audio.cpp
+    (rvc), F16 (1.3 GB). Converts to one of its packaged voices (voice default, manthos, chocola or fraise), not to a
+    recording. The base models are MIT; the packaged voices have no documented source or licence, so treat it as
+    not cleared for commercial use. Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp)
+    or one you run (setting tts_servers).'
+  source_url: https://huggingface.co/lj1995/VoiceConversionWebUI
+  validated: cpu
+  measured:
+    rtf: 6.19
+    audio_s: 11.8
+    threads: 4
+    engine: audio.cpp (built from source, 2026-11-18)
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared with other jobs
+    note: 'en-long clip to the packaged voice chocola, no pitch shift: words kept (moonshine-tiny-en transcript), 48 kHz
+      out; time includes loading'
+    date: '2026-11-18'
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: RVC-GGUF
+    include: [rvc-f16.gguf]
+  options:
+    runtime: audio.cpp
+    family: rvc
+    server_model: rvc-audiocpp
+    vc_voices: true
+    hardware: {gpu: optional, vram_gb: 2.1, note: 'approximate: weights x 1.3 + 0.5 GB'}
+  voices:
+  - {id: default, name: Default (packaged)}
+  - {id: manthos, name: Manthos (packaged)}
+  - {id: chocola, name: Chocola (packaged)}
+  - {id: fraise, name: Fraise (packaged)}
+
+- id: seed-vc-audiocpp
+  task: voice-conversion
+  engine: tts-server
+  kind: tts-server
+  family: Seed-VC
+  languages: []
+  tier: accuracy
+  sample_rate: 22050
+  size_bytes: 3120809440
+  license: GPL-3.0
+  license_url: https://huggingface.co/Plachta/Seed-VC
+  commercial_use: true
+  gated: false
+  features: []
+  description: 'Seed-VC (Plachta) on audio.cpp (seed_vc, the V2 voice-conversion route by default; options route,
+    num_inference_steps, similarity_guidance_scale, ...), Q8_0 (3.1 GB, from the MLX conversion). GPL-3.0, a copyleft
+    licence: software you distribute with it must be GPL-3.0 too; speech you make with it is yours. Needs a recording
+    of the target voice. Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one on this
+    machine. GPU recommended.'
+  source_url: https://huggingface.co/Plachta/Seed-VC
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: audio-cpp/audio.cpp-gguf
+    revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
+    subdir: SeedVC-MLX-GGUF
+    include: [seed-vc-mlx-q8_0.gguf]
+  options:
+    runtime: audio.cpp
+    family: seed_vc
+    server_model: seed-vc-audiocpp
+    hardware: {gpu: recommended, vram_gb: 4.6, note: 'approximate: weights x 1.3 + 0.5 GB; slow on a CPU'}

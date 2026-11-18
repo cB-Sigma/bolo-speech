@@ -20,7 +20,7 @@ from bolo.store import Source
 
 TASKS = (
     "stt", "tts", "vad", "diarization", "turn", "translation", "separation", "denoise", "lid", "speech-to-speech",
-    "audio-llm", "speaker-embedding", "audio-tagging", "emotion",
+    "audio-llm", "speaker-embedding", "audio-tagging", "emotion", "voice-conversion",
 )  # fmt: skip
 TIERS = ("realtime", "balanced", "accuracy")
 VALIDATED = ("cpu", "untested")

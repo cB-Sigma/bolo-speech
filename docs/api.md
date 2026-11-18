@@ -107,7 +107,9 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `POST` | `/v1/audio-isolation/stream` | Voice isolation, streamed (ElevenLabs' route) |
 | `POST` | `/v1/audio/tags` | Sound events and audio tags (music, speech, ...) |
 | `POST` | `/v1/audio/emotion` | Speech emotion |
-| `POST` | `/v1/audio/dialogue` | Speak a multi-speaker dialogue as one recording |
+| `POST` | `/v1/audio/dialogue` | Speak a multi-speaker dialogue |
+| `POST` | `/v1/audio/voice-conversion` | Say the same words in another voice |
+| `POST` | `/v1/speech-to-speech/{voice_id}` | Voice conversion (ElevenLabs' route) |
 | `GET` | `/api/v1/keys` | API keys and their usage (the keys themselves are never returned) |
 | `POST` | `/api/v1/keys` | Create an API key (its value is returned once) |
 | `GET` | `/api/v1/keys/{key_id}` | One API key and its usage |
@@ -772,6 +774,41 @@ curl -s localhost:8000/v1/audio/dialogue -H 'content-type: application/json' -o 
   "script": "Asha: Welcome back to the show.\nRavi: Thanks for having me.",
   "voices": {"Asha": "af_heart", "Ravi": "am_michael"}
 }'
+```
+
+### Voice conversion: `POST /v1/audio/voice-conversion`
+
+Extension. A recording of speech in, the same words out in another voice (speech-to-speech voice conversion).
+Multipart form:
+
+| Field | | |
+| --- | --- | --- |
+| `file` | required | the speech to convert (WAV, FLAC, MP3, ... ; 0.3 s to 5 minutes) |
+| `voice` | - | the target: a saved voice ([voices.md](voices.md)), a reference clip (`en-short`, `en-long`, `hi-short`), or, for RVC, one of the model's own voices (`default`, `manthos`, `chocola`, `fraise`) |
+| `reference_audio` | - | a recording of the target voice (up to 30 s are used); wins over `voice` |
+| `model` | `default_voice_conversion` (`openvoice-v2-tone-color-audiocpp`) | a `voice-conversion` model |
+| `options` | - | JSON object of the model's request options, passed to audio.cpp: Seed-VC `route`, `num_inference_steps`, `similarity_guidance_scale`; RVC `semitone_shift`, `retrieval_blend`; OpenVoice `temperature`, `seed`; ... |
+| `response_format`, `sample_rate` | `wav`, model's | as for `/v1/audio/speech` |
+| `keep_alive` | - | as everywhere |
+
+A model that imitates a recording with no recording (no `reference_audio`, and `voice` neither a saved voice nor a
+clip) is `400`; so is a recording sent to RVC, which converts to its packaged voices only. Headers: `x-bolo-model`,
+`x-bolo-target` (`saved=priya`, `clip=en-short`, `voice=chocola` or `reference=upload`), `x-sample-rate`; the
+request's trace has kind `voice-conversion`. ElevenLabs' `POST /v1/speech-to-speech/{voice_id}` answers too
+(multipart `audio`, `model_id`, `output_format`; MP3 back by default).
+
+The models run on audio.cpp (`bolo components install audio.cpp`): OpenVoice v2's tone colour converter (MIT, 66 MB,
+the default), MeanVC2 (Apache-2.0, 342 MB), Chatterbox's converter (MIT, 2.1 GB), RVC (MIT base models; its packaged
+voices have no stated licence, so it is marked not cleared for commercial use) and Seed-VC (GPL-3.0, 3.1 GB). audio.cpp
+reads the target recording from a file, so the target must be on the same machine as the server: a server bolo
+manages, or one on a loopback address. Run on a 4-core CPU: OpenVoice v2, MeanVC2 and RVC each converted an 11.8 s
+recording with its words kept (checked by transcribing the result) in 35 s, 44 s and 73 s including loading; Chatterbox
+VC and Seed-VC have not been run here (GPU recommended). From the command line:
+`bolo convert speech.wav --voice priya -o converted.wav` (`--reference other.wav`, `-m seed-vc-audiocpp`,
+`--options '{"num_inference_steps": 10}'`); in the console, the Voice conversion page.
+
+```bash
+curl -s localhost:8000/v1/audio/voice-conversion -F file=@me.wav -F voice=en-short -o converted.wav
 ```
 
 ### `GET /v1/models`, `GET /v1/models/{id}`
