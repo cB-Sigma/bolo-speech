@@ -552,6 +552,7 @@ class DiCoWOnnx(STTModel):
     supports_word_timestamps = False
     languages = WHISPER_LANGUAGES
     max_chunk_s = WINDOW_S
+    request_fields = ("prompt",)  # greedy decoding only
 
     def __init__(
         self,

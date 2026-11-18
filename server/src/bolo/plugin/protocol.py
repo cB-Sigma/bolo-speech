@@ -58,7 +58,8 @@ shutdown   -                                                            - (then 
 
 ``info`` of a loaded model may hold ``voices`` (list of ``{id, name, language, gender}``),
 ``languages``, ``max_batch`` (default 1: no batching), ``supports_translate`` and
-``supports_word_timestamps`` and ``speaker_conditioned`` (true: the model answers ``speakers``, diarization-
+``supports_word_timestamps``, ``request_fields`` (after bolo 0.6.7: which of ``prompt``, ``hotwords`` and
+``temperature`` the model uses; bolo reports the others as ignored; not given: all three) and ``speaker_conditioned`` (true: the model answers ``speakers``, diarization-
 conditioned recognition of a whole recording, bolo sends it only to such models); a separation model (task ``separation``) gives ``mode``
 (``"blind"``: answers ``separate``; ``"target"``: answers ``enrol``/``extract``/``release``) and
 ``min_sample_s`` (seconds of voice a target model needs); a diarization model (task ``diarization``, bolo 0.6.7)

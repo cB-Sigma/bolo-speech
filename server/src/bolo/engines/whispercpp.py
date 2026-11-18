@@ -34,6 +34,12 @@ _PER_REQUEST = (
 )  # fmt: skip
 
 
+def initial_prompt(prompt: str | None, hotwords: str | None) -> str:
+    """The request's prompt with its hotwords after it: whisper.cpp has no hotword parameter, and terms in the
+    initial prompt steer Whisper towards their spelling (faster-whisper puts its ``hotwords`` there too)."""
+    return " ".join(part.strip() for part in (prompt, hotwords) if part and part.strip())
+
+
 class WhisperCppSTT(STTModel):
     max_chunk_s = 30.0
     supports_translate = True
@@ -46,6 +52,8 @@ class WhisperCppSTT(STTModel):
     decode_options = (
         "condition_on_previous_text", "temperature_increment_on_fallback", "log_prob_threshold", "no_speech_threshold",
     )  # fmt: skip
+    #: hotwords go into the initial prompt (after the request's prompt), as faster-whisper does with them
+    request_fields = ("prompt", "hotwords", "temperature")
 
     def __init__(self, path: Path, spec: dict[str, Any], opts: LoadOptions) -> None:
         from pywhispercpp.model import Model as CppModel
@@ -100,8 +108,9 @@ class WhisperCppSTT(STTModel):
             }
             if r.language:
                 kwargs["language"] = r.language.split("-")[0]
-            if r.prompt:
-                kwargs["initial_prompt"] = r.prompt
+            prompt = initial_prompt(r.prompt, r.hotwords)
+            if prompt:
+                kwargs["initial_prompt"] = prompt
             opts = r.options
             if opts.get("condition_on_previous_text") is not None:
                 kwargs["no_context"] = not opts["condition_on_previous_text"]

@@ -157,6 +157,8 @@ class _Server:
             )  # fmt: skip
             if model.speaker_conditioned:
                 info["speaker_conditioned"] = True
+            if "request_fields" in vars(type(model)) or "request_fields" in vars(model):
+                info["request_fields"] = list(model.request_fields)
         report = getattr(model, "placement_report", None)
         if isinstance(report, dict):  # {"gpu_bytes", "cpu_bytes", "device_map"}: how the model was split
             info["placement"] = report

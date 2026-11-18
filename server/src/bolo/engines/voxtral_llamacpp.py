@@ -86,6 +86,8 @@ class VoxtralLlamaCpp(STTModel):
 
     supports_translate = True
     supports_word_timestamps = False
+    #: transcription mode takes no text, so neither ``prompt`` nor ``hotwords`` reach the model
+    request_fields = ("temperature",)
 
     def __init__(
         self,

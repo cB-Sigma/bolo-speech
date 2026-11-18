@@ -113,6 +113,11 @@ class STTRequest:
     abort: threading.Event = field(default_factory=threading.Event, compare=False, repr=False)
 
 
+#: the free-form fields of a request a recogniser may or may not use (``STTModel.request_fields``); a temperature
+#: counts as set when it is above 0 (greedy decoding is what every model does without one)
+REQUEST_FIELDS = ("prompt", "hotwords", "temperature")
+
+
 @dataclass
 class STTResult:
     text: str
@@ -201,6 +206,9 @@ class STTModel(Model):
     #: decoding options (``bolo.stt_options.ENGINE_OPTIONS``) ``transcribe`` honours in ``STTRequest.options``;
     #: bolo passes only these and reports the others as ignored
     decode_options: tuple[str, ...] = ()
+    #: request fields (:data:`REQUEST_FIELDS`) ``transcribe`` uses; a request that sets one the model does not use
+    #: is told so (the response's ``x-bolo-ignored-options`` header), the same as an engine option it does not honour
+    request_fields: tuple[str, ...] = ()
 
     @abc.abstractmethod
     def transcribe(self, requests: list[STTRequest]) -> list[STTResult]:

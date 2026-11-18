@@ -1472,6 +1472,8 @@ class Bolo:
                 ignored = [k for k in ignored if k != "chunk_length"]  # bolo cuts the audio to it in any case
                 if word_timestamps and not stt.supports_word_timestamps:
                     ignored.append("timestamp_granularities")  # no word timings from this model
+                given = {"prompt": bool(prompt), "hotwords": bool(hotwords), "temperature": temperature > 0}
+                ignored += [k for k, on in given.items() if on and k not in stt.request_fields]
                 if vad_filter is None:
                     # vad_parameters given with the request ask for the filter; pinned ones only tune it
                     vad_filter = decode.get("vad_filter", True if options.get("vad_parameters") else None)
@@ -1484,6 +1486,8 @@ class Bolo:
                 max_repeats = int(decode.get("max_repeats", DEFAULT_MAX_REPEATS))
                 if diarize is not None and stt.speaker_conditioned:
                     ignored += [k for k in decode if k in ENGINE_OPTIONS or k.startswith("vad_")]
+                    if hotwords:  # speaker-conditioned decoding takes no hotwords
+                        ignored.append("hotwords")
                     self._note_ignored(trace, spec.id, ignored)
                     if separate is not None:
                         raise _conditioned_separation(spec.id)

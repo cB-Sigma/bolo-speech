@@ -93,6 +93,10 @@ def test_whispercpp_options_reach_whisper_cpp_and_do_not_carry_over(live: LiveSe
     # a prompt and a language given to one request are gone for the next one (pywhispercpp keeps parameters)
     _post(live, vad_filter="false", prompt="Order status call.", language="de")
     assert _params(live)["initial_prompt"] == "Order status call." and _params(live)["language"] == "de"
+    # hotwords follow the prompt in the initial prompt (whisper.cpp has no hotword parameter), and are not ignored
+    hot = _post(live, vad_filter="false", prompt="Order status call.", hotwords="Zintrava Labs")
+    assert "x-bolo-ignored-options" not in hot.headers
+    assert _params(live)["initial_prompt"] == "Order status call. Zintrava Labs"
     again = _post(live, vad_filter="false").json()
     after = _params(live)
     assert {k: after[k] for k in _PER_REQUEST} == {k: defaults[k] for k in _PER_REQUEST}

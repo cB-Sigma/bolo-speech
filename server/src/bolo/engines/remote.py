@@ -72,6 +72,9 @@ SETTLE_S = 3.0
 
 class RemoteSTT(STTModel):
     max_batch = 1
+    #: each provider adapter checks these itself (``Adapter.unsupported``: an error, or dropped with
+    #: ``ignore_unsupported``)
+    request_fields = ("prompt", "hotwords", "temperature")
 
     def __init__(self, registry: ProviderRegistry, adapter: Adapter, name: str, spec: dict[str, Any]) -> None:
         self.registry = registry

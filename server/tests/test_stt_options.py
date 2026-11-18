@@ -224,6 +224,44 @@ def test_options_a_model_cannot_honour_are_dropped_and_named(live: LiveServer) -
     assert neg.headers["x-bolo-ignored-options"] == "vad_parameters.neg_threshold"
 
 
+def test_request_fields_a_model_does_not_use_are_named(live: LiveServer) -> None:
+    assert _post(live).status_code == 200  # loads the model
+    model = live.core.manager.loaded["fake-stt"].model
+    model.request_fields = ("prompt",)  # type: ignore[misc]
+    r = _post(live, prompt="Order status call.", hotwords="Zintrava", temperature=0.4)
+    assert r.status_code == 200
+    assert r.headers["x-bolo-ignored-options"] == "hotwords, temperature"
+    assert "x-bolo-ignored-options" not in _post(live, prompt="Order status call.", temperature=0).headers
+    model.request_fields = ("prompt", "hotwords", "temperature")  # type: ignore[misc]
+    assert "x-bolo-ignored-options" not in _post(live, hotwords="Zintrava", temperature=0.4).headers
+
+
+def test_whispercpp_puts_hotwords_into_the_initial_prompt() -> None:
+    from bolo.engines.whispercpp import WhisperCppSTT, initial_prompt
+
+    assert initial_prompt("Order status call.", "Zintrava Labs, Wadhwani") == (
+        "Order status call. Zintrava Labs, Wadhwani"
+    )
+    assert initial_prompt(None, " Zintrava ") == "Zintrava"
+    assert initial_prompt("", None) == ""
+    assert {"prompt", "hotwords", "temperature"} <= set(WhisperCppSTT.request_fields)
+
+
+def test_every_local_recogniser_says_which_request_fields_it_uses() -> None:
+    from bolo.engines.dicow_onnx import DiCoWOnnx
+    from bolo.engines.faster_whisper import FasterWhisperSTT
+    from bolo.engines.moonshine import MoonshineSTT
+    from bolo.engines.sherpa import SherpaOfflineSTT, SherpaOnlineSTT
+    from bolo.engines.voxtral_llamacpp import VoxtralLlamaCpp
+
+    assert FasterWhisperSTT.request_fields == ("prompt", "hotwords", "temperature")
+    assert VoxtralLlamaCpp.request_fields == ("temperature",)
+    assert DiCoWOnnx.request_fields == ("prompt",)
+    for cls in (MoonshineSTT, SherpaOnlineSTT):
+        assert "prompt" not in cls.request_fields and "temperature" not in cls.request_fields
+    assert "prompt" not in SherpaOfflineSTT.request_fields
+
+
 def test_language_probability_in_verbose_json(client: openai.OpenAI) -> None:
     detected = client.audio.transcriptions.create(model="fake-stt", file=wav_file(1.0), response_format="verbose_json")
     assert detected.language_probability == 0.97  # type: ignore[attr-defined]

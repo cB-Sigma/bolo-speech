@@ -111,6 +111,7 @@ class FakeSTT(STTModel):
         #: a request with this prompt gets Whisper's loop: its words, then "the" forty times ("*": every request)
         self.loop_on = opts.get("loop_on", "loop")
         self.decode_options = tuple(opts.get("decode_options", self._all_options()))
+        self.request_fields = tuple(opts.get("request_fields", ("prompt", "hotwords", "temperature")))
         self.seen_options: list[dict[str, Any]] = []  # STTRequest.options of every request
         #: honours STTRequest.abort (option ``abortable``); ``aborted`` counts the decodes it stopped part-way
         self.abortable = bool(opts.get("abortable", True))

@@ -140,6 +140,7 @@ class DiCoW(STTModel):
     speaker_conditioned = True
     supports_translate = True
     supports_word_timestamps = False
+    request_fields = ("prompt",)
     languages = WHISPER_LANGUAGES
     max_chunk_s = WINDOW_S
 

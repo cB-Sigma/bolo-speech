@@ -227,7 +227,7 @@ Multipart form.
 | `vad_filter` | auto | extension. `true` forces silence removal before decoding; by default VAD is used only to split audio longer than the model's window |
 | `vad_parameters` | - | extension. Tunes the silence removal, as a JSON object or as bracketed fields (`vad_parameters[threshold]=0.6`, which is how the OpenAI SDKs send a nested `extra_body` object): `threshold` (0 to 1, default 0.5), `min_speech_duration_ms`, `max_speech_duration_s`, `min_silence_duration_ms` (default 300), `speech_pad_ms` (default 150). Given without `vad_filter`, it switches the filter on. `neg_threshold` is accepted and ignored |
 | `chunk_length` | `30` | extension. Longest piece of audio decoded at once, in seconds (1 to 30): audio longer than this goes through silence removal and is cut at pauses into pieces of at most this length, for every engine; faster-whisper also uses it as its own window. With `vad_filter=false` nothing is cut, and faster-whisper decodes the audio in windows of this length: short windows of silence are where Whisper hallucinates most, so keep the filter on with a short `chunk_length` |
-| `hotwords` | - | extension, passed to engines that support it |
+| `hotwords` | - | extension: terms to favour (comma or line separated). faster-whisper and whisper.cpp put them into the initial prompt (after `prompt`); cloud providers as in [providers.md](providers.md); a model that cannot use them names `hotwords` in `x-bolo-ignored-options` |
 | `condition_on_previous_text` | `false` | extension, Whisper models: give the decoder the text of the previous window. Off by default: it is the main cause of repetition loops on long audio |
 | `repetition_penalty` | `1` | extension, faster-whisper: penalty on tokens already generated (greater than 0; 1 is off; 1.1 to 1.3 is a usual value against loops) |
 | `no_repeat_ngram_size` | `0` | extension, faster-whisper: never generate the same n-gram of this many tokens twice in a window (0 to 100; 0 is off). It also removes speech that really is repeated: a phrase said several times in one window comes out once |
@@ -320,6 +320,11 @@ An option the model cannot honour does not fail the request: it is dropped, name
 `x-bolo-ignored-options` (comma-separated) and in the request log (`ignored_options`), and logged at `INFO`.
 faster-whisper decodes requests with options other than `repetition_penalty` and `no_repeat_ngram_size` one at a
 time instead of in a batch with others. Speaker-conditioned models (DiCoW) ignore the Whisper options.
+
+The same goes for `prompt`, `hotwords` and a `temperature` above 0 when the model does not use them: faster-whisper
+uses all three; whisper.cpp all three (hotwords join the prompt); Voxtral (llama.cpp) only `temperature`; DiCoW only
+`prompt`; the other local recognisers (sherpa-onnx, Moonshine) none. A plugin model says which it uses
+(`request_fields` in its load reply); one that does not is given all three.
 
 `text`, `srt` and `vtt` return plain text. Fields bolo cannot fill honestly
 are present with neutral values (`tokens: []`, `compression_ratio: 0.0`;

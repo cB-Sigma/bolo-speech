@@ -24,6 +24,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   models and did not say so. Words now come from whisper.cpp's token timestamps (`token_timestamps`, computed after
   decoding, so the text does not change; set per request and not carried over). A model that cannot give word times
   now names `timestamp_granularities` in `x-bolo-ignored-options`.
+- **whisper.cpp ignored `hotwords` without saying so.** They now go into whisper.cpp's initial prompt, after the
+  request's `prompt`, as faster-whisper does with them. More generally, `prompt`, `hotwords` and a `temperature`
+  above 0 given to a model that does not use them (sherpa-onnx and Moonshine recognisers, Voxtral for prompt and
+  hotwords, DiCoW for hotwords and temperature) are now named in `x-bolo-ignored-options` and the request log, like
+  the decoding options a model cannot honour. Plugin models say which they use (`request_fields`).
 
 ### Added
 

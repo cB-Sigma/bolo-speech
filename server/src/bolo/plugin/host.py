@@ -41,6 +41,7 @@ import numpy as np
 
 from bolo import procs
 from bolo.engines.base import (
+    REQUEST_FIELDS,
     ConversationChunk,
     ConversationRequest,
     DenoiseModel,
@@ -419,6 +420,9 @@ class PluginSTT(_PluginModelMixin, STTModel):
         self.supports_translate = bool(info.get("supports_translate"))
         self.supports_word_timestamps = bool(info.get("supports_word_timestamps"))
         self.speaker_conditioned = bool(info.get("speaker_conditioned"))
+        # a plugin model that does not say which request fields it uses is given (and trusted with) all of them
+        fields = info.get("request_fields")
+        self.request_fields = tuple(fields) if isinstance(fields, list) else REQUEST_FIELDS
 
     def transcribe_speakers(self, request: SpeakerRequest) -> list[STTResult]:
         if not self.speaker_conditioned:

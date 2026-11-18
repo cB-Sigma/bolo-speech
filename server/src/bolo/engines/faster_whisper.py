@@ -52,6 +52,7 @@ class FasterWhisperSTT(STTModel):
         "log_prob_threshold", "no_speech_threshold", "temperature_increment_on_fallback",
         "hallucination_silence_threshold", "chunk_length",
     )  # fmt: skip
+    request_fields = ("prompt", "hotwords", "temperature")
 
     def __init__(self, path: Path, spec: dict[str, Any], opts: LoadOptions) -> None:
         from faster_whisper import BatchedInferencePipeline, WhisperModel

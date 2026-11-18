@@ -105,7 +105,7 @@ messages before their final reply. Replies to different requests may interleave.
 | --- | --- | --- |
 | `hello` | `protocol` (highest version bolo speaks) | `protocol` (version used), `name`, `version`, `kinds` |
 | `health` | - | `rss_mb` |
-| `load` | `model`, `kind`, `task`, `path`, `options`, `threads`, `device`, `placement` (optional) | `handle`, `sample_rate`, `info` (`voices`, `languages`, `max_batch`, `supports_translate`, `supports_word_timestamps`, `speaker_conditioned`, `placement`) |
+| `load` | `model`, `kind`, `task`, `path`, `options`, `threads`, `device`, `placement` (optional) | `handle`, `sample_rate`, `info` (`voices`, `languages`, `max_batch`, `supports_translate`, `supports_word_timestamps`, `request_fields` (which of `prompt`, `hotwords`, `temperature` the model uses; not given: all three), `speaker_conditioned`, `placement`) |
 | `unload` | `handle` | - |
 | `transcribe` | `handle`, `requests: [{n, language, task, prompt, word_timestamps, temperature, hotwords}]` + the audio of all requests, concatenated | `results: [{text, language, segments: [{start, end, text, words}], words: [{w, t0, t1}]}]` |
 | `speakers` | `handle`, `n`, `language`, `task`, `prompt`, `word_timestamps`, `temperature`, `frame_s`, `frames`, `speakers` + `n` audio samples, then the speaker activity (`frames` x `speakers` float32, frame by frame) | `results`: one per speaker, as for `transcribe`, times from the start of the audio |
