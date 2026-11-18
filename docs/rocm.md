@@ -74,6 +74,18 @@ An APU (Radeon 780M and the like) has a small VRAM carve-out (512 MB to 1 GB) an
 bolo treats a GPU with less than 2 GB of VRAM as unified memory and plans with the machine's available memory, as on
 Apple Silicon.
 
+### On Windows
+
+There is no sysfs on Windows: `bolo doctor` lists a Radeon through DXGI, as a DirectML adapter (`dml:N`), and adds a
+line saying what ROCm means for it. AMD's HIP runtime for Windows covers the Radeon RX 6000, 7000 and 9000 series and
+Radeon PRO W6000/W7000 (RDNA 2 to 4); for those, doctor says that llama-server's ROCm (HIP) build can use the card
+(`bolo components install llama-server --flavour rocm`; the archive brings its own HIP runtime DLLs and needs a recent
+Adrenalin driver). For other Radeons (integrated graphics such as the Radeon 780M, RX 5000 and older) it says
+"ROCm: not available on Windows for this GPU". Either way the ONNX Runtime engines use the GPU through DirectML
+(`device = "dml"`, with `onnxruntime-directml`) and llama-server through its Vulkan build (`device = "vulkan"`).
+MIGraphX, ROCm builds of PyTorch and the rest of ROCm are Linux only for bolo. Doctor matches the card's name; it
+does not ask the driver, and none of this has been run on a Radeon by bolo's maintainers.
+
 ## Several AMD GPUs
 
 `rocm:N` numbers GPUs as HIP does: PCI order, after `HIP_VISIBLE_DEVICES` (else `ROCR_VISIBLE_DEVICES`). With
@@ -86,5 +98,5 @@ keeps no per-process figure in sysfs, so `bolo ps` measures a load by the device
   size, but bolo has not started them.
 - sherpa-onnx and faster-whisper have no ROCm builds; their models run on the CPU.
 - The `gpus` setting and NVML-based per-process memory are NVIDIA only.
-- Windows: only llama-server's HIP build. ONNX Runtime engines can use an AMD GPU there through DirectML
-  (`device = "dml"`).
+- Windows: only llama-server's HIP build, on RDNA 2 and newer Radeon cards (see "On Windows"). ONNX Runtime engines
+  use an AMD GPU there through DirectML (`device = "dml"`).

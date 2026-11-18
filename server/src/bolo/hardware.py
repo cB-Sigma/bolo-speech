@@ -1230,6 +1230,10 @@ def detect(
             "(onnxruntime-migraphx), llama.cpp (its HIP build) and the torch plugin (a ROCm build of PyTorch) on it: "
             "docs/rocm.md"
         )
+    if hw.system == "windows":
+        for g in hw.gpus:
+            if g.vendor == "amd":
+                hw.notes.append(windows_rocm_note(g))
     best = hw.best_gpu()
     if best is not None and hw.device == "cpu":
         example = device_for(best)
@@ -1246,6 +1250,28 @@ def detect(
                 f'device = "{device_for(best)}"'
             )
     return hw
+
+
+#: Radeon cards AMD's HIP runtime for Windows covers (RDNA 2 to 4: RX 6000, 7000 and 9000, Radeon PRO W6000/W7000),
+#: which llama.cpp's Windows ROCm build of llama-server is for
+_WINDOWS_HIP = re.compile(r"Radeon\s*(?:\(TM\)\s*)?(?:RX\s*(?:6[4-9]|7[6-9]|9[06])\d\d|PRO\s*W[67]\d\d\d)", re.I)
+
+
+def windows_rocm_note(gpu: Gpu) -> str:
+    """What ROCm means on Windows for an AMD GPU: only llama-server's ROCm (HIP) build, and only on the Radeon cards
+    AMD's HIP runtime for Windows covers; everything else in bolo reaches the GPU through DirectML (or Vulkan)."""
+    name = gpu.name.split(" (dml:")[0]
+    if _WINDOWS_HIP.search(name):
+        return (
+            f"ROCm on Windows ({name}): only llama-server's ROCm (HIP) build uses it (bolo components install "
+            "llama-server --flavour rocm; it brings its own HIP runtime and needs a recent Adrenalin driver; not run "
+            "by bolo's maintainers); ONNX Runtime engines use DirectML (device = \"dml\"), and llama-server's Vulkan "
+            "build works too: docs/rocm.md"
+        )
+    return (
+        f'ROCm: not available on Windows for this GPU ({name}); bolo uses DirectML (device = "dml") or '
+        'llama-server\'s Vulkan build (device = "vulkan") for it: docs/rocm.md'
+    )
 
 
 def device_for(gpu: Gpu) -> str:

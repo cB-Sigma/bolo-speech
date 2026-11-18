@@ -246,3 +246,28 @@ def test_recommend_counts_an_amd_gpu_with_rocm() -> None:
     assert gpu_for(_spec("tts-server", "tts-server"), on) == (amd, None)
     assert gpu_for(_spec("sherpa-onnx"), on) == (None, "sherpa-onnx has no ROCm build")
     assert gpu_for(_spec("mlx", "mlx-audio-stt"), on)[0] is None
+
+
+def test_windows_doctor_says_what_rocm_means_for_a_radeon(tmp_path: Path) -> None:
+    """On Windows the Radeon is listed through DirectML; doctor says whether ROCm (llama-server's HIP build) applies."""
+    from bolo.config import Settings
+    from bolo.winhw import Adapter
+
+    def notes(name: str, vram: int) -> list[str]:
+        host = FakeHost(
+            system="windows", machine="AMD64",
+            adapters=[Adapter(0, name, 0x1002, vram, 8 * GB, False, vram // 2, 0)],
+        )  # fmt: skip
+        return [n for n in hw.detect(Settings(data_dir=tmp_path), host).notes if "ROCm" in n]
+
+    integrated = notes("AMD Radeon(TM) Graphics", 512 * 1024 * 1024)
+    assert (
+        len(integrated) == 1
+        and "ROCm: not available on Windows for this GPU (AMD Radeon(TM) Graphics)" in integrated[0]
+    )
+    assert 'DirectML (device = "dml")' in integrated[0]
+    card = notes("AMD Radeon RX 7900 XTX", 24 * GB)
+    assert len(card) == 1 and "--flavour rocm" in card[0] and "not available" not in card[0]
+    assert "not available" in notes("AMD Radeon RX 5700 XT", 8 * GB)[0]
+    assert "--flavour rocm" in notes("AMD Radeon RX 9070 XT", 16 * GB)[0]
+    assert not [n for n in hw.detect(None, _amd_host(rocm=True)).notes if "Windows" in n]

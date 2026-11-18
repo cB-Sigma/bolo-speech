@@ -27,6 +27,10 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **`bolo doctor` on Windows says what ROCm means for a Radeon.** The card is listed through DirectML as before; a
+  line now says either that llama-server's ROCm (HIP) build can use it (Radeon RX 6000, 7000 and 9000, Radeon PRO
+  W6000/W7000) or "ROCm: not available on Windows for this GPU", with DirectML and Vulkan named as the routes bolo
+  uses. Matched on the card's name; untested on a Radeon. docs/rocm.md, "On Windows".
 - **Voice conversion: `POST /v1/audio/voice-conversion`.** Speech in, the same words out in another voice: a
   saved voice, a reference clip or an uploaded recording. Five catalog models on audio.cpp, each with its licence:
   OpenVoice v2's tone colour converter (MIT, the default), MeanVC2 (Apache-2.0), Chatterbox VC (MIT), RVC (MIT base

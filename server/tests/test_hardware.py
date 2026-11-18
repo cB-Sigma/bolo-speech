@@ -599,7 +599,9 @@ def test_hybrid_laptop_integrated_first_then_nvidia(tmp_path: Path) -> None:
     assert nvidia.dml_index == 1 and nvidia.dml_preferred and not nvidia.integrated
     assert amd.name == "AMD Radeon(TM) Graphics (dml:0)" and amd.integrated and not amd.dml_preferred
     assert found.best_gpu() is nvidia and found.best_gpu("dml") is None
-    assert any('device = "cuda"' in n for n in found.notes) and not any("Radeon" in n for n in found.notes)
+    # the Radeon is named only in the line that says what ROCm means for it on Windows
+    assert any('device = "cuda"' in n for n in found.notes)
+    assert not any("Radeon" in n for n in found.notes if "ROCm" not in n)
     assert found.to_dict()["gpus"][0]["dml_index"] == 1
     # without nvidia-smi or NVML both come from DXGI; "dml" (no number) is the NVIDIA card
     dxgi_only = hw.detect(settings(tmp_path), _windows(adapters))
@@ -652,7 +654,8 @@ def test_integrated_graphics_never_become_the_best_gpu(tmp_path: Path) -> None:
     # an APU whose BIOS carves out 2 GB still counts as integrated
     apu = [Adapter(0, "AMD Radeon(TM) Graphics", 0x1002, 2 * GB, 8 * GB, False, 2 * GB, 0)]
     found = hw.detect(settings(tmp_path), _windows(apu))
-    assert found.gpus[0].integrated and found.best_gpu() is None and not any("device =" in n for n in found.notes)
+    assert found.gpus[0].integrated and found.best_gpu() is None
+    assert not any("device =" in n for n in found.notes if "ROCm" not in n)
     assert is_integrated("amd", "AMD Radeon 780M Graphics", 4 * GB)
     assert is_integrated("intel", "Intel(R) Arc(TM) Graphics", 2 * GB)  # Meteor Lake's integrated Arc
     assert not is_integrated("intel", "Intel(R) Arc(TM) A770 Graphics", 16 * GB)
