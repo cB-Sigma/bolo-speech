@@ -1,7 +1,9 @@
 """The latency numbers the console shows must be right.
 
 These tests drive the real pipeline with the fake engine, whose delays are
-known exactly, and check every reported duration against them.
+known, and check every reported duration against them. Where a sleep can
+overrun (a loaded machine; macOS runners oversleep by 80 ms and more), the
+check is against what the fake engine's calls really took (its ``spans``).
 """
 
 from __future__ import annotations
@@ -38,6 +40,10 @@ def phase(trace: Trace, name: str) -> float:
     return sum(p.dur_ms for p in trace.phases if p.name == name)
 
 
+def ms(seconds: float) -> float:
+    return seconds * 1000
+
+
 async def test_stt_decode_phase_matches_engine_delay(core: Bolo) -> None:
     add(core, "t-stt", "fake-stt", base_delay_s=0.400, delay_per_audio_s=0.0)
     await core.manager.load("t-stt")
@@ -59,17 +65,21 @@ async def test_stt_decode_phase_matches_engine_delay(core: Bolo) -> None:
 
 async def test_stt_queue_phase_measures_waiting_behind_another_request(core: Bolo) -> None:
     add(core, "t-q", "fake-stt", base_delay_s=0.400, delay_per_audio_s=0.0, max_batch=1)
-    await core.manager.load("t-q")
+    entry = await core.manager.load("t-q")
     t1 = Trace("stt", "http", "")
     first = asyncio.ensure_future(core.transcribe(speechlike(1.0), 16000, model="t-q", trace=t1))
     await asyncio.sleep(0.1)
+    arrived = time.perf_counter()
     t2 = Trace("stt", "http", "")
     await core.transcribe(speechlike(1.0), 16000, model="t-q", trace=t2)
     await first
+    (_, end1), (start2, end2) = entry.model.spans  # type: ignore[attr-defined]
     assert phase(t1, "queue") < 25
-    assert phase(t2, "queue") == pytest.approx(300, abs=TOL)  # arrived 100 ms into a 400 ms decode
-    assert phase(t2, "decode") == pytest.approx(400, abs=TOL)
-    assert t2.total_ms == pytest.approx(700, abs=TOL + 20)
+    # arrived about 100 ms into a 400 ms decode: it waited for the rest of it, then took its own
+    assert start2 >= end1
+    assert phase(t2, "queue") == pytest.approx(ms(start2 - arrived), abs=TOL)
+    assert phase(t2, "decode") == pytest.approx(ms(end2 - start2), abs=TOL)
+    assert t2.total_ms == pytest.approx(ms(end2 - arrived), abs=TOL + 20)
     assert core.stats()["models"][0]["queue"]["queue_ms"]["p95"] > 200
 
 
@@ -112,19 +122,22 @@ async def test_long_audio_is_segmented_and_first_segment_time_is_reported(core: 
 
 async def test_tts_time_to_first_audio_and_phases(core: Bolo) -> None:
     add(core, "t-tts", "fake-tts", task="tts", first_delay_s=0.400, delay_per_char_s=0.0, pieces=2)
-    await core.manager.load("t-tts")
+    entry = await core.manager.load("t-tts")
+    started = time.perf_counter()
     trace = Trace("tts", "http", "")
     arrivals: list[float] = []
     async for _chunk in core.synthesize("Hello there. General greetings to you.", model="t-tts", trace=trace):
         trace.mark_ttfa()
         arrivals.append(trace.elapsed_ms())
     core.complete_tts(trace)
-    # two sentences x two pieces; each piece costs 200 ms
+    # two sentences x two pieces; each piece costs 200 ms (what each really took: the fake's piece_spans)
     assert len(arrivals) == 4
-    assert trace.ttfa_ms == pytest.approx(200, abs=TOL)
-    assert phase(trace, "synthesize_first") == pytest.approx(200, abs=TOL)
-    assert phase(trace, "synthesize_rest") == pytest.approx(600, abs=TOL + 30)
-    assert trace.total_ms == pytest.approx(800, abs=TOL + 40)
+    pieces = entry.model.piece_spans  # type: ignore[attr-defined]
+    assert len(pieces) == 4
+    assert trace.ttfa_ms == pytest.approx(ms(pieces[0][1] - started), abs=TOL)
+    assert phase(trace, "synthesize_first") == pytest.approx(ms(pieces[0][1] - pieces[0][0]), abs=TOL)
+    assert phase(trace, "synthesize_rest") == pytest.approx(ms(pieces[-1][1] - pieces[0][1]), abs=TOL + 30)
+    assert trace.total_ms == pytest.approx(ms(pieces[-1][1] - started), abs=TOL + 40)
     assert [p.name for p in trace.phases] == ["normalize", "queue", "synthesize_first", "synthesize_rest"]
     assert trace.audio_seconds == pytest.approx(len("Hello there. General greetings to you.") * 0.06, rel=0.1)
     assert trace.rtf == pytest.approx(trace.total_ms / 1000 / trace.audio_seconds)
@@ -154,15 +167,15 @@ async def run_stream(
 
 async def test_native_stream_latency_equals_decode_step(core: Bolo) -> None:
     add(core, "t-rt", "fake-stt-streaming", step_delay_s=0.200, endpoint_silence_s=0.4)
-    await core.manager.load("t-rt")
+    entry = await core.manager.load("t-rt")
     audio = np.concatenate([speechlike(1.6), np.zeros(16000, dtype=np.float32)])
     messages, session = await run_stream(core, "t-rt", audio)
     partials = [m for m in messages if m["type"] == "partial"]
     finals = [m for m in messages if m["type"] == "final"]
     assert len(partials) >= 2 and len(finals) == 1
-    for m in partials:
-        assert m["latency_ms"] == pytest.approx(200, abs=TOL)  # receipt of the last audio -> message sent
-    assert finals[0]["latency_ms"] == pytest.approx(200, abs=TOL)
+    steps = [ms(end - start) for start, end in entry.model.stream_spans]  # type: ignore[attr-defined]
+    for m in [*partials, *finals]:  # receipt of the last audio -> message sent: one decode step (200 ms asked)
+        assert min(steps) - 1 <= m["latency_ms"] <= max(steps) + TOL
     texts = [m["text"] for m in partials]
     assert all(b.startswith(a) for a, b in zip(texts, texts[1:]))  # append-only
     assert finals[0]["text"].startswith(texts[-1])
@@ -180,7 +193,7 @@ async def test_native_stream_latency_equals_decode_step(core: Bolo) -> None:
 
 async def test_pseudo_stream_partials_and_final_latency(core: Bolo) -> None:
     add(core, "t-ps", "fake-stt", base_delay_s=0.200, delay_per_audio_s=0.0)
-    await core.manager.load("t-ps")
+    entry = await core.manager.load("t-ps")
     audio = np.concatenate([speechlike(2.4), np.zeros(16000, dtype=np.float32)])
     messages, session = await run_stream(core, "t-ps", audio)
     kinds = [m["type"] for m in messages]
@@ -191,9 +204,9 @@ async def test_pseudo_stream_partials_and_final_latency(core: Bolo) -> None:
     partials = [m for m in messages if m["type"] == "partial"]
     finals = [m for m in messages if m["type"] == "final"]
     assert len(partials) >= 3 and len(finals) == 1
-    for m in partials:  # one re-decode of the utterance: the engine's 200 ms
-        assert m["latency_ms"] == pytest.approx(200, abs=TOL)
-    assert finals[0]["latency_ms"] == pytest.approx(200, abs=TOL)
+    decodes = [ms(end - start) for start, end in entry.model.spans]  # type: ignore[attr-defined]
+    for m in [*partials, *finals]:  # one re-decode of the utterance: the engine's 200 ms
+        assert min(decodes) - 1 <= m["latency_ms"] <= max(decodes) + TOL
     gaps = [b["_at"] - a["_at"] for a, b in zip(partials, partials[1:])]
     assert min(gaps) >= 0.30  # partial_interval_ms = 350 by default
     # LocalAgreement: the stable prefix only ever grows
@@ -210,12 +223,13 @@ async def test_concurrent_streams_are_decoded_in_batches(core: Bolo) -> None:
     entry = await core.manager.load("t-many")
     audio = np.concatenate([speechlike(1.2), np.zeros(12800, dtype=np.float32)])
     results = await asyncio.gather(*[run_stream(core, "t-many", audio) for _ in range(6)])
+    steps = [ms(end - start) for start, end in entry.model.stream_spans]  # type: ignore[attr-defined]
     calls = entry.model.stream_calls  # type: ignore[attr-defined]
     assert max(calls) >= 4  # six streams advance in shared engine calls
     assert entry.queue.stats.mean_batch > 2
     for messages, _session in results:
         finals = [m for m in messages if m["type"] == "final"]
         assert len(finals) == 1
-        # even with six streams the wait is about one or two engine steps, not six
-        assert finals[0]["latency_ms"] < 100 * 3 + TOL
+        # even with six streams the wait is about one or two engine steps (100 ms asked), not six
+        assert finals[0]["latency_ms"] < 3 * max(steps) + TOL
     assert core.active_streams == 0

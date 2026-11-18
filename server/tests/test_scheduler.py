@@ -12,12 +12,15 @@ from bolo.scheduler import ModelQueue
 
 
 class Recorder:
-    """A handler with a fixed cost per call that records every batch it is given."""
+    """A handler with a fixed cost per call that records every batch it is given, and when each call really ran:
+    ``spans`` holds (start, end) on time.perf_counter, the clock ModelQueue measures with (sleeps overrun on a
+    loaded machine, macOS runners by 80 ms and more, so durations are checked against these, not the delay asked)."""
 
     def __init__(self, delay: float = 0.05, fail_on: object = None) -> None:
         self.delay = delay
         self.fail_on = fail_on
         self.batches: list[list[object]] = []
+        self.spans: list[tuple[float, float]] = []
         self.concurrent = 0
         self.max_concurrent = 0
         self._lock = threading.Lock()
@@ -27,6 +30,7 @@ class Recorder:
             self.batches.append(list(items))
             self.concurrent += 1
             self.max_concurrent = max(self.max_concurrent, self.concurrent)
+        start = time.perf_counter()
         try:
             time.sleep(self.delay)
             if self.fail_on is not None and self.fail_on in items:
@@ -35,6 +39,7 @@ class Recorder:
         finally:
             with self._lock:
                 self.concurrent -= 1
+                self.spans.append((start, time.perf_counter()))
 
 
 async def test_idle_queue_runs_immediately_without_batching_delay() -> None:
@@ -44,7 +49,9 @@ async def test_idle_queue_runs_immediately_without_batching_delay() -> None:
     assert result == "ok:1"
     assert info.batch_size == 1
     assert info.queue_ms < 15
-    assert info.run_ms == pytest.approx(30, abs=15)
+    ((start, end),) = rec.spans
+    assert info.started <= start and end <= info.finished  # run_ms spans the engine call ...
+    assert info.run_ms == pytest.approx((end - start) * 1000, abs=15)  # ... and little else
     await q.close()
 
 
@@ -53,15 +60,17 @@ async def test_jobs_that_arrive_while_busy_are_batched_together() -> None:
     q = ModelQueue("m", {"batch": rec}, max_batch=4, workers=1)
     first = asyncio.ensure_future(q.submit("batch", 0))
     await asyncio.sleep(0.02)  # the worker is now busy with job 0
+    submitted = time.perf_counter()
     rest = [asyncio.ensure_future(q.submit("batch", i)) for i in range(1, 7)]
     results = await asyncio.gather(first, *rest)
     assert [r[0] for r in results] == [f"ok:{i}" for i in range(7)]
     assert [len(b) for b in rec.batches] == [1, 4, 2]  # natural batching, capped at max_batch
     assert rec.batches[1] == [1, 2, 3, 4]  # FIFO order is preserved
     assert results[1][1].batch_size == 4
-    # queue time is measured from submission to the start of the engine call
-    assert results[1][1].queue_ms == pytest.approx(60, abs=25)
-    assert results[5][1].queue_ms == pytest.approx(140, abs=35)
+    # queue time is measured from submission to the start of the engine call: job 1 waited for the rest of job 0's
+    # call (about 60 ms), job 5 for that and the call of jobs 1 to 4 (about 140 ms)
+    assert results[1][1].queue_ms == pytest.approx((rec.spans[1][0] - submitted) * 1000, abs=25)
+    assert results[5][1].queue_ms == pytest.approx((rec.spans[2][0] - submitted) * 1000, abs=35)
     st = q.stats
     assert st.batches == 3 and st.batched_jobs == 7 and st.max_batch_seen == 4
     assert st.mean_batch == pytest.approx(7 / 3)
@@ -166,7 +175,9 @@ async def test_workers_run_in_parallel_up_to_the_pool_size() -> None:
     await asyncio.gather(*[q.submit("tts", i) for i in range(6)])
     elapsed = time.perf_counter() - t0
     assert rec.max_concurrent == 3
-    assert 0.18 < elapsed < 0.4  # two rounds of three, not six in series
+    # two rounds of three, not six in series: at least two calls long, well under the six calls' total
+    durations = sorted(end - start for start, end in rec.spans)
+    assert 2 * durations[0] <= elapsed < sum(durations) / 2
     await q.close()
 
 

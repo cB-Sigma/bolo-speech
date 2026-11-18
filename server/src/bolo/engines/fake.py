@@ -122,6 +122,9 @@ class FakeSTT(STTModel):
         self.supports_word_timestamps = True
         self.supports_translate = True
         self.calls: list[int] = []  # batch size of every transcribe() call
+        #: (start, end) on time.perf_counter of every transcribe() call's decode: what the delays really cost, which
+        #: is more than asked for wherever the OS oversleeps (tests check reported durations against these)
+        self.spans: list[tuple[float, float]] = []
         self.concurrent = 0
         self.max_concurrent = 0
         self._lock = threading.Lock()
@@ -143,6 +146,7 @@ class FakeSTT(STTModel):
         try:
             longest = max((len(r.samples) for r in requests), default=0) / self.sample_rate
             delay = self.base_delay_s + self.delay_per_audio_s * longest
+            start = time.perf_counter()
             if self.abortable:  # stops early when every request of the batch was given up
                 deadline = time.monotonic() + delay
                 while time.monotonic() < deadline and not all(r.abort.is_set() for r in requests):
@@ -151,6 +155,8 @@ class FakeSTT(STTModel):
                     self.aborted += 1
             else:
                 time.sleep(delay)
+            with self._lock:
+                self.spans.append((start, time.perf_counter()))
             out: list[STTResult] = []
             for r in requests:
                 if self.fail_on is not None and r.prompt == self.fail_on:
@@ -262,6 +268,8 @@ class FakeStreamingSTT(FakeSTT):
         level = opts.get("speech_dbfs")
         self.stream_speech_dbfs = None if level is None else float(level)
         self.stream_calls: list[int] = []
+        #: (start, end) on time.perf_counter of every decode_streams() call (see FakeSTT.spans)
+        self.stream_spans: list[tuple[float, float]] = []
         #: every word the streams "hear" is this one (a recogniser stuck in a loop)
         self.loop_word = str(opts.get("loop_word") or "")
         self.heard = 0  # samples the streams were given
@@ -273,7 +281,10 @@ class FakeStreamingSTT(FakeSTT):
     def decode_streams(self, streams: list[STTStream]) -> None:
         with self._lock:
             self.stream_calls.append(len(streams))
+        start = time.perf_counter()
         time.sleep(self.step_delay_s)
+        with self._lock:
+            self.stream_spans.append((start, time.perf_counter()))
         for s in streams:
             assert isinstance(s, _FakeStream)
             s.voiced_decoded = s.voiced_received
@@ -295,6 +306,8 @@ class FakeTTS(TTSModel):
         self.seconds_per_char = float(opts.get("seconds_per_char", 0.06))
         self.pieces = int(opts.get("pieces", 2))
         self.calls: list[str] = []
+        #: (start, end) on time.perf_counter of every piece's synthesis (see FakeSTT.spans)
+        self.piece_spans: list[tuple[float, float]] = []
         #: option ``cloning``: "clones" a reference by speaking at its dominant pitch
         self.supports_cloning = bool(opts.get("cloning"))
         self.accepts_extras = self.supports_cloning
@@ -343,7 +356,9 @@ class FakeTTS(TTSModel):
         for i in range(self.pieces):
             if cancelled and cancelled():
                 return
+            start = time.perf_counter()
             time.sleep(delay / self.pieces)
+            self.piece_spans.append((start, time.perf_counter()))
             n = per_piece if i < self.pieces - 1 else total - per_piece * (self.pieces - 1)
             t = (np.arange(n) + i * per_piece) / self.sample_rate
             yield (0.2 * np.sin(2 * np.pi * freq * t)).astype(np.float32)
