@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import sys
 
-__version__ = "0.1.7"
+__version__ = "0.1.8"
 
 
 def plugin() -> list[str]:

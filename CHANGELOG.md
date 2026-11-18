@@ -6,6 +6,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+## [0.6.10] - 2026-11-18
+
 ### Added
 
 - **tiny-voca in the browser demo.** The demo's Text to speech page offers tiny-voca's F2 and M2 voices: the

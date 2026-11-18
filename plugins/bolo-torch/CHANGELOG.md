@@ -4,6 +4,8 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-11-18
+
 ### Added
 
 - **`bolo-torch check`**, what `bolo check <model>` asks the plugin's environment: the loader and the extra's
