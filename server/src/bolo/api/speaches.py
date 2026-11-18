@@ -23,7 +23,7 @@ from bolo.api.common import get_core, read_upload
 from bolo.api.openai import _model_object
 from bolo.audio.resample import resample
 from bolo.engines.base import VadParams
-from bolo.errors import InvalidRequest, ModelNotFound
+from bolo.errors import BoloError, InvalidRequest, ModelNotFound
 from bolo.obs.trace import Trace
 from bolo.streaming.vad import detect_segments
 
@@ -166,8 +166,14 @@ async def speech_timestamps(request: Request) -> JSONResponse:
         speech_pad_s=num("speech_pad_ms", 0.0) / 1000.0,
     )
     model = str(form.get("model") or "") or None
-    if model and core.catalog.resolve(model) is None:
+    spec = core.catalog.resolve(model) if model else None
+    if spec is None:
         model = None  # speaches clients send its fixed silero id
+    else:
+        try:  # that id, when it names a detector that cannot be used here: the default, as speaches would answer
+            core.require_usable(spec)
+        except BoloError:
+            model = None
     samples, rate = await read_upload(core, file)
     trace = Trace("vad", "http", model or core.settings.default_vad)
     trace.audio_seconds = len(samples) / rate
