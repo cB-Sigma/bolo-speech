@@ -27,7 +27,7 @@ describe('TranscriptTracker', () => {
     t.partial('hello', 0.3, 120, 0)
     send(t, 1.0)
     t.partial('hello wor', 0.3, 110, 6)
-    expect(t.store.get().partial).toEqual({ text: 'hello wor', stableChars: 6 })
+    expect(t.store.get().partial).toEqual({ text: 'hello wor', stableChars: 6, t0: 0.3 })
     send(t, 0.5)
     t.speechEnd(1.9) // left at 11_880
     now += 240
@@ -116,6 +116,58 @@ describe('TranscriptTracker', () => {
     expect(s.utterances.every((u) => u.finalAt != null)).toBe(true)
     expect(s.speech[1]).toEqual({ t0: 1.2, t1: 2.3 })
     expect(s.partial).toBeNull()
+  })
+
+  it('a final that arrives after the next segment started replaces its own interim (not shown twice)', () => {
+    // seen on a loaded server: the final of segment A came ~20 s late, after segment B had started, and the last
+    // interim of A (arriving after B's speech_start) stayed on screen next to A's final
+    const t = new TranscriptTracker()
+    send(t, 0.2)
+    t.speechStart(0.2)
+    t.partial('and roughly how many', 0.2, 300, 0)
+    send(t, 2.0)
+    t.speechEnd(2.2)
+    send(t, 0.5)
+    t.speechStart(2.7) // segment B starts; A's final has not come yet
+    t.partial('and roughly how many people live there', 0.2, 900, 10) // a late interim of A
+    send(t, 0.5)
+    t.final({
+      text: 'And roughly how many people live there?',
+      t0: 0.2,
+      t1: 2.2,
+      words: null,
+      language: 'en',
+      latencyMs: 19600,
+    })
+    let s = t.store.get()
+    expect(s.finals.map((f) => f.text)).toEqual(['And roughly how many people live there?'])
+    expect(s.partial).toBeNull()
+
+    // B's own interim, shown before a late final of A, stays; A's late interim never replaces it
+    t.partial('what is', 2.7, 200, 0)
+    expect(t.store.get().partial?.text).toBe('what is')
+    send(t, 1.0)
+    t.speechEnd(3.9)
+    t.final({ text: 'What is it?', t0: 2.7, t1: 3.9, words: null, language: 'en', latencyMs: 400 })
+    s = t.store.get()
+    expect(s.partial).toBeNull()
+    expect(transcriptText(s)).toBe('And roughly how many people live there? What is it?')
+    expect(s.utterances.map((u) => u.text)).toEqual(['And roughly how many people live there?', 'What is it?'])
+  })
+
+  it('keeps the interim of the segment being spoken when an earlier final arrives late', () => {
+    const t = new TranscriptTracker()
+    t.speechStart(0)
+    t.partial('first part', 0, 100, 0)
+    t.speechEnd(1.5)
+    t.speechStart(2.0)
+    t.partial('second', 2.0, 100, 0)
+    t.partial('first part done', 0, 100, 0) // late interim of the first segment: not shown over the second
+    expect(t.store.get().partial?.text).toBe('second')
+    t.final({ text: 'First part done.', t0: 0, t1: 1.5, words: null, language: 'en', latencyMs: 9000 })
+    const s = t.store.get()
+    expect(s.partial?.text).toBe('second')
+    expect(s.finals.map((f) => f.text)).toEqual(['First part done.'])
   })
 
   it('ignores empty finals in the transcript but still closes the utterance', () => {

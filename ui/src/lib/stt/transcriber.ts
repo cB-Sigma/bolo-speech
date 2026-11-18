@@ -23,7 +23,8 @@ export interface TranscriptState {
   status: TranscriberStatus
   error: string | null
   finals: FinalSegment[]
-  partial: { text: string; stableChars: number } | null
+  /** The newest interim; `t0`: where its segment starts (audio seconds, the server's `t0`). */
+  partial: { text: string; stableChars: number; t0?: number } | null
   utterances: Utterance[]
   speech: SpeechSpan[]
   /** Seconds of audio pushed so far. */
@@ -57,6 +58,9 @@ export const emptyTranscript = (): TranscriptState => ({
   rttMs: null,
 })
 
+/** Seconds of tolerance when matching a segment's start to an utterance's (detector and recogniser disagree). */
+const START_SLACK_S = 0.05
+
 /** Something that turns a stream of 16 kHz mono blocks into a transcript. */
 export interface Transcriber {
   readonly store: Store<TranscriptState>
@@ -83,6 +87,8 @@ export class TranscriptTracker {
   private pending: Utterance[] = []
   private closed: Utterance[] = []
   private nextId = 1
+  /** Where each open utterance starts in the audio (seconds, before `timeOffset`), by utterance id. */
+  private startT = new Map<number, number>()
   /** Added to audio times, so a reconnect continues the same time axis. */
   timeOffset = 0
 
@@ -118,6 +124,7 @@ export class TranscriptTracker {
     const last = this.pending[this.pending.length - 1]
     // Reuse an utterance opened by an early partial; otherwise this is a new one.
     const u = last && last.speechEndAt == null ? last : this.add()
+    if (!this.startT.has(u.id)) this.startT.set(u.id, t)
     // The detector's timestamp beats one inferred from an early partial.
     u.speechStartAt = this.wall(t)
     if (u.firstPartialAt != null && u.firstPartialAt < u.speechStartAt) u.speechStartAt = u.firstPartialAt
@@ -134,20 +141,39 @@ export class TranscriptTracker {
     this.publish({ speech })
   }
 
+  /** The open utterance a segment starting at `t0` belongs to: the newest that started by then (a late interim of an
+   * earlier segment must not be taken for the one being spoken now). */
+  private owner(t0: number): Utterance {
+    for (let i = this.pending.length - 1; i >= 0; i--) {
+      const u = this.pending[i] as Utterance
+      const start = this.startT.get(u.id)
+      if (start == null || start <= t0 + START_SLACK_S) return u
+    }
+    return this.pending[0] ?? this.add()
+  }
+
   partial(text: string, t0: number, serverMs: number | null, stableChars?: number): void {
-    const u = this.latest()
+    const u = this.pending.length ? this.owner(t0) : this.latest()
+    if (!this.startT.has(u.id)) this.startT.set(u.id, t0)
     if (u.speechStartAt == null) u.speechStartAt = this.wall(t0)
     if (u.firstPartialAt == null && text.trim()) {
       u.firstPartialAt = this.now()
       u.firstPartialServerMs = serverMs
     }
     u.text = text
-    this.publish({ partial: { text, stableChars: Math.max(0, Math.min(text.length, stableChars ?? 0)) } })
+    const shown = this.store.get().partial
+    // an interim of an older segment never replaces the one of the segment being spoken now
+    if (shown?.t0 != null && t0 < shown.t0 - START_SLACK_S) {
+      this.publish()
+      return
+    }
+    this.publish({ partial: { text, stableChars: Math.max(0, Math.min(text.length, stableChars ?? 0)), t0 } })
   }
 
   final(seg: FinalSegment): void {
     // Finals arrive in order, so this one belongs to the oldest open utterance.
     const u = this.pending.shift() ?? newUtterance(this.nextId++)
+    this.startT.delete(u.id)
     const at = this.now()
     if (u.speechStartAt == null) u.speechStartAt = this.wall(seg.t0)
     if (u.speechEndAt == null) u.speechEndAt = Math.min(at, this.wall(seg.t1))
@@ -166,8 +192,10 @@ export class TranscriptTracker {
     const finals = seg.text.trim() ? [...s.finals, { ...seg, t0: seg.t0 + this.timeOffset, t1 }] : s.finals
     // Without VAD events the final is the only thing that closes a span; never close one that began later.
     const speech = s.speech.map((sp) => (sp.t1 == null && sp.t0 <= t1 ? { ...sp, t1 } : sp))
-    // The visible partial belongs to the newest utterance; keep it if that one is still open.
-    const partial = this.pending.length > 0 && this.pending[this.pending.length - 1]?.text ? s.partial : null
+    // The visible interim stays only if it belongs to a later segment still open: a final that arrives late (after
+    // the next segment started) replaces its own interim instead of being shown next to it.
+    const later = s.partial?.t0 == null || s.partial.t0 >= seg.t1 - START_SLACK_S
+    const partial = later && this.pending.length > 0 && this.pending[this.pending.length - 1]?.text ? s.partial : null
     this.publish({ finals, partial, speech })
   }
 
@@ -175,6 +203,7 @@ export class TranscriptTracker {
   abandon(): void {
     if (this.pending.length === 0) return
     this.pending = []
+    this.startT.clear()
     const end = this.clock.sentSeconds
     const speech = this.store.get().speech.map((sp) => (sp.t1 == null ? { ...sp, t1: end } : sp))
     this.publish({ partial: null, speech })

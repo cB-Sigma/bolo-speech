@@ -17,6 +17,12 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   NVIDIA GPU, and the plugin's README and docs/configuration.md give the CUDA index
   (`https://download.pytorch.org/whl/cu128`). The `pyannote` extra's floor stays at pyannote.audio 3.3.2 (pip takes
   4.x, which needs torch 2.8, unless `bolo-torch install pyannote` keeps an older torch); the README says so.
+- **Console: a late final no longer shows its sentence twice.** On a loaded server, when the final of a sentence
+  arrived after the next one had started, the live Speech to text view could keep that sentence's last interim on
+  screen next to its final ("and roughly how many people live there" twice). Interims and finals are now matched to
+  their segment by its start time, so a late final replaces its own interim and an older segment's interim never
+  replaces the current one. The browser demo's live view shares the fix.
+
 - **bolo-torch: installing an extra replaced a CUDA build of torch with a CPU one.** On Windows with CUDA torch installed,
   `pip install "bolo-torch[pyannote]"` let pip take the newest torchaudio, which needs a newer torch, so pip
   installed PyPI's torch 2.15, a CPU build, and pyannote ran on the CPU. A new command, `bolo-torch install
