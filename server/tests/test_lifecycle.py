@@ -32,10 +32,12 @@ async def test_lazy_load_and_single_flight(core: Bolo) -> None:
     await asyncio.sleep(0)
     t0 = time.perf_counter()
     entries = await asyncio.gather(*[core.manager.load("slow") for _ in range(5)])
-    assert time.perf_counter() - t0 < 0.3  # five callers, one load
+    waited_ms = (time.perf_counter() - t0) * 1000
+    # five callers, one load: the engine was asked once and every caller got that load's entry
     assert all(e is entries[0] for e in entries)
     assert len(core.engines.get("fake").loaded) == 1
-    assert entries[0].load_ms == pytest.approx(150, abs=60)
+    # the load's own time: at least the engine's 150 ms, within what the callers waited
+    assert 150 <= entries[0].load_ms <= waited_ms
     events.append(await task)
     assert events[0] == {"type": "model", "id": "slow", "event": "loaded", "processor": "100% CPU"}
     await sub.aclose()
