@@ -159,7 +159,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   uses. Matched on the card's name; untested on a Radeon. docs/rocm.md, "On Windows".
 - **Watermarks on synthetic speech.** Speech can carry an inaudible AudioSeal watermark, on request: `watermark` on
   speech, dialogues, voice conversion and the TTS WebSocket, `--watermark` on `bolo speak`, `bolo dialogue` and `bolo
-  convert`, and a checkbox on the console's Text to speech, Dialogue and Voice conversion pages. Off by default; the
+  convert`, and a Watermark switch with a choice of watermarker (every `watermark` model of the catalog) on the console's Text
+  to speech, Dialogue and Voice conversion pages. Off by default; the
   `watermark` setting can mark speech in cloned voices (`cloned`) or everything (`all`), and the watermark model is
   never pulled unless a mark is asked for. AudioSeal (Meta, MIT) runs as ONNX in core bolo, no PyTorch; checked against the PyTorch
   original both ways, and found again after MP3, Opus and resampling to 16 or 8 kHz on every clip tried. A

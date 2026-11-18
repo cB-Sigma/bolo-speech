@@ -5,11 +5,11 @@ import { Page } from '@/components/layout/app-shell'
 import { ModelPicker } from '@/components/model-picker'
 import { Panel } from '@/components/panel'
 import { VoiceClonePanel, type CloneReference } from '@/components/tts/voice-clone'
+import { WatermarkControl, watermarkParam, type WatermarkChoice } from '@/components/tts/watermark-control'
 import { dataUrlToBlob } from '@/components/voices/new-voice-dialog'
 import { useVoices } from '@/components/voices/use-voices'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { describeError, pickDefault, useModels } from '@/hooks/use-api'
+import { describeError, pickDefault, useInfo, useModels } from '@/hooks/use-api'
+import { autoPull } from '@/lib/capabilities'
 import { api } from '@/lib/api/client'
 import { openMicrophone, STT_RATE, type AudioSource } from '@/lib/audio/capture'
 import { concatFloat } from '@/lib/audio/pcm'
@@ -57,7 +58,9 @@ export default function ConvertPage() {
   const [useUpload, setUseUpload] = useState(false)
   const [reference, setReference] = useState<CloneReference | null>(null)
   const [busy, setBusy] = useState(false)
-  const [watermark, setWatermark] = useState(false)
+  const [watermark, setWatermark] = useState<WatermarkChoice>(null)
+  const watermarkers = useModels('watermark').models
+  const info = useInfo()
   const [result, setResult] = useState<Result | null>(null)
   const [recording, setRecording] = useState(false)
   const [elapsed, setElapsed] = useState(0)
@@ -127,7 +130,7 @@ export default function ConvertPage() {
         model: model.id,
         voice: upload ? undefined : chosen,
         reference: upload,
-        watermark,
+        watermark: watermarkParam(watermark),
       })
       const blob = await res.blob()
       setResult({
@@ -274,20 +277,16 @@ export default function ConvertPage() {
             >
               <Play className="fill-current" /> {busy ? 'Converting…' : 'Convert'}
             </Button>
-            <label
-              className="ml-2 inline-flex h-8 items-center gap-2 rounded-lg border border-input px-2.5 text-xs dark:bg-input/30"
-              title="An inaudible mark that says the speech was converted by a machine (AudioSeal)"
-            >
-              Watermark
-              <Switch
-                checked={watermark}
-                onCheckedChange={setWatermark}
-                size="sm"
-                disabled={busy}
-                aria-label="Add an inaudible watermark"
-                data-testid="convert-watermark"
-              />
-            </label>
+            <WatermarkControl
+              value={watermark}
+              onChange={setWatermark}
+              models={watermarkers}
+              defaultModel={info.data?.capabilities?.watermark?.default_model}
+              autoPull={autoPull(info.data)}
+              disabled={busy}
+              testId="convert-watermark"
+              className="mt-3"
+            />
             {result && (
               <div className="mt-4 grid gap-3" data-testid="convert-result">
                 <audio controls src={result.url} className="w-full" />

@@ -513,7 +513,7 @@ export const api = {
   /** The same words in another voice (`POST /v1/audio/voice-conversion`). */
   async convertVoice(
     source: Blob,
-    opts: { model?: string; voice?: string; reference?: Blob; watermark?: boolean },
+    opts: { model?: string; voice?: string; reference?: Blob; watermark?: string },
     signal?: AbortSignal,
   ): Promise<Response> {
     const form = new FormData()
@@ -521,7 +521,7 @@ export const api = {
     if (opts.model) form.set('model', opts.model)
     if (opts.voice) form.set('voice', opts.voice)
     if (opts.reference) form.set('reference_audio', opts.reference, 'reference.wav')
-    if (opts.watermark) form.set('watermark', 'on')
+    if (opts.watermark) form.set('watermark', opts.watermark)
     form.set('response_format', 'wav')
     return request('v1/audio/voice-conversion', { method: 'POST', body: form, signal })
   },

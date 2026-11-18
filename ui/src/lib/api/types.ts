@@ -106,6 +106,8 @@ export interface Capabilities {
   }
   /** Background noise removal (`POST /v1/audio/denoise` and the denoise option of transcriptions). */
   denoise?: { available?: boolean; installed?: boolean; default_model?: string | null; [k: string]: unknown }
+  /** Watermarks: `default` is the server's policy (off, cloned, all), `default_model` its watermarker. */
+  watermark?: { endpoint?: string; default?: string; default_model?: string | null; [k: string]: unknown }
   /** Sound events (`POST /v1/audio/tags`), newer servers. */
   audio_tagging?: { endpoint?: string; default_model?: string | null; windows?: boolean; [k: string]: unknown }
   /** Speech emotion (`POST /v1/audio/emotion`); `transcription_tags`: recognisers that tag emotions as they go. */

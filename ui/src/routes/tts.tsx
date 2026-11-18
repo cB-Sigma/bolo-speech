@@ -40,6 +40,7 @@ import {
   missingComponent,
   useComponents,
   useInfo,
+  useModels,
   useSamples,
   useSelectedModel,
   useWordLists,
@@ -64,6 +65,7 @@ import { SpeechCaptions } from '@/components/tts/speech-captions'
 import { isDemo } from '@/lib/api/config'
 import { detectSupport } from '@/lib/support'
 import { BrowserTts } from './tts-browser'
+import { WatermarkControl, watermarkParam, type WatermarkChoice } from '@/components/tts/watermark-control'
 import { VoiceClonePanel, type CloneReference } from '@/components/tts/voice-clone'
 import { startingBlend, VoiceBlendPanel } from '@/components/tts/voice-blend'
 import {
@@ -78,6 +80,7 @@ import { dataUrlToBlob, type VoiceSource } from '@/components/voices/new-voice-d
 import { useVoices } from '@/components/voices/use-voices'
 import { VoiceLibrary } from '@/components/voices/voice-library'
 import {
+  autoPull,
   canClone,
   followsInstructions,
   cloudNotice,
@@ -165,7 +168,8 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
   const [lists, setLists] = useState<string[]>([])
   const [romanised, setRomanised] = useState('')
   const [instructions, setInstructions] = useState('')
-  const [watermark, setWatermark] = useState(false)
+  const [watermark, setWatermark] = useState<WatermarkChoice>(null)
+  const watermarkers = useModels('watermark').models
   const wordLists = useWordLists()
   // Saved voices (the server's library): one can stand in for the model's voice when the model clones voices.
   const library = useVoices()
@@ -217,7 +221,7 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
     romanised: roman || undefined,
     detectLanguage: detect ? undefined : false,
     instructions: direction || undefined,
-    watermark: watermark ? 'on' : undefined,
+    watermark: watermarkParam(watermark),
   }
   const forcedHttp = clone || ssml
   const fromServer = (samples.data?.samples ?? []).filter((s) => s.kind === 'text')
@@ -628,20 +632,15 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
                   />
                 </label>
               )}
-              <label
-                className="flex h-8 items-center gap-2 rounded-lg border border-input px-2.5 text-xs dark:bg-input/30"
-                title="An inaudible mark that says the speech was made by a machine (AudioSeal); bolo can detect it later"
-              >
-                Watermark
-                <Switch
-                  checked={watermark}
-                  onCheckedChange={setWatermark}
-                  size="sm"
-                  disabled={busy}
-                  aria-label="Add an inaudible watermark"
-                  data-testid="tts-watermark"
-                />
-              </label>
+              <WatermarkControl
+                value={watermark}
+                onChange={setWatermark}
+                models={watermarkers}
+                defaultModel={info.data?.capabilities?.watermark?.default_model}
+                autoPull={autoPull(info.data)}
+                disabled={busy}
+                testId="tts-watermark"
+              />
               {wordLists.offered && (
                 <WordListSelect names={listNames} value={chosenLists} onChange={setLists} disabled={busy} />
               )}

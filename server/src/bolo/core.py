@@ -517,6 +517,13 @@ class Bolo:
                 "windows": True,
                 "transcription_tags": [m.id for m in self.catalog.all() if m.kind == "sense_voice"],
             },
+            # watermarks (docs/api.md, "Watermarks"): opt-in per request unless the policy says otherwise
+            "watermark": {
+                "endpoint": "/v1/audio/watermark/detect",
+                "default": s.watermark,
+                "default_model": s.watermark_model,
+                "models": [m.id for m in self.catalog.all() if m.task == "watermark" and not m.builtin],
+            },
             # voice conversion (docs/api.md, "Voice conversion")
             "voice_conversion": {
                 "endpoint": "/v1/audio/voice-conversion",

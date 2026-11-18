@@ -70,7 +70,7 @@ export function dialogueBody(
   model: string | undefined,
   turns: DialogueTurn[],
   voices: Record<string, string>,
-  opts: { mode?: DialogueMode; pauseMs?: number; instructions?: string; watermark?: boolean } = {},
+  opts: { mode?: DialogueMode; pauseMs?: number; instructions?: string; watermark?: string } = {},
 ): DialogueBody {
   const kept = turns.map((t) => ({ speaker: t.speaker.trim(), text: t.text.trim() })).filter((t) => t.speaker && t.text)
   const speakers = speakersOf(kept)
@@ -83,7 +83,7 @@ export function dialogueBody(
     mode: opts.mode && opts.mode !== 'auto' ? opts.mode : undefined,
     pause_ms: opts.pauseMs,
     instructions: opts.instructions?.trim() || undefined,
-    watermark: opts.watermark ? 'on' : undefined,
+    watermark: opts.watermark,
     response_format: 'wav',
   }
 }

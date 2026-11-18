@@ -952,8 +952,8 @@ server's `watermark_payload`.
 
 **Which speech is marked.** None, unless asked: watermarking is off by default. `watermark` on `POST
 /v1/audio/speech`, `POST /v1/audio/dialogue`, `POST /v1/audio/voice-conversion` and the TTS WebSocket, `--watermark`
-on `bolo speak`, `bolo dialogue` and `bolo convert`, and a checkbox on the console's Text to speech, Dialogue and
-Voice conversion pages: `true` / `"on"` (the server's `watermark_model`), `false` / `"off"`, or a watermark model's
+on `bolo speak`, `bolo dialogue` and `bolo convert`, and a Watermark switch with a watermarker picker on the console's Text to
+speech, Dialogue and Voice conversion pages: `true` / `"on"` (the server's `watermark_model`), `false` / `"off"`, or a watermark model's
 id. Without it the server's `watermark` setting decides: `off` (the default), `cloned` (speech in a cloned voice: a
 saved voice, `reference_audio`, a one-take dialogue, voice conversion) or `all`. While nothing asks for a mark the
 watermark model is neither loaded nor pulled. The answer says what happened: `x-bolo-watermark: audioseal-16bits`,
@@ -976,7 +976,8 @@ installed watermarker, the most certain first, each in `results`). Answer:
 `bolo watermark detect clip.wav` prints the same (exit status 0 when marked, 1 when not; `--json`).
 **`POST /v1/audio/watermark`** adds the server's mark to a recording you send (multipart `file`, `model`,
 `response_format`, `sample_rate`); `bolo watermark embed in.wav -o out.wav`. The console has a Watermark page to
-drop a clip on, and a watermark checkbox on Text to speech, Dialogue and Voice conversion.
+drop a clip on, and a Watermark switch with a watermarker picker on Text to speech, Dialogue and Voice conversion.
+`GET /api/v1/info` lists them under `capabilities.watermark` (`default`, `default_model`, `models`).
 
 **Checked.** The ONNX graphs (DarumaHQ/audioseal-onnx, revision 55477a4) against the PyTorch original
 (`audioseal` 0.2.0, torch 2.15 CPU) on an 11.8 s clip: the generators differ by at most 4.5e-7; audio marked by
