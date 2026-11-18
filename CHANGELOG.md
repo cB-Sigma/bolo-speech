@@ -21,6 +21,14 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   model's `device` option) answered 400 ("this torch 2.15.0+cpu has no a ROCm build of torch"). The model now loads
   on the CPU with a warning, as the built-in engines do, and bolo shows why: the plugin reports the fallback with the
   load, and the model's placement says CPU with a notice (`bolo ps`, `GET /api/v1/ps`).
+- **`bolo keys` with the server running: changes took no effect and the server undid them.** A key revoked with
+  `bolo keys revoke` went on working, and a key made with `bolo keys create` was refused (401); the next time the
+  server wrote its usage counters it put its own copy of the file back, so the revoked key showed active again and
+  the new key disappeared (with the `api_key` setting set, the server never read the file again at all). Every
+  write to `api-keys.json` is now a read-modify-write under a lock file (`api-keys.json.lock`), merged key by key,
+  and usage counters are added to what the file holds rather than written over it; the server looks at the file's
+  stamp at most every 0.5 s before authenticating (at once for a key it does not know), so a revoke takes effect
+  within half a second and a new key at once.
 - **Plugins run in Python's UTF-8 mode.** Model code that opens a text file without naming an encoding read it with
   the Windows code page and failed (MaskGCT's bundled g2p: `UnicodeDecodeError`); plugin processes now start with
   `PYTHONUTF8=1` unless a plugin's own environment or the user sets it.

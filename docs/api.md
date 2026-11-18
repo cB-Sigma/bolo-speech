@@ -1521,7 +1521,11 @@ bolo keys delete key_3f9a1c0e2b7d                              # removes it and 
 ```
 
 `bolo keys` writes `<data_dir>/api-keys.json` (mode 0600) directly, with the
-server running or stopped: a running server notices the change. Only a SHA-256
+server running or stopped. Every writer (the server, the CLI) takes the lock file
+`api-keys.json.lock`, reads the file again and merges its change into it key by
+key, so neither undoes the other's; a running server looks at the file at most
+every half second before authenticating (at once for a key it does not know), so
+a key revoked with the CLI stops working within that time. Only a SHA-256
 hash of each key is stored; the key is shown once. Authentication is on as soon
 as the file holds one key, revoked or not (revoking every key locks the server;
 deleting them all opens it again, as before).

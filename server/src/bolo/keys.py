@@ -11,8 +11,9 @@ The ``api_key`` setting stays what it was: one root key with every scope. On top
 Only a SHA-256 hash of each key is stored; the key itself is shown once, when it is created. Authentication is
 on when the ``api_key`` setting is set or the store holds at least one key (revoked and expired keys count:
 revoking every key locks the server rather than opening it; only deleting them all opens it again). The store is a
-plain file: ``bolo keys create`` writes it with the server stopped or running (a running server reads it again
-when it changes).
+plain file: ``bolo keys`` changes it with the server stopped or running. Every writer reads the file again under a
+lock file and merges its change into what it finds, key by key, so neither undoes the other's changes, and a
+running server notices a changed file within :data:`CHECK_EVERY_S` (a revoked key stops working, a new one works).
 """
 
 from __future__ import annotations
@@ -27,12 +28,14 @@ import os
 import secrets
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from bolo.errors import AuthError, BoloError, InvalidRequest, Overloaded
+from bolo.locks import FileLock, replace_file
 
 log = logging.getLogger("bolo.keys")
 
@@ -50,6 +53,11 @@ PREFIX = "bolo_"
 FILE_NAME = "api-keys.json"
 #: usage counters are written back at most this often (seconds); key changes are written at once
 FLUSH_EVERY_S = 10.0
+#: how often a request looks whether another process (``bolo keys``) changed the key file (seconds): a key revoked
+#: there stops working within this time
+CHECK_EVERY_S = 0.5
+#: how long a write waits for another process's write to the key file
+LOCK_TIMEOUT_S = 10.0
 
 
 class RateLimited(Overloaded):
@@ -230,92 +238,187 @@ OPEN = Principal(None)
 ROOT = Principal(None, root=True)
 
 
+@dataclass
+class _Usage:
+    """A key's counters this process has not written to the file yet. They are added to what the file holds when
+    they are written, so counts from other processes (and changes to the key itself) are kept."""
+
+    requests: int = 0
+    rejected: int = 0
+    period: str = ""
+    period_requests: int = 0
+    by_scope: dict[str, int] = field(default_factory=dict)
+    last_used_at: float | None = None
+
+    def add_to(self, key: ApiKey) -> None:
+        key.requests += self.requests
+        key.rejected += self.rejected
+        for scope, n in self.by_scope.items():
+            key.by_scope[scope] = key.by_scope.get(scope, 0) + n
+        if self.last_used_at is not None and (key.last_used_at or 0.0) < self.last_used_at:
+            key.last_used_at = self.last_used_at
+        if self.period:
+            if key.period == self.period:
+                key.period_requests += self.period_requests
+            elif not key.period or key.period < self.period:  # the file's count is of an earlier period, or reset
+                key.period, key.period_requests = self.period, self.period_requests
+
+
+_STORED_FIELDS = tuple(ApiKey("", "", "", "", [], 0.0).stored())
+
+
 class KeyStore:
+    """The key file as this process sees it.
+
+    Several processes use the file at once (the server, ``bolo keys`` with the server running), so
+
+    * every write is a read-modify-write under a lock file (``api-keys.json.lock``, :class:`bolo.locks.FileLock`):
+      the file is read again with the lock held, this process's change and its unwritten usage counters are applied
+      to what it holds, key by key, and the result written. A change another process made in between is kept;
+    * before authenticating, the file's stamp (mtime, size, file id) is compared with the one last read, at most
+      every :data:`CHECK_EVERY_S` (and at once for a key this process does not know), and the file read again when
+      it changed: a key revoked or created elsewhere takes effect within that time.
+    """
+
     def __init__(self, data_dir: Path | str, root_key: str | None = None) -> None:
         self.path = Path(data_dir) / FILE_NAME
         self.root_key = root_key or None
         self._lock = threading.Lock()
         self._keys: dict[str, ApiKey] = {}
         self._by_hash: dict[str, ApiKey] = {}
-        self._stamp: tuple[int, int] | None = None
-        self._dirty = False
+        self._stamp: tuple[int, int, int] | None = None
+        self._checked_at = -math.inf
+        #: usage counters not yet written, by key id
+        self._pending: dict[str, _Usage] = {}
         self._flushed_at = 0.0
-        self._load()
+        with self._lock:
+            self._refresh(force=True)
 
     # -- file -----------------------------------------------------------------------------------------------
-    def _file_stamp(self) -> tuple[int, int] | None:
+    def _file_lock(self) -> FileLock:
+        return FileLock(self.path.with_name(FILE_NAME + ".lock"), timeout=LOCK_TIMEOUT_S)
+
+    def _file_stamp(self) -> tuple[int, int, int] | None:
         try:
             st = self.path.stat()
         except OSError:
             return None
-        return (st.st_mtime_ns, st.st_size)
+        return (st.st_mtime_ns, st.st_size, st.st_ino)
 
-    def _load(self) -> None:
-        stamp = self._file_stamp()
+    def _read(self) -> dict[str, ApiKey]:
+        """The keys the file holds (with the file lock held). Raises OSError or ValueError when it cannot be read."""
+        try:
+            text = self.path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return {}
+        doc = json.loads(text)
         keys: dict[str, ApiKey] = {}
-        if stamp is not None:
+        for entry in doc.get("keys", []) if isinstance(doc, dict) else []:
             try:
-                doc = json.loads(self.path.read_text(encoding="utf-8"))
-                for entry in doc.get("keys", []) if isinstance(doc, dict) else []:
-                    try:
-                        key = ApiKey.from_stored(entry)
-                    except (KeyError, TypeError, ValueError) as exc:
-                        log.warning("ignoring a malformed entry in %s: %s", self.path, exc)
-                        continue
-                    old = self._keys.get(key.id)
-                    if old is not None:  # keep the bucket across reloads
-                        key.tokens, key.refilled_at = old.tokens, old.refilled_at
-                    keys[key.id] = key
-            except (OSError, ValueError) as exc:
-                log.warning("could not read %s: %s", self.path, exc)
-                return
-        self._keys = keys
-        self._by_hash = {k.hash: k for k in keys.values()}
+                key = ApiKey.from_stored(entry)
+            except (KeyError, TypeError, ValueError) as exc:
+                log.warning("ignoring a malformed entry in %s: %s", self.path, exc)
+                continue
+            keys[key.id] = key
+        return keys
+
+    def _show(self, keys: dict[str, ApiKey], stamp: tuple[int, int, int] | None) -> None:
+        """Go by ``keys`` (what the file holds) from now on, with this process's unwritten counters on top. A key
+        already known keeps its object (requests in flight hold it) and its token bucket."""
+        shown: dict[str, ApiKey] = {}
+        for key_id, fresh in keys.items():
+            key = self._keys.get(key_id)
+            if key is not None and key.hash == fresh.hash:
+                for name in _STORED_FIELDS:
+                    setattr(key, name, getattr(fresh, name))
+            else:
+                key = fresh
+            usage = self._pending.get(key_id)
+            if usage is not None:
+                usage.add_to(key)
+            shown[key_id] = key
+        self._pending = {k: u for k, u in self._pending.items() if k in shown}  # deleted elsewhere: not counted
+        self._keys = shown
+        self._by_hash = {k.hash: k for k in shown.values()}
         self._stamp = stamp
+        self._checked_at = time.monotonic()
 
-    def _reload_if_changed(self) -> None:
-        if self._file_stamp() != self._stamp:
-            if self._dirty:  # counters not yet written: write them first, then read the other writer's changes
-                self._write()
-            self._load()
+    def _refresh(self, *, force: bool = False) -> None:
+        """Read the file again if another process changed it (looked at most every CHECK_EVERY_S unless ``force``)."""
+        now = time.monotonic()
+        if not force and now - self._checked_at < CHECK_EVERY_S:
+            return
+        self._checked_at = now
+        if self._file_stamp() == self._stamp:
+            return
+        try:
+            with self._file_lock():
+                stamp = self._file_stamp()
+                if stamp == self._stamp:
+                    return
+                keys = self._read()
+        except (OSError, ValueError) as exc:
+            log.warning("could not read %s: %s", self.path, exc)
+            return
+        self._show(keys, stamp)
 
-    def _write(self) -> None:
-        doc = {"version": 1, "keys": [k.stored() for k in self._keys.values()]}
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_name(self.path.name + ".tmp")
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(doc, fh, indent=1)
-        with contextlib.suppress(OSError):
-            tmp.chmod(0o600)
-        tmp.replace(self.path)
-        self._stamp = self._file_stamp()
-        self._dirty = False
+    def _commit(self, change: Callable[[dict[str, ApiKey]], None] | None = None) -> None:
+        """Write the file: read it again under the file lock, add this process's unwritten counters, apply
+        ``change`` to the keys it holds, and write the result. Nothing is written when ``change`` raises."""
+        with self._file_lock():
+            try:
+                keys = self._read()
+            except ValueError as exc:  # never overwrite a file we cannot read: the keys in it would be lost
+                raise BoloError(f"{self.path} cannot be read ({exc}); fix or remove it") from exc
+            for key_id, usage in self._pending.items():
+                if key_id in keys:
+                    usage.add_to(keys[key_id])
+            if change is not None:
+                change(keys)
+            doc = {"version": 1, "keys": [k.stored() for k in keys.values()]}
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self.path.with_name(self.path.name + ".tmp")
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                json.dump(doc, fh, indent=1)
+            with contextlib.suppress(OSError):
+                tmp.chmod(0o600)
+            replace_file(tmp, self.path)
+            stamp = self._file_stamp()
+        self._pending = {}
         self._flushed_at = time.monotonic()
+        self._show(keys, stamp)
 
     def flush(self) -> None:
         with self._lock:
-            if self._dirty:
-                self._write()
+            if self._pending:
+                self._commit()
 
     # -- state ----------------------------------------------------------------------------------------------
+    def _known(self) -> bool:
+        """Whether there are stored keys (with the lock held); with none, the file is looked at every time, so
+        the first key made elsewhere turns authentication on at once."""
+        self._refresh()
+        if not self._keys:
+            self._refresh(force=True)
+        return bool(self._keys)
+
     @property
     def enabled(self) -> bool:
         """Whether requests need a key."""
         if self.root_key:
             return True
         with self._lock:
-            self._reload_if_changed()
-            return bool(self._keys)
+            return self._known()
 
     def all(self) -> list[ApiKey]:
         with self._lock:
-            self._reload_if_changed()
+            self._refresh(force=True)
             return sorted(self._keys.values(), key=lambda k: k.created_at)
 
     def get(self, key_id: str) -> ApiKey:
         with self._lock:
-            self._reload_if_changed()
+            self._refresh(force=True)
             key = self._keys.get(key_id)
         if key is None:
             raise InvalidRequest(f"no API key with id {key_id!r}", param="id")
@@ -355,17 +458,19 @@ class KeyStore:
             quota_period=quota_period,
             expires_at=now + float(days) * 86400 if days else None,
         )
+
+        def add(keys: dict[str, ApiKey]) -> None:
+            keys[key.id] = key
+
         with self._lock:
-            self._reload_if_changed()
-            self._keys[key.id] = key
-            self._by_hash[key.hash] = key
-            self._write()
-        return key, secret
+            self._commit(add)
+            return self._keys[key.id], secret
 
     def update(self, key_id: str, changes: dict[str, Any]) -> ApiKey:
-        with self._lock:
-            self._reload_if_changed()
-            key = self._keys.get(key_id)
+        bucket = "rate_limit" in changes or "burst" in changes
+
+        def apply(keys: dict[str, ApiKey]) -> None:
+            key = keys.get(key_id)
             if key is None:
                 raise InvalidRequest(f"no API key with id {key_id!r}", param="id")
             if "name" in changes and changes["name"] is not None:
@@ -377,10 +482,8 @@ class KeyStore:
                 key.scopes = parse_scopes(changes["scopes"])
             if "rate_limit" in changes:
                 key.rate_limit = _positive(changes["rate_limit"], "rate_limit", allow_float=True)
-                key.tokens = -1.0
             if "burst" in changes:
                 key.burst = _positive(changes["burst"], "burst")  # type: ignore[assignment]
-                key.tokens = -1.0
             if "quota" in changes:
                 key.quota = _positive(changes["quota"], "quota")  # type: ignore[assignment]
             if changes.get("quota_period") is not None:
@@ -391,33 +494,43 @@ class KeyStore:
                     key.period, key.period_requests = "", 0
             if changes.get("reset_usage"):
                 key.period, key.period_requests = "", 0
-            self._write()
+
+        with self._lock:
+            self._commit(apply)
+            key = self._keys[key_id]
+            if bucket:
+                key.tokens = -1.0  # a new limit starts with a full bucket
             return key
 
     def revoke(self, key_id: str, *, delete: bool = False) -> None:
-        with self._lock:
-            self._reload_if_changed()
-            key = self._keys.get(key_id)
+        def apply(keys: dict[str, ApiKey]) -> None:
+            key = keys.get(key_id)
             if key is None:
                 raise InvalidRequest(f"no API key with id {key_id!r}", param="id")
             if delete:
-                del self._keys[key_id]
-                self._by_hash.pop(key.hash, None)
+                del keys[key_id]
             elif key.revoked_at is None:
                 key.revoked_at = time.time()
-            self._write()
+
+        with self._lock:
+            self._commit(apply)
 
     # -- requests -------------------------------------------------------------------------------------------
     def authenticate(self, presented: str | None) -> Principal:
         """Who ``presented`` is. Raises :class:`AuthError` when keys are needed and it is not a valid one."""
-        if not self.enabled:
-            return OPEN
-        if not presented:
-            raise AuthError("API key required. Provide it in the Authorization header using the Bearer scheme.")
-        if self.root_key and hmac.compare_digest(presented.encode(), self.root_key.encode()):
-            return ROOT
         with self._lock:
-            key = self._by_hash.get(hash_key(presented))
+            known = self._known()
+            if not self.root_key and not known:
+                return OPEN
+            if not presented:
+                raise AuthError("API key required. Provide it in the Authorization header using the Bearer scheme.")
+            if self.root_key and hmac.compare_digest(presented.encode(), self.root_key.encode()):
+                return ROOT
+            digest = hash_key(presented)
+            key = self._by_hash.get(digest)
+            if key is None:  # perhaps a key created by another process a moment ago
+                self._refresh(force=True)
+                key = self._by_hash.get(digest)
         if key is None:
             raise AuthError("Incorrect API key provided.")
         if key.revoked_at is not None:
@@ -437,12 +550,15 @@ class KeyStore:
             )
         now = time.time()
         with self._lock:
+            usage = self._pending.setdefault(key.id, _Usage())
             period = period_key(key.quota_period, now)
             if key.period != period:
                 key.period, key.period_requests = period, 0
+            if usage.period != period:
+                usage.period, usage.period_requests = period, 0
             if key.quota is not None and key.period_requests >= key.quota:
                 key.rejected += 1
-                self._dirty = True
+                usage.rejected += 1
                 end = _period_end(key.quota_period, now)
                 raise QuotaExceeded(
                     f"this API key has used its quota of {key.quota} requests per {key.quota_period}",
@@ -457,7 +573,7 @@ class KeyStore:
                 key.refilled_at = now
                 if key.tokens < 1.0:
                     key.rejected += 1
-                    self._dirty = True
+                    usage.rejected += 1
                     raise RateLimited(
                         f"rate limit of {key.rate_limit:g} requests per minute reached for this API key",
                         retry_after_s=(1.0 - key.tokens) / rate,
@@ -467,10 +583,16 @@ class KeyStore:
             key.period_requests += 1
             key.by_scope[scope] = key.by_scope.get(scope, 0) + 1
             key.last_used_at = now
-            self._dirty = True
+            usage.requests += 1
+            usage.period_requests += 1
+            usage.by_scope[scope] = usage.by_scope.get(scope, 0) + 1
+            usage.last_used_at = now
             if time.monotonic() - self._flushed_at >= FLUSH_EVERY_S:
-                with contextlib.suppress(OSError):
-                    self._write()
+                try:
+                    self._commit()
+                except (OSError, BoloError) as exc:  # counted again at the next write
+                    log.debug("could not write the usage counters to %s: %s", self.path, exc)
+                    self._flushed_at = time.monotonic()
 
 
 # -- which scope a route needs ----------------------------------------------------------------------------

@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import io
 import json
+import subprocess
+import sys
+import threading
 import time
 from pathlib import Path
 
@@ -13,7 +16,7 @@ import pytest
 
 from bolo.config import Settings
 from bolo.errors import AuthError
-from bolo.keys import KeyStore, QuotaExceeded, RateLimited, ScopeError, period_key, scope_for
+from bolo.keys import KeyStore, Principal, QuotaExceeded, RateLimited, ScopeError, period_key, scope_for
 from conftest import LiveServer, wav_bytes
 
 
@@ -167,3 +170,90 @@ def test_cli_keys(settings: Settings, tmp_path: Path, capsys: pytest.CaptureFixt
     assert json.loads(capsys.readouterr().out)["rate_limit"] == 30
     assert main(["keys", "revoke", key_id, "--data-dir", data]) == 0
     assert "revoked" in capsys.readouterr().out
+
+
+def _bolo_keys(data_dir: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    """``bolo keys`` in a process of its own, as when it is typed in another terminal while the server runs."""
+    return subprocess.run(
+        [sys.executable, "-m", "bolo", "keys", *args, "--data-dir", str(data_dir)],
+        capture_output=True, text=True, timeout=120, check=True,
+    )  # fmt: skip
+
+
+def _status(base: str, secret: str) -> int:
+    return httpx.get(base + "/v1/models", headers={"Authorization": f"Bearer {secret}"}).status_code
+
+
+def test_cli_changes_reach_a_running_server_and_are_kept(settings: Settings) -> None:
+    """``bolo keys create`` and ``bolo keys revoke`` with the server running: the server goes by them at once
+    (within CHECK_EVERY_S), and its own writes of usage counters never put the old keys back."""
+    from bolo import keys as keys_mod
+
+    srv = LiveServer(settings)
+    srv.start()
+    try:
+        base = srv.url
+        admin = httpx.post(base + "/api/v1/keys", json={"name": "ops"}).json()
+        assert _status(base, admin["key"]) == 200  # the server now has usage counters it has not written yet
+        made = _bolo_keys(settings.data_dir, "create", "app", "--scopes", "read,stt").stdout
+        app = made.strip().splitlines()[-1]
+        assert app.startswith("bolo_")
+        assert _status(base, app) == 200  # a key made with the CLI works at once
+        assert _status(base, admin["key"]) == 200
+        app_id = next(k.id for k in KeyStore(settings.data_dir).all() if k.name == "app")
+        _bolo_keys(settings.data_dir, "revoke", app_id)
+        time.sleep(keys_mod.CHECK_EVERY_S + 0.2)
+        r = httpx.get(base + "/v1/models", headers={"Authorization": f"Bearer {app}"})
+        assert r.status_code == 401 and "revoked" in r.json()["error"]["message"]
+        assert _status(base, admin["key"]) == 200
+        srv.core.keys.flush()  # the server writes its counters: the CLI's changes stay
+        listed = {k["name"]: k for k in json.loads(_bolo_keys(settings.data_dir, "list", "--json").stdout)}
+        assert set(listed) == {"ops", "app"}
+        assert listed["app"]["active"] is False and listed["app"]["usage"]["requests"] == 1
+        assert listed["ops"]["active"] is True and listed["ops"]["usage"]["requests"] >= 3
+    finally:
+        srv.stop()
+    stored = json.loads((settings.data_dir / "api-keys.json").read_text(encoding="utf-8"))["keys"]
+    assert {k["name"]: k["revoked_at"] is not None for k in stored} == {"ops": False, "app": True}
+
+
+def test_a_writer_never_undoes_another_writers_change(tmp_path: Path) -> None:
+    from bolo import keys as keys_mod
+
+    server = KeyStore(tmp_path, root_key="fake-root-key")  # with the api_key setting too, changes are noticed
+    cli = KeyStore(tmp_path)
+    key, secret = server.create("app", ["stt"])
+    server.admit(server.authenticate(secret), "stt")  # written at once (the first write of counters)
+    server.admit(server.authenticate(secret), "stt")  # held back for FLUSH_EVERY_S
+    cli.revoke(key.id)
+    _, other = cli.create("other", ["tts"])
+    assert server.authenticate(other).key is not None  # a key this process does not know: the file is read at once
+    time.sleep(keys_mod.CHECK_EVERY_S + 0.05)
+    with pytest.raises(AuthError, match="revoked"):
+        server.authenticate(secret)
+    server.flush()
+    stored = {k["name"]: k for k in json.loads((tmp_path / "api-keys.json").read_text(encoding="utf-8"))["keys"]}
+    assert set(stored) == {"app", "other"} and stored["app"]["revoked_at"] is not None
+    assert stored["app"]["requests"] == 2 and stored["app"]["by_scope"] == {"stt": 2}
+    # counters of a key deleted elsewhere are dropped, not written back as a key
+    server.admit(Principal(server.get(key.id)), "stt")
+    cli.revoke(key.id, delete=True)
+    server.flush()
+    assert [k.name for k in KeyStore(tmp_path).all()] == ["other"]
+
+
+def test_writers_in_parallel_lose_nothing(tmp_path: Path) -> None:
+    """Each writer reads the file again under the lock file, so keys created at the same moment by several
+    processes (here: stores of their own in threads; the lock is per open file) all end up in it."""
+
+    def make(n: int) -> None:
+        store = KeyStore(tmp_path)
+        for i in range(5):
+            store.create(f"k{n}-{i}", ["read"])
+
+    threads = [threading.Thread(target=make, args=(n,)) for n in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=60)
+    assert len(KeyStore(tmp_path).all()) == 30
