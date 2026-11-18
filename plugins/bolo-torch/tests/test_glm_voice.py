@@ -3,6 +3,8 @@ text and speech, the decoder's growing blocks."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 from bolo.engines.base import ConversationRequest, ConversationTurn
@@ -142,7 +144,7 @@ def test_load_wires_the_pieces(tmp_path, monkeypatch) -> None:  # type: ignore[n
         assert [k for k, _ in loaded] == ["tokenizer", "model", "features"]
         assert loaded[0][1] == {"trust_remote_code": True} and loaded[1][1]["trust_remote_code"] is True
         assert model.whisper.path.endswith("glm-4-voice-tokenizer") and model.decoder.kw["device"] == "cpu"
-        assert model.decoder.kw["config_path"].endswith("glm-4-voice-decoder/config.yaml")
+        assert Path(model.decoder.kw["config_path"]).as_posix().endswith("glm-4-voice-decoder/config.yaml")
         with pytest.raises(InvalidRequest, match="quantization"):
             glm_voice.load(
                 LoadContext("glm-4-voice", "speech-to-speech", root, {**ctx.options, "quantization": "int3"})
