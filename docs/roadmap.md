@@ -34,6 +34,7 @@ Suggestions and pull requests are welcome; open an issue first for anything mark
 | Singing voice synthesis | missing | M | DiffSinger / OpenUtau voicebanks (licence per voicebank), YuE |
 | Accent conversion | missing | L | Voice-conversion models with an accent-target reference |
 | Dubbing (translate and re-voice with timing) | missing | M-L | Recognition, translation, a cloning voice and duration fitting, on top of forced alignment |
+| Watermarking with the original PyTorch models | ONNX ports only (AudioSeal; Perth and WavMark next) | S | bolo-torch catalog entries for `audioseal`, `resemble-perth` and `wavmark`, behind the same `watermark` option and detect endpoint |
 
 ## Voice agents and telephony
 
