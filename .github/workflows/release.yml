@@ -8,10 +8,11 @@ name: Release
 #     server/src/bolo/__init__.py and the tag vX.Y.Z is created by this workflow.
 #   * Push a tag vX.Y.Z (it must match the package version).
 #
-# Needs the repository secret PYPI_API_TOKEN (a PyPI API token for bolo).
+# Publishes through PyPI trusted publishing: bolo-speech and bolo-torch each list this repository and
+# release.yml as a trusted publisher on PyPI; no token is stored.
 #
 # The PyTorch engine plugin (plugins/bolo-torch) is released separately: "Run workflow" with
-# package = bolo-torch. It builds the plugin, publishes it to PyPI with the same PYPI_API_TOKEN and
+# package = bolo-torch. It builds the plugin, publishes it to PyPI the same way and
 # creates the GitHub release bolo-torch-vX.Y.Z; nothing of bolo itself runs. Publish bolo first: the
 # plugin depends on bolo>=0.2. The first upload of a new PyPI project needs a token that is not
 # scoped to an existing project (an account-wide token, or add a project-scoped one afterwards), and
@@ -87,14 +88,14 @@ jobs:
     name: publish to PyPI
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # PyPI trusted publishing: no stored token
     steps:
       - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
 
   release:
     name: GitHub release and tag
@@ -229,14 +230,14 @@ jobs:
     name: publish bolo-torch to PyPI
     needs: plugin-torch-build
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # PyPI trusted publishing: no stored token
     steps:
       - uses: actions/download-artifact@v8
         with:
           name: dist-bolo-torch
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
 
   plugin-torch-release:
     name: bolo-torch GitHub release and tag

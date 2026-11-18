@@ -138,7 +138,7 @@ Apache License 2.0.
 2. Merge to `main` with CI green.
 3. Run the **Release** workflow from the Actions tab ("Run workflow" on
    `main`). It builds the console and the distributions, publishes them to
-   PyPI with the `PYPI_API_TOKEN` repository secret, creates the tag
+   PyPI through trusted publishing (no stored token), creates the tag
    `vX.Y.Z` and the GitHub release with generated notes, and pushes the
    container image (after a smoke test of it). Pushing a tag `vX.Y.Z` by hand
    starts the same workflow.
