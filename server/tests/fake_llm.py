@@ -109,9 +109,12 @@ class FakeLLM:
                         for piece in (fn["arguments"][:half], fn["arguments"][half:]):
                             emit({"tool_calls": [{"index": 0, "function": {"arguments": piece}}]})
                     words = text.split(" ") if text else []
+                    started = time.perf_counter()
                     for i, word in enumerate(words):
                         emit({"content": word + ("" if i == len(words) - 1 else " ")})
-                        time.sleep(owner.token_delay_s)
+                        # paced against the clock, not sleep after sleep: where sleeps overrun (macOS runners, by
+                        # 80 ms and more) the overruns do not add up over the words of a long answer
+                        time.sleep(max(0.0, started + (i + 1) * owner.token_delay_s - time.perf_counter()))
                     emit({}, "tool_calls" if tool else "stop")
                     if (body.get("stream_options") or {}).get("include_usage"):
                         self.wfile.write(

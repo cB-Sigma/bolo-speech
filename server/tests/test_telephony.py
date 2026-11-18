@@ -124,7 +124,8 @@ def events(record: dict[str, Any], kind: str) -> list[dict[str, Any]]:
     return [e for e in record["timeline"] if e["type"] == kind]
 
 
-TALK = {"steps": [{"wait_for_agent": True}, {"speech_s": 2.0}, {"silence": 1.6}, {"hangup": True}]}
+# the caller hangs up once the agent has answered (not after a fixed pause: on a slow machine the answer takes longer)
+TALK = {"steps": [{"wait_for_agent": True}, {"speech_s": 2.0}, {"wait_for_agent": True}, {"hangup": True}]}
 
 
 # -- signatures ---------------------------------------------------------------------------------------------
@@ -480,7 +481,7 @@ async def test_barge_in_clears_the_providers_queue_and_truncates_the_answer(phon
     scenario = {
         "steps": [
             {"wait_for_agent": True}, {"speech_s": 2.0}, {"interrupt": {"after_s": 1.0, "speech_s": 1.5}},
-            {"silence": 1.5}, {"hangup": True},
+            {"wait_for_agent": True}, {"hangup": True},
         ],
         "expect": [{"type": "barge_in"}],
     }  # fmt: skip
@@ -722,7 +723,7 @@ async def test_an_outbound_call_answered_by_a_person(phone: Phone) -> None:
     assert found
     link.stream_url, link.token = found.group(1), token
     report = await run_scenario(phone.server.core, TALK, provider="twilio", link=link)
-    record = phone.call(call["id"])
+    record = phone.wait_ended(call["id"])  # the server closes the record once it has seen the stream end
     assert report["caller"]["agent_audio_s"] > 2
     assert (
         record["direction"] == "outbound" and record["answered_by"] == "human" and record["outcome"] == "caller_hangup"
@@ -756,7 +757,7 @@ async def test_voicemail_is_hung_up_on_or_left_a_message(phone: Phone) -> None:
     report = await run_scenario(
         phone.server.core, {"steps": [{"wait_for_end": True}], "max_s": 15}, provider="twilio", link=link
     )
-    record = phone.call(call["id"])
+    record = phone.wait_ended(call["id"])
     assert record["outcome"] == "voicemail" and report["after"] == "hangup"
     assert [(e["kind"], e["text"]) for e in record["transcript"]] == [("voicemail_message", "Please call us back.")]
     assert report["caller"]["agent_audio_s"] == pytest.approx(len("Please call us back.") * 0.06, abs=0.3)
@@ -895,7 +896,7 @@ async def test_the_caller_can_speak_with_tts_or_from_a_file(phone: Phone, tmp_pa
             {"say": "I would like to book a table for two."},  # spoken by the server's text-to-speech
             {"wait_for_agent": True},
             {"audio": str(recording)},  # a 16 kHz recording, resampled to the line's 8 kHz
-            {"silence": 1.5},
+            {"wait_for_agent": True},
             {"hangup": True},
         ],
         "expect": [{"type": "turns_min", "value": 2}, {"type": "caller_heard_as", "contains": "the quick"}],
