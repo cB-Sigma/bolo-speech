@@ -72,7 +72,9 @@ request (bolo 0.5) is
 ``{"device_map": "auto", "max_memory": {"0": bytes, "cpu": bytes}}`` when bolo's scheduler found less free
 accelerator memory than the model needs: a plugin that can split the model (accelerate's ``device_map``) may use it,
 and answers with ``info.placement`` = ``{"gpu_bytes", "cpu_bytes", "device_map"}``; a plugin that cannot ignores
-it. Segments are ``{start, end, text, words}``, words ``{w, t0, t1}``.
+it. ``info.device`` (optional, bolo 0.6.11) is the device the plugin put the model on (``mps``, ``cuda:0``, ``cpu``):
+when that is an accelerator and bolo placed the model on the CPU, bolo moves its placement there. Segments are
+``{start, end, text, words}``, words ``{w, t0, t1}``.
 
 Versioning: bolo sends the highest version it speaks in ``hello``; the plugin answers with the
 version it will use (at most bolo's). A plugin that cannot speak any version bolo knows answers

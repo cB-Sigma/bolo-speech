@@ -191,6 +191,22 @@ def _fall_back(note: str) -> str:
     return "cpu"
 
 
+#: model kinds whose output is wrong on Apple silicon's GPU with the torch versions tried, so they run on the CPU there
+#: (with the reason, which bolo shows) rather than return noise
+MPS_WRONG = {
+    "parler-tts": "its speech comes out as noise on MPS, in float16 and in float32 (torch 2.15, an M4 Pro, "
+    "2026-11-19); the CPU's is right",
+}
+
+
+def cpu_instead_of_mps(kind: str, model_id: str, device: str) -> str:
+    """``device``, or the CPU (with a fallback note) for a kind :data:`MPS_WRONG` names when ``device`` is MPS."""
+    why = MPS_WRONG.get(kind)
+    if why and device.partition(":")[0] == "mps":
+        return _fall_back(f"'{model_id}' runs on the CPU, not mps: {why}")
+    return device
+
+
 #: how to get a CUDA build of torch (PyPI's torch is CPU only on Windows; docs/configuration.md)
 CUDA_TORCH = "pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128"
 

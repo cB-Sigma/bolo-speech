@@ -16,6 +16,7 @@ from bolo_torch import __version__
 from bolo_torch.runtime import (
     InvalidRequest,
     LoadContext,
+    cpu_instead_of_mps,
     pick_device,
     pick_dtype,
     set_threads,
@@ -87,6 +88,7 @@ class TorchEngine(Engine):
     def load(self, kind: str, task: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Model:
         loader = self._loader(kind)
         device = pick_device(opts.device, spec)
+        device = cpu_instead_of_mps(kind, str(spec.get("model_id", path.name)), device)
         dtype = pick_dtype(device, spec)
         threads = set_threads(opts.threads)
         ctx = LoadContext(
@@ -104,4 +106,5 @@ class TorchEngine(Engine):
             "loaded %s (%s) on %s, %s, %d threads in %.1f s",
             ctx.model_id, kind, device, str(dtype).replace("torch.", ""), threads, time.perf_counter() - t0,
         )  # fmt: skip
+        setattr(model, "ran_on", device)  # noqa: B010 (where it really runs: bolo shows that, not its own placement)
         return model

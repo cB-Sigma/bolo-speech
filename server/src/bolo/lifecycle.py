@@ -934,6 +934,10 @@ class ModelManager:
             with contextlib.suppress(TypeError, ValueError):
                 vram, measured, source = int(report["gpu_bytes"]), True, "plugin"
                 place.gpu_bytes, place.cpu_bytes = vram, int(report.get("cpu_bytes") or 0)
+        ran = getattr(model, "ran_on", None)
+        if isinstance(ran, str) and family(place.device) == "cpu" and family(ran) not in ("cpu", ""):
+            # the plugin chose its GPU itself (BOLO_TORCH_DEVICE): bolo ps and the console say where it runs
+            place.ran_on_gpu(ran, f"'{spec.id}' runs on {ran}, as the plugin's own device setting chose")
         # An estimate. RSS growth during the load reads low, sometimes zero, when the allocator reuses memory
         # that an unloaded model gave back, so it is never taken to be less than the model's files on disk.
         ram = grown if vram_before.unified else grown + vram

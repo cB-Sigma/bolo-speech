@@ -315,13 +315,17 @@ class ProviderFallback:
         if self.runtime.startswith("plugin:"):
             name = f"the {self.runtime.removeprefix('plugin:')} plugin"
         asked = _SHORT.get(self.requested, self.requested)
+        fix = f"; fix: {self.recipe}" if self.recipe else ""
+        if self.requested.partition(":")[0] in ("cpu", "") and self.detail:
+            # placed on the CPU by bolo; the runtime turned down a GPU of its own choosing (a plugin's own device
+            # setting): its own words say which and why
+            return f"{name}: {self.detail.strip().splitlines()[-1][:300]}{fix}"
         why = (
             f" ({', '.join(self.missing)} {'is' if len(self.missing) == 1 else 'are'} missing)" if self.missing else ""
         )
         if not why and self.detail:
             why = f" ({self.detail.strip().splitlines()[-1][:200]})"
         part = f" for its {self.role}" if self.role else ""
-        fix = f"; fix: {self.recipe}" if self.recipe else ""
         return f"{name} could not start {asked}{part}{why} and runs on the CPU{fix}"
 
     def to_dict(self) -> dict[str, Any]:

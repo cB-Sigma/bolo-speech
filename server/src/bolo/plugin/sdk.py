@@ -165,6 +165,9 @@ class _Server:
         fallback = getattr(model, "device_fallback", None)
         if isinstance(fallback, str) and fallback:  # asked for a GPU the plugin's runtime cannot reach: on the CPU
             info["device_fallback"] = fallback
+        ran = getattr(model, "ran_on", None)
+        if isinstance(ran, str) and ran:  # the device the model runs on ("mps", "cuda:0", "cpu"), when it knows
+            info["device"] = ran
         report = getattr(model, "placement_report", None)
         if isinstance(report, dict):  # {"gpu_bytes", "cpu_bytes", "device_map"}: how the model was split
             info["placement"] = report

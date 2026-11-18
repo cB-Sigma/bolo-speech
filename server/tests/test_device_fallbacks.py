@@ -454,3 +454,12 @@ def test_the_catalog_keeps_soprano_on_audiocpp_off_metal() -> None:
 
     entry = Catalog.load().resolve("soprano-1.1-80m-audiocpp")
     assert entry is not None and "segmentation fault" in entry.options["cpu_only_on"]["metal"]
+
+
+def test_a_model_the_plugin_put_on_its_gpu_is_shown_there() -> None:
+    """bolo-torch with BOLO_TORCH_DEVICE=mps loaded demucs-dns48 "on mps, float16" while bolo ps said "100% CPU on cpu"
+    (an M4 Pro): the plugin's load reply names the device and the placement follows it."""
+    p = Placement(device="cpu", requested="cpu", cpu_bytes=541 << 20)
+    p.ran_on_gpu("mps", "'demucs-dns48' runs on mps, as the plugin's own device setting chose")
+    assert p.device == "mps" and p.gpu_bytes == 541 << 20 and p.cpu_bytes == 0
+    assert p.processor() == "100% GPU" and "plugin's own device setting" in (p.notice or "")

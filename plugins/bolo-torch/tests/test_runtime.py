@@ -168,3 +168,30 @@ def test_a_gpu_this_torch_cannot_reach_runs_on_the_cpu_and_says_so(monkeypatch: 
     monkeypatch.setattr(torch.version, "cuda", "12.8")  # a CUDA build without a visible GPU
     assert runtime.pick_device("cuda") == "cpu"
     assert "sees no CUDA device" in (runtime.take_device_fallback() or "")
+
+
+def test_the_documented_plugin_commands_run_a_module_that_exists() -> None:
+    """docs/plugins.md told people to run `python -m bolo_torch.plugin`, which does not exist: the plugin crashed with
+    "No module named bolo_torch.plugin". Every module the docs name after `-m` for this plugin must be importable."""
+    import importlib.util
+    import re
+    from pathlib import Path
+
+    docs = Path(__file__).resolve().parents[3] / "docs" / "plugins.md"
+    modules = set(re.findall(r"-m (bolo_torch[\w.]*)", docs.read_text(encoding="utf-8")))
+    assert modules, "no plugin command found in docs/plugins.md"
+    for module in modules:
+        assert importlib.util.find_spec(module) is not None, f"docs/plugins.md runs a missing module: {module}"
+
+
+def test_parler_runs_on_the_cpu_when_mps_is_chosen() -> None:
+    """Parler-TTS on MPS spoke noise in float16 and float32 (torch 2.15, an M4 Pro); the CPU's speech is right."""
+    from bolo_torch import runtime
+
+    assert runtime.take_device_fallback() is None
+    assert runtime.cpu_instead_of_mps("parler-tts", "parler-tts-tiny-v1", "mps") == "cpu"
+    note = runtime.take_device_fallback()
+    assert note is not None and "noise on MPS" in note and "parler-tts-tiny-v1" in note
+    assert runtime.cpu_instead_of_mps("parler-tts", "p", "cuda:0") == "cuda:0"  # only MPS
+    assert runtime.cpu_instead_of_mps("demucs-denoiser", "d", "mps") == "mps"  # other kinds keep it
+    assert runtime.take_device_fallback() is None

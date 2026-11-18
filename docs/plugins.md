@@ -36,10 +36,10 @@ A plugin is found in two ways:
 
   ```toml
   # bolo.toml
-  plugins = ["torch=/opt/bolo-torch/venv/bin/python -m bolo_torch.plugin"]
+  plugins = ["torch=/opt/bolo-torch/venv/bin/python -m bolo_torch"]
   ```
 
-  or `BOLO_PLUGINS="torch=/opt/bolo-torch/venv/bin/python -m bolo_torch.plugin"`.
+  or `BOLO_PLUGINS="torch=/opt/bolo-torch/venv/bin/python -m bolo_torch"`.
 
 The plugin then appears as engine `plugin:torch` in `bolo doctor`, `/api/v1/info` and
 `/api/v1/components`, and catalog entries with `engine: plugin:torch` become usable. Until it is
@@ -87,7 +87,7 @@ Implement bolo's ordinary engine interface (`bolo.engines.base.Engine`, returnin
 `TTSModel` objects) in the plugin package, and serve it:
 
 ```python
-# bolo_torch/plugin.py
+# bolo_torch/__main__.py (so that `python -m bolo_torch` serves it)
 from bolo.plugin.sdk import serve
 from bolo_torch.engine import TorchEngine
 

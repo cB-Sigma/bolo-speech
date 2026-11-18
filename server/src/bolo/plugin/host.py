@@ -455,6 +455,10 @@ class _PluginModelMixin:
             # how the plugin split the model across the GPU and the CPU (optional; bolo 0.5)
             report = (reply.get("info") or {}).get("placement")
             self.placement_report = dict(report) if isinstance(report, dict) else None
+            # where the plugin put the model (optional, bolo 0.6.11): its own device setting (BOLO_TORCH_DEVICE=mps)
+            # can choose a GPU although bolo placed the model on the CPU
+            ran = (reply.get("info") or {}).get("device")
+            self.ran_on = str(ran) if isinstance(ran, str) and ran else None
             fallback = (reply.get("info") or {}).get("device_fallback")
             if isinstance(fallback, str) and fallback:
                 # the plugin runs the model on the CPU although a GPU was asked for (a CPU build of torch with

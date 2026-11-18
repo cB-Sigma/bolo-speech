@@ -303,3 +303,14 @@ def test_benchmark_graph_feeds_match_the_doctor() -> None:
         "a": np.zeros((512, 512), np.float32),
     })  # fmt: skip
     assert len(out) == 2
+
+
+def test_a_plugins_own_choice_turned_down_reads_plainly() -> None:
+    """bolo placed parler-tts-tiny-v1 on the CPU; the plugin (BOLO_TORCH_DEVICE=mps) kept it off MPS: the notice said
+    "the torch plugin could not start cpu (...)". It now gives the plugin's own words."""
+    from bolo.cuda_libs import ProviderFallback
+
+    own = ProviderFallback("plugin:torch", "cpu", "cpu", [], "'parler-tts-tiny-v1' runs on the CPU, not mps: noise")
+    assert own.message() == "the torch plugin: 'parler-tts-tiny-v1' runs on the CPU, not mps: noise"
+    gpu = ProviderFallback("plugin:torch", "rocm", "cpu", [], "torch is not a ROCm build")
+    assert gpu.message() == "the torch plugin could not start rocm (torch is not a ROCm build) and runs on the CPU"

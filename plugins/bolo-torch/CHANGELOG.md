@@ -4,6 +4,18 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Fixed
+
+- **Parler-TTS spoke noise on Apple silicon's GPU.** On MPS (torch 2.15, an M4 Pro) its speech came out as noise in
+  float16 and in float32 while the CPU's was right; Parler models now run on the CPU when MPS is chosen, with the
+  reason as the load's `device_fallback` (bolo shows it in `bolo ps`).
+- **bolo showed models on the CPU that the plugin ran on MPS.** With `BOLO_TORCH_DEVICE=mps`, demucs-dns48 loaded
+  "on mps, float16" while `bolo ps` said "100% CPU on cpu": the load reply now carries the device (`info.device`) and
+  bolo moves the placement there.
+
+Checked on an M4 Pro with MPS (warm): pyannote speaker-diarization-community-1 0.83 s against 6.7 s on the CPU for
+22 s of audio, the same two speakers; SepFormer 3.4 s against 5.9 s, the same two clean tracks; demucs-dns48 works.
+
 ## [0.1.8] - 2026-11-18
 
 ### Added

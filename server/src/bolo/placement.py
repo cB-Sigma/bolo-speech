@@ -214,6 +214,14 @@ class Placement:
             self.graphs = dict.fromkeys(self.graphs, "cpu")
             self.graph_split = {}
 
+    def ran_on_gpu(self, device: str, notice: str) -> None:
+        """The runtime put a model bolo placed on the CPU on an accelerator of its own choosing (a plugin's own device
+        setting): the placement says so, so that ``device``, the processor and the memory figures are where it is."""
+        self.device = device
+        self.gpu_bytes += self.cpu_bytes
+        self.cpu_bytes = 0
+        self.notice = f"{self.notice}; {notice}" if self.notice else notice
+
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
             "device": self.device,
