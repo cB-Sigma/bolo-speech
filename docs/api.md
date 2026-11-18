@@ -105,6 +105,8 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `POST` | `/v1/audio/denoise` | Remove background noise from a recording |
 | `POST` | `/v1/audio-isolation` | Voice isolation (ElevenLabs' route) |
 | `POST` | `/v1/audio-isolation/stream` | Voice isolation, streamed (ElevenLabs' route) |
+| `POST` | `/v1/audio/tags` | Sound events and audio tags (music, speech, ...) |
+| `POST` | `/v1/audio/emotion` | Speech emotion |
 | `GET` | `/api/v1/keys` | API keys and their usage (the keys themselves are never returned) |
 | `POST` | `/api/v1/keys` | Create an API key (its value is returned once) |
 | `GET` | `/api/v1/keys/{key_id}` | One API key and its usage |
@@ -446,6 +448,64 @@ does the same from the command line.
 ElevenLabs' routes answer too: `POST /v1/audio-isolation` and `POST /v1/audio-isolation/stream` take the recording
 as multipart `audio` and send MP3 back unless `output_format` (`mp3_44100_128`, `pcm_16000`, ...: the codec is the
 part before the first `_`) or `response_format` says otherwise; `model`, `strength` and `sample_rate` as above.
+
+### Sound events and audio tags: `POST /v1/audio/tags`
+
+Extension: which sounds a recording holds, each of AudioSet's 527 classes with its own probability: speech, music
+(and its genres and instruments), singing, laughter, applause, crying, a dog, a siren, an engine, ... Classes are
+independent (speech and music at once), so probabilities do not sum to 1. Multipart form.
+
+| Field | | |
+| --- | --- | --- |
+| `file` | required | audio, as for transcriptions |
+| `model` | `default_audio_tagging` (`ced-mini`) | an `audio-tagging` model: `ced-tiny`, `ced-mini`, `ced-small`, `ced-base` (CED, Apache-2.0), `zipformer-small-audio-tagging`, `zipformer-audio-tagging` (icefall, Apache-2.0) |
+| `top_k` | `10` | most tags listed |
+| `threshold` | `0.1` | tags below this probability are left out |
+| `labels` | all | only these classes, comma-separated or repeated (`Speech,Music`): AudioSet's display names, any case |
+| `window`, `hop` | - | seconds (0.5 to 30): also tag the recording window by window (`hop` defaults to `window`), for sound event detection over time |
+| `keep_alive` | - | how long the model stays loaded |
+
+```jsonc
+{"object": "audio.tags", "model": "ced-mini", "duration": 10.0,
+ "tags": [{"label": "Whistling", "score": 0.8428}, {"label": "Music", "score": 0.3275}, {"label": "Piano", "score": 0.1374}],
+ "segments": [{"start": 0.0, "end": 2.0, "tags": [...]}, ...]}   // with window
+```
+
+A tagger hears 30 s at most at once; a longer recording without `window` is heard in 10 s windows and each class
+keeps its highest probability in any of them. `x-bolo-model` names the model; the trace has kind `audio-tagging`.
+From the command line: `bolo tags FILE [-m model] [--window 2] [--top-k 5] [--threshold 0.2] [--json]`.
+
+### Speech emotion: `POST /v1/audio/emotion`
+
+Extension: how the speaker sounds. Multipart form: `file`, `model` (an `emotion` model: `emotion2vec-plus-base`,
+`emotion2vec-plus-large`; default `default_emotion`), `top_k` (classes listed, default all), `window` and `hop`
+(as for tags) and `keep_alive`.
+
+```jsonc
+{"object": "audio.emotion", "model": "emotion2vec-plus-base", "duration": 4.1,
+ "emotion": "angry", "score": 1.0,
+ "emotions": [{"label": "angry", "score": 1.0}, {"label": "happy", "score": 0.0}, ...],
+ "segments": [{"start": 0.0, "end": 2.0, "emotion": "angry", "score": 0.98, "emotions": [...]}, ...]}  // with window
+```
+
+emotion2vec+ knows `angry`, `disgusted`, `fearful`, `happy`, `neutral`, `other`, `sad`, `surprised` and `unknown`;
+over 30 s without `window`, the probabilities of the 10 s windows that hold sound are averaged. Its weights are
+under the FunASR Model Open Source License Agreement 1.1 (attribution; "for reference and learning purposes"): read
+it before commercial use. Emotion recognition guesses how someone sounds, not how they feel; acted, synthesised or
+telephone speech and other cultures' ways of speaking move it. From the command line: `bolo emotion FILE [-m model]
+[--window 2] [--json]`.
+
+SenseVoice (`sense-voice-small`) tags emotions and sounds while it transcribes: a `verbose_json` transcription
+with it has `emotion` and `events` on each segment and, for the whole recording, `emotion` (the one heard in the
+most speech), `emotions` and `audio_events` (seconds of segments each was heard in). Emotions: `happy`, `sad`,
+`angry`, `neutral`, `fearful`, `disgusted`, `surprised`; events: `speech`, `music`, `applause`, `laughter`,
+`crying`, `sneeze`, `breath`, `cough`.
+
+```jsonc
+// POST /v1/audio/transcriptions  model=sense-voice-small  response_format=verbose_json
+{"text": "...", "segments": [{"start": 0.0, "end": 3.0, "text": "...", "emotion": "happy", "events": ["speech"], ...}],
+ "emotion": "happy", "emotions": {"happy": 3.0}, "audio_events": {"speech": 3.0}, ...}
+```
 
 ### `POST /v1/audio/speech`
 
@@ -1906,7 +1966,7 @@ differences from OpenAI are in [voice-agents.md](voice-agents.md).
 | `WS /v1/realtime?model=…` | OpenAI Realtime API over WebSocket (GA event names, as typed in `openai` 3.50.0). `?intent=transcription` or `session.update` with `type: "transcription"` for transcription-only sessions. Audio: base64 `audio/pcm` (24 kHz PCM16), `audio/pcmu`, `audio/pcma`. User transcripts arrive as incremental deltas. `turn_detection`: `server_vad`, `semantic_vad` (with the optional end-of-turn model) or `null`. Auth: `Authorization: Bearer`, or subprotocols `realtime` + `openai-insecure-api-key.<key>`; an ephemeral `ek_…` key is accepted in the same places. bolo extension `session.pipeline`: `cascade` (default, setting `realtime_pipeline`), `audio-llm` (an audio-understanding model hears the turn, bolo's TTS speaks) or `speech-to-speech` (a speech-to-speech model, first backend llama-server `/v1/realtime` with LFM3-Audio, answers with speech and tool calls; bolo keeps turn detection, barge-in, codecs and transcripts); see [voice-agents.md](voice-agents.md#pipelines-cascade-audio-in-language-model-speech-to-speech). `GET /api/v1/info` lists them under `capabilities.realtime.pipelines` |
 | `POST /v1/realtime/client_secrets` | mint an ephemeral key (`{"value": "ek_…", "expires_at", "session"}`) for browsers. Needs the server key. Body: `{"expires_after": {"anchor": "created_at", "seconds": 600}, "session": {…}}`, all optional |
 | `POST /v1/realtime/calls` | the same sessions over **WebRTC**: SDP offer in (`application/sdp`, or multipart `sdp` + `session`), `201` with the SDP answer and `Location: /v1/realtime/calls/{call_id}`. Needs `bolo-speech[webrtc]` (else `503 engine_unavailable`). `POST …/{call_id}/hangup` ends the call. Not implemented: OpenAI's SIP connector (for phone calls see [Phone calls](#phone-calls)) |
-| `POST /v1/chat/completions` | `input_audio` content parts are transcribed; `modalities: ["text","audio"]` + `audio: {voice, format}` adds a spoken reply (`message.audio`, or `delta.audio` when streaming); everything else is forwarded to the language model untouched; requests without audio are proxied as they are |
+| `POST /v1/chat/completions` | `input_audio` content parts are transcribed; `modalities: ["text","audio"]` + `audio: {voice, format}` adds a spoken reply (`message.audio`, or `delta.audio` when streaming); everything else is forwarded to the language model untouched; requests without audio are proxied as they are. |
 
 Voice-agent turns are traces of kind `agent` (transport `realtime`, `webrtc`,
 `chat` or `telephony`) with `first_token_ms` and `ttfa_ms`; see

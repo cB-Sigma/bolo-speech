@@ -36,6 +36,7 @@ from bolo.catalog import Catalog, ModelSpec
 from bolo.config import Settings
 from bolo.engines import EngineRegistry
 from bolo.engines.base import (
+    AudioClassifierModel,
     DenoiseModel,
     DiarizationModel,
     LidModel,
@@ -762,6 +763,10 @@ class ModelManager:
             denoiser = model
             handlers["denoise"] = lambda items: [denoiser.denoise(item) for item in items]
             max_batch["denoise"] = 1
+        elif isinstance(model, AudioClassifierModel):
+            classifier = model
+            handlers["classify"] = lambda items: [classifier.classify(item) for item in items]
+            max_batch["classify"] = 1
         elif isinstance(model, LidModel):
             lid = model
             handlers["lid"] = lambda items: [lid.identify(item) for item in items]

@@ -112,6 +112,8 @@ const TASK_LABEL: Record<Task, string> = {
   'speaker-embedding': 'Speaker embedding',
   'speech-to-speech': 'Speech to speech',
   'audio-llm': 'Audio-in language models',
+  'audio-tagging': 'Sound events',
+  emotion: 'Speech emotion',
 }
 const TASK_SHORT: Record<Task, string> = {
   stt: 'STT',
@@ -126,6 +128,8 @@ const TASK_SHORT: Record<Task, string> = {
   'speaker-embedding': 'Embedding',
   'speech-to-speech': 'S2S',
   'audio-llm': 'Audio LLM',
+  'audio-tagging': 'Tags',
+  emotion: 'Emotion',
 }
 const TASK_ORDER: Task[] = [
   'stt',
@@ -137,6 +141,8 @@ const TASK_ORDER: Task[] = [
   'speaker-embedding',
   'separation',
   'denoise',
+  'audio-tagging',
+  'emotion',
   'speech-to-speech',
   'audio-llm',
   'translation',

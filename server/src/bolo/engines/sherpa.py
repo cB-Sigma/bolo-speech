@@ -86,6 +86,7 @@ DIARIZATION_KINDS = ("pyannote_diarization",)
 SEPARATION_KINDS = ("voxlock",)
 DENOISE_KINDS = ("gtcrn", "dpdfnet")
 SPEAKER_EMBEDDING_KINDS = ("speaker_embedding",)
+AUDIO_TAGGING_KINDS = ("audio_tagging",)
 
 
 def find_file(path: Path, *patterns: str, required: bool = True, prefer_int8: bool = True) -> str:
@@ -144,6 +145,27 @@ def tokens_to_words(tokens: list[str], starts: list[float], end: float) -> list[
     for i in range(len(words) - 1):  # close each word where the next begins
         words[i].t1 = max(words[i].t0, min(words[i].t1, words[i + 1].t0))
     return words
+
+
+#: SenseVoice's emotion tags, as bolo names them (EMO_UNKNOWN: none)
+SENSE_VOICE_EMOTIONS = {
+    "HAPPY": "happy", "SAD": "sad", "ANGRY": "angry", "NEUTRAL": "neutral", "FEARFUL": "fearful",
+    "DISGUSTED": "disgusted", "SURPRISED": "surprised",
+}  # fmt: skip
+#: SenseVoice's audio-event tags, as bolo names them (Event_UNK: none)
+SENSE_VOICE_EVENTS = {
+    "Speech": "speech", "BGM": "music", "Applause": "applause", "Laughter": "laughter", "Cry": "crying",
+    "Sneeze": "sneeze", "Breath": "breath", "Cough": "cough",
+}  # fmt: skip
+
+
+def sense_voice_tags(emotion: str, event: str) -> tuple[str | None, list[str]]:
+    """SenseVoice's ``<|HAPPY|>`` and ``<|Laughter|>`` tags as (emotion, events); unknown tags are left out."""
+    emo = SENSE_VOICE_EMOTIONS.get(emotion.strip().strip("<|>"))
+    events = [
+        SENSE_VOICE_EVENTS[t] for t in event.replace("><", ">|<").split("|") if t.strip("<>") in SENSE_VOICE_EVENTS
+    ]
+    return emo, events
 
 
 _SENSE_VOICE_LANGS = {"<|zh|>": "zh", "<|en|>": "en", "<|ja|>": "ja", "<|ko|>": "ko", "<|yue|>": "yue"}
@@ -298,6 +320,10 @@ class SherpaOfflineSTT(STTModel):
             if tokens and len(starts) >= len(tokens):
                 words = tokens_to_words(tokens, starts, duration)
         seg = Segment(0.0, duration, text, words)
+        if self.kind == "sense_voice":
+            seg.emotion, seg.events = sense_voice_tags(
+                str(getattr(res, "emotion", "") or ""), str(getattr(res, "event", "") or "")
+            )
         return STTResult(text, detected, [seg] if text else [], words)
 
     def close(self) -> None:
@@ -1080,6 +1106,7 @@ class SherpaOnnxEngine(Engine):
         + SEPARATION_KINDS
         + DENOISE_KINDS
         + SPEAKER_EMBEDDING_KINDS
+        + AUDIO_TAGGING_KINDS
     )
 
     def status(self) -> EngineStatus:
@@ -1131,4 +1158,8 @@ class SherpaOnnxEngine(Engine):
             return SherpaDenoiser(kind, path, spec, opts)
         if kind in SPEAKER_EMBEDDING_KINDS:
             return SherpaSpeakerEmbedding(path, spec, opts)
+        if kind in AUDIO_TAGGING_KINDS:
+            from bolo.engines.audio_classify import SherpaAudioTagging
+
+            return SherpaAudioTagging(path, spec, opts)
         raise ValueError(f"sherpa-onnx engine cannot load kind {kind!r}")

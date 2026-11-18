@@ -1,5 +1,5 @@
 """Audio analysis routes: speech enhancement on its own (``/v1/audio/denoise``, with ElevenLabs' voice-isolation
-route as an alias).
+route as an alias), sound-event tags (``/v1/audio/tags``) and speech emotion (``/v1/audio/emotion``).
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from collections.abc import AsyncGenerator, AsyncIterator
 from typing import Any
 
 from fastapi import APIRouter, Request
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from bolo.api.common import get_core, parse_bool, read_upload
 from bolo.audio.encode import FORMATS, StreamEncoder, encode_audio, normalize_format
@@ -226,6 +226,83 @@ async def _denoise_response(
             core.traces.record(trace)
 
     return StreamingResponse(body(), media_type=encoder.media_type, headers=headers)
+
+
+def _float(form: Any, name: str, default: float | None = None) -> float | None:
+    raw = form.get(name)
+    if raw in (None, ""):
+        return default
+    try:
+        return float(str(raw))
+    except ValueError as exc:
+        raise InvalidRequest(f"{name} must be a number", param=name) from exc
+
+
+def _top_k(form: Any, default: int) -> int:
+    raw = form.get("top_k")
+    try:
+        value = default if raw in (None, "") else int(str(raw))
+    except ValueError as exc:
+        raise InvalidRequest("top_k must be a whole number", param="top_k") from exc
+    if not 1 <= value <= 1000:
+        raise InvalidRequest("top_k must be between 1 and 1000", param="top_k")
+    return value
+
+
+async def _classify(request: Request, task: str) -> tuple[Any, Any]:
+    from bolo.classify import classify
+
+    core = get_core(request)
+    form = await request.form()
+    file = _upload(form, "file")
+    request_keep_alive(form.get("keep_alive"), (task,))
+    spec = core.resolve(str(form.get("model") or "") or None, task)
+    window, hop = _float(form, "window"), _float(form, "hop")
+    samples, rate = await read_upload(core, file)
+    trace = Trace(task, "http", spec.id)
+    trace.audio_seconds = len(samples) / rate if rate else 0.0
+    try:
+        result = await classify(core, samples, rate, spec.id, task, trace, window, hop)
+        trace.extra[task] = result.scores[0][0] if result.scores else None
+        trace.finish("ok")
+    except Exception as exc:
+        trace.finish("error", exc.message if isinstance(exc, BoloError) else f"{type(exc).__name__}: {exc}")
+        raise
+    finally:
+        core.traces.record(trace)
+    return (form, result), {"x-request-id": trace.id, "x-bolo-model": spec.id}
+
+
+@router.post("/v1/audio/tags", tags=["native"], summary="Sound events and audio tags (music, speech, ...)")
+async def audio_tags(request: Request) -> JSONResponse:
+    """Extension. Which sounds a recording holds (AudioSet's 527 classes: speech, music and its genres and
+    instruments, laughter, applause, dog, siren, engine, ...), each with its probability. Multipart form: ``file``,
+    ``model`` (an ``audio-tagging`` model: ``ced-tiny``, ``ced-mini``, ``ced-small``, ``ced-base``,
+    ``zipformer-audio-tagging``, ``zipformer-small-audio-tagging``; default ``default_audio_tagging``), ``top_k``
+    (default 10), ``threshold`` (leave out tags below this probability, default 0.1), ``labels`` (only these
+    classes, comma-separated: ``Speech,Music``), ``window`` and ``hop`` (seconds: tag the recording window by window
+    too, for sound event detection over time) and ``keep_alive``. Classes are independent: probabilities do not
+    sum to 1."""
+    (form, result), headers = await _classify(request, "audio-tagging")
+    from bolo.classify import tags_body
+
+    labels = [x.strip() for raw in form.getlist("labels") for x in str(raw).split(",") if x.strip()] or None
+    threshold = _float(form, "threshold", 0.1)
+    assert threshold is not None
+    return JSONResponse(tags_body(result, _top_k(form, 10), threshold, labels), headers=headers)
+
+
+@router.post("/v1/audio/emotion", tags=["native"], summary="Speech emotion")
+async def audio_emotion(request: Request) -> JSONResponse:
+    """Extension. How the speaker sounds: ``emotion`` (the most likely class) with its probability and every
+    class's probability. Multipart form: ``file``, ``model`` (an ``emotion`` model: ``emotion2vec-plus-base``,
+    ``emotion2vec-plus-large``; default ``default_emotion``), ``top_k`` (classes listed, default all), ``window``
+    and ``hop`` (seconds: also window by window) and ``keep_alive``. SenseVoice's own emotion tags come back with
+    its transcriptions (``verbose_json``)."""
+    (form, result), headers = await _classify(request, "emotion")
+    from bolo.classify import emotion_body
+
+    return JSONResponse(emotion_body(result, _top_k(form, 1000)), headers=headers)
 
 
 __all__ = ["router"]

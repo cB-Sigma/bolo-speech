@@ -23,11 +23,13 @@ import numpy as np
 
 from bolo import __version__
 from bolo.engines.base import (
+    AudioTaggingModel,
     ConversationChunk,
     ConversationRequest,
     DenoiseModel,
     DiarizationModel,
     DiarizationResult,
+    EmotionModel,
     Engine,
     EngineStatus,
     FloatArray,
@@ -650,6 +652,36 @@ class FakeS2S(SpeechToSpeechModel):
             yield ConversationChunk(text=word if i == 0 else " " + word, audio=tone)
 
 
+def _dominant_hz(samples: FloatArray) -> float:
+    if len(samples) == 0 or not np.any(samples):
+        return 0.0
+    spectrum = np.abs(np.fft.rfft(samples))
+    return float(np.argmax(spectrum)) * 16000.0 / len(samples)
+
+
+class FakeTagging(AudioTaggingModel):
+    """Audio tagging by loudness and pitch (tests only): "Silence" for silence, "Music" for a tone under 400 Hz,
+    "Speech" for one at or above, each with 0.9; the other classes get 0.05."""
+
+    LABELS = ("Speech", "Music", "Silence")
+
+    def classify(self, samples: FloatArray) -> list[tuple[str, float]]:
+        hz = _dominant_hz(samples)
+        top = "Silence" if hz == 0.0 else ("Music" if hz < 400.0 else "Speech")
+        return sorted(((label, 0.9 if label == top else 0.05) for label in self.LABELS), key=lambda t: -t[1])
+
+
+class FakeEmotion(EmotionModel):
+    """Speech emotion by pitch (tests only): under 300 Hz "neutral", else "happy" (0.8; the rest share 0.2)."""
+
+    LABELS = ("neutral", "happy", "sad", "angry")
+
+    def classify(self, samples: FloatArray) -> list[tuple[str, float]]:
+        top = "neutral" if _dominant_hz(samples) < 300.0 else "happy"
+        rest = 0.2 / (len(self.LABELS) - 1)
+        return sorted(((label, 0.8 if label == top else rest) for label in self.LABELS), key=lambda t: -t[1])
+
+
 class FakeLid(LidModel):
     """Language identification by pitch (tests only): the dominant frequency picks the language whose tone in
     ``tones`` (Hz -> language) is nearest. That language gets ``confidence``; the rest share what is left.
@@ -690,6 +722,7 @@ class FakeEngine(Engine):
     kinds = (
         "fake-stt", "fake-stt-streaming", "fake-stt-speakers", "fake-tts", "fake-vad", "fake-diarization", "fake-turn",
         "fake-turn-text", "fake-separation", "fake-denoise", "fake-s2s", "fake-lid", "fake-speaker-embedding",
+        "fake-tagging", "fake-emotion",
     )  # fmt: skip
 
     def __init__(self) -> None:
@@ -727,6 +760,10 @@ class FakeEngine(Engine):
             model = FakeS2S(merged)
         elif kind == "fake-lid":
             model = FakeLid(merged)
+        elif kind == "fake-tagging":
+            model = FakeTagging()
+        elif kind == "fake-emotion":
+            model = FakeEmotion()
         else:
             raise ValueError(f"fake engine cannot load kind {kind!r}")
         self.loaded.append(model)

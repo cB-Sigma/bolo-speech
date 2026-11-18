@@ -5,12 +5,15 @@ import type {
   ApiKeyInfo,
   ApiKeyList,
   ApiKeyUpdate,
+  AudioEmotion,
+  AudioTags,
   BenchRequest,
   BenchResult,
   CallRecord,
   CallSummary,
   Catalog,
   Component,
+  EnrolledSpeaker,
   FitWarning,
   HardwareInfo,
   Job,
@@ -31,6 +34,9 @@ import type {
   SimulationReport,
   LanguageId,
   SpeakerEmbedding,
+  SpeakerIdentification,
+  SpeakerList,
+  SpeakerVerification,
   SpeedInfo,
   Stats,
   Task,
@@ -326,6 +332,127 @@ export const api = {
     if (opts.topK) form.set('top_k', String(opts.topK))
     const res = await request('v1/audio/language', { method: 'POST', body: form, signal })
     return res.json() as Promise<LanguageId>
+  },
+  /** Background noise removed (`POST /v1/audio/denoise`): the cleaned recording as WAV, and the model that ran. */
+  async denoise(
+    file: Blob,
+    name: string,
+    opts: { model?: string; strength?: number } = {},
+    signal?: AbortSignal,
+  ): Promise<{ audio: Blob; model: string | null }> {
+    const form = new FormData()
+    form.set('file', file, name)
+    form.set('response_format', 'wav')
+    if (opts.model) form.set('model', opts.model)
+    if (opts.strength != null) form.set('strength', String(opts.strength))
+    const res = await request('v1/audio/denoise', { method: 'POST', body: form, signal })
+    return { audio: await res.blob(), model: res.headers.get('x-bolo-model') }
+  },
+  /** Sound events in a recording (`POST /v1/audio/tags`), also window by window when `window` (seconds) is set. */
+  async audioTags(
+    file: Blob,
+    name: string,
+    opts: { model?: string; topK?: number; threshold?: number; window?: number } = {},
+    signal?: AbortSignal,
+  ): Promise<AudioTags> {
+    const form = new FormData()
+    form.set('file', file, name)
+    if (opts.model) form.set('model', opts.model)
+    if (opts.topK) form.set('top_k', String(opts.topK))
+    if (opts.threshold != null) form.set('threshold', String(opts.threshold))
+    if (opts.window) form.set('window', String(opts.window))
+    const res = await request('v1/audio/tags', { method: 'POST', body: form, signal })
+    return res.json() as Promise<AudioTags>
+  },
+  /** How the speaker sounds (`POST /v1/audio/emotion`), also window by window when `window` (seconds) is set. */
+  async audioEmotion(
+    file: Blob,
+    name: string,
+    opts: { model?: string; window?: number } = {},
+    signal?: AbortSignal,
+  ): Promise<AudioEmotion> {
+    const form = new FormData()
+    form.set('file', file, name)
+    if (opts.model) form.set('model', opts.model)
+    if (opts.window) form.set('window', String(opts.window))
+    const res = await request('v1/audio/emotion', { method: 'POST', body: form, signal })
+    return res.json() as Promise<AudioEmotion>
+  },
+  /** A question about a recording, answered by an audio language model that hears it (`/v1/chat/completions`). */
+  async askAudio(file: Blob, format: string, question: string, model: string, signal?: AbortSignal): Promise<string> {
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    let binary = ''
+    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+    const body = {
+      model,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: question },
+            { type: 'input_audio', input_audio: { data: btoa(binary), format } },
+          ],
+        },
+      ],
+    }
+    const out = await json<{ choices: { message: { content: string | null } }[] }>('v1/chat/completions', {
+      method: 'POST',
+      json: body,
+      signal,
+    })
+    return out.choices[0]?.message.content ?? ''
+  },
+  speakers: () => json<SpeakerList>('v1/audio/speakers'),
+  /** Enrol a speaker from one or more recordings of them alone. */
+  async enrolSpeaker(name: string, clips: { blob: Blob; name: string }[], model?: string): Promise<EnrolledSpeaker> {
+    const form = new FormData()
+    form.set('name', name)
+    for (const c of clips) form.append('file', c.blob, c.name)
+    if (model) form.set('model', model)
+    const res = await request('v1/audio/speakers', { method: 'POST', body: form })
+    return res.json() as Promise<EnrolledSpeaker>
+  },
+  /** Add recordings to an enrolled speaker, or rename them. */
+  async changeSpeaker(id: string, changes: { name?: string; clips?: { blob: Blob; name: string }[] }) {
+    const form = new FormData()
+    if (changes.name) form.set('name', changes.name)
+    for (const c of changes.clips ?? []) form.append('file', c.blob, c.name)
+    const res = await request(`v1/audio/speakers/${encodeURIComponent(id)}`, { method: 'POST', body: form })
+    return res.json() as Promise<EnrolledSpeaker>
+  },
+  deleteSpeaker: (id: string) =>
+    json<{ deleted: boolean }>(`v1/audio/speakers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  deleteSpeakerClip: (id: string, clip: string) =>
+    json<EnrolledSpeaker>(`v1/audio/speakers/${encodeURIComponent(id)}/clips/${encodeURIComponent(clip)}`, {
+      method: 'DELETE',
+    }),
+  /** Is this recording the enrolled speaker? */
+  async verifySpeaker(
+    file: Blob,
+    name: string,
+    speaker: string,
+    opts: { model?: string; threshold?: number } = {},
+  ): Promise<SpeakerVerification> {
+    const form = new FormData()
+    form.set('file', file, name)
+    form.set('speaker', speaker)
+    if (opts.model) form.set('model', opts.model)
+    if (opts.threshold != null) form.set('threshold', String(opts.threshold))
+    const res = await request('v1/audio/speakers/verify', { method: 'POST', body: form })
+    return res.json() as Promise<SpeakerVerification>
+  },
+  /** Which enrolled speaker is this, if any? */
+  async identifySpeaker(
+    file: Blob,
+    name: string,
+    opts: { model?: string; threshold?: number } = {},
+  ): Promise<SpeakerIdentification> {
+    const form = new FormData()
+    form.set('file', file, name)
+    if (opts.model) form.set('model', opts.model)
+    if (opts.threshold != null) form.set('threshold', String(opts.threshold))
+    const res = await request('v1/audio/speakers/identify', { method: 'POST', body: form })
+    return res.json() as Promise<SpeakerIdentification>
   },
   bench: (req: BenchRequest) => json<{ job_id: string }>('api/v1/bench', { method: 'POST', json: req }),
   benchJob: (jobId: string, signal?: AbortSignal) => api.job<BenchResult>(jobId, signal),

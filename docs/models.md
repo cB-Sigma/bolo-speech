@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-466 models: 184 validated on CPU by the maintainers, 282 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+474 models: 192 validated on CPU by the maintainers, 282 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -1062,6 +1062,33 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `ecapa-tdnn-voxceleb` | - | realtime | - | 42 MB | Apache-2.0 | **CPU** · RTF 0.203 |
+
+### Audio tagging and sound events
+
+#### CED
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ced-tiny` | - | realtime | - | 6 MB | Apache-2.0 | **CPU** · RTF 0.034 |
+| `ced-mini` | - | realtime | - | 10 MB | Apache-2.0 | **CPU** · RTF 0.039 |
+| `ced-small` | - | balanced | - | 23 MB | Apache-2.0 | **CPU** · RTF 0.052 |
+| `ced-base` | - | accuracy | - | 87 MB | Apache-2.0 | **CPU** · RTF 0.105 |
+
+#### Zipformer
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `zipformer-audio-tagging` | - | balanced | - | 68 MB | Apache-2.0 | **CPU** · RTF 0.201 |
+| `zipformer-small-audio-tagging` | - | realtime | - | 27 MB | Apache-2.0 | **CPU** · RTF 0.126 |
+
+### Speech emotion
+
+#### emotion2vec+
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `emotion2vec-plus-base` | - | balanced | - | 373 MB | FunASR Model License 1.1 (custom) | **CPU** · RTF 0.925 |
+| `emotion2vec-plus-large` | - | accuracy | - | 649 MB | FunASR Model License 1.1 (custom) | **CPU** · RTF 0.845 |
 
 ⚠ = the licence restricts commercial use. RTF = processing time / audio duration (lower is faster).
 <!-- END GENERATED: models -->
@@ -2472,6 +2499,53 @@ broken Tamil), English and Hindi stayed with `whisper-tiny`, and the
 `indicconformer-bn-community` as the recognisers to pull for Hindi and
 Bengali. The Odia clip, heard as Bengali, was routed as Bengali: a
 language the identifier does not know is routed as its nearest neighbour.
+
+## Sound events and speech emotion
+
+**Taggers** (task `audio-tagging`, `POST /v1/audio/tags`): every model scores each of AudioSet's 527 classes
+on its own (sigmoids, not a softmax), so a recording can be speech and music at once. They hear 30 s at most;
+bolo cuts longer recordings into 10 s windows and keeps each class's highest probability. CED (Xiaomi,
+Apache-2.0) is a ViT distilled from an ensemble; the Zipformer taggers come from icefall (Apache-2.0). All run on
+sherpa-onnx in 8 bits, from the exports k2-fsa publishes.
+
+**Measured** (docs/measurements/audio-classifiers.json, `server/tools/measure_classifiers.py`): the 13 test clips
+k2-fsa ships with its taggers (113 s) and emotion2vec's own example clip (4 s), one request at a time on the shared
+4-vCPU Xeon (load average about 21, so the RTFs are pessimistic and only comparable with each other). The top tag of
+four of the clips: 1.wav is a cat, 3.wav a capella singing, 7.wav a smoke alarm, the last an actor's line.
+
+| id | model | RTF | 1.wav | 3.wav | 7.wav | speech clip |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ced-tiny` | CED tiny (5.5 M) | 0.034 | Animal 0.90 | A capella 0.74 | Smoke detector, smoke alarm 0.77 | Speech 0.70 |
+| `ced-mini` | CED mini (9.6 M), the default | 0.039 | Animal 0.91 | A capella 0.72 | Smoke detector, smoke alarm 0.94 | Speech 0.76 |
+| `ced-small` | CED small (22 M) | 0.052 | Animal 0.90 | A capella 0.70 | Smoke detector, smoke alarm 0.84 | Speech 0.78 |
+| `ced-base` | CED base (86 M) | 0.105 | Animal 0.91 | A capella 0.75 | Smoke detector, smoke alarm 0.85 | Speech 0.84 |
+| `zipformer-small-audio-tagging` | Zipformer small (icefall) | 0.126 | Animal 0.95 | Music 0.79 | Smoke detector, smoke alarm 0.79 | Speech 1.00 |
+| `zipformer-audio-tagging` | Zipformer (icefall) | 0.201 | Cat 0.95 | Music 0.86 | Smoke detector, smoke alarm 0.37 | Speech 1.00 |
+
+The four CEDs agree with one another and with the Zipformers on every clip's top class; the Zipformers are
+more confident (speech at 0.99 against CED's 0.70 to 0.84) and four to six times slower. The browser demo runs CED
+tiny and mini with the same features computed in JavaScript (within 0.02 of sherpa-onnx's probabilities on these
+clips).
+
+**Emotion** (task `emotion`, `POST /v1/audio/emotion`): emotion2vec+ base and large (Ziyang Ma et al.; FunASR),
+nine classes, in ONNX Runtime from third-party exports of the authors' weights. Their licence is the FunASR Model
+Open Source License Agreement 1.1: use, copying, changes and sharing are allowed with attribution and the model names
+kept; the model is "provided for reference and learning purposes only", the licence ends for anyone who disparages
+the software, and later revisions apply automatically. It says nothing about commercial use either way: read it
+before relying on it commercially.
+
+| id | RTF | load | emotion2vec's example clip |
+| --- | --- | --- | --- |
+| `emotion2vec-plus-base` | 0.92 | 4.2 s | angry 1.00 |
+| `emotion2vec-plus-large` | 0.84 | 14.0 s | angry 1.00 |
+
+Both call emotion2vec's example (an actor's line) "angry". On the non-speech clips the answer means
+nothing (a cat comes out "sad"): run the tagger first, or send speech only. An emotion model guesses how someone
+sounds, not how they feel; acted, synthesised and telephone speech and other ways of speaking move it.
+
+**SenseVoice** tags emotions and sounds while it transcribes; bolo returns them with `verbose_json`
+([api.md](api.md#speech-emotion-post-v1audioemotion)). On the clips above it said "music" for the singing and
+"speech" for the actor's line, and gave no emotion for either (its `EMO_UNKNOWN`).
 
 ## Word timestamps
 

@@ -44,6 +44,23 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   emotion text, Parler-TTS and Indic Parler-TTS (bolo-torch) as the voice description, `openai-gpt-4o-mini-tts` as
   OpenAI's `instructions`. Other models speak as before; `x-bolo-instructions: applied | ignored` says which.
 
+- **Sound events and audio tags: `POST /v1/audio/tags`.** Which of AudioSet's 527 sounds a recording holds
+  (speech, music and its genres and instruments, singing, laughter, applause, alarms, animals, engines...), each with
+  its probability, from six new `audio-tagging` models on sherpa-onnx: CED tiny, mini, small and base (Apache-2.0)
+  and the two Zipformer taggers from icefall (Apache-2.0). `window` and `hop` tag the recording window by window
+  too, for sound event detection over time; `threshold`, `top_k` and `labels` narrow the answer. From the command
+  line: `bolo tags FILE`. All six were run on CPU on k2-fsa's 13 test clips (docs/measurements/audio-classifiers.json):
+  CED mini, the default, at RTF 0.04.
+- **Speech emotion: `POST /v1/audio/emotion`.** How the speaker sounds, with emotion2vec+ base and large (9
+  classes) in ONNX Runtime, whole or window by window; `bolo emotion FILE`. The weights are under the FunASR Model
+  Open Source License Agreement 1.1 (attribution, "for reference and learning purposes"), labelled on both entries:
+  read it before commercial use. Both were run on CPU.
+- **SenseVoice's emotion and sound tags are kept.** A `verbose_json` transcription with `sense-voice-small` has
+  `emotion` and `events` (speech, music, laughter, applause, crying, coughing, ...) on each segment and, for the
+  whole recording, `emotion`, `emotions` and `audio_events`, instead of the tags being thrown away.
+- **Console: Analyse audio.** One recording through the sound-event taggers, the emotion models and the denoisers
+  (listen to and download the cleaned audio). In the live demo the page tags sounds in the browser with CED tiny or
+  mini on WebAssembly, nothing uploaded.
 - **Speech enhancement on its own: `POST /v1/audio/denoise`.** The recording comes back with its background noise
   removed (voice isolation), from any `denoise` model of the catalog, with `strength` (mixed with the original),
   `response_format` (WAV, MP3, FLAC, Opus, AAC, PCM, mu-law, A-law) and `sample_rate`. `stream=true` sends the audio

@@ -20,6 +20,7 @@ const KeysPage = lazy(() => import('./routes/keys'))
 const ComparePage = lazy(() => import('./routes/compare'))
 const DiarizePage = lazy(() => import('./routes/diarize'))
 const CloneBrowserPage = lazy(() => import('./routes/clone-browser'))
+const AnalysePage = lazy(() => import('./routes/analyse'))
 
 function PageFallback() {
   return (
@@ -166,6 +167,14 @@ export function App() {
             element={
               <Suspense fallback={<PageFallback />}>
                 <ComparePage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="analyse"
+            element={
+              <Suspense fallback={<PageFallback />}>
+                <AnalysePage />
               </Suspense>
             }
           />

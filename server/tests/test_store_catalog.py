@@ -276,6 +276,8 @@ def test_every_packaged_entry_is_well_formed() -> None:
         "audio-llm",
         "speech-to-speech",
         "speaker-embedding",
+        "audio-tagging",
+        "emotion",
     }
     needs = [s for s in specs if s.needs_phonemes]
     assert len(needs) >= 80 and all(s.task == "tts" for s in needs)

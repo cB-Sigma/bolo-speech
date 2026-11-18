@@ -130,6 +130,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | **Hardware-aware recommendations** | bolo looks at the machine and rates every model for it; it recommends and warns, and never hides or refuses a model | [recommendations.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/recommendations.md) |
 | **Text preparation** | numbers, dates, money, units and URLs read out in the voice's language; pronunciation word lists for names and jargon; an SSML subset; romanised input ("mujhe kal jana hai") written in the voice's script; phonemes without the GPL through [uccharan](https://github.com/cb-Sigma/uccharan) | [api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#text-preparation-ssml-and-pronunciation-word-lists), [models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md#phonemisers) |
 | **Language identification and routing** | `POST /v1/audio/language` says which language a recording is in, with probabilities, from a choice of identifiers (VoxLingua107 ECAPA, Whisper's own detector, AmberNet, MMS-LID), each with its licence; a transcription with `model=auto` is sent to the best installed recogniser for the language it hears, and the response header says what was decided. Never overrides a model or language you name | [api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#language-identification-and-routing), [models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md#language-identification-1) |
+| **Sound events and speech emotion** | `POST /v1/audio/tags` names the sounds in a recording (AudioSet's 527: speech, music and its instruments, laughter, alarms, animals, vehicles...) with CED and Zipformer taggers, over the whole recording or window by window; `POST /v1/audio/emotion` says how the speaker sounds (emotion2vec+, licence labelled); SenseVoice's own emotion and sound tags come back with its transcriptions. Background-noise removal on its own: `POST /v1/audio/denoise` | [api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#sound-events-and-audio-tags-post-v1audiotags), [models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md#audio-tagging-and-sound-events) |
 | **Indian languages** | recognition for all 22 scheduled languages, voices for 15 of them and for Bhojpuri, Magahi and Chhattisgarhi, 8 kHz G.711 in and out | [indic-telephony.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/indic-telephony.md) |
 | **A web console** | playgrounds, the catalog, latency dashboards, benchmarks, conversations, calls, served by the same process | [below](#the-console) |
 | **Engine plugins** | models that need another runtime run out of process behind the same API: [bolo-torch](https://github.com/cB-Sigma/bolo-speech/blob/main/plugins/bolo-torch/README.md) for PyTorch models | [plugins.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/plugins.md) |
@@ -150,6 +151,8 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | AUDIO-LLM | Qwen3-Omni 30B-A3B | 1 | ar, de, en, es, fr, id, it, ja +10 | 0 | - |
 | AUDIO-LLM | Gemma 4 E2B | 1 | en | 0 | - |
 | AUDIO-LLM | Gemma 4 E4B | 1 | en | 0 | - |
+| AUDIO-TAGGING | CED | 4 | - | 4 | 0.034 (`ced-tiny`) |
+| AUDIO-TAGGING | Zipformer | 2 | - | 2 | 0.126 (`zipformer-small-audio-tagging`) |
 | STT | OpenAI (cloud) | 4 | af, am, ar, as, az, ba, be, bg +92 | 0 | - |
 | TTS | OpenAI (cloud) | 3 | af, am, ar, as, az, ba, be, bg +92 | 0 | - |
 | STT | Sarvam (cloud) | 3 | as, bn, brx, doi, en, gu, hi, kn +15 | 0 | - |
@@ -173,6 +176,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | SPEECH-TO-SPEECH | FLM-Audio | 1 | en, zh | 0 | - |
 | SPEECH-TO-SPEECH | Freeze-Omni | 1 | en, zh | 0 | - |
 | SPEECH-TO-SPEECH | MiniCPM-o 4.5 | 1 | en, zh | 0 | - |
+| EMOTION | emotion2vec+ | 2 | - | 2 | 0.845 (`emotion2vec-plus-large`) |
 | LID | VoxLingua107 ECAPA-TDNN | 2 | ab, af, am, ar, as, az, ba, be +99 | 2 | 0.106 (`voxlingua107-ecapa`) |
 | LID | Whisper | 2 | af, am, ar, as, az, ba, be, bg +91 | 2 | 0.301 (`whisper-tiny-lid`) |
 | LID | AmberNet | 1 | ab, af, am, ar, as, az, ba, be +99 | 1 | 0.104 (`ambernet-langid`) |
@@ -241,7 +245,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | VAD | WebRTC VAD | 2 | - | 2 | 0.000 (`webrtc-vad-aggressive`) |
 | VAD | Energy VAD | 1 | - | 1 | 0.000 (`energy-vad`) |
 
-**466 models in the catalog, 184 validated on CPU, 282 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md).
+**474 models in the catalog, 192 validated on CPU, 282 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.
@@ -308,6 +312,7 @@ Served at `/` by the same process, and as a browser-only [live demo](https://cb-
 | Benchmark | sweep concurrency and find the ceiling for a latency target |
 | Conversation | talk to a voice agent and choose its pipeline |
 | Phone | telephony providers and the addresses to paste into their dashboards, agents, numbers, recent calls with per-turn latency, and "Simulate a call" |
+| Analyse audio | one recording through the sound-event taggers, the emotion models and the denoisers; in the live demo, sound events heard by CED in the page |
 | Compare | the same audio or text through several models, local and cloud, side by side |
 | Providers | cloud accounts, keys and cost estimates |
 | API keys | a key for each client, with scopes, a rate limit, a quota and its usage |

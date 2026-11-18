@@ -180,12 +180,36 @@ def _verbose(t: Transcript, task: str, word_level: bool, segment_level: bool) ->
                 **({"speaker": s.speaker} if s.speaker else {}),
                 **({"overlap": True} if s.overlap else {}),
                 **({"separated": True} if s.separated else {}),
+                **({"emotion": s.emotion} if s.emotion else {}),
+                **({"events": s.events} if s.events else {}),
             }
             for i, s in enumerate(t.segments)
         ]
+    out.update(paralinguistics(t.segments))
     out["usage"] = _usage(t.duration)
     if t.separation is not None:
         out["separation"] = t.separation
+    return out
+
+
+def paralinguistics(segments: list[Segment]) -> dict[str, Any]:
+    """What a recogniser that tags emotions and sounds (SenseVoice) heard, over the whole recording: ``emotion`` (the
+    one heard in the most speech, by seconds) and ``audio_events`` (each sound with the seconds of the segments it was
+    heard in). Nothing when the recogniser does not tag."""
+    emotions: dict[str, float] = {}
+    events: dict[str, float] = {}
+    for s in segments:
+        length = max(0.0, s.end - s.start)
+        if s.emotion:
+            emotions[s.emotion] = emotions.get(s.emotion, 0.0) + length
+        for e in s.events:
+            events[e] = events.get(e, 0.0) + length
+    out: dict[str, Any] = {}
+    if emotions:
+        out["emotion"] = max(emotions, key=lambda k: emotions[k])
+        out["emotions"] = {k: round(v, 2) for k, v in sorted(emotions.items(), key=lambda kv: -kv[1])}
+    if events:
+        out["audio_events"] = {k: round(v, 2) for k, v in sorted(events.items(), key=lambda kv: -kv[1])}
     return out
 
 

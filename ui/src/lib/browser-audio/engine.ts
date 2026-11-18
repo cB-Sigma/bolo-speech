@@ -93,6 +93,7 @@ const TASK_NOUN: Record<AudioTask, string> = {
   vad: 'Voice activity',
   turn: 'End of turn',
   embed: 'Speaker embeddings',
+  tag: 'Sound events',
 }
 
 const FRAME_BY_FRAME = new Set(['gtcrn', 'dpdfnet', 'deepfilternet3', 'silero-v4', 'silero-v5'])
@@ -321,6 +322,20 @@ export class AudioModelEngine {
       [copy.buffer],
     )
     return { ranked: r.ranked, ms: r.ms }
+  }
+
+  /** Sound events in 16 kHz audio, the `top` most likely, whole and (with `window` seconds) window by window. */
+  async tag(
+    audio: Float32Array,
+    top = 10,
+    window?: number,
+  ): Promise<Omit<Extract<AudioWorkerResponse, { type: 'tags' }>, 'type' | 'id'>> {
+    const copy = audio.slice()
+    const r = await this.request<Extract<AudioWorkerResponse, { type: 'tags' }>>(
+      { type: 'tag', id: this.nextId++, audio: copy, top, window },
+      [copy.buffer],
+    )
+    return { ranked: r.ranked, windows: r.windows, ms: r.ms }
   }
 
   dispose(): void {

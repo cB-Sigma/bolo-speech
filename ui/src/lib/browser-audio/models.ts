@@ -10,7 +10,7 @@
  * away for the ones ONNX Runtime can place there.
  */
 
-export type AudioTask = 'denoise' | 'lid' | 'vad' | 'turn' | 'embed'
+export type AudioTask = 'denoise' | 'lid' | 'vad' | 'turn' | 'embed' | 'tag'
 
 /** Where a model's bytes come from. */
 export type AudioFiles =
@@ -34,6 +34,7 @@ export type AudioRunner =
   | 'energy'
   | 'smart-turn'
   | 'speaker-embedding'
+  | 'ced'
 
 export interface AudioModel {
   /** The server's catalog id. */
@@ -395,6 +396,32 @@ export const AUDIO_MODELS: AudioModel[] = [
     webgpu: true,
     device: 'wasm',
   },
+  // -- sound events (audio-tagging.yaml): CED, the k2-fsa exports the server runs with sherpa-onnx ---------------
+  ...(
+    [
+      ['ced-tiny', 'CED tiny', 'efe3a5cfad74e56598d855d055006903adc00e38', 6_133_417, '5.5 M parameters, 6 MB.'],
+      ['ced-mini', 'CED mini', '4da6df50dc47b25f91074b5ef7df4c1cc0dd7d4d', 10_451_715, '9.6 M parameters, 10 MB.'],
+    ] as const
+  ).map(([id, label, revision, bytes, size]): AudioModel => ({
+    id,
+    task: 'tag',
+    label,
+    runner: 'ced',
+    files: {
+      from: 'hub',
+      repo: `k2-fsa/sherpa-onnx-${id}-audio-tagging-2024-04-19`,
+      revision,
+      files: { model: 'model.int8.onnx', labels: 'class_labels_indices.csv' },
+    },
+    bytes: bytes + 14_675,
+    peakBytes: 120e6,
+    rate: 16000,
+    license: 'Apache-2.0',
+    source: 'https://github.com/RicherMans/CED',
+    blurb: `AudioSet's 527 sounds (speech, music, instruments, animals, vehicles...), 8-bit. ${size}`,
+    webgpu: false,
+    device: 'wasm',
+  })),
 ]
 
 export function audioModel(id: string): AudioModel {

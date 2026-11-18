@@ -896,6 +896,44 @@ def cmd_denoise(args: argparse.Namespace) -> int:
     return asyncio.run(run())
 
 
+def cmd_classify(args: argparse.Namespace) -> int:
+    """``bolo tags FILE`` / ``bolo emotion FILE``: sound-event tags or speech emotion of a recording."""
+    from bolo.audio import decode_audio
+    from bolo.classify import classify, emotion_body, tags_body
+    from bolo.obs.trace import Trace
+
+    task = "audio-tagging" if args.command == "tags" else "emotion"
+    core = _core(args)
+    path = Path(args.file)
+    samples, rate = decode_audio(path.read_bytes(), filename=path.name)
+
+    async def run() -> int:
+        await core.start()
+        try:
+            spec = core.resolve(args.model, task)
+            result = await classify(core, samples, rate, spec.id, task, Trace(task, "cli", spec.id), args.window)
+            if task == "audio-tagging":
+                body = tags_body(result, args.top_k or 10, args.threshold, None)
+            else:
+                body = emotion_body(result, args.top_k or 1000)
+            if args.json:
+                print(json.dumps(body, indent=2, ensure_ascii=False))
+                return 0
+
+            def line(scores: list[dict[str, Any]]) -> str:
+                return ", ".join(f"{t['label']} {t['score']:.2f}" for t in scores) or "-"
+
+            key = "tags" if task == "audio-tagging" else "emotions"
+            print(f"{spec.id}: {line(body[key])}")
+            for seg in body.get("segments", []):
+                print(f"  {seg['start']:7.2f}-{seg['end']:7.2f}  {line(seg[key])}")
+            return 0
+        finally:
+            await core.stop()
+
+    return asyncio.run(run())
+
+
 def cmd_speak(args: argparse.Namespace) -> int:
     from bolo.audio.encode import encode_audio
     from bolo.obs.trace import Trace
@@ -1397,7 +1435,7 @@ _TASK_TITLES = {
     "stt": "Speech to text", "tts": "Text to speech", "diarization": "Speaker diarization",
     "vad": "Voice-activity detection", "turn": "End-of-turn detection", "separation": "Overlapped-speech separation",
     "denoise": "Denoising", "lid": "Language identification", "speech-to-speech": "Speech to speech",
-    "speaker-embedding": "Speaker embedding",
+    "speaker-embedding": "Speaker embedding", "audio-tagging": "Audio tagging", "emotion": "Speech emotion",
 }  # fmt: skip
 
 
@@ -2141,6 +2179,17 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--format", "-f", help="default: from the output file extension")
     s.add_argument("--sample-rate", dest="sample_rate", type=int)
     s.set_defaults(func=cmd_denoise)
+
+    for name, text in (("tags", "sound events in an audio file (music, speech, ...)"), ("emotion", "speech emotion")):
+        s = sub.add_parser(name, help=text)
+        _common(s)
+        s.add_argument("file")
+        s.add_argument("--model", "-m")
+        s.add_argument("--window", type=float, help="seconds: also window by window")
+        s.add_argument("--top-k", dest="top_k", type=int)
+        s.add_argument("--threshold", type=float, default=0.1, help="tags: leave out tags below this probability")
+        s.add_argument("--json", action="store_true")
+        s.set_defaults(func=cmd_classify)
 
     s = sub.add_parser("speak", help="synthesise speech to a file")
     _common(s)

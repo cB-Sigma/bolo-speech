@@ -1,6 +1,6 @@
 import type * as Ort from 'onnxruntime-web/wasm'
 import { AutoFeatureExtractor, env } from '@huggingface/transformers'
-import { fbank60, periodicHann, RealFft, reflectPad, softmax, whisperLogMel } from './dsp'
+import { cedFeatures, fbank60, periodicHann, RealFft, reflectPad, softmax, whisperLogMel } from './dsp'
 import type { AudioModel } from './models'
 import { onnxMetadata } from './onnx-meta'
 
@@ -20,6 +20,9 @@ export interface Runner {
   turn?: (audio: Float32Array) => Promise<number>
   embed?: (audio: Float32Array) => Promise<Float32Array>
   lid?: (audio: Float32Array) => Promise<[string, number][]>
+  /** Every class with its probability, in label order. */
+  tag?: (audio: Float32Array) => Promise<Float32Array>
+  labels?: string[]
   warmup?: () => Promise<void>
   release: () => Promise<void>
 }
@@ -540,4 +543,50 @@ export async function makeLid(ctx: RunnerContext): Promise<Runner> {
     return rankLanguages(labels, softmax(scores.subarray(0, labels.length)))
   }
   return { rate: 16000, lid, warmup: async () => void (await lid(tone(16000))), release: release(session) }
+}
+
+/** AudioSet's `class_labels_indices.csv` (`index,mid,display_name`, quoted names may hold commas) as names by index. */
+export function readAudioSetLabels(text: string): string[] {
+  const out: string[] = []
+  for (const line of text.split(/\r?\n/).slice(1)) {
+    if (!line.trim()) continue
+    const cells: string[] = []
+    let cell = ''
+    let quoted = false
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i] as string
+      if (c === '"') {
+        if (quoted && line[i + 1] === '"') {
+          cell += '"'
+          i++
+        } else quoted = !quoted
+      } else if (c === ',' && !quoted) {
+        cells.push(cell)
+        cell = ''
+      } else cell += c
+    }
+    cells.push(cell)
+    const index = Number(cells[0])
+    if (Number.isInteger(index)) out[index] = (cells[2] ?? String(index)).trim()
+  }
+  return Array.from(out, (l, i) => l ?? String(i))
+}
+
+/** CED (8-bit, the k2-fsa export): 64-band features of at most 30 s in, one independent probability per class. */
+export async function makeTagger(ctx: RunnerContext): Promise<Runner> {
+  const session = await ctx.session(file(ctx, 'model'))
+  const labels = readAudioSetLabels(new TextDecoder().decode(file(ctx, 'labels')))
+  const MAX = 30 * 16000
+  const tag = async (audio: Float32Array) => {
+    let x = audio.subarray(0, MAX)
+    if (x.length < 1600) {
+      const padded = new Float32Array(1600)
+      padded.set(x)
+      x = padded
+    }
+    const { data, frames } = cedFeatures(x)
+    const out = await session.run({ [session.inputNames[0] as string]: f32(ctx, data, [1, 64, frames]) })
+    return Float32Array.from((out[session.outputNames[0] as string] as Tensor).data as Float32Array)
+  }
+  return { rate: 16000, tag, labels, warmup: async () => void (await tag(tone(16000))), release: release(session) }
 }

@@ -50,6 +50,8 @@ TASK_TITLES = {
     "speech-to-speech": "Speech to speech (Realtime speech-to-speech pipeline)",
     "audio-llm": "Audio-in language models (Realtime audio-llm pipeline)",
     "speaker-embedding": "Speaker embedding",
+    "audio-tagging": "Audio tagging and sound events",
+    "emotion": "Speech emotion",
 }
 
 

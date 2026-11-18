@@ -23,6 +23,7 @@ export type AudioWorkerRequest =
   | { type: 'turn'; id: number; audio: Float32Array }
   | { type: 'embed'; id: number; audio: Float32Array }
   | { type: 'lid'; id: number; audio: Float32Array; top?: number }
+  | { type: 'tag'; id: number; audio: Float32Array; top?: number; window?: number }
 
 export type AudioWorkerResponse =
   | { type: 'progress'; files: { file: string; loaded: number; total: number }[] }
@@ -34,4 +35,12 @@ export type AudioWorkerResponse =
   | { type: 'value'; id: number; value: number; ms: number }
   | { type: 'vector'; id: number; vector: Float32Array; ms: number }
   | { type: 'langs'; id: number; ranked: [string, number][]; ms: number }
+  /** Sound events: the whole clip, and each window when one was asked for. */
+  | {
+      type: 'tags'
+      id: number
+      ranked: [string, number][]
+      windows: { start: number; end: number; ranked: [string, number][] }[]
+      ms: number
+    }
   | { type: 'error'; id?: number; message: string }

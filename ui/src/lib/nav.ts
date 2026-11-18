@@ -13,6 +13,7 @@ import {
   Phone,
   Plug,
   Puzzle,
+  ScanSearch,
   Users,
   type LucideIcon,
 } from 'lucide-react'
@@ -167,6 +168,14 @@ export const NAV: NavItem[] = [
     icon: KeyRound,
     group: 'Server',
     when: (f) => Boolean(f.keys),
+  },
+  {
+    to: '/analyse',
+    label: 'Analyse audio',
+    short: 'Analyse',
+    description: 'Sound events, emotion and noise removal for one recording',
+    icon: ScanSearch,
+    group: 'Playground',
   },
 ]
 

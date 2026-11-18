@@ -485,6 +485,14 @@ class Bolo:
             "separation": self._separation_capability(),
             "denoise": self._denoise_capability(),
             "lid": self._lid_capability(),
+            # sound events and speech emotion (docs/api.md, "Sound events and audio tags", "Speech emotion")
+            "audio_tagging": {"endpoint": "/v1/audio/tags", "default_model": s.default_audio_tagging, "windows": True},
+            "emotion": {
+                "endpoint": "/v1/audio/emotion",
+                "default_model": s.default_emotion,
+                "windows": True,
+                "transcription_tags": [m.id for m in self.catalog.all() if m.kind == "sense_voice"],
+            },
             "voices": {
                 "endpoint": "/api/v1/voices",
                 "openai": ["/v1/audio/voices", "/v1/audio/voice_consents"],
@@ -887,6 +895,8 @@ class Bolo:
                 "denoise": s.default_denoise,
                 "lid": s.default_lid,
                 "speaker-embedding": "eres2net-voxceleb",
+                "audio-tagging": s.default_audio_tagging,
+                "emotion": s.default_emotion,
             }
             name = defaults[task]
         elif name == "realtime":
@@ -1712,6 +1722,8 @@ class Bolo:
                         bool(overlapped and overlapped[index]),
                         bool(sources and sources[index] is not None),
                         used if seg.temperature is None else seg.temperature,
+                        seg.emotion,
+                        list(seg.events),
                     )
                     if not shifted.text:
                         continue

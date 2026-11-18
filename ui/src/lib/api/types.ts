@@ -13,6 +13,8 @@ export type Task =
   | 'speaker-embedding'
   | 'speech-to-speech'
   | 'audio-llm'
+  | 'audio-tagging'
+  | 'emotion'
 export type Tier = 'realtime' | 'balanced' | 'accuracy'
 export type Validated = 'cpu' | 'untested'
 
@@ -92,6 +94,20 @@ export interface Capabilities {
     }
     [k: string]: unknown
   }
+  /** Background noise removal (`POST /v1/audio/denoise` and the denoise option of transcriptions). */
+  denoise?: { available?: boolean; installed?: boolean; default_model?: string | null; [k: string]: unknown }
+  /** Sound events (`POST /v1/audio/tags`), newer servers. */
+  audio_tagging?: { endpoint?: string; default_model?: string | null; windows?: boolean; [k: string]: unknown }
+  /** Speech emotion (`POST /v1/audio/emotion`); `transcription_tags`: recognisers that tag emotions as they go. */
+  emotion?: {
+    endpoint?: string
+    default_model?: string | null
+    windows?: boolean
+    transcription_tags?: string[]
+    [k: string]: unknown
+  }
+  /** Enrolled speakers: verification and identification (`/v1/audio/speakers`), newer servers. */
+  speakers?: { endpoint?: string; embedding_model?: string; threshold?: number; enrolled?: number; [k: string]: unknown }
   /** Pronunciation word lists: announced by newer servers (older ones are probed with a request). */
   wordlists?: { available?: boolean; endpoint?: string; install?: string | null; [k: string]: unknown }
   /** Romanised text for text-to-speech: what the server's transliterator can do. */
@@ -865,6 +881,74 @@ export interface LanguageId {
     recommended?: string | null
     detail?: string | null
   } | null
+}
+
+/** One class and its probability (`POST /v1/audio/tags`, `POST /v1/audio/emotion`). */
+export interface LabelScore {
+  label: string
+  score: number
+}
+
+/** `POST /v1/audio/tags`: sound events heard in a recording, and per window when `window` was sent. */
+export interface AudioTags {
+  object: 'audio.tags'
+  model: string
+  duration: number
+  tags: LabelScore[]
+  segments?: { start: number; end: number; tags: LabelScore[] }[]
+}
+
+/** `POST /v1/audio/emotion`: how the speaker sounds. */
+export interface AudioEmotion {
+  object: 'audio.emotion'
+  model: string
+  duration: number
+  emotion: string | null
+  score: number
+  emotions: LabelScore[]
+  segments?: { start: number; end: number; emotion: string | null; score: number; emotions: LabelScore[] }[]
+}
+
+/** An enrolled speaker (`/v1/audio/speakers`). */
+export interface EnrolledSpeaker {
+  id: string
+  object: 'speaker'
+  name: string
+  created_at?: string
+  updated_at?: string
+  metadata: Record<string, unknown>
+  clips: { id: string; seconds: number; added_at?: string }[]
+  seconds: number
+  embedding_models: string[]
+}
+
+export interface SpeakerList {
+  object: 'list'
+  data: EnrolledSpeaker[]
+  embedding_model: string
+  threshold: number
+  calibrated: boolean
+  thresholds: Record<string, number>
+}
+
+export interface SpeakerVerification {
+  object: 'speaker.verification'
+  speaker: { id: string; name: string }
+  similarity: number
+  threshold: number
+  match: boolean
+  embedding_model: string
+  calibrated: boolean
+}
+
+export interface SpeakerIdentification {
+  object: 'speaker.identification'
+  speaker: { id: string; name: string } | null
+  similarity: number | null
+  threshold: number
+  candidates: { id: string; name: string; similarity: number; match: boolean }[]
+  embedding_model: string
+  calibrated: boolean
 }
 
 export type SttEncoding = 'pcm_s16le' | 'pcm_f32le' | 'mulaw' | 'alaw'

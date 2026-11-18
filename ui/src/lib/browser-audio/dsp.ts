@@ -330,6 +330,83 @@ export function fbank60(audio: Float32Array): { data: Float32Array; frames: numb
   return { data, frames }
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// CED's features (sherpa-onnx's OfflineStream for CED: Kaldi fbank, 64 bands, 10 log10, 120 dB range)
+// ---------------------------------------------------------------------------------------------------------------
+
+let cedBank: Float64Array | null = null
+let fft512: RealFft | null = null
+
+/** Kaldi's mel filterbank: `nMels` triangles in Kaldi's mel scale between `low` and `high`, [mel][bin] flattened. */
+function kaldiFilterbank(nMels: number, nFft: number, rate: number, low: number, high: number): Float64Array {
+  const mel = (f: number) => 1127 * Math.log(1 + f / 700)
+  const bins = nFft / 2 + 1
+  const lo = mel(low)
+  const delta = (mel(high) - lo) / (nMels + 1)
+  const out = new Float64Array(nMels * bins)
+  for (let m = 0; m < nMels; m++) {
+    const left = lo + m * delta
+    const center = left + delta
+    const right = center + delta
+    for (let b = 0; b < nFft / 2; b++) {
+      const f = mel((rate * b) / nFft)
+      if (f > left && f < right) out[m * bins + b] = f <= center ? (f - left) / delta : (right - f) / delta
+    }
+  }
+  return out
+}
+
+/**
+ * CED's input, shape [64][frames] flattened row by row (band-major), frames = round(len / 160): Kaldi's fbank
+ * without snipped edges (32 ms symmetric Hann windows every 10 ms centred on each shift, reflected at the ends, no
+ * dither, pre-emphasis or DC removal), power spectrum, 64 Kaldi mel bands from 0 to 8 kHz, then 10 log10 floored
+ * 120 dB under the loudest value. A NumPy copy of this gave tag probabilities within 0.02 of sherpa-onnx's own on
+ * its test clips (the server's tagger).
+ */
+export function cedFeatures(audio: Float32Array): { data: Float32Array; frames: number } {
+  const N = 512
+  const HOP = 160
+  const MELS = 64
+  cedBank ??= kaldiFilterbank(MELS, N, 16000, 0, 8000)
+  fft512 ??= new RealFft(N)
+  const bank = cedBank
+  const fft = fft512
+  const n = audio.length
+  const frames = Math.floor((n + HOP / 2) / HOP)
+  const window = Float64Array.from({ length: N }, (_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1)))
+  const frame = new Float64Array(N)
+  const re = new Float64Array(fft.bins)
+  const im = new Float64Array(fft.bins)
+  const power = new Float64Array(fft.bins)
+  const db = new Float64Array(MELS * frames)
+  let peak = -Infinity
+  for (let t = 0; t < frames; t++) {
+    const start = t * HOP + HOP / 2 - N / 2
+    for (let i = 0; i < N; i++) {
+      let k = start + i
+      if (k < 0) k = -k - 1
+      else if (k >= n) k = 2 * n - 1 - k
+      frame[i] = ((audio[Math.min(Math.max(k, 0), n - 1)] as number) || 0) * (window[i] as number)
+    }
+    fft.forward(frame, re, im)
+    for (let b = 0; b < fft.bins; b++) power[b] = (re[b] as number) ** 2 + (im[b] as number) ** 2
+    for (let m = 0; m < MELS; m++) {
+      let s = 0
+      const row = m * fft.bins
+      for (let b = 0; b < fft.bins; b++) {
+        const w = bank[row + b] as number
+        if (w) s += w * (power[b] as number)
+      }
+      const v = 10 * Math.log10(Math.max(s, 1e-10))
+      db[m * frames + t] = v
+      if (v > peak) peak = v
+    }
+  }
+  const data = new Float32Array(MELS * frames)
+  for (let i = 0; i < data.length; i++) data[i] = Math.max(db[i] as number, peak - 120)
+  return { data, frames }
+}
+
 /** Softmax of scores, in double precision. */
 export function softmax(scores: ArrayLike<number>): Float64Array {
   let max = -Infinity

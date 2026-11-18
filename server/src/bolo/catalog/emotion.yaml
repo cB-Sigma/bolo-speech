@@ -1,0 +1,90 @@
+# Speech emotion recognition (task emotion): how the speaker sounds. Used by POST /v1/audio/emotion (also over
+# time, window by window). SenseVoice (task stt) tags emotions as it transcribes: those come back in verbose_json
+# transcriptions, not here.
+# * emotion2vec+ (Ziyang Ma et al., SJTU and Alibaba; FunASR): 9 classes (angry, disgusted, fearful, happy, neutral,
+#   other, sad, surprised, unknown). The weights are under the FunASR Model Open Source License Agreement 1.1:
+#   use, copying, modification and sharing allowed with attribution, and a clause that the model is provided "for
+#   reference and learning purposes only" with no responsibility taken by Alibaba; not an OSI licence. Read it before
+#   commercial use. The authors publish PyTorch checkpoints (model.pt) for FunASR; bolo runs third-party ONNX
+#   exports of the same weights in ONNX Runtime (bolo.engines.audio_classify), which take the 16 kHz waveform and
+#   return the 9 probabilities (FunASR's utterance path in the graph, normalisation included). emotion2vec+ seed has
+#   no such export and is not listed.
+
+- id: emotion2vec-plus-base
+  aliases: [emotion2vec/emotion2vec_plus_base, emotion2vec_plus_base]
+  task: emotion
+  engine: onnxruntime
+  kind: onnx_emotion
+  family: emotion2vec+
+  languages: []
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 373129993
+  params: 90000000
+  license: FunASR Model License 1.1 (custom)
+  license_url: https://github.com/modelscope/FunASR/blob/main/MODEL_LICENSE
+  description: 'emotion2vec+ base (90 M parameters), speech emotion in 9 classes, trained by its authors on
+    large-scale pseudo-labelled data in many languages. fp32 ONNX export of the authors'' weights by PenxPen
+    (PenxPen/emotion2vec-plus-base-onnx), checked by its author against FunASR. FunASR model licence: attribution
+    required, "for reference and learning purposes"; read it before commercial use.'
+  source_url: https://huggingface.co/emotion2vec/emotion2vec_plus_base
+  validated: cpu
+  measured:
+    rtf: 0.9248
+    audio_s: 118.2
+    load_s: 4.17
+    threads: 4
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 21
+    date: '2026-11-18'
+  source:
+    repo: PenxPen/emotion2vec-plus-base-onnx
+    revision: 6e03d5fdfc7ff62274da9cd51f32e5d88d48a42c
+    include: [emotion2vec_plus_base.onnx]
+  options:
+    model: emotion2vec_plus_base.onnx
+    outputs: probabilities
+    labels: [angry, disgusted, fearful, happy, neutral, other, sad, surprised, unknown]
+    license_note: 'FunASR Model Open Source License Agreement 1.1: use, copy, modify and share with attribution to the
+      source and authors, keeping the model names; the model is "provided for reference and learning purposes only",
+      the licence ends for anyone who disparages the software, and later revisions apply automatically. No
+      commercial-use clause either way: read it before commercial use.'
+- id: emotion2vec-plus-large
+  aliases: [emotion2vec/emotion2vec_plus_large, emotion2vec_plus_large]
+  task: emotion
+  engine: onnxruntime
+  kind: onnx_emotion
+  family: emotion2vec+
+  languages: []
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 648984830
+  params: 300000000
+  license: FunASR Model License 1.1 (custom)
+  license_url: https://github.com/modelscope/FunASR/blob/main/MODEL_LICENSE
+  description: 'emotion2vec+ large (300 M parameters), the most accurate emotion2vec+, 9 classes. fp32 ONNX export of
+    the authors'' weights by Voldorn (Voldorn/emotion2vec-plus-large-onnx), checked by its author against FunASR
+    1.4.16 (largest difference 2.9e-6 over clips of 0.5 to 30 s). FunASR model licence: attribution required, "for
+    reference and learning purposes"; read it before commercial use.'
+  source_url: https://huggingface.co/emotion2vec/emotion2vec_plus_large
+  validated: cpu
+  measured:
+    rtf: 0.8445
+    audio_s: 118.2
+    load_s: 14.04
+    threads: 4
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 21
+    date: '2026-11-18'
+  source:
+    repo: Voldorn/emotion2vec-plus-large-onnx
+    revision: cdcbc0964e2fa3092f79937287d4222056bc12fc
+    include: [emotion2vec_plus_large.onnx]
+  options:
+    model: emotion2vec_plus_large.onnx
+    outputs: probabilities
+    labels: [angry, disgusted, fearful, happy, neutral, other, sad, surprised, unknown]
+    license_note: 'FunASR Model Open Source License Agreement 1.1: use, copy, modify and share with attribution to the
+      source and authors, keeping the model names; the model is "provided for reference and learning purposes only",
+      the licence ends for anyone who disparages the software, and later revisions apply automatically. No
+      commercial-use clause either way: read it before commercial use.'

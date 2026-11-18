@@ -129,7 +129,7 @@ class OnnxRuntimeEngine(Engine):
     kinds = (
         "smart_turn", "text_turn", "nemotron_diarization", "dicow_onnx", "lfm3_audio_onnx", "marblenet_vad",
         "deepfilternet3_stream",
-        "whisper_lid", "onnx_lid", "onnx_speaker_embedding", "fbank_speaker_embedding",
+        "whisper_lid", "onnx_lid", "onnx_speaker_embedding", "fbank_speaker_embedding", "onnx_emotion",
     )  # fmt: skip
 
     def status(self) -> EngineStatus:
@@ -141,7 +141,7 @@ class OnnxRuntimeEngine(Engine):
             return EngineStatus(
                 self.id, False, None,
                 f"{type(exc).__name__}: {exc}. Optional (end-of-turn detection, MarbleNet VAD, Nemotron diarization, DiCoW, LFM3-Audio, "
-                "DeepFilterNet 3, language identification): "
+                "DeepFilterNet 3, language identification, speech emotion): "
                 "pip install onnxruntime",
             )  # fmt: skip
 
@@ -198,6 +198,10 @@ class OnnxRuntimeEngine(Engine):
             from bolo.engines.lid_onnx import OnnxLid
 
             return OnnxLid(path, spec, opts)
+        if kind == "onnx_emotion":
+            from bolo.engines.audio_classify import OnnxEmotion
+
+            return OnnxEmotion(path, spec, opts)
         if kind != "smart_turn":
             raise ValueError(f"the onnxruntime engine cannot load kind {kind!r}")
         return SmartTurn(path, spec, opts)

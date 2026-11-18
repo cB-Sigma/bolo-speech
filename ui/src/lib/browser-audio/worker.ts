@@ -4,7 +4,7 @@ import { resample } from '@/lib/audio/resample'
 import { cachedDownload, lowerMemoryMaximum, ortCdnBase, RUNTIME_CACHE } from '@/lib/browser-runtime'
 import { setOrtGpuPower } from '@/lib/webgpu'
 import { mixWithOriginal, resampleAligned } from './dsp'
-import { makeDenoiser, makeEmbedder, makeLid, makeTurn, makeVad, type Runner } from './runners'
+import { makeDenoiser, makeEmbedder, makeLid, makeTagger, makeTurn, makeVad, type Runner } from './runners'
 import { AUDIO_CACHE, type AudioWorkerRequest, type AudioWorkerResponse } from './protocol'
 
 /**
@@ -95,7 +95,9 @@ async function load(req: Extract<AudioWorkerRequest, { type: 'load' }>): Promise
           ? await makeTurn(ctx)
           : task === 'embed'
             ? await makeEmbedder(ctx)
-            : await makeLid(ctx)
+            : task === 'tag'
+              ? await makeTagger(ctx)
+              : await makeLid(ctx)
   await runner.warmup?.()
   post({
     type: 'ready',
@@ -141,6 +143,39 @@ async function handle(req: AudioWorkerRequest): Promise<void> {
     if (!r.lid) throw new Error('not a language identifier')
     const ranked = await r.lid(req.audio)
     post({ type: 'langs', id: req.id, ranked: ranked.slice(0, req.top ?? 5), ms: performance.now() - started })
+  } else if (req.type === 'tag') {
+    const tag = r.tag
+    const labels = r.labels ?? []
+    if (!tag) throw new Error('not a sound-event tagger')
+    const top = req.top ?? 10
+    const rank = (p: Float32Array): [string, number][] =>
+      Array.from(p, (v, i): [string, number] => [labels[i] ?? String(i), v])
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, top)
+    // As the server (bolo.classify): at most 30 s at once; longer recordings in 10 s windows, each class keeping
+    // its highest probability in any of them.
+    const spans = (size: number, hop: number): [number, number][] => {
+      const n = req.audio.length
+      if (n <= size) return [[0, n]]
+      const out: [number, number][] = []
+      for (let a = 0; a < n - Math.floor(size / 4); a += hop) out.push([a, Math.min(n, a + size)])
+      return out
+    }
+    const R = 16000
+    const long = req.audio.length > 30 * R
+    const whole = spans(long ? 10 * R : 30 * R, 10 * R)
+    let best: Float32Array | null = null
+    for (const [a, b] of whole) {
+      const p = await tag(req.audio.subarray(a, b))
+      if (!best) best = p
+      else for (let i = 0; i < best.length; i++) best[i] = Math.max(best[i] as number, p[i] ?? 0)
+    }
+    const windows: { start: number; end: number; ranked: [string, number][] }[] = []
+    if (req.window) {
+      const size = Math.round(req.window * R)
+      for (const [a, b] of spans(size, size)) windows.push({ start: a / R, end: b / R, ranked: rank(await tag(req.audio.subarray(a, b))) })
+    }
+    post({ type: 'tags', id: req.id, ranked: rank(best ?? new Float32Array()), windows, ms: performance.now() - started })
   }
 }
 

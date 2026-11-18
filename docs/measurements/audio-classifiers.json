@@ -1,0 +1,1660 @@
+{
+ "what": "audio tagging and speech emotion models, one request at a time (bolo.classify)",
+ "hardware": "4 vCPU x86_64, no GPU",
+ "packages": {
+  "sherpa-onnx": "2.0.1",
+  "onnxruntime": "1.32.0"
+ },
+ "date": "2026-11-18",
+ "load_average": 21.6,
+ "clips": {
+  "1.wav": 10.0,
+  "10.wav": 7.84,
+  "11.wav": 11.48,
+  "12.wav": 8.97,
+  "13.wav": 9.07,
+  "2.wav": 10.0,
+  "3.wav": 10.0,
+  "4.wav": 10.0,
+  "5.wav": 8.28,
+  "6.wav": 8.72,
+  "7.wav": 2.82,
+  "8.wav": 7.72,
+  "9.wav": 9.22,
+  "e2v-test.wav": 4.1
+ },
+ "models": {
+  "ced-tiny": {
+   "task": "audio-tagging",
+   "load_s": 0.68,
+   "rtf": 0.034,
+   "audio_s": 118.2,
+   "top3": {
+    "1.wav": [
+     [
+      "Animal",
+      0.903
+     ],
+     [
+      "Cat",
+      0.899
+     ],
+     [
+      "Domestic animals, pets",
+      0.865
+     ]
+    ],
+    "10.wav": [
+     [
+      "Water",
+      0.405
+     ],
+     [
+      "Trickle, dribble",
+      0.336
+     ],
+     [
+      "Stream",
+      0.288
+     ]
+    ],
+    "11.wav": [
+     [
+      "Cat",
+      0.816
+     ],
+     [
+      "Meow",
+      0.803
+     ],
+     [
+      "Animal",
+      0.734
+     ]
+    ],
+    "12.wav": [
+     [
+      "Animal",
+      0.567
+     ],
+     [
+      "Bark",
+      0.514
+     ],
+     [
+      "Dog",
+      0.493
+     ]
+    ],
+    "13.wav": [
+     [
+      "Pig",
+      0.707
+     ],
+     [
+      "Animal",
+      0.458
+     ],
+     [
+      "Speech",
+      0.447
+     ]
+    ],
+    "2.wav": [
+     [
+      "Whistling",
+      0.793
+     ],
+     [
+      "Music",
+      0.354
+     ],
+     [
+      "Piano",
+      0.165
+     ]
+    ],
+    "3.wav": [
+     [
+      "A capella",
+      0.744
+     ],
+     [
+      "Singing",
+      0.525
+     ],
+     [
+      "Vocal music",
+      0.514
+     ]
+    ],
+    "4.wav": [
+     [
+      "Speech",
+      0.693
+     ],
+     [
+      "Snicker",
+      0.481
+     ],
+     [
+      "Laughter",
+      0.394
+     ]
+    ],
+    "5.wav": [
+     [
+      "Finger snapping",
+      0.873
+     ],
+     [
+      "Slap, smack",
+      0.312
+     ],
+     [
+      "Tap",
+      0.035
+     ]
+    ],
+    "6.wav": [
+     [
+      "Baby cry, infant cry",
+      0.493
+     ],
+     [
+      "Crying, sobbing",
+      0.31
+     ],
+     [
+      "Speech",
+      0.1
+     ]
+    ],
+    "7.wav": [
+     [
+      "Smoke detector, smoke alarm",
+      0.769
+     ],
+     [
+      "Music",
+      0.408
+     ],
+     [
+      "Fire alarm",
+      0.167
+     ]
+    ],
+    "8.wav": [
+     [
+      "Civil defense siren",
+      0.767
+     ],
+     [
+      "Siren",
+      0.698
+     ],
+     [
+      "Speech",
+      0.071
+     ]
+    ],
+    "9.wav": [
+     [
+      "Siren",
+      0.823
+     ],
+     [
+      "Civil defense siren",
+      0.806
+     ],
+     [
+      "Animal",
+      0.024
+     ]
+    ],
+    "e2v-test.wav": [
+     [
+      "Speech",
+      0.702
+     ],
+     [
+      "Sigh",
+      0.21
+     ],
+     [
+      "Male speech, man speaking",
+      0.143
+     ]
+    ]
+   }
+  },
+  "ced-mini": {
+   "task": "audio-tagging",
+   "load_s": 0.43,
+   "rtf": 0.039,
+   "audio_s": 118.2,
+   "top3": {
+    "1.wav": [
+     [
+      "Animal",
+      0.913
+     ],
+     [
+      "Domestic animals, pets",
+      0.883
+     ],
+     [
+      "Cat",
+      0.882
+     ]
+    ],
+    "10.wav": [
+     [
+      "Trickle, dribble",
+      0.423
+     ],
+     [
+      "Water",
+      0.247
+     ],
+     [
+      "Stream",
+      0.237
+     ]
+    ],
+    "11.wav": [
+     [
+      "Cat",
+      0.811
+     ],
+     [
+      "Meow",
+      0.793
+     ],
+     [
+      "Animal",
+      0.722
+     ]
+    ],
+    "12.wav": [
+     [
+      "Animal",
+      0.703
+     ],
+     [
+      "Dog",
+      0.637
+     ],
+     [
+      "Bark",
+      0.584
+     ]
+    ],
+    "13.wav": [
+     [
+      "Pig",
+      0.831
+     ],
+     [
+      "Animal",
+      0.468
+     ],
+     [
+      "Speech",
+      0.414
+     ]
+    ],
+    "2.wav": [
+     [
+      "Whistling",
+      0.843
+     ],
+     [
+      "Music",
+      0.328
+     ],
+     [
+      "Piano",
+      0.137
+     ]
+    ],
+    "3.wav": [
+     [
+      "A capella",
+      0.725
+     ],
+     [
+      "Singing",
+      0.47
+     ],
+     [
+      "Vocal music",
+      0.418
+     ]
+    ],
+    "4.wav": [
+     [
+      "Speech",
+      0.43
+     ],
+     [
+      "Snicker",
+      0.367
+     ],
+     [
+      "Laughter",
+      0.298
+     ]
+    ],
+    "5.wav": [
+     [
+      "Finger snapping",
+      0.933
+     ],
+     [
+      "Plop",
+      0.137
+     ],
+     [
+      "Slap, smack",
+      0.119
+     ]
+    ],
+    "6.wav": [
+     [
+      "Baby cry, infant cry",
+      0.627
+     ],
+     [
+      "Crying, sobbing",
+      0.536
+     ],
+     [
+      "Laughter",
+      0.052
+     ]
+    ],
+    "7.wav": [
+     [
+      "Smoke detector, smoke alarm",
+      0.937
+     ],
+     [
+      "Music",
+      0.316
+     ],
+     [
+      "Fire alarm",
+      0.266
+     ]
+    ],
+    "8.wav": [
+     [
+      "Siren",
+      0.636
+     ],
+     [
+      "Civil defense siren",
+      0.623
+     ],
+     [
+      "Bird",
+      0.034
+     ]
+    ],
+    "9.wav": [
+     [
+      "Siren",
+      0.82
+     ],
+     [
+      "Civil defense siren",
+      0.796
+     ],
+     [
+      "Speech",
+      0.018
+     ]
+    ],
+    "e2v-test.wav": [
+     [
+      "Speech",
+      0.756
+     ],
+     [
+      "Sigh",
+      0.178
+     ],
+     [
+      "Narration, monologue",
+      0.124
+     ]
+    ]
+   }
+  },
+  "ced-small": {
+   "task": "audio-tagging",
+   "load_s": 0.71,
+   "rtf": 0.0524,
+   "audio_s": 118.2,
+   "top3": {
+    "1.wav": [
+     [
+      "Animal",
+      0.896
+     ],
+     [
+      "Cat",
+      0.885
+     ],
+     [
+      "Domestic animals, pets",
+      0.844
+     ]
+    ],
+    "10.wav": [
+     [
+      "Trickle, dribble",
+      0.49
+     ],
+     [
+      "Water",
+      0.362
+     ],
+     [
+      "Stream",
+      0.28
+     ]
+    ],
+    "11.wav": [
+     [
+      "Meow",
+      0.86
+     ],
+     [
+      "Cat",
+      0.763
+     ],
+     [
+      "Animal",
+      0.694
+     ]
+    ],
+    "12.wav": [
+     [
+      "Animal",
+      0.646
+     ],
+     [
+      "Dog",
+      0.641
+     ],
+     [
+      "Bark",
+      0.631
+     ]
+    ],
+    "13.wav": [
+     [
+      "Pig",
+      0.78
+     ],
+     [
+      "Animal",
+      0.561
+     ],
+     [
+      "Oink",
+      0.206
+     ]
+    ],
+    "2.wav": [
+     [
+      "Whistling",
+      0.82
+     ],
+     [
+      "Music",
+      0.304
+     ],
+     [
+      "Piano",
+      0.163
+     ]
+    ],
+    "3.wav": [
+     [
+      "A capella",
+      0.703
+     ],
+     [
+      "Singing",
+      0.468
+     ],
+     [
+      "Vocal music",
+      0.415
+     ]
+    ],
+    "4.wav": [
+     [
+      "Snicker",
+      0.44
+     ],
+     [
+      "Laughter",
+      0.364
+     ],
+     [
+      "Speech",
+      0.239
+     ]
+    ],
+    "5.wav": [
+     [
+      "Finger snapping",
+      0.859
+     ],
+     [
+      "Slap, smack",
+      0.431
+     ],
+     [
+      "Clapping",
+      0.071
+     ]
+    ],
+    "6.wav": [
+     [
+      "Baby cry, infant cry",
+      0.703
+     ],
+     [
+      "Crying, sobbing",
+      0.502
+     ],
+     [
+      "Whimper",
+      0.072
+     ]
+    ],
+    "7.wav": [
+     [
+      "Smoke detector, smoke alarm",
+      0.837
+     ],
+     [
+      "Music",
+      0.398
+     ],
+     [
+      "Fire alarm",
+      0.317
+     ]
+    ],
+    "8.wav": [
+     [
+      "Civil defense siren",
+      0.648
+     ],
+     [
+      "Siren",
+      0.632
+     ],
+     [
+      "Speech",
+      0.074
+     ]
+    ],
+    "9.wav": [
+     [
+      "Siren",
+      0.763
+     ],
+     [
+      "Civil defense siren",
+      0.678
+     ],
+     [
+      "Speech",
+      0.021
+     ]
+    ],
+    "e2v-test.wav": [
+     [
+      "Speech",
+      0.784
+     ],
+     [
+      "Sigh",
+      0.156
+     ],
+     [
+      "Male speech, man speaking",
+      0.11
+     ]
+    ]
+   }
+  },
+  "ced-base": {
+   "task": "audio-tagging",
+   "load_s": 0.99,
+   "rtf": 0.1049,
+   "audio_s": 118.2,
+   "top3": {
+    "1.wav": [
+     [
+      "Animal",
+      0.913
+     ],
+     [
+      "Cat",
+      0.906
+     ],
+     [
+      "Domestic animals, pets",
+      0.852
+     ]
+    ],
+    "10.wav": [
+     [
+      "Trickle, dribble",
+      0.447
+     ],
+     [
+      "Water",
+      0.351
+     ],
+     [
+      "Stream",
+      0.231
+     ]
+    ],
+    "11.wav": [
+     [
+      "Meow",
+      0.842
+     ],
+     [
+      "Cat",
+      0.758
+     ],
+     [
+      "Animal",
+      0.688
+     ]
+    ],
+    "12.wav": [
+     [
+      "Animal",
+      0.699
+     ],
+     [
+      "Dog",
+      0.677
+     ],
+     [
+      "Bark",
+      0.655
+     ]
+    ],
+    "13.wav": [
+     [
+      "Pig",
+      0.8
+     ],
+     [
+      "Animal",
+      0.584
+     ],
+     [
+      "Oink",
+      0.242
+     ]
+    ],
+    "2.wav": [
+     [
+      "Whistling",
+      0.808
+     ],
+     [
+      "Music",
+      0.362
+     ],
+     [
+      "Piano",
+      0.214
+     ]
+    ],
+    "3.wav": [
+     [
+      "A capella",
+      0.749
+     ],
+     [
+      "Singing",
+      0.507
+     ],
+     [
+      "Vocal music",
+      0.453
+     ]
+    ],
+    "4.wav": [
+     [
+      "Laughter",
+      0.362
+     ],
+     [
+      "Snicker",
+      0.355
+     ],
+     [
+      "Speech",
+      0.227
+     ]
+    ],
+    "5.wav": [
+     [
+      "Finger snapping",
+      0.754
+     ],
+     [
+      "Slap, smack",
+      0.115
+     ],
+     [
+      "Clapping",
+      0.074
+     ]
+    ],
+    "6.wav": [
+     [
+      "Baby cry, infant cry",
+      0.691
+     ],
+     [
+      "Crying, sobbing",
+      0.493
+     ],
+     [
+      "Whimper",
+      0.091
+     ]
+    ],
+    "7.wav": [
+     [
+      "Smoke detector, smoke alarm",
+      0.852
+     ],
+     [
+      "Fire alarm",
+      0.392
+     ],
+     [
+      "Music",
+      0.363
+     ]
+    ],
+    "8.wav": [
+     [
+      "Siren",
+      0.682
+     ],
+     [
+      "Civil defense siren",
+      0.589
+     ],
+     [
+      "Speech",
+      0.045
+     ]
+    ],
+    "9.wav": [
+     [
+      "Siren",
+      0.792
+     ],
+     [
+      "Civil defense siren",
+      0.677
+     ],
+     [
+      "Speech",
+      0.021
+     ]
+    ],
+    "e2v-test.wav": [
+     [
+      "Speech",
+      0.838
+     ],
+     [
+      "Male speech, man speaking",
+      0.126
+     ],
+     [
+      "Sigh",
+      0.123
+     ]
+    ]
+   }
+  },
+  "zipformer-audio-tagging": {
+   "task": "audio-tagging",
+   "load_s": 1.89,
+   "rtf": 0.2007,
+   "audio_s": 118.2,
+   "top3": {
+    "1.wav": [
+     [
+      "Cat",
+      0.952
+     ],
+     [
+      "Animal",
+      0.897
+     ],
+     [
+      "Domestic animals, pets",
+      0.889
+     ]
+    ],
+    "10.wav": [
+     [
+      "Water",
+      0.343
+     ],
+     [
+      "Stream",
+      0.242
+     ],
+     [
+      "Gurgling",
+      0.134
+     ]
+    ],
+    "11.wav": [
+     [
+      "Meow",
+      0.946
+     ],
+     [
+      "Cat",
+      0.816
+     ],
+     [
+      "Domestic animals, pets",
+      0.752
+     ]
+    ],
+    "12.wav": [
+     [
+      "Bark",
+      0.755
+     ],
+     [
+      "Dog",
+      0.717
+     ],
+     [
+      "Animal",
+      0.696
+     ]
+    ],
+    "13.wav": [
+     [
+      "Oink",
+      0.926
+     ],
+     [
+      "Pig",
+      0.494
+     ],
+     [
+      "Animal",
+      0.223
+     ]
+    ],
+    "2.wav": [
+     [
+      "Whistling",
+      0.934
+     ],
+     [
+      "Music",
+      0.363
+     ],
+     [
+      "Piano",
+      0.105
+     ]
+    ],
+    "3.wav": [
+     [
+      "Music",
+      0.863
+     ],
+     [
+      "A capella",
+      0.716
+     ],
+     [
+      "Choir",
+      0.445
+     ]
+    ],
+    "4.wav": [
+     [
+      "Laughter",
+      0.848
+     ],
+     [
+      "Belly laugh",
+      0.093
+     ],
+     [
+      "Inside, small room",
+      0.087
+     ]
+    ],
+    "5.wav": [
+     [
+      "Slap, smack",
+      0.925
+     ],
+     [
+      "Finger snapping",
+      0.925
+     ],
+     [
+      "Whip",
+      0.2
+     ]
+    ],
+    "6.wav": [
+     [
+      "Baby cry, infant cry",
+      0.891
+     ],
+     [
+      "Crying, sobbing",
+      0.521
+     ],
+     [
+      "Whimper",
+      0.081
+     ]
+    ],
+    "7.wav": [
+     [
+      "Smoke detector, smoke alarm",
+      0.369
+     ],
+     [
+      "Sine wave",
+      0.344
+     ],
+     [
+      "Beep, bleep",
+      0.256
+     ]
+    ],
+    "8.wav": [
+     [
+      "Siren",
+      0.939
+     ],
+     [
+      "Civil defense siren",
+      0.782
+     ],
+     [
+      "Vehicle",
+      0.008
+     ]
+    ],
+    "9.wav": [
+     [
+      "Siren",
+      0.944
+     ],
+     [
+      "Civil defense siren",
+      0.752
+     ],
+     [
+      "Police car (siren)",
+      0.007
+     ]
+    ],
+    "e2v-test.wav": [
+     [
+      "Speech",
+      0.999
+     ],
+     [
+      "Whimper",
+      0.004
+     ],
+     [
+      "Narration, monologue",
+      0.002
+     ]
+    ]
+   }
+  },
+  "zipformer-small-audio-tagging": {
+   "task": "audio-tagging",
+   "load_s": 1.64,
+   "rtf": 0.1263,
+   "audio_s": 118.2,
+   "top3": {
+    "1.wav": [
+     [
+      "Animal",
+      0.947
+     ],
+     [
+      "Cat",
+      0.94
+     ],
+     [
+      "Domestic animals, pets",
+      0.932
+     ]
+    ],
+    "10.wav": [
+     [
+      "Stream",
+      0.235
+     ],
+     [
+      "Water",
+      0.233
+     ],
+     [
+      "Gurgling",
+      0.169
+     ]
+    ],
+    "11.wav": [
+     [
+      "Meow",
+      0.822
+     ],
+     [
+      "Cat",
+      0.712
+     ],
+     [
+      "Domestic animals, pets",
+      0.57
+     ]
+    ],
+    "12.wav": [
+     [
+      "Animal",
+      0.687
+     ],
+     [
+      "Dog",
+      0.629
+     ],
+     [
+      "Bark",
+      0.609
+     ]
+    ],
+    "13.wav": [
+     [
+      "Oink",
+      0.872
+     ],
+     [
+      "Pig",
+      0.174
+     ],
+     [
+      "Animal",
+      0.173
+     ]
+    ],
+    "2.wav": [
+     [
+      "Whistling",
+      0.804
+     ],
+     [
+      "Music",
+      0.275
+     ],
+     [
+      "Piano",
+      0.132
+     ]
+    ],
+    "3.wav": [
+     [
+      "Music",
+      0.792
+     ],
+     [
+      "A capella",
+      0.775
+     ],
+     [
+      "Singing",
+      0.472
+     ]
+    ],
+    "4.wav": [
+     [
+      "Laughter",
+      0.931
+     ],
+     [
+      "Snicker",
+      0.324
+     ],
+     [
+      "Giggle",
+      0.151
+     ]
+    ],
+    "5.wav": [
+     [
+      "Finger snapping",
+      0.681
+     ],
+     [
+      "Slap, smack",
+      0.465
+     ],
+     [
+      "Clapping",
+      0.188
+     ]
+    ],
+    "6.wav": [
+     [
+      "Baby cry, infant cry",
+      0.909
+     ],
+     [
+      "Crying, sobbing",
+      0.665
+     ],
+     [
+      "Whimper",
+      0.19
+     ]
+    ],
+    "7.wav": [
+     [
+      "Smoke detector, smoke alarm",
+      0.793
+     ],
+     [
+      "Beep, bleep",
+      0.648
+     ],
+     [
+      "Buzzer",
+      0.23
+     ]
+    ],
+    "8.wav": [
+     [
+      "Siren",
+      0.875
+     ],
+     [
+      "Civil defense siren",
+      0.738
+     ],
+     [
+      "Vehicle",
+      0.012
+     ]
+    ],
+    "9.wav": [
+     [
+      "Siren",
+      0.977
+     ],
+     [
+      "Civil defense siren",
+      0.816
+     ],
+     [
+      "Police car (siren)",
+      0.006
+     ]
+    ],
+    "e2v-test.wav": [
+     [
+      "Speech",
+      0.996
+     ],
+     [
+      "Narration, monologue",
+      0.009
+     ],
+     [
+      "Male speech, man speaking",
+      0.008
+     ]
+    ]
+   }
+  },
+  "emotion2vec-plus-base": {
+   "task": "emotion",
+   "load_s": 4.17,
+   "rtf": 0.9248,
+   "audio_s": 118.2,
+   "top3": {
+    "1.wav": [
+     [
+      "sad",
+      1.0
+     ],
+     [
+      "happy",
+      0.0
+     ],
+     [
+      "neutral",
+      0.0
+     ]
+    ],
+    "10.wav": [
+     [
+      "happy",
+      1.0
+     ],
+     [
+      "neutral",
+      0.0
+     ],
+     [
+      "sad",
+      0.0
+     ]
+    ],
+    "11.wav": [
+     [
+      "fearful",
+      0.889
+     ],
+     [
+      "other",
+      0.101
+     ],
+     [
+      "sad",
+      0.01
+     ]
+    ],
+    "12.wav": [
+     [
+      "happy",
+      0.996
+     ],
+     [
+      "angry",
+      0.004
+     ],
+     [
+      "fearful",
+      0.0
+     ]
+    ],
+    "13.wav": [
+     [
+      "fearful",
+      0.968
+     ],
+     [
+      "other",
+      0.03
+     ],
+     [
+      "neutral",
+      0.001
+     ]
+    ],
+    "2.wav": [
+     [
+      "fearful",
+      0.984
+     ],
+     [
+      "surprised",
+      0.005
+     ],
+     [
+      "sad",
+      0.003
+     ]
+    ],
+    "3.wav": [
+     [
+      "neutral",
+      0.997
+     ],
+     [
+      "happy",
+      0.001
+     ],
+     [
+      "angry",
+      0.001
+     ]
+    ],
+    "4.wav": [
+     [
+      "happy",
+      0.988
+     ],
+     [
+      "sad",
+      0.012
+     ],
+     [
+      "fearful",
+      0.0
+     ]
+    ],
+    "5.wav": [
+     [
+      "disgusted",
+      0.946
+     ],
+     [
+      "sad",
+      0.032
+     ],
+     [
+      "angry",
+      0.012
+     ]
+    ],
+    "6.wav": [
+     [
+      "sad",
+      1.0
+     ],
+     [
+      "fearful",
+      0.0
+     ],
+     [
+      "neutral",
+      0.0
+     ]
+    ],
+    "7.wav": [
+     [
+      "fearful",
+      1.0
+     ],
+     [
+      "angry",
+      0.0
+     ],
+     [
+      "sad",
+      0.0
+     ]
+    ],
+    "8.wav": [
+     [
+      "sad",
+      1.0
+     ],
+     [
+      "neutral",
+      0.0
+     ],
+     [
+      "angry",
+      0.0
+     ]
+    ],
+    "9.wav": [
+     [
+      "sad",
+      1.0
+     ],
+     [
+      "fearful",
+      0.0
+     ],
+     [
+      "neutral",
+      0.0
+     ]
+    ],
+    "e2v-test.wav": [
+     [
+      "angry",
+      1.0
+     ],
+     [
+      "happy",
+      0.0
+     ],
+     [
+      "neutral",
+      0.0
+     ]
+    ]
+   }
+  },
+  "emotion2vec-plus-large": {
+   "task": "emotion",
+   "load_s": 14.04,
+   "rtf": 0.8445,
+   "audio_s": 118.2,
+   "top3": {
+    "1.wav": [
+     [
+      "sad",
+      0.921
+     ],
+     [
+      "disgusted",
+      0.062
+     ],
+     [
+      "other",
+      0.005
+     ]
+    ],
+    "10.wav": [
+     [
+      "happy",
+      1.0
+     ],
+     [
+      "sad",
+      0.0
+     ],
+     [
+      "surprised",
+      0.0
+     ]
+    ],
+    "11.wav": [
+     [
+      "sad",
+      0.991
+     ],
+     [
+      "other",
+      0.007
+     ],
+     [
+      "fearful",
+      0.002
+     ]
+    ],
+    "12.wav": [
+     [
+      "happy",
+      1.0
+     ],
+     [
+      "sad",
+      0.0
+     ],
+     [
+      "angry",
+      0.0
+     ]
+    ],
+    "13.wav": [
+     [
+      "sad",
+      0.935
+     ],
+     [
+      "other",
+      0.064
+     ],
+     [
+      "happy",
+      0.001
+     ]
+    ],
+    "2.wav": [
+     [
+      "fearful",
+      0.503
+     ],
+     [
+      "sad",
+      0.463
+     ],
+     [
+      "happy",
+      0.014
+     ]
+    ],
+    "3.wav": [
+     [
+      "happy",
+      0.671
+     ],
+     [
+      "sad",
+      0.242
+     ],
+     [
+      "neutral",
+      0.065
+     ]
+    ],
+    "4.wav": [
+     [
+      "happy",
+      0.999
+     ],
+     [
+      "sad",
+      0.001
+     ],
+     [
+      "disgusted",
+      0.0
+     ]
+    ],
+    "5.wav": [
+     [
+      "disgusted",
+      0.422
+     ],
+     [
+      "sad",
+      0.329
+     ],
+     [
+      "neutral",
+      0.08
+     ]
+    ],
+    "6.wav": [
+     [
+      "sad",
+      0.999
+     ],
+     [
+      "happy",
+      0.0
+     ],
+     [
+      "fearful",
+      0.0
+     ]
+    ],
+    "7.wav": [
+     [
+      "sad",
+      0.919
+     ],
+     [
+      "neutral",
+      0.056
+     ],
+     [
+      "happy",
+      0.008
+     ]
+    ],
+    "8.wav": [
+     [
+      "neutral",
+      0.777
+     ],
+     [
+      "sad",
+      0.201
+     ],
+     [
+      "other",
+      0.019
+     ]
+    ],
+    "9.wav": [
+     [
+      "sad",
+      1.0
+     ],
+     [
+      "fearful",
+      0.0
+     ],
+     [
+      "other",
+      0.0
+     ]
+    ],
+    "e2v-test.wav": [
+     [
+      "angry",
+      1.0
+     ],
+     [
+      "surprised",
+      0.0
+     ],
+     [
+      "happy",
+      0.0
+     ]
+    ]
+   }
+  }
+ }
+}

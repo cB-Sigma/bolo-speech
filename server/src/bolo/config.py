@@ -108,6 +108,10 @@ class Settings:
     denoise: str = "off"
     #: spoken-language identification model: POST /v1/audio/language without a model, and language routing
     default_lid: str = "voxlingua107-ecapa"
+    #: sound-event / audio-tagging model: POST /v1/audio/tags without a model
+    default_audio_tagging: str = "ced-mini"
+    #: speech-emotion model: POST /v1/audio/emotion without a model
+    default_emotion: str = "emotion2vec-plus-base"
     #: transcription with the model "auto" and no language: identify the language and send the audio to the best
     #: installed recogniser for it (docs/api.md, "Language identification and routing"). Off: "auto" is the default
     language_routing: bool = True

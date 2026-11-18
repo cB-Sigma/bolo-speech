@@ -96,6 +96,8 @@ class Segment:
     #: the sampling temperature this segment was decoded at (a model that falls back to higher temperatures says
     #: which); None: the model does not say (bolo then reports the request's temperature, or 0 for greedy decoding)
     temperature: float | None = None
+    emotion: str | None = None  # the emotion the recogniser heard in this segment (SenseVoice), when it says
+    events: list[str] = field(default_factory=list)  # sounds the recogniser heard (SenseVoice: laughter, music, ...)
 
 
 @dataclass
@@ -560,6 +562,32 @@ class DenoiseModel(Model):
     def create_stream(self) -> DenoiseStream:
         """A live stream (:class:`DenoiseStream`); models without a streaming form overlap pieces instead."""
         return OverlapDenoiseStream(self)
+
+
+class AudioClassifierModel(Model):
+    """A recording in (mono float32 at ``sample_rate``, 16 kHz), every class the model knows with its score out,
+    most likely first."""
+
+    #: classes are independent (audio tagging: speech and music at once); False: one class wins (scores sum to 1)
+    multi_label: bool = False
+
+    @abc.abstractmethod
+    def classify(self, samples: FloatArray) -> list[tuple[str, float]]: ...
+
+
+class AudioTaggingModel(AudioClassifierModel):
+    """Sound event detection and audio tagging: which sounds (speech, music, a dog, a siren, ...) a recording holds,
+    each with its own probability (AudioSet's 527 classes for CED and the Zipformer taggers)."""
+
+    task = "audio-tagging"
+    multi_label = True
+
+
+class EmotionModel(AudioClassifierModel):
+    """Speech emotion recognition: how the speaker sounds (angry, happy, neutral, sad, ...), probabilities over the
+    model's classes."""
+
+    task = "emotion"
 
 
 class LidModel(Model):

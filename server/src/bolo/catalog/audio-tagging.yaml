@@ -1,0 +1,200 @@
+# Sound event detection and audio tagging (task audio-tagging): which sounds a recording holds (speech, music,
+# laughter, a dog, a siren, an engine, ...), each of AudioSet's 527 classes with its own probability. Used by
+# POST /v1/audio/tags (also over time, window by window). All run on sherpa-onnx (bolo.engines.audio_classify)
+# from the exports k2-fsa publishes; the class names are AudioSet's ontology (CC BY 4.0, Google), shipped with
+# each model as class_labels_indices.csv.
+# * CED (Consistent Ensemble Distillation, Heinrich Dinkel et al., Xiaomi): ViT audio transformers distilled from
+#   an ensemble, Apache-2.0 (github.com/RicherMans/CED). tiny, mini, small and base, int8.
+# * Zipformer audio taggers from icefall (k2-fsa, Apache-2.0), trained on AudioSet, int8.
+
+- id: ced-tiny
+  aliases: [k2-fsa/sherpa-onnx-ced-tiny-audio-tagging-2024-04-19, mispeech/ced-tiny]
+  task: audio-tagging
+  engine: sherpa-onnx
+  kind: audio_tagging
+  family: CED
+  languages: []
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 6148092
+  params: 5500000
+  license: Apache-2.0
+  license_url: https://github.com/RicherMans/CED/blob/main/LICENSE
+  features: [music, sound-events]
+  description: CED tiny (Xiaomi), the smallest AudioSet tagger here (5.5 M parameters, int8, 6 MB) - 527 sound
+    classes, speech and music among them. The one the browser demo runs.
+  source_url: https://github.com/RicherMans/CED
+  validated: cpu
+  measured:
+    rtf: 0.034
+    audio_s: 118.2
+    load_s: 0.68
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 21
+    date: '2026-11-18'
+  source:
+    repo: k2-fsa/sherpa-onnx-ced-tiny-audio-tagging-2024-04-19
+    revision: efe3a5cfad74e56598d855d055006903adc00e38
+    include: [model.int8.onnx, class_labels_indices.csv]
+  options:
+    arch: ced
+    model: model.int8.onnx
+- id: ced-mini
+  aliases: [k2-fsa/sherpa-onnx-ced-mini-audio-tagging-2024-04-19, mispeech/ced-mini]
+  task: audio-tagging
+  engine: sherpa-onnx
+  kind: audio_tagging
+  family: CED
+  languages: []
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 10466390
+  params: 9600000
+  license: Apache-2.0
+  license_url: https://github.com/RicherMans/CED/blob/main/LICENSE
+  features: [music, sound-events]
+  description: CED mini (Xiaomi), 9.6 M parameters, int8, 10 MB - 527 AudioSet sound classes. The default tagger; the browser demo runs it too.
+  source_url: https://github.com/RicherMans/CED
+  validated: cpu
+  measured:
+    rtf: 0.039
+    audio_s: 118.2
+    load_s: 0.43
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 21
+    date: '2026-11-18'
+  source:
+    repo: k2-fsa/sherpa-onnx-ced-mini-audio-tagging-2024-04-19
+    revision: 4da6df50dc47b25f91074b5ef7df4c1cc0dd7d4d
+    include: [model.int8.onnx, class_labels_indices.csv]
+  options:
+    arch: ced
+    model: model.int8.onnx
+- id: ced-small
+  aliases: [k2-fsa/sherpa-onnx-ced-small-audio-tagging-2024-04-19, mispeech/ced-small]
+  task: audio-tagging
+  engine: sherpa-onnx
+  kind: audio_tagging
+  family: CED
+  languages: []
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 22641622
+  params: 22000000
+  license: Apache-2.0
+  license_url: https://github.com/RicherMans/CED/blob/main/LICENSE
+  features: [music, sound-events]
+  description: CED small (Xiaomi), 22 M parameters, int8, 23 MB - 527 AudioSet sound classes.
+  source_url: https://github.com/RicherMans/CED
+  validated: cpu
+  measured:
+    rtf: 0.0524
+    audio_s: 118.2
+    load_s: 0.71
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 21
+    date: '2026-11-18'
+  source:
+    repo: k2-fsa/sherpa-onnx-ced-small-audio-tagging-2024-04-19
+    revision: afbf166bdf847d68f2adfe0c358be20d704c2289
+    include: [model.int8.onnx, class_labels_indices.csv]
+  options:
+    arch: ced
+    model: model.int8.onnx
+- id: ced-base
+  aliases: [k2-fsa/sherpa-onnx-ced-base-audio-tagging-2024-04-19, mispeech/ced-base]
+  task: audio-tagging
+  engine: sherpa-onnx
+  kind: audio_tagging
+  family: CED
+  languages: []
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 87478918
+  params: 86000000
+  license: Apache-2.0
+  license_url: https://github.com/RicherMans/CED/blob/main/LICENSE
+  features: [music, sound-events]
+  description: CED base (Xiaomi), 86 M parameters, int8, 87 MB - 527 AudioSet sound classes; the most accurate CED.
+  source_url: https://github.com/RicherMans/CED
+  validated: cpu
+  measured:
+    rtf: 0.1049
+    audio_s: 118.2
+    load_s: 0.99
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 21
+    date: '2026-11-18'
+  source:
+    repo: k2-fsa/sherpa-onnx-ced-base-audio-tagging-2024-04-19
+    revision: 6c64f5ae637788ad51e138fdaaa4a49686b4eb91
+    include: [model.int8.onnx, class_labels_indices.csv]
+  options:
+    arch: ced
+    model: model.int8.onnx
+- id: zipformer-audio-tagging
+  aliases: [k2-fsa/sherpa-onnx-zipformer-audio-tagging-2024-04-09]
+  task: audio-tagging
+  engine: sherpa-onnx
+  kind: audio_tagging
+  family: Zipformer
+  languages: []
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 68372963
+  license: Apache-2.0
+  license_url: https://github.com/k2-fsa/icefall/blob/master/LICENSE
+  features: [music, sound-events]
+  description: icefall's Zipformer audio tagger (k2-fsa), trained on AudioSet, int8, 68 MB - 527 sound classes.
+  source_url: https://github.com/k2-fsa/icefall/tree/master/egs/audioset/AT
+  validated: cpu
+  measured:
+    rtf: 0.2007
+    audio_s: 118.2
+    load_s: 1.89
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 21
+    date: '2026-11-18'
+  source:
+    repo: k2-fsa/sherpa-onnx-zipformer-audio-tagging-2024-04-09
+    revision: b527a78c480122a35a1b71a195f648d1b0586f8c
+    include: [model.int8.onnx, class_labels_indices.csv]
+  options:
+    arch: zipformer
+    model: model.int8.onnx
+- id: zipformer-small-audio-tagging
+  aliases: [k2-fsa/sherpa-onnx-zipformer-small-audio-tagging-2024-04-15]
+  task: audio-tagging
+  engine: sherpa-onnx
+  kind: audio_tagging
+  family: Zipformer
+  languages: []
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 27052741
+  license: Apache-2.0
+  license_url: https://github.com/k2-fsa/icefall/blob/master/LICENSE
+  features: [music, sound-events]
+  description: icefall's small Zipformer audio tagger (k2-fsa), trained on AudioSet, int8, 27 MB - 527 sound classes.
+  source_url: https://github.com/k2-fsa/icefall/tree/master/egs/audioset/AT
+  validated: cpu
+  measured:
+    rtf: 0.1263
+    audio_s: 118.2
+    load_s: 1.64
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 21
+    date: '2026-11-18'
+  source:
+    repo: k2-fsa/sherpa-onnx-zipformer-small-audio-tagging-2024-04-15
+    revision: c24f9d0fdf7d0b8c0c4f9733aa0cac51fda10c95
+    include: [model.int8.onnx, class_labels_indices.csv]
+  options:
+    arch: zipformer
+    model: model.int8.onnx

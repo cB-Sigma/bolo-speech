@@ -2903,6 +2903,46 @@
     }
    }
   },
+  "/v1/audio/tags": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Sound events and audio tags (music, speech, ...)",
+    "description": "Extension. Which sounds a recording holds (AudioSet's 527 classes: speech, music and its genres and\ninstruments, laughter, applause, dog, siren, engine, ...), each with its probability. Multipart form: ``file``,\n``model`` (an ``audio-tagging`` model: ``ced-tiny``, ``ced-mini``, ``ced-small``, ``ced-base``,\n``zipformer-audio-tagging``, ``zipformer-small-audio-tagging``; default ``default_audio_tagging``), ``top_k``\n(default 10), ``threshold`` (leave out tags below this probability, default 0.1), ``labels`` (only these\nclasses, comma-separated: ``Speech,Music``), ``window`` and ``hop`` (seconds: tag the recording window by window\ntoo, for sound event detection over time) and ``keep_alive``. Classes are independent: probabilities do not\nsum to 1.",
+    "operationId": "audio_tags_v1_audio_tags_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio/emotion": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Speech emotion",
+    "description": "Extension. How the speaker sounds: ``emotion`` (the most likely class) with its probability and every\nclass's probability. Multipart form: ``file``, ``model`` (an ``emotion`` model: ``emotion2vec-plus-base``,\n``emotion2vec-plus-large``; default ``default_emotion``), ``top_k`` (classes listed, default all), ``window``\nand ``hop`` (seconds: also window by window) and ``keep_alive``. SenseVoice's own emotion tags come back with\nits transcriptions (``verbose_json``).",
+    "operationId": "audio_emotion_v1_audio_emotion_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/keys": {
    "get": {
     "tags": [

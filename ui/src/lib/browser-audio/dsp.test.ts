@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import ref from '../fixtures/server-features.json'
-import { fbank60, RealFft, reflectPad, resampleAligned, whisperLogMel } from './dsp'
+import { cedFeatures, fbank60, RealFft, reflectPad, resampleAligned, whisperLogMel } from './dsp'
 import { onnxMetadata } from './onnx-meta'
 
 /** The same test signal as scripts/parity/export_cases.py. */
@@ -93,5 +93,27 @@ describe('aligned resampling', () => {
       den += ((back[i] as number) - (x[i] as number)) ** 2
     }
     expect(10 * Math.log10(num / den)).toBeGreaterThan(40)
+  })
+})
+
+describe('cedFeatures', () => {
+  it('gives the numbers of the NumPy port checked against sherpa-onnx', () => {
+    const x = Float32Array.from(
+      { length: 4000 },
+      (_, i) => 0.3 * Math.sin((2 * Math.PI * 440 * i) / 16000) + 0.05 * Math.sin((2 * Math.PI * 3000 * i) / 16000),
+    )
+    const { data, frames } = cedFeatures(x)
+    expect(frames).toBe(25)
+    expect(data.length).toBe(64 * 25)
+    const at = (t: number, m: number) => data[m * frames + t] as number
+    const want: [number, number, number][] = [
+      [0, 0, 8.24673],
+      [0, 7, 13.29374],
+      [12, 7, -35.99175],
+      [12, 40, -66.25853],
+      [24, 63, -39.64885],
+      [24, 50, -15.28084],
+    ]
+    for (const [t, m, v] of want) expect(at(t, m)).toBeCloseTo(v, 2)
   })
 })
