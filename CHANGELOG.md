@@ -66,6 +66,12 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - **Word confidence.** Words in `verbose_json` carry `probability`: Whisper's word probability on faster-whisper,
   the mean token probability on whisper.cpp and on sherpa-onnx models whose decoder reports token log-probabilities,
   Deepgram's word confidence.
+- **Audio questions and captions through `/v1/chat/completions`.** A request whose `model` is an `audio-llm`
+  model of the catalog (LFM2.5-Audio, Ultravox, Qwen2.5-Omni, Gemma 4, ...), the `audio_llm_model` setting or
+  `audio-llm` sends its `input_audio` parts to that model as they are (re-encoded as 16 kHz WAV) instead of
+  transcribing them first, so the model hears the recording: questions about it, captions, how the speaker
+  sounds. Catalog models run on bolo's managed llama-server, started (and pulled) on first use. Run on CPU with
+  `lfm2.5-audio-1.5b-llamacpp`. The console's Analyse audio page has an "Ask about it" panel.
 - **Enrolled speakers: verification and identification (`/v1/audio/speakers`).** Enrol a person from one or
   more recordings, then ask whether a recording is them (`/verify`) or which enrolled person it is, if anyone
   (`/identify`), with any speaker embedder of the catalog (ERes2Net, CAM++, WeSpeaker, TitaNet, ECAPA-TDNN) or a

@@ -72,11 +72,7 @@ export function App() {
           />
           <Route
             path="speakers"
-            element={
-              <Suspense fallback={<PageFallback />}>
-                {isDemo ? <DiarizePage /> : <SpeakersPage />}
-              </Suspense>
-            }
+            element={<Suspense fallback={<PageFallback />}>{isDemo ? <DiarizePage /> : <SpeakersPage />}</Suspense>}
           />
           <Route
             path="clone"

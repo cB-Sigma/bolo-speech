@@ -215,3 +215,68 @@ def test_llm_settings_and_doctor(
     monkeypatch.delenv("BOLO_LLM_BASE_URL")
     main(["doctor"])
     assert "language model: not configured" in capsys.readouterr().out
+
+
+@pytest.fixture
+def audio_agent(settings, llm):  # type: ignore[no-untyped-def]
+    """The fake model as the audio-llm pipeline's model (it records what it was sent)."""
+    settings.llm_base_url = llm.url
+    settings.llm_model = "fake-llm"
+    settings.audio_llm_base_url = llm.url
+    settings.audio_llm_model = "fake-audio-llm"
+    srv = LiveServer(settings)
+    srv.llm = llm  # type: ignore[attr-defined]
+    srv.start()
+    try:
+        yield srv
+    finally:
+        srv.stop()
+
+
+def test_audio_language_model_hears_the_audio(audio_agent: LiveServer) -> None:
+    """``model`` names an audio language model: the audio goes to it as 16 kHz WAV, not as a transcript."""
+    import io
+
+    import numpy as np
+    import soundfile as sf
+
+    t = np.arange(48000) / 48000
+    buf = io.BytesIO()
+    sf.write(buf, np.stack([0.3 * np.sin(2 * np.pi * 300 * t)] * 2, axis=1), 48000, format="FLAC")
+    flac = {"type": "input_audio", "input_audio": {"data": base64.b64encode(buf.getvalue()).decode(), "format": "flac"}}
+    client = openai.OpenAI(base_url=audio_agent.url + "/v1", api_key="x", max_retries=0)
+    for model, sent_model in (("audio-llm", "fake-audio-llm"), ("fake-audio-llm", "fake-audio-llm")):
+        result = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": [{"type": "text", "text": "What is this sound?"}, flac]}],
+        )
+        assert (
+            result.choices[0].message.content == "You said: What is this sound? . That is all I heard. Goodbye for now."
+        )
+        sent = audio_agent.llm.requests[-1]  # type: ignore[attr-defined]
+        assert sent["model"] == sent_model
+        part = sent["messages"][0]["content"][1]
+        assert part["type"] == "input_audio" and part["input_audio"]["format"] == "wav"
+        samples, rate = decode_audio(base64.b64decode(part["input_audio"]["data"]))
+        assert rate == 16000 and len(samples) == 16000  # mono, resampled
+    trace = httpx.get(audio_agent.url + "/api/v1/requests", params={"kind": "agent"}).json()["requests"][0]
+    assert trace["pipeline"] == "audio-llm" and trace["audio_inputs"] == 1
+    # streamed, and a text model name still transcribes first
+    stream = client.chat.completions.create(
+        model="audio-llm", messages=[{"role": "user", "content": [flac]}], stream=True
+    )
+    assert "That is all I heard" in "".join(c.choices[0].delta.content or "" for c in stream if c.choices)
+    client.chat.completions.create(model="gpt-4o-audio-preview", messages=[{"role": "user", "content": [audio_part()]}])
+    assert audio_agent.llm.requests[-1]["messages"][0]["content"] == "the quick brown fox jumps"  # type: ignore[attr-defined]
+
+
+def test_catalog_audio_llm_runs_on_the_managed_server(settings) -> None:  # type: ignore[no-untyped-def]
+    from bolo.audio_llm import client_for
+    from bolo.core import Bolo
+    from bolo.llm import ManagedModelClient
+
+    core = Bolo(settings)
+    client = client_for(core, "ultravox-0.5-llama-3.2-1b-llamacpp")
+    assert isinstance(client, ManagedModelClient) and client.model == "ultravox-0.5-llama-3.2-1b-llamacpp"
+    assert client_for(core, "gpt-4o") is None and client_for(core, None) is None
+    assert client_for(core, "audio-llm") is None  # nothing configured for the pipeline

@@ -2188,7 +2188,40 @@ differences from OpenAI are in [voice-agents.md](voice-agents.md).
 | `WS /v1/realtime?model=…` | OpenAI Realtime API over WebSocket (GA event names, as typed in `openai` 3.50.0). `?intent=transcription` or `session.update` with `type: "transcription"` for transcription-only sessions. Audio: base64 `audio/pcm` (24 kHz PCM16), `audio/pcmu`, `audio/pcma`. User transcripts arrive as incremental deltas. `turn_detection`: `server_vad`, `semantic_vad` (with the optional end-of-turn model) or `null`. Auth: `Authorization: Bearer`, or subprotocols `realtime` + `openai-insecure-api-key.<key>`; an ephemeral `ek_…` key is accepted in the same places. bolo extension `session.pipeline`: `cascade` (default, setting `realtime_pipeline`), `audio-llm` (an audio-understanding model hears the turn, bolo's TTS speaks) or `speech-to-speech` (a speech-to-speech model, first backend llama-server `/v1/realtime` with LFM3-Audio, answers with speech and tool calls; bolo keeps turn detection, barge-in, codecs and transcripts); see [voice-agents.md](voice-agents.md#pipelines-cascade-audio-in-language-model-speech-to-speech). `GET /api/v1/info` lists them under `capabilities.realtime.pipelines` |
 | `POST /v1/realtime/client_secrets` | mint an ephemeral key (`{"value": "ek_…", "expires_at", "session"}`) for browsers. Needs the server key. Body: `{"expires_after": {"anchor": "created_at", "seconds": 600}, "session": {…}}`, all optional |
 | `POST /v1/realtime/calls` | the same sessions over **WebRTC**: SDP offer in (`application/sdp`, or multipart `sdp` + `session`), `201` with the SDP answer and `Location: /v1/realtime/calls/{call_id}`. Needs `bolo-speech[webrtc]` (else `503 engine_unavailable`). `POST …/{call_id}/hangup` ends the call. Not implemented: OpenAI's SIP connector (for phone calls see [Phone calls](#phone-calls)) |
-| `POST /v1/chat/completions` | `input_audio` content parts are transcribed; `modalities: ["text","audio"]` + `audio: {voice, format}` adds a spoken reply (`message.audio`, or `delta.audio` when streaming); everything else is forwarded to the language model untouched; requests without audio are proxied as they are. |
+| `POST /v1/chat/completions` | `input_audio` content parts are transcribed; `modalities: ["text","audio"]` + `audio: {voice, format}` adds a spoken reply (`message.audio`, or `delta.audio` when streaming); everything else is forwarded to the language model untouched; requests without audio are proxied as they are. A `model` that is an audio language model hears the audio itself: [Audio questions and captions](#audio-questions-and-captions) |
+
+### Audio questions and captions
+
+When a chat-completions request's `model` is an audio language model, the `input_audio` parts are not
+transcribed: the model hears the recording, so it can answer questions about it (who is speaking, what the sound
+is, how the speaker sounds), caption it or summarise it. Such a `model` is one of:
+
+* an `audio-llm` model of the catalog (`lfm2.5-audio-1.5b-llamacpp`, `ultravox-0.5-llama-3.2-1b-llamacpp`,
+  `qwen2.5-omni-3b-llamacpp`, `gemma-4-e2b-it-llamacpp`, ...; [models.md](models.md)): bolo pulls it and runs it on
+  its managed llama-server (`bolo components install llama-server`), the one the Realtime `audio-llm` pipeline uses.
+  One such server runs at a time: a request for another model stops it and starts one for that model (a minute or
+  more on a CPU), so a Realtime session on the pipeline waits for it to come back;
+* the `audio_llm_model` setting when `audio_llm_base_url` points at your own server;
+* `audio-llm`: whatever the audio-llm pipeline is configured with.
+
+The audio parts are re-encoded as 16 kHz mono WAV (llama.cpp's server reads WAV and MP3 only), so any format bolo
+decodes can be sent; the rest of the request (text parts, `max_tokens`, `stream`, `temperature`, ...) goes to the
+model as it is. `modalities: ["text", "audio"]` still adds a spoken reply. The trace (kind `agent`) has
+`pipeline: "audio-llm"`.
+
+```bash
+AUDIO=$(base64 -w0 street.wav)
+curl -s localhost:8000/v1/chat/completions -H 'Content-Type: application/json' -d '{
+  "model": "qwen2.5-omni-3b-llamacpp",
+  "messages": [{"role": "user", "content": [
+    {"type": "text", "text": "Describe this recording in one sentence."},
+    {"type": "input_audio", "input_audio": {"data": "'"$AUDIO"'", "format": "wav"}}]}]}'
+```
+
+How well a model answers depends on the model: the small ones transcribe more readily than they answer (see each
+entry's note in [models.md](models.md)). On a CPU an answer takes a while: `lfm2.5-audio-1.5b-llamacpp` described a
+4 s clip in about 5 minutes on a heavily shared 4-vCPU machine, longer than the default `llm_timeout_s` of 120 s, so
+raise that setting for audio questions on a CPU. The console's Analyse audio page asks these questions too.
 
 Voice-agent turns are traces of kind `agent` (transport `realtime`, `webrtc`,
 `chat` or `telephony`) with `first_token_ms` and `ttfa_ms`; see

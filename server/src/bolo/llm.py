@@ -215,3 +215,37 @@ class AudioLLMClient(LLMClient):
             "base_url": self.settings.audio_llm_base_url or self.settings.llm_base_url,
             "model": self.model,
         }
+
+
+class ManagedModelClient(LLMClient):
+    """An ``audio-llm`` catalog model on bolo's managed llama-server, named by a chat-completions request
+    (bolo.audio_llm.client_for): the request's audio parts go to it as they are."""
+
+    def __init__(self, settings: Settings, managed: ManagedAudioLLM, model: str) -> None:
+        super().__init__(settings)
+        self.managed = managed
+        self.model = model
+        self._url: str | None = None
+        self._key: str | None = None
+
+    @property
+    def configured(self) -> bool:
+        return True
+
+    async def prepare(self) -> None:
+        self._url, self._key = await self.managed.base_url(self.model)
+
+    @property
+    def base_url(self) -> str:
+        if not self._url:
+            raise LLMNotConfigured(f"the audio language model '{self.model}' has not been started")
+        return self._url.rstrip("/")
+
+    def headers(self) -> dict[str, str]:
+        h = {"Content-Type": "application/json"}
+        if self._key:
+            h["Authorization"] = f"Bearer {self._key}"
+        return h
+
+    def describe(self) -> dict[str, Any]:
+        return {"configured": True, "base_url": self._url, "model": self.model, "managed": True}

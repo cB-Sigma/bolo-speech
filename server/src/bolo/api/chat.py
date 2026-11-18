@@ -1,11 +1,16 @@
-"""``/v1/chat/completions``: a speech front end for the operator's language model.
+"""``/v1/chat/completions``: a speech front end for the operator's language model, and audio language models.
 
 Follows the OpenAI reference for audio in chat completions: ``input_audio``
 content parts on the way in, ``modalities: ["text", "audio"]`` with an
-``audio`` object (``voice``, ``format``) on the way out. bolo transcribes the
-audio parts, forwards an ordinary text request to the configured model, and
-synthesises the reply when audio was asked for. Requests that involve no
-audio are proxied unchanged, so a client can use one base URL for everything.
+``audio`` object (``voice``, ``format``) on the way out. For the operator's
+text model, bolo transcribes the audio parts, forwards an ordinary text
+request to the configured model, and synthesises the reply when audio was
+asked for. A request whose ``model`` is an audio language model (an
+``audio-llm`` model of the catalog, the ``audio_llm_model`` setting, or
+``audio-llm``) goes to that model with its audio as it is (re-encoded to 16 kHz
+WAV), so the model hears the recording: questions about it, captions, what
+was said and how. Requests that involve no audio are proxied unchanged, so a
+client can use one base URL for everything.
 """
 
 from __future__ import annotations
@@ -80,6 +85,37 @@ async def transcribe_parts(core: Bolo, body: dict[str, Any], trace: Trace) -> tu
     return count, seconds
 
 
+async def audio_parts_to_wav(body: dict[str, Any]) -> tuple[int, float]:
+    """Re-encode every ``input_audio`` part as 16 kHz mono WAV, for an audio language model (llama.cpp's server
+    reads WAV and MP3 only). Returns (count, audio seconds)."""
+    from bolo.audio.resample import resample
+
+    count, seconds = 0, 0.0
+    for i, message in enumerate(body.get("messages") or []):
+        content = message.get("content") if isinstance(message, dict) else None
+        if not isinstance(content, list):
+            continue
+        for j, part in enumerate(content):
+            if not (isinstance(part, dict) and part.get("type") == "input_audio"):
+                continue
+            param = f"messages[{i}].content[{j}].input_audio"
+            spec = part.get("input_audio")
+            if not isinstance(spec, dict) or not isinstance(spec.get("data"), str):
+                raise InvalidRequest("input_audio needs base64 'data' and a 'format'", param=param)
+            try:
+                raw = base64.b64decode(spec["data"], validate=True)
+            except (binascii.Error, ValueError) as exc:
+                raise InvalidRequest("input_audio.data is not valid base64", param=param + ".data") from exc
+            fmt = str(spec.get("format") or "wav")
+            samples, rate = await asyncio.to_thread(decode_audio, raw, filename=f"audio.{fmt}")
+            x = await asyncio.to_thread(resample, samples, rate, 16000)
+            wav = await asyncio.to_thread(encode_audio, x, 16000, "wav")
+            part["input_audio"] = {"data": base64.b64encode(wav).decode(), "format": "wav"}
+            count += 1
+            seconds += len(samples) / rate if rate else 0.0
+    return count, seconds
+
+
 def has_audio_parts(body: dict[str, Any]) -> bool:
     for message in body.get("messages") or []:
         content = message.get("content") if isinstance(message, dict) else None
@@ -94,9 +130,11 @@ def has_audio_parts(body: dict[str, Any]) -> bool:
     summary="Chat completions with audio in and out (speech front end to your LLM)",
 )
 async def chat_completions(request: Request) -> Response:
-    """Needs ``llm_base_url``. Audio parts are transcribed, the text request goes to the configured
-    model, and the reply is synthesised when ``modalities`` contains ``"audio"``. Requests without
-    audio are proxied unchanged. Extensions (not forwarded): ``transcription_model``,
+    """Needs ``llm_base_url``, or a ``model`` that is an audio language model. For the text model, audio parts are
+    transcribed, the text request goes to the configured model, and the reply is synthesised when ``modalities``
+    contains ``"audio"``. A ``model`` that is an ``audio-llm`` model of the catalog (bolo runs it on llama-server),
+    the ``audio_llm_model`` setting or ``audio-llm`` hears the audio parts directly (questions about the recording,
+    captions). Requests without audio are proxied unchanged. Extensions (not forwarded): ``transcription_model``,
     ``transcription_language``, ``speech_model``."""
     core = get_core(request)
     try:
@@ -105,8 +143,12 @@ async def chat_completions(request: Request) -> Response:
         raise InvalidRequest("the request body must be JSON") from exc
     if not isinstance(body, dict) or not isinstance(body.get("messages"), list):
         raise InvalidRequest("'messages' is required", param="messages")
-    llm = core.llm
-    _ = llm.base_url  # raises a clear error when no language model is configured
+    from bolo.audio_llm import client_for
+
+    direct = client_for(core, body.get("model"))  # an audio language model: it hears the audio itself
+    llm = direct or core.llm
+    if direct is None:
+        _ = llm.base_url  # raises a clear error when no language model is configured
     wants_audio = "audio" in (body.get("modalities") or [])
     audio_in = has_audio_parts(body)
     stream = bool(body.get("stream"))
@@ -132,7 +174,7 @@ async def chat_completions(request: Request) -> Response:
         )
 
     trace = Trace("agent", "chat", "voice-agent")
-    trace.extra["pipeline"] = "cascade"
+    trace.extra["pipeline"] = "audio-llm" if direct is not None else "cascade"
     audio_cfg: dict[str, Any] = body["audio"] if isinstance(body.get("audio"), dict) else {}
     try:
         fmt = _audio_format(str(audio_cfg.get("format") or "wav")) if wants_audio else "wav"
@@ -150,11 +192,17 @@ async def chat_completions(request: Request) -> Response:
         tts_spec = (
             (core.resolve(speech_model, "tts") if speech_model else core.realtime_tts(voice)) if wants_audio else None
         )
-        n_audio, seconds_in = await transcribe_parts(core, body, trace)
+        if direct is not None:
+            n_audio, seconds_in = await audio_parts_to_wav(body)
+        else:
+            n_audio, seconds_in = await transcribe_parts(core, body, trace)
         trace.audio_seconds = seconds_in or None
         trace.mark_final()
         forward = {k: v for k, v in body.items() if k not in ("modalities", "audio", *EXTENSIONS)}
-        if core.settings.llm_model:
+        if direct is not None:
+            if direct is core.audio_llm and core.audio_llm.model:
+                forward["model"] = core.audio_llm.model
+        elif core.settings.llm_model:
             forward["model"] = core.settings.llm_model  # audio model names mean nothing to a text model
         trace.extra.update(
             llm_model=forward.get("model"), tts_model=tts_spec.id if tts_spec else None, audio_inputs=n_audio

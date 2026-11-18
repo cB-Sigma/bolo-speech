@@ -210,8 +210,8 @@ function CheckPanel({ speakers, thresholds }: { speakers: EnrolledSpeaker[]; thr
                 </>
               )}
               threshold {result.threshold} ({result.calibrated ? 'measured for' : 'not measured for'}{' '}
-              {result.embedding_model}). A voiceprint is not proof of identity: noise, telephone audio, short clips
-              and imitated or synthesised voices move the score.
+              {result.embedding_model}). A voiceprint is not proof of identity: noise, telephone audio, short clips and
+              imitated or synthesised voices move the score.
             </p>
           </div>
         )}
@@ -269,7 +269,11 @@ export default function SpeakersPage() {
           ) : (
             <ul className="grid gap-3">
               {speakers.map((s) => (
-                <li key={s.id} className="grid gap-2 rounded-md border border-border p-3" data-testid={`speaker-${s.id}`}>
+                <li
+                  key={s.id}
+                  className="grid gap-2 rounded-md border border-border p-3"
+                  data-testid={`speaker-${s.id}`}
+                >
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{s.name}</span>
                     <span className="num text-xs text-muted-foreground">

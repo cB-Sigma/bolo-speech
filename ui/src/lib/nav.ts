@@ -195,7 +195,7 @@ export const NAV: NavItem[] = [
     to: '/analyse',
     label: 'Analyse audio',
     short: 'Analyse',
-    description: 'Sound events, emotion and noise removal for one recording',
+    description: 'Sound events, emotion, noise removal and questions about one recording',
     icon: ScanSearch,
     group: 'Playground',
   },

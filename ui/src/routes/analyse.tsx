@@ -1,4 +1,4 @@
-import { AudioLines, Download, FileAudio, Loader2, Smile, Sparkles, Tags } from 'lucide-react'
+import { AudioLines, Download, FileAudio, Loader2, MessageCircleQuestion, Smile, Sparkles, Tags } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { CatalogSelect } from '@/components/catalog-select'
@@ -9,6 +9,7 @@ import { TagBars } from '@/components/analyse/tag-bars'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
+import { Textarea } from '@/components/ui/textarea'
 import { ClipSlot, type Clip } from '@/components/voices/voice-compare'
 import { describeError, useInfo, useModels, useSamples } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
@@ -327,7 +328,86 @@ function CleanPanel({
   )
 }
 
-/** Analyse a recording: sound events, emotion and noise removed. */
+const QUESTIONS = [
+  'Describe this recording in one sentence.',
+  'What sounds can you hear, apart from speech?',
+  'How does the speaker sound?',
+  'Summarise what is said.',
+]
+
+/** A question about the recording, answered by an audio language model that hears it (`/v1/chat/completions`). */
+function AskPanel({ clip }: { clip: Clip | null }) {
+  const models = useModels('audio-llm').models
+  const [model, setModel] = useState('')
+  const [question, setQuestion] = useState<string>(QUESTIONS[0] ?? '')
+  const [busy, setBusy] = useState(false)
+  const [reply, setReply] = useState<{ clip: Clip; text: string } | null>(null)
+  const answer = reply?.clip === clip ? reply.text : null
+  const chosen = model || models.find((m) => m.installed)?.id || models[0]?.id || ''
+  const run = async () => {
+    if (!clip || !chosen) return
+    setBusy(true)
+    try {
+      const format = /\.([a-z0-9]+)$/i.exec(clip.name)?.[1]?.toLowerCase() ?? 'wav'
+      setReply({ clip, text: await api.askAudio(clip.blob, format, question, chosen) })
+    } catch (err) {
+      toast.error('Could not get an answer', { description: describeError(err) })
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Panel
+      title="Ask about it"
+      description="An audio language model hears the recording itself, not a transcript of it. The first question starts the model, which can take a minute."
+      data-testid="analyse-ask"
+    >
+      <div className="grid gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <CatalogSelect
+            models={models}
+            value={chosen}
+            onChange={setModel}
+            label="Audio language model"
+            defaultLabel={null}
+            disabled={busy}
+            className="w-72 max-sm:w-full"
+            testId="analyse-ask-model"
+          />
+          {QUESTIONS.map((q) => (
+            <Button key={q} size="sm" variant="ghost" className="border border-border" onClick={() => setQuestion(q)}>
+              {q.split(' ').slice(0, 3).join(' ')}...
+            </Button>
+          ))}
+        </div>
+        <Textarea
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          rows={2}
+          aria-label="Question"
+          data-testid="analyse-ask-question"
+        />
+        <div>
+          <Button
+            size="sm"
+            onClick={() => void run()}
+            disabled={!clip || !chosen || !question.trim() || busy}
+            data-testid="analyse-ask-run"
+          >
+            {busy ? <Loader2 className="animate-spin" /> : <MessageCircleQuestion />} Ask
+          </Button>
+        </div>
+        {answer != null && (
+          <p className="text-sm whitespace-pre-wrap" data-testid="analyse-ask-answer">
+            {answer || '(no answer)'}
+          </p>
+        )}
+      </div>
+    </Panel>
+  )
+}
+
+/** Analyse a recording: sound events, emotion, noise removed, and questions to an audio language model. */
 export default function AnalysePage() {
   const info = useInfo().data
   const samples = useSamples().data?.samples
@@ -369,6 +449,7 @@ export default function AnalysePage() {
           <TagsPanel clip={clip} autoPullOn={on} defaultModel={caps?.audio_tagging?.default_model} />
           <EmotionPanel clip={clip} autoPullOn={on} defaultModel={caps?.emotion?.default_model} />
           <CleanPanel clip={clip} autoPullOn={on} defaultModel={caps?.denoise?.default_model} />
+          <AskPanel clip={clip} />
         </div>
         {!clip && (
           <p className="flex items-center gap-2 text-xs text-muted-foreground">
