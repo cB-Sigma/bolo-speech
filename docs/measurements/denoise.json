@@ -164,5 +164,2179 @@
    "gtcrn@0.5": 0.117
   }
  },
- "caveat": "47 words of synthetic (Kokoro) speech: a direction, not a benchmark. The noisy conditions are artificial mixes."
+ "caveat": "47 words of synthetic (Kokoro) speech: a direction, not a benchmark. The noisy conditions are artificial mixes.",
+ "catalog_comparison": {
+  "what": "The same measurement for every runnable denoiser of the catalog: the two English samples with white, pink, applause and train noise at 10, 5 and 0 dB SNR, transcribed by moonshine-v2-tiny-en and whisper-base with denoise off, on (full strength) and at strength 0.5",
+  "date": "2026-11-17",
+  "harness": "server/tools/measure_denoise.py (the recipe of the first measurement above, written down: numpy default_rng(7) draws the white noise of en-short, then of en-long, then the pink noise the same way; the gallery sounds are resampled with soxr). Its noise realisations differ from the first run's, so its 'off' word error rates differ too (moonshine 0.344 against 0.317, whisper 0.172 against 0.154): compare denoisers within this block",
+  "hardware": "4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 12-17 throughout)",
+  "threads": "recognisers and denoisers 2 threads in the server; speed measured on 1 thread in-process",
+  "software": {
+   "bolo": "main after 11c48c5",
+   "sherpa-onnx": "2.0.1",
+   "onnxruntime": "1.32.0",
+   "torch": "CPU build"
+  },
+  "speed_note": "rtf_cpu: CPU seconds per second of audio on one thread (74 s of speech, at the model's own rate, best of 3); live_20ms: the live stream's denoiser fed 20 ms chunks of 16 kHz audio for 15 s (time per chunk, most audio held back at once)",
+  "off": {
+   "moonshine-v2-tiny-en": {
+    "clean": {
+     "off": 0.064
+    },
+    "white@10dB": {
+     "off": 0.17
+    },
+    "white@5dB": {
+     "off": 0.404
+    },
+    "white@0dB": {
+     "off": 0.83
+    },
+    "pink@10dB": {
+     "off": 0.106
+    },
+    "pink@5dB": {
+     "off": 0.17
+    },
+    "pink@0dB": {
+     "off": 0.574
+    },
+    "applause@10dB": {
+     "off": 0.17
+    },
+    "applause@5dB": {
+     "off": 0.319
+    },
+    "applause@0dB": {
+     "off": 0.489
+    },
+    "train@10dB": {
+     "off": 0.106
+    },
+    "train@5dB": {
+     "off": 0.319
+    },
+    "train@0dB": {
+     "off": 0.468
+    }
+   },
+   "whisper-base": {
+    "clean": {
+     "off": 0.0
+    },
+    "white@10dB": {
+     "off": 0.106
+    },
+    "white@5dB": {
+     "off": 0.255
+    },
+    "white@0dB": {
+     "off": 0.787
+    },
+    "pink@10dB": {
+     "off": 0.043
+    },
+    "pink@5dB": {
+     "off": 0.106
+    },
+    "pink@0dB": {
+     "off": 0.34
+    },
+    "applause@10dB": {
+     "off": 0.043
+    },
+    "applause@5dB": {
+     "off": 0.064
+    },
+    "applause@0dB": {
+     "off": 0.085
+    },
+    "train@10dB": {
+     "off": 0.021
+    },
+    "train@5dB": {
+     "off": 0.064
+    },
+    "train@0dB": {
+     "off": 0.149
+    }
+   }
+  },
+  "mean_over_noisy_conditions_off": {
+   "moonshine-v2-tiny-en": 0.344,
+   "whisper-base": 0.172
+  },
+  "denoisers": {
+   "gtcrn-simple": {
+    "sample_rate": 16000,
+    "license": "MIT",
+    "size_bytes": 535638,
+    "results": {
+     "moonshine-v2-tiny-en": {
+      "clean": {
+       "on": 0.021,
+       "half": 0.064
+      },
+      "white@10dB": {
+       "on": 0.213,
+       "half": 0.085
+      },
+      "white@5dB": {
+       "on": 0.319,
+       "half": 0.191
+      },
+      "white@0dB": {
+       "on": 0.66,
+       "half": 0.617
+      },
+      "pink@10dB": {
+       "on": 0.085,
+       "half": 0.085
+      },
+      "pink@5dB": {
+       "on": 0.106,
+       "half": 0.17
+      },
+      "pink@0dB": {
+       "on": 0.511,
+       "half": 0.362
+      },
+      "applause@10dB": {
+       "on": 0.064,
+       "half": 0.085
+      },
+      "applause@5dB": {
+       "on": 0.149,
+       "half": 0.17
+      },
+      "applause@0dB": {
+       "on": 0.213,
+       "half": 0.298
+      },
+      "train@10dB": {
+       "on": 0.021,
+       "half": 0.064
+      },
+      "train@5dB": {
+       "on": 0.128,
+       "half": 0.128
+      },
+      "train@0dB": {
+       "on": 0.404,
+       "half": 0.426
+      }
+     },
+     "whisper-base": {
+      "clean": {
+       "on": 0.0,
+       "half": 0.0
+      },
+      "white@10dB": {
+       "on": 0.191,
+       "half": 0.085
+      },
+      "white@5dB": {
+       "on": 0.277,
+       "half": 0.106
+      },
+      "white@0dB": {
+       "on": 0.702,
+       "half": 0.362
+      },
+      "pink@10dB": {
+       "on": 0.064,
+       "half": 0.043
+      },
+      "pink@5dB": {
+       "on": 0.191,
+       "half": 0.106
+      },
+      "pink@0dB": {
+       "on": 0.511,
+       "half": 0.255
+      },
+      "applause@10dB": {
+       "on": 0.043,
+       "half": 0.0
+      },
+      "applause@5dB": {
+       "on": 0.128,
+       "half": 0.064
+      },
+      "applause@0dB": {
+       "on": 0.191,
+       "half": 0.085
+      },
+      "train@10dB": {
+       "on": 0.043,
+       "half": 0.021
+      },
+      "train@5dB": {
+       "on": 0.085,
+       "half": 0.085
+      },
+      "train@0dB": {
+       "on": 0.234,
+       "half": 0.106
+      }
+     }
+    },
+    "mean_over_noisy_conditions": {
+     "moonshine-v2-tiny-en": {
+      "on": 0.239,
+      "half": 0.223
+     },
+     "whisper-base": {
+      "on": 0.222,
+      "half": 0.11
+     }
+    },
+    "speed": {
+     "audio_s": 74.1,
+     "rtf_cpu": 0.051,
+     "rtf_wall": 0.0552,
+     "live_20ms": {
+      "chunks": 750,
+      "mean_ms": 1.78,
+      "p95_ms": 3.66,
+      "max_ms": 12.55,
+      "held_ms": 28.0,
+      "stateful": true
+     }
+    }
+   },
+   "dpdfnet-baseline": {
+    "sample_rate": 16000,
+    "license": "Apache-2.0",
+    "size_bytes": 8722707,
+    "results": {
+     "moonshine-v2-tiny-en": {
+      "clean": {
+       "on": 0.043,
+       "half": 0.064
+      },
+      "white@10dB": {
+       "on": 0.128,
+       "half": 0.085
+      },
+      "white@5dB": {
+       "on": 0.298,
+       "half": 0.17
+      },
+      "white@0dB": {
+       "on": 0.511,
+       "half": 0.702
+      },
+      "pink@10dB": {
+       "on": 0.064,
+       "half": 0.085
+      },
+      "pink@5dB": {
+       "on": 0.106,
+       "half": 0.191
+      },
+      "pink@0dB": {
+       "on": 0.426,
+       "half": 0.404
+      },
+      "applause@10dB": {
+       "on": 0.191,
+       "half": 0.106
+      },
+      "applause@5dB": {
+       "on": 0.17,
+       "half": 0.277
+      },
+      "applause@0dB": {
+       "on": 0.404,
+       "half": 0.404
+      },
+      "train@10dB": {
+       "on": 0.064,
+       "half": 0.064
+      },
+      "train@5dB": {
+       "on": 0.085,
+       "half": 0.191
+      },
+      "train@0dB": {
+       "on": 0.319,
+       "half": 0.404
+      }
+     },
+     "whisper-base": {
+      "clean": {
+       "on": 0.021,
+       "half": 0.0
+      },
+      "white@10dB": {
+       "on": 0.149,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.298,
+       "half": 0.085
+      },
+      "white@0dB": {
+       "on": 1.298,
+       "half": 0.383
+      },
+      "pink@10dB": {
+       "on": 0.0,
+       "half": 0.043
+      },
+      "pink@5dB": {
+       "on": 0.085,
+       "half": 0.064
+      },
+      "pink@0dB": {
+       "on": 0.383,
+       "half": 0.255
+      },
+      "applause@10dB": {
+       "on": 0.085,
+       "half": 0.0
+      },
+      "applause@5dB": {
+       "on": 0.213,
+       "half": 0.043
+      },
+      "applause@0dB": {
+       "on": 0.255,
+       "half": 0.064
+      },
+      "train@10dB": {
+       "on": 0.043,
+       "half": 0.021
+      },
+      "train@5dB": {
+       "on": 0.128,
+       "half": 0.043
+      },
+      "train@0dB": {
+       "on": 0.17,
+       "half": 0.064
+      }
+     }
+    },
+    "mean_over_noisy_conditions": {
+     "moonshine-v2-tiny-en": {
+      "on": 0.231,
+      "half": 0.257
+     },
+     "whisper-base": {
+      "on": 0.259,
+      "half": 0.094
+     }
+    },
+    "speed": {
+     "audio_s": 74.1,
+     "rtf_cpu": 0.0796,
+     "rtf_wall": 0.0988,
+     "live_20ms": {
+      "chunks": 750,
+      "mean_ms": 2.7,
+      "p95_ms": 5.94,
+      "max_ms": 12.06,
+      "held_ms": 50.0,
+      "stateful": true
+     }
+    }
+   },
+   "dpdfnet2": {
+    "sample_rate": 16000,
+    "license": "Apache-2.0",
+    "size_bytes": 10178747,
+    "results": {
+     "moonshine-v2-tiny-en": {
+      "clean": {
+       "on": 0.064,
+       "half": 0.064
+      },
+      "white@10dB": {
+       "on": 0.085,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.191,
+       "half": 0.17
+      },
+      "white@0dB": {
+       "on": 0.617,
+       "half": 0.723
+      },
+      "pink@10dB": {
+       "on": 0.021,
+       "half": 0.064
+      },
+      "pink@5dB": {
+       "on": 0.128,
+       "half": 0.128
+      },
+      "pink@0dB": {
+       "on": 0.319,
+       "half": 0.34
+      },
+      "applause@10dB": {
+       "on": 0.106,
+       "half": 0.085
+      },
+      "applause@5dB": {
+       "on": 0.213,
+       "half": 0.277
+      },
+      "applause@0dB": {
+       "on": 0.255,
+       "half": 0.319
+      },
+      "train@10dB": {
+       "on": 0.085,
+       "half": 0.064
+      },
+      "train@5dB": {
+       "on": 0.128,
+       "half": 0.191
+      },
+      "train@0dB": {
+       "on": 0.213,
+       "half": 0.404
+      }
+     },
+     "whisper-base": {
+      "clean": {
+       "on": 0.064,
+       "half": 0.0
+      },
+      "white@10dB": {
+       "on": 0.17,
+       "half": 0.106
+      },
+      "white@5dB": {
+       "on": 0.362,
+       "half": 0.106
+      },
+      "white@0dB": {
+       "on": 0.596,
+       "half": 0.319
+      },
+      "pink@10dB": {
+       "on": 0.0,
+       "half": 0.021
+      },
+      "pink@5dB": {
+       "on": 0.064,
+       "half": 0.064
+      },
+      "pink@0dB": {
+       "on": 0.383,
+       "half": 0.255
+      },
+      "applause@10dB": {
+       "on": 0.085,
+       "half": 0.0
+      },
+      "applause@5dB": {
+       "on": 0.213,
+       "half": 0.021
+      },
+      "applause@0dB": {
+       "on": 0.213,
+       "half": 0.064
+      },
+      "train@10dB": {
+       "on": 0.085,
+       "half": 0.0
+      },
+      "train@5dB": {
+       "on": 0.064,
+       "half": 0.043
+      },
+      "train@0dB": {
+       "on": 0.191,
+       "half": 0.064
+      }
+     }
+    },
+    "mean_over_noisy_conditions": {
+     "moonshine-v2-tiny-en": {
+      "on": 0.197,
+      "half": 0.236
+     },
+     "whisper-base": {
+      "on": 0.202,
+      "half": 0.089
+     }
+    },
+    "speed": {
+     "audio_s": 74.1,
+     "rtf_cpu": 0.1625,
+     "rtf_wall": 0.1729,
+     "live_20ms": {
+      "chunks": 750,
+      "mean_ms": 3.85,
+      "p95_ms": 4.53,
+      "max_ms": 11.95,
+      "held_ms": 50.0,
+      "stateful": true
+     }
+    }
+   },
+   "dpdfnet4": {
+    "sample_rate": 16000,
+    "license": "Apache-2.0",
+    "size_bytes": 11633337,
+    "results": {
+     "moonshine-v2-tiny-en": {
+      "clean": {
+       "on": 0.064,
+       "half": 0.064
+      },
+      "white@10dB": {
+       "on": 0.085,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.255,
+       "half": 0.149
+      },
+      "white@0dB": {
+       "on": 0.404,
+       "half": 0.617
+      },
+      "pink@10dB": {
+       "on": 0.085,
+       "half": 0.085
+      },
+      "pink@5dB": {
+       "on": 0.149,
+       "half": 0.128
+      },
+      "pink@0dB": {
+       "on": 0.362,
+       "half": 0.34
+      },
+      "applause@10dB": {
+       "on": 0.106,
+       "half": 0.106
+      },
+      "applause@5dB": {
+       "on": 0.234,
+       "half": 0.277
+      },
+      "applause@0dB": {
+       "on": 0.34,
+       "half": 0.383
+      },
+      "train@10dB": {
+       "on": 0.043,
+       "half": 0.064
+      },
+      "train@5dB": {
+       "on": 0.234,
+       "half": 0.191
+      },
+      "train@0dB": {
+       "on": 0.255,
+       "half": 0.404
+      }
+     },
+     "whisper-base": {
+      "clean": {
+       "on": 0.021,
+       "half": 0.0
+      },
+      "white@10dB": {
+       "on": 0.149,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.255,
+       "half": 0.085
+      },
+      "white@0dB": {
+       "on": 0.574,
+       "half": 0.362
+      },
+      "pink@10dB": {
+       "on": 0.043,
+       "half": 0.021
+      },
+      "pink@5dB": {
+       "on": 0.085,
+       "half": 0.043
+      },
+      "pink@0dB": {
+       "on": 0.362,
+       "half": 0.255
+      },
+      "applause@10dB": {
+       "on": 0.128,
+       "half": 0.0
+      },
+      "applause@5dB": {
+       "on": 0.17,
+       "half": 0.0
+      },
+      "applause@0dB": {
+       "on": 0.17,
+       "half": 0.064
+      },
+      "train@10dB": {
+       "on": 0.021,
+       "half": 0.021
+      },
+      "train@5dB": {
+       "on": 0.149,
+       "half": 0.043
+      },
+      "train@0dB": {
+       "on": 0.234,
+       "half": 0.064
+      }
+     }
+    },
+    "mean_over_noisy_conditions": {
+     "moonshine-v2-tiny-en": {
+      "on": 0.213,
+      "half": 0.234
+     },
+     "whisper-base": {
+      "on": 0.195,
+      "half": 0.085
+     }
+    },
+    "speed": {
+     "audio_s": 74.1,
+     "rtf_cpu": 0.2317,
+     "rtf_wall": 0.2456,
+     "live_20ms": {
+      "chunks": 750,
+      "mean_ms": 5.84,
+      "p95_ms": 9.12,
+      "max_ms": 25.65,
+      "held_ms": 50.0,
+      "stateful": true
+     }
+    }
+   },
+   "dpdfnet8": {
+    "sample_rate": 16000,
+    "license": "Apache-2.0",
+    "size_bytes": 14542517,
+    "results": {
+     "moonshine-v2-tiny-en": {
+      "clean": {
+       "on": 0.085,
+       "half": 0.064
+      },
+      "white@10dB": {
+       "on": 0.106,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.191,
+       "half": 0.149
+      },
+      "white@0dB": {
+       "on": 0.489,
+       "half": 0.617
+      },
+      "pink@10dB": {
+       "on": 0.085,
+       "half": 0.064
+      },
+      "pink@5dB": {
+       "on": 0.128,
+       "half": 0.128
+      },
+      "pink@0dB": {
+       "on": 0.255,
+       "half": 0.362
+      },
+      "applause@10dB": {
+       "on": 0.191,
+       "half": 0.085
+      },
+      "applause@5dB": {
+       "on": 0.319,
+       "half": 0.17
+      },
+      "applause@0dB": {
+       "on": 0.277,
+       "half": 0.383
+      },
+      "train@10dB": {
+       "on": 0.085,
+       "half": 0.064
+      },
+      "train@5dB": {
+       "on": 0.064,
+       "half": 0.149
+      },
+      "train@0dB": {
+       "on": 0.234,
+       "half": 0.383
+      }
+     },
+     "whisper-base": {
+      "clean": {
+       "on": 0.064,
+       "half": 0.0
+      },
+      "white@10dB": {
+       "on": 0.128,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.17,
+       "half": 0.128
+      },
+      "white@0dB": {
+       "on": 0.447,
+       "half": 0.362
+      },
+      "pink@10dB": {
+       "on": 0.043,
+       "half": 0.021
+      },
+      "pink@5dB": {
+       "on": 0.064,
+       "half": 0.043
+      },
+      "pink@0dB": {
+       "on": 0.234,
+       "half": 0.191
+      },
+      "applause@10dB": {
+       "on": 0.128,
+       "half": 0.0
+      },
+      "applause@5dB": {
+       "on": 0.149,
+       "half": 0.0
+      },
+      "applause@0dB": {
+       "on": 0.234,
+       "half": 0.064
+      },
+      "train@10dB": {
+       "on": 0.106,
+       "half": 0.0
+      },
+      "train@5dB": {
+       "on": 0.128,
+       "half": 0.043
+      },
+      "train@0dB": {
+       "on": 0.17,
+       "half": 0.064
+      }
+     }
+    },
+    "mean_over_noisy_conditions": {
+     "moonshine-v2-tiny-en": {
+      "on": 0.202,
+      "half": 0.218
+     },
+     "whisper-base": {
+      "on": 0.167,
+      "half": 0.082
+     }
+    },
+    "speed": {
+     "audio_s": 74.1,
+     "rtf_cpu": 0.3813,
+     "rtf_wall": 0.4821,
+     "live_20ms": {
+      "chunks": 750,
+      "mean_ms": 16.06,
+      "p95_ms": 23.92,
+      "max_ms": 39.08,
+      "held_ms": 50.0,
+      "stateful": true
+     }
+    }
+   },
+   "dpdfnet2-48k": {
+    "sample_rate": 48000,
+    "license": "Apache-2.0",
+    "size_bytes": 10493337,
+    "results": {
+     "moonshine-v2-tiny-en": {
+      "clean": {
+       "on": 0.064,
+       "half": 0.064
+      },
+      "white@10dB": {
+       "on": 0.106,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.298,
+       "half": 0.17
+      },
+      "white@0dB": {
+       "on": 0.66,
+       "half": 0.702
+      },
+      "pink@10dB": {
+       "on": 0.106,
+       "half": 0.106
+      },
+      "pink@5dB": {
+       "on": 0.128,
+       "half": 0.128
+      },
+      "pink@0dB": {
+       "on": 0.277,
+       "half": 0.319
+      },
+      "applause@10dB": {
+       "on": 0.106,
+       "half": 0.106
+      },
+      "applause@5dB": {
+       "on": 0.277,
+       "half": 0.277
+      },
+      "applause@0dB": {
+       "on": 0.319,
+       "half": 0.468
+      },
+      "train@10dB": {
+       "on": 0.043,
+       "half": 0.043
+      },
+      "train@5dB": {
+       "on": 0.064,
+       "half": 0.149
+      },
+      "train@0dB": {
+       "on": 0.277,
+       "half": 0.404
+      }
+     },
+     "whisper-base": {
+      "clean": {
+       "on": 0.064,
+       "half": 0.0
+      },
+      "white@10dB": {
+       "on": 0.191,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.383,
+       "half": 0.106
+      },
+      "white@0dB": {
+       "on": 0.787,
+       "half": 0.404
+      },
+      "pink@10dB": {
+       "on": 0.021,
+       "half": 0.043
+      },
+      "pink@5dB": {
+       "on": 0.213,
+       "half": 0.043
+      },
+      "pink@0dB": {
+       "on": 0.404,
+       "half": 0.277
+      },
+      "applause@10dB": {
+       "on": 0.021,
+       "half": 0.0
+      },
+      "applause@5dB": {
+       "on": 0.106,
+       "half": 0.043
+      },
+      "applause@0dB": {
+       "on": 0.319,
+       "half": 0.064
+      },
+      "train@10dB": {
+       "on": 0.064,
+       "half": 0.0
+      },
+      "train@5dB": {
+       "on": 0.043,
+       "half": 0.021
+      },
+      "train@0dB": {
+       "on": 0.17,
+       "half": 0.064
+      }
+     }
+    },
+    "mean_over_noisy_conditions": {
+     "moonshine-v2-tiny-en": {
+      "on": 0.222,
+      "half": 0.245
+     },
+     "whisper-base": {
+      "on": 0.227,
+      "half": 0.094
+     }
+    },
+    "speed": {
+     "audio_s": 74.1,
+     "rtf_cpu": 0.2137,
+     "rtf_wall": 0.2321,
+     "live_20ms": {
+      "chunks": 750,
+      "mean_ms": 8.3,
+      "p95_ms": 12.81,
+      "max_ms": 27.09,
+      "held_ms": 61.0,
+      "stateful": true
+     }
+    }
+   },
+   "dpdfnet8-48k": {
+    "sample_rate": 48000,
+    "license": "Apache-2.0",
+    "size_bytes": 14857107,
+    "results": {
+     "moonshine-v2-tiny-en": {
+      "clean": {
+       "on": 0.043,
+       "half": 0.064
+      },
+      "white@10dB": {
+       "on": 0.085,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.255,
+       "half": 0.149
+      },
+      "white@0dB": {
+       "on": 0.426,
+       "half": 0.702
+      },
+      "pink@10dB": {
+       "on": 0.128,
+       "half": 0.085
+      },
+      "pink@5dB": {
+       "on": 0.128,
+       "half": 0.128
+      },
+      "pink@0dB": {
+       "on": 0.298,
+       "half": 0.362
+      },
+      "applause@10dB": {
+       "on": 0.149,
+       "half": 0.085
+      },
+      "applause@5dB": {
+       "on": 0.191,
+       "half": 0.191
+      },
+      "applause@0dB": {
+       "on": 0.234,
+       "half": 0.298
+      },
+      "train@10dB": {
+       "on": 0.064,
+       "half": 0.064
+      },
+      "train@5dB": {
+       "on": 0.149,
+       "half": 0.213
+      },
+      "train@0dB": {
+       "on": 0.34,
+       "half": 0.404
+      }
+     },
+     "whisper-base": {
+      "clean": {
+       "on": 0.0,
+       "half": 0.0
+      },
+      "white@10dB": {
+       "on": 0.085,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.319,
+       "half": 0.128
+      },
+      "white@0dB": {
+       "on": 0.447,
+       "half": 0.383
+      },
+      "pink@10dB": {
+       "on": 0.043,
+       "half": 0.021
+      },
+      "pink@5dB": {
+       "on": 0.085,
+       "half": 0.085
+      },
+      "pink@0dB": {
+       "on": 0.362,
+       "half": 0.277
+      },
+      "applause@10dB": {
+       "on": 0.064,
+       "half": 0.0
+      },
+      "applause@5dB": {
+       "on": 0.106,
+       "half": 0.0
+      },
+      "applause@0dB": {
+       "on": 0.106,
+       "half": 0.064
+      },
+      "train@10dB": {
+       "on": 0.0,
+       "half": 0.0
+      },
+      "train@5dB": {
+       "on": 0.064,
+       "half": 0.043
+      },
+      "train@0dB": {
+       "on": 0.17,
+       "half": 0.064
+      }
+     }
+    },
+    "mean_over_noisy_conditions": {
+     "moonshine-v2-tiny-en": {
+      "on": 0.204,
+      "half": 0.229
+     },
+     "whisper-base": {
+      "on": 0.154,
+      "half": 0.094
+     }
+    },
+    "speed": {
+     "audio_s": 74.1,
+     "rtf_cpu": 0.5183,
+     "rtf_wall": 0.6082,
+     "live_20ms": {
+      "chunks": 750,
+      "mean_ms": 17.64,
+      "p95_ms": 25.2,
+      "max_ms": 49.23,
+      "held_ms": 61.0,
+      "stateful": true
+     }
+    }
+   },
+   "dpdfnet2-8k": {
+    "sample_rate": 8000,
+    "license": "Apache-2.0",
+    "size_bytes": 10188357,
+    "results": {
+     "moonshine-v2-tiny-en": {
+      "clean": {
+       "on": 0.021,
+       "half": 0.021
+      },
+      "white@10dB": {
+       "on": 0.149,
+       "half": 0.17
+      },
+      "white@5dB": {
+       "on": 0.34,
+       "half": 0.234
+      },
+      "white@0dB": {
+       "on": 0.553,
+       "half": 0.617
+      },
+      "pink@10dB": {
+       "on": 0.128,
+       "half": 0.064
+      },
+      "pink@5dB": {
+       "on": 0.149,
+       "half": 0.106
+      },
+      "pink@0dB": {
+       "on": 0.383,
+       "half": 0.34
+      },
+      "applause@10dB": {
+       "on": 0.362,
+       "half": 0.085
+      },
+      "applause@5dB": {
+       "on": 0.447,
+       "half": 0.383
+      },
+      "applause@0dB": {
+       "on": 0.489,
+       "half": 0.426
+      },
+      "train@10dB": {
+       "on": 0.128,
+       "half": 0.085
+      },
+      "train@5dB": {
+       "on": 0.213,
+       "half": 0.149
+      },
+      "train@0dB": {
+       "on": 0.447,
+       "half": 0.404
+      }
+     },
+     "whisper-base": {
+      "clean": {
+       "on": 0.0,
+       "half": 0.0
+      },
+      "white@10dB": {
+       "on": 0.149,
+       "half": 0.085
+      },
+      "white@5dB": {
+       "on": 0.34,
+       "half": 0.255
+      },
+      "white@0dB": {
+       "on": 0.574,
+       "half": 0.298
+      },
+      "pink@10dB": {
+       "on": 0.043,
+       "half": 0.021
+      },
+      "pink@5dB": {
+       "on": 0.234,
+       "half": 0.043
+      },
+      "pink@0dB": {
+       "on": 0.681,
+       "half": 0.255
+      },
+      "applause@10dB": {
+       "on": 0.255,
+       "half": 0.021
+      },
+      "applause@5dB": {
+       "on": 0.319,
+       "half": 0.043
+      },
+      "applause@0dB": {
+       "on": 0.511,
+       "half": 0.064
+      },
+      "train@10dB": {
+       "on": 0.106,
+       "half": 0.0
+      },
+      "train@5dB": {
+       "on": 0.298,
+       "half": 0.021
+      },
+      "train@0dB": {
+       "on": 0.426,
+       "half": 0.064
+      }
+     }
+    },
+    "mean_over_noisy_conditions": {
+     "moonshine-v2-tiny-en": {
+      "on": 0.316,
+      "half": 0.255
+     },
+     "whisper-base": {
+      "on": 0.328,
+      "half": 0.097
+     }
+    },
+    "speed": {
+     "audio_s": 74.1,
+     "rtf_cpu": 0.1477,
+     "rtf_wall": 0.1634,
+     "live_20ms": {
+      "chunks": 750,
+      "mean_ms": 3.91,
+      "p95_ms": 7.38,
+      "max_ms": 8.85,
+      "held_ms": 62.0,
+      "stateful": true
+     }
+    }
+   },
+   "dpdfnet8-8k": {
+    "sample_rate": 8000,
+    "license": "Apache-2.0",
+    "size_bytes": 14552127,
+    "results": {
+     "moonshine-v2-tiny-en": {
+      "clean": {
+       "on": 0.021,
+       "half": 0.021
+      },
+      "white@10dB": {
+       "on": 0.149,
+       "half": 0.085
+      },
+      "white@5dB": {
+       "on": 0.383,
+       "half": 0.255
+      },
+      "white@0dB": {
+       "on": 0.489,
+       "half": 0.66
+      },
+      "pink@10dB": {
+       "on": 0.106,
+       "half": 0.128
+      },
+      "pink@5dB": {
+       "on": 0.17,
+       "half": 0.17
+      },
+      "pink@0dB": {
+       "on": 0.553,
+       "half": 0.34
+      },
+      "applause@10dB": {
+       "on": 0.234,
+       "half": 0.085
+      },
+      "applause@5dB": {
+       "on": 0.34,
+       "half": 0.277
+      },
+      "applause@0dB": {
+       "on": 0.511,
+       "half": 0.447
+      },
+      "train@10dB": {
+       "on": 0.149,
+       "half": 0.085
+      },
+      "train@5dB": {
+       "on": 0.34,
+       "half": 0.191
+      },
+      "train@0dB": {
+       "on": 0.447,
+       "half": 0.383
+      }
+     },
+     "whisper-base": {
+      "clean": {
+       "on": 0.0,
+       "half": 0.0
+      },
+      "white@10dB": {
+       "on": 0.149,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.277,
+       "half": 0.277
+      },
+      "white@0dB": {
+       "on": 0.489,
+       "half": 0.319
+      },
+      "pink@10dB": {
+       "on": 0.064,
+       "half": 0.043
+      },
+      "pink@5dB": {
+       "on": 0.085,
+       "half": 0.085
+      },
+      "pink@0dB": {
+       "on": 0.447,
+       "half": 0.319
+      },
+      "applause@10dB": {
+       "on": 0.149,
+       "half": 0.0
+      },
+      "applause@5dB": {
+       "on": 0.17,
+       "half": 0.021
+      },
+      "applause@0dB": {
+       "on": 0.574,
+       "half": 0.085
+      },
+      "train@10dB": {
+       "on": 0.085,
+       "half": 0.0
+      },
+      "train@5dB": {
+       "on": 0.17,
+       "half": 0.064
+      },
+      "train@0dB": {
+       "on": 0.255,
+       "half": 0.128
+      }
+     }
+    },
+    "mean_over_noisy_conditions": {
+     "moonshine-v2-tiny-en": {
+      "on": 0.323,
+      "half": 0.259
+     },
+     "whisper-base": {
+      "on": 0.243,
+      "half": 0.117
+     }
+    },
+    "speed": {
+     "audio_s": 74.1,
+     "rtf_cpu": 0.3436,
+     "rtf_wall": 0.3746,
+     "live_20ms": {
+      "chunks": 750,
+      "mean_ms": 8.28,
+      "p95_ms": 12.34,
+      "max_ms": 47.0,
+      "held_ms": 62.0,
+      "stateful": true
+     }
+    }
+   },
+   "deepfilternet3": {
+    "sample_rate": 48000,
+    "license": "MIT OR Apache-2.0",
+    "size_bytes": 16104687,
+    "results": {
+     "moonshine-v2-tiny-en": {
+      "clean": {
+       "on": 0.043,
+       "half": 0.064
+      },
+      "white@10dB": {
+       "on": 0.128,
+       "half": 0.085
+      },
+      "white@5dB": {
+       "on": 0.447,
+       "half": 0.234
+      },
+      "white@0dB": {
+       "on": 0.596,
+       "half": 0.638
+      },
+      "pink@10dB": {
+       "on": 0.106,
+       "half": 0.064
+      },
+      "pink@5dB": {
+       "on": 0.17,
+       "half": 0.149
+      },
+      "pink@0dB": {
+       "on": 0.532,
+       "half": 0.383
+      },
+      "applause@10dB": {
+       "on": 0.213,
+       "half": 0.17
+      },
+      "applause@5dB": {
+       "on": 0.362,
+       "half": 0.255
+      },
+      "applause@0dB": {
+       "on": 0.426,
+       "half": 0.404
+      },
+      "train@10dB": {
+       "on": 0.149,
+       "half": 0.149
+      },
+      "train@5dB": {
+       "on": 0.319,
+       "half": 0.234
+      },
+      "train@0dB": {
+       "on": 0.404,
+       "half": 0.426
+      }
+     },
+     "whisper-base": {
+      "clean": {
+       "on": 0.021,
+       "half": 0.0
+      },
+      "white@10dB": {
+       "on": 0.17,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.383,
+       "half": 0.191
+      },
+      "white@0dB": {
+       "on": 0.702,
+       "half": 0.532
+      },
+      "pink@10dB": {
+       "on": 0.085,
+       "half": 0.021
+      },
+      "pink@5dB": {
+       "on": 0.106,
+       "half": 0.085
+      },
+      "pink@0dB": {
+       "on": 0.404,
+       "half": 0.277
+      },
+      "applause@10dB": {
+       "on": 0.106,
+       "half": 0.021
+      },
+      "applause@5dB": {
+       "on": 0.128,
+       "half": 0.085
+      },
+      "applause@0dB": {
+       "on": 1.064,
+       "half": 0.064
+      },
+      "train@10dB": {
+       "on": 0.085,
+       "half": 0.0
+      },
+      "train@5dB": {
+       "on": 0.362,
+       "half": 0.043
+      },
+      "train@0dB": {
+       "on": 0.362,
+       "half": 0.149
+      }
+     }
+    },
+    "mean_over_noisy_conditions": {
+     "moonshine-v2-tiny-en": {
+      "on": 0.321,
+      "half": 0.266
+     },
+     "whisper-base": {
+      "on": 0.33,
+      "half": 0.128
+     }
+    },
+    "speed": {
+     "audio_s": 74.1,
+     "rtf_cpu": 0.259,
+     "rtf_wall": 0.2738,
+     "live_20ms": {
+      "chunks": 750,
+      "mean_ms": 5.43,
+      "p95_ms": 6.45,
+      "max_ms": 10.73,
+      "held_ms": 41.0,
+      "stateful": true
+     }
+    }
+   },
+   "rnnoise": {
+    "sample_rate": 48000,
+    "license": "BSD-3-Clause",
+    "size_bytes": 13273323,
+    "results": {
+     "moonshine-v2-tiny-en": {
+      "clean": {
+       "on": 0.043,
+       "half": 0.021
+      },
+      "white@10dB": {
+       "on": 0.149,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.468,
+       "half": 0.191
+      },
+      "white@0dB": {
+       "on": 0.638,
+       "half": 0.681
+      },
+      "pink@10dB": {
+       "on": 0.149,
+       "half": 0.085
+      },
+      "pink@5dB": {
+       "on": 0.191,
+       "half": 0.085
+      },
+      "pink@0dB": {
+       "on": 0.511,
+       "half": 0.426
+      },
+      "applause@10dB": {
+       "on": 0.319,
+       "half": 0.17
+      },
+      "applause@5dB": {
+       "on": 0.447,
+       "half": 0.277
+      },
+      "applause@0dB": {
+       "on": 0.511,
+       "half": 0.532
+      },
+      "train@10dB": {
+       "on": 0.255,
+       "half": 0.17
+      },
+      "train@5dB": {
+       "on": 0.362,
+       "half": 0.234
+      },
+      "train@0dB": {
+       "on": 0.574,
+       "half": 0.426
+      }
+     },
+     "whisper-base": {
+      "clean": {
+       "on": 0.0,
+       "half": 0.0
+      },
+      "white@10dB": {
+       "on": 0.234,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.574,
+       "half": 0.255
+      },
+      "white@0dB": {
+       "on": 0.745,
+       "half": 0.383
+      },
+      "pink@10dB": {
+       "on": 0.064,
+       "half": 0.021
+      },
+      "pink@5dB": {
+       "on": 0.234,
+       "half": 0.043
+      },
+      "pink@0dB": {
+       "on": 0.723,
+       "half": 0.319
+      },
+      "applause@10dB": {
+       "on": 0.17,
+       "half": 0.064
+      },
+      "applause@5dB": {
+       "on": 0.468,
+       "half": 0.043
+      },
+      "applause@0dB": {
+       "on": 0.468,
+       "half": 0.128
+      },
+      "train@10dB": {
+       "on": 0.191,
+       "half": 0.043
+      },
+      "train@5dB": {
+       "on": 0.234,
+       "half": 0.085
+      },
+      "train@0dB": {
+       "on": 0.596,
+       "half": 0.149
+      }
+     }
+    },
+    "mean_over_noisy_conditions": {
+     "moonshine-v2-tiny-en": {
+      "on": 0.381,
+      "half": 0.278
+     },
+     "whisper-base": {
+      "on": 0.392,
+      "half": 0.133
+     }
+    },
+    "speed": {
+     "audio_s": 74.1,
+     "rtf_cpu": 0.0682,
+     "rtf_wall": 0.0694,
+     "live_20ms": {
+      "chunks": 750,
+      "mean_ms": 1.73,
+      "p95_ms": 2.2,
+      "max_ms": 6.17,
+      "held_ms": 31.0,
+      "stateful": true
+     }
+    }
+   },
+   "demucs-dns48": {
+    "sample_rate": 16000,
+    "license": "CC-BY-NC-4.0",
+    "size_bytes": 75478395,
+    "results": {
+     "moonshine-v2-tiny-en": {
+      "clean": {
+       "on": 0.064,
+       "half": 0.064
+      },
+      "white@10dB": {
+       "on": 0.17,
+       "half": 0.128
+      },
+      "white@5dB": {
+       "on": 0.213,
+       "half": 0.255
+      },
+      "white@0dB": {
+       "on": 0.617,
+       "half": 0.66
+      },
+      "pink@10dB": {
+       "on": 0.128,
+       "half": 0.085
+      },
+      "pink@5dB": {
+       "on": 0.213,
+       "half": 0.213
+      },
+      "pink@0dB": {
+       "on": 0.383,
+       "half": 0.426
+      },
+      "applause@10dB": {
+       "on": 0.17,
+       "half": 0.085
+      },
+      "applause@5dB": {
+       "on": 0.404,
+       "half": 0.298
+      },
+      "applause@0dB": {
+       "on": 0.404,
+       "half": 0.383
+      },
+      "train@10dB": {
+       "on": 0.255,
+       "half": 0.149
+      },
+      "train@5dB": {
+       "on": 0.404,
+       "half": 0.085
+      },
+      "train@0dB": {
+       "on": 0.468,
+       "half": 0.447
+      }
+     },
+     "whisper-base": {
+      "clean": {
+       "on": 0.0,
+       "half": 0.0
+      },
+      "white@10dB": {
+       "on": 0.128,
+       "half": 0.085
+      },
+      "white@5dB": {
+       "on": 1.0,
+       "half": 0.17
+      },
+      "white@0dB": {
+       "on": 0.702,
+       "half": 0.191
+      },
+      "pink@10dB": {
+       "on": 0.064,
+       "half": 0.043
+      },
+      "pink@5dB": {
+       "on": 0.128,
+       "half": 0.064
+      },
+      "pink@0dB": {
+       "on": 0.447,
+       "half": 0.234
+      },
+      "applause@10dB": {
+       "on": 0.064,
+       "half": 0.0
+      },
+      "applause@5dB": {
+       "on": 0.277,
+       "half": 0.043
+      },
+      "applause@0dB": {
+       "on": 0.383,
+       "half": 0.064
+      },
+      "train@10dB": {
+       "on": 0.149,
+       "half": 0.021
+      },
+      "train@5dB": {
+       "on": 0.234,
+       "half": 0.064
+      },
+      "train@0dB": {
+       "on": 0.787,
+       "half": 0.191
+      }
+     }
+    },
+    "mean_over_noisy_conditions": {
+     "moonshine-v2-tiny-en": {
+      "on": 0.319,
+      "half": 0.268
+     },
+     "whisper-base": {
+      "on": 0.364,
+      "half": 0.097
+     }
+    },
+    "speed": {
+     "audio_s": 74.1,
+     "rtf_cpu": 0.1935,
+     "rtf_wall": 0.2072,
+     "live_20ms": {
+      "chunks": 150,
+      "mean_ms": 77.44,
+      "p95_ms": 103.42,
+      "max_ms": 132.18,
+      "held_ms": 0.0,
+      "stateful": false
+     }
+    }
+   },
+   "demucs-dns64": {
+    "sample_rate": 16000,
+    "license": "CC-BY-NC-4.0",
+    "size_bytes": 134140945,
+    "results": {
+     "moonshine-v2-tiny-en": {
+      "clean": {
+       "on": 0.064,
+       "half": 0.064
+      },
+      "white@10dB": {
+       "on": 0.085,
+       "half": 0.128
+      },
+      "white@5dB": {
+       "on": 0.277,
+       "half": 0.149
+      },
+      "white@0dB": {
+       "on": 0.596,
+       "half": 0.596
+      },
+      "pink@10dB": {
+       "on": 0.106,
+       "half": 0.064
+      },
+      "pink@5dB": {
+       "on": 0.191,
+       "half": 0.17
+      },
+      "pink@0dB": {
+       "on": 0.447,
+       "half": 0.383
+      },
+      "applause@10dB": {
+       "on": 0.085,
+       "half": 0.106
+      },
+      "applause@5dB": {
+       "on": 0.255,
+       "half": 0.255
+      },
+      "applause@0dB": {
+       "on": 0.234,
+       "half": 0.426
+      },
+      "train@10dB": {
+       "on": 0.106,
+       "half": 0.085
+      },
+      "train@5dB": {
+       "on": 0.213,
+       "half": 0.085
+      },
+      "train@0dB": {
+       "on": 0.319,
+       "half": 0.404
+      }
+     },
+     "whisper-base": {
+      "clean": {
+       "on": 0.0,
+       "half": 0.021
+      },
+      "white@10dB": {
+       "on": 0.106,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.128,
+       "half": 0.149
+      },
+      "white@0dB": {
+       "on": 0.617,
+       "half": 0.319
+      },
+      "pink@10dB": {
+       "on": 0.021,
+       "half": 0.043
+      },
+      "pink@5dB": {
+       "on": 0.106,
+       "half": 0.043
+      },
+      "pink@0dB": {
+       "on": 0.447,
+       "half": 0.213
+      },
+      "applause@10dB": {
+       "on": 0.064,
+       "half": 0.021
+      },
+      "applause@5dB": {
+       "on": 0.149,
+       "half": 0.043
+      },
+      "applause@0dB": {
+       "on": 0.17,
+       "half": 0.149
+      },
+      "train@10dB": {
+       "on": 0.043,
+       "half": 0.021
+      },
+      "train@5dB": {
+       "on": 0.149,
+       "half": 0.064
+      },
+      "train@0dB": {
+       "on": 0.404,
+       "half": 0.106
+      }
+     }
+    },
+    "mean_over_noisy_conditions": {
+     "moonshine-v2-tiny-en": {
+      "on": 0.243,
+      "half": 0.238
+     },
+     "whisper-base": {
+      "on": 0.2,
+      "half": 0.103
+     }
+    },
+    "speed": {
+     "audio_s": 74.1,
+     "rtf_cpu": 0.2942,
+     "rtf_wall": 0.3032,
+     "live_20ms": {
+      "chunks": 150,
+      "mean_ms": 134.67,
+      "p95_ms": 167.58,
+      "max_ms": 205.64,
+      "held_ms": 0.0,
+      "stateful": false
+     }
+    }
+   },
+   "demucs-master64": {
+    "sample_rate": 16000,
+    "license": "CC-BY-NC-4.0",
+    "size_bytes": 134140945,
+    "results": {
+     "moonshine-v2-tiny-en": {
+      "clean": {
+       "on": 0.085,
+       "half": 0.021
+      },
+      "white@10dB": {
+       "on": 0.085,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.404,
+       "half": 0.213
+      },
+      "white@0dB": {
+       "on": 0.745,
+       "half": 0.766
+      },
+      "pink@10dB": {
+       "on": 0.128,
+       "half": 0.085
+      },
+      "pink@5dB": {
+       "on": 0.234,
+       "half": 0.128
+      },
+      "pink@0dB": {
+       "on": 0.574,
+       "half": 0.447
+      },
+      "applause@10dB": {
+       "on": 0.106,
+       "half": 0.085
+      },
+      "applause@5dB": {
+       "on": 0.213,
+       "half": 0.298
+      },
+      "applause@0dB": {
+       "on": 0.277,
+       "half": 0.362
+      },
+      "train@10dB": {
+       "on": 0.043,
+       "half": 0.085
+      },
+      "train@5dB": {
+       "on": 0.128,
+       "half": 0.128
+      },
+      "train@0dB": {
+       "on": 0.426,
+       "half": 0.383
+      }
+     },
+     "whisper-base": {
+      "clean": {
+       "on": 0.021,
+       "half": 0.0
+      },
+      "white@10dB": {
+       "on": 0.191,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.34,
+       "half": 0.064
+      },
+      "white@0dB": {
+       "on": 0.745,
+       "half": 0.255
+      },
+      "pink@10dB": {
+       "on": 0.106,
+       "half": 0.0
+      },
+      "pink@5dB": {
+       "on": 0.191,
+       "half": 0.043
+      },
+      "pink@0dB": {
+       "on": 0.702,
+       "half": 0.213
+      },
+      "applause@10dB": {
+       "on": 0.021,
+       "half": 0.0
+      },
+      "applause@5dB": {
+       "on": 0.085,
+       "half": 0.064
+      },
+      "applause@0dB": {
+       "on": 0.234,
+       "half": 0.106
+      },
+      "train@10dB": {
+       "on": 0.064,
+       "half": 0.0
+      },
+      "train@5dB": {
+       "on": 0.085,
+       "half": 0.043
+      },
+      "train@0dB": {
+       "on": 0.298,
+       "half": 0.106
+      }
+     }
+    },
+    "mean_over_noisy_conditions": {
+     "moonshine-v2-tiny-en": {
+      "on": 0.28,
+      "half": 0.254
+     },
+     "whisper-base": {
+      "on": 0.255,
+      "half": 0.08
+     }
+    },
+    "speed": {
+     "audio_s": 74.1,
+     "rtf_cpu": 0.285,
+     "rtf_wall": 0.2965,
+     "live_20ms": {
+      "chunks": 150,
+      "mean_ms": 133.04,
+      "p95_ms": 166.71,
+      "max_ms": 198.95,
+      "held_ms": 0.0,
+      "stateful": false
+     }
+    }
+   },
+   "demucs-valentini-nc": {
+    "sample_rate": 16000,
+    "license": "CC-BY-NC-4.0",
+    "size_bytes": 243263941,
+    "results": {
+     "moonshine-v2-tiny-en": {
+      "clean": {
+       "on": 0.191,
+       "half": 0.064
+      },
+      "white@10dB": {
+       "on": 0.681,
+       "half": 0.17
+      },
+      "white@5dB": {
+       "on": 0.83,
+       "half": 0.362
+      },
+      "white@0dB": {
+       "on": 0.915,
+       "half": 0.809
+      },
+      "pink@10dB": {
+       "on": 0.915,
+       "half": 0.149
+      },
+      "pink@5dB": {
+       "on": 0.915,
+       "half": 0.213
+      },
+      "pink@0dB": {
+       "on": 0.936,
+       "half": 0.447
+      },
+      "applause@10dB": {
+       "on": 0.894,
+       "half": 0.064
+      },
+      "applause@5dB": {
+       "on": 0.872,
+       "half": 0.319
+      },
+      "applause@0dB": {
+       "on": 0.915,
+       "half": 0.489
+      },
+      "train@10dB": {
+       "on": 0.915,
+       "half": 0.17
+      },
+      "train@5dB": {
+       "on": 0.915,
+       "half": 0.298
+      },
+      "train@0dB": {
+       "on": 0.915,
+       "half": 0.489
+      }
+     },
+     "whisper-base": {
+      "clean": {
+       "on": 0.0,
+       "half": 0.0
+      },
+      "white@10dB": {
+       "on": 0.809,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.872,
+       "half": 0.298
+      },
+      "white@0dB": {
+       "on": 0.957,
+       "half": 0.617
+      },
+      "pink@10dB": {
+       "on": 0.915,
+       "half": 0.021
+      },
+      "pink@5dB": {
+       "on": 0.936,
+       "half": 0.085
+      },
+      "pink@0dB": {
+       "on": 0.936,
+       "half": 0.362
+      },
+      "applause@10dB": {
+       "on": 0.894,
+       "half": 0.021
+      },
+      "applause@5dB": {
+       "on": 0.915,
+       "half": 0.064
+      },
+      "applause@0dB": {
+       "on": 0.957,
+       "half": 0.064
+      },
+      "train@10dB": {
+       "on": 0.83,
+       "half": 0.021
+      },
+      "train@5dB": {
+       "on": 0.915,
+       "half": 0.064
+      },
+      "train@0dB": {
+       "on": 0.979,
+       "half": 0.149
+      }
+     }
+    },
+    "mean_over_noisy_conditions": {
+     "moonshine-v2-tiny-en": {
+      "on": 0.885,
+      "half": 0.332
+     },
+     "whisper-base": {
+      "on": 0.91,
+      "half": 0.152
+     }
+    },
+    "speed": {
+     "audio_s": 74.1,
+     "rtf_cpu": 3.7129,
+     "rtf_wall": 3.7814,
+     "live_20ms": {
+      "chunks": 150,
+      "mean_ms": 1923.38,
+      "p95_ms": 2250.66,
+      "max_ms": 2578.95,
+      "held_ms": 0.0,
+      "stateful": false
+     }
+    }
+   }
+  }
+ }
 }

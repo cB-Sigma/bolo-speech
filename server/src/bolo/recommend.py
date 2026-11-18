@@ -609,11 +609,21 @@ def quality(spec: ModelSpec) -> dict[str, Any] | None:
     return None
 
 
+#: a denoiser whose best strength left more than this share of the recognisers' errors on noisy speech
+#: (``measured.wer_ratio``: the mean over moonshine-v2-tiny-en and whisper-base of the lower of the word error rates at
+#: full strength and at 0.5, divided by the rate without denoising; models.md, "Denoising")
+POOR_DENOISE_RATIO = 0.75
+
+
 def _poor_voice(spec: ModelSpec) -> bool:
-    """A voice whose speech a recogniser could not read back (round trip), in the maintainers' run."""
+    """A voice whose speech a recogniser could not read back (round trip), in the maintainers' run; or a denoiser
+    that did little for recognisers in theirs (:data:`POOR_DENOISE_RATIO`). Such models are listed after the others."""
+    m = spec.measured or {}
+    if spec.task == "denoise":
+        ratio = m.get("wer_ratio")
+        return isinstance(ratio, (int, float)) and ratio > POOR_DENOISE_RATIO
     if spec.task != "tts":
         return False
-    m = spec.measured or {}
     value = m.get("round_trip_wer", m.get("round_trip_cer"))
     return isinstance(value, (int, float)) and value > 0.25
 
@@ -662,6 +672,9 @@ def _rank_key(c: Candidate, q: Query) -> tuple[Any, ...]:
         _poor_voice(spec),
         specialist,
         not spec.commercial_use,
+        # a denoiser's tier says how big it is, not how much it helps a recogniser (models.md, "Denoising"): the
+        # configured default comes first, the others follow as alternatives
+        not c.is_default if spec.task == "denoise" else 0,
         tier,
         not c.is_default,
         not c.installed,

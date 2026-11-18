@@ -21,6 +21,7 @@
   source_url: https://github.com/Xiaobin-Rong/gtcrn
   validated: cpu
   measured:
+    wer_ratio: 0.644
     rtf: 0.06
     rtf_note: seconds of CPU per second of audio on one thread at light load; 0.12 to 0.13 with the load average at 17
     wer_note: 'mean WER over 12 noisy mixes, moonshine-v2-tiny-en: 0.317 off, 0.234 on; whisper-base: 0.154 off, 0.268
@@ -57,7 +58,19 @@
     that sherpa-onnx runs at 16 kHz; other rates are resampled to it and back. Trained by its authors for noise
     suppression in speech; option attenuation_limit_db caps how much noise it removes (0: no cap).'
   source_url: https://github.com/ceva-ip/DPDFNet
-  validated: untested
+  validated: cpu
+  measured:
+    wer_ratio: 0.609
+    rtf: 0.0796
+    rtf_note: 'CPU seconds per second of audio on one thread, at 16 kHz; machine shared (load average 12-17); live stream: 2.7 ms per 20 ms chunk (p95 5.94), 50 ms held back'
+    wer_note: 'mean WER over 12 noisy mixes (off: moonshine-v2-tiny-en 0.344, whisper-base 0.172): moonshine 0.231 on, 0.257 at strength 0.5; whisper-base 0.259 on, 0.094 at strength 0.5'
+    audio_s: 74.1
+    threads: 1
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 12-17)
+    date: '2026-11-17'
+    test_audio: bolo's en-short and en-long samples with white, pink, applause and train noise at 10, 5 and 0 dB SNR
+      (docs/measurements/denoise.json, catalog_comparison)
   source:
     urls:
     - path: baseline.onnx
@@ -83,7 +96,19 @@
     that sherpa-onnx runs at 16 kHz; other rates are resampled to it and back. Trained by its authors for noise
     suppression in speech; option attenuation_limit_db caps how much noise it removes (0: no cap).'
   source_url: https://github.com/ceva-ip/DPDFNet
-  validated: untested
+  validated: cpu
+  measured:
+    wer_ratio: 0.545
+    rtf: 0.1625
+    rtf_note: 'CPU seconds per second of audio on one thread, at 16 kHz; machine shared (load average 12-17); live stream: 3.85 ms per 20 ms chunk (p95 4.53), 50 ms held back'
+    wer_note: 'mean WER over 12 noisy mixes (off: moonshine-v2-tiny-en 0.344, whisper-base 0.172): moonshine 0.197 on, 0.236 at strength 0.5; whisper-base 0.202 on, 0.089 at strength 0.5'
+    audio_s: 74.1
+    threads: 1
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 12-17)
+    date: '2026-11-17'
+    test_audio: bolo's en-short and en-long samples with white, pink, applause and train noise at 10, 5 and 0 dB SNR
+      (docs/measurements/denoise.json, catalog_comparison)
   source:
     urls:
     - path: dpdfnet2.onnx
@@ -109,7 +134,19 @@
     that sherpa-onnx runs at 16 kHz; other rates are resampled to it and back. Trained by its authors for noise
     suppression in speech; option attenuation_limit_db caps how much noise it removes (0: no cap).'
   source_url: https://github.com/ceva-ip/DPDFNet
-  validated: untested
+  validated: cpu
+  measured:
+    wer_ratio: 0.557
+    rtf: 0.2317
+    rtf_note: 'CPU seconds per second of audio on one thread, at 16 kHz; machine shared (load average 12-17); live stream: 5.84 ms per 20 ms chunk (p95 9.12), 50 ms held back'
+    wer_note: 'mean WER over 12 noisy mixes (off: moonshine-v2-tiny-en 0.344, whisper-base 0.172): moonshine 0.213 on, 0.234 at strength 0.5; whisper-base 0.195 on, 0.085 at strength 0.5'
+    audio_s: 74.1
+    threads: 1
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 12-17)
+    date: '2026-11-17'
+    test_audio: bolo's en-short and en-long samples with white, pink, applause and train noise at 10, 5 and 0 dB SNR
+      (docs/measurements/denoise.json, catalog_comparison)
   source:
     urls:
     - path: dpdfnet4.onnx
@@ -135,7 +172,19 @@
     that sherpa-onnx runs at 16 kHz; other rates are resampled to it and back. Trained by its authors for noise
     suppression in speech; option attenuation_limit_db caps how much noise it removes (0: no cap).'
   source_url: https://github.com/ceva-ip/DPDFNet
-  validated: untested
+  validated: cpu
+  measured:
+    wer_ratio: 0.532
+    rtf: 0.3813
+    rtf_note: 'CPU seconds per second of audio on one thread, at 16 kHz; machine shared (load average 12-17); live stream: 16.06 ms per 20 ms chunk (p95 23.92), 50 ms held back'
+    wer_note: 'mean WER over 12 noisy mixes (off: moonshine-v2-tiny-en 0.344, whisper-base 0.172): moonshine 0.202 on, 0.218 at strength 0.5; whisper-base 0.167 on, 0.082 at strength 0.5'
+    audio_s: 74.1
+    threads: 1
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 12-17)
+    date: '2026-11-17'
+    test_audio: bolo's en-short and en-long samples with white, pink, applause and train noise at 10, 5 and 0 dB SNR
+      (docs/measurements/denoise.json, catalog_comparison)
   source:
     urls:
     - path: dpdfnet8.onnx
@@ -161,7 +210,19 @@
     that sherpa-onnx runs at 48 kHz; other rates are resampled to it and back. Trained by its authors for noise
     suppression in speech; option attenuation_limit_db caps how much noise it removes (0: no cap).'
   source_url: https://github.com/ceva-ip/DPDFNet
-  validated: untested
+  validated: cpu
+  measured:
+    wer_ratio: 0.596
+    rtf: 0.2137
+    rtf_note: 'CPU seconds per second of audio on one thread, at 48 kHz; machine shared (load average 12-17); live stream: 8.3 ms per 20 ms chunk (p95 12.81), 61 ms held back'
+    wer_note: 'mean WER over 12 noisy mixes (off: moonshine-v2-tiny-en 0.344, whisper-base 0.172): moonshine 0.222 on, 0.245 at strength 0.5; whisper-base 0.227 on, 0.094 at strength 0.5'
+    audio_s: 74.1
+    threads: 1
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 12-17)
+    date: '2026-11-17'
+    test_audio: bolo's en-short and en-long samples with white, pink, applause and train noise at 10, 5 and 0 dB SNR
+      (docs/measurements/denoise.json, catalog_comparison)
   source:
     urls:
     - path: dpdfnet2_48khz_hr.onnx
@@ -187,7 +248,19 @@
     that sherpa-onnx runs at 48 kHz; other rates are resampled to it and back. Trained by its authors for noise
     suppression in speech; option attenuation_limit_db caps how much noise it removes (0: no cap).'
   source_url: https://github.com/ceva-ip/DPDFNet
-  validated: untested
+  validated: cpu
+  measured:
+    wer_ratio: 0.57
+    rtf: 0.5183
+    rtf_note: 'CPU seconds per second of audio on one thread, at 48 kHz; machine shared (load average 12-17); live stream: 17.64 ms per 20 ms chunk (p95 25.2), 61 ms held back'
+    wer_note: 'mean WER over 12 noisy mixes (off: moonshine-v2-tiny-en 0.344, whisper-base 0.172): moonshine 0.204 on, 0.229 at strength 0.5; whisper-base 0.154 on, 0.094 at strength 0.5'
+    audio_s: 74.1
+    threads: 1
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 12-17)
+    date: '2026-11-17'
+    test_audio: bolo's en-short and en-long samples with white, pink, applause and train noise at 10, 5 and 0 dB SNR
+      (docs/measurements/denoise.json, catalog_comparison)
   source:
     urls:
     - path: dpdfnet8_48khz_hr.onnx
@@ -213,7 +286,19 @@
     that sherpa-onnx runs at 8 kHz; other rates are resampled to it and back. Trained by its authors for noise
     suppression in speech; option attenuation_limit_db caps how much noise it removes (0: no cap).'
   source_url: https://github.com/ceva-ip/DPDFNet
-  validated: untested
+  validated: cpu
+  measured:
+    wer_ratio: 0.653
+    rtf: 0.1477
+    rtf_note: 'CPU seconds per second of audio on one thread, at 8 kHz; machine shared (load average 12-17); live stream: 3.91 ms per 20 ms chunk (p95 7.38), 62 ms held back'
+    wer_note: 'mean WER over 12 noisy mixes (off: moonshine-v2-tiny-en 0.344, whisper-base 0.172): moonshine 0.316 on, 0.255 at strength 0.5; whisper-base 0.328 on, 0.097 at strength 0.5'
+    audio_s: 74.1
+    threads: 1
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 12-17)
+    date: '2026-11-17'
+    test_audio: bolo's en-short and en-long samples with white, pink, applause and train noise at 10, 5 and 0 dB SNR
+      (docs/measurements/denoise.json, catalog_comparison)
   source:
     urls:
     - path: dpdfnet2_8khz.onnx
@@ -239,7 +324,19 @@
     that sherpa-onnx runs at 8 kHz; other rates are resampled to it and back. Trained by its authors for noise
     suppression in speech; option attenuation_limit_db caps how much noise it removes (0: no cap).'
   source_url: https://github.com/ceva-ip/DPDFNet
-  validated: untested
+  validated: cpu
+  measured:
+    wer_ratio: 0.717
+    rtf: 0.3436
+    rtf_note: 'CPU seconds per second of audio on one thread, at 8 kHz; machine shared (load average 12-17); live stream: 8.28 ms per 20 ms chunk (p95 12.34), 62 ms held back'
+    wer_note: 'mean WER over 12 noisy mixes (off: moonshine-v2-tiny-en 0.344, whisper-base 0.172): moonshine 0.323 on, 0.259 at strength 0.5; whisper-base 0.243 on, 0.117 at strength 0.5'
+    audio_s: 74.1
+    threads: 1
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 12-17)
+    date: '2026-11-17'
+    test_audio: bolo's en-short and en-long samples with white, pink, applause and train noise at 10, 5 and 0 dB SNR
+      (docs/measurements/denoise.json, catalog_comparison)
   source:
     urls:
     - path: dpdfnet8_8khz.onnx
@@ -268,7 +365,19 @@
     ONNX Runtime alone runs it (pip install onnxruntime), 10 ms at a time on the CPU. The file is the copy that
     kimtos-labs keeps on Hugging Face, pinned by SHA-256. Option atten_lim_db caps the suppression (0: no cap).'
   source_url: https://github.com/Rikorose/DeepFilterNet
-  validated: untested
+  validated: cpu
+  measured:
+    wer_ratio: 0.759
+    rtf: 0.259
+    rtf_note: 'CPU seconds per second of audio on one thread, at 48 kHz; machine shared (load average 12-17); live stream: 5.43 ms per 20 ms chunk (p95 6.45), 41 ms held back'
+    wer_note: 'mean WER over 12 noisy mixes (off: moonshine-v2-tiny-en 0.344, whisper-base 0.172): moonshine 0.321 on, 0.266 at strength 0.5; whisper-base 0.33 on, 0.128 at strength 0.5'
+    audio_s: 74.1
+    threads: 1
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 12-17)
+    date: '2026-11-17'
+    test_audio: bolo's en-short and en-long samples with white, pink, applause and train noise at 10, 5 and 0 dB SNR
+      (docs/measurements/denoise.json, catalog_comparison)
   source:
     urls:
     - path: denoiser_model.onnx
@@ -295,7 +404,19 @@
     x86-64; Apache-2.0 packaging, pinned by SHA-256), unpacked into the model directory; bolo calls the library
     directly, without pyrnnoise''s Python code or its dependencies. Tuned for listening, not for recognisers.'
   source_url: https://github.com/pengzhendong/pyrnnoise
-  validated: untested
+  validated: cpu
+  measured:
+    wer_ratio: 0.791
+    rtf: 0.0682
+    rtf_note: 'CPU seconds per second of audio on one thread, at 48 kHz; machine shared (load average 12-17); live stream: 1.73 ms per 20 ms chunk (p95 2.2), 31 ms held back'
+    wer_note: 'mean WER over 12 noisy mixes (off: moonshine-v2-tiny-en 0.344, whisper-base 0.172): moonshine 0.381 on, 0.278 at strength 0.5; whisper-base 0.392 on, 0.133 at strength 0.5'
+    audio_s: 74.1
+    threads: 1
+    engine: RNNoise 0.2 (pyrnnoise 0.4.5 build)
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 12-17)
+    date: '2026-11-17'
+    test_audio: bolo's en-short and en-long samples with white, pink, applause and train noise at 10, 5 and 0 dB SNR
+      (docs/measurements/denoise.json, catalog_comparison)
   source:
     urls:
     - path: pyrnnoise-0.4.5-linux-x86_64.whl
@@ -341,7 +462,19 @@
     at 16 kHz: 48 hidden channels, trained on the DNS Challenge data; causal. Code and weights are CC-BY-NC 4.0, not for commercial use. Needs PyTorch: it runs on the
     torch engine plugin (pip install "bolo-torch[demucs-denoiser]").'
   source_url: https://github.com/facebookresearch/denoiser
-  validated: untested
+  validated: cpu
+  measured:
+    wer_ratio: 0.672
+    rtf: 0.1935
+    rtf_note: 'CPU seconds per second of audio on one thread, at 16 kHz; machine shared (load average 12-17); live stream: 77.44 ms per 20 ms chunk (p95 103.42): no streaming form, each chunk is enhanced with the half second before it, slower than real time'
+    wer_note: 'mean WER over 12 noisy mixes (off: moonshine-v2-tiny-en 0.344, whisper-base 0.172): moonshine 0.319 on, 0.268 at strength 0.5; whisper-base 0.364 on, 0.097 at strength 0.5'
+    audio_s: 74.1
+    threads: 1
+    engine: bolo-torch, torch 2.15.0+cpu, denoiser 0.1.5
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 12-17)
+    date: '2026-11-17'
+    test_audio: bolo's en-short and en-long samples with white, pink, applause and train noise at 10, 5 and 0 dB SNR
+      (docs/measurements/denoise.json, catalog_comparison)
   source:
     urls:
     - path: dns48-11decc9d8e3f0998.th
@@ -369,7 +502,19 @@
     at 16 kHz: 64 hidden channels, trained on the DNS Challenge data; causal. Code and weights are CC-BY-NC 4.0, not for commercial use. Needs PyTorch: it runs on the
     torch engine plugin (pip install "bolo-torch[demucs-denoiser]").'
   source_url: https://github.com/facebookresearch/denoiser
-  validated: untested
+  validated: cpu
+  measured:
+    wer_ratio: 0.645
+    rtf: 0.2942
+    rtf_note: 'CPU seconds per second of audio on one thread, at 16 kHz; machine shared (load average 12-17); live stream: 134.67 ms per 20 ms chunk (p95 167.58): no streaming form, each chunk is enhanced with the half second before it, slower than real time'
+    wer_note: 'mean WER over 12 noisy mixes (off: moonshine-v2-tiny-en 0.344, whisper-base 0.172): moonshine 0.243 on, 0.238 at strength 0.5; whisper-base 0.2 on, 0.103 at strength 0.5'
+    audio_s: 74.1
+    threads: 1
+    engine: bolo-torch, torch 2.15.0+cpu, denoiser 0.1.5
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 12-17)
+    date: '2026-11-17'
+    test_audio: bolo's en-short and en-long samples with white, pink, applause and train noise at 10, 5 and 0 dB SNR
+      (docs/measurements/denoise.json, catalog_comparison)
   source:
     urls:
     - path: dns64-a7761ff99a7d5bb6.th
@@ -397,7 +542,19 @@
     at 16 kHz: 64 hidden channels, trained on the DNS Challenge data and Valentini (VCTK-DEMAND); causal. Code and weights are CC-BY-NC 4.0, not for commercial use. Needs PyTorch: it runs on the
     torch engine plugin (pip install "bolo-torch[demucs-denoiser]").'
   source_url: https://github.com/facebookresearch/denoiser
-  validated: untested
+  validated: cpu
+  measured:
+    wer_ratio: 0.602
+    rtf: 0.285
+    rtf_note: 'CPU seconds per second of audio on one thread, at 16 kHz; machine shared (load average 12-17); live stream: 133.04 ms per 20 ms chunk (p95 166.71): no streaming form, each chunk is enhanced with the half second before it, slower than real time'
+    wer_note: 'mean WER over 12 noisy mixes (off: moonshine-v2-tiny-en 0.344, whisper-base 0.172): moonshine 0.28 on, 0.254 at strength 0.5; whisper-base 0.255 on, 0.08 at strength 0.5'
+    audio_s: 74.1
+    threads: 1
+    engine: bolo-torch, torch 2.15.0+cpu, denoiser 0.1.5
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 12-17)
+    date: '2026-11-17'
+    test_audio: bolo's en-short and en-long samples with white, pink, applause and train noise at 10, 5 and 0 dB SNR
+      (docs/measurements/denoise.json, catalog_comparison)
   source:
     urls:
     - path: master64-8a5dfb4bb92753dd.th
@@ -425,7 +582,19 @@
     at 16 kHz: 64 hidden channels, non-causal (it looks ahead), trained on Valentini (VCTK-DEMAND) only. Code and weights are CC-BY-NC 4.0, not for commercial use. Needs PyTorch: it runs on the
     torch engine plugin (pip install "bolo-torch[demucs-denoiser]").'
   source_url: https://github.com/facebookresearch/denoiser
-  validated: untested
+  validated: cpu
+  measured:
+    wer_ratio: 0.924
+    rtf: 3.7129
+    rtf_note: 'CPU seconds per second of audio on one thread, at 16 kHz; machine shared (load average 12-17); live stream: 1923.38 ms per 20 ms chunk (p95 2250.66): no streaming form, each chunk is enhanced with the half second before it, slower than real time'
+    wer_note: 'mean WER over 12 noisy mixes (off: moonshine-v2-tiny-en 0.344, whisper-base 0.172): moonshine 0.885 on, 0.332 at strength 0.5; whisper-base 0.91 on, 0.152 at strength 0.5'
+    audio_s: 74.1
+    threads: 1
+    engine: bolo-torch, torch 2.15.0+cpu, denoiser 0.1.5
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 12-17)
+    date: '2026-11-17'
+    test_audio: bolo's en-short and en-long samples with white, pink, applause and train noise at 10, 5 and 0 dB SNR
+      (docs/measurements/denoise.json, catalog_comparison)
   source:
     urls:
     - path: valentini_nc-93fc4337.th

@@ -163,7 +163,14 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   bolo-torch plugin, extra `demucs-denoiser`) and **ElevenLabs Voice Isolator** (`elevenlabs-voice-isolator`, cloud,
   `POST /v1/audio-isolation`; not run against a real account). Every entry runs; the ones looked at and left out
   (ClearVoice FRCRN, MossFormer2 and MossFormerGAN, Resemble Enhance, DeepFilterNet 2's three-graph export) are in
-  docs/models-unsupported.md with the reason. `gtcrn-simple` stays the default. Measured with the harness of the first
+  docs/models-unsupported.md with the reason. `gtcrn-simple` stays the default. Every runnable local denoiser was measured with
+  the harness of the first one, now `server/tools/measure_denoise.py`: on the noisy mixes of the repository's samples
+  (word error rate off: `moonshine-v2-tiny-en` 34.4%, `whisper-base` 17.2%) `dpdfnet2` gave 19.7% / 20.2% at full
+  strength and 23.6% / 8.9% at strength 0.5, GTCRN 23.9% / 22.2% and 22.3% / 11.0%; only the largest DPDFNets helped
+  Whisper at full strength, every denoiser helped it at 0.5; RNNoise and DeepFilterNet 3 were among the weakest and
+  `demucs-valentini-nc` wrecked Moonshine (88.5%). CPU time and time per live chunk for each: docs/models.md,
+  "Denoising"; docs/measurements/denoise.json, `catalog_comparison`. `bolo recommend --task denoise` puts the configured
+  default first and the denoisers that did little for recognisers (`measured.wer_ratio` above 0.75) last. Measured with the harness of the first
   denoiser (docs/measurements/denoise.json, docs/models.md, "Denoising").
 - **`denoise` on the live speech-to-text WebSocket** (`/api/v1/stt/stream`): query or `config` message, the same
   values as for transcriptions (`true`, `false`, a strength, a model id, `denoise_strength`), and the model's pin, its

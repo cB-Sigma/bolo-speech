@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-466 models: 170 validated on CPU by the maintainers, 296 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+466 models: 184 validated on CPU by the maintainers, 282 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -803,35 +803,35 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `dpdfnet-baseline` | - | realtime | - | 9 MB | Apache-2.0 | untested |
-| `dpdfnet2` | - | realtime | - | 10 MB | Apache-2.0 | untested |
-| `dpdfnet4` | - | balanced | - | 12 MB | Apache-2.0 | untested |
-| `dpdfnet8` | - | accuracy | - | 15 MB | Apache-2.0 | untested |
-| `dpdfnet2-48k` | - | balanced | - | 10 MB | Apache-2.0 | untested |
-| `dpdfnet8-48k` | - | accuracy | - | 15 MB | Apache-2.0 | untested |
-| `dpdfnet2-8k` | - | realtime | - | 10 MB | Apache-2.0 | untested |
-| `dpdfnet8-8k` | - | balanced | - | 15 MB | Apache-2.0 | untested |
+| `dpdfnet-baseline` | - | realtime | - | 9 MB | Apache-2.0 | **CPU** · RTF 0.080 |
+| `dpdfnet2` | - | realtime | - | 10 MB | Apache-2.0 | **CPU** · RTF 0.163 |
+| `dpdfnet4` | - | balanced | - | 12 MB | Apache-2.0 | **CPU** · RTF 0.232 |
+| `dpdfnet8` | - | accuracy | - | 15 MB | Apache-2.0 | **CPU** · RTF 0.381 |
+| `dpdfnet2-48k` | - | balanced | - | 10 MB | Apache-2.0 | **CPU** · RTF 0.214 |
+| `dpdfnet8-48k` | - | accuracy | - | 15 MB | Apache-2.0 | **CPU** · RTF 0.518 |
+| `dpdfnet2-8k` | - | realtime | - | 10 MB | Apache-2.0 | **CPU** · RTF 0.148 |
+| `dpdfnet8-8k` | - | balanced | - | 15 MB | Apache-2.0 | **CPU** · RTF 0.344 |
 
 #### DeepFilterNet
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `deepfilternet3` | - | balanced | - | 16 MB | MIT OR Apache-2.0 | untested |
+| `deepfilternet3` | - | balanced | - | 16 MB | MIT OR Apache-2.0 | **CPU** · RTF 0.259 |
 
 #### RNNoise
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `rnnoise` | - | realtime | - | 13 MB | BSD-3-Clause | untested |
+| `rnnoise` | - | realtime | - | 13 MB | BSD-3-Clause | **CPU** · RTF 0.068 |
 
 #### Demucs denoiser
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `demucs-dns48` | - | realtime | - | 75 MB | CC-BY-NC-4.0 ⚠ · needs plugin torch | untested |
-| `demucs-dns64` | - | balanced | - | 134 MB | CC-BY-NC-4.0 ⚠ · needs plugin torch | untested |
-| `demucs-master64` | - | balanced | - | 134 MB | CC-BY-NC-4.0 ⚠ · needs plugin torch | untested |
-| `demucs-valentini-nc` | - | accuracy | - | 243 MB | CC-BY-NC-4.0 ⚠ · needs plugin torch | untested |
+| `demucs-dns48` | - | realtime | - | 75 MB | CC-BY-NC-4.0 ⚠ · needs plugin torch | **CPU** · RTF 0.194 |
+| `demucs-dns64` | - | balanced | - | 134 MB | CC-BY-NC-4.0 ⚠ · needs plugin torch | **CPU** · RTF 0.294 |
+| `demucs-master64` | - | balanced | - | 134 MB | CC-BY-NC-4.0 ⚠ · needs plugin torch | **CPU** · RTF 0.285 |
+| `demucs-valentini-nc` | - | accuracy | - | 243 MB | CC-BY-NC-4.0 ⚠ · needs plugin torch | **CPU** · RTF 3.713 |
 
 ### Language identification
 
@@ -2272,17 +2272,20 @@ WeSpeaker's model gets 16-bit sample values, 3D-Speaker's -1..1), and the number
 ## Denoising
 
 `denoise` (configuration.md, "Denoising") runs a speech-enhancement model
-before the recogniser. The catalog has one: **`gtcrn-simple`**, GTCRN
-(Rong et al., ICASSP 2024; MIT licence; 48 thousand parameters, 0.5 MB),
-the ONNX export sherpa-onnx publishes. It runs at 16 kHz in sherpa-onnx, no
-PyTorch; other rates are resampled to it and back. On one thread of a
-shared 4-vCPU Xeon it took 0.06 s per second of audio at light load and
-0.12 to 0.13 s with the machine's load average at 17.
+before the recogniser: on a transcription, a Realtime session or the live
+speech-to-text WebSocket. Every `task: denoise` model of the catalog can be
+named; `gtcrn-simple` is the default. Denoisers that were looked at and
+cannot run yet are in [models-unsupported.md](models-unsupported.md).
 
-**Measured** (docs/measurements/denoise.json): the repository's two English
-samples (47 words of synthetic speech) mixed with white noise, pink noise,
-applause and a passing train at 10, 5 and 0 dB SNR, twelve noisy mixes in
-all; word error rate over both clips.
+**The default, `gtcrn-simple`**: GTCRN (Rong et al., ICASSP 2024; MIT;
+48 thousand parameters, 0.5 MB), the ONNX export sherpa-onnx publishes, at
+16 kHz. On one thread of a shared 4-vCPU Xeon it took 0.06 s per second of
+audio at light load and 0.12 to 0.13 s with the machine's load average at 17.
+
+**First measurement** (docs/measurements/denoise.json, top level): the
+repository's two English samples (47 words of synthetic speech) mixed with
+white noise, pink noise, applause and a passing train at 10, 5 and 0 dB SNR,
+twelve noisy mixes in all; word error rate over both clips.
 
 | recogniser | clean, off / on | mean of 12 noisy mixes: off | on | on, strength 0.5 |
 | --- | --- | --- | --- | --- |
@@ -2295,9 +2298,82 @@ them, helping on none (white noise at 5 dB: 17.0% to 76.6%, where Whisper droppe
 most of a sentence). Whisper was trained on large amounts of noisy audio
 and copes with noise better than with the artefacts enhancement leaves.
 Mixing half of the original back (`denoise=0.5`) was the better setting for
-both. This is a small, synthetic test: it shows the direction, not the
-size, of the effect on your audio. Measure before you turn denoising on for
-a model or the server.
+both.
+
+### Every denoiser compared
+
+The same test for every runnable denoiser (docs/measurements/denoise.json,
+`catalog_comparison`; `server/tools/measure_denoise.py` repeats it against a
+running server). Its noise is drawn the same way but not identically to the
+first run's, so its "off" error rates differ from the table above (34.4%
+against 31.7% for Moonshine, 17.2% against 15.4% for Whisper): compare
+denoisers within this table. Word error rate is the mean over the twelve
+noisy mixes, at full strength and at strength 0.5; "clean, on" is the
+noise-free pair with the denoiser at full strength. CPU time is seconds per
+second of audio on one thread (74 s of speech, at the model's own rate; the
+PyTorch models in 15 s pieces); the live column is the live stream's
+denoiser fed 20 ms chunks (api.md, "Denoising a live stream"). The machine
+was shared, with a load average of 12 to 17 throughout: the times are
+pessimistic, and the error rates are those of 47 words, so a difference of
+two or three points is one word.
+
+| denoiser | licence | rate | download | CPU s per s of audio | live: ms per 20 ms chunk | `moonshine-v2-tiny-en`: on / 0.5 | `whisper-base`: on / 0.5 | clean, on: Moonshine / Whisper |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| off | - | - | - | - | - | 34.4% | 17.2% | 6.4% / 0.0% |
+| `gtcrn-simple` | MIT | 16 kHz | 536 KB | 0.051 | 1.8 (p95 3.7) | 23.9% / 22.3% | 22.2% / 11.0% | 2.1% / 0.0% |
+| `dpdfnet-baseline` | Apache-2.0 | 16 kHz | 8.7 MB | 0.080 | 2.7 (p95 5.9) | 23.1% / 25.7% | 25.9% / 9.4% | 4.3% / 2.1% |
+| `dpdfnet2` | Apache-2.0 | 16 kHz | 10.2 MB | 0.163 | 3.9 (p95 4.5) | 19.7% / 23.6% | 20.2% / 8.9% | 6.4% / 6.4% |
+| `dpdfnet4` | Apache-2.0 | 16 kHz | 11.6 MB | 0.232 | 5.8 (p95 9.1) | 21.3% / 23.4% | 19.5% / 8.5% | 6.4% / 2.1% |
+| `dpdfnet8` | Apache-2.0 | 16 kHz | 14.5 MB | 0.381 | 16.1 (p95 23.9) | 20.2% / 21.8% | 16.7% / 8.2% | 8.5% / 6.4% |
+| `dpdfnet2-48k` | Apache-2.0 | 48 kHz | 10.5 MB | 0.214 | 8.3 (p95 12.8) | 22.2% / 24.5% | 22.7% / 9.4% | 6.4% / 6.4% |
+| `dpdfnet8-48k` | Apache-2.0 | 48 kHz | 14.9 MB | 0.518 | 17.6 (p95 25.2) | 20.4% / 22.9% | 15.4% / 9.4% | 4.3% / 0.0% |
+| `dpdfnet2-8k` | Apache-2.0 | 8 kHz | 10.2 MB | 0.148 | 3.9 (p95 7.4) | 31.6% / 25.5% | 32.8% / 9.7% | 2.1% / 0.0% |
+| `dpdfnet8-8k` | Apache-2.0 | 8 kHz | 14.6 MB | 0.344 | 8.3 (p95 12.3) | 32.3% / 25.9% | 24.3% / 11.7% | 2.1% / 0.0% |
+| `deepfilternet3` | MIT OR Apache-2.0 | 48 kHz | 16.1 MB | 0.259 | 5.4 (p95 6.5) | 32.1% / 26.6% | 33.0% / 12.8% | 4.3% / 2.1% |
+| `rnnoise` | BSD-3-Clause | 48 kHz | 13.3 MB | 0.068 | 1.7 (p95 2.2) | 38.1% / 27.8% | 39.2% / 13.3% | 4.3% / 0.0% |
+| `demucs-dns48` | CC-BY-NC-4.0 ⚠ | 16 kHz | 75.5 MB | 0.194 | 77.4 (p95 103.4) | 31.9% / 26.8% | 36.4% / 9.7% | 6.4% / 0.0% |
+| `demucs-dns64` | CC-BY-NC-4.0 ⚠ | 16 kHz | 134.1 MB | 0.294 | 134.7 (p95 167.6) | 24.3% / 23.8% | 20.0% / 10.3% | 6.4% / 0.0% |
+| `demucs-master64` | CC-BY-NC-4.0 ⚠ | 16 kHz | 134.1 MB | 0.285 | 133.0 (p95 166.7) | 28.0% / 25.4% | 25.5% / 8.0% | 8.5% / 2.1% |
+| `demucs-valentini-nc` | CC-BY-NC-4.0 ⚠ | 16 kHz | 243.3 MB | 3.713 | 1923.4 (p95 2250.7) | 88.5% / 33.2% | 91.0% / 15.2% | 19.1% / 0.0% |
+
+⚠ = not for commercial use. `elevenlabs-voice-isolator` (cloud) was not run:
+no account.
+
+What it shows, on this small synthetic test:
+
+* **At full strength only the largest DPDFNets helped `whisper-base`**, by
+  a word or so (`dpdfnet8` 16.7%, `dpdfnet8-48k` 15.4%, against 17.2% off);
+  every other denoiser made it worse. **At strength 0.5 every denoiser
+  helped it**, the DPDFNets and `demucs-master64` most (8.0% to 9.7%, about
+  half the errors of "off").
+* **Moonshine gained from most of them at full strength**, the 16 kHz
+  DPDFNets most (`dpdfnet2` 19.7%, against 34.4% off and 23.9% for GTCRN).
+  RNNoise made it worse (38.1%), and `demucs-valentini-nc` (non-causal,
+  trained on VCTK-DEMAND only) wrecked it (88.5%; 33.2% at 0.5).
+* The **8 kHz** DPDFNets cut everything above 4 kHz: made for telephone
+  audio, they did little for wideband speech at full strength.
+* **DeepFilterNet 3 and RNNoise**, tuned for listening, were among the
+  weakest at full strength; at 0.5 they helped Whisper less than the others
+  (12.8% and 13.3%).
+* The **Demucs** denoiser (PyTorch, non-commercial) did no better than the
+  DPDFNets and costs more: it has no streaming form here, so a live stream
+  enhances every 20 ms chunk with the half second before it, which is
+  several times slower than real time. `demucs-valentini-nc` needs 3.7 s of
+  CPU per second of audio even for whole recordings.
+
+The default stays `gtcrn-simple`: it is the lightest (0.5 MB, 0.05 s of CPU
+per second of audio, 2 ms per live chunk), and at strength 0.5 it helped
+both recognisers (Moonshine 22.3%, Whisper 11.0%). For more quality at three
+to five times the CPU, `dpdfnet2` or `dpdfnet4` (Apache-2.0, 10 to 12 MB)
+did better than GTCRN on both recognisers at full strength and on Whisper at
+0.5 (Moonshine at 0.5 was a word worse), and still keep up with a live
+stream; none is clearly better enough on 47 words to
+replace the default. `bolo recommend --task denoise` lists them all with
+this machine's fit: the configured default first, and the denoisers whose
+best strength left more than three quarters of the errors (`measured.wer_ratio`
+above 0.75 in the catalog: DeepFilterNet 3, RNNoise, `demucs-valentini-nc`)
+last. Measure on your own audio before turning denoising on for a model or
+the server.
 
 ## Language identification
 

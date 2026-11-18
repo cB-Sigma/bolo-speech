@@ -331,3 +331,11 @@ def test_low_delay_resampler_is_in_step_and_holds_back_little(rate_in: int, rate
     assert len(outs[0]) >= rate_out // 50 - held - 1
     with pytest.raises(ValueError):
         LowDelayResampler(16000, 44100)
+
+
+def test_recommendations_put_the_default_first_and_weak_denoisers_last() -> None:
+    from bolo.recommend import _poor_voice
+
+    cat = Catalog.load()
+    assert _poor_voice(cat.resolve("rnnoise")) and _poor_voice(cat.resolve("deepfilternet3"))  # type: ignore[arg-type]
+    assert not _poor_voice(cat.resolve("dpdfnet2")) and not _poor_voice(cat.resolve("gtcrn-simple"))  # type: ignore[arg-type]

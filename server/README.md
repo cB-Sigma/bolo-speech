@@ -155,10 +155,10 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | STT | Deepgram (cloud) | 2 | af, ar, as, be, bg, bn, bs, ca +53 | 0 | - |
 | STT | Soniox (cloud) | 2 | af, ar, az, be, bg, bn, bs, ca +52 | 0 | - |
 | DENOISE | GTCRN | 1 | - | 1 | 0.060 (`gtcrn-simple`) |
-| DENOISE | DPDFNet | 8 | - | 0 | - |
-| DENOISE | DeepFilterNet | 1 | - | 0 | - |
-| DENOISE | RNNoise | 1 | - | 0 | - |
-| DENOISE | Demucs denoiser | 4 | - | 0 | - |
+| DENOISE | DPDFNet | 8 | - | 8 | 0.080 (`dpdfnet-baseline`) |
+| DENOISE | DeepFilterNet | 1 | - | 1 | 0.259 (`deepfilternet3`) |
+| DENOISE | RNNoise | 1 | - | 1 | 0.068 (`rnnoise`) |
+| DENOISE | Demucs denoiser | 4 | - | 4 | 0.194 (`demucs-dns48`) |
 | DIARIZATION | pyannote + speaker embeddings | 3 | - | 1 | 0.106 (`pyannote-3.0-eres2net`) |
 | DIARIZATION | Nemotron diarization | 1 | - | 1 | 0.039 (`nemotron-3-diarization`) |
 | SPEECH-TO-SPEECH | Moshi | 14 | en | 0 | - |
@@ -236,7 +236,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | VAD | WebRTC VAD | 2 | - | 2 | 0.000 (`webrtc-vad-aggressive`) |
 | VAD | Energy VAD | 1 | - | 1 | 0.000 (`energy-vad`) |
 
-**466 models in the catalog, 170 validated on CPU, 296 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md).
+**466 models in the catalog, 184 validated on CPU, 282 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

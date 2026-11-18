@@ -1445,12 +1445,36 @@ is not a strength or a model is an `invalid_request` error.
   unchanged. The held-back audio is released at `stop`.
 * **Other models** (the Demucs denoiser on the PyTorch plugin) enhance each
   chunk together with the half second of audio before it, and nothing is
-  held back; they cost more per chunk.
+  held back; they cost much more per chunk, and on a small CPU the stream
+  falls behind (below: the Demucs denoisers cannot keep up with 20 ms chunks).
 
 `metrics.denoise` reports, for the stream so far: `chunks`, `mean_ms`,
 `p95_ms` and `max_ms` (time spent denoising each chunk), `held_ms` (the most
 audio held back at once) and `stateful`; the trace in `/api/v1/requests` has
 the same under `denoise`.
+
+Measured per 20 ms chunk of 16 kHz audio on one thread of the shared
+4-vCPU machine of models.md ("Denoising"), whose load average was 12 to 17
+throughout, so the times are pessimistic; a chunk must take less than 20 ms
+for the stream to keep up:
+
+| model | ms per chunk, mean / p95 | held back |
+| --- | --- | --- |
+| `gtcrn-simple` | 1.8 / 3.7 | 28 ms |
+| `dpdfnet-baseline` | 2.7 / 5.9 | 50 ms |
+| `dpdfnet2` | 3.9 / 4.5 | 50 ms |
+| `dpdfnet4` | 5.8 / 9.1 | 50 ms |
+| `dpdfnet8` | 16.1 / 23.9 | 50 ms |
+| `dpdfnet2-48k` | 8.3 / 12.8 | 61 ms |
+| `dpdfnet8-48k` | 17.6 / 25.2 | 61 ms |
+| `dpdfnet2-8k` | 3.9 / 7.4 | 62 ms |
+| `dpdfnet8-8k` | 8.3 / 12.3 | 62 ms |
+| `deepfilternet3` | 5.4 / 6.5 | 41 ms |
+| `rnnoise` | 1.7 / 2.2 | 31 ms |
+| `demucs-dns48` | 77.4 / 103.4 | 0 ms (overlap) |
+| `demucs-dns64` | 134.7 / 167.6 | 0 ms (overlap) |
+| `demucs-master64` | 133.0 / 166.7 | 0 ms (overlap) |
+| `demucs-valentini-nc` | 1923.4 / 2250.7 | 0 ms (overlap) |
 
 ## `WS /api/v1/tts/stream`
 
