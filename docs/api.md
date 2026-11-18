@@ -2456,6 +2456,13 @@ commands; `--latest` takes the index's newest torch) or `bolo components install
 running at `--url` the server does it. `bolo torch` lists each environment's build, and `bolo doctor` warns of a
 CPU build next to a GPU, naming the environment and the command.
 
+On Windows the `pytorch` kind also lists `triton-windows`, when an environment has a CUDA build of torch (the
+full-duplex servers' PyTorch builds and the bolo-torch environments): its `envs` say per environment whether Triton is
+installed and the speed-up (torch.compile) on. `POST /api/v1/components/triton-windows/install` installs the
+release of triton-windows that goes with each environment's torch where it is missing (`bolo components install
+triton-windows`; `bolo torch use cuda` adds it on Windows too). The `duplex-server` items add `torch_compile`
+(`{"triton", "triton_version", "torch", "speed_up", "reason"}` for the installed PyTorch build, else null).
+
 `GET /api/v1/components`
 
 ```json

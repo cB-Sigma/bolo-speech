@@ -31,6 +31,15 @@ describe('conversation events', () => {
     expect(s.events.at(-1)).toBe('error')
   })
 
+  it('keeps what the server says about how the model runs (bolo.notice), once each', () => {
+    let s = emptyConversation('speech-to-speech')
+    const ev = (e: Record<string, unknown>) => (s = applyEvent(s, e as { type: string }))
+    ev({ type: 'bolo.notice', message: 'Moshi speed-up off: Triton is not installed' })
+    ev({ type: 'bolo.notice', message: 'Moshi speed-up off: Triton is not installed' })
+    ev({ type: 'bolo.notice' })
+    expect(s.notices).toEqual(['Moshi speed-up off: Triton is not installed'])
+  })
+
   it('sends MCP tools and follows the servers, calls and approval requests', () => {
     const tools = [{ type: 'mcp', server_label: 'files' }]
     const u = sessionUpdate('cascade', undefined, 'websocket', undefined, undefined, { tools }) as {

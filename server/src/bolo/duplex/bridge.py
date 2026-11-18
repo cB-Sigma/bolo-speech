@@ -100,6 +100,8 @@ class DuplexBridge:
                     self.failed = True
                     await s.error(exc.message, code=exc.code, type_=exc.type)
                     return None
+                for notice in getattr(backend, "notices", None) or []:  # how the model runs (speed-up off, memory)
+                    await s.send("bolo.notice", message=notice)
                 self._resampler = StreamResampler(SR, self.model.input_rate)
                 self._t0 = time.monotonic()
                 self._tasks = [

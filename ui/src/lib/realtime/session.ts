@@ -70,6 +70,8 @@ export interface ConversationState {
   agentSpeaking: boolean
   error: string | null
   errorCode: string | null
+  /** What the server says about how the model runs (`bolo.notice`: "Moshi speed-up off: ..."). */
+  notices: string[]
   mic: MicFailure | null
   /** MCP servers the session opened (`mcp_list_tools` items), by server label. */
   mcpServers: Record<string, McpServerState>
@@ -115,6 +117,7 @@ export const emptyConversation = (
   agentSpeaking: false,
   error: null,
   errorCode: null,
+  notices: [],
   mic: null,
   mcpServers: {},
   toolCalls: [],
@@ -278,6 +281,12 @@ export function applyEvent(s: ConversationState, ev: Ev): ConversationState {
       return { ...applyItem(s, ev.item as Item | undefined, ev.type === 'conversation.item.done'), events }
     case 'response.mcp_call.in_progress':
       return { ...s, events, toolCalls: patchCall(s.toolCalls, str(ev.item_id), { status: 'running' }) }
+    case 'bolo.notice': {
+      const message = typeof ev.message === 'string' ? ev.message : ''
+      return message && !s.notices.includes(message)
+        ? { ...s, events, notices: [...s.notices, message] }
+        : { ...s, events }
+    }
     case 'error': {
       const e = (ev.error ?? {}) as { message?: string; code?: string }
       return { ...s, events, error: e.message ?? 'The server reported an error.', errorCode: e.code ?? null }

@@ -107,8 +107,18 @@ class DuplexBackend(abc.ABC):
     @abc.abstractmethod
     async def open(self, config: DuplexConfig) -> DuplexSession: ...
 
+    #: what a session should be told about how the model runs ("Moshi speed-up off: ..."); sent to each new session
+    #: as a ``bolo.notice`` event and listed by :meth:`describe`
+    notices: list[str]
+
     def describe(self) -> dict[str, Any]:
-        return {"backend": self.name, "model": self.model, "full_duplex": True, "max_sessions": self.max_sessions}
+        out: dict[str, Any] = {
+            "backend": self.name, "model": self.model, "full_duplex": True, "max_sessions": self.max_sessions,
+        }  # fmt: skip
+        notices = getattr(self, "notices", None)
+        if notices:
+            out["notices"] = list(notices)
+        return out
 
     async def session_closed(self) -> None:
         """Called after a session closed (a backend whose server keeps state across connections restarts it)."""

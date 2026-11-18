@@ -195,6 +195,17 @@ function ServerConversation() {
       {state.mic && (
         <MicHelpPanel className="mb-4" failure={state.mic} onRetry={start} onDismiss={() => setSession(null)} />
       )}
+      {state.notices.length > 0 && (
+        <Alert className="mb-4" data-testid="conversation-notices">
+          <Info />
+          <AlertTitle>How the model runs</AlertTitle>
+          <AlertDescription>
+            {state.notices.map((n) => (
+              <p key={n}>{n}</p>
+            ))}
+          </AlertDescription>
+        </Alert>
+      )}
       {state.error && !state.mic && (
         <Alert className="mb-4" variant="destructive" data-testid="conversation-error">
           <Info />

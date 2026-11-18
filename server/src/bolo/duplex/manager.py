@@ -125,11 +125,16 @@ async def build_backend(core: Bolo, spec: ModelSpec) -> DuplexBackend:
         )
     except (ValueError, FileNotFoundError) as exc:
         raise EngineUnavailable(str(exc)) from exc
+    notices = [launch.notice] if launch.notice else []
+    for notice in notices:
+        core.log("warning", f"{spec.id}: {notice}")
     if spec.kind == FREEZE_OMNI_KIND:
-        return FreezeOmniBackend(
+        backend: DuplexBackend = FreezeOmniBackend(
             process=launch.process, model=spec.id, max_sessions=launch.max_sessions, runtime=launch.runtime
         )
+        backend.notices = notices
+        return backend
     return KyutaiBackend(
         process=launch.process, max_sessions=launch.max_sessions, restart_after_session=launch.restart_after_session,
-        runtime=launch.runtime, **common,
+        runtime=launch.runtime, family=spec.family, notices=notices, **common,
     )  # fmt: skip

@@ -129,6 +129,7 @@ class FreezeOmniBackend(DuplexBackend):
         self, url: str | None = None, *, process: ServerProcess | None = None, model: str | None = None,
         max_sessions: int = 1, runtime: str | None = None, connect_timeout_s: float = 30.0,
     ) -> None:  # fmt: skip
+        self.notices: list[str] = []
         if url is None and process is None:
             raise ValueError("a URL or a process is needed")
         self.url = url

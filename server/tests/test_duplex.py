@@ -9,6 +9,8 @@ import contextlib
 import dataclasses
 import io
 import json
+import subprocess
+import sys
 import tarfile
 import time
 from collections.abc import Iterator
@@ -869,3 +871,127 @@ def test_minicpmo_launch_and_install(settings: Settings, tmp_path: Path, monkeyp
     torch = next(c for c in commands if "--index-url" in c)
     assert "torch==2.8.0" in torch and "torchaudio==2.8.0" in torch
     assert any("minicpmo-utils[all]==1.0.6" in c and "transformers==4.51.0" in c for c in commands)
+
+
+# -- torch.compile: never a crash (Windows has no Triton unless triton-windows is installed) -----------------------
+def test_compile_plan() -> None:
+    env, reason = rt.compile_plan("windows-x86_64", gpu=True, has_triton=False, has_compiler=False)
+    assert reason and "Triton is not installed" in reason and "triton-windows" in reason
+    assert env == {"TORCHINDUCTOR_USE_STATIC_CUDA_LAUNCHER": "0", "NO_TORCH_COMPILE": "1", "TORCHDYNAMO_DISABLE": "1"}
+    # with triton-windows: compile on, without inductor's static CUDA launcher (OverflowError on Windows)
+    assert rt.compile_plan("windows-x86_64", True, True, False) == (
+        {"TORCHINDUCTOR_USE_STATIC_CUDA_LAUNCHER": "0"},
+        None,
+    )
+    assert rt.compile_plan("linux-x86_64", True, True, True) == ({}, None)  # Linux's CUDA torch brings Triton
+    env, reason = rt.compile_plan("linux-x86_64", True, False, True)
+    assert reason == "Triton is not installed" and env["NO_TORCH_COMPILE"] == "1"
+    env, reason = rt.compile_plan("windows-x86_64", False, False, False)  # the CPU: a C++ compiler is what counts
+    assert reason and "cl.exe" in reason and "TORCHINDUCTOR_USE_STATIC_CUDA_LAUNCHER" not in env
+    assert rt.compile_plan("windows-x86_64", False, False, True) == ({}, None)
+    assert rt.compile_failed("torch._inductor.exc.TritonMissing: Cannot find a working triton installation")
+    assert rt.compile_failed("OverflowError: Python int too large to convert to C long (static_cuda_launcher)")
+    assert not rt.compile_failed("CUDA out of memory")
+
+
+def test_a_windows_start_without_triton_turns_compile_off(
+    settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Windows, moshi 0.2.13 with torch 2.9.1+cu128 and no Triton: Moshi and Hibiki crashed at start with
+    TritonMissing. They start with compile off and say so; the q8 scales are then kept as stored."""
+    from bolo.catalog import Catalog
+
+    monkeypatch.setattr(rt, "platform_key", lambda: "windows-x86_64")
+    catalog = Catalog.load(None)
+    spec = catalog.resolve("moshiko-pytorch-q8")
+    assert spec is not None
+    _install_fake(settings, "moshi", "pytorch")
+    settings.device = "cuda"
+    launch = rt.launch(settings, spec, _model_dir(tmp_path, spec), 1234, [])
+    env = launch.process.env
+    assert env["NO_TORCH_COMPILE"] == "1" and env["TORCHINDUCTOR_USE_STATIC_CUDA_LAUNCHER"] == "0"
+    assert launch.notice and launch.notice.startswith("Moshi speed-up off: Triton is not installed")
+    assert json.loads(launch.process.argv[4])["keep_scb_float"] is True
+    state = rt.compile_state(settings, "moshi")
+    assert state is not None and state["triton"] is False and state["speed_up"] is False
+    # with triton-windows in its environment: compile on
+    root = rt.install_dir(settings, "moshi", "pytorch")
+    package = root / "Lib" / "site-packages" / "triton"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    (root / "Lib" / "site-packages" / "triton_windows-3.5.1.post24.dist-info").mkdir()
+    launch = rt.launch(settings, spec, tmp_path / "models" / spec.id, 1234, [])
+    assert "NO_TORCH_COMPILE" not in launch.process.env and launch.notice is None
+    assert launch.process.env["TORCHINDUCTOR_USE_STATIC_CUDA_LAUNCHER"] == "0"
+    assert "keep_scb_float" not in json.loads(launch.process.argv[4])
+    state = rt.compile_state(settings, "moshi")
+    assert state is not None and state["speed_up"] and state["triton_version"] == "3.5.1.post24"
+
+
+async def test_a_server_whose_compile_fails_is_started_again_without_it() -> None:
+    class Process:
+        def __init__(self) -> None:
+            self.env: dict[str, str] = {"HF_HUB_OFFLINE": "1"}
+            self.argv = ["python", "-I", "-u", "bolo_launch.py", json.dumps({"module": "moshi.server"})]
+            self.starts = 0
+            self.base_url = "http://127.0.0.1:1"
+
+        def status(self) -> dict[str, Any]:
+            return {}
+
+        def ensure_started(self) -> None:
+            self.starts += 1
+            if self.env.get("NO_TORCH_COMPILE") != "1":
+                raise EngineUnavailable("TTS server 'duplex:x' exited: torch._inductor.exc.TritonMissing")
+
+    process = Process()
+    backend = KyutaiBackend(process=process, model="hibiki-1b-pytorch-bf16", family="Hibiki")  # type: ignore[arg-type]
+    await backend._start()
+    assert process.starts == 2 and process.env["NO_TORCH_COMPILE"] == "1"
+    assert json.loads(process.argv[-1])["keep_scb_float"] is True
+    assert backend.describe()["notices"] == backend.notices
+    assert backend.notices[0].startswith("Hibiki speed-up off")
+
+    class Broken(Process):
+        def ensure_started(self) -> None:
+            raise EngineUnavailable("CUDA out of memory")
+
+    with pytest.raises(EngineUnavailable, match="out of memory"):
+        await KyutaiBackend(process=Broken(), model="m")._start()  # type: ignore[arg-type]
+
+
+def test_the_launcher_keeps_the_q8_scales_as_stored(tmp_path: Path) -> None:
+    """moshi's loader casts every floating-point tensor to bfloat16, the q8 scales (weight_scb) too, and QLinear
+    refuses them once compile is off. The launcher answers the cast with the scales as stored."""
+    package = tmp_path / "pkgs" / "moshi" / "models"
+    package.mkdir(parents=True)
+    (tmp_path / "pkgs" / "moshi" / "__init__.py").write_text("", encoding="utf-8")
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    (package / "loaders.py").write_text(
+        "def load_file(name, device=None):\n"
+        "    return {'lm.layer.weight': 'float32 weight', 'lm.layer.weight_scb': 'float32 scales'}\n"
+        "def get_moshi_lm():  # as moshi 0.2.13 does: every floating-point value to the model's dtype\n"
+        "    state = load_file('model.q8.safetensors')\n"
+        "    for key, value in state.items():\n"
+        "        state[key] = 'bfloat16'\n"
+        "    return dict(state)\n",
+        encoding="utf-8",
+    )
+    server = tmp_path / "server.py"
+    server.write_text(
+        "import json\nfrom moshi.models import loaders\nprint(json.dumps(loaders.get_moshi_lm()))\n", encoding="utf-8"
+    )
+    script = tmp_path / "bolo_launch.py"
+    script.write_text(rt.LAUNCHER, encoding="utf-8")
+    import os
+
+    for keep, scales in ((True, "float32 scales"), (False, "bfloat16")):
+        spec = {"module": str(server), "args": [], "host": "127.0.0.1", "port": 1, "files": {}, "keep_scb_float": keep}
+        out = subprocess.run(
+            [sys.executable, str(script), json.dumps(spec)], capture_output=True, text=True, timeout=60,
+            env={**os.environ, "PYTHONPATH": str(tmp_path / "pkgs")}, check=True,
+        )  # fmt: skip
+        assert json.loads(out.stdout.strip().splitlines()[-1]) == {
+            "lm.layer.weight": "bfloat16",
+            "lm.layer.weight_scb": scales,
+        }

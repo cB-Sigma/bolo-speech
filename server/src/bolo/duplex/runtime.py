@@ -321,6 +321,88 @@ def _cargo_binary(root: Path, name: str) -> Path:
     return root / "bin" / (name + (".exe" if os.name == "nt" else ""))
 
 
+# -- torch.compile ----------------------------------------------------------------------------------------------
+#: what turns torch.compile off in the PyTorch servers: Kyutai's moshi package (and its forks) read
+#: NO_TORCH_COMPILE; TORCHDYNAMO_DISABLE turns every other torch.compile into plain eager code
+COMPILE_OFF = {"NO_TORCH_COMPILE": "1", "TORCHDYNAMO_DISABLE": "1"}
+#: Windows: inductor's static CUDA launcher fails with "OverflowError: Python int too large to convert to C long"
+#: under triton-windows (Windows' C long is 32 bits); the regular launcher works
+WINDOWS_COMPILE_ENV = {"TORCHINDUCTOR_USE_STATIC_CUDA_LAUNCHER": "0"}
+#: what a server's output says when torch.compile could not build its kernels
+COMPILE_FAILURES = (
+    "TritonMissing", "torch._inductor", "InductorError", "BackendCompilerFailed", "CppCompileError",
+    "Cannot find a working triton installation", "static_cuda_launcher",
+)  # fmt: skip
+#: the PyTorch builds of the servers bolo starts (the MLX and Rust builds do not use torch.compile)
+TORCH_BUILDS = (PYTORCH,)
+
+
+def site_packages(root: Path) -> list[Path]:
+    """The site-packages folders of the virtual environment ``root``."""
+    return [p for p in (root / "Lib" / "site-packages", *sorted(root.glob("lib/python*/site-packages"))) if p.is_dir()]
+
+
+def has_package(root: Path, module: str) -> bool:
+    """Whether the virtual environment ``root`` has the importable package ``module`` (no Python is started)."""
+    return any((sp / module / "__init__.py").is_file() for sp in site_packages(root))
+
+
+def package_version(root: Path, distribution: str) -> str | None:
+    """The version of ``distribution`` in the virtual environment ``root`` (from its .dist-info folder name)."""
+    prefix = distribution.replace("-", "_").lower() + "-"
+    for sp in site_packages(root):
+        for info in sp.glob("*.dist-info"):
+            name = info.name[: -len(".dist-info")]
+            if name.lower().startswith(prefix):
+                return name[len(prefix) :]
+    return None
+
+
+def compile_plan(key: str, gpu: bool, has_triton: bool, has_compiler: bool) -> tuple[dict[str, str], str | None]:
+    """The environment of a PyTorch server, and why torch.compile is off (None: on). On the GPU it needs Triton
+    (Linux's CUDA and ROCm torch bring it; Windows has none unless triton-windows is installed); on the CPU a C++
+    compiler (MSVC's cl.exe on Windows). Without it the server would crash at its first compile, so it starts
+    with compile off: slower, never broken."""
+    windows = key.startswith("windows")
+    env = dict(WINDOWS_COMPILE_ENV) if windows and gpu else {}
+    reason = None
+    if gpu and not has_triton:
+        reason = "Triton is not installed" + (
+            " (on Windows: bolo components install triton-windows)" if windows else ""
+        )
+    elif not gpu and not has_compiler:
+        reason = "no C++ compiler (MSVC's cl.exe) is on PATH" if windows else "no C compiler (cc) is on PATH"
+    if reason:
+        env.update(COMPILE_OFF)
+    return env, reason
+
+
+def compile_failed(output: str) -> bool:
+    """Whether a server's output says torch.compile could not build (then it is started again with compile off)."""
+    return any(marker in output for marker in COMPILE_FAILURES)
+
+
+def has_compiler() -> bool:
+    if os.name == "nt":
+        return shutil.which("cl") is not None
+    return any(shutil.which(c) for c in ("cc", "gcc", "clang"))
+
+
+def compile_state(settings: Settings, server: str, gpu: bool = True) -> dict[str, Any] | None:
+    """For the components page and ``bolo doctor``: Triton and torch.compile in the installed PyTorch build of
+    ``server`` (``{"triton", "triton_version", "torch", "speed_up", "reason"}``), or None when it is not installed."""
+    if installed_path(settings, server, PYTORCH) is None:
+        return None
+    root = install_dir(settings, server, PYTORCH)
+    triton = has_package(root, "triton")
+    _, reason = compile_plan(platform_key(), gpu, triton, has_compiler())
+    return {
+        "triton": triton,
+        "triton_version": package_version(root, "triton-windows") or package_version(root, "triton"),
+        "torch": package_version(root, "torch"), "speed_up": reason is None, "reason": reason,
+    }  # fmt: skip
+
+
 def installed_path(settings: Settings, server: str, flavour: str) -> Path | None:
     """The interpreter (Python builds) or binary (Rust build) of an installed build, else None."""
     build = SERVERS[server].builds.get(flavour)
@@ -556,6 +638,26 @@ try:
     huggingface_hub.hf_hub_download = hf_hub_download
 except ImportError:
     pass
+if spec.get("keep_scb_float"):
+    # moshi's loader casts every floating-point tensor of the checkpoint to the model's dtype (bfloat16), the q8
+    # scales (weight_scb) too, which its QLinear refuses ("Expected weight_scb to have type float") once
+    # torch.compile is off. The scales are read as they are stored (float32).
+    try:
+        import moshi.models.loaders as _loaders
+
+        _load_file = _loaders.load_file
+
+        class _KeepScales(dict):
+            def __init__(self, state):
+                super().__init__(state)
+                self._scales = {k: v for k, v in state.items() if k.endswith("weight_scb")}
+
+            def __setitem__(self, key, value):
+                super().__setitem__(key, self._scales.get(key, value))
+
+        _loaders.load_file = lambda *a, **k: _KeepScales(_load_file(*a, **k))
+    except (ImportError, AttributeError):
+        pass
 if spec.get("cpu"):
     import torch
 
@@ -577,6 +679,8 @@ class Launch:
     #: the server keeps the model's state between connections (MLX): bolo stops it after each conversation
     restart_after_session: bool
     runtime: str
+    #: what the session and the log should say about this start ("Moshi speed-up off: Triton is not installed")
+    notice: str | None = None
 
 
 def server_of(spec: ModelSpec) -> tuple[str, str]:
@@ -681,6 +785,7 @@ def launch(settings: Settings, spec: ModelSpec, path: Path, port: int, extra_arg
         files["tokenizer_file"],
     ]
     tls, sessions, restart = False, 1, False
+    notice: str | None = None
     gpu = str(settings.device or "").lower() != "cpu"
     if build == CANDLE:
         config = {
@@ -779,6 +884,13 @@ def launch(settings: Settings, spec: ModelSpec, path: Path, port: int, extra_arg
         launch_spec: dict[str, Any] = {
             "module": module, "args": full, "host": "127.0.0.1", "port": port, "files": local, "cpu": not gpu,
         }  # fmt: skip
+        if build in TORCH_BUILDS:
+            root = install_dir(settings, server, build)
+            compile_env, reason = compile_plan(platform_key(), gpu, has_package(root, "triton"), has_compiler())
+            env.update(compile_env)
+            if reason:
+                notice = f"{spec.family or spec.id} speed-up off: {reason}; torch.compile is off, so it runs slower"
+                launch_spec["keep_scb_float"] = True
         build_info = SERVERS[server].builds[build]
         if build_info.requirements:  # run from the kept checkout
             launch_spec["cwd"] = str(
@@ -789,7 +901,24 @@ def launch(settings: Settings, spec: ModelSpec, path: Path, port: int, extra_arg
         f"duplex:{spec.id}", argv, port, start_timeout_s=float(getattr(settings, "duplex_start_timeout_s", 900.0)),
         env=env, health_path="/", gpu=gpu and build != MLX, flavour=build, tls=tls, ready_any_status=True,
     )  # fmt: skip
-    return Launch(process, sessions, restart, f"{server}:{build}")
+    return Launch(process, sessions, restart, f"{server}:{build}", notice)
+
+
+def compile_off(process: ServerProcess, name: str, output: str) -> str | None:
+    """A PyTorch server that failed at its first torch.compile (``output``: what it said): change its start to
+    compile off (and the q8 scales kept as stored), and return the notice; None when that is not what happened or
+    compile was off already."""
+    if not compile_failed(output) or process.env.get("NO_TORCH_COMPILE") == "1":
+        return None
+    process.env.update(COMPILE_OFF)
+    with contextlib.suppress(ValueError, IndexError):
+        launch_spec = json.loads(process.argv[-1])
+        launch_spec["keep_scb_float"] = True
+        process.argv[-1] = json.dumps(launch_spec)
+    return (
+        f"{name} speed-up off: torch.compile could not build its kernels here; started again "
+        "without it, so it runs slower"
+    )
 
 
 def default_fetch(store: Any) -> Callable[[Pinned, Path], Path]:

@@ -47,6 +47,8 @@ DOWNLOAD_BYTES = 2_500_000_000
 #: torch versions bolo-torch supports (its requirement ``torch>=2.4``)
 MIN_TORCH = (2, 4)
 PACKAGES = ("torch", "torchaudio", "torchvision")
+#: also read from each environment (not reinstalled)
+OTHER_PACKAGES = ("triton", "triton-windows")
 
 #: run in an environment's Python: what it has installed, read from the package metadata (torch is not imported)
 PROBE = """
@@ -58,7 +60,7 @@ def v(n):
         return None
 print(json.dumps({"python": sys.executable, "tag": "cp%d%d" % sys.version_info[:2], "platform": sysconfig.get_platform(),
                   "bolo_torch": v("bolo-torch"), "torch": v("torch"), "torchaudio": v("torchaudio"),
-                  "torchvision": v("torchvision")}))
+                  "torchvision": v("torchvision"), "triton": v("triton"), "triton-windows": v("triton-windows")}))
 """
 #: run in an environment's Python after a reinstall: does torch reach the GPU
 VERIFY = """
@@ -82,6 +84,34 @@ def run(cmd: Sequence[str], timeout: float = 60.0) -> tuple[int, str]:
     except (OSError, subprocess.TimeoutExpired) as exc:
         return 127, str(exc)
     return proc.returncode, (proc.stdout + proc.stderr).decode(errors="replace")
+
+
+# -- Triton on Windows ----------------------------------------------------------------------------------------------
+#: triton-windows (github.com/woct0rdho/triton-windows, MIT) series for each torch minor version: "each PyTorch
+#: minor version is only guaranteed to work with a specific Triton minor version". Linux's CUDA and ROCm builds of
+#: torch bring Triton themselves; Windows has none, and torch.compile on the GPU needs it.
+TRITON_WINDOWS: dict[tuple[int, int], tuple[int, int]] = {
+    (2, 4): (3, 1), (2, 5): (3, 1), (2, 6): (3, 2), (2, 7): (3, 3), (2, 8): (3, 4), (2, 9): (3, 5), (2, 10): (3, 6),
+}  # fmt: skip
+
+
+def triton_windows_requirement(torch_version: str | None) -> str | None:
+    """The triton-windows requirement that goes with ``torch_version`` (``triton-windows>=3.5,<3.6`` for torch
+    2.9), or None when no series is known for it."""
+    if not torch_version:
+        return None
+    series = TRITON_WINDOWS.get(tuple(_key(torch_version)[:2]))  # type: ignore[arg-type]
+    if series is None:
+        return None
+    major, minor = series
+    return f"triton-windows>={major}.{minor},<{major}.{minor + 1}"
+
+
+def pip_install(python: str) -> list[str]:
+    """How to install into the environment of ``python``: uv when it is there (bolo's own environments for the
+    full-duplex servers have no pip), else that Python's pip."""
+    uv = shutil.which("uv")
+    return [uv, "pip", "install", "--python", python] if uv else [python, "-m", "pip", "install"]
 
 
 # -- the builds ---------------------------------------------------------------------------------------------------
@@ -259,7 +289,7 @@ def discover(commands: dict[str, list[str]], runner: Runner = run) -> list[Torch
             continue
         envs[key] = TorchEnv(
             [plugin], python, str(info.get("tag") or ""), str(info.get("platform") or ""), str(info["bolo_torch"]),
-            {p: info.get(p) for p in PACKAGES},
+            {p: info.get(p) for p in (*PACKAGES, *OTHER_PACKAGES)},
         )  # fmt: skip
     return list(envs.values())
 
@@ -462,6 +492,13 @@ def apply(
             else:
                 ok, what = verify(p.env, p.target, runner)
                 result["ok"], result["detail"] = ok, what
+                triton = triton_windows_requirement(p.pins["torch"]) if p.env.platform.startswith("win") else None
+                if ok and p.target == "cuda" and triton:
+                    # torch.compile on the GPU needs Triton, which Windows' torch does not bring; optional: a model
+                    # starts without it, with compile off
+                    code, output = runner([*pip_install(p.env.python), triton], 1800.0)
+                    tail = " | ".join(output.strip().splitlines()[-2:])
+                    result["detail"] += f"; {triton}: " + ("installed" if code == 0 else f"not installed ({tail})")
         log.info("torch in %s: %s", p.env.python, result["detail"])
         results.append(result)
     if progress:

@@ -178,6 +178,8 @@ class KyutaiBackend(DuplexBackend):
         voice_suffix: str = "",
         default_voice: str | None = None,
         instructions_param: str | None = None,
+        family: str | None = None,
+        notices: list[str] | None = None,
     ) -> None:
         if url is None and process is None:
             raise ValueError("a URL or a process is needed")
@@ -195,6 +197,8 @@ class KyutaiBackend(DuplexBackend):
         self.voice_suffix = voice_suffix
         self.default_voice = default_voice
         self.instructions_param = instructions_param
+        self.family = family
+        self.notices = list(notices or [])
         self.active = 0
         self.sessions_served = 0
         self._lock = asyncio.Lock()
@@ -237,7 +241,7 @@ class KyutaiBackend(DuplexBackend):
             self.active += 1
         try:
             if self.process is not None:
-                await asyncio.to_thread(self.process.ensure_started)
+                await self._start()
             url = self._url(config)
             session = await self._connect(connect, url)
         except BaseException:
@@ -246,6 +250,22 @@ class KyutaiBackend(DuplexBackend):
             raise
         self.sessions_served += 1
         return _Tracked(session, self)
+
+    async def _start(self) -> None:
+        """Start the managed server; one that failed at its first torch.compile (no Triton, a compiler error) is
+        started again with compile off, and the sessions are told (``notices``)."""
+        from bolo.duplex import runtime
+
+        assert self.process is not None
+        try:
+            await asyncio.to_thread(self.process.ensure_started)
+        except EngineUnavailable as exc:
+            notice = runtime.compile_off(self.process, self.family or str(self.model), exc.message)
+            if notice is None:
+                raise
+            log.warning("%s: %s", self.model, notice)
+            self.notices.append(notice)
+            await asyncio.to_thread(self.process.ensure_started)
 
     def _url(self, config: DuplexConfig) -> str:
         from bolo.s2s import OPENAI_VOICES

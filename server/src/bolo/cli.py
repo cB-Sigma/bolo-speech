@@ -1495,9 +1495,37 @@ def _follow_job(args: argparse.Namespace, job_id: str) -> int:
         time.sleep(1.0)
 
 
-def cmd_components(args: argparse.Namespace) -> int:
-    from bolo.components import TORCH_COMPONENTS, TORCH_PREFIX
+def torch_envs_requirement(torch_version: str | None) -> str | None:
+    from bolo import torch_envs
 
+    return torch_envs.triton_windows_requirement(torch_version)
+
+
+def cmd_components(args: argparse.Namespace) -> int:
+    from bolo.components import TORCH_COMPONENTS, TORCH_PREFIX, TRITON
+
+    if getattr(args, "action", None) == "install" and args.component == TRITON:
+        r = _server(args, "POST", f"/api/v1/components/{TRITON}/install", {})
+        if r is not None and r.status_code == 202:
+            print(f"the server at {args.url} is installing it")
+            return _follow_job(args, r.json()["job_id"])
+        manager = _core(args).components
+        targets = manager.triton_targets()
+        for t in targets:
+            need = torch_envs_requirement(t["torch"])
+            state = "installed" if t["triton"] else f"missing ({need or 'no series known for this torch'})"
+            print(f"{t['name']}: {t['python']}: torch {t['torch']}, Triton {state}")
+        if not targets:
+            print("no environment with a CUDA build of torch (bolo torch use cuda, bolo components install moshi)")
+            return 1
+        if getattr(args, "dry_run", False):
+            return 0
+        problems = manager.install_triton_blocking()
+        for problem in problems:
+            print(f"error: {problem}", file=sys.stderr)
+        if not problems:
+            print("installed; the next start of a PyTorch model compiles its kernels (a few minutes)")
+        return 1 if problems else 0
     if getattr(args, "action", None) == "install" and args.component in TORCH_COMPONENTS:
         args.target, args.action = args.component[len(TORCH_PREFIX) :], "use"
         args.dry_run = getattr(args, "dry_run", False)
@@ -2204,6 +2232,21 @@ def _doctor_torch_build(settings: Settings) -> None:
         print(f"  WARNING: {line}")
 
 
+def _doctor_duplex_compile(settings: Settings) -> None:
+    """The installed PyTorch builds of the full-duplex servers: Triton, and whether torch.compile (the speed-up)
+    runs or is left off (bolo.duplex.runtime.compile_plan)."""
+    from bolo.duplex import runtime as duplex_runtime
+
+    gpu = str(settings.device or "").lower() != "cpu"
+    for server in duplex_runtime.COMPONENTS:
+        state = duplex_runtime.compile_state(settings, server, gpu)
+        if state is None:
+            continue
+        triton = f"Triton {state['triton_version'] or ''}".strip() if state["triton"] else "Triton not installed"
+        speed = "speed-up on (torch.compile)" if state["speed_up"] else f"speed-up off: {state['reason']}"
+        print(f"{server} (pytorch build, torch {state['torch'] or '?'}): {triton}; {speed}")
+
+
 def _doctor_gpu_health(settings: Settings, which: Any = None, checker: Any = None) -> None:
     """Is the NVIDIA GPU still there (bolo.gpu_health)? Asked where NVIDIA's driver tools are installed."""
     import importlib.util
@@ -2367,6 +2410,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     _doctor_gpu_health(settings)
     _doctor_cuda(settings)
     _doctor_torch_build(settings)
+    _doctor_duplex_compile(settings)
     _doctor_llm(settings)
     _doctor_providers(settings)
     _doctor_watermark(settings)

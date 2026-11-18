@@ -825,6 +825,14 @@ export interface Component {
   /** pytorch components (torch-cuda, ...): the GPU and the build of each bolo-torch environment. */
   gpu?: string | null
   envs?: TorchEnvInfo[]
+  /** duplex-server components: Triton and torch.compile in their PyTorch build (null: not installed). */
+  torch_compile?: {
+    triton: boolean
+    triton_version: string | null
+    torch: string | null
+    speed_up: boolean
+    reason: string | null
+  } | null
 }
 
 /** One environment a bolo-torch plugin runs in, and its PyTorch build. */

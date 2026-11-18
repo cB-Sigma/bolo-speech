@@ -416,6 +416,14 @@ function ComponentRow({ c, detailed }: { c: Component; detailed?: boolean }) {
         c.servers?.length ? ['Connected servers', c.servers.join(', ')] : null,
         !c.installed && c.release ? ['Would install', `${c.release.version} (prebuilt, checksum pinned)`] : null,
         c.languages?.length ? ['Languages', c.languages.join(', ')] : null,
+        c.torch_compile
+          ? [
+              'Speed-up (torch.compile)',
+              c.torch_compile.speed_up
+                ? `on${c.torch_compile.triton_version ? ` (Triton ${c.torch_compile.triton_version})` : ''}`
+                : `off: ${c.torch_compile.reason ?? 'unknown'}`,
+            ]
+          : null,
         ...(c.envs ?? []).map((e): [string, string] => [
           `PyTorch (${e.plugins.join(', ')})`,
           `${e.torch ?? 'not installed'}: ${e.label}`,

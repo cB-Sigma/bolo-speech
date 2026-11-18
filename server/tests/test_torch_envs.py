@@ -154,7 +154,7 @@ def test_apply_stops_the_plugin_installs_and_checks() -> None:
 
     (result,) = torch_envs.apply(plans, runner, stopped.append)
     assert stopped == [["plugin:torch"]] and ran[0] == plans[0].command()
-    assert result["ok"] and result["detail"] == "torch 2.9.0+cu128 on NVIDIA GeForce RTX 4060 Laptop GPU"
+    assert result["ok"] and result["detail"].startswith("torch 2.9.0+cu128 on NVIDIA GeForce RTX 4060 Laptop GPU")
 
     def no_gpu(cmd: Sequence[str], timeout: float) -> tuple[int, str]:
         if "-c" in cmd:
@@ -224,5 +224,72 @@ async def test_the_component_installs_the_gpu_build_and_restarts_the_plugin(sett
         found[:] = [windows_env("2.9.0+cu128", "2.9.0+cu128")]
         (row,) = [c for c in manager.status() if c["kind"] == "pytorch"]
         assert row["installed"] and row["envs"][0]["label"] == "CUDA 12.8 build"
+    finally:
+        await core.stop()
+
+
+def test_triton_windows_follows_the_torch_version() -> None:
+    assert torch_envs.triton_windows_requirement("2.9.1+cu128") == "triton-windows>=3.5,<3.6"
+    assert torch_envs.triton_windows_requirement("2.4.1+cu124") == "triton-windows>=3.1,<3.2"
+    assert torch_envs.triton_windows_requirement("2.6.0") == "triton-windows>=3.2,<3.3"
+    assert torch_envs.triton_windows_requirement("2.15.0+cu130") is None  # no series known: not guessed
+    assert torch_envs.triton_windows_requirement(None) is None
+
+
+def test_torch_use_cuda_on_windows_adds_triton() -> None:
+    gpu = Gpu("nvidia", "RTX 3060", (12, 8))
+    plans = [torch_envs.plan(windows_env(), "cuda", gpu, page)]
+    ran: list[list[str]] = []
+
+    def runner(cmd: Sequence[str], timeout: float) -> tuple[int, str]:
+        ran.append(list(cmd))
+        if "-c" in cmd:
+            return 0, json.dumps({"version": "2.9.0+cu128", "cuda": True, "hip": None, "xpu": False, "device": "RTX"})
+        return 0, ""
+
+    (result,) = torch_envs.apply(plans, runner)
+    assert result["ok"] and ran[-1][-1] == "triton-windows>=3.5,<3.6" and "triton-windows" in result["detail"]
+    linux = TorchEnv(["plugin:torch"], "/env/bin/python", "cp312", "linux-x86_64", "0.1.6", {"torch": "2.9.0+cpu"})
+    ran.clear()
+    torch_envs.apply([torch_envs.plan(linux, "cuda", gpu, page)], runner)
+    assert not any("triton-windows" in " ".join(c) for c in ran)  # Linux's CUDA torch brings Triton
+
+
+async def test_the_triton_component_on_windows(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    from bolo import tts_runtimes
+
+    monkeypatch.setattr(tts_runtimes, "platform_key", lambda: "windows-x86_64")
+    core = Bolo(settings)
+    await core.start()
+    try:
+        manager = core.components
+        targets = [{"name": "moshi", "python": r"C:\data\moshi\Scripts\python.exe", "torch": "2.9.1+cu128",
+                    "triton": False}]  # fmt: skip
+        manager.triton_targets = lambda: targets  # type: ignore[method-assign]
+        ran: list[list[str]] = []
+
+        def runner(cmd: Sequence[str], timeout: float) -> tuple[int, str]:
+            if "install" not in cmd:
+                return 1, ""  # nvidia-smi, probes: nothing here
+            ran.append(list(cmd))
+            targets[0]["triton"] = True
+            return 0, ""
+
+        manager.torch_runner = runner
+        (row,) = [c for c in manager.status() if c["id"] == "triton-windows"]
+        assert not row["installed"] and row["installable"] and "speed-up off" in row["envs"][0]["label"]
+        job = manager.start_install("triton-windows", accept_license=False)
+        for _ in range(200):
+            if job.state in ("done", "error"):
+                break
+            await asyncio.sleep(0.02)
+        assert job.state == "done", job.error
+        assert (ran[0][-1] == "triton-windows>=3.5,<3.6" and ran[0][-2] == r"C:\data\moshi\Scripts\python.exe") or (
+            "--python" in ran[0]
+        )
+        (row,) = [c for c in manager.status() if c["id"] == "triton-windows"]
+        assert row["installed"]
+        monkeypatch.setattr(tts_runtimes, "platform_key", lambda: "linux-x86_64")
+        assert not [c for c in manager.status() if c["id"] == "triton-windows"]  # Linux: not listed
     finally:
         await core.stop()

@@ -59,6 +59,8 @@ PLUGIN_PREFIX = "plugin:"
 #: GPU builds of PyTorch for bolo-torch's environments: "torch-cuda" (bolo.torch_envs)
 TORCH_PREFIX = "torch-"
 TORCH_COMPONENTS = tuple(TORCH_PREFIX + t for t in torch_envs.TARGETS)
+#: Triton for torch.compile on Windows, in every environment with a CUDA build of torch (bolo.torch_envs)
+TRITON = "triton-windows"
 #: how long the bolo-torch environments and the GPU, as last looked at, are taken as they are (seconds)
 TORCH_STATUS_TTL_S = 120.0
 #: uccharan's romanised-text packs as components: "uccharan-xlit-hi" (bolo.text.romanised)
@@ -424,6 +426,7 @@ class ComponentManager:
         out.extend(self.runtime_status())
         out.extend(self.duplex_status())
         out.extend(self.torch_status())
+        out.extend(self.triton_status())
         for plugin in self.plugin_ids():
             st = self.core.engines.status(plugin)
             hint = next(
@@ -714,6 +717,10 @@ class ComponentManager:
                         else f" (the {build.id} build; --flavour picks another: {', '.join(info.builds)})"
                     ),
                     "path": state["path"],
+                    # Triton and torch.compile in its PyTorch build (None: no PyTorch build installed)
+                    "torch_compile": duplex_runtime.compile_state(
+                        self.core.settings, component, str(self.core.settings.device or "").lower() != "cpu"
+                    ),
                     "servers": [self.core.settings.duplex_server_url] if self.core.settings.duplex_server_url else [],
                     "release": None,
                     "description": info.description,
@@ -881,6 +888,103 @@ class ComponentManager:
             }
         ]
 
+    def triton_targets(self) -> list[dict[str, Any]]:
+        """The environments with a CUDA build of torch that torch.compile runs in: the PyTorch builds of the
+        full-duplex servers and the bolo-torch environments. ``[{name, python, torch, triton}]``."""
+        out: list[dict[str, Any]] = []
+        s = self.core.settings
+        for server in duplex_runtime.COMPONENTS:
+            python = duplex_runtime.installed_path(s, server, duplex_runtime.PYTORCH)
+            if python is None:
+                continue
+            root = duplex_runtime.install_dir(s, server, duplex_runtime.PYTORCH)
+            torch = duplex_runtime.package_version(root, "torch")
+            if torch_envs.family_of(torch_envs.build_of(torch, "win32")) != "cuda":
+                continue
+            out.append({"name": server, "python": str(python), "torch": torch,
+                        "triton": duplex_runtime.has_package(root, "triton")})  # fmt: skip
+        try:
+            envs, _ = self.torch_state()
+        except Exception:
+            envs = []
+        for env in envs:
+            if torch_envs.family_of(env.build) == "cuda":
+                out.append({"name": ", ".join(env.plugins), "python": env.python, "torch": env.torch,
+                            "triton": bool(env.versions.get("triton-windows") or env.versions.get("triton"))})  # fmt: skip
+        return out
+
+    def triton_status(self) -> list[dict[str, Any]]:
+        """``triton-windows``, on Windows when an environment has a CUDA build of torch."""
+        if not tts_runtimes.platform_key().startswith("windows"):
+            return []
+        targets = self.triton_targets()
+        if not targets:
+            return []
+        blocked = self.torch_blocked_reason()
+        installed = all(t["triton"] for t in targets)
+        lines = "; ".join(
+            f"{t['name']}: torch {t['torch']}, " + ("Triton installed, speed-up on" if t["triton"] else
+                                                     "Triton missing, speed-up off")
+            for t in targets
+        )  # fmt: skip
+        return [
+            {
+                "id": TRITON, "name": "Triton for Windows (torch.compile)", "kind": "pytorch",
+                "installed": installed, "source": "python-package" if installed else None, "version": None,
+                "license": "MIT", "license_url": "https://github.com/woct0rdho/triton-windows/blob/main/LICENSE",
+                "required_by_count": 0, "installable": blocked is None and not installed,
+                "install_blocked_reason": None if installed else blocked,
+                "manual_command": "bolo components install triton-windows", "size_bytes": 150_000_000,
+                "envs": [
+                    {"plugins": [t["name"]], "python": t["python"], "torch": t["torch"], "build": None,
+                     "family": None, "label": "Triton installed, speed-up on" if t["triton"] else
+                     "Triton missing, speed-up off (torch.compile off)"}
+                    for t in targets
+                ],
+                "description": (
+                    "Optional. torch.compile on an NVIDIA GPU needs Triton, which PyTorch for Windows does not bring; "
+                    "without it the full-duplex servers (Moshi, Hibiki, PersonaPlex) and bolo-torch start with "
+                    "compile off. Installs triton-windows matching each environment's torch. The first start after "
+                    "it compiles for a few minutes; on an RTX 3060 laptop it gave no real-time gain over compile off. "
+                    f"Now: {lines}."
+                ),
+            }
+        ]  # fmt: skip
+
+    def install_triton_blocking(self, job: Job | None = None) -> list[str]:
+        """pip install triton-windows, matching each environment's torch, where it is missing. The problems."""
+        problems: list[str] = []
+        todo = [t for t in self.triton_targets() if not t["triton"]]
+        for i, t in enumerate(todo):
+            requirement = torch_envs.triton_windows_requirement(t["torch"])
+            if requirement is None:
+                problems.append(f"{t['name']}: no triton-windows series is known for torch {t['torch']}")
+                continue
+            code, output = self.torch_runner([*torch_envs.pip_install(t["python"]), requirement], 1800.0)
+            if code != 0:
+                problems.append(f"{t['name']}: pip exited with {code}: {' | '.join(output.splitlines()[-3:])}")
+            if job is not None:
+                job.progress = 0.05 + 0.9 * (i + 1) / max(1, len(todo))
+        self._torch_cache = None
+        return problems
+
+    async def _install_triton(self, job: Job) -> None:
+        core = self.core
+        loop = asyncio.get_running_loop()
+        job.state, job.progress = "running", 0.05
+        core.events.publish("job", {"job": job.to_dict()})
+
+        problems = await loop.run_in_executor(None, self.install_triton_blocking, job)
+        self._torch_cache = None
+        if problems:
+            job.state, job.error = "error", "; ".join(problems)
+            core.log("error", f"installing triton-windows failed: {job.error}")
+        else:
+            job.state, job.progress = "done", 1.0
+            core.events.publish("component", {"id": job.model, "event": "installed"})
+            core.log("info", "installed triton-windows; the next start of a PyTorch model compiles (a few minutes)")
+        core.events.publish("job", {"job": job.to_dict()})
+
     def torch_blocked_reason(self) -> str | None:
         s = self.core.settings
         if s.host not in LOOPBACK and not s.api_key:
@@ -941,6 +1045,15 @@ class ComponentManager:
     def start_install(self, component: str, accept_license: bool, flavour: str | None = None) -> Job:
         """Start installing ``component``; ``flavour`` (``cpu``, ``cuda``, ``vulkan``, ``rocm``) picks the build of
         llama-server or audio.cpp, which is otherwise the one ``device`` asks for."""
+        if component == TRITON:
+            blocked = self.torch_blocked_reason()
+            if blocked:
+                raise InvalidRequest(f"cannot install {component}: {blocked}")
+            job = self.core.jobs.create("install", component)
+            task = asyncio.create_task(self._install_triton(job), name=f"bolo-install-{component}")
+            self.core._tasks.append(task)
+            task.add_done_callback(lambda t: self.core._tasks.remove(t) if t in self.core._tasks else None)
+            return job
         if component in TORCH_COMPONENTS:
             blocked = self.torch_blocked_reason()
             if blocked:

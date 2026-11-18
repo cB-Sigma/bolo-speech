@@ -27,6 +27,15 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- **Moshi and Hibiki crashed at start on Windows (no Triton).** Kyutai's PyTorch server compiles its kernels with
+  torch.compile, which needs Triton, and PyTorch for Windows has none: `TritonMissing` at start, 3 out of 3. The
+  full-duplex servers now start with compile off when Triton (or, on the CPU, a C++ compiler) is missing, and a
+  server whose compile still fails is started again without it; the session gets a `bolo.notice` event, and the log,
+  the console's Conversation page and `bolo doctor` say "speed-up off" and why. Moshi q8 with compile off failed with
+  "Expected `weight_scb` to have type float" (moshi's loader casts the q8 scales to bfloat16); bolo's launcher keeps
+  them as stored. On Windows an optional `triton-windows` component installs the Triton release that goes with each
+  environment's torch (also part of `bolo torch use cuda`), and `TORCHINDUCTOR_USE_STATIC_CUDA_LAUNCHER=0` is always
+  set there (inductor's static launcher fails with an OverflowError). Linux and macOS are unchanged.
 - **bolo-torch on a CPU-only torch next to an NVIDIA GPU (PyPI's torch on Windows).** With `device = "cuda"` the
   model was refused ("this torch build sees no CUDA device"), so a Demucs denoiser was skipped and live and file
   denoising returned the audio untouched (`x-bolo-denoise: skipped`); with the model's option `device = "auto"` it

@@ -549,6 +549,21 @@ and asks the Hub for `config.json` at each start; bolo starts the Python servers
 pin the bind address to `127.0.0.1`, answer the Hub from disk and skip the synchronisation on a CPU (`device = "cpu"`,
 far from real time for 7 B models). Only Kyutai's servers are touched this way, never their code.
 
+**torch.compile and Triton.** The PyTorch servers compile their kernels with `torch.compile` at the first start,
+which needs Triton on the GPU (and a C++ compiler on the CPU). Linux's CUDA and ROCm builds of PyTorch bring Triton;
+PyTorch for Windows does not, and Moshi and Hibiki crashed at start there (`TritonMissing`). bolo looks before it
+starts a server: without Triton (or without a compiler on the CPU) it starts it with compile off
+(`NO_TORCH_COMPILE=1`, `TORCHDYNAMO_DISABLE=1`), and a server whose compile still fails at start is started again
+that way. Either way the session gets a `bolo.notice` event ("Moshi speed-up off: Triton is not installed"), the log
+and the console's Conversation page say so, and `bolo doctor` lists each server's Triton and speed-up. With compile
+off, moshi's loader would turn the q8 checkpoints' scales into bfloat16, which its q8 layers refuse ("Expected
+`weight_scb` to have type float"); the launcher keeps them as stored. On Windows `triton-windows` (MIT) can be added:
+`bolo components install triton-windows` (or the console's Components page) installs the release that goes with each
+environment's torch (3.5 for torch 2.9) into the full-duplex servers and the bolo-torch environments, and bolo always
+sets `TORCHINDUCTOR_USE_STATIC_CUDA_LAUNCHER=0` there (inductor's static launcher fails with an `OverflowError` on
+Windows). It is optional: on an RTX 3060 laptop the first start took 32 s including the compile, with no real-time
+gain over compile off, while Hibiki 1B held real time with compile off (4.6 GB of GPU memory).
+
 **How the session maps onto the Realtime API** (`bolo/duplex/bridge.py`):
 
 | Realtime | Full-duplex model |
