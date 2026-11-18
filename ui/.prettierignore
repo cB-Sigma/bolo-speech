@@ -8,3 +8,4 @@ dist-demo
 src/demo/catalog-snapshot.json
 src/vendor
 public/diarization
+src/lib/browser-tts/dizione/fixtures

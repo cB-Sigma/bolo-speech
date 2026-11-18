@@ -9,7 +9,10 @@ the browser" below), the parts of Kyutai's moshi named under "Full-duplex
 speech models", and dizione in server/src/bolo/vendor/dizione: English text to
 phonemes, Copyright Muhammed Nazeem, Apache License 2.0 (its LICENSE is next to
 it), unchanged from https://github.com/n4ze3m/dizione at commit
-8cd889e4de7be6bd1dd2e6891344a0729fa14dd4, used by the tiny-voca voice. It talks to the
+8cd889e4de7be6bd1dd2e6891344a0729fa14dd4, used by the tiny-voca voice, and its
+TypeScript port in ui/src/lib/browser-tts/dizione (a derivative work of that
+copy, same copyright and licence; the browser demo's tiny-voca voice reads its
+tables from server/src/bolo/vendor/dizione/data). It talks to the
 following components, which are installed separately as Python dependencies
 or optional extras and keep their own licences:
 

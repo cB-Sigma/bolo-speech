@@ -9,9 +9,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 ### Added
 
 - **tiny-voca in the browser demo.** The demo's Text to speech page offers tiny-voca's F2 and M2 voices: the
-  authors' ONNX export on ONNX Runtime Web, phonemes from their dizione running unchanged under Pyodide (as their own
-  browser studio does), so the text is read exactly as on the server. Model and phonemiser data come from Hugging
-  Face at the pinned revision; Pyodide and dizione's source from jsDelivr, pinned. Checked in headless Chromium.
+  authors' ONNX export on ONNX Runtime Web, phonemes from a TypeScript port of their dizione (bolo's copy), which
+  gives the Python's tokens exactly on a 306-text corpus held in a unit test, so the text is read as on the server.
+  Model and phonemiser data come from Hugging Face at the pinned revision. Checked in headless Chromium.
 
 - **New llama.cpp voices, and llama-server b12521.** Kokoro-82M (`kokoro-82m-llamacpp`, its American and British
   English voices) and tiny-voca (`tiny-voca-llamacpp`, a 4.5 M-parameter English voice, F2 and M2) on llama.cpp, and

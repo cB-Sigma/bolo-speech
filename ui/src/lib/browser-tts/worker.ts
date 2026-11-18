@@ -13,17 +13,11 @@ import { VOICE_CACHE, type TtsWorkerRequest, type TtsWorkerResponse } from './pr
 import type * as UccharanModule from '@/vendor/uccharan/index.js'
 import { scaleSilence } from './silence'
 import { coquiIds, piperConfigFromJson, piperIds, withLeadIn, type VoiceConfig } from './text'
-import {
-  DIZIONE_BASE,
-  DIZIONE_DATA_FILES,
-  DIZIONE_FILES,
-  finished,
-  limitPeak,
-  PYODIDE_BASE,
-  shorter,
-  TINY_VOCA_BASE,
-  TINY_VOCA_TOKEN_LIMIT,
-} from './tiny-voca'
+import { DIZIONE_DATA_FILES, finished, limitPeak, shorter, TINY_VOCA_BASE, TINY_VOCA_TOKEN_LIMIT } from './tiny-voca'
+import type { AlignTable } from './dizione/align'
+import type { Phonemizer as Dizione } from './dizione/engine'
+import type { G2PSettings } from './dizione/g2p'
+import type { HomographData } from './dizione/homographs'
 
 /**
  * Runs one voice with ONNX Runtime Web (WebAssembly). The VITS graph is called
@@ -34,14 +28,6 @@ import {
 const scope = self as unknown as DedicatedWorkerGlobalScope
 const post = (msg: TtsWorkerResponse, transfer: Transferable[] = []) => scope.postMessage(msg, transfer)
 const stage = (s: LoadStage, loaded?: number, total?: number) => post({ type: 'stage', stage: s, loaded, total })
-
-/** The part of Pyodide's API used here. */
-interface Pyodide {
-  loadPackage(name: string): Promise<void>
-  runPython(code: string): unknown
-  FS: { mkdirTree(path: string): void; writeFile(path: string, data: Uint8Array): void }
-  globals: { get(name: string): unknown }
-}
 
 /** One ONNX Runtime session, or two (front on WebGPU, back on the CPU) behind the same surface. */
 interface Runner {
@@ -78,8 +64,8 @@ let session: Runner | null = null
 let config: VoiceConfig | null = null
 let uccharan: typeof UccharanModule | null = null
 let kokoroStyle: Float32Array | null = null
-/** tiny-voca's phonemiser: text -> phoneme ids and stress (dizione under Pyodide), loaded once per worker. */
-let dizione: ((text: string) => { ids: number[]; stress: number[] } | null) | null = null
+/** tiny-voca's phonemiser (dizione, ported to TypeScript), loaded once per worker. */
+let dizione: Dizione | null = null
 /** The loaded voice's own style, to go back to after a blend. */
 let ownStyle: Float32Array | null = null
 let chain: Promise<void> = Promise.resolve()
@@ -173,48 +159,20 @@ async function load(req: Extract<TtsWorkerRequest, { type: 'load' }>): Promise<v
   if (req.phonemizer === 'dizione' && !dizione) {
     pending.push(
       (async () => {
-        // Pyodide (CPython on WebAssembly) with numpy, dizione's sources and the voice's phonemiser data
-        const pyodideModule = (await import(/* @vite-ignore */ `${PYODIDE_BASE}pyodide.mjs`)) as {
-          loadPyodide: (opts: { indexURL: string }) => Promise<Pyodide>
-        }
-        const [py, sources, data] = await Promise.all([
-          pyodideModule.loadPyodide({ indexURL: PYODIDE_BASE }).then(async (p) => {
-            await p.loadPackage('numpy')
-            return p
-          }),
-          Promise.all(DIZIONE_FILES.map((f) => get(`${DIZIONE_BASE}${f}`, `dizione/${f}`))),
+        // the port of dizione and the voice's phonemiser data
+        const [{ Phonemizer }, g2p, data] = await Promise.all([
+          import('./dizione/engine'),
+          import('./dizione/g2p'),
           Promise.all(DIZIONE_DATA_FILES.map((f) => get(`${TINY_VOCA_BASE}phonemizer/${f}`, `phonemizer/${f}`))),
         ])
-        py.FS.mkdirTree('/dizione/dizione/data')
-        py.FS.mkdirTree('/dizione-data')
-        DIZIONE_FILES.forEach((f, i) =>
-          py.FS.writeFile(`/dizione/dizione/${f}`, new Uint8Array(sources[i]?.data ?? new ArrayBuffer(0))),
-        )
-        DIZIONE_DATA_FILES.forEach((f, i) =>
-          py.FS.writeFile(`/dizione-data/${f}`, new Uint8Array(data[i]?.data ?? new ArrayBuffer(0))),
-        )
-        py.runPython(`
-import sys
-sys.path.insert(0, "/dizione")
-from dizione.engine import Phonemizer
-from dizione.symbols import tokenize
-_dizione = Phonemizer("/dizione-data")
-
-def _phonemize(text):
-    try:
-        p = tokenize(_dizione.pieces(text))
-    except ValueError:
-        return None
-    return [list(p.ids), list(p.stress)]
-`)
-        const fn = py.globals.get('_phonemize') as (text: string) => { toJs(): unknown; destroy(): void } | undefined
-        dizione = (text) => {
-          const r = fn(text)
-          if (!r) return null
-          const [ids, stress] = r.toJs() as [number[], number[]]
-          r.destroy()
-          return { ids, stress }
-        }
+        const file = (name: (typeof DIZIONE_DATA_FILES)[number]) => data[DIZIONE_DATA_FILES.indexOf(name)]!.data
+        const text = (name: (typeof DIZIONE_DATA_FILES)[number]) => new TextDecoder().decode(file(name))
+        dizione = new Phonemizer({
+          lexicon: text('lexicon.tsv'),
+          align: JSON.parse(text('align.json')) as AlignTable,
+          homographs: JSON.parse(text('homographs.json')) as HomographData,
+          g2p: new g2p.G2P(JSON.parse(text('g2p.json')) as G2PSettings, g2p.readNpz(new Uint8Array(file('g2p.npz')))),
+        })
       })(),
     )
   }
@@ -375,7 +333,7 @@ async function runTinyVoca(p: { ids: number[]; stress: number[] }, speed: number
 /** One utterance of tiny-voca, cut after commas, then between words, when it is longer than the model takes. */
 async function speakTinyVoca(text: string, speed: number, spoken: { ids: number }): Promise<Float32Array[]> {
   if (!dizione) throw new Error('The phonemiser is not loaded')
-  const p = dizione(text)
+  const p = dizione.tryPhonemize(text)
   if (!p) return [] // nothing to pronounce: another script, signs only
   if (p.ids.length <= TINY_VOCA_TOKEN_LIMIT) {
     spoken.ids += p.ids.length

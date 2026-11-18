@@ -2919,12 +2919,14 @@ Face, voices and options from llama.cpp's docs/multimodal/tts.md, architectures 
 
 **tiny-voca in process** (`tiny-voca-onnx`): the authors' ONNX export on ONNX Runtime, no server, with their
 phonemiser dizione (Apache-2.0; bolo carries a copy in `bolo/vendor/dizione`, its data comes with the model). One
-sentence per voice came back as non-silent 24 kHz audio, as loud as the llama.cpp conversion's. The authors' browser
-studio phonemises with the Python dizione under Pyodide (there is no JavaScript port); the browser demo does the same:
-its Text to speech page offers tiny-voca F2 and M2, the ONNX export on ONNX Runtime Web and dizione (from its
-repository at the pinned commit) under Pyodide 0.26.4, so the phonemes are the server's exactly. The first use fetches
-the model (21 MB), the phonemiser data (5 MB) and Pyodide with numpy (about 15 MB); in headless Chromium on a 4-core
-CPU a two-clause sentence came back as 3.5 to 3.8 s of non-silent 24 kHz audio in 6 to 10 s, downloads included.
+sentence per voice came back as non-silent 24 kHz audio, as loud as the llama.cpp conversion's. dizione exists only in
+Python (the authors' browser studio runs it under Pyodide); the browser demo has a TypeScript port of bolo's copy
+(`ui/src/lib/browser-tts/dizione`), so its Text to speech page offers tiny-voca F2 and M2: the ONNX export on ONNX
+Runtime Web, phonemes from the port. The port gives the token ids and stress of the Python exactly on a corpus of 306
+texts (numbers, money, dates, times, codes, addresses, homographs, chat spellings, unknown words; the unit test
+`dizione.test.ts`, its fixture written by `ui/scripts/parity/dizione_cases.py`) and on 3,000 lines of bolo's docs. The
+first use fetches the model (21 MB) and the phonemiser data (5 MB); in headless Chromium on a 4-core CPU a two-clause
+sentence came back as 3.5 to 3.8 s of non-silent 24 kHz audio in 2 to 6 s, downloads included.
 
 **What was run**: `pocket-tts-en-llamacpp` on the upstream llama-server b12375
 release, started by bolo (`bolo components install llama-server`), on the
