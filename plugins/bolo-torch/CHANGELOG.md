@@ -4,6 +4,8 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-11-18
+
 ### Fixed
 
 - **GLM-4-Voice in 4-bit (`quantization = "int4"`) loads again.** The `glm-4-voice` extra pins transformers 4.44.1

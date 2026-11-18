@@ -6,6 +6,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-11-18
+
 ### Fixed
 
 - **A long recording is no longer refused with 429 by its own chunks.** A request cut into more chunks than the
