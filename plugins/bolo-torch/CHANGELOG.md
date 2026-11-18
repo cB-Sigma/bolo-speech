@@ -4,6 +4,8 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-11-18
+
 ### Added
 
 - **MaskGCT** (kind `maskgct`, extra `maskgct`, code bundle `maskgct`): Amphion's `MaskGCT_Inference_Pipeline`

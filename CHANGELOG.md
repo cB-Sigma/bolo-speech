@@ -6,6 +6,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-11-18
+
 ### Added
 
 - **Console: the server's newer models, chosen where they are used.** Conversation: a "Listening" panel picks the

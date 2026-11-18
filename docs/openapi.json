@@ -7,7 +7,7 @@
    "name": "Apache-2.0",
    "url": "https://www.apache.org/licenses/LICENSE-2.0"
   },
-  "version": "0.6.6"
+  "version": "0.6.7"
  },
  "paths": {
   "/v1/models": {
