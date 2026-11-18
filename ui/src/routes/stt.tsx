@@ -1008,9 +1008,35 @@ export default function SttPage() {
               />
             )}
           </Panel>
+          <Panel
+            title="This session"
+            description="Measured in this browser, from audio leaving the page to text arriving"
+            actions={
+              isDemo ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void share()}
+                  disabled={!canShare}
+                  data-testid="share"
+                >
+                  <Share2 /> Share this result
+                </Button>
+              ) : undefined
+            }
+          >
+            {mode === 'compare' ? (
+              <div className="grid gap-6 lg:grid-cols-2">
+                <SessionStats state={serverState} targetMs={p.targetMs} title="Server" compact />
+                <SessionStats state={browserState} targetMs={p.targetMs} title="In browser" compact />
+              </div>
+            ) : (
+              <SessionStats state={primary} targetMs={p.targetMs} />
+            )}
+          </Panel>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-4 xl:col-start-2 xl:row-span-2 xl:row-start-1">
+        <div className="flex min-w-0 flex-col gap-4 xl:col-start-2 xl:row-start-1">
           <Panel
             title="Latency timeline"
             description="Last utterance"
@@ -1130,27 +1156,6 @@ export default function SttPage() {
             </Panel>
           )}
         </div>
-        <Panel
-          className="xl:col-start-1 xl:row-start-2 xl:self-start"
-          title="This session"
-          description="Measured in this browser, from audio leaving the page to text arriving"
-          actions={
-            isDemo ? (
-              <Button size="sm" variant="outline" onClick={() => void share()} disabled={!canShare} data-testid="share">
-                <Share2 /> Share this result
-              </Button>
-            ) : undefined
-          }
-        >
-          {mode === 'compare' ? (
-            <div className="grid gap-6 lg:grid-cols-2">
-              <SessionStats state={serverState} targetMs={p.targetMs} title="Server" compact />
-              <SessionStats state={browserState} targetMs={p.targetMs} title="In browser" compact />
-            </div>
-          ) : (
-            <SessionStats state={primary} targetMs={p.targetMs} />
-          )}
-        </Panel>
       </div>
       {!isDemo && mode === 'server' && (
         <SpeakersPanel

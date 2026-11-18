@@ -79,6 +79,21 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - **`bolo doctor` on macOS said "CTranslate2 (CUDA devices: 0)".** CTranslate2 has no GPU backend on macOS, so the
   count said nothing; the runtimes line now reads "CTranslate2 4.9.0 (CPU only on macOS)". Other systems still show
   the CUDA device count.
+- **The MLX build of full-duplex Moshi never counted as installed.** Its check imported `moshi`, the PyTorch package,
+  so `bolo duplex install` on a Mac finished and the model still said it was missing. The MLX build now checks
+  `moshi_mlx` and `sphn`, the packages it installs. On an M4 Pro, Moshi MLX answered six times in a minute, the first
+  reply 3.1 s after speech.
+- **The sherpa-onnx keyword spotters missed a wake word said at the very start of a stream** ("Hey Jarvis" from the
+  first sample: nothing heard; with a tenth of a second of silence ahead of it: found at 1.2 s). Each stream now
+  first hears half a second of silence; reported times still count from the caller's first sample.
+- **The test suite read the developer's Hugging Face login.** A test that a gated model is never pulled without a
+  token failed on a machine where `hf auth login` had run; the tests now run without `HF_TOKEN` and the saved token.
+- **Console: the speech-to-speech model list was empty on a default server.** `s2s_model` defaults to
+  lfm3-audio-2b-llamacpp, which the catalog lists under text to speech, so the Conversation page showed a blank choice
+  and no licence for the model sessions use. The server's model is now listed and its licence shown.
+- **Console layout.** Speech to text left a tall empty gap above "This session" (it waited for the right-hand column);
+  Connect stretched its client snippets to the height of the server column, with wide gaps between them; the two
+  switches under "Longest turn and interruptions" did not line up.
 
 ## [0.6.10] - 2026-11-18
 

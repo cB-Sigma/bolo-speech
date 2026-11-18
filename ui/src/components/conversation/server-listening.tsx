@@ -87,7 +87,7 @@ export function ServerListeningPanel({
           </>
         }
         control={
-          <div className="grid justify-items-end gap-1.5">
+          <div className="grid justify-items-start gap-1.5">
             <ToggleGroup
               type="single"
               variant="outline"
@@ -147,7 +147,7 @@ export function ServerListeningPanel({
           </>
         }
         control={
-          <div className="grid justify-items-end gap-1.5">
+          <div className="grid justify-items-start gap-1.5">
             <ToggleGroup
               type="single"
               variant="outline"

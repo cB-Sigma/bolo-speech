@@ -5,7 +5,7 @@ import { CopyCommand } from '@/components/component-install'
 import { Panel } from '@/components/panel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useModelActions, useModels } from '@/hooks/use-api'
+import { useCatalog, useModelActions, useModels } from '@/hooks/use-api'
 import type { CatalogModel, ServerInfo } from '@/lib/api/types'
 import { autoPull, isCloud, isFullDuplex, licenceTags, remoteCodeCommand } from '@/lib/capabilities'
 import type { PipelineId } from '@/lib/capabilities'
@@ -48,10 +48,16 @@ export function PipelineModelPanel({
   className?: string
 }) {
   const task = pipeline === 'audio-llm' ? 'audio-llm' : 'speech-to-speech'
-  const models = useModels(task).models
+  const ofTask = useModels(task).models
+  const catalog = useCatalog().data?.models
   const actions = useModelActions()
   const entry = info?.capabilities?.realtime?.pipelines?.[pipeline]
   const configured = entry?.model ?? null
+  // the server's model may be listed under another task (s2s_model defaults to LFM3-Audio, a text-to-speech entry):
+  // it is still the one sessions use, so the list shows it rather than an empty choice
+  const extra =
+    configured && !ofTask.some((x) => x.id === configured) ? catalog?.find((x) => x.id === configured) : null
+  const models = extra ? [extra, ...ofTask] : ofTask
   const [chosen, setChosen] = useState<string>('')
   if (pipeline === 'cascade') return null
   const shown = chosen || configured || ''

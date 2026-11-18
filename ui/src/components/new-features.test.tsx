@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { installDescription, needsLicenceAcceptance } from '@/components/component-install'
+import { PipelineModelPanel } from '@/components/conversation/pipeline-model'
 import { PipelinePicker } from '@/components/conversation/pipeline-picker'
 import { SpeakerResult } from '@/components/stt/speaker-result'
 import { SpeakersPanel } from '@/components/stt/speakers-panel'
@@ -160,6 +161,24 @@ describe('PipelinePicker', () => {
     wrap(<PipelinePicker options={options} value="cascade" onChange={() => undefined} locked />)
     expect(screen.getAllByRole('radio').every((r) => (r as HTMLInputElement).disabled)).toBe(true)
     expect(screen.getByText(/Locked for this conversation/)).toBeInTheDocument()
+  })
+})
+
+describe('PipelineModelPanel', () => {
+  it('shows the server’s speech-to-speech model when the catalog lists it under another task', async () => {
+    // s2s_model defaults to LFM3-Audio, a text-to-speech entry: the choice was blank and its licence went unshown
+    vi.spyOn(api, 'catalog').mockResolvedValue({
+      models: [
+        model({ id: 'lfm3-audio-2b-llamacpp', task: 'tts', license: 'LFM Open License v1.0' }),
+        model({ id: 'moshiko-mlx-q4', task: 'speech-to-speech' }),
+      ],
+    } as never)
+    const info = {
+      capabilities: { realtime: { pipelines: { 'speech-to-speech': { model: 'lfm3-audio-2b-llamacpp' } } } },
+    }
+    wrap(<PipelineModelPanel pipeline="speech-to-speech" info={info as never} />)
+    await waitFor(() => expect(screen.getByTestId('pipeline-model-about')).toHaveTextContent('LFM Open License v1.0'))
+    expect(screen.getByTestId('pipeline-model-running')).toBeInTheDocument()
   })
 })
 
