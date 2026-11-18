@@ -1,5 +1,6 @@
 import { apiUrl, authHeaders, getTransport } from './config'
 import { parseTranscription, transcriptionForm, type DiarizedResult, type TranscribeOptions } from '@/lib/diarize'
+import type { DialogueBody } from '@/lib/dialogue'
 import type {
   ApiKeyCreate,
   ApiKeyInfo,
@@ -473,6 +474,11 @@ export const api = {
   /** One-shot synthesis through the OpenAI-compatible route. */
   async speech(body: SpeechBody, signal?: AbortSignal): Promise<Response> {
     return request('v1/audio/speech', { method: 'POST', json: body, signal })
+  },
+
+  /** A multi-speaker dialogue as one recording (`POST /v1/audio/dialogue`). */
+  async dialogue(body: DialogueBody, signal?: AbortSignal): Promise<Response> {
+    return request('v1/audio/dialogue', { method: 'POST', json: body, signal })
   },
 
   /** One-shot transcription through the OpenAI-compatible route. */

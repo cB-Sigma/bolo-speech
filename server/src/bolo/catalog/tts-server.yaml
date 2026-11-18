@@ -1349,8 +1349,9 @@
   license_url: https://huggingface.co/microsoft/VibeVoice-1.5B
   commercial_use: true
   gated: false
-  features: []
-  description: 'VibeVoice 1.5B on audio.cpp (vibevoice, supported there). Languages: en, zh. | 2026-09-21 Runs in an audiocpp_server
+  features: [dialogue]
+  description: 'VibeVoice 1.5B on audio.cpp (vibevoice, supported there). Languages: en, zh. Speaks a dialogue of up to
+    four speakers in one take (POST /v1/audio/dialogue), each imitated from a recording (a saved voice or a reference clip). | 2026-09-21 Runs in an audiocpp_server
     that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU recommended, about 4.7
     GB. audio.cpp also streams this family (stream: true in the catalog options, served with mode streaming).'
   source_url: https://huggingface.co/microsoft/VibeVoice-1.5B
@@ -1364,6 +1365,8 @@
   options:
     runtime: audio.cpp
     family: vibevoice
+    dialogue: vibevoice
+    dialogue_speakers: 4
     server_model: vibevoice-1.5b-audiocpp
     cloning: false
     send_language: true

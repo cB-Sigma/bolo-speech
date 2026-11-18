@@ -2943,6 +2943,46 @@
     }
    }
   },
+  "/v1/audio/dialogue": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Speak a multi-speaker dialogue",
+    "description": "Extension. A dialogue (turns of speaker and text, a voice per speaker) as one recording.\n\nModels that speak a whole script themselves (`features` contains `dialogue`: VibeVoice on audio.cpp) do it\nin one take, with a recording of each voice (a saved voice or a reference clip); any other model speaks each\nturn on its own and the turns are joined. Headers: `x-bolo-dialogue` (`native` or `stitched`),\n`x-bolo-speakers` (the speakers in order), `x-bolo-model`, `x-bolo-segments` (stitched: JSON\n`[{turn, speaker, start, end}]`, in seconds).",
+    "operationId": "create_dialogue_v1_audio_dialogue_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DialogueRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/keys": {
    "get": {
     "tags": [
@@ -3944,6 +3984,167 @@
      "destination"
     ],
     "title": "CopyRequest"
+   },
+   "DialogueRequest": {
+    "properties": {
+     "model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model",
+      "description": "Any text-to-speech model; default `default_tts`."
+     },
+     "turns": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/DialogueTurn"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Turns",
+      "description": "The dialogue, turn by turn."
+     },
+     "script": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Script",
+      "description": "Instead of `turns`: one `Name: text` line per turn (a line without a name continues the turn)."
+     },
+     "voices": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Voices",
+      "description": "Speaker name -> voice: a voice of the model, a saved voice, a blend (stitched), or one of the reference clips `en-short`, `en-long`, `hi-short` (one take). A speaker without one gets the model's default voice (stitched) or a reference clip (one take)."
+     },
+     "mode": {
+      "type": "string",
+      "title": "Mode",
+      "description": "`auto`: in one take when the model speaks dialogues itself (`features` has `dialogue`) and every voice has a recording, stitched otherwise; `native`: in one take or an error; `stitched`: each turn on its own, joined with `pause_ms` between them.",
+      "default": "auto"
+     },
+     "pause_ms": {
+      "type": "integer",
+      "title": "Pause Ms",
+      "description": "Silence between turns of a stitched dialogue (0 to 5000).",
+      "default": 300
+     },
+     "language": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Language"
+     },
+     "speed": {
+      "type": "number",
+      "title": "Speed",
+      "default": 1.0
+     },
+     "instructions": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 4096
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Instructions",
+      "description": "Direction for the whole dialogue, for models that follow it."
+     },
+     "response_format": {
+      "type": "string",
+      "title": "Response Format",
+      "default": "wav"
+     },
+     "sample_rate": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sample Rate"
+     },
+     "keep_alive": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "integer"
+       },
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Keep Alive"
+     }
+    },
+    "type": "object",
+    "title": "DialogueRequest"
+   },
+   "DialogueTurn": {
+    "properties": {
+     "speaker": {
+      "type": "string",
+      "maxLength": 40,
+      "title": "Speaker",
+      "description": "Who speaks this turn (any name; the same name, the same voice)."
+     },
+     "text": {
+      "type": "string",
+      "title": "Text",
+      "description": "What they say."
+     },
+     "instructions": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 4096
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Instructions",
+      "description": "Direction for this turn only (stitched dialogues)."
+     }
+    },
+    "type": "object",
+    "required": [
+     "speaker",
+     "text"
+    ],
+    "title": "DialogueTurn"
    },
    "HTTPValidationError": {
     "properties": {

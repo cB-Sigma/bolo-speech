@@ -36,6 +36,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Multi-speaker dialogues: `POST /v1/audio/dialogue`.** Turns of speaker and text (or a `Name: text` script),
+  a voice per speaker, spoken as one recording. VibeVoice 1.5B on audio.cpp speaks the whole script in one take,
+  imitating each speaker from a saved voice or a reference clip (not yet run here with the real weights); every
+  other model speaks turn by turn and the turns are joined with a pause, with each turn's start and end in
+  `x-bolo-segments`. `bolo dialogue script.txt --voice Asha=af_heart ...` and a Dialogue page in the console do
+  the same. Run on CPU with Kokoro (two voices, stitched).
+
 - **Speech `instructions`: style, emotion and voice direction in words.** `instructions` on `POST /v1/audio/speech`
   (and the TTS WebSocket, `bolo speak --instructions`, an Instructions box on the console's Text to speech page) is
   no longer ignored: it reaches every catalog model that follows it, listed with the `instructions` feature. audio.cpp

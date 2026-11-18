@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import io
+import json
 import os
 import tarfile
 import time
@@ -928,5 +929,72 @@ def test_instructions_through_the_speech_api(settings: Settings, audiocpp: FakeT
         assert "instruct" not in (audiocpp.requests[-1]["body"].get("options") or {})
         r = httpx.post(f"{srv.url}/v1/audio/speech", json={"model": "plain", "input": "Hi.", "response_format": "wav"})
         assert "x-bolo-instructions" not in r.headers
+    finally:
+        srv.stop()
+
+
+def test_dialogue_in_one_take_and_stitched(settings: Settings, audiocpp: FakeTTSServer) -> None:
+    """A model with ``dialogue: vibevoice`` gets the whole script as ``Speaker N:`` lines and a recording per speaker
+    (files the server reads); any other model speaks turn by turn, joined with pauses. ``mode`` forces either."""
+    settings.tts_servers = [f"vv={audiocpp.url}", f"plain={audiocpp.url}"]
+    srv = LiveServer(settings)
+    vv = entry("vv", "audio.cpp", server_model="ac-model", dialogue="vibevoice", cloning=False)
+    vv["features"] = ["dialogue"]
+    srv.core.catalog.add(ModelSpec.from_dict(vv))
+    srv.core.catalog.add(ModelSpec.from_dict(entry("plain", "audio.cpp", server_model="ac-model")))
+    srv.start()
+    turns = [
+        {"speaker": "Asha", "text": "Hello there."},
+        {"speaker": "Ravi", "text": "Hi."},
+        {"speaker": "Asha", "text": "Shall we start?"},
+    ]
+    try:
+        r = httpx.post(
+            f"{srv.url}/v1/audio/dialogue",
+            json={"model": "vv", "turns": turns, "voices": {"Ravi": "en-long"}},
+            timeout=60,
+        )
+        assert r.status_code == 200, r.text
+        assert r.headers["x-bolo-dialogue"] == "native" and r.headers["x-bolo-speakers"] == "Asha, Ravi"
+        sent = audiocpp.requests[-1]
+        assert sent["body"]["input"] == "Speaker 1: Hello there.\nSpeaker 2: Hi.\nSpeaker 1: Shall we start?"
+        assert len(sent["voice_samples"]) == 2 and all(n > 1000 for n in sent["voice_samples"])
+        assert "voice_ref" not in sent["body"]
+        audio, rate = sf.read(io.BytesIO(r.content))
+        assert rate == 24000 and len(audio) > 0
+
+        # a voice with no recording: auto stitches, native refuses
+        body = {"model": "vv", "turns": turns, "voices": {"Ravi": "default"}}
+        r = httpx.post(f"{srv.url}/v1/audio/dialogue", json=body, timeout=60)
+        assert r.status_code == 200 and r.headers["x-bolo-dialogue"] == "stitched"
+        r = httpx.post(f"{srv.url}/v1/audio/dialogue", json={**body, "mode": "native"}, timeout=60)
+        assert r.status_code == 400 and "recording of every voice" in r.json()["error"]["message"]
+
+        # stitched: one request per turn, the pause between them, segments in the header
+        n = len(audiocpp.requests)
+        script = "Asha: Hello there.\nRavi: Hi.\nAsha: Shall we start?"
+        r = httpx.post(
+            f"{srv.url}/v1/audio/dialogue",
+            json={"model": "plain", "script": script, "voices": {"Asha": "heart"}, "pause_ms": 500},
+            timeout=60,
+        )
+        assert r.status_code == 200, r.text
+        assert r.headers["x-bolo-dialogue"] == "stitched"
+        assert [q["body"]["input"] for q in audiocpp.requests[n:]] == ["Hello there.", "Hi.", "Shall we start?"]
+        assert "voice_ref" in audiocpp.requests[n]["body"] and "voice_ref" not in audiocpp.requests[n + 1]["body"]
+        segments = json.loads(r.headers["x-bolo-segments"])
+        assert [s["speaker"] for s in segments] == ["Asha", "Ravi", "Asha"]
+        assert segments[1]["start"] == pytest.approx(segments[0]["end"] + 0.5, abs=0.01)
+        audio, rate = sf.read(io.BytesIO(r.content))
+        assert len(audio) / rate == pytest.approx(segments[-1]["end"], abs=0.01)
+
+        r = httpx.post(f"{srv.url}/v1/audio/dialogue", json={"model": "plain", "turns": turns, "mode": "native"})
+        assert r.status_code == 400 and "does not speak dialogues in one take" in r.json()["error"]["message"]
+        r = httpx.post(f"{srv.url}/v1/audio/dialogue", json={"model": "plain", "turns": [], "script": ""})
+        assert r.status_code == 400
+        r = httpx.post(
+            f"{srv.url}/v1/audio/dialogue", json={"model": "plain", "turns": turns, "voices": {"Nobody": "heart"}}
+        )
+        assert r.status_code == 400 and "Nobody" in r.json()["error"]["message"]
     finally:
         srv.stop()

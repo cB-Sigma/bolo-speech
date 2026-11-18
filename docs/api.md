@@ -107,6 +107,7 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `POST` | `/v1/audio-isolation/stream` | Voice isolation, streamed (ElevenLabs' route) |
 | `POST` | `/v1/audio/tags` | Sound events and audio tags (music, speech, ...) |
 | `POST` | `/v1/audio/emotion` | Speech emotion |
+| `POST` | `/v1/audio/dialogue` | Speak a multi-speaker dialogue as one recording |
 | `GET` | `/api/v1/keys` | API keys and their usage (the keys themselves are never returned) |
 | `POST` | `/api/v1/keys` | Create an API key (its value is returned once) |
 | `GET` | `/api/v1/keys/{key_id}` | One API key and its usage |
@@ -729,6 +730,44 @@ SSML subset (`input_format: "ssml"`; the `<speak>` wrapper is optional): `<sub a
 `currency`; `<break>`, `<p>`, `<s>`, `<lang>`, and `<emphasis>` / `<prosody>` (text kept, styling
 ignored). Malformed SSML → `400` with the line and column; another element → `400`; DOCTYPE
 and entity declarations are refused.
+
+### Dialogues: `POST /v1/audio/dialogue`
+
+Extension. Several speakers, a voice each, spoken as one recording (a podcast, an interview, a scene). JSON body:
+
+| Field | | |
+| --- | --- | --- |
+| `turns` | required (or `script`) | `[{"speaker": "Asha", "text": "…", "instructions"?: "…"}]`, in order; the same name means the same voice. At most 200 turns and 20000 characters |
+| `script` | - | instead of `turns`: one `Name: text` line per turn; a line without a name continues the turn before |
+| `model` | `default_tts` | any text-to-speech model |
+| `voices` | - | speaker name -> voice: a voice of the model, a saved voice or a blend (stitched), a saved voice or a reference clip `en-short`, `en-long`, `hi-short` (in one take). A speaker without one gets the model's default voice (stitched) or a reference clip (in one take, alternating the English ones) |
+| `mode` | `auto` | `auto`: in one take when the model can and every voice has a recording, stitched otherwise; `native`: in one take or `400`; `stitched`: turn by turn |
+| `pause_ms` | `300` | silence between the turns of a stitched dialogue, 0 to 5000 |
+| `instructions` | - | direction for the whole dialogue (a turn's own `instructions` win for that turn), for models that follow it |
+| `language`, `speed` | - | as for `/v1/audio/speech` (`speed` in stitched dialogues) |
+| `response_format`, `sample_rate` | `wav`, model's | as for `/v1/audio/speech` |
+
+**In one take**: a model whose `features` contain `dialogue` speaks the whole script itself, turn-taking and all.
+Today that is VibeVoice 1.5B on audio.cpp (up to four speakers, each imitated from a recording). audio.cpp reads
+those recordings from files, so this works with an audio.cpp server bolo manages or one on a loopback address;
+otherwise the dialogue is stitched. bolo's side is tested against a stand-in for audio.cpp; a run with the real
+VibeVoice weights has not been made here yet. **Stitched**: any other model (and Fish Audio Drama 3, Higgs TTS 3 or
+any voice without a recording) speaks each turn on its own in its speaker's voice, and the turns are joined with
+`pause_ms` of silence, resampled to the first turn's rate.
+
+Headers: `x-bolo-dialogue` (`native` or `stitched`), `x-bolo-speakers` (the speakers in order of appearance),
+`x-bolo-model`, `x-bolo-segments` (stitched: JSON `[{"turn", "speaker", "start", "end"}]` in seconds),
+`x-bolo-instructions`. Each stitched turn is also a speech trace of its own. From the command line:
+`bolo dialogue script.txt -m kokoro-v1.0-int8 --voice Asha=af_heart --voice Ravi=am_michael -o talk.wav`; in the
+console, the Dialogue page.
+
+```bash
+curl -s localhost:8000/v1/audio/dialogue -H 'content-type: application/json' -o talk.wav -d '{
+  "model": "kokoro-v1.0-int8",
+  "script": "Asha: Welcome back to the show.\nRavi: Thanks for having me.",
+  "voices": {"Asha": "af_heart", "Ravi": "am_michael"}
+}'
+```
 
 ### `GET /v1/models`, `GET /v1/models/{id}`
 

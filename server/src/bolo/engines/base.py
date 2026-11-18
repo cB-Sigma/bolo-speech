@@ -278,6 +278,10 @@ class TTSModel(Model):
     supports_instructions: bool = False
     #: True when ``voice`` may be a blend of the model's voices, ``af_bella(0.7)+af_sky(0.3)`` (bolo.engines.blend)
     supports_blending: bool = False
+    #: True when :meth:`synthesize_dialogue` speaks a whole multi-speaker script in one take (bolo.dialogue)
+    supports_dialogue: bool = False
+    #: the most speakers :meth:`synthesize_dialogue` takes
+    max_dialogue_speakers: int = 0
 
     @abc.abstractmethod
     def synthesize(
@@ -288,6 +292,17 @@ class TTSModel(Model):
         cancelled: Callable[[], bool] | None = None,
     ) -> Iterator[FloatArray]:
         """Yield float32 audio at ``sample_rate`` for one chunk of text."""
+
+    def synthesize_dialogue(
+        self,
+        turns: list[tuple[int, str]],
+        references: list[tuple[bytes, str]],
+        cancelled: Callable[[], bool] | None = None,
+        extras: SynthesisExtras | None = None,
+    ) -> Iterator[FloatArray]:
+        """Speak a dialogue in one take: ``turns`` are (speaker index, text), ``references`` one recording (mono
+        PCM16 WAV) and its transcript per speaker, in speaker order. Only for ``supports_dialogue`` models."""
+        raise NotImplementedError(f"{type(self).__name__} does not speak dialogues natively")
 
     def warm_up(self) -> None:
         """Run once after loading so that the first request does not pay for lazy initialisation."""

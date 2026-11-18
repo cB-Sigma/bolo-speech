@@ -112,6 +112,9 @@ class FakeTTSServer:
                     return
                 body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
                 outer.requests.append({"path": self.path, "body": body})
+                samples = (body.get("options") or {}).get("voice_samples")
+                if samples:  # VibeVoice's per-speaker references: files on this machine, read while the request runs
+                    outer.requests[-1]["voice_samples"] = [len(Path(p).read_bytes()) for p in str(samples).split(",")]
                 text = str(body.get("input", ""))
                 if text == "crash now":
                     if outer.exit_on_crash:

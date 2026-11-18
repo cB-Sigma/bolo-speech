@@ -981,6 +981,46 @@ def cmd_speak(args: argparse.Namespace) -> int:
     return asyncio.run(run())
 
 
+def cmd_dialogue(args: argparse.Namespace) -> int:
+    from bolo.audio.encode import encode_audio
+    from bolo.dialogue import parse_script, speak_dialogue
+    from bolo.obs.trace import Trace
+
+    core = _core(args)
+    script = sys.stdin.read() if args.script == "-" else Path(args.script).read_text(encoding="utf-8")
+    voices: dict[str, str] = {}
+    for item in args.voice or []:
+        name, sep, voice = item.partition("=")
+        if not sep or not name.strip() or not voice.strip():
+            print(f"error: --voice takes NAME=VOICE, not {item!r}", file=sys.stderr)
+            return 2
+        voices[name.strip()] = voice.strip()
+    out = Path(args.output)
+    fmt = args.format or (out.suffix.lstrip(".").lower() or "wav")
+
+    async def run() -> int:
+        await core.start()
+        try:
+            trace = Trace("tts", "cli", "")
+            result = await speak_dialogue(
+                core, parse_script(script), voices, model=args.model, mode=args.mode, pause_ms=args.pause_ms,
+                instructions=args.instructions, trace=trace,
+            )  # fmt: skip
+            trace.audio_seconds = len(result.samples) / result.sample_rate
+            core.complete_tts(trace)
+            out.write_bytes(encode_audio(result.samples, result.sample_rate, fmt, args.sample_rate))
+            how = "in one take" if result.mode == "native" else "turn by turn"
+            print(
+                f"wrote {out} ({trace.audio_seconds:.1f}s, {fmt}); {result.model}, {how}, "
+                f"speakers: {', '.join(result.speakers)}"
+            )
+            return 0
+        finally:
+            await core.stop()
+
+    return asyncio.run(run())
+
+
 def cmd_bench(args: argparse.Namespace) -> int:
     from bolo.bench import run_bench
 
@@ -2213,6 +2253,29 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--sample-rate", dest="sample_rate", type=int)
     s.add_argument("--verbose", "-v", action="store_true")
     s.set_defaults(func=cmd_speak)
+
+    s = sub.add_parser("dialogue", help="speak a multi-speaker dialogue to a file")
+    _common(s)
+    s.add_argument("script", help="a file of 'Name: text' lines, or - to read standard input")
+    s.add_argument("--output", "-o", required=True)
+    s.add_argument("--model", "-m")
+    s.add_argument(
+        "--voice",
+        action="append",
+        metavar="NAME=VOICE",
+        help="a speaker's voice (a voice of the model, a saved voice, or a reference clip); repeat per speaker",
+    )
+    s.add_argument(
+        "--mode",
+        choices=["auto", "native", "stitched"],
+        default="auto",
+        help="native: the model speaks it in one take; stitched: turn by turn (default: native when it can)",
+    )
+    s.add_argument("--pause-ms", dest="pause_ms", type=int, default=300, help="silence between stitched turns")
+    s.add_argument("--instructions", help="direction for the delivery, for models that follow it")
+    s.add_argument("--format", "-f", help="default: from the output file extension")
+    s.add_argument("--sample-rate", dest="sample_rate", type=int)
+    s.set_defaults(func=cmd_dialogue)
 
     s = sub.add_parser("bench", help="concurrency sweep against a model (in process)")
     _common(s)

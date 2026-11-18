@@ -12,6 +12,7 @@ import {
   Mic,
   Phone,
   Plug,
+  Podcast,
   Puzzle,
   ScanSearch,
   Users,
@@ -159,6 +160,15 @@ export const NAV: NavItem[] = [
     icon: Phone,
     group: 'Server',
     when: (f) => Boolean(f.telephony),
+  },
+  {
+    to: '/dialogue',
+    label: 'Dialogue',
+    short: 'Dialogue',
+    description: 'Several speakers, a voice each, spoken as one recording',
+    icon: Podcast,
+    group: 'Playground',
+    when: () => !isDemo,
   },
   {
     to: '/keys',

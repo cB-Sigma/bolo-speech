@@ -38,6 +38,11 @@ with ``reference: <bolo sample id>``: bolo's synthetic reference clips, sent as 
 ``instructions`` (audio.cpp): the model option a request's ``instructions`` go to (``instruct`` for most families),
 or ``{option, with}`` where ``with`` are further options sent alongside (IndexTTS-2: ``emotion_text`` with
 ``use_emotion_text: true``); ``default_instructions`` is sent when a request has none (Maya1 needs one).
+
+``dialogue`` (audio.cpp): how the family speaks a multi-speaker script in one take (:mod:`bolo.dialogue`).
+``vibevoice``: ``Speaker 1: …`` lines and one reference recording per speaker, which audio.cpp reads from files
+(``voice_samples``), so only a server on this machine (managed by bolo, or on a loopback address) takes it;
+``dialogue_speakers`` caps the speakers (4).
 """
 
 from __future__ import annotations
@@ -379,6 +384,8 @@ class ServerTTS(TTSModel):
         self._instruction_option = str(wanted.get("option") if isinstance(wanted, dict) else wanted or "")
         self._instruction_with = dict(wanted.get("with") or {}) if isinstance(wanted, dict) else {}
         self.supports_instructions = bool(self._instruction_option)
+        self.dialogue_format = str(spec.get("dialogue") or "") if runtime == AUDIOCPP else ""
+        self.max_dialogue_speakers = int(spec.get("dialogue_speakers") or 4) if self.dialogue_format else 0
         self.stream = bool(spec.get("stream", runtime == LLAMA)) and runtime != TONTAUBE
         if runtime == TONTAUBE:
             self.request_options = ("style", *TONTAUBE_SLIDERS, "temperature", "seed")
@@ -408,6 +415,15 @@ class ServerTTS(TTSModel):
     def base_url(self) -> str:
         return self.process.base_url if self.process is not None else self._base_url
 
+    @property
+    def supports_dialogue(self) -> bool:  # type: ignore[override]
+        """The family speaks dialogues natively and the server can read files bolo writes (same machine)."""
+        if self.dialogue_format != "vibevoice":
+            return False
+        host = httpx.URL(self.base_url).host if self.base_url else ""
+        return self.process is not None or host in ("127.0.0.1", "localhost", "::1")
+
+    # -- setup ----------------------------------------------------------------------------------------------
     # -- setup ----------------------------------------------------------------------------------------------
     def connect(self) -> None:
         """Check that the server answers and pick up the voices it knows (called once after loading)."""
@@ -613,6 +629,44 @@ class ServerTTS(TTSModel):
             yield from self._predict(body)
             return
         yield from self._post_speech(body, cancelled)
+
+    def synthesize_dialogue(
+        self,
+        turns: list[tuple[int, str]],
+        references: list[tuple[bytes, str]],
+        cancelled: Callable[[], bool] | None = None,
+        extras: SynthesisExtras | None = None,
+    ) -> Iterator[FloatArray]:
+        """VibeVoice: the script as ``Speaker N:`` lines, the references as files the server reads."""
+        if not self.supports_dialogue:
+            raise InvalidRequest(f"model '{self.name}' does not speak dialogues in one take here", param="model")
+        if not 1 <= len(references) <= self.max_dialogue_speakers:
+            raise InvalidRequest(
+                f"model '{self.name}' takes 1 to {self.max_dialogue_speakers} speakers in one take", param="turns"
+            )
+        script = "\n".join(f"Speaker {k + 1}: {' '.join(text.split())}" for k, text in turns)
+        extras = SynthesisExtras(
+            language=extras.language if extras else None,
+            options=dict(extras.options) if extras else {},
+            instructions=extras.instructions if extras else None,
+        )
+        body = self.build_request(script, None, 1.0, extras)
+        import shutil
+        import tempfile
+
+        folder = Path(tempfile.mkdtemp(prefix="bolo-dialogue-"))
+        try:
+            paths = []
+            for k, (audio, _text) in enumerate(references):
+                path = folder / f"speaker-{k + 1}.wav"
+                path.write_bytes(audio)
+                paths.append(str(path))
+            body.setdefault("options", {})["voice_samples"] = ",".join(paths)
+            if self.process is not None:
+                self.process.ensure_started()
+            yield from self._post_speech(body, cancelled)
+        finally:
+            shutil.rmtree(folder, ignore_errors=True)
 
     def _post_speech(self, body: dict[str, Any], cancelled: Callable[[], bool] | None) -> Iterator[FloatArray]:
         path = "/tts" if self.runtime == LLAMA else "/v1/audio/speech"
