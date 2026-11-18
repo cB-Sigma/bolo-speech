@@ -520,8 +520,13 @@ environment).
 * For CUDA install the default torch wheel (`pip install torch`) or the one for your CUDA version from
   https://pytorch.org/get-started/locally/, then the plugin.
 * With bolo 0.5 or later, when its scheduler finds less free GPU memory than a model needs, the load carries a `placement`
-  (`device_map="auto"` and a `max_memory`): the Orpheus SNAC loader lets accelerate put as many layers on the GPU as
-  fit and the rest on the CPU, and reports the split back for `bolo ps`. Other loaders load whole on `device`.
+  (`device_map="auto"` and a `max_memory`): the Orpheus SNAC, Qwen-Omni, Step-Audio 2, GLM-4-Voice and MiniCPM-o
+  loaders let accelerate put as many layers on the GPU as fit and the rest on the CPU, and report the split back for
+  `bolo ps`. Other loaders load whole on `device`. A model class that does not name the layers to keep whole
+  (`_no_split_modules`; remote code often does not, and transformers 4 then refuses `device_map="auto"`) is built
+  without weights first, its repeated layers (the elements of its largest `nn.ModuleList`) are kept whole, and an
+  explicit device map is passed instead; a model with no repeated layers is refused before loading with the memory
+  it needs on one device.
 * **No GPU was used in testing.** The GPU, MPS and half-precision paths are untested; the placement protocol is
   tested on CPU torch and with fakes.
 * **Windows**: CI runs the fast tests on `windows-latest` with CPU torch. With bolo 0.6 the worker runs in a Job

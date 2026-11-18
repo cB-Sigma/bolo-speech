@@ -8,6 +8,14 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- **bolo-torch: Step-Audio 2 mini could not load on a GPU under 24 GB.** When bolo split it between the GPU and the CPU, transformers
+  refused: "StepAudio2ForCausalLM does not support `device_map='auto'`" (its remote code declares no
+  `_no_split_modules`). When a model class names no layers to keep whole, the plugin now builds the model without
+  weights (accelerate's `init_empty_weights`), takes its repeated layers (the elements of its largest
+  `nn.ModuleList`) as the layers to keep on one device, and passes accelerate's device map for bolo's `max_memory`
+  to `from_pretrained`. A model with no repeated layers is refused before loading, saying how many GB it needs on one
+  device. Applies to every loader that splits (Step-Audio 2, Qwen-Omni, GLM-4-Voice, MiniCPM-o, Orpheus SNAC);
+  under transformers 5, which splits such a class anywhere, also inside a layer, the layers are now kept whole too.
 - **Two pulls of the same model at once failed on Windows.** `bolo pull X` while the server was pulling X on
   first use failed on both sides with WinError 32 (file in use): both wrote the same partial download and renamed
   it into place. A model is now pulled by one process at a time (a lock file in `<data_dir>/locks/`, held with the

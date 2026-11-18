@@ -198,7 +198,10 @@ def load(ctx: LoadContext) -> MiniCPMoS2S:
         if not (path / rel).is_file():  # init_tts would download it from the Hub (unpinned) instead
             raise InvalidRequest(f"{path / rel} is missing: pull the model again")
     transformers = require("transformers", "minicpm-o")
-    split = split_kwargs(ctx)
+    split = split_kwargs(
+        ctx, transformers.AutoModel, path, trust_remote_code=trust, init_vision=bool(ctx.option("init_vision", True)),
+        init_audio=True, init_tts=True,
+    )  # fmt: skip
     model = transformers.AutoModel.from_pretrained(
         str(path), trust_remote_code=trust, attn_implementation=str(ctx.option("attn_implementation", "sdpa")),
         torch_dtype=ctx.dtype, init_vision=bool(ctx.option("init_vision", True)), init_audio=True, init_tts=True,

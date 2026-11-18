@@ -230,7 +230,8 @@ def load(ctx: LoadContext) -> OrpheusSNAC:
     if params is None:
         raise InvalidRequest(f"unknown prompt_format {fmt!r} (veena or svara)")
     tokenizer = transformers.AutoTokenizer.from_pretrained(str(root))
-    split = split_kwargs(ctx)  # bolo found too little GPU memory for all of it: layers on the GPU while they fit
+    # bolo found too little GPU memory for all of it: layers on the GPU while they fit
+    split = split_kwargs(ctx, transformers.AutoModelForCausalLM, root)
     model = transformers.AutoModelForCausalLM.from_pretrained(str(root), torch_dtype=ctx.dtype, **split)
     model = (model if split else model.to(ctx.device)).eval()
     report = device_map_report(model)

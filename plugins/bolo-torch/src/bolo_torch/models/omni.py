@@ -188,7 +188,7 @@ def load(ctx: LoadContext) -> OmniS2S:
             f'{name} needs transformers {family.transformers} or later: pip install "bolo-torch[omni]"'
         )
     path = model_dir(ctx.path, ctx.options)
-    split = split_kwargs(ctx)
+    split = split_kwargs(ctx, model_cls, path)
     model = model_cls.from_pretrained(str(path), torch_dtype=ctx.dtype, **split)
     if not split:
         model = model.to(ctx.device)

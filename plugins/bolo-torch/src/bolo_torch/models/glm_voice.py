@@ -255,7 +255,7 @@ def load(ctx: LoadContext) -> GlmVoiceS2S:
             kwargs["device_map"] = {"": 0 if ctx.device == "cuda" else ctx.device}
     elif quantization:
         raise InvalidRequest(f"unknown quantization {quantization!r} (int4, or none)")
-    split = {} if "device_map" in kwargs else split_kwargs(ctx)
+    split = {} if "device_map" in kwargs else split_kwargs(ctx, transformers.AutoModel, path, trust_remote_code=trust)
     glm = transformers.AutoModel.from_pretrained(str(path), **kwargs, **split)
     if "device_map" not in kwargs and not split:
         glm = glm.to(ctx.device)

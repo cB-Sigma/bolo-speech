@@ -274,7 +274,8 @@ def load(ctx: LoadContext) -> StepAudio2S2S:
     code = upstream.ensure("step-audio-2")
     utils = _module("bolo_torch_step_audio2_utils", code / "utils.py")
     tokenizer = transformers.AutoTokenizer.from_pretrained(str(path), trust_remote_code=trust, padding_side="right")
-    split = split_kwargs(ctx)
+    # its remote code declares no _no_split_modules: split_kwargs finds the layers to keep whole
+    split = split_kwargs(ctx, transformers.AutoModelForCausalLM, path, trust_remote_code=trust)
     llm = transformers.AutoModelForCausalLM.from_pretrained(
         str(path), trust_remote_code=trust, torch_dtype=ctx.dtype, **split
     )

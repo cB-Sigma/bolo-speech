@@ -250,10 +250,17 @@ class LoadContext:
         return default if value is None else value
 
 
-def split_kwargs(ctx: LoadContext) -> dict[str, Any]:
+def split_kwargs(
+    ctx: LoadContext, model_cls: Any = None, path: Path | str | None = None, **build: Any
+) -> dict[str, Any]:
     """``from_pretrained`` arguments that split a model across the GPU and the CPU (accelerate's
     ``device_map="auto"`` limited by ``max_memory``), when bolo asked for a split and accelerate is installed;
-    empty otherwise (load whole, then ``.to(device)``)."""
+    empty otherwise (load whole, then ``.to(device)``).
+
+    With ``model_cls`` (what ``from_pretrained`` is called on; an ``Auto`` class too) and the model's ``path``, a
+    model class that declares no ``_no_split_modules`` (Hugging Face remote code often does not, and transformers
+    then refuses ``device_map="auto"``) is planned here instead: :func:`planned_split`. ``build`` holds what the
+    model needs to be built: ``trust_remote_code`` and arguments of the model class itself."""
     if not ctx.max_memory or ctx.device == "cpu":
         return {}
     import importlib.util
@@ -263,7 +270,103 @@ def split_kwargs(ctx: LoadContext) -> dict[str, Any]:
     limits: dict[Any, Any] = {}
     for key, value in ctx.max_memory.items():
         limits[int(key) if str(key).isdigit() else str(key)] = int(value)
-    return {"device_map": "auto", "max_memory": limits}
+    split = {"device_map": "auto", "max_memory": limits}
+    if model_cls is None or path is None:
+        return split
+    return planned_split(ctx, split, model_cls, Path(path), **build)
+
+
+def repeated_blocks(model: Any) -> list[str]:
+    """The class names of a model's repeated layers, the largest stack first: the class of the elements of each
+    ``nn.ModuleList`` of two or more modules of one class that have modules of their own (a decoder's layers, an
+    audio encoder's blocks). Each such layer adds its input to its output, so it must stay on one device."""
+    from torch import nn
+
+    stacks: list[tuple[int, str]] = []
+    for module in model.modules():
+        if not isinstance(module, nn.ModuleList) or len(module) < 2:
+            continue
+        classes = {type(m) for m in module}
+        first = module[0]
+        if len(classes) != 1 or next(first.children(), None) is None:  # mixed, or leaves (Linear) that never split
+            continue
+        stacks.append((sum(int(p.numel()) for p in module.parameters()), type(first).__name__))
+    names: list[str] = []
+    for _, name in sorted(stacks, key=lambda s: -s[0]):
+        if name not in names:
+            names.append(name)
+    return names
+
+
+def _empty_model(model_cls: Any, path: Path, trust_remote_code: bool, build: dict[str, Any]) -> Any:
+    """The model built without weights (accelerate's ``init_empty_weights``: every parameter on the meta device)."""
+    import accelerate
+    import transformers
+
+    config = transformers.AutoConfig.from_pretrained(str(path), trust_remote_code=trust_remote_code)
+    with accelerate.init_empty_weights():
+        if hasattr(model_cls, "_model_mapping"):  # AutoModel, AutoModelForCausalLM, ...
+            return model_cls.from_config(config, trust_remote_code=trust_remote_code, **build)
+        return model_cls._from_config(config, **build)
+
+
+def _gb(n: float) -> str:
+    return f"{n / 1e9:.1f}"
+
+
+def planned_split(
+    ctx: LoadContext,
+    split: dict[str, Any],
+    model_cls: Any,
+    path: Path,
+    *,
+    trust_remote_code: bool = False,
+    **build: Any,
+) -> dict[str, Any]:
+    """``split`` itself when the model names the layers to keep whole (``_no_split_modules``); otherwise an
+    explicit device map: the model is built without weights, its repeated layers found (:func:`repeated_blocks`)
+    and accelerate's ``infer_auto_device_map`` given them as ``no_split_module_classes`` and bolo's ``max_memory``.
+    A model with no repeated layers cannot be split: :class:`PluginError` (``out_of_memory``) says how much memory
+    it needs on one device, before anything is loaded."""
+    if getattr(model_cls, "_no_split_modules", None) and not hasattr(model_cls, "_model_mapping"):
+        return split
+    try:
+        model = _empty_model(model_cls, path, trust_remote_code, build)
+    except Exception as exc:  # leave it to from_pretrained, as before
+        log.warning("%s: could not build the model without weights to plan its split: %s", ctx.model_id, exc)
+        return split
+    # transformers 4 refuses device_map="auto" without it; transformers 5 makes it an empty set and splits
+    # anywhere, also inside a layer, whose output then meets its input on another device
+    if getattr(model, "_no_split_modules", None):
+        return split
+    import accelerate
+    from accelerate.utils import compute_module_sizes
+
+    name = type(model).__name__
+    dtype = ctx.dtype
+    needed = int(compute_module_sizes(model, dtype=dtype)[""])
+    limits: dict[Any, int] = split["max_memory"]
+    gpu = sum(v for k, v in limits.items() if k not in ("cpu", "disk"))
+    blocks = repeated_blocks(model)
+    if not blocks:
+        raise PluginError(
+            f"{ctx.model_id or name} cannot be split between the GPU and the CPU ({name} names no layers to keep "
+            f"whole and has no repeated layers): it needs about {_gb(needed)} GB on one device, and bolo found "
+            f"{_gb(gpu)} GB free on the GPU. Free GPU memory, or load it on the CPU (device = cpu)",
+            code="out_of_memory",
+        )
+    device_map = accelerate.infer_auto_device_map(model, max_memory=limits, no_split_module_classes=blocks, dtype=dtype)
+    if "disk" in device_map.values():
+        raise PluginError(
+            f"{ctx.model_id or name} needs about {_gb(needed)} GB and does not fit in the {_gb(gpu)} GB free on the "
+            f"GPU and the {_gb(limits.get('cpu', 0))} GB bolo allows on the CPU",
+            code="out_of_memory",
+        )
+    log.info(
+        "%s: %s declares no _no_split_modules; keeping each %s on one device (%s)",
+        ctx.model_id, name, ", ".join(blocks), ", ".join(sorted({str(v) for v in device_map.values()})),
+    )  # fmt: skip
+    return {"device_map": device_map}
 
 
 def device_map_report(model: Any) -> dict[str, Any] | None:
