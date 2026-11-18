@@ -279,7 +279,7 @@ describe('voice catalogue', () => {
     })
   })
   it('Piper and Kokoro voices use only languages uccharan reads, and say when the phonemes are approximate', () => {
-    for (const v of BROWSER_VOICES.filter((x) => x.kind !== 'coqui')) {
+    for (const v of BROWSER_VOICES.filter((x) => x.kind === 'piper' || x.kind === 'kokoro')) {
       expect(v.phonemizer, v.id).toBe('uccharan')
       expect(
         UCCHARAN_LANGUAGES.some((l) => v.phonemeLanguage?.toLowerCase().startsWith(l)),

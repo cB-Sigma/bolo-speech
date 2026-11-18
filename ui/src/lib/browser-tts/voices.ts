@@ -1,5 +1,6 @@
 import { isDemo } from '@/lib/api/config'
 import type { NumberLanguage } from './numbers'
+import { TINY_VOCA_BASE } from './tiny-voca'
 
 /**
  * Voices the console can run in the browser.
@@ -16,7 +17,7 @@ import type { NumberLanguage } from './numbers'
  */
 export interface BrowserVoice {
   id: string
-  kind: 'coqui' | 'piper' | 'kokoro'
+  kind: 'coqui' | 'piper' | 'kokoro' | 'tiny-voca'
   /** BCP-47 tag. */
   language: string
   /** Name of the language in its own script, and in English. */
@@ -43,7 +44,7 @@ export interface BrowserVoice {
   /** Honest notes shown next to the voice. */
   notes: string[]
   /** Text to phonemes, for voices that read phonemes. */
-  phonemizer: 'uccharan' | null
+  phonemizer: 'uccharan' | 'dizione' | null
   /** uccharan's language for the phonemes (Piper and Kokoro voices). */
   phonemeLanguage?: string
   /** Weights as downloaded: '8-bit', '16-bit', '32-bit'. */
@@ -55,6 +56,7 @@ export interface BrowserVoice {
     | { from: 'published' }
     | { from: 'remote'; model: string; config: string; configFormat: 'bolo' | 'piper' }
     | { from: 'kokoro'; model: string; style: string }
+    | { from: 'tiny-voca'; model: string; config: string }
   /** Id under which its download is listed (Kokoro voices share one model per precision). */
   downloadId: string
   downloadLabel: string
@@ -397,6 +399,37 @@ const KOKORO_VOICES: [string, string, 'female' | 'male', boolean][] = [
   ['pm_alex', 'pt-BR', 'male', true],
 ]
 
+function tinyVoca(speaker: 'F2' | 'M2'): BrowserVoice {
+  const l = lang('en-US')
+  return {
+    id: `tiny-voca-${speaker.toLowerCase()}`,
+    kind: 'tiny-voca',
+    language: l.language,
+    nativeName: l.nativeName,
+    englishName: l.englishName,
+    gender: speaker === 'F2' ? 'female' : 'male',
+    label: `tiny-voca ${speaker}`,
+    approxBytes: 21_386_372 + 5_400_000,
+    peakBytes: 400e6,
+    sample: 'Hello! This is tiny voca, a small voice that runs in your browser. The meeting moved to 3:30 pm.',
+    numbers: null,
+    roundTrip: l.roundTrip,
+    credit: 'tiny-voca by Muhammed Nazeem (n4ze3m), the authors’ ONNX export; phonemes by their dizione under Pyodide',
+    license: 'Apache-2.0',
+    dataLicense: 'Apache-2.0 (trained from scratch on about 18 hours of synthetic speech); dizione Apache-2.0',
+    source: 'https://huggingface.co/n4ze3m/tiny-voca',
+    notes: [
+      'A 4.5 M-parameter English voice (21 MB), 24 kHz. Numbers, dates, money and units are read out by its phonemiser.',
+      'The phonemiser, dizione, is Python: it runs under Pyodide (CPython on WebAssembly), about 15 MB fetched once from jsDelivr.',
+    ],
+    phonemizer: 'dizione',
+    precision: '32-bit',
+    files: { from: 'tiny-voca', model: `${TINY_VOCA_BASE}onnx/model.onnx`, config: `${TINY_VOCA_BASE}config.json` },
+    downloadId: 'tiny-voca',
+    downloadLabel: 'tiny-voca (and its phonemiser)',
+  }
+}
+
 export const BROWSER_VOICES: BrowserVoice[] = [
   ...syspin('hi', 'female'),
   ...syspin('hi', 'male'),
@@ -558,6 +591,8 @@ export const BROWSER_VOICES: BrowserVoice[] = [
   piper('no_NO-talesyntese-medium', 'no/no_NO/talesyntese/medium', 'nb', null, 'CC0', 63227447, 'nb', 22050),
   piper('da_DK-talesyntese-medium', 'da/da_DK/talesyntese/medium', 'da', null, 'CC0', 63206172, 'da', 22050),
   ...KOKORO_VOICES.map(([style, code, gender, approx]) => kokoro(style, code, gender, approx)),
+  tinyVoca('F2'),
+  tinyVoca('M2'),
 ]
 
 export const DEFAULT_BROWSER_VOICE = BROWSER_VOICES[0] as BrowserVoice

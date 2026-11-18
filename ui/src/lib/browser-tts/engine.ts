@@ -522,6 +522,8 @@ export class BrowserTtsEngine {
     halves?: Halves
   }> {
     const files = voice.files
+    if (files.from === 'tiny-voca')
+      return { model: hubUrl(files.model), config: hubUrl(files.config), configFormat: null, bytes: voice.approxBytes }
     if (files.from === 'kokoro')
       return {
         model: hubUrl(files.model),

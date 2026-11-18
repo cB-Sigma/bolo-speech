@@ -13,6 +13,17 @@ import { VOICE_CACHE, type TtsWorkerRequest, type TtsWorkerResponse } from './pr
 import type * as UccharanModule from '@/vendor/uccharan/index.js'
 import { scaleSilence } from './silence'
 import { coquiIds, piperConfigFromJson, piperIds, withLeadIn, type VoiceConfig } from './text'
+import {
+  DIZIONE_BASE,
+  DIZIONE_DATA_FILES,
+  DIZIONE_FILES,
+  finished,
+  limitPeak,
+  PYODIDE_BASE,
+  shorter,
+  TINY_VOCA_BASE,
+  TINY_VOCA_TOKEN_LIMIT,
+} from './tiny-voca'
 
 /**
  * Runs one voice with ONNX Runtime Web (WebAssembly). The VITS graph is called
@@ -23,6 +34,14 @@ import { coquiIds, piperConfigFromJson, piperIds, withLeadIn, type VoiceConfig }
 const scope = self as unknown as DedicatedWorkerGlobalScope
 const post = (msg: TtsWorkerResponse, transfer: Transferable[] = []) => scope.postMessage(msg, transfer)
 const stage = (s: LoadStage, loaded?: number, total?: number) => post({ type: 'stage', stage: s, loaded, total })
+
+/** The part of Pyodide's API used here. */
+interface Pyodide {
+  loadPackage(name: string): Promise<void>
+  runPython(code: string): unknown
+  FS: { mkdirTree(path: string): void; writeFile(path: string, data: Uint8Array): void }
+  globals: { get(name: string): unknown }
+}
 
 /** One ONNX Runtime session, or two (front on WebGPU, back on the CPU) behind the same surface. */
 interface Runner {
@@ -59,6 +78,8 @@ let session: Runner | null = null
 let config: VoiceConfig | null = null
 let uccharan: typeof UccharanModule | null = null
 let kokoroStyle: Float32Array | null = null
+/** tiny-voca's phonemiser: text -> phoneme ids and stress (dizione under Pyodide), loaded once per worker. */
+let dizione: ((text: string) => { ids: number[]; stress: number[] } | null) | null = null
 /** The loaded voice's own style, to go back to after a blend. */
 let ownStyle: Float32Array | null = null
 let chain: Promise<void> = Promise.resolve()
@@ -149,6 +170,54 @@ async function load(req: Extract<TtsWorkerRequest, { type: 'load' }>): Promise<v
     : null
   const settings = req.config ? get(req.config, short(req.config), 'application/json') : null
   const style = req.style ? get(req.style, short(req.style)) : null
+  if (req.phonemizer === 'dizione' && !dizione) {
+    pending.push(
+      (async () => {
+        // Pyodide (CPython on WebAssembly) with numpy, dizione's sources and the voice's phonemiser data
+        const pyodideModule = (await import(/* @vite-ignore */ `${PYODIDE_BASE}pyodide.mjs`)) as {
+          loadPyodide: (opts: { indexURL: string }) => Promise<Pyodide>
+        }
+        const [py, sources, data] = await Promise.all([
+          pyodideModule.loadPyodide({ indexURL: PYODIDE_BASE }).then(async (p) => {
+            await p.loadPackage('numpy')
+            return p
+          }),
+          Promise.all(DIZIONE_FILES.map((f) => get(`${DIZIONE_BASE}${f}`, `dizione/${f}`))),
+          Promise.all(DIZIONE_DATA_FILES.map((f) => get(`${TINY_VOCA_BASE}phonemizer/${f}`, `phonemizer/${f}`))),
+        ])
+        py.FS.mkdirTree('/dizione/dizione/data')
+        py.FS.mkdirTree('/dizione-data')
+        DIZIONE_FILES.forEach((f, i) =>
+          py.FS.writeFile(`/dizione/dizione/${f}`, new Uint8Array(sources[i]?.data ?? new ArrayBuffer(0))),
+        )
+        DIZIONE_DATA_FILES.forEach((f, i) =>
+          py.FS.writeFile(`/dizione-data/${f}`, new Uint8Array(data[i]?.data ?? new ArrayBuffer(0))),
+        )
+        py.runPython(`
+import sys
+sys.path.insert(0, "/dizione")
+from dizione.engine import Phonemizer
+from dizione.symbols import tokenize
+_dizione = Phonemizer("/dizione-data")
+
+def _phonemize(text):
+    try:
+        p = tokenize(_dizione.pieces(text))
+    except ValueError:
+        return None
+    return [list(p.ids), list(p.stress)]
+`)
+        const fn = py.globals.get('_phonemize') as (text: string) => { toJs(): unknown; destroy(): void } | undefined
+        dizione = (text) => {
+          const r = fn(text)
+          if (!r) return null
+          const [ids, stress] = r.toJs() as [number[], number[]]
+          r.destroy()
+          return { ids, stress }
+        }
+      })(),
+    )
+  }
   if (req.phonemizer === 'uccharan') {
     pending.push(
       (async () => {
@@ -163,7 +232,18 @@ async function load(req: Extract<TtsWorkerRequest, { type: 'load' }>): Promise<v
     )
   }
   const [modelFile, cfgFile, styleFile, halfFiles] = await Promise.all([model, settings, style, halves, ...pending])
-  if (req.kind === 'kokoro') {
+  if (req.kind === 'tiny-voca') {
+    if (!cfgFile) throw new Error('The voice settings are missing')
+    const json = JSON.parse(new TextDecoder().decode(cfgFile.data)) as { voices?: string[]; sample_rate?: number }
+    const speaker = (json.voices ?? ['F2', 'M2']).indexOf(req.voice.endsWith('m2') ? 'M2' : 'F2')
+    config = {
+      id: req.voice,
+      kind: 'tiny-voca',
+      sample_rate: json.sample_rate ?? 24000,
+      speaker: Math.max(0, speaker),
+      inference: { noise_scale: 0, length_scale: 1, noise_scale_w: 0 },
+    }
+  } else if (req.kind === 'kokoro') {
     if (!styleFile) throw new Error('The voice style is missing')
     kokoroStyle = new Float32Array(styleFile.data)
     ownStyle = kokoroStyle
@@ -218,6 +298,7 @@ async function load(req: Extract<TtsWorkerRequest, { type: 'load' }>): Promise<v
   stage('warmup')
   // A short run so the first sentence does not pay for first-use allocations.
   if (config.kind === 'kokoro') await runKokoro([0, 50, 83, 0], 1)
+  else if (config.kind === 'tiny-voca') await runTinyVoca({ ids: [1, 31, 43, 6, 2], stress: [0, 0, 1, 0, 0] }, 1)
   else await run(config.kind === 'coqui' ? coquiIds(config, 'a') : piperIds(config.phoneme_id_map, 'ə').ids, [0, 1, 0])
   post({
     type: 'ready',
@@ -272,9 +353,68 @@ async function runKokoro(ids: number[], speed: number): Promise<Float32Array> {
   return audio
 }
 
+/** tiny-voca: phoneme ids, stress, the voice, speed, pitch shift and range; the waveform at 24 kHz. */
+async function runTinyVoca(p: { ids: number[]; stress: number[] }, speed: number): Promise<Float32Array> {
+  if (!session || config?.kind !== 'tiny-voca') throw new Error('The voice is not loaded')
+  const ints = (xs: number[]) => BigInt64Array.from(xs, (x) => BigInt(x))
+  const feeds = {
+    tokens: new ort.Tensor('int64', ints(p.ids), [1, p.ids.length]),
+    stress: new ort.Tensor('int64', ints(p.stress), [1, p.stress.length]),
+    voice: new ort.Tensor('int64', ints([config.speaker]), [1]),
+    speed: new ort.Tensor('float32', Float32Array.from([speed]), [1]),
+    pitch_shift: new ort.Tensor('float32', Float32Array.from([0]), [1]),
+    pitch_range: new ort.Tensor('float32', Float32Array.from([1]), [1]),
+  }
+  const out = await session.run(feeds)
+  const tensor = out.audio as Ort.Tensor
+  const audio = new Float32Array(tensor.data as Float32Array)
+  tensor.dispose()
+  return audio
+}
+
+/** One utterance of tiny-voca, cut after commas, then between words, when it is longer than the model takes. */
+async function speakTinyVoca(text: string, speed: number, spoken: { ids: number }): Promise<Float32Array[]> {
+  if (!dizione) throw new Error('The phonemiser is not loaded')
+  const p = dizione(text)
+  if (!p) return [] // nothing to pronounce: another script, signs only
+  if (p.ids.length <= TINY_VOCA_TOKEN_LIMIT) {
+    spoken.ids += p.ids.length
+    return [await runTinyVoca(p, speed)]
+  }
+  const pieces = shorter(text)
+  if (pieces.length === 0) throw new Error(`One word is too long to speak: ${text.slice(0, 40)}`)
+  const out: Float32Array[] = []
+  for (const piece of pieces) out.push(...(await speakTinyVoca(piece, speed, spoken)))
+  return out
+}
+
 async function synth(req: Extract<TtsWorkerRequest, { type: 'synth' }>): Promise<void> {
   if (!config) throw new Error('The voice is not loaded')
   const started = performance.now()
+  if (config.kind === 'tiny-voca') {
+    const spoken = { ids: 0 }
+    const parts = await speakTinyVoca(finished(req.text.trim()), 1 / (req.scales[1] || 1), spoken)
+    const joined = new Float32Array(parts.reduce((a, x) => a + x.length, 0))
+    let at = 0
+    for (const x of parts) {
+      joined.set(x, at)
+      at += x.length
+    }
+    const audio = limitPeak(joined)
+    post(
+      {
+        type: 'audio',
+        id: req.id,
+        audio,
+        ms: performance.now() - started,
+        tokens: spoken.ids,
+        missing: [],
+        memoryBytes: runtimeMemoryBytes(),
+      },
+      [audio.buffer],
+    )
+    return
+  }
   let ids: number[][]
   let phonemes: string | undefined
   const missing: string[] = []

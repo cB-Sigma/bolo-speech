@@ -3,7 +3,7 @@ import { concatFloat } from '@/lib/audio/pcm'
 import { Store } from '@/lib/store'
 import { emptyTts, type TtsChunk, type TtsState } from '@/lib/tts/session'
 import type { BrowserTtsEngine } from './engine'
-import { mergeShortChunks, prepareText, type PreparedText } from './text'
+import { mergeShortChunks, prepareText, type PreparedText, type VoiceConfig } from './text'
 import type { BrowserVoice } from './voices'
 
 /**
@@ -25,7 +25,7 @@ export function shortFirstChunk(chunks: string[], over = 90): string[] {
  * its phonemiser makes one model call per sentence whatever it is handed), so
  * its sentences stay apart and the first one is heard as early as possible.
  */
-export function synthesisChunks(sentences: string[], kind: 'coqui' | 'piper' | 'kokoro'): string[] {
+export function synthesisChunks(sentences: string[], kind: VoiceConfig['kind']): string[] {
   return shortFirstChunk(kind === 'coqui' ? mergeShortChunks(sentences) : sentences)
 }
 

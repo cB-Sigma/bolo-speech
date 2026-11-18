@@ -38,7 +38,18 @@ export interface KokoroVoiceConfig {
   inference: { noise_scale: number; length_scale: number; noise_scale_w: number }
 }
 
-export type VoiceConfig = (CoquiVoiceConfig | PiperVoiceConfig | KokoroVoiceConfig) & { id: string }
+/** tiny-voca: phonemes and stress from dizione (under Pyodide), voice F2 or M2 by index. */
+export interface TinyVocaVoiceConfig {
+  kind: 'tiny-voca'
+  sample_rate: number
+  /** Index of the voice in the model's speakers (0 = F2, 1 = M2). */
+  speaker: number
+  inference: { noise_scale: number; length_scale: number; noise_scale_w: number }
+}
+
+export type VoiceConfig = (CoquiVoiceConfig | PiperVoiceConfig | KokoroVoiceConfig | TinyVocaVoiceConfig) & {
+  id: string
+}
 
 /** A Piper `.onnx.json` turned into what the browser needs (as build.py does for published voices). */
 export function piperConfigFromJson(
@@ -218,7 +229,7 @@ export interface PreparedText {
  * applies to them.
  */
 export function prepareText(text: string, cfg: VoiceConfig, numbers: NumberLanguage | null): PreparedText {
-  if (cfg.kind === 'piper' || cfg.kind === 'kokoro') {
+  if (cfg.kind === 'piper' || cfg.kind === 'kokoro' || cfg.kind === 'tiny-voca') {
     const chunks = splitSentences(text.replace(/\s+/g, ' ').trim())
     return { spoken: chunks.join(' '), chunks, dropped: [], rewritten: false }
   }
