@@ -1062,3 +1062,33 @@ def test_graphs_get_their_own_providers(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert [p for _, p in seen] == [[cuda, cpu], [cuda, cpu], [cpu], [cpu]]
     sizes = OnnxRuntimeEngine().graphs("lfm3_audio_onnx", tmp_path / "lfm", {})
     assert sizes == {"decoder": 100, "encoder": 10, "depth_decoder": 10, "codec_decoder": 10}
+
+
+async def test_a_plugin_model_placed_on_the_gpu_that_runs_on_the_cpu_reads_as_on_the_cpu(
+    settings: Settings, gpu: FakeNvml
+) -> None:
+    """bolo-torch on a CPU-only torch next to an NVIDIA GPU: bolo placed the model on cuda:0, the plugin ran it on
+    the CPU and `bolo ps` said "100% GPU cuda:0". The plugin says so with the load (device_fallback), and the
+    placement, `bolo ps` and /api/v1/ps say CPU with its reason."""
+    import sys
+
+    settings.plugins = [f"ref={sys.executable} -m bolo.plugin.reference"]
+    settings.plugin_entry_points = False
+    core = await gpu_core(settings, gpu)
+    try:
+        core.catalog.add(
+            ModelSpec.from_dict({
+                "id": "plug-denoise", "task": "tts", "engine": "plugin:ref", "kind": "fake-tts", "family": "Fake",
+                "languages": ["en"], "license": "Apache-2.0", "builtin": True, "sample_rate": 24000,
+                "voices": [{"id": "alpha", "language": "en-US"}], "size_bytes": 100 * MB,
+                "options": {"cpu_only_runtime": True},
+            })
+        )  # fmt: skip
+        entry = await core.manager.load("plug-denoise")
+        p = entry.placement
+        assert p.device == "cpu" and p.gpu_bytes == 0 and entry.processor() == "100% CPU"
+        assert "no GPU support" in (p.notice or "")
+        row = next(m for m in core.stats()["models"] if m["id"] == "plug-denoise")
+        assert row["device"] == "cpu" and row["processor"] == "100% CPU"
+    finally:
+        await core.stop()

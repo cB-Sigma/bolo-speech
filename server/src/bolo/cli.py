@@ -2096,6 +2096,47 @@ def _doctor_cuda(settings: Settings) -> None:
             print(line)
 
 
+#: how to get a CUDA build of torch for bolo-torch (PyPI's torch is CPU only on Windows and macOS)
+CUDA_TORCH_INDEX = "https://download.pytorch.org/whl/cu128"
+
+
+def torch_cpu_warning(torch_version: str | None, platform: str, nvidia: bool, plugin: bool) -> str | None:
+    """A warning when bolo-torch is installed with a CPU-only torch on a machine with an NVIDIA GPU: a ``+cpu``
+    build, or PyPI's torch without a local version on Windows or macOS (CPU only there; on Linux it is CUDA)."""
+    if not (plugin and nvidia and torch_version):
+        return None
+    local = torch_version.partition("+")[2]
+    cpu_only = local == "cpu" or (not local and platform in ("win32", "darwin"))
+    if not cpu_only:
+        return None
+    return (
+        f"bolo-torch is installed with torch {torch_version}, a CPU-only build, and this machine has an NVIDIA GPU: "
+        f"its models run on the CPU. For the GPU: pip install --force-reinstall torch torchaudio --index-url "
+        f"{CUDA_TORCH_INDEX} (then `bolo-torch install <extras>` keeps it when adding model families)"
+    )
+
+
+def _doctor_torch_build(which: Any = None) -> None:
+    """bolo-torch next to an NVIDIA GPU with a CPU-only torch: one loud line (read from the package metadata, so
+    torch is not imported)."""
+    import importlib.metadata
+
+    def version(name: str) -> str | None:
+        try:
+            return importlib.metadata.version(name)
+        except importlib.metadata.PackageNotFoundError:
+            return None
+
+    warning = torch_cpu_warning(
+        version("torch"),
+        sys.platform,
+        (which or shutil.which)("nvidia-smi") is not None,
+        version("bolo-torch") is not None,
+    )
+    if warning:
+        print(f"  WARNING: {warning}")
+
+
 def _doctor_gpu_health(settings: Settings, which: Any = None, checker: Any = None) -> None:
     """Is the NVIDIA GPU still there (bolo.gpu_health)? Asked where NVIDIA's driver tools are installed."""
     import importlib.util
@@ -2258,6 +2299,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     _doctor_onnxruntime(settings)
     _doctor_gpu_health(settings)
     _doctor_cuda(settings)
+    _doctor_torch_build()
     _doctor_llm(settings)
     _doctor_providers(settings)
     _doctor_watermark(settings)

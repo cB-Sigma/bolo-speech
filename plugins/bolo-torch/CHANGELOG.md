@@ -6,6 +6,15 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ### Fixed
 
+- **A CPU-only torch next to an NVIDIA GPU (PyPI's torch on Windows).** With `device = "cuda"` the
+  model was refused ("this torch build sees no CUDA device"), so a Demucs denoiser was skipped and live and file
+  denoising returned the audio untouched (`x-bolo-denoise: skipped`); with the model's option `device = "auto"` it
+  ran on the CPU while bolo, `bolo ps` and `/api/v1/ps` said "100% GPU cuda:0". In both cases the model now loads on
+  the CPU with a notice saying why and how to get a CUDA build of torch, and the plugin reports it, so the placement
+  says CPU (as `rocm` already did). `bolo doctor` warns when bolo-torch has a CPU-only torch on a machine with an
+  NVIDIA GPU, and the plugin's README and docs/configuration.md give the CUDA index
+  (`https://download.pytorch.org/whl/cu128`). The `pyannote` extra's floor stays at pyannote.audio 3.3.2 (pip takes
+  4.x, which needs torch 2.8, unless `bolo-torch install pyannote` keeps an older torch); the README says so.
 - **Installing an extra replaced a CUDA build of torch with a CPU one.** On Windows with CUDA torch installed,
   `pip install "bolo-torch[pyannote]"` let pip take the newest torchaudio, which needs a newer torch, so pip
   installed PyPI's torch 2.15, a CPU build, and pyannote ran on the CPU. A new command, `bolo-torch install

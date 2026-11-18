@@ -351,3 +351,19 @@ def test_hardware_says_which_sherpa_build_is_installed(tmp_path: Path) -> None:
     (lib / "onnxruntime_providers_cuda.dll").write_bytes(b"")
     assert hardware._sherpa_gpu(module) is True
     assert hardware._sherpa_gpu(SimpleNamespace(__version__="2.0.1")) is None
+
+
+def test_doctor_warns_of_a_cpu_only_torch_next_to_an_nvidia_gpu(capsys: pytest.CaptureFixture[str]) -> None:
+    """bolo-torch with PyPI's torch on Windows (CPU only) and an NVIDIA GPU: say so, with the CUDA index."""
+    from bolo import cli
+
+    warn = cli.torch_cpu_warning
+    message = warn("2.15.0+cpu", "win32", nvidia=True, plugin=True)
+    assert message and "CPU-only" in message and "download.pytorch.org/whl/cu128" in message
+    assert warn("2.15.0", "win32", nvidia=True, plugin=True)  # PyPI's Windows wheel has no local version
+    assert warn("2.15.0+cpu", "linux", nvidia=True, plugin=True)
+    assert warn("2.15.0", "linux", nvidia=True, plugin=True) is None  # PyPI's Linux wheel is a CUDA build
+    assert warn("2.9.0+cu128", "win32", nvidia=True, plugin=True) is None
+    assert warn("2.15.0+cpu", "win32", nvidia=False, plugin=True) is None  # no NVIDIA GPU
+    assert warn("2.15.0+cpu", "win32", nvidia=True, plugin=False) is None  # no bolo-torch
+    assert warn(None, "win32", nvidia=True, plugin=True) is None

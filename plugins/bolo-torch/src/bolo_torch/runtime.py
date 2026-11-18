@@ -146,14 +146,28 @@ def _fall_back(note: str) -> str:
     return "cpu"
 
 
+#: how to get a CUDA build of torch (PyPI's torch is CPU only on Windows; docs/configuration.md)
+CUDA_TORCH = "pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128"
+
+
+def _no_cuda(torch: Any) -> str:
+    version = str(torch.__version__)
+    if getattr(torch.version, "cuda", None) is None and not getattr(torch.version, "hip", None):
+        why = f"torch {version} is a CPU-only build"
+    else:
+        why = f"torch {version} sees no CUDA device (no NVIDIA GPU or driver visible)"
+    return f"{why}, so the model runs on the CPU. For the GPU install a CUDA build of torch: {CUDA_TORCH}"
+
+
 def pick_device(requested: str | None, options: dict[str, Any] | None = None) -> str:
     """``BOLO_TORCH_DEVICE`` > the model's ``device`` option > bolo's ``device`` setting; ``auto`` detects.
 
     bolo's names for accelerators are accepted too: ``coreml`` / ``metal`` is MPS and ``rocm`` / ``hip`` is
     ``cuda`` on a ROCm build of torch. A torch build that cannot reach the GPU bolo gave (its ``auto`` resolved to
     the machine's GPU: a CPU-only torch next to an AMD GPU, a virtual Mac without Metal) runs on the CPU with a
-    warning instead of failing, and so does ``rocm`` asked for by name on a torch without ROCm (docs/rocm.md);
-    :func:`take_device_fallback` says why. ``mps`` or ``coreml`` asked for by name without Metal fails."""
+    warning instead of failing, and so do ``cuda`` and ``rocm`` asked for by name on a torch without them
+    (docs/rocm.md), and a model option ``auto`` when bolo placed the model on its GPU; :func:`take_device_fallback`
+    says why. ``mps`` or ``coreml`` asked for by name without Metal fails."""
     _fallback.note = None
     options = options or {}
     chosen = os.environ.get("BOLO_TORCH_DEVICE") or options.get("device")
@@ -184,14 +198,16 @@ def pick_device(requested: str | None, options: dict[str, Any] | None = None) ->
             return "cuda"
         if _mps_available(torch):
             return "mps"
+        placed = (requested or "").strip().lower()
+        if not from_bolo and placed.partition(":")[0] not in ("", "auto", "cpu"):
+            # the model's option says auto, and bolo placed it on its GPU: it runs on the CPU, so say so (bolo moves
+            # its placement to the CPU; `bolo ps` said "100% GPU" otherwise)
+            return _fall_back(f"device {placed!r}: {_no_cuda(torch)}")
         return "cpu"
     if base == "cuda" and not torch.cuda.is_available():
-        if from_bolo and alias is not None:
-            return _fall_back(f"device {choice!r}: this torch sees no GPU, so the model runs on the CPU")
-        raise InvalidRequest(
-            f"device {choice!r} was requested but this torch build sees no CUDA device "
-            f"(torch {torch.__version__}; a CPU-only build cannot use a GPU)"
-        )
+        # bolo's device (cuda:0 next to an NVIDIA GPU), BOLO_TORCH_DEVICE or the model's option: the CPU with the
+        # reason, as the built-in engines do, rather than refusing the model
+        return _fall_back(f"device {choice!r}: {_no_cuda(torch)}")
     if base == "mps" and not _mps_available(torch):
         raise InvalidRequest("device 'mps' was requested but Metal is not available")
     return choice

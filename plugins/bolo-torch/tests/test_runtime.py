@@ -25,8 +25,8 @@ def test_device_selection(monkeypatch: pytest.MonkeyPatch) -> None:
     assert runtime.pick_device("cpu") == "cpu"
     assert runtime.pick_device("auto") in ("cpu", "mps")
     assert runtime.pick_device("cpu", {"device": "auto"}) in ("cpu", "mps")  # the model option wins over bolo's
-    with pytest.raises(InvalidRequest, match="no CUDA device"):
-        runtime.pick_device("cuda")
+    assert runtime.pick_device("cuda") == "cpu"  # a CPU build of torch: the CPU with the reason (below), not a 400
+    runtime.take_device_fallback()
     with pytest.raises(InvalidRequest, match="unknown device"):
         runtime.pick_device("tpu")
     monkeypatch.setenv("BOLO_TORCH_DEVICE", "cpu")
@@ -144,3 +144,27 @@ def test_split_sentences() -> None:
     parts = split_sentences(long, max_chars=60)
     assert all(len(p) <= 60 for p in parts) and " ".join(parts).split() == long.split()
     assert split_sentences("x" * 30 + " " + "y" * 30, max_chars=40) == ["x" * 30, "y" * 30]
+
+
+def test_a_gpu_this_torch_cannot_reach_runs_on_the_cpu_and_says_so(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Windows with PyPI's torch 2.15.0+cpu next to an NVIDIA GPU. (a) device = cuda: the model was refused, and a
+    denoiser was skipped (x-bolo-denoise: skipped); it now runs on the CPU, with the reason and how to get CUDA
+    torch. (b) the model's option device = auto while bolo placed it on cuda:0: it ran on the CPU while `bolo ps`
+    said 100% GPU; the plugin now reports the fallback, which moves bolo's placement to the CPU."""
+    monkeypatch.delenv("BOLO_TORCH_DEVICE", raising=False)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    monkeypatch.setattr(torch.version, "cuda", None)
+    monkeypatch.setattr(torch.version, "hip", None)
+    for requested, options in (("cuda:0", {}), ("cpu", {"device": "cuda"}), ("cuda:0", {"device": "cuda"})):
+        assert runtime.pick_device(requested, options) == "cpu"
+        note = runtime.take_device_fallback() or ""
+        assert "CPU-only build" in note and "download.pytorch.org/whl/cu128" in note, (requested, options)
+    assert runtime.pick_device("cuda:0", {"device": "auto"}) == "cpu"  # (b)
+    note = runtime.take_device_fallback() or ""
+    assert note.startswith("device 'cuda:0'") and "runs on the CPU" in note
+    assert runtime.pick_device("cpu", {"device": "auto"}) == "cpu"  # placed on the CPU: nothing to say
+    assert runtime.take_device_fallback() is None
+    monkeypatch.setattr(torch.version, "cuda", "12.8")  # a CUDA build without a visible GPU
+    assert runtime.pick_device("cuda") == "cpu"
+    assert "sees no CUDA device" in (runtime.take_device_fallback() or "")

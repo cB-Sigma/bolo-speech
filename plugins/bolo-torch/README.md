@@ -266,6 +266,13 @@ then replaces your torch with PyPI's, which on Windows is the CPU build: the mod
 install` pins the installed torch, holds torchaudio and torchvision to its release (a constraints file), and adds
 the PyTorch index the build came from (`+cu128` -> download.pytorch.org/whl/cu128).
 
+**pyannote and older torch.** The `pyannote` extra asks for pyannote.audio 3.3.2 or later (torch 2.0 or later), but
+left free pip takes pyannote.audio 4, which needs torch 2.8 or later, and with an older CUDA torch (2.6.0+cu124, say)
+it replaces that torch with PyPI's newest, CPU only on Windows. The floor cannot go lower than it is: pyannote
+`speaker-diarization-community-1` needs pyannote.audio 4. So either upgrade torch first from the CUDA index (2.8 or
+later), or run `bolo-torch install pyannote`, which keeps your torch: with torch 2.6 pip then resolves pyannote.audio
+3.4, which runs `pyannote-speaker-diarization-3.1` and `pixit-ami` but not community-1.
+
 From a checkout of the bolo repository:
 
 ```bash
@@ -529,8 +536,15 @@ environment).
   also works. Asking for `cuda` with a CPU-only torch answers `400` with that explanation.
 * `dtype` is automatic: float32 on CPU, bfloat16 on CUDA when supported (else float16), float16 on MPS. Override
   with `BOLO_TORCH_DTYPE` or the option `dtype` (`float32`, `float16`, `bfloat16`).
-* For CUDA install the default torch wheel (`pip install torch`) or the one for your CUDA version from
-  https://pytorch.org/get-started/locally/, then the plugin.
+* For CUDA install torch from PyTorch's CUDA index before the plugin:
+  `pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128` (or the `cu12x` folder for your
+  driver, https://pytorch.org/get-started/locally/). On Linux PyPI's default torch is a CUDA build too; **on Windows
+  (and macOS) PyPI's torch is CPU only**, so a plain `pip install bolo-torch` there gets a CPU-only torch. Add model
+  families with `bolo-torch install <extras>`, which keeps the torch you installed (see Install). `bolo doctor` warns
+  when bolo-torch has a CPU-only torch on a machine with an NVIDIA GPU.
+* A GPU this torch cannot reach (a CPU-only build with `device = "cuda"`, `rocm`, or bolo placing the model on its
+  GPU while the model's option is `auto`) is not an error: the model loads on the CPU with a warning saying why and
+  how to get a CUDA build, and bolo's placement (`bolo ps`, `/api/v1/ps`) says CPU with that notice.
 * With bolo 0.5 or later, when its scheduler finds less free GPU memory than a model needs, the load carries a `placement`
   (`device_map="auto"` and a `max_memory`): the Orpheus SNAC, Qwen-Omni, Step-Audio 2, GLM-4-Voice and MiniCPM-o
   loaders let accelerate put as many layers on the GPU as fit and the rest on the CPU, and report the split back for
