@@ -13,7 +13,7 @@ export const SCOPE_LABEL: Record<string, string> = {
 
 export const PERIOD_LABEL: Record<string, string> = { day: 'per day', month: 'per month', total: 'in all' }
 
-export const DOCS_KEYS = 'https://github.com/cb-Sigma/bolo/blob/main/docs/api.md#api-keys-apiv1keys'
+export const DOCS_KEYS = 'https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#api-keys-apiv1keys'
 
 /** What the create/edit dialog holds; numbers stay text until they are sent. */
 export interface KeyForm {
