@@ -158,6 +158,11 @@ class PluginProcess:
         self.handles: set[str] = set()
         self._last_active = time.monotonic()
         self._idle_timer: threading.Timer | None = None
+        #: restarts made to give back the GPU memory of a failed load (see :meth:`load_failed`)
+        self.reclaims = 0
+        #: a failed GPU load left memory in the process that could not be given back yet (other models were
+        #: loaded in it): what the plugin reported (``reserved_bytes``, None when unknown) and which model
+        self.gpu_held: dict[str, Any] | None = None
 
     # -- process ------------------------------------------------------------
     @property
@@ -292,11 +297,15 @@ class PluginProcess:
             err = message.get("error") or {}
             code, text = str(err.get("code", "error")), str(err.get("message", ""))
             # errors with a meaning to the client keep their status (a gated download is 401, not 503)
+            exc: Any
             if code == GatedModel.code:
-                raise GatedModel(text)
-            if code == InvalidRequest.code:
-                raise InvalidRequest(text)
-            raise EngineUnavailable(f"plugin error ({code}): {text}")
+                exc = GatedModel(text)
+            elif code == InvalidRequest.code:
+                exc = InvalidRequest(text)
+            else:
+                exc = EngineUnavailable(f"plugin error ({code}): {text}")
+            exc.plugin_error = err  # the whole error object (a failed load's "gpu")
+            raise exc
         return message
 
     def request(
@@ -350,9 +359,54 @@ class PluginProcess:
         finally:
             self._calls.pop(rid, None)
 
+    # -- a failed load on the GPU -------------------------------------------------
+    def load_failed(self, model: str, device: str, exc: BaseException) -> None:
+        """A load on a GPU failed: free what it left behind there.
+
+        The plugin frees what it can itself before answering (bolo-torch: the garbage collector, then
+        ``torch.cuda.empty_cache()`` and ``ipc_collect()``), but the CUDA context and blocks its allocator cannot
+        hand back stay with the process until it ends. With no other model loaded in it the process is stopped, so
+        the driver gets all of it back and the next load starts a fresh one; otherwise the memory stays held until
+        those models unload (then the process stops at once), and :meth:`status` says so."""
+        from bolo.placement import family
+
+        if family(device) not in ("cuda", "rocm", "metal") or not self.running:
+            return  # a CPU load, or the process is gone (and its memory with it)
+        error = getattr(exc, "plugin_error", None)
+        gpu = error.get("gpu") if isinstance(error, dict) else None
+        if isinstance(gpu, dict) and gpu.get("initialized") is False:
+            return  # the plugin never started its GPU runtime: nothing is held there
+        reserved = gpu.get("reserved_bytes") if isinstance(gpu, dict) else None
+        with self._lock:
+            if self.handles:
+                self.gpu_held = {
+                    "model": model,
+                    "device": device,
+                    "reserved_bytes": int(reserved) if isinstance(reserved, (int, float)) else None,
+                }
+                log.warning(
+                    "plugin %s keeps GPU memory after the failed load of %s (%s, plus its CUDA context): %d other "
+                    "model(s) are loaded in it, so it is not restarted; it stops when they unload",
+                    self.config.name, model,
+                    f"{int(reserved) / 1e6:.0f} MB reserved" if isinstance(reserved, (int, float)) else "amount unknown",
+                    len(self.handles),
+                )  # fmt: skip
+                return
+        log.info("stopping plugin %s to give back the GPU memory of the failed load of %s", self.config.name, model)
+        self.reclaims += 1
+        self.gpu_held = None
+        self.stop()
+
     # -- idle shutdown ----------------------------------------------------------
     def model_unloaded(self, handle: str) -> None:
         self.handles.discard(handle)
+        if not self.handles and self.gpu_held is not None and self.running:
+            # GPU memory of an earlier failed load is still held: stop now rather than after plugin_idle_s
+            log.info("stopping plugin %s: its last model unloaded, giving back GPU memory", self.config.name)
+            self.gpu_held = None
+            self.reclaims += 1
+            self.stop()
+            return
         if not self.handles and self.config.idle_s >= 0:
             if self._idle_timer is not None:
                 self._idle_timer.cancel()
@@ -371,6 +425,7 @@ class PluginProcess:
             "running": self.running, "pid": self._proc.pid if self._proc else None, "generation": self.generation,
             "crashes": self.crashes, "restarts": self.restarts, "last_error": self.last_error,
             "loaded_models": len(self.handles), "protocol": self.hello.get("protocol"),
+            "gpu_reclaims": self.reclaims, "gpu_held_after_failed_load": self.gpu_held,
         }  # fmt: skip
 
 
@@ -387,7 +442,12 @@ class _PluginModelMixin:
         proc = self.process
         proc.ensure_started()
         if self._handle is None or self._generation != proc.generation:
-            reply = proc.request(self._load_message)
+            try:
+                reply = proc.request(self._load_message)
+            except Exception as exc:
+                message = self._load_message
+                proc.load_failed(str(message.get("model") or message.get("path")), str(message.get("device")), exc)
+                raise
             self._handle = str(reply["handle"])
             self._generation = proc.generation
             proc.handles.add(self._handle)

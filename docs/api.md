@@ -1443,7 +1443,9 @@ Like Ollama's `/api/ps` (bolo's `/api/ps` is speaches' route, which lists model 
                       "models_vram_bytes": 1610612736}],   // what bolo's loaded models hold on this GPU
             "accelerator_source": "nvml", "gpu_spread": false,
             "models_vram_bytes": 1610612736, "models_ram_bytes": 107374182,
-            "gpu_health": {"state": "ok", "lost": false, …}},   // as "health.gpu" in GET /api/v1/info; also in /api/v1/stats
+            "gpu_health": {"state": "ok", "lost": false, …},   // as "health.gpu" in GET /api/v1/info; also in /api/v1/stats
+            // only while a failed load left GPU memory in a plugin that other loaded models keep running (plugins.md)
+            "plugin_gpu_held": [{"plugin": "plugin:torch", "model": "orpheus-3b", "device": "cuda", "reserved_bytes": 734003200}]},
  "budgets": {"memory_budget_bytes": null, "gpu_memory_budget_bytes": null, "gpu_reserve_bytes": 536870912,
              "gpus": null, "gpu_spread": false, "max_loaded_models": null, "keep_alive": "5m"},
  "speech_to_speech": {"model": "lfm3-audio-2b-llamacpp", "placement": {…}}   // once its llama-server started

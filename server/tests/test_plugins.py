@@ -433,3 +433,62 @@ def test_a_plugin_that_cannot_reach_the_gpu_loads_on_the_cpu_and_says_so() -> No
         assert not quiet.fallbacks
     finally:
         proc.stop()
+
+
+def _wait_stopped(proc: PluginProcess) -> bool:
+    for _ in range(100):
+        if not proc.running:
+            return True
+        time.sleep(0.05)
+    return False
+
+
+def test_a_failed_gpu_load_gives_the_memory_back() -> None:
+    """Bug 17: a model that fails to load on the GPU leaves weights, the allocator's cache and the CUDA context in the
+    plugin process. With nothing else loaded there, the process is stopped (the driver frees all of it) and the next
+    load starts a fresh one; with other models loaded it keeps running, ps says what is held, and it stops as soon as
+    they unload. A failed load on the CPU, or one the plugin says never started its GPU runtime, changes nothing."""
+    proc = PluginProcess(PluginConfig("ref", [sys.executable, "-m", "bolo.plugin.reference"], idle_s=60))
+    load = {"op": "load", "kind": "fake-tts", "task": "tts", "path": "/nonexistent", "threads": 1, "model": "big"}
+    broken = {**load, "options": {"fail_on_load": "out of memory"}}
+    try:
+        with pytest.raises(EngineUnavailable, match="out of memory"):
+            host.PluginTTS(proc, {**broken, "device": "cpu"})
+        assert proc.running and proc.reclaims == 0  # the CPU: nothing to give back
+        first = proc.status()["pid"]
+        with pytest.raises(EngineUnavailable, match="out of memory"):
+            host.PluginTTS(proc, {**broken, "device": "cuda:0"})
+        assert _wait_stopped(proc) and proc.reclaims == 1 and proc.crashes == 0
+        model = host.PluginTTS(proc, {**load, "device": "cpu", "options": {}})  # a fresh process, no back-off
+        assert proc.running and proc.status()["pid"] != first and list(model.synthesize("Fresh."))
+
+        # another model is loaded: the process stays, and says what it holds
+        with pytest.raises(EngineUnavailable):
+            host.PluginTTS(proc, {**broken, "device": "cuda"})
+        assert proc.running and proc.reclaims == 1
+        held = proc.status()["gpu_held_after_failed_load"]
+        assert held == {"model": "big", "device": "cuda", "reserved_bytes": None}
+        assert list(model.synthesize("Still here."))
+        model.close()  # the last model unloads: the process stops now, not after plugin_idle_s
+        assert _wait_stopped(proc) and proc.reclaims == 2 and proc.gpu_held is None
+
+        # the plugin says its GPU runtime never started (bolo-torch's error.gpu): no restart
+        exc = EngineUnavailable("plugin error (RuntimeError): bad config")
+        exc.plugin_error = {"code": "RuntimeError", "gpu": {"initialized": False}}  # type: ignore[attr-defined]
+        host.PluginTTS(proc, {**load, "device": "cpu", "options": {}})
+        proc.handles.clear()
+        proc.load_failed("x", "cuda", exc)
+        assert proc.running and proc.reclaims == 2
+    finally:
+        proc.stop()
+
+
+def test_ps_says_what_a_failed_plugin_load_still_holds() -> None:
+    from bolo.cli import format_ps
+
+    doc = {
+        "models": [],
+        "system": {"plugin_gpu_held": [{"plugin": "plugin:torch", "model": "big", "reserved_bytes": 1_500_000_000}]},
+    }
+    text = format_ps(doc)
+    assert "plugin:torch holds 1.4 GB of GPU memory" in text and "failed load of big" in text

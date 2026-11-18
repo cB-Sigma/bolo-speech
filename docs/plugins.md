@@ -63,6 +63,14 @@ answered with HTTP 424 `component_missing` and the install hint from the entry's
   see one failed request, not a broken model. Unloading the last model of a plugin starts the idle
   timer; the process is asked to shut down (then killed after 5 s) when it expires and on server
   shutdown.
+* **A failed load on a GPU.** Weights already copied to the GPU, the allocator's cache and the CUDA context stay
+  with the process after a load fails (out of memory part-way, a broken checkpoint). bolo-torch frees what it can
+  before it answers (`gc.collect()`, `torch.cuda.empty_cache()`, `ipc_collect()`) and says what is left in the
+  reply (`error.gpu`). When no other model is loaded in the process, bolo then stops it, so the driver gets all of
+  it back, and the next load starts a fresh one (no back-off: it is not a crash). When other models are loaded the
+  process keeps running; `bolo ps` (and `system.plugin_gpu_held` in `GET /api/v1/ps`) says how much the failed load
+  left, and the process stops as soon as those models unload. Either way the next placement reads the GPU's free
+  memory again.
 * **Scheduling and observability.** Plugin models are ordinary `STTModel` / `TTSModel` objects to
   the rest of bolo: they get the same per-model queues, backpressure (`429`), cancellation on client
   disconnect, idle unloading, memory budget, traces with phases (`queue`, `decode`,
@@ -175,7 +183,10 @@ transformers language model of Orpheus SNAC voices this way; its other loaders l
 Errors: `error.code` `model_gated` becomes bolo's `401 model_gated` and `invalid_request` its
 `400 invalid_request` (so a gated download inside the plugin reaches the client as such); any other
 code is a `503 engine_unavailable` naming the code. bolo's SDK reports an exception by its class
-name; bolo-torch sends the code of its own errors instead.
+name; bolo-torch sends the code of its own errors instead. A failed `load` may add `error.gpu`:
+`{"initialized": false}` when the plugin never started its GPU runtime (bolo then has no reason to restart it), or
+`{"initialized": true, "allocated_bytes", "reserved_bytes"}`, what the process still holds after freeing what it
+could (optional; without it bolo assumes memory is held after any failed GPU load).
 
 Compatibility: new optional members, and new ops that bolo sends only to models announcing them in
 `info` (`speakers`) or loaded for a new task (`diarize`, `embed`, `respond`), can appear within version 1; an incompatible change gets

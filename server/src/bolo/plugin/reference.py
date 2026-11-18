@@ -6,7 +6,7 @@ uses, and the smallest example of a plugin. It loads the kinds ``fake-stt``, ``f
 turn-based speech-to-speech model) and ``fake-lid`` (a language identifier).
 
 For tests of the host's crash handling, text containing "plugin crash test" makes the process exit at once
-during synthesis.
+during synthesis; the option ``fail_on_load`` makes a load fail.
 """
 
 from __future__ import annotations
@@ -57,6 +57,8 @@ class ReferenceEngine(Engine):
             os.write(1, b"a native library writing to stdout\n")
         if spec.get("ask_on_load"):
             input("Download the model now? [y/N] ")
+        if spec.get("fail_on_load"):  # a load that fails part-way (the host's clean-up after it is tested)
+            raise RuntimeError(f"cannot load {kind}: {spec['fail_on_load']}")
         if spec.get("require_utf8_mode") and not sys.flags.utf8_mode:
             raise RuntimeError("not in Python UTF-8 mode: open() without an encoding would use the locale's")
         model = self.fake.load(kind, task, path, spec, opts)

@@ -27,6 +27,18 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   inside the graphs (codebucketsolutions/perth-onnx and codebucketsolutions/wavmark-onnx, with the export script and
   the parity results) and checked against their PyTorch originals in both directions; they run in core bolo without
   PyTorch. Perth was found after MP3, Opus and 16 or 8 kHz resampling on every clip tried. WavMark is slow on a CPU.
+### Fixed
+
+- **GPU memory is given back after a plugin model fails to load (bug 17).** A bolo-torch load that failed on the GPU
+  (out of memory part-way, a broken checkpoint) left its weights, torch's cached blocks and the CUDA context in the
+  plugin process: `nvidia-smi` showed the memory held, and later loads had less room. bolo-torch now frees what it can
+  before it answers (the loader's frames are cleared, then `gc.collect()`, `torch.cuda.empty_cache()` and
+  `ipc_collect()`) and reports what is still held (`error.gpu`). When no other model is loaded in the plugin, bolo
+  stops the process so the driver gets everything back (the next load starts a fresh one, without the crash back-off);
+  when other models are loaded it keeps running, `bolo ps` and `system.plugin_gpu_held` in `GET /api/v1/ps` say how
+  much the failed load left, and the process stops as soon as those models unload. After a failed GPU load the free
+  memory is read again for `ps` and the next placement. Tested on Linux with the CPU build of torch and a faked
+  `torch.cuda`; not run on a real GPU, Windows or macOS.
 
 - **`bolo check <model>`: would a model run here, or on a bigger machine, found out without its weights.** Its
   runtime (engine, components, a full-duplex server's environment and imports, a bolo-torch environment's loader,

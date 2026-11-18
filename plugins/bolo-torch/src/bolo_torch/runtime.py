@@ -121,6 +121,50 @@ def _torch() -> Any:
     return require("torch", "parler")
 
 
+def release_memory() -> dict[str, Any]:
+    """Give back the memory a failed load left behind, and say what the GPU still holds.
+
+    The weights a loader had already moved to the GPU live on in reference cycles (modules point at their parents,
+    accelerate's hooks at their modules) until the garbage collector runs, and torch's caching allocator keeps
+    the blocks they used reserved even then: ``gc.collect()``, then ``torch.cuda.empty_cache()`` and
+    ``ipc_collect()`` hand them back to the driver. What stays is the CUDA context itself (a few hundred MB per
+    process) and whatever another loaded model uses; bolo restarts the plugin when nothing else is loaded in it.
+
+    Returns ``{"initialized": False}`` when this process never started CUDA (nothing on the GPU to give back),
+    else ``{"initialized": True, "allocated_bytes", "reserved_bytes"}`` summed over the visible GPUs."""
+    import gc
+    import sys
+
+    gc.collect()
+    torch = sys.modules.get("torch")  # a load that failed before importing torch touched no GPU
+    if torch is None:
+        return {"initialized": False}
+    mps = getattr(torch, "mps", None)
+    if _mps_available(torch) and mps is not None and hasattr(mps, "empty_cache"):
+        with _suppress():
+            mps.empty_cache()
+    cuda = getattr(torch, "cuda", None)
+    if cuda is None or not cuda.is_initialized():
+        return {"initialized": False}
+    with _suppress():
+        cuda.synchronize()
+    cuda.empty_cache()
+    with _suppress():
+        cuda.ipc_collect()
+    allocated = reserved = 0
+    for i in range(int(cuda.device_count())):
+        with _suppress():
+            allocated += int(cuda.memory_allocated(i))
+            reserved += int(cuda.memory_reserved(i))
+    return {"initialized": True, "allocated_bytes": allocated, "reserved_bytes": reserved}
+
+
+def _suppress() -> Any:
+    import contextlib
+
+    return contextlib.suppress(Exception)
+
+
 #: bolo's own ``device`` names for an accelerator, and the torch device each one is: Apple silicon (bolo resolves
 #: ``auto`` to ``coreml`` there) is MPS; an AMD GPU is ``cuda`` in a ROCm build of torch (HIP serves torch.cuda)
 BOLO_ALIASES = {"coreml": "mps", "metal": "mps", "mlx": "mps", "rocm": "cuda", "hip": "cuda", "gpu": "cuda"}

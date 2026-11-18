@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import functools
 import json
 import logging
 import subprocess
@@ -1068,9 +1069,17 @@ class ModelManager:
                 need_ram = int(need_ram * placement.cpu_bytes / (placement.gpu_bytes + placement.cpu_bytes))
             await self._make_room(spec, need_ram)
             loop = asyncio.get_running_loop()
-            model, memory, load_ms, vram, measured, source = await loop.run_in_executor(
-                None, self._load_blocking, spec, placement
-            )
+            try:
+                model, memory, load_ms, vram, measured, source = await loop.run_in_executor(
+                    None, self._load_blocking, spec, placement
+                )
+            except Exception:
+                if family(placement.device) in GPU_FAMILIES:
+                    # a failed load may have given GPU memory back (a plugin restarted to free it): ps and the next
+                    # placement read the devices again rather than a reading taken before or during the load
+                    with contextlib.suppress(Exception):
+                        await loop.run_in_executor(None, functools.partial(self.accel.devices, fresh=True))
+                raise
             entry = LoadedModel(spec, model, self._build_queue(spec, model), memory, load_ms)
             entry.vram_bytes, entry.vram_measured, entry.placement = vram, measured, placement
             entry.vram_source = source

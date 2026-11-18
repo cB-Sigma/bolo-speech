@@ -739,6 +739,12 @@ def format_ps(doc: dict[str, Any], verbose: bool = False) -> str:
         if (m.get("placement") or {}).get("notice")
     ]
     lines += [f"note: {n}" for n in notices]  # always: they say where a model really runs
+    for h in system.get("plugin_gpu_held") or []:
+        amount = _human(h["reserved_bytes"]) if h.get("reserved_bytes") is not None else "an unknown amount"
+        lines.append(
+            f"note: {h.get('plugin')} holds {amount} of GPU memory (and its CUDA context) left by the failed load of "
+            f"{h.get('model')}; it is given back when the plugin's other models unload"
+        )
     return "\n".join(lines)
 
 

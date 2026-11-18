@@ -10,10 +10,13 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import traceback
 from typing import IO, Any
 
 from bolo.engines.base import Engine
 from bolo.plugin.sdk import _Server, protocol_streams
+
+from bolo_torch.runtime import release_memory
 
 
 def error_code(exc: BaseException) -> str:
@@ -27,6 +30,7 @@ def error_code(exc: BaseException) -> str:
 
 class TorchServer(_Server):
     def handle(self, rid: str, op: Any, message: dict[str, Any], payload: bytes) -> None:
+        failed_load: tuple[str, str] | None = None
         try:
             if op == "load":
                 self.load(rid, message)
@@ -54,10 +58,36 @@ class TorchServer(_Server):
             else:
                 self.fail(rid, "unknown_op", f"unknown op {op!r}")
         except Exception as exc:
-            logging.getLogger("bolo_torch").warning("%s failed: %s: %s", op, type(exc).__name__, exc)
-            self.fail(rid, error_code(exc), str(exc)[:2000])
+            logging.getLogger("bolo_torch").warning("%s failed: %s: %s", op, type(exc).__name__, str(exc))
+            if op == "load":
+                failed_load = (error_code(exc), str(exc)[:2000])
+                # whoever still holds the exception (a log handler, a debugger) must not keep the loader's locals
+                traceback.clear_frames(exc.__traceback__)
+            else:
+                self.fail(rid, error_code(exc), str(exc)[:2000])
         finally:
             self.cancelled.discard(rid)
+        if failed_load is not None:
+            # out of the except block: the exception, its traceback and the loader's frames (which hold the weights
+            # loaded so far) are gone, so the collector can free them and torch can give their memory back
+            self.load_failed(rid, *failed_load)
+
+    def load_failed(self, rid: str, code: str, text: str) -> None:
+        """Answer a failed load after freeing what it left on the GPU; ``error.gpu`` says what is still held, so
+        bolo can restart the process when no other model needs it (the CUDA context stays until the process ends)."""
+        error: dict[str, Any] = {"code": code, "message": text}
+        try:
+            gpu = release_memory()
+        except Exception as exc:  # never let the cleanup hide the load's own error
+            logging.getLogger("bolo_torch").warning("could not free memory after the failed load: %s", exc)
+            gpu = {"initialized": True}
+        error["gpu"] = gpu
+        if gpu.get("initialized"):
+            logging.getLogger("bolo_torch").info(
+                "after the failed load the GPU holds %.0f MB allocated, %.0f MB reserved by this process",
+                gpu.get("allocated_bytes", 0) / 1e6, gpu.get("reserved_bytes", 0) / 1e6,
+            )  # fmt: skip
+        self.send({"id": rid, "ok": False, "error": error})
 
 
 def serve(engine: Engine, stdin: IO[bytes] | None = None, stdout: IO[bytes] | None = None) -> int:

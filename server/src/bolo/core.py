@@ -1086,6 +1086,18 @@ class Bolo:
         }
         if self.s2s.placement is not None:
             out["speech_to_speech"] = {"model": s.s2s_model, "placement": self.s2s.placement.to_dict()}
+        held = self._plugin_gpu_held()
+        if held:  # GPU memory no loaded model accounts for: a failed load in a plugin that other models keep running
+            out["system"]["plugin_gpu_held"] = held
+        return out
+
+    def _plugin_gpu_held(self) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for engine in self.engines.plugins():
+            process = getattr(engine, "process", None)
+            held = getattr(process, "gpu_held", None)
+            if isinstance(held, dict):
+                out.append({"plugin": getattr(engine, "id", ""), **held})
         return out
 
     # ------------------------------------------------------------------

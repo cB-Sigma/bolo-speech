@@ -21,6 +21,11 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
   own code (transformers 4.44.1); the 4-bit load itself needs CUDA and was not run here.
 - **Extras that bring librosa ask for 0.10.2 or later** (`f5`, `step-audio-2`, `glm-4-voice`, `kimi-audio`,
   `minicpm-o`, `maskgct`): older librosa imports `pkg_resources`, which setuptools 81 no longer has.
+- **A failed load gives its GPU memory back.** Before answering a failed `load`, the plugin clears the loader's
+  frames, runs the garbage collector, then `torch.cuda.empty_cache()` and `torch.cuda.ipc_collect()` (MPS:
+  `torch.mps.empty_cache()`), and adds `error.gpu` to the reply: `{"initialized": false}` when CUDA was never started,
+  else the bytes still allocated and reserved. bolo uses it to restart the plugin when nothing else is loaded in it
+  (bolo bug 17).
 
 ## [0.1.7] - 2026-11-18
 
