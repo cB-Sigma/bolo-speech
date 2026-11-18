@@ -40,6 +40,8 @@ the OpenAI audio and Realtime APIs. On top of speech-to-text and text-to-speech 
   automatic fallback in either direction.
 - **Voice agents**: three pipelines (recogniser → your language model → voice, an audio language model, or one
   speech-to-speech model) over the Realtime API and WebRTC, with turn detection and tools.
+- **Audio analysis**: background noise removed from a recording (whole or streamed back) with any of the
+  catalog's denoisers.
 - **Latency you can see**: a phase-by-phase trace of every request, micro-batching and backpressure under load.
 - **Telephony**, as an extra: answers and places phone calls through Twilio, Plivo, Telnyx, Exotel or SIP, with barge-in,
   transfers and per-call latency.

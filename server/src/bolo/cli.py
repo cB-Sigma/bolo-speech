@@ -864,6 +864,38 @@ def cmd_transcribe(args: argparse.Namespace) -> int:
     return asyncio.run(run())
 
 
+def cmd_denoise(args: argparse.Namespace) -> int:
+    """``bolo denoise in.wav -o out.wav``: the recording with its background noise removed."""
+    from bolo.audio import decode_audio
+    from bolo.audio.encode import encode_audio
+    from bolo.denoise import enhance, mix
+    from bolo.obs.trace import Trace
+
+    core = _core(args)
+    path, out = Path(args.file), Path(args.output)
+    samples, rate = decode_audio(path.read_bytes(), filename=path.name)
+    fmt = args.format or (out.suffix.lstrip(".").lower() or "wav")
+    if not 0.0 < args.strength <= 1.0:
+        print("error: --strength must be above 0 and at most 1", file=sys.stderr)
+        return 2
+
+    async def run() -> int:
+        await core.start()
+        try:
+            spec = core.resolve(args.model, "denoise")
+            trace = Trace("denoise", "cli", spec.id)
+            with trace.phase("denoise"):
+                enhanced, native = await enhance(core, samples, rate, spec.id, trace)
+            out.write_bytes(encode_audio(mix(samples, enhanced, args.strength), rate, fmt, args.sample_rate))
+            seconds = len(samples) / rate if rate else 0.0
+            print(f"wrote {out} ({seconds:.1f}s, {fmt}) with {spec.id} ({native} Hz)")
+            return 0
+        finally:
+            await core.stop()
+
+    return asyncio.run(run())
+
+
 def cmd_speak(args: argparse.Namespace) -> int:
     from bolo.audio.encode import encode_audio
     from bolo.obs.trace import Trace
@@ -2029,6 +2061,16 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--format", "-f", choices=["text", "json", "srt", "vtt"], default="text")
     s.add_argument("--verbose", "-v", action="store_true")
     s.set_defaults(func=cmd_transcribe)
+
+    s = sub.add_parser("denoise", help="remove background noise from an audio file (speech enhancement)")
+    _common(s)
+    s.add_argument("file")
+    s.add_argument("--output", "-o", required=True)
+    s.add_argument("--model", "-m", help="a denoise model (default: default_denoise)")
+    s.add_argument("--strength", type=float, default=1.0, help="0 to 1: the enhanced audio mixed with the original")
+    s.add_argument("--format", "-f", help="default: from the output file extension")
+    s.add_argument("--sample-rate", dest="sample_rate", type=int)
+    s.set_defaults(func=cmd_denoise)
 
     s = sub.add_parser("speak", help="synthesise speech to a file")
     _common(s)

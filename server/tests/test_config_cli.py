@@ -155,6 +155,9 @@ def test_cli_transcribe_and_speak_with_fake_engine(cli_env: Path, capsys: pytest
     assert (cli_env / "out.wav").read_bytes()[:4] == b"RIFF"
     assert main(["speak", "Hello there.", "-o", "out.ulaw", "--fake-engine", "-f", "mulaw"]) == 0
     assert len((cli_env / "out.ulaw").read_bytes()) == pytest.approx(0.72 * 8000, rel=0.02)
+    assert main(["denoise", "in.wav", "-o", "clean.flac", "--fake-engine", "-m", "fake-denoise"]) == 0
+    assert "wrote clean.flac (2.0s, flac) with fake-denoise" in capsys.readouterr().out
+    assert (cli_env / "clean.flac").read_bytes()[:4] == b"fLaC"
     assert main(["transcribe", "missing.wav", "--fake-engine"]) == 1
     assert main(["transcribe", "in.wav"]) == 1  # the fake models do not exist without the flag
     assert "does not exist" in capsys.readouterr().err

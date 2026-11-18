@@ -2843,6 +2843,66 @@
     }
    }
   },
+  "/v1/audio/denoise": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Remove background noise from a recording",
+    "description": "Extension. Speech enhancement on its own: the recording comes back with the background noise removed and\nthe voice kept (voice isolation). Multipart form:\n\n* ``file``: the audio (any format bolo decodes);\n* ``model``: any ``denoise`` model of the catalog (``gtcrn-simple``, ``dpdfnet2``, ``deepfilternet3``,\n  ``rnnoise``, ``demucs-dns48``, ``elevenlabs-voice-isolator``, ...); default ``default_denoise``;\n* ``strength``: 0 to 1 (default 1): the enhanced audio mixed with the original at that weight;\n* ``response_format``: ``wav`` (default), ``mp3``, ``flac``, ``opus``, ``aac``, ``pcm`` (16-bit), ``mulaw``,\n  ``alaw``; ``sample_rate``: the output's rate (default the input's);\n* ``stream``: ``true`` sends the audio back as it is made (chunked). Models with a live form (GTCRN, DPDFNet,\n  DeepFilterNet 3, RNNoise) enhance the recording piece by piece as it is sent; the others enhance it whole\n  first. A streamed WAV has no length in its header;\n* ``keep_alive``.\n\nThe model runs at its own sample rate (16 or 48 kHz); the audio is resampled to it and back. Headers:\n``x-bolo-denoise`` (model and strength), ``x-bolo-model``, ``x-sample-rate``. A model that cannot run is an\nerror here (transcriptions skip it instead).",
+    "operationId": "denoise_audio_v1_audio_denoise_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio-isolation": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Voice isolation (ElevenLabs' route)",
+    "description": "ElevenLabs' voice-isolation route: multipart ``audio``; the voice comes back as MP3 (``output_format``, or\nthe fields of ``POST /v1/audio/denoise``, choose otherwise). The denoiser is ``model`` or ``default_denoise``.",
+    "operationId": "audio_isolation_v1_audio_isolation_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio-isolation/stream": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Voice isolation, streamed (ElevenLabs' route)",
+    "description": "As ``POST /v1/audio-isolation``, the audio sent back as it is made.",
+    "operationId": "audio_isolation_stream_v1_audio_isolation_stream_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
   "/metrics": {
    "get": {
     "tags": [

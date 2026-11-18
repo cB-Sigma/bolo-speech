@@ -102,6 +102,9 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `DELETE` | `/api/v1/wordlists/{name}` | Delete a word list |
 | `POST` | `/api/v1/wordlists/{name}/preview` | What each voice would receive |
 | `GET` | `/api/v1/text-input/{model_id}` | How a model's voices take text |
+| `POST` | `/v1/audio/denoise` | Remove background noise from a recording |
+| `POST` | `/v1/audio-isolation` | Voice isolation (ElevenLabs' route) |
+| `POST` | `/v1/audio-isolation/stream` | Voice isolation, streamed (ElevenLabs' route) |
 | `GET` | `/api/v1/telephony` | Telephony: providers, webhook URLs, agents, numbers (no secrets) |
 | `GET` | `/api/v1/telephony/agents` | Voice agents that answer and place calls |
 | `GET` | `/api/v1/telephony/agents/{name}` | One voice agent |
@@ -392,6 +395,39 @@ The decision comes back in two headers (also on streamed responses) and in the t
 
 `GET /api/v1/info` describes it under `capabilities.lid` (default model, whether it is available, the routing
 settings), so a client can offer an "Auto (detect the language)" choice when `routing.enabled` is true.
+
+### Speech enhancement: `POST /v1/audio/denoise`
+
+Extension: the recording comes back with its background noise removed and the voice kept (voice isolation), as
+audio. The same denoisers that can run before a transcription (`denoise`, above) run here on their own. Multipart
+form.
+
+| Field | | |
+| --- | --- | --- |
+| `file` | required | audio, as for transcriptions |
+| `model` | `default_denoise` | any denoise model (`task: denoise` in the catalog: `gtcrn-simple`, `dpdfnet2`, `dpdfnet-baseline`, `deepfilternet3`, `rnnoise`, `demucs-dns48`, `elevenlabs-voice-isolator`, ...; [models.md](models.md)) |
+| `strength` | `1` | above 0 and at most 1: the enhanced audio mixed with the original at that weight (`0.7` keeps 30 % of the original: less noise removed, less speech damaged) |
+| `response_format` | `wav` | `wav`, `mp3`, `flac`, `opus`, `aac`, `pcm` (16-bit little-endian), `mulaw`, `alaw` |
+| `sample_rate` | the input's | rate of the audio sent back (8000 to 48000) |
+| `stream` | `false` | `true`: the audio is sent back as it is made (chunked transfer). Models with a live form (GTCRN, DPDFNet, DeepFilterNet 3, RNNoise) enhance the recording half a second at a time, carrying their state across, so the first audio comes back after the first piece; the others (Demucs, a cloud isolator) enhance it whole first. A streamed WAV says "unknown length" in its header |
+| `keep_alive` | - | how long the model stays loaded ([Keep-alive](#keep-alive)) |
+
+```bash
+curl -s localhost:8000/v1/audio/denoise -F file=@noisy.wav -F model=deepfilternet3 -o clean.wav
+curl -sN localhost:8000/v1/audio/denoise -F file=@noisy.wav -F stream=true -F response_format=pcm | aplay -f S16_LE -r 16000
+```
+
+The model runs at its own rate (16 kHz for GTCRN and DPDFNet 2, 48 kHz for DeepFilterNet 3 and RNNoise): the audio is resampled to it
+and back, and comes back as long as it went in. Headers: `x-bolo-denoise` (`deepfilternet3` or
+`deepfilternet3; strength=0.7`), `x-bolo-model`, `x-sample-rate`, `x-request-id`; the trace has kind `denoise`. Unlike
+a transcription's `denoise`, a model that cannot run (unknown, not installed with `auto_pull` off, its engine
+missing) is an error here, not skipped. Which denoiser to choose, with word error rates and CPU time:
+[configuration.md](configuration.md#denoising). `bolo denoise noisy.wav -o clean.wav [-m model] [--strength 0.8]`
+does the same from the command line.
+
+ElevenLabs' routes answer too: `POST /v1/audio-isolation` and `POST /v1/audio-isolation/stream` take the recording
+as multipart `audio` and send MP3 back unless `output_format` (`mp3_44100_128`, `pcm_16000`, ...: the codec is the
+part before the first `_`) or `response_format` says otherwise; `model`, `strength` and `sample_rate` as above.
 
 ### `POST /v1/audio/speech`
 

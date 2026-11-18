@@ -130,6 +130,31 @@ def _fit(audio: FloatArray, n: int) -> FloatArray:
     return np.ascontiguousarray(audio[:n], dtype=np.float32)
 
 
+async def enhance(core: Bolo, samples: FloatArray, rate: int, model_id: str, trace: Trace) -> tuple[FloatArray, int]:
+    """``samples`` (mono float32 at ``rate``) enhanced by the denoise model ``model_id``, at the same rate and length,
+    and the model's own sample rate. Raises when the model cannot run (the standalone ``/v1/audio/denoise``)."""
+    if len(samples) == 0:
+        return samples, rate
+    async with core.manager.use(model_id) as entry:
+        model = entry.model
+        assert isinstance(model, DenoiseModel)
+        native = int(model.sample_rate)
+        big = len(samples) > rate * 30
+        source = samples
+        if native != rate:
+            source = (
+                await asyncio.to_thread(resample, samples, rate, native) if big else resample(samples, rate, native)
+            )
+        enhanced, _ = await entry.queue.submit("denoise", np.ascontiguousarray(source, dtype=np.float32))
+        enhanced = _fit(np.asarray(enhanced, dtype=np.float32), len(source))
+        if native != rate:
+            back = (
+                await asyncio.to_thread(resample, enhanced, native, rate) if big else resample(enhanced, native, rate)
+            )
+            enhanced = _fit(back, len(samples))
+    return enhanced, native
+
+
 async def apply(core: Bolo, samples: FloatArray, rate: int, opts: DenoiseOptions, trace: Trace) -> FloatArray:
     """``samples`` (mono float32 at ``rate``) with ``opts.model`` applied, at the same rate and length.
 
@@ -142,26 +167,8 @@ async def apply(core: Bolo, samples: FloatArray, rate: int, opts: DenoiseOptions
         return samples
     t0 = trace.now()
     try:
-        async with core.manager.use(opts.model) as entry:
-            model = entry.model
-            assert isinstance(model, DenoiseModel)
-            native = int(model.sample_rate)
-            big = len(samples) > rate * 30
-            source = samples
-            if native != rate:
-                source = (
-                    await asyncio.to_thread(resample, samples, rate, native) if big else resample(samples, rate, native)
-                )
-            enhanced, _ = await entry.queue.submit("denoise", np.ascontiguousarray(source, dtype=np.float32))
-            enhanced = _fit(np.asarray(enhanced, dtype=np.float32), len(source))
-            if native != rate:
-                back = (
-                    await asyncio.to_thread(resample, enhanced, native, rate)
-                    if big
-                    else resample(enhanced, native, rate)
-                )
-                enhanced = _fit(back, len(samples))
-            record["sample_rate"] = native
+        enhanced, native = await enhance(core, samples, rate, opts.model, trace)
+        record["sample_rate"] = native
     except asyncio.CancelledError:
         raise
     except BoloError as exc:

@@ -212,3 +212,47 @@ async def test_realtime_session_config(dn_core: Bolo) -> None:
     assert await session._transcribe(item, noisy(), Trace("stt", "realtime", ""))
     assert calls(dn_core) == [(2 * SR, SR)]
     assert any(e["type"] == "conversation.item.input_audio_transcription.completed" for e in sent)
+
+
+def test_http_denoise_route(dn_live: LiveServer) -> None:
+    """``POST /v1/audio/denoise``: the enhanced recording, whole or streamed, in the format asked for."""
+    from bolo.audio import decode_audio
+
+    url = dn_live.url + "/v1/audio/denoise"
+    x = noisy()
+    r = httpx.post(url, files={"file": wav(x)}, timeout=30)
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"].startswith("audio/wav") and r.headers["x-bolo-denoise"] == "fake-denoise"
+    out, rate = decode_audio(r.content)
+    assert rate == SR and abs(len(out) - len(x)) <= 1
+    assert float(np.std(out - x)) > 0.01  # the noise went
+    trace = httpx.get(dn_live.url + f"/api/v1/requests/{r.headers['x-request-id']}").json()
+    assert trace["denoise"]["model"] == "fake-denoise"
+
+    r = httpx.post(url, files={"file": wav(x)}, data={"strength": "0.5", "response_format": "flac"}, timeout=30)
+    assert r.status_code == 200 and r.headers["x-bolo-denoise"] == "fake-denoise; strength=0.5"
+    assert r.content[:4] == b"fLaC"
+
+    # streamed: the model has a live form, so the audio comes back piece by piece, as long as the input
+    r = httpx.post(
+        url, files={"file": wav(x)}, data={"stream": "true", "response_format": "pcm", "model": "fake-denoise-48k"},
+        timeout=30,
+    )  # fmt: skip
+    assert r.status_code == 200, r.text
+    assert len(r.content) == 2 * len(x)
+    r = httpx.post(url, files={"file": wav(x)}, data={"stream": "true", "sample_rate": "8000"}, timeout=30)
+    out, rate = decode_audio(r.content)
+    assert rate == 8000 and abs(len(out) - len(x) // 2) <= 32
+
+    for data, param in (({"model": "fake-stt"}, "model"), ({"strength": "2"}, "strength")):
+        r = httpx.post(url, files={"file": wav(x)}, data=data, timeout=30)
+        assert r.status_code == 400 and r.json()["error"]["param"] == param
+
+    # ElevenLabs' voice-isolation route: multipart "audio", MP3 back by default
+    r = httpx.post(dn_live.url + "/v1/audio-isolation", files={"audio": wav(x)}, timeout=30)
+    assert r.status_code == 200 and r.headers["content-type"].startswith("audio/mpeg")
+    r = httpx.post(
+        dn_live.url + "/v1/audio-isolation/stream", files={"audio": wav(x)}, data={"output_format": "pcm_16000"},
+        timeout=30,
+    )  # fmt: skip
+    assert r.status_code == 200 and len(r.content) == 2 * len(x)

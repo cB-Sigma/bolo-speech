@@ -17,6 +17,16 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   `hallucination_silence_threshold` works as before (it decodes with timestamp tokens whether or not words are
   asked for).
 
+### Added
+
+- **Speech enhancement on its own: `POST /v1/audio/denoise`.** The recording comes back with its background noise
+  removed (voice isolation), from any `denoise` model of the catalog, with `strength` (mixed with the original),
+  `response_format` (WAV, MP3, FLAC, Opus, AAC, PCM, mu-law, A-law) and `sample_rate`. `stream=true` sends the audio
+  back as it is made: models with a live form (GTCRN, DPDFNet, DeepFilterNet 3, RNNoise) enhance it half a second at
+  a time with their state carried across, the others enhance it whole first. ElevenLabs' `POST /v1/audio-isolation`
+  and `/v1/audio-isolation/stream` answer too (multipart `audio`, MP3 back). From the command line:
+  `bolo denoise noisy.wav -o clean.wav`. Run on CPU with `gtcrn-simple` and `dpdfnet2`, whole and streamed.
+
 ## [0.6.7] - 2026-11-18
 
 ### Added
