@@ -1,7 +1,29 @@
-import { Ban, CircleCheck, CircleDashed, Clock, Cloud, Cpu, Lock, Scale, Target, Zap } from 'lucide-react'
+import {
+  Ban,
+  CircleCheck,
+  CircleDashed,
+  Clock,
+  Cloud,
+  Code,
+  Cpu,
+  FileExclamationPoint,
+  Lock,
+  PackageX,
+  Scale,
+  Target,
+  Zap,
+} from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { CatalogModel, Tier } from '@/lib/api/types'
-import { cloudNotice, hardwareLabel, isCloud, isNotImplemented, isPending, notRunnableReason } from '@/lib/capabilities'
+import {
+  cloudNotice,
+  hardwareLabel,
+  isCloud,
+  isNotImplemented,
+  isPending,
+  notRunnableReason,
+  remoteCodeCommand,
+} from '@/lib/capabilities'
 import { languageName } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -217,6 +239,111 @@ export function AvailabilityMark({
         {pending
           ? 'Described in the catalog, but its files are not published yet. It cannot be pulled or used.'
           : `Listed for reference: nothing this server has can run it yet, so loading it fails. ${why ?? 'The description says why.'}`}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+/** "Non-commercial" for models whose licence rules out commercial use. */
+export function NonCommercialMark({ license, className }: { license: string; className?: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          className={cn('inline-flex items-center gap-1 text-xs text-warning-text', className)}
+          data-testid="non-commercial-mark"
+        >
+          <Ban className="size-3.5" aria-hidden /> Non-commercial
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-64">
+        Its licence ({license}) does not allow commercial use. Read it before you build on this model.
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+/** "Licence note": a term to act on before use, such as a registration for commercial use. */
+export function LicenseNoteMark({ note, className }: { note: string; className?: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          className={cn('inline-flex items-center gap-1 text-xs text-warning-text', className)}
+          data-testid="license-note-mark"
+        >
+          <FileExclamationPoint className="size-3.5" aria-hidden /> Licence note
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-72">{note}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+/**
+ * "Remote code": loading the model runs Python files from its own repository, pinned by commit and sha256, and
+ * only after the operator opts in for it. Says which way the opt-in stands.
+ */
+export function RemoteCodeMark({
+  model,
+  className,
+}: {
+  model: Pick<CatalogModel, 'id' | 'remote_code'>
+  className?: string
+}) {
+  const rc = model.remote_code
+  if (!rc) return null
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          className={cn(
+            'inline-flex items-center gap-1 text-xs',
+            rc.allowed ? 'text-muted-foreground' : 'text-warning-text',
+            className,
+          )}
+          data-testid="remote-code-mark"
+          data-allowed={rc.allowed}
+        >
+          <Code className="size-3.5" aria-hidden /> {rc.allowed ? 'Remote code allowed' : 'Remote code, not allowed'}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-72">
+        Loading it runs Python files from the model&apos;s own repository with the server&apos;s rights.{' '}
+        {rc.allowed
+          ? 'You opted in for this model (allow_remote_code).'
+          : `It will not load until you opt in: ${remoteCodeCommand(model.id)}.`}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+/** "Engine not installed": the server has nothing to run this model with yet (whisper.cpp without pywhispercpp...). */
+export function EngineMissingMark({
+  engine,
+  reason,
+  className,
+}: {
+  engine: string
+  reason?: string | null
+  className?: string
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          className={cn('inline-flex items-center gap-1 text-xs text-warning-text', className)}
+          data-testid="engine-missing-mark"
+        >
+          <PackageX className="size-3.5" aria-hidden /> Needs {engine}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-72">
+        The {engine} engine is not installed on this server, so the model cannot load yet. {reason ?? ''}
       </TooltipContent>
     </Tooltip>
   )

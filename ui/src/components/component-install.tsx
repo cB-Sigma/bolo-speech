@@ -102,15 +102,29 @@ const SOURCE_LABEL: Record<string, string> = {
   configured: 'configured path',
 }
 
-function CopyCommand({ command }: { command: string }) {
+/** A command on one line with a Copy button. */
+export function CopyCommand({
+  command,
+  className,
+  label = 'Manual install command',
+}: {
+  command: string
+  className?: string
+  label?: string
+}) {
   const [copied, setCopied] = useState(false)
   if (!command) return null
   return (
-    <div className="flex min-w-0 items-stretch overflow-hidden rounded-lg border border-border bg-background/60">
+    <div
+      className={cn(
+        'flex min-w-0 items-stretch overflow-hidden rounded-lg border border-border bg-background/60',
+        className,
+      )}
+    >
       <pre
         className="min-w-0 flex-1 overflow-x-auto px-3 py-2 num text-[12.5px] leading-5"
         tabIndex={0}
-        aria-label="Manual install command"
+        aria-label={label}
       >
         <code>{command}</code>
       </pre>

@@ -195,6 +195,13 @@ async def test_a_text_turn_model_is_asked_about_the_transcript(core: Bolo) -> No
     assert await core.end_of_turn(speechlike(1.0), text=None, model="fake-turn-text") is None
 
 
+def test_the_catalog_marks_end_of_turn_models_that_read_text() -> None:
+    catalog = Catalog.load(include_fake=True)
+    features = {m.id: m.to_api()["features"] for m in catalog.all() if m.task == "turn"}
+    assert "reads-text" in features["namo-turn-en"] and "reads-text" in features["fake-turn-text"]
+    assert "reads-text" not in features["smart-turn-v3"] and "reads-text" not in features["fake-turn"]
+
+
 async def test_a_realtime_session_chooses_its_end_of_turn_model(settings: Settings) -> None:
     live = LiveServer(settings)
     live.start()

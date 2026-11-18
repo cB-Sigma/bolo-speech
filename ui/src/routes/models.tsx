@@ -19,7 +19,10 @@ import { Page } from '@/components/layout/app-shell'
 import {
   AvailabilityMark,
   CloudMark,
+  EngineMissingMark,
   GatedMark,
+  LicenseNoteMark,
+  RemoteCodeMark,
   HardwareMark,
   languageSummary,
   StateDot,
@@ -57,6 +60,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import {
   ComponentInstallButton,
   ComponentNotice,
+  CopyCommand,
   ComponentsCard,
   NeedsComponentMark,
 } from '@/components/component-install'
@@ -66,15 +70,25 @@ import { LoadedModelsPanel } from '@/components/loaded-models'
 import { ModelSettingsSection } from '@/components/model-settings'
 import {
   cloudNotice,
+  engineMissing,
   isCloud,
   isCpuFriendly,
   isNotImplemented,
   isPending,
   PHONEMIZER_LABEL,
+  remoteCodeCommand,
   runtimeLabel,
 } from '@/lib/capabilities'
 import { describePrice } from '@/lib/cost'
-import { describeError, missingComponent, useCatalog, useComponents, useLive, useModelActions } from '@/hooks/use-api'
+import {
+  describeError,
+  missingComponent,
+  useCatalog,
+  useComponents,
+  useInfo,
+  useLive,
+  useModelActions,
+} from '@/hooks/use-api'
 import { useStore } from '@/hooks/use-store'
 import type { CatalogModel, ModelStats, Task } from '@/lib/api/types'
 import { isUnlikely, sortByFit } from '@/lib/fit'
@@ -94,6 +108,10 @@ const TASK_LABEL: Record<Task, string> = {
   denoise: 'Denoising',
   turn: 'End of turn',
   translation: 'Translation',
+  lid: 'Language identification',
+  'speaker-embedding': 'Speaker embedding',
+  'speech-to-speech': 'Speech to speech',
+  'audio-llm': 'Audio-in language models',
 }
 const TASK_SHORT: Record<Task, string> = {
   stt: 'STT',
@@ -104,13 +122,100 @@ const TASK_SHORT: Record<Task, string> = {
   denoise: 'Denoise',
   turn: 'Turn',
   translation: 'Translation',
+  lid: 'LID',
+  'speaker-embedding': 'Embedding',
+  'speech-to-speech': 'S2S',
+  'audio-llm': 'Audio LLM',
 }
-const TASK_ORDER: Task[] = ['stt', 'tts', 'vad', 'diarization', 'separation', 'denoise', 'turn', 'translation']
+const TASK_ORDER: Task[] = [
+  'stt',
+  'tts',
+  'vad',
+  'turn',
+  'lid',
+  'diarization',
+  'speaker-embedding',
+  'separation',
+  'denoise',
+  'speech-to-speech',
+  'audio-llm',
+  'translation',
+]
 
 /** "Needs eSpeak NG" for a model whose optional component is not installed; nothing otherwise. */
 function UnmetMark({ m }: { m: CatalogModel }) {
   const missing = missingComponent(m, useComponents().data?.components)
   return missing ? <NeedsComponentMark name={missing.name} /> : null
+}
+
+/** Licence note, remote code and a missing engine, as marks on a card or in the drawer. */
+function LicenceMarks({ m }: { m: CatalogModel }) {
+  const info = useInfo().data
+  const engine = isDemo ? null : engineMissing(info, m)
+  return (
+    <>
+      {m.license_note && <LicenseNoteMark note={m.license_note} />}
+      <RemoteCodeMark model={m} />
+      {engine && <EngineMissingMark engine={engine.engine} reason={engine.reason} />}
+    </>
+  )
+}
+
+/** The drawer's account of what to do before using a model: licence terms, remote code, a missing engine. */
+function LicenceDetails({ m }: { m: CatalogModel }) {
+  const info = useInfo().data
+  const engine = isDemo ? null : engineMissing(info, m)
+  const rc = m.remote_code
+  if (!m.license_note && !rc && !engine) return null
+  return (
+    <div className="grid min-w-0 gap-3" data-testid="licence-details">
+      {engine && (
+        <div className="min-w-0 rounded-lg border border-warning/40 bg-warning/10 p-3 text-[13px] leading-5">
+          <p className="font-medium text-warning-text">The {engine.engine} engine is not installed on this server</p>
+          <p className="mt-1 text-muted-foreground">
+            {m.id} can be pulled, but it cannot load until it is. {engine.reason}
+          </p>
+          {engine.install && <CopyCommand command={engine.install} className="mt-2" label="Install command" />}
+        </div>
+      )}
+      {m.license_note && (
+        <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-[13px] leading-5">
+          <p className="font-medium text-warning-text">Licence note</p>
+          <p className="mt-1 text-muted-foreground" data-testid="license-note">
+            {m.license_note}
+          </p>
+        </div>
+      )}
+      {rc && (
+        <div
+          className={cn(
+            'min-w-0 rounded-lg border p-3 text-[13px] leading-5',
+            rc.allowed ? 'border-border' : 'border-warning/40 bg-warning/10',
+          )}
+          data-testid="remote-code"
+          data-allowed={rc.allowed}
+        >
+          <p className={cn('font-medium', !rc.allowed && 'text-warning-text')}>
+            Remote code · {rc.allowed ? 'allowed for this model' : 'not allowed yet'}
+          </p>
+          {rc.notice && <p className="mt-1 text-muted-foreground">{rc.notice}</p>}
+          <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+            <dt className="text-muted-foreground">Commit</dt>
+            <dd className="num break-all">{rc.revision ?? 'not stated'}</dd>
+            <dt className="text-muted-foreground">Files</dt>
+            <dd className="num break-all">{rc.files.join(', ') || 'none listed'}</dd>
+            {rc.reviewed && (
+              <>
+                <dt className="text-muted-foreground">Review</dt>
+                <dd className="text-muted-foreground">{rc.reviewed}</dd>
+              </>
+            )}
+          </dl>
+          {!rc.allowed && <CopyCommand command={remoteCodeCommand(m.id)} className="mt-2" label="Opt-in command" />}
+        </div>
+      )}
+    </div>
+  )
 }
 
 /** A row under a card: what the model still needs, with an install button when the server can install it. */
@@ -327,6 +432,7 @@ function ModelCard({
           <AvailabilityMark model={m} />
           <ValidatedMark validated={m.validated} />
           {m.gated && <GatedMark />}
+          <LicenceMarks m={m} />
           <HardwareMark hardware={m.hardware} />
         </div>
         {m.fit && !isDemo && (
@@ -387,11 +493,13 @@ function Details({
                 <ValidatedMark validated={m.validated} />
                 <UnmetMark m={m} />
                 {m.gated && <GatedMark />}
+                <LicenceMarks m={m} />
                 <HardwareMark hardware={m.hardware} />
               </div>
             </SheetHeader>
             <div className="grid gap-5 p-4 text-sm">
               <p className="leading-6 text-muted-foreground">{m.description}</p>
+              <LicenceDetails m={m} />
               {isCloud(m) && (
                 <div
                   className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-[13px] leading-5"
@@ -860,23 +968,25 @@ export default function ModelsPage() {
           type="search"
         />
       </div>
-      <ToggleGroup
-        type="single"
-        variant="outline"
-        size="sm"
-        value={task}
-        onValueChange={(v) => v && setTask(v)}
-        aria-label="Task"
-      >
-        <ToggleGroupItem value="all" className="px-2.5 text-xs">
-          All
-        </ToggleGroupItem>
-        {options.tasks.map((t) => (
-          <ToggleGroupItem key={t} value={t} className="px-2.5 text-xs">
-            {TASK_SHORT[t] ?? t}
+      <div className="max-w-full overflow-x-auto">
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          value={task}
+          onValueChange={(v) => v && setTask(v)}
+          aria-label="Task"
+        >
+          <ToggleGroupItem value="all" className="px-2.5 text-xs">
+            All
           </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
+          {options.tasks.map((t) => (
+            <ToggleGroupItem key={t} value={t} className="px-2.5 text-xs" title={TASK_LABEL[t] ?? t}>
+              {TASK_SHORT[t] ?? t}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
       {filterSelect(
         'Tier',
         tier,
@@ -1160,6 +1270,8 @@ export default function ModelsPage() {
                         {m.license}
                         {m.commercial_use === false && <span className="text-warning-text">non-commercial</span>}
                         {m.gated && <GatedMark />}
+                        {m.license_note && <LicenseNoteMark note={m.license_note} />}
+                        <RemoteCodeMark model={m} />
                       </span>
                     </TableCell>
                     <TableCell>

@@ -54,6 +54,10 @@ export interface ConversationState {
   serverPipeline: string | null
   /** The denoiser the server says runs before transcription (`audio.input.denoise`); null: none reported. */
   serverDenoise: { enabled: boolean; model: string | null; strength: number } | null
+  /** The turn detection the server says the session uses (`audio.input.turn_detection`), null until it says. */
+  serverListening: { type: string; vad_model?: string | null; turn_model?: string | null } | null
+  /** The server says the session talks to a full-duplex model (`session.full_duplex`, a bolo extension). */
+  serverFullDuplex: boolean | null
   turns: Turn[]
   userSpeaking: boolean
   agentSpeaking: boolean
@@ -76,6 +80,8 @@ export const emptyConversation = (
   locked: false,
   serverPipeline: null,
   serverDenoise: null,
+  serverListening: null,
+  serverFullDuplex: null,
   turns: [],
   userSpeaking: false,
   agentSpeaking: false,
@@ -94,12 +100,16 @@ export function sessionUpdate(
   voice?: string,
   transport: RealtimeTransport = 'websocket',
   denoise?: RealtimeDenoise,
+  listening?: Listening,
 ): Record<string, unknown> & { session: Record<string, unknown> } {
   const pcm = transport === 'websocket'
   const format = { type: 'audio/pcm', rate: REALTIME_RATE }
   const output: Record<string, unknown> = pcm ? { format } : {}
   if (voice) output.voice = voice
-  const turn_detection = { type: 'server_vad' }
+  const turn_detection: Record<string, unknown> = { type: listening?.type ?? 'server_vad' }
+  // bolo's extensions: the session's voice-activity detector and end-of-turn model; left out, the server's defaults
+  if (listening?.vadModel) turn_detection.vad_model = listening.vadModel
+  if (listening?.type === 'semantic_vad' && listening.turnModel) turn_detection.turn_model = listening.turnModel
   const input: Record<string, unknown> = pcm ? { format, turn_detection } : { turn_detection }
   // bolo's extension; left out, the server's default (its `denoise` setting) applies
   if (denoise !== undefined) input.denoise = denoise
@@ -112,6 +122,16 @@ export function sessionUpdate(
       audio: { input, output },
     },
   }
+}
+
+/**
+ * How the session hears the end of a turn: `server_vad` (a pause ends it) or `semantic_vad` (an end-of-turn model is
+ * asked at each pause), with the voice-activity detector and the end-of-turn model by id ('' for the server's).
+ */
+export interface Listening {
+  type: 'server_vad' | 'semantic_vad'
+  vadModel?: string
+  turnModel?: string
 }
 
 /** `audio.input.denoise`: off, or a model and strength (see `realtimeDenoise`). */
@@ -134,13 +154,20 @@ export function applyEvent(s: ConversationState, ev: Ev): ConversationState {
   switch (ev.type) {
     case 'session.created':
     case 'session.updated': {
-      const session = (ev.session ?? {}) as { pipeline?: unknown; audio?: { input?: { denoise?: unknown } } }
+      const session = (ev.session ?? {}) as {
+        pipeline?: unknown
+        full_duplex?: unknown
+        audio?: { input?: { denoise?: unknown; turn_detection?: unknown } }
+      }
       const d = session.audio?.input?.denoise as ConversationState['serverDenoise'] | undefined
+      const td = session.audio?.input?.turn_detection as ConversationState['serverListening'] | undefined
       return {
         ...s,
         events,
         serverPipeline: typeof session.pipeline === 'string' ? session.pipeline : s.serverPipeline,
         serverDenoise: d && typeof d === 'object' ? d : d === null ? null : s.serverDenoise,
+        serverListening: td && typeof td === 'object' && typeof td.type === 'string' ? td : s.serverListening,
+        serverFullDuplex: typeof session.full_duplex === 'boolean' ? session.full_duplex : s.serverFullDuplex,
       }
     }
     case 'input_audio_buffer.speech_started':
@@ -255,10 +282,40 @@ export class ConversationSession {
   private answered = new Set<string>()
 
   private readonly denoise: RealtimeDenoise | undefined
+  private readonly listening: Listening | undefined
+  /** A full-duplex model keeps talking when the user talks: the page does not cut its audio on speech_started. */
+  private readonly fullDuplex: boolean
 
-  constructor(pipeline: PipelineId, transport: RealtimeTransport = 'websocket', denoise?: RealtimeDenoise) {
+  constructor(
+    pipeline: PipelineId,
+    transport: RealtimeTransport = 'websocket',
+    denoise?: RealtimeDenoise,
+    opts: { listening?: Listening; fullDuplex?: boolean } = {},
+  ) {
     this.store = new Store(emptyConversation(pipeline, transport))
     this.denoise = denoise
+    this.listening = opts.listening
+    this.fullDuplex = Boolean(opts.fullDuplex)
+  }
+
+  /**
+   * Stop the answer being spoken: `response.cancel` (and, over WebRTC, `output_audio_buffer.clear`), and drop what
+   * is queued here. For a full-duplex model this is the way to stop it; talking over it does not.
+   */
+  stopAnswer(): void {
+    if (this.closed) return
+    diag.event('conversation', 'stop the answer')
+    if (this.rtc) {
+      this.rtc.send({ type: 'output_audio_buffer.clear' })
+      this.rtc.send({ type: 'response.cancel' })
+    } else if (this.ws?.readyState === 1) {
+      this.ws.send(JSON.stringify({ type: 'response.cancel' }))
+    }
+    if (this.player && this.ctx) {
+      this.player.stop()
+      this.player = new GaplessPlayer(this.ctx)
+    }
+    this.store.patch({ agentSpeaking: false })
   }
 
   /** Choose the pipeline. Refused (returns false) once audio has gone out. */
@@ -319,7 +376,7 @@ export class ConversationSession {
       onFail: (message, code, mic) => this.fail(message, code ?? null, mic ?? null),
     })
     this.rtc = link
-    return link.start(sessionUpdate(pipeline, voice, 'webrtc', this.denoise).session)
+    return link.start(sessionUpdate(pipeline, voice, 'webrtc', this.denoise, this.listening).session)
   }
 
   private openSocket(pipeline: PipelineId, voice?: string): void {
@@ -333,7 +390,7 @@ export class ConversationSession {
     }
     this.ws = ws
     ws.onopen = () => {
-      ws.send(JSON.stringify(sessionUpdate(pipeline, voice, 'websocket', this.denoise)))
+      ws.send(JSON.stringify(sessionUpdate(pipeline, voice, 'websocket', this.denoise, this.listening)))
       this.ready = true
       for (const chunk of this.pending.splice(0)) this.sendAudio(chunk)
       this.store.patch({ status: 'live' })
@@ -362,8 +419,8 @@ export class ConversationSession {
       const p = (ev.session as { pipeline?: unknown } | undefined)?.pipeline
       if (typeof p === 'string' && p !== before.serverPipeline) diag.event('conversation', `server pipeline=${p}`)
     }
-    if (ev.type === 'input_audio_buffer.speech_started') {
-      // Barge-in: drop whatever of the answer is still queued.
+    if (ev.type === 'input_audio_buffer.speech_started' && !this.fullDuplex) {
+      // Barge-in: drop whatever of the answer is still queued (a full-duplex model decides that itself).
       if (this.player && this.ctx) {
         this.player.stop()
         this.player = new GaplessPlayer(this.ctx)

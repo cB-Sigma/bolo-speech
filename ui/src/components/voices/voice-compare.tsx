@@ -4,7 +4,9 @@ import { toast } from 'sonner'
 import { Panel } from '@/components/panel'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { describeError, useModels } from '@/hooks/use-api'
+import { CatalogSelect } from '@/components/catalog-select'
+import { describeError, useInfo, useModels } from '@/hooks/use-api'
+import { autoPull } from '@/lib/capabilities'
 import { useStore } from '@/hooks/use-store'
 import { api } from '@/lib/api/client'
 import { openMicrophone, STT_RATE, type AudioSource } from '@/lib/audio/capture'
@@ -18,7 +20,7 @@ import { CALIBRATED_MODEL, CALIBRATED_MODELS, cosine, SAME_SPEAKER, SIMILAR, ver
 import { useSupport } from '@/hooks/use-support'
 import { cn } from '@/lib/utils'
 
-interface Clip {
+export interface Clip {
   blob: Blob
   name: string
   seconds: number | null
@@ -37,7 +39,7 @@ async function clip16k(c: Clip): Promise<Float32Array> {
 }
 
 /** One of the two recordings: upload a file or record one here. */
-function ClipSlot({
+export function ClipSlot({
   label,
   clip,
   onChange,
@@ -143,6 +145,10 @@ function ClipSlot({
  */
 export function VoiceCompare({ className, inBrowser = false }: { className?: string; inBrowser?: boolean }) {
   const diarizers = useModels('diarization').models.filter((m) => m.installed && m.available !== false)
+  // Every speaker embedder of the catalog (pulled on first use where the server does that), then the installed
+  // diarization pipelines, whose embedding model answers too.
+  const speakerEmbedders = useModels('speaker-embedding').models
+  const info = useInfo()
   const embedders = audioModelsFor('embed')
   const engine = audioEngine('embed')
   const es = useStore(engine.store)
@@ -219,20 +225,18 @@ export function VoiceCompare({ className, inBrowser = false }: { className?: str
       data-testid="voice-compare"
     >
       <div className="grid gap-3">
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid min-w-0 gap-2 sm:grid-cols-2">
           <ClipSlot label="First voice" clip={a} onChange={change(setA)} disabled={busy} testId="compare-a" />
           <ClipSlot label="Second voice" clip={b} onChange={change(setB)} disabled={busy} testId="compare-b" />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Select value={model} onValueChange={setModel} disabled={busy}>
-            <SelectTrigger className="h-8 w-56" aria-label="Embedding model" data-testid="compare-model">
-              <SelectValue>
-                {inBrowser ? (embedders.find((m) => m.id === model)?.label ?? model) : undefined}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent position="popper" align="start">
-              {inBrowser ? (
-                embedders.map((m) => (
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {inBrowser ? (
+            <Select value={model} onValueChange={setModel} disabled={busy}>
+              <SelectTrigger className="h-8 w-56" aria-label="Embedding model" data-testid="compare-model">
+                <SelectValue>{embedders.find((m) => m.id === model)?.label ?? model}</SelectValue>
+              </SelectTrigger>
+              <SelectContent position="popper" align="start">
+                {embedders.map((m) => (
                   <SelectItem key={m.id} value={m.id} textValue={m.label}>
                     <span className="flex min-w-0 flex-col">
                       <span>{m.label}</span>
@@ -241,19 +245,36 @@ export function VoiceCompare({ className, inBrowser = false }: { className?: str
                       </span>
                     </span>
                   </SelectItem>
-                ))
-              ) : (
-                <>
-                  <SelectItem value={DEFAULT}>Embedding: server default</SelectItem>
-                  {diarizers.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      <span className="num">{m.id}</span>
-                    </SelectItem>
-                  ))}
-                </>
-              )}
-            </SelectContent>
-          </Select>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <CatalogSelect
+              models={[...speakerEmbedders, ...diarizers]}
+              value={model === DEFAULT ? '' : model}
+              onChange={(id) => {
+                setModel(id || DEFAULT)
+                setResult(null)
+              }}
+              label="Embedding model"
+              defaultLabel={`Embedding: server default${
+                info.data?.capabilities?.voices?.similarity_model
+                  ? ` (${info.data.capabilities.voices.similarity_model})`
+                  : ''
+              }`}
+              disabled={busy}
+              autoPull={autoPull(info.data)}
+              extra={(m) =>
+                CALIBRATED_MODELS.includes(m.id)
+                  ? 'thresholds calibrated'
+                  : m.task === 'diarization'
+                    ? 'a diarization pipeline’s embedder, bare cosine'
+                    : 'bare cosine'
+              }
+              className="w-64 max-sm:w-full"
+              testId="compare-model"
+            />
+          )}
           {inBrowser && (
             <Select value={device} onValueChange={(v) => setDevice(v as AudioDeviceChoice)} disabled={busy}>
               <SelectTrigger className="h-8 w-40" aria-label="Run on" data-testid="compare-device">

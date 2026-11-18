@@ -8,6 +8,28 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Console: the server's newer models, chosen where they are used.** Conversation: a "Listening" panel picks the
+  session's voice-activity detector (`turn_detection.vad_model`, every `vad` model of the catalog) and, with "Pause +
+  model" (`semantic_vad`), its end-of-turn model (`turn_model`, every `turn` model; the ones that read the transcript
+  are marked, with what that costs), and shows what the server reports. For the audio-LLM and speech-to-speech
+  pipelines a model panel lists every `audio-llm` or `speech-to-speech` model with its licence and labels, marks the
+  one the server runs, and for another one gives the `audio_llm_model` / `s2s_model` line to switch to it (a server
+  setting, not a session field) and pulls it. A full-duplex model is explained (talking over it does not cut it off);
+  "Stop the answer" sends `response.cancel` (and `output_audio_buffer.clear` over WebRTC), and the page no longer
+  drops a full-duplex model's audio when you start speaking. The speech-to-speech pipeline shows the model's own
+  licence instead of LFM's. Speech to text: "Detect language" (`POST /v1/audio/language`: the top 3, 5 or 10
+  languages with their probabilities, the identifier to use, and where `model=auto` would send the recording); the
+  "Who spoke when" recogniser can be `auto`, and the result shows `x-bolo-route` and `x-bolo-language` in words;
+  "Denoise first" on the live server stream (`denoise`, `denoise_strength`), with what `ready.denoise` and
+  `metrics.denoise` report; the denoiser pickers list every denoise model with its licence and labels (cloud
+  denoisers left out for live streams). Speakers: "Compare two voices" offers every speaker embedder and the
+  installed diarizers, saying which have calibrated thresholds. Models: language identification, speaker embedding,
+  speech-to-speech and audio-in models have their own groups (they were not listed); whisper.cpp models are named
+  as such and, like any model whose engine the server lacks, marked "Needs whisper.cpp" with the install command;
+  remote-code models show whether the opt-in is set, the server's warning, the pinned commit and files, and the
+  opt-in command; licence notes are shown; model pickers mark gated, non-commercial, licence-note and remote-code
+  models. The task filter scrolls instead of widening the page on a phone.
+- Catalog API: end-of-turn models that read the transcript carry the feature `reads-text`.
 - **Smart Turn v2 and TEN Turn Detection run.** `smart-turn-v2` (BSD-2-Clause): bolo reads the published PyTorch
   weights (safetensors) and computes wav2vec2-base, the attention pooling and the classifier in its own NumPy code
   (no PyTorch, nothing converted or re-hosted), over the real audio only with the reference's 16 s padding accounted

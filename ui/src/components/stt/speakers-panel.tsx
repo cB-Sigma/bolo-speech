@@ -19,6 +19,8 @@ import { SpeakerResult } from './speaker-result'
 import { DecodingSection, DenoiseControl, RunNotes } from './transcribe-options'
 
 const PAGE_MODEL = '__page'
+/** `model=auto`: the language identifier hears the recording first and routes it to a recogniser for it. */
+const AUTO = 'auto'
 
 interface Picked {
   name: string
@@ -76,6 +78,8 @@ export function SpeakersPanel({
   const defaultDiarizer = diarizers.find((d) => d.isDefault)?.id ?? diarizers[0]?.id ?? ''
   const chosenDiarizer = diarizer || defaultDiarizer
   const conditionedModel = conditioned.find((m) => m.id === recogniser) ?? null
+  const routing = info?.capabilities?.lid?.routing?.enabled === true
+  const routed = routing && recogniser === AUTO
   const usedModel = conditionedModel ?? model
   const count: SpeakerCount =
     countMode === 'exact'
@@ -119,8 +123,9 @@ export function SpeakersPanel({
     setError(null)
     try {
       const r = await api.transcribeSegments(file.blob, file.name, {
-        model: usedModel.id,
-        language,
+        // auto with no language: identified first, then routed (the route comes back in x-bolo-route)
+        model: routed ? AUTO : usedModel.id,
+        language: routed ? undefined : language,
         diarize,
         // A speaker-conditioned model brings its own diarizer unless one is named explicitly.
         diarizer: diarize && (diarizer || !conditionedModel) ? chosenDiarizer || undefined : undefined,
@@ -201,6 +206,11 @@ export function SpeakersPanel({
                 <SelectItem value={PAGE_MODEL}>
                   {model ? `${model.id} (chosen above)` : 'Model chosen above'}
                 </SelectItem>
+                {routing && (
+                  <SelectItem value={AUTO} data-testid="recogniser-auto">
+                    auto · identify the language, then route
+                  </SelectItem>
+                )}
                 {conditioned.map((m) => (
                   <SelectItem key={m.id} value={m.id} disabled={!m.installed || m.available === false}>
                     {m.id} · speaker-conditioned
@@ -209,6 +219,13 @@ export function SpeakersPanel({
                 ))}
               </SelectContent>
             </Select>
+            {routed && (
+              <p className="text-xs leading-4 text-muted-foreground" data-testid="auto-note">
+                The language identifier ({info?.capabilities?.lid?.default_model ?? 'default_lid'}) hears the recording
+                first; it goes to the recogniser installed for that language (else the default one), which is told the
+                language. The page&apos;s language is not sent.
+              </p>
+            )}
             {conditioned.length > 0 && (
               <p className="text-xs leading-4 text-muted-foreground">
                 Speaker-conditioned models (DiCoW) transcribe each speaker separately, overlaps included; several times

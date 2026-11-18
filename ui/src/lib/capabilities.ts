@@ -104,7 +104,16 @@ export function pipelineOptions(info: ServerInfo | undefined, components: Compon
       available,
       reason: available ? null : reason,
       detail,
-      note: id === 'speech-to-speech' ? (isCloudS2s(entry) ? S2S_CLOUD_NOTE : S2S_LICENCE_NOTE) : null,
+      note:
+        id === 'speech-to-speech'
+          ? isCloudS2s(entry)
+            ? S2S_CLOUD_NOTE
+            : entry?.license
+              ? `Licence: ${entry.license}${entry.full_duplex ? ' · full duplex' : ''}`
+              : !entry?.model || /^lfm/i.test(entry.model)
+                ? S2S_LICENCE_NOTE
+                : null
+          : null,
     }
   })
 }
@@ -301,11 +310,64 @@ function formatGb(gb: number): string {
 export function runtimeLabel(m: Pick<CatalogModel, 'engine' | 'requires' | 'id'>): string | null {
   if (m.engine.startsWith('plugin:')) return `plugin ${m.engine.slice(7)}`
   if (m.engine === 'remote') return 'cloud API'
+  if (m.engine === 'whisper.cpp') return 'whisper.cpp'
+  if (m.engine === 'duplex') return 'full-duplex server'
   if (m.engine === 'tts-server') {
     if (m.requires?.includes('audio.cpp') || m.id.endsWith('-audiocpp')) return 'audio.cpp'
     return 'llama.cpp'
   }
   return null
+}
+
+// --- Licences, gates and remote code ---------------------------------------------------------------------------
+
+type Labelled = Pick<CatalogModel, 'gated' | 'commercial_use' | 'license_note' | 'remote_code'>
+
+/**
+ * The short warnings a model carries wherever it is offered: gated, not for commercial use, a licence term to act
+ * on, and Python code from its own repository (with whether the operator opted in).
+ */
+export function licenceTags(m: Partial<Labelled>): string[] {
+  const tags: string[] = []
+  if (m.gated) tags.push('gated')
+  if (m.commercial_use === false) tags.push('non-commercial')
+  if (m.license_note) tags.push('licence note')
+  if (m.remote_code) tags.push(m.remote_code.allowed ? 'remote code, allowed' : 'remote code, not allowed')
+  return tags
+}
+
+/** The per-model setting that lets a model's remote code run, and the command that sets it. */
+export const REMOTE_CODE_SETTING = 'allow_remote_code'
+export function remoteCodeCommand(id: string): string {
+  return `bolo models config ${id} --set ${REMOTE_CODE_SETTING}=true`
+}
+
+/** A speech-to-speech model that hears and speaks at once (Moshi, Hibiki, PersonaPlex, ...). */
+export function isFullDuplex(m: Pick<CatalogModel, 'features'> | null | undefined): boolean {
+  return Boolean(m?.features.includes('full-duplex'))
+}
+
+/** End-of-turn models that read the transcript rather than hear the audio (catalog option `input: text`). */
+const TEXT_TURN_IDS = ['namo-turn-en', 'namo-turn-multilingual', 'ten-turn-detection', 'fake-turn-text']
+export function readsText(m: Pick<CatalogModel, 'id' | 'task' | 'features'>): boolean {
+  if (m.task !== 'turn') return false
+  // Newer servers mark them; older ones are known by id.
+  return m.features.includes('reads-text') || TEXT_TURN_IDS.includes(m.id)
+}
+
+/**
+ * Why the server cannot run a model at all yet: its engine is not installed (whisper.cpp without pywhispercpp,
+ * the full-duplex bridge without PyAV, ...), from `GET /api/v1/info` engines. Null when it can, or when unknown.
+ */
+export function engineMissing(
+  info: ServerInfo | undefined,
+  m: Pick<CatalogModel, 'engine' | 'cloud'>,
+): { engine: string; reason: string; install: string | null } | null {
+  const e = info?.engines?.find((x) => x.id === m.engine)
+  if (!e || e.available) return null
+  const reason = e.reason ?? `${e.id} is not installed`
+  const quoted = /pip install\s+(['"])([^'"]+)\1/.exec(reason)
+  return { engine: e.id, reason, install: quoted ? `pip install '${quoted[2]}'` : null }
 }
 
 const ORPHEUS = /^(veena|svara|orpheus|snortts)/i

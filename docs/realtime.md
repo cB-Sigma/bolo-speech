@@ -200,7 +200,7 @@ to silence detection in Realtime sessions (what it does and what we measured:
 * If the neural VAD stays silent on speech it was not trained for, an energy
   detector takes over after 1.5 seconds so the stream still produces a
   transcript; the first partials of that utterance are late.
-* There is no echo cancellation. Noise suppression (`denoise`) applies to
-  file transcription and Realtime sessions, not to this WebSocket.
+* There is no echo cancellation. Noise suppression (`denoise`) applies here
+  too: see api.md, "Denoising a live stream".
 * All latency numbers are server-side. The browser, the network and your
   audio capture buffer come on top.

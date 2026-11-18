@@ -758,7 +758,7 @@ curl -s localhost:8000/v1/audio/speech/embedding -F file=@a.wav | jq '.data[0].e
 
 ### `GET /api/v1/catalog?task=&q=&installed=`
 
-`task`: `stt`, `tts`, `vad`, `diarization`, `turn` (end-of-turn models), `separation` (overlapped-speech separation), `denoise`, `speech-to-speech` (conversation models for the Realtime `speech-to-speech` pipeline: turn-based, or full-duplex with the feature `full-duplex`), `audio-llm` (models that hear audio and answer in text, for the `audio-llm` pipeline). `q`: space-separated words that must all appear
+`task`: `stt`, `tts`, `vad`, `diarization`, `turn` (end-of-turn models; those that read the transcript instead of hearing the audio have the feature `reads-text`), `separation` (overlapped-speech separation), `denoise`, `speech-to-speech` (conversation models for the Realtime `speech-to-speech` pipeline: turn-based, or full-duplex with the feature `full-duplex`), `audio-llm` (models that hear audio and answer in text, for the `audio-llm` pipeline). `q`: space-separated words that must all appear
 in the id, aliases, family, engine, languages, licence or description.
 `installed`: `true` / `false`.
 

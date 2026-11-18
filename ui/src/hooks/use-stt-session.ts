@@ -9,6 +9,7 @@ import { levelFromRms, type LevelTrack } from '@/components/charts/level-strip'
 import { audioEngine } from '@/lib/browser-audio/engine'
 import { BrowserTranscriber } from '@/lib/stt/browser'
 import { DenoisingTranscriber } from '@/lib/stt/denoising'
+import type { Denoise } from '@/lib/stt-options'
 import { ServerTranscriber } from '@/lib/stt/server'
 import type { Transcriber } from '@/lib/stt/transcriber'
 
@@ -28,6 +29,8 @@ export interface SessionConfig {
   model: string
   language: string
   telephony: boolean
+  /** Denoising on the server's live stream (`denoise` query parameter); left out, the server's default. */
+  denoise?: Denoise
   /** Language for the in-browser model (`auto` or a code). */
   browserLanguage?: string
 }
@@ -160,7 +163,12 @@ export function useSttSession() {
       // 2. The recognisers, in parallel.
       const srv =
         cfg.mode !== 'browser'
-          ? new ServerTranscriber({ model: cfg.model, language: cfg.language, telephony: cfg.telephony })
+          ? new ServerTranscriber({
+              model: cfg.model,
+              language: cfg.language,
+              telephony: cfg.telephony,
+              denoise: cfg.denoise,
+            })
           : null
       const p = prefs.get()
       const recogniser =

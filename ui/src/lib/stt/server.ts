@@ -4,6 +4,7 @@ import { floatToInt16 } from '@/lib/audio/pcm'
 import { TelephonyEncoder, TELEPHONY_RATE } from '@/lib/audio/telephony'
 import { STT_RATE } from '@/lib/audio/capture'
 import { median } from '@/lib/latency/stats'
+import type { Denoise } from '@/lib/stt-options'
 import { TranscriptTracker, type Transcriber } from './transcriber'
 
 export interface ServerTranscriberOptions {
@@ -13,6 +14,16 @@ export interface ServerTranscriberOptions {
   telephony?: boolean
   /** Reconnect attempts if the socket drops mid-stream. */
   maxReconnects?: number
+  /** Denoise before recognition (`denoise`, `denoise_strength`); left out, the server's default. */
+  denoise?: Denoise
+}
+
+/** The live stream's `denoise` and `denoise_strength` query parameters, as for transcriptions. */
+export function denoiseParams(d: Denoise | undefined): { denoise?: string; denoise_strength?: number } {
+  if (!d || d.mode === 'default') return {}
+  if (d.mode === 'off') return { denoise: 'false' }
+  const strength = Math.max(0.05, Math.round(d.strength * 100) / 100)
+  return { denoise: d.model || 'true', ...(strength < 1 ? { denoise_strength: strength } : {}) }
 }
 
 export function sttStreamUrl(opts: ServerTranscriberOptions): string {
@@ -24,6 +35,7 @@ export function sttStreamUrl(opts: ServerTranscriberOptions): string {
     encoding,
     interim: true,
     vad: true,
+    ...denoiseParams(opts.denoise),
   })
 }
 
@@ -83,7 +95,7 @@ export class ServerTranscriber implements Transcriber {
           this.store.patch({ status: 'streaming', requestId: msg.request_id ?? null })
           const mode =
             msg.mode === 'pseudo' ? 'server · re-decoding' : msg.mode === 'native' ? 'server · streaming' : 'server'
-          this.store.patch({ backend: mode })
+          this.store.patch({ backend: mode, denoise: msg.denoise ?? null })
           for (const frame of this.queued) ws.send(frame)
           this.queued = []
           this.startPing()
@@ -167,7 +179,11 @@ export class ServerTranscriber implements Transcriber {
         })
         break
       case 'metrics':
-        this.store.patch({ rtf: msg.rtf, queueMs: msg.queue_ms ?? null })
+        this.store.patch({
+          rtf: msg.rtf,
+          queueMs: msg.queue_ms ?? null,
+          ...(msg.denoise ? { denoiseMetrics: msg.denoise } : {}),
+        })
         break
       case 'error':
         this.fail(msg.message || msg.code)

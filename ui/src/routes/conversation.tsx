@@ -1,7 +1,9 @@
-import { Info, MessagesSquare, Mic, MicOff, PhoneOff } from 'lucide-react'
+import { Info, MessagesSquare, Mic, MicOff, PhoneOff, Square } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { BrowserConversation } from '@/components/conversation/browser-conversation'
+import { PipelineModelPanel } from '@/components/conversation/pipeline-model'
 import { PipelinePicker } from '@/components/conversation/pipeline-picker'
+import { ServerListeningPanel } from '@/components/conversation/server-listening'
 import { NeedsServer } from '@/components/demo'
 import { Page } from '@/components/layout/app-shell'
 import { Empty, Panel } from '@/components/panel'
@@ -21,6 +23,7 @@ import {
   ConversationSession,
   emptyConversation,
   type ConversationState,
+  type Listening,
   type RealtimeTransport,
 } from '@/lib/realtime/session'
 import { Store } from '@/lib/store'
@@ -57,10 +60,14 @@ function ServerConversation() {
   const pipeline = chosen ?? defaultPipeline(info.data, options)
   const [transport, setTransport] = useState<RealtimeTransport>('websocket')
   const [denoise, setDenoise] = useState<Denoise>(defaultDenoise)
+  const [listening, setListening] = useState<Listening>({ type: 'server_vad' })
   const [session, setSession] = useState<ConversationSession | null>(null)
   const state = useStore(session?.store ?? idle)
   const active = state.status === 'starting' || state.status === 'live'
   const selected = options.find((o) => o.id === pipeline)
+  // A full-duplex model hears and speaks at once: talking over it does not stop it, the stop button does.
+  const fullDuplex =
+    pipeline === 'speech-to-speech' && Boolean(info.data?.capabilities?.realtime?.pipelines?.[pipeline]?.full_duplex)
   const webrtc = info.data?.capabilities?.realtime?.webrtc
   const webrtcAvailable = webrtc?.available !== false && typeof RTCPeerConnection !== 'undefined'
   const webrtcReason =
@@ -76,7 +83,7 @@ function ServerConversation() {
 
   const start = () => {
     // Everything that needs the tap happens inside start(): the microphone prompt first.
-    const s = new ConversationSession(pipeline, transport, realtimeDenoise(denoise))
+    const s = new ConversationSession(pipeline, transport, realtimeDenoise(denoise), { listening, fullDuplex })
     void s.start()
     setSession(s)
   }
@@ -184,9 +191,21 @@ function ServerConversation() {
           description={`${STATUS[state.status]}${state.serverPipeline ? ` · pipeline ${state.serverPipeline}` : ''}`}
           actions={
             active ? (
-              <Button variant="destructive" size="sm" onClick={() => void session?.stop()} data-testid="end-call">
-                <PhoneOff /> End
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => session?.stopAnswer()}
+                  disabled={state.status !== 'live'}
+                  title="Stops what the agent is saying (response.cancel); the conversation goes on"
+                  data-testid="stop-answer"
+                >
+                  <Square className="fill-current" /> Stop the answer
+                </Button>
+                <Button variant="destructive" size="sm" onClick={() => void session?.stop()} data-testid="end-call">
+                  <PhoneOff /> End
+                </Button>
+              </div>
             ) : (
               <Button
                 size="sm"
@@ -206,6 +225,11 @@ function ServerConversation() {
             )
           }
         >
+          {fullDuplex && (
+            <p className="mb-3 text-xs text-muted-foreground" data-testid="full-duplex-hint">
+              Full duplex: talking over the model does not stop it. Stop the answer does.
+            </p>
+          )}
           <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground" aria-live="polite">
             <Indicator on={state.userSpeaking} label="You are speaking" idleLabel="You: quiet" />
             <Indicator on={state.agentSpeaking} label="Agent is speaking" idleLabel="Agent: quiet" />
@@ -259,24 +283,35 @@ function ServerConversation() {
           )}
         </Panel>
 
-        <Panel title="About the pipelines" bodyClassName="grid gap-2.5 text-[13px] leading-5 text-muted-foreground">
-          <p>
-            <span className="text-foreground">Cascade</span> is speech to text, your language model, then text to
-            speech. Every step is visible on the Latency screen.
-          </p>
-          <p>
-            <span className="text-foreground">Audio LLM</span> lets a model that understands audio hear your turn
-            itself, so it can pick up tone; bolo still speaks the answer.
-          </p>
-          <p>
-            <span className="text-foreground">Speech to speech</span> hands the whole turn to a model that answers in
-            its own voice. bolo keeps turn detection, interruptions and the transcripts.
-          </p>
-          <p>
-            Interrupt the agent by talking: its audio stops at once. The server default is{' '}
-            <span className="num text-foreground">{info.data?.capabilities?.realtime?.pipeline ?? 'cascade'}</span>.
-          </p>
-        </Panel>
+        <div className="grid min-w-0 content-start gap-4">
+          <PipelineModelPanel key={pipeline} pipeline={pipeline} info={info.data} />
+          <ServerListeningPanel
+            info={info.data}
+            value={listening}
+            onChange={setListening}
+            disabled={active}
+            reported={state.serverListening}
+          />
+          <Panel title="About the pipelines" bodyClassName="grid gap-2.5 text-[13px] leading-5 text-muted-foreground">
+            <p>
+              <span className="text-foreground">Cascade</span> is speech to text, your language model, then text to
+              speech. Every step is visible on the Latency screen.
+            </p>
+            <p>
+              <span className="text-foreground">Audio LLM</span> lets a model that understands audio hear your turn
+              itself, so it can pick up tone; bolo still speaks the answer.
+            </p>
+            <p>
+              <span className="text-foreground">Speech to speech</span> hands the whole turn to a model that answers in
+              its own voice. bolo keeps turn detection, interruptions and the transcripts.
+            </p>
+            <p>
+              Interrupt the agent by talking: its audio stops at once (not a full-duplex model&apos;s: see its panel).
+              The server default is{' '}
+              <span className="num text-foreground">{info.data?.capabilities?.realtime?.pipeline ?? 'cascade'}</span>.
+            </p>
+          </Panel>
+        </div>
       </div>
     </Page>
   )

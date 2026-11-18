@@ -45,7 +45,10 @@ import { Switch } from '@/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { describeError, useCatalog, useInfo, useSamples, useSelectedModel } from '@/hooks/use-api'
+import { LanguageIdPanel } from '@/components/stt/language-id-panel'
 import { SpeakersPanel } from '@/components/stt/speakers-panel'
+import { DenoiseControl } from '@/components/stt/transcribe-options'
+import { defaultDenoise, type Denoise } from '@/lib/stt-options'
 import { usePing } from '@/hooks/use-ping'
 import { useStore } from '@/hooks/use-store'
 import { useSttSession, type EngineMode, type SessionInput } from '@/hooks/use-stt-session'
@@ -235,6 +238,7 @@ export default function SttPage() {
   const [params, setParams] = useSearchParams()
   const shared = isDemo ? decodeShare(params.get('r')) : null
   const [telephony, setTelephony] = useState(false)
+  const [liveDenoise, setLiveDenoise] = useState<Denoise>(defaultDenoise)
   const [dragging, setDragging] = useState(false)
   const [busySample, setBusySample] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -321,6 +325,7 @@ export default function SttPage() {
       model: model?.id ?? '',
       language,
       telephony: telephony && mode !== 'browser',
+      denoise: mode !== 'browser' ? liveDenoise : undefined,
       browserLanguage,
     })
   }
@@ -939,6 +944,13 @@ export default function SttPage() {
               ))}
             </div>
 
+            {mode !== 'browser' && !isDemo && (
+              <div className="mt-3 grid gap-1">
+                <DenoiseControl live value={liveDenoise} onChange={setLiveDenoise} disabled={running} />
+                <LiveDenoiseLine state={serverState} />
+              </div>
+            )}
+
             <div className="mt-4 rounded-lg border border-border bg-background/60 px-2 py-1">
               <LevelStrip
                 track={session.levels}
@@ -1086,6 +1098,7 @@ export default function SttPage() {
             />
           )}
 
+          {mode === 'server' && !isDemo && <LanguageIdPanel info={info.data} samples={samples.data?.samples ?? []} />}
           {mode === 'server' && (
             <Panel title="Try it without the network" bodyClassName="flex items-start gap-3">
               <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/50 text-muted-foreground">
@@ -1136,5 +1149,39 @@ export default function SttPage() {
         />
       )}
     </Page>
+  )
+}
+
+/** What the server said about denoising the live stream: the model that runs (or why it was skipped) and its cost. */
+function LiveDenoiseLine({ state }: { state: TranscriptState }) {
+  const d = state.denoise
+  const m = state.denoiseMetrics
+  if (d === undefined || state.status === 'idle') return null
+  return (
+    <p
+      className={cn('text-xs leading-4', d?.status === 'skipped' ? 'text-warning-text' : 'text-muted-foreground')}
+      data-testid="live-denoise"
+    >
+      Server:{' '}
+      {d == null ? (
+        'no denoising'
+      ) : d.status === 'skipped' ? (
+        <>
+          <span className="num">{d.model}</span> skipped{d.detail ? `: ${d.detail}` : ''}
+        </>
+      ) : (
+        <>
+          denoising with <span className="num">{d.model}</span> at strength {d.strength}
+          {d.stateful ? ', keeping its state from chunk to chunk' : ', each chunk with the half second before it'}
+          {m?.chunks ? (
+            <span className="num">
+              {' '}
+              · {m.mean_ms?.toFixed(1)} ms per chunk (p95 {m.p95_ms?.toFixed(1)}) · {Math.round(m.held_ms ?? 0)} ms held
+              back
+            </span>
+          ) : null}
+        </>
+      )}
+    </p>
   )
 }

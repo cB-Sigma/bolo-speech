@@ -1,6 +1,18 @@
 /** Types for the bolo native API (`/api/v1`). Field names mirror the wire format. */
 
-export type Task = 'stt' | 'tts' | 'vad' | 'diarization' | 'translation' | 'separation' | 'turn' | 'denoise'
+export type Task =
+  | 'stt'
+  | 'tts'
+  | 'vad'
+  | 'diarization'
+  | 'translation'
+  | 'separation'
+  | 'turn'
+  | 'denoise'
+  | 'lid'
+  | 'speaker-embedding'
+  | 'speech-to-speech'
+  | 'audio-llm'
 export type Tier = 'realtime' | 'balanced' | 'accuracy'
 export type Validated = 'cpu' | 'untested'
 
@@ -58,9 +70,26 @@ export interface Capabilities {
     transports?: string[]
     /** `POST /v1/realtime/calls`; `available` is false without the server's `webrtc` extra. */
     webrtc?: { endpoint?: string; available?: boolean; install?: string | null; ice_servers?: string[] }
+    /** The end-of-turn model `semantic_vad` asks by default; `input` says whether it hears audio or reads text. */
+    semantic_vad?: { model?: string | null; available?: boolean; installed?: boolean; input?: 'audio' | 'text' | null }
     [k: string]: unknown
   }
   llm?: { configured?: boolean; base_url?: string | null; model?: string | null }
+  /** Spoken-language identification and routing by language (`model=auto`), newer servers. */
+  lid?: {
+    available?: boolean
+    installed?: boolean
+    default_model?: string | null
+    endpoint?: string
+    routing?: {
+      enabled?: boolean
+      model_names?: string[]
+      routes?: Record<string, string>
+      min_probability?: number
+      header?: string
+    }
+    [k: string]: unknown
+  }
   /** Pronunciation word lists: announced by newer servers (older ones are probed with a request). */
   wordlists?: { available?: boolean; endpoint?: string; install?: string | null; [k: string]: unknown }
   /** Romanised text for text-to-speech: what the server's transliterator can do. */
@@ -149,6 +178,12 @@ export interface RealtimePipelineInfo {
   backend?: string
   managed?: boolean
   process?: unknown
+  /** Speech to speech: a full-duplex model (it hears and speaks at once; talking over it does not stop it). */
+  full_duplex?: boolean
+  features?: string[]
+  license?: string
+  max_sessions?: number
+  active_sessions?: number
 }
 
 export interface Voice {
@@ -271,6 +306,24 @@ export interface CatalogModel {
   adhoc?: boolean
   /** Live demo only: where this entry can run. */
   runtime?: 'browser' | 'server'
+  /**
+   * Python code from the model's own repository that loading it runs (Hugging Face remote code), pinned by commit
+   * and sha256; it runs only once the operator opts in (`allow_remote_code`). Null for every other model.
+   */
+  remote_code?: RemoteCode | null
+  /** A licence term to act on before use (for example a registration for commercial use). */
+  license_note?: string | null
+}
+
+export interface RemoteCode {
+  revision: string | null
+  files: string[]
+  /** What the review of the code found. */
+  reviewed: string | null
+  /** The operator opted in for this model (per-model setting `allow_remote_code`). */
+  allowed: boolean
+  /** The server's warning: what runs, and how to opt in. */
+  notice: string | null
 }
 
 /** The cloud provider behind a catalog entry. */
@@ -755,6 +808,8 @@ export type SttServerMessage =
       mode?: 'native' | 'pseudo'
       vad?: string
       encoding?: string
+      /** What denoises the stream (newer servers): null for none. */
+      denoise?: LiveDenoise | null
     }
   | { type: 'vad'; event: 'speech_start' | 'speech_end'; t: number }
   | { type: 'partial'; text: string; t0: number; t1: number; latency_ms: number; stable_chars?: number }
@@ -767,10 +822,48 @@ export type SttServerMessage =
       words?: SttWord[] | null
       language?: string | null
     }
-  | { type: 'metrics'; audio_seconds: number; rtf: number; queue_ms?: number }
+  | { type: 'metrics'; audio_seconds: number; rtf: number; queue_ms?: number; denoise?: LiveDenoiseMetrics }
   | { type: 'error'; code: string; message: string }
   | { type: 'done'; request_id?: string }
   | { type: 'pong' }
+
+/** `ready.denoise` of the live speech-to-text stream. */
+export interface LiveDenoise {
+  model: string
+  strength: number
+  status: 'applied' | 'skipped' | string
+  sample_rate?: number
+  stateful?: boolean
+  detail?: string | null
+}
+
+/** `metrics.denoise`: time spent denoising each chunk and the audio held back, for the stream so far. */
+export interface LiveDenoiseMetrics {
+  chunks?: number
+  mean_ms?: number
+  p95_ms?: number
+  max_ms?: number
+  held_ms?: number
+  stateful?: boolean
+}
+
+/** `POST /v1/audio/language`. */
+export interface LanguageId {
+  model: string
+  language: string
+  name?: string
+  probability: number
+  languages: { language: string; name?: string; probability: number }[]
+  duration?: number
+  heard?: number
+  recogniser?: {
+    model: string | null
+    reason: string
+    language: string | null
+    recommended?: string | null
+    detail?: string | null
+  } | null
+}
 
 export type SttEncoding = 'pcm_s16le' | 'pcm_f32le' | 'mulaw' | 'alaw'
 

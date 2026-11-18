@@ -25,6 +25,7 @@ import type {
   SetupPlan,
   SetupUse,
   SimulationReport,
+  LanguageId,
   SpeakerEmbedding,
   SpeedInfo,
   Stats,
@@ -300,6 +301,20 @@ export const api = {
     if (model) form.set('model', model)
     const res = await request('v1/audio/speech/embedding', { method: 'POST', body: form, signal })
     return res.json() as Promise<SpeakerEmbedding>
+  },
+  /** Which language is spoken in a recording (`POST /v1/audio/language`), with the `topK` most likely ones. */
+  async identifyLanguage(
+    file: Blob,
+    name: string,
+    opts: { model?: string; topK?: number } = {},
+    signal?: AbortSignal,
+  ): Promise<LanguageId> {
+    const form = new FormData()
+    form.set('file', file, name)
+    if (opts.model) form.set('model', opts.model)
+    if (opts.topK) form.set('top_k', String(opts.topK))
+    const res = await request('v1/audio/language', { method: 'POST', body: form, signal })
+    return res.json() as Promise<LanguageId>
   },
   bench: (req: BenchRequest) => json<{ job_id: string }>('api/v1/bench', { method: 'POST', json: req }),
   benchJob: (jobId: string, signal?: AbortSignal) => api.job<BenchResult>(jobId, signal),

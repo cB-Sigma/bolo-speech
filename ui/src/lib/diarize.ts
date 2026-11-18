@@ -75,6 +75,44 @@ export interface DiarizedResult {
   separationHeader?: string | null
   /** `x-request-id`, to find the trace. */
   requestId?: string | null
+  /** `x-bolo-route`: where `model=auto` sent the recording, and why. */
+  routeHeader?: string | null
+  /** `x-bolo-language`: the language heard and whether the recogniser was told it. */
+  languageHeader?: string | null
+  /** `x-bolo-model`: the model that answered. */
+  modelHeader?: string | null
+}
+
+/** `x-bolo-route` (`auto -> whisper-base; reason=recommended; language=hi; probability=0.98; lid=...`), read. */
+export interface RouteDecision {
+  requested: string
+  answered: string
+  reason: string | null
+  language: string | null
+  probability: number | null
+  lid: string | null
+  recommended: string | null
+}
+
+export function parseRoute(header: string | null | undefined): RouteDecision | null {
+  if (!header) return null
+  const [head = '', ...parts] = header.split(';').map((p) => p.trim())
+  const [requested = '', answered = ''] = head.split('->').map((p) => p.trim())
+  const kv: Record<string, string> = {}
+  for (const p of parts) {
+    const i = p.indexOf('=')
+    if (i > 0) kv[p.slice(0, i).trim()] = p.slice(i + 1).trim()
+  }
+  const probability = kv.probability != null ? Number(kv.probability) : null
+  return {
+    requested,
+    answered: answered || requested,
+    reason: kv.reason ?? null,
+    language: kv.language ?? null,
+    probability: probability != null && Number.isFinite(probability) ? probability : null,
+    lid: kv.lid ?? null,
+    recommended: kv.recommended ?? null,
+  }
 }
 
 /** Builds the multipart form. Throws for combinations the server would refuse, with the reason. */
@@ -139,6 +177,9 @@ export function parseTranscription(body: unknown, headers?: Headers): DiarizedRe
     ignoredOptions: headers?.get('x-bolo-ignored-options') ?? null,
     denoiseHeader: headers?.get('x-bolo-denoise') ?? null,
     requestId: headers?.get('x-request-id') ?? null,
+    routeHeader: headers?.get('x-bolo-route') ?? null,
+    languageHeader: headers?.get('x-bolo-language') ?? null,
+    modelHeader: headers?.get('x-bolo-model') ?? null,
   }
 }
 

@@ -1,6 +1,6 @@
 import { AudioClock, newUtterance, type Utterance } from '@/lib/latency/timeline'
 import { Store } from '@/lib/store'
-import type { SttWord } from '@/lib/api/types'
+import type { LiveDenoise, LiveDenoiseMetrics, SttWord } from '@/lib/api/types'
 
 export type TranscriberStatus =
   'idle' | 'loading' | 'connecting' | 'streaming' | 'reconnecting' | 'finishing' | 'done' | 'error'
@@ -37,6 +37,9 @@ export interface TranscriptState {
   rttMs: number | null
   /** Words the repetition guard removed from finals (in-browser recogniser). */
   repeatsRemoved?: number
+  /** Server stream: what denoises it (`ready.denoise`; null: nothing), and the time it takes (`metrics.denoise`). */
+  denoise?: LiveDenoise | null
+  denoiseMetrics?: LiveDenoiseMetrics | null
 }
 
 export const emptyTranscript = (): TranscriptState => ({

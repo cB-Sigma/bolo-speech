@@ -5,8 +5,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { useModels } from '@/hooks/use-api'
-import type { DiarizedResult } from '@/lib/diarize'
+import { CatalogSelect, SERVER_DEFAULT } from '@/components/catalog-select'
+import { useInfo, useModels } from '@/hooks/use-api'
+import { autoPull, isCloud } from '@/lib/capabilities'
+import { parseRoute, type DiarizedResult } from '@/lib/diarize'
+import { languageName } from '@/lib/format'
 import {
   decodingCount,
   DECODING_FIELDS,
@@ -18,8 +21,6 @@ import {
 } from '@/lib/stt-options'
 import { cn } from '@/lib/utils'
 
-const SERVER_DEFAULT = '__default'
-
 /**
  * Denoising before recognition: the server's default (off unless the server or the model's pin says otherwise),
  * off, or on with a strength and a denoise model. Opt-in on purpose: it helps some models on noisy audio and makes
@@ -29,14 +30,18 @@ export function DenoiseControl({
   value,
   onChange,
   disabled,
+  live = false,
   className,
 }: {
   value: Denoise
   onChange: (d: Denoise) => void
   disabled?: boolean
+  /** A live stream: cloud denoisers enhance whole recordings only, so they are left out. */
+  live?: boolean
   className?: string
 }) {
   const id = useId()
+  const info = useInfo()
   const denoisers = useModels('denoise').models
   return (
     <div className={cn('grid gap-1.5', className)} data-testid="denoise-control">
@@ -81,33 +86,24 @@ export function DenoiseControl({
             />
             <span className="w-8 num">{value.strength.toFixed(2)}</span>
           </label>
-          <Select
-            value={value.model || SERVER_DEFAULT}
-            onValueChange={(v) => onChange({ ...value, model: v === SERVER_DEFAULT ? '' : v })}
+          <CatalogSelect
+            models={live ? denoisers.filter((m) => !isCloud(m)) : denoisers}
+            value={value.model}
+            onChange={(model) => onChange({ ...value, model })}
+            label="Denoise model"
+            defaultLabel="Default denoiser"
             disabled={disabled}
-          >
-            <SelectTrigger className="h-8 w-52" aria-label="Denoise model">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent position="popper" align="start">
-              <SelectItem value={SERVER_DEFAULT}>Default denoiser</SelectItem>
-              {denoisers.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  <span className="num">{m.id}</span>
-                  <span className="text-xs text-muted-foreground [[data-slot=select-trigger]_&]:hidden">
-                    {' '}
-                    · {m.license}
-                    {!m.installed ? ' · downloaded on first use' : ''}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            autoPull={autoPull(info.data)}
+            extra={(m) => (m.sample_rate && m.sample_rate !== 16000 ? `${m.sample_rate / 1000} kHz` : null)}
+            className="w-56"
+            testId="denoise-model"
+          />
         </div>
       )}
       {value.mode === 'on' && (
         <p className="text-xs leading-4 text-warning-text">
           It can make clean audio, and Whisper&apos;s transcripts, worse; a strength below 1 mixes in the original.
+          {live && ' Cloud denoisers work on whole recordings only, so they are not offered for a live stream.'}
         </p>
       )}
     </div>
@@ -266,6 +262,22 @@ export function RunNotes({ result }: { result: DiarizedResult }) {
       warn: result.languageProbability != null && result.languageProbability < 0.5,
       testId: 'run-language',
     })
+  }
+  const route = parseRoute(result.routeHeader)
+  if (route) {
+    items.push({
+      label: 'Routed',
+      value: `${route.requested} → ${route.answered}${route.reason ? ` (${route.reason})` : ''}${
+        route.language ? ` · heard ${languageName(route.language)}` : ''
+      }${route.probability != null ? ` ${(route.probability * 100).toFixed(0)} %` : ''}${route.lid ? ` by ${route.lid}` : ''}${
+        route.recommended ? ` · better, not installed: ${route.recommended}` : ''
+      }`,
+      warn: route.reason === 'unsure' || route.reason === 'lid-failed' || route.reason === 'default',
+      testId: 'run-route',
+    })
+  }
+  if (result.languageHeader) {
+    items.push({ label: 'x-bolo-language', value: result.languageHeader, testId: 'run-language-header' })
   }
   if (result.denoiseHeader) {
     items.push({

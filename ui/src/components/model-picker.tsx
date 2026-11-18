@@ -12,7 +12,7 @@ import type { CatalogModel } from '@/lib/api/types'
 import { fmtBytes, languageName } from '@/lib/format'
 import { supportsLanguage } from '@/lib/languages'
 import { cn } from '@/lib/utils'
-import { hardwareLabel, isCloud, runtimeLabel } from '@/lib/capabilities'
+import { hardwareLabel, isCloud, licenceTags, runtimeLabel } from '@/lib/capabilities'
 import { languageSummary, TIER_LABEL, TIERS } from './model-bits'
 
 const GROUP_ORDER = [
@@ -111,15 +111,18 @@ export function ModelPicker({
                       {isCloud(m) ? '' : ` · ${fmtBytes(m.size_bytes)}`}
                       {runtimeLabel(m) ? ` · ${runtimeLabel(m)}` : ''}
                       {m.hardware && m.hardware.gpu !== 'optional' ? ` · ${hardwareLabel(m.hardware)}` : ''}
-                      {m.gated ? ' · gated' : ''}
-                      {m.commercial_use === false ? ' · non-commercial' : ''}
-                      {m.available === false
-                        ? ' · needs a component'
-                        : m.loaded
-                          ? ' · loaded'
-                          : m.installed
-                            ? ''
-                            : ' · not installed'}
+                      {licenceTags(m)
+                        .map((t) => ` · ${t}`)
+                        .join('')}
+                      {m.fit?.engine_available === false
+                        ? ` · ${m.engine} not installed`
+                        : m.available === false
+                          ? ' · needs a component'
+                          : m.loaded
+                            ? ' · loaded'
+                            : m.installed
+                              ? ''
+                              : ' · not installed'}
                     </span>
                   </span>
                 </SelectItem>
