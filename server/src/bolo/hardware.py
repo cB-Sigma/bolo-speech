@@ -1260,7 +1260,7 @@ _WINDOWS_HIP = re.compile(r"Radeon\s*(?:\(TM\)\s*)?(?:RX\s*(?:6[4-9]|7[6-9]|9[06
 def windows_rocm_note(gpu: Gpu) -> str:
     """What ROCm means on Windows for an AMD GPU: only llama-server's ROCm (HIP) build, and only on the Radeon cards
     AMD's HIP runtime for Windows covers; everything else in bolo reaches the GPU through DirectML (or Vulkan)."""
-    name = gpu.name.split(" (dml:")[0]
+    name = (gpu.name or "AMD GPU").split(" (dml:")[0]
     if _WINDOWS_HIP.search(name):
         return (
             f"ROCm on Windows ({name}): only llama-server's ROCm (HIP) build uses it (bolo components install "
