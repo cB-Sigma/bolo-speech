@@ -165,6 +165,7 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
   const [lists, setLists] = useState<string[]>([])
   const [romanised, setRomanised] = useState('')
   const [instructions, setInstructions] = useState('')
+  const [watermark, setWatermark] = useState('')
   const wordLists = useWordLists()
   // Saved voices (the server's library): one can stand in for the model's voice when the model clones voices.
   const library = useVoices()
@@ -216,6 +217,7 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
     romanised: roman || undefined,
     detectLanguage: detect ? undefined : false,
     instructions: direction || undefined,
+    watermark: watermark || undefined,
   }
   const forcedHttp = clone || ssml
   const fromServer = (samples.data?.samples ?? []).filter((s) => s.kind === 'text')
@@ -626,6 +628,25 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
                   />
                 </label>
               )}
+              <Select
+                value={watermark || 'default'}
+                onValueChange={(v) => setWatermark(v === 'default' ? '' : v)}
+                disabled={busy}
+              >
+                <SelectTrigger
+                  className="h-8 w-52"
+                  aria-label="Watermark"
+                  data-testid="tts-watermark"
+                  title="An inaudible mark that says the speech was made by a machine (AudioSeal); bolo can detect it later"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper" align="start">
+                  <SelectItem value="default">Watermark: server default</SelectItem>
+                  <SelectItem value="on">Watermark: on</SelectItem>
+                  <SelectItem value="off">Watermark: off</SelectItem>
+                </SelectContent>
+              </Select>
               {wordLists.offered && (
                 <WordListSelect names={listNames} value={chosenLists} onChange={setLists} disabled={busy} />
               )}
@@ -935,6 +956,20 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
                   </dl>
                   {reported.fallback && (
                     <p className="text-xs text-warning-text">Another model answered: {reported.fallback}</p>
+                  )}
+                  {reported.watermark && (
+                    <p
+                      className={
+                        reported.watermark.startsWith('unavailable')
+                          ? 'text-xs text-warning-text'
+                          : 'text-xs text-muted-foreground'
+                      }
+                      data-testid="tts-watermark-header"
+                    >
+                      {reported.watermark.startsWith('unavailable')
+                        ? `Not watermarked: ${reported.watermark.slice('unavailable; '.length)}`
+                        : `Watermarked with ${reported.watermark}`}
+                    </p>
                   )}
                   {reported.instructions?.startsWith('ignored') && (
                     <p className="text-xs text-warning-text" data-testid="tts-instructions-ignored">

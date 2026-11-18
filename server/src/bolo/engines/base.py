@@ -646,6 +646,38 @@ class PunctuationModel(Model):
         """``text`` with punctuation (and, for models that restore it, capital letters) added; the words stay."""
 
 
+@dataclass
+class WatermarkDetection:
+    """What a watermark detector found in a recording (at the detector's ``sample_rate``)."""
+
+    #: the share of the recording's frames the detector holds to be marked (0 to 1)
+    score: float
+    #: per frame (``frame_s`` long), the probability that it is marked
+    frame_probs: FloatArray
+    frame_s: float
+    #: the decoded payload, "0"/"1" per bit, for models that carry one; None otherwise
+    payload: str | None = None
+
+
+class WatermarkModel(Model):
+    """An audio watermarker: an inaudible mark added to speech (``embed``), and found again (``detect``).
+
+    Audio in and out at ``sample_rate`` (mono float32). ``payload_bits`` is the size of the message the mark carries
+    (0: the mark carries none)."""
+
+    task = "watermark"
+    payload_bits: int = 0
+    #: the model's frame (samples at ``sample_rate``): a mark made in pieces keeps to this grid (bolo.watermark)
+    hop: int = 1
+
+    @abc.abstractmethod
+    def embed(self, samples: FloatArray, payload: str | None = None) -> FloatArray:
+        """The watermarked audio, as long as ``samples``; ``payload`` a "0"/"1" string of ``payload_bits``."""
+
+    @abc.abstractmethod
+    def detect(self, samples: FloatArray) -> WatermarkDetection: ...
+
+
 class LidModel(Model):
     """Spoken-language identification: which language is spoken in a recording (16 kHz mono in)."""
 

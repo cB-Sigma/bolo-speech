@@ -110,12 +110,18 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   1.x and 2.x). The console's Conversation page picks servers, shows the calls and answers approvals. Tried against
   a server built with the MCP SDK itself, over stdio and Streamable HTTP.
 
-### Added
-
 - **`bolo doctor` on Windows says what ROCm means for a Radeon.** The card is listed through DirectML as before; a
   line now says either that llama-server's ROCm (HIP) build can use it (Radeon RX 6000, 7000 and 9000, Radeon PRO
   W6000/W7000) or "ROCm: not available on Windows for this GPU", with DirectML and Vulkan named as the routes bolo
   uses. Matched on the card's name; untested on a Radeon. docs/rocm.md, "On Windows".
+- **Watermarks on synthetic speech.** Speech in a cloned voice now carries an inaudible AudioSeal watermark by
+  default (setting `watermark`: `cloned`, `all` or `off`; `watermark` per request on speech, dialogues, the TTS
+  WebSocket and the CLI). AudioSeal (Meta, MIT) runs as ONNX in core bolo, no PyTorch; checked against the PyTorch
+  original both ways, and found again after MP3, Opus and resampling to 16 or 8 kHz on every clip tried. A
+  watermarker that cannot run never stops speech: `x-bolo-watermark` says why, as do the log and `bolo doctor`.
+  `POST /v1/audio/watermark/detect` (marked, where, the payload), `POST /v1/audio/watermark`, `bolo watermark
+  detect|embed`, and a Watermark page in the console.
+
 - **Voice conversion: `POST /v1/audio/voice-conversion`.** Speech in, the same words out in another voice: a
   saved voice, a reference clip or an uploaded recording. Five catalog models on audio.cpp, each with its licence:
   OpenVoice v2's tone colour converter (MIT, the default), MeanVC2 (Apache-2.0), Chatterbox VC (MIT), RVC (MIT base

@@ -3104,6 +3104,46 @@
     }
    }
   },
+  "/v1/audio/watermark/detect": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Is this recording watermarked?",
+    "description": "Extension. Multipart ``file`` (any decodable recording), optional ``model`` (a ``watermark`` model; default\nthe server's ``watermark_model``; ``all``: every installed watermarker, the most certain answer first).\n\nReturns ``marked``, ``model`` (the watermarker whose mark was looked for), ``score`` (the share of the recording\nthat holds the mark, 0 to 1; marked from 0.5), ``payload`` (the bits the mark carries, for models that carry\nsome), ``payload_is_this_servers`` and ``segments`` (where the mark is, in seconds); with ``model=all``,\n``results`` for each watermarker.",
+    "operationId": "detect_watermark_v1_audio_watermark_detect_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio/watermark": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Add a watermark to a recording",
+    "description": "Extension. Multipart ``file``; ``model`` (a ``watermark`` model, default ``watermark_model``),\n``response_format`` (default ``wav``), ``sample_rate``. The recording comes back with the server's mark\n(``watermark_payload``), at its own rate unless ``sample_rate`` says otherwise.",
+    "operationId": "embed_watermark_v1_audio_watermark_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
   "/v1/audio/speakers": {
    "get": {
     "tags": [
@@ -4506,6 +4546,21 @@
       "title": "Instructions",
       "description": "Direction for the whole dialogue, for models that follow it."
      },
+     "watermark": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Watermark",
+      "description": "As for `/v1/audio/speech`: on, off or a watermark model; unset: the server's policy (a one-take dialogue imitates recordings, so it counts as cloned speech)."
+     },
      "response_format": {
       "type": "string",
       "title": "Response Format",
@@ -5423,6 +5478,21 @@
       ],
       "title": "Instructions",
       "description": "Direction for the delivery in plain words (style, emotion, accent, the voice itself), for models that follow it (`features` has `instructions`: Qwen3-TTS CustomVoice, CosyVoice3, FireRedTTS3 Instruct, Maya1, Parler-TTS, …). Other models speak as usual; `x-bolo-instructions` says `applied` or `ignored`."
+     },
+     "watermark": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Watermark",
+      "description": "An inaudible watermark on the speech: `true` / `\"on\"` (the server's `watermark_model`), `false` / `\"off\"`, or a `watermark` model's id. Unset: the server's `watermark` setting (`cloned`: speech in a cloned voice is marked). `x-bolo-watermark` names the model that marked it, or says why none could; the speech is never refused for it."
      },
      "response_format": {
       "type": "string",

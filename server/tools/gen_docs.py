@@ -56,6 +56,7 @@ TASK_TITLES = {
     "align": "Forced alignment (word timestamps)",
     "echo-cancellation": "Echo cancellation (voice agents)",
     "wake-word": "Wake words and keyword spotting",
+    "watermark": "Watermarking",
 }
 
 

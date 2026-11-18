@@ -208,7 +208,7 @@ async def _tts_stream(ws: WebSocket) -> None:
     ``phonemizer`` (auto | uccharan | uccharan:improved | espeak-ng; bolo extension),
     ``wordlists`` (comma-separated word-list names; empty applies none) and ``normalize``
     (uccharan | light | model | none), ``keep_alive``, ``instructions`` (direction for the delivery, for models
-    that follow it).
+    that follow it), ``watermark`` (on | off | a watermark model; unset: the server's policy).
     Client sends JSON ``{"type":"text","text":…}`` (incrementally),
     ``flush`` and ``stop``; the server answers with binary audio frames and
     JSON ``ready`` / ``chunk`` / ``metrics`` / ``done`` / ``error``.
@@ -238,6 +238,7 @@ async def _tts_stream(ws: WebSocket) -> None:
         )
         romanised = parse_romanised(params.get("romanised") or params.get("romanized"))
         instructions = params.get("instructions") or None
+        watermark = params.get("watermark") or None
         async with core.manager.use(spec.id) as entry:
             model_rate = entry.model.sample_rate
             core.active_streams += 1
@@ -281,6 +282,7 @@ async def _tts_stream(ws: WebSocket) -> None:
                             normalize=normalize,
                             romanised=romanised,
                             instructions=instructions,
+                            watermark=watermark,
                         )
                         first = True
                         try:

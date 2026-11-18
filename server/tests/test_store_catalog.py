@@ -296,6 +296,7 @@ def test_every_packaged_entry_is_well_formed() -> None:
         "punctuation",
         "echo-cancellation",
         "wake-word",
+        "watermark",
     }
     needs = [s for s in specs if s.needs_phonemes]
     assert len(needs) >= 80 and all(s.task == "tts" for s in needs)

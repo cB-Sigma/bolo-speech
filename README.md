@@ -37,7 +37,7 @@ the OpenAI audio and Realtime APIs. On top of speech-to-text and text-to-speech 
 - **Speech directed in words**: `instructions` ("calm, a little amused, speaking slowly") reach every model that
   follows them (Qwen3-TTS CustomVoice, CosyVoice3, FireRedTTS3, OmniVoice, Maya1, Parler-TTS, …), and
   multi-speaker dialogues with a voice per speaker, spoken in one take or turn by turn, and voice conversion (the
-  same words in another voice).
+  same words in another voice); cloned speech carries an inaudible watermark (AudioSeal) that bolo can detect.
 - **Indian languages**: speech recognition for all 22 scheduled languages, voices for 15 of them, 8 kHz telephone
   audio, and romanised input ("mujhe kal jana hai") written in the right script.
 - **Cloud models next to local ones**: OpenAI, Sarvam, ElevenLabs, Deepgram and Soniox behind the same API, with
@@ -264,8 +264,9 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | WAKE-WORD | Zipformer keyword spotter | 2 | en, zh | 2 | 0.083 (`kws-zipformer-zh-en`) |
 | WAKE-WORD | openWakeWord | 3 | en | 3 | 0.082 (`openwakeword-hey-mycroft`) |
 | WAKE-WORD | microWakeWord | 4 | en | 4 | 0.003 (`microwakeword-hey-jarvis`) |
+| WATERMARK | AudioSeal | 1 | - | 0 | - |
 
-**499 models in the catalog, 215 validated on CPU, 284 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**500 models in the catalog, 215 validated on CPU, 285 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

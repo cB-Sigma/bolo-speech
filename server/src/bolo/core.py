@@ -17,7 +17,7 @@ import shutil
 import threading
 import time
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -125,6 +125,8 @@ from bolo.text.romanised import status as romanised_status
 from bolo.text.segment import chunk_text
 from bolo.text.wordlists import MAX_LISTS_PER_REQUEST
 from bolo.voices import SavedVoice, VoiceStore
+from bolo.watermark import choose as choose_watermark
+from bolo.watermark import marker as watermark_marker
 
 log = logging.getLogger("bolo")
 
@@ -2370,6 +2372,7 @@ class Bolo:
         options: dict[str, Any] | None = None,
         detect_language: bool = False,
         instructions: str | None = None,
+        watermark: Any = None,
     ) -> AsyncGenerator[SynthChunk, None]:
         """Synthesise ``text`` sentence by sentence, yielding audio as soon as it exists.
 
@@ -2378,6 +2381,10 @@ class Bolo:
         ``voice: {"id": ...}``) prefers the saved voice even over a model voice of that name. Without ``model``
         the saved voice's default model answers. ``options`` are model-specific request options
         (``SynthesisExtras.options``).
+
+        ``watermark`` (True / ``"on"``, False / ``"off"``, a watermark model id; None: the server's ``watermark``
+        policy, which marks cloned voices) adds an inaudible watermark to every chunk (:mod:`bolo.watermark`);
+        ``trace.extra["watermark"]`` says which model marked it, or why none could (the ``x-bolo-watermark`` header).
 
         ``instructions`` direct the delivery in words (style, emotion, voice) for a model that follows them
         (``TTSModel.supports_instructions``); other models speak as usual. ``trace.extra["instructions"]`` says
@@ -2424,32 +2431,39 @@ class Bolo:
         if saved is not None or reference_audio is not None:
             # a cloned voice must stay the same person: only models that clone voices can stand in
             chain = [spec, *(c for c in chain[1:] if "voice-cloning" in c.features)]
+        # synthetic speech gets a watermark when the request or the server's policy asks (bolo.watermark)
+        mark_with = choose_watermark(self, watermark, cloned=saved is not None or reference_audio is not None)
         try:
-            for i, candidate in enumerate(chain):
-                more = i + 1 < len(chain)
-                started = False
-                attempt = self._synthesize_once(
-                    text, candidate, trace, more, own_voice=i == 0,
-                    voice=voice, speed=speed, language=language, normalize=normalize, phonemizer=phonemizer,
-                    reference_audio=reference_audio, reference_text=reference_text, wordlists=wordlists,
-                    pronunciations=pronunciations, input_format=input_format, romanised=romanised,
-                    romanised_strict=romanised_strict, saved=saved, custom_voice=custom_voice, options=options,
-                    blend_name=blend_name, detect_language=detect_language, instructions=instructions,
-                )  # fmt: skip
-                try:
-                    async for chunk in attempt:
-                        started = True
-                        yield chunk
-                    return
-                except BoloError as exc:
-                    # once audio was delivered the answer cannot change voice: no fallback after the first chunk
-                    if started or not more or not fallback_worthy(exc) or trace.status != "running":
-                        raise
-                    self._note_fallback(trace, spec, candidate, chain[i + 1], exc)
-                finally:
-                    # a consumer that stopped listening closes this generator: the attempt has to hear of it
-                    # now (it stops the engine and marks the trace), not when it is garbage-collected
-                    await attempt.aclose()
+            async with watermark_marker(self, mark_with) as mark:
+                if mark is not None:
+                    trace.extra["watermark"] = mark.record()
+                for i, candidate in enumerate(chain):
+                    more = i + 1 < len(chain)
+                    started = False
+                    attempt = self._synthesize_once(
+                        text, candidate, trace, more, own_voice=i == 0,
+                        voice=voice, speed=speed, language=language, normalize=normalize, phonemizer=phonemizer,
+                        reference_audio=reference_audio, reference_text=reference_text, wordlists=wordlists,
+                        pronunciations=pronunciations, input_format=input_format, romanised=romanised,
+                        romanised_strict=romanised_strict, saved=saved, custom_voice=custom_voice, options=options,
+                        blend_name=blend_name, detect_language=detect_language, instructions=instructions,
+                    )  # fmt: skip
+                    try:
+                        async for chunk in attempt:
+                            started = True
+                            if mark is not None and mark.active:
+                                chunk = replace(chunk, samples=await mark.mark(chunk.samples, chunk.sample_rate))
+                            yield chunk
+                        return
+                    except BoloError as exc:
+                        # once audio was delivered the answer cannot change voice: no fallback after the first chunk
+                        if started or not more or not fallback_worthy(exc) or trace.status != "running":
+                            raise
+                        self._note_fallback(trace, spec, candidate, chain[i + 1], exc)
+                    finally:
+                        # a consumer that stopped listening closes this generator: the attempt has to hear of it
+                        # now (it stops the engine and marks the trace), not when it is garbage-collected
+                        await attempt.aclose()
         finally:
             if own_trace:
                 self.complete_tts(trace)
@@ -2761,6 +2775,12 @@ def fallback_headers(trace: Trace) -> dict[str, str]:
     if trace.extra.get("instructions"):
         note = str(trace.extra["instructions"])
         headers["x-bolo-instructions"] = note.splitlines()[0][:400].encode("ascii", "replace").decode()
+    mark = trace.extra.get("watermark")
+    if isinstance(mark, dict):
+        value = (
+            str(mark.get("model")) if mark.get("applied") else f"unavailable; {mark.get('model')}: {mark.get('reason')}"
+        )
+        headers["x-bolo-watermark"] = value.splitlines()[0][:300].encode("ascii", "replace").decode() if value else ""
     ignored = trace.extra.get("ignored_options")
     if ignored:
         headers["x-bolo-ignored-options"] = ", ".join(ignored)

@@ -1,6 +1,18 @@
 import { apiUrl, authHeaders, getTransport } from './config'
 import { parseTranscription, transcriptionForm, type DiarizedResult, type TranscribeOptions } from '@/lib/diarize'
 import type { DialogueBody } from '@/lib/dialogue'
+
+/** The answer of `POST /v1/audio/watermark/detect`. */
+export interface WatermarkDetection {
+  model: string
+  marked: boolean
+  score: number
+  payload: string | null
+  payload_is_this_servers: boolean
+  segments: { start: number; end: number }[]
+  duration: number
+  results?: WatermarkDetection[]
+}
 import type {
   ApiKeyCreate,
   ApiKeyInfo,
@@ -513,6 +525,15 @@ export const api = {
     return request('v1/audio/voice-conversion', { method: 'POST', body: form, signal })
   },
 
+  /** Is this recording watermarked? (`POST /v1/audio/watermark/detect`) */
+  async detectWatermark(file: Blob, model?: string, signal?: AbortSignal): Promise<WatermarkDetection> {
+    const form = new FormData()
+    form.set('file', file, 'clip')
+    if (model) form.set('model', model)
+    const res = await request('v1/audio/watermark/detect', { method: 'POST', body: form, signal })
+    return (await res.json()) as WatermarkDetection
+  },
+
   /** One-shot transcription through the OpenAI-compatible route. */
   async transcribe(file: Blob, model: string, language?: string, signal?: AbortSignal): Promise<{ text: string }> {
     const form = new FormData()
@@ -609,4 +630,6 @@ export interface SpeechBody {
   pronunciations?: { word: string; ipa?: string; say?: string; lang?: string; match?: string }[]
   /** Direction for the delivery in words, for models whose `features` include `instructions`. */
   instructions?: string
+  /** `on`, `off` or a watermark model; unset: the server's policy. */
+  watermark?: string
 }

@@ -126,6 +126,7 @@ async def speak_dialogue(
     speed: float = 1.0,
     instructions: str | None = None,
     trace: Trace | None = None,
+    watermark: Any = None,
 ) -> DialogueResult:
     """Speak ``turns`` with ``voices`` (speaker -> voice). See the module docstring for ``mode``."""
     if mode not in MODES:
@@ -144,8 +145,17 @@ async def speak_dialogue(
     if mode != "stitched":
         result = await _native(core, spec, turns, speakers, voices, language, instructions, mode, trace)
         if result is not None:
+            # every voice of a one-take dialogue is imitated from a recording: it counts as cloned speech
+            from bolo.watermark import choose, marker
+
+            async with marker(core, choose(core, watermark, cloned=True)) as mark:
+                if mark is not None:
+                    result.samples = await mark.mark(result.samples, result.sample_rate)
+                    trace.extra["watermark"] = mark.record()
             return result
-    return await _stitched(core, spec.id, turns, speakers, voices, pause_ms, language, speed, instructions, trace)
+    return await _stitched(
+        core, spec.id, turns, speakers, voices, pause_ms, language, speed, instructions, trace, watermark
+    )
 
 
 async def _native(
@@ -214,6 +224,7 @@ async def _stitched(
     speed: float,
     instructions: str | None,
     trace: Trace,
+    watermark: Any = None,
 ) -> DialogueResult:
     pieces: list[FloatArray] = []
     segments: list[dict[str, Any]] = []
@@ -226,7 +237,12 @@ async def _stitched(
             audio, turn_rate = await core.synthesize_all(
                 turn.text, model=model_id, voice=voices.get(turn.speaker) or None, language=language, speed=speed,
                 instructions=turn.instructions or instructions, detect_language=language is None, trace=sub,
+                watermark=watermark,
             )  # fmt: skip
+            if isinstance(sub.extra.get("watermark"), dict) and (
+                "watermark" not in trace.extra or not sub.extra["watermark"].get("applied")
+            ):
+                trace.extra["watermark"] = sub.extra["watermark"]
             if sub.extra.get("instructions"):
                 applied.add(str(sub.extra["instructions"]))
             core.complete_tts(sub)

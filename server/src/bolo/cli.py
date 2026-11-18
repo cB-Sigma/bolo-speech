@@ -1111,6 +1111,7 @@ def cmd_speak(args: argparse.Namespace) -> int:
                 async for chunk in core.synthesize(
                     text, model=args.model, voice=args.voice, speed=args.speed, trace=trace,
                     romanised=args.romanised, detect_language=True, instructions=args.instructions,
+                    watermark=args.watermark,
                 ):  # fmt: skip
                     trace.mark_ttfa()
                     parts.append(chunk.samples)
@@ -1125,6 +1126,12 @@ def cmd_speak(args: argparse.Namespace) -> int:
 
             chosen = language_header(trace)
             print(f"wrote {out} ({len(audio) / rate:.1f}s, {fmt})" + (f"; language: {chosen}" if chosen else ""))
+            mark = trace.extra.get("watermark")
+            if isinstance(mark, dict):
+                if mark.get("applied"):
+                    print(f"watermarked with {mark.get('model')}", file=sys.stderr)
+                else:
+                    print(f"warning: not watermarked: {mark.get('model')}: {mark.get('reason')}", file=sys.stderr)
             followed = str(trace.extra.get("instructions") or "")
             if followed == "ignored":
                 print(f"note: {trace.model} does not follow instructions; they were ignored", file=sys.stderr)
@@ -1167,7 +1174,7 @@ def cmd_dialogue(args: argparse.Namespace) -> int:
             trace = Trace("tts", "cli", "")
             result = await speak_dialogue(
                 core, parse_script(script), voices, model=args.model, mode=args.mode, pause_ms=args.pause_ms,
-                instructions=args.instructions, trace=trace,
+                instructions=args.instructions, trace=trace, watermark=args.watermark,
             )  # fmt: skip
             trace.audio_seconds = len(result.samples) / result.sample_rate
             core.complete_tts(trace)
@@ -2118,6 +2125,74 @@ def _doctor_gpu_health(settings: Settings, which: Any = None, checker: Any = Non
         print(f"gpu health: unknown ({health.reason})")
 
 
+def _doctor_watermark(settings: Settings) -> None:
+    """Whether the watermarker the server's policy marks speech with can run."""
+    from bolo.catalog import Catalog
+    from bolo.store import ModelStore
+
+    if settings.watermark == "off":
+        print("watermark: off (the watermark setting); requests may still ask for one")
+        return
+    spec = Catalog.load(settings.data_dir).resolve(settings.watermark_model)
+    if spec is None:
+        print(f"watermark: WARNING the watermark_model {settings.watermark_model!r} is not in the catalog")
+        return
+    installed = ModelStore(settings.data_dir).is_installed(spec.id)
+    which = "all speech" if settings.watermark == "all" else "speech in cloned voices"
+    if installed:
+        print(f"watermark: {spec.id} marks {which} ({spec.license})")
+    elif settings.auto_pull:
+        print(f"watermark: {spec.id} is not installed; it is pulled when {which} is first made (auto_pull)")
+    else:
+        print(
+            f"watermark: WARNING {spec.id} is not installed and auto_pull is off: {which} goes out unmarked "
+            f"(bolo pull {spec.id})"
+        )
+
+
+def cmd_watermark(args: argparse.Namespace) -> int:
+    from bolo.audio.decode import decode_audio
+    from bolo.audio.encode import encode_audio
+    from bolo.watermark import detect, marker
+
+    core = _core(args)
+    samples, rate = decode_audio(Path(args.input).read_bytes())
+    model = args.model or core.settings.watermark_model
+
+    async def run() -> int:
+        await core.start()
+        try:
+            if args.action == "detect":
+                found = await detect(core, samples, rate, model)
+                if args.json:
+                    print(json.dumps(found.to_dict(), indent=2))
+                else:
+                    where = ", ".join(f"{g['start']:.1f}-{g['end']:.1f}s" for g in found.segments) or "-"
+                    print(
+                        f"{args.input}: {'MARKED' if found.marked else 'not marked'} by {found.model} "
+                        f"(score {found.score:.2f}; payload {found.payload if found.marked else '-'}"
+                        f"{', this server' if found.ours else ''}; where {where})"
+                    )
+                return 0 if found.marked else 1
+            if not args.output:
+                print("error: watermark embed needs --output", file=sys.stderr)
+                return 2
+            async with marker(core, core.resolve(model, "watermark").id) as mark:
+                assert mark is not None
+                if not mark.active:
+                    print(f"error: {mark.model} cannot run: {mark.reason}", file=sys.stderr)
+                    return 1
+                out = await mark.mark(samples, rate)
+            path = Path(args.output)
+            path.write_bytes(encode_audio(out, rate, path.suffix.lstrip(".").lower() or "wav"))
+            print(f"wrote {path} (marked by {mark.model}, payload {mark.payload})")
+            return 0
+        finally:
+            await core.stop()
+
+    return asyncio.run(run())
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     import platform
 
@@ -2185,6 +2260,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     _doctor_cuda(settings)
     _doctor_llm(settings)
     _doctor_providers(settings)
+    _doctor_watermark(settings)
     _doctor_hardware(args)
     try:
         import wyoming
@@ -2503,6 +2579,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="direction for the delivery in plain words (style, emotion, voice), for models that follow it",
     )
     s.add_argument(
+        "--watermark",
+        help="on, off or a watermark model (default: the server's watermark setting; cloned voices are marked)",
+    )
+    s.add_argument(
         "--romanised",
         "--romanized",
         choices=["off", "auto", "on"],
@@ -2532,6 +2612,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="native: the model speaks it in one take; stitched: turn by turn (default: native when it can)",
     )
     s.add_argument("--pause-ms", dest="pause_ms", type=int, default=300, help="silence between stitched turns")
+    s.add_argument("--watermark", help="on, off or a watermark model (default: the server's watermark setting)")
     s.add_argument("--instructions", help="direction for the delivery, for models that follow it")
     s.add_argument("--format", "-f", help="default: from the output file extension")
     s.add_argument("--sample-rate", dest="sample_rate", type=int)
@@ -2551,6 +2632,15 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--sample-rate", dest="sample_rate", type=int)
     s.add_argument("--verbose", "-v", action="store_true")
     s.set_defaults(func=cmd_convert)
+
+    s = sub.add_parser("watermark", help="find the watermark in a recording, or add one")
+    _common(s)
+    s.add_argument("action", choices=["detect", "embed"])
+    s.add_argument("input", help="the recording")
+    s.add_argument("--model", "-m", help="a watermark model (default: the watermark_model setting)")
+    s.add_argument("--output", "-o", help="embed: where to write the marked recording")
+    s.add_argument("--json", action="store_true", help="detect: print the result as JSON")
+    s.set_defaults(func=cmd_watermark)
 
     s = sub.add_parser("bench", help="concurrency sweep against a model (in process)")
     _common(s)

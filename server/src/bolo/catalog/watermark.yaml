@@ -1,0 +1,30 @@
+# Audio watermarkers: an inaudible mark on synthetic and cloned speech, and its detection (docs/api.md, "Watermarks").
+- id: audioseal-16bits
+  aliases: [audioseal, facebook/audioseal]
+  task: watermark
+  engine: onnxruntime
+  kind: audioseal_onnx
+  family: AudioSeal
+  languages: []
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 93481274
+  license: MIT
+  license_url: https://huggingface.co/facebook/audioseal
+  commercial_use: true
+  description: 'AudioSeal (Meta, MIT; code and weights), the 16-bit model: a generator that adds an inaudible,
+    sample-level watermark carrying 16 bits, and a detector that finds it again, sample by sample, after cuts,
+    resampling and lossy compression. ONNX export of the authors'' generator_base.pth and detector_base.pth by
+    DarumaHQ (DarumaHQ/audioseal-onnx, export script and parity results published); bolo checked it against the
+    PyTorch original in both directions (embedded by one, detected by the other: same payload, every sample marked,
+    detector scores within 1e-6). Runs on ONNX Runtime: no PyTorch.'
+  source_url: https://github.com/facebookresearch/audioseal
+  validated: untested
+  source:
+    repo: DarumaHQ/audioseal-onnx
+    revision: 55477a4c93a98fd9c38f59173d506c7e9a803589
+    include: [audioseal_generator_16bits.onnx, audioseal_detector_16bits.onnx, LICENSE]
+  options:
+    generator: audioseal_generator_16bits.onnx
+    detector: audioseal_detector_16bits.onnx
+    window_s: 10

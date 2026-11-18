@@ -119,6 +119,7 @@ const TASK_LABEL: Record<Task, string> = {
   align: 'Forced alignment',
   'echo-cancellation': 'Echo cancellation',
   'wake-word': 'Wake words',
+  watermark: 'Watermarking',
 }
 const TASK_SHORT: Record<Task, string> = {
   stt: 'STT',
@@ -140,6 +141,7 @@ const TASK_SHORT: Record<Task, string> = {
   align: 'Align',
   'echo-cancellation': 'Echo',
   'wake-word': 'Wake',
+  watermark: 'Watermark',
 }
 const TASK_ORDER: Task[] = [
   'stt',
@@ -158,6 +160,7 @@ const TASK_ORDER: Task[] = [
   'punctuation',
   'echo-cancellation',
   'wake-word',
+  'watermark',
   'speech-to-speech',
   'audio-llm',
   'translation',

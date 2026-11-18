@@ -54,6 +54,11 @@ class DialogueRequest(BaseModel):
     instructions: str | None = Field(
         default=None, max_length=4096, description="Direction for the whole dialogue, for models that follow it."
     )
+    watermark: bool | str | None = Field(
+        default=None,
+        description="As for `/v1/audio/speech`: on, off or a watermark model; unset: the server's policy (a one-take "
+        "dialogue imitates recordings, so it counts as cloned speech).",
+    )
     response_format: str = "wav"
     sample_rate: int | None = None
     keep_alive: str | int | float | None = None
@@ -89,7 +94,7 @@ async def create_dialogue(request: Request, body: DialogueRequest) -> Response:
         result = await speak_dialogue(
             core, turns, {k.strip(): v for k, v in body.voices.items()}, model=body.model, mode=body.mode,
             pause_ms=body.pause_ms, language=body.language, speed=body.speed, instructions=body.instructions,
-            trace=trace,
+            trace=trace, watermark=body.watermark,
         )  # fmt: skip
         trace.audio_seconds = len(result.samples) / result.sample_rate if result.sample_rate else 0.0
         data = await asyncio.to_thread(encode_audio, result.samples, result.sample_rate, fmt, body.sample_rate)
@@ -111,6 +116,10 @@ async def create_dialogue(request: Request, body: DialogueRequest) -> Response:
         headers["x-bolo-segments"] = json.dumps(result.segments, ensure_ascii=True, separators=(",", ":"))
     if trace.extra.get("instructions"):
         headers["x-bolo-instructions"] = str(trace.extra["instructions"])
+    from bolo.core import fallback_headers
+
+    if "x-bolo-watermark" in (wm := fallback_headers(trace)):
+        headers["x-bolo-watermark"] = wm["x-bolo-watermark"]
     return Response(data, media_type=encoder.media_type, headers=headers)
 
 
@@ -211,4 +220,85 @@ async def speech_to_speech(request: Request, voice_id: str) -> Response:
         voice_id,
         str(form.get("model_id") or form.get("model") or "") or None,
         raw.split("_", maxsplit=1)[0],
+    )
+
+
+@router.post("/v1/audio/watermark/detect", tags=["native"], summary="Is this recording watermarked?")
+async def detect_watermark(request: Request) -> Response:
+    """Extension. Multipart ``file`` (any decodable recording), optional ``model`` (a ``watermark`` model; default
+    the server's ``watermark_model``; ``all``: every installed watermarker, the most certain answer first).
+
+    Returns ``marked``, ``model`` (the watermarker whose mark was looked for), ``score`` (the share of the recording
+    that holds the mark, 0 to 1; marked from 0.5), ``payload`` (the bits the mark carries, for models that carry
+    some), ``payload_is_this_servers`` and ``segments`` (where the mark is, in seconds); with ``model=all``,
+    ``results`` for each watermarker."""
+    from fastapi.responses import JSONResponse
+
+    from bolo.watermark import detect
+
+    core = get_core(request)
+    form = await request.form()
+    file = _form_file(form, "file", "audio")
+    if file is None:
+        raise InvalidRequest("a multipart 'file' field with the recording is required", param="file")
+    wanted = str(form.get("model") or "") or core.settings.watermark_model
+    if wanted == "all":
+        models = [m.id for m in core.catalog.all() if m.task == "watermark" and core.manager.is_installed(m)]
+        if not models:
+            raise InvalidRequest("no watermark model is installed (bolo pull audioseal-16bits)", param="model")
+    else:
+        models = [wanted]
+    samples, rate = await read_upload(core, file)
+    trace = Trace("watermark", "http", models[0])
+    trace.audio_seconds = len(samples) / rate if rate else 0.0
+    try:
+        with trace.phase("detect"):
+            results = [await detect(core, samples, rate, m) for m in models]
+        trace.finish("ok")
+    except BoloError as exc:
+        trace.finish("error", exc.message)
+        raise
+    finally:
+        core.traces.record(trace)
+    results.sort(key=lambda r: (not r.marked, -r.score))
+    best = results[0]
+    body: dict[str, Any] = {
+        "object": "audio.watermark",
+        "duration": round(len(samples) / rate, 3) if rate else 0.0,
+        **best.to_dict(),
+    }
+    if wanted == "all":
+        body["results"] = [r.to_dict() for r in results]
+    return JSONResponse(body, headers={"x-request-id": trace.id})
+
+
+@router.post("/v1/audio/watermark", tags=["native"], summary="Add a watermark to a recording")
+async def embed_watermark(request: Request) -> Response:
+    """Extension. Multipart ``file``; ``model`` (a ``watermark`` model, default ``watermark_model``),
+    ``response_format`` (default ``wav``), ``sample_rate``. The recording comes back with the server's mark
+    (``watermark_payload``), at its own rate unless ``sample_rate`` says otherwise."""
+    from bolo.watermark import marker
+
+    core = get_core(request)
+    form = await request.form()
+    file = _form_file(form, "file", "audio")
+    if file is None:
+        raise InvalidRequest("a multipart 'file' field with the recording is required", param="file")
+    fmt = normalize_format(str(form.get("response_format") or "wav"))
+    if fmt not in FORMATS:
+        raise InvalidRequest(f"response_format must be one of {', '.join(FORMATS)}", param="response_format")
+    out_rate = int(str(form.get("sample_rate"))) if form.get("sample_rate") else None
+    samples, rate = await read_upload(core, file)
+    model = core.resolve(str(form.get("model") or "") or core.settings.watermark_model, "watermark").id
+    async with marker(core, model) as mark:
+        assert mark is not None
+        if not mark.active:
+            raise InvalidRequest(f"the watermark model '{model}' cannot run: {mark.reason}", param="model")
+        marked = await mark.mark(samples, rate)
+    data = await asyncio.to_thread(encode_audio, marked, rate, fmt, out_rate)
+    encoder = StreamEncoder(fmt, rate, out_rate)
+    return Response(
+        data,
+        media_type=encoder.media_type,
+        headers={"x-bolo-watermark": model, "x-sample-rate": str(encoder.sample_rate)},
     )

@@ -77,6 +77,7 @@ def test_catalog_shape_and_filters(live: LiveServer) -> None:
             "punctuation",
             "echo-cancellation",
             "wake-word",
+            "watermark",
         )
         assert isinstance(m["requires"], list) and isinstance(m["available"], bool)
     tts = httpx.get(live.url + "/api/v1/catalog", params={"task": "tts"}).json()["models"]
@@ -107,6 +108,7 @@ def test_catalog_shape_and_filters(live: LiveServer) -> None:
         "fake-emotion",
         "fake-echo",
         "fake-wake",
+        "fake-watermark",
     } | BUILT_IN
     not_installed = httpx.get(live.url + "/api/v1/catalog", params={"installed": "false", "task": "vad"}).json()[
         "models"

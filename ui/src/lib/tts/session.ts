@@ -62,6 +62,8 @@ export interface TtsReported {
   fallback: string | null
   /** `x-bolo-instructions`: `applied` or `ignored` when the request carried instructions. */
   instructions: string | null
+  /** `x-bolo-watermark`: the model that marked the speech, or `unavailable; <model>: <why>`. */
+  watermark: string | null
 }
 
 export function reportedFrom(headers: Headers): TtsReported {
@@ -72,6 +74,7 @@ export function reportedFrom(headers: Headers): TtsReported {
     language: headers.get('x-bolo-language'),
     fallback: headers.get('x-bolo-fallback'),
     instructions: headers.get('x-bolo-instructions'),
+    watermark: headers.get('x-bolo-watermark'),
   }
 }
 
@@ -118,6 +121,8 @@ export interface TtsOptions {
   detectLanguage?: boolean
   /** Direction for the delivery in words (style, emotion, voice), for models with the `instructions` feature. */
   instructions?: string
+  /** `on`, `off` or a watermark model; unset: the server's policy (cloned voices are marked). */
+  watermark?: string
 }
 
 /** Finds the PCM payload of a WAV stream once enough header bytes have arrived. */
@@ -292,7 +297,7 @@ export class TtsSession {
   }
 
   private runWs(): void {
-    const { model, voice, text, language, phonemizer, wordlists, romanised, instructions } = this.opts
+    const { model, voice, text, language, phonemizer, wordlists, romanised, instructions, watermark } = this.opts
     let ws: WebSocket
     try {
       const WS = getTransport().WebSocket
@@ -306,6 +311,7 @@ export class TtsSession {
           wordlists: wordlists?.length ? wordlists.join(',') : undefined,
           romanised,
           instructions,
+          watermark,
         }),
       )
     } catch (err) {
@@ -377,6 +383,7 @@ export class TtsSession {
       romanised,
       detectLanguage,
       instructions,
+      watermark,
     } = this.opts
     this.abort = new AbortController()
     try {
@@ -395,6 +402,7 @@ export class TtsSession {
           romanised,
           detect_language: detectLanguage === false ? false : undefined,
           instructions,
+          watermark,
         },
         this.abort.signal,
       )

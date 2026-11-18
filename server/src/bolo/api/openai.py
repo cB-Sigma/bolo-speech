@@ -659,6 +659,13 @@ class SpeechRequest(BaseModel):
         "that follow it (`features` has `instructions`: Qwen3-TTS CustomVoice, CosyVoice3, FireRedTTS3 Instruct, "
         "Maya1, Parler-TTS, …). Other models speak as usual; `x-bolo-instructions` says `applied` or `ignored`.",
     )
+    watermark: bool | str | None = Field(
+        default=None,
+        description='An inaudible watermark on the speech: `true` / `"on"` (the server\'s `watermark_model`), `false` / '
+        "`\"off\"`, or a `watermark` model's id. Unset: the server's `watermark` setting (`cloned`: speech in a cloned "
+        "voice is marked). `x-bolo-watermark` names the model that marked it, or says why none could; the speech is "
+        "never refused for it.",
+    )
     response_format: str = "mp3"
     speed: float = 1.0
     stream_format: str = "audio"
@@ -888,7 +895,7 @@ async def create_speech(request: Request, body: SpeechRequest) -> Response:
         phonemizer=body.phonemizer, reference_audio=reference, reference_text=body.reference_text,
         wordlists=body.wordlists, pronunciations=body.pronunciations, input_format=body.input_format,
         romanised=body.romanised, custom_voice=custom_voice, options=body.options,
-        detect_language=body.detect_language, instructions=body.instructions,
+        detect_language=body.detect_language, instructions=body.instructions, watermark=body.watermark,
     )  # fmt: skip
     chunks = stream.chunks()
     try:

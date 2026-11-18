@@ -20,6 +20,7 @@ export type Task =
   | 'align'
   | 'echo-cancellation'
   | 'wake-word'
+  | 'watermark'
 export type Tier = 'realtime' | 'balanced' | 'accuracy'
 export type Validated = 'cpu' | 'untested'
 

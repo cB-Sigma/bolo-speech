@@ -91,6 +91,7 @@ describe('synthesis headers', () => {
       language: 'en-US; source=voice',
       fallback: null,
       instructions: null,
+      watermark: null,
     })
   })
 })

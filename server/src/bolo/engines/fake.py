@@ -57,6 +57,8 @@ from bolo.engines.base import (
     VADModel,
     VadParams,
     Voice,
+    WatermarkDetection,
+    WatermarkModel,
     Word,
 )
 from bolo.engines.blend import looks_like_blend, resolve_blend
@@ -684,6 +686,33 @@ class FakeEmotion(EmotionModel):
         return sorted(((label, 0.8 if label == top else rest) for label in self.LABELS), key=lambda t: -t[1])
 
 
+class FakeWatermark(WatermarkModel):
+    """A watermark for tests: a quiet 7 kHz tone (16 kHz audio); detected frame by frame from that tone's energy.
+    The payload it reports is the one it last embedded."""
+
+    sample_rate = 16000
+    payload_bits = 16
+    hop = 320
+    TONE_HZ = 7000.0
+
+    def __init__(self) -> None:
+        self.payload = "0" * 16
+
+    def embed(self, samples: FloatArray, payload: str | None = None) -> FloatArray:
+        self.payload = payload or self.payload
+        t = np.arange(len(samples)) / self.sample_rate
+        return (np.asarray(samples, dtype=np.float32) + 0.01 * np.sin(2 * np.pi * self.TONE_HZ * t)).astype(np.float32)
+
+    def detect(self, samples: FloatArray) -> WatermarkDetection:
+        n = len(samples) // self.hop
+        frames = np.asarray(samples[: n * self.hop], dtype=np.float32).reshape(n, self.hop)
+        spec = np.abs(np.fft.rfft(frames * np.hanning(self.hop), axis=1))
+        k = round(self.TONE_HZ / self.sample_rate * self.hop)
+        probs = (spec[:, k] > 0.3).astype(np.float32)
+        score = float(probs.mean()) if n else 0.0
+        return WatermarkDetection(score, probs, self.hop / self.sample_rate, self.payload if score >= 0.5 else None)
+
+
 class FakeLid(LidModel):
     """Language identification by pitch (tests only): the dominant frequency picks the language whose tone in
     ``tones`` (Hz -> language) is nearest. That language gets ``confidence``; the rest share what is left.
@@ -776,7 +805,7 @@ class FakeEngine(Engine):
         "fake-turn-text", "fake-separation", "fake-denoise", "fake-s2s", "fake-lid", "fake-speaker-embedding",
         "fake-tagging", "fake-emotion",
         "fake-align",
-        "fake-punctuation", "fake-echo", "fake-wake",
+        "fake-punctuation", "fake-echo", "fake-wake", "fake-watermark",
     )  # fmt: skip
 
     def __init__(self) -> None:
@@ -830,6 +859,8 @@ class FakeEngine(Engine):
             from bolo.echo import FakeEchoCanceller
 
             model = FakeEchoCanceller(merged)
+        elif kind == "fake-watermark":
+            model = FakeWatermark()
         else:
             raise ValueError(f"fake engine cannot load kind {kind!r}")
         self.loaded.append(model)

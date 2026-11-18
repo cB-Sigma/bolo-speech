@@ -132,6 +132,7 @@ class OnnxRuntimeEngine(Engine):
         "whisper_lid", "onnx_lid", "onnx_speaker_embedding", "fbank_speaker_embedding", "onnx_emotion",
         "ctc_align",
         "dtln_aec", "openwakeword",
+        "audioseal_onnx",
     )  # fmt: skip
 
     def status(self) -> EngineStatus:
@@ -143,7 +144,8 @@ class OnnxRuntimeEngine(Engine):
             return EngineStatus(
                 self.id, False, None,
                 f"{type(exc).__name__}: {exc}. Optional (end-of-turn detection, MarbleNet VAD, Nemotron diarization, DiCoW, LFM3-Audio, "
-                "DeepFilterNet 3, language identification, speech emotion, forced alignment, DTLN-aec, openWakeWord): "
+                "DeepFilterNet 3, language identification, speech emotion, forced alignment, DTLN-aec, openWakeWord, "
+                "watermarking): "
                 "pip install onnxruntime",
             )  # fmt: skip
 
@@ -208,6 +210,10 @@ class OnnxRuntimeEngine(Engine):
             from bolo.echo import DtlnAec
 
             return DtlnAec(path, spec, opts.threads)
+        if kind == "audioseal_onnx":
+            from bolo.engines.watermark import AudioSealOnnx
+
+            return AudioSealOnnx(path, spec, opts)
         if kind == "onnx_emotion":
             from bolo.engines.audio_classify import OnnxEmotion
 

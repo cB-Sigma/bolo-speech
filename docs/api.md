@@ -112,6 +112,8 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `POST` | `/v1/audio/dialogue` | Speak a multi-speaker dialogue |
 | `POST` | `/v1/audio/voice-conversion` | Say the same words in another voice |
 | `POST` | `/v1/speech-to-speech/{voice_id}` | Voice conversion (ElevenLabs' route) |
+| `POST` | `/v1/audio/watermark/detect` | Is this recording watermarked? |
+| `POST` | `/v1/audio/watermark` | Add a watermark to a recording |
 | `GET` | `/v1/audio/speakers` | List enrolled speakers |
 | `POST` | `/v1/audio/speakers` | Enrol a speaker |
 | `POST` | `/v1/audio/speakers/verify` | Is this recording the enrolled speaker? |
@@ -940,6 +942,58 @@ VC and Seed-VC have not been run here (GPU recommended). From the command line:
 ```bash
 curl -s localhost:8000/v1/audio/voice-conversion -F file=@me.wav -F voice=en-short -o converted.wav
 ```
+
+### Watermarks
+
+Speech made by bolo can carry an inaudible watermark, found again later even after the audio was cut, resampled
+or compressed. The watermarker is a catalog model of the task `watermark`; the default, `audioseal-16bits`, is
+Meta's AudioSeal (MIT) as ONNX graphs, so it runs in core bolo without PyTorch. Its mark carries 16 bits: the
+server's `watermark_payload`.
+
+**Which speech is marked.** `watermark` on `POST /v1/audio/speech`, `POST /v1/audio/dialogue`, the TTS
+WebSocket, `bolo speak --watermark` and `bolo dialogue --watermark`: `true` / `"on"` (the server's
+`watermark_model`), `false` / `"off"`, or a watermark model's id. Without it the server's `watermark` setting
+decides: `cloned` (the default) marks speech in a cloned voice (a saved voice, `reference_audio`, a one-take
+dialogue), `all` marks everything, `off` nothing. The answer says what happened: `x-bolo-watermark:
+audioseal-16bits`, or `x-bolo-watermark: unavailable; audioseal-16bits: <why>` when the watermarker could not run
+(not installed with `auto_pull` off, its engine missing). **Speech is never refused for want of a watermark**: it
+goes out unmarked, the server log warns, and `bolo doctor` says so. With `auto_pull` on (the default) the
+watermarker is downloaded the first time it is needed. Streamed speech is marked chunk by chunk, each chunk on the
+model's 20 ms frame grid counted from the start of the stream (AudioSeal's detector misses a mark that is shifted
+off that grid by a few milliseconds), so the whole recording is found marked.
+
+**`POST /v1/audio/watermark/detect`**: multipart `file`, optional `model` (default `watermark_model`; `all`: every
+installed watermarker, the most certain first, each in `results`). Answer:
+
+```json
+{"object": "audio.watermark", "duration": 7.7, "model": "audioseal-16bits", "marked": true, "score": 1.0,
+ "payload": "1011000000010000", "payload_is_this_servers": true, "segments": [{"start": 0.0, "end": 7.7}]}
+```
+
+`score` is the share of the recording that holds the mark (marked from 0.5); `segments` say where it is.
+`bolo watermark detect clip.wav` prints the same (exit status 0 when marked, 1 when not; `--json`).
+**`POST /v1/audio/watermark`** adds the server's mark to a recording you send (multipart `file`, `model`,
+`response_format`, `sample_rate`); `bolo watermark embed in.wav -o out.wav`. The console has a Watermark page to
+drop a clip on, and a watermark control on Text to speech.
+
+**Checked.** The ONNX graphs (DarumaHQ/audioseal-onnx, revision 55477a4) against the PyTorch original
+(`audioseal` 0.2.0, torch 2.15 CPU) on an 11.8 s clip: the generators differ by at most 4.5e-7; audio marked by
+PyTorch and by ONNX is found marked by both detectors (every sample, the same 16-bit payload); detector
+probabilities agree within 1.5e-4 (8e-7 on marked audio). Robustness, AudioSeal through bolo on four recordings
+(Kokoro speech at 24 kHz, the en-long, hi-short and a two-speaker 27 s English clip at 16 kHz; first 20 s each):
+
+| after | marked: score, payload bits right | unmarked: highest score |
+| --- | --- | --- |
+| nothing | 1.00, 16 of 16 (all four) | 0.025 |
+| MP3 (bolo's encoder) | 1.00, 16 of 16 | 0.025 |
+| Opus (bolo's encoder) | 1.00, 16 of 16 | 0.032 |
+| resampled to 16 kHz | 1.00, 16 of 16 | 0.025 |
+| through 8 kHz and back | 1.00, 16 of 16 | 0.026 |
+| 16 kHz, then MP3 | 1.00, 16 of 16 | 0.025 |
+
+A mark made in pieces off the 20 ms grid (pieces of 0.25 s with no context) scored 0.67 instead of 1.00, which is
+why bolo aligns them. The upstream export notes that steady tones can give false positives on the score alone:
+check the payload too.
 
 ### `GET /v1/models`, `GET /v1/models/{id}`
 

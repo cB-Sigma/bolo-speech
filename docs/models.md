@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-499 models: 215 validated on CPU by the maintainers, 284 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+500 models: 215 validated on CPU by the maintainers, 285 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -1185,6 +1185,14 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `microwakeword-hey-jarvis` | en | realtime | - | 0 MB | Apache-2.0 | **CPU** · RTF 0.003 |
 | `microwakeword-hey-mycroft` | en | realtime | - | 0 MB | Apache-2.0 | **CPU** · RTF 0.003 |
 | `microwakeword-alexa` | en | realtime | - | 0 MB | Apache-2.0 | **CPU** · RTF 0.003 |
+
+### Watermarking
+
+#### AudioSeal
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `audioseal-16bits` | - | realtime | - | 93 MB | MIT | untested |
 
 ⚠ = the licence restricts commercial use. RTF = processing time / audio duration (lower is faster).
 <!-- END GENERATED: models -->

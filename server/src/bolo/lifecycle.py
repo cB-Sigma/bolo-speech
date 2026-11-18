@@ -51,6 +51,7 @@ from bolo.engines.base import (
     TTSModel,
     TurnModel,
     VoiceConversionModel,
+    WatermarkModel,
 )
 from bolo.errors import EngineUnavailable, ModelNotFound, ModelNotInstalled, Overloaded
 from bolo.keepalive import REQUEST_KEEP_ALIVE, parse_keep_alive
@@ -771,6 +772,12 @@ class ModelManager:
             classifier = model
             handlers["classify"] = lambda items: [classifier.classify(item) for item in items]
             max_batch["classify"] = 1
+        elif isinstance(model, WatermarkModel):
+            marker = model
+            handlers["watermark"] = lambda items: [marker.embed(*item) for item in items]
+            handlers["detect_watermark"] = lambda items: [marker.detect(item) for item in items]
+            max_batch["watermark"] = 1
+            max_batch["detect_watermark"] = 1
         elif isinstance(model, VoiceConversionModel):
             converter = model
             handlers["convert"] = lambda items: [converter.convert(*item) for item in items]
