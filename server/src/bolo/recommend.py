@@ -61,6 +61,9 @@ HEURISTIC_SPREAD = (0.5, 2.0)
 SIBLING_SPREAD = (0.5, 2.0)
 #: a sibling this many times larger or smaller is too different to estimate from
 SIBLING_MAX_RATIO = 4.0
+#: a real-time factor measured on one Apple silicon GPU, applied to another: an M4 Pro's GPU is about 2.5 times an
+#: M1's and about half an M4 Max's, so the range reaches from a base chip to a Max
+METAL_SPREAD = (0.5, 3.0)
 
 #: speed of one core against the reference machine's (an Intel Xeon with AVX-512, VNNI and AMX), by instruction
 #: set. Documented guesses, not measurements: `bolo recommend --benchmark` replaces them.
@@ -253,6 +256,14 @@ def measured_rtf(spec: ModelSpec) -> float | None:
     return float(rtf) if isinstance(rtf, (int, float)) and rtf > 0 else None
 
 
+def metal_measurement(spec: ModelSpec) -> dict[str, Any] | None:
+    """The catalog's measurement on an Apple silicon GPU (``measured.metal``: ``rtf``, ``hardware``, ...), or None."""
+    m = spec.measured.get("metal") if spec.measured else None
+    if isinstance(m, dict) and isinstance(m.get("rtf"), (int, float)) and m["rtf"] > 0:
+        return m
+    return None
+
+
 def ram_need(spec: ModelSpec) -> tuple[int | None, str | None]:
     """Memory the model takes on a CPU: the catalog's figure, else an estimate from its files."""
     h = hint(spec)
@@ -298,13 +309,15 @@ def gpu_for(spec: ModelSpec, hw: Hardware) -> tuple[Gpu | None, str | None]:
     ``device = "auto"`` is the GPU bolo would pick (an NVIDIA GPU first, then an AMD GPU with ROCm, then Apple
     silicon), as the server resolves it (bolo.lifecycle)."""
     from bolo.hardware import device_for
-    from bolo.placement import family
+    from bolo.placement import CPU_ONLY_ON, family, metal_first
 
     cuda, rocm, metal = hw.best_gpu("cuda"), hw.best_gpu("rocm"), hw.best_gpu("metal")
     any_gpu = cuda or rocm or metal
     if any_gpu is None:
         return None, None
     device = (hw.device or "cpu").lower()
+    if device == "cpu" and not hw.device_explicit and metal is not None and metal_first(spec.engine, spec.options):
+        device = "coreml"  # what bolo.lifecycle places such a model on with the setting left at its default
     if spec.engine == "plugin:torch":
         rt = hw.runtimes.get("plugin:torch", {})
         chosen = str(rt.get("device") or "auto")
@@ -322,6 +335,12 @@ def gpu_for(spec: ModelSpec, hw: Hardware) -> tuple[Gpu | None, str | None]:
     if device == "auto":
         device = device_for(any_gpu)
     fam = family(device)
+    own = spec.options.get("cpu_only_on")
+    why = CPU_ONLY_ON.get((spec.engine, spec.kind), {}).get(fam) or (
+        str(own[fam]) if isinstance(own, dict) and own.get(fam) else None
+    )
+    if why:
+        return None, why
     gpu = {"cuda": cuda, "rocm": rocm, "metal": metal}.get(fam)
     if gpu is None:
         return None, None
@@ -483,6 +502,9 @@ def _assess(spec: ModelSpec, hw: Hardware, speed: Speed, siblings: Siblings | No
                 f"{name} has {gigabytes(total)}."
             )
         return cpu
+    metal = metal_measurement(spec) if gpu.backend == "metal" else None
+    if metal is not None:
+        return _assess_metal(spec, gpu, metal, need, basis, live)
     measured = GPU_MEASURED.get(spec.engine)
     if wants not in ("recommended", "required") and cpu.level in ("comfortable", "usable") and not measured:
         cpu.notes.append(f"{name} can run it too; GPU speed was never measured by the maintainers")
@@ -499,6 +521,29 @@ def _assess(spec: ModelSpec, hw: Hardware, speed: Speed, siblings: Siblings | No
     )
     if need is not None and gpu.vram_free_bytes is not None and need > gpu.vram_free_bytes:
         fit.notes.append(f"only {gigabytes(gpu.vram_free_bytes)} of GPU memory is free right now")
+    return fit
+
+
+def _assess_metal(
+    spec: ModelSpec, gpu: Gpu, metal: dict[str, Any], need: int | None, basis: str | None, live: bool
+) -> Fit:
+    """A model on Apple silicon's GPU with a speed measured on one: that speed, not a CPU figure scaled."""
+    rtf = float(metal["rtf"])
+    fit = Fit(rtf_level(rtf, live), "", device="gpu", memory_kind="vram", memory_basis=basis)
+    fit.expected_rtf = rtf
+    fit.rtf_range = (rtf * METAL_SPREAD[0], rtf * METAL_SPREAD[1])
+    fit.rtf_basis = "measured"
+    fit.scaled_by = "metal"
+    fit.memory_needed_bytes, fit.memory_available_bytes = need, gpu.vram_total_bytes
+    where = str(metal.get("hardware") or "an Apple silicon GPU")
+    fit.reason = (
+        f"{_pace(rtf)} on {gpu.name or 'the GPU'} (real-time factor ~{_rtf_text(rtf)}, measured on {where} with "
+        "Metal; other Apple chips are up to about 3 times slower or 2 times faster)"
+    )
+    total = gpu.vram_total_bytes
+    if need is not None and total is not None:
+        fit.reason += f"; needs about {gigabytes(need)} of the {gigabytes(total)} of memory shared with the system"
+    fit.reason += "."
     return fit
 
 

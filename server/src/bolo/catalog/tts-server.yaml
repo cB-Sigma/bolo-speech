@@ -81,6 +81,13 @@
     hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
     date: '2026-11-16'
     note: 'server/tools/measure_cloning.py (docs/measurements/voice-cloning-cpu.json): cloned two LibriSpeech dev-clean speakers (CC BY 4.0, about 15 s each, saved voices) and spoke one test sentence in en: libri-2277 similarity 0.732 (others at most 0.367, its stock voice 0.226); libri-84 similarity 0.697 (others at most 0.513, its stock voice 0.06). Round trip by moonshine-tiny-en. One run after a warm-up, the faster voice''s RTF; the machine was shared.'
+    metal:
+      rtf: 0.466
+      audio_s: 5.6
+      engine: llama-server as bolo 0.6.10 installs it (Metal), device = coreml
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API: one English sentence of about 5.6 s, after a warm-up request; transcribed back with whispercpp-small word for word (only "ten thirty" written 10.30).'
   requires: [llama-server]
   source:
     repo: ggml-org/chatterbox-turbo-GGUF
@@ -192,6 +199,13 @@
       average 5-7 from other work). Voice michael (11.8 s reference clip): RTF 1.7-2.3, first audio 2.4-3.4 s, because llama-server
       encodes the reference again for every sentence. With 4 threads on the busy machine RTF was about 12: give the server
       fewer threads than free cores.'
+    metal:
+      rtf: 0.081
+      audio_s: 5.6
+      engine: llama-server as bolo 0.6.10 installs it (Metal), device = coreml
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API: one English sentence of about 5.6 s, after a warm-up request; transcribed back with whispercpp-small word for word (only "ten thirty" written 10.30).'
 - id: pocket-tts-de-llamacpp
   task: tts
   engine: tts-server
@@ -494,6 +508,13 @@
       The machine was shared (load average about 15 on 4 vCPU): with 4 threads llama.cpp''s waiting worker threads made
       it about 50 times slower, so it ran with threads = 1; llama-tts alone with one thread took 3.45 s for 2.62 s of
       audio.'
+    metal:
+      rtf: 0.064
+      audio_s: 5.6
+      engine: llama-server as bolo 0.6.10 installs it (Metal), device = coreml
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API: one English sentence of about 5.6 s, after a warm-up request; transcribed back with whispercpp-small word for word (only "ten thirty" written 10.30).'
   requires: [llama-server]
   source:
     repo: ggml-org/Soprano-1.1-80M-GGUF
@@ -530,6 +551,14 @@
   source_url: https://huggingface.co/n4ze3m/tiny-voca
   validated: untested
   requires: [llama-server]
+  measured:
+    metal:
+      rtf: 0.029
+      audio_s: 5.6
+      engine: llama-server as bolo 0.6.10 installs it (Metal), device = coreml
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API: one English sentence of about 5.6 s, after a warm-up request; transcribed back with whispercpp-small word for word (only "ten thirty" written 10.30).'
   source:
     repo: ggml-org/tiny-voca-GGUF
     revision: 8a785351a6dac0b9168bc14bc5de635a98a7b809
@@ -567,6 +596,14 @@
   source_url: https://huggingface.co/hexgrad/Kokoro-82M
   validated: untested
   requires: [llama-server]
+  measured:
+    metal:
+      rtf: 0.213
+      audio_s: 5.6
+      engine: llama-server as bolo 0.6.10 installs it (Metal), device = coreml
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API: one English sentence of about 5.6 s, after a warm-up request; transcribed back with whispercpp-small word for word (only "ten thirty" written 10.30).'
   source:
     repo: ggml-org/Kokoro-82M-GGUF
     revision: ed4a98eab16351c7d803ff011e88267a5b036666
@@ -625,12 +662,20 @@
   description: 'ZONOS3-Mini (Zyphra, Apache-2.0; a gated DeltaNet / attention MoE backbone of 800 M parameters, 100 M
     active, and the ZAC codec, 44.1 kHz) as converted by ggml-org, on llama.cpp (supported since b12424): 27 voices of
     the release (English, German, Spanish, French, Hindi, Italian, Korean, Portuguese, Telugu, Mandarin) and cloning
-    from a reference clip. Numbers are written out for en, fr, de, es, it, pt, ja and zh. Added, not yet run here.
+    from a reference clip. Numbers are written out for en, fr, de, es, it, pt, ja and zh. Run on an M4 Pro with Metal (2026-11-19): intelligible, 0.21 of real time.
     Runs in a llama-server that bolo starts (bolo components install llama-server) or one you run (setting
     tts_servers).'
   source_url: https://huggingface.co/Zyphra/ZONOS3-Mini
   validated: untested
   requires: [llama-server]
+  measured:
+    metal:
+      rtf: 0.207
+      audio_s: 5.6
+      engine: llama-server as bolo 0.6.10 installs it (Metal), device = coreml
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API: one English sentence of about 5.6 s, after a warm-up request; transcribed back with whispercpp-small word for word (only "ten thirty" written 10.30).'
   source:
     repo: ggml-org/ZONOS3-Mini-GGUF
     revision: 2e7bc4126a2343787298e1a297a3d1c4a13165aa
@@ -808,6 +853,14 @@
   source_url: https://huggingface.co/ResembleAI/chatterbox-turbo
   validated: untested
   requires: [audio.cpp]
+  measured:
+    metal:
+      rtf: 0.354
+      audio_s: 5.6
+      engine: audio.cpp as bolo 0.6.10 installs it (Metal), device = coreml
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API: one English sentence of about 5.6 s, after a warm-up request; transcribed back with whispercpp-small word for word (only "ten thirty" written 10.30).'
   source:
     repo: audio-cpp/audio.cpp-gguf
     revision: ca0b203eb1bb87f333a7cfbad2d5f6672b4ccba7
@@ -1083,6 +1136,13 @@
     hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
     date: '2026-11-16'
     note: 'server/tools/measure_cloning.py (docs/measurements/voice-cloning-cpu.json): cloned two LibriSpeech dev-clean speakers (CC BY 4.0, about 15 s each, saved voices) and spoke one test sentence: libri-2277 similarity 0.551 (others at most 0.366, its stock voice 0.131); libri-84 similarity 0.581 (others at most 0.448, its stock voice 0.182). Round trip by moonshine-tiny-en. One run after a warm-up; the machine was shared.'
+    metal:
+      rtf: 0.068
+      audio_s: 5.6
+      engine: audio.cpp as bolo 0.6.10 installs it (Metal), device = coreml
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API: one English sentence of about 5.6 s, after a warm-up request; transcribed back with whispercpp-small word for word (only "ten thirty" written 10.30).'
   requires: [audio.cpp]
   source:
     repo: audio-cpp/audio.cpp-gguf
@@ -1135,6 +1195,10 @@
     cloning: false
     send_language: false
     hardware: {gpu: optional, vram_gb: 0.7, note: small enough for a CPU}
+    cpu_only_on:
+      metal: "audio.cpp's Metal build stops with a segmentation fault while it compiles its kernels for this model
+        (M4 Pro, macOS 26.3.1, 2026-11-19); on that Mac's CPU it reads at 0.094 of real time, and
+        soprano-1.1-80m-llamacpp runs on Metal"
 - id: supertonic-3-audiocpp
   task: tts
   engine: tts-server
@@ -1328,6 +1392,13 @@
     hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
     date: '2026-11-16'
     note: 'server/tools/measure_cloning.py (docs/measurements/voice-cloning-cpu.json): cloned two LibriSpeech dev-clean speakers (CC BY 4.0, about 15 s each, saved voices) and spoke one test sentence: libri-2277 similarity 0.091 (others at most 0.247, its stock voice -0.037); libri-84 similarity 0.151 (others at most 0.207, its stock voice 0.328). Round trip by moonshine-tiny-en. One run after a warm-up; the machine was shared. It did not clone: the output was not closer to its reference than to other people.'
+    metal:
+      rtf: 0.699
+      audio_s: 5.6
+      engine: audio.cpp as bolo 0.6.10 installs it (Metal), device = coreml
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API: one English sentence of about 5.6 s, after a warm-up request; transcribed back with whispercpp-small word for word (only "ten thirty" written 10.30).'
   requires: [audio.cpp]
   source:
     repo: audio-cpp/audio.cpp-gguf

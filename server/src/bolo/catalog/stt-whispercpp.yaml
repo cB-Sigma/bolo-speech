@@ -23,6 +23,14 @@
   description: 'Whisper tiny in ggml format for whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given.'
   source_url: https://huggingface.co/ggerganov/whisper.cpp
   validated: untested
+  measured:
+    metal:
+      rtf: 0.0119
+      audio_s: 146.3
+      engine: pywhispercpp 1.5.1 (Metal build), DTW word times off
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API with the device setting left at its default (placed on Metal): an English recording of 146 s, median of three warm runs, transcript checked.'
   source:
     urls:
     - path: ggml-tiny.bin
@@ -182,6 +190,14 @@
   description: 'Whisper base in ggml format for whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given.'
   source_url: https://huggingface.co/ggerganov/whisper.cpp
   validated: untested
+  measured:
+    metal:
+      rtf: 0.0152
+      audio_s: 146.3
+      engine: pywhispercpp 1.5.1 (Metal build), DTW word times off
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API with the device setting left at its default (placed on Metal): an English recording of 146 s, median of three warm runs, transcript checked.'
   source:
     urls:
     - path: ggml-base.bin
@@ -341,6 +357,14 @@
   description: 'Whisper small in ggml format for whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given.'
   source_url: https://huggingface.co/ggerganov/whisper.cpp
   validated: untested
+  measured:
+    metal:
+      rtf: 0.0345
+      audio_s: 146.3
+      engine: pywhispercpp 1.5.1 (Metal build), DTW word times off
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API with the device setting left at its default (placed on Metal): an English recording of 146 s, median of three warm runs, transcript checked.'
   source:
     urls:
     - path: ggml-small.bin
@@ -711,6 +735,14 @@
   description: 'Whisper large-v3-turbo in ggml format for whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given. Not trained for translation (OpenAI''s turbo model).'
   source_url: https://huggingface.co/ggerganov/whisper.cpp
   validated: untested
+  measured:
+    metal:
+      rtf: 0.1014
+      audio_s: 146.3
+      engine: pywhispercpp 1.5.1 (Metal build), DTW word times off
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API with the device setting left at its default (placed on Metal): an English recording of 146 s, median of three warm runs, transcript checked.'
   source:
     urls:
     - path: ggml-large-v3-turbo.bin
@@ -737,6 +769,14 @@
   description: 'Whisper large-v3-turbo in ggml format for whisper.cpp, 5-bit (q5_0) quantised by whisper.cpp. Multilingual (99 languages, including the major Indian languages); detects the language when none is given. Not trained for translation (OpenAI''s turbo model).'
   source_url: https://huggingface.co/ggerganov/whisper.cpp
   validated: untested
+  measured:
+    metal:
+      rtf: 0.1017
+      audio_s: 146.3
+      engine: pywhispercpp 1.5.1 (Metal build), DTW word times off
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API with the device setting left at its default (placed on Metal): an English recording of 146 s, median of three warm runs, transcript checked.'
   source:
     urls:
     - path: ggml-large-v3-turbo-q5_0.bin

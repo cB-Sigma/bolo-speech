@@ -411,6 +411,8 @@ class Hardware:
     container: Container = field(default_factory=Container)
     #: the ``device`` setting and the inference threads bolo uses per worker on this machine
     device: str = "cpu"
+    #: False when the ``device`` setting was left at its default (bolo.config.Settings.device_explicit)
+    device_explicit: bool = True
     threads: int | None = None
     notes: list[str] = field(default_factory=list)
     detected_at: str = ""
@@ -1224,6 +1226,7 @@ def detect(
         hw.notes.append("runtimes could not be read")
     if settings is not None:
         hw.device = settings.device
+        hw.device_explicit = bool(getattr(settings, "device_explicit", True))
         with contextlib.suppress(Exception):
             hw.threads = settings.resolved_threads()
     quota = hw.container.cpu_quota
@@ -1245,7 +1248,13 @@ def detect(
             if g.vendor == "amd":
                 hw.notes.append(windows_rocm_note(g))
     best = hw.best_gpu()
-    if best is not None and hw.device == "cpu":
+    if best is not None and hw.device == "cpu" and best.backend == "metal" and not hw.device_explicit:
+        hw.notes.append(
+            "Apple silicon GPU: MLX, whisper.cpp and llama.cpp models use Metal; the other built-in engines run on "
+            'the CPU until the `device` setting asks for the GPU (device = "coreml"), and device = "cpu" keeps '
+            "everything on the CPU; the torch plugin picks its own device"
+        )
+    elif best is not None and hw.device == "cpu":
         example = device_for(best)
         hw.notes.append(
             'a GPU was found but the `device` setting is "cpu": the built-in engines run on the CPU until it is '

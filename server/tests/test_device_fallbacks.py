@@ -351,3 +351,106 @@ def test_hardware_says_which_sherpa_build_is_installed(tmp_path: Path) -> None:
     (lib / "onnxruntime_providers_cuda.dll").write_bytes(b"")
     assert hardware._sherpa_gpu(module) is True
     assert hardware._sherpa_gpu(SimpleNamespace(__version__="2.0.1")) is None
+
+
+# -- Apple silicon: engines built for its GPU use Metal when no device is set ---------------------------------------
+class FakeAppleAccel(FakeAccel):
+    """An Apple silicon GPU (Metal), as bolo.accel reports one on a Mac."""
+
+    def __init__(self) -> None:
+        super().__init__(nvidia=False)
+
+    def default_device(self) -> str | None:
+        return "coreml"
+
+    def devices(self, fresh: bool = False) -> list[DeviceMemory]:
+        return [DeviceMemory(0, "apple", "Apple M4 Pro", 24 << 30, 12 << 30, unified=True, backend="metal")]
+
+
+def apple_manager(settings: Settings, accel: FakeAccel | None = None) -> ModelManager:
+    core = Bolo(settings)
+    core.manager.accel = accel or FakeAppleAccel()  # type: ignore[assignment]
+    return core.manager
+
+
+def duplex(build: str) -> ModelSpec:
+    return ModelSpec.from_dict({
+        "id": f"moshi-{build}", "task": "speech-to-speech", "engine": "duplex", "kind": "duplex", "family": "Test",
+        "languages": ["en"], "license": "MIT", "builtin": True, "size_bytes": 8 * MB, "options": {"build": build},
+    })  # fmt: skip
+
+
+def test_metal_first_engines_use_metal_on_apple_silicon_by_default(settings: Settings) -> None:
+    assert settings.device == "cpu" and settings.device_explicit is False
+    m = apple_manager(settings)
+    for gpu_first in (spec("w", "mlx", "whisper"), spec("c", "whisper.cpp", "whisper"),
+                      spec("l", "tts-server", "tts-server", task="tts"), duplex("mlx")):  # fmt: skip
+        assert m.requested_device(gpu_first) == "coreml", gpu_first.id
+        assert m.device_for(gpu_first)[0] == "coreml"
+    # the engines whose Mac route is the CPU (or untested CoreML) stay there
+    for cpu_first in (spec("s", "sherpa-onnx", "whisper"), spec("f", "faster-whisper", "whisper"),
+                      spec("o", "onnxruntime", "smart_turn", task="turn"), duplex("pytorch")):  # fmt: skip
+        assert m.requested_device(cpu_first) == "cpu", cpu_first.id
+
+
+def test_an_explicit_cpu_keeps_metal_first_engines_on_the_cpu(settings: Settings) -> None:
+    settings.device_explicit = True  # device = "cpu" written in the config, the environment or a flag
+    m = apple_manager(settings)
+    assert m.requested_device(spec("w", "mlx", "whisper")) == "cpu"
+    # and so does a model pinned to the CPU, with the setting left alone
+    settings.device_explicit = False
+    m = apple_manager(settings)
+    m.store.set_model_settings("pinned", {"device": "cpu"})
+    assert m.requested_device(spec("pinned", "mlx", "whisper")) == "cpu"
+
+
+def test_no_metal_no_change(settings: Settings) -> None:
+    m = apple_manager(settings, FakeAccel(nvidia=False))  # an Intel Mac, or Linux: no Metal device
+    assert m.requested_device(spec("w", "mlx", "whisper")) == "cpu"
+    m = apple_manager(settings, FakeAccel(nvidia=True))  # an NVIDIA GPU: the default stays the CPU, as before
+    assert m.requested_device(spec("c", "whisper.cpp", "whisper")) == "cpu"
+
+
+def test_load_settings_knows_whether_device_was_set(tmp_path: Path) -> None:
+    from bolo.config import load_settings
+
+    env = {"BOLO_DATA_DIR": str(tmp_path)}
+    assert load_settings(env=env).device_explicit is False
+    assert load_settings(env={**env, "BOLO_DEVICE": "cpu"}).device_explicit is True
+    assert load_settings(overrides={"device": "cpu"}, env=env).device_explicit is True
+    config = tmp_path / "bolo.toml"
+    config.write_text('device = "cpu"\n')
+    assert load_settings(config, env=env).device_explicit is True
+    config.write_text("device_explicit = true\n")  # an internal flag, not a setting
+    with pytest.raises(ValueError, match="unknown setting"):
+        load_settings(config, env=env)
+
+
+def test_moonshine_v2_runs_on_the_cpu_with_coreml(settings: Settings) -> None:
+    settings.device, settings.device_explicit = "coreml", True
+    m = apple_manager(settings)
+    device, reason = m.device_for(spec("moonshine-v2-base-en", "sherpa-onnx", "moonshine_v2"))
+    assert device == "cpu" and reason is not None and "Unable to compute the prediction" in reason
+    # Moonshine v1 and the other sherpa-onnx models still use CoreML when asked to
+    assert m.device_for(spec("moonshine-base-en", "sherpa-onnx", "moonshine"))[0] == "coreml"
+    assert m.device_for(spec("zipformer", "sherpa-onnx", "transducer"))[0] == "coreml"
+
+
+def test_a_catalog_entry_can_keep_itself_off_a_device_family(settings: Settings) -> None:
+    """Soprano 1.1 on audio.cpp segfaults on Metal (an M4 Pro): its entry says so and it runs on the CPU there."""
+    m = apple_manager(settings)  # device left unset: tts-server models go on Metal
+    entry = ModelSpec.from_dict({
+        "id": "soprano-audiocpp", "task": "tts", "engine": "tts-server", "kind": "tts-server", "family": "Test",
+        "languages": ["en"], "license": "MIT", "builtin": True, "size_bytes": 8 * MB,
+        "options": {"runtime": "audio.cpp", "cpu_only_on": {"metal": "audio.cpp segfaults on Metal"}},
+    })  # fmt: skip
+    device, reason = m.device_for(entry)
+    assert device == "cpu" and reason is not None and "segfaults on Metal" in reason
+    assert m.device_for(spec("l", "tts-server", "tts-server", task="tts"))[0] == "coreml"  # the others still go there
+
+
+def test_the_catalog_keeps_soprano_on_audiocpp_off_metal() -> None:
+    from bolo.catalog import Catalog
+
+    entry = Catalog.load().resolve("soprano-1.1-80m-audiocpp")
+    assert entry is not None and "segmentation fault" in entry.options["cpu_only_on"]["metal"]

@@ -68,6 +68,7 @@ from bolo.placement import (
     best_gpu,
     family,
     gguf_block_count,
+    metal_first,
     operator_layers,
     partly_on_cpu,
     plan,
@@ -415,9 +416,28 @@ class ModelManager:
     # -- placement ----------------------------------------------------------
     def requested_device(self, spec: ModelSpec) -> str:
         """``device`` pinned for the model (``PUT /api/v1/models/{id}/settings``), else the catalog entry's
-        ``options.device``, else the ``device`` setting."""
+        ``options.device``, else the ``device`` setting. With that setting left at its default (``cpu``), a model
+        of an engine built for Apple silicon's GPU (:func:`bolo.placement.metal_first`) asks for Metal on a Mac
+        that has one; ``device = "cpu"`` written anywhere keeps it on the CPU."""
         pinned = self.store.model_settings(spec.id).get("device") or spec.options.get("device")
-        return str(pinned or self.settings.device or "cpu").strip().lower()
+        if pinned:
+            return str(pinned).strip().lower()
+        device = str(self.settings.device or "cpu").strip().lower()
+        if (
+            device == "cpu"
+            and not getattr(self.settings, "device_explicit", True)
+            and metal_first(spec.engine, spec.options)
+            and self.has_metal()
+        ):
+            return "coreml"  # what ``auto`` means on Apple silicon (Accelerators.default_device)
+        return device
+
+    def has_metal(self) -> bool:
+        """Whether this machine has an Apple silicon GPU bolo can reach (Metal)."""
+        try:
+            return any(d.backend == "metal" for d in self.accel.devices())
+        except Exception:
+            return False
 
     def resolve_device(self, requested: str, engine: str | None = None) -> str:
         """``auto`` -> the accelerator found (``cuda`` when there are NVIDIA GPUs: one is picked per model; else
@@ -443,7 +463,10 @@ class ModelManager:
         requested = self.requested_device(spec) if requested is None else requested
         device = self.resolve_device(requested, spec.engine)
         fam = family(device)
-        reason = CPU_ONLY_ON.get((spec.engine, spec.kind), {}).get(fam)
+        own = spec.options.get("cpu_only_on")  # a catalog entry's own: {"metal": "why"}
+        reason = CPU_ONLY_ON.get((spec.engine, spec.kind), {}).get(fam) or (
+            str(own[fam]) if isinstance(own, dict) and own.get(fam) else None
+        )
         if reason:
             return "cpu", f"'{spec.id}' runs on the CPU, not {device}: {reason}"
         if spec.engine == "sherpa-onnx" and fam == "cuda" and ort_providers.sherpa_gpu_build() is False:

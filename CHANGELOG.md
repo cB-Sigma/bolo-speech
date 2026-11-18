@@ -6,8 +6,60 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Changed
+
+- **Apple silicon: MLX, whisper.cpp and llama.cpp models run on Metal by default.** With `device` left at its default
+  (`cpu`), every model ran on the CPU on a Mac, MLX included: whisper-tiny-mlx took 0.054 of real time there against
+  0.0115 on the GPU, whispercpp-small 0.121 against 0.035 (an M4 Pro, 146 s of English, warm). With `device` unset,
+  the engines built for Apple silicon's GPU (MLX, whisper.cpp, the llama.cpp and audio.cpp servers, MLX full-duplex
+  servers) are now placed on Metal; sherpa-onnx, ONNX Runtime and faster-whisper stay on the CPU, and `device = "cpu"`
+  written anywhere keeps everything there. `bolo doctor` says which engines use the GPU.
+- **`bolo recommend` on a Mac rates those models by their speed on Metal.** It scaled the figures measured on the
+  Linux reference machine's CPU (parakeet-tdt-ctc-110m-mlx 1.49, "slow"), so it picked CPU models on a Mac. Catalog
+  entries can now carry a measurement on Apple silicon (`measured.metal`), used when the model is placed on Metal, with
+  a range from a base chip to a Max; eight MLX and whisper.cpp entries have one from an M4 Pro. On that Mac the picks
+  are whispercpp-large-v3-turbo (0.10) for speech to text and whisper-tiny-mlx (0.011) for live speech to text.
+  Text to speech gains the most: kokoro-v1.0-mlx took 83 s to speak 7.9 s on the M4 Pro's CPU (10.5 of real time)
+  and takes 0.38 s on Metal (0.048). Ten more entries carry a Metal figure (kokoro-v1.0-mlx and nine llama.cpp and
+  audio.cpp voices, ZONOS3-Mini, Kokoro-82M and tiny-voca on llama.cpp among them, all three intelligible on Metal).
+- **A catalog entry can keep itself off a device family** (`options.cpu_only_on: {metal: "why"}`): it is placed on
+  the CPU there with that reason as its notice. Soprano 1.1 on audio.cpp segfaults on Metal while audio.cpp compiles
+  its kernels (exit -11, every time; it reads at 0.094 of real time on the CPU), so it stays on the CPU on a Mac;
+  soprano-1.1-80m-llamacpp runs on Metal.
+
 ### Fixed
 
+- **whisper.cpp could abort the whole server on a short segment.** whispercpp-large-v3-turbo on Metal stopped the
+  process (`WHISPER_ASSERT: filter_width < a->ne[2]`, SIGABRT) on the third of three identical requests: the DTW word
+  timing's median filter asserts when a decoded segment is shorter than the filter, which whisper.cpp fixed on
+  2026-10-19 (ggml-org/whisper.cpp#4096) and no pywhispercpp release carries yet (1.5.1 is the newest). bolo now loads
+  whisper.cpp without DTW with pywhispercpp 1.5.1 and older; word times come from whisper.cpp's token timestamps. 27
+  requests (six 146 s files, fifteen one-word phrases, word timestamps) ran without a stop afterwards.
+- **Voxtral on llama.cpp sometimes answered the audio like a chat message.** In a 24-minute English file
+  (voxtral-mini-3b-llamacpp, Metal, one request), 6 of 158 pieces came back as replies ("It seems like you're
+  referring to ... Could you please provide more context?", "Here's a high-level overview ...", markdown) in place of
+  what was said. Generation now also stops at markdown, and a piece that still reads as a reply is transcribed again
+  with its language named (`lang:xx[TRANSCRIBE]`, the request's language or the reply's), which keeps the model
+  transcribing; a piece that stays a reply is left out with a warning rather than returned as words that were never
+  said.
+- **Moonshine v2 on CoreML returned an empty transcript with 200 OK.** CoreML fails every decode of its decoder
+  ("Unable to compute the prediction"; not every model runs on CoreML, k2-fsa/sherpa-onnx#1448); with `device =
+  "coreml"` Moonshine v2 is now placed on the CPU with a notice. Moonshine v1 and the other sherpa-onnx models still use
+  CoreML when asked (measured on an M4 Pro: slower than its CPU for zipformer and Canary).
+- **Hotwords: two names heard as one word were left alone.** whisper-tiny-mlx and parakeet wrote "Kshetjwadwani" for
+  "Kshitij Wadhwani"; runs of adjacent words inside a hotword phrase now match a word heard joined, and the word times
+  are shared. Heard one for one, the word-by-word pass still reports exactly which word changed.
+- **ITN wrote "ten thirty in the morning" as "1030 in the morning".** wetext's English grammar takes a clock time only
+  before "a m" / "p m"; an hour and minutes before "in the morning", "in the afternoon", "in the evening" or "at
+  night" are now written 10:30.
+- **The browser demo's text-to-speech swapped a Maithili (or Bhojpuri, Marathi) voice for a Hindi one.** Language
+  detection, on by default, named Devanagari text Hindi whenever no letters or common words decided, and moved to a
+  Hindi voice. A voice of the same script that was chosen now stays unless the text's own letters or words point
+  elsewhere, and detection starts switched off.
+- **`--redact on` did not say it leaves names.** The CLI help now says that the default model (pii-presidio-patterns)
+  masks numbers and e-mail addresses only, and names the two that mask names too.
+- **A console test depended on the machine's time zone** (it expected 10:00:00 and saw 15:30:00 in IST): the UI tests
+  run in UTC, as CI does.
 - **`bolo doctor` on macOS said "CTranslate2 (CUDA devices: 0)".** CTranslate2 has no GPU backend on macOS, so the
   count said nothing; the runtimes line now reads "CTranslate2 4.9.0 (CPU only on macOS)". Other systems still show
   the CUDA device count.

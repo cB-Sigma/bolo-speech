@@ -326,6 +326,9 @@ class Settings:
 
     # -- misc ---------------------------------------------------------------
     device: str = "cpu"
+    #: True when ``device`` was set (file, environment, flag), not left at its default; with it unset, the engines
+    #: built for Apple silicon's GPU use Metal there (bolo.placement.metal_first). Not a setting of its own.
+    device_explicit: bool = field(default=False, init=False, repr=False, compare=False)
     #: the GPUs bolo may use (CUDA device numbers as this process sees them, after CUDA_VISIBLE_DEVICES); empty: all
     gpus: list[int] = field(default_factory=list)
     #: spread each llama.cpp model over every allowed GPU (Ollama's OLLAMA_SCHED_SPREAD) instead of placing it on
@@ -551,8 +554,11 @@ def _provider_env(values: dict[str, Any], environ: dict[str, str]) -> None:
 
 def _field_types() -> dict[str, Any]:
     hints = get_type_hints(Settings)
+    internal = {f.name for f in fields(Settings) if not f.init}
     out: dict[str, Any] = {}
     for name, hint in hints.items():
+        if name in internal:
+            continue
         args = getattr(hint, "__args__", ())
         if args and type(None) in args and getattr(hint, "__origin__", None) not in (list, dict):
             hint = next(a for a in args if a is not type(None))
@@ -658,6 +664,7 @@ def load_settings(
         values[name] = _coerce(name, val, types[name])
 
     settings = Settings(**values)
+    settings.device_explicit = "device" in values
     _check_cloud(settings)
     from bolo.keepalive import parse_keep_alive
 

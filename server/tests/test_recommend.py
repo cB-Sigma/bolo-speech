@@ -813,3 +813,47 @@ async def test_a_full_duplex_model_that_does_not_fit_is_not_started(
     with pytest.raises(EngineUnavailable, match="stubbed"):  # past the check: the (stubbed) start is reached
         await duplex_manager.build_backend(core, q8)
     assert started == ["launch"]
+
+
+# -- Apple silicon ----------------------------------------------------------------------------------------------
+def apple_mac(device_explicit: bool = False) -> Hardware:
+    gpu = Gpu("apple", "Apple M4 Pro GPU", 24 * GB, 12 * GB, unified_memory=True, backend="metal", source="platform")
+    hw = machine(cores=14, ram_gb=24, features=["neon", "dotprod"], arch="arm64", gpus=[gpu], system="macos",
+                 runtimes={"mlx": {"installed": True, "metal": True}, "whisper.cpp": {"backends": ["metal"]}})  # fmt: skip
+    hw.device_explicit = device_explicit
+    return hw
+
+
+#: CPU figures from the Linux reference machine (MLX on its CPU wheel), and what this Mac's GPU measured
+MAC_CATALOG = [
+    spec("cpu-tiny", rtf=0.05, tier="realtime", family="CpuTiny", size_bytes=80 * MB),
+    spec("mlx-tiny", rtf=1.5, tier="realtime", family="MlxTiny", engine="mlx", kind="mlx_whisper",
+         size_bytes=75 * MB, measured={"metal": {"rtf": 0.012, "hardware": "Apple M4 Pro (20-core GPU)"}}),
+    spec("cpp-turbo", tier="accuracy", family="CppTurbo", engine="whisper.cpp", kind="whispercpp",
+         size_bytes=600 * MB, validated="untested",
+         measured={"metal": {"rtf": 0.05, "hardware": "Apple M4 Pro (20-core GPU)"}}),
+]  # fmt: skip
+
+
+def test_apple_silicon_uses_metal_measurements_for_metal_first_engines() -> None:
+    out = run(rec.Query(task="stt", realtime=True), apple_mac(), MAC_CATALOG)
+    mlx = out["fits"]["mlx-tiny"]
+    assert mlx.device == "gpu" and mlx.rtf_basis == "measured" and mlx.expected_rtf == 0.012
+    assert mlx.level == "comfortable" and "measured on Apple M4 Pro (20-core GPU) with Metal" in mlx.reason
+    assert mlx.rtf_range == pytest.approx((0.006, 0.036))
+    # the GPU figure, not the Linux CPU figure scaled: it now ranks ahead of the measured CPU model
+    assert out["ids"].index("mlx-tiny") < out["ids"].index("cpu-tiny")
+    turbo = run(rec.Query(task="stt"), apple_mac(), MAC_CATALOG)["fits"]["cpp-turbo"]
+    assert turbo.device == "gpu" and turbo.rtf_basis == "measured" and turbo.expected_rtf == 0.05
+
+
+def test_an_explicit_cpu_device_keeps_the_cpu_figures_on_a_mac() -> None:
+    out = run(rec.Query(task="stt", realtime=True), apple_mac(device_explicit=True), MAC_CATALOG)
+    mlx = out["fits"]["mlx-tiny"]
+    assert mlx.device == "cpu" and mlx.level in ("slow", "unlikely")
+    assert out["ids"].index("cpu-tiny") < out["ids"].index("mlx-tiny")
+
+
+def test_metal_measurements_are_ignored_off_apple_silicon() -> None:
+    fit = run(rec.Query(task="stt"), machine(gpus=[nvidia(24)], device="cuda"), MAC_CATALOG)["fits"]["mlx-tiny"]
+    assert fit.device == "cpu" and fit.expected_rtf is not None and fit.expected_rtf > 0.5  # the CPU figure

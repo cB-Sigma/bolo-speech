@@ -454,5 +454,6 @@ def test_every_setting_is_documented() -> None:
     from dataclasses import fields
 
     docs = (Path(__file__).resolve().parents[2] / "docs" / "configuration.md").read_text(encoding="utf-8")
-    missing = [f.name for f in fields(Settings) if f"`{f.name}`" not in docs]
+    # internal fields (init=False, such as device_explicit) are not settings
+    missing = [f.name for f in fields(Settings) if f.init and f"`{f.name}`" not in docs]
     assert not missing, f"settings missing from docs/configuration.md: {missing}"

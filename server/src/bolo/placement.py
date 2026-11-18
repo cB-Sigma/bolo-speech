@@ -54,6 +54,11 @@ CPU_ONLY_ON: dict[tuple[str, str], dict[str, str]] = {
         "dml": "DirectML cannot run the end-of-turn model (ONNX Runtime fails in its Reshape node 'node_view_1' "
         "with 8007023E, on every adapter); it is 8 MB and takes 13-39 ms on the CPU",
     },
+    ("sherpa-onnx", "moonshine_v2"): {
+        "metal": "CoreML cannot run Moonshine v2's decoder (sherpa-onnx 2.0.1, onnxruntime 1.32: every decode fails "
+        "with 'Unable to compute the prediction' and the transcript comes back empty; not every model runs on CoreML, "
+        "k2-fsa/sherpa-onnx#1448); on an M4 Pro's CPU it takes 0.026 of real time",
+    },
     ("onnxruntime", "deepfilternet3_stream"): dict.fromkeys(
         _ORT,
         "DeepFilterNet 3 runs its graph once per 10 ms frame, where an accelerator would spend more time copying than "
@@ -80,6 +85,20 @@ LLAMA_OVERHEAD = 0.10
 GRAPH_OVERHEAD = 1.2
 #: single-graph ONNX Runtime models that may be cut in two (bolo.onnx_split)
 SPLITTABLE_KINDS = ("smart_turn", "nemotron_diarization")
+
+
+#: engines built for Apple silicon's GPU: MLX, whisper.cpp (a Metal build on macOS), and the llama.cpp / audio.cpp
+#: servers (the macOS builds carry Metal). With the ``device`` setting left at its default they use Metal on a Mac
+#: with Apple silicon, where the CPU would be two to three times slower; the other engines stay on the CPU.
+METAL_FIRST_ENGINES = frozenset({"mlx", "whisper.cpp", "tts-server"})
+
+
+def metal_first(engine: str, options: dict[str, Any] | None = None) -> bool:
+    """Whether a model of ``engine`` uses Metal on Apple silicon when no ``device`` is set (a full-duplex server
+    of the MLX build counts too)."""
+    if engine == "duplex":
+        return str((options or {}).get("build") or "") == "mlx"
+    return engine in METAL_FIRST_ENGINES
 
 
 def family(device: str | None) -> str:

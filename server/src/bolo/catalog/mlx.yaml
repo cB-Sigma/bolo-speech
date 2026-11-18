@@ -30,6 +30,13 @@
     hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, load average about 20 from other work
     date: '2026-11-18'
     note: 'Through bolo''s HTTP API with device = coreml on a machine without Metal: placed on the CPU with a notice. en-short sample, transcript exact. MLX''s Linux CPU back end is far slower than on Apple silicon; not run on a Mac by the maintainers (the macOS CI job runs it).'
+    metal:
+      rtf: 0.0115
+      audio_s: 146.3
+      engine: mlx 0.32.4 (Metal), mlx-whisper 0.4.3
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API with the device setting left at its default (placed on Metal): an English recording of 146 s, median of three warm runs, transcript checked.'
   source:
     repo: mlx-community/whisper-tiny-mlx
     revision: 6caf9c55601caafbe6508a8b0d216bdf4783c4e8
@@ -61,6 +68,13 @@
     date: '2026-11-18'
     note: 'Loaded by the engine on the CPU, en-short sample, transcript exact. MLX''s Linux CPU back end is far slower
       than on Apple silicon; not run on a Mac by the maintainers.'
+    metal:
+      rtf: 0.014
+      audio_s: 146.3
+      engine: mlx 0.32.4 (Metal), mlx-whisper 0.4.3
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API with the device setting left at its default (placed on Metal): an English recording of 146 s, median of three warm runs, transcript checked.'
   source:
     repo: mlx-community/whisper-base-mlx
     revision: 1e3e249fb8d01c655324bd6841b1deadffd6d04c
@@ -91,6 +105,13 @@
     hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, load average about 20 from other work
     date: '2026-11-18'
     note: 'Through bolo''s HTTP API (device = coreml, placed on the CPU without Metal): en-short sample, transcript exact, word timestamps. Also the round trip of kokoro-v1.0-mlx (exact). Not run on a Mac by the maintainers (the macOS CI job runs it).'
+    metal:
+      rtf: 0.0133
+      audio_s: 146.3
+      engine: mlx 0.32.4 (Metal), parakeet-mlx 0.7.0
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API with the device setting left at its default (placed on Metal): an English recording of 146 s, median of three warm runs, transcript checked.'
   source:
     repo: mlx-community/parakeet-tdt_ctc-110m
     revision: d62547387c356a1ab6bb3d85d98b2103f655282e
@@ -124,6 +145,13 @@
     hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, load average about 20 from other work
     date: '2026-11-18'
     note: 'Through bolo''s HTTP API (device = coreml, placed on the CPU without Metal), voice af_heart; a blend (af_heart(0.6)+am_michael(0.4)) and Hindi (hf_alpha) also spoke. Very slow on MLX''s Linux CPU back end; meant for Apple silicon (the macOS CI job runs it).'
+    metal:
+      rtf: 0.048
+      audio_s: 7.9
+      engine: mlx 0.32.4 (Metal), mlx-audio 0.6.6
+      hardware: Apple M4 Pro (20-core GPU), 24 GB, macOS 26.3.1
+      date: '2026-11-19'
+      note: 'Through bolo''s HTTP API with the device setting left at its default (placed on Metal), warm: 0.38 s for 7.9 s of English speech; the same model on that Mac''s CPU took 83 s (10.5 of real time).'
   source:
     repo: mlx-community/Kokoro-82M-bf16
     revision: a71e4d38b236d968966a2002c4c895dbd12b1c3c
