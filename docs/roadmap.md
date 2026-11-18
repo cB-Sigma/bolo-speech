@@ -35,6 +35,7 @@ Suggestions and pull requests are welcome; open an issue first for anything mark
 | Accent conversion | missing | L | Voice-conversion models with an accent-target reference |
 | Dubbing (translate and re-voice with timing) | missing | M-L | Recognition, translation, a cloning voice and duration fitting, on top of forced alignment |
 | Watermarking with the original PyTorch models | ONNX ports only (AudioSeal; Perth and WavMark next) | S | bolo-torch catalog entries for `audioseal`, `resemble-perth` and `wavmark`, behind the same `watermark` option and detect endpoint |
+| Swappable phonemisers | each voice uses the phonemiser it was trained with (uccharan, dizione, espeak-ng, ...) | M | Phonemisers as a catalog model kind; a voice names the one it was trained with, and uccharan (or any other) can be swapped in with a symbol mapping, mainly for retrained Indian-language voices |
 
 ## Voice agents and telephony
 
