@@ -132,7 +132,7 @@ class OnnxRuntimeEngine(Engine):
         "whisper_lid", "onnx_lid", "onnx_speaker_embedding", "fbank_speaker_embedding", "onnx_emotion",
         "ctc_align",
         "dtln_aec", "openwakeword", "gliner_pii",
-        "audioseal_onnx",
+        "audioseal_onnx", "perth_onnx", "wavmark_onnx",
     )  # fmt: skip
 
     def status(self) -> EngineStatus:
@@ -218,6 +218,14 @@ class OnnxRuntimeEngine(Engine):
             from bolo.engines.watermark import AudioSealOnnx
 
             return AudioSealOnnx(path, spec, opts)
+        if kind == "perth_onnx":
+            from bolo.engines.watermark import PerthOnnx
+
+            return PerthOnnx(path, spec, opts)
+        if kind == "wavmark_onnx":
+            from bolo.engines.watermark import WavMarkOnnx
+
+            return WavMarkOnnx(path, spec, opts)
         if kind == "onnx_emotion":
             from bolo.engines.audio_classify import OnnxEmotion
 

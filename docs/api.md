@@ -1013,6 +1013,26 @@ A mark made in pieces off the 20 ms grid (pieces of 0.25 s with no context) scor
 why bolo aligns them. The upstream export notes that steady tones can give false positives on the score alone:
 check the payload too.
 
+**The watermarkers.** All three run on ONNX Runtime in core bolo, without PyTorch; pick one with `watermark:
+<id>` or the console's picker, or make it the server's with `watermark_model`.
+
+| id | licence | rate | payload | marks | speed on 4 CPU cores |
+| --- | --- | --- | --- | --- | --- |
+| `audioseal-16bits` (default) | MIT (Meta) | 16 kHz | 16 bits | every sample; streams are marked chunk by chunk on its 20 ms grid | fast |
+| `perth-onnx` | MIT (Resemble AI) | 32 kHz | none: marked or not | the spectrum below 2 kHz, any length | marking 0.024 and detecting 0.033 times real time |
+| `wavmark-onnx` | MIT (WavMark authors) | 16 kHz | 16 bits | one second in every 1.1 s; a piece shorter than 1.1 s stays unmarked | slow: about 2 s of compute to mark a second, and up to 6 s per second to search unmarked audio |
+
+Perth and WavMark are exports by this project (codebucketsolutions/perth-onnx and codebucketsolutions/wavmark-onnx
+on Hugging Face, with the export script and the parity results). The graphs hold the whole pipeline, STFT and
+inverse STFT included (`torch.istft` does not export, so they use an equivalent made of matrix products, within
+1.5e-6 of it). Checked against the PyTorch originals in both directions on two speech clips: Perth's marked audio
+within 5.4e-7 and every score the same (1.0 marked, about 5e-5 unmarked, whichever side marked and detected);
+WavMark's within 6.3e-5, every bit decoded the same by both. Through bolo on CPU, Perth was found on every marked
+clip (Kokoro speech at 24 kHz, en-long, hi-short) with score 1.00 and on no unmarked one (0.00), untouched and after
+MP3, Opus, resampling to 16 kHz and a round trip through 8 kHz. WavMark, on hi-short and the Kokoro clip, found every marked clip with score 1.00 and all 16 payload bits right and
+no unmarked one, under the same five changes. A stream is marked piece by piece, so WavMark leaves the tail of a
+piece shorter than 1.1 s unmarked (a two-sentence Kokoro stream scored 0.71 with the right payload).
+
 ### `GET /v1/models`, `GET /v1/models/{id}`
 
 Installed models in OpenAI's list shape, with extra fields (`task`,

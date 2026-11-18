@@ -120,3 +120,36 @@ def test_embed_and_detect_routes(settings: Settings) -> None:
         assert not _detect(client, plain, model="fake-watermark")["marked"]
         r = client.post("/v1/audio/watermark/detect", files={"file": ("a.wav", plain)}, data={"model": "fake-tts"})
         assert r.status_code == 400
+
+
+def test_wavmark_follows_marks_from_second_to_second() -> None:
+    """WavMark's detector is costly (a second of audio per run): a found mark is followed 1.1 s on instead of decoding
+    every 50 ms, a cut that shifts the marks still finds them, and the payload is the majority of the marks found."""
+    import threading
+
+    from bolo.engines.watermark import WavMarkOnnx
+
+    marks = {0, 17600, 35200}  # where the "audio" carries the pattern (start samples)
+    calls: list[int] = []
+
+    class Session:
+        def run(self, _out: object, feed: dict) -> list:
+            batch = feed["audio"]
+            rows = []
+            for window in batch:
+                start = int(window[0])  # each sample holds its own index: the window says where it starts
+                calls.append(start)
+                pattern = start in marks
+                rows.append([*WavMarkOnnx.PATTERN, *([1, 0] * 8)] if pattern else [0] * 32)
+            return [np.asarray(rows, dtype=np.float32)]
+
+    model = WavMarkOnnx.__new__(WavMarkOnnx)
+    model._detect = Session()  # type: ignore[assignment]
+    model._lock = threading.Lock()
+    audio = np.arange(17600 * 3 + 16000, dtype=np.float32)
+    found = model.detect(audio)
+    assert found.score == 1.0 and found.payload == "10" * 8
+    assert len(calls) < 40  # not one decode every 50 ms over 4.5 s (about 70)
+    marks.clear()
+    nothing = model.detect(audio)
+    assert nothing.score == 0.0 and nothing.payload is None

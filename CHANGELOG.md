@@ -6,6 +6,15 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Added
+
+- **Two more watermarkers: Perth and WavMark, as ONNX.** `perth-onnx` (Resemble AI, MIT; 32 kHz, no payload) and
+  `wavmark-onnx` (MIT; a 16-bit payload in each 1.1 s) join AudioSeal as `watermark` models, chosen per request
+  (`watermark: perth-onnx`) or in the console's picker. Both were exported to ONNX with their STFT and inverse STFT
+  inside the graphs (codebucketsolutions/perth-onnx and codebucketsolutions/wavmark-onnx, with the export script and
+  the parity results) and checked against their PyTorch originals in both directions; they run in core bolo without
+  PyTorch. Perth was found after MP3, Opus and 16 or 8 kHz resampling on every clip tried. WavMark is slow on a CPU.
+
 ## [0.6.9] - 2026-11-18
 
 ### Security

@@ -28,3 +28,77 @@
     generator: audioseal_generator_16bits.onnx
     detector: audioseal_detector_16bits.onnx
     window_s: 10
+
+- id: perth-onnx
+  aliases: [perth, resemble-perth]
+  task: watermark
+  engine: onnxruntime
+  kind: perth_onnx
+  family: Perth
+  languages: []
+  tier: realtime
+  sample_rate: 32000
+  size_bytes: 56142402
+  license: MIT
+  license_url: https://github.com/resemble-ai/Perth/blob/master/LICENSE
+  commercial_use: true
+  description: 'Perth (Resemble AI, MIT), the implicit watermarker of the resemble-perth package: an imperceptible mark
+    in the spectrum below 2 kHz, found again from a stretch of audio. Carries no payload: a clip is marked or not.
+    ONNX export with the STFT and inverse STFT inside the graphs (codebucketsolutions/perth-onnx), checked against the
+    PyTorch original both ways: embedded audio within 5.4e-7, scores the same.'
+  source_url: https://github.com/resemble-ai/Perth
+  validated: cpu
+  measured:
+    rtf: 0.033
+    audio_s: 11.8
+    threads: 4
+    engine: onnxruntime
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared with other jobs
+    note: 'detection; marking 0.024. Found on every marked clip and no unmarked one, also after MP3, Opus and 16 or
+      8 kHz resampling'
+    date: '2026-11-18'
+  source:
+    repo: codebucketsolutions/perth-onnx
+    revision: 1c22fd5ff7c3a5a5d9091a02175bf7e7a1d7970d
+    include: [perth_embed.onnx, perth_detect.onnx, LICENSE]
+  options:
+    embedder: perth_embed.onnx
+    detector: perth_detect.onnx
+    window_s: 2
+
+- id: wavmark-onnx
+  aliases: [wavmark, M4869/WavMark]
+  task: watermark
+  engine: onnxruntime
+  kind: wavmark_onnx
+  family: WavMark
+  languages: []
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 26609306
+  license: MIT
+  license_url: https://huggingface.co/M4869/WavMark
+  commercial_use: true
+  description: 'WavMark (Chen et al., MIT): 32 bits in each second of audio, 16 of them a fixed pattern that finds the
+    mark and 16 the payload, one second in every 1.1 s, decoded wherever it starts (searched every 50 ms). Marks only
+    whole seconds: a stretch shorter than 1.1 s is left unmarked. ONNX export (codebucketsolutions/wavmark-onnx) of
+    the checkpoint of M4869/WavMark, checked against the PyTorch original both ways: every bit decoded the same.'
+  source_url: https://huggingface.co/M4869/WavMark
+  validated: cpu
+  measured:
+    rtf: 2.3
+    audio_s: 4.1
+    threads: 4
+    engine: onnxruntime
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared with other jobs
+    note: 'marking (about 2.3 s per second of audio); detecting a marked clip about 2.8 s per second, an unmarked one
+      up to 6 s per second (it searches every 50 ms). Found on every marked clip with all 16 bits right and no
+      unmarked one, also after MP3, Opus and 16 or 8 kHz resampling'
+    date: '2026-11-18'
+  source:
+    repo: codebucketsolutions/wavmark-onnx
+    revision: 4eb7998f31a20707bb5b4359c88597ef19468520
+    include: [wavmark_embed.onnx, wavmark_detect.onnx, LICENSE]
+  options:
+    embedder: wavmark_embed.onnx
+    detector: wavmark_detect.onnx

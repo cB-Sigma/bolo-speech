@@ -2345,7 +2345,7 @@ def cmd_watermark(args: argparse.Namespace) -> int:
                     where = ", ".join(f"{g['start']:.1f}-{g['end']:.1f}s" for g in found.segments) or "-"
                     print(
                         f"{args.input}: {'MARKED' if found.marked else 'not marked'} by {found.model} "
-                        f"(score {found.score:.2f}; payload {found.payload if found.marked else '-'}"
+                        f"(score {found.score:.2f}; payload {(found.payload or '-') if found.marked else '-'}"
                         f"{', this server' if found.ours else ''}; where {where})"
                     )
                 return 0 if found.marked else 1
