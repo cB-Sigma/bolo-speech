@@ -4,6 +4,7 @@ import { BrowserConversation } from '@/components/conversation/browser-conversat
 import { PipelineModelPanel } from '@/components/conversation/pipeline-model'
 import { PipelinePicker } from '@/components/conversation/pipeline-picker'
 import { ServerListeningPanel } from '@/components/conversation/server-listening'
+import { defaultEcho, EchoControl, realtimeEcho, type Echo } from '@/components/conversation/echo-control'
 import { AgentToolsPanel, mcpTools, noMcp, type McpChoice } from '@/components/conversation/agent-tools'
 import { NeedsServer } from '@/components/demo'
 import { Page } from '@/components/layout/app-shell'
@@ -63,6 +64,7 @@ function ServerConversation() {
   const [denoise, setDenoise] = useState<Denoise>(defaultDenoise)
   const [listening, setListening] = useState<Listening>({ type: 'server_vad' })
   const [mcp, setMcp] = useState<McpChoice>(noMcp)
+  const [echo, setEcho] = useState<Echo>(defaultEcho)
   const [session, setSession] = useState<ConversationSession | null>(null)
   const state = useStore(session?.store ?? idle)
   const active = state.status === 'starting' || state.status === 'live'
@@ -89,6 +91,7 @@ function ServerConversation() {
       listening,
       fullDuplex,
       tools: pipeline === 'speech-to-speech' ? [] : mcpTools(mcp),
+      echo: realtimeEcho(echo),
     })
     void s.start()
     setSession(s)
@@ -155,6 +158,15 @@ function ServerConversation() {
             </span>
           </div>
           <DenoiseControl value={denoise} onChange={setDenoise} disabled={active} className="mt-3" />
+          <EchoControl
+            info={info.data}
+            value={echo}
+            onChange={setEcho}
+            disabled={active}
+            reported={state.serverEcho}
+            live={state.status !== 'idle'}
+            className="mt-3"
+          />
           {state.status !== 'idle' && (
             <p className="mt-1.5 text-xs text-muted-foreground" data-testid="server-denoise">
               Server:{' '}

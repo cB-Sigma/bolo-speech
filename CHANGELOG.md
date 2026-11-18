@@ -140,6 +140,16 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   other model speaks turn by turn and the turns are joined with a pause, with each turn's start and end in
   `x-bolo-segments`. `bolo dialogue script.txt --voice Asha=af_heart ...` and a Dialogue page in the console do
   the same. Run on CPU with Kokoro (two voices, stitched) and VibeVoice 1.5B (two voices, one take; slow on a CPU).
+  the same. Run on CPU with Kokoro (two voices, stitched).
+- **Echo cancellation for voice agents.** `audio.input.echo_cancellation` in a Realtime session (a bolo extension;
+  `true`, a model id or `{"model", "delay_ms"}`) removes the agent's own voice from what the session hears, with
+  the audio the session sent as the reference, before the voice-activity detector, the recogniser or a
+  speech-to-speech model hear it: no more answers cut short by their own echo on phones and devices without
+  headphones. A new catalog task, `echo-cancellation`: `speex-aec` (SpeexDSP through pyaec, the default),
+  `webrtc-aec3` (WebRTC's AEC3 through LiveKit's SDK; both `pip install 'bolo-speech[aec]'`) and `dtln-aec-128`
+  (DTLN-aec in ONNX Runtime, MIT, 7 MB). Settings `echo_cancellation` (for every session and phone call) and
+  `default_echo_cancellation`; an Echo cancellation choice on the console's Conversation page. All three run on CPU
+  on a synthetic echo: 37, 33 and 20 dB of echo removed (docs/voice-agents.md, "Echo cancellation").
 
 - **Speech `instructions`: style, emotion and voice direction in words.** `instructions` on `POST /v1/audio/speech`
   (and the TTS WebSocket, `bolo speak --instructions`, an Instructions box on the console's Text to speech page) is

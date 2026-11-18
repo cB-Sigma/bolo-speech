@@ -123,7 +123,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | --- | --- | --- |
 | **OpenAI-compatible speech APIs** | `/v1/audio/transcriptions` (json, text, srt, vtt, verbose_json with word timestamps, SSE), translations, `/v1/audio/speech` (mp3, opus, aac, flac, wav, pcm, G.711; streamed as it is synthesised), `/v1/models`. OpenAI model and voice names map to your defaults. Also the model-management routes and environment variables of [speaches](https://github.com/speaches-ai/speaches), and streaming WebSockets for both directions | [api.md](docs/api.md), [migration-from-speaches.md](docs/migration-from-speaches.md) |
 | **Realtime speech-to-text** | true streaming models, and stabilised partial results for models that were never designed to stream; endpointing you can tune | [realtime.md](docs/realtime.md) |
-| **Voice agents, three pipelines** | the OpenAI Realtime API (`WS /v1/realtime`, WebRTC at `/v1/realtime/calls`) and audio in `/v1/chat/completions`, with turn detection, barge-in, function tools, tools from MCP servers (called by bolo, with approvals) and per-turn traces. `cascade`: bolo's recogniser → your language model → bolo's voice. `audio-llm`: a model that hears the audio itself, bolo speaks. `speech-to-speech`: one model hears and speaks, behind a llama-server, a cloud Realtime API, or **in bolo's own process** (`lfm3-audio-2b-onnx`) | [voice-agents.md](docs/voice-agents.md) |
+| **Voice agents, three pipelines** | the OpenAI Realtime API (`WS /v1/realtime`, WebRTC at `/v1/realtime/calls`) and audio in `/v1/chat/completions`, with turn detection, barge-in, function tools, tools from MCP servers (called by bolo, with approvals), server-side echo cancellation (SpeexDSP, WebRTC AEC3 or DTLN-aec) and per-turn traces. `cascade`: bolo's recogniser → your language model → bolo's voice. `audio-llm`: a model that hears the audio itself, bolo speaks. `speech-to-speech`: one model hears and speaks, behind a llama-server, a cloud Realtime API, or **in bolo's own process** (`lfm3-audio-2b-onnx`) | [voice-agents.md](docs/voice-agents.md) |
 | **Phone calls** | Twilio Media Streams, Plivo audio streams, Telnyx media streaming and the Exotel Voicebot applet connected to named agents; an experimental inbound SIP endpoint. Greeting, barge-in, key presses, hang-up and transfer, outbound calls with voicemail handling, signed webhooks, call records with a latency breakdown, a call simulator | [telephony.md](docs/telephony.md) |
 | **Cloud providers next to local models** | OpenAI, Sarvam, ElevenLabs, Deepgram, Soniox or any OpenAI-compatible server behind the same routes, with bolo's diarization, word lists, telephony formats, traces and cost estimates on top, and **fallback** between local and cloud models in either direction. Audio leaves the server only when you name such a model | [providers.md](docs/providers.md) |
 | **Who said what** | speaker diarization without PyTorch (pyannote segmentation with speaker embeddings, or NVIDIA's overlap-aware Nemotron), as `diarized_json`, in subtitles, on words and on live transcripts; known speakers named from reference recordings. **Speaker-attributed recognition**: DiCoW transcribes each speaker of a conversation separately, overlaps included, in the core (`dicow-v3.3-onnx`) or through the torch plugin | [models.md](docs/models.md#speaker-diarization-1) |
@@ -182,6 +182,9 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | SPEECH-TO-SPEECH | FLM-Audio | 1 | en, zh | 0 | - |
 | SPEECH-TO-SPEECH | Freeze-Omni | 1 | en, zh | 0 | - |
 | SPEECH-TO-SPEECH | MiniCPM-o 4.5 | 1 | en, zh | 0 | - |
+| ECHO-CANCELLATION | SpeexDSP | 1 | - | 1 | 0.026 (`speex-aec`) |
+| ECHO-CANCELLATION | WebRTC AEC3 | 1 | - | 1 | 0.026 (`webrtc-aec3`) |
+| ECHO-CANCELLATION | DTLN-aec | 1 | - | 1 | 0.233 (`dtln-aec-128`) |
 | EMOTION | emotion2vec+ | 2 | - | 2 | 0.845 (`emotion2vec-plus-large`) |
 | LID | VoxLingua107 ECAPA-TDNN | 2 | ab, af, am, ar, as, az, ba, be +99 | 2 | 0.106 (`voxlingua107-ecapa`) |
 | LID | Whisper | 2 | af, am, ar, as, az, ba, be, bg +91 | 2 | 0.301 (`whisper-tiny-lid`) |
@@ -258,7 +261,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | VOICE-CONVERSION | RVC | 1 | - | 1 | 6.190 (`rvc-audiocpp`) |
 | VOICE-CONVERSION | Seed-VC | 1 | - | 0 | - |
 
-**487 models in the catalog, 203 validated on CPU, 284 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**490 models in the catalog, 206 validated on CPU, 284 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

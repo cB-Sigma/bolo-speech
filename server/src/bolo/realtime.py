@@ -57,6 +57,7 @@ from bolo.audio.codecs import alaw_decode, alaw_encode, float_to_pcm16, mulaw_de
 from bolo.audio.encode import encode_audio
 from bolo.audio.resample import StreamResampler, resample
 from bolo.denoise import DenoiseOptions, parse_denoise
+from bolo.echo import EchoCanceller, EchoCancellerModel, EchoOptions, parse_echo
 from bolo.engines.base import FloatArray, VadDetector, VadParams
 from bolo.errors import BoloError, EngineUnavailable
 from bolo.mcp_tools import McpError, McpServerSpec, McpTool, McpTools, parse_tool
@@ -89,6 +90,16 @@ END_PADDING_S = 0.2
 
 #: responses in a row that may end in MCP tool calls before bolo stops asking the model again
 MAX_MCP_ROUNDS = 8
+
+
+def _default_echo(setting: str | None) -> EchoOptions | None:
+    """The ``echo_cancellation`` setting: "off" (none), "on" / "default" (the default canceller) or a model id."""
+    value = (setting or "off").strip()
+    if value.lower() in ("", "off", "false", "no", "0", "none"):
+        return None
+    if value.lower() in ("on", "true", "yes", "1", "default"):
+        return EchoOptions()
+    return EchoOptions(value)
 
 
 def new_id(prefix: str) -> str:
@@ -197,6 +208,11 @@ class RealtimeSession:
         #: session.audio.input.denoise; either turns on the denoiser before transcription (None: the defaults)
         self.noise_reduction: dict[str, Any] | None = None
         self.denoise: DenoiseOptions | None = None
+        #: session.audio.input.echo_cancellation (bolo extension): the agent's voice removed from the input
+        self.echo: EchoOptions | None = _default_echo(s.echo_cancellation)
+        self._echo: EchoCanceller | None = None
+        self._echo_stack: contextlib.AsyncExitStack | None = None
+        self._echo_error: str | None = None
         self.turn_detection: dict[str, Any] | None = {
             "type": "server_vad", "threshold": 0.5, "prefix_padding_ms": 300,
             "silence_duration_ms": int(s.endpoint_silence_ms), "create_response": True, "interrupt_response": True,
@@ -271,6 +287,7 @@ class RealtimeSession:
             "format": self.in_format,
             "noise_reduction": self.noise_reduction,
             "denoise": self.denoise.to_dict() if self.denoise is not None else None,  # bolo extension
+            "echo_cancellation": self._echo_info(),  # bolo extension
             "transcription": {k: v for k, v in self.transcription.items() if v is not None},
             "turn_detection": self.turn_detection,
         }
@@ -327,6 +344,7 @@ class RealtimeSession:
                     await task
         with contextlib.suppress(Exception):
             await self.mcp.close()
+        await self._drop_echo()
         conv, self._s2s = self._s2s, None
         if conv is not None:
             with contextlib.suppress(Exception):
@@ -430,6 +448,17 @@ class RealtimeSession:
             }
         if "noise_reduction" in audio_in or "denoise" in audio_in:
             self._configure_denoise(audio_in)
+        if "echo_cancellation" in audio_in:
+            param = "session.audio.input.echo_cancellation"
+            try:
+                opts = parse_echo(audio_in["echo_cancellation"], param=param)
+                if opts is not None:
+                    opts.model = self.core.resolve(opts.model, "echo-cancellation").id
+            except BoloError as exc:
+                raise RealtimeError(str(exc), param=param) from exc
+            if opts != self.echo:
+                self.echo = opts
+                self._echo_pending_reset = True
         if "turn_detection" in audio_in:
             td = audio_in["turn_detection"]
             if td is None:
@@ -623,6 +652,10 @@ class RealtimeSession:
         """Take input audio that is already 16 kHz mono (the WebRTC transport calls this directly)."""
         if not len(samples):
             return
+        if self.echo is not None or self._echo is not None:
+            canceller = await self._ensure_echo()
+            if canceller is not None:
+                samples = await asyncio.to_thread(canceller.near, samples)
         self._buf = np.concatenate([self._buf, samples]) if len(self._buf) else samples.copy()
         self._pos += len(samples)
         duplex = self.full_duplex
@@ -675,6 +708,56 @@ class RealtimeSession:
         if self._s2s_mode and not duplex and self._speech_start is not None:
             await self._s2s_forward(self._speech_start)
         self._trim()
+
+    # -- echo cancellation (bolo.echo) ---------------------------------------------
+    _echo_pending_reset = False
+
+    def _echo_info(self) -> dict[str, Any] | None:
+        if self.echo is None:
+            return None
+        info: dict[str, Any] = {
+            "enabled": True,
+            "model": self.echo.model or self.core.settings.default_echo_cancellation,
+            "delay_ms": self.echo.delay_ms,
+        }
+        if self._echo is not None:
+            info.update(self._echo.summary())
+        if self._echo_error:
+            info["error"] = self._echo_error
+        return info
+
+    async def _drop_echo(self) -> None:
+        stack, self._echo_stack, self._echo = self._echo_stack, None, None
+        if stack is not None:
+            with contextlib.suppress(Exception):
+                await stack.aclose()
+
+    async def _ensure_echo(self) -> EchoCanceller | None:
+        if self._echo_pending_reset:
+            self._echo_pending_reset = False
+            self._echo_error = None
+            await self._drop_echo()
+        if self.echo is None or self._echo is not None or self._echo_error:
+            return self._echo
+        model_id = self.echo.model or self.core.settings.default_echo_cancellation
+        stack = contextlib.AsyncExitStack()
+        try:
+            entry = await stack.enter_async_context(self.core.manager.use(model_id))
+            model = entry.model
+            if not isinstance(model, EchoCancellerModel):
+                raise RealtimeError(f"'{model_id}' is not an echo-cancellation model")
+            self._echo = await asyncio.to_thread(EchoCanceller, model, model_id, self.echo.delay_ms)
+            self._echo_stack = stack
+        except Exception as exc:  # the conversation goes on without it, and says why
+            await stack.aclose()
+            self._echo_error = f"{type(exc).__name__}: {exc}"
+            log.warning("echo cancellation off for session %s: %s", self.id, self._echo_error)
+            await self.error(
+                f"echo cancellation with '{model_id}' is not available: {exc}",
+                code="echo_cancellation_unavailable",
+                type_="server_error",
+            )
+        return self._echo
 
     # -- speech-to-speech pipeline ------------------------------------------------
     @property
@@ -904,6 +987,8 @@ class RealtimeSession:
 
     async def _on_output_clear(self, event: dict[str, Any]) -> None:
         # WebRTC/SIP only in the reference; over WebSocket the client owns playback. Stop generating.
+        if self._echo is not None:
+            self._echo.stop_playback()
         await self._cancel_response("client_cancelled")
 
     async def _commit(self, audio: FloatArray, item_id: str, trace: Trace, auto_response: bool | None = None) -> None:
@@ -1163,6 +1248,8 @@ class RealtimeSession:
         if task is None or task.done():
             return
         self._cancel_reason = reason
+        if self._echo is not None:  # the client stops playing what it has not played yet
+            self._echo.stop_playback()
         task.cancel()
         with contextlib.suppress(asyncio.CancelledError, Exception):
             await task
@@ -1213,6 +1300,8 @@ class RealtimeSession:
         return messages
 
     def _encode(self, samples: FloatArray, rate: int) -> str:
+        if self._echo is not None:  # the far end, as the client will play it
+            self._echo.far(resample(samples, rate, SR))
         x = resample(samples, rate, self.out_rate)
         if self.out_codec == "mulaw":
             raw = mulaw_encode(x)

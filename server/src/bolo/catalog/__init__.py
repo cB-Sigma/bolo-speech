@@ -21,6 +21,7 @@ from bolo.store import Source
 TASKS = (
     "stt", "tts", "vad", "diarization", "turn", "translation", "separation", "denoise", "lid", "speech-to-speech",
     "audio-llm", "speaker-embedding", "audio-tagging", "emotion", "voice-conversion", "align", "punctuation",
+    "echo-cancellation",
 )  # fmt: skip
 TIERS = ("realtime", "balanced", "accuracy")
 VALIDATED = ("cpu", "untested")
@@ -341,6 +342,11 @@ FAKE_MODELS: list[dict[str, Any]] = [
         "id": "fake-denoise-48k", "task": "denoise", "engine": "fake", "kind": "fake-denoise", "family": "Fake",
         "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True, "options": {"sample_rate": 48000},
         "description": "Test denoiser that works at 48 kHz, like full-band enhancement models.",
+    },
+    {
+        "id": "fake-echo", "task": "echo-cancellation", "engine": "fake", "kind": "fake-echo", "family": "Fake",
+        "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
+        "description": "Test echo canceller: mutes the input while the reference plays. Not real echo cancellation.",
     },
     {
         "id": "fake-tagging", "task": "audio-tagging", "engine": "fake", "kind": "fake-tagging", "family": "Fake",

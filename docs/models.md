@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-487 models: 203 validated on CPU by the maintainers, 284 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+490 models: 206 validated on CPU by the maintainers, 284 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -1139,6 +1139,26 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `mms-300m-forced-aligner` | - | balanced | - | 317 MB | CC-BY-NC-4.0 ⚠ | **CPU** · RTF 1.137 |
+
+### Echo cancellation (voice agents)
+
+#### SpeexDSP
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `speex-aec` | - | realtime | - | 0 MB | BSD-3-Clause (SpeexDSP) + MIT (pyaec binding) | **CPU** · RTF 0.026 |
+
+#### WebRTC AEC3
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `webrtc-aec3` | - | realtime | - | 0 MB | BSD-3-Clause (WebRTC) + Apache-2.0 (LiveKit SDK) | **CPU** · RTF 0.026 |
+
+#### DTLN-aec
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `dtln-aec-128` | - | realtime | - | 7 MB | MIT | **CPU** · RTF 0.233 |
 
 ⚠ = the licence restricts commercial use. RTF = processing time / audio duration (lower is faster).
 <!-- END GENERATED: models -->

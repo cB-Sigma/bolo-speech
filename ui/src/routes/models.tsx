@@ -117,6 +117,7 @@ const TASK_LABEL: Record<Task, string> = {
   emotion: 'Speech emotion',
   'voice-conversion': 'Voice conversion',
   align: 'Forced alignment',
+  'echo-cancellation': 'Echo cancellation',
 }
 const TASK_SHORT: Record<Task, string> = {
   stt: 'STT',
@@ -136,6 +137,7 @@ const TASK_SHORT: Record<Task, string> = {
   emotion: 'Emotion',
   'voice-conversion': 'Convert',
   align: 'Align',
+  'echo-cancellation': 'Echo',
 }
 const TASK_ORDER: Task[] = [
   'stt',
@@ -152,6 +154,7 @@ const TASK_ORDER: Task[] = [
   'emotion',
   'voice-conversion',
   'punctuation',
+  'echo-cancellation',
   'speech-to-speech',
   'audio-llm',
   'translation',

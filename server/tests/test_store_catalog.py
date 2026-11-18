@@ -238,8 +238,8 @@ def test_every_packaged_entry_is_well_formed() -> None:
             assert s.engine == "remote" and s.license_url and s.size_bytes == 0, s.id
             assert not (s.source.repo or s.source.urls), s.id
             continue
-        if s.builtin:  # nothing to download: code that is part of bolo or of a Python package (WebRTC VAD)
-            assert s.engine in ("builtin", "webrtcvad") and s.size_bytes == 0, s.id
+        if s.builtin:  # nothing to download: code that is part of bolo or of a Python package (WebRTC VAD, the AECs)
+            assert s.engine in ("builtin", "webrtcvad", "speexdsp", "webrtc-apm") and s.size_bytes == 0, s.id
             assert not (s.source.repo or s.source.urls), s.id
             assert s.description and s.source_url.startswith("https://"), s.id
             continue
@@ -281,6 +281,7 @@ def test_every_packaged_entry_is_well_formed() -> None:
         "voice-conversion",
         "align",
         "punctuation",
+        "echo-cancellation",
     }
     needs = [s for s in specs if s.needs_phonemes]
     assert len(needs) >= 80 and all(s.task == "tts" for s in needs)

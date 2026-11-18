@@ -1633,6 +1633,7 @@ _TASK_TITLES = {
     "speaker-embedding": "Speaker embedding", "audio-tagging": "Audio tagging", "emotion": "Speech emotion",
     "align": "Forced alignment",
     "punctuation": "Punctuation restoration",
+    "echo-cancellation": "Echo cancellation",
 }  # fmt: skip
 
 

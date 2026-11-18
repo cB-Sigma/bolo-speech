@@ -126,6 +126,10 @@ class Settings:
     #: transcript is aligned to the audio with default_align. Off: those return no words and name
     #: timestamp_granularities in x-bolo-ignored-options
     align_words: bool = True
+    #: the echo canceller of Realtime sessions that ask for one (audio.input.echo_cancellation: true)
+    default_echo_cancellation: str = "speex-aec"
+    #: echo cancellation in every Realtime session unless it says otherwise: off, or a model id (or "default")
+    echo_cancellation: str = "off"
     #: transcription with the model "auto" and no language: identify the language and send the audio to the best
     #: installed recogniser for it (docs/api.md, "Language identification and routing"). Off: "auto" is the default
     language_routing: bool = True

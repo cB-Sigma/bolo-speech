@@ -776,7 +776,7 @@ class FakeEngine(Engine):
         "fake-turn-text", "fake-separation", "fake-denoise", "fake-s2s", "fake-lid", "fake-speaker-embedding",
         "fake-tagging", "fake-emotion",
         "fake-align",
-        "fake-punctuation",
+        "fake-punctuation", "fake-echo",
     )  # fmt: skip
 
     def __init__(self) -> None:
@@ -822,6 +822,10 @@ class FakeEngine(Engine):
             model = FakeAligner(merged)
         elif kind == "fake-punctuation":
             model = FakePunctuation(merged)
+        elif kind == "fake-echo":
+            from bolo.echo import FakeEchoCanceller
+
+            model = FakeEchoCanceller(merged)
         else:
             raise ValueError(f"fake engine cannot load kind {kind!r}")
         self.loaded.append(model)

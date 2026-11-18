@@ -148,7 +148,7 @@ WebSocket subprotocols `realtime` and `openai-insecure-api-key.<key>`.
 
 | Client event | Behaviour |
 | --- | --- |
-| `session.update` | `type` (`realtime` \| `transcription`), `instructions`, `output_modalities` (`["audio"]` or `["text"]`), `audio.input.format` / `audio.output.format` (`audio/pcm` at 24 kHz, `audio/pcmu`, `audio/pcma`), `audio.input.transcription` (`model`, `language`, `prompt`), `audio.input.noise_reduction` (`{"type": "near_field"}` or `"far_field"`: the default denoiser before transcription; `null`: the server's default; see below), `audio.input.denoise` (bolo extension: `true`, `false`, a strength between 0 and 1, a model id, or `{"model", "strength"}`; wins over `noise_reduction`), `audio.input.turn_detection` (`server_vad` with `threshold`, `silence_duration_ms`, `prefix_padding_ms`, `create_response`, `interrupt_response`; `semantic_vad` with `eagerness`, see below; or `null`; bolo extensions in either: `vad_model`, the voice-activity detector of the session, any `vad` model, default `default_vad`; `turn_model`, the end-of-turn model `semantic_vad` asks, any `turn` model, default `default_turn`), `audio.output.voice`, `audio.output.speed`, `tools` (functions, and MCP servers: below), `tool_choice`, `max_output_tokens` |
+| `session.update` | `type` (`realtime` \| `transcription`), `instructions`, `output_modalities` (`["audio"]` or `["text"]`), `audio.input.format` / `audio.output.format` (`audio/pcm` at 24 kHz, `audio/pcmu`, `audio/pcma`), `audio.input.transcription` (`model`, `language`, `prompt`), `audio.input.noise_reduction` (`{"type": "near_field"}` or `"far_field"`: the default denoiser before transcription; `null`: the server's default; see below), `audio.input.denoise` (bolo extension: `true`, `false`, a strength between 0 and 1, a model id, or `{"model", "strength"}`; wins over `noise_reduction`), `audio.input.echo_cancellation` (bolo extension: `true`, `false`, a model id or `{"model", "delay_ms"}`; see "Echo cancellation" below), `audio.input.turn_detection` (`server_vad` with `threshold`, `silence_duration_ms`, `prefix_padding_ms`, `create_response`, `interrupt_response`; `semantic_vad` with `eagerness`, see below; or `null`; bolo extensions in either: `vad_model`, the voice-activity detector of the session, any `vad` model, default `default_vad`; `turn_model`, the end-of-turn model `semantic_vad` asks, any `turn` model, default `default_turn`), `audio.output.voice`, `audio.output.speed`, `tools` (functions, and MCP servers: below), `tool_choice`, `max_output_tokens` |
 | `input_audio_buffer.append` / `.commit` / `.clear` | base64 audio in the session's input format; manual commit when turn detection is off |
 | `conversation.item.create` | user/assistant/system messages (`input_text`, `input_audio` with base64 audio that is transcribed, `output_text`), `function_call`, `function_call_output` |
 | `conversation.item.delete` / `.retrieve` / `.truncate` | `truncate` cuts an assistant message's transcript to the sentences that had started playing before `audio_end_ms`, so the model does not "remember" words the user never heard |
@@ -461,6 +461,54 @@ voice names are not sent (LFM3's voices are `female` and `male`); upstream
 token usage is output tokens only. Tested against a scripted fake
 llama-server, **not against a real LFM3-Audio model.**
 
+### Echo cancellation
+
+A caller without headphones sends back what the agent says. bolo then hears the agent's own voice as the user
+speaking: it cuts the answer short (barge-in) and transcribes the agent's words as a user turn. Browsers cancel
+echo on the microphone themselves (`echoCancellation`), but phones, SIP trunks, embedded devices and clients that
+send raw audio often do not. `audio.input.echo_cancellation` (a bolo extension) removes it on the server: the
+audio the session sends out is the reference, and the input is cleaned before the voice-activity detector, the
+recogniser and a speech-to-speech model hear it.
+
+```jsonc
+{"type": "session.update", "session": {"audio": {"input": {
+  "echo_cancellation": true                          // the server's default canceller (default_echo_cancellation)
+  // or "webrtc-aec3", "dtln-aec-128", or {"model": "dtln-aec-128", "delay_ms": 120}, or false
+}}}}
+```
+
+| Model | What it is | Licence | Install |
+| --- | --- | --- | --- |
+| `speex-aec` (default) | SpeexDSP's adaptive filter (400 ms long) with its residual-echo suppressor | BSD-3-Clause, MIT binding | `pip install 'bolo-speech[aec]'` (pyaec, 0.2 MB) |
+| `webrtc-aec3` | WebRTC's AEC3, the canceller in Chrome; finds the delay itself | BSD-3-Clause, Apache-2.0 SDK | `pip install 'bolo-speech[aec]'` (LiveKit's SDK, 11 MB) |
+| `dtln-aec-128` | DTLN-aec, a small LSTM network (1.8 M parameters) | MIT | pulled on first use (7 MB), ONNX Runtime |
+
+The reference is released at the pace the input arrives, which is the pace the client plays it, so it leads its
+echo by about the round trip plus the client's buffer. It is dropped when the client stops playing: on barge-in,
+`response.cancel` and `output_audio_buffer.clear`. `delay_ms` holds the reference back by a fixed time first, for
+a canceller that does not find the delay itself: DTLN-aec wants its reference within a few tens of milliseconds of
+the echo. `session.updated` reports the canceller in use, how much audio it has cleaned and how much of that had a
+reference (`with_reference_s`). When the canceller cannot be loaded (its package missing), the session goes on
+without it and sends an `error` with code `echo_cancellation_unavailable`. The setting `echo_cancellation` turns
+it on for every session and phone call that does not say otherwise.
+
+Measured on CPU on a synthetic echo (the 11.8 s English sample through a 60 ms echo path with a 250 ms tail, the
+3 s English sample spoken over it from 7 s; echo return loss enhancement while only the agent talks, and the level
+of the user's voice while both talk):
+
+| Model | Echo removed | User's voice while both talk | Real-time factor |
+| --- | --- | --- | --- |
+| `speex-aec` | 36.6 dB | -7.1 dB | 0.026 |
+| `webrtc-aec3` | 33.0 dB | -6.1 dB | 0.026 |
+| `dtln-aec-128` | 19.7 dB | -1.3 dB | 0.23 |
+
+With a 250 ms echo delay SpeexDSP removes 26.8 dB, AEC3 34.3 dB, and DTLN-aec nothing unless `delay_ms` (240)
+brings it back to 33.9 dB. Moonshine tiny transcribed the user's sentence correctly from SpeexDSP's and DTLN-aec's
+output while both talked, and not from AEC3's, which suppresses double talk harder in its first seconds. A real
+room has more reverberation than this test: expect less.
+
+The console's Conversation page has an Echo cancellation choice next to the denoiser.
+
 ### Full-duplex models: Moshi, Hibiki, PersonaPlex, FLM-Audio, Freeze-Omni, MiniCPM-o 4.5
 
 A *full-duplex* model listens and speaks at the same time, frame by frame (Moshi: 80 ms frames, about 200 ms of
@@ -517,8 +565,8 @@ far from real time for 7 B models). Only Kyutai's servers are touched this way, 
 | `session.duplex` (bolo extension) | sampling options for the Rust server's query string (`text_temperature`, `text_topk`, `audio_temperature`, `audio_topk`, `pad_mult`, `repetition_penalty`, ...); the Python servers ignore them |
 | closing the session | closes the model's WebSocket; the server is free for the next conversation |
 
-Use echo cancellation (browsers do by default) or headphones: the model hears whatever the microphone picks up,
-its own voice included. Traces are recorded per response (`full_duplex: true`, `started_after_user_ms`).
+Use echo cancellation (browsers do by default, or bolo's own: "Echo cancellation" above) or headphones: the model
+hears whatever the microphone picks up, its own voice included. Traces are recorded per response (`full_duplex: true`, `started_after_user_ms`).
 
 **Adding a full-duplex model.** A model whose server speaks Kyutai's protocol needs only a catalog entry (task
 `speech-to-speech`, engine `duplex`, kind `kyutai`, features `[speech-to-speech, full-duplex]`, options `server`,

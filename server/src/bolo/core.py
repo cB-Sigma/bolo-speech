@@ -551,6 +551,13 @@ class Bolo:
                 },
                 "client_secrets": "/v1/realtime/client_secrets",
                 "transcript_deltas": True,
+                # audio.input.echo_cancellation (docs/voice-agents.md, "Echo cancellation")
+                "echo_cancellation": {
+                    "default_model": s.default_echo_cancellation,
+                    "default": s.echo_cancellation,
+                    "models": sorted(m.id for m in self.catalog.all() if m.task == "echo-cancellation"),
+                    "install": None if importlib.util.find_spec("pyaec") else "pip install 'bolo-speech[aec]'",
+                },
                 # MCP servers as session tools ({"type": "mcp", ...}; docs/voice-agents.md, "MCP tools")
                 "mcp": {
                     "available": importlib.util.find_spec("mcp") is not None,
@@ -1046,6 +1053,7 @@ class Bolo:
                 "emotion": s.default_emotion,
                 "voice-conversion": s.default_voice_conversion,
                 "punctuation": s.default_punctuation,
+                "echo-cancellation": s.default_echo_cancellation,
             }
             name = defaults[task]
         elif name == "realtime":

@@ -54,6 +54,7 @@ TASK_TITLES = {
     "emotion": "Speech emotion",
     "voice-conversion": "Voice conversion",
     "align": "Forced alignment (word timestamps)",
+    "echo-cancellation": "Echo cancellation (voice agents)",
 }
 
 

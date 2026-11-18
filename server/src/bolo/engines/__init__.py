@@ -26,6 +26,8 @@ BUILTIN_ENGINES: dict[str, str] = {
     "tts-server": "bolo.engines.tts_server:TTSServerEngine",
     "duplex": "bolo.engines.duplex:DuplexEngine",
     "rnnoise": "bolo.engines.denoisers:RNNoiseEngine",
+    "webrtc-apm": "bolo.echo:WebRtcApmEngine",
+    "speexdsp": "bolo.echo:SpeexDspEngine",
     "remote": "bolo.engines.remote:RemoteEngine",
     "fake": "bolo.engines.fake:FakeEngine",
 }

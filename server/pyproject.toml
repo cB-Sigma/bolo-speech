@@ -89,6 +89,9 @@ s2s = ["onnxruntime>=1.20", "tokenizers>=0.20"]
 # MCP tools in Realtime sessions (the MCP Python SDK, MIT): bolo connects to MCP servers named in session.tools
 # or in the setting mcp_servers and calls their tools for the language model. 1.x and 2.x both work
 mcp = ["mcp>=1.10"]
+# echo cancellation for voice agents (bolo.echo): SpeexDSP's canceller through pyaec (BSD-3-Clause + MIT) and
+# WebRTC's AEC3 through LiveKit's Python SDK (Apache-2.0 + BSD-3-Clause); DTLN-aec needs only onnxruntime
+aec = ["pyaec>=1.0.1", "livekit>=1.0"]
 # inbound SIP endpoint for trunks and PBXs (sipmessage is BSD-2-Clause, pure Python: it parses and writes SIP messages)
 sip = ["sipmessage>=0.7"]
 text = ["whisper-normalizer>=0.1"]
@@ -137,6 +140,8 @@ dev = [
   "python-socketio>=5.11",
   # the MCP Python SDK (MIT): the MCP tool tests of Realtime sessions
   "mcp>=1.10",
+  # SpeexDSP's echo canceller (pyaec, BSD-3-Clause + MIT, 0.2 MB): the echo-cancellation tests
+  "pyaec>=1.0.1",
   "ruff>=0.8",
   "mypy>=1.13",
   "types-PyYAML",
@@ -203,6 +208,7 @@ module = [
   "opentelemetry.*", "webrtcvad.*", "sphn.*", "torch.*", "transformers.*", "mlx.*", "mlx_whisper.*", "parakeet_mlx.*",
   "mlx_audio.*",
   "mcp.*", "mcp_types.*",
+  "pyaec.*", "livekit.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"

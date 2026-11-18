@@ -54,6 +54,13 @@ export interface ConversationState {
   serverPipeline: string | null
   /** The denoiser the server says runs before transcription (`audio.input.denoise`); null: none reported. */
   serverDenoise: { enabled: boolean; model: string | null; strength: number } | null
+  /** The echo canceller the server says the session uses (`audio.input.echo_cancellation`); null: none. */
+  serverEcho: {
+    model: string
+    error?: string
+    audio_s?: number
+    with_reference_s?: number
+  } | null
   /** The turn detection the server says the session uses (`audio.input.turn_detection`), null until it says. */
   serverListening: { type: string; vad_model?: string | null; turn_model?: string | null } | null
   /** The server says the session talks to a full-duplex model (`session.full_duplex`, a bolo extension). */
@@ -100,6 +107,7 @@ export const emptyConversation = (
   locked: false,
   serverPipeline: null,
   serverDenoise: null,
+  serverEcho: null,
   serverListening: null,
   serverFullDuplex: null,
   turns: [],
@@ -136,6 +144,8 @@ export function sessionUpdate(
   const input: Record<string, unknown> = pcm ? { format, turn_detection } : { turn_detection }
   // bolo's extension; left out, the server's default (its `denoise` setting) applies
   if (denoise !== undefined) input.denoise = denoise
+  // bolo's extension; left out, the server's `echo_cancellation` setting applies
+  if (extras.echo !== undefined) input.echo_cancellation = extras.echo
   const session: Record<string, unknown> = {
     type: 'realtime',
     pipeline,
@@ -146,10 +156,14 @@ export function sessionUpdate(
   return { type: 'session.update', session }
 }
 
-/** More of the first `session.update`: tools (MCP servers, `{"type": "mcp", ...}`). */
+/** More of the first `session.update`: tools (MCP servers, `{"type": "mcp", ...}`) and echo cancellation. */
 export interface SessionExtras {
   tools?: Record<string, unknown>[]
+  echo?: RealtimeEcho
 }
+
+/** `audio.input.echo_cancellation`: off, or a canceller (none named: the server's default). */
+export type RealtimeEcho = false | { model?: string; delay_ms?: number }
 
 /**
  * How the session hears the end of a turn: `server_vad` (a pause ends it) or `semantic_vad` (an end-of-turn model is
@@ -184,8 +198,9 @@ export function applyEvent(s: ConversationState, ev: Ev): ConversationState {
       const session = (ev.session ?? {}) as {
         pipeline?: unknown
         full_duplex?: unknown
-        audio?: { input?: { denoise?: unknown; turn_detection?: unknown } }
+        audio?: { input?: { denoise?: unknown; turn_detection?: unknown; echo_cancellation?: unknown } }
       }
+      const echo = session.audio?.input?.echo_cancellation as ConversationState['serverEcho'] | undefined
       const d = session.audio?.input?.denoise as ConversationState['serverDenoise'] | undefined
       const td = session.audio?.input?.turn_detection as ConversationState['serverListening'] | undefined
       return {
@@ -193,6 +208,7 @@ export function applyEvent(s: ConversationState, ev: Ev): ConversationState {
         events,
         serverPipeline: typeof session.pipeline === 'string' ? session.pipeline : s.serverPipeline,
         serverDenoise: d && typeof d === 'object' ? d : d === null ? null : s.serverDenoise,
+        serverEcho: echo && typeof echo === 'object' ? echo : echo === null ? null : s.serverEcho,
         serverListening: td && typeof td === 'object' && typeof td.type === 'string' ? td : s.serverListening,
         serverFullDuplex: typeof session.full_duplex === 'boolean' ? session.full_duplex : s.serverFullDuplex,
       }
@@ -360,12 +376,12 @@ export class ConversationSession {
     pipeline: PipelineId,
     transport: RealtimeTransport = 'websocket',
     denoise?: RealtimeDenoise,
-    opts: { listening?: Listening; fullDuplex?: boolean; tools?: Record<string, unknown>[] } = {},
+    opts: { listening?: Listening; fullDuplex?: boolean; tools?: Record<string, unknown>[]; echo?: RealtimeEcho } = {},
   ) {
     this.store = new Store(emptyConversation(pipeline, transport))
     this.denoise = denoise
     this.listening = opts.listening
-    this.extras = { tools: opts.tools }
+    this.extras = { tools: opts.tools, echo: opts.echo }
     this.fullDuplex = Boolean(opts.fullDuplex)
   }
 

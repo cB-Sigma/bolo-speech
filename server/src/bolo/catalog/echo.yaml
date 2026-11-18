@@ -1,0 +1,105 @@
+# Acoustic echo cancellation (task echo-cancellation): the agent's own voice removed from what a Realtime session
+# hears (audio.input.echo_cancellation, docs/voice-agents.md, "Echo cancellation"). bolo.echo feeds each canceller
+# the audio the session sent as the reference.
+# * WebRTC AEC3 is the canceller of the WebRTC audio processing module, through LiveKit's Python SDK (Apache-2.0;
+#   WebRTC is BSD-3-Clause); SpeexDSP's MDF canceller (BSD-3-Clause) comes through the pyaec binding (MIT). Both
+#   are pip packages (pip install 'bolo-speech[aec]'): nothing is downloaded, the package version is the pin.
+# * DTLN-aec (Nils L. Westhausen and Bernd T. Meyer, "Acoustic echo cancellation with the dual-signal transformation
+#   LSTM network", ICASSP 2021; MIT) runs in ONNX Runtime. The ONNX files are those of the anarlog project, hosted
+#   unchanged at ChatPanel/dtln-aec-128; the weights are breizhn/DTLN-aec's (MIT). That repository also carries
+#   anarlog's GPL-3.0 licence file, which covers anarlog's code, not the weights.
+# Measured on a synthetic echo (docs/voice-agents.md, "Echo cancellation"): the 11.8 s English sample played back
+# through a 60 ms, 250 ms-tail echo path at -4.4 dB, a 3 s English sample spoken over it from 7 s.
+
+- id: speex-aec
+  aliases: [speex, speexdsp]
+  task: echo-cancellation
+  engine: speexdsp
+  kind: speex_aec
+  family: SpeexDSP
+  languages: []
+  tier: realtime
+  builtin: true
+  license: BSD-3-Clause (SpeexDSP) + MIT (pyaec binding)
+  description: 'SpeexDSP''s echo canceller (an adaptive MDF filter, 400 ms long) with its residual-echo and noise
+    suppressor, through the pyaec package. Fast to adapt and very light. The default. Needs pip install
+    ''bolo-speech[aec]''.'
+  source_url: https://github.com/thewh1teagle/aec-rs
+  validated: cpu
+  measured:
+    rtf: 0.0264
+    audio_s: 12.8
+    load_s: 0.0
+    memory_mb: 0
+    threads: 1
+    engine: pyaec 1.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 20
+    date: '2026-11-18'
+    erle_db: 36.6
+    near_level_db: -7.1
+  options:
+    filter_ms: 400
+    preprocess: true
+- id: webrtc-aec3
+  aliases: [webrtc-aec, aec3, webrtc]
+  task: echo-cancellation
+  engine: webrtc-apm
+  kind: webrtc_aec3
+  family: WebRTC AEC3
+  languages: []
+  tier: realtime
+  builtin: true
+  license: BSD-3-Clause (WebRTC) + Apache-2.0 (LiveKit SDK)
+  description: 'The echo canceller of WebRTC''s audio processing module (AEC3, as in Chrome), through LiveKit''s
+    Python SDK: it finds the delay between the reference and its echo by itself. Needs pip install
+    ''bolo-speech[aec]''.'
+  source_url: https://webrtc.googlesource.com/src/+/refs/heads/main/modules/audio_processing/aec3/
+  validated: cpu
+  measured:
+    rtf: 0.0262
+    audio_s: 12.8
+    load_s: 0.0
+    memory_mb: 0
+    threads: 1
+    engine: livekit 1.3.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 20
+    date: '2026-11-18'
+    erle_db: 33.0
+    near_level_db: -6.1
+- id: dtln-aec-128
+  aliases: [dtln-aec, dtln]
+  task: echo-cancellation
+  engine: onnxruntime
+  kind: dtln_aec
+  family: DTLN-aec
+  languages: []
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 7289725
+  params: 1800000
+  license: MIT
+  license_url: https://github.com/breizhn/DTLN-aec/blob/main/LICENSE
+  description: 'DTLN-aec with 128 LSTM units (Westhausen and Meyer, 2021), a recurrent network trained for the
+    Microsoft AEC Challenge: a spectral mask, then a time-domain stage, both given the reference. Keeps the most of
+    the user''s voice when both talk at once, removes less echo than the signal-processing cancellers, and costs
+    more CPU (about a quarter of a core). Weights MIT; the hosting repository also holds anarlog''s GPL-3.0 licence
+    file, which covers anarlog''s code.'
+  source_url: https://github.com/breizhn/DTLN-aec
+  validated: cpu
+  measured:
+    rtf: 0.2331
+    audio_s: 12.8
+    load_s: 0.1
+    threads: 1
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, load average about 20
+    date: '2026-11-18'
+    erle_db: 19.7
+    near_level_db: -1.3
+  source:
+    repo: ChatPanel/dtln-aec-128
+    revision: a178b10d8d820181e54df15b7b8f2d4a691a736b
+    include: [model_128_1.onnx, model_128_2.onnx]
+  options:
+    model_1: model_128_1.onnx
+    model_2: model_128_2.onnx

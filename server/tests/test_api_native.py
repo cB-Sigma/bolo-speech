@@ -64,6 +64,7 @@ def test_catalog_shape_and_filters(live: LiveServer) -> None:
             "voice-conversion",
             "align",
             "punctuation",
+            "echo-cancellation",
         )
         assert isinstance(m["requires"], list) and isinstance(m["available"], bool)
     tts = httpx.get(live.url + "/api/v1/catalog", params={"task": "tts"}).json()["models"]

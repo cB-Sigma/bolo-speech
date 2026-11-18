@@ -18,6 +18,7 @@ export type Task =
   | 'emotion'
   | 'voice-conversion'
   | 'align'
+  | 'echo-cancellation'
 export type Tier = 'realtime' | 'balanced' | 'accuracy'
 export type Validated = 'cpu' | 'untested'
 
@@ -81,6 +82,8 @@ export interface Capabilities {
     semantic_vad?: { model?: string | null; available?: boolean; installed?: boolean; input?: 'audio' | 'text' | null }
     /** MCP servers as session tools: whether the SDK is installed, the configured servers, whether a URL may be given. */
     mcp?: { available?: boolean; install?: string | null; configured?: string[]; session_urls?: boolean }
+    /** Server-side echo cancellation (`audio.input.echo_cancellation`): the default canceller and the setting. */
+    echo_cancellation?: { default_model?: string; default?: string; models?: string[]; install?: string | null }
     [k: string]: unknown
   }
   llm?: { configured?: boolean; base_url?: string | null; model?: string | null }
