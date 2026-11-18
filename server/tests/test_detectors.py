@@ -473,3 +473,72 @@ def test_smart_turn_v2_matches_the_full_16_second_computation(tmp_path: Path) ->
     for seconds in (0.7, 2.13, 5.0):
         audio = (speechlike(seconds) + 0.01 * rng.standard_normal(int(seconds * 16000))).astype(np.float32)
         assert abs(model.probability(audio) - _smart_turn_v2_reference(t, audio)) < 1e-4
+
+
+# -- a model chosen by name is used or refused, never replaced ------------------------------------------
+def _engines(core: Bolo, monkeypatch: pytest.MonkeyPatch, unavailable: set[str]) -> None:
+    """Engines as on a machine where ``unavailable`` are missing (webrtcvad-wheels not installed) and the rest
+    there (so a model that is only not downloaded is told apart)."""
+    from bolo.engines.base import EngineStatus
+
+    real = core.engines.status
+
+    def status(engine: str) -> EngineStatus:
+        if engine in unavailable:
+            return EngineStatus(engine, False, None, f"No module named '{engine}'. pip install 'bolo-speech[{engine}]'")
+        got = real(engine)
+        return got if got.available else EngineStatus(engine, True, "test", None)
+
+    monkeypatch.setattr(core.engines, "status", status)
+
+
+async def test_a_named_detector_that_cannot_be_used_is_an_error_not_the_energy_detector(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The live conversation with vad_model webrtc-vad, and webrtcvad not installed: it went on with the energy
+    detector while the session said webrtc-vad. It is now refused with the error loading the model gives."""
+    live = LiveServer(settings)
+    _engines(live.core, monkeypatch, {"webrtcvad"})
+    live.start()
+    try:
+        bad = await session_update(live.url, {"type": "server_vad", "vad_model": "webrtc-vad"})
+        assert bad["type"] == "error", bad
+        assert bad["error"]["param"] == "session.audio.input.turn_detection.vad_model"
+        assert bad["error"]["code"] == "engine_unavailable" and "webrtcvad" in bad["error"]["message"]
+        absent = await session_update(live.url, {"type": "server_vad", "vad_model": "silero-vad"})
+        assert absent["type"] == "error" and absent["error"]["code"] == "model_not_installed"
+        assert "auto_pull is off" in absent["error"]["message"] and "bolo pull silero-vad" in absent["error"]["message"]
+        turn = await session_update(live.url, {"type": "semantic_vad", "turn_model": "smart-turn-v3"})
+        assert turn["type"] == "error" and turn["error"]["code"] == "model_not_installed"
+        assert turn["error"]["param"] == "session.audio.input.turn_detection.turn_model"
+        ok = await session_update(live.url, {"type": "server_vad", "vad_model": "energy-vad"})
+        assert ok["type"] == "session.updated"
+    finally:
+        live.stop()
+
+
+async def test_vad_detector_loads_a_named_model_as_anywhere_else(core: Bolo, monkeypatch: pytest.MonkeyPatch) -> None:
+    from bolo.errors import EngineUnavailable, ModelNotInstalled
+
+    _engines(core, monkeypatch, {"webrtcvad"})
+    with pytest.raises(EngineUnavailable, match="webrtcvad"):
+        await core.vad_detector(model="webrtc-vad")
+    with pytest.raises(ModelNotInstalled, match="auto_pull is off"):
+        await core.vad_detector(model="silero-vad")
+    # with auto_pull on, it is pulled on first use, as a model loaded directly would be
+    pulled: list[str] = []
+
+    async def pull(spec: Any) -> None:
+        pulled.append(spec.id)
+        raise ModelNotInstalled("stop here: no download in the tests")
+
+    core.settings.auto_pull = True
+    monkeypatch.setattr(core, "_auto_pull", pull)
+    monkeypatch.setattr(core.manager, "_ensure_installed", pull)
+    with pytest.raises(ModelNotInstalled, match="stop here"):
+        await core.vad_detector(model="silero-vad")
+    assert pulled == ["silero-vad"]
+    # nothing named: the configured detector if it can be used, else the energy detector, as before
+    core.settings.auto_pull = False
+    _, name = await core.vad_detector()
+    assert name in ("energy", core.resolve(None, "vad").id)

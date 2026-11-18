@@ -1304,10 +1304,8 @@ class Bolo:
             return
         await self._auto_pull(spec)
 
-    async def _auto_pull(self, spec: ModelSpec) -> None:
-        if spec.cloud:
-            self._require_provider(spec)
-            return
+    def _check_pullable(self, spec: ModelSpec) -> None:
+        """Raise what pulling ``spec`` on first use would raise before it downloads anything."""
         spec.require_published()
         if spec.gated and not self.store.hub.token:
             raise GatedModel(
@@ -1319,6 +1317,26 @@ class Bolo:
                 f"model '{spec.id}' is not installed and auto_pull is off; run `bolo pull {spec.id}` "
                 f"or POST /api/v1/models/pull"
             )
+
+    def require_usable(self, spec: ModelSpec) -> None:
+        """Raise now what loading ``spec`` would raise, without loading or downloading it: its engine is not
+        available (EngineUnavailable), or it is not installed and cannot be pulled on first use (auto_pull off,
+        gated, unpublished). A model chosen by name is checked with this, so that a session does not go on with
+        something else in its place."""
+        status = self.engines.status(spec.engine)
+        if not status.available:
+            raise EngineUnavailable(
+                f"model '{spec.id}' needs the '{spec.engine}' engine, which is not available: {status.reason}"
+            )
+        if spec.builtin or spec.cloud or self.manager.is_installed(spec):
+            return
+        self._check_pullable(spec)
+
+    async def _auto_pull(self, spec: ModelSpec) -> None:
+        if spec.cloud:
+            self._require_provider(spec)
+            return
+        self._check_pullable(spec)
         self.log("info", f"model '{spec.id}' is not installed; pulling it now")
         job = await self.pull_and_wait(spec.id)
         if job.state != "done":
@@ -1432,8 +1450,9 @@ class Bolo:
     ) -> tuple[VadDetector, str]:
         """A fresh detector and the name of what backs it.
 
-        Uses the configured neural VAD when it is installed (or can be pulled);
-        otherwise falls back to the built-in energy detector.
+        Without ``model``: the configured neural VAD when it is installed (or can be pulled), otherwise the built-in
+        energy detector. A ``model`` chosen by name is loaded as anywhere else (pulled with ``auto_pull``) and
+        never replaced: when it cannot be used the error says why.
         """
         params = params or VadParams(
             min_silence_s=self.settings.endpoint_silence_ms / 1000.0, max_speech_s=self.settings.max_utterance_s
@@ -1443,7 +1462,7 @@ class Bolo:
             usable = self.engines.status(spec.engine).available and (
                 self.manager.is_installed(spec) or (self.settings.auto_pull and not spec.gated)
             )
-            if usable:
+            if usable or model:  # a model chosen by name loads as anywhere else, or says why it cannot
                 entry = await self.manager.load(spec.id)
                 entry.last_used = time.perf_counter()
                 assert isinstance(entry.model, VADModel)

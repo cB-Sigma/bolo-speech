@@ -8,6 +8,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- **A live conversation's listening model, chosen by name, was silently replaced.** With `vad_model: "webrtc-vad"`
+  and webrtcvad-wheels not installed (or a detector or end-of-turn model not downloaded), the session went on with
+  the energy detector (or with pauses alone) while `session.updated` still named the model asked for. A `vad_model`
+  or `turn_model` named in `session.update` now follows the rules of every other load: pulled on first use with
+  `auto_pull`, otherwise refused at once with an `error` naming the parameter and the code and message loading the
+  model gives (`engine_unavailable`, `model_not_installed`), which the console shows. Without a named model the
+  defaults behave as before.
 - **bolo-torch: Step-Audio 2 mini could not load on a GPU under 24 GB.** When bolo split it between the GPU and the CPU, transformers
   refused: "StepAudio2ForCausalLM does not support `device_map='auto'`" (its remote code declares no
   `_no_split_modules`). When a model class names no layers to keep whole, the plugin now builds the model without

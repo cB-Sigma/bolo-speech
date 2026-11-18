@@ -473,17 +473,26 @@ class RealtimeSession:
                 merged.setdefault("create_response", True)
                 merged.setdefault("interrupt_response", True)
                 # bolo extension: the voice-activity detector of this session (default: the default_vad setting)
+                # A model chosen by name is used or refused, never silently replaced by another
                 if merged.get("vad_model") is not None:
                     try:
-                        merged["vad_model"] = self.core.resolve(str(merged["vad_model"]), "vad").id
+                        vad_spec = self.core.resolve(str(merged["vad_model"]), "vad")
+                        self.core.require_usable(vad_spec)
+                        merged["vad_model"] = vad_spec.id
                     except BoloError as exc:
-                        raise RealtimeError(exc.message, param="session.audio.input.turn_detection.vad_model") from exc
+                        raise RealtimeError(
+                            exc.message, code=exc.code, param="session.audio.input.turn_detection.vad_model"
+                        ) from exc
                 # bolo extension: the end-of-turn model semantic_vad asks (default: the default_turn setting)
                 if merged.get("turn_model") is not None:
                     try:
-                        merged["turn_model"] = self.core.resolve(str(merged["turn_model"]), "turn").id
+                        turn_spec = self.core.resolve(str(merged["turn_model"]), "turn")
+                        self.core.require_usable(turn_spec)
+                        merged["turn_model"] = turn_spec.id
                     except BoloError as exc:
-                        raise RealtimeError(exc.message, param="session.audio.input.turn_detection.turn_model") from exc
+                        raise RealtimeError(
+                            exc.message, code=exc.code, param="session.audio.input.turn_detection.turn_model"
+                        ) from exc
                 self.turn_detection = merged
             else:
                 raise RealtimeError(
