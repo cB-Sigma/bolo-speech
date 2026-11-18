@@ -6,6 +6,17 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- **faster-whisper: asking for word timestamps no longer changes the transcript.** With `response_format=verbose_json`
+  and `timestamp_granularities[]=word` (or `segment,word`) faster-whisper switched to timestamp-token decoding, which
+  gives other text: on large-v3-turbo the `text` and every word came back lowercase and without punctuation, on CPU
+  and on CUDA. The text is now decoded exactly as without word timestamps, and the words are aligned to that text
+  afterwards with Whisper's own cross-attention alignment, window by window, from the encoder output the decode
+  already computed (no second encoder pass), so the transcript is the same by construction.
+  `hallucination_silence_threshold` works as before (it decodes with timestamp tokens whether or not words are
+  asked for).
+
 ## [0.6.7] - 2026-11-18
 
 ### Added

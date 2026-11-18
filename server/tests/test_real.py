@@ -118,6 +118,58 @@ async def test_word_timestamps_real(core: Bolo) -> None:
     assert result.words[0].w.lower().strip(".,") == "after"
 
 
+@pytest.mark.parametrize("model", ["faster-whisper-tiny", "faster-whisper-base"])
+async def test_word_timestamps_do_not_change_the_text(core: Bolo, model: str) -> None:
+    """Asking for word timings must not change the transcript (it once switched Whisper to timestamp-token
+    decoding, which on large-v3-turbo gave lowercase text without punctuation)."""
+    path = Path(__file__).parents[1] / "src" / "bolo" / "samples" / "en-long.wav"
+    samples, rate = decode_audio(path.read_bytes(), filename=path.name)
+    duration = len(samples) / rate
+    plain = await core.transcribe(samples, rate, model=model, language="en")
+    timed = await core.transcribe(samples, rate, model=model, language="en", word_timestamps=True)
+    assert timed.text == plain.text
+    assert [s.text for s in timed.segments] == [s.text for s in plain.segments]
+    assert " ".join(w.w for w in timed.words) == timed.text
+    starts = [w.t0 for w in timed.words]
+    assert starts == sorted(starts)
+    assert all(0.0 <= w.t0 <= w.t1 <= duration for w in timed.words)
+    assert timed.words[-1].t1 > duration - 3.0  # the words reach the end of the speech
+    # the hallucination check still works (it decodes with timestamp tokens, with or without words)
+    options = {"hallucination_silence_threshold": 2.0}
+    checked = await core.transcribe(samples, rate, model=model, language="en", options=options)
+    checked_timed = await core.transcribe(
+        samples, rate, model=model, language="en", word_timestamps=True, options=options
+    )
+    assert checked.text == checked_timed.text and checked.text
+    assert checked_timed.words and not checked.words
+
+
+def test_word_granularity_keeps_the_text_over_http(live: LiveServer) -> None:
+    """verbose_json with ``word`` and with ``segment,word`` returns the same text as without, words included."""
+    path = Path(__file__).parents[1] / "src" / "bolo" / "samples" / "en-long.wav"
+    audio = path.read_bytes()
+
+    def ask(granularities: list[str]) -> dict[str, Any]:
+        data: dict[str, Any] = {"model": "faster-whisper-tiny", "language": "en", "response_format": "verbose_json"}
+        if granularities:
+            data["timestamp_granularities[]"] = granularities
+        r = httpx.post(
+            f"{live.url}/v1/audio/transcriptions", data=data, files={"file": (path.name, audio)}, timeout=600
+        )
+        r.raise_for_status()
+        return dict(r.json())
+
+    plain = ask([])
+    assert plain["text"] and not plain.get("words")
+    for granularities in (["word"], ["segment", "word"]):
+        timed = ask(granularities)
+        assert timed["text"] == plain["text"], granularities
+        assert " ".join(w["word"] for w in timed["words"]) == timed["text"]
+        assert any(c in timed["text"] for c in ".,") and timed["text"][0].isupper()
+        starts = [w["start"] for w in timed["words"]]
+        assert starts == sorted(starts) and timed["words"][-1]["end"] <= plain["duration"] + 0.01
+
+
 async def test_streaming_model_emits_incremental_partials(live: LiveServer) -> None:
     samples, rate = librispeech(live.core.settings.data_dir)
     pcm = (resample(samples, rate, 16000) * 32767).astype("<i2").tobytes() + b"\x00" * 48000

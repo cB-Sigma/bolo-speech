@@ -133,8 +133,16 @@ class FasterWhisperSTT(STTModel):
             model = copy.copy(self.model)
             model.feature_extractor = copy.copy(self.model.feature_extractor)
             kwargs["chunk_length"] = int(opts["chunk_length"])
-        # the hallucination check needs word timings; they are computed then, and returned only when asked for
-        timed = req.word_timestamps or opts.get("hallucination_silence_threshold") is not None
+        # the hallucination check needs word timings inside faster-whisper's decoding loop, which decodes with
+        # timestamp tokens: with it the text is the same whether or not words are asked for, and the words are
+        # faster-whisper's own. Without it, words are aligned afterwards to the text of the plain decode, because
+        # asking faster-whisper for words switches it to timestamp-token decoding, which gives other text (on
+        # large-v3-turbo: lowercase, no punctuation)
+        timed = opts.get("hallucination_silence_threshold") is not None
+        align = req.word_timestamps and not timed
+        windows: list[Any] = []  # the encoder output of the window being decoded (align only)
+        if align:
+            model = _capturing_encoder(model, windows)
         segments, info = model.transcribe(
             req.samples,
             language=self._language(req),
@@ -149,16 +157,18 @@ class FasterWhisperSTT(STTModel):
             without_timestamps=not timed,
             **kwargs,
         )
+        aligner = _Aligner(model, info, req.task, len(req.samples) / self.sample_rate) if align else None
         out: list[Segment] = []
         words: list[Word] = []
         for seg in segments:  # faster-whisper decodes a window at a time, as this loop asks for the next segment
             if req.abort.is_set():  # the client went away: stop at this window (the result is discarded)
                 break
-            seg_words = (
-                [Word(w.word.strip(), float(w.start), float(w.end)) for w in (seg.words or [])]
-                if req.word_timestamps
-                else []
-            )
+            if aligner is not None:
+                seg_words = aligner.words(seg, windows[-1] if windows else None)
+            elif req.word_timestamps:
+                seg_words = [_word(w) for w in (seg.words or [])]
+            else:
+                seg_words = []
             words.extend(seg_words)
             out.append(
                 Segment(
@@ -256,6 +266,70 @@ class FasterWhisperSTT(STTModel):
     def close(self) -> None:
         del self.batched
         del self.model
+
+
+def _word(w: Any) -> Word:
+    return Word(w.word.strip(), float(w.start), float(w.end))
+
+
+def _capturing_encoder(model: Any, windows: list[Any]) -> Any:
+    """A copy of ``model`` (sharing the weights) that keeps the encoder output of the window it last encoded.
+
+    faster-whisper encodes each 30-second window just before decoding it and yields that window's segments before
+    it encodes the next one, so while a segment is being read, ``windows[-1]`` is the encoder output it came from.
+    """
+    from faster_whisper import WhisperModel
+
+    clone = copy.copy(model)
+
+    def encode(features: Any) -> Any:
+        output = WhisperModel.encode(clone, features)
+        windows[:] = [output]
+        return output
+
+    clone.encode = encode
+    return clone
+
+
+class _Aligner:
+    """Word timings for the segments of a plain (``without_timestamps``) decode, aligned to their own tokens.
+
+    The text is decoded exactly as without word timestamps; each window's tokens are then aligned to that window's
+    encoder output with faster-whisper's cross-attention alignment (``WhisperModel.add_word_timestamps``), so the
+    words are the transcript's words and the transcript does not change."""
+
+    def __init__(self, model: Any, info: Any, task: str, duration: float) -> None:
+        from faster_whisper.tokenizer import Tokenizer
+
+        self.model = model
+        self.tokenizer = Tokenizer(model.hf_tokenizer, model.model.is_multilingual, task=task, language=info.language)
+        options = info.transcription_options
+        self.prepend = str(options.prepend_punctuations)
+        self.append = str(options.append_punctuations)
+        self.duration = duration
+        self.last_speech = 0.0
+        self.last_start = 0.0
+
+    def words(self, seg: Any, encoder_output: Any) -> list[Word]:
+        model = self.model
+        frames = round((float(seg.end) - float(seg.start)) * model.frames_per_second)
+        if encoder_output is None or frames <= 0 or not seg.tokens:
+            return []
+        subsegment = {"seek": seg.seek, "start": float(seg.start), "end": float(seg.end), "tokens": list(seg.tokens)}
+        self.last_speech = model.add_word_timestamps(
+            [[subsegment]], self.tokenizer, encoder_output, frames, self.prepend, self.append, self.last_speech
+        )
+        out: list[Word] = []
+        for w in subsegment.get("words", []):
+            text = str(w["word"]).strip()
+            if not text:
+                continue
+            # inside the audio and in order: the alignment can run a few frames past the end of a short window
+            t0 = min(max(float(w["start"]), self.last_start, 0.0), self.duration)
+            t1 = min(max(float(w["end"]), t0), self.duration)
+            self.last_start = t0
+            out.append(Word(text, t0, t1))
+        return out
 
 
 def _probability(info: Any) -> float | None:
