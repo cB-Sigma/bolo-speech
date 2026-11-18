@@ -1287,6 +1287,74 @@ def _print_report(report: dict[str, Any]) -> None:
         print(f"    {line['t_ms'] / 1000:6.1f}s {line['speaker']:<6} {line['text']}")
 
 
+def cmd_keys(args: argparse.Namespace) -> int:
+    """API keys in <data_dir>/api-keys.json (bolo.keys): works with the server running or stopped."""
+    from bolo.keys import KeyStore
+
+    settings = _settings(args)
+    store = KeyStore(settings.data_dir, settings.api_key)
+    try:
+        if args.action == "create":
+            if not args.name:
+                print("error: name the key: bolo keys create <name>", file=sys.stderr)
+                return 1
+            key, secret = store.create(
+                args.name, args.scopes, rate_limit=args.rate_limit, burst=args.burst, quota=args.quota,
+                quota_period=args.quota_period or "day", expires_in_days=args.expires_in_days,
+            )  # fmt: skip
+            if args.json:
+                print(json.dumps({**key.public(), "key": secret}, indent=1))
+            else:
+                print(f"created {key.id} ({key.name}), scopes: {', '.join(key.scopes)}")
+                print("the key is shown once; store it now:")
+                print(secret)
+            return 0
+        if args.action in ("revoke", "delete", "update"):
+            if not args.name:
+                print(f"error: name the key id: bolo keys {args.action} <key_id>", file=sys.stderr)
+                return 1
+            if args.action == "update":
+                changes: dict[str, Any] = {
+                    k: getattr(args, k)
+                    for k in ("scopes", "rate_limit", "burst", "quota")
+                    if getattr(args, k) is not None
+                }
+                if args.quota_period:
+                    changes["quota_period"] = args.quota_period
+                for k in ("rate_limit", "burst", "quota"):  # 0 removes a limit
+                    if changes.get(k) == 0:
+                        changes[k] = None
+                print(json.dumps(store.update(args.name, changes).public(), indent=1) if args.json else "updated")
+                return 0
+            store.revoke(args.name, delete=args.action == "delete")
+            print(f"{args.name} {'deleted' if args.action == 'delete' else 'revoked'}")
+            return 0
+        keys = store.all()
+        if args.json:
+            print(json.dumps([k.public() for k in keys], indent=1))
+            return 0
+        if not keys:
+            print("no stored API keys" + (" (the api_key setting is set)" if settings.api_key else
+                                          "; authentication is off unless the api_key setting is set"))  # fmt: skip
+            return 0
+        print(
+            f"{'ID':<17} {'NAME':<20} {'SCOPES':<22} {'LIMIT/MIN':>9} {'QUOTA':>14} {'USED':>8} {'STATE':<8} LAST USED"
+        )
+        for key in keys:
+            info = key.public()
+            usage = info["usage"]
+            quota = f"{key.quota}/{key.quota_period}" if key.quota else "-"
+            state = "revoked" if key.revoked_at else ("active" if key.active else "expired")
+            print(f"{key.id:<17} {key.name[:20]:<20} {','.join(key.scopes)[:22]:<22} {key.rate_limit or '-':>9} {quota:>14} "
+                  f"{usage['period_requests']:>8} {state:<8} {usage['last_used_at'] or '-'}")  # fmt: skip
+        return 0
+    except BoloError as exc:
+        print(f"error: {exc.message}", file=sys.stderr)
+        return 1
+    finally:
+        store.flush()
+
+
 def cmd_telephony(args: argparse.Namespace) -> int:
     """Phone calls (docs/telephony.md): what is configured, and the call simulator."""
     if args.action == "simulate":
@@ -2155,6 +2223,19 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("action", choices=["list", "test"])
     s.add_argument("provider", nargs="?")
     s.set_defaults(func=cmd_providers)
+
+    s = sub.add_parser("keys", help="API keys with scopes, rate limits and quotas: list, create, update, revoke")
+    _common(s)
+    s.add_argument("action", nargs="?", default="list", choices=["list", "create", "update", "revoke", "delete"])
+    s.add_argument("name", nargs="?", help="create: the key's name; update, revoke, delete: its id (key_...)")
+    s.add_argument("--scopes", help="comma separated: read, stt, tts, realtime, manage, admin (default: admin)")
+    s.add_argument("--rate-limit", dest="rate_limit", type=float, help="requests per minute (0: no limit)")
+    s.add_argument("--burst", type=int, help="requests allowed at once (default: the per-minute limit)")
+    s.add_argument("--quota", type=int, help="requests per quota period (0: no quota)")
+    s.add_argument("--quota-period", dest="quota_period", choices=["day", "month", "total"], help="default: day")
+    s.add_argument("--expires-in-days", dest="expires_in_days", type=float)
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(func=cmd_keys)
 
     s = sub.add_parser("telephony", help="phone calls (docs/telephony.md): status, simulate")
     _common(s)

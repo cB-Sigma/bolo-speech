@@ -76,6 +76,9 @@ from bolo.errors import (
     SynthesisFailed,
 )
 from bolo.jobs import Job, JobStore
+from bolo.keys import PERIODS as KEY_PERIODS
+from bolo.keys import SCOPES as KEY_SCOPES
+from bolo.keys import KeyStore
 from bolo.lid import LidResult, parse_routes, route_headers
 from bolo.lid import identify as identify_language
 from bolo.lifecycle import LoadedModel, ModelManager
@@ -186,6 +189,8 @@ class Bolo:
         self.audio_llm = AudioLLMClient(s, ManagedAudioLLM(self))
         #: the backend of the Realtime speech-to-speech pipeline (built on first use)
         self.s2s = S2SManager(self)
+        #: API keys: the api_key setting (root) and the stored keys with scopes, rate limits and quotas
+        self.keys = KeyStore(s.data_dir, s.api_key)
         #: ephemeral Realtime keys: value -> (expiry as epoch seconds, session configuration)
         self.client_secrets: dict[str, tuple[float, dict[str, Any]]] = {}
         #: open WebRTC calls by id (objects from bolo.webrtc; closed in stop())
@@ -279,6 +284,8 @@ class Bolo:
                 await call.close()
         with contextlib.suppress(Exception):
             await self.telephony.close()
+        with contextlib.suppress(Exception):
+            self.keys.flush()
         with contextlib.suppress(Exception):
             await self.s2s.close()
         if self.audio_llm.managed is not None:
@@ -380,7 +387,7 @@ class Bolo:
             "cpu_count": os.cpu_count() or 1,
             "platform": f"{system}-{machine}",
             "python": platform.python_version(),
-            "auth_required": bool(s.api_key),
+            "auth_required": self.keys.enabled,
             "data_dir": str(s.data_dir),
             # models that are not installed are downloaded on first use
             "auto_pull": s.auto_pull,
@@ -451,6 +458,14 @@ class Bolo:
                 "adhoc_models": "<provider>:<model>",
                 "fallback": True,
                 "cost_estimates": any(p.prices for p in self.providers.all()),
+            },
+            # API keys with scopes, rate limits and quotas (docs/api.md, "API keys")
+            "api_keys": {
+                "endpoint": "/api/v1/keys",
+                "auth": self.keys.enabled,
+                "root_key": bool(self.keys.root_key),
+                "scopes": list(KEY_SCOPES),
+                "quota_periods": list(KEY_PERIODS),
             },
             "diarization": {
                 "available": bool(diar) and (diar_ready or s.auto_pull),

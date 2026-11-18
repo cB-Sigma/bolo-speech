@@ -34,6 +34,19 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   a time with their state carried across, the others enhance it whole first. ElevenLabs' `POST /v1/audio-isolation`
   and `/v1/audio-isolation/stream` answer too (multipart `audio`, MP3 back). From the command line:
   `bolo denoise noisy.wav -o clean.wav`. Run on CPU with `gtcrn-simple` and `dpdfnet2`, whole and streamed.
+### Added
+
+- **API keys with scopes, rate limits and quotas.** Besides the one `api_key` setting, bolo keeps named keys in
+  `<data_dir>/api-keys.json` (only a SHA-256 hash of each; mode 0600). Each key has scopes (`read`, `stt`, `tts`,
+  `realtime`, `manage`, `admin`; every key may read), an optional requests-per-minute limit (a token bucket with a
+  `burst`), an optional quota per day, month or in all, an optional expiry, and usage counters (requests, this
+  period, by scope, refused, last use). A request without the scope gets 403 `insufficient_scope`; an empty bucket
+  or a used-up quota 429 `rate_limit_exceeded` or `insufficient_quota` with `Retry-After`. `bolo keys
+  list|create|update|revoke|delete` works on the file with the server running or stopped; `/api/v1/keys` (admin
+  scope) does the same over HTTP, and a server without keys lets a client on the same machine create the first,
+  admin, key. The console has an **API keys** page: create (the key is shown once and, for the first key, kept by
+  the console), edit limits, revoke, delete, and each key's usage against its quota. `info.auth_required` and
+  `capabilities.api_keys` reflect the store. Saved voices record which key created them (`created_by.key`).
 
 ## [0.6.7] - 2026-11-18
 

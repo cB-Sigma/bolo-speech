@@ -105,6 +105,11 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `POST` | `/v1/audio/denoise` | Remove background noise from a recording |
 | `POST` | `/v1/audio-isolation` | Voice isolation (ElevenLabs' route) |
 | `POST` | `/v1/audio-isolation/stream` | Voice isolation, streamed (ElevenLabs' route) |
+| `GET` | `/api/v1/keys` | API keys and their usage (the keys themselves are never returned) |
+| `POST` | `/api/v1/keys` | Create an API key (its value is returned once) |
+| `GET` | `/api/v1/keys/{key_id}` | One API key and its usage |
+| `PATCH` | `/api/v1/keys/{key_id}` | Change a key's name, scopes, rate limit or quota |
+| `DELETE` | `/api/v1/keys/{key_id}` | Revoke a key (?delete=true removes it and its counters) |
 | `GET` | `/api/v1/telephony` | Telephony: providers, webhook URLs, agents, numbers (no secrets) |
 | `GET` | `/api/v1/telephony/agents` | Voice agents that answer and place calls |
 | `GET` | `/api/v1/telephony/agents/{name}` | One voice agent |
@@ -134,11 +139,14 @@ WebSockets (not part of OpenAPI): `WS /api/v1/stt/stream`, `WS /api/v1/tts/strea
 
 ## Conventions
 
-**Authentication.** Off by default. With `api_key` set, send
+**Authentication.** Off by default. With `api_key` set, or once the key store
+holds a key ([API keys](#api-keys-apiv1keys)), send
 `Authorization: Bearer <key>`. `X-API-Key: <key>` and, for browsers that
 cannot set headers on WebSockets or EventSource, `?api_key=<key>` are also
 accepted. `/healthz`, `/readyz`, `/health`, `/metrics` and the console's
-static files are never authenticated.
+static files are never authenticated. A stored key also needs the scope of the
+route (403 `insufficient_scope` otherwise) and is held to its rate limit and
+quota (429).
 
 **Errors.** Every error has the OpenAI envelope plus a `detail` copy of the
 message:
@@ -152,10 +160,12 @@ message:
 | Status | `code` | When |
 | --- | --- | --- |
 | 400 | `invalid_request`, `audio_decode_error`, `unsupported_format`, `unsupported_characters` | bad parameters, undecodable audio; text with letters or digits that a character-input voice has no symbol for (the message names them) |
-| 401 | `invalid_api_key`, `model_gated` | missing/wrong key; gated model without a token |
+| 401 | `invalid_api_key`, `model_gated` | missing/wrong/revoked/expired key; gated model without a token |
+| 403 | `insufficient_scope` | a stored API key without the scope the route needs |
 | 404 | `model_not_found`, `model_not_installed`, `not_found` | unknown model; not installed and `auto_pull` off |
 | 424 | `component_missing` | the voice needs an optional component (espeak-ng) that is not installed; the message says how to install it |
 | 429 | `overloaded` (`type: rate_limit_error`) | the model's queue is full, or the memory budget is exhausted. `Retry-After` is set |
+| 429 | `rate_limit_exceeded`, `insufficient_quota` (`type: rate_limit_error`) | the API key's requests-per-minute bucket is empty, or its quota for the period is used up. `Retry-After` is set (for a quota: until the period ends) |
 | 500 | `synthesis_failed`, `internal_error` | the engine failed, or a voice produced no audio for the text (never an empty 200) |
 | 502 | `download_failed`, `llm_error` | a model download failed; the configured language model could not be reached or answered with an error |
 | 502 | `provider_error`, `provider_auth` | a cloud provider failed (5xx, a broken connection, an unknown model) or refused bolo's key. See [providers.md](providers.md#errors) |
@@ -1154,6 +1164,65 @@ described in [providers.md](providers.md#the-providers-api).
 {"name": "sarvam", "ok": true, "message": "…", "code": null, "checked": "reachability", "latency_ms": 212.4}
 ```
 
+### API keys: `/api/v1/keys`
+
+The `api_key` setting is one key with every right. For more than one caller,
+create keys of their own, each with scopes, a rate limit and a quota:
+
+```bash
+bolo keys create "mobile app" --scopes stt,tts --rate-limit 60 --quota 5000 --quota-period day
+# created key_3f9a1c0e2b7d (mobile app), scopes: stt, tts
+# the key is shown once; store it now:
+# bolo_Q2x…
+bolo keys                    # list: scopes, limits, requests this period, last use
+bolo keys update key_3f9a1c0e2b7d --rate-limit 120 --quota 0   # 0 removes a limit
+bolo keys revoke key_3f9a1c0e2b7d
+bolo keys delete key_3f9a1c0e2b7d                              # removes it and its counters
+```
+
+`bolo keys` writes `<data_dir>/api-keys.json` (mode 0600) directly, with the
+server running or stopped: a running server notices the change. Only a SHA-256
+hash of each key is stored; the key is shown once. Authentication is on as soon
+as the file holds one key, revoked or not (revoking every key locks the server;
+deleting them all opens it again, as before).
+
+| Scope | Routes |
+| --- | --- |
+| `read` | every `GET`: catalog, models, info, stats, traces, events, voices, word lists. Every key has it |
+| `stt` | transcriptions, translations, language identification, diarization, `WS /api/v1/stt/stream`, wake words |
+| `tts` | `/v1/audio/speech`, `WS /api/v1/tts/stream`, creating and changing saved voices |
+| `realtime` | `/v1/realtime` (WebSocket and WebRTC), client secrets, `/v1/chat/completions`, telephony routes |
+| `manage` | other changes: pull, load, unload, delete models; model settings; word lists; providers; benchmarks |
+| `admin` | everything, and `/api/v1/keys` |
+
+Rate limit: a token bucket per key, `rate_limit` requests per minute with room
+for `burst` at once (default: the per-minute figure). Quota: `quota` requests
+per `quota_period` (`day` or `month` in UTC, or `total`). A WebSocket or WebRTC
+session counts as one request when it opens. Both answer 429 with `Retry-After`
+(codes `rate_limit_exceeded` and `insufficient_quota`); the limits of
+the `overloaded` queue apply on top. Counters are kept per key: requests in
+all, in this period, by scope, rejected, last use; they are written to the file
+every ten seconds and when the server stops.
+
+```jsonc
+// POST /api/v1/keys   {"name": "mobile app", "scopes": ["stt", "tts"], "rate_limit": 60, "quota": 5000}
+{"id": "key_3f9a1c0e2b7d", "name": "mobile app", "hint": "bolo_Q2x0…a9Fc", "scopes": ["stt", "tts"],
+ "created_at": "2026-11-18T10:02:11Z", "expires_at": null, "revoked_at": null, "active": true,
+ "rate_limit": 60, "burst": null, "quota": 5000, "quota_period": "day",
+ "usage": {"requests": 0, "period": "2026-11-18", "period_requests": 0, "quota_remaining": 5000,
+           "by_scope": {}, "rejected": 0, "last_used_at": null},
+ "key": "bolo_Q2x0…"}                       // only in this answer
+// GET /api/v1/keys     -> {"auth": true, "root_key": false, "you": "key_…", "scopes": {...}, "data": [...]}
+// PATCH /api/v1/keys/{id}  {"rate_limit": 120, "quota": null, "reset_usage": true}
+// DELETE /api/v1/keys/{id}             -> 204 (revoked; ?delete=true removes it)
+```
+
+Every route here needs `admin`. On a server without any key yet, a client on
+the same machine may create the first key, which must have the `admin` scope
+(it turns authentication on; the console keeps it as its own key). The last
+key cannot be deleted over HTTP (that would turn authentication off); use
+`bolo keys delete`. The console's **Keys** page does all of this.
+
 ### Pronunciation word lists
 
 Named lists in `<data_dir>/wordlists/<name>.tsv` (names `[a-z0-9_-]`, at most 64 characters),
@@ -1356,9 +1425,10 @@ A saved blend:
  "created_by": {"auth": "none", "name": null, "client": "127.0.0.1"}, "source": "blend", "audio_url": null}
 ```
 
-`by.auth` is `api_key` when the server has an API key (bolo has one key, so
-the name is what the client sends in `created_by`), `none` otherwise, `cli`
-for `bolo voices add`.
+`by.auth` is `api_key` when the server requires a key, `none` otherwise, `cli`
+for `bolo voices add`; `by.key` is the id of the stored key that made the
+request (`root` for the `api_key` setting). The name is what the client sends
+in `created_by`.
 
 #### OpenAI's custom voices
 

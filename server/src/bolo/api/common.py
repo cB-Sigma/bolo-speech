@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hmac
 import json
 from typing import Any
 
@@ -13,6 +12,7 @@ from bolo.audio import decode_audio
 from bolo.core import Bolo
 from bolo.engines.base import FloatArray
 from bolo.errors import AuthError, BoloError, InvalidRequest, Overloaded
+from bolo.keys import Principal, scope_for
 
 
 def get_core(request: Request) -> Bolo:
@@ -42,15 +42,29 @@ def _presented_key(headers: Any, query: Any) -> str | None:
     return str(key) if key else None
 
 
-def check_auth(core: Bolo, conn: Request | WebSocket) -> None:
-    expected = core.settings.api_key
-    if not expected:
-        return
-    presented = _presented_key(conn.headers, conn.query_params)
-    if not presented:
-        raise AuthError("API key required. Provide it in the Authorization header using the Bearer scheme.")
-    if not hmac.compare_digest(presented.encode(), expected.encode()):
-        raise AuthError("Incorrect API key provided.")
+def check_auth(
+    core: Bolo, conn: Request | WebSocket, *, scope: str | None = None, presented: list[str | None] | None = None
+) -> Principal:
+    """Authenticate a request (the ``api_key`` setting or a stored key, bolo.keys), check that the key has the
+    scope the route needs and count the request against the key's rate limit and quota. ``presented``: the keys
+    to try instead of the one in the headers or query (the first that is valid wins)."""
+    candidates = presented if presented is not None else [_presented_key(conn.headers, conn.query_params)]
+    candidates = [c for c in candidates if c] or [None]
+    principal: Principal | None = None
+    error: AuthError | None = None
+    for candidate in candidates:
+        try:
+            principal = core.keys.authenticate(candidate)
+            break
+        except AuthError as exc:
+            error = error or exc
+    if principal is None:
+        assert error is not None
+        raise error
+    method = conn.scope.get("method") or "GET"
+    core.keys.admit(principal, scope or scope_for(str(method), conn.url.path))
+    conn.state.principal = principal
+    return principal
 
 
 def sse(data: dict[str, Any] | str, event: str | None = None) -> bytes:

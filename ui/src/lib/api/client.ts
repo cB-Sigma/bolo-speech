@@ -1,6 +1,10 @@
 import { apiUrl, authHeaders, getTransport } from './config'
 import { parseTranscription, transcriptionForm, type DiarizedResult, type TranscribeOptions } from '@/lib/diarize'
 import type {
+  ApiKeyCreate,
+  ApiKeyInfo,
+  ApiKeyList,
+  ApiKeyUpdate,
   BenchRequest,
   BenchResult,
   CallRecord,
@@ -172,6 +176,13 @@ export const api = {
   deleteProvider: (name: string) => json<void>(`api/v1/providers/${encodeURIComponent(name)}`, { method: 'DELETE' }),
   testProvider: (name: string) =>
     json<ProviderTest>(`api/v1/providers/${encodeURIComponent(name)}/test`, { method: 'POST' }),
+  /** API keys. The key itself comes back once, from `createKey`. */
+  keys: (signal?: AbortSignal) => json<ApiKeyList>('api/v1/keys', { signal }),
+  createKey: (body: ApiKeyCreate) => json<ApiKeyInfo>('api/v1/keys', { method: 'POST', json: body }),
+  updateKey: (id: string, body: ApiKeyUpdate) =>
+    json<ApiKeyInfo>(`api/v1/keys/${encodeURIComponent(id)}`, { method: 'PATCH', json: body }),
+  revokeKey: (id: string, remove = false) =>
+    json<void>(`api/v1/keys/${encodeURIComponent(id)}`, { method: 'DELETE', query: { delete: remove || undefined } }),
   /** Phone calls: providers and the addresses to give them, agents, numbers. No call returns a credential. */
   telephony: (signal?: AbortSignal) => json<TelephonyOverview>('api/v1/telephony', { signal }),
   putAgent: (name: string, body: PhoneAgentUpdate) =>

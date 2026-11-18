@@ -4,7 +4,13 @@ import { toast } from 'sonner'
 import { api, ApiError, NetworkError } from '@/lib/api/client'
 import { isDemo } from '@/lib/api/config'
 import type { Catalog, CatalogModel, Component, Task } from '@/lib/api/types'
-import { providersOffered, recommendationsOffered, telephonyOffered, wordListsAnnounced } from '@/lib/capabilities'
+import {
+  keysOffered,
+  providersOffered,
+  recommendationsOffered,
+  telephonyOffered,
+  wordListsAnnounced,
+} from '@/lib/capabilities'
 import { warningText } from '@/lib/fit'
 import { live } from '@/lib/live'
 import type { NavFeatures } from '@/lib/nav'
@@ -121,6 +127,7 @@ export function useNavFeatures(): NavFeatures {
     wordLists: useWordLists().offered,
     providers: providersOffered(info),
     telephony: telephonyOffered(info) && !isDemo,
+    keys: keysOffered(info) && !isDemo,
   }
 }
 

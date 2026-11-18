@@ -7,6 +7,7 @@ import {
   Cloud,
   Columns3,
   Gauge,
+  KeyRound,
   MessagesSquare,
   Mic,
   Phone,
@@ -24,6 +25,8 @@ export interface NavFeatures {
   providers?: boolean
   /** Phone calls through telephony providers. */
   telephony?: boolean
+  /** API keys with scopes, rate limits and quotas. */
+  keys?: boolean
 }
 
 export interface NavItem {
@@ -155,6 +158,15 @@ export const NAV: NavItem[] = [
     icon: Phone,
     group: 'Server',
     when: (f) => Boolean(f.telephony),
+  },
+  {
+    to: '/keys',
+    label: 'API keys',
+    short: 'Keys',
+    description: 'Keys for each client: scopes, rate limits, quotas and usage',
+    icon: KeyRound,
+    group: 'Server',
+    when: (f) => Boolean(f.keys),
   },
 ]
 

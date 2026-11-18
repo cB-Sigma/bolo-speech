@@ -44,6 +44,8 @@ export interface ServerInfo {
 
 /** `info.capabilities`: what the server can do beyond plain STT/TTS. Every part is optional (older servers). */
 export interface Capabilities {
+  /** API keys with scopes, rate limits and quotas (`/api/v1/keys`). */
+  api_keys?: { endpoint?: string; auth?: boolean; root_key?: boolean; scopes?: string[]; quota_periods?: string[] }
   diarization?: {
     available?: boolean
     installed?: boolean
@@ -1281,3 +1283,50 @@ export interface VoiceList {
   consent: Record<string, string>
   similarity: { embedding_model: string; same_speaker: number; similar: number; calibration?: Record<string, unknown> }
 }
+
+/** A stored API key as `/api/v1/keys` returns it: never the key itself, except `key` once, on creation. */
+export interface ApiKeyInfo {
+  id: string
+  name: string
+  hint: string
+  scopes: string[]
+  created_at: string
+  expires_at: string | null
+  revoked_at: string | null
+  active: boolean
+  rate_limit: number | null
+  burst: number | null
+  quota: number | null
+  quota_period: 'day' | 'month' | 'total'
+  usage: {
+    requests: number
+    period: string
+    period_requests: number
+    quota_remaining: number | null
+    by_scope: Record<string, number>
+    rejected: number
+    last_used_at: string | null
+  }
+  key?: string
+}
+
+export interface ApiKeyList {
+  auth: boolean
+  root_key: boolean
+  you: string | null
+  scopes: Record<string, string>
+  periods: string[]
+  data: ApiKeyInfo[]
+}
+
+export interface ApiKeyCreate {
+  name: string
+  scopes?: string[]
+  rate_limit?: number | null
+  burst?: number | null
+  quota?: number | null
+  quota_period?: string
+  expires_in_days?: number | null
+}
+
+export type ApiKeyUpdate = Partial<Omit<ApiKeyCreate, 'expires_in_days'>> & { reset_usage?: boolean }

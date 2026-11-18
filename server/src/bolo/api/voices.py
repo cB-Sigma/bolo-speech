@@ -56,7 +56,8 @@ def created_by(request: Request, name: Any = None) -> dict[str, Any]:
     """Who created a voice: whether an API key authorised it, the name the client gave, and its address."""
     core = get_core(request)
     return {
-        "auth": "api_key" if core.settings.api_key else "none",
+        "auth": "api_key" if core.keys.enabled else "none",
+        "key": getattr(getattr(request.state, "principal", None), "id", None),
         "name": (str(name).strip()[:100] or None) if name else None,
         "client": request.client.host if request.client else None,
     }

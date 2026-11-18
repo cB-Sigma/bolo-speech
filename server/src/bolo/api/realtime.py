@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse, Response
 from bolo import realtime
 from bolo.api.common import _presented_key, check_auth
 from bolo.core import Bolo
-from bolo.errors import AuthError, BoloError, EngineUnavailable, InvalidRequest, ModelNotFound
+from bolo.errors import BoloError, EngineUnavailable, InvalidRequest, ModelNotFound
 from bolo.keepalive import request_keep_alive
 
 router = APIRouter()
@@ -44,12 +44,7 @@ async def realtime_ws(ws: WebSocket) -> None:
         presented += [p[len(KEY_PROTOCOL) :] for p in offered if p.startswith(KEY_PROTOCOL)]
         config = next((c for c in (realtime.client_secret_session(core, k) for k in presented) if c is not None), None)
         if config is None:
-            try:
-                check_auth(core, ws)
-            except AuthError:
-                expected = core.settings.api_key
-                if not any(p == KEY_PROTOCOL + str(expected) for p in offered):
-                    raise
+            check_auth(core, ws, presented=presented)
     except BoloError as exc:
         with contextlib.suppress(Exception):
             await send(

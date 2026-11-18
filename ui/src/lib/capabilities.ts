@@ -280,6 +280,11 @@ export function recommendationsOffered(info: ServerInfo | undefined): boolean {
 }
 
 /** Whether the server has cloud providers (the Providers screen and cost estimates). */
+/** Whether the server keeps API keys with scopes, rate limits and quotas (the Keys screen). */
+export function keysOffered(info: ServerInfo | undefined): boolean {
+  return Boolean(info?.capabilities?.api_keys)
+}
+
 export function providersOffered(info: ServerInfo | undefined): boolean {
   return Boolean(info?.capabilities?.providers)
 }

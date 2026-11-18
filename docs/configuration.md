@@ -19,7 +19,7 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | --- | --- | --- | --- |
 | `host` | `127.0.0.1` | `--host` | bind address |
 | `port` | `8000` | `--port` | HTTP port |
-| `api_key` | none | `--api-key` | if set, required as `Authorization: Bearer <key>` (or `X-API-Key`, or `?api_key=` for WebSockets and SSE) |
+| `api_key` | none | `--api-key` | if set, required as `Authorization: Bearer <key>` (or `X-API-Key`, or `?api_key=` for WebSockets and SSE). It has every scope. For more keys, with scopes, rate limits and quotas, see `bolo keys` ([api.md](api.md#api-keys-apiv1keys)) |
 | `cors_origins` | `[]` | `--cors-origin` (repeatable) | allowed browser origins; `*` allows any |
 | `ui` | `true` | `--no-ui`, `--no-console` | serve the web console at `/` |
 | `console_port` | unset | `--console-port` | serve the web console on this port of its own; the API stays on `port` and no longer serves the console. Unset: both on `port`. `0`: no console (like `ui = false`). See deploy/README.md, "The console on its own port" |

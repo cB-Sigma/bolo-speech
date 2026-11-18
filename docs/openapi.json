@@ -2903,6 +2903,198 @@
     }
    }
   },
+  "/api/v1/keys": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "API keys and their usage (the keys themselves are never returned)",
+    "operationId": "list_keys_api_v1_keys_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Create an API key (its value is returned once)",
+    "operationId": "create_key_api_v1_keys_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/KeyRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/keys/{key_id}": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "One API key and its usage",
+    "operationId": "get_key_api_v1_keys__key_id__get",
+    "parameters": [
+     {
+      "name": "key_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Key Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Change a key's name, scopes, rate limit or quota",
+    "operationId": "update_key_api_v1_keys__key_id__patch",
+    "parameters": [
+     {
+      "name": "key_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Key Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/KeyUpdate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Revoke a key (?delete=true removes it and its counters)",
+    "operationId": "revoke_key_api_v1_keys__key_id__delete",
+    "parameters": [
+     {
+      "name": "key_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Key Id"
+      }
+     },
+     {
+      "name": "delete",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "default": false,
+       "title": "Delete"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/metrics": {
    "get": {
     "tags": [
@@ -3748,6 +3940,172 @@
     },
     "type": "object",
     "title": "InstallRequest"
+   },
+   "KeyRequest": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "title": "Name",
+      "description": "A name to tell keys apart (1 to 80 characters)."
+     },
+     "scopes": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Scopes",
+      "description": "Any of read, stt, tts, realtime, manage, admin. Default: admin. Every key may use read routes."
+     },
+     "rate_limit": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rate Limit",
+      "description": "Requests per minute (token bucket); null: no limit."
+     },
+     "burst": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Burst",
+      "description": "Requests allowed at once; default: the per-minute limit."
+     },
+     "quota": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Quota",
+      "description": "Requests per quota_period; null: no quota."
+     },
+     "quota_period": {
+      "type": "string",
+      "title": "Quota Period",
+      "description": "One of day, month, total (UTC).",
+      "default": "day"
+     },
+     "expires_in_days": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires In Days",
+      "description": "Days until the key stops working; null: never."
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "title": "KeyRequest"
+   },
+   "KeyUpdate": {
+    "properties": {
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "scopes": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Scopes"
+     },
+     "rate_limit": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rate Limit"
+     },
+     "burst": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Burst"
+     },
+     "quota": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Quota"
+     },
+     "quota_period": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Quota Period"
+     },
+     "reset_usage": {
+      "type": "boolean",
+      "title": "Reset Usage",
+      "description": "Start the current quota period's count again from zero.",
+      "default": false
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "KeyUpdate"
    },
    "ModelSettingsRequest": {
     "properties": {
