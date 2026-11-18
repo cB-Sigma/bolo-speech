@@ -380,7 +380,7 @@ export default function DialoguePage() {
                   <dt className="text-muted-foreground">Spoken</dt>
                   <dd className="text-right">{result.mode === 'native' ? 'in one take' : 'turn by turn, stitched'}</dd>
                 </dl>
-                {result.instructions === 'ignored' && (
+                {result.instructions?.startsWith('ignored') && (
                   <p className="text-xs text-warning-text">
                     This model does not follow instructions; they were ignored.
                   </p>

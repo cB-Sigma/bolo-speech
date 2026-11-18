@@ -1060,3 +1060,85 @@ def test_voice_conversion_through_audiocpp(settings: Settings, audiocpp: FakeTTS
         assert r.status_code == 400
     finally:
         srv.stop()
+
+
+def test_plain_instructions_for_a_model_with_a_closed_list_of_items(
+    settings: Settings, audiocpp: FakeTTSServer
+) -> None:
+    """OmniVoice understands only its own items: plain words are put into them ("Whisper very softly" -> whisper),
+    and words that fit none are dropped with a 200 and ``x-bolo-instructions: ignored; ...`` instead of the server's
+    refusal (a 503 that said the engine was down). A family that refuses instructions bolo did not expect is asked
+    again without them."""
+    from bolo.engines.instruct_vocab import omnivoice
+
+    assert omnivoice("Whisper very softly").items == ["whisper"]
+    assert omnivoice("An old man with a deep voice").items == ["low pitch", "male", "elderly"]
+    assert omnivoice("female, low pitch, british accent").items == ["female", "low pitch", "british accent"]
+    assert omnivoice("a little girl").items == ["female", "child"]
+    assert omnivoice("angry").items == [] and omnivoice("angry").unplaced == ["angry"]
+    assert omnivoice("Speak English with an Indian accent").items == ["indian accent"]
+
+    audiocpp.instruct_items = {"whisper", "male", "female", "low pitch", "elderly"}
+    settings.tts_servers = [f"omni={audiocpp.url}", f"strict={audiocpp.url}"]
+    srv = LiveServer(settings)
+    omni = entry(
+        "omni", "audio.cpp", server_model="ac-model", instructions={"option": "instruct", "vocabulary": "omnivoice"}
+    )
+    omni["features"] = ["voice-cloning", "instructions"]
+    strict = entry("strict", "audio.cpp", server_model="ac-model", instructions="instruct")
+    strict["features"] = ["voice-cloning", "instructions"]
+    srv.core.catalog.add(ModelSpec.from_dict(omni))
+    srv.core.catalog.add(ModelSpec.from_dict(strict))
+    srv.start()
+    url = f"{srv.url}/v1/audio/speech"
+    try:
+        for words, sent, header in [
+            ("whisper", "whisper", "applied"),
+            ("Whisper very softly", "whisper", "applied; as: whisper"),
+            ("An old man, whispering angrily", "whisper, male, elderly", "applied; as: whisper, male, elderly"),
+            ("Speak angrily, with a lot of emotion", None, "ignored; OmniVoice understands only these items"),
+            ("happy", None, "ignored; OmniVoice understands only these items"),
+        ]:
+            r = httpx.post(
+                url, json={"model": "omni", "input": "Hello.", "response_format": "wav", "instructions": words}
+            )
+            assert r.status_code == 200, (words, r.text)
+            assert r.headers["x-bolo-instructions"].startswith(header), (words, r.headers["x-bolo-instructions"])
+            assert (audiocpp.requests[-1]["body"].get("options") or {}).get("instruct") == sent, words
+        assert (
+            "(not understood: angrily)"
+            in httpx.post(
+                url,
+                json={"model": "omni", "input": "Hi.", "response_format": "wav", "instructions": "an old man, angrily"},
+            ).headers["x-bolo-instructions"]
+        )
+        # no vocabulary in the catalog: the server refuses, bolo asks again without the instructions
+        r = httpx.post(
+            url, json={"model": "strict", "input": "Hello.", "response_format": "wav", "instructions": "angry"}
+        )
+        assert r.status_code == 200, r.text
+        assert r.headers["x-bolo-instructions"].startswith("ignored; the model refused them: unsupported OmniVoice")
+        assert "instruct" not in (audiocpp.requests[-1]["body"].get("options") or {})
+        assert audiocpp.requests[-2]["body"]["options"]["instruct"] == "angry"
+    finally:
+        srv.stop()
+
+
+def test_instructions_only_without_a_reference_recording() -> None:
+    """FireRedTTS3 follows instructions when it designs a voice (no reference): with a reference they are noted as
+    ignored rather than sent where the model would read them as the reference's transcript."""
+    spec = {
+        "model_id": "x", "cloning": True,
+        "instructions": {"option": "instruct", "with": {"template_name": "voice_design"}, "without_reference": True},
+    }  # fmt: skip
+    model = ServerTTS("audio.cpp", "x", spec, base_url="http://127.0.0.1:9")
+    try:
+        extras = SynthesisExtras(instructions="A calm old man.")
+        assert model.build_request("Hi.", None, 1.0, extras)["options"] == {
+            "instruct": "A calm old man.", "template_name": "voice_design"
+        }  # fmt: skip
+        extras = SynthesisExtras(instructions="A calm old man.", reference_audio=wav_bytes(1.0))
+        assert "options" not in model.build_request("Hi.", None, 1.0, extras)
+        assert extras.instructions_note and extras.instructions_note.startswith("ignored; x follows instructions only")
+    finally:
+        model.close()

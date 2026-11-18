@@ -1137,7 +1137,7 @@
   options:
     runtime: audio.cpp
     family: omnivoice
-    instructions: instruct
+    instructions: {option: instruct, vocabulary: omnivoice}
     server_model: omnivoice-audiocpp
     cloning: true
     send_language: true
@@ -1555,7 +1555,7 @@
   options:
     runtime: audio.cpp
     family: fireredtts3
-    instructions: instruct
+    instructions: {option: instruct, with: {template_name: voice_design}, without_reference: true}
     server_model: fireredtts3-instruct-audiocpp
     cloning: true
     send_language: true

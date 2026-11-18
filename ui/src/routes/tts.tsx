@@ -936,9 +936,16 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
                   {reported.fallback && (
                     <p className="text-xs text-warning-text">Another model answered: {reported.fallback}</p>
                   )}
-                  {reported.instructions === 'ignored' && (
+                  {reported.instructions?.startsWith('ignored') && (
                     <p className="text-xs text-warning-text" data-testid="tts-instructions-ignored">
-                      The model that answered does not follow instructions; they were ignored.
+                      {reported.instructions === 'ignored'
+                        ? 'The model that answered does not follow instructions; they were ignored.'
+                        : `Instructions ignored: ${reported.instructions.slice('ignored; '.length)}`}
+                    </p>
+                  )}
+                  {reported.instructions?.startsWith('applied; ') && (
+                    <p className="text-xs text-muted-foreground" data-testid="tts-instructions-as">
+                      Instructions {reported.instructions.slice('applied; '.length)}
                     </p>
                   )}
                   {decisionWarning && (

@@ -38,6 +38,9 @@ with ``reference: <bolo sample id>``: bolo's synthetic reference clips, sent as 
 ``instructions`` (audio.cpp): the model option a request's ``instructions`` go to (``instruct`` for most families),
 or ``{option, with}`` where ``with`` are further options sent alongside (IndexTTS-2: ``emotion_text`` with
 ``use_emotion_text: true``); ``default_instructions`` is sent when a request has none (Maya1 needs one).
+``vocabulary: omnivoice`` puts plain words into OmniVoice's closed list of items (bolo.engines.instruct_vocab);
+``without_reference: true`` sends them only when no reference recording is (FireRedTTS3's voice design). A server
+that refuses the instructions is asked again without them: the speech is never lost to them.
 
 ``dialogue`` (audio.cpp): how the family speaks a multi-speaker script in one take (:mod:`bolo.dialogue`).
 ``vibevoice``: ``Speaker 1: …`` lines and one reference recording per speaker, which audio.cpp reads from files
@@ -331,6 +334,13 @@ class ServerProcess:
         }  # fmt: skip
 
 
+def _server_reason(message: str) -> str:
+    """The server's own words in one of bolo's error messages (after the last ': ')."""
+    if "): " in message:
+        return message.split("): ", 1)[1]
+    return message.split("': ", 1)[1] if "': " in message else message
+
+
 def _error_message(resp: httpx.Response) -> str:
     try:
         body = resp.read()
@@ -389,6 +399,10 @@ class ServerTTS(TTSModel):
         wanted = spec.get("instructions") if runtime == AUDIOCPP else None
         self._instruction_option = str(wanted.get("option") if isinstance(wanted, dict) else wanted or "")
         self._instruction_with = dict(wanted.get("with") or {}) if isinstance(wanted, dict) else {}
+        #: a closed vocabulary the family checks its instructions against (bolo.engines.instruct_vocab)
+        self._instruction_vocab = str(wanted.get("vocabulary") or "") if isinstance(wanted, dict) else ""
+        #: the family follows instructions only when it designs a voice, never with a reference recording
+        self._instruction_no_reference = bool(wanted.get("without_reference")) if isinstance(wanted, dict) else False
         self.supports_instructions = bool(self._instruction_option)
         self.dialogue_format = str(spec.get("dialogue") or "") if runtime == AUDIOCPP else ""
         self.max_dialogue_speakers = int(spec.get("dialogue_speakers") or 4) if self.dialogue_format else 0
@@ -610,7 +624,14 @@ class ServerTTS(TTSModel):
         if language and self.spec.get("language_option"):
             # families that declare a "language" request option read it there, not from the top-level field
             extra_fields.setdefault("language", language)
-        direction = extras.instructions or self.spec.get("default_instructions")
+        direction = self._direction(extras)
+        if direction and ref_audio is not None and self._instruction_no_reference:
+            if extras.instructions:
+                extras.instructions_note = (
+                    f"ignored; {self.name} follows instructions only when it designs a voice, not with a reference "
+                    "recording (choose the default voice)"
+                )
+            direction = None
         if self._instruction_option and direction:
             extra_fields[self._instruction_option] = str(direction)
             extra_fields.update(self._instruction_with)
@@ -618,6 +639,25 @@ class ServerTTS(TTSModel):
         if extra_fields:
             body["options"] = {str(k): v for k, v in extra_fields.items()}
         return body
+
+    def _direction(self, extras: SynthesisExtras) -> str | None:
+        """The instruction to send: the request's (put into the family's own items where it has a closed list, see
+        bolo.engines.instruct_vocab), else the catalog's default. What could not be used is noted on ``extras``."""
+        wanted = (extras.instructions or "").strip()
+        if not wanted or self._instruction_vocab != "omnivoice":
+            return wanted or self.spec.get("default_instructions")
+        from bolo.engines.instruct_vocab import omnivoice, omnivoice_items_list
+
+        mapped = omnivoice(wanted)
+        if not mapped.items:
+            extras.instructions_note = f"ignored; OmniVoice understands only these items: {omnivoice_items_list()}"
+            return None
+        if mapped.items != [p.strip() for p in wanted.split(",")]:
+            note = f"applied; as: {mapped.text}"
+            if mapped.unplaced:
+                note += f" (not understood: {', '.join(mapped.unplaced)})"
+            extras.instructions_note = note
+        return mapped.text
 
     # -- synthesis --------------------------------------------------------------------------------------------
     def synthesize(
@@ -634,7 +674,27 @@ class ServerTTS(TTSModel):
         if self.runtime == TONTAUBE:
             yield from self._predict(body)
             return
-        yield from self._post_speech(body, cancelled)
+        sent = (body.get("options") or {}).get(self._instruction_option) if self._instruction_option else None
+        if not sent or not (extras and extras.instructions):
+            yield from self._post_speech(body, cancelled)
+            return
+        try:
+            first = True
+            for piece in self._post_speech(body, cancelled):
+                first = False
+                yield piece
+        except (InvalidRequest, EngineUnavailable) as exc:
+            # a family that checks its instructions (a closed list of items) refuses words it does not know: speak
+            # without them rather than fail; the answer says they were ignored and why
+            if not first or "instruct" not in exc.message.lower():
+                raise
+            options = dict(body["options"])
+            options.pop(self._instruction_option, None)
+            for key in self._instruction_with:
+                options.pop(key, None)
+            body = {**body, "options": options} if options else {k: v for k, v in body.items() if k != "options"}
+            extras.instructions_note = f"ignored; the model refused them: {_server_reason(exc.message)}"
+            yield from self._post_speech(body, cancelled)
 
     def synthesize_dialogue(
         self,

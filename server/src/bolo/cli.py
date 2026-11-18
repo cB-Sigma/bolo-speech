@@ -1125,8 +1125,13 @@ def cmd_speak(args: argparse.Namespace) -> int:
 
             chosen = language_header(trace)
             print(f"wrote {out} ({len(audio) / rate:.1f}s, {fmt})" + (f"; language: {chosen}" if chosen else ""))
-            if trace.extra.get("instructions") == "ignored":
+            followed = str(trace.extra.get("instructions") or "")
+            if followed == "ignored":
                 print(f"note: {trace.model} does not follow instructions; they were ignored", file=sys.stderr)
+            elif followed.startswith("ignored; "):
+                print(f"note: instructions ignored: {followed[len('ignored; ') :]}", file=sys.stderr)
+            elif followed.startswith("applied; "):
+                print(f"note: instructions {followed[len('applied; ') :]}", file=sys.stderr)
             if args.verbose:
                 print(
                     f"[{trace.model}] first audio after {trace.ttfa_ms:.0f} ms, total {trace.total_ms:.0f} ms, RTF {trace.rtf:.3f}",

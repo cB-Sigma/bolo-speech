@@ -2603,6 +2603,8 @@ class Bolo:
                             if first_audio_at is None:
                                 first_audio_at = trace.now()
                             total_samples += len(chunk)
+                            if extras is not None and extras.instructions_note:
+                                trace.extra["instructions"] = extras.instructions_note
                             shown = strip_overrides(piece) if first_of_text else ""
                             yield SynthChunk(chunk, sample_rate, seq, shown, first_of_text)
                             seq += 1
@@ -2738,7 +2740,8 @@ def fallback_headers(trace: Trace) -> dict[str, str]:
     if isinstance(cost, dict):
         headers["x-bolo-estimated-cost"] = f"{cost.get('amount')} {cost.get('currency')}"
     if trace.extra.get("instructions"):
-        headers["x-bolo-instructions"] = str(trace.extra["instructions"])
+        note = str(trace.extra["instructions"])
+        headers["x-bolo-instructions"] = note.splitlines()[0][:400].encode("ascii", "replace").decode()
     ignored = trace.extra.get("ignored_options")
     if ignored:
         headers["x-bolo-ignored-options"] = ", ".join(ignored)

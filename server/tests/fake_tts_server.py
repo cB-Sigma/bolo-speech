@@ -62,6 +62,8 @@ class FakeTTSServer:
         self.exit_on_crash = exit_on_crash
         self.model_id = model_id
         self.requests: list[dict[str, Any]] = []
+        #: when set, the instruct items the "model" accepts (the rest are refused, like OmniVoice)
+        self.instruct_items: set[str] | None = None
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -216,6 +218,13 @@ class FakeTTSServer:
                                  "sample_rate": 24000})  # fmt: skip
 
             def _audiocpp(self, body: dict[str, Any], text: str) -> None:
+                instruct = str((body.get("options") or {}).get("instruct") or "")
+                if outer.instruct_items is not None and instruct:
+                    # like audio.cpp's OmniVoice: a closed list of items, anything else refused (with a 503)
+                    unknown = [i for i in instruct.split(", ") if i not in outer.instruct_items]
+                    if unknown:
+                        self._error(503, f"unsupported OmniVoice instruct items: '{unknown[0]}' (unsupported)")
+                        return
                 ref = body.get("voice_ref")
                 if ref is not None and not (isinstance(ref, dict) and ref.get("type") == "base64"):
                     self._error(400, "voice_ref must be an object")

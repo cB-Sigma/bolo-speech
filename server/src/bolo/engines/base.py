@@ -270,6 +270,9 @@ class SynthesisExtras:
     #: a direction for the delivery in plain words ("calm, a little amused"), for models with
     #: ``supports_instructions``; None for the others
     instructions: str | None = None
+    #: set by the model when it did not take ``instructions`` as given: ``"applied; as: whisper"`` (translated into
+    #: the items it understands) or ``"ignored; <why>"`` (the request's ``x-bolo-instructions``)
+    instructions_note: str | None = None
 
 
 class TTSModel(Model):

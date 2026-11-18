@@ -44,6 +44,14 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   and usage counters are added to what the file holds rather than written over it; the server looks at the file's
   stamp at most every 0.5 s before authenticating (at once for a key it does not know), so a revoke takes effect
   within half a second and a new key at once.
+- **OmniVoice no longer answers 503 to plain instructions.** OmniVoice takes only its own items ("whisper", "male, low
+  pitch"); "Whisper very softly", "angry" or "happy" made audio.cpp refuse the request, which bolo passed on as
+  `503 engine_unavailable`. Plain words are now put into OmniVoice's items (whisper, softly -> whisper; man, woman,
+  girl; old, teenager; deep or high voice; accents), and words that fit none are left out: the answer is 200 with
+  `x-bolo-instructions: applied; as: whisper` or `ignored; OmniVoice understands only these items: ...`. Any model that
+  refuses its instructions is asked again without them; FireRedTTS3 gets them only when it designs a voice. Checked
+  with OmniVoice on CPU: "Whisper very softly" became `whisper` (voiced share 0.19 against 0.74 without it).
+
 - **Plugins run in Python's UTF-8 mode.** Model code that opens a text file without naming an encoding read it with
   the Windows code page and failed (MaskGCT's bundled g2p: `UnicodeDecodeError`); plugin processes now start with
   `PYTHONUTF8=1` unless a plugin's own environment or the user sets it.
