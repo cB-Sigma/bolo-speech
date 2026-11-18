@@ -1607,8 +1607,10 @@ class Bolo:
             return source if source is not None else samples[a:b]
 
         submitted = trace.now()
-        pending = [
-            asyncio.ensure_future(
+
+        def submit(i: int) -> asyncio.Future[Any]:
+            a, b = chunks[i]
+            return asyncio.ensure_future(
                 entry.queue.submit(
                     "batch",
                     STTRequest(
@@ -1624,8 +1626,14 @@ class Bolo:
                     ),
                 )
             )
-            for i, (a, b) in enumerate(chunks)
-        ]
+
+        # One request keeps only a few chunks waiting at a time (enough to fill two micro-batches, and at most
+        # half the model's queue), so a long recording is never refused by the queue its own chunks filled
+        # and leaves room for other clients; the next chunk is submitted as each one comes back.
+        batch = getattr(entry.queue, "batch_limit", lambda _kind: 8)("batch")
+        queue_cap = getattr(entry.queue, "max_queue", 64)
+        window = max(1, min(2 * batch, queue_cap // 2 or 1))
+        pending: list[asyncio.Future[Any]] = [submit(i) for i in range(min(window, len(chunks)))]
         segments: list[Segment] = []
         words: list[Word] = []
         detected: str | None = language
@@ -1635,8 +1643,10 @@ class Bolo:
         last_finish = submitted
         usage = Usage()
         try:
-            for index, ((a, _b), fut) in enumerate(zip(chunks, pending)):
-                result, info = await fut
+            for index, (a, _b) in enumerate(chunks):
+                result, info = await pending[index]
+                if index + window < len(chunks):
+                    pending.append(submit(index + window))
                 assert isinstance(result, STTResult)
                 if isinstance(result.usage, Usage):
                     usage.add(result.usage)

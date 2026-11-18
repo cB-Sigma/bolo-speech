@@ -5,6 +5,7 @@ import asyncio
 import numpy as np
 import pytest
 
+from bolo.config import Settings
 from bolo.core import Bolo
 from bolo.errors import InvalidRequest, ModelNotFound
 from bolo.obs.trace import Trace
@@ -205,3 +206,17 @@ def test_realtime_and_quality_tts_defaults(tmp_path) -> None:  # type: ignore[no
     assert core.realtime_tts(None).id == "piper-en-us-amy-low"
     assert core.realtime_tts("alloy").id == "piper-en-us-amy-low"
     assert core.realtime_tts("af_heart").id == "kokoro-v1.0-int8"  # only the quality model has that voice
+
+
+async def test_a_long_recording_is_not_refused_by_the_queue_its_own_chunks_fill(settings: Settings) -> None:
+    """A recording cut into more chunks than the model's queue holds still transcribes: one request keeps
+    only a few chunks waiting at a time (the queue here holds 2; the 4-minute recording makes 8 chunks)."""
+    settings.max_queue = 2
+    core = Bolo(settings)
+    await core.start()
+    try:
+        result = await core.transcribe(speechlike(240.0, 16000), 16000)
+        assert result.duration == 240.0 and result.text
+        assert len(result.segments) >= 8
+    finally:
+        await core.stop()

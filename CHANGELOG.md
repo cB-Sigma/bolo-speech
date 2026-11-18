@@ -8,6 +8,10 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- **A long recording is no longer refused with 429 by its own chunks.** A request cut into more chunks than the
+  model's queue holds (a 25-minute file on Voxtral makes about 110 against the default `max_queue` of 64) queued
+  them all at once and failed with "overloaded" after minutes of decoding. One request now keeps at most a few
+  chunks waiting (two micro-batches, never more than half the queue) and submits the next as each comes back.
 - **faster-whisper: asking for word timestamps no longer changes the transcript.** With `response_format=verbose_json`
   and `timestamp_granularities[]=word` (or `segment,word`) faster-whisper switched to timestamp-token decoding, which
   gives other text: on large-v3-turbo the `text` and every word came back lowercase and without punctuation, on CPU
