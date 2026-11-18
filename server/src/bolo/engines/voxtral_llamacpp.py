@@ -33,6 +33,7 @@ from __future__ import annotations
 import base64
 import io
 import logging
+import re
 import wave
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -53,6 +54,22 @@ KIND = "voxtral-llamacpp"
 SAMPLE_RATE = 16000
 #: llama.cpp's media marker before builds made it random; used when ``/props`` does not name one
 DEFAULT_MARKER = "<__media__>"
+#: an answer instead of a transcript: llama.cpp's Voxtral sometimes replies to the audio as to a chat message (in a
+#: 24-minute English file, 6 of 158 pieces: "It seems like you're referring to ... Could you please provide more
+#: context?", "Here's a high-level overview ...", markdown). Spoken words have no markdown, and these openings
+#: and requests are an assistant's
+_CHAT = re.compile(
+    r"\*\*|```|\bit seems (?:like|that) you(?:'re| are)\b|\bcould you (?:please )?(?:provide|clarify|share)\b|"
+    r"\bhigh-level (?:overview|approach)\b|\bhere(?:'s| is) (?:a|an) (?:step-by-step|breakdown|overview)\b",
+    re.IGNORECASE,
+)
+
+
+def looks_like_chat(text: str) -> bool:
+    """Whether ``text`` reads as an assistant's reply rather than what was said."""
+    return bool(_CHAT.search(text))
+
+
 TRANSLATE_INSTRUCTION = (
     "Translate this audio into {language}. Reply with the {language} translation only, without any comment."
 )
@@ -119,8 +136,8 @@ class VoxtralLlamaCpp(STTModel):
         self.request_extra = dict(spec.get("request") or {})
         self.marker = str(spec.get("media_marker") or "")
         #: llama.cpp's Voxtral can carry on after the transcript as if chatting ("Here's a breakdown..."), always
-        #: after a blank line; a transcript has none, so generation stops there
-        self.stop = [str(x) for x in spec.get("stop", ["\n\n"]) or []]
+        #: after a blank line or in markdown; a transcript has neither, so generation stops there
+        self.stop = [str(x) for x in spec.get("stop", ["\n\n", "```", "**"]) or []]
         api_key = api_key or (process.api_key if process is not None else None)
         self._client = httpx.Client(
             headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
@@ -176,8 +193,8 @@ class VoxtralLlamaCpp(STTModel):
         return f"{where} at {self.base_url} is not reachable ({type(exc).__name__}: {exc})"
 
     # -- requests ---------------------------------------------------------------------------------------------
-    def completion_request(self, req: STTRequest) -> dict[str, Any]:
-        language = (req.language or "").strip().lower().split("-", 1)[0] or None
+    def completion_request(self, req: STTRequest, language_hint: str | None = None) -> dict[str, Any]:
+        language = (req.language or language_hint or "").strip().lower().split("-", 1)[0] or None
         seconds = len(req.samples) / self.sample_rate
         body: dict[str, Any] = {
             "prompt": {
@@ -234,6 +251,21 @@ class VoxtralLlamaCpp(STTModel):
             raise EngineUnavailable(f"{where} refused bolo's credentials (set tts_server_api_key): {message}")
         raise EngineUnavailable(f"{where} failed ({resp.status_code}): {message}")
 
+    def _transcribe_again(self, req: STTRequest, reply: str) -> str:
+        """A piece that came back as a chat reply, once more with the language named (``lang:xx[TRANSCRIBE]``),
+        which keeps the model transcribing: the request's language, else the reply's. Still a reply, or no
+        language to name: nothing, rather than words that were never said."""
+        hint = None if req.language else _reply_language(reply)
+        if req.language or hint:
+            again = str(self._post(self.completion_request(req, hint)).get("content") or "").strip()
+            if not looks_like_chat(again):
+                log.info("model '%s' answered a piece as a chat message; transcribed again with lang:%s",
+                         self.name, req.language or hint)  # fmt: skip
+                return again
+        log.warning("model '%s' answered a piece of audio as a chat message instead of transcribing it; the piece "
+                    "is left out", self.name)  # fmt: skip
+        return ""
+
     def transcribe(self, requests: list[STTRequest]) -> list[STTResult]:
         out: list[STTResult] = []
         for req in requests:
@@ -244,11 +276,21 @@ class VoxtralLlamaCpp(STTModel):
                 continue
             doc = self._post(self.completion_request(req))
             text = str(doc.get("content") or "").strip()
+            if req.task != "translate" and looks_like_chat(text):
+                text = self._transcribe_again(req, text)
             if doc.get("stop_type") == "limit":
                 log.warning("model '%s' reached its token budget; the text may be cut short", self.name)
             language = (req.target_language or "en") if req.task == "translate" else req.language
             out.append(STTResult(text, language))
         return out
+
+
+def _reply_language(text: str) -> str | None:
+    """The language a chat-like reply is written in: Voxtral answers in the language it heard."""
+    from bolo.text.langdetect import detect
+
+    found = detect(re.sub(r"[*`#]", " ", text))
+    return found.language if found.language and found.confidence >= 0.5 else None
 
 
 def load_model(engine: TTSServerEngine, path: Path, spec: dict[str, Any], opts: LoadOptions) -> VoxtralLlamaCpp:

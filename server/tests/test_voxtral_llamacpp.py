@@ -76,7 +76,7 @@ def test_transcription_against_the_fake_server(server: FakeVoxtralServer) -> Non
     assert len(server.requests) == 2  # nothing is sent for a piece shorter than 50 ms
     body = server.requests[0]["body"]
     assert body["temperature"] == 0.0 and body["top_k"] == 1 and body["n_predict"] == 56
-    assert body["cache_prompt"] is False and body["stream"] is False and body["stop"] == ["\n\n"]
+    assert body["cache_prompt"] is False and body["stream"] is False and body["stop"] == ["\n\n", "```", "**"]
     sent = base64.b64decode(body["prompt"]["multimodal_data"][0])
     with wave.open(io.BytesIO(sent)) as w:
         assert w.getframerate() == 16000 and w.getnframes() == 32000
@@ -268,3 +268,34 @@ def test_catalog_entries() -> None:
     )
     assert specs["voxtral-small-24b-llamacpp"].options["hardware"]["gpu"] == "required"
     assert "voxtral-llamacpp" in TTSServerEngine.kinds
+
+
+def test_a_chat_reply_is_transcribed_again_with_the_language_named(
+    server: FakeVoxtralServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """In a 24-minute English file on an M4 Pro, 6 of 158 pieces came back as chat replies ("It seems like you're
+    referring to ... Could you please provide more context?"); named, the language keeps the model transcribing."""
+    model = model_for(server)
+    chat = "It seems like you're referring to a specific model. Could you please provide more context?"
+    replies = iter([chat, "and hidden Markov models became the standard approach"])
+    sent: list[dict[str, Any]] = []
+
+    def post(body: dict[str, Any]) -> dict[str, Any]:
+        sent.append(body)
+        return {"content": next(replies)}
+
+    monkeypatch.setattr(model, "_post", post)
+    (result,) = model.transcribe([STTRequest(tone(2.0))])
+    assert result.text == "and hidden Markov models became the standard approach"
+    assert sent[0]["prompt"]["prompt_string"].endswith("[/INST][TRANSCRIBE]")
+    assert sent[1]["prompt"]["prompt_string"].endswith("[/INST]lang:en[TRANSCRIBE]")  # the reply's language
+
+    # still a reply after that: left out rather than words that were never said
+    replies = iter(["Here's a high-level overview of the process:", "**Step 1**"])
+    sent.clear()
+    assert model.transcribe([STTRequest(tone(2.0), language="en")])[0].text == ""
+    assert all(b["prompt"]["prompt_string"].endswith("lang:en[TRANSCRIBE]") for b in sent)
+    # speech that only sounds like a request stays
+    replies = iter(["Could you pass the salt? It seems cold today."])
+    assert model.transcribe([STTRequest(tone(2.0))])[0].text == "Could you pass the salt? It seems cold today."
+    model.close()
