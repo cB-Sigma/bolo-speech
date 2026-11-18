@@ -323,9 +323,10 @@ async def test_text_modality_and_a_second_session_when_busy(duplex: LiveServer, 
     assert busy[-1]["error"]["code"] == "overloaded"
 
 
-def test_turn_based_models_are_not_duplex(settings: Settings) -> None:
+def test_turn_based_models_are_not_duplex(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
     from bolo.core import Bolo
 
+    monkeypatch.setattr(rt, "platform_key", lambda: "linux-x86_64")  # where the PyTorch server runs
     core = Bolo(settings)
     assert core.s2s.full_duplex is False
     settings.s2s_model = "hibiki-1b-pytorch-bf16"
@@ -333,6 +334,8 @@ def test_turn_based_models_are_not_duplex(settings: Settings) -> None:
     described = core.s2s.describe()
     assert described["full_duplex"] is True and described["available"] is False
     assert "bolo components install moshi" in described["reason"]
+    monkeypatch.setattr(rt, "platform_key", lambda: "darwin-arm64")  # where it does not: the reason says so
+    assert "not on darwin-arm64" in core.s2s.describe()["reason"]
 
 
 # -- catalog --------------------------------------------------------------------------------------------------------
