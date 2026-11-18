@@ -10,7 +10,7 @@
  * away for the ones ONNX Runtime can place there.
  */
 
-export type AudioTask = 'denoise' | 'lid' | 'vad' | 'turn' | 'embed' | 'tag'
+export type AudioTask = 'denoise' | 'lid' | 'vad' | 'turn' | 'embed' | 'tag' | 'punct'
 
 /** Where a model's bytes come from. */
 export type AudioFiles =
@@ -35,6 +35,7 @@ export type AudioRunner =
   | 'smart-turn'
   | 'speaker-embedding'
   | 'ced'
+  | 'cnn-bilstm-punct'
 
 export interface AudioModel {
   /** The server's catalog id. */
@@ -422,6 +423,31 @@ export const AUDIO_MODELS: AudioModel[] = [
     webgpu: false,
     device: 'wasm',
   })),
+  // -- punctuation (punctuation.yaml): the server's default, run on the transcripts of recognisers that write none --
+  {
+    id: 'punct-en-cnn-bilstm',
+    task: 'punct',
+    label: 'Edge-Punct-Casing (English)',
+    runner: 'cnn-bilstm-punct',
+    // The sherpa-onnx package is only a release archive (a page cannot read it): its two files, unchanged, on the
+    // Hub (codebucketsolutions/edge-punct-casing-en-onnx, with the licence and where they came from).
+    files: {
+      from: 'hub',
+      repo: 'codebucketsolutions/edge-punct-casing-en-onnx',
+      revision: 'a674d07ac7b0acac68462fde38f82ec3fe70b3da',
+      files: { model: 'model.int8.onnx', vocab: 'bpe.vocab' },
+    },
+    bytes: 7_490_500 + 149_430,
+    peakBytes: 60e6,
+    rate: 16000,
+    license: 'Apache-2.0',
+    source: 'https://github.com/frankyoujian/Edge-Punct-Casing',
+    blurb:
+      'English punctuation and capital letters (a CNN-BiLSTM, 8-bit): commas, full stops and question marks, capitals at sentence starts, names and “I”.',
+    // 8-bit LSTM and convolution kernels (DynamicQuantizeLSTM, ConvInteger): ONNX Runtime has them on the CPU only.
+    webgpu: false,
+    device: 'wasm',
+  },
 ]
 
 export function audioModel(id: string): AudioModel {

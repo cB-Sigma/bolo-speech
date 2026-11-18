@@ -3,6 +3,8 @@ import { AutoFeatureExtractor, env } from '@huggingface/transformers'
 import { cedFeatures, fbank60, periodicHann, RealFft, reflectPad, softmax, whisperLogMel } from './dsp'
 import type { AudioModel } from './models'
 import { onnxMetadata } from './onnx-meta'
+import { argmaxRows, MAX_SEQ, punctuate, type PunctModel } from '@/lib/browser-punct/punct'
+import { Ssentencepiece } from '@/lib/browser-punct/tokenizer'
 
 /**
  * What runs each kind of model inside the audio worker. Every denoiser here follows the server's code (bolo's
@@ -23,6 +25,8 @@ export interface Runner {
   /** Every class with its probability, in label order. */
   tag?: (audio: Float32Array) => Promise<Float32Array>
   labels?: string[]
+  /** Punctuation and capitals restored in a transcript. */
+  punct?: (text: string) => Promise<string>
   warmup?: () => Promise<void>
   release: () => Promise<void>
 }
@@ -589,4 +593,33 @@ export async function makeTagger(ctx: RunnerContext): Promise<Runner> {
     return Float32Array.from((out[session.outputNames[0] as string] as Tensor).data as Float32Array)
   }
   return { rate: 16000, tag, labels, warmup: async () => void (await tag(tone(16000))), release: release(session) }
+}
+
+// -------------------------------------------------------------------------------------------------------------
+// Punctuation
+// -------------------------------------------------------------------------------------------------------------
+
+/** The English CNN-BiLSTM (sherpa-onnx's OnlinePunctuation), with its tokenizer and steps in TypeScript. */
+export async function makePunct(ctx: RunnerContext): Promise<Runner> {
+  const ort = ctx.ort as typeof Ort
+  const session = await ctx.session(file(ctx, 'model'))
+  const sp = Ssentencepiece.fromVocab(new TextDecoder().decode(file(ctx, 'vocab')))
+  const model: PunctModel = async (input) => {
+    const out = await session.run({
+      token_ids: new ort.Tensor('int32', input.tokenIds, [input.n, MAX_SEQ]),
+      valid_ids: new ort.Tensor('int32', input.validIds, [input.n, MAX_SEQ]),
+      label_lens: new ort.Tensor('int32', input.labelLens, [input.n]),
+    })
+    const cases = out.active_case_logits?.data as Float32Array
+    const marks = out.active_punct_logits?.data as Float32Array
+    return { cases: argmaxRows(cases, 4), marks: argmaxRows(marks, 4) }
+  }
+  return {
+    rate: ctx.model.rate,
+    punct: (text) => punctuate(sp, model, text),
+    warmup: async () => {
+      await punctuate(sp, model, 'hello how are you')
+    },
+    release: release(session),
+  }
 }

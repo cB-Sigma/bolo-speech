@@ -4,7 +4,7 @@ import { resample } from '@/lib/audio/resample'
 import { cachedDownload, lowerMemoryMaximum, ortCdnBase, RUNTIME_CACHE } from '@/lib/browser-runtime'
 import { setOrtGpuPower } from '@/lib/webgpu'
 import { mixWithOriginal, resampleAligned } from './dsp'
-import { makeDenoiser, makeEmbedder, makeLid, makeTagger, makeTurn, makeVad, type Runner } from './runners'
+import { makeDenoiser, makeEmbedder, makeLid, makePunct, makeTagger, makeTurn, makeVad, type Runner } from './runners'
 import { AUDIO_CACHE, type AudioWorkerRequest, type AudioWorkerResponse } from './protocol'
 
 /**
@@ -97,7 +97,9 @@ async function load(req: Extract<AudioWorkerRequest, { type: 'load' }>): Promise
             ? await makeEmbedder(ctx)
             : task === 'tag'
               ? await makeTagger(ctx)
-              : await makeLid(ctx)
+              : task === 'punct'
+                ? await makePunct(ctx)
+                : await makeLid(ctx)
   await runner.warmup?.()
   post({
     type: 'ready',
@@ -143,6 +145,10 @@ async function handle(req: AudioWorkerRequest): Promise<void> {
     if (!r.lid) throw new Error('not a language identifier')
     const ranked = await r.lid(req.audio)
     post({ type: 'langs', id: req.id, ranked: ranked.slice(0, req.top ?? 5), ms: performance.now() - started })
+  } else if (req.type === 'punct') {
+    if (!r.punct) throw new Error('not a punctuation model')
+    const text = await r.punct(req.text)
+    post({ type: 'text', id: req.id, text, ms: performance.now() - started })
   } else if (req.type === 'tag') {
     const tag = r.tag
     const labels = r.labels ?? []

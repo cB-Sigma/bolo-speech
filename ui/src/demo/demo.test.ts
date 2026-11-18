@@ -46,7 +46,9 @@ describe('demo backend', () => {
     const { body } = await get<Catalog>('api/v1/catalog')
     const browser = body.models.filter((m) => m.runtime === 'browser')
     const server = body.models.filter((m) => m.runtime === 'server')
-    expect(browser.map((m) => m.id)).toEqual(BROWSER_MODELS.map((m) => m.id))
+    expect(browser.map((m) => m.id)).toEqual([...BROWSER_MODELS.map((m) => m.id), 'punct-en-cnn-bilstm'])
+    // the punctuation model the page runs on recognisers that write none, with its size and licence
+    expect(browser.at(-1)).toMatchObject({ task: 'punctuation', license: 'Apache-2.0', size_bytes: 7_639_930 })
     expect(browser[0]).toMatchObject({ license: 'MIT', engine: 'onnxruntime-web', task: 'stt' })
     expect(server.length).toBeGreaterThan(50)
     expect(server.every((m) => !m.installed && !m.loaded && m.pulling === null)).toBe(true)

@@ -25,6 +25,8 @@ export interface Prefs {
   browserDenoise: string | null
   /** Share of the denoised audio mixed with the original (the server's `denoise_strength`). */
   browserDenoiseStrength: number
+  /** In-browser recogniser: restore punctuation and capitals for recognisers that write none (`punctuation=auto`). */
+  browserPunctuation: boolean
   /** In-browser recogniser: identify the spoken language first with this model, or null. */
   browserLid: string | null
   /** Where the small audio models run: Auto (their measured default), WebAssembly or WebGPU. */
@@ -52,6 +54,7 @@ const defaults: Prefs = {
   browserMaxRepeats: 4,
   browserDenoise: null,
   browserDenoiseStrength: 1,
+  browserPunctuation: true,
   browserLid: null,
   browserAudioDevice: 'auto',
   browserVad: 'energy-vad',

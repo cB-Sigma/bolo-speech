@@ -85,7 +85,7 @@ export type Backend = 'webgpu' | 'wasm' | 'split'
 export interface Resident {
   id: string
   label: string
-  task: 'stt' | 'tts' | 'diarize' | 'llm' | 'vad' | 's2s' | 'denoise' | 'lid' | 'turn' | 'embed' | 'tag'
+  task: 'stt' | 'tts' | 'diarize' | 'llm' | 'vad' | 's2s' | 'denoise' | 'lid' | 'turn' | 'embed' | 'tag' | 'punct'
   backend: Backend
   /** Estimated memory it takes while loaded (a page cannot measure one model's share), bytes. */
   bytes: number

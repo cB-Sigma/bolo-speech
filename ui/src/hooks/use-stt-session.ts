@@ -8,6 +8,7 @@ import { prefs } from '@/lib/prefs'
 import { levelFromRms, type LevelTrack } from '@/components/charts/level-strip'
 import { audioEngine } from '@/lib/browser-audio/engine'
 import { BrowserTranscriber } from '@/lib/stt/browser'
+import { browserPunctuator } from '@/lib/browser-punct/apply'
 import { DenoisingTranscriber } from '@/lib/stt/denoising'
 import type { Denoise } from '@/lib/stt-options'
 import { ServerTranscriber } from '@/lib/stt/server'
@@ -176,6 +177,11 @@ export function useSttSession() {
           ? new BrowserTranscriber(sharedEngine(), {
               language: cfg.browserLanguage ?? 'auto',
               maxRepeats: p.browserMaxRepeats,
+              punctuate: browserPunctuator(
+                () => sharedEngine().store.get().model,
+                () => prefs.get().browserPunctuation,
+                () => prefs.get().browserAudioDevice,
+              ),
             })
           : null
       const dn =

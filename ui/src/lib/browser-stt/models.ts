@@ -30,6 +30,11 @@ export interface BrowserModel {
   forceLanguage?: string
   /** Only runs with WebGPU (16-bit weights). */
   requiresWebGpu?: boolean
+  /**
+   * Writes no punctuation or capitals of its own (CTC models, some fine-tunes), as the server's catalog says
+   * (no `punctuation` feature): the page's punctuation model restores them in the languages it knows.
+   */
+  noPunctuation?: boolean
   /** Runs on the CPU too, but is meant for WebGPU: on the CPU it is slow. */
   prefersWebGpu?: boolean
   license: string
@@ -104,6 +109,7 @@ export const BROWSER_MODELS: BrowserModel[] = [
   {
     // Fine-tuned for Hindi by ARTPARK-IISc (Apache-2.0); the ONNX conversion is a community upload.
     id: 'whisper-tiny-hindi',
+    noPunctuation: true,
     label: 'Whisper Tiny Hindi',
     family: 'Whisper',
     repo: 'astronova001/whisper-tiny-hindi-ONNX',
@@ -324,6 +330,7 @@ export const BROWSER_MODELS: BrowserModel[] = [
   },
   {
     id: 'whisper-hindi-small',
+    noPunctuation: true,
     label: 'Whisper Small Hindi (IIT Madras)',
     family: 'Whisper',
     repo: 'onnx-community/whisper-hindi-small-ONNX',
@@ -342,6 +349,7 @@ export const BROWSER_MODELS: BrowserModel[] = [
   },
   {
     id: 'whisper-hinglish-swift',
+    noPunctuation: true,
     label: 'Whisper Hindi to Hinglish (Swift)',
     family: 'Whisper',
     repo: 'Hirecentive-D3l/Whisper-Hindi2Hinglish-Swift-ONNX',
@@ -360,6 +368,7 @@ export const BROWSER_MODELS: BrowserModel[] = [
   },
   {
     id: 'indicwav2vec-hindi',
+    noPunctuation: true,
     label: 'IndicWav2Vec Hindi (AI4Bharat)',
     family: 'Wav2Vec2',
     repo: 'onnx-community/indicwav2vec-hindi-ONNX',
@@ -374,6 +383,24 @@ export const BROWSER_MODELS: BrowserModel[] = [
     source: `${HUB}ai4bharat/indicwav2vec-hindi`,
     group: 'Hindi and Indian languages',
     blurb: 'Hindi only. A character model (CTC) from AI4Bharat: no punctuation, never invents text that was not said.',
+  },
+  {
+    id: 'wav2vec2-base-960h',
+    label: 'Wav2Vec2 Base (English)',
+    family: 'Wav2Vec2',
+    repo: 'onnx-community/wav2vec2-base-960h-ONNX',
+    dtype: 'q8',
+    approxBytes: 95_800_000,
+    peakBytes: peak(95_800_000),
+    params: 95_000_000,
+    languages: ['en'],
+    multilingual: false,
+    noPunctuation: true,
+    license: 'Apache-2.0',
+    source: `${HUB}facebook/wav2vec2-base-960h`,
+    group: 'English',
+    blurb:
+      'English only. Meta’s character model (CTC) trained on LibriSpeech read speech: capitals only, no punctuation, which the page’s punctuation model adds.',
   },
   moonshineLanguage('tiny', 'ar', 'Arabic', 32_100_000),
   moonshineLanguage('tiny', 'zh', 'Chinese', 32_100_000),

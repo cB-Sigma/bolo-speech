@@ -30,6 +30,21 @@ export interface BrowserTranscriberOptions {
   turn?: TurnDetector
   /** Each end-of-turn check, as it happens. */
   onTurnCheck?: (check: TurnCheck) => void
+  /**
+   * Punctuation and capitals restored in each final (the server's `punctuation`), for recognisers that write none.
+   * Never throws: when it cannot run it answers with the text as it was.
+   */
+  punctuate?: Punctuator | null
+}
+
+/** A final's text with punctuation restored, and how long that took (null: it was not run). */
+export type Punctuator = (text: string, language: string | null) => Promise<{ text: string; ms: number | null }>
+
+/** Word times with the punctuated spelling of each word, while the text still has one token per word (as the server). */
+export function rewriteWords(words: SttWord[], text: string): SttWord[] {
+  const tokens = text.split(/\s+/).filter(Boolean)
+  if (!words.length || tokens.length !== words.length) return words
+  return words.map((w, i) => ({ ...w, w: tokens[i] as string }))
 }
 
 /** Whisper sees 30 s at a time; cut a non-stop utterance before that. */
@@ -82,6 +97,9 @@ export class BrowserTranscriber implements Transcriber {
   private vadChain: Promise<void> = Promise.resolve()
   private readonly turn: TurnDetector | null
   private readonly onTurnCheck: ((c: TurnCheck) => void) | null
+  private readonly punctuate: Punctuator | null
+  /** Finals in order: each waits for the one before (punctuation answers later). */
+  private finals: Promise<void> = Promise.resolve()
   /** A pause the end-of-turn model is being asked about (or said was not the end). */
   private holding: { t: number; since: number; asked: boolean; generation: number } | null = null
 
@@ -91,6 +109,7 @@ export class BrowserTranscriber implements Transcriber {
     this.vad = opts.vad ?? new EnergyVad({ sampleRate: STT_RATE, endMs: opts.endpointMs ?? 500 })
     this.turn = opts.turn ?? null
     this.onTurnCheck = opts.onTurnCheck ?? null
+    this.punctuate = opts.punctuate ?? null
     this.language = opts.language ?? 'auto'
     this.guard = new RepeatGuard(opts.maxRepeats ?? DEFAULT_MAX_REPEATS)
   }
@@ -251,24 +270,34 @@ export class BrowserTranscriber implements Transcriber {
         this.store.patch({ repeatsRemoved: this.guard.removed })
       }
       // word times from the model (CTC), from the utterance's start; only while the repetition guard left the text whole
-      const words =
+      const timed0 =
         timed?.length && text === decoded ? timed.map((w) => ({ ...w, t0: w.t0 + t0, t1: w.t1 + t0 })) : null
-      this.tracker.final({ text, t0, t1: t, words, language: spoken, latencyMs: ms })
-      const finalMs = performance.now() - speechEndAt
-      const endpointMs = Math.max(0, decidedAt - speechEndAt)
-      recordBrowserTrace({
-        model: this.engine.store.get().model.id,
-        startedAtPerf: speechEndAt,
-        phases: [
-          { name: 'endpoint', ms: endpointMs },
-          { name: 'queue', ms: Math.max(0, finalMs - endpointMs - ms) },
-          { name: 'decode', ms },
-        ],
-        audioSeconds: audio.length / STT_RATE,
-        firstPartialMs,
-        finalMs,
-        rtf: audio.length ? ms / 1000 / (audio.length / STT_RATE) : null,
-        text,
+      const punctuate = this.punctuate
+      this.finals = this.finals.then(async () => {
+        const restored =
+          punctuate && text ? await punctuate(text, spoken ?? (language === 'auto' ? null : language)) : null
+        if (this.cancelled) return
+        const finalText = restored?.text ?? text
+        const words = timed0 && restored?.ms != null ? rewriteWords(timed0, finalText) : timed0
+        this.tracker.final({ text: finalText, t0, t1: t, words, language: spoken, latencyMs: ms })
+        const finalMs = performance.now() - speechEndAt
+        const endpointMs = Math.max(0, decidedAt - speechEndAt)
+        const punctMs = restored?.ms ?? 0 // null: not run
+        recordBrowserTrace({
+          model: this.engine.store.get().model.id,
+          startedAtPerf: speechEndAt,
+          phases: [
+            { name: 'endpoint', ms: endpointMs },
+            { name: 'queue', ms: Math.max(0, finalMs - endpointMs - ms - punctMs) },
+            { name: 'decode', ms },
+            ...(restored?.ms != null ? [{ name: 'punctuation', ms: restored.ms }] : []),
+          ],
+          audioSeconds: audio.length / STT_RATE,
+          firstPartialMs,
+          finalMs,
+          rtf: audio.length ? ms / 1000 / (audio.length / STT_RATE) : null,
+          text: finalText,
+        })
       })
     })
   }
@@ -328,6 +357,7 @@ export class BrowserTranscriber implements Transcriber {
     if (held && !this.vad.isSpeaking) this.onEnd(held.t)
     for (const ev of this.vad.flush()) if (ev.event === 'speech_end') this.onEnd(ev.t)
     if (this.decoding > 0) await new Promise<void>((resolve) => (this.idle = resolve))
+    await this.finals
     this.tracker.abandon()
     if (this.store.get().status !== 'error') this.store.patch({ status: 'done' })
   }

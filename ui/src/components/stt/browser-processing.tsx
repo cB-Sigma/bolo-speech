@@ -1,16 +1,24 @@
-import { AudioWaveform, Cpu, Languages, Play, Repeat2, Sparkles } from 'lucide-react'
+import { AudioWaveform, Cpu, Languages, Pilcrow, Play, Repeat2, Sparkles } from 'lucide-react'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Panel } from '@/components/panel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
 import { useStore } from '@/hooks/use-store'
 import { useSupport } from '@/hooks/use-support'
 import { STT_RATE } from '@/lib/audio/capture'
-import { audioModelsFor, NOT_IN_THE_PAGE, type AudioModel, type AudioTask } from '@/lib/browser-audio/models'
+import {
+  audioModel,
+  audioModelsFor,
+  NOT_IN_THE_PAGE,
+  type AudioModel,
+  type AudioTask,
+} from '@/lib/browser-audio/models'
 import { fmtBytes, fmtMs, fmtSeconds, languageName } from '@/lib/format'
 import { prefs, setPref } from '@/lib/prefs'
+import { PUNCT_MODEL } from '@/lib/browser-punct/apply'
 import { DEFAULT_MAX_REPEATS } from '@/lib/repeat-guard'
 import type { DenoisingTranscriber } from '@/lib/stt/denoising'
 import type { LidDecision } from '@/lib/stt/routing'
@@ -91,6 +99,49 @@ export function RepeatGuardOption({ disabled, removed }: { disabled?: boolean; r
             ))}
           </SelectContent>
         </Select>
+      }
+    />
+  )
+}
+
+/**
+ * Punctuation and capitals restored after recognition, as the server's `punctuation=auto` ("If missing"): only for
+ * recognisers that write none, in English. On by default.
+ */
+export function PunctuationOption({
+  disabled,
+  recogniserWritesNone,
+}: {
+  disabled?: boolean
+  recogniserWritesNone?: boolean
+}) {
+  const p = useStore(prefs)
+  const m = audioModel(PUNCT_MODEL)
+  return (
+    <OptionRow
+      testId="punctuation-option"
+      icon={<Pilcrow />}
+      title="Punctuation"
+      hint={
+        <>
+          If missing: recognisers that write no punctuation or capitals (Wav2Vec2, some fine-tunes) get them from a
+          punctuation model after recognition, in English (the server’s{' '}
+          <span className="font-mono">punctuation=auto</span>). {m.label}, <span className="num">{m.id}</span> ·{' '}
+          {fmtBytes(m.bytes)} · {m.license}, downloaded on first use.
+          {recogniserWritesNone === false && ' The recogniser chosen writes its own, so it is left alone.'}
+        </>
+      }
+      control={
+        <label className="flex items-center gap-2 text-xs">
+          <Switch
+            checked={p.browserPunctuation}
+            onCheckedChange={(v) => setPref('browserPunctuation', v)}
+            disabled={disabled}
+            aria-label="Punctuation"
+            data-testid="punctuation-toggle"
+          />
+          If missing
+        </label>
       }
     />
   )
@@ -390,12 +441,15 @@ export function BrowserProcessingPanel({
   denoiser,
   decision,
   onSuggest,
+  recogniserWritesNone,
 }: {
   disabled?: boolean
   removed?: number
   denoiser?: DenoisingTranscriber | null
   decision?: LidDecision | null
   onSuggest?: (language: string) => void
+  /** Whether the chosen recogniser writes no punctuation of its own. */
+  recogniserWritesNone?: boolean
 }) {
   return (
     <Panel
@@ -412,6 +466,7 @@ export function BrowserProcessingPanel({
       )}
       <LidOption disabled={disabled} decision={decision} onSuggest={onSuggest} />
       <RepeatGuardOption disabled={disabled} removed={removed} />
+      <PunctuationOption recogniserWritesNone={recogniserWritesNone} />
       <DeviceOption disabled={disabled} />
     </Panel>
   )

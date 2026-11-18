@@ -57,6 +57,7 @@ by the browser (Cache Storage, `transformers-cache`) and can be removed from the
 | Whisper Tiny Hindi, 8-bit quantised ONNX. Hindi only. | <https://huggingface.co/astronova001/whisper-tiny-hindi-ONNX>, a community conversion of <https://huggingface.co/ARTPARK-IISc/whisper-tiny-vaani-hindi>. The conversion repository carries no licence tag of its own; the weights it converts are Apache-2.0. | 124 MB | Apache-2.0 |
 | Whisper Tiny, multilingual (99 languages), 8-bit quantised ONNX | <https://huggingface.co/onnx-community/whisper-tiny> (conversion of <https://huggingface.co/openai/whisper-tiny>, Apache-2.0; the conversion repository has no licence tag) | 43.6 MB | Apache-2.0 |
 | Whisper Base, multilingual (99 languages), 8-bit quantised ONNX | <https://huggingface.co/onnx-community/whisper-base> | 79.7 MB | Apache-2.0 |
+| Wav2Vec2 Base, English, 8-bit quantised ONNX (CTC: capitals only, no punctuation; the page's punctuation model adds it) | <https://huggingface.co/onnx-community/wav2vec2-base-960h-ONNX> (conversion of <https://huggingface.co/facebook/wav2vec2-base-960h>) | 95.8 MB | Apache-2.0 |
 | ONNX Runtime Web WebAssembly binary and loader (`ort-wasm-simd-threaded.wasm` / `.mjs`; the `.asyncify` build when WebGPU is used) | jsDelivr, `onnxruntime-web` at the exact version `@huggingface/transformers` depends on | about 14 MB (27 MB for the WebGPU build) | MIT |
 
 Sizes are the sums of the files listed on the Hub on 2026-11-13. Whisper Small was left out: its
@@ -477,6 +478,7 @@ catalog entry. Files come from Hugging Face at the server's pinned revisions, ex
 | Voice activity (Conversation) | `silero-vad` (v4), `silero-vad-v5`, `silero-vad-v6`, `ten-vad`, `energy-vad` | `csukuangfj/vad`; Silero's repository (raw GitHub, v6); `TEN-framework/ten-vad` (its own WebAssembly build); nothing for the energy detector | 0–2.3 MB | MIT; TEN VAD: Apache-2.0 with Agora's conditions, not for commercial use |
 | End of turn (Conversation) | `smart-turn-v3`, `smart-turn-v3.1`, `smart-turn-v3.0`, `smart-turn-v3-fp32` | `pipecat-ai/smart-turn-v3`; Whisper's log-mel ported from `bolo.audio.features` | 8.7–32.4 MB | BSD-2-Clause |
 | Compare two voices (Speakers) | `eres2net-voxceleb` (default, calibrated), `campplus-voxceleb`, `campplus-zh-en`, `wespeaker-campplus-voxceleb`, `wespeaker-resnet34-voxceleb`, `ecapa-tdnn-voxceleb` | `csukuangfj/speaker-embedding-models`; `Pawls2theWall/equivl-ecapa-voxceleb-onnx` | 26–42 MB | Apache-2.0; WeSpeaker models CC-BY-4.0 |
+| Punctuation, on by default (Speech to text, live mic and files) | `punct-en-cnn-bilstm` | `codebucketsolutions/edge-punct-casing-en-onnx` at `a674d07`: the two files of sherpa-onnx's release archive, unchanged (a page cannot read GitHub release assets); model card with the licence and the archive's SHA-256 | 7.6 MB | Apache-2.0 |
 
 Left out, with the reason shown next to the choices: the Demucs denoiser (PyTorch, non-commercial), ElevenLabs
 Voice Isolator (cloud), MMS-LID (978 MB, non-commercial), AmberNet (NGC terms), the identifiers on the torch
@@ -491,6 +493,19 @@ half-second pieces with half a second of context, its routing for `model=auto` (
 a recogniser that is not downloaded is only suggested), its segmenter for frame-scoring detectors, Smart Turn's
 8-second window, and its same / similar thresholds (0.50 / 0.30) for ERes2Net only. The filterbank ports are
 held to the server's NumPy output by `ui/src/lib/browser-audio/dsp.test.ts`.
+
+Punctuation is the server's `punctuation=auto`: only the finals of recognisers that write none (the Wav2Vec2
+models and the Whisper fine-tunes without punctuation, `noPunctuation` in `ui/src/lib/browser-stt/models.ts`, as
+the server's catalog has no `punctuation` feature for them), only in English (the model's language; text in
+another language is left alone), after the repetition guard; word times keep the punctuated spelling of each word.
+sherpa-onnx's tokenizer (simple-sentencepiece) and its pre- and post-processing are ported to TypeScript
+(`ui/src/lib/browser-punct/`). `ui/scripts/punctuation/export_cases.py` writes what the server returns for 285
+transcripts (documentation sentences without punctuation, and edge cases) with the token ids and the model's
+answers; `punct.test.ts` requires the same ids and the same text, character for character. With
+`BOLO_PUNCT_DIR` it also runs the real model in ONNX Runtime Web in Node: all of them match, except one word of
+230 times "x", where two logits nearly tie and ONNX Runtime Web rounds the 8-bit graph differently. The graph's
+8-bit LSTM and convolutions have CPU kernels only, so it runs on WebAssembly. The English recogniser the page can
+use it with is Wav2Vec2 Base (`wav2vec2-base-960h`, capitals only, no punctuation), added for it.
 
 ### WebAssembly or WebGPU: measured
 

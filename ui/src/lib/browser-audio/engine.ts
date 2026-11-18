@@ -94,6 +94,7 @@ const TASK_NOUN: Record<AudioTask, string> = {
   turn: 'End of turn',
   embed: 'Speaker embeddings',
   tag: 'Sound events',
+  punct: 'Punctuation',
 }
 
 const FRAME_BY_FRAME = new Set(['gtcrn', 'dpdfnet', 'deepfilternet3', 'silero-v4', 'silero-v5'])
@@ -336,6 +337,16 @@ export class AudioModelEngine {
       [copy.buffer],
     )
     return { ranked: r.ranked, windows: r.windows, ms: r.ms }
+  }
+
+  /** Punctuation and capitals restored in a transcript, as the server's punctuation model writes them. */
+  async punctuate(text: string): Promise<{ text: string; ms: number }> {
+    const r = await this.request<Extract<AudioWorkerResponse, { type: 'text' }>>({
+      type: 'punct',
+      id: this.nextId++,
+      text,
+    })
+    return { text: r.text, ms: r.ms }
   }
 
   dispose(): void {

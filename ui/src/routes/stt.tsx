@@ -1073,6 +1073,7 @@ export default function SttPage() {
               denoiser={session.denoiser}
               decision={lidDecision}
               onSuggest={(lang) => setSwitchFor(lang)}
+              recogniserWritesNone={Boolean(bModel.noPunctuation)}
             />
           )}
           {mode !== 'server' && <DownloadsPanel />}

@@ -13,6 +13,16 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   browser studio does), so the text is read exactly as on the server. Model and phonemiser data come from Hugging
   Face at the pinned revision; Pyodide and dizione's source from jsDelivr, pinned. Checked in headless Chromium.
 
+- **Punctuation in the browser demo.** The server's English punctuation and casing model (`punct-en-cnn-bilstm`,
+  Edge-Punct-Casing, Apache-2.0) now runs in the page with ONNX Runtime Web (WebAssembly), on the finals of
+  recognisers that write no punctuation, from the microphone and from files: "Punctuation" on Speech to text, on by
+  default, as the server's `punctuation=auto`. sherpa-onnx's tokenizer and steps are ported to TypeScript and give
+  the server's text to the character on 285 transcripts (`ui/src/lib/browser-punct`, fixture written by
+  `ui/scripts/punctuation/export_cases.py`). The model's two files are on the Hugging Face Hub at a pinned revision
+  (codebucketsolutions/edge-punct-casing-en-onnx: unchanged from sherpa-onnx's release archive, with the licence and
+  a model card), and the models manager lists it with its size and licence. Wav2Vec2 Base (English, capitals only)
+  joins the page's recognisers for it.
+
 - **New llama.cpp voices, and llama-server b12521.** Kokoro-82M (`kokoro-82m-llamacpp`, its American and British
   English voices) and tiny-voca (`tiny-voca-llamacpp`, a 4.5 M-parameter English voice, F2 and M2) on llama.cpp, and
   tiny-voca in process on ONNX Runtime (`tiny-voca-onnx`, the authors' ONNX export with their phonemiser dizione,

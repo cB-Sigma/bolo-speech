@@ -24,6 +24,8 @@ export type AudioWorkerRequest =
   | { type: 'embed'; id: number; audio: Float32Array }
   | { type: 'lid'; id: number; audio: Float32Array; top?: number }
   | { type: 'tag'; id: number; audio: Float32Array; top?: number; window?: number }
+  /** Punctuation and capitals for a transcript. */
+  | { type: 'punct'; id: number; text: string }
 
 export type AudioWorkerResponse =
   | { type: 'progress'; files: { file: string; loaded: number; total: number }[] }
@@ -43,4 +45,5 @@ export type AudioWorkerResponse =
       windows: { start: number; end: number; ranked: [string, number][] }[]
       ms: number
     }
+  | { type: 'text'; id: number; text: string; ms: number }
   | { type: 'error'; id?: number; message: string }

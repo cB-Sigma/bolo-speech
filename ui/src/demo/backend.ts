@@ -22,7 +22,10 @@ import { percentile } from '@/lib/latency/stats'
 import longUrl from '../mock/assets/en-ask-not.wav?url'
 import shortUrl from '../mock/assets/en-fellow-americans.wav?url'
 import hindiUrl from './assets/hi-short.wav?url'
-import { deleteDownload, idleSeconds, residentModels, type Resident } from '@/lib/downloads'
+import { deleteDownload, idleSeconds, isDownloaded, residentModels, type Resident } from '@/lib/downloads'
+import { audioEngine, downloadId } from '@/lib/browser-audio/engine'
+import { audioModel } from '@/lib/browser-audio/models'
+import { PUNCT_LANGUAGES, PUNCT_MODEL } from '@/lib/browser-punct/apply'
 import { keepAliveSeconds, keepLoaded, unloadModel } from '@/lib/keepalive'
 import { pickBrowserModel, prefs } from '@/lib/prefs'
 import { BOLO_VERSION } from '@/lib/version'
@@ -101,6 +104,39 @@ function browserEntry(m: BrowserModel, installed: boolean, loaded: boolean, prog
     loaded,
     pulling: progress != null ? { job_id: 'browser-load', progress } : null,
     description: `${m.label}, ${DTYPE_TEXT[m.dtype]} weights, running in this page with ONNX Runtime Web${m.requiresWebGpu ? ' (WebGPU only)' : m.prefersWebGpu ? ' (best with WebGPU)' : ''}. ${m.blurb}${m.licenseNote ? ` ${m.licenseNote}` : ''} Downloaded once from the Hugging Face Hub, then kept in the browser cache.`,
+    source_url: m.source,
+    validated: 'untested',
+    measured: null,
+    runtime: 'browser',
+  }
+}
+
+/** The punctuation model the page runs on the transcripts of recognisers that write none. */
+function punctEntry(): CatalogModel {
+  const m = audioModel(PUNCT_MODEL)
+  const e = audioEngine('punct').store.get()
+  const loaded = e.status === 'ready'
+  return {
+    id: m.id,
+    aliases: [],
+    task: 'punctuation',
+    engine: 'onnxruntime-web',
+    family: 'Edge-Punct-Casing',
+    languages: PUNCT_LANGUAGES,
+    tier: 'realtime',
+    streaming: false,
+    sample_rate: 16000,
+    size_bytes: m.bytes,
+    params: null,
+    license: m.license,
+    commercial_use: true,
+    gated: false,
+    voices: [],
+    features: ['punctuation', 'casing', 'in-browser'],
+    installed: loaded || isDownloaded(downloadId(m)),
+    loaded,
+    pulling: e.status === 'loading' ? { job_id: 'browser-load', progress: e.progress } : null,
+    description: `${m.label}, 8-bit, running in this page with ONNX Runtime Web: the server's default punctuation model, with its tokenizer and steps in TypeScript. ${m.blurb} Used on the transcripts of recognisers that write none (Punctuation on Speech to text). Downloaded once from the Hugging Face Hub at a pinned revision, then kept in the browser cache.`,
     source_url: m.source,
     validated: 'untested',
     measured: null,
@@ -194,7 +230,7 @@ export class DemoBackend {
       pulling: null,
       runtime: 'server' as const,
     }))
-    return [...browser, ...server]
+    return [...browser, punctEntry(), ...server]
   }
 
   stats(): Stats {
@@ -233,7 +269,9 @@ export class DemoBackend {
               ? r.task
               : r.task === 'diarize' || r.task === 'embed'
                 ? 'diarization'
-                : 'stt',
+                : r.task === 'punct'
+                  ? 'punctuation'
+                  : 'stt',
           loaded: true,
           memory_bytes: r.bytes,
           memory_estimated: true,
@@ -315,6 +353,7 @@ export class DemoBackend {
 
   /** Download and compile the browser model, reported as a pull job. */
   private pull(id: string): Response {
+    if (id === PUNCT_MODEL) return this.pullPunct()
     const model = BROWSER_MODELS.find((m) => m.id === id)
     if (!model) return needsServer()
     const engine = sharedEngine()
@@ -338,6 +377,39 @@ export class DemoBackend {
     })
     engine
       .load()
+      .then(() => {
+        job.state = 'done'
+        job.progress = 1
+      })
+      .catch((err: unknown) => {
+        job.state = 'error'
+        job.error = err instanceof Error ? err.message : String(err)
+      })
+      .finally(off)
+    return json({ job_id: job.id }, 202)
+  }
+
+  /** Download and compile the punctuation model, reported as a pull job. */
+  private pullPunct(): Response {
+    const engine = audioEngine('punct')
+    const bytes = audioModel(PUNCT_MODEL).bytes
+    const job: Job = {
+      id: `j_${this.jobSeq++}`,
+      kind: 'pull',
+      model: PUNCT_MODEL,
+      state: 'running',
+      progress: 0,
+      bytes_done: 0,
+      bytes_total: bytes,
+      error: null,
+    }
+    this.jobs.set(job.id, job)
+    const off = engine.store.subscribe(() => {
+      job.progress = engine.store.get().progress
+      job.bytes_done = Math.round(job.progress * bytes)
+    })
+    engine
+      .load(PUNCT_MODEL, prefs.get().browserAudioDevice)
       .then(() => {
         job.state = 'done'
         job.progress = 1
@@ -524,6 +596,12 @@ export class DemoBackend {
     const action = /^\/api\/v1\/models\/([^/]+)\/(load|unload)$/.exec(path)
     if (action && method === 'POST') {
       const id = decodeURIComponent(action[1] as string)
+      if (id === PUNCT_MODEL) {
+        const engine = audioEngine('punct')
+        if (action[2] === 'unload') engine.dispose()
+        else await engine.load(PUNCT_MODEL, prefs.get().browserAudioDevice)
+        return json({ id, loaded: action[2] === 'load' })
+      }
       const resident = residentModels().some((r) => r.id === id)
       if (action[2] === 'unload') {
         if (!resident && !BROWSER_MODELS.some((m) => m.id === id)) return needsServer()
@@ -542,6 +620,10 @@ export class DemoBackend {
     const del = /^\/api\/v1\/models\/([^/]+)$/.exec(path)
     if (del && method === 'DELETE') {
       const id = decodeURIComponent(del[1] as string)
+      if (id === PUNCT_MODEL) {
+        await deleteDownload(downloadId(audioModel(PUNCT_MODEL)))
+        return new Response(null, { status: 204 })
+      }
       if (!BROWSER_MODELS.some((m) => m.id === id)) return needsServer()
       // Unloads it if loaded, then removes only this model's files (by their keys: the cache is not listed).
       await deleteDownload(id)
