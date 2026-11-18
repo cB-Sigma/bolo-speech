@@ -107,7 +107,13 @@ export interface Capabilities {
     [k: string]: unknown
   }
   /** Enrolled speakers: verification and identification (`/v1/audio/speakers`), newer servers. */
-  speakers?: { endpoint?: string; embedding_model?: string; threshold?: number; enrolled?: number; [k: string]: unknown }
+  speakers?: {
+    endpoint?: string
+    embedding_model?: string
+    threshold?: number
+    enrolled?: number
+    [k: string]: unknown
+  }
   /** Pronunciation word lists: announced by newer servers (older ones are probed with a request). */
   wordlists?: { available?: boolean; endpoint?: string; install?: string | null; [k: string]: unknown }
   /** Romanised text for text-to-speech: what the server's transliterator can do. */

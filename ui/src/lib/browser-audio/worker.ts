@@ -173,9 +173,16 @@ async function handle(req: AudioWorkerRequest): Promise<void> {
     const windows: { start: number; end: number; ranked: [string, number][] }[] = []
     if (req.window) {
       const size = Math.round(req.window * R)
-      for (const [a, b] of spans(size, size)) windows.push({ start: a / R, end: b / R, ranked: rank(await tag(req.audio.subarray(a, b))) })
+      for (const [a, b] of spans(size, size))
+        windows.push({ start: a / R, end: b / R, ranked: rank(await tag(req.audio.subarray(a, b))) })
     }
-    post({ type: 'tags', id: req.id, ranked: rank(best ?? new Float32Array()), windows, ms: performance.now() - started })
+    post({
+      type: 'tags',
+      id: req.id,
+      ranked: rank(best ?? new Float32Array()),
+      windows,
+      ms: performance.now() - started,
+    })
   }
 }
 

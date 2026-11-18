@@ -16,7 +16,7 @@ export function TagBars({ items, empty }: { items: LabelScore[]; empty: string }
               style={{ width: `${Math.max(1, Math.round(t.score * 100))}%` }}
             />
           </span>
-          <span className="num text-right text-xs text-muted-foreground">{Math.round(t.score * 100)} %</span>
+          <span className="text-right num text-xs text-muted-foreground">{Math.round(t.score * 100)} %</span>
         </li>
       ))}
     </ul>

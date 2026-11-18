@@ -19,7 +19,12 @@ import { fmtSeconds } from '@/lib/format'
 
 const WINDOWS = ['0', '1', '2', '5', '10']
 
-function WindowSelect({ value, onChange, disabled, testId }: {
+function WindowSelect({
+  value,
+  onChange,
+  disabled,
+  testId,
+}: {
   value: string
   onChange: (v: string) => void
   disabled?: boolean
@@ -41,7 +46,12 @@ function WindowSelect({ value, onChange, disabled, testId }: {
   )
 }
 
-function SamplePicker({ samples, clip, onPick, disabled }: {
+function SamplePicker({
+  samples,
+  clip,
+  onPick,
+  disabled,
+}: {
   samples: Sample[]
   clip: Clip | null
   onPick: (s: Sample) => void
@@ -69,7 +79,11 @@ function SamplePicker({ samples, clip, onPick, disabled }: {
 }
 
 /** Sound events heard in the recording (`POST /v1/audio/tags`), whole and window by window. */
-function TagsPanel({ clip, autoPullOn, defaultModel }: {
+function TagsPanel({
+  clip,
+  autoPullOn,
+  defaultModel,
+}: {
   clip: Clip | null
   autoPullOn: boolean | null
   defaultModel?: string | null
@@ -126,7 +140,7 @@ function TagsPanel({ clip, autoPullOn, defaultModel }: {
               <ol className="grid gap-1 text-xs" data-testid="analyse-tags-segments">
                 {result.segments.map((s) => (
                   <li key={s.start} className="flex gap-3">
-                    <span className="num w-24 shrink-0 text-muted-foreground">
+                    <span className="w-24 shrink-0 num text-muted-foreground">
                       {s.start.toFixed(1)}-{s.end.toFixed(1)} s
                     </span>
                     <span className="min-w-0 truncate">
@@ -148,7 +162,11 @@ function TagsPanel({ clip, autoPullOn, defaultModel }: {
 }
 
 /** How the speaker sounds (`POST /v1/audio/emotion`). */
-function EmotionPanel({ clip, autoPullOn, defaultModel }: {
+function EmotionPanel({
+  clip,
+  autoPullOn,
+  defaultModel,
+}: {
   clip: Clip | null
   autoPullOn: boolean | null
   defaultModel?: string | null
@@ -211,7 +229,7 @@ function EmotionPanel({ clip, autoPullOn, defaultModel }: {
               <ol className="grid gap-1 text-xs" data-testid="analyse-emotion-segments">
                 {result.segments.map((s) => (
                   <li key={s.start} className="flex gap-3">
-                    <span className="num w-24 shrink-0 text-muted-foreground">
+                    <span className="w-24 shrink-0 num text-muted-foreground">
                       {s.start.toFixed(1)}-{s.end.toFixed(1)} s
                     </span>
                     <span>
@@ -232,7 +250,11 @@ function EmotionPanel({ clip, autoPullOn, defaultModel }: {
 }
 
 /** Background noise removed (`POST /v1/audio/denoise`), to listen to and download. */
-function CleanPanel({ clip, autoPullOn, defaultModel }: {
+function CleanPanel({
+  clip,
+  autoPullOn,
+  defaultModel,
+}: {
   clip: Clip | null
   autoPullOn: boolean | null
   defaultModel?: string | null
@@ -283,7 +305,7 @@ function CleanPanel({ clip, autoPullOn, defaultModel }: {
               disabled={busy}
               aria-label="Strength"
             />
-            <span className="num w-9">{Math.round(strength * 100)} %</span>
+            <span className="w-9 num">{Math.round(strength * 100)} %</span>
           </label>
           <Button size="sm" onClick={() => void run()} disabled={!clip || busy} data-testid="analyse-denoise-run">
             {busy ? <Loader2 className="animate-spin" /> : <Sparkles />} Clean up

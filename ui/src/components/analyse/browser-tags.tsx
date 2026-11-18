@@ -117,7 +117,7 @@ export function BrowserTagsPanel() {
               <ol className="grid gap-1 text-xs">
                 {result.windows.map((w) => (
                   <li key={w.start} className="flex gap-3">
-                    <span className="num w-24 shrink-0 text-muted-foreground">
+                    <span className="w-24 shrink-0 num text-muted-foreground">
                       {w.start.toFixed(1)}-{w.end.toFixed(1)} s
                     </span>
                     <span className="min-w-0 truncate">
