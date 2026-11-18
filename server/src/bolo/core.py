@@ -97,6 +97,8 @@ from bolo.recommend import Advisor
 from bolo.s2s import S2SManager
 from bolo.separate import SeparateOptions, SeparationResult, check_request, is_narrowband, plan_chunks, split_long
 from bolo.separate import separate as run_separation
+from bolo.speakers import SAME_FILE, SpeakerStore
+from bolo.speakers import THRESHOLDS as speaker_thresholds
 from bolo.store import HubClient, ModelStore
 from bolo.streaming.vad import EnergyVad, FallbackVad, detect_segments, merge_segments
 from bolo.stt_options import (
@@ -195,6 +197,8 @@ class Bolo:
         self.components = ComponentManager(self)
         #: saved voices (the voice library): cleaned references for the models that clone voices (bolo.voices)
         self.voices = VoiceStore(s.data_dir)
+        #: enrolled speakers, for verification and identification (bolo.speakers)
+        self.speakers = SpeakerStore(s.data_dir)
         phonemize.set_preference(s.phonemizer)
         # uccharan's language packs: downloaded by bolo, on first use, as a pull job (bolo.text.packs)
         packs.configure(s.uccharan_auto_download, reporter=self)
@@ -511,6 +515,14 @@ class Bolo:
                 "endpoint": "/v1/audio/voice-conversion",
                 "default_model": s.default_voice_conversion,
                 "models": [m.id for m in self.catalog.all() if m.task == "voice-conversion"],
+            },
+            # enrolled speakers: verification and identification (docs/api.md, "Enrolled speakers")
+            "speakers": {
+                "endpoint": "/v1/audio/speakers",
+                "verify": "/v1/audio/speakers/verify",
+                "identify": "/v1/audio/speakers/identify",
+                "embedding_model": SAME_FILE.get(*[s.voice_similarity_model or s.default_diarization] * 2),
+                "thresholds": dict(speaker_thresholds),
             },
             "voices": {
                 "endpoint": "/api/v1/voices",

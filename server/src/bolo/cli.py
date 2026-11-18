@@ -974,6 +974,72 @@ def cmd_classify(args: argparse.Namespace) -> int:
     return asyncio.run(run())
 
 
+def cmd_speakers(args: argparse.Namespace) -> int:
+    """``bolo speakers list | enrol NAME FILE... | verify SPEAKER FILE | identify FILE | rm SPEAKER``."""
+    from bolo import speakers
+    from bolo.audio import decode_audio
+    from bolo.voices import now_iso
+
+    core = _core(args)
+    action = args.action
+    rest = list(args.args)
+
+    def read(name: str) -> tuple[Any, int]:
+        return decode_audio(Path(name).read_bytes(), filename=name)
+
+    async def run() -> int:
+        await core.start()
+        try:
+            model = speakers.embedder_id(core, args.model)
+            if action == "list":
+                for spk in core.speakers.all():
+                    d = spk.to_dict()
+                    print(f"{d['id']}  {d['name']}  ({len(d['clips'])} recordings, {d['seconds']:.1f} s)")
+                threshold, calibrated = speakers.threshold_for(model)
+                print(f"embedder {model}, threshold {threshold:g}" + ("" if calibrated else " (not measured)"))
+            elif action == "enrol":
+                if len(rest) < 2:
+                    print("usage: bolo speakers enrol NAME FILE [FILE ...]", file=sys.stderr)
+                    return 2
+                clips = [speakers.prepare_clip(*read(f)) for f in rest[1:]]
+                now = now_iso()
+                spk = core.speakers.create(rest[0], None, None, now)
+                for clip in clips:
+                    core.speakers.add_clip(spk, clip, now)
+                await speakers.voiceprint(core, core.speakers.get(spk.id), model)
+                print(f"enrolled {spk.id} ({len(clips)} recordings)")
+            elif action == "verify":
+                if len(rest) != 2:
+                    print("usage: bolo speakers verify SPEAKER FILE", file=sys.stderr)
+                    return 2
+                body = await speakers.verify(core, *read(rest[1]), core.speakers.find(rest[0]), model, args.threshold)
+                verdict = "same speaker" if body["match"] else "not the same speaker"
+                print(f"{verdict}: similarity {body['similarity']:.3f} (threshold {body['threshold']:g}, {model})")
+                return 0 if body["match"] else 1
+            elif action == "identify":
+                if len(rest) != 1:
+                    print("usage: bolo speakers identify FILE", file=sys.stderr)
+                    return 2
+                body = await speakers.identify(core, *read(rest[0]), core.speakers.all(), model, args.threshold)
+                best = body["speaker"]
+                print(f"{best['name']} ({best['id']})" if best else "nobody enrolled")
+                for c in body["candidates"]:
+                    print(f"  {c['similarity']:.3f}  {c['name']} ({c['id']})")
+            elif action == "rm":
+                for ref in rest:
+                    spk = core.speakers.find(ref)
+                    core.speakers.delete(spk.id)
+                    print(f"deleted {spk.id}")
+            return 0
+        except BoloError as exc:
+            print(f"error: {exc.message}", file=sys.stderr)
+            return 1
+        finally:
+            await core.stop()
+
+    return asyncio.run(run())
+
+
 def cmd_speak(args: argparse.Namespace) -> int:
     from bolo.audio.encode import encode_audio
     from bolo.obs.trace import Trace
@@ -2338,6 +2404,16 @@ def build_parser() -> argparse.ArgumentParser:
         s.add_argument("--threshold", type=float, default=0.1, help="tags: leave out tags below this probability")
         s.add_argument("--json", action="store_true")
         s.set_defaults(func=cmd_classify)
+
+    s = sub.add_parser(
+        "speakers", help="enrolled speakers: list, enrol NAME FILE..., verify SPEAKER FILE, identify FILE, rm"
+    )
+    _common(s)
+    s.add_argument("action", choices=["list", "enrol", "verify", "identify", "rm"])
+    s.add_argument("args", nargs="*")
+    s.add_argument("--model", "-m", help="speaker embedder (default: voice_similarity_model)")
+    s.add_argument("--threshold", type=float, help="default: the embedder's measured threshold")
+    s.set_defaults(func=cmd_speakers)
 
     s = sub.add_parser("speak", help="synthesise speech to a file")
     _common(s)

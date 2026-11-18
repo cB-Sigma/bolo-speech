@@ -66,6 +66,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - **Word confidence.** Words in `verbose_json` carry `probability`: Whisper's word probability on faster-whisper,
   the mean token probability on whisper.cpp and on sherpa-onnx models whose decoder reports token log-probabilities,
   Deepgram's word confidence.
+- **Enrolled speakers: verification and identification (`/v1/audio/speakers`).** Enrol a person from one or
+  more recordings, then ask whether a recording is them (`/verify`) or which enrolled person it is, if anyone
+  (`/identify`), with any speaker embedder of the catalog (ERes2Net, CAM++, WeSpeaker, TitaNet, ECAPA-TDNN) or a
+  diarization model's. Each embedder has its own measured threshold (1 in 1000 false accepts on LibriSpeech
+  dev-clean; docs/measurements/speaker-verification.json), listed in docs/api.md with its false rejects and
+  identification accuracy. CLI: `bolo speakers list | enrol | verify | identify | rm`; console: a Speakers page.
+  Scopes: verifying, identifying, tagging, emotion and denoising need `stt`; enrolling needs `manage`.
 
 ## [0.6.8] - 2026-11-18
 

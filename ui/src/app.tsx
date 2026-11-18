@@ -3,6 +3,7 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/layout/app-shell'
 import { Skeleton } from './components/ui/skeleton'
 import { api } from './lib/api/client'
+import { isDemo } from './lib/api/config'
 import { live } from './lib/live'
 
 const SttPage = lazy(() => import('./routes/stt'))
@@ -23,6 +24,7 @@ const CloneBrowserPage = lazy(() => import('./routes/clone-browser'))
 const AnalysePage = lazy(() => import('./routes/analyse'))
 const DialoguePage = lazy(() => import('./routes/dialogue'))
 const ConvertPage = lazy(() => import('./routes/convert'))
+const SpeakersPage = lazy(() => import('./routes/speakers'))
 
 function PageFallback() {
   return (
@@ -72,7 +74,7 @@ export function App() {
             path="speakers"
             element={
               <Suspense fallback={<PageFallback />}>
-                <DiarizePage />
+                {isDemo ? <DiarizePage /> : <SpeakersPage />}
               </Suspense>
             }
           />

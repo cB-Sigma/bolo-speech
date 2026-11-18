@@ -112,6 +112,15 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `POST` | `/v1/audio/dialogue` | Speak a multi-speaker dialogue |
 | `POST` | `/v1/audio/voice-conversion` | Say the same words in another voice |
 | `POST` | `/v1/speech-to-speech/{voice_id}` | Voice conversion (ElevenLabs' route) |
+| `GET` | `/v1/audio/speakers` | List enrolled speakers |
+| `POST` | `/v1/audio/speakers` | Enrol a speaker |
+| `POST` | `/v1/audio/speakers/verify` | Is this recording the enrolled speaker? |
+| `POST` | `/v1/audio/speakers/identify` | Which enrolled speaker is this? |
+| `GET` | `/v1/audio/speakers/{speaker_id}` | One enrolled speaker |
+| `POST` | `/v1/audio/speakers/{speaker_id}` | Rename a speaker or add recordings |
+| `DELETE` | `/v1/audio/speakers/{speaker_id}` | Delete an enrolled speaker |
+| `GET` | `/v1/audio/speakers/{speaker_id}/clips/{clip_id}` | One enrolment recording (WAV) |
+| `DELETE` | `/v1/audio/speakers/{speaker_id}/clips/{clip_id}` | Remove an enrolment recording |
 | `GET` | `/api/v1/keys` | API keys and their usage (the keys themselves are never returned) |
 | `POST` | `/api/v1/keys` | Create an API key (its value is returned once) |
 | `GET` | `/api/v1/keys/{key_id}` | One API key and its usage |
@@ -942,6 +951,66 @@ request appears in the request traces as kind `embedding`.
 curl -s localhost:8000/v1/audio/speech/embedding -F file=@a.wav | jq '.data[0].embedding | length'
 ```
 
+### Enrolled speakers: verify and identify
+
+Extension. Enrol people once from recordings of them alone, then ask whether a recording is a given person
+(verification) or which of them it is, if any (identification). bolo keeps the recordings (16 kHz, 30 s at most
+each, up to 20 per person) under `<data_dir>/speakers/`, and a voiceprint per speaker embedder: the mean of the
+unit-length embeddings of their recordings, computed the first time that embedder is used. Any
+`speaker-embedding` model, or a diarization model (its embedder), can be used; nobody has to enrol again to switch.
+
+| Route | |
+| --- | --- |
+| `POST /v1/audio/speakers` | enrol: multipart `name` (required), one or more `file` (1 to 30 s of that person alone), optional `id` (default: from the name), `metadata` (a JSON object), `model` (compute that voiceprint now). `201` with the speaker |
+| `GET /v1/audio/speakers` | every speaker, the default embedder, its `threshold` and every measured `thresholds` |
+| `GET /v1/audio/speakers/{id}` | one speaker (by id, or by name when it is unique) |
+| `POST /v1/audio/speakers/{id}` | rename (`name`), replace `metadata`, add `file` recordings (multipart, or JSON for name and metadata) |
+| `DELETE /v1/audio/speakers/{id}` | delete the speaker and their recordings |
+| `GET`, `DELETE /v1/audio/speakers/{id}/clips/{clip_id}` | one enrolment recording as WAV; remove it |
+| `POST /v1/audio/speakers/verify` | multipart `file`, `speaker` (id or name), optional `model`, `threshold` |
+| `POST /v1/audio/speakers/identify` | multipart `file`, optional `speakers` (only these, comma-separated), `model`, `threshold`, `top_k` (5) |
+
+```jsonc
+// POST /v1/audio/speakers/verify   file=@call.wav speaker=asha-rao
+{"object": "speaker.verification", "speaker": {"id": "asha-rao", "name": "Asha Rao"}, "similarity": 0.7412,
+ "threshold": 0.52, "match": true, "embedding_model": "eres2net-voxceleb", "calibrated": true}
+// POST /v1/audio/speakers/identify  file=@call.wav
+{"object": "speaker.identification", "speaker": {"id": "asha-rao", "name": "Asha Rao"}, "similarity": 0.7412,
+ "threshold": 0.52, "candidates": [{"id": "asha-rao", "name": "Asha Rao", "similarity": 0.7412, "match": true},
+ {"id": "ben", "name": "Ben", "similarity": 0.1033, "match": false}], "embedding_model": "eres2net-voxceleb", "calibrated": true}
+```
+
+`match` is `similarity >= threshold`; identification answers the closest speaker when they reach the threshold,
+else `speaker: null` (someone not enrolled). The default embedder is `voice_similarity_model`, else the default
+diarization model's (`pyannote-3.0-eres2net`, the same file as `eres2net-voxceleb`).
+
+**Thresholds.** Each embedder has its own scale, so each has its own threshold, measured
+(docs/measurements/speaker-verification.json, `server/tools/calibrate_speakers.py`): LibriSpeech dev-clean (CC BY
+4.0), 16 speakers with five utterances of 4 to 15 s each, every speaker enrolled from every pair of their
+utterances (as the API averages them) and tested with their other three (480 same-speaker trials) and with every
+utterance of the 15 others (12,000 different-speaker trials). The threshold is the lowest score, rounded up to two
+decimals, that at most 1 in 1000 different-speaker trials reached.
+
+| embedder | threshold | false accepts | false rejects | EER | closed-set identification |
+| --- | --- | --- | --- | --- | --- |
+| `eres2net-voxceleb` | 0.52 | 0.06 % | 0.2 % | 0.2 % | 99.8 % |
+| `campplus-voxceleb` | 0.51 | 0.07 % | 0.0 % | 0.0 % | 100.0 % |
+| `campplus-zh-en` | 0.53 | 0.09 % | 0.0 % | 0.0 % | 100.0 % |
+| `wespeaker-campplus-voxceleb` | 0.55 | 0.07 % | 0.0 % | 0.0 % | 100.0 % |
+| `wespeaker-resnet34-voxceleb` | 0.86 | 0.03 % | 9.4 % | 1.8 % | 98.3 % |
+| `titanet-small` | 0.51 | 0.09 % | 0.0 % | 0.0 % | 100.0 % |
+| `ecapa-tdnn-voxceleb` | 0.46 | 0.07 % | 1.0 % | 0.4 % | 100.0 % |
+
+An embedder that is not measured (a custom model) uses 0.5 and says `"calibrated": false`. WeSpeaker ResNet34
+scores different people high (their median is 0.54), so its threshold is 0.86 and it rejects 9 % of genuine
+trials there; any of the others is a better choice. These are clean read English recordings: telephone audio, noise,
+recordings shorter than a few seconds, other languages, and imitated or synthesised voices all move the scores, so
+check the threshold on your own recordings (`threshold` per request). A voiceprint is not proof of identity and
+must not be the only check in front of anything that matters. Verify and identify are traces of kind
+`speaker-verify` and `speaker-identify`. From the command line: `bolo speakers list`, `bolo speakers enrol NAME
+FILE...`, `bolo speakers verify SPEAKER FILE` (exit status 1 when it is not them), `bolo speakers identify FILE`,
+`bolo speakers rm SPEAKER`.
+
 ## Native API (`/api/v1`)
 
 ### `GET /api/v1/info`
@@ -1409,10 +1478,10 @@ deleting them all opens it again, as before).
 | Scope | Routes |
 | --- | --- |
 | `read` | every `GET`: catalog, models, info, stats, traces, events, voices, word lists. Every key has it |
-| `stt` | transcriptions, translations, language identification, diarization, `WS /api/v1/stt/stream`, wake words |
+| `stt` | transcriptions, translations, language identification, diarization, `WS /api/v1/stt/stream`, wake words; listening to a recording: denoising, sound tags, emotion, speaker verification and identification |
 | `tts` | `/v1/audio/speech`, `WS /api/v1/tts/stream`, creating and changing saved voices |
 | `realtime` | `/v1/realtime` (WebSocket and WebRTC), client secrets, `/v1/chat/completions`, telephony routes |
-| `manage` | other changes: pull, load, unload, delete models; model settings; word lists; providers; benchmarks |
+| `manage` | other changes: pull, load, unload, delete models; model settings; word lists; providers; benchmarks; enrolling and deleting speakers |
 | `admin` | everything, and `/api/v1/keys` |
 
 Rate limit: a token bucket per key, `rate_limit` requests per minute with room

@@ -28,6 +28,9 @@ def test_scope_of_routes() -> None:
     assert scope_for("GET", "/api/v1/keys") == "admin"
     assert scope_for("POST", "/api/v1/voices") == "tts"
     assert scope_for("GET", "/api/v1/voices") == "read"
+    for path in ("/v1/audio/tags", "/v1/audio/emotion", "/v1/audio/denoise", "/v1/audio/speakers/identify"):
+        assert scope_for("POST", path) == "stt"
+    assert scope_for("POST", "/v1/audio/speakers") == "manage"  # enrolling
 
 
 def test_store_scopes_bucket_and_quota(tmp_path: Path) -> None:

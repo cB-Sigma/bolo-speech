@@ -3104,6 +3104,296 @@
     }
    }
   },
+  "/v1/audio/speakers": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "List enrolled speakers",
+    "operationId": "list_speakers_v1_audio_speakers_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Enrol a speaker",
+    "description": "Extension. Multipart form: ``name`` (required), one or more ``file`` fields (recordings of that person alone,\n1 to 30 s each; longer ones keep their first 30 s), optional ``id`` (lowercase letters, digits, ``-``, ``_``;\ndefault: from the name), ``metadata`` (a JSON object kept with the speaker) and ``model`` (a speaker embedder:\nits voiceprint is computed now, so that the first verification is fast; any embedder works later).",
+    "operationId": "enrol_speaker_v1_audio_speakers_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio/speakers/verify": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Is this recording the enrolled speaker?",
+    "description": "Extension. Multipart form: ``file``, ``speaker`` (an enrolled speaker's id or name), optional ``model`` (a\nspeaker embedder; default ``voice_similarity_model``, else the default diarization\nmodel's embedder) and ``threshold`` (default: the embedder's measured threshold). ``match`` is true when the\ncosine similarity of the recording and the speaker's voiceprint is at or above the threshold.",
+    "operationId": "verify_speaker_v1_audio_speakers_verify_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio/speakers/identify": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Which enrolled speaker is this?",
+    "description": "Extension. Multipart form: ``file``, optional ``speakers`` (ids or names, comma-separated or repeated: only\nthese are compared; default every enrolled speaker), ``model``, ``threshold`` and ``top_k`` (candidates listed,\ndefault 5). ``speaker`` is the closest enrolled speaker when their similarity reaches the threshold, else\nnull (someone not enrolled).",
+    "operationId": "identify_speaker_v1_audio_speakers_identify_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio/speakers/{speaker_id}": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "One enrolled speaker",
+    "operationId": "get_speaker_v1_audio_speakers__speaker_id__get",
+    "parameters": [
+     {
+      "name": "speaker_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Speaker Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Rename a speaker or add recordings",
+    "description": "Multipart form (or JSON): ``name``, ``metadata`` (replaces it), and more ``file`` recordings to add. Adding or\nremoving a recording recomputes the speaker's voiceprints the next time they are used.",
+    "operationId": "change_speaker_v1_audio_speakers__speaker_id__post",
+    "parameters": [
+     {
+      "name": "speaker_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Speaker Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Delete an enrolled speaker",
+    "operationId": "delete_speaker_v1_audio_speakers__speaker_id__delete",
+    "parameters": [
+     {
+      "name": "speaker_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Speaker Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio/speakers/{speaker_id}/clips/{clip_id}": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "One enrolment recording (WAV)",
+    "operationId": "speaker_clip_v1_audio_speakers__speaker_id__clips__clip_id__get",
+    "parameters": [
+     {
+      "name": "speaker_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Speaker Id"
+      }
+     },
+     {
+      "name": "clip_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Clip Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Remove an enrolment recording",
+    "operationId": "delete_speaker_clip_v1_audio_speakers__speaker_id__clips__clip_id__delete",
+    "parameters": [
+     {
+      "name": "speaker_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Speaker Id"
+      }
+     },
+     {
+      "name": "clip_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Clip Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/keys": {
    "get": {
     "tags": [

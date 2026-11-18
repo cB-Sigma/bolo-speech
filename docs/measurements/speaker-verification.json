@@ -1,0 +1,240 @@
+{
+ "what": "speaker verification and identification with enrolled speakers (bolo.speakers)",
+ "data": "LibriSpeech dev-clean (CC BY 4.0): 16 speakers, 80 utterances of 4 to 15 s",
+ "protocol": "each speaker enrolled from every pair of their 5 utterances (mean of the unit embeddings); genuine trials: their other 3 utterances; impostor trials: all utterances of the other speakers; identification: each held-out utterance against every speaker's voiceprint from the same pair split",
+ "hardware": "4 vCPU x86_64, no GPU",
+ "date": "2026-11-18",
+ "models": {
+  "eres2net-voxceleb": {
+   "dimensions": 192,
+   "genuine": {
+    "n": 480,
+    "min": 0.498,
+    "p5": 0.72,
+    "median": 0.838,
+    "p95": 0.921,
+    "max": 0.938
+   },
+   "impostor": {
+    "n": 12000,
+    "min": -0.292,
+    "p5": -0.037,
+    "median": 0.121,
+    "p95": 0.368,
+    "max": 0.575
+   },
+   "eer": 0.002,
+   "eer_threshold": 0.498,
+   "far_0.001": {
+    "threshold": 0.52,
+    "false_accepts": 0.00058,
+    "false_rejects": 0.00208
+   },
+   "far_0.01": {
+    "threshold": 0.45,
+    "false_accepts": 0.009,
+    "false_rejects": 0.0
+   },
+   "identification_top1": 0.9979,
+   "identification_trials": 480
+  },
+  "campplus-voxceleb": {
+   "dimensions": 512,
+   "genuine": {
+    "n": 480,
+    "min": 0.534,
+    "p5": 0.703,
+    "median": 0.853,
+    "p95": 0.932,
+    "max": 0.952
+   },
+   "impostor": {
+    "n": 12000,
+    "min": -0.198,
+    "p5": -0.037,
+    "median": 0.13,
+    "p95": 0.379,
+    "max": 0.537
+   },
+   "eer": 0.0,
+   "eer_threshold": 0.53,
+   "far_0.001": {
+    "threshold": 0.51,
+    "false_accepts": 0.00075,
+    "false_rejects": 0.0
+   },
+   "far_0.01": {
+    "threshold": 0.45,
+    "false_accepts": 0.00883,
+    "false_rejects": 0.0
+   },
+   "identification_top1": 1.0,
+   "identification_trials": 480
+  },
+  "campplus-zh-en": {
+   "dimensions": 192,
+   "genuine": {
+    "n": 480,
+    "min": 0.691,
+    "p5": 0.772,
+    "median": 0.855,
+    "p95": 0.929,
+    "max": 0.948
+   },
+   "impostor": {
+    "n": 12000,
+    "min": -0.212,
+    "p5": -0.055,
+    "median": 0.096,
+    "p95": 0.333,
+    "max": 0.577
+   },
+   "eer": 0.0,
+   "eer_threshold": 0.578,
+   "far_0.001": {
+    "threshold": 0.53,
+    "false_accepts": 0.00092,
+    "false_rejects": 0.0
+   },
+   "far_0.01": {
+    "threshold": 0.43,
+    "false_accepts": 0.00925,
+    "false_rejects": 0.0
+   },
+   "identification_top1": 1.0,
+   "identification_trials": 480
+  },
+  "wespeaker-campplus-voxceleb": {
+   "dimensions": 512,
+   "genuine": {
+    "n": 480,
+    "min": 0.561,
+    "p5": 0.727,
+    "median": 0.863,
+    "p95": 0.936,
+    "max": 0.961
+   },
+   "impostor": {
+    "n": 12000,
+    "min": -0.217,
+    "p5": -0.039,
+    "median": 0.151,
+    "p95": 0.419,
+    "max": 0.577
+   },
+   "eer": 0.0002,
+   "eer_threshold": 0.56,
+   "far_0.001": {
+    "threshold": 0.55,
+    "false_accepts": 0.00075,
+    "false_rejects": 0.0
+   },
+   "far_0.01": {
+    "threshold": 0.5,
+    "false_accepts": 0.00808,
+    "false_rejects": 0.0
+   },
+   "identification_top1": 1.0,
+   "identification_trials": 480
+  },
+  "wespeaker-resnet34-voxceleb": {
+   "dimensions": 256,
+   "genuine": {
+    "n": 480,
+    "min": 0.697,
+    "p5": 0.821,
+    "median": 0.917,
+    "p95": 0.96,
+    "max": 0.973
+   },
+   "impostor": {
+    "n": 12000,
+    "min": 0.283,
+    "p5": 0.397,
+    "median": 0.557,
+    "p95": 0.753,
+    "max": 0.861
+   },
+   "eer": 0.0181,
+   "eer_threshold": 0.787,
+   "far_0.001": {
+    "threshold": 0.86,
+    "false_accepts": 0.00025,
+    "false_rejects": 0.09375
+   },
+   "far_0.01": {
+    "threshold": 0.8,
+    "false_accepts": 0.00967,
+    "false_rejects": 0.02083
+   },
+   "identification_top1": 0.9833,
+   "identification_trials": 480
+  },
+  "titanet-small": {
+   "dimensions": 192,
+   "genuine": {
+    "n": 480,
+    "min": 0.573,
+    "p5": 0.77,
+    "median": 0.873,
+    "p95": 0.928,
+    "max": 0.967
+   },
+   "impostor": {
+    "n": 12000,
+    "min": -0.29,
+    "p5": -0.115,
+    "median": 0.063,
+    "p95": 0.289,
+    "max": 0.554
+   },
+   "eer": 0.0,
+   "eer_threshold": 0.555,
+   "far_0.001": {
+    "threshold": 0.51,
+    "false_accepts": 0.00092,
+    "false_rejects": 0.0
+   },
+   "far_0.01": {
+    "threshold": 0.39,
+    "false_accepts": 0.00942,
+    "false_rejects": 0.0
+   },
+   "identification_top1": 1.0,
+   "identification_trials": 480
+  },
+  "ecapa-tdnn-voxceleb": {
+   "dimensions": 192,
+   "genuine": {
+    "n": 480,
+    "min": 0.307,
+    "p5": 0.65,
+    "median": 0.807,
+    "p95": 0.906,
+    "max": 0.941
+   },
+   "impostor": {
+    "n": 12000,
+    "min": -0.175,
+    "p5": -0.035,
+    "median": 0.111,
+    "p95": 0.322,
+    "max": 0.503
+   },
+   "eer": 0.0042,
+   "eer_threshold": 0.425,
+   "far_0.001": {
+    "threshold": 0.46,
+    "false_accepts": 0.00075,
+    "false_rejects": 0.01042
+   },
+   "far_0.01": {
+    "threshold": 0.4,
+    "false_accepts": 0.00908,
+    "false_rejects": 0.00208
+   },
+   "identification_top1": 1.0,
+   "identification_trials": 480
+  }
+ }
+}

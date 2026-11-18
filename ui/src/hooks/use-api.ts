@@ -127,6 +127,7 @@ export function useNavFeatures(): NavFeatures {
     wordLists: useWordLists().offered,
     providers: providersOffered(info),
     telephony: telephonyOffered(info) && !isDemo,
+    speakers: Boolean(info?.capabilities?.speakers),
     keys: keysOffered(info) && !isDemo,
   }
 }

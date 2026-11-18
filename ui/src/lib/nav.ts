@@ -30,6 +30,8 @@ export interface NavFeatures {
   telephony?: boolean
   /** API keys with scopes, rate limits and quotas. */
   keys?: boolean
+  /** Enrolled speakers (`/v1/audio/speakers`). */
+  speakers?: boolean
 }
 
 export interface NavItem {
@@ -196,6 +198,15 @@ export const NAV: NavItem[] = [
     description: 'Sound events, emotion and noise removal for one recording',
     icon: ScanSearch,
     group: 'Playground',
+  },
+  {
+    to: '/speakers',
+    label: 'Speakers',
+    short: 'Speakers',
+    description: 'Enrol people, then verify or identify who is speaking',
+    icon: Users,
+    group: 'Playground',
+    when: (f) => !isDemo && Boolean(f.speakers),
   },
 ]
 
