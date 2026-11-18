@@ -354,6 +354,25 @@ Local models only, unless you ask for cloud ones (`--cloud`,
 `local_only=false`). It lists what would have to be pulled and how large
 the download is. Nothing is pulled until you say so.
 
+## Checking a model before downloading it
+
+`bolo check <model> [--tiny] [--json]`, `POST /api/v1/models/{id}/check` (`{"tiny": true}`) and the "Check" button on
+the console's Models page answer "would this run?" without downloading a model's weights. Exit code 1 (`"ok": false`)
+when any step failed. The steps (`{"name", "status": "ok" | "fail" | "warn" | "skip", "detail"}`):
+
+| Step | What is checked |
+| --- | --- |
+| `catalog` | the entry can be pulled and has a runtime |
+| `runtime` (`imports`, `code`, `components`) | its engine is available and its components installed; for a full-duplex server, its environment imports its own code (`--install` installs a missing one: several GB), and whether torch.compile would be on; for a bolo-torch model, the plugin's environment imports the loader and the libraries of its extra, and its inference-code bundle matches its pins |
+| `weights` | every file, asked for (HEAD) at its pinned revision or URL: there, or gated (for a gated entry), and as large as the listing or catalog says |
+| `placement` | what the advisor makes of it here: fits on the GPU, split across the GPU and the CPU, on the CPU, or refused (a full-duplex model that does not fit the GPU) |
+| `tiny-build`, `tiny-split`, `tiny-load`, `tiny-request` (`--tiny`) | a transformers-based bolo-torch model (Orpheus voices, Qwen-Omni, Step-Audio 2, GLM-4-Voice, MiniCPM-o) built from its `config.json` with two attention heads of the same head size and two layers, random weights; saved; split planning as when bolo's scheduler asks for a GPU/CPU split (bolo-torch's `split_kwargs`); loaded in bfloat16; one forward pass. Remote code is used only with the model's opt-in or `--allow-remote-code`, and only after the same pin check a load does |
+
+What `--tiny` cannot check is reported as `skip`, never as `ok`: the full-duplex servers' models (they run in their
+servers' own code), models that are not transformers models, 4-bit and 8-bit loading (bitsandbytes needs CUDA), and a
+forward pass that needs more than text tokens. Only configuration, code and small companion files (up to 5 MB) are
+fetched. A CI job runs `bolo check --all --tiny` over every entry it can build (not required yet).
+
 ## Warnings, and how to turn them off
 
 When a model whose fit is `slow` or `unlikely` is pulled or loaded, bolo

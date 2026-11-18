@@ -1468,6 +1468,64 @@
     }
    }
   },
+  "/api/v1/models/{model_id}/check": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Would this model run? Checked without its weights",
+    "description": "``bolo check``: the model's runtime (engine, component or plugin environment and its imports), every weight\nfile at its pinned revision (HEAD: there or gated, the right size) and the advisor's placement on this machine;\nwith ``tiny``, its architecture built small and loaded through bolo's load path. Nothing is downloaded but\nconfiguration. ``{\"model\", \"ok\", \"tiny\", \"steps\": [{\"name\", \"status\": \"ok\"|\"fail\"|\"skip\"|\"warn\", \"detail\"}]}``.",
+    "operationId": "check_model_api_v1_models__model_id__check_post",
+    "parameters": [
+     {
+      "name": "model_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Model Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "anyOf": [
+         {
+          "$ref": "#/components/schemas/CheckRequest"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "title": "Body"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/ps": {
    "get": {
     "tags": [
@@ -4421,6 +4479,24 @@
      "blend"
     ],
     "title": "BlendCreate"
+   },
+   "CheckRequest": {
+    "properties": {
+     "tiny": {
+      "type": "boolean",
+      "title": "Tiny",
+      "description": "also build it tiny (its config.json, random weights) and load and run it the way bolo does",
+      "default": false
+     },
+     "allow_remote_code": {
+      "type": "boolean",
+      "title": "Allow Remote Code",
+      "description": "build a remote-code model tiny even without the model's opt-in (its code is checked against the catalog's pins first)",
+      "default": false
+     }
+    },
+    "type": "object",
+    "title": "CheckRequest"
    },
    "ConsentPatch": {
     "properties": {

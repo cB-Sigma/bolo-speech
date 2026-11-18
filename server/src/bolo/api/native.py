@@ -588,6 +588,38 @@ async def unload(request: Request, model_id: str) -> JSONResponse:
     return JSONResponse({"id": spec.id, "loaded": False, "unloaded": was_loaded})
 
 
+class CheckRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    tiny: bool = Field(
+        default=False,
+        description="also build it tiny (its config.json, random weights) and load and run it the way bolo does",
+    )
+    allow_remote_code: bool = Field(
+        default=False,
+        description="build a remote-code model tiny even without the model's opt-in (its code is checked against the "
+        "catalog's pins first)",
+    )
+
+
+@router.post(
+    "/models/{model_id:path}/check", tags=["native"], summary="Would this model run? Checked without its weights"
+)
+async def check_model(request: Request, model_id: str, body: CheckRequest | None = None) -> JSONResponse:
+    """``bolo check``: the model's runtime (engine, component or plugin environment and its imports), every weight
+    file at its pinned revision (HEAD: there or gated, the right size) and the advisor's placement on this machine;
+    with ``tiny``, its architecture built small and loaded through bolo's load path. Nothing is downloaded but
+    configuration. ``{"model", "ok", "tiny", "steps": [{"name", "status": "ok"|"fail"|"skip"|"warn", "detail"}]}``."""
+    from bolo import check
+
+    core = get_core(request)
+    spec = core.manager.resolve(model_id)
+    opts = body or CheckRequest()
+    report = await asyncio.to_thread(
+        check.run_check, core, spec, tiny=opts.tiny, allow_remote_code=opts.allow_remote_code
+    )
+    return JSONResponse(report)
+
+
 @router.get("/ps", tags=["native"], summary="Loaded models: size, GPU/CPU split, keep-alive (Ollama style)")
 async def ps(request: Request) -> JSONResponse:
     """Like Ollama's ``/api/ps``: per model ``size``, ``size_vram`` (bytes), ``processor`` ("100% GPU", "100% CPU",

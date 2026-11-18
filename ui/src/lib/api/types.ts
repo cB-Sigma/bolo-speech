@@ -1489,3 +1489,12 @@ export interface ApiKeyCreate {
 }
 
 export type ApiKeyUpdate = Partial<Omit<ApiKeyCreate, 'expires_in_days'>> & { reset_usage?: boolean }
+
+/** `POST /api/v1/models/{id}/check` (`bolo check`). */
+export interface ModelCheck {
+  model: string
+  /** False when any step failed. */
+  ok: boolean
+  tiny: boolean
+  steps: { name: string; status: 'ok' | 'fail' | 'skip' | 'warn' | string; detail: string }[]
+}

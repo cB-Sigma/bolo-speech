@@ -82,6 +82,7 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `POST` | `/api/v1/providers/{name}/test` | Check that a provider answers and accepts the key |
 | `POST` | `/api/v1/models/{model_id}/load` | Load a model into memory |
 | `POST` | `/api/v1/models/{model_id}/unload` | Unload a model from memory |
+| `POST` | `/api/v1/models/{model_id}/check` | Would this model run? Checked without its weights |
 | `GET` | `/api/v1/ps` | Loaded models: size, GPU/CPU split, keep-alive (Ollama style) |
 | `POST` | `/api/v1/models/copy` | Copy a model's settings to a new name (a preset) |
 | `GET` | `/api/v1/models/{model_id}/show` | Everything about one model (bolo show) |

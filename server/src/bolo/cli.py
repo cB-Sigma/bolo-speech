@@ -1525,6 +1525,38 @@ def torch_envs_requirement(torch_version: str | None) -> str | None:
     return torch_envs.triton_windows_requirement(torch_version)
 
 
+def cmd_check(args: argparse.Namespace) -> int:
+    """``bolo check <model> [--tiny] [--json]``: whether a model would run, without downloading its weights
+    (bolo.check). ``--all`` checks every entry ``--tiny`` can build. Exit 1 when any check failed."""
+    from bolo import check
+
+    core = _core(args)
+    if args.all:
+        specs = [s for s in core.catalog.all() if check.supports_tiny(s) and s.status != "pending"]
+    elif args.model:
+        found = core.catalog.resolve(args.model)
+        if found is None:
+            print(f"error: no model '{args.model}' in the catalog", file=sys.stderr)
+            return 1
+        specs = [found]
+    else:
+        print("error: name a model (or --all)", file=sys.stderr)
+        return 1
+    reports = []
+    for spec in specs:
+        report = check.run_check(
+            core, spec, tiny=args.tiny, install=args.install, allow_remote_code=args.allow_remote_code
+        )
+        reports.append(report)
+        if not args.json:
+            print(f"{spec.id}: {'ok' if report['ok'] else 'FAILED'}")
+            for s in report["steps"]:
+                print(f"  [{s['status']:<4}] {s['name']}: {s['detail']}")
+    if args.json:
+        print(json.dumps(reports if args.all else reports[0], indent=1))
+    return 0 if all(r["ok"] for r in reports) else 1
+
+
 def cmd_components(args: argparse.Namespace) -> int:
     from bolo.components import TORCH_COMPONENTS, TORCH_PREFIX, TRITON
 
@@ -2916,6 +2948,22 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--api-key", dest="api_key", default=os.environ.get("BOLO_API_KEY"))
     s.add_argument("--dry-run", dest="dry_run", action="store_true", help="torch-*: print what would be done")
     s.set_defaults(func=cmd_components)
+
+    s = sub.add_parser(
+        "check",
+        help="whether a model would run here (and on bigger hardware), without downloading its weights",
+    )
+    _common(s)
+    s.add_argument("model", nargs="?")
+    s.add_argument("--tiny", action="store_true", help="also build it tiny (random weights) and load and run it")
+    s.add_argument("--all", action="store_true", help="every catalog entry --tiny can build")
+    s.add_argument("--install", action="store_true", help="install a missing full-duplex server (several GB)")
+    s.add_argument(
+        "--allow-remote-code", dest="allow_remote_code", action="store_true",
+        help="build remote-code models tiny (their code is checked against the catalog's pins first)",
+    )  # fmt: skip
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(func=cmd_check)
 
     s = sub.add_parser(
         "torch",

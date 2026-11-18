@@ -290,11 +290,14 @@ bolo recommend                              # this machine, and a default pick p
 bolo recommend --task stt --language hi     # every Hindi recogniser, best fit first
 bolo recommend --use live --language en     # a whole setup: speech-to-text + text-to-speech
 bolo recommend --benchmark                  # measure this machine first (about three seconds)
+bolo check step-audio-2-mini --tiny         # would it run? checked without downloading its weights
 ```
 
 bolo detects the CPU and its instruction sets, memory, GPUs, the runtimes that can use them and container limits, and rates every model `comfortable`, `usable`, `slow` or `unlikely to fit`, with the expected real-time factor and the reason. The same is on the console's Models page ("This machine", a fit line per model, "Pick for me") and in `bolo list`.
 
-**It recommends; it never restricts.** No model is hidden, refused or blocked because of hardware; pulling or loading one that is unlikely to fit only adds a notice.
+**It recommends; it never restricts.** No model is hidden, refused or blocked because of hardware; pulling or loading one that is unlikely to fit only adds a notice. The one exception: a full-duplex model (Moshi, Hibiki, PersonaPlex, ...) that needs more GPU memory than the GPU has is not started, since it cannot be split across the GPU and the CPU.
+
+**Check before you download.** `bolo check <model>` (the console's "Check" button, `POST /api/v1/models/{id}/check`) finds out whether a model would run without downloading its weights: its runtime (engine, component or plugin environment, and its imports), every weight file at its pinned revision (there or gated, the right size) and where the advisor would put it on this machine. `--tiny` also builds a transformers-based bolo-torch model from its configuration with tiny dimensions and random weights and loads and runs it the way bolo would (GPU/CPU split planning, bfloat16), so a model meant for a bigger machine is checked on a small one. What cannot be built small is reported as skipped, never as passed. [docs/recommendations.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/recommendations.md#checking-a-model-before-downloading-it).
 
 The estimates are rough and say so: the catalog's real-time factors were measured on one reference machine and are scaled to yours by a three-second benchmark, or by a rule of thumb when it has not run; about two thirds of the catalog was never run by the maintainers and is estimated from a similar model or marked as a guess; **nothing was measured on a GPU**. [docs/recommendations.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/recommendations.md).
 

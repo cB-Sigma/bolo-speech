@@ -7,6 +7,7 @@ bolo-torch code list                   # inference code from GitHub repositories
 bolo-torch code install step-audio-2   # download one bundle now (a load also installs it when missing)
 bolo-torch pin-remote-code DIR --revision COMMIT   # the remote_code pin of a downloaded model folder
 bolo-torch install pyannote            # an extra, keeping the torch build already installed (CUDA stays CUDA)
+bolo-torch check '{"kind": ...}'      # what `bolo check <model>` asks this environment (JSON in, JSON out)
 """
 
 from __future__ import annotations
@@ -226,7 +227,14 @@ def main(argv: list[str] | None = None) -> int:
     inst.add_argument("extras", nargs="+", help="extras of bolo-torch, e.g. pyannote")
     inst.add_argument("--package", default="bolo-torch", help="what to install them for (a path for a checkout)")
     inst.add_argument("--dry-run", action="store_true", help="print the pip command only")
+    chk = sub.add_parser("check", help="what `bolo check <model>` asks this environment (JSON in, JSON out)")
+    chk.add_argument("request", help='JSON: {"kind", "extra", "tiny", "config_dir", "options", ...}')
     args = parser.parse_args(argv)
+    if args.command == "check":
+        from bolo_torch import check
+
+        print(json.dumps(check.run(json.loads(args.request))))
+        return 0
     if args.command == "install":
         return install_command(args.extras, args.package, args.dry_run)
     if args.command in (None, "serve"):

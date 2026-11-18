@@ -23,6 +23,16 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   the parity results) and checked against their PyTorch originals in both directions; they run in core bolo without
   PyTorch. Perth was found after MP3, Opus and 16 or 8 kHz resampling on every clip tried. WavMark is slow on a CPU.
 
+- **`bolo check <model>`: would a model run here, or on a bigger machine, found out without its weights.** Its
+  runtime (engine, components, a full-duplex server's environment and imports, a bolo-torch environment's loader,
+  libraries and pinned code bundle), every weight file asked for (HEAD) at its pinned revision (there or gated, the
+  size the catalog says) and the advisor's placement here (GPU, split, CPU, refused); exit code 1 and `"ok": false` on
+  any failure, `--json`. `--tiny` builds a transformers-based bolo-torch model from its `config.json` with tiny
+  dimensions and random weights and takes it through bolo-torch's split planning, a bfloat16 load and one forward
+  pass (the three Qwen-Omni entries pass on CPU torch, Qwen3-Omni 30B included); what cannot be built small is skipped,
+  never passed. Also `POST /api/v1/models/{id}/check`, a "Check" button on the console's Models page, and a CI job
+  (not required yet) running `bolo check --all --tiny`.
+
 ### Fixed
 
 - **`bolo components install minicpm-o` failed its own check on Windows (2 of 2).** minicpmo-utils 1.0.6 pins

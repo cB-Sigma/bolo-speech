@@ -26,6 +26,7 @@ import type {
   CallSummary,
   Catalog,
   Component,
+  ModelCheck,
   EnrolledSpeaker,
   FitWarning,
   HardwareInfo,
@@ -183,6 +184,9 @@ export const api = {
     signal?: AbortSignal,
   ) => json<SetupPlan>('api/v1/recommendations/setup', { query: q, signal }),
   unload: (id: string) => json<unknown>(`api/v1/models/${encodeURIComponent(id)}/unload`, { method: 'POST' }),
+  /** `bolo check`: would the model run here? Checked without downloading its weights. */
+  checkModel: (id: string, body: { tiny?: boolean; allow_remote_code?: boolean } = {}) =>
+    json<ModelCheck>(`api/v1/models/${encodeURIComponent(id)}/check`, { method: 'POST', json: body }),
   remove: (id: string) => json<void>(`api/v1/models/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   stats: (signal?: AbortSignal) => json<Stats>('api/v1/stats', { signal }),
   requests: (q: { limit?: number; kind?: string; model?: string } = {}, signal?: AbortSignal) =>

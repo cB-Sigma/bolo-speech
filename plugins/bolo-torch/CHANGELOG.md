@@ -4,6 +4,17 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Added
+
+- **`bolo-torch check`**, what `bolo check <model>` asks the plugin's environment: the loader and the extra's
+  libraries import, the code bundle matches its pins, and with `tiny` the model's architecture built small from its
+  configuration, split-planned, loaded in bfloat16 and run once.
+
+### Fixed
+
+- **Extras that bring librosa ask for 0.10.2 or later** (`f5`, `step-audio-2`, `glm-4-voice`, `kimi-audio`,
+  `minicpm-o`, `maskgct`): older librosa imports `pkg_resources`, which setuptools 81 no longer has.
+
 ## [0.1.7] - 2026-11-18
 
 ### Security
@@ -20,8 +31,6 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ### Fixed
 
-- **Extras that bring librosa ask for 0.10.2 or later** (`f5`, `step-audio-2`, `glm-4-voice`, `kimi-audio`,
-  `minicpm-o`, `maskgct`): older librosa imports `pkg_resources`, which setuptools 81 no longer has.
 - **A CPU-only torch next to an NVIDIA GPU (PyPI's torch on Windows).** With `device = "cuda"` the
   model was refused ("this torch build sees no CUDA device"), so a Demucs denoiser was skipped and live and file
   denoising returned the audio untouched (`x-bolo-denoise: skipped`); with the model's option `device = "auto"` it

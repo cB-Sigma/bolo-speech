@@ -16,6 +16,7 @@ import {
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Page } from '@/components/layout/app-shell'
+import { ModelCheckButton } from '@/components/model-check'
 import {
   AvailabilityMark,
   CloudMark,
@@ -337,16 +338,19 @@ function ModelActions({
   }
   if (!m.installed) {
     return (
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => actions.pull.mutate(m.id)}
-        disabled={actions.pull.isPending && actions.pull.variables === m.id}
-        data-testid={`pull-${m.id}`}
-      >
-        <Download /> {m.runtime === 'browser' ? 'Download' : 'Pull'}
-        <span className="num text-muted-foreground">{fmtBytes(m.size_bytes)}</span>
-      </Button>
+      <div className="flex items-center gap-1">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => actions.pull.mutate(m.id)}
+          disabled={actions.pull.isPending && actions.pull.variables === m.id}
+          data-testid={`pull-${m.id}`}
+        >
+          <Download /> {m.runtime === 'browser' ? 'Download' : 'Pull'}
+          <span className="num text-muted-foreground">{fmtBytes(m.size_bytes)}</span>
+        </Button>
+        {m.runtime !== 'browser' && <ModelCheckButton id={m.id} />}
+      </div>
     )
   }
   return (
@@ -367,6 +371,7 @@ function ModelActions({
           <Power /> {loading ? 'Loading…' : 'Load'}
         </Button>
       )}
+      <ModelCheckButton id={m.id} />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button size="icon-sm" variant="ghost" aria-label={`More actions for ${m.id}`}>
