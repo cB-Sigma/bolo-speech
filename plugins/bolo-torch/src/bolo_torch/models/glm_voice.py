@@ -35,7 +35,7 @@ from bolo.engines.base import ConversationChunk, ConversationRequest, Conversati
 from bolo_torch import remote_code, upstream
 from bolo_torch.models import peak_safe, to_voices
 from bolo_torch.models.s2s_util import GrowingText, TokenQueue, generate_in_thread, no_grad, stopping_criteria, to_numpy
-from bolo_torch.runtime import InvalidRequest, LoadContext, model_dir, require, split_kwargs
+from bolo_torch.runtime import InvalidRequest, LoadContext, model_dir, quantized_device_map, require, split_kwargs
 
 log = logging.getLogger("bolo_torch.glm_voice")
 
@@ -250,7 +250,11 @@ def load(ctx: LoadContext) -> GlmVoiceS2S:
             bnb_4bit_compute_dtype=torch.bfloat16, llm_int8_enable_fp32_cpu_offload=bool(offload),
         )  # fmt: skip
         if offload:
-            kwargs.update(offload)
+            # an explicit map, worked out here: with device_map="auto" transformers converts the layers bound for
+            # the CPU to 4-bit too, and they cannot be loaded there (meta tensors)
+            kwargs["device_map"] = quantized_device_map(
+                ctx, offload, transformers.AutoModel, path, bits=4, trust_remote_code=trust
+            )
         else:
             kwargs["device_map"] = {"": 0 if ctx.device == "cuda" else ctx.device}
     elif quantization:

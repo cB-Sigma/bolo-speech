@@ -149,6 +149,36 @@ def test_load_wires_the_pieces(tmp_path, monkeypatch) -> None:  # type: ignore[n
             glm_voice.load(
                 LoadContext("glm-4-voice", "speech-to-speech", root, {**ctx.options, "quantization": "int3"})
             )
+        # int4 that bolo asked to split (a 6 GB GPU): an explicit device map, never "auto" (transformers would turn
+        # the CPU's layers into 4-bit ones it cannot load there: "Cannot copy out of meta tensor")
+        planned: list[dict] = []
+
+        def plan(c, split, cls, path, *, bits, trust_remote_code):  # type: ignore[no-untyped-def]
+            planned.append({"split": split, "bits": bits, "trust": trust_remote_code})
+            return {"transformer.embedding": 0, "transformer.encoder": 0, "transformer.output_layer": "cpu"}
+
+        monkeypatch.setattr(glm_voice, "split_kwargs", lambda c, *a, **k: {"device_map": "auto", "max_memory": {0: 6}})
+        monkeypatch.setattr(glm_voice, "quantized_device_map", plan)
+        loaded.clear()
+        glm_voice.load(
+            LoadContext(
+                "glm-4-voice",
+                "speech-to-speech",
+                root,
+                {**ctx.options, "quantization": "int4"},
+                device="cuda",
+                model_id="glm",
+                max_memory={"0": 6, "cpu": 64},
+            )
+        )
+        kw = dict(loaded)["model"]
+        assert kw["device_map"] == {
+            "transformer.embedding": 0,
+            "transformer.encoder": 0,
+            "transformer.output_layer": "cpu",
+        }
+        assert "max_memory" not in kw and kw["quantization_config"][1]["llm_int8_enable_fp32_cpu_offload"] is True
+        assert planned == [{"split": {"device_map": "auto", "max_memory": {0: 6}}, "bits": 4, "trust": True}]
     finally:
         if str(code) in sys.path:
             sys.path.remove(str(code))

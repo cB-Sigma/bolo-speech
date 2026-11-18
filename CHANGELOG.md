@@ -35,6 +35,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- **bolo-torch: GLM-4-Voice int4 split across the GPU and the CPU failed with meta tensors.** bolo-torch passed
+  `device_map="auto"`, and transformers converts the layers to 4-bit before it resolves that, so the layers bound
+  for the CPU became 4-bit there and accelerate's offload could not load them ("Cannot copy out of meta tensor"). The
+  plugin now works out an explicit device map first (transformers' documented way to keep the CPU's share
+  unquantized), sized for 4-bit layers with the embeddings and output layer in 16-bit, and the decoder blocks whole:
+  for GLM-4-Voice 9B on a 6 GB GPU, 29 of its 40 blocks on the GPU. Reproduced and checked on CPU with GLM-4-Voice's
+  own code (transformers 4.44.1); the 4-bit load itself needs CUDA and was not run here.
 - **`bolo doctor` on macOS warned that `llama-server --list-devices` did not answer.** Metal loads its library the
   first time a process uses it, and the first `--list-devices` took 11 s and more; the probe gave up at 20 s. On
   macOS it now waits up to 60 s; elsewhere 20 s, as before.

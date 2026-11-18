@@ -174,6 +174,10 @@ def check_tiny(request: dict[str, Any]) -> list[dict[str, str]]:
                 model = cls.from_config(config, trust_remote_code=trust)
             else:
                 model = cls._from_config(config)
+            with torch.no_grad():  # random weights of a sane size: remote code built with skip_init has none
+                for p in model.parameters():
+                    if p.is_floating_point():
+                        p.normal_(0.0, 0.02)
             params = sum(int(p.numel()) for p in model.parameters())
             model.save_pretrained(str(work), safe_serialization=True)
             for other in source.iterdir():  # remote code and small companion files the saved copy needs too

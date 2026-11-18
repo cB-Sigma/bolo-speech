@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import threading
@@ -324,6 +325,70 @@ def _empty_model(model_cls: Any, path: Path, trust_remote_code: bool, build: dic
         if hasattr(model_cls, "_model_mapping"):  # AutoModel, AutoModelForCausalLM, ...
             return model_cls.from_config(config, trust_remote_code=trust_remote_code, **build)
         return model_cls._from_config(config, **build)
+
+
+#: the output layer's names: bitsandbytes leaves it unquantized
+OUTPUT_LAYERS = ("lm_head", "output_layer", "embed_out")
+
+
+def unquantized(model: Any, dtype: Any) -> dict[str, Any]:
+    """The parameters a bitsandbytes load keeps in ``dtype``: all but those of the linear layers (embeddings,
+    norms), and the output layer's."""
+    from torch import nn
+
+    out = getattr(model, "get_output_embeddings", lambda: None)()
+    special: dict[str, Any] = {}
+    for name, module in model.named_modules():
+        last = name.rsplit(".", 1)[-1]
+        if isinstance(module, nn.Linear) and module is not out and last not in OUTPUT_LAYERS:
+            continue
+        for pname, _ in module.named_parameters(recurse=False):
+            special[f"{name}.{pname}" if name else pname] = dtype
+    return special
+
+
+def quantized_device_map(
+    ctx: LoadContext, split: dict[str, Any], model_cls: Any, path: Path | str, *, bits: int = 4,
+    trust_remote_code: bool = False, **build: Any,
+) -> dict[str, Any]:  # fmt: skip
+    """An explicit GPU/CPU device map for a bitsandbytes 4-bit (or 8-bit) load that bolo asked to split
+    (``split``: :func:`split_kwargs`' ``{"device_map": "auto", "max_memory"}``).
+
+    transformers converts a model's layers to 4-bit before it works out ``device_map="auto"``, so it cannot leave the
+    layers bound for the CPU unconverted: they become 4-bit layers on the CPU, whose weights accelerate's offload keeps
+    on the meta device and cannot load ("Cannot copy out of meta tensor", GLM-4-Voice int4 on a 6 GB GPU). With an
+    explicit map the CPU's share stays in its own dtype (``llm_int8_enable_fp32_cpu_offload``), as transformers'
+    documentation asks. The map is sized for the quantized weights (each GPU budget less transformers' 10 % margin)
+    and keeps the model's layers whole."""
+    import accelerate
+    import torch
+
+    model = _empty_model(model_cls, Path(path), trust_remote_code, build)
+    no_split = list(getattr(model, "_no_split_modules", None) or []) or repeated_blocks(model)
+    dtype: Any = torch.int8
+    if bits == 4:
+        with contextlib.suppress(ImportError, AttributeError):
+            from accelerate.utils import CustomDtype
+
+            dtype = CustomDtype.INT4
+    limits = {k: int(v * 0.9) for k, v in dict(split["max_memory"]).items()}
+    device_map = dict(
+        accelerate.infer_auto_device_map(
+            model, max_memory=limits, no_split_module_classes=no_split, dtype=dtype,
+            special_dtypes=unquantized(model, ctx.dtype or torch.bfloat16),
+        )
+    )  # fmt: skip
+    if "disk" in device_map.values():
+        raise PluginError(
+            f"{ctx.model_id or type(model).__name__} does not fit in the GPU and CPU memory bolo allows, even in "
+            f"{bits}-bit",
+            code="out_of_memory",
+        )
+    log.info(
+        "%s: %d-bit with a GPU/CPU split over %s (an explicit map: the CPU's share stays unquantized)",
+        ctx.model_id, bits, ", ".join(sorted({str(v) for v in device_map.values()})),
+    )  # fmt: skip
+    return device_map
 
 
 def _gb(n: float) -> str:

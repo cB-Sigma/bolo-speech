@@ -149,3 +149,28 @@ def test_a_model_that_cannot_be_split_says_what_it_needs_before_loading(tmp_path
     # a class that names its layers is left to transformers' own device_map="auto"
     declared = SimpleNamespace(_no_split_modules=["Block"])
     assert runtime.split_kwargs(load, declared, tmp_path)["device_map"] == "auto"
+
+
+def test_a_4bit_split_gets_an_explicit_map_sized_for_4_bit(tmp_path: Path) -> None:
+    """GLM-4-Voice int4 on a 6 GB GPU failed with meta tensors: transformers converts layers to 4-bit before it works
+    out device_map="auto", so the layers bound for the CPU became 4-bit there. The plan is made first: an explicit map,
+    the layers whole, more of them on the GPU than in 16-bit (each takes a quarter of the memory)."""
+    fake = _fake_models()
+    torch, transformers = fake.torch, fake.transformers
+    fake.Model(fake.Config(layers=8)).save_pretrained(tmp_path)
+    block = 2 * (64 * 64 + 64) * 4  # bytes of one layer in float32
+    load = ctx("cuda", {"0": block, "cpu": 1 << 30})  # one float32 layer's worth: a split in 16-bit and in 4-bit
+    load.dtype, load.model_id = torch.bfloat16, "fake-glm"
+    split = runtime.split_kwargs(load)
+    assert split["device_map"] == "auto"  # what the loader had: transformers resolves it too late for 4-bit
+    four = runtime.quantized_device_map(load, split, transformers.AutoModel, tmp_path, bits=4)
+    assert isinstance(four, dict) and {0, "cpu"} <= set(four.values())
+    assert not any(name.startswith("layers.") and name.count(".") > 1 for name in four)  # layers kept whole
+    sixteen = runtime.planned_split(load, split, transformers.AutoModel, tmp_path)["device_map"]
+    on_gpu = lambda m: sum(1 for name, where in m.items() if name.startswith("layers.") and where == 0)  # noqa: E731
+    assert on_gpu(four) > on_gpu(sixteen)
+    tiny = ctx("cuda", {"0": 1, "cpu": 1})
+    tiny.model_id = "fake-glm"
+    with pytest.raises(runtime.PluginError, match="does not fit") as info:
+        runtime.quantized_device_map(tiny, runtime.split_kwargs(tiny), transformers.AutoModel, tmp_path, bits=4)
+    assert info.value.code == "out_of_memory"
