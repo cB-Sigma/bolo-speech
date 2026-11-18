@@ -464,8 +464,12 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   names them). Not run here (wiring tested with fakes; the front end and the pipeline with tiny random networks ran);
   licence labelled CC-BY-NC-4.0, `commercial_use: false`. With this, every catalog entry can be pulled and run, and a
   test keeps it so.
+
 ### Fixed
 
+- `/api/v1/stt/stream`: a client that disconnected while the server was sending it a message was recorded as an
+  error (with a logged traceback) instead of as cancelled, depending on which the server noticed first. It is now
+  cancelled either way.
 - Telephony: a call whose caller hung up while the agent was still preparing an answer was never closed (its record
   stayed "in progress" with no outcome, and its Realtime session stayed open): the turn waiting on the response
   swallowed the cancellation, and the session then waited for another turn. Closing a Realtime session now ends its
