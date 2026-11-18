@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import functools
 import inspect
+import logging
 import re
 import threading
 from pathlib import Path
@@ -47,6 +48,30 @@ def initial_prompt(prompt: str | None, hotwords: str | None) -> str:
 
 
 #: whisper.cpp's system information names a GPU back end it was built with ("MTL : EMBED_LIBRARY = 1", "CUDA : ...")
+log = logging.getLogger(__name__)
+
+#: the newest pywhispercpp whose whisper.cpp aborts the whole process (``WHISPER_ASSERT: filter_width < a->ne[2]``)
+#: when DTW word timing meets a decoded segment shorter than its median filter, which a short phrase or the tail of
+#: a file can be; whisper.cpp narrows the filter instead since ggml-org/whisper.cpp#4096 (2026-10-19), which no
+#: pywhispercpp release on PyPI carries yet
+DTW_ABORTS_UP_TO = (1, 5, 1)
+
+
+def dtw_is_safe(binding_version: str | None) -> bool:
+    """Whether whisper.cpp's DTW token timestamps can be switched on with this pywhispercpp version."""
+    numbers = tuple(int(x) for x in re.findall(r"\d+", binding_version or "")[:3])
+    return bool(numbers) and numbers > DTW_ABORTS_UP_TO
+
+
+def _binding_version() -> str | None:
+    try:
+        from importlib.metadata import version
+
+        return version("pywhispercpp")
+    except Exception:
+        return None
+
+
 _BACKENDS = {"metal": ("MTL", "METAL"), "cuda": ("CUDA",), "rocm": ("HIP", "ROCM"), "vulkan": ("VULKAN",)}
 
 
@@ -109,7 +134,8 @@ class WhisperCppSTT(STTModel):
 
     def _load(self, cpp_model: Any, file: Path, opts: LoadOptions, spec: dict[str, Any]) -> Any:
         """The model, with whisper.cpp's DTW token timestamps (word times) switched on unless the catalog entry
-        turns them off (``dtw: false``). DTW needs the model's alignment heads (a preset for the standard sizes,
+        turns them off (``dtw: false``) or the installed pywhispercpp's whisper.cpp would abort on a short segment
+        (:data:`DTW_ABORTS_UP_TO`). DTW needs the model's alignment heads (a preset for the standard sizes,
         else the top heads) and cannot run with flash attention, which is then off. A binding without context
         parameters loads the model without DTW; words then come from whisper.cpp's coarser token timestamps."""
         kwargs: dict[str, Any] = {"n_threads": opts.threads, "print_progress": False, "print_realtime": False}
@@ -119,7 +145,16 @@ class WhisperCppSTT(STTModel):
             gpu["gpu_device"] = int(opts.device.partition(":")[2])
         #: word times come from DTW (True) or from the plain token timestamps
         self.dtw = False
-        if spec.get("dtw", True):
+        wanted = spec.get("dtw", True)
+        binding = _binding_version()
+        if wanted and not dtw_is_safe(binding):
+            wanted = False
+            log.info(
+                "%s: DTW word times are off: the whisper.cpp in pywhispercpp %s can abort the process on a short "
+                "segment (ggml-org/whisper.cpp#4096); word times come from token timestamps",
+                file.name, binding or "(unknown version)",
+            )  # fmt: skip
+        if wanted:
             try:
                 import _pywhispercpp as pw
 
