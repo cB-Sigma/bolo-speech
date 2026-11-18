@@ -164,7 +164,7 @@ def parse_tool(tool: dict[str, Any], settings: Any, *, authenticated: bool = Fal
     ``authenticated``: requests to this server need an API key."""
     label = tool.get("server_label")
     if not isinstance(label, str) or not label.strip():
-        raise ValueError("an mcp tool needs a server_label")
+        raise ValueError("an MCP tool needs a server_label")
     configured = configured_servers(settings)
     url = tool.get("server_url")
     if tool.get("connector_id"):
@@ -398,7 +398,7 @@ class McpTools:
     def configure(self, specs: list[McpServerSpec]) -> None:
         labels = [s.label for s in specs]
         if len(set(labels)) != len(labels):
-            raise ValueError("each mcp tool needs a server_label of its own")
+            raise ValueError("each MCP tool needs a server_label of its own")
         self.specs = {s.label: s for s in specs}
 
     async def sync(self, emit: Emit) -> None:
