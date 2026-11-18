@@ -385,7 +385,7 @@ def test_quality_and_warnings() -> None:
     assert rec.fit_warnings(huge_spec, rec.assess(huge_spec, hw, speed), disk_free=10 * GB)[0]["level"] == "unlikely"
     doc = rec.assess(CATALOG[1], hw, speed).to_dict()
     assert {"level", "label", "expected_rtf", "rtf_range", "rtf_basis", "scaled_by", "device", "memory", "reason",
-            "recommended", "recommended_for", "default_for", "notes", "engine_available"} == set(doc)  # fmt: skip
+            "recommended", "recommended_for", "default_for", "notes", "engine_available", "gpu_too_small"} == set(doc)  # fmt: skip
     assert json.loads(json.dumps(doc)) == doc
 
 
@@ -751,3 +751,65 @@ def test_cli_doctor_and_pull_warning(
     monkeypatch.delenv("BOLO_HARDWARE_WARNINGS")
     assert main(["pull", "silero-vad"]) == 0
     assert "warning:" not in capsys.readouterr().err
+
+
+def test_a_full_duplex_model_that_does_not_fit_the_gpu_wont_fit() -> None:
+    """Full-duplex models load whole on one device (split across the GPU and the CPU they are 5 to 7 times too slow):
+    one that needs more than the GPU has is "won't fit this GPU", never a CPU suggestion. Others keep their CPU
+    assessment (warn, never restrict)."""
+    from bolo.catalog import Catalog
+
+    catalog = Catalog.load(None)
+    q8 = catalog.resolve("moshiko-pytorch-q8")
+    assert q8 is not None and rec.is_full_duplex(q8)
+    small = machine(gpus=[nvidia(6)], device="auto")
+    fit = rec.assess(q8, small, rec.heuristic_speed(small))
+    assert fit.level == "unlikely" and fit.gpu_too_small and fit.device == "gpu"
+    assert fit.reason == (
+        "moshiko-pytorch-q8 needs about 12.0 GB of GPU memory; RTX Test has 6.0 GB; full-duplex models can't be split "
+        "across GPU and CPU"
+    )
+    assert fit.to_dict()["label"] == "won't fit this GPU" and not any("CPU" in n for n in fit.notes)
+    big = machine(gpus=[nvidia(24)], device="auto")
+    fit = rec.assess(q8, big, rec.heuristic_speed(big))
+    assert fit.level != "unlikely" and not fit.gpu_too_small and fit.device == "gpu"
+    # every full-duplex entry says it needs a GPU and how much memory
+    for entry in catalog.all():
+        if rec.is_full_duplex(entry):
+            hint = rec.hint(entry)
+            assert hint.get("gpu") in ("required", "recommended") and hint.get("vram_gb"), entry.id
+    # not full-duplex: as before, a CPU assessment with a note
+    plain = spec("big-tts", task="tts", size_bytes=20 * GB, options={"hardware": {"gpu": "recommended", "vram_gb": 24}})
+    fit = rec.assess(plain, small, rec.heuristic_speed(small))
+    assert not fit.gpu_too_small and fit.device == "cpu"
+
+
+async def test_a_full_duplex_model_that_does_not_fit_is_not_started(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from bolo.core import Bolo
+    from bolo.duplex import manager as duplex_manager
+    from bolo.duplex import runtime as duplex_runtime
+    from bolo.errors import EngineUnavailable, InsufficientGpuMemory
+
+    core = Bolo(settings)
+    q8 = core.catalog.resolve("moshiko-pytorch-q8")
+    assert q8 is not None
+    monkeypatch.setattr(duplex_manager, "_codec_missing", lambda: None)
+    monkeypatch.setattr(duplex_runtime, "missing_reason", lambda s, spec: None)
+    monkeypatch.setattr(core.store, "is_installed", lambda model_id: True)
+    started: list[str] = []
+
+    def launch(*args: Any, **kwargs: Any) -> Any:
+        started.append("launch")
+        raise ValueError("stubbed: not started in the tests")
+
+    monkeypatch.setattr(duplex_runtime, "launch", launch)
+    core.advisor.use_hardware(machine(gpus=[nvidia(6)], device="auto"))
+    with pytest.raises(InsufficientGpuMemory, match=r"needs about 12\.0 GB of GPU memory; RTX Test has 6\.0 GB"):
+        await duplex_manager.build_backend(core, q8)
+    assert not started
+    core.advisor.use_hardware(machine(gpus=[nvidia(24)], device="auto"))
+    with pytest.raises(EngineUnavailable, match="stubbed"):  # past the check: the (stubbed) start is reached
+        await duplex_manager.build_backend(core, q8)
+    assert started == ["launch"]

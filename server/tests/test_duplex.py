@@ -958,6 +958,13 @@ async def test_a_server_whose_compile_fails_is_started_again_without_it() -> Non
 
     with pytest.raises(EngineUnavailable, match="out of memory"):
         await KyutaiBackend(process=Broken(), model="m")._start()  # type: ignore[arg-type]
+    # a CUDA out-of-memory at start reads as what it means, not as the server's traceback
+    from bolo.errors import InsufficientGpuMemory
+
+    message = "moshiko-pytorch-q8 ran out of GPU memory while starting: ..."
+    with pytest.raises(InsufficientGpuMemory) as info:
+        await KyutaiBackend(process=Broken(), model="m", oom_message=message)._start()  # type: ignore[arg-type]
+    assert info.value.message == message and info.value.code == "insufficient_gpu_memory"
 
 
 def test_the_launcher_keeps_the_q8_scales_as_stored(tmp_path: Path) -> None:

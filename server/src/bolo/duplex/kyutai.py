@@ -34,7 +34,7 @@ from urllib.parse import urlencode, urlsplit
 from bolo.duplex.base import DuplexAudio, DuplexBackend, DuplexConfig, DuplexEnd, DuplexEvent, DuplexSession, DuplexText
 from bolo.duplex.ogg_opus import OggOpusReader, OggOpusWriter
 from bolo.engines.base import FloatArray
-from bolo.errors import EngineUnavailable, Overloaded
+from bolo.errors import EngineUnavailable, InsufficientGpuMemory, Overloaded
 
 if TYPE_CHECKING:
     from bolo.engines.tts_server import ServerProcess
@@ -62,6 +62,9 @@ def chat_url(url: str) -> str:
         url = "ws://" + url
     return url if urlsplit(url).path not in ("", "/") else url + "/api/chat"
 
+
+#: what a PyTorch server's output says when the GPU ran out of memory
+OUT_OF_MEMORY = ("CUDA out of memory", "OutOfMemoryError", "CUDA error: out of memory", "out of memory")
 
 #: SentencePiece's start and end of sequence, which Hibiki's server sends as text tokens of their own
 _SEQUENCE_MARKS = ("<s>", "</s>")
@@ -180,6 +183,7 @@ class KyutaiBackend(DuplexBackend):
         instructions_param: str | None = None,
         family: str | None = None,
         notices: list[str] | None = None,
+        oom_message: str | None = None,
     ) -> None:
         if url is None and process is None:
             raise ValueError("a URL or a process is needed")
@@ -199,6 +203,8 @@ class KyutaiBackend(DuplexBackend):
         self.instructions_param = instructions_param
         self.family = family
         self.notices = list(notices or [])
+        #: what a start that ran out of GPU memory is reported as (bolo.duplex.manager.out_of_memory_message)
+        self.oom_message = oom_message
         self.active = 0
         self.sessions_served = 0
         self._lock = asyncio.Lock()
@@ -258,14 +264,20 @@ class KyutaiBackend(DuplexBackend):
 
         assert self.process is not None
         try:
-            await asyncio.to_thread(self.process.ensure_started)
+            try:
+                await asyncio.to_thread(self.process.ensure_started)
+            except EngineUnavailable as exc:
+                notice = runtime.compile_off(self.process, self.family or str(self.model), exc.message)
+                if notice is None:
+                    raise
+                log.warning("%s: %s", self.model, notice)
+                self.notices.append(notice)
+                await asyncio.to_thread(self.process.ensure_started)
         except EngineUnavailable as exc:
-            notice = runtime.compile_off(self.process, self.family or str(self.model), exc.message)
-            if notice is None:
-                raise
-            log.warning("%s: %s", self.model, notice)
-            self.notices.append(notice)
-            await asyncio.to_thread(self.process.ensure_started)
+            if self.oom_message and any(m in exc.message for m in OUT_OF_MEMORY):
+                log.warning("%s: %s", self.model, exc.message)
+                raise InsufficientGpuMemory(self.oom_message) from exc
+            raise
 
     def _url(self, config: DuplexConfig) -> str:
         from bolo.s2s import OPENAI_VOICES

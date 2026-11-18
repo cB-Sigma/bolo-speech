@@ -189,6 +189,9 @@ class Fit:
     memory_kind: str | None = None  # ram | vram
     memory_basis: str | None = None  # catalog | estimated
     engine_available: bool = True
+    #: a model that cannot be split across the GPU and the CPU (a full-duplex model) needs more GPU memory than
+    #: the GPU has: bolo refuses to start it ("won't fit this GPU")
+    gpu_too_small: bool = False
     notes: list[str] = field(default_factory=list)
     #: marks from the per-task rankings: "*" stands for "any language"
     recommended_for: list[str] = field(default_factory=list)
@@ -209,7 +212,8 @@ class Fit:
             }
         return {
             "level": self.level,
-            "label": LEVEL_LABEL[self.level],
+            "label": "won't fit this GPU" if self.gpu_too_small else LEVEL_LABEL[self.level],
+            "gpu_too_small": self.gpu_too_small,
             "expected_rtf": _round_rtf(self.expected_rtf),
             "rtf_range": [_round_rtf(self.rtf_range[0]), _round_rtf(self.rtf_range[1])] if self.rtf_range else None,
             "rtf_basis": self.rtf_basis,
@@ -360,6 +364,13 @@ def gpu_for(spec: ModelSpec, hw: Hardware) -> tuple[Gpu | None, str | None]:
         if providers is not None and not any(p in providers for p in wanted):
             return None, f"this ONNX Runtime has no {wanted[0].removesuffix('ExecutionProvider')} provider"
         return gpu, None
+    if spec.engine == "duplex":  # a server bolo starts in an environment of its own (bolo.duplex.runtime)
+        build = str(spec.options.get("build") or "pytorch")
+        if build == "mlx":
+            return (gpu, None) if fam == "metal" else (None, "MLX uses Apple silicon's GPU only")
+        if build == "candle":
+            return (gpu, None) if fam in ("cuda", "metal") else (None, "the Rust server runs on CUDA or Metal")
+        return (cuda, None) if cuda is not None else (None, "its PyTorch server needs an NVIDIA GPU")
     return None, None
 
 
@@ -456,6 +467,13 @@ def _assess(spec: ModelSpec, hw: Hardware, speed: Speed, siblings: Siblings | No
     total = gpu.vram_total_bytes
     budget = int(total * 0.7) if total is not None and gpu.unified_memory else total
     name = gpu.name or "the GPU"
+    if need is not None and budget is not None and need > budget and is_full_duplex(spec):
+        # it loads whole on one device: split across the GPU and the CPU it would be 5 to 7 times too slow (each
+        # 80 ms frame touches every weight), and on the CPU alone far slower; bolo refuses to start it
+        fit = Fit("unlikely", full_duplex_too_big(spec, need, total, name), device="gpu", memory_kind="vram",
+                  memory_basis=basis, gpu_too_small=True)  # fmt: skip
+        fit.memory_needed_bytes, fit.memory_available_bytes = need, total
+        return fit
     if need is not None and budget is not None and need > budget:
         cpu.notes.append(f"needs about {gigabytes(need)} of GPU memory and {name} has {gigabytes(total)}")
         if wants == "required":
@@ -482,6 +500,19 @@ def _assess(spec: ModelSpec, hw: Hardware, speed: Speed, siblings: Siblings | No
     if need is not None and gpu.vram_free_bytes is not None and need > gpu.vram_free_bytes:
         fit.notes.append(f"only {gigabytes(gpu.vram_free_bytes)} of GPU memory is free right now")
     return fit
+
+
+def is_full_duplex(spec: ModelSpec) -> bool:
+    """A full-duplex model (Moshi, Hibiki, PersonaPlex, FLM-Audio, Freeze-Omni, MiniCPM-o's duplex mode): it hears
+    and speaks at once in 80 ms frames, and cannot be split across the GPU and the CPU."""
+    return spec.engine == "duplex" or "full-duplex" in spec.features
+
+
+def full_duplex_too_big(spec: ModelSpec, need: int, total: int | None, name: str) -> str:
+    return (
+        f"{spec.id} needs about {gigabytes(need)} of GPU memory; {name} has {gigabytes(total)}; full-duplex models "
+        "can't be split across GPU and CPU"
+    )
 
 
 def _basis_words(basis: str | None) -> str:
@@ -986,6 +1017,10 @@ class Advisor:
             if generation == self._generation:
                 self._fits, self._fits_at, self._fits_size = fits, time.monotonic(), len(specs)
         return fits
+
+    def fit_of(self, spec: ModelSpec) -> Fit:
+        """The fit of ``spec`` now (the hardware as last detected, cached), without the ranking marks."""
+        return assess(spec, self.hardware(), self.speed())
 
     def cached_fit(self, spec: ModelSpec) -> Fit | None:
         """The fit of ``spec`` if it is already known. For the request path: this never detects hardware and

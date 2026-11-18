@@ -256,6 +256,8 @@ export type FitLevel = 'comfortable' | 'usable' | 'slow' | 'unlikely' | 'cloud' 
 export interface ModelFit {
   level: FitLevel | string
   label?: string
+  /** A full-duplex model that needs more GPU memory than the GPU has: the server will not start it. */
+  gpu_too_small?: boolean
   /** Expected real-time factor on this machine; null when nothing was measured or estimated. */
   expected_rtf: number | null
   rtf_range?: [number, number] | null

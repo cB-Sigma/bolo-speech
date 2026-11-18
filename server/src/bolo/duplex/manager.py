@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from bolo.duplex.base import DuplexBackend
-from bolo.errors import ComponentMissing, EngineUnavailable
+from bolo.errors import ComponentMissing, EngineUnavailable, InsufficientGpuMemory
 
 if TYPE_CHECKING:
     from bolo.catalog import ModelSpec
@@ -119,6 +119,11 @@ async def build_backend(core: Bolo, spec: ModelSpec) -> DuplexBackend:
     problem = remote_code_problem(core, spec, core.store.model_dir(spec.id))
     if problem:
         raise EngineUnavailable(problem)
+    # a full-duplex model loads whole on one device (split across the GPU and the CPU it would be 5 to 7 times too
+    # slow): one that does not fit the GPU is not started (the advisor's fit, as `bolo recommend` shows it)
+    fit = await asyncio.to_thread(core.advisor.fit_of, spec)
+    if fit.gpu_too_small:
+        raise InsufficientGpuMemory(fit.reason)
     try:
         launch = await asyncio.to_thread(
             runtime.launch, s, spec, core.store.model_dir(spec.id), free_port(), list(s.duplex_server_args)
@@ -136,5 +141,21 @@ async def build_backend(core: Bolo, spec: ModelSpec) -> DuplexBackend:
         return backend
     return KyutaiBackend(
         process=launch.process, max_sessions=launch.max_sessions, restart_after_session=launch.restart_after_session,
-        runtime=launch.runtime, family=spec.family, notices=notices, **common,
+        runtime=launch.runtime, family=spec.family, notices=notices, oom_message=out_of_memory_message(spec, fit),
+        **common,
     )  # fmt: skip
+
+
+def out_of_memory_message(spec: ModelSpec, fit: Any) -> str:
+    """What a full-duplex server that ran out of GPU memory at start is reported as, instead of its traceback."""
+    from bolo.hardware import gigabytes
+    from bolo.recommend import vram_need
+
+    need, _ = vram_need(spec)
+    have = getattr(fit, "memory_available_bytes", None)
+    size = f"needs about {gigabytes(need)} of GPU memory" if need else "needs more GPU memory than is free"
+    there = f" (the GPU has {gigabytes(have)})" if have else ""
+    return (
+        f"{spec.id} ran out of GPU memory while starting: it {size}{there}; full-duplex models can't be split across "
+        "GPU and CPU. Close other programs that use the GPU, or choose a smaller model"
+    )

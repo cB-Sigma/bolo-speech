@@ -30,6 +30,12 @@ export const FIT_LABEL: Record<string, string> = {
   unavailable: 'Not available yet',
 }
 
+/** The fit's label: "Won't fit this GPU" for a model that cannot be split and needs more GPU memory than there is. */
+export function fitLabel(fit: ModelFit): string {
+  if (fit.gpu_too_small) return "Won't fit this GPU"
+  return FIT_LABEL[fit.level] ?? fit.label ?? fit.level
+}
+
 export type FitTone = 'good' | 'neutral' | 'warning'
 
 export function fitTone(level: string | undefined): FitTone {
@@ -90,9 +96,9 @@ export function fitBasis(fit: ModelFit): string {
 
 /** One line for a card: "Comfortable here · 9.1× real time (measured, roughly scaled)". */
 export function fitLine(fit: ModelFit): string {
-  const label = FIT_LABEL[fit.level] ?? fit.label ?? fit.level
+  const label = fitLabel(fit)
   if (fit.level === 'cloud') return 'Cloud: this machine does not matter'
-  if (fit.level === 'unavailable') return label
+  if (fit.level === 'unavailable' || fit.gpu_too_small) return label
   const here = `${label} here`
   if (fit.expected_rtf == null) return `${here} · speed not measured`
   return `${here} · ${fmtSpeed(fit.expected_rtf)} real time (${fitBasis(fit)})`

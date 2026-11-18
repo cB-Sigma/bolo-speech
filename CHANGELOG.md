@@ -23,6 +23,17 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   the parity results) and checked against their PyTorch originals in both directions; they run in core bolo without
   PyTorch. Perth was found after MP3, Opus and 16 or 8 kHz resampling on every clip tried. WavMark is slow on a CPU.
 
+### Fixed
+
+- **A full-duplex model too big for the GPU started anyway and failed.** Moshi, Hibiki, PersonaPlex and the other
+  full-duplex models load whole on one device (split across the GPU and the CPU they are 5 to 7 times too slow). The
+  advisor now rates one that needs more GPU memory than the GPU has "won't fit this GPU" (`fit.gpu_too_small`; no
+  CPU suggestion), `bolo recommend` and the console's pickers show it, recommendations never pick it, and bolo
+  refuses to start it with `503 insufficient_gpu_memory` and that reason ("moshiko-pytorch-q8 needs about 12.0 GB
+  of GPU memory; ... has 6.0 GB; full-duplex models can't be split across GPU and CPU"). A CUDA out-of-memory while
+  the server starts reads the same way. Every other model keeps warn-never-restrict. The MLX entries got a GPU
+  memory estimate too.
+
 ## [0.6.9] - 2026-11-18
 
 ### Security

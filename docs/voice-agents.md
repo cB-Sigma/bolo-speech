@@ -549,6 +549,15 @@ and asks the Hub for `config.json` at each start; bolo starts the Python servers
 pin the bind address to `127.0.0.1`, answer the Hub from disk and skip the synchronisation on a CPU (`device = "cpu"`,
 far from real time for 7 B models). Only Kyutai's servers are touched this way, never their code.
 
+**GPU memory.** A full-duplex model loads whole on one device: split across the GPU and the CPU it would be 5 to 7
+times too slow, since each 80 ms frame touches all its weights. So, unlike every other model (where bolo advises and
+never refuses), bolo does not start one that needs more GPU memory than the GPU has, and says so before loading
+anything: `503 insufficient_gpu_memory`, "moshiko-pytorch-q8 needs about 12.0 GB of GPU memory; NVIDIA GeForce RTX
+3060 Laptop GPU has 6.0 GB; full-duplex models can't be split across GPU and CPU". The catalog entries carry a GPU
+memory estimate (`hardware.vram_gb`); `bolo recommend` and the console's model pickers mark them "won't fit this GPU"
+and never suggest them. A server that still runs out of memory at start (other programs on the GPU) is reported the
+same way, not as its traceback.
+
 **torch.compile and Triton.** The PyTorch servers compile their kernels with `torch.compile` at the first start,
 which needs Triton on the GPU (and a C++ compiler on the CPU). Linux's CUDA and ROCm builds of PyTorch bring Triton;
 PyTorch for Windows does not, and Moshi and Hibiki crashed at start there (`TritonMissing`). bolo looks before it

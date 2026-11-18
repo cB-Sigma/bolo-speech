@@ -62,6 +62,13 @@ class EngineUnavailable(BoloError):
     type = "server_error"
 
 
+class InsufficientGpuMemory(EngineUnavailable):
+    """A model that cannot be split across the GPU and the CPU (a full-duplex model) needs more GPU memory than
+    there is: bolo does not start it."""
+
+    code = "insufficient_gpu_memory"
+
+
 class ProviderNotConfigured(EngineUnavailable):
     """A cloud model whose provider has no entry (or no key) in the ``providers`` setting."""
 

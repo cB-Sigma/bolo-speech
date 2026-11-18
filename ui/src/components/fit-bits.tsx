@@ -22,7 +22,7 @@ import { describeError, useCatalog, useHardware, useModelActions } from '@/hooks
 import { api } from '@/lib/api/client'
 import type { CatalogModel, ModelFit, Recommendation, SetupUse } from '@/lib/api/types'
 import {
-  FIT_LABEL,
+  fitLabel,
   fitLine,
   fitMemory,
   fitRtf,
@@ -120,7 +120,7 @@ export function FitSection({ m, lang }: { m: CatalogModel; lang?: string | null 
         <p className={cn('flex flex-wrap items-center gap-x-2 gap-y-1 font-medium', TONE_CLASS[tone])}>
           <span className="inline-flex items-center gap-1.5">
             <FitIcon level={fit.level} />
-            {FIT_LABEL[fit.level] ?? fit.label ?? fit.level}
+            {fitLabel(fit)}
           </span>
           <RecommendedBadge m={m} lang={lang} />
         </p>

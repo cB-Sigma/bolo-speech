@@ -190,6 +190,7 @@ message:
 | 502 | `provider_error`, `provider_auth` | a cloud provider failed (5xx, a broken connection, an unknown model) or refused bolo's key. See [providers.md](providers.md#errors) |
 | 503 | `llm_not_configured` | `/v1/chat/completions` or a Realtime conversation without `llm_base_url` |
 | 503 | `engine_unavailable` | the engine for this model is not installed, or the model failed its load probe |
+| 503 | `insufficient_gpu_memory` | a full-duplex model needs more GPU memory than the GPU has (it cannot be split across the GPU and the CPU), or ran out of it while its server started |
 | 503 | `provider_not_configured` | a cloud model whose provider has no entry or no key in `providers` |
 | 504 | `provider_timeout` | a cloud provider did not answer within `provider_timeout_s` |
 
@@ -1267,7 +1268,9 @@ in the id, aliases, family, engine, languages, licence or description.
   "hardware": null,                   // or {"gpu": "optional"|"recommended"|"required", "vram_gb": 2.0, "note": "…"}
   "fit": {                            // how well the model suits THIS machine; advice, never a restriction
     "level": "comfortable",           // comfortable | usable | slow | unlikely | cloud | unavailable
-    "label": "comfortable",
+    "label": "comfortable",           // "won't fit this GPU" when gpu_too_small
+    "gpu_too_small": false,           // a full-duplex model needing more GPU memory than the GPU has: the one
+                                      // case where bolo refuses (503 insufficient_gpu_memory), since it cannot split
     "expected_rtf": 0.033,            // null when nothing was measured or estimated
     "rtf_range": [0.017, 0.066],
     "rtf_basis": "measured",          // measured | estimated (from a sibling model) | unknown

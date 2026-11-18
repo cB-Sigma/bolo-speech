@@ -91,6 +91,8 @@ describe('fit', () => {
     const benchmarked = fit('slow', { expected_rtf: 2, rtf_basis: 'estimated', scaled_by: 'benchmark' })
     expect(fitLine(benchmarked)).toBe('Slow here · 0.5× real time (estimated, scaled by the benchmark)')
     expect(fitLine(fit('unlikely'))).toBe('Unlikely to fit here · speed not measured')
+    // a full-duplex model bigger than the GPU: the server will not start it
+    expect(fitLine(fit('unlikely', { gpu_too_small: true }))).toBe("Won't fit this GPU")
     expect(fitLine(fit('cloud'))).toBe('Cloud: this machine does not matter')
     expect(fitLine(fit('unavailable'))).toBe('Not available yet')
     expect(fitRtf(fit('usable', { expected_rtf: 0.5, rtf_range: [0.25, 1] }))).toBe('0.50 (0.25–1.00)')

@@ -170,6 +170,7 @@
     hardware:
       gpu: required
       ram_gb: 6
+      vram_gb: 6
       note: Apple silicon, unified memory (estimate)
   voices:
   - id: moshiko
@@ -227,6 +228,7 @@
     hardware:
       gpu: required
       ram_gb: 10
+      vram_gb: 10
       note: Apple silicon, unified memory (estimate)
   voices:
   - id: moshiko
@@ -283,6 +285,7 @@
     hardware:
       gpu: required
       ram_gb: 18
+      vram_gb: 18
       note: Apple silicon, unified memory (estimate)
   voices:
   - id: moshiko
@@ -571,6 +574,7 @@
     hardware:
       gpu: required
       ram_gb: 6
+      vram_gb: 6
       note: Apple silicon, unified memory (estimate)
   voices:
   - id: moshika
@@ -628,6 +632,7 @@
     hardware:
       gpu: required
       ram_gb: 10
+      vram_gb: 10
       note: Apple silicon, unified memory (estimate)
   voices:
   - id: moshika
@@ -684,6 +689,7 @@
     hardware:
       gpu: required
       ram_gb: 18
+      vram_gb: 18
       note: Apple silicon, unified memory (estimate)
   voices:
   - id: moshika
@@ -978,6 +984,7 @@
     hardware:
       gpu: required
       ram_gb: 6
+      vram_gb: 6
       note: Apple silicon, unified memory (estimate); Kyutai runs it on an iPhone
 - id: hibiki-2b-mlx-bf16
   task: speech-to-speech
@@ -1036,6 +1043,7 @@
     hardware:
       gpu: required
       ram_gb: 10
+      vram_gb: 10
       note: Apple silicon, unified memory (estimate)
 - id: hibiki-zero-3b-pytorch-bf16
   task: speech-to-speech
