@@ -635,7 +635,7 @@
   license_url: https://huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512
   commercial_use: true
   gated: false
-  features: [voice-cloning]
+  features: [voice-cloning, instructions]
   description: 'Fun-CosyVoice3 0.5B on audio.cpp (cosyvoice3, supported there). Languages: zh, en, ja, ko, de, es, fr, it,
     ru, yue. Clones a voice from reference audio (reference_audio, or the reference-clip voices). | 2026-09-21 Runs in an
     audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU recommended,
@@ -651,6 +651,7 @@
   options:
     runtime: audio.cpp
     family: cosyvoice3
+    instructions: instruct
     server_model: cosyvoice3-0.5b-audiocpp
     cloning: true
     send_language: true
@@ -744,7 +745,7 @@
   license_url: https://huggingface.co/maya-research/maya1
   commercial_use: true
   gated: false
-  features: []
+  features: [instructions]
   description: 'Maya1 3B on audio.cpp (maya1, supported there). Languages: en. The combined GGUF contains weights from both
     projects. Runs in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers).
     GPU required, about 5.8 GB.'
@@ -759,6 +760,9 @@
   options:
     runtime: audio.cpp
     family: maya1
+    instructions: instruct
+    # Maya1 needs a description of the voice; this one is sent when a request has no instructions
+    default_instructions: A clear, warm adult voice with an American accent, at a natural pace.
     server_model: maya1-audiocpp
     cloning: false
     send_language: false
@@ -824,7 +828,7 @@
   license_url: https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base
   commercial_use: true
   gated: false
-  features: [voice-cloning]
+  features: [voice-cloning, instructions]
   description: 'Qwen3-TTS 1.7B CustomVoice on audio.cpp (qwen3_tts, supported there). Languages: zh, en, ja, ko, de, fr,
     ru, pt, es, it. Clones a voice from reference audio (reference_audio, or the reference-clip voices). | 2026-09-21 Runs
     in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU
@@ -841,6 +845,7 @@
   options:
     runtime: audio.cpp
     family: qwen3_tts
+    instructions: instruct
     server_model: qwen3-tts-1.7b-customvoice-audiocpp
     cloning: true
     send_language: true
@@ -1102,7 +1107,7 @@
   license_url: https://huggingface.co/k2-fsa/OmniVoice#license
   commercial_use: false
   gated: false
-  features: [voice-cloning]
+  features: [voice-cloning, instructions]
   description: 'OmniVoice on audio.cpp (omnivoice, supported there). Languages: 600+ languages. Clones a voice from reference
     audio (reference_audio, or the reference-clip voices). Non-commercial licence. Changed from Apache-2.0 on 2026-07-03,
     "due to constraints from its training data (e.g., Emilia)". The code is Apache-2.0. The audio tokenizer, bosonai/higgs-audio-v2-tokenizer,
@@ -1132,6 +1137,7 @@
   options:
     runtime: audio.cpp
     family: omnivoice
+    instructions: instruct
     server_model: omnivoice-audiocpp
     cloning: true
     send_language: true
@@ -1303,7 +1309,7 @@
   license_url: https://huggingface.co/IndexTeam/IndexTTS-2.5/blob/main/LICENSE
   commercial_use: false
   gated: false
-  features: [voice-cloning]
+  features: [voice-cloning, instructions]
   description: 'IndexTTS-2 on audio.cpp (index_tts2, supported there). Languages: zh, en, ja, es, ar. Clones a voice from
     reference audio (reference_audio, or the reference-clip voices). Commercial use is conditional: A separate license is
     needed above RMB 1 billion yearly revenue or 100 million monthly users. The model and its outputs may not be used to
@@ -1321,6 +1327,7 @@
   options:
     runtime: audio.cpp
     family: index_tts2
+    instructions: {option: emotion_text, with: {use_emotion_text: true}}
     server_model: indextts-2-audiocpp
     cloning: true
     send_language: true
@@ -1528,7 +1535,7 @@
   license_url: https://huggingface.co/FireRedTeam/FireRedTTS3
   commercial_use: true
   gated: false
-  features: [voice-cloning]
+  features: [voice-cloning, instructions]
   description: 'FireRedTTS3 Instruct on audio.cpp (fireredtts3, experimental there). Languages: Chinese, English, Cantonese,
     Japanese, Korean, Spanish, French, Russian, Arabic, Turkish, Indonesian, Portuguese, Italian, Dutch, Vietnamese, German,
     Ukrainian, Thai, Polish, Romanian, …. Clones a voice from reference audio (reference_audio, or the reference-clip voices).
@@ -1545,6 +1552,7 @@
   options:
     runtime: audio.cpp
     family: fireredtts3
+    instructions: instruct
     server_model: fireredtts3-instruct-audiocpp
     cloning: true
     send_language: true
@@ -1608,7 +1616,7 @@
   license_url: https://huggingface.co/BreezeBlue/Breeze-TTS-2/blob/main/LICENSE
   commercial_use: false
   gated: false
-  features: [voice-cloning]
+  features: [voice-cloning, instructions]
   description: 'BreezeTTS 2 on audio.cpp (breeze_tts, supported there). Languages: zh, en. Clones a voice from reference
     audio (reference_audio, or the reference-clip voices). Non-commercial licence. | 2026-09-21 Runs in an audiocpp_server
     that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU required, about 7.1 GB.
@@ -1624,6 +1632,7 @@
   options:
     runtime: audio.cpp
     family: breeze_tts
+    instructions: instruct
     server_model: breeze-tts-2-audiocpp
     cloning: true
     send_language: true
@@ -2057,7 +2066,7 @@
   license_url: https://huggingface.co/IndexTeam/IndexTTS-2.5/blob/main/LICENSE
   commercial_use: false
   gated: false
-  features: [voice-cloning]
+  features: [voice-cloning, instructions]
   description: 'IndexTTS-2.5 on audio.cpp (index_tts2, version 2.5: multilingual tokenizer adding Japanese, Spanish and
     Arabic to Chinese and English). Clones a voice from reference audio (reference_audio, or the reference-clip
     voices). Commercial use is conditional: a separate licence is needed above RMB 1 billion yearly revenue or 100
@@ -2075,6 +2084,7 @@
   options:
     runtime: audio.cpp
     family: index_tts2
+    instructions: {option: emotion_text, with: {use_emotion_text: true}}
     server_model: indextts-2.5-audiocpp
     cloning: true
     send_language: true

@@ -6,6 +6,7 @@ import {
   cloudNotice,
   defaultPipeline,
   diarizerOptions,
+  followsInstructions,
   hardwareLabel,
   isCloud,
   isCpuFriendly,
@@ -249,5 +250,13 @@ describe('server behaviour flags', () => {
     expect(wordListsAnnounced(info({}, { providers: { endpoint: '/api/v1/providers' } }))).toBe(false)
     expect(providersOffered(info({}, { providers: {} }))).toBe(true)
     expect(providersOffered(info({}))).toBe(false)
+  })
+})
+
+describe('instructions', () => {
+  it('are offered for models with the instructions feature', () => {
+    expect(followsInstructions({ features: ['voice-cloning', 'instructions'] })).toBe(true)
+    expect(followsInstructions({ features: ['voice-cloning'] })).toBe(false)
+    expect(followsInstructions(null)).toBe(false)
   })
 })

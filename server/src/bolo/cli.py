@@ -914,7 +914,7 @@ def cmd_speak(args: argparse.Namespace) -> int:
             try:
                 async for chunk in core.synthesize(
                     text, model=args.model, voice=args.voice, speed=args.speed, trace=trace,
-                    romanised=args.romanised, detect_language=True,
+                    romanised=args.romanised, detect_language=True, instructions=args.instructions,
                 ):  # fmt: skip
                     trace.mark_ttfa()
                     parts.append(chunk.samples)
@@ -929,6 +929,8 @@ def cmd_speak(args: argparse.Namespace) -> int:
 
             chosen = language_header(trace)
             print(f"wrote {out} ({len(audio) / rate:.1f}s, {fmt})" + (f"; language: {chosen}" if chosen else ""))
+            if trace.extra.get("instructions") == "ignored":
+                print(f"note: {trace.model} does not follow instructions; they were ignored", file=sys.stderr)
             if args.verbose:
                 print(
                     f"[{trace.model}] first audio after {trace.ttfa_ms:.0f} ms, total {trace.total_ms:.0f} ms, RTF {trace.rtf:.3f}",
@@ -2147,6 +2149,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--model", "-m")
     s.add_argument("--voice")
     s.add_argument("--speed", type=float, default=1.0)
+    s.add_argument(
+        "--instructions",
+        help="direction for the delivery in plain words (style, emotion, voice), for models that follow it",
+    )
     s.add_argument(
         "--romanised",
         "--romanized",

@@ -191,6 +191,8 @@ class ModelSpec:
             features.append("partials")
         if self.task == "tts" and self.kind in ("kokoro", "kokoro-onnx") and "voice-blending" not in features:
             features.append("voice-blending")  # bolo.engines.blend.BLEND_KINDS
+        if self.task == "tts" and self.kind == "parler-tts" and "instructions" not in features:
+            features.append("instructions")  # Parler-TTS: the request's instructions are its voice description
         if self.task == "turn" and str(self.options.get("input", "audio")) == "text" and "reads-text" not in features:
             features.append("reads-text")  # an end-of-turn model that judges the transcript (Bolo.turn_reads_text)
         return {

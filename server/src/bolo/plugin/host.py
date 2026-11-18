@@ -61,6 +61,7 @@ from bolo.engines.base import (
     STTModel,
     STTRequest,
     STTResult,
+    SynthesisExtras,
     TTSModel,
     Voice,
     Word,
@@ -478,12 +479,21 @@ class PluginTTS(_PluginModelMixin, TTSModel):
             Voice(str(v["id"]), str(v.get("name", "")), str(v.get("language", "")), str(v.get("gender", "")), i)
             for i, v in enumerate(info.get("voices") or [])
         )
+        # a plugin model that follows instructions says so; only then are extras passed (older plugins: never)
+        self.supports_instructions = self.accepts_extras = bool(info.get("instructions"))
 
     def synthesize(
-        self, text: str, voice: str | None = None, speed: float = 1.0, cancelled: Callable[[], bool] | None = None
+        self,
+        text: str,
+        voice: str | None = None,
+        speed: float = 1.0,
+        cancelled: Callable[[], bool] | None = None,
+        extras: SynthesisExtras | None = None,
     ) -> Iterator[FloatArray]:
         handle = self._ensure_loaded()
-        message = {"op": "synthesize", "handle": handle, "text": text, "voice": voice, "speed": speed}
+        message: dict[str, Any] = {"op": "synthesize", "handle": handle, "text": text, "voice": voice, "speed": speed}
+        if extras is not None and extras.instructions:
+            message["instructions"] = extras.instructions
         for reply, payload in self.process.stream(message, cancelled):
             if "chunk" in reply and payload:
                 yield audio_from_bytes(payload)

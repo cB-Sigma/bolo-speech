@@ -207,7 +207,8 @@ async def _tts_stream(ws: WebSocket) -> None:
     alaw | wav | mp3 | opus | flac | aac), ``sample_rate``, ``speed``,
     ``phonemizer`` (auto | uccharan | uccharan:improved | espeak-ng; bolo extension),
     ``wordlists`` (comma-separated word-list names; empty applies none) and ``normalize``
-    (uccharan | light | model | none), ``keep_alive``.
+    (uccharan | light | model | none), ``keep_alive``, ``instructions`` (direction for the delivery, for models
+    that follow it).
     Client sends JSON ``{"type":"text","text":…}`` (incrementally),
     ``flush`` and ``stop``; the server answers with binary audio frames and
     JSON ``ready`` / ``chunk`` / ``metrics`` / ``done`` / ``error``.
@@ -236,6 +237,7 @@ async def _tts_stream(ws: WebSocket) -> None:
             True if raw_norm in ("", "true", "1") else False if raw_norm in ("false", "0", "off") else raw_norm
         )
         romanised = parse_romanised(params.get("romanised") or params.get("romanized"))
+        instructions = params.get("instructions") or None
         async with core.manager.use(spec.id) as entry:
             model_rate = entry.model.sample_rate
             core.active_streams += 1
@@ -278,6 +280,7 @@ async def _tts_stream(ws: WebSocket) -> None:
                             wordlists=wordlists,
                             normalize=normalize,
                             romanised=romanised,
+                            instructions=instructions,
                         )
                         first = True
                         try:

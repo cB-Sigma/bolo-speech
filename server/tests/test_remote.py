@@ -307,6 +307,13 @@ def test_openai_speech_streams_and_is_resampled(srv: LiveServer, cloud: FakeProv
     assert len(r.content) == pytest.approx(14 * 0.05 * 8000, rel=0.1)
     r = speak(srv, "openai-tts-1", voice="nobody")
     assert r.status_code == 400 and "voice 'nobody' is not available" in r.json()["error"]["message"]
+    # gpt-4o-mini-tts follows a request's instructions; tts-1 does not, and they are not sent there
+    r = speak(srv, "openai-gpt-4o-mini-tts", "Hi.", voice="coral", instructions="Sound tired.")
+    assert r.status_code == 200 and r.headers["x-bolo-instructions"] == "applied"
+    assert cloud.last("/v1/audio/speech")["json"]["instructions"] == "Sound tired."
+    r = speak(srv, "openai-tts-1", "Hi.", instructions="Sound tired.")
+    assert r.status_code == 200 and r.headers["x-bolo-instructions"] == "ignored"
+    assert "instructions" not in cloud.last("/v1/audio/speech")["json"]
 
 
 def test_text_is_prepared_before_it_leaves(srv: LiveServer, cloud: FakeProviders) -> None:

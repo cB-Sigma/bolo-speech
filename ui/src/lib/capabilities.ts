@@ -390,6 +390,11 @@ export function canClone(m: Pick<CatalogModel, 'features'> | null | undefined): 
   return Boolean(m?.features.includes('voice-cloning'))
 }
 
+/** The model follows a request's `instructions` (style, emotion or the voice itself, described in words). */
+export function followsInstructions(m: Pick<CatalogModel, 'features'> | null | undefined): boolean {
+  return Boolean(m?.features.includes('instructions'))
+}
+
 // --- Phonemisers --------------------------------------------------------------------------------------------------
 
 export const PHONEMIZER_LABEL: Record<string, string> = {

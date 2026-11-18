@@ -575,7 +575,13 @@ class SpeechRequest(BaseModel):
         'model that blends voices (Kokoro), a blend of its voices: `"af_bella+af_sky"` or `"af_bella(0.7)+af_sky(0.3)"` '
         "(weights normalised), or a saved blend's id.",
     )
-    instructions: str | None = Field(default=None, description="Accepted for compatibility; ignored.")
+    instructions: str | None = Field(
+        default=None,
+        max_length=4096,
+        description="Direction for the delivery in plain words (style, emotion, accent, the voice itself), for models "
+        "that follow it (`features` has `instructions`: Qwen3-TTS CustomVoice, CosyVoice3, FireRedTTS3 Instruct, "
+        "Maya1, Parler-TTS, …). Other models speak as usual; `x-bolo-instructions` says `applied` or `ignored`.",
+    )
     response_format: str = "mp3"
     speed: float = 1.0
     stream_format: str = "audio"
@@ -734,7 +740,7 @@ async def create_speech(request: Request, body: SpeechRequest) -> Response:
         phonemizer=body.phonemizer, reference_audio=reference, reference_text=body.reference_text,
         wordlists=body.wordlists, pronunciations=body.pronunciations, input_format=body.input_format,
         romanised=body.romanised, custom_voice=custom_voice, options=body.options,
-        detect_language=body.detect_language,
+        detect_language=body.detect_language, instructions=body.instructions,
     )  # fmt: skip
     chunks = stream.chunks()
     try:

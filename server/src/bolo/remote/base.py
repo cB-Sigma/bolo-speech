@@ -351,6 +351,7 @@ class Adapter(abc.ABC):
         out_rate: int,
         usage: Usage,
         cancelled: Callable[[], bool] | None = None,
+        instructions: str | None = None,
     ) -> Iterator[FloatArray]:
         raise InvalidRequest(f"{self.where} has no text-to-speech API in bolo", param="model")
 

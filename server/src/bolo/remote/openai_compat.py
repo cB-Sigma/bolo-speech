@@ -21,7 +21,8 @@ Model options (catalog ``options`` of an ``engine: remote`` entry):
 ``stream``           ask for a streamed transcription and join the deltas
 ``prompt``           false: the model takes no ``prompt``
 ``hotwords_field``   ``keywords`` sends hotwords as ``keywords[]``; default: appended to the prompt
-``instructions``     speech: sent as ``instructions`` (voice direction of ``gpt-4o-mini-tts``)
+``instructions``     speech: sent as ``instructions`` (voice direction of ``gpt-4o-mini-tts``) when a request has none
+``follows_instructions``  speech: the model follows a request's ``instructions`` (sent as ``instructions``)
 ``speed``            false: the model speaks at one speed only
 ``send_language``    speech: also send ``language`` (a bolo extension another bolo understands)
 ``pcm_sample_rate``  the rate of the server's ``pcm`` answers when it sends no ``x-sample-rate`` header (24000)
@@ -173,6 +174,7 @@ class OpenAICompatible(Adapter):
         out_rate: int,
         usage: Usage,
         cancelled: Callable[[], bool] | None = None,
+        instructions: str | None = None,
     ) -> Iterator[FloatArray]:
         spec = self.spec
         voice = voice or spec.get("default_voice")
@@ -184,8 +186,8 @@ class OpenAICompatible(Adapter):
                 self.unsupported("speed", "a speed other than 1.0")
             else:
                 body["speed"] = speed
-        if spec.get("instructions"):
-            body["instructions"] = str(spec["instructions"])
+        if instructions or spec.get("instructions"):
+            body["instructions"] = str(instructions or spec["instructions"])
         if language and spec.get("send_language"):
             body["language"] = language
         body.update(spec.get("request") or {})

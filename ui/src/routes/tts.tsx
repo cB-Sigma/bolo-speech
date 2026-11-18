@@ -78,6 +78,7 @@ import { useVoices } from '@/components/voices/use-voices'
 import { VoiceLibrary } from '@/components/voices/voice-library'
 import {
   canClone,
+  followsInstructions,
   cloudNotice,
   isCloud,
   notInstalledHint,
@@ -159,6 +160,7 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
   const [ssml, setSsml] = useState(false)
   const [lists, setLists] = useState<string[]>([])
   const [romanised, setRomanised] = useState('')
+  const [instructions, setInstructions] = useState('')
   const wordLists = useWordLists()
   // Saved voices (the server's library): one can stand in for the model's voice when the model clones voices.
   const library = useVoices()
@@ -198,6 +200,8 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
   const autoVoice = multilingual && p.ttsVoice === AUTO_VOICE && detect && !lang
   const voiceSent = blendSpelled || (savedBlend ? savedBlend.id : saved ? saved.id : autoVoice ? undefined : voice?.id)
   const cloneReady = !clone || reference != null
+  const steerable = followsInstructions(model)
+  const direction = steerable ? instructions.trim() : ''
   const requestOptions = {
     language: lang || undefined,
     phonemizer: phon || undefined,
@@ -207,6 +211,7 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
     wordlists: chosenLists.length ? chosenLists : undefined,
     romanised: roman || undefined,
     detectLanguage: detect ? undefined : false,
+    instructions: direction || undefined,
   }
   const forcedHttp = clone || ssml
   const fromServer = (samples.data?.samples ?? []).filter((s) => s.kind === 'text')
@@ -556,6 +561,23 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
                 </Button>
               ))}
             </div>
+            {steerable && (
+              <div className="mt-3 grid gap-1.5">
+                <label htmlFor="tts-instructions" className="text-xs text-muted-foreground">
+                  Instructions: how to say it (style, emotion, the voice), in words
+                </label>
+                <Textarea
+                  id="tts-instructions"
+                  value={instructions}
+                  onChange={(e) => setInstructions(e.target.value)}
+                  placeholder="Calm and warm, a little amused, speaking slowly."
+                  className="min-h-14 resize-y text-[13px]"
+                  maxLength={4096}
+                  disabled={busy}
+                  data-testid="tts-instructions"
+                />
+              </div>
+            )}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <label className="flex h-8 items-center gap-2 rounded-lg border border-input px-2.5 text-xs dark:bg-input/30">
                 SSML
@@ -890,6 +912,11 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
                   </dl>
                   {reported.fallback && (
                     <p className="text-xs text-warning-text">Another model answered: {reported.fallback}</p>
+                  )}
+                  {reported.instructions === 'ignored' && (
+                    <p className="text-xs text-warning-text" data-testid="tts-instructions-ignored">
+                      The model that answered does not follow instructions; they were ignored.
+                    </p>
                   )}
                   {decisionWarning && (
                     <Alert data-testid="tts-language-mismatch">

@@ -256,6 +256,9 @@ class SynthesisExtras:
     usage: Any = None
     #: model-specific request options (the request's ``options``), e.g. Tontaube's style and sliders
     options: dict[str, Any] = field(default_factory=dict)
+    #: a direction for the delivery in plain words ("calm, a little amused"), for models with
+    #: ``supports_instructions``; None for the others
+    instructions: str | None = None
 
 
 class TTSModel(Model):
@@ -269,6 +272,8 @@ class TTSModel(Model):
     supports_cloning: bool = False
     #: names of the request options (``SynthesisExtras.options``) the model reads; ``("*",)``: any
     request_options: tuple[str, ...] = ()
+    #: True when the model follows ``SynthesisExtras.instructions`` (style, emotion or voice direction in words)
+    supports_instructions: bool = False
     #: True when ``voice`` may be a blend of the model's voices, ``af_bella(0.7)+af_sky(0.3)`` (bolo.engines.blend)
     supports_blending: bool = False
 

@@ -37,6 +37,7 @@ from bolo.engines.base import (
     STTModel,
     STTRequest,
     STTResult,
+    SynthesisExtras,
     TTSModel,
 )
 from bolo.plugin.protocol import (
@@ -142,6 +143,8 @@ class _Server:
         info: dict[str, Any] = {}
         if isinstance(model, TTSModel):
             info["voices"] = [v.to_dict() for v in model.voices]
+            if model.supports_instructions and model.accepts_extras:
+                info["instructions"] = True
         if isinstance(model, SeparationModel):
             info.update(mode=model.mode, min_sample_s=model.min_sample_s)
         if isinstance(model, DiarizationModel):
@@ -282,8 +285,11 @@ class _Server:
         if not isinstance(model, TTSModel):
             raise TypeError("this model does not synthesise")
         seq = 0
+        kwargs: dict[str, Any] = {}
+        if m.get("instructions") and model.accepts_extras and model.supports_instructions:
+            kwargs["extras"] = SynthesisExtras(instructions=str(m["instructions"]))
         for chunk in model.synthesize(
-            str(m.get("text", "")), m.get("voice"), float(m.get("speed", 1.0)), lambda: rid in self.cancelled
+            str(m.get("text", "")), m.get("voice"), float(m.get("speed", 1.0)), lambda: rid in self.cancelled, **kwargs
         ):
             if rid in self.cancelled:
                 break

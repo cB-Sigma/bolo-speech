@@ -92,6 +92,7 @@ class ElevenLabs(Adapter):
         out_rate: int,
         usage: Usage,
         cancelled: Callable[[], bool] | None = None,
+        instructions: str | None = None,
     ) -> Iterator[FloatArray]:
         spec = self.spec
         voice_id = voice or spec.get("default_voice")

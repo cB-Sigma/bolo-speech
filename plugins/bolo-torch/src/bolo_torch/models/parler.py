@@ -1,4 +1,8 @@
-"""Parler-TTS (Indic Parler-TTS, Parler-TTS Tiny/Mini/Large): text in, voice described in words."""
+"""Parler-TTS (Indic Parler-TTS, Parler-TTS Tiny/Mini/Large): text in, voice described in words.
+
+A request's ``instructions`` are the description (with the voice's name first when a named voice was asked for, so
+that Indic Parler-TTS keeps its speaker); without them the voice's own description is used.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from bolo.engines.base import FloatArray, TTSModel
+from bolo.engines.base import FloatArray, SynthesisExtras, TTSModel
 
 from bolo_torch.models import peak_safe, to_voices, voices_from_options
 from bolo_torch.runtime import LoadContext, ModelGated, PluginError, hub_snapshot, model_dir, require
@@ -29,6 +33,9 @@ GENERIC_DESCRIPTION = (
 
 class ParlerTTS(TTSModel):
     """Streams sentence by sentence; with ``stream_steps`` also inside a sentence (Parler's own streamer)."""
+
+    accepts_extras = True
+    supports_instructions = True
 
     def __init__(
         self,
@@ -62,8 +69,9 @@ class ParlerTTS(TTSModel):
         self._lock = threading.Lock()
 
     # -- voice --------------------------------------------------------------
-    def describe(self, voice: str | None, speed: float = 1.0) -> str:
-        """The description for a voice id or name, or ``voice`` itself when it is a description."""
+    def describe(self, voice: str | None, speed: float = 1.0, instructions: str | None = None) -> str:
+        """The description for a voice id or name, or ``voice`` itself when it is a description; ``instructions``
+        replace the voice's description (after its name)."""
         entry: dict[str, Any] | None = None
         if voice:
             key = voice.strip().lower()
@@ -77,6 +85,12 @@ class ParlerTTS(TTSModel):
                 raise PluginError(f"unknown voice {voice!r}", "invalid_request")
         elif self._voice_entries:
             entry = next(iter(self._voice_entries.values()))
+        direction = (instructions or "").strip()
+        if direction:
+            name = str(entry.get("name") or entry["id"]) if entry is not None and voice else ""
+            if name and name.lower() not in direction.lower():
+                direction = f"{name}'s voice. {direction}"
+            return direction + _speed_hint(speed)
         if entry is None:
             return GENERIC_DESCRIPTION + _speed_hint(speed)
         text = str(entry.get("description") or self.template.format(name=entry.get("name") or entry["id"]))
@@ -84,11 +98,16 @@ class ParlerTTS(TTSModel):
 
     # -- synthesis ----------------------------------------------------------
     def synthesize(
-        self, text: str, voice: str | None = None, speed: float = 1.0, cancelled: Callable[[], bool] | None = None
+        self,
+        text: str,
+        voice: str | None = None,
+        speed: float = 1.0,
+        cancelled: Callable[[], bool] | None = None,
+        extras: SynthesisExtras | None = None,
     ) -> Iterator[FloatArray]:
         import torch
 
-        description = self.describe(voice, speed)
+        description = self.describe(voice, speed, extras.instructions if extras is not None else None)
         d = self.description_tokenizer(description, return_tensors="pt").to(self.device)
         for sentence in split_sentences(text, self.max_chars):
             if cancelled is not None and cancelled():

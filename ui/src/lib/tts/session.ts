@@ -60,6 +60,8 @@ export interface TtsReported {
   /** `x-bolo-language`, raw (see `parseLanguageHeader`). */
   language: string | null
   fallback: string | null
+  /** `x-bolo-instructions`: `applied` or `ignored` when the request carried instructions. */
+  instructions: string | null
 }
 
 export function reportedFrom(headers: Headers): TtsReported {
@@ -69,6 +71,7 @@ export function reportedFrom(headers: Headers): TtsReported {
     voice: headers.get('x-bolo-voice'),
     language: headers.get('x-bolo-language'),
     fallback: headers.get('x-bolo-fallback'),
+    instructions: headers.get('x-bolo-instructions'),
   }
 }
 
@@ -113,6 +116,8 @@ export interface TtsOptions {
   romanised?: string
   /** False turns off guessing the language from the text (chunked HTTP; the server's default is on). */
   detectLanguage?: boolean
+  /** Direction for the delivery in words (style, emotion, voice), for models with the `instructions` feature. */
+  instructions?: string
 }
 
 /** Finds the PCM payload of a WAV stream once enough header bytes have arrived. */
@@ -287,7 +292,7 @@ export class TtsSession {
   }
 
   private runWs(): void {
-    const { model, voice, text, language, phonemizer, wordlists, romanised } = this.opts
+    const { model, voice, text, language, phonemizer, wordlists, romanised, instructions } = this.opts
     let ws: WebSocket
     try {
       const WS = getTransport().WebSocket
@@ -300,6 +305,7 @@ export class TtsSession {
           phonemizer,
           wordlists: wordlists?.length ? wordlists.join(',') : undefined,
           romanised,
+          instructions,
         }),
       )
     } catch (err) {
@@ -370,6 +376,7 @@ export class TtsSession {
       wordlists,
       romanised,
       detectLanguage,
+      instructions,
     } = this.opts
     this.abort = new AbortController()
     try {
@@ -387,6 +394,7 @@ export class TtsSession {
           wordlists: wordlists?.length ? wordlists : undefined,
           romanised,
           detect_language: detectLanguage === false ? false : undefined,
+          instructions,
         },
         this.abort.signal,
       )

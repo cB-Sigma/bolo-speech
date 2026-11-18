@@ -2153,6 +2153,7 @@ class Bolo:
         custom_voice: bool = False,
         options: dict[str, Any] | None = None,
         detect_language: bool = False,
+        instructions: str | None = None,
     ) -> AsyncGenerator[SynthChunk, None]:
         """Synthesise ``text`` sentence by sentence, yielding audio as soon as it exists.
 
@@ -2161,6 +2162,10 @@ class Bolo:
         ``voice: {"id": ...}``) prefers the saved voice even over a model voice of that name. Without ``model``
         the saved voice's default model answers. ``options`` are model-specific request options
         (``SynthesisExtras.options``).
+
+        ``instructions`` direct the delivery in words (style, emotion, voice) for a model that follows them
+        (``TTSModel.supports_instructions``); other models speak as usual. ``trace.extra["instructions"]`` says
+        which (``applied`` or ``ignored``; the ``x-bolo-instructions`` header).
 
         A ``voice`` written as a blend (``af_bella(0.7)+af_sky(0.3)``, :mod:`bolo.engines.blend`), or naming a
         saved blend, is spoken by a model that blends voices (Kokoro); its voices are checked first (400 naming
@@ -2213,7 +2218,7 @@ class Bolo:
                     reference_audio=reference_audio, reference_text=reference_text, wordlists=wordlists,
                     pronunciations=pronunciations, input_format=input_format, romanised=romanised,
                     romanised_strict=romanised_strict, saved=saved, custom_voice=custom_voice, options=options,
-                    blend_name=blend_name, detect_language=detect_language,
+                    blend_name=blend_name, detect_language=detect_language, instructions=instructions,
                 )  # fmt: skip
                 try:
                     async for chunk in attempt:
@@ -2258,6 +2263,7 @@ class Bolo:
         options: dict[str, Any] | None = None,
         blend_name: str | None = None,
         detect_language: bool = False,
+        instructions: str | None = None,
     ) -> AsyncGenerator[SynthChunk, None]:
         """One model's attempt at :meth:`synthesize`. ``own_voice`` is false for a fallback model: a voice it
         does not have is replaced by its default instead of refused."""
@@ -2346,6 +2352,14 @@ class Bolo:
                         usage=Usage() if spec.cloud else None,
                         options=dict(options or {}),
                     )
+                instructions = (instructions or "").strip() or None
+                if instructions:
+                    followed = extras is not None and tts.supports_instructions
+                    if followed and extras is not None:
+                        extras.instructions = instructions
+                    trace.extra["instructions"] = "applied" if followed else "ignored"
+                else:
+                    trace.extra.pop("instructions", None)
                 with trace.phase("normalize"):
                     # uccharan's language packs for this voice, downloaded on first use (bolo.text.packs)
                     if packs.table():
@@ -2523,6 +2537,8 @@ def fallback_headers(trace: Trace) -> dict[str, str]:
     cost = trace.extra.get("cost")
     if isinstance(cost, dict):
         headers["x-bolo-estimated-cost"] = f"{cost.get('amount')} {cost.get('currency')}"
+    if trace.extra.get("instructions"):
+        headers["x-bolo-instructions"] = str(trace.extra["instructions"])
     ignored = trace.extra.get("ignored_options")
     if ignored:
         headers["x-bolo-ignored-options"] = ", ".join(ignored)

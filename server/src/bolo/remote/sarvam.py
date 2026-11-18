@@ -186,6 +186,7 @@ class Sarvam(Adapter):
         out_rate: int,
         usage: Usage,
         cancelled: Callable[[], bool] | None = None,
+        instructions: str | None = None,
     ) -> Iterator[FloatArray]:
         spec = self.spec
         code = sarvam_language(language or guess_language(text), TTS_LANGUAGES)

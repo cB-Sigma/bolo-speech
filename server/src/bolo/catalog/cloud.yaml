@@ -328,7 +328,8 @@
   cloud: true
   features:
   - telephony
-  description: 'OpenAI''s steerable voice model (the model option `instructions` directs the delivery). Audio is
+  - instructions
+  description: 'OpenAI''s steerable voice model (a request''s `instructions` direct the delivery). Audio is
     streamed from OpenAI as 24 kHz PCM while it is synthesised; at most 4096 characters per request (bolo sends
     a sentence at a time). OpenAI has announced its shutdown for 2027-01-06. Paid cloud API: the text leaves this
     server.'
@@ -338,6 +339,7 @@
     provider: openai
     provider_kind: openai-compatible
     model: gpt-4o-mini-tts
+    follows_instructions: true
     workers: 4
     text_normalizer: model
   voices:

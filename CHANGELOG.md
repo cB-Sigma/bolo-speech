@@ -36,6 +36,14 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Speech `instructions`: style, emotion and voice direction in words.** `instructions` on `POST /v1/audio/speech`
+  (and the TTS WebSocket, `bolo speak --instructions`, an Instructions box on the console's Text to speech page) is
+  no longer ignored: it reaches every catalog model that follows it, listed with the `instructions` feature. audio.cpp
+  Qwen3-TTS 1.7B CustomVoice, CosyVoice3, FireRedTTS3 Instruct, OmniVoice, BreezeTTS 2 and Maya1 get it as their
+  `instruct` option (Maya1 gets a neutral voice description when a request has none), IndexTTS-2 and 2.5 as their
+  emotion text, Parler-TTS and Indic Parler-TTS (bolo-torch) as the voice description, `openai-gpt-4o-mini-tts` as
+  OpenAI's `instructions`. Other models speak as before; `x-bolo-instructions: applied | ignored` says which.
+
 - **Speech enhancement on its own: `POST /v1/audio/denoise`.** The recording comes back with its background noise
   removed (voice isolation), from any `denoise` model of the catalog, with `strength` (mixed with the original),
   `response_format` (WAV, MP3, FLAC, Opus, AAC, PCM, mu-law, A-law) and `sample_rate`. `stream=true` sends the audio

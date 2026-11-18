@@ -338,6 +338,7 @@ class RemoteTTS(TTSModel):
         self.name = name
         self.spec = spec
         self.sample_rate = int(spec.get("sample_rate") or 24000)
+        self.supports_instructions = bool(spec.get("follows_instructions"))
         voices: list[Voice] = []
         self._voice_info: dict[str, dict[str, Any]] = {}
         for i, v in enumerate(spec.get("voices") or []):
@@ -382,7 +383,11 @@ class RemoteTTS(TTSModel):
         samples = 0
         error: str | None = None
         try:
-            for piece in self.adapter.synthesize(text, send_voice, speed, language, self.sample_rate, usage, cancelled):
+            direction = extras.instructions if extras is not None and self.supports_instructions else None
+            pieces = self.adapter.synthesize(
+                text, send_voice, speed, language, self.sample_rate, usage, cancelled, instructions=direction
+            )
+            for piece in pieces:
                 samples += len(piece)
                 yield piece
         except BoloError as exc:

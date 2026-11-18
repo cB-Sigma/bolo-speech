@@ -34,6 +34,8 @@ the OpenAI audio and Realtime APIs. On top of speech-to-text and text-to-speech 
   transcribed separately, overlaps included, without PyTorch.
 - **Voice cloning with a voice library**: save a voice once with recorded consent, use it with any cloning model,
   and get a speaker-similarity score for each clone.
+- **Speech directed in words**: `instructions` ("calm, a little amused, speaking slowly") reach every model that
+  follows them (Qwen3-TTS CustomVoice, CosyVoice3, FireRedTTS3, OmniVoice, Maya1, Parler-TTS, …).
 - **Indian languages**: speech recognition for all 22 scheduled languages, voices for 15 of them, 8 kHz telephone
   audio, and romanised input ("mujhe kal jana hai") written in the right script.
 - **Cloud models next to local ones**: OpenAI, Sarvam, ElevenLabs, Deepgram and Soniox behind the same API, with

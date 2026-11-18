@@ -4727,14 +4727,15 @@
      "instructions": {
       "anyOf": [
        {
-        "type": "string"
+        "type": "string",
+        "maxLength": 4096
        },
        {
         "type": "null"
        }
       ],
       "title": "Instructions",
-      "description": "Accepted for compatibility; ignored."
+      "description": "Direction for the delivery in plain words (style, emotion, accent, the voice itself), for models that follow it (`features` has `instructions`: Qwen3-TTS CustomVoice, CosyVoice3, FireRedTTS3 Instruct, Maya1, Parler-TTS, …). Other models speak as usual; `x-bolo-instructions` says `applied` or `ignored`."
      },
      "response_format": {
       "type": "string",

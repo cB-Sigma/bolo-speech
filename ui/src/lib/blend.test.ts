@@ -90,6 +90,7 @@ describe('synthesis headers', () => {
       voice: 'warm-mix',
       language: 'en-US; source=voice',
       fallback: null,
+      instructions: null,
     })
   })
 })

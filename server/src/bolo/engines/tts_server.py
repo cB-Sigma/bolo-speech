@@ -34,6 +34,10 @@ the language of the text), ``language_option`` (audio.cpp: also as the model opt
 ``language_names`` (send English language names instead of codes), ``language_map``, ``speed`` (the
 server honours ``speed``), ``stream`` (ask for streamed audio), ``request`` (extra request fields), and voices
 with ``reference: <bolo sample id>``: bolo's synthetic reference clips, sent as the voice to imitate.
+
+``instructions`` (audio.cpp): the model option a request's ``instructions`` go to (``instruct`` for most families),
+or ``{option, with}`` where ``with`` are further options sent alongside (IndexTTS-2: ``emotion_text`` with
+``use_emotion_text: true``); ``default_instructions`` is sent when a request has none (Maya1 needs one).
 """
 
 from __future__ import annotations
@@ -371,6 +375,10 @@ class ServerTTS(TTSModel):
         self.server_model = server_model or str(spec.get("server_model") or spec.get("model_id") or name)
         self.sample_rate = int(spec.get("sample_rate") or 24000)
         self.supports_cloning = bool(spec.get("cloning"))
+        wanted = spec.get("instructions") if runtime == AUDIOCPP else None
+        self._instruction_option = str(wanted.get("option") if isinstance(wanted, dict) else wanted or "")
+        self._instruction_with = dict(wanted.get("with") or {}) if isinstance(wanted, dict) else {}
+        self.supports_instructions = bool(self._instruction_option)
         self.stream = bool(spec.get("stream", runtime == LLAMA)) and runtime != TONTAUBE
         if runtime == TONTAUBE:
             self.request_options = ("style", *TONTAUBE_SLIDERS, "temperature", "seed")
@@ -580,6 +588,10 @@ class ServerTTS(TTSModel):
         if language and self.spec.get("language_option"):
             # families that declare a "language" request option read it there, not from the top-level field
             extra_fields.setdefault("language", language)
+        direction = extras.instructions or self.spec.get("default_instructions")
+        if self._instruction_option and direction:
+            extra_fields[self._instruction_option] = str(direction)
+            extra_fields.update(self._instruction_with)
         extra_fields.update(extras.options)
         if extra_fields:
             body["options"] = {str(k): v for k, v in extra_fields.items()}
@@ -600,6 +612,9 @@ class ServerTTS(TTSModel):
         if self.runtime == TONTAUBE:
             yield from self._predict(body)
             return
+        yield from self._post_speech(body, cancelled)
+
+    def _post_speech(self, body: dict[str, Any], cancelled: Callable[[], bool] | None) -> Iterator[FloatArray]:
         path = "/tts" if self.runtime == LLAMA else "/v1/audio/speech"
         for attempt in (1, 2):
             started = False

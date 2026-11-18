@@ -36,6 +36,18 @@ def test_parler_voices_and_descriptions() -> None:
     assert fake_parler().describe(None).startswith("A speaker delivers")
 
 
+def test_parler_instructions_are_the_description() -> None:
+    from bolo.engines.base import SynthesisExtras
+
+    model = fake_parler(voices=[{"id": "jon", "name": "Jon"}])
+    assert model.supports_instructions and model.accepts_extras
+    assert model.describe(None, instructions="A whisper, very slow.") == "A whisper, very slow."
+    assert model.describe("jon", instructions="Angry and loud.") == "Jon's voice. Angry and loud."
+    assert model.describe("jon", instructions="Jon sounds sleepy.") == "Jon sounds sleepy."
+    list(model.synthesize("Hello.", "jon", extras=SynthesisExtras(instructions="Angry and loud.")))
+    assert model.description_tokenizer.seen == ["Jon's voice. Angry and loud."]
+
+
 def test_parler_streams_one_chunk_per_sentence() -> None:
     model = fake_parler(voices=[{"id": "jon", "name": "Jon"}])
     chunks = list(model.synthesize("Hello there. How are you today? नमस्ते। ठीक है।", "jon"))

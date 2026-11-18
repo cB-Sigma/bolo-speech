@@ -869,3 +869,64 @@ def test_check_voice_without_named_voices() -> None:
         assert "voice" not in model.build_request("Hi.", None, 1.0, None)
     finally:
         model.close()
+
+
+def test_instructions_go_to_the_option_the_audiocpp_family_reads() -> None:
+    """A request's instructions become the family's instruction option (``instruct``, or IndexTTS-2's
+    ``emotion_text`` with ``use_emotion_text``); an explicit option of the same name wins; Maya1's default is sent
+    when a request has none; families without the option, and llama-server, never get it."""
+    model = ServerTTS("audio.cpp", "x", {"model_id": "x", "instructions": "instruct"}, base_url="http://127.0.0.1:9")
+    assert model.supports_instructions
+    body = model.build_request("Hi.", None, 1.0, SynthesisExtras(instructions="Whisper, slowly."))
+    assert body["options"] == {"instruct": "Whisper, slowly."}
+    body = model.build_request(
+        "Hi.", None, 1.0, SynthesisExtras(instructions="Whisper.", options={"instruct": "Shout."})
+    )
+    assert body["options"] == {"instruct": "Shout."}
+    assert "options" not in model.build_request("Hi.", None, 1.0, SynthesisExtras())
+    model.close()
+
+    spec = {"model_id": "x", "instructions": {"option": "emotion_text", "with": {"use_emotion_text": True}}}
+    model = ServerTTS("audio.cpp", "x", spec, base_url="http://127.0.0.1:9")
+    body = model.build_request("Hi.", None, 1.0, SynthesisExtras(instructions="Sad."))
+    assert body["options"] == {"emotion_text": "Sad.", "use_emotion_text": True}
+    model.close()
+
+    spec = {"model_id": "x", "instructions": "instruct", "default_instructions": "A calm voice."}
+    model = ServerTTS("audio.cpp", "x", spec, base_url="http://127.0.0.1:9")
+    assert model.build_request("Hi.", None, 1.0, None)["options"] == {"instruct": "A calm voice."}
+    model.close()
+
+    for runtime in ("audio.cpp", "llama-server"):
+        model = ServerTTS(runtime, "x", {"model_id": "x"}, base_url="http://127.0.0.1:9")
+        assert not model.supports_instructions
+        assert "options" not in model.build_request("Hi.", None, 1.0, SynthesisExtras(instructions="Sad."))
+        model.close()
+
+
+def test_instructions_through_the_speech_api(settings: Settings, audiocpp: FakeTTSServer) -> None:
+    """``instructions`` reach a model that follows them (``x-bolo-instructions: applied``) and are reported as
+    ignored by one that does not; /v1/models lists the feature."""
+    settings.tts_servers = [f"steer={audiocpp.url}", f"plain={audiocpp.url}"]
+    srv = LiveServer(settings)
+    steer = entry("steer", "audio.cpp", server_model="ac-model", instructions="instruct")
+    steer["features"] = ["voice-cloning", "instructions"]
+    srv.core.catalog.add(ModelSpec.from_dict(steer))
+    srv.core.catalog.add(ModelSpec.from_dict(entry("plain", "audio.cpp", server_model="ac-model")))
+    srv.start()
+    try:
+        info = httpx.get(f"{srv.url}/api/v1/models/steer").json()
+        assert "instructions" in info["features"]
+        body = {"input": "Hello.", "response_format": "wav", "instructions": "Cheerful and quick."}
+        r = httpx.post(f"{srv.url}/v1/audio/speech", json={"model": "steer", **body}, timeout=30)
+        assert r.status_code == 200, r.text
+        assert r.headers["x-bolo-instructions"] == "applied"
+        assert audiocpp.requests[-1]["body"]["options"]["instruct"] == "Cheerful and quick."
+        r = httpx.post(f"{srv.url}/v1/audio/speech", json={"model": "plain", **body}, timeout=30)
+        assert r.status_code == 200, r.text
+        assert r.headers["x-bolo-instructions"] == "ignored"
+        assert "instruct" not in (audiocpp.requests[-1]["body"].get("options") or {})
+        r = httpx.post(f"{srv.url}/v1/audio/speech", json={"model": "plain", "input": "Hi.", "response_format": "wav"})
+        assert "x-bolo-instructions" not in r.headers
+    finally:
+        srv.stop()

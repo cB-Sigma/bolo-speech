@@ -442,4 +442,6 @@ export interface SpeechBody {
   /** Guess the language from the text when none is given (the server's default is true). */
   detect_language?: boolean
   pronunciations?: { word: string; ipa?: string; say?: string; lang?: string; match?: string }[]
+  /** Direction for the delivery in words, for models whose `features` include `instructions`. */
+  instructions?: string
 }
