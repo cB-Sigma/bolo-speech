@@ -24,6 +24,35 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   (`x-bolo-route: ...; recommended=<id>; pulled=true`; the console's run notes say so too). Checked on a FLEURS
   Tamil clip with only `whisper-large-v3-turbo` installed: `auto` pulled `indicconformer-ta-community` and answered
   with it.
+### Added
+
+- **Wake words and keyword spotting.** A new catalog task, `wake-word`: the sherpa-onnx keyword spotters
+  `kws-zipformer-gigaspeech` (English, any phrase you type; the default) and `kws-zipformer-zh-en` (Chinese and
+  English), openWakeWord's "hey jarvis", "alexa" and "hey mycroft" (the phrase models are CC BY-NC-SA 4.0,
+  labelled non-commercial) and microWakeWord's "okay nabu", "hey jarvis", "hey mycroft" and "alexa" (through
+  pymicro-wakeword). `POST /api/v1/wake` for a recording, `WS /api/v1/wake/stream` live, a Wyoming wake service
+  (`detect`, `detection`, `not-detected`; `<model>:<phrase>` names for your own phrases), `bolo wake FILE` and a
+  Wake word page in the console. `pip install 'bolo-speech[wake]'` adds phrases of your own for the GigaSpeech
+  spotter and microWakeWord. All nine were run on CPU on Piper's voice saying the phrases (docs/api.md, "Wake
+  words", says which each found).
+- **Echo cancellation for voice agents.** `audio.input.echo_cancellation` in a Realtime session (a bolo extension;
+  `true`, a model id or `{"model", "delay_ms"}`) removes the agent's own voice from what the session hears, with
+  the audio the session sent as the reference, before the voice-activity detector, the recogniser or a
+  speech-to-speech model hear it: no more answers cut short by their own echo on phones and devices without
+  headphones. A new catalog task, `echo-cancellation`: `speex-aec` (SpeexDSP through pyaec, the default),
+  `webrtc-aec3` (WebRTC's AEC3 through LiveKit's SDK; both `pip install 'bolo-speech[aec]'`) and `dtln-aec-128`
+  (DTLN-aec in ONNX Runtime, MIT, 7 MB). Settings `echo_cancellation` (for every session and phone call) and
+  `default_echo_cancellation`; an Echo cancellation choice on the console's Conversation page. All three run on CPU
+  on a synthetic echo: 37, 33 and 20 dB of echo removed (docs/voice-agents.md, "Echo cancellation").
+- **MCP tools in Realtime sessions.** A `{"type": "mcp", "server_label", "server_url", ...}` entry in `session.tools`
+  connects the session to a Model Context Protocol server (Streamable HTTP, or SSE); servers set up by the operator
+  (`mcp_servers`, which may also start a local server over stdio) are named by label alone. bolo lists the tools,
+  offers them to the language model as functions and calls them itself, with OpenAI's events (`mcp_list_tools`,
+  `mcp_call`, `response.mcp_call.*`) and approvals (`require_approval`, `mcp_approval_request` /
+  `mcp_approval_response`); the model then answers with the result. A session may name a server by URL on a loopback
+  bind or when requests need an API key (`realtime_mcp_urls`). Needs `bolo-speech[mcp]` (the MCP Python SDK, MIT;
+  1.x and 2.x). The console's Conversation page picks servers, shows the calls and answers approvals. Tried against
+  a server built with the MCP SDK itself, over stdio and Streamable HTTP.
 
 ### Added
 
@@ -141,24 +170,6 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   `x-bolo-segments`. `bolo dialogue script.txt --voice Asha=af_heart ...` and a Dialogue page in the console do
   the same. Run on CPU with Kokoro (two voices, stitched) and VibeVoice 1.5B (two voices, one take; slow on a CPU).
   the same. Run on CPU with Kokoro (two voices, stitched).
-- **Wake words and keyword spotting.** A new catalog task, `wake-word`: the sherpa-onnx keyword spotters
-  `kws-zipformer-gigaspeech` (English, any phrase you type; the default) and `kws-zipformer-zh-en` (Chinese and
-  English), openWakeWord's "hey jarvis", "alexa" and "hey mycroft" (the phrase models are CC BY-NC-SA 4.0,
-  labelled non-commercial) and microWakeWord's "okay nabu", "hey jarvis", "hey mycroft" and "alexa" (through
-  pymicro-wakeword). `POST /api/v1/wake` for a recording, `WS /api/v1/wake/stream` live, a Wyoming wake service
-  (`detect`, `detection`, `not-detected`; `<model>:<phrase>` names for your own phrases), `bolo wake FILE` and a
-  Wake word page in the console. `pip install 'bolo-speech[wake]'` adds phrases of your own for the GigaSpeech
-  spotter and microWakeWord. All nine were run on CPU on Piper's voice saying the phrases (docs/api.md, "Wake
-  words", says which each found).
-- **Echo cancellation for voice agents.** `audio.input.echo_cancellation` in a Realtime session (a bolo extension;
-  `true`, a model id or `{"model", "delay_ms"}`) removes the agent's own voice from what the session hears, with
-  the audio the session sent as the reference, before the voice-activity detector, the recogniser or a
-  speech-to-speech model hear it: no more answers cut short by their own echo on phones and devices without
-  headphones. A new catalog task, `echo-cancellation`: `speex-aec` (SpeexDSP through pyaec, the default),
-  `webrtc-aec3` (WebRTC's AEC3 through LiveKit's SDK; both `pip install 'bolo-speech[aec]'`) and `dtln-aec-128`
-  (DTLN-aec in ONNX Runtime, MIT, 7 MB). Settings `echo_cancellation` (for every session and phone call) and
-  `default_echo_cancellation`; an Echo cancellation choice on the console's Conversation page. All three run on CPU
-  on a synthetic echo: 37, 33 and 20 dB of echo removed (docs/voice-agents.md, "Echo cancellation").
 
 - **Speech `instructions`: style, emotion and voice direction in words.** `instructions` on `POST /v1/audio/speech`
   (and the TTS WebSocket, `bolo speak --instructions`, an Instructions box on the console's Text to speech page) is
@@ -197,15 +208,6 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - **Console: Analyse audio.** One recording through the sound-event taggers, the emotion models and the denoisers
   (listen to and download the cleaned audio). In the live demo the page tags sounds in the browser with CED tiny or
   mini on WebAssembly, nothing uploaded.
-- **MCP tools in Realtime sessions.** A `{"type": "mcp", "server_label", "server_url", ...}` entry in `session.tools`
-  connects the session to a Model Context Protocol server (Streamable HTTP, or SSE); servers set up by the operator
-  (`mcp_servers`, which may also start a local server over stdio) are named by label alone. bolo lists the tools,
-  offers them to the language model as functions and calls them itself, with OpenAI's events (`mcp_list_tools`,
-  `mcp_call`, `response.mcp_call.*`) and approvals (`require_approval`, `mcp_approval_request` /
-  `mcp_approval_response`); the model then answers with the result. A session may name a server by URL on a loopback
-  bind or when requests need an API key (`realtime_mcp_urls`). Needs `bolo-speech[mcp]` (the MCP Python SDK, MIT;
-  1.x and 2.x). The console's Conversation page picks servers, shows the calls and answers approvals. Tried against
-  a server built with the MCP SDK itself, over stdio and Streamable HTTP.
 - **Speech enhancement on its own: `POST /v1/audio/denoise`.** The recording comes back with its background noise
   removed (voice isolation), from any `denoise` model of the catalog, with `strength` (mixed with the original),
   `response_format` (WAV, MP3, FLAC, Opus, AAC, PCM, mu-law, A-law) and `sample_rate`. `stream=true` sends the audio
