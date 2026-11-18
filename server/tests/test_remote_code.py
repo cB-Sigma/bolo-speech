@@ -47,10 +47,20 @@ def test_catalog_pins_are_checked(pin: Any, message: str) -> None:
 def test_packaged_remote_code_entries_are_pinned() -> None:
     entries = [s for s in Catalog.load().all() if remote_code.pin(s) is not None]
     assert {"step-audio-2-mini", "glm-4-voice-9b", "kimi-audio-7b-instruct", "minicpm-o-2.6"} <= {s.id for s in entries}
+    assert "minicpm-o-4.5" in {s.id for s in entries}  # bolo's own duplex server, files pinned by URL
     for spec in entries:
         pin = remote_code.pin(spec)
-        assert pin is not None and pin["revision"] == spec.source.revision and pin.get("reviewed"), spec.id
-        assert spec.runnable and "allow_remote_code" in str(spec.options["plugin_install"]), spec.id
+        assert pin is not None and pin.get("reviewed") and spec.runnable, spec.id
+        if spec.source.repo:  # a repository snapshot: the reviewed commit is the one pulled
+            assert pin["revision"] == spec.source.revision, spec.id
+        else:  # files pinned one by one: each reviewed file is downloaded from the reviewed commit
+            urls = {u["path"]: u["url"] for u in spec.source.urls}
+            for name in pin["files"]:
+                assert f"/resolve/{pin['revision']}/" in urls.get(name, ""), (spec.id, name)
+        if spec.engine == "plugin:torch":  # the plugin's install hint names the opt-in
+            assert "allow_remote_code" in str(spec.options["plugin_install"]), spec.id
+        else:
+            assert "allow_remote_code" in spec.description, spec.id
 
 
 def test_the_opt_in_is_the_operators(tmp_path: Path) -> None:
