@@ -440,7 +440,7 @@ class RemoteEngine(Engine):
     id = ENGINE_ID
     name = "Cloud speech APIs (OpenAI-compatible, Sarvam, ElevenLabs, Deepgram, Soniox)"
     license = "Apache-2.0 (bolo's client); each provider's terms apply to its API"
-    url = "https://github.com/cb-Sigma/bolo/blob/main/docs/providers.md"
+    url = "https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md"
     kinds = ("remote-stt", "remote-tts", "remote-denoise")
 
     def __init__(self) -> None:

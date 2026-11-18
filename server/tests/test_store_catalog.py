@@ -223,7 +223,7 @@ def test_every_packaged_entry_is_well_formed() -> None:
         and (
             (
                 s.source.urls
-                and s.source.urls[0]["url"].startswith("https://github.com/cb-Sigma/bolo/releases/download/")
+                and s.source.urls[0]["url"].startswith("https://github.com/cB-Sigma/bolo-speech/releases/download/")
             )
             or (s.source.repo or "").startswith("codebucketsolutions/")
             # external TTS servers: upstream has no file the runtime can load yet (conversion needed, fork-only)

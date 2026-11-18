@@ -58,7 +58,7 @@ const HUB = 'https://huggingface.co/'
 const NPM = 'https://cdn.jsdelivr.net/npm/'
 
 /** Where the public demo is published: the console served by a bolo server reads the demo's copies from there. */
-const PUBLIC_DEMO = 'https://cb-sigma.github.io/bolo/'
+const PUBLIC_DEMO = 'https://cb-sigma.github.io/bolo-speech/'
 
 /** Base URL of the demo's own copies of models (`models/` next to the demo's page). */
 function siteBase(): string {

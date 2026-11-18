@@ -1220,7 +1220,7 @@
     - voice.json
     fallback:
     - path: syspin-mai-female.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-mai-female.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-mai-female.tar.gz
       size: 105730991
       sha256: 4bde66189dcfd06a1a41acefa4891f694c1535b6ea8cbc73eda6a7ee611be605
       extract: true
@@ -1252,7 +1252,7 @@
     - voice.json
     fallback:
     - path: syspin-mai-male.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-mai-male.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-mai-male.tar.gz
       size: 105628342
       sha256: 1711011e4388e2319922e6184ba764a3957ecffed13448aee66daf9e3806ee33
       extract: true
@@ -1284,7 +1284,7 @@
     - voice.json
     fallback:
     - path: syspin-bho-female.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-bho-female.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-bho-female.tar.gz
       size: 105698578
       sha256: 5b3e5d3b6088ea6a8655ef3ed9b8d444a845f4559e6d3aedd6dd71f5260f6c22
       extract: true
@@ -1316,7 +1316,7 @@
     - voice.json
     fallback:
     - path: syspin-bho-male.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-bho-male.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-bho-male.tar.gz
       size: 105679741
       sha256: 420592f0567a8dcd75e55332698ac48e239cb6e103774b9f45db140a7c5c6b78
       extract: true
@@ -1348,7 +1348,7 @@
     - voice.json
     fallback:
     - path: syspin-hi-female.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-hi-female.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-hi-female.tar.gz
       size: 105444567
       sha256: 0c8c579060f39082cd6aca58b16654f8bde6b867c76981054f893291975d2f6f
       extract: true
@@ -1380,7 +1380,7 @@
     - voice.json
     fallback:
     - path: syspin-hi-male.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-hi-male.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-hi-male.tar.gz
       size: 105467591
       sha256: 8a5e584b8b08f006d22b245764415fd0aad05b34479966dacc8d9341073e5d8c
       extract: true
@@ -1412,7 +1412,7 @@
     - voice.json
     fallback:
     - path: syspin-bn-female.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-bn-female.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-bn-female.tar.gz
       size: 105501785
       sha256: e21bc57f52e89cbaed443b833e7a5bfd8e42097a107919389e36524ecdf673f6
       extract: true
@@ -1444,7 +1444,7 @@
     - voice.json
     fallback:
     - path: syspin-bn-male.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-bn-male.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-bn-male.tar.gz
       size: 105624187
       sha256: 3cb7ffcbe178bfd635dcdee5711be06eae0a06682cfe307795ed554b93be3c4a
       extract: true
@@ -1476,7 +1476,7 @@
     - voice.json
     fallback:
     - path: syspin-mr-female.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-mr-female.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-mr-female.tar.gz
       size: 105705739
       sha256: 9c5163b2b58dd22a271c4a27be8853a8ae3e765bf8f4f64490f72b18ad69f013
       extract: true
@@ -1508,7 +1508,7 @@
     - voice.json
     fallback:
     - path: syspin-mr-male.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-mr-male.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-mr-male.tar.gz
       size: 105566723
       sha256: 873cbfeee42cf129b05c9f5ca5f3f9ca4b057e2887805c9dd4ae49f280d7af8b
       extract: true
@@ -1540,7 +1540,7 @@
     - voice.json
     fallback:
     - path: syspin-te-female.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-te-female.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-te-female.tar.gz
       size: 105762303
       sha256: c6b672304e517c4f232082af2d409d679c8f402f3962eac4e813678e068f206a
       extract: true
@@ -1572,7 +1572,7 @@
     - voice.json
     fallback:
     - path: syspin-te-male.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-te-male.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-te-male.tar.gz
       size: 105761689
       sha256: 7eefebd79bf2aa7515f0ef3fa33abb3f0c43b606c91592282f69a3dfc70bc92f
       extract: true
@@ -1604,7 +1604,7 @@
     - voice.json
     fallback:
     - path: syspin-kn-female.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-kn-female.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-kn-female.tar.gz
       size: 105428221
       sha256: 425d846f77ffa6b912e1583d583ce920a1191d72f866d46fbe1d687f5f01ad68
       extract: true
@@ -1636,7 +1636,7 @@
     - voice.json
     fallback:
     - path: syspin-kn-male.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-kn-male.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-kn-male.tar.gz
       size: 105536086
       sha256: 56e6cf26ef0bb6fa32c92363699fefa45a5f5e8f1ec66dcbd302b6f86568e383
       extract: true
@@ -1668,7 +1668,7 @@
     - voice.json
     fallback:
     - path: syspin-gu-female.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-gu-female.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-gu-female.tar.gz
       size: 105556104
       sha256: 624e43890910024bf6b3e9f864772a7ad894de7cdd2f33f4582298aa4c12a5ae
       extract: true
@@ -1700,7 +1700,7 @@
     - voice.json
     fallback:
     - path: syspin-gu-male.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-gu-male.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-gu-male.tar.gz
       size: 105447942
       sha256: 278231a89eb33a220bfe254a810898b90dad991c74f8e2e203101a3995dbddb7
       extract: true
@@ -1732,7 +1732,7 @@
     - voice.json
     fallback:
     - path: syspin-mag-female.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-mag-female.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-mag-female.tar.gz
       size: 105639227
       sha256: 5da8ddb42a2f7ec7c975155c9e5434d7ad69b84d296e09ef7634f40caee12ea2
       extract: true
@@ -1764,7 +1764,7 @@
     - voice.json
     fallback:
     - path: syspin-mag-male.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-mag-male.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-mag-male.tar.gz
       size: 105451658
       sha256: d497ad7d1bec21cf1d82d476a9cbecace6154ae82c27fc16274263017c9d356e
       extract: true
@@ -1796,7 +1796,7 @@
     - voice.json
     fallback:
     - path: syspin-hne-female.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-hne-female.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-hne-female.tar.gz
       size: 105696828
       sha256: aa77865fa95aacf8a33ff5b7319fe1899829f74f52c6c5fb381b297d34bce086
       extract: true
@@ -1828,7 +1828,7 @@
     - voice.json
     fallback:
     - path: syspin-hne-male.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-hne-male.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-hne-male.tar.gz
       size: 105511970
       sha256: 8393b61376f3c1e3c79bd83b139f0f0e7f3f7d8499887fdc3914a2f5ba4641a8
       extract: true
@@ -1860,7 +1860,7 @@
     - voice.json
     fallback:
     - path: syspin-en-female.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-en-female.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-en-female.tar.gz
       size: 105518220
       sha256: 561e59a0c22f36d472e4cbb59b18ee8c20fe46f2e08957cd6c816b9d1e5ec366
       extract: true
@@ -1892,7 +1892,7 @@
     - voice.json
     fallback:
     - path: syspin-en-male.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/syspin-en-male.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/syspin-en-male.tar.gz
       size: 105643456
       sha256: d6e65497c38665ea85e52508fa0912d228eef09b4a2a4a9087b33a518c66e438
       extract: true

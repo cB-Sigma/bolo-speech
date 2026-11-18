@@ -43,7 +43,7 @@ export function boloVersion(): string | null {
 }
 
 /** Where the live demo is published; used for absolute social-preview URLs. */
-const DEMO_URL = 'https://cb-sigma.github.io/bolo/'
+const DEMO_URL = 'https://cb-sigma.github.io/bolo-speech/'
 
 /**
  * Extras for the static live demo (`vite build --mode demo`): the service

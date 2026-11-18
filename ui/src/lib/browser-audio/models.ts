@@ -177,7 +177,7 @@ export const AUDIO_MODELS: AudioModel[] = [
     peakBytes: 0,
     rate: 16000,
     license: 'Apache-2.0',
-    source: 'https://github.com/cB-Sigma/bolo',
+    source: 'https://github.com/cB-Sigma/bolo-speech',
     blurb: 'No model: loudness above the room’s noise floor. Nothing to download; fooled by noise.',
     webgpu: false,
     device: 'wasm',

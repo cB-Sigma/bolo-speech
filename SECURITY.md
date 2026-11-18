@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please do not open a public issue for a security problem. Use GitHub's
-[private vulnerability reporting](https://github.com/cb-Sigma/bolo/security/advisories/new)
+[private vulnerability reporting](https://github.com/cB-Sigma/bolo-speech/security/advisories/new)
 instead. You should get an acknowledgement within a week. Please include the
 version (`bolo --version`), how to reproduce the problem, and what an attacker
 gains.

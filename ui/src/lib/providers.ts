@@ -18,7 +18,7 @@ export const PROVIDER_KIND_NOTE: Record<string, string> = {
 }
 
 export const PROVIDER_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,39}$/
-export const DOCS_PROVIDERS = 'https://github.com/cb-Sigma/bolo/blob/main/docs/providers.md'
+export const DOCS_PROVIDERS = 'https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md'
 
 /** The name the catalog's entries of a kind look for. */
 export function catalogName(kind: string): string {

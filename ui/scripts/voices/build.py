@@ -81,7 +81,7 @@ from the rhasspy/piper-voices repository (MIT licence), revision {revision}.
 Training data and its licence: see MODEL_CARD in this directory.
 
 Weights shrunk for the browser by ui/scripts/voices/build.py of the bolo project
-(https://github.com/cb-Sigma/bolo): 8-bit convolution weights outside the text
+(https://github.com/cB-Sigma/bolo-speech): 8-bit convolution weights outside the text
 encoder, 16-bit elsewhere. Not retrained.
 """
 

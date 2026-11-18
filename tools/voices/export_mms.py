@@ -54,7 +54,7 @@ def attribution(voice: dict[str, Any], spec: dict[str, Any]) -> str:
         "https://creativecommons.org/licenses/by-nc/4.0/ (full text in LICENSE). NON-COMMERCIAL USE ONLY.\n\n"
         "Changes: format conversion only (PyTorch checkpoint to ONNX with the original VITS inference code,\n"
         f"{spec['code_repo']} at revision {spec['code_revision']}), made with tools/voices/export_mms.py of the\n"
-        "bolo project (https://github.com/cb-Sigma/bolo). The weights were not retrained or otherwise changed.\n"
+        "bolo project (https://github.com/cB-Sigma/bolo-speech). The weights were not retrained or otherwise changed.\n"
         "Inference code: VITS, MIT licence, Copyright (c) 2021 Jaehyeon Kim.\n"
     )
 

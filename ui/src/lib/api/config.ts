@@ -125,4 +125,4 @@ export const isDemo = import.meta.env.VITE_BOLO_DEMO === '1'
 
 /** How to get a real server; shown wherever the demo cannot do something. */
 export const INSTALL_COMMAND = "uv tool install 'bolo-speech[all]'"
-export const REPO_URL = 'https://github.com/cb-Sigma/bolo'
+export const REPO_URL = 'https://github.com/cB-Sigma/bolo-speech'

@@ -31,7 +31,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 CATALOG_DIR = ROOT / "server" / "src" / "bolo" / "catalog"
 DEFAULT_CATALOGS = [CATALOG_DIR / n for n in ("tts.yaml", "tts-mms.yaml", "stt-faster-whisper.yaml")]
-RELEASE_URL = "https://github.com/cb-Sigma/bolo/releases/download/{tag}/"
+RELEASE_URL = "https://github.com/cB-Sigma/bolo-speech/releases/download/{tag}/"
 
 
 def update_file(path: Path, published: dict[str, Any], base: str) -> tuple[list[str], list[str]]:

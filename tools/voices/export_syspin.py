@@ -82,7 +82,7 @@ def attribution(voice: dict[str, Any]) -> str:
         "Training data: the SYSPIN text-to-speech corpus (IISc), licensed CC-BY-4.0\n"
         "(https://creativecommons.org/licenses/by/4.0/).\n\n"
         "This archive is a format conversion (Coqui VITS checkpoint to ONNX) made with\n"
-        "tools/voices/export_syspin.py of the bolo project (https://github.com/cb-Sigma/bolo).\n"
+        "tools/voices/export_syspin.py of the bolo project (https://github.com/cB-Sigma/bolo-speech).\n"
         "The weights were not retrained or otherwise changed.\n"
     )
 

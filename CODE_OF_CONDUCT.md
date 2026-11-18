@@ -34,7 +34,7 @@ other contributions that do not follow them.
 
 Report unacceptable behaviour privately through GitHub's "Report abuse"
 function on the offending content, or by opening a
-[private security advisory](https://github.com/cb-Sigma/bolo/security/advisories/new)
+[private security advisory](https://github.com/cB-Sigma/bolo-speech/security/advisories/new)
 marked "conduct". Reports are reviewed promptly and the reporter's identity is
 kept confidential.
 

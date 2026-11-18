@@ -1,6 +1,6 @@
 {
   "about": "Voices published with the live demo for in-browser speech synthesis. Read by build.py; the console's own list is ui/src/lib/browser-tts/voices.ts (keep the ids in step).",
-  "syspin_release": "https://github.com/cb-Sigma/bolo/releases/download/voices-v1/",
+  "syspin_release": "https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/",
   "voices": [
     {
       "id": "syspin-hi-female",

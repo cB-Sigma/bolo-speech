@@ -624,7 +624,7 @@ export function hubUrl(url: string): string {
 const KEY = 'bolo.browserTts'
 
 /** Public copy of the voices, used by consoles that do not ship them (the one served by `bolo serve`). */
-export const PUBLIC_VOICES = 'https://cb-sigma.github.io/bolo/voices/'
+export const PUBLIC_VOICES = 'https://cb-sigma.github.io/bolo-speech/voices/'
 
 export function readBrowserTtsConfig(): BrowserTtsConfig {
   try {

@@ -132,10 +132,10 @@ bolo-torch = "bolo_torch.cli:main"
 torch = "bolo_torch:plugin"
 
 [project.urls]
-Homepage = "https://github.com/cb-Sigma/bolo/tree/main/plugins/bolo-torch"
-Documentation = "https://github.com/cb-Sigma/bolo/blob/main/plugins/bolo-torch/README.md"
-Issues = "https://github.com/cb-Sigma/bolo/issues"
-Changelog = "https://github.com/cb-Sigma/bolo/blob/main/plugins/bolo-torch/CHANGELOG.md"
+Homepage = "https://github.com/cB-Sigma/bolo-speech/tree/main/plugins/bolo-torch"
+Documentation = "https://github.com/cB-Sigma/bolo-speech/blob/main/plugins/bolo-torch/README.md"
+Issues = "https://github.com/cB-Sigma/bolo-speech/issues"
+Changelog = "https://github.com/cB-Sigma/bolo-speech/blob/main/plugins/bolo-torch/CHANGELOG.md"
 
 [tool.hatch.version]
 path = "src/bolo_torch/__init__.py"

@@ -73,7 +73,7 @@ def model_card(entry: dict[str, Any], attribution: str, measured: dict[str, Any]
         f"# {entry['id']}",
         "",
         f"{entry['language_name']} {'voice' if task == 'tts' else 'speech recogniser'} converted for "
-        "[bolo](https://github.com/cb-Sigma/bolo), a speech server that runs without PyTorch "
+        "[bolo](https://github.com/cB-Sigma/bolo-speech), a speech server that runs without PyTorch "
         f"({'sherpa-onnx' if task == 'tts' else 'faster-whisper / CTranslate2'}).",
         "",
         "## Use it",

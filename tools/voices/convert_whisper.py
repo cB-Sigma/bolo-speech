@@ -39,7 +39,7 @@ def attribution(model: dict[str, Any]) -> str:
         f"Base model: {model['base']}. Training data: {model['data']}.\n"
         f"Licence: {model['license']} ({model['license_url']}); full text in LICENSE.\n\n"
         "Changes: format conversion only (transformers checkpoint to CTranslate2, int8 weights), made with\n"
-        "tools/voices/convert_whisper.py of the bolo project (https://github.com/cb-Sigma/bolo).\n"
+        "tools/voices/convert_whisper.py of the bolo project (https://github.com/cB-Sigma/bolo-speech).\n"
         "The weights were not retrained.\n"
     )
 

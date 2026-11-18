@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://cb-sigma.github.io/bolo/">
+  <a href="https://cb-sigma.github.io/bolo-speech/">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/banner-dark.png">
       <source media="(prefers-color-scheme: light)" srcset="docs/assets/brand/banner-light.png">
@@ -15,14 +15,14 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/cb-Sigma/bolo/actions/workflows/ci.yml"><img src="https://github.com/cb-Sigma/bolo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/cB-Sigma/bolo-speech/actions/workflows/ci.yml"><img src="https://github.com/cB-Sigma/bolo-speech/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-1f62b3" alt="License: Apache-2.0"></a>
   <a href="https://pypi.org/project/bolo-speech/"><img src="https://img.shields.io/pypi/v/bolo-speech?color=1f62b3" alt="PyPI"></a>
   <img src="https://img.shields.io/badge/API-OpenAI%20compatible-1f62b3" alt="OpenAI-compatible API">
 </p>
 
 <p align="center">
-  <a href="https://cb-sigma.github.io/bolo/"><img src="docs/assets/brand/button-live-demo.png" alt="Try the live demo" width="233"></a>
+  <a href="https://cb-sigma.github.io/bolo-speech/"><img src="docs/assets/brand/button-live-demo.png" alt="Try the live demo" width="233"></a>
 </p>
 
 **bolo** (बोलो, "speak") pulls speech models by name, like Ollama does for language models, and serves them over
@@ -47,7 +47,7 @@ the OpenAI audio and Realtime APIs. On top of speech-to-text and text-to-speech 
   transfers and per-call latency.
 
 It runs on the CPU, and on an NVIDIA GPU or through DirectML when there is one. A web console comes with it, and a
-[live demo](https://cb-sigma.github.io/bolo/) runs models in your browser with nothing to install. bolo is alpha:
+[live demo](https://cb-sigma.github.io/bolo-speech/) runs models in your browser with nothing to install. bolo is alpha:
 [what was tested where](#status).
 
 <p align="center">
@@ -294,7 +294,7 @@ These are small samples that show the pipelines work, not accuracy benchmarks, a
 
 ## The console
 
-Served at `/` by the same process, and as a browser-only [live demo](https://cb-sigma.github.io/bolo/).
+Served at `/` by the same process, and as a browser-only [live demo](https://cb-sigma.github.io/bolo-speech/).
 
 | Page | What it is for |
 | --- | --- |

@@ -127,10 +127,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/cb-Sigma/bolo"
-Documentation = "https://github.com/cb-Sigma/bolo/tree/main/docs"
-Issues = "https://github.com/cb-Sigma/bolo/issues"
-Changelog = "https://github.com/cb-Sigma/bolo/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/cB-Sigma/bolo-speech"
+Documentation = "https://github.com/cB-Sigma/bolo-speech/tree/main/docs"
+Issues = "https://github.com/cB-Sigma/bolo-speech/issues"
+Changelog = "https://github.com/cB-Sigma/bolo-speech/blob/main/CHANGELOG.md"
 
 [project.scripts]
 bolo = "bolo.cli:main"

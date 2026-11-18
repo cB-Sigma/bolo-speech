@@ -39,7 +39,7 @@ sys.path.insert(0, str(HERE.parent / "voices"))
 from build import coqui_ids  # noqa: E402
 
 RATE = 24000
-PAGES = "https://cb-sigma.github.io/bolo/voices/"
+PAGES = "https://cb-sigma.github.io/bolo-speech/voices/"
 KOKORO = "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/"
 
 CREDITS = {

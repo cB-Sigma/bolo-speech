@@ -45,7 +45,7 @@
     - voice.json
     fallback:
     - path: mms-tts-pan.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-pan.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/mms-tts-pan.tar.gz
       size: 105245211
       sha256: 5c1cc0988f863e76d67ea1b3ff26960720a1e46ad95edf5a7044f559427b71cf
       extract: true
@@ -93,7 +93,7 @@
     - voice.json
     fallback:
     - path: mms-tts-ory.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-ory.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/mms-tts-ory.tar.gz
       size: 105226828
       sha256: 6d9e3b3e59f107d320cef0f77cdc486738e6441a20e714093c16988c96cddb48
       extract: true
@@ -141,7 +141,7 @@
     - voice.json
     fallback:
     - path: mms-tts-asm.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-asm.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/mms-tts-asm.tar.gz
       size: 105232657
       sha256: d919c1008974a55a35a5f5a064a8c096c904a70a7faef4b91bb94ddca8b35921
       extract: true
@@ -189,7 +189,7 @@
     - voice.json
     fallback:
     - path: mms-tts-dgo.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-dgo.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/mms-tts-dgo.tar.gz
       size: 105228936
       sha256: 093465749c33c127cc26332a6b3c9a8acba8eddd4e58be21fc3a5e7e62d101b2
       extract: true
@@ -237,7 +237,7 @@
     - voice.json
     fallback:
     - path: mms-tts-mai.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-mai.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/mms-tts-mai.tar.gz
       size: 105198186
       sha256: 38956b4de93a101d1fb55cb1fb49bb17e2428860110370af3061d5173d8008f8
       extract: true
@@ -285,7 +285,7 @@
     - voice.json
     fallback:
     - path: mms-tts-mag.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-mag.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/mms-tts-mag.tar.gz
       size: 105245014
       sha256: 7edd771a24bb10ac9d3cd0a5db07f67668fe49791c2e3561fff7d797cea5cccf
       extract: true
@@ -333,7 +333,7 @@
     - voice.json
     fallback:
     - path: mms-tts-hne.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-hne.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/mms-tts-hne.tar.gz
       size: 105225754
       sha256: a325a6c7a763e61719b237d6d66267b9b8f717e0e4bb60254b46756234432a1f
       extract: true
@@ -369,7 +369,7 @@
     - voice.json
     fallback:
     - path: mms-tts-awa.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-awa.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/mms-tts-awa.tar.gz
       size: 105221279
       sha256: 7aadd7bc32cd7a8f7fee475d0e525bce06f2d56d1d743bf7d783babc98b0b1cd
       extract: true
@@ -405,7 +405,7 @@
     - voice.json
     fallback:
     - path: mms-tts-bgc.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-bgc.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/mms-tts-bgc.tar.gz
       size: 105236345
       sha256: 5ef8f9ebc761133a4d02ec3a430c0c7e2496901c72750879c5162e1e36720ee4
       extract: true
@@ -453,7 +453,7 @@
     - voice.json
     fallback:
     - path: mms-tts-urd.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-urd.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/mms-tts-urd.tar.gz
       size: 105222621
       sha256: 65a903e3e5124f96c013602fa1b5e4d9f846b0ce115f9bdc1508439c76de1e53
       extract: true
@@ -489,7 +489,7 @@
     - voice.json
     fallback:
     - path: mms-tts-hin.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-hin.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/mms-tts-hin.tar.gz
       size: 105241778
       sha256: 95d1f3f3cbcf5c4ed82dabffe2cfd9c347748c914273c6df040657bb2c59f2b6
       extract: true
@@ -525,7 +525,7 @@
     - voice.json
     fallback:
     - path: mms-tts-ben.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-ben.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/mms-tts-ben.tar.gz
       size: 105225872
       sha256: a1d1ab331cdf8c1897f8084e5a2743bdf0057a1fb7c8b5409b98f4aa59f37ab6
       extract: true
@@ -561,7 +561,7 @@
     - voice.json
     fallback:
     - path: mms-tts-guj.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-guj.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/mms-tts-guj.tar.gz
       size: 105238597
       sha256: 001dd43d98bd6ddf7c22d278b5e09b72877c4b4745ac69244ed17d22dcefeae7
       extract: true
@@ -597,7 +597,7 @@
     - voice.json
     fallback:
     - path: mms-tts-kan.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-kan.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/mms-tts-kan.tar.gz
       size: 105232501
       sha256: 59ddbf5aad2ede24b554ca4aca9904adf9b306c329a5c1ea0031a23405128bed
       extract: true
@@ -633,7 +633,7 @@
     - voice.json
     fallback:
     - path: mms-tts-mal.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-mal.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/mms-tts-mal.tar.gz
       size: 105245136
       sha256: 689248e56685e06d7736206d081709e1692a05a5050262867d17000888f76b2a
       extract: true
@@ -669,7 +669,7 @@
     - voice.json
     fallback:
     - path: mms-tts-mar.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-mar.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/mms-tts-mar.tar.gz
       size: 105227837
       sha256: 5763fef9c1062cc64ddc4a073cdb01aff23e24092a490ba759853d4b82621335
       extract: true
@@ -705,7 +705,7 @@
     - voice.json
     fallback:
     - path: mms-tts-tam.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-tam.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/mms-tts-tam.tar.gz
       size: 105211530
       sha256: b8b0cd23352238cee76109a92925a12afe468ecce427b9d47cd77c86e546b0f0
       extract: true
@@ -741,7 +741,7 @@
     - voice.json
     fallback:
     - path: mms-tts-tel.tar.gz
-      url: https://github.com/cb-Sigma/bolo/releases/download/voices-v1/mms-tts-tel.tar.gz
+      url: https://github.com/cB-Sigma/bolo-speech/releases/download/voices-v1/mms-tts-tel.tar.gz
       size: 105231672
       sha256: 18c162e2db5730fa18910366a3db677ed2752b552e4f0b023f92aa6ad323159c
       extract: true

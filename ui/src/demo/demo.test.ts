@@ -7,7 +7,7 @@ import { DemoBackend, isApiUrl } from './backend'
 
 let backend: DemoBackend
 const get = async <T>(path: string, init?: RequestInit) => {
-  const res = await backend.handle(`https://cb-sigma.github.io/bolo/${path}`, init)
+  const res = await backend.handle(`https://cb-sigma.github.io/bolo-speech/${path}`, init)
   return { status: res.status, body: (res.status === 204 ? null : await res.json()) as T }
 }
 
@@ -19,9 +19,9 @@ afterEach(clearBrowserTraces)
 
 describe('demo backend', () => {
   it('recognises API URLs under the Pages sub-path', () => {
-    expect(isApiUrl('https://cb-sigma.github.io/bolo/api/v1/info')).toBe(true)
-    expect(isApiUrl('https://cb-sigma.github.io/bolo/healthz')).toBe(true)
-    expect(isApiUrl('https://cb-sigma.github.io/bolo/assets/index.js')).toBe(false)
+    expect(isApiUrl('https://cb-sigma.github.io/bolo-speech/api/v1/info')).toBe(true)
+    expect(isApiUrl('https://cb-sigma.github.io/bolo-speech/healthz')).toBe(true)
+    expect(isApiUrl('https://cb-sigma.github.io/bolo-speech/assets/index.js')).toBe(false)
     expect(isApiUrl('https://huggingface.co/api/v1x')).toBe(false)
   })
 

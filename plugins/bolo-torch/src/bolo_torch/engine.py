@@ -54,7 +54,7 @@ class TorchEngine(Engine):
     id = "torch"
     name = "torch"
     license = "Apache-2.0"
-    url = "https://github.com/cb-Sigma/bolo/tree/main/plugins/bolo-torch"
+    url = "https://github.com/cB-Sigma/bolo-speech/tree/main/plugins/bolo-torch"
 
     def __init__(self, loaders: dict[str, Loader | tuple[str, str]] | None = None) -> None:
         self.loaders: dict[str, Loader | tuple[str, str]] = dict(LOADERS if loaders is None else loaders)

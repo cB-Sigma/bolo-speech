@@ -69,7 +69,7 @@ tags: [onnx, whisper, speaker-diarization, target-speaker-asr, dicow]
 # DiCoW v3.3, ONNX
 
 ONNX export of [{repo}](https://huggingface.co/{repo}) (revision `{revision}`) for
-[bolo](https://github.com/cb-Sigma/bolo), which runs it with ONNX Runtime and NumPy, without PyTorch.
+[bolo](https://github.com/cB-Sigma/bolo-speech), which runs it with ONNX Runtime and NumPy, without PyTorch.
 DiCoW (Diarization-Conditioned Whisper) is Whisper large-v3-turbo conditioned on per-frame speaker activity
 (silence / target / non-target / overlap masks), so a recording is transcribed once per diarized speaker,
 overlapping speech included. The model is by the Speech@FIT group of Brno University of Technology and is

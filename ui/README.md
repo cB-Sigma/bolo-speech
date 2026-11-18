@@ -92,7 +92,7 @@ storage key at run time, to point the console at a different origin.
 ## Live demo (GitHub Pages)
 
 `npm run build:demo` produces a static site with no server behind it, published by
-`.github/workflows/pages.yml` to <https://cb-sigma.github.io/bolo/>. In this build:
+`.github/workflows/pages.yml` to <https://cb-sigma.github.io/bolo-speech/>. In this build:
 
 - Speech to text really runs, in the page, with the in-browser recogniser (microphone, file upload
   and three bundled samples, one of them Hindi). Nothing is simulated and no audio leaves the

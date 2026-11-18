@@ -67,7 +67,7 @@ test('a Pages-like host sends no isolation headers; the service worker supplies 
   // Link previews: absolute image URL and a description.
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
     'content',
-    'https://cb-sigma.github.io/bolo/og.png',
+    'https://cb-sigma.github.io/bolo-speech/og.png',
   )
   await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary_large_image')
 })

@@ -1060,7 +1060,7 @@ uccharan 0.6.4 is the new minimum.
   saved voices in the voice picker of cloning models, and "Save as a voice" in the clone panel.
 - **Brand**: the tagline under "Ollama for speech." is now "Speech-to-text, text-to-speech and voice agents on your
   own machine." (banners, social preview, README, the console's share descriptions).
-- **Live demo: Clone a voice** (<https://cb-sigma.github.io/bolo/>, everything in the visitor's browser, nothing
+- **Live demo: Clone a voice** (<https://cb-sigma.github.io/bolo-speech/>, everything in the visitor's browser, nothing
   uploaded; tested in headless Chromium on a CPU). Record (after a consent tick) or upload 5 to 30 s of speech, or
   pick one of three synthetic example voices; the recogniser in the page fills in the transcript; the voice is spoken
   back with streaming playback, time to first audio, real-time factor, a WAV download and a speaker-similarity score
@@ -1249,7 +1249,7 @@ Everything on the GPU side is tested with fakes only: no GPU was used.
 - **Homebrew**: `brew install cb-sigma/tap/bolo` (macOS 14 or later, Linux), then `brew services start bolo`. The
   formula lives in [cB-Sigma/homebrew-tap](https://github.com/cB-Sigma/homebrew-tap), installs `all` and follows
   new releases by itself.
-- **Live demo** (<https://cb-sigma.github.io/bolo/>, everything in the visitor's browser; tested in headless
+- **Live demo** (<https://cb-sigma.github.io/bolo-speech/>, everything in the visitor's browser; tested in headless
   Chromium on a CPU, with WebGPU and phones faked):
   - **Speech to text: 28 models** (Moonshine, Whisper Tiny to Large v3 Turbo, Distil-Whisper, Hindi and Hinglish
     Whisper fine-tunes, IndicWav2Vec Hindi, Moonshine for Arabic, Chinese, Japanese, Korean, Ukrainian, Vietnamese

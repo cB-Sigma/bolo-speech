@@ -1331,7 +1331,7 @@ switch: with `auto_pull` off nothing is downloaded unless you ask.
 Some good voices exist only as PyTorch checkpoints. bolo has no PyTorch, so
 the project converts them once, in the open (`tools/voices/` and the "Voices"
 workflow), and publishes the results as assets of a GitHub release of this
-repository (`https://github.com/cb-Sigma/bolo/releases/tag/voices-v1`) and as one
+repository (`https://github.com/cB-Sigma/bolo-speech/releases/tag/voices-v1`) and as one
 public repository per voice under `codebucketsolutions/` on Hugging Face (the
 catalog pulls from the Hub, pinned to the uploaded commit, with the release
 archive as fallback). Each archive

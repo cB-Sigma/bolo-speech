@@ -379,7 +379,7 @@ then the "Live demo" workflow (it also runs by itself when "Voices" completes). 
 grows by about 320 MB; the largest single file is 36.5 MB.
 
 The console served by `bolo serve` fetches the voices from the public demo
-(`https://cb-sigma.github.io/bolo/voices/`; GitHub Pages sends `Access-Control-Allow-Origin: *`).
+(`https://cb-sigma.github.io/bolo-speech/voices/`; GitHub Pages sends `Access-Control-Allow-Origin: *`).
 To use a copy of your own: `localStorage.setItem('bolo.browserTts', JSON.stringify({ voicesBase:
 'https://static.internal.example/voices/' }))`. A natural follow-up is for the server to offer
 the voices it has installed under its own origin. With a Content-Security-Policy, add the voices

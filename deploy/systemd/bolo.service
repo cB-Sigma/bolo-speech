@@ -7,7 +7,7 @@
 #   sudo systemctl daemon-reload && sudo systemctl enable --now bolo
 [Unit]
 Description=bolo speech server
-Documentation=https://github.com/cb-Sigma/bolo
+Documentation=https://github.com/cB-Sigma/bolo-speech
 After=network-online.target
 Wants=network-online.target
 

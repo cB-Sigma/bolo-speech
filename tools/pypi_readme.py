@@ -2,8 +2,8 @@
 """Write the copy of README.md that goes into the Python package.
 
 PyPI shows the package's README on its own site, where relative links and images lead nowhere.
-This rewrites them to absolute URLs: links to https://github.com/cB-Sigma/bolo/blob/main/...
-(tree/main for directories) and images to https://raw.githubusercontent.com/cB-Sigma/bolo/main/...
+This rewrites them to absolute URLs: links to https://github.com/cB-Sigma/bolo-speech/blob/main/...
+(tree/main for directories) and images to https://raw.githubusercontent.com/cB-Sigma/bolo-speech/main/...
 Text inside code blocks and code spans is left alone.
 
     python tools/pypi_readme.py README.md server/README.md           # write
@@ -16,8 +16,8 @@ import re
 import sys
 from pathlib import Path
 
-REPO = "https://github.com/cB-Sigma/bolo"
-RAW = "https://raw.githubusercontent.com/cB-Sigma/bolo/main"
+REPO = "https://github.com/cB-Sigma/bolo-speech"
+RAW = "https://raw.githubusercontent.com/cB-Sigma/bolo-speech/main"
 IMAGE = (".png", ".gif", ".jpg", ".jpeg", ".svg", ".webp")
 
 

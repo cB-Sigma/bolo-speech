@@ -1,9 +1,9 @@
 <p align="center">
-  <a href="https://cb-sigma.github.io/bolo/">
+  <a href="https://cb-sigma.github.io/bolo-speech/">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/cB-Sigma/bolo/main/docs/assets/brand/banner-dark.png">
-      <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/cB-Sigma/bolo/main/docs/assets/brand/banner-light.png">
-      <img src="https://raw.githubusercontent.com/cB-Sigma/bolo/main/docs/assets/brand/banner-dark.png" alt="bolo: Ollama for speech. Speech-to-text, text-to-speech and voice agents on your own machine." width="100%">
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/cB-Sigma/bolo-speech/main/docs/assets/brand/banner-dark.png">
+      <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/cB-Sigma/bolo-speech/main/docs/assets/brand/banner-light.png">
+      <img src="https://raw.githubusercontent.com/cB-Sigma/bolo-speech/main/docs/assets/brand/banner-dark.png" alt="bolo: Ollama for speech. Speech-to-text, text-to-speech and voice agents on your own machine." width="100%">
     </picture>
   </a>
 </p>
@@ -15,14 +15,14 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/cb-Sigma/bolo/actions/workflows/ci.yml"><img src="https://github.com/cb-Sigma/bolo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/cB-Sigma/bolo/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-1f62b3" alt="License: Apache-2.0"></a>
+  <a href="https://github.com/cB-Sigma/bolo-speech/actions/workflows/ci.yml"><img src="https://github.com/cB-Sigma/bolo-speech/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/cB-Sigma/bolo-speech/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-1f62b3" alt="License: Apache-2.0"></a>
   <a href="https://pypi.org/project/bolo-speech/"><img src="https://img.shields.io/pypi/v/bolo-speech?color=1f62b3" alt="PyPI"></a>
   <img src="https://img.shields.io/badge/API-OpenAI%20compatible-1f62b3" alt="OpenAI-compatible API">
 </p>
 
 <p align="center">
-  <a href="https://cb-sigma.github.io/bolo/"><img src="https://raw.githubusercontent.com/cB-Sigma/bolo/main/docs/assets/brand/button-live-demo.png" alt="Try the live demo" width="233"></a>
+  <a href="https://cb-sigma.github.io/bolo-speech/"><img src="https://raw.githubusercontent.com/cB-Sigma/bolo-speech/main/docs/assets/brand/button-live-demo.png" alt="Try the live demo" width="233"></a>
 </p>
 
 **bolo** (बोलो, "speak") pulls speech models by name, like Ollama does for language models, and serves them over
@@ -47,11 +47,11 @@ the OpenAI audio and Realtime APIs. On top of speech-to-text and text-to-speech 
   transfers and per-call latency.
 
 It runs on the CPU, and on an NVIDIA GPU or through DirectML when there is one. A web console comes with it, and a
-[live demo](https://cb-sigma.github.io/bolo/) runs models in your browser with nothing to install. bolo is alpha:
+[live demo](https://cb-sigma.github.io/bolo-speech/) runs models in your browser with nothing to install. bolo is alpha:
 [what was tested where](#status).
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/cB-Sigma/bolo/main/docs/assets/console-playground.gif" alt="Animated capture of the speech-to-text playground: words appear as audio streams in, then the latency timeline shows how long the final transcript took after speech ended" width="900">
+  <img src="https://raw.githubusercontent.com/cB-Sigma/bolo-speech/main/docs/assets/console-playground.gif" alt="Animated capture of the speech-to-text playground: words appear as audio streams in, then the latency timeline shows how long the final transcript took after speech ended" width="900">
 </p>
 
 <p align="center">
@@ -111,29 +111,29 @@ For a voice agent, point bolo at any OpenAI-compatible language model and connec
 bolo serve --llm-base-url http://127.0.0.1:11434/v1 --llm-model llama3.2      # Ollama, for example
 ```
 
-More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming): [examples/](https://github.com/cB-Sigma/bolo/tree/main/examples/).
+More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming): [examples/](https://github.com/cB-Sigma/bolo-speech/tree/main/examples/).
 
 ## What it does
 
 | | | More |
 | --- | --- | --- |
-| **OpenAI-compatible speech APIs** | `/v1/audio/transcriptions` (json, text, srt, vtt, verbose_json with word timestamps, SSE), translations, `/v1/audio/speech` (mp3, opus, aac, flac, wav, pcm, G.711; streamed as it is synthesised), `/v1/models`. OpenAI model and voice names map to your defaults. Also the model-management routes and environment variables of [speaches](https://github.com/speaches-ai/speaches), and streaming WebSockets for both directions | [api.md](https://github.com/cB-Sigma/bolo/blob/main/docs/api.md), [migration-from-speaches.md](https://github.com/cB-Sigma/bolo/blob/main/docs/migration-from-speaches.md) |
-| **Realtime speech-to-text** | true streaming models, and stabilised partial results for models that were never designed to stream; endpointing you can tune | [realtime.md](https://github.com/cB-Sigma/bolo/blob/main/docs/realtime.md) |
-| **Voice agents, three pipelines** | the OpenAI Realtime API (`WS /v1/realtime`, WebRTC at `/v1/realtime/calls`) and audio in `/v1/chat/completions`, with turn detection, barge-in, tools and per-turn traces. `cascade`: bolo's recogniser → your language model → bolo's voice. `audio-llm`: a model that hears the audio itself, bolo speaks. `speech-to-speech`: one model hears and speaks, behind a llama-server, a cloud Realtime API, or **in bolo's own process** (`lfm3-audio-2b-onnx`) | [voice-agents.md](https://github.com/cB-Sigma/bolo/blob/main/docs/voice-agents.md) |
-| **Phone calls** | Twilio Media Streams, Plivo audio streams, Telnyx media streaming and the Exotel Voicebot applet connected to named agents; an experimental inbound SIP endpoint. Greeting, barge-in, key presses, hang-up and transfer, outbound calls with voicemail handling, signed webhooks, call records with a latency breakdown, a call simulator | [telephony.md](https://github.com/cB-Sigma/bolo/blob/main/docs/telephony.md) |
-| **Cloud providers next to local models** | OpenAI, Sarvam, ElevenLabs, Deepgram, Soniox or any OpenAI-compatible server behind the same routes, with bolo's diarization, word lists, telephony formats, traces and cost estimates on top, and **fallback** between local and cloud models in either direction. Audio leaves the server only when you name such a model | [providers.md](https://github.com/cB-Sigma/bolo/blob/main/docs/providers.md) |
-| **Who said what** | speaker diarization without PyTorch (pyannote segmentation with speaker embeddings, or NVIDIA's overlap-aware Nemotron), as `diarized_json`, in subtitles, on words and on live transcripts; known speakers named from reference recordings. **Speaker-attributed recognition**: DiCoW transcribes each speaker of a conversation separately, overlaps included, in the core (`dicow-v3.3-onnx`) or through the torch plugin | [models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md#speaker-diarization-1) |
-| **Voice cloning with a voice library** | save a person's voice once (cleaned, checked, **consent required** and recorded), then name it as the `voice` of any cloning model, OpenAI's custom-voice shape included; cloned speech is labelled; a speaker-similarity score, calibrated on real speech, says how alike the clone is; Tontaube, Chatterbox, Qwen3-TTS, Pocket TTS and more | [voices.md](https://github.com/cB-Sigma/bolo/blob/main/docs/voices.md) |
-| **A model catalog** | pull by name, with licences and gating on every entry and what was actually measured; `hf:owner/repo`, any Piper voice by name, local directories and URLs for everything else | [models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md), [below](#models-and-licences) |
-| **Hardware-aware recommendations** | bolo looks at the machine and rates every model for it; it recommends and warns, and never hides or refuses a model | [recommendations.md](https://github.com/cB-Sigma/bolo/blob/main/docs/recommendations.md) |
-| **Text preparation** | numbers, dates, money, units and URLs read out in the voice's language; pronunciation word lists for names and jargon; an SSML subset; romanised input ("mujhe kal jana hai") written in the voice's script; phonemes without the GPL through [uccharan](https://github.com/cb-Sigma/uccharan) | [api.md](https://github.com/cB-Sigma/bolo/blob/main/docs/api.md#text-preparation-ssml-and-pronunciation-word-lists), [models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md#phonemisers) |
-| **Language identification and routing** | `POST /v1/audio/language` says which language a recording is in, with probabilities, from a choice of identifiers (VoxLingua107 ECAPA, Whisper's own detector, AmberNet, MMS-LID), each with its licence; a transcription with `model=auto` is sent to the best installed recogniser for the language it hears, and the response header says what was decided. Never overrides a model or language you name | [api.md](https://github.com/cB-Sigma/bolo/blob/main/docs/api.md#language-identification-and-routing), [models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md#language-identification-1) |
-| **Indian languages** | recognition for all 22 scheduled languages, voices for 15 of them and for Bhojpuri, Magahi and Chhattisgarhi, 8 kHz G.711 in and out | [indic-telephony.md](https://github.com/cB-Sigma/bolo/blob/main/docs/indic-telephony.md) |
+| **OpenAI-compatible speech APIs** | `/v1/audio/transcriptions` (json, text, srt, vtt, verbose_json with word timestamps, SSE), translations, `/v1/audio/speech` (mp3, opus, aac, flac, wav, pcm, G.711; streamed as it is synthesised), `/v1/models`. OpenAI model and voice names map to your defaults. Also the model-management routes and environment variables of [speaches](https://github.com/speaches-ai/speaches), and streaming WebSockets for both directions | [api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md), [migration-from-speaches.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/migration-from-speaches.md) |
+| **Realtime speech-to-text** | true streaming models, and stabilised partial results for models that were never designed to stream; endpointing you can tune | [realtime.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/realtime.md) |
+| **Voice agents, three pipelines** | the OpenAI Realtime API (`WS /v1/realtime`, WebRTC at `/v1/realtime/calls`) and audio in `/v1/chat/completions`, with turn detection, barge-in, tools and per-turn traces. `cascade`: bolo's recogniser → your language model → bolo's voice. `audio-llm`: a model that hears the audio itself, bolo speaks. `speech-to-speech`: one model hears and speaks, behind a llama-server, a cloud Realtime API, or **in bolo's own process** (`lfm3-audio-2b-onnx`) | [voice-agents.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/voice-agents.md) |
+| **Phone calls** | Twilio Media Streams, Plivo audio streams, Telnyx media streaming and the Exotel Voicebot applet connected to named agents; an experimental inbound SIP endpoint. Greeting, barge-in, key presses, hang-up and transfer, outbound calls with voicemail handling, signed webhooks, call records with a latency breakdown, a call simulator | [telephony.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/telephony.md) |
+| **Cloud providers next to local models** | OpenAI, Sarvam, ElevenLabs, Deepgram, Soniox or any OpenAI-compatible server behind the same routes, with bolo's diarization, word lists, telephony formats, traces and cost estimates on top, and **fallback** between local and cloud models in either direction. Audio leaves the server only when you name such a model | [providers.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md) |
+| **Who said what** | speaker diarization without PyTorch (pyannote segmentation with speaker embeddings, or NVIDIA's overlap-aware Nemotron), as `diarized_json`, in subtitles, on words and on live transcripts; known speakers named from reference recordings. **Speaker-attributed recognition**: DiCoW transcribes each speaker of a conversation separately, overlaps included, in the core (`dicow-v3.3-onnx`) or through the torch plugin | [models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md#speaker-diarization-1) |
+| **Voice cloning with a voice library** | save a person's voice once (cleaned, checked, **consent required** and recorded), then name it as the `voice` of any cloning model, OpenAI's custom-voice shape included; cloned speech is labelled; a speaker-similarity score, calibrated on real speech, says how alike the clone is; Tontaube, Chatterbox, Qwen3-TTS, Pocket TTS and more | [voices.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/voices.md) |
+| **A model catalog** | pull by name, with licences and gating on every entry and what was actually measured; `hf:owner/repo`, any Piper voice by name, local directories and URLs for everything else | [models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md), [below](#models-and-licences) |
+| **Hardware-aware recommendations** | bolo looks at the machine and rates every model for it; it recommends and warns, and never hides or refuses a model | [recommendations.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/recommendations.md) |
+| **Text preparation** | numbers, dates, money, units and URLs read out in the voice's language; pronunciation word lists for names and jargon; an SSML subset; romanised input ("mujhe kal jana hai") written in the voice's script; phonemes without the GPL through [uccharan](https://github.com/cb-Sigma/uccharan) | [api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#text-preparation-ssml-and-pronunciation-word-lists), [models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md#phonemisers) |
+| **Language identification and routing** | `POST /v1/audio/language` says which language a recording is in, with probabilities, from a choice of identifiers (VoxLingua107 ECAPA, Whisper's own detector, AmberNet, MMS-LID), each with its licence; a transcription with `model=auto` is sent to the best installed recogniser for the language it hears, and the response header says what was decided. Never overrides a model or language you name | [api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#language-identification-and-routing), [models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md#language-identification-1) |
+| **Indian languages** | recognition for all 22 scheduled languages, voices for 15 of them and for Bhojpuri, Magahi and Chhattisgarhi, 8 kHz G.711 in and out | [indic-telephony.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/indic-telephony.md) |
 | **A web console** | playgrounds, the catalog, latency dashboards, benchmarks, conversations, calls, served by the same process | [below](#the-console) |
-| **Engine plugins** | models that need another runtime run out of process behind the same API: [bolo-torch](https://github.com/cB-Sigma/bolo/blob/main/plugins/bolo-torch/README.md) for PyTorch models | [plugins.md](https://github.com/cB-Sigma/bolo/blob/main/docs/plugins.md) |
-| **Wyoming** | speech-to-text and text-to-speech for Home Assistant on one TCP port | [api.md](https://github.com/cB-Sigma/bolo/blob/main/docs/api.md#wyoming-protocol), [examples/home_assistant.md](https://github.com/cB-Sigma/bolo/blob/main/examples/home_assistant.md) |
-| **Ollama-style model scheduling** | each model goes on the GPU when it fits in free VRAM and on the CPU when it does not (llama.cpp models split by layers, ONNX models by graph or cut in two at a layer boundary); several GPUs (`gpus`, `gpu_spread`, `--tensor-split` for llama.cpp); `keep_alive` per request, `num_parallel` and `max_queue` per model, flash attention and a quantized KV cache for llama.cpp voices; `bolo ps` with size, CPU/GPU split, GPU and time until unload, `bolo load` / `stop` / `show` / `rm` / `cp` (presets) / `logs`, a "Loaded models" panel in the console; `OLLAMA_*` variables mapped. GPU side tested with fakes, and with whole models on one laptop's GPU | [configuration.md](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md#gpu-and-cpu-placement), [coming from Ollama](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md#coming-from-ollama), [api.md](https://github.com/cB-Sigma/bolo/blob/main/docs/api.md#keep-alive) |
-| **Server behaviour** | per-model queues with micro-batching, backpressure (`429`, not a growing delay), cancellation, lazy loading, idle unloading, a memory budget, resumable verified downloads, Prometheus metrics, and a phase-by-phase trace of every request, exportable to OpenTelemetry | [architecture.md](https://github.com/cB-Sigma/bolo/blob/main/docs/architecture.md), [configuration.md](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md#opentelemetry) |
+| **Engine plugins** | models that need another runtime run out of process behind the same API: [bolo-torch](https://github.com/cB-Sigma/bolo-speech/blob/main/plugins/bolo-torch/README.md) for PyTorch models | [plugins.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/plugins.md) |
+| **Wyoming** | speech-to-text and text-to-speech for Home Assistant on one TCP port | [api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#wyoming-protocol), [examples/home_assistant.md](https://github.com/cB-Sigma/bolo-speech/blob/main/examples/home_assistant.md) |
+| **Ollama-style model scheduling** | each model goes on the GPU when it fits in free VRAM and on the CPU when it does not (llama.cpp models split by layers, ONNX models by graph or cut in two at a layer boundary); several GPUs (`gpus`, `gpu_spread`, `--tensor-split` for llama.cpp); `keep_alive` per request, `num_parallel` and `max_queue` per model, flash attention and a quantized KV cache for llama.cpp voices; `bolo ps` with size, CPU/GPU split, GPU and time until unload, `bolo load` / `stop` / `show` / `rm` / `cp` (presets) / `logs`, a "Loaded models" panel in the console; `OLLAMA_*` variables mapped. GPU side tested with fakes, and with whole models on one laptop's GPU | [configuration.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/configuration.md#gpu-and-cpu-placement), [coming from Ollama](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/configuration.md#coming-from-ollama), [api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#keep-alive) |
+| **Server behaviour** | per-model queues with micro-batching, backpressure (`429`, not a growing delay), cancellation, lazy loading, idle unloading, a memory budget, resumable verified downloads, Prometheus metrics, and a phase-by-phase trace of every request, exportable to OpenTelemetry | [architecture.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/architecture.md), [configuration.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/configuration.md#opentelemetry) |
 
 ## Models and licences
 
@@ -238,14 +238,14 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | VAD | WebRTC VAD | 2 | - | 2 | 0.000 (`webrtc-vad-aggressive`) |
 | VAD | Energy VAD | 1 | - | 1 | 0.000 (`energy-vad`) |
 
-**466 models in the catalog, 184 validated on CPU, 282 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md).
+**466 models in the catalog, 184 validated on CPU, 282 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md).
 <!-- END GENERATED: models-summary -->
 
-"Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.
+"Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.
 
-**Licences are labelled, not filtered.** Every entry states `license`, `commercial_use` and `gated`, the console shows them, and you decide what to download. Non-commercial models (MMS-TTS, some Piper voices, non-English Moonshine, several LLM-based voices) and models with conditional terms are in the catalog and marked ⚠. The default models are permissively licensed; the one exception is the opt-in speech-to-speech pipeline, whose default model (LFM3-Audio, LFM Open License) allows commercial use only below a revenue threshold. Gated models are fetched only with your own Hugging Face token. Cloud models are labelled as paid APIs that receive your audio. How each restricted model runs: [docs/models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md#non-commercial-and-restricted-models-and-how-each-runs).
+**Licences are labelled, not filtered.** Every entry states `license`, `commercial_use` and `gated`, the console shows them, and you decide what to download. Non-commercial models (MMS-TTS, some Piper voices, non-English Moonshine, several LLM-based voices) and models with conditional terms are in the catalog and marked ⚠. The default models are permissively licensed; the one exception is the opt-in speech-to-speech pipeline, whose default model (LFM3-Audio, LFM Open License) allows commercial use only below a revenue threshold. Gated models are fetched only with your own Hugging Face token. Cloud models are labelled as paid APIs that receive your audio. How each restricted model runs: [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md#non-commercial-and-restricted-models-and-how-each-runs).
 
-**No PyTorch in the server.** Inference runs on ONNX Runtime (through [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) and directly) and CTranslate2 (through [faster-whisper](https://github.com/SYSTRAN/faster-whisper)); LLM-based voices run on llama.cpp's `llama-server` or audio.cpp, which bolo can install and start. Models that need PyTorch run in the separate [bolo-torch](https://github.com/cB-Sigma/bolo/blob/main/plugins/bolo-torch/README.md) process. bolo runs no text language model itself: voice agents use the one you connect.
+**No PyTorch in the server.** Inference runs on ONNX Runtime (through [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) and directly) and CTranslate2 (through [faster-whisper](https://github.com/SYSTRAN/faster-whisper)); LLM-based voices run on llama.cpp's `llama-server` or audio.cpp, which bolo can install and start. Models that need PyTorch run in the separate [bolo-torch](https://github.com/cB-Sigma/bolo-speech/blob/main/plugins/bolo-torch/README.md) process. bolo runs no text language model itself: voice agents use the one you connect.
 
 ## Models for your machine
 
@@ -260,7 +260,7 @@ bolo detects the CPU and its instruction sets, memory, GPUs, the runtimes that c
 
 **It recommends; it never restricts.** No model is hidden, refused or blocked because of hardware; pulling or loading one that is unlikely to fit only adds a notice.
 
-The estimates are rough and say so: the catalog's real-time factors were measured on one reference machine and are scaled to yours by a three-second benchmark, or by a rule of thumb when it has not run; about two thirds of the catalog was never run by the maintainers and is estimated from a similar model or marked as a guess; **nothing was measured on a GPU**. [docs/recommendations.md](https://github.com/cB-Sigma/bolo/blob/main/docs/recommendations.md).
+The estimates are rough and say so: the catalog's real-time factors were measured on one reference machine and are scaled to yours by a three-second benchmark, or by a rule of thumb when it has not run; about two thirds of the catalog was never run by the maintainers and is estimated from a similar model or marked as a guess; **nothing was measured on a GPU**. [docs/recommendations.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/recommendations.md).
 
 ## Voice agents and phone calls
 
@@ -268,7 +268,7 @@ bolo is the speech side of a voice agent: you bring a language model (Ollama, ll
 
 On a phone line the same session answers calls from Twilio, Plivo, Telnyx or Exotel, or from a SIP trunk (experimental: G.711 over UDP, no registration, authentication or encryption). `bolo telephony simulate` rings an agent through a fake provider and reports what the caller heard and how long each turn took, without a phone account.
 
-Two things to know before relying on it: the quality of a conversation is the quality of the language model you connect (bolo was developed with models of 360M and 500M parameters, enough to prove the path and no more), and **no real phone call has been made with this code**. [docs/voice-agents.md](https://github.com/cB-Sigma/bolo/blob/main/docs/voice-agents.md), [docs/telephony.md](https://github.com/cB-Sigma/bolo/blob/main/docs/telephony.md).
+Two things to know before relying on it: the quality of a conversation is the quality of the language model you connect (bolo was developed with models of 360M and 500M parameters, enough to prove the path and no more), and **no real phone call has been made with this code**. [docs/voice-agents.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/voice-agents.md), [docs/telephony.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/telephony.md).
 
 ## Text, pronunciation and romanised input
 
@@ -280,21 +280,21 @@ Voices differ in what they read: phonemes, plain text or a fixed character set. 
 - **Romanised input.** With `"romanised": "auto"`, Hindi typed in Latin letters is written in Devanagari before a Hindi voice reads it, and English words are left alone. This needs uccharan and the language's pack (CC BY-SA 4.0, installed on request); without them the text is spoken as written and the request's trace says what is missing. Off by default.
 - **Phonemes without the GPL.** Piper-format voices, KittenTTS, Matcha and Kokoro read phonemes. uccharan (Apache-2.0) provides them in its 39 languages: English (US, British), Hindi, Bengali, Marathi, Telugu, Nepali, Kannada, Tamil, Malayalam, Assamese, Gujarati, Bhojpuri, Maithili, Magahi, Punjabi, Odia, Konkani, Sinhala, Sanskrit, Urdu, Sindhi, Spanish, German, Dutch, French (also Belgian and Swiss), Italian, Portuguese (Brazil, Portugal), Polish, Turkish, Czech, Swedish, Catalan, Romanian, Hungarian, Finnish, Norwegian Bokmål and Danish. Voices in those languages work as installed (69 catalog voices, and Kokoro's English, Spanish, French, Italian, Portuguese and Hindi voices); a language's word table is downloaded from uccharan's release the first time a voice needs it (`uccharan_auto_download`, or `bolo pull uccharan-de` ahead of time). Voices in other languages (Russian, Mandarin, Arabic, Persian, Latin American Spanish …) need eSpeak NG, which is optional and never installed unless you ask.
 
-[docs/api.md](https://github.com/cB-Sigma/bolo/blob/main/docs/api.md#text-preparation-ssml-and-pronunciation-word-lists), [docs/models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md#phonemisers).
+[docs/api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#text-preparation-ssml-and-pronunciation-word-lists), [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md#phonemisers).
 
 ## Indian languages
 
 - **Recognition for all 22 scheduled languages**, one IndicConformer model per language (AI4Bharat, MIT; ungated community ONNX exports pinned to a commit). Sixteen were run here on real recordings (10 to 60 utterances each): character error rates from 2.5 % (Bengali) to 14.9 % (Assamese). Bodo, Dogri, Kashmiri, Konkani, Manipuri and Santali are untested for lack of public test recordings.
 - **Voices** for Hindi, Bengali, Telugu, Tamil, Malayalam, Marathi, Urdu, Nepali, Gujarati, Kannada, Maithili, Bhojpuri, Magahi and Chhattisgarhi under permissive licences, and non-commercial MMS voices for Punjabi, Odia, Assamese, Dogri and more. No voice that runs without PyTorch for Sanskrit, Sindhi, Kashmiri, Konkani, Manipuri, Bodo or Santali.
-- **Which language is it?** `POST /v1/audio/language` identifies the spoken language, and `model=auto` sends a transcription to the best installed recogniser for it (an IndicConformer model for its language, when one is installed). The default identifier, VoxLingua107 ECAPA (Apache-2.0), named the right language for 33 of 39 synthesised clips in 13 Indian languages; it does not know Odia, and it heard Urdu as Hindi ([models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md#language-identification-1)).
+- **Which language is it?** `POST /v1/audio/language` identifies the spoken language, and `model=auto` sends a transcription to the best installed recogniser for it (an IndicConformer model for its language, when one is installed). The default identifier, VoxLingua107 ECAPA (Apache-2.0), named the right language for 33 of 39 synthesised clips in 13 Indian languages; it does not know Odia, and it heard Urdu as Hindi ([models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md#language-identification-1)).
 - **Bhojpuri** has no recogniser of its own that beats the Hindi model: 41 % word error rate on 120 utterances with the Hindi model, 48 % with the Bhojpuri Whisper fine-tune we converted.
 - Hindi numbers in the Indian system (`250000` → दो लाख पचास हज़ार), sentences split at the danda, Hinglish in Latin script, and 8 kHz G.711 μ-law and A-law in both directions.
 
-These are small samples that show the pipelines work, not accuracy benchmarks, and nobody who speaks the languages reviewed the synthesised audio. The table per language, with licences: [docs/indic-telephony.md](https://github.com/cB-Sigma/bolo/blob/main/docs/indic-telephony.md).
+These are small samples that show the pipelines work, not accuracy benchmarks, and nobody who speaks the languages reviewed the synthesised audio. The table per language, with licences: [docs/indic-telephony.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/indic-telephony.md).
 
 ## The console
 
-Served at `/` by the same process, and as a browser-only [live demo](https://cb-sigma.github.io/bolo/).
+Served at `/` by the same process, and as a browser-only [live demo](https://cb-sigma.github.io/bolo-speech/).
 
 | Page | What it is for |
 | --- | --- |
@@ -314,38 +314,38 @@ Served at `/` by the same process, and as a browser-only [live demo](https://cb-
 <table>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://raw.githubusercontent.com/cB-Sigma/bolo/main/docs/assets/console-latency.png"><img src="https://raw.githubusercontent.com/cB-Sigma/bolo/main/docs/assets/console-latency.png" alt="Latency dashboard with percentile charts and a request waterfall"></a>
+      <a href="https://raw.githubusercontent.com/cB-Sigma/bolo-speech/main/docs/assets/console-latency.png"><img src="https://raw.githubusercontent.com/cB-Sigma/bolo-speech/main/docs/assets/console-latency.png" alt="Latency dashboard with percentile charts and a request waterfall"></a>
       <br><b>Latency.</b> Percentiles against your target, the distribution, and a waterfall of every request.
     </td>
     <td width="50%" valign="top">
-      <a href="https://raw.githubusercontent.com/cB-Sigma/bolo/main/docs/assets/console-tts.png"><img src="https://raw.githubusercontent.com/cB-Sigma/bolo/main/docs/assets/console-tts.png" alt="Text-to-speech playground with time to first audio and a chunk timeline"></a>
+      <a href="https://raw.githubusercontent.com/cB-Sigma/bolo-speech/main/docs/assets/console-tts.png"><img src="https://raw.githubusercontent.com/cB-Sigma/bolo-speech/main/docs/assets/console-tts.png" alt="Text-to-speech playground with time to first audio and a chunk timeline"></a>
       <br><b>Text to speech.</b> Streamed playback, time to first audio and a round trip back through recognition.
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://raw.githubusercontent.com/cB-Sigma/bolo/main/docs/assets/console-models.png"><img src="https://raw.githubusercontent.com/cB-Sigma/bolo/main/docs/assets/console-models.png" alt="Model catalog with tiers, licences and load state"></a>
+      <a href="https://raw.githubusercontent.com/cB-Sigma/bolo-speech/main/docs/assets/console-models.png"><img src="https://raw.githubusercontent.com/cB-Sigma/bolo-speech/main/docs/assets/console-models.png" alt="Model catalog with tiers, licences and load state"></a>
       <br><b>Models.</b> The catalog with licences, load state and what was validated on CPU.
     </td>
     <td width="50%" valign="top">
-      <a href="https://raw.githubusercontent.com/cB-Sigma/bolo/main/docs/assets/console-benchmark.png"><img src="https://raw.githubusercontent.com/cB-Sigma/bolo/main/docs/assets/console-benchmark.png" alt="Benchmark showing latency and throughput against concurrency"></a>
+      <a href="https://raw.githubusercontent.com/cB-Sigma/bolo-speech/main/docs/assets/console-benchmark.png"><img src="https://raw.githubusercontent.com/cB-Sigma/bolo-speech/main/docs/assets/console-benchmark.png" alt="Benchmark showing latency and throughput against concurrency"></a>
       <br><b>Benchmark.</b> Latency and throughput against concurrency.
     </td>
   </tr>
 </table>
 
 <p align="center">
-  <sub>Screenshots of the real console on a 4-core CPU with no GPU; <a href="https://github.com/cB-Sigma/bolo/blob/main/docs/assets/README.md">docs/assets/README.md</a> says what each was taken against. The screenshots predate the Conversation, Compare, Providers, Phone and Word lists pages.</sub>
+  <sub>Screenshots of the real console on a 4-core CPU with no GPU; <a href="https://github.com/cB-Sigma/bolo-speech/blob/main/docs/assets/README.md">docs/assets/README.md</a> says what each was taken against. The screenshots predate the Conversation, Compare, Providers, Phone and Word lists pages.</sub>
 </p>
 
 ## Compatibility
 
-- **OpenAI.** Request and response shapes follow the API as typed in the official `openai` Python SDK (3.50.0) and are exercised with that SDK in the test-suite: audio (transcription, translation, speech, streaming, `diarized_json`), Realtime (GA event names; WebSocket and WebRTC, the latter tested with an aiortc peer and in headless Chromium, not yet in Chrome or Edge themselves) and chat completions with audio. Not implemented: OpenAI's SIP connector (phone calls have their own path), MCP tools, image input. [docs/voice-agents.md](https://github.com/cB-Sigma/bolo/blob/main/docs/voice-agents.md#what-is-different-from-openai-or-missing).
-- **speaches.** Existing clients keep their model ids and environment variables; what matches, differs and is missing: [docs/migration-from-speaches.md](https://github.com/cB-Sigma/bolo/blob/main/docs/migration-from-speaches.md).
+- **OpenAI.** Request and response shapes follow the API as typed in the official `openai` Python SDK (3.50.0) and are exercised with that SDK in the test-suite: audio (transcription, translation, speech, streaming, `diarized_json`), Realtime (GA event names; WebSocket and WebRTC, the latter tested with an aiortc peer and in headless Chromium, not yet in Chrome or Edge themselves) and chat completions with audio. Not implemented: OpenAI's SIP connector (phone calls have their own path), MCP tools, image input. [docs/voice-agents.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/voice-agents.md#what-is-different-from-openai-or-missing).
+- **speaches.** Existing clients keep their model ids and environment variables; what matches, differs and is missing: [docs/migration-from-speaches.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/migration-from-speaches.md).
 - **Wyoming / Home Assistant.** `bolo serve --wyoming` exposes installed models on port 10300. Tested with the `wyoming` Python client, not against a Home Assistant instance.
 - **Agent frameworks.** Run from Pipecat 1.16 and LiveKit Agents 1.8 through their Realtime and HTTP integrations.
 
-Full reference: [docs/api.md](https://github.com/cB-Sigma/bolo/blob/main/docs/api.md) and [docs/openapi.json](https://github.com/cB-Sigma/bolo/blob/main/docs/openapi.json). How bolo compares with speaches, LocalAI, vLLM-Omni, WhisperLiveKit, Kokoro-FastAPI and the sherpa-onnx servers, and when to choose them instead: [docs/comparison.md](https://github.com/cB-Sigma/bolo/blob/main/docs/comparison.md).
+Full reference: [docs/api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md) and [docs/openapi.json](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/openapi.json). How bolo compares with speaches, LocalAI, vLLM-Omni, WhisperLiveKit, Kokoro-FastAPI and the sherpa-onnx servers, and when to choose them instead: [docs/comparison.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/comparison.md).
 
 ## Performance
 
@@ -363,11 +363,11 @@ Measured with bolo's own load generator on **4 vCPUs of an Intel Xeon at 2.1 GHz
 | a voice-agent turn with a 360M language model on the same 4 cores | first audio 2.4 s after the end of speech is detected; says that the path works, not what a deployment does |
 | 30 minutes of mixed load, 1 to 8 clients | 1,494 requests, one refused with `429` by design, none failed; memory ended at 1.80 GB |
 
-All tables, the method and what batching does and does not buy on CPU: [docs/performance.md](https://github.com/cB-Sigma/bolo/blob/main/docs/performance.md). Raw results: [docs/measurements/](https://github.com/cB-Sigma/bolo/tree/main/docs/measurements/).
+All tables, the method and what batching does and does not buy on CPU: [docs/performance.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/performance.md). Raw results: [docs/measurements/](https://github.com/cB-Sigma/bolo-speech/tree/main/docs/measurements/).
 
 ## What has not been validated
 
-- **GPUs, Apple Silicon, arm64, Windows.** One GPU machine was used: a hybrid Windows 11 laptop with an RTX 3060 Laptop GPU and integrated AMD Radeon graphics, natively (CPU; CUDA, DirectML and Vulkan on the NVIDIA GPU; DirectML and WebGPU on the Radeon) and under WSL2; the GPU figures in the documentation come from it, and only for the models named in [docs/status.md](https://github.com/cB-Sigma/bolo/blob/main/docs/status.md#a-windows-11-laptop). Apple Silicon (Metal, CoreML), ROCm and discrete Radeon cards, a discrete GPU under native Linux, arm64 and spreading models or layers over several NVIDIA GPUs (`gpus`, `cuda:0` and `cuda:1`) were not run; CI runs the server's and the bolo-torch plugin's tests on `windows-latest` (CPU, Python 3.12) and starts `bolo serve` there. A GPU Dockerfile exists and was not built. Apart from whole models placed on the laptop's GPU, GPU/CPU placement, several NVIDIA GPUs, llama.cpp offload and tensor splits, the ONNX graph cut and bolo-torch's `device_map` splits are tested only with fake NVML readings, made-up memory figures and command lines that are built but not run (the cut graph with both halves on the CPU).
+- **GPUs, Apple Silicon, arm64, Windows.** One GPU machine was used: a hybrid Windows 11 laptop with an RTX 3060 Laptop GPU and integrated AMD Radeon graphics, natively (CPU; CUDA, DirectML and Vulkan on the NVIDIA GPU; DirectML and WebGPU on the Radeon) and under WSL2; the GPU figures in the documentation come from it, and only for the models named in [docs/status.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/status.md#a-windows-11-laptop). Apple Silicon (Metal, CoreML), ROCm and discrete Radeon cards, a discrete GPU under native Linux, arm64 and spreading models or layers over several NVIDIA GPUs (`gpus`, `cuda:0` and `cuda:1`) were not run; CI runs the server's and the bolo-torch plugin's tests on `windows-latest` (CPU, Python 3.12) and starts `bolo serve` there. A GPU Dockerfile exists and was not built. Apart from whole models placed on the laptop's GPU, GPU/CPU placement, several NVIDIA GPUs, llama.cpp offload and tensor splits, the ONNX graph cut and bolo-torch's `device_map` splits are tested only with fake NVML readings, made-up memory figures and command lines that are built but not run (the cut graph with both halves on the CPU).
 - **The live demo on phones.** Its tests run in headless Chromium on a desktop CPU, and it was run in Chrome and Edge (WebGPU included) on the Windows laptop; the GPU/CPU split and phone limits are tested with a faked device, not on an iPhone or an Android phone.
 - **Voice cloning beyond 14 models on CPU.** Cloning was measured on CPU for 14 models (Pocket TTS, Chatterbox Turbo, Qwen3-TTS, MOSS-TTS Nano, XTTS v2, Plapre 3, OmniVoice) with two LibriSpeech speakers; the other cloning entries and Tontaube were not run; on a GPU only Pocket TTS was cloned (llama.cpp's CUDA build, on the Windows laptop); and the speaker-similarity thresholds are calibrated on read English speech only.
 - **Phone providers.** No real call was made and no provider account was used: Twilio, Plivo, Telnyx and Exotel are implemented from their documentation and tested against fake providers; SIP against the test-suite's own user agent.
@@ -377,7 +377,7 @@ All tables, the method and what batching does and does not buy on CPU: [docs/per
 - **Voice agents with a capable language model; real browsers over WebRTC (headless Chromium only so far); Home Assistant; the speech-to-speech model at conversational speed** (0.4 to 0.5× real time on four shared cores).
 - **Romanised input** beyond bolo's own tests: how converted text sounds was not evaluated.
 
-The full list, with what *was* run of each: [docs/status.md](https://github.com/cB-Sigma/bolo/blob/main/docs/status.md).
+The full list, with what *was* run of each: [docs/status.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/status.md).
 
 ## Installing in more detail
 
@@ -387,9 +387,9 @@ The double quotes work in bash, zsh, PowerShell and cmd (cmd.exe does not treat 
 - Run it once without installing: `uvx --from "bolo-speech[all]" bolo serve`.
 - Without uv: `pipx install "bolo-speech[all]"`, or `pip install "bolo-speech[all]"` into a virtual environment.
 - With Homebrew (macOS 14 or later, Linux): `brew install cb-sigma/tap/bolo`, then `brew services start bolo` to run it in the background (console at http://127.0.0.1:8000/). It installs `all`; the [tap's README](https://github.com/cB-Sigma/homebrew-tap#bolo) shows how to add the opt-in extras.
-- On Windows (PowerShell or cmd), the same command. Models go to `%USERPROFILE%\.cache\bolo`; DirectML, services and the other differences: [docs/configuration.md](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md#windows). On Windows, install natively. With an NVIDIA GPU, add the CUDA wheels (see [CUDA on Windows](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md#cuda-on-windows)): speech-to-text runs on the GPU natively as fast as under WSL2. Use WSL2 only for Tontaube and other Linux-only runtimes.
-- With an NVIDIA GPU on Windows: `uv tool install "bolo-speech[all,cuda]"`, then swap `onnxruntime` for `onnxruntime-gpu[cuda,cudnn]` in the tool's environment (`uv pip uninstall --python <tool python> onnxruntime`, then `uv pip install --python <tool python> "onnxruntime-gpu[cuda,cudnn]" nvidia-cublas-cu12 "nvidia-cudnn-cu12>=9,<10"`, about 2.5 GB for CUDA 12 and 13) and set `BOLO_DEVICE=cuda`; `bolo doctor` loads both CUDA runtimes and names what is missing. faster-whisper is the GPU route for speech-to-text there (sherpa-onnx's CUDA build cannot run inside bolo on Windows). The recipe: [CUDA on Windows](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md#cuda-on-windows).
-- As a container (CPU image): `docker run -p 8000:8000 -v bolo-data:/data ghcr.io/cb-sigma/bolo:latest`. Compose, systemd and Kubernetes examples, and what was run of each: [deploy/README.md](https://github.com/cB-Sigma/bolo/blob/main/deploy/README.md).
+- On Windows (PowerShell or cmd), the same command. Models go to `%USERPROFILE%\.cache\bolo`; DirectML, services and the other differences: [docs/configuration.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/configuration.md#windows). On Windows, install natively. With an NVIDIA GPU, add the CUDA wheels (see [CUDA on Windows](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/configuration.md#cuda-on-windows)): speech-to-text runs on the GPU natively as fast as under WSL2. Use WSL2 only for Tontaube and other Linux-only runtimes.
+- With an NVIDIA GPU on Windows: `uv tool install "bolo-speech[all,cuda]"`, then swap `onnxruntime` for `onnxruntime-gpu[cuda,cudnn]` in the tool's environment (`uv pip uninstall --python <tool python> onnxruntime`, then `uv pip install --python <tool python> "onnxruntime-gpu[cuda,cudnn]" nvidia-cublas-cu12 "nvidia-cudnn-cu12>=9,<10"`, about 2.5 GB for CUDA 12 and 13) and set `BOLO_DEVICE=cuda`; `bolo doctor` loads both CUDA runtimes and names what is missing. faster-whisper is the GPU route for speech-to-text there (sherpa-onnx's CUDA build cannot run inside bolo on Windows). The recipe: [CUDA on Windows](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/configuration.md#cuda-on-windows).
+- As a container (CPU image): `docker run -p 8000:8000 -v bolo-data:/data ghcr.io/cb-sigma/bolo:latest`. Compose, systemd and Kubernetes examples, and what was run of each: [deploy/README.md](https://github.com/cB-Sigma/bolo-speech/blob/main/deploy/README.md).
 
 The PyPI distribution is `bolo-speech`; the command and the Python package are `bolo`. Python 3.10 or newer.
 
@@ -410,36 +410,36 @@ Windows PowerShell 5.1 drops the double quotes inside an argument it passes to a
 
 ## Status
 
-**Alpha.** Developed on Linux x86-64; measured on one Windows 11 laptop natively and under WSL2, on its CPU, its NVIDIA GPU (CUDA, DirectML, Vulkan), its integrated AMD Radeon (DirectML) and in Chrome and Edge ([the numbers](https://github.com/cB-Sigma/bolo/blob/main/docs/status.md#a-windows-11-laptop)); CI runs the test suite on Linux and Windows. Apple Silicon, ROCm and discrete Radeon cards, native Linux GPUs, several NVIDIA GPUs, arm64 and phones are untested; the phone and cloud integrations have not met a real account. [What has not been validated](#what-has-not-been-validated) says so plainly.
+**Alpha.** Developed on Linux x86-64; measured on one Windows 11 laptop natively and under WSL2, on its CPU, its NVIDIA GPU (CUDA, DirectML, Vulkan), its integrated AMD Radeon (DirectML) and in Chrome and Edge ([the numbers](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/status.md#a-windows-11-laptop)); CI runs the test suite on Linux and Windows. Apple Silicon, ROCm and discrete Radeon cards, native Linux GPUs, several NVIDIA GPUs, arm64 and phones are untested; the phone and cloud integrations have not met a real account. [What has not been validated](#what-has-not-been-validated) says so plainly.
 
 ## Documentation
 
 | | |
 | --- | --- |
-| [docs/api.md](https://github.com/cB-Sigma/bolo/blob/main/docs/api.md) | every route, with the OpenAPI description in [docs/openapi.json](https://github.com/cB-Sigma/bolo/blob/main/docs/openapi.json) |
-| [docs/configuration.md](https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md) | settings, environment variables, per-model options |
-| [docs/models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md) | the catalog, diarization, phonemisers, licences |
-| [docs/recommendations.md](https://github.com/cB-Sigma/bolo/blob/main/docs/recommendations.md) | hardware detection and how a fit is computed |
-| [docs/realtime.md](https://github.com/cB-Sigma/bolo/blob/main/docs/realtime.md) | streaming recognition and endpointing |
-| [docs/voice-agents.md](https://github.com/cB-Sigma/bolo/blob/main/docs/voice-agents.md) | the Realtime API, pipelines, chat completions with audio, agent frameworks |
-| [docs/telephony.md](https://github.com/cB-Sigma/bolo/blob/main/docs/telephony.md) | phone calls: providers, agents, security, the simulator, SIP |
-| [docs/providers.md](https://github.com/cB-Sigma/bolo/blob/main/docs/providers.md) | cloud providers, fallback, cost estimates |
-| [docs/indic-telephony.md](https://github.com/cB-Sigma/bolo/blob/main/docs/indic-telephony.md) | Indian languages and telephone audio |
-| [docs/plugins.md](https://github.com/cB-Sigma/bolo/blob/main/docs/plugins.md) | engine plugins and bolo-torch |
-| [docs/architecture.md](https://github.com/cB-Sigma/bolo/blob/main/docs/architecture.md) | how the server is built |
-| [docs/performance.md](https://github.com/cB-Sigma/bolo/blob/main/docs/performance.md), [docs/status.md](https://github.com/cB-Sigma/bolo/blob/main/docs/status.md), [docs/comparison.md](https://github.com/cB-Sigma/bolo/blob/main/docs/comparison.md) | measurements, what was and was not tested, alternatives |
-| [docs/roadmap.md](https://github.com/cB-Sigma/bolo/blob/main/docs/roadmap.md) | what is planned and not done yet |
-| [docs/migration-from-speaches.md](https://github.com/cB-Sigma/bolo/blob/main/docs/migration-from-speaches.md) | coming from speaches |
-| [deploy/README.md](https://github.com/cB-Sigma/bolo/blob/main/deploy/README.md), [examples/](https://github.com/cB-Sigma/bolo/tree/main/examples/) | containers and units; client examples |
-| [CHANGELOG.md](https://github.com/cB-Sigma/bolo/blob/main/CHANGELOG.md) | what changed in each release |
+| [docs/api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md) | every route, with the OpenAPI description in [docs/openapi.json](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/openapi.json) |
+| [docs/configuration.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/configuration.md) | settings, environment variables, per-model options |
+| [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md) | the catalog, diarization, phonemisers, licences |
+| [docs/recommendations.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/recommendations.md) | hardware detection and how a fit is computed |
+| [docs/realtime.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/realtime.md) | streaming recognition and endpointing |
+| [docs/voice-agents.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/voice-agents.md) | the Realtime API, pipelines, chat completions with audio, agent frameworks |
+| [docs/telephony.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/telephony.md) | phone calls: providers, agents, security, the simulator, SIP |
+| [docs/providers.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md) | cloud providers, fallback, cost estimates |
+| [docs/indic-telephony.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/indic-telephony.md) | Indian languages and telephone audio |
+| [docs/plugins.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/plugins.md) | engine plugins and bolo-torch |
+| [docs/architecture.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/architecture.md) | how the server is built |
+| [docs/performance.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/performance.md), [docs/status.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/status.md), [docs/comparison.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/comparison.md) | measurements, what was and was not tested, alternatives |
+| [docs/roadmap.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/roadmap.md) | what is planned and not done yet |
+| [docs/migration-from-speaches.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/migration-from-speaches.md) | coming from speaches |
+| [deploy/README.md](https://github.com/cB-Sigma/bolo-speech/blob/main/deploy/README.md), [examples/](https://github.com/cB-Sigma/bolo-speech/tree/main/examples/) | containers and units; client examples |
+| [CHANGELOG.md](https://github.com/cB-Sigma/bolo-speech/blob/main/CHANGELOG.md) | what changed in each release |
 
 ## Licences
 
-bolo itself is [Apache-2.0](https://github.com/cB-Sigma/bolo/blob/main/LICENSE). It contains no third-party source code; [NOTICE](https://github.com/cB-Sigma/bolo/blob/main/NOTICE) lists what it works with.
+bolo itself is [Apache-2.0](https://github.com/cB-Sigma/bolo-speech/blob/main/LICENSE). It contains no third-party source code; [NOTICE](https://github.com/cB-Sigma/bolo-speech/blob/main/NOTICE) lists what it works with.
 
 - **Engines**: sherpa-onnx (Apache-2.0), ONNX Runtime (MIT), faster-whisper and CTranslate2 (MIT). The optional `kokoro-onnx` plugin is MIT but pulls in the GPL `phonemizer` package, so it is not part of `all`.
 - **uccharan (Apache-2.0)** is a dependency of `bolo-speech[all]`, not part of bolo's code. Its language packs (word tables, Apache-2.0) are downloaded on first use unless `uccharan_auto_download = false`; its romanised-text and WikiPron packs are CC BY-SA 4.0 and are downloaded only when you install them.
-- **eSpeak NG (GPL-3.0-or-later) is a separate, optional component.** bolo's wheel does not contain it, the `all` extra does not install it, and the container image does not include it unless you build with `--build-arg WITH_ESPEAK=1`. It arrives only when you ask: the console's install button (which asks you to accept the licence), `bolo components install espeak-ng --accept-license`, `pip install "bolo-speech[espeak]"`, or a system package. bolo's own code stays Apache-2.0 either way, but if you redistribute a bundle that contains eSpeak NG you must comply with the GPL for that component. [docs/models.md](https://github.com/cB-Sigma/bolo/blob/main/docs/models.md#licences-and-the-espeak-ng-question).
+- **eSpeak NG (GPL-3.0-or-later) is a separate, optional component.** bolo's wheel does not contain it, the `all` extra does not install it, and the container image does not include it unless you build with `--build-arg WITH_ESPEAK=1`. It arrives only when you ask: the console's install button (which asks you to accept the licence), `bolo components install espeak-ng --accept-license`, `pip install "bolo-speech[espeak]"`, or a system package. bolo's own code stays Apache-2.0 either way, but if you redistribute a bundle that contains eSpeak NG you must comply with the GPL for that component. [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md#licences-and-the-espeak-ng-question).
 - **Models** are downloaded from their publishers under their own licences, which the catalog records per model. Most are MIT, Apache-2.0 or CC-BY-4.0; some are non-commercial or have custom terms, and a few are gated. bolo never downloads a gated model without your own token.
 - **Cloud providers** are paid services under their own terms; bolo ships no keys and no prices.
 
@@ -455,4 +455,4 @@ bolo itself is [Apache-2.0](https://github.com/cB-Sigma/bolo/blob/main/LICENSE).
 
 ## Contributing
 
-Issues and pull requests are welcome, especially measurements on hardware we do not have, reports from real phone and cloud accounts, and new catalog entries: [CONTRIBUTING.md](https://github.com/cB-Sigma/bolo/blob/main/CONTRIBUTING.md) explains the setup and how to add and validate a model. Please read the [Code of Conduct](https://github.com/cB-Sigma/bolo/blob/main/CODE_OF_CONDUCT.md); report security problems as described in [SECURITY.md](https://github.com/cB-Sigma/bolo/blob/main/SECURITY.md).
+Issues and pull requests are welcome, especially measurements on hardware we do not have, reports from real phone and cloud accounts, and new catalog entries: [CONTRIBUTING.md](https://github.com/cB-Sigma/bolo-speech/blob/main/CONTRIBUTING.md) explains the setup and how to add and validate a model. Please read the [Code of Conduct](https://github.com/cB-Sigma/bolo-speech/blob/main/CODE_OF_CONDUCT.md); report security problems as described in [SECURITY.md](https://github.com/cB-Sigma/bolo-speech/blob/main/SECURITY.md).

@@ -6,7 +6,7 @@ have, new catalog entries and code are all welcome.
 ## Development setup
 
 ```bash
-git clone https://github.com/cb-Sigma/bolo && cd bolo/server
+git clone https://github.com/cB-Sigma/bolo-speech && cd bolo/server
 python -m venv .venv && . .venv/bin/activate          # Python 3.10 to 3.13
 pip install -e '.[all,dev]'
 

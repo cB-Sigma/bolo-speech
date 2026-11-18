@@ -24,8 +24,8 @@ describe('share links', () => {
     expect(r?.rtf).toBeNull()
   })
   it('builds a link into the playground under whatever path the demo is mounted at', () => {
-    const url = shareUrl(result, { origin: 'https://cb-sigma.github.io', pathname: '/bolo/' })
-    expect(url.startsWith('https://cb-sigma.github.io/bolo/#/stt?r=')).toBe(true)
+    const url = shareUrl(result, { origin: 'https://cb-sigma.github.io', pathname: '/bolo-speech/' })
+    expect(url.startsWith('https://cb-sigma.github.io/bolo-speech/#/stt?r=')).toBe(true)
     expect(decodeShare(url.split('?r=')[1])?.n).toBe(4)
   })
   it('rejects anything that is not a well-formed result', () => {

@@ -337,7 +337,7 @@
   description: 'No end-of-turn model: every pause of turn_detection.silence_duration_ms ends the turn. As default_turn
     (or a session''s turn_detection.turn_model) it makes semantic_vad behave exactly like server_vad; the cheapest
     choice, and the right one when a model would only add latency.'
-  source_url: https://github.com/cB-Sigma/bolo
+  source_url: https://github.com/cB-Sigma/bolo-speech
   validated: cpu
   measured:
     rtf: 1.0e-05

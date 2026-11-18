@@ -49,7 +49,7 @@ class BuiltinEngine(Engine):
     id = "builtin"
     name = "bolo built-in detectors"
     license = "Apache-2.0"
-    url = "https://github.com/cB-Sigma/bolo"
+    url = "https://github.com/cB-Sigma/bolo-speech"
     kinds = ("energy_vad", SILENCE_TURN, "smart_turn_v2")
 
     def status(self) -> EngineStatus:

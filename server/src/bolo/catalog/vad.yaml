@@ -315,7 +315,7 @@
   description: bolo's adaptive energy detector (a level above a tracked noise floor, with hang-over). Part of bolo;
     nothing to download. It is what bolo falls back to when no neural detector can be used; choose it by name to
     use it on purpose. Hears loud noise as speech.
-  source_url: https://github.com/cB-Sigma/bolo
+  source_url: https://github.com/cB-Sigma/bolo-speech
   validated: cpu
   measured:
     rtf: 0.00019

@@ -46,11 +46,11 @@ def _require() -> Any:
 def build_info(core: Bolo) -> Any:
     from wyoming.info import AsrModel, AsrProgram, Attribution, Info, TtsProgram, TtsVoice, TtsVoiceSpeaker
 
-    attribution = Attribution(name="bolo", url="https://github.com/cb-Sigma/bolo")
+    attribution = Attribution(name="bolo", url="https://github.com/cB-Sigma/bolo-speech")
     asr_models = []
     voices = []
     for m in core.catalog_api(installed=True):
-        origin = Attribution(name=m["family"], url=m["source_url"] or "https://github.com/cb-Sigma/bolo")
+        origin = Attribution(name=m["family"], url=m["source_url"] or "https://github.com/cB-Sigma/bolo-speech")
         if m["task"] == "stt":
             asr_models.append(
                 AsrModel(

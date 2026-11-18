@@ -28,7 +28,7 @@ const DiagnosticsPanel = lazy(() =>
   import('@/components/diagnostics-panel').then((m) => ({ default: m.DiagnosticsPanel })),
 )
 
-export const DOCS_URL = 'https://github.com/cb-Sigma/bolo/tree/main/docs'
+export const DOCS_URL = 'https://github.com/cB-Sigma/bolo-speech/tree/main/docs'
 
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const groups = ['Playground', 'Server'] as const

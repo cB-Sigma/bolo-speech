@@ -1,6 +1,6 @@
 import type { CallTurn, PhoneAgent, PhoneAgentUpdate, TelephonyProvider } from './api/types'
 
-export const DOCS_TELEPHONY = 'https://github.com/cb-Sigma/bolo/blob/main/docs/telephony.md'
+export const DOCS_TELEPHONY = 'https://github.com/cB-Sigma/bolo-speech/blob/main/docs/telephony.md'
 export const AGENT_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,39}$/
 
 export const OUTCOME_LABEL: Record<string, string> = {

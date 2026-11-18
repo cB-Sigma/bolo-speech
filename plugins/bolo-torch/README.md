@@ -1,10 +1,10 @@
 # bolo-torch
 
-The PyTorch engine plugin for [bolo](https://github.com/cb-Sigma/bolo), the torch-free speech server.
+The PyTorch engine plugin for [bolo](https://github.com/cB-Sigma/bolo-speech), the torch-free speech server.
 
 bolo never imports PyTorch. When a catalog entry says `engine: plugin:torch`, bolo starts this package in a
 separate process (`python -m bolo_torch`) and talks to it over the plugin protocol
-([docs/plugins.md](https://github.com/cB-Sigma/bolo/blob/main/docs/plugins.md)): it loads models there, streams synthesis back sentence by sentence,
+([docs/plugins.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/plugins.md)): it loads models there, streams synthesis back sentence by sentence,
 restarts the process if it crashes and stops it when it has been idle. Everything else (queues, traces, metrics,
 the console, the OpenAI-compatible API) works as for bolo's own engines.
 
@@ -357,7 +357,7 @@ only. Close other GPU programs first and check free memory with `nvidia-smi`.
 **1. bolo, from a checkout** (PowerShell; Python 3.12 from python.org, git):
 
 ```powershell
-git clone https://github.com/cB-Sigma/bolo C:\bolo-src
+git clone https://github.com/cB-Sigma/bolo-speech C:\bolo-src
 py -3.12 -m venv C:\bolo-env
 C:\bolo-env\Scripts\pip install "C:\bolo-src\server[all,cuda]"
 ```
@@ -439,7 +439,7 @@ DiariZen ran here on a CPU only; Spark-TTS (3.9 GB) and MaskGCT (8.9 GB) were no
 GPU, from a checkout. Spark-TTS needs about 4 GB of GPU memory, MaskGCT about 12 GB (float32, as its authors run it;
 an 8 GB laptop GPU will not hold it), DiariZen about 2 GB.
 
-**1. bolo**, as above (`git clone https://github.com/cB-Sigma/bolo C:\bolo-src`, `C:\bolo-env`).
+**1. bolo**, as above (`git clone https://github.com/cB-Sigma/bolo-speech C:\bolo-src`, `C:\bolo-env`).
 
 **2. One plugin environment per model** (DiariZen's pyannote.audio fork must not meet other pyannote versions):
 

@@ -307,7 +307,9 @@ def pinned_flavours(runtime: str) -> list[str]:
 
 
 #: how to get a GPU build where none is published (Linux CUDA)
-GPU_BUILD_DOCS = "https://github.com/cB-Sigma/bolo/blob/main/docs/configuration.md#a-gpu-build-of-llama-server-on-linux"
+GPU_BUILD_DOCS = (
+    "https://github.com/cB-Sigma/bolo-speech/blob/main/docs/configuration.md#a-gpu-build-of-llama-server-on-linux"
+)
 
 
 def missing_build_note(runtime: str, device: str | None = None) -> str | None:
