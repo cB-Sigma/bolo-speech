@@ -72,6 +72,8 @@ export interface TtsEngineState {
   index: VoiceIndex | null
   /** Why the index could not be read, if it could not. */
   indexError: string | null
+  /** The blend of Kokoro voices spoken instead of the voice's own style, or null. */
+  blend?: string | null
 }
 
 export interface SynthResult {
@@ -154,6 +156,7 @@ export class BrowserTtsEngine {
   private loading: Promise<void> | null = null
   private nextId = 1
   private pending = new Map<number, { resolve: (r: SynthResult) => void; reject: (e: Error) => void }>()
+  private blends = new Map<number, { resolve: () => void; reject: (e: Error) => void }>()
   private watchdog: ReturnType<typeof setInterval> | null = null
   private lastMovement = 0
   private generation = 0
@@ -462,8 +465,14 @@ export class BrowserTtsEngine {
             this.peakMemory = msg.memoryBytes
             diag.event('voice', `runtime memory grew to ${(msg.memoryBytes / 2 ** 20).toFixed(0)} MiB`)
           }
+        } else if (msg.type === 'styled') {
+          this.blends.get(msg.id)?.resolve()
+          this.blends.delete(msg.id)
         } else if (msg.type === 'error') {
-          if (msg.id != null) {
+          if (msg.id != null && this.blends.has(msg.id)) {
+            this.blends.get(msg.id)?.reject(new Error(msg.message))
+            this.blends.delete(msg.id)
+          } else if (msg.id != null) {
             this.pending.get(msg.id)?.reject(new Error(msg.message))
             this.pending.delete(msg.id)
           } else {
@@ -586,6 +595,26 @@ export class BrowserTtsEngine {
     })
   }
 
+  /**
+   * Speak a blend of Kokoro voices from now on (the loaded voice must be one of them, the heaviest: its language
+   * is the one read), or the loaded voice's own style again with null. Returns the blend as the server spells it.
+   */
+  async setBlend(parts: { voice: BrowserVoice; weight: number }[] | null): Promise<void> {
+    await this.load()
+    const worker = this.worker
+    if (!worker) throw new Error('The voice is not loaded')
+    const styles = (parts ?? []).map((p) => {
+      if (p.voice.files.from !== 'kokoro') throw new Error(`${p.voice.label} is not a Kokoro voice`)
+      return { url: hubUrl(p.voice.files.style), weight: p.weight }
+    })
+    const id = this.nextId++
+    await new Promise<void>((resolve, reject) => {
+      this.blends.set(id, { resolve, reject })
+      worker.postMessage({ type: 'style', id, styles })
+    })
+    this.store.patch({ blend: parts && parts.length ? parts.map((p) => `${p.voice.id}(${p.weight})`).join('+') : null })
+  }
+
   /** Stop answering outstanding requests (the worker finishes the one it is on). */
   cancelPending(): void {
     for (const p of this.pending.values()) p.reject(new Error('Stopped'))
@@ -602,7 +631,18 @@ export class BrowserTtsEngine {
     this.worker = null
     this.loading = null
     this.cancelPending()
-    this.store.patch({ status: 'idle', progress: 0, files: [], stage: null, runtime: null, stalled: null, error: null })
+    for (const b of this.blends.values()) b.reject(new Error('Unloaded'))
+    this.blends.clear()
+    this.store.patch({
+      status: 'idle',
+      progress: 0,
+      files: [],
+      stage: null,
+      runtime: null,
+      stalled: null,
+      error: null,
+      blend: null,
+    })
   }
 }
 

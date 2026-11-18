@@ -59,6 +59,8 @@ let session: Runner | null = null
 let config: VoiceConfig | null = null
 let uccharan: typeof UccharanModule | null = null
 let kokoroStyle: Float32Array | null = null
+/** The loaded voice's own style, to go back to after a blend. */
+let ownStyle: Float32Array | null = null
 let chain: Promise<void> = Promise.resolve()
 
 const record = (r: FetchRecord) => post({ type: 'fetch', record: r })
@@ -164,6 +166,7 @@ async function load(req: Extract<TtsWorkerRequest, { type: 'load' }>): Promise<v
   if (req.kind === 'kokoro') {
     if (!styleFile) throw new Error('The voice style is missing')
     kokoroStyle = new Float32Array(styleFile.data)
+    ownStyle = kokoroStyle
     config = {
       id: req.voice,
       kind: 'kokoro',
@@ -333,14 +336,36 @@ async function synth(req: Extract<TtsWorkerRequest, { type: 'synth' }>): Promise
   )
 }
 
+/** A blend of Kokoro voices: their style vectors (one per input length) added up with normalised weights. */
+async function blend(req: Extract<TtsWorkerRequest, { type: 'style' }>): Promise<void> {
+  const started = performance.now()
+  if (!ownStyle) throw new Error('Blends need a Kokoro voice')
+  if (req.styles.length === 0) {
+    kokoroStyle = ownStyle
+  } else {
+    const files = await Promise.all(req.styles.map((s) => cachedDownload(s.url, VOICE_CACHE, { record })))
+    const total = req.styles.reduce((a, s) => a + s.weight, 0)
+    if (!(total > 0)) throw new Error('A blend needs a weight above 0')
+    const mixed = new Float32Array(ownStyle.length)
+    files.forEach((f, i) => {
+      const v = new Float32Array(f.data)
+      if (v.length !== mixed.length) throw new Error('These voices’ styles do not have the same shape')
+      const w = (req.styles[i] as { weight: number }).weight / total
+      for (let k = 0; k < mixed.length; k++) mixed[k] = (mixed[k] as number) + w * (v[k] as number)
+    })
+    kokoroStyle = mixed
+  }
+  post({ type: 'styled', id: req.id, ms: performance.now() - started })
+}
+
 scope.onmessage = (e: MessageEvent<TtsWorkerRequest>) => {
   const req = e.data
   chain = chain
-    .then(() => (req.type === 'load' ? load(req) : synth(req)))
+    .then(() => (req.type === 'load' ? load(req) : req.type === 'style' ? blend(req) : synth(req)))
     .catch((err: unknown) => {
       post({
         type: 'error',
-        id: req.type === 'synth' ? req.id : undefined,
+        id: req.type === 'synth' || req.type === 'style' ? req.id : undefined,
         message: err instanceof Error ? err.message : String(err),
       })
     })

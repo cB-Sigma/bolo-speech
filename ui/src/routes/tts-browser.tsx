@@ -50,6 +50,17 @@ import { wordErrorRate } from '@/lib/latency/wer'
 import { prefs } from '@/lib/prefs'
 import { Store } from '@/lib/store'
 import { emptyTts, type TtsState } from '@/lib/tts/session'
+import { VoiceBlendPanel, startingBlend } from '@/components/tts/voice-blend'
+import { Switch } from '@/components/ui/switch'
+import {
+  blendString,
+  languageSummary,
+  languageWarning,
+  normalised,
+  parseLanguageHeader,
+  type BlendPart,
+} from '@/lib/blend'
+import { voiceForText } from '@/lib/browser-tts/language'
 import { cn } from '@/lib/utils'
 
 const idle = new Store<TtsState>(emptyTts())
@@ -277,6 +288,10 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
   const extra = useStore(session?.extra ?? idleExtra)
   const busy = state.status === 'connecting' || state.status === 'synthesizing' || state.status === 'playing'
   const tripRef = useRef(0)
+  const [detectLang, setDetectLang] = useState(true)
+  const [decision, setDecision] = useState<string | null>(null)
+  const [blendOn, setBlendOn] = useState(false)
+  const [blendParts, setBlendParts] = useState<BlendPart[]>([])
 
   useEffect(() => {
     engine.setVoice(voice.id)
@@ -298,7 +313,7 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
         : null
   const unavailable = published != null && publishedId != null && !published.has(publishedId)
 
-  const chooseVoice = (id: string) => {
+  const chooseVoice = (id: string, opts: { keepText?: boolean } = {}) => {
     const next = browserVoice(id)
     session?.stop()
     setVoice(next)
@@ -309,13 +324,69 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
       // ignore
     }
     // Keep what the user typed; swap a sample sentence for the new voice's own.
-    if (!text.trim() || SAMPLES.has(text)) setText(next.sample)
+    if (!opts.keepText && (!text.trim() || SAMPLES.has(text))) setText(next.sample)
   }
 
-  const speak = (): BrowserTtsSession | null => {
+  /** The Kokoro voices of the loaded precision, as the blend panel lists them (by style name, as the server). */
+  const precision = voice.id.split('@')[1] ?? 'q8'
+  const kokoroVoices = BROWSER_VOICES.filter((v) => v.kind === 'kokoro' && (v.id.split('@')[1] ?? 'q8') === precision)
+  const styleOf = (v: BrowserVoice) =>
+    (v.files.from === 'kokoro' ? (v.files.style.split('/').pop() ?? '') : '').replace(/\.bin$/, '')
+  const blendVoices = kokoroVoices.map((v) => ({
+    id: styleOf(v),
+    name: v.label,
+    language: v.language,
+    gender: v.gender,
+  }))
+  const blendActive = voice.kind === 'kokoro' && blendOn && normalised(blendParts).length > 0
+
+  const speak = async (): Promise<BrowserTtsSession | null> => {
     if (!text.trim() || unavailable) return null
     session?.stop()
-    const s = new BrowserTtsSession(engine, voice, text.trim())
+    let speaker = voice
+    let blendSpelled: string | null = null
+    const shares = blendActive ? normalised(blendParts) : []
+    if (shares.length) {
+      // The heaviest voice is loaded (its language is read); the others lend their style vectors.
+      const heaviest = shares.reduce((a, b) => (b.weight > a.weight ? b : a))
+      speaker = kokoroVoices.find((v) => styleOf(v) === heaviest.voice) ?? voice
+      blendSpelled = blendString(blendParts)
+    } else {
+      const choice = voiceForText(text, voice, BROWSER_VOICES, {
+        follow: detectLang,
+        downloaded: (v) => es.cachedIds.includes(v.id),
+      })
+      setDecision(choice.header)
+      if (choice.switched) {
+        speaker = choice.voice
+        toast.message(`Read by ${speaker.label}`, {
+          description: `The text looks like ${languageLabel(speaker)}; ${voice.label} speaks ${languageLabel(voice)}.`,
+        })
+      }
+    }
+    if (speaker.id !== voice.id) {
+      engine.setVoice(speaker.id)
+      chooseVoice(speaker.id, { keepText: true })
+    }
+    try {
+      if (speaker.kind === 'kokoro' && (blendSpelled || engine.store.get().blend)) {
+        await engine.setBlend(
+          shares.length
+            ? shares.map((p) => ({
+                voice: kokoroVoices.find((v) => styleOf(v) === p.voice) as BrowserVoice,
+                weight: p.weight,
+              }))
+            : null,
+        )
+      }
+    } catch (err) {
+      toast.error('Could not blend the voices', { description: err instanceof Error ? err.message : String(err) })
+      return null
+    }
+    if (blendSpelled) {
+      setDecision(voiceForText(text, speaker, BROWSER_VOICES, { follow: false, blend: blendSpelled }).header)
+    }
+    const s = new BrowserTtsSession(engine, speaker, text.trim())
     setSession(s)
     setTrip(null)
     void s.start()
@@ -329,7 +400,7 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
 
   /** Each synthesised sentence through the in-browser recogniser, scored against what was spoken. */
   const transcribe = async (s: BrowserTtsSession) => {
-    const rt = voice.roundTrip
+    const rt = s.voice.roundTrip
     if (!rt) return
     const token = ++tripRef.current
     const stt = sharedEngine()
@@ -385,10 +456,14 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
   const roundTrip = () => {
     // Reuse what was just spoken only when it is this voice saying this text.
     const fresh = session && session.voice.id === voice.id && session.text === text.trim()
-    const s = state.totalMs != null && session && fresh && !busy ? session : speak()
-    if (s) void transcribe(s)
+    if (state.totalMs != null && session && fresh && !busy) void transcribe(session)
+    else
+      void speak().then((s) => {
+        if (s) void transcribe(s)
+      })
   }
 
+  const decisionView = parseLanguageHeader(decision)
   const hasAudio = state.audioSeconds > 0 && state.totalMs != null
   const underrun = state.underruns > 0
   const bytes = (voice.files.from === 'published' ? sizes[voice.id] : undefined) ?? voice.approxBytes
@@ -443,7 +518,7 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
               className="min-h-28 resize-y text-[15px] leading-7"
               lang={htmlLang(voice)}
               onKeyDown={(e) => {
-                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !busy) speak()
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !busy) void speak()
               }}
               data-testid="tts-text"
             />
@@ -475,6 +550,19 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
                   )
                 })}
             </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+              <Switch
+                id="tts-detect-language"
+                checked={detectLang}
+                onCheckedChange={setDetectLang}
+                disabled={busy}
+                data-testid="detect-language"
+              />
+              <label htmlFor="tts-detect-language" className="text-muted-foreground">
+                Pick the voice from the text: a voice of the language it is written in reads it (the server’s{' '}
+                <span className="font-mono">detect_language</span>)
+              </label>
+            </div>
             <div className="mt-4 flex flex-wrap items-center gap-2">
               {busy ? (
                 <Button
@@ -487,7 +575,7 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
                 </Button>
               ) : (
                 <Button
-                  onClick={speak}
+                  onClick={() => void speak()}
                   className="h-9 min-w-24"
                   disabled={!text.trim() || unavailable}
                   data-testid="speak"
@@ -516,6 +604,26 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
                 <Download /> WAV
               </Button>
             </div>
+            {decisionView && (
+              <div
+                className="mt-3 grid gap-1 rounded-lg border border-border bg-muted/30 p-2.5 text-xs leading-4"
+                data-testid="tts-decision"
+              >
+                <span className="font-medium">What the page decided</span>
+                <span className="text-muted-foreground">{languageSummary(decisionView)}</span>
+                {languageWarning(decisionView) && (
+                  <span className="text-warning-text" data-testid="tts-mismatch">
+                    {languageWarning(decisionView)}
+                  </span>
+                )}
+                <span
+                  className="font-mono text-[11px] break-all text-muted-foreground"
+                  data-testid="tts-language-header"
+                >
+                  {decision}
+                </span>
+              </div>
+            )}
             {es.status !== 'ready' && <VerdictLine className="mt-3" verdict={voiceVerdict} bytes={bytes} />}
             <PlacementSelect
               className="mt-3"
@@ -626,6 +734,28 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
             )}
           </Panel>
 
+          {voice.kind === 'kokoro' && (
+            <VoiceBlendPanel
+              model={es.voice.downloadId}
+              voices={blendVoices}
+              enabled={blendOn}
+              onEnabledChange={(on) => {
+                setBlendOn(on)
+                if (on && normalised(blendParts).length === 0) {
+                  const own = styleOf(voice)
+                  setBlendParts(
+                    startingBlend([
+                      ...blendVoices.filter((v) => v.id === own),
+                      ...blendVoices.filter((v) => v.id !== own),
+                    ]),
+                  )
+                }
+              }}
+              parts={blendParts}
+              onPartsChange={setBlendParts}
+              disabled={busy}
+            />
+          )}
           {trip && <RoundTripPanel trip={trip} lang={htmlLang(voice)} />}
         </div>
 

@@ -35,6 +35,15 @@ export type TtsWorkerRequest =
       power?: GpuPower
     }
   | {
+      /**
+       * Kokoro: speak with a blend of voices' style vectors, added up with these weights (normalised to sum to 1),
+       * as the server blends `af_bella(0.7)+af_sky(0.3)`. An empty list goes back to the voice's own style.
+       */
+      type: 'style'
+      id: number
+      styles: { url: string; weight: number }[]
+    }
+  | {
       type: 'synth'
       id: number
       /** One chunk, already prepared by prepareText (cleaned for character voices). */
@@ -73,6 +82,7 @@ export type TtsWorkerResponse =
       missing: string[]
       memoryBytes: number | null
     }
+  | { type: 'styled'; id: number; ms: number }
   | { type: 'note'; text: string }
   | { type: 'error'; id?: number; message: string }
 

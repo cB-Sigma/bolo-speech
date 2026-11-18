@@ -42,6 +42,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   after installing their pinned requirements with PyTorch. Tested with fakes only (Freeze-Omni's against
   python-socketio's server).
 
+- **Live demo: Kokoro voice blends and the voice chosen from the text.** Text to speech in the page blends Kokoro
+  voices as the server does (`af_heart(0.7)+af_bella(0.3)`: the style vectors added up with normalised weights in
+  the worker, the text read in the heaviest voice's language), with the console's blend panel and the blend spelled
+  as it is sent. "Pick the voice from the text" (on by default) runs the server's text-language detector, ported to
+  TypeScript, and lets a voice of the detected language read the text, or the closest language of its script,
+  preferring a downloaded voice of the same kind and gender; switched off, or with a blend, the voice is kept and a
+  mismatch is said. The decision is shown in words and spelled as the server's `x-bolo-language`.
 - **Live demo: the server's new audio features run in the page.** Small models of their own, with the server's
   catalog ids and licences, one worker each, listed in the downloads manager and Loaded models and unloaded by the
   keep-alive (`ui/src/lib/browser-audio/`). **Denoise first** on Speech to text (files and the live microphone):
