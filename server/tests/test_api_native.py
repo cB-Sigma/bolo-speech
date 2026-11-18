@@ -86,6 +86,7 @@ def test_catalog_shape_and_filters(live: LiveServer) -> None:
         "fake-denoise-48k",
         "fake-s2s",
         "fake-lid",
+        "fake-align",
         "fake-stt-ta",
         "fake-tagging",
         "fake-emotion",
