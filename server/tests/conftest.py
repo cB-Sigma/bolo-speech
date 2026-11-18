@@ -44,6 +44,15 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
 
 @pytest.fixture(autouse=True)
+def _no_host_hf_token(monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory) -> None:
+    """A developer's Hugging Face login (HF_TOKEN, or the token `hf auth login` saved) must not reach the tests: a
+    test that a gated model needs a token failed on a Mac where `hf auth login` had run."""
+    for name in ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "BOLO_HF_TOKEN"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("HF_TOKEN_PATH", str(tmp_path_factory.getbasetemp() / "no-hf-token"))
+
+
+@pytest.fixture(autouse=True)
 def _sherpa_build_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
     """Which sherpa-onnx wheel this machine has (PyPI's CPU build, or none) must not move tests' sherpa-onnx models
     to the CPU: tests that are about it say which build they mean."""

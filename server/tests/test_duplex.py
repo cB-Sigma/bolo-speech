@@ -1012,3 +1012,13 @@ def test_minicpm_o_environment_keeps_pkg_resources() -> None:
     assert "minicpmo-utils[all]==1.0.6" in build.packages and "setuptools<81" in build.packages
     # in the same pip command as the package that needs it (bolo.duplex.runtime._install_python)
     assert build.packages.index("setuptools<81") > build.packages.index("minicpmo-utils[all]==1.0.6")
+
+
+def test_each_build_checks_the_package_it_installs() -> None:
+    """The MLX build of the Moshi servers installs moshi_mlx, which does not depend on moshi; its install check
+    imported moshi and failed every install on a Mac (M4 Pro: "No module named 'moshi'")."""
+    from bolo.duplex import runtime
+
+    builds = runtime.SERVERS[runtime.MOSHI].builds
+    assert builds[runtime.MLX].imports == ("moshi_mlx", "sphn")
+    assert builds[runtime.PYTORCH].imports[0] == "moshi"

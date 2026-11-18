@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import threading
 
 import httpx
 import numpy as np
@@ -155,3 +156,53 @@ def test_cli_wake(settings: Settings, tmp_path: object, capsys: pytest.CaptureFi
     assert code == 0
     body = json.loads(capsys.readouterr().out)
     assert [d["keyword"] for d in body["detections"]] == ["hi bolo"]
+
+
+def test_keyword_spotter_hears_a_wake_word_at_the_very_start() -> None:
+    """sherpa-onnx's spotter missed a wake word said from the stream's first sample: each stream first hears a moment
+    of silence, which the times it reports leave out."""
+    from bolo import wake
+
+    class Stream:
+        def __init__(self) -> None:
+            self.fed: list[np.ndarray] = []
+
+        def accept_waveform(self, sr: int, x: np.ndarray) -> None:
+            assert sr == SR
+            self.fed.append(np.asarray(x))
+
+    class Kws:
+        def __init__(self) -> None:
+            self.streams: list[Stream] = []
+            self.ready = False
+
+        def create_stream(self, spec: str | None = None) -> Stream:
+            self.streams.append(Stream())
+            return self.streams[-1]
+
+        def is_ready(self, s: Stream) -> bool:
+            ready, self.ready = self.ready, False
+            return ready
+
+        def decode_stream(self, s: Stream) -> None:
+            pass
+
+        def get_result(self, s: Stream) -> str:
+            return "HEY_JARVIS"
+
+        def reset_stream(self, s: Stream) -> None:
+            pass
+
+    model = wake.SherpaKeywordSpotter.__new__(wake.SherpaKeywordSpotter)
+    model.kws = Kws()
+    model._lock = threading.Lock()
+    model._default_names = {"HEY_JARVIS": "HEY JARVIS"}
+    model.default_keywords = ["HEY JARVIS"]
+    detector = model.create_detector()
+    stream = model.kws.streams[0]
+    assert len(stream.fed) == 1 and len(stream.fed[0]) >= int(0.1 * SR) and not stream.fed[0].any()
+
+    model.kws.ready = True
+    hits = detector.accept(np.full(SR, 0.1, dtype=np.float32))
+    assert [(h.keyword, h.time) for h in hits] == [("HEY JARVIS", 1.0)]  # the silence ahead is not counted
+    assert len(stream.fed) == 2

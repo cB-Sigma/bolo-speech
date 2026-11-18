@@ -213,6 +213,12 @@ def _pinyin(text: str, model_id: str) -> list[str]:
     return out
 
 
+#: silence a keyword-spotting stream hears before the first audio: sherpa-onnx's spotter
+#: missed a wake word said at the very start of a stream ("Hey Jarvis, ..." from the first sample: nothing heard; with
+#: 0.1 s of silence ahead of it: found), as a recording or a session that starts with the wake word has it
+KWS_PRIME = np.zeros(int(0.5 * SR), dtype=np.float32)
+
+
 class SherpaKwsDetector(WakeDetector):
     def __init__(self, model: SherpaKeywordSpotter, keywords: list[str] | None, threshold: float | None) -> None:
         self.model = model
@@ -232,6 +238,7 @@ class SherpaKwsDetector(WakeDetector):
         super().__init__(keywords or model.default_keywords)
         with model._lock:
             self.stream = model.kws.create_stream(spec) if spec else model.kws.create_stream()
+            self.stream.accept_waveform(SR, KWS_PRIME)  # not counted in self.samples: times stay the input's
 
     def accept(self, samples: FloatArray) -> list[WakeDetection]:
         out: list[WakeDetection] = []

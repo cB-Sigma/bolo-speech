@@ -134,6 +134,8 @@ SERVERS: dict[str, Server] = {
                     "2ec210340df8bf34025df6c272ea3ed618f5c22e176c3513f5dba4e529420621",
                     55777,
                 ),
+                # moshi_mlx does not depend on the PyTorch package moshi: checking for it failed every install
+                imports=("moshi_mlx", "sphn"),
                 note="Apple silicon (MLX); q4 checkpoints need about 6 GB of memory",
             ),
             CANDLE: Build(
