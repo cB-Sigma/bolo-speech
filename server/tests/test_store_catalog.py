@@ -5,7 +5,10 @@ import hashlib
 import http.server
 import json
 import re
+import subprocess
+import sys
 import threading
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -28,6 +31,7 @@ class Hub(http.server.BaseHTTPRequestHandler):
     truncate_once = False
     corrupt = False
     gated = False
+    slow = 0.0  # seconds a file takes to send
 
     def log_message(self, *args: object) -> None:
         pass
@@ -83,6 +87,13 @@ class Hub(http.server.BaseHTTPRequestHandler):
                 self.wfile.flush()
                 self.connection.close()
                 return
+            if cls.slow:
+                step = max(1, len(payload) // 16)
+                for i in range(0, len(payload), step):
+                    self.wfile.write(payload[i : i + step])
+                    self.wfile.flush()
+                    time.sleep(cls.slow / 16)
+                return
             self.wfile.write(payload)
             return
         self.send_response(404)
@@ -91,7 +102,7 @@ class Hub(http.server.BaseHTTPRequestHandler):
 
 @pytest.fixture
 def hub() -> Iterator[str]:
-    Hub.requests, Hub.truncate_once, Hub.corrupt, Hub.gated = [], False, False, False
+    Hub.requests, Hub.truncate_once, Hub.corrupt, Hub.gated, Hub.slow = [], False, False, False, 0.0
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Hub)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -675,3 +686,89 @@ async def test_no_manifest_stays_open_after_a_component_missing_load(
             assert not [p for p in held if p.endswith("manifest.json")]
     finally:
         await core.stop()
+
+
+_PULL = """
+import sys
+from pathlib import Path
+from bolo.store import HubClient, ModelStore, Source
+store = ModelStore(Path(sys.argv[1]), HubClient(sys.argv[2]))
+manifest = store.pull("same-model", Source(urls=[{"path": "m.onnx", "url": sys.argv[3]}]))
+print(manifest["size_bytes"], manifest["installed_at"])
+"""
+
+
+def test_two_processes_pulling_the_same_model_fetch_it_once(hub: str, tmp_path: Path) -> None:
+    """The server pulling a model on first use while ``bolo pull`` fetches the same one (WinError 32 on both sides
+    on Windows: two writers of one .part file): the second waits for the first and takes the finished model. The
+    file has no checksum in the source, so a second fetch of it could not be skipped otherwise."""
+    Hub.slow = 2.0
+    url = f"{hub}/org/model/resolve/main/model.int8.onnx"
+    data = tmp_path / "data"
+    args = [sys.executable, "-c", _PULL, str(data), hub, url]
+    first = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    deadline = time.monotonic() + 60
+    while not Hub.requests and time.monotonic() < deadline:  # the first is downloading
+        time.sleep(0.02)
+    second = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    outs = [p.communicate(timeout=120) for p in (first, second)]
+    assert [p.returncode for p in (first, second)] == [0, 0], [err for _, err in outs]
+    assert outs[0][0] == outs[1][0]  # the same manifest: the second took the first's
+    assert [path for path, _ in Hub.requests] == ["/org/model/resolve/main/model.int8.onnx"]  # fetched once
+    store = ModelStore(data)
+    assert (store.model_dir("same-model") / "m.onnx").read_bytes() == BIG
+    assert not list((data / "blobs" / "partial").glob("*.part"))
+
+
+def test_threads_pulling_the_same_model_fetch_it_once(hub: str, tmp_path: Path) -> None:
+    Hub.slow = 1.0
+    store = ModelStore(tmp_path, HubClient(hub))
+    src = Source(urls=[{"path": "m.onnx", "url": f"{hub}/org/model/resolve/main/model.int8.onnx"}])
+    results: list[dict[str, object]] = []
+    progress: list[tuple[int, int]] = []
+    threads = [
+        threading.Thread(
+            target=lambda: results.append(store.pull("m", src, progress=lambda d, t: progress.append((d, t))))
+        )
+        for _ in range(2)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=60)
+    assert len(results) == 2 and results[0] == results[1] and len(Hub.requests) == 1
+    assert (len(BIG), len(BIG)) in progress  # the one that waited reports the finished model
+
+
+def test_a_repull_leaves_files_in_place_and_renames_wait_out_sharing_violations(
+    hub: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Windows: a model the server has loaded keeps its files open, so ``bolo pull`` of it again must not delete
+    them (they are the same files already); and a rename into place that meets a file held for a moment by an
+    antivirus scanner (WinError 32) is tried again."""
+    from bolo import locks
+
+    store = ModelStore(tmp_path, HubClient(hub))
+    store.pull("my-model", SOURCE)
+    real_unlink = Path.unlink
+
+    def unlink(self: Path, missing_ok: bool = False) -> None:
+        if store.models in self.parents:
+            raise _in_use(self.parent)  # held open by the loaded model
+        real_unlink(self, missing_ok=missing_ok)
+
+    monkeypatch.setattr(Path, "unlink", unlink)
+    real_replace = Path.replace
+    refused: list[Path] = []
+
+    def replace(self: Path, target: Path) -> Path:
+        if len(refused) < 2:
+            refused.append(self)
+            raise _in_use(self.parent)
+        return real_replace(self, target)
+
+    monkeypatch.setattr(Path, "replace", replace)
+    monkeypatch.setattr(locks.time, "sleep", lambda s: None)
+    manifest = store.pull("my-model", SOURCE)
+    assert manifest["complete"] and len(refused) == 2
+    assert (store.model_dir("my-model") / "model.int8.onnx").read_bytes() == BIG

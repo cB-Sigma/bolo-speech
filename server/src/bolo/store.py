@@ -4,16 +4,23 @@ Layout under the data directory::
 
     blobs/sha256-<hex>             one file per unique content
     blobs/partial/<key>.part       interrupted downloads (resumed with HTTP Range)
+    locks/pull-<id>.lock           held while a model is pulled, by whichever process pulls it (bolo.locks)
+    locks/blob-<key>.lock          held while a file is downloaded
     models/<id>/manifest.json      what the model consists of and where it came from
     models/<id>/<relative path>    hard links (or symlinks/copies) to blobs
 
 Models are fetched from Hugging Face model repositories (the listing API
 supplies each file's size and, for LFS files, its SHA-256) or from plain
 URLs with an optional checksum in the catalog.
+
+Several processes may pull at once (the server pulling a model on first use while ``bolo pull`` fetches the same
+one): a model is pulled by one process at a time, and one that waited for another's pull of the same model and
+source takes the finished model instead of fetching it again.
 """
 
 from __future__ import annotations
 
+import contextlib
 import fnmatch
 import hashlib
 import json
@@ -27,7 +34,7 @@ import tarfile
 import threading
 import time
 import zipfile
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -37,22 +44,15 @@ import httpx
 
 from bolo import logs
 from bolo.errors import DownloadError, FilesInUse, GatedModel, ModelNotFound
+from bolo.locks import FileLock, replace_file, retry_sharing, sharing_violation
 from bolo.stt_options import DECODE_SETTINGS
 
 log = logging.getLogger("bolo.store")
 
 
-# -- removal that waits out Windows sharing violations ---------------------------------------------------------
-#: Windows errors that mean another program has the file open for a moment (ERROR_ACCESS_DENIED,
-#: ERROR_SHARING_VIOLATION): an antivirus scanner looking at files that were just written, an indexer, an editor
-_SHARING_ERRORS = (5, 32)
+# -- removal that waits out Windows sharing violations (bolo.locks.sharing_violation) ---------------------------
 #: how long :func:`remove_tree` waits between tries (about 3 s in all)
 REMOVE_BACKOFF_S = (0.1, 0.2, 0.4, 0.8, 1.5)
-
-
-def sharing_violation(exc: BaseException) -> bool:
-    """A Windows "in use by another process" error (WinError 32, or 5 for a file being deleted or scanned)."""
-    return isinstance(exc, OSError) and getattr(exc, "winerror", None) in _SHARING_ERRORS
 
 
 def _remove_model_dir(path: Path) -> None:
@@ -552,6 +552,33 @@ class ModelStore:
         with self._guard:
             return self._locks.setdefault(key, threading.Lock())
 
+    @contextlib.contextmanager
+    def _file_lock(
+        self, name: str, cancelled: Callable[[], bool] | None = None, on_wait: Callable[[], None] | None = None
+    ) -> Iterator[bool]:
+        """Hold ``<data_dir>/locks/<name>.lock`` (other processes); yields whether another one held it first."""
+        lock = FileLock(self.data_dir / "locks" / f"{name}.lock")
+        try:
+            waited = lock.acquire(cancelled=cancelled, on_wait=on_wait)
+        except InterruptedError:
+            raise DownloadError("download cancelled") from None
+        try:
+            yield waited
+        finally:
+            lock.release()
+
+    def _finished(self, model_id: str, source: Source) -> dict[str, Any] | None:
+        """The manifest of ``model_id`` if it is complete, from ``source``, with every file in place."""
+        manifest = self.manifest(model_id)
+        if not manifest or not manifest.get("complete"):
+            return None
+        if manifest.get("source") != json.loads(json.dumps(source.to_dict())):
+            return None
+        mdir = self.model_dir(model_id)
+        if not all((mdir / str(f.get("path", ""))).is_file() for f in manifest.get("files", [])):
+            return None
+        return manifest
+
     def _blob_path(self, sha256: str) -> Path:
         return self.blobs / f"sha256-{sha256}"
 
@@ -572,7 +599,15 @@ class ModelStore:
                 return blob, remote.sha256
         key = hashlib.sha256(f"{remote.url}|{remote.sha256 or remote.git_oid or ''}".encode()).hexdigest()[:32]
         part = self.partial / f"{key}.part"
-        with self._lock(key):
+        # threads of this process, then other processes: one writer of a .part file at a time (two of them
+        # appending to it corrupt it; on Windows the rename into place then fails with WinError 32)
+        with self._lock(key), self._file_lock(f"blob-{key}", cancelled):
+            if remote.sha256:  # another process may have fetched it while this one waited
+                blob = self._blob_path(remote.sha256)
+                if blob.is_file() and (remote.size is None or blob.stat().st_size == remote.size):
+                    if on_bytes:
+                        on_bytes(blob.stat().st_size)
+                    return blob, remote.sha256
             last_error: Exception | None = None
             for attempt in range(retries):
                 try:
@@ -597,9 +632,12 @@ class ModelStore:
                 raise DownloadError(f"size mismatch for {remote.path}")
             blob = self._blob_path(digest)
             if blob.exists():
-                part.unlink()
+                try:
+                    retry_sharing(part.unlink)
+                except OSError as exc:  # a leftover .part of a finished file is checked and used next time
+                    log.debug("could not delete %s: %s", part, exc)
             else:
-                part.replace(blob)
+                replace_file(part, blob)
             return blob, digest
 
     def _download(
@@ -651,8 +689,14 @@ class ModelStore:
 
     def _place(self, blob: Path, dest: Path) -> None:
         dest.parent.mkdir(parents=True, exist_ok=True)
+        if dest.exists() and not dest.is_symlink():
+            try:
+                if dest.samefile(blob):
+                    return  # already this file (a hard link): nothing to do, and a loaded model may hold it open
+            except OSError:
+                pass
         if dest.exists() or dest.is_symlink():
-            dest.unlink()
+            retry_sharing(dest.unlink)
         try:
             os.link(blob, dest)
         except OSError:
@@ -690,7 +734,14 @@ class ModelStore:
             except (DownloadError, httpx.HTTPError) as exc:
                 log.warning("%s: %s; using the fallback source", model_id, exc)
                 return self.pull(model_id, Source(urls=source.fallback), progress, cancelled, meta)
-        with self._lock("model:" + model_id):
+        with self._model_lock(model_id, cancelled) as waited:
+            if waited:  # another thread or process pulled it meanwhile: take what it fetched
+                finished = self._finished(model_id, source)
+                if finished is not None:
+                    log.info("%s: pulled by another process meanwhile", model_id)
+                    if progress:
+                        progress(int(finished.get("size_bytes") or 0), int(finished.get("size_bytes") or 0))
+                    return finished
             files = self.plan(source)
             total = sum(f.size or 0 for f in files)
             done = 0
@@ -744,8 +795,30 @@ class ModelStore:
                 manifest["meta"] = meta
             tmp = mdir / "manifest.json.tmp"
             tmp.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-            tmp.replace(mdir / "manifest.json")
+            replace_file(tmp, mdir / "manifest.json")
             return manifest
+
+    @contextlib.contextmanager
+    def _model_lock(self, model_id: str, cancelled: Callable[[], bool] | None) -> Iterator[bool]:
+        """One pull of a model at a time: among the threads of this process, then among processes (the server's
+        pull on first use and ``bolo pull`` in a terminal). Yields whether another pull held it first."""
+        tlock = self._lock("model:" + model_id)
+        waited = False
+        while not tlock.acquire(timeout=0.2):
+            if not waited:
+                log.info("%s: waiting for another pull of it to finish", model_id)
+            waited = True
+            if cancelled and cancelled():
+                raise DownloadError("download cancelled")
+        try:
+            with self._file_lock(
+                "pull-" + safe_id(model_id),
+                cancelled,
+                on_wait=lambda: log.info("%s: another process is pulling it; waiting for it to finish", model_id),
+            ) as held_elsewhere:
+                yield waited or held_elsewhere
+        finally:
+            tlock.release()
 
     def register_local(self, model_id: str, path: Path, meta: dict[str, Any] | None = None) -> dict[str, Any]:
         """Register a model directory that already exists on disk (no download)."""

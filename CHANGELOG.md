@@ -8,6 +8,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- **Two pulls of the same model at once failed on Windows.** `bolo pull X` while the server was pulling X on
+  first use failed on both sides with WinError 32 (file in use): both wrote the same partial download and renamed
+  it into place. A model is now pulled by one process at a time (a lock file in `<data_dir>/locks/`, held with the
+  operating system's own locking, so a crashed pull leaves no stale lock); the other waits, says so in the log,
+  and takes the finished model instead of fetching it again. Each download is locked the same way. Renames into
+  place (`os.replace`) and deletions are tried again for about 3 s while Windows reports a sharing violation, and a
+  pull of a model that is already there no longer deletes and relinks its files, which a loaded model holds open.
 - **Telugu and Bengali through Whisper on sherpa-onnx.** Telugu text was still cut short: sherpa-onnx cannot hand
   over Whisper's tokens when one holds part of a character, and the estimate from the text's length (Tamil's 3
   bytes a token) missed that Telugu, at 1.4 to 2 bytes a token, had filled the limit. The tokens are now counted by
