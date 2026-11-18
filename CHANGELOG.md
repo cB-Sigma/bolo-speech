@@ -21,6 +21,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   `model.bin`, `config.json` and vocabulary as with 4.57.6, and transcribes the bundled English samples. The
   workaround for checkpoints saved by transformers 5 (dropping `extra_special_tokens` from `tokenizer_config.json`)
   is no longer needed and is gone.
+- **bolo-torch: "Security notes" in its README.** The `glm-4-voice`, `minicpm-o` and `step-audio-2` extras keep
+  transformers 4.44.1, 4.44.2 and 4.49.0, which their models' remote code needs and which have published
+  advisories. They are opt-in; the README recommends installing each in its own plugin environment.
 
 ### Fixed
 

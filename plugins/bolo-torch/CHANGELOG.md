@@ -4,6 +4,12 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Security
+
+- **README: "Security notes".** The `glm-4-voice`, `minicpm-o` and `step-audio-2` extras pin transformers 4.44.1,
+  4.44.2 and 4.49.0, which their models' remote code needs and which have published advisories. The pins stay; the
+  README says so and recommends a separate plugin environment for each.
+
 ### Added
 
 - **`bolo-torch install` keeps a GPU build of torch even when pip replaces it**: it reinstalls the build that was

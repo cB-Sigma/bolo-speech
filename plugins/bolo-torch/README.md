@@ -330,6 +330,16 @@ load logs a warning that names the files. Otherwise the load fails with `remote_
 The code runs inside this plugin's process with its rights. `bolo-torch pin-remote-code <folder> --revision <commit>`
 prints the pin for a new entry; read the files it lists first. bolo's docs/models.md, "Remote code", has the details.
 
+## Security notes
+
+Three extras pin an older transformers because their models' remote code needs it: `glm-4-voice` (4.44.1),
+`minicpm-o` (4.44.2) and `step-audio-2` (4.49.0). These releases have published security advisories (16 to 18
+each), fixed in later 4.x releases and in 5.x. Other extras also keep transformers below 5 (`kimi-audio`,
+`dicow`, `maskgct`, and `parler` through parler-tts). They are opt-in: nothing installs them unless you name the
+extra, and the models' remote code runs only after `allow_remote_code = true`. Install each in its own plugin
+environment (a separate venv that bolo starts through `BOLO_PLUGINS`, as under "Some extras do not mix"), not in
+the one bolo or your other models use.
+
 ## Inference code from GitHub
 
 Code that is not a package (Step-Audio 2's token2wav, ...) comes from the authors' GitHub repository at a pinned
