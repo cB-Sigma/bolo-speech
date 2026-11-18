@@ -2581,24 +2581,42 @@ sounds, not how they feel; acted, synthesised and telephone speech and other way
 
 ## Word timestamps
 
-| Models | Word times |
-| --- | --- |
-| faster-whisper (CTranslate2 Whisper) | yes (cross-attention alignment of the transcript, after decoding: the text is the same with or without words) |
-| whisper.cpp (`whispercpp-*`) | yes, from whisper.cpp's token timestamps (computed after decoding: the text is the same) |
-| transducer and CTC models through sherpa-onnx (Zipformer, Parakeet, NeMo, IndicConformer, SenseVoice, …) | yes, from the token times the decoder reports |
-| Whisper through sherpa-onnx (`whisper-*`) | **no** with the exports in the catalog: token times need a model exported with cross-attention outputs. sherpa-onnx 2.0.1 supports such exports, and a catalog entry for one can switch them on with the option `token_timestamps: true`; we checked that the stock `whisper-tiny` export reports none |
-| Moonshine | **no**: the runtime exposes no token times, and we did not add a forced aligner |
-| Voxtral on llama.cpp (`voxtral-*-llamacpp`) | **no**: the model writes text only. `verbose_json` segments are the pieces of speech bolo cut the audio into (at most 15 s each), not times the model reported |
+| Models | Word times | Word confidence (`probability`) |
+| --- | --- | --- |
+| faster-whisper (CTranslate2 Whisper) | from the model: cross-attention alignment of the transcript, after decoding (the text is the same with or without words) | Whisper's word probability |
+| whisper.cpp (`whispercpp-*`) | from the model: whisper.cpp's token timestamps (DTW), computed after decoding (the text is the same) | mean of the word's token probabilities |
+| transducer and CTC models through sherpa-onnx (Zipformer, Parakeet, NeMo, IndicConformer, SenseVoice, …) | from the model: the token times the decoder reports | mean of the word's token probabilities when the decoder reports token log-probabilities (`ys_log_probs`), else none |
+| Whisper through sherpa-onnx (`whisper-*`) | **forced alignment** (below): the stock exports have no cross-attention outputs, so no token times. A catalog entry for an export with them can switch on the model's own with the option `token_timestamps: true` | none |
+| Moonshine | **forced alignment**: the runtime exposes no token times | none |
+| Voxtral on llama.cpp (`voxtral-*-llamacpp`) and other models that write text only | **forced alignment** of each piece of speech bolo cut the audio into (at most 15 s each for Voxtral) | none |
+| cloud recognisers | from the provider when it gives them, else forced alignment | Deepgram's word confidence |
 
-A cheap forced aligner (CTC alignment of the transcript against a small CTC
-model) was considered for both and not built: sherpa-onnx's offline
-recogniser does not expose the per-frame posteriors such an alignment needs,
-so it would mean running a CTC model's ONNX graph and NeMo-compatible feature
-extraction ourselves, and we had no reference word timings here to check the
-result against.
+### Forced alignment
 
-With `diarize=true`, words also carry their speaker. For word times with
-Whisper, use the `faster-whisper-*` entries.
+Recognisers without word times of their own get them by aligning the transcript to the audio (setting
+`align_words`, on by default; header `x-bolo-word-aligner`). The aligner is a character-level CTC model run in ONNX
+Runtime: its per-frame scores and the Viterbi path that spells the transcript put each letter on its 20 ms frames
+(bolo.alignment). The same aligner answers `POST /v1/audio/alignments` (audio and text in, word times out) and
+gives the word times of synthesised speech (`POST /v1/audio/speech/captioned`); docs/api.md, "Word timestamps and
+forced alignment".
+
+| Aligner (task `align`) | Model | Languages | Licence |
+| --- | --- | --- | --- |
+| `omnilingual-ctc-300m-align` (default) | Meta Omnilingual ASR CTC 300M, int8; the same files as the recogniser `omnilingual-ctc-300m` (pulled once) | the scripts of 1,600+ languages, as written | Apache-2.0 |
+| `mms-300m-forced-aligner` | ctc-forced-aligner's MMS-300m alignment model (wav2vec 2.0, 1,130 languages), int8 ONNX by onnx-community | any, romanized with uroman (`pip install "bolo-speech[align]"`); Latin script only without it | **CC-BY-NC-4.0 (non-commercial)** |
+
+What was run (CPU, 4 threads): both aligners on the bundled `en-long` (11.8 s) and `hi-short` (Hindi) clips with
+their texts. On `en-long` every word start and end of the two aligners is within 0.05 s of the other's; Hindi is
+aligned in Devanagari by the Omnilingual model and after romanizing by MMS. Through the HTTP API: `moonshine-tiny-en`
+on `en-long` with `timestamp_granularities[]=word` (words from `omnilingual-ctc-300m-align`), and captioned speech
+from `kitten-nano-0.8-int8`.
+
+NVIDIA's CTC models in the catalog (Parakeet TDT-CTC, NeMo FastConformer CTC) are not offered as aligners: their
+sub-word vocabularies would need the models' SentencePiece tokenizers, which the sherpa-onnx exports do not ship,
+and their exports take NeMo's filterbank features rather than audio. They give word times of their own as
+recognisers.
+
+With `diarize=true`, words also carry their speaker.
 
 ## Cloud providers
 

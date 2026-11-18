@@ -36,6 +36,7 @@ def _words(items: Any) -> list[Word]:
             str(w.get("punctuated_word") or w.get("word") or ""),
             float(w.get("start") or 0.0),
             float(w.get("end") or 0.0),
+            float(w["confidence"]) if isinstance(w.get("confidence"), (int, float)) else None,
         )
         for w in items or []
         if isinstance(w, dict)

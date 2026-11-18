@@ -37,6 +37,7 @@ from bolo.config import Settings
 from bolo.engines import EngineRegistry
 from bolo.engines.base import (
     AudioClassifierModel,
+    AlignModel,
     DenoiseModel,
     DiarizationModel,
     LidModel,
@@ -777,6 +778,10 @@ class ModelManager:
             lid = model
             handlers["lid"] = lambda items: [lid.identify(item) for item in items]
             max_batch["lid"] = 1
+        elif isinstance(model, AlignModel):
+            aligner = model
+            handlers["align"] = lambda items: [aligner.align(*item) for item in items]
+            max_batch["align"] = 1
         elif isinstance(model, TurnModel):
             turn = model
             handlers["turn"] = lambda items: [turn.probability(item) for item in items]

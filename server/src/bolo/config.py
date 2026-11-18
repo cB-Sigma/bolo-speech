@@ -114,6 +114,13 @@ class Settings:
     default_emotion: str = "emotion2vec-plus-base"
     #: voice-conversion model: POST /v1/audio/voice-conversion without a model (OpenVoice v2, MIT, 66 MB)
     default_voice_conversion: str = "openvoice-v2-tone-color-audiocpp"
+    #: forced-alignment model (task align): POST /v1/audio/alignments without a model, word times for recognisers
+    #: that give none (align_words) and word times of synthesised speech
+    default_align: str = "omnilingual-ctc-300m-align"
+    #: word timestamps for recognisers that give none (Moonshine, Voxtral, Whisper through sherpa-onnx, ...): the
+    #: transcript is aligned to the audio with default_align. Off: those return no words and name
+    #: timestamp_granularities in x-bolo-ignored-options
+    align_words: bool = True
     #: transcription with the model "auto" and no language: identify the language and send the audio to the best
     #: installed recogniser for it (docs/api.md, "Language identification and routing"). Off: "auto" is the default
     language_routing: bool = True

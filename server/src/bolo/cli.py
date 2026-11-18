@@ -865,6 +865,45 @@ def cmd_transcribe(args: argparse.Namespace) -> int:
     return asyncio.run(run())
 
 
+def cmd_align(args: argparse.Namespace) -> int:
+    """``bolo align speech.wav "the text"``: each word of the text with when it is spoken (forced alignment)."""
+    from bolo.audio import decode_audio
+    from bolo.engines.base import Segment
+    from bolo.obs.trace import Trace
+    from bolo.text.formats import to_vtt
+
+    core = _core(args)
+    path = Path(args.file)
+    samples, rate = decode_audio(path.read_bytes(), filename=path.name)
+    text = sys.stdin.read() if args.text == "-" else args.text
+    if args.text.startswith("@"):
+        text = Path(args.text[1:]).read_text(encoding="utf-8")
+
+    async def run() -> int:
+        await core.start()
+        try:
+            trace = Trace("align", "cli", "")
+            result = await core.align(samples, rate, text, language=args.language, model=args.model, trace=trace)
+            words = [{"word": w.word, "start": round(w.start, 3), "end": round(w.end, 3), "score": w.score}
+                     for w in result.words]  # fmt: skip
+            if args.format == "json":
+                print(json.dumps({"model": result.model, "duration": round(result.duration, 3), "words": words},
+                                 indent=2, ensure_ascii=False))  # fmt: skip
+            elif args.format == "vtt":
+                print(to_vtt([Segment(w.start, w.end, w.word) for w in result.words]))
+            else:
+                for w in words:
+                    print(f"{w['start']:8.3f} {w['end']:8.3f}  {w['word']}")
+            return 0
+        except BoloError as exc:
+            print(f"error: {exc.message}", file=sys.stderr)
+            return 1
+        finally:
+            await core.stop()
+
+    return asyncio.run(run())
+
+
 def cmd_denoise(args: argparse.Namespace) -> int:
     """``bolo denoise in.wav -o out.wav``: the recording with its background noise removed."""
     from bolo.audio import decode_audio
@@ -1515,6 +1554,7 @@ _TASK_TITLES = {
     "vad": "Voice-activity detection", "turn": "End-of-turn detection", "separation": "Overlapped-speech separation",
     "denoise": "Denoising", "lid": "Language identification", "speech-to-speech": "Speech to speech",
     "speaker-embedding": "Speaker embedding", "audio-tagging": "Audio tagging", "emotion": "Speech emotion",
+    "align": "Forced alignment",
 }  # fmt: skip
 
 
@@ -2268,6 +2308,15 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--format", "-f", choices=["text", "json", "srt", "vtt"], default="text")
     s.add_argument("--verbose", "-v", action="store_true")
     s.set_defaults(func=cmd_transcribe)
+
+    s = sub.add_parser("align", help="word timestamps of a known text in an audio file (forced alignment)")
+    _common(s)
+    s.add_argument("file")
+    s.add_argument("text", help="what is said in the audio; '-' reads it from stdin, '@file.txt' from a file")
+    s.add_argument("--model", "-m", help="an alignment model (default: default_align)")
+    s.add_argument("--language", "-l")
+    s.add_argument("--format", "-f", choices=["text", "json", "vtt"], default="text")
+    s.set_defaults(func=cmd_align)
 
     s = sub.add_parser("denoise", help="remove background noise from an audio file (speech enhancement)")
     _common(s)

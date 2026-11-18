@@ -131,6 +131,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | **A model catalog** | pull by name, with licences and gating on every entry and what was actually measured; `hf:owner/repo`, any Piper voice by name, local directories and URLs for everything else | [models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md), [below](#models-and-licences) |
 | **Hardware-aware recommendations** | bolo looks at the machine and rates every model for it; it recommends and warns, and never hides or refuses a model | [recommendations.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/recommendations.md) |
 | **Text preparation** | numbers, dates, money, units and URLs read out in the voice's language; pronunciation word lists for names and jargon; an SSML subset; romanised input ("mujhe kal jana hai") written in the voice's script; phonemes without the GPL through [uccharan](https://github.com/cb-Sigma/uccharan) | [api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#text-preparation-ssml-and-pronunciation-word-lists), [models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md#phonemisers) |
+| **Word timestamps for every recogniser** | words with start, end and confidence in `verbose_json` from every speech-to-text model: from the model where it gives them, else by aligning the transcript to the audio with a CTC forced aligner (Omnilingual ASR, Apache-2.0, 1,600+ languages as written; or the non-commercial MMS-300m aligner). `POST /v1/audio/alignments` aligns your own text to your audio, and **captioned speech** gives the time of every word the voice reads | [api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#word-timestamps-and-forced-alignment), [models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md#word-timestamps) |
 | **Language identification and routing** | `POST /v1/audio/language` says which language a recording is in, with probabilities, from a choice of identifiers (VoxLingua107 ECAPA, Whisper's own detector, AmberNet, MMS-LID), each with its licence; a transcription with `model=auto` is sent to the best installed recogniser for the language it hears, and the response header says what was decided. Never overrides a model or language you name | [api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#language-identification-and-routing), [models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md#language-identification-1) |
 | **Sound events and speech emotion** | `POST /v1/audio/tags` names the sounds in a recording (AudioSet's 527: speech, music and its instruments, laughter, alarms, animals, vehicles...) with CED and Zipformer taggers, over the whole recording or window by window; `POST /v1/audio/emotion` says how the speaker sounds (emotion2vec+, licence labelled); SenseVoice's own emotion and sound tags come back with its transcriptions. Background-noise removal on its own: `POST /v1/audio/denoise` | [api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#sound-events-and-audio-tags-post-v1audiotags), [models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md#audio-tagging-and-sound-events) |
 | **Indian languages** | recognition for all 22 scheduled languages, voices for 15 of them and for Bhojpuri, Magahi and Chhattisgarhi, 8 kHz G.711 in and out | [indic-telephony.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/indic-telephony.md) |
@@ -146,6 +147,8 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 <!-- BEGIN GENERATED: models-summary -->
 | Task | Family | Models | Languages | Validated on CPU | Best measured RTF |
 | --- | --- | --- | --- | --- | --- |
+| ALIGN | Omnilingual ASR | 1 | ar, as, bn, de, en, es, fr, gu +23 | 1 | 0.888 (`omnilingual-ctc-300m-align`) |
+| ALIGN | MMS | 1 | - | 1 | 1.137 (`mms-300m-forced-aligner`) |
 | AUDIO-LLM | LFM2.5-Audio 1.5B | 1 | en | 0 | - |
 | AUDIO-LLM | Ultravox 0.5 | 1 | ar, de, en, es, fr, hi, it, ja +7 | 0 | - |
 | AUDIO-LLM | Qwen2.5-Omni 3B | 1 | en, zh | 0 | - |
@@ -411,7 +414,7 @@ The double quotes work in bash, zsh, PowerShell and cmd (cmd.exe does not treat 
 
 The PyPI distribution is `bolo-speech`; the command and the Python package are `bolo`. Python 3.10 or newer.
 
-The base install has no engine at all; extras add what you want. `all` is `sherpa` (most models), `faster-whisper`, `uccharan` (phonemes and text normalisation), `av` (M4A/WebM/AAC through bundled FFmpeg) and `wyoming`. Opt-in extras: `webrtc`, `otel` (OpenTelemetry export of request traces), `turn` (end-of-turn model), `lid` (spoken-language identification; `all` has ONNX Runtime through faster-whisper already), `orpheus`, `s2s` (in-process speech-to-speech), `sip`, `moonshine`, `whispercpp`, `mlx` (MLX models on Apple Silicon; installs nothing elsewhere), `cuda` (CUDA 12's cuBLAS and cuDNN for faster-whisper on an NVIDIA GPU, Windows and Linux), and `espeak` (eSpeak NG, GPL-3.0-or-later, never part of `all`; see [Licences](#licences)).
+The base install has no engine at all; extras add what you want. `all` is `sherpa` (most models), `faster-whisper`, `uccharan` (phonemes and text normalisation), `av` (M4A/WebM/AAC through bundled FFmpeg) and `wyoming`. Opt-in extras: `webrtc`, `otel` (OpenTelemetry export of request traces), `turn` (end-of-turn model), `lid` (spoken-language identification; `all` has ONNX Runtime through faster-whisper already), `align` (forced alignment, with uroman for the MMS aligner), `orpheus`, `s2s` (in-process speech-to-speech), `sip`, `moonshine`, `whispercpp`, `mlx` (MLX models on Apple Silicon; installs nothing elsewhere), `cuda` (CUDA 12's cuBLAS and cuDNN for faster-whisper on an NVIDIA GPU, Windows and Linux), and `espeak` (eSpeak NG, GPL-3.0-or-later, never part of `all`; see [Licences](#licences)).
 
 On Windows, from PowerShell or cmd:
 
@@ -468,7 +471,6 @@ bolo itself is [Apache-2.0](https://github.com/cB-Sigma/bolo-speech/blob/main/LI
 - GPU and Apple Silicon validation.
 - A Bhojpuri recogniser better than the Hindi fallback; models trained for 8 kHz telephone speech.
 - Overlap-aware live diarization; a diarization error rate on more real recordings.
-- Word timestamps for Whisper through sherpa-onnx and for Moonshine.
 - MCP tools in Realtime sessions; authentication beyond a single shared key.
 
 ## Contributing

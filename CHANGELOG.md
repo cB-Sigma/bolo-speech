@@ -43,6 +43,22 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - **Where a model runs, in words.** Each loaded model's placement carries `runtime` ("Core ML (sherpa-onnx)",
   "MIGraphX (ONNX Runtime)", "Metal (MLX)", "MPS (PyTorch)", "ROCm (llama.cpp)", "CPU"): in `GET /api/v1/ps`, the
   console's Loaded models panel next to the device, and `bolo ps --verbose` (RUNTIME).
+- **Word timestamps for every speech-to-text model, from a forced aligner.** Moonshine, Voxtral, Whisper through
+  sherpa-onnx and the other recognisers that give no word times now return words with
+  `timestamp_granularities[]=word`: the transcript is aligned to the audio with a character-level CTC model
+  (Viterbi over its frame scores, in NumPy) and `x-bolo-word-aligner` names the aligner. New task `align` with two
+  aligners: `omnilingual-ctc-300m-align` (the default, `default_align`; the files of `omnilingual-ctc-300m`,
+  Apache-2.0, the scripts of 1,600+ languages as written) and `mms-300m-forced-aligner` (ctc-forced-aligner's
+  MMS-300m model, 1,130 languages through uroman romanization, **CC-BY-NC-4.0, non-commercial**). `align_words =
+  false` switches it off.
+- **`POST /v1/audio/alignments` and `bolo align`:** a recording and its text in, every word with `start`, `end` and
+  an alignment `score` out.
+- **Captioned speech.** `POST /v1/audio/speech/captioned` returns the synthesised audio with the time of every word
+  in it, and `/v1/audio/speech` with `stream_format: "sse"` and `timestamps: true` sends a `speech.words` event
+  after each sentence. The words are the text the voice read (after normalisation), aligned to its audio.
+- **Word confidence.** Words in `verbose_json` carry `probability`: Whisper's word probability on faster-whisper,
+  the mean token probability on whisper.cpp and on sherpa-onnx models whose decoder reports token log-probabilities,
+  Deepgram's word confidence.
 
 ## [0.6.8] - 2026-11-18
 

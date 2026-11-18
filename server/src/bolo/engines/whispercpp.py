@@ -189,7 +189,7 @@ class WhisperCppSTT(STTModel):
         out: list[list[Word]] = []
         last = 0.0
         for i in range(min(n_segments, int(pw.whisper_full_n_segments(ctx)))):
-            pieces: list[list[Any]] = []  # one per word: bytes, start, end, DTW end
+            pieces: list[list[Any]] = []  # one per word: bytes, start, end, DTW end, token probabilities
             for j in range(int(pw.whisper_full_n_tokens(ctx, i))):
                 data = pw.whisper_full_get_token_data(ctx, i, j)
                 if int(data.id) >= eot:
@@ -199,13 +199,15 @@ class WhisperCppSTT(STTModel):
                 dtw = float(data.t_dtw) / 100.0 if self.dtw and int(data.t_dtw) >= 0 else None
                 if dtw is not None and not raw.strip().decode("utf-8", "replace").strip(_PUNCTUATION):
                     dtw = None  # punctuation: its DTW time is late, at the next word
+                p = float(data.p)
                 if not pieces or raw.startswith(b" "):
-                    pieces.append([raw, t0, t1, dtw])
+                    pieces.append([raw, t0, t1, dtw, [p]])
                 else:
                     word = pieces[-1]
                     word[0] += raw
                     word[2] = t1
                     word[3] = dtw if dtw is not None else word[3]
+                    word[4].append(p)
             pieces = [p for p in pieces if p[0].decode("utf-8", errors="replace").strip()]
             ends = [p[3] for p in pieces]
             if pieces and all(e is not None for e in ends):
@@ -225,7 +227,8 @@ class WhisperCppSTT(STTModel):
             for piece, (t0, t1) in zip(pieces, spans):
                 start = min(max(t0, last), duration)
                 end = min(max(t1, start), duration)
-                words.append(Word(piece[0].decode("utf-8", errors="replace").strip(), start, end))
+                p = round(float(np.mean(piece[4])), 4)
+                words.append(Word(piece[0].decode("utf-8", errors="replace").strip(), start, end, p))
                 last = max(last, start) if not self.dtw else max(last, end)
             out.append(words)
         return out

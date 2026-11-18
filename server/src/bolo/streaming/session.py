@@ -829,7 +829,7 @@ def better_start(main: StreamResult, alt: StreamResult, shift_s: float) -> Strea
     agree = next((b for b in blocks if b.size >= 2), blocks[0] if blocks else None)
     if (agree.a > agree.b) if agree is not None else (len(m) > len(a)):
         return main
-    return StreamResult(alt.text, [Word(w.w, w.t0 + shift_s, w.t1 + shift_s) for w in alt.words])
+    return StreamResult(alt.text, [Word(w.w, w.t0 + shift_s, w.t1 + shift_s, w.p) for w in alt.words])
 
 
 class PreRoll:
@@ -1059,7 +1059,7 @@ class _NativeProcessor(_Processor):
             result = self._result()
         text = result.text.strip()
         base = self.base / SR
-        words = [Word(w.w, w.t0 + base, w.t1 + base) for w in result.words] if self.s.cfg.word_timestamps else []
+        words = [Word(w.w, w.t0 + base, w.t1 + base, w.p) for w in result.words] if self.s.cfg.word_timestamps else []
         if self.gated:
             text, words = without_stray_letter(text, words)
         if text:
@@ -1224,7 +1224,8 @@ class _PseudoProcessor(_Processor):
             return
         t0 = start / SR
         words = [
-            Word(w.w, w.t0 + t0, w.t1 + t0) for w in (result.words or [w for s in result.segments for w in s.words])
+            Word(w.w, w.t0 + t0, w.t1 + t0, w.p)
+            for w in (result.words or [w for s in result.segments for w in s.words])
         ]
         audio = self._slice(start, end).copy() if self.s.cfg.diarize else None
         await self.s.send_final(text, t0, end / SR, recv_t, words, result.language, audio)

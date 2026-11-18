@@ -233,6 +233,26 @@
     }
    }
   },
+  "/v1/audio/alignments": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Align a text to its audio (word timestamps)",
+    "description": "Extension: forced alignment. Multipart form: ``file`` (the audio), ``text`` (what is said in it), optional\n``model`` (an alignment model; default ``default_align``), ``language`` and ``keep_alive``.\n\nReturns every word of ``text`` (cut at whitespace, and at each character of scripts written without spaces)\nwith ``start`` and ``end`` in seconds and ``score``, the mean probability the aligner gave the word's letters\nwhere it put them (0..1; ``null`` for a word with no letter the model knows, such as a lone dash, which gets\nthe time where it stands). A text with more sounds than the audio has 20 ms frames is a 400 error.",
+    "operationId": "align_text_v1_audio_alignments_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
   "/v1/audio/speech": {
    "post": {
     "tags": [
@@ -241,6 +261,46 @@
     "summary": "Synthesise speech",
     "description": "Returns audio as it is synthesised (chunked transfer).\n\n``response_format``: mp3 (default), opus, aac, flac, wav, pcm, plus the\ntelephony extensions ``mulaw`` and ``alaw`` (8 kHz G.711).\n``stream_format``: ``audio`` (default) or ``sse`` (``speech.audio.delta`` events).",
     "operationId": "create_speech_v1_audio_speech_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SpeechRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio/speech/captioned": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Synthesise speech with word timestamps",
+    "description": "Extension (captioned speech): the same request as ``/v1/audio/speech``, answered when synthesis is done\nwith one JSON object: ``audio`` (base64, in ``response_format``), ``sample_rate``, ``model``, ``aligner`` and\n``words`` (``word``, ``start``, ``end`` in seconds of that audio). The words are the text the voice read,\naligned to the audio sentence by sentence (``align_model``, default ``default_align``).",
+    "operationId": "create_captioned_speech_v1_audio_speech_captioned_post",
     "requestBody": {
      "content": {
       "application/json": {
@@ -5230,6 +5290,24 @@
       ],
       "title": "Options",
       "description": "Extension: model-specific request options, for example Tontaube's `style` (audiobook, conversational, agentic) and sliders (`rate`, `pause`, `pitch_range`, `pitch_level`, `legato`). A model answers 400 for an option it does not read."
+     },
+     "timestamps": {
+      "type": "boolean",
+      "title": "Timestamps",
+      "description": "Extension: word timestamps of the speech (captioned speech), found by aligning each sentence's text to its audio with the alignment model (`align_model`, default `default_align`). With `stream_format: sse`, a `speech.words` event follows the audio of each sentence; POST /v1/audio/speech/captioned returns the audio and all its words in one JSON answer.",
+      "default": false
+     },
+     "align_model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Align Model",
+      "description": "Extension: the alignment model for `timestamps` (default `default_align`)."
      }
     },
     "type": "object",

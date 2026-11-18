@@ -1,0 +1,91 @@
+# Forced alignment (task: align): where in a recording each word of a known text is spoken. Used by
+# POST /v1/audio/alignments, by word timestamps for recognisers that give none (align_words), and by the word times
+# of synthesised speech (docs/api.md, "Word timestamps and forced alignment"). Character-level CTC models in ONNX
+# Runtime (bolo.engines.ctc_align); the Viterbi alignment runs in NumPy (bolo.alignment).
+
+- id: omnilingual-ctc-300m-align
+  aliases: [omnilingual-align]
+  task: align
+  engine: onnxruntime
+  kind: ctc_align
+  family: Omnilingual ASR
+  languages: [en, hi, bn, ta, te, mr, gu, kn, ml, pa, or, as, ur, ne, sa, sd, es, fr, de, it, pt, ru, ar, zh, ja, ko,
+    id, vi, th, tr, sw]
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 365438543
+  params: 300000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/facebook/omniASR-CTC-300M
+  features: [1600-languages]
+  description: 'Meta Omnilingual ASR CTC 300M (int8) used as a forced aligner: the same files as the recogniser
+    omnilingual-ctc-300m (pulled once, shared on disk). Its character vocabulary covers the scripts of 1,600+
+    languages, so text in Latin, Devanagari, Bengali, Tamil, Arabic, Cyrillic, Han and many more is aligned as
+    written, without romanizing. Commercial use allowed (Apache-2.0). The default aligner (default_align).'
+  source_url: https://huggingface.co/facebook/omniASR-CTC-300M
+  validated: cpu
+  measured:
+    rtf: 0.888
+    rtf_note: aligning the text of the clip to it, best of three runs
+    audio_s: 11.8
+    load_s: 1.85
+    memory_mb: 963
+    threads: 4
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, shared (load average 15-22)
+    date: '2026-11-18'
+    test_audio: bolo sample en-long (11.8 s) with its text; also hi-short (Hindi, Devanagari)
+    note: 'every word start and end within 0.05 s of mms-300m-forced-aligner''s on en-long; Hindi aligned as written, in Devanagari'
+  source:
+    repo: csukuangfj/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12
+    revision: 6abf1ece20cd2308bdb7d13cd78ec1c44fa4c094
+    include: [model.int8.onnx, tokens.txt]
+  options:
+    model: model.int8.onnx
+    tokens: tokens.txt
+    blank: 0
+    separator: ' '
+    normalize: true
+
+- id: mms-300m-forced-aligner
+  aliases: [MahmoudAshraf/mms-300m-1130-forced-aligner, mms-fa, ctc-forced-aligner]
+  task: align
+  engine: onnxruntime
+  kind: ctc_align
+  family: MMS
+  languages: []
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 317346159
+  params: 300000000
+  license: CC-BY-NC-4.0
+  license_url: https://huggingface.co/MahmoudAshraf/mms-300m-1130-forced-aligner
+  commercial_use: false
+  description: 'The MMS-300m forced-alignment model of ctc-forced-aligner (wav2vec 2.0 trained on 1,130 languages,
+    fine-tuned for alignment by Mahmoud Ashraf), int8 ONNX export by onnx-community. Non-commercial (CC-BY-NC-4.0).
+    Its vocabulary is the Latin letters: text in other scripts is romanized with uroman first
+    (pip install uroman), as ctc-forced-aligner does; without it only text in Latin letters can be aligned.'
+  source_url: https://huggingface.co/MahmoudAshraf/mms-300m-1130-forced-aligner
+  validated: cpu
+  measured:
+    rtf: 1.137
+    rtf_note: aligning the text of the clip to it, best of three runs
+    audio_s: 11.8
+    load_s: 7.04
+    memory_mb: 947
+    threads: 4
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.30GHz), no GPU, shared (load average 15-22)
+    date: '2026-11-18'
+    test_audio: bolo sample en-long (11.8 s) with its text; also hi-short (Hindi, Devanagari)
+    note: 'every word start and end within 0.05 s of omnilingual-ctc-300m-align''s on en-long; Hindi aligned after romanizing with uroman 1.3.1.1'
+  source:
+    repo: onnx-community/mms-300m-1130-forced-aligner-ONNX
+    revision: 2100fb247d8e43962eef24491597fbeb8b469531
+    include: [onnx/model_int8.onnx, vocab.json]
+  options:
+    model: onnx/model_int8.onnx
+    tokens: vocab.json
+    blank: 0
+    romanize: uroman
+    normalize: true

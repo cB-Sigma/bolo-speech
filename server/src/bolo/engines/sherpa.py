@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import math
 import re
 import tempfile
 import threading
@@ -110,16 +111,23 @@ def find_dir(path: Path, name: str) -> str:
     return str(d) if d.is_dir() else ""
 
 
-def tokens_to_words(tokens: list[str], starts: list[float], end: float) -> list[Word]:
+def tokens_to_words(
+    tokens: list[str], starts: list[float], end: float, log_probs: list[float] | None = None
+) -> list[Word]:
     """Merge sub-word tokens with start times into words.
 
     Handles SentencePiece (``▁`` marks a word start), Whisper/BPE tokens
     (leading space) and unsegmented scripts (each CJK character is a word).
+    With ``log_probs`` (one per token, as sherpa-onnx's ``ys_log_probs``), a word's ``p`` is the mean
+    probability of its tokens.
     """
     words: list[Word] = []
     current = ""
     t0 = 0.0
     n = min(len(tokens), len(starts))
+    if log_probs is not None and len(log_probs) < n:
+        log_probs = None
+    probs: list[float] = []
 
     def is_cjk(ch: str) -> bool:
         return "一" <= ch <= "鿿" or "぀" <= ch <= "ヿ" or "가" <= ch <= "힯"
@@ -128,8 +136,10 @@ def tokens_to_words(tokens: list[str], starts: list[float], end: float) -> list[
         nonlocal current
         text = current.strip()
         if text:
-            words.append(Word(text, t0, max(until, t0)))
+            p = round(sum(probs) / len(probs), 4) if probs else None
+            words.append(Word(text, t0, max(until, t0), p))
         current = ""
+        probs.clear()
 
     for i in range(n):
         tok = tokens[i]
@@ -141,6 +151,8 @@ def tokens_to_words(tokens: list[str], starts: list[float], end: float) -> list[
         if not current.strip():
             t0 = starts[i]
         current += tok.replace("▁", " ")
+        if log_probs is not None and tok.replace("▁", "").strip():
+            probs.append(math.exp(min(0.0, float(log_probs[i]))))
     flush(end)
     for i in range(len(words) - 1):  # close each word where the next begins
         words[i].t1 = max(words[i].t0, min(words[i].t1, words[i + 1].t0))
@@ -166,6 +178,15 @@ def sense_voice_tags(emotion: str, event: str) -> tuple[str | None, list[str]]:
         SENSE_VOICE_EVENTS[t] for t in event.replace("><", ">|<").split("|") if t.strip("<>") in SENSE_VOICE_EVENTS
     ]
     return emo, events
+
+
+def _log_probs(res: Any, n: int) -> list[float] | None:
+    """The log probability of each token of a result (``ys_log_probs``), when the decoder gave one per token."""
+    try:
+        values = [float(x) for x in getattr(res, "ys_log_probs", None) or []]
+    except (TypeError, ValueError):
+        return None
+    return values if len(values) >= n else None
 
 
 _SENSE_VOICE_LANGS = {"<|zh|>": "zh", "<|en|>": "en", "<|ja|>": "ja", "<|ko|>": "ko", "<|yue|>": "yue"}
@@ -398,7 +419,7 @@ class SherpaOfflineSTT(STTModel):
             tokens = [str(t) for t in res.tokens]
             starts = [float(t) for t in res.timestamps]
             if tokens and len(starts) >= len(tokens):
-                words = tokens_to_words(tokens, starts, duration)
+                words = tokens_to_words(tokens, starts, duration, _log_probs(res, len(tokens)))
         seg = Segment(0.0, duration, text, words)
         if self.kind == "sense_voice":
             seg.emotion, seg.events = sense_voice_tags(

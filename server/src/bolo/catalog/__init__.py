@@ -20,7 +20,7 @@ from bolo.store import Source
 
 TASKS = (
     "stt", "tts", "vad", "diarization", "turn", "translation", "separation", "denoise", "lid", "speech-to-speech",
-    "audio-llm", "speaker-embedding", "audio-tagging", "emotion", "voice-conversion",
+    "audio-llm", "speaker-embedding", "audio-tagging", "emotion", "voice-conversion", "align",
 )  # fmt: skip
 TIERS = ("realtime", "balanced", "accuracy")
 VALIDATED = ("cpu", "untested")
@@ -357,6 +357,12 @@ FAKE_MODELS: list[dict[str, Any]] = [
         "languages": ["en", "hi", "ta", "fr"], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
         "description": "Test language identifier: the dominant pitch picks the language (220 Hz English, 440 Hz Hindi, "
         "660 Hz Tamil, 880 Hz French). Not real language identification.",
+    },
+    {
+        "id": "fake-align", "task": "align", "engine": "fake", "kind": "fake-align", "family": "Fake",
+        "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
+        "description": "Test aligner: the words share out the audio that is not silent by their letters. Not real "
+        "alignment.",
     },
     {
         "id": "fake-stt-ta", "task": "stt", "engine": "fake", "kind": "fake-stt", "family": "Fake",

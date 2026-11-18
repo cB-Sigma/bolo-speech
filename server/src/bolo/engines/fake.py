@@ -24,6 +24,7 @@ import numpy as np
 from bolo import __version__
 from bolo.engines.base import (
     AudioTaggingModel,
+    AlignModel,
     ConversationChunk,
     ConversationRequest,
     DenoiseModel,
@@ -715,6 +716,37 @@ class FakeLid(LidModel):
         return out
 
 
+class FakeAligner(AlignModel):
+    """Forced alignment by sound (tests only): the words of the text share out the stretch of audio that is not
+    silent, in proportion to their letters. Remembers every call's text."""
+
+    def __init__(self, opts: dict[str, Any]) -> None:
+        self.fail = bool(opts.get("fail", False))
+        self.calls: list[str] = []
+        self._lock = threading.Lock()
+
+    def align(self, samples: FloatArray, text: str, language: str | None = None) -> list[Any]:
+        from bolo.alignment import AlignedWord, split_words
+
+        if self.fail:
+            raise RuntimeError("fake alignment failure requested")
+        with self._lock:
+            self.calls.append(text)
+        words = split_words(text)
+        loud = np.flatnonzero(np.abs(samples) > 1e-3)
+        first = float(loud[0]) / self.sample_rate if len(loud) else 0.0
+        last = float(loud[-1] + 1) / self.sample_rate if len(loud) else len(samples) / self.sample_rate
+        weights = [max(1, sum(c.isalnum() for c in w)) for w in words]
+        total = float(sum(weights)) or 1.0
+        out: list[Any] = []
+        t = first
+        for word, weight in zip(words, weights):
+            end = t + (last - first) * weight / total
+            out.append(AlignedWord(word, round(t, 3), round(end, 3), 0.9))
+            t = end
+        return out
+
+
 class FakeEngine(Engine):
     id = "fake"
     name = "Fake engine (testing)"
@@ -723,6 +755,7 @@ class FakeEngine(Engine):
         "fake-stt", "fake-stt-streaming", "fake-stt-speakers", "fake-tts", "fake-vad", "fake-diarization", "fake-turn",
         "fake-turn-text", "fake-separation", "fake-denoise", "fake-s2s", "fake-lid", "fake-speaker-embedding",
         "fake-tagging", "fake-emotion",
+        "fake-align",
     )  # fmt: skip
 
     def __init__(self) -> None:
@@ -764,6 +797,8 @@ class FakeEngine(Engine):
             model = FakeTagging()
         elif kind == "fake-emotion":
             model = FakeEmotion()
+        elif kind == "fake-align":
+            model = FakeAligner(merged)
         else:
             raise ValueError(f"fake engine cannot load kind {kind!r}")
         self.loaded.append(model)

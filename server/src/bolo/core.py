@@ -25,6 +25,7 @@ import numpy as np
 import psutil
 
 from bolo import __version__, logs, ort_providers, remote_code
+from bolo.alignment import AlignedWord, AlignmentError
 from bolo.audio.decode import decode_audio
 from bolo.audio.encode import encode_audio
 from bolo.audio.resample import resample
@@ -49,6 +50,7 @@ from bolo.diarize import (
 )
 from bolo.engines import EngineRegistry
 from bolo.engines.base import (
+    AlignModel,
     FloatArray,
     Segment,
     SpeakerRequest,
@@ -144,6 +146,17 @@ class Transcript:
     separation: dict[str, Any] | None = None
     #: how sure the model was of ``language`` when it detected it (0..1), when it says
     language_probability: float | None = None
+
+
+@dataclass
+class Alignment:
+    """The result of forced alignment (``Bolo.align``)."""
+
+    model: str
+    text: str
+    language: str | None
+    duration: float
+    words: list[AlignedWord] = field(default_factory=list)
 
 
 @dataclass
@@ -649,6 +662,109 @@ class Bolo:
         finally:
             self.traces.record(trace)
 
+    async def align(
+        self,
+        samples: FloatArray,
+        sample_rate: int,
+        text: str,
+        *,
+        language: str | None = None,
+        model: str | None = None,
+        trace: Trace | None = None,
+        record: bool = True,
+    ) -> Alignment:
+        """Forced alignment (``model``, else ``default_align``): each word of ``text`` with when it is spoken in the
+        recording (bolo.alignment). ``text`` must be what is said; a text with more sounds than the audio has
+        frames, or too long to align in one piece, is an invalid request."""
+        spec = self.resolve(model, "align")
+        trace = trace or Trace("align", "internal", spec.id)
+        trace.model = spec.id
+        duration = len(samples) / sample_rate if sample_rate else 0.0
+        trace.audio_seconds = duration
+        try:
+            if not text.strip():
+                raise InvalidRequest("text is empty: give the words spoken in the audio", param="text")
+            async with self.manager.use(spec.id) as entry:
+                aligner = entry.model
+                assert isinstance(aligner, AlignModel)
+                with trace.phase("resample"):
+                    audio = np.asarray(samples, dtype=np.float32)
+                    if sample_rate != aligner.sample_rate:
+                        audio = await asyncio.to_thread(resample, audio, sample_rate, aligner.sample_rate)
+                    audio = np.ascontiguousarray(audio, dtype=np.float32)
+                with trace.phase("align"):
+                    try:
+                        words, _ = await entry.queue.submit("align", (audio, text, language))
+                    except AlignmentError as exc:
+                        raise InvalidRequest(str(exc), param="text") from exc
+            trace.mark_final()
+            trace.chars = len(text)
+            trace.text_preview = preview(text)
+            trace.finish("ok")
+            if duration and trace.total_ms is not None:
+                trace.rtf = trace.total_ms / 1000.0 / duration
+            return Alignment(spec.id, text, language, duration, list(words))
+        except asyncio.CancelledError:
+            trace.finish("cancelled", "client disconnected")
+            raise
+        except BoloError as exc:
+            trace.finish("error", exc.message)
+            raise
+        except Exception as exc:
+            trace.finish("error", f"{type(exc).__name__}: {exc}")
+            raise
+        finally:
+            if record:
+                self.traces.record(trace)
+
+    def word_aligner(self) -> ModelSpec | None:
+        """The aligner that gives word times to recognisers without their own (``align_words``, ``default_align``):
+        None when that is off, or the model is neither installed nor pulled on first use, or its engine is missing."""
+        s = self.settings
+        if not s.align_words:
+            return None
+        spec = self.catalog.resolve(s.default_align)
+        if spec is None or spec.task != "align" or not self.manager.engines.status(spec.engine).available:
+            return None
+        return spec if self.manager.is_installed(spec) or s.auto_pull else None
+
+    async def _align_transcript(
+        self, transcript: Transcript, samples: FloatArray, sr: int, aligner: ModelSpec, trace: Trace
+    ) -> bool:
+        """Word times for a transcript from a recogniser without them: each segment's text aligned to its audio.
+        False (and nothing changed) when the aligner fails."""
+        pad = int(0.2 * sr)
+        timed: list[list[Word]] = []
+        try:
+            with trace.phase("align"):
+                for seg in transcript.segments:
+                    if not seg.text.strip():
+                        timed.append([])
+                        continue
+                    a = max(0, int(seg.start * sr) - pad)
+                    b = min(len(samples), int(seg.end * sr) + pad)
+                    result = await self.align(
+                        samples[a:b], sr, seg.text, language=transcript.language, model=aligner.id,
+                        trace=Trace("align", "internal", aligner.id), record=False,
+                    )  # fmt: skip
+                    offset = a / sr
+                    timed.append(
+                        [
+                            Word(w.word, min(w.start + offset, seg.end), min(w.end + offset, seg.end))
+                            for w in result.words
+                        ]
+                    )
+        except Exception as exc:  # the transcript stands without words
+            message = exc.message if isinstance(exc, BoloError) else f"{type(exc).__name__}: {exc}"
+            log.warning("word alignment with '%s' failed: %s", aligner.id, message)
+            trace.extra["word_alignment"] = {"model": aligner.id, "error": message}
+            return False
+        for seg, words in zip(transcript.segments, timed, strict=True):
+            seg.words = words
+        transcript.words = [w for words in timed for w in words]
+        trace.extra["word_alignment"] = {"model": aligner.id}
+        return True
+
     def note_separation(self, result: SeparationResult) -> None:
         self.separation_counts[result.status] = self.separation_counts.get(result.status, 0) + 1
         self.separation_audio_s += result.separated_audio_s
@@ -900,6 +1016,7 @@ class Bolo:
                 "separation": s.default_separation,
                 "denoise": s.default_denoise,
                 "lid": s.default_lid,
+                "align": s.default_align,
                 "speaker-embedding": "eres2net-voxceleb",
                 "audio-tagging": s.default_audio_tagging,
                 "emotion": s.default_emotion,
@@ -1493,8 +1610,12 @@ class Bolo:
                 decode = self.decode_options(spec, options)
                 ignored = [k for k in ENGINE_OPTIONS if k in decode and k not in stt.decode_options]
                 ignored = [k for k in ignored if k != "chunk_length"]  # bolo cuts the audio to it in any case
+                aligner = None
                 if word_timestamps and not stt.supports_word_timestamps:
-                    ignored.append("timestamp_granularities")  # no word timings from this model
+                    # no word timings from this model: the transcript is aligned to the audio afterwards
+                    aligner = None if diarize is not None and stt.speaker_conditioned else self.word_aligner()
+                    if aligner is None:
+                        ignored.append("timestamp_granularities")
                 given = {"prompt": bool(prompt), "hotwords": bool(hotwords), "temperature": temperature > 0}
                 ignored += [k for k, on in given.items() if on and k not in stt.request_fields]
                 if vad_filter is None:
@@ -1587,6 +1708,9 @@ class Bolo:
                         overlapped=overlapped, sources=sources, diarize=native, options=engine_options,
                         max_repeats=max_repeats,
                     )  # fmt: skip
+                if aligner is not None and not await self._align_transcript(transcript, samples, sr, aligner, trace):
+                    ignored.append("timestamp_granularities")
+                    self._note_ignored(trace, spec.id, ignored)
                 transcript.duration = duration
                 transcript.model = spec.id
                 if separation is not None and diarize is not None:
@@ -1728,7 +1852,7 @@ class Bolo:
                         within(seg.start) + offset,
                         within(seg.end) + offset,
                         seg.text.strip(),
-                        [Word(w.w, within(w.t0) + offset, within(w.t1) + offset) for w in seg.words],
+                        [Word(w.w, within(w.t0) + offset, within(w.t1) + offset, w.p) for w in seg.words],
                         seg.avg_logprob,
                         seg.no_speech_prob,
                         speakers[index] if speakers else seg.speaker,
@@ -1748,7 +1872,7 @@ class Bolo:
                 if not result.segments:
                     pass
                 elif not words and result.words:
-                    words.extend(Word(w.w, within(w.t0) + offset, within(w.t1) + offset) for w in result.words)
+                    words.extend(Word(w.w, within(w.t0) + offset, within(w.t1) + offset, w.p) for w in result.words)
         except BaseException:
             for fut in pending:
                 fut.cancel()
@@ -2567,6 +2691,9 @@ def fallback_headers(trace: Trace) -> dict[str, str]:
     ignored = trace.extra.get("ignored_options")
     if ignored:
         headers["x-bolo-ignored-options"] = ", ".join(ignored)
+    aligned = trace.extra.get("word_alignment")
+    if isinstance(aligned, dict) and aligned.get("model") and not aligned.get("error"):
+        headers["x-bolo-word-aligner"] = str(aligned["model"])
     return headers
 
 

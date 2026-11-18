@@ -26,8 +26,8 @@ from bolo.audio.encode import StreamEncoder, normalize_format
 from bolo.core import Bolo, SynthChunk, Transcript, fallback_headers
 from bolo.denoise import parse_denoise
 from bolo.diarize import DiarizeOptions, KnownSpeaker
-from bolo.engines.base import Segment
-from bolo.errors import BoloError, InvalidRequest, ModelNotFound
+from bolo.engines.base import FloatArray, Segment
+from bolo.errors import BoloError, InvalidRequest, ModelNotFound, ModelNotInstalled
 from bolo.keepalive import request_keep_alive
 from bolo.lid import is_routing_request, route_headers
 from bolo.lid import route as route_language
@@ -160,6 +160,7 @@ def _verbose(t: Transcript, task: str, word_level: bool, segment_level: bool) ->
                 "word": w.w,
                 "start": round(w.t0, 3),
                 "end": round(w.t1, 3),
+                **({"probability": w.p} if w.p is not None else {}),
                 **({"speaker": speaker_of[id(w)]} if id(w) in speaker_of else {}),
             }
             for w in t.words
@@ -587,6 +588,46 @@ async def identify_language(request: Request) -> Response:
     return JSONResponse(body, headers=headers)
 
 
+@router.post("/v1/audio/alignments", tags=["native"], summary="Align a text to its audio (word timestamps)")
+async def align_text(request: Request) -> Response:
+    """Extension: forced alignment. Multipart form: ``file`` (the audio), ``text`` (what is said in it), optional
+    ``model`` (an alignment model; default ``default_align``), ``language`` and ``keep_alive``.
+
+    Returns every word of ``text`` (cut at whitespace, and at each character of scripts written without spaces)
+    with ``start`` and ``end`` in seconds and ``score``, the mean probability the aligner gave the word's letters
+    where it put them (0..1; ``null`` for a word with no letter the model knows, such as a lone dash, which gets
+    the time where it stands). A text with more sounds than the audio has 20 ms frames is a 400 error."""
+    core = get_core(request)
+    form = await request.form()
+    file = form.get("file")
+    if file is None or isinstance(file, str):
+        raise InvalidRequest("a multipart 'file' field with the audio is required", param="file")
+    text = str(form.get("text") or "")
+    if not text.strip():
+        raise InvalidRequest("a 'text' field with the words spoken in the audio is required", param="text")
+    request_keep_alive(form.get("keep_alive"), ("align",))
+    spec = core.resolve(str(form.get("model") or "") or None, "align")
+    language = str(form.get("language") or "") or None
+    samples, rate = await read_upload(core, file)
+    trace = Trace("align", "http", spec.id)
+    result = await run_unless_disconnected(
+        request, core.align(samples, rate, text, language=language, model=spec.id, trace=trace)
+    )
+    if result is None:
+        return Response(status_code=499)  # the client went away; nobody reads this
+    body = {
+        "model": result.model,
+        "text": result.text,
+        "language": result.language,
+        "duration": round(result.duration, 3),
+        "words": [
+            {"word": w.word, "start": round(w.start, 3), "end": round(w.end, 3), "score": w.score} for w in result.words
+        ],
+    }
+    headers = {"x-request-id": trace.id, "x-bolo-model": spec.id}
+    return JSONResponse(body, headers=headers)
+
+
 class SpeechRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -671,6 +712,72 @@ class SpeechRequest(BaseModel):
         "conversational, agentic) and sliders (`rate`, `pause`, `pitch_range`, `pitch_level`, `legato`). A model "
         "answers 400 for an option it does not read.",
     )
+    timestamps: bool = Field(
+        default=False,
+        description="Extension: word timestamps of the speech (captioned speech), found by aligning each sentence's "
+        "text to its audio with the alignment model (`align_model`, default `default_align`). With "
+        "`stream_format: sse`, a `speech.words` event follows the audio of each sentence; POST "
+        "/v1/audio/speech/captioned returns the audio and all its words in one JSON answer.",
+    )
+    align_model: str | None = Field(
+        default=None, description="Extension: the alignment model for `timestamps` (default `default_align`)."
+    )
+
+
+class Captions:
+    """Word times of synthesised speech: the audio of each piece of text (from a chunk marked ``first_of_text``
+    to the next) is aligned to that text (bolo.alignment), its times counted from the start of the whole answer.
+    The text is the one the voice read (after normalisation: "25" is "twenty-five")."""
+
+    def __init__(self, core: Bolo, model: str, language: str | None) -> None:
+        self.core = core
+        self.model = model
+        self.language = language
+        self.offset = 0.0  # seconds of audio before the piece being collected
+        self.text = ""
+        self.audio: list[FloatArray] = []
+        self.rate = 0
+
+    @staticmethod
+    def check(core: Bolo, model: str | None) -> str:
+        """The alignment model to use, or a 4xx before any audio is made when it cannot be used."""
+        spec = core.resolve(model, "align")
+        if not core.manager.is_installed(spec) and not core.settings.auto_pull:
+            raise ModelNotInstalled(
+                f"word timestamps of speech need the alignment model '{spec.id}', which is not installed; "
+                f"run `bolo pull {spec.id}`",
+                param="align_model",
+            )
+        return spec.id
+
+    async def add(self, chunk: SynthChunk) -> list[dict[str, Any]]:
+        """Collect a chunk; when it starts a new piece of text, the words of the piece before it."""
+        words: list[dict[str, Any]] = []
+        if chunk.first_of_text and self.audio:
+            words = await self.flush()
+        if not self.audio:
+            self.text = chunk.text
+        self.rate = chunk.sample_rate
+        self.audio.append(np.asarray(chunk.samples, dtype=np.float32))
+        return words
+
+    async def flush(self) -> list[dict[str, Any]]:
+        """The words of the piece collected so far."""
+        if not self.audio:
+            return []
+        samples = np.concatenate(self.audio)
+        text, offset = self.text, self.offset
+        self.audio, self.text = [], ""
+        self.offset += len(samples) / self.rate
+        if not text.strip() or not len(samples):
+            return []
+        trace = Trace("align", "internal", self.model)
+        result = await self.core.align(
+            samples, self.rate, text, language=self.language, model=self.model, trace=trace, record=False
+        )
+        return [
+            {"word": w.word, "start": round(w.start + offset, 3), "end": round(w.end + offset, 3)} for w in result.words
+        ]
 
 
 class SpeechStream:
@@ -753,6 +860,11 @@ async def create_speech(request: Request, body: SpeechRequest) -> Response:
         spec = core.resolve(model, "tts")
         trace.model = spec.id
         encoder = StreamEncoder(fmt, spec.sample_rate, body.sample_rate)
+        if body.timestamps and body.stream_format != "sse":
+            raise InvalidRequest(
+                "timestamps need stream_format 'sse' (or POST /v1/audio/speech/captioned)", param="timestamps"
+            )
+        captions = Captions(core, Captions.check(core, body.align_model), body.language) if body.timestamps else None
     except BoloError as exc:
         trace.finish("error", exc.message)
         if trace.model:
@@ -785,6 +897,10 @@ async def create_speech(request: Request, body: SpeechRequest) -> Response:
         try:
             chunk = first
             while chunk is not None:
+                if captions is not None:
+                    words = await captions.add(chunk)  # the sentence before this one is complete
+                    if words:
+                        yield sse({"type": "speech.words", "words": words})
                 data = stream.encode(chunk)
                 if data:
                     trace.mark_ttfa()
@@ -801,6 +917,14 @@ async def create_speech(request: Request, body: SpeechRequest) -> Response:
             if tail:
                 trace.mark_ttfa()
                 yield sse({"type": "speech.audio.delta", "audio": base64.b64encode(tail).decode()}) if as_sse else tail
+            if captions is not None:
+                try:
+                    words = await captions.flush()
+                except BoloError as exc:
+                    yield sse({"type": "error", "error": {"message": exc.message, "type": exc.type, "code": exc.code}})
+                    words = []
+                if words:
+                    yield sse({"type": "speech.words", "words": words})
             if as_sse:
                 n_in = len(body.input)
                 yield sse(
@@ -824,6 +948,81 @@ async def create_speech(request: Request, body: SpeechRequest) -> Response:
     }
     media = "text/event-stream" if as_sse else encoder.media_type
     return StreamingResponse(gen(), media_type=media, headers=headers)
+
+
+@router.post("/v1/audio/speech/captioned", tags=["native"], summary="Synthesise speech with word timestamps")
+async def create_captioned_speech(request: Request, body: SpeechRequest) -> Response:
+    """Extension (captioned speech): the same request as ``/v1/audio/speech``, answered when synthesis is done
+    with one JSON object: ``audio`` (base64, in ``response_format``), ``sample_rate``, ``model``, ``aligner`` and
+    ``words`` (``word``, ``start``, ``end`` in seconds of that audio). The words are the text the voice read,
+    aligned to the audio sentence by sentence (``align_model``, default ``default_align``)."""
+    core = get_core(request)
+    trace = Trace("tts", "http", "")
+    try:
+        fmt = normalize_format(body.response_format)
+        if fmt in ("pcm", "mulaw", "alaw"):
+            raise InvalidRequest("captioned speech needs a format with a header (wav, mp3, opus, aac, flac)",
+                                 param="response_format")  # fmt: skip
+        voice, custom_voice = speech_voice(body.voice)
+        request_keep_alive(body.keep_alive, ("tts", "align"))
+        reference = decode_reference(body.reference_audio) if body.reference_audio else None
+        model = body.model
+        saved = core.voices.find(voice) if voice and reference is None and model is None else None
+        if saved is not None and saved.default_model:
+            model = saved.default_model
+        spec = core.resolve(model, "tts")
+        trace.model = spec.id
+        aligner = Captions.check(core, body.align_model)
+    except BoloError as exc:
+        trace.finish("error", exc.message)
+        if trace.model:
+            core.traces.record(trace)
+        raise
+    stream = SpeechStream(
+        core, trace, None,
+        text=body.input, model=spec.id, voice=voice, speed=body.speed, language=body.language, normalize=body.normalize,
+        phonemizer=body.phonemizer, reference_audio=reference, reference_text=body.reference_text,
+        wordlists=body.wordlists, pronunciations=body.pronunciations, input_format=body.input_format,
+        romanised=body.romanised, custom_voice=custom_voice, options=body.options,
+        detect_language=body.detect_language,
+    )  # fmt: skip
+    captions = Captions(core, aligner, body.language)
+    words: list[dict[str, Any]] = []
+    audio: list[FloatArray] = []
+    rate = spec.sample_rate
+
+    async def run() -> None:
+        nonlocal rate
+        try:
+            async for chunk in stream.chunks():
+                words.extend(await captions.add(chunk))
+                audio.append(np.asarray(chunk.samples, dtype=np.float32))
+                rate = chunk.sample_rate
+            words.extend(await captions.flush())
+        finally:
+            await stream.aclose()
+
+    if await run_unless_disconnected(request, _done(run())) is None:
+        return Response(status_code=499)
+    samples = np.concatenate(audio) if audio else np.zeros(0, dtype=np.float32)
+    encoder = StreamEncoder(fmt, rate, body.sample_rate)
+    data = encoder.feed(samples) + encoder.finish()
+    body_out = {
+        "model": spec.id,
+        "aligner": aligner,
+        "format": fmt,
+        "sample_rate": encoder.sample_rate,
+        "duration": round(len(samples) / rate, 3) if rate else 0.0,
+        "audio": base64.b64encode(data).decode(),
+        "words": words,
+    }
+    headers = {"x-request-id": trace.id, **fallback_headers(trace)}
+    return JSONResponse(body_out, headers=headers)
+
+
+async def _done(coro: Coroutine[Any, Any, None]) -> bool:
+    await coro
+    return True
 
 
 def speech_voice(value: str | dict[str, Any] | None) -> tuple[str | None, bool]:

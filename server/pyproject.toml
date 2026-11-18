@@ -77,6 +77,10 @@ turn = ["onnxruntime>=1.17", "tokenizers>=0.20"]
 webrtcvad = ["webrtcvad-wheels>=2.0.14"]
 # spoken-language identification (POST /v1/audio/language, routing with model=auto); faster-whisper brings it too
 lid = ["onnxruntime>=1.17"]
+# forced alignment (POST /v1/audio/alignments, word times for recognisers without them, captioned speech) runs in
+# onnxruntime; uroman (MIT-style, asks that publications acknowledge it) romanizes text for the MMS aligner, which
+# knows only Latin letters
+align = ["onnxruntime>=1.17", "uroman>=1.3"]
 # Orpheus-family voices (Svara, Veena, Orpheus, snorTTS) on llama.cpp: the SNAC audio decoder runs in onnxruntime
 orpheus = ["onnxruntime>=1.17"]
 # LFM3-Audio in this process (speech-to-speech and text-to-speech without llama-server): the model's ONNX graphs

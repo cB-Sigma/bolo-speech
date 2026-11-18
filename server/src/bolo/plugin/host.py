@@ -719,7 +719,8 @@ def _results(reply: dict[str, Any]) -> list[STTResult]:
 
 
 def _word(w: dict[str, Any]) -> Word:
-    return Word(str(w["w"]), float(w["t0"]), float(w["t1"]))
+    p = w.get("p")
+    return Word(str(w["w"]), float(w["t0"]), float(w["t1"]), float(p) if p is not None else None)
 
 
 def _jsonable(value: Any) -> bool:

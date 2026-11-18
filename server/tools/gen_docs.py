@@ -53,6 +53,7 @@ TASK_TITLES = {
     "audio-tagging": "Audio tagging and sound events",
     "emotion": "Speech emotion",
     "voice-conversion": "Voice conversion",
+    "align": "Forced alignment (word timestamps)",
 }
 
 

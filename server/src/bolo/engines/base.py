@@ -77,9 +77,15 @@ class Word:
     w: str
     t0: float
     t1: float
+    #: how sure the recogniser was of the word (0..1): Whisper's word probability, or the mean probability of the
+    #: word's tokens; None when the model does not say
+    p: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {"w": self.w, "t0": round(self.t0, 3), "t1": round(self.t1, 3)}
+        out: dict[str, Any] = {"w": self.w, "t0": round(self.t0, 3), "t1": round(self.t1, 3)}
+        if self.p is not None:
+            out["p"] = round(self.p, 4)
+        return out
 
 
 @dataclass
@@ -636,6 +642,18 @@ class LidModel(Model):
     @abc.abstractmethod
     def identify(self, samples: FloatArray) -> list[tuple[str, float]]:
         """Every language the model knows with its probability (summing to 1), most likely first."""
+
+
+class AlignModel(Model):
+    """Forced alignment: where in a recording each word of a known text is spoken (16 kHz mono in)."""
+
+    task = "align"
+    #: languages the model is known to align well; empty means any it has the letters of
+    languages: tuple[str, ...] = ()
+
+    @abc.abstractmethod
+    def align(self, samples: FloatArray, text: str, language: str | None = None) -> list[Any]:
+        """The words of ``text`` with their times (``bolo.alignment.AlignedWord``), seconds from the start."""
 
 
 class TurnModel(Model):

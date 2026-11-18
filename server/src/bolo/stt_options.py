@@ -260,7 +260,7 @@ def _apply_mask(
         words = [w for w, k in zip(words, keep) if k] if len(words) == len(tokens) else words[: len(kept_tokens)]
     elif by_chars:
         words = words[: len(kept_tokens)] if words and len(words) == len(tokens) else words
-    return out, [Word(w.w, w.t0, w.t1) for w in words]
+    return out, [Word(w.w, w.t0, w.t1, w.p) for w in words]
 
 
 def trim_repeats(segment: Segment, max_repeats: int = DEFAULT_MAX_REPEATS) -> tuple[Segment, int]:

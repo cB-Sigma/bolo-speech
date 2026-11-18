@@ -283,7 +283,8 @@ class FasterWhisperSTT(STTModel):
 
 
 def _word(w: Any) -> Word:
-    return Word(w.word.strip(), float(w.start), float(w.end))
+    p = getattr(w, "probability", None)
+    return Word(w.word.strip(), float(w.start), float(w.end), round(float(p), 4) if p is not None else None)
 
 
 def _capturing_encoder(model: Any, windows: list[Any]) -> Any:
@@ -342,7 +343,8 @@ class _Aligner:
             t0 = min(max(float(w["start"]), self.last_start, 0.0), self.duration)
             t1 = min(max(float(w["end"]), t0), self.duration)
             self.last_start = t0
-            out.append(Word(text, t0, t1))
+            p = w.get("probability")
+            out.append(Word(text, t0, t1, round(float(p), 4) if p is not None else None))
         return out
 
 

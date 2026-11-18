@@ -62,6 +62,8 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | Method | Path | Summary |
 | --- | --- | --- |
 | `POST` | `/v1/audio/language` | Identify the spoken language |
+| `POST` | `/v1/audio/alignments` | Align a text to its audio (word timestamps) |
+| `POST` | `/v1/audio/speech/captioned` | Synthesise speech with word timestamps |
 | `GET` | `/api/v1/info` | Server, engine and platform information |
 | `GET` | `/api/v1/catalog` | Model catalog with install and load state |
 | `GET` | `/api/v1/hardware` | This machine: CPU, memory, disk, GPUs, runtimes, container limits |
@@ -336,9 +338,18 @@ uses all three; whisper.cpp all three (hotwords join the prompt); Voxtral (llama
 `text`, `srt` and `vtt` return plain text. Fields bolo cannot fill honestly
 are present with neutral values (`tokens: []`, `compression_ratio: 0.0`;
 `avg_logprob`/`no_speech_prob` are real only for faster-whisper models).
-Word timestamps need a model that gives them (docs/models.md, "Word timestamps"); others return an
-empty `words` list and name `timestamp_granularities` in `x-bolo-ignored-options`. Asking for words never changes
-the text.
+Word timestamps (`timestamp_granularities[]=word`, with or without `segment`) come from the model when it gives
+them (docs/models.md, "Word timestamps"). For every other recogniser (Moonshine, Voxtral, Whisper through
+sherpa-onnx, cloud models without words, …) bolo aligns the transcript to the audio with its forced aligner
+(`default_align`, see "Word timestamps and forced alignment" below) and says so in `x-bolo-word-aligner: <model>`.
+When that is switched off (`align_words = false`), the aligner is not installed and `auto_pull` is off, or the
+alignment fails, the `words` list is empty and `x-bolo-ignored-options` names `timestamp_granularities`. Asking
+for words never changes the text.
+
+Each word carries `probability` (0..1) when the recogniser says how sure it was of it: Whisper's word probability
+on faster-whisper, the mean probability of the word's tokens on whisper.cpp and on sherpa-onnx models whose
+decoder reports token log-probabilities, Deepgram's word confidence. Words found by the aligner have none (an
+alignment score is not a recognition confidence).
 
 With `stream=true` the response is `text/event-stream`:
 
@@ -356,6 +367,46 @@ sent as `{"type":"error","error":{…}}`. Disconnecting cancels the remaining wo
 
 Same form without `language` and `stream`; translates to English. Needs a
 multilingual Whisper model (feature `translate`); other models answer 400.
+
+### Word timestamps and forced alignment
+
+Forced alignment finds when each word of a known text is spoken. bolo's aligner runs a character-level CTC model
+(task `align`) over the audio and finds the most likely path through its frame scores that spells the text
+(Viterbi over the CTC graph, 20 ms frames); each word spans its letters. It serves three things:
+
+- `POST /v1/audio/alignments`: your audio and your text in, word times out;
+- word timestamps for recognisers that give none (above);
+- word timestamps of synthesised speech (`POST /v1/audio/speech/captioned`, and `timestamps: true` with SSE).
+
+| Aligner | Languages | Licence |
+| --- | --- | --- |
+| `omnilingual-ctc-300m-align` (default, `default_align`) | the scripts of 1,600+ languages as written (Latin, Devanagari, Bengali, Tamil, Arabic, Cyrillic, Han, …) | Apache-2.0 |
+| `mms-300m-forced-aligner` (ctc-forced-aligner's MMS-300m model) | 1,130 languages, romanized with uroman (`pip install uroman`); without it, Latin script only | **CC-BY-NC-4.0, non-commercial** |
+
+The text is cut into words at whitespace, and at each character of scripts written without spaces (Chinese,
+Japanese, Thai, …). Letters the model does not know (punctuation) are skipped; a word with none gets the time where
+it stands, with no length and `score: null`. The text must be what is said: a text with more letters than the
+audio has frames is a `400`; a wrong text is still aligned, badly (look at `score`).
+
+#### `POST /v1/audio/alignments`
+
+Multipart form: `file` (the audio), `text` (what is said in it), optional `model` (an alignment model), `language`
+and `keep_alive`.
+
+```bash
+curl -s localhost:8000/v1/audio/alignments -F file=@speech.wav -F text="Good morning. Could you tell me when my order will arrive?"
+```
+
+```json
+{"model": "omnilingual-ctc-300m-align", "text": "Good morning. …", "language": null, "duration": 3.004,
+ "words": [{"word": "Good", "start": 0.12, "end": 0.26, "score": 0.8781},
+           {"word": "morning.", "start": 0.36, "end": 0.66, "score": 0.8516}, …]}
+```
+
+`score` is the mean probability the aligner gave the word's letters on the frames it put them on (0..1): low
+scores point at words that are not in the audio. Audio and text are aligned in one piece, up to about five minutes
+of speech; longer recordings are a `400` (align them in parts). The CLI does the same: `bolo align speech.wav
+"the text"` (`-f json` or `-f vtt`; `-` reads the text from stdin, `@file.txt` from a file).
 
 ### Language identification and routing
 
@@ -539,6 +590,8 @@ JSON body.
 | `reference_audio` | - | extension, for models that clone voices (`features` contains `voice-cloning`, today the `tts-server` models): a recording of the voice to imitate, plain base64 or a `data:audio/…;base64,` URL (WAV, FLAC, MP3, … whatever bolo can decode). Up to 30 s are used; it is sent to the server as mono 16-bit WAV. `400` (`param: "reference_audio"`) for a model that cannot clone, an empty, undecodable or shorter-than-0.5 s recording. It takes precedence over `voice` |
 | `reference_text` | - | extension: what is said in `reference_audio`; some cloning models (audio.cpp CosyVoice3, IndexTTS-2, …) use it |
 | `options` | - | extension: model-specific request options. Tontaube: `style` (`audiobook`, `conversational`, `agentic`), the sliders `rate` (0-4), `pause` (0-4), `pitch_range` (0-5), `pitch_level` (0-4), `legato` (0-2), `temperature`, `seed`. audio.cpp models: passed through as the server's `options`. `400` (`param: "options"`) for an option the model does not read |
+| `timestamps` | `false` | extension: word timestamps of the speech (captioned speech), with `stream_format: "sse"`: after the audio of each sentence comes `{"type": "speech.words", "words": [{"word", "start", "end"}]}`, times in seconds from the start of the answer. Without SSE → `400`; use `POST /v1/audio/speech/captioned`. The aligner must be installed (or `auto_pull` on), else `404` (`param: "align_model"`) before any audio is made |
+| `align_model` | `default_align` | extension: the alignment model for `timestamps` |
 
 Speech in a cloned voice (a saved voice, or `reference_audio`) carries the
 response headers `x-bolo-cloned: true` and, for a saved voice, `x-bolo-voice:
@@ -549,6 +602,23 @@ Speech in a blend carries `x-bolo-blend` with the blend as it was spoken (normal
 `af_bella(0.7)+af_sky(0.3)`) and, for a saved blend, `x-bolo-voice: <id>`; the trace's `extra.voice` is
 `{"saved": "warm-mix" | null, "cloned": false, "blend": "...", "voices": [{"voice", "weight"}, ...]}`. The text is
 read in the language of the voice with the largest weight. See [voices.md](voices.md), "Blends".
+
+#### Captioned speech: `POST /v1/audio/speech/captioned`
+
+The same JSON body as `/v1/audio/speech`, answered when synthesis is done with one JSON object: the audio
+(base64, in `response_format`; not `pcm`, `mulaw` or `alaw`) and the time of every word in it.
+
+```json
+{"model": "kitten-nano-0.8-int8", "aligner": "omnilingual-ctc-300m-align", "format": "wav", "sample_rate": 24000,
+ "duration": 4.162, "audio": "UklGRiQ…",
+ "words": [{"word": "Good", "start": 0.24, "end": 0.44}, {"word": "morning.", "start": 0.58, "end": 1.0},
+           {"word": "It", "start": 1.644, "end": 1.704}, {"word": "is", "start": 1.744, "end": 1.824},
+           {"word": "twenty-five", "start": 1.924, "end": 2.444}, …]}
+```
+
+That is `"Good morning. It is 25 degrees today, so take a hat!"`: each sentence's audio is aligned to the text the
+voice read, after text preparation, so `25` is captioned `twenty-five`. The console's Text to speech page uses this to highlight each word as it is
+played.
 
 #### Language detection
 
