@@ -212,7 +212,7 @@ def test_load_follows_maskgct_inference(tmp_path: Path, fake_libraries: dict[str
     options = {"voices": [{"id": "heart", "name": "Heart", "reference": "en-short"}]}
     model = maskgct.load(LoadContext("maskgct", "tts", root, options))
     seen = fake_libraries
-    assert seen["bundle"] == "maskgct" and seen["config"].endswith(maskgct.CONFIG)
+    assert seen["bundle"] == "maskgct" and Path(seen["config"]).as_posix().endswith(maskgct.CONFIG)
     # w2v-bert-2.0 and its feature extractor from the pinned download, never the Hub's latest revision
     assert seen["semantic"][:2] == (maskgct.SEMANTIC_REPO, maskgct.SEMANTIC_REVISION)
     assert seen["w2v"] == seen["extractor"] == str(tmp_path / "w2v-bert-2.0")

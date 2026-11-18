@@ -21,7 +21,7 @@ def model_folder(tmp_path: Path, revision: str = REV) -> Path:
     root = tmp_path / "model"
     root.mkdir()
     (root / "manifest.json").write_text(json.dumps({"source": {"repo": "org/m", "revision": revision}}))
-    (root / "modeling_m.py").write_text("X = 1\n")
+    (root / "modeling_m.py").write_bytes(b"X = 1\n")
     (root / "config.json").write_text(json.dumps({"auto_map": {"AutoModel": "modeling_m.M"}}))
     (root / "tokenizer_config.json").write_text(json.dumps({"model_max_length": 10}))
     (root / "model.safetensors").write_bytes(b"weights")
@@ -77,12 +77,12 @@ def test_revision_of_a_plugin_download(tmp_path: Path) -> None:
 
 
 def test_pinned_configuration_files(tmp_path: Path) -> None:
-    (tmp_path / "flow.yaml").write_text("flow: !new:x.Y\n")
+    (tmp_path / "flow.yaml").write_bytes(b"flow: !new:x.Y\n")
     digest = hashlib.sha256(b"flow: !new:x.Y\n").hexdigest()
     check_pinned_files(tmp_path, {"sha256": {"flow.yaml": digest}}, ["flow.yaml"])
     with pytest.raises(RemoteCodeRefused, match="pins no sha256"):
         check_pinned_files(tmp_path, {}, ["flow.yaml"])
-    (tmp_path / "flow.yaml").write_text("flow: !new:os.system\n")
+    (tmp_path / "flow.yaml").write_bytes(b"flow: !new:os.system\n")
     with pytest.raises(RemoteCodeRefused, match="does not match"):
         check_pinned_files(tmp_path, {"sha256": {"flow.yaml": digest}}, ["flow.yaml"])
 

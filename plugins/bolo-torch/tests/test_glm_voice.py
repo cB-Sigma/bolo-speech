@@ -91,7 +91,7 @@ def test_load_wires_the_pieces(tmp_path, monkeypatch) -> None:  # type: ignore[n
     (root / "glm-4-voice-decoder").mkdir(parents=True)
     (root / "manifest.json").write_text(json.dumps({"source": {"revision": rev}}))
     (root / "modeling_chatglm.py").write_text("")
-    (root / "glm-4-voice-decoder" / "config.yaml").write_text("flow: 1\n")
+    (root / "glm-4-voice-decoder" / "config.yaml").write_bytes(b"flow: 1\n")
     code = tmp_path / "code"
     (code / "speech_tokenizer").mkdir(parents=True)
     (code / "speech_tokenizer" / "__init__.py").write_text("")
@@ -148,6 +148,7 @@ def test_load_wires_the_pieces(tmp_path, monkeypatch) -> None:  # type: ignore[n
                 LoadContext("glm-4-voice", "speech-to-speech", root, {**ctx.options, "quantization": "int3"})
             )
     finally:
-        sys.path.remove(str(code))
+        if str(code) in sys.path:
+            sys.path.remove(str(code))
         for name in ("flow_inference", "speech_tokenizer", "speech_tokenizer.modeling_whisper"):
             sys.modules.pop(name, None)

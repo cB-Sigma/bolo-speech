@@ -103,7 +103,7 @@ def test_load_checks_remote_code_and_files_first(tmp_path, monkeypatch) -> None:
     (root / "manifest.json").write_text(json.dumps({"source": {"revision": rev}}))
     (root / "modeling_step_audio_2.py").write_text("")
     (root / "config.json").write_text(json.dumps({"auto_map": {"AutoModelForCausalLM": "modeling_step_audio_2.M"}}))
-    (root / "token2wav" / "flow.yaml").write_text("flow: 1\n")
+    (root / "token2wav" / "flow.yaml").write_bytes(b"flow: 1\n")
     code = tmp_path / "code"
     code.mkdir()
     (code / "utils.py").write_text("def compute_token_num(n):\n    return n\n")
@@ -140,6 +140,6 @@ def test_load_checks_remote_code_and_files_first(tmp_path, monkeypatch) -> None:
     model = step_audio.load(ctx)
     assert [k for k, _ in calls] == ["tokenizer", "model"] and all(kw["trust_remote_code"] for _, kw in calls)
     assert model.token2wav is None and model.utils.compute_token_num(7) == 7 and llm.config.eos_token_id == 151665
-    (root / "token2wav" / "flow.yaml").write_text("flow: !new:os.system\n")
+    (root / "token2wav" / "flow.yaml").write_bytes(b"flow: !new:os.system\n")
     with pytest.raises(RemoteCodeRefused, match=r"flow\.yaml"):
         step_audio.load(ctx)
