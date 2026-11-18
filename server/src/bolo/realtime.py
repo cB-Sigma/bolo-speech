@@ -59,6 +59,7 @@ from bolo.audio.resample import StreamResampler, resample
 from bolo.denoise import DenoiseOptions, parse_denoise
 from bolo.engines.base import FloatArray, VadDetector, VadParams
 from bolo.errors import BoloError, EngineUnavailable
+from bolo.mcp_tools import McpError, McpServerSpec, McpTool, McpTools, parse_tool
 from bolo.obs.trace import Trace, preview
 from bolo.s2s import AudioDelta, ResponseEnd, S2SConfig, S2SConversation, TextDelta, ToolCall
 from bolo.streaming.agreement import LocalAgreement
@@ -84,6 +85,10 @@ PIPELINES = ("cascade", "audio-llm", "speech-to-speech")
 KEEP_USER_AUDIO = 8
 #: audio kept after the detected end of speech (so a turn's audio_end_ms lies this far after the last speech)
 END_PADDING_S = 0.2
+
+
+#: responses in a row that may end in MCP tool calls before bolo stops asking the model again
+MAX_MCP_ROUNDS = 8
 
 
 def new_id(prefix: str) -> str:
@@ -168,6 +173,10 @@ class RealtimeSession:
         self.instructions = s.llm_instructions
         self.output_modalities = ["audio"]
         self.tools: list[dict[str, Any]] = []
+        #: MCP servers named in session.tools ({"type": "mcp", ...}): opened per session (bolo.mcp_tools)
+        self.mcp = McpTools(timeout=float(getattr(s, "mcp_timeout_s", 30.0)))
+        #: MCP calls made through this session: item id -> (the name the language model used, its call id)
+        self._mcp_calls: dict[str, tuple[str, str]] = {}
         self.tool_choice: Any = "auto"
         self.max_output_tokens: Any = "inf"
         self.voice: str | None = None
@@ -290,7 +299,7 @@ class RealtimeSession:
                     "romanised": self.romanised,
                 },
             },
-            "tools": self.tools,
+            "tools": [*self.tools, *(spec.public() for spec in self.mcp.specs.values())],
             "tool_choice": self.tool_choice,
             "max_output_tokens": self.max_output_tokens,
             "truncation": "auto",
@@ -304,6 +313,7 @@ class RealtimeSession:
         self.core.active_streams += 1
         self._worker = asyncio.create_task(self._work(), name=f"bolo-realtime-{self.id}")
         await self.send("session.created", session=self.session_object())
+        await self.mcp.sync(self._mcp_event)
 
     async def close(self) -> None:
         if self._closed:
@@ -315,6 +325,8 @@ class RealtimeSession:
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError, Exception):
                     await task
+        with contextlib.suppress(Exception):
+            await self.mcp.close()
         conv, self._s2s = self._s2s, None
         if conv is not None:
             with contextlib.suppress(Exception):
@@ -377,6 +389,7 @@ class RealtimeSession:
     async def _on_session_update(self, event: dict[str, Any]) -> None:
         self.configure(event.get("session"))
         await self.send("session.updated", session=self.session_object())
+        await self.mcp.sync(self._mcp_event)
 
     def configure(self, session: Any) -> None:
         """Apply a session configuration (the ``session`` object of ``session.update``)."""
@@ -497,14 +510,33 @@ class RealtimeSession:
                 self.output_modalities = mods
             if "tools" in session:
                 tools = session["tools"] or []
+                functions: list[dict[str, Any]] = []
+                servers: list[McpServerSpec] = []
                 for tool in tools:
-                    if not isinstance(tool, dict) or tool.get("type", "function") != "function":
+                    kind = tool.get("type", "function") if isinstance(tool, dict) else None
+                    if kind == "function":
+                        functions.append(tool)
+                    elif kind == "mcp":
+                        try:
+                            servers.append(parse_tool(tool, self.core.settings, authenticated=self.core.keys.enabled))
+                        except ValueError as exc:
+                            raise RealtimeError(str(exc), param="session.tools") from exc
+                    else:
                         raise RealtimeError(
-                            "only function tools are supported (MCP tools are not)",
-                            param="session.tools",
-                            code="unsupported",
+                            "tools must be function or mcp tools", param="session.tools", code="unsupported"
                         )
-                self.tools = tools
+                if servers and self.pipeline == "speech-to-speech":
+                    raise RealtimeError(
+                        "MCP tools work with the cascade and audio-llm pipelines; the speech-to-speech model calls "
+                        "function tools only",
+                        param="session.tools",
+                        code="unsupported",
+                    )
+                try:
+                    self.mcp.configure(servers)
+                except ValueError as exc:
+                    raise RealtimeError(str(exc), param="session.tools") from exc
+                self.tools = functions
             if "tool_choice" in session:
                 self.tool_choice = session["tool_choice"]
             if "max_output_tokens" in session:
@@ -1027,6 +1059,14 @@ class RealtimeSession:
         elif kind == "function_call":
             if not isinstance(item.get("name"), str):
                 raise RealtimeError("function_call needs a 'name'", param="item")
+        elif kind == "mcp_approval_response":
+            request_id = item.get("approval_request_id")
+            if not isinstance(request_id, str) or not isinstance(item.get("approve"), bool):
+                raise RealtimeError(
+                    "mcp_approval_response needs 'approval_request_id' and a boolean 'approve'", param="item"
+                )
+            if request_id not in self.mcp.pending:
+                raise RealtimeError(f"no MCP approval request {request_id!r} is waiting", param="item")
         else:
             raise RealtimeError(f"unsupported item type {kind!r}", code="unsupported", param="item.type")
         stored = {
@@ -1046,6 +1086,8 @@ class RealtimeSession:
         self.items.append(stored)
         await self.send("conversation.item.added", item=stored, previous_item_id=previous)
         await self.send("conversation.item.done", item=stored, previous_item_id=previous)
+        if kind == "mcp_approval_response":
+            await self._on_mcp_approval(stored)
 
     async def _s2s_item(self, item: dict[str, Any]) -> None:
         """Give the speech-to-speech model a client-created item: user text, or the output of a tool call. Other
@@ -1166,6 +1208,8 @@ class RealtimeSession:
                 messages.append({"role": "assistant", "content": None, "tool_calls": [call]})
             elif kind == "function_call_output":
                 messages.append({"role": "tool", "tool_call_id": item["call_id"], "content": item["output"]})
+            elif kind in ("mcp_call", "mcp_approval_request"):
+                messages.extend(self._mcp_messages(item, items))
         return messages
 
     def _encode(self, samples: FloatArray, rate: int) -> str:
@@ -1186,6 +1230,12 @@ class RealtimeSession:
         audio_mode = "audio" in modalities
         instructions = params.get("instructions") or self.instructions
         tools = params.get("tools") if params.get("tools") is not None else self.tools
+        tools = [t for t in tools or [] if isinstance(t, dict) and t.get("type", "function") == "function"]
+        mcp_map: dict[str, McpTool] = {}
+        if not self._s2s_mode and self.mcp.specs:
+            await self.mcp.ready()
+            mcp_functions, mcp_map = self.mcp.functions({str(t.get("name")) for t in tools})
+            tools = [*tools, *mcp_functions]
         voice = ((params.get("audio") or {}).get("output") or {}).get("voice") or self.voice
         response: dict[str, Any] = {
             "id": response_id, "object": "realtime.response", "status": "in_progress", "status_details": None, "output": [],
@@ -1432,9 +1482,20 @@ class RealtimeSession:
             await self.send("response.output_item.done", response_id=response_id, output_index=0, item=item)
             await self.send("conversation.item.done", item=item, previous_item_id=previous)
             output.append(item)
+        mcp_ran = False
+        client_calls = False
         if status == "completed":
             for index in sorted(calls):  # function calls requested by the model
                 call = calls[index]
+                if call["name"] in mcp_map:  # a tool of an MCP server: bolo calls it (after the client's approval)
+                    tool = mcp_map[call["name"]]
+                    if self.mcp.needs_approval(tool):
+                        output.append(await self._mcp_approval_request(response_id, len(output), tool, call, mcp_map))
+                    else:
+                        output.append(await self._mcp_call(response_id, len(output), tool, call["name"], call))
+                        mcp_ran = True
+                    continue
+                client_calls = True
                 call_item = {
                     "id": new_id("item"), "object": "realtime.item", "type": "function_call", "status": "completed",
                     "name": call["name"], "call_id": call["id"] or new_id("call"), "arguments": call["arguments"] or "{}",
@@ -1490,6 +1551,168 @@ class RealtimeSession:
         )
         core.traces.record(trace)
         self._response_id = None
+        if mcp_ran and not client_calls and status == "completed":
+            # the model asked for MCP tools and has their results: let it answer with them (a new response)
+            await self._mcp_continue(params)
+
+    # -- MCP tools (bolo.mcp_tools) ---------------------------------------------------------------------------
+    async def _mcp_event(self, kind: str, **fields: Any) -> Any:
+        """Events of an MCP server being opened: an ``mcp_list_tools`` item that fills in when its tools arrive."""
+        if kind == "mcp_list_tools.open":
+            item = {
+                "id": new_id("item"), "object": "realtime.item", "type": "mcp_list_tools",
+                "server_label": fields["server_label"], "tools": [],
+            }  # fmt: skip
+            previous = self.items[-1]["id"] if self.items else None
+            self.items.append(item)
+            await self.send("conversation.item.added", item=item, previous_item_id=previous)
+            await self.send("mcp_list_tools.in_progress", item_id=item["id"])
+            return item["id"]
+        found = next((i for i in self.items if i.get("id") == fields.get("item_id")), None)
+        if found is None:
+            return None
+        item = found
+        if kind == "mcp_list_tools.completed":
+            item["tools"] = fields["tools"]
+            await self.send("mcp_list_tools.completed", item_id=item["id"])
+        else:
+            item["error"] = fields.get("message")
+            await self.send("mcp_list_tools.failed", item_id=item["id"])
+            await self.error(str(fields.get("message")), code="mcp_list_tools_failed", type_="server_error")
+        await self.send("conversation.item.done", item=item, previous_item_id=None)
+        return item["id"]
+
+    async def _mcp_approval_request(
+        self, response_id: str, out_index: int, tool: McpTool, call: dict[str, Any], names: dict[str, McpTool]
+    ) -> dict[str, Any]:
+        item = {
+            "id": new_id("mcpr"), "object": "realtime.item", "type": "mcp_approval_request",
+            "server_label": tool.server, "name": tool.name, "arguments": call["arguments"] or "{}",
+        }  # fmt: skip
+        self._mcp_calls[item["id"]] = (call["name"], call["id"] or new_id("call"))
+        self.mcp.pending[item["id"]] = (tool.server, tool.name, item["arguments"])
+        previous = self.items[-1]["id"] if self.items else None
+        self.items.append(item)
+        await self.send("response.output_item.added", response_id=response_id, output_index=out_index, item=item)
+        await self.send("conversation.item.added", item=item, previous_item_id=previous)
+        await self.send("response.output_item.done", response_id=response_id, output_index=out_index, item=item)
+        await self.send("conversation.item.done", item=item, previous_item_id=previous)
+        return item
+
+    async def _mcp_call(
+        self,
+        response_id: str,
+        out_index: int,
+        tool: McpTool,
+        llm_name: str,
+        call: dict[str, Any],
+        approval_request_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Call an MCP tool, as an ``mcp_call`` item with the events of the Realtime API."""
+        arguments = call.get("arguments") or "{}"
+        item: dict[str, Any] = {
+            "id": new_id("mcp"), "object": "realtime.item", "type": "mcp_call", "server_label": tool.server,
+            "name": tool.name, "arguments": "", "approval_request_id": approval_request_id, "output": None,
+            "error": None,
+        }  # fmt: skip
+        self._mcp_calls[item["id"]] = (llm_name, call.get("id") or new_id("call"))
+        previous = self.items[-1]["id"] if self.items else None
+        self.items.append(item)
+        common = {"response_id": response_id, "item_id": item["id"], "output_index": out_index}
+        await self.send("response.output_item.added", response_id=response_id, output_index=out_index, item=dict(item))
+        await self.send("conversation.item.added", item=dict(item), previous_item_id=previous)
+        item["arguments"] = arguments
+        await self.send("response.mcp_call_arguments.delta", delta=arguments, **common)
+        await self.send("response.mcp_call_arguments.done", arguments=arguments, **common)
+        await self.send("response.mcp_call.in_progress", item_id=item["id"], output_index=out_index)
+        try:
+            text, is_error = await self.mcp.call(tool, arguments)
+            if is_error:
+                item["error"] = {"type": "tool_execution_error", "message": text}
+            else:
+                item["output"] = text
+        except McpError as exc:
+            item["error"] = {"type": "mcp_protocol_error", "message": str(exc)}
+        if item["error"]:
+            await self.send("response.mcp_call.failed", item_id=item["id"], output_index=out_index)
+        else:
+            await self.send("response.mcp_call.completed", item_id=item["id"], output_index=out_index)
+        await self.send("response.output_item.done", response_id=response_id, output_index=out_index, item=item)
+        await self.send("conversation.item.done", item=item, previous_item_id=previous)
+        return item
+
+    def _mcp_messages(self, item: dict[str, Any], items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """An MCP call as the language model sees it: its tool call and the result. An approval request appears once
+        it is answered: an approved one through its ``mcp_call``, a declined one with a refusal as the result."""
+        name, call_id = self._mcp_calls.get(item["id"], (item.get("name") or "tool", item["id"]))
+        if item["type"] == "mcp_approval_request":
+            answer: dict[str, Any] | None = next(
+                (i for i in items if i.get("type") == "mcp_approval_response"
+                 and i.get("approval_request_id") == item["id"]),
+                None,
+            )  # fmt: skip
+            if answer is None or answer.get("approve"):
+                return []
+            result = "The user did not allow this tool call." + (
+                f" Reason: {answer['reason']}" if answer.get("reason") else ""
+            )
+        else:
+            if item.get("approval_request_id"):
+                name, call_id = self._mcp_calls.get(item["approval_request_id"], (name, call_id))
+            error = item.get("error")
+            result = item.get("output") or (f"Error: {error.get('message')}" if isinstance(error, dict) else "")
+        call = {
+            "id": call_id,
+            "type": "function",
+            "function": {"name": name, "arguments": item.get("arguments") or "{}"},
+        }
+        return [
+            {"role": "assistant", "content": None, "tool_calls": [call]},
+            {"role": "tool", "tool_call_id": call_id, "content": result},
+        ]
+
+    async def _on_mcp_approval(self, answer: dict[str, Any]) -> None:
+        """The client answered an approval request: run the call when allowed, then let the model go on."""
+        request_id = str(answer["approval_request_id"])
+        server, tool_name, arguments = self.mcp.pending.pop(request_id)
+        trace = self._agent_trace()
+
+        async def turn() -> None:
+            if answer.get("approve"):
+                response_id = new_id("resp")
+                self._response_id = response_id
+                response: dict[str, Any] = {
+                    "id": response_id, "object": "realtime.response", "status": "in_progress", "status_details": None,
+                    "output": [], "conversation_id": self.conversation_id, "output_modalities": self.output_modalities,
+                    "usage": None, "metadata": None,
+                }  # fmt: skip
+                await self.send("response.created", response=response)
+                llm_name = self._mcp_calls.get(request_id, (tool_name, ""))[0]
+                item = await self._mcp_call(
+                    response_id, 0, McpTool(server, tool_name), llm_name, {"arguments": arguments}, request_id
+                )
+                response.update(status="completed", output=[item],
+                                usage={"input_tokens": 0, "output_tokens": 0, "total_tokens": 0})  # fmt: skip
+                await self.send("response.done", response=response)
+                self._response_id = None
+            await self._start_response({}, trace)
+
+        await self._turns.put(turn)
+
+    async def _mcp_continue(self, params: dict[str, Any]) -> None:
+        depth = int(params.get("_mcp_depth", 0)) + 1
+        if depth > MAX_MCP_ROUNDS:
+            await self.error(
+                f"the model called MCP tools {MAX_MCP_ROUNDS} times in a row; not continuing", code="mcp_rounds"
+            )
+            return
+        trace = self._agent_trace()
+        follow = {k: v for k, v in params.items() if k != "input"} | {"_mcp_depth": depth}
+
+        async def turn() -> None:
+            await self._start_response(follow, trace)
+
+        await self._turns.put(turn)
 
 
 # -- ephemeral client secrets -------------------------------------------------

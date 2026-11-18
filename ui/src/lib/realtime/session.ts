@@ -64,8 +64,28 @@ export interface ConversationState {
   error: string | null
   errorCode: string | null
   mic: MicFailure | null
+  /** MCP servers the session opened (`mcp_list_tools` items), by server label. */
+  mcpServers: Record<string, McpServerState>
+  /** MCP tool calls the server made for the language model, and approval requests waiting for an answer. */
+  toolCalls: ToolCall[]
   /** Recent server event types, newest last (for the debug panel). */
   events: string[]
+}
+
+export interface McpServerState {
+  status: 'listing' | 'ready' | 'failed'
+  tools: string[]
+  error: string | null
+}
+
+export interface ToolCall {
+  /** The item id (`mcp_call` or `mcp_approval_request`). */
+  id: string
+  server: string
+  name: string
+  arguments: string
+  status: 'approval' | 'allowed' | 'denied' | 'running' | 'done' | 'failed'
+  output: string | null
 }
 
 export const emptyConversation = (
@@ -88,6 +108,8 @@ export const emptyConversation = (
   error: null,
   errorCode: null,
   mic: null,
+  mcpServers: {},
+  toolCalls: [],
   events: [],
 })
 
@@ -101,6 +123,7 @@ export function sessionUpdate(
   transport: RealtimeTransport = 'websocket',
   denoise?: RealtimeDenoise,
   listening?: Listening,
+  extras: SessionExtras = {},
 ): Record<string, unknown> & { session: Record<string, unknown> } {
   const pcm = transport === 'websocket'
   const format = { type: 'audio/pcm', rate: REALTIME_RATE }
@@ -113,15 +136,19 @@ export function sessionUpdate(
   const input: Record<string, unknown> = pcm ? { format, turn_detection } : { turn_detection }
   // bolo's extension; left out, the server's default (its `denoise` setting) applies
   if (denoise !== undefined) input.denoise = denoise
-  return {
-    type: 'session.update',
-    session: {
-      type: 'realtime',
-      pipeline,
-      output_modalities: ['audio'],
-      audio: { input, output },
-    },
+  const session: Record<string, unknown> = {
+    type: 'realtime',
+    pipeline,
+    output_modalities: ['audio'],
+    audio: { input, output },
   }
+  if (extras.tools?.length) session.tools = extras.tools
+  return { type: 'session.update', session }
+}
+
+/** More of the first `session.update`: tools (MCP servers, `{"type": "mcp", ...}`). */
+export interface SessionExtras {
+  tools?: Record<string, unknown>[]
 }
 
 /**
@@ -230,6 +257,11 @@ export function applyEvent(s: ConversationState, ev: Ev): ConversationState {
         error: failed ? (r.status_details?.error?.message ?? 'The response failed.') : s.error,
       }
     }
+    case 'conversation.item.added':
+    case 'conversation.item.done':
+      return { ...applyItem(s, ev.item as Item | undefined, ev.type === 'conversation.item.done'), events }
+    case 'response.mcp_call.in_progress':
+      return { ...s, events, toolCalls: patchCall(s.toolCalls, str(ev.item_id), { status: 'running' }) }
     case 'error': {
       const e = (ev.error ?? {}) as { message?: string; code?: string }
       return { ...s, events, error: e.message ?? 'The server reported an error.', errorCode: e.code ?? null }
@@ -237,6 +269,43 @@ export function applyEvent(s: ConversationState, ev: Ev): ConversationState {
     default:
       return { ...s, events }
   }
+}
+
+type Item = Record<string, unknown> & { id?: string; type?: string }
+
+function patchCall(calls: ToolCall[], id: string, patch: Partial<ToolCall>): ToolCall[] {
+  return calls.map((c) => (c.id === id ? { ...c, ...patch } : c))
+}
+
+/** MCP items: a server's tool list (`mcp_list_tools`), a call (`mcp_call`) and an approval request. */
+function applyItem(s: ConversationState, item: Item | undefined, done: boolean): ConversationState {
+  if (!item || typeof item.id !== 'string') return s
+  const str = (v: unknown) => (typeof v === 'string' ? v : '')
+  if (item.type === 'mcp_list_tools') {
+    const tools = Array.isArray(item.tools) ? item.tools.map((t) => str((t as { name?: unknown }).name)) : []
+    const error = typeof item.error === 'string' ? item.error : null
+    const status: McpServerState['status'] = !done ? 'listing' : error ? 'failed' : 'ready'
+    return { ...s, mcpServers: { ...s.mcpServers, [str(item.server_label)]: { status, tools, error } } }
+  }
+  if (item.type === 'mcp_call' || item.type === 'mcp_approval_request') {
+    const err = item.error as { message?: string } | null | undefined
+    const done = item.type === 'mcp_call' && (item.output != null || err != null)
+    const call: ToolCall = {
+      id: item.id,
+      server: str(item.server_label),
+      name: str(item.name),
+      arguments: str(item.arguments),
+      status: item.type === 'mcp_approval_request' ? 'approval' : done ? (err ? 'failed' : 'done') : 'running',
+      output: err ? (err.message ?? 'failed') : typeof item.output === 'string' ? item.output : null,
+    }
+    const old = s.toolCalls.find((c) => c.id === call.id)
+    if (old && call.status === 'approval') return s // answered already, or the same request again (item.done)
+    const toolCalls = old ? patchCall(s.toolCalls, call.id, call) : [...s.toolCalls.slice(-19), call]
+    // an approved request becomes a call of its own: mark the request
+    const req = str(item.approval_request_id)
+    return { ...s, toolCalls: req ? patchCall(toolCalls, req, { status: 'allowed' }) : toolCalls }
+  }
+  return s
 }
 
 function toBase64(bytes: Uint8Array): string {
@@ -283,6 +352,7 @@ export class ConversationSession {
 
   private readonly denoise: RealtimeDenoise | undefined
   private readonly listening: Listening | undefined
+  private readonly extras: SessionExtras
   /** A full-duplex model keeps talking when the user talks: the page does not cut its audio on speech_started. */
   private readonly fullDuplex: boolean
 
@@ -290,11 +360,12 @@ export class ConversationSession {
     pipeline: PipelineId,
     transport: RealtimeTransport = 'websocket',
     denoise?: RealtimeDenoise,
-    opts: { listening?: Listening; fullDuplex?: boolean } = {},
+    opts: { listening?: Listening; fullDuplex?: boolean; tools?: Record<string, unknown>[] } = {},
   ) {
     this.store = new Store(emptyConversation(pipeline, transport))
     this.denoise = denoise
     this.listening = opts.listening
+    this.extras = { tools: opts.tools }
     this.fullDuplex = Boolean(opts.fullDuplex)
   }
 
@@ -316,6 +387,20 @@ export class ConversationSession {
       this.player = new GaplessPlayer(this.ctx)
     }
     this.store.patch({ agentSpeaking: false })
+  }
+
+  /** Answer an MCP approval request (`mcp_approval_response`): the server runs the call, or tells the model no. */
+  answerApproval(id: string, approve: boolean): void {
+    if (this.closed) return
+    const ev = {
+      type: 'conversation.item.create',
+      item: { type: 'mcp_approval_response', approval_request_id: id, approve },
+    }
+    if (this.rtc) this.rtc.send(ev)
+    else if (this.ws?.readyState === 1) this.ws.send(JSON.stringify(ev))
+    else return
+    const s = this.store.get()
+    this.store.patch({ toolCalls: patchCall(s.toolCalls, id, { status: approve ? 'allowed' : 'denied' }) })
   }
 
   /** Choose the pipeline. Refused (returns false) once audio has gone out. */
@@ -376,7 +461,7 @@ export class ConversationSession {
       onFail: (message, code, mic) => this.fail(message, code ?? null, mic ?? null),
     })
     this.rtc = link
-    return link.start(sessionUpdate(pipeline, voice, 'webrtc', this.denoise, this.listening).session)
+    return link.start(sessionUpdate(pipeline, voice, 'webrtc', this.denoise, this.listening, this.extras).session)
   }
 
   private openSocket(pipeline: PipelineId, voice?: string): void {
@@ -390,7 +475,7 @@ export class ConversationSession {
     }
     this.ws = ws
     ws.onopen = () => {
-      ws.send(JSON.stringify(sessionUpdate(pipeline, voice, 'websocket', this.denoise, this.listening)))
+      ws.send(JSON.stringify(sessionUpdate(pipeline, voice, 'websocket', this.denoise, this.listening, this.extras)))
       this.ready = true
       for (const chunk of this.pending.splice(0)) this.sendAudio(chunk)
       this.store.patch({ status: 'live' })

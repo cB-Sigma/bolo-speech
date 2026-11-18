@@ -4,6 +4,7 @@ import { BrowserConversation } from '@/components/conversation/browser-conversat
 import { PipelineModelPanel } from '@/components/conversation/pipeline-model'
 import { PipelinePicker } from '@/components/conversation/pipeline-picker'
 import { ServerListeningPanel } from '@/components/conversation/server-listening'
+import { AgentToolsPanel, mcpTools, noMcp, type McpChoice } from '@/components/conversation/agent-tools'
 import { NeedsServer } from '@/components/demo'
 import { Page } from '@/components/layout/app-shell'
 import { Empty, Panel } from '@/components/panel'
@@ -61,6 +62,7 @@ function ServerConversation() {
   const [transport, setTransport] = useState<RealtimeTransport>('websocket')
   const [denoise, setDenoise] = useState<Denoise>(defaultDenoise)
   const [listening, setListening] = useState<Listening>({ type: 'server_vad' })
+  const [mcp, setMcp] = useState<McpChoice>(noMcp)
   const [session, setSession] = useState<ConversationSession | null>(null)
   const state = useStore(session?.store ?? idle)
   const active = state.status === 'starting' || state.status === 'live'
@@ -83,7 +85,11 @@ function ServerConversation() {
 
   const start = () => {
     // Everything that needs the tap happens inside start(): the microphone prompt first.
-    const s = new ConversationSession(pipeline, transport, realtimeDenoise(denoise), { listening, fullDuplex })
+    const s = new ConversationSession(pipeline, transport, realtimeDenoise(denoise), {
+      listening,
+      fullDuplex,
+      tools: pipeline === 'speech-to-speech' ? [] : mcpTools(mcp),
+    })
     void s.start()
     setSession(s)
   }
@@ -292,6 +298,16 @@ function ServerConversation() {
             disabled={active}
             reported={state.serverListening}
           />
+          {pipeline !== 'speech-to-speech' && (
+            <AgentToolsPanel
+              info={info.data}
+              value={mcp}
+              onChange={setMcp}
+              disabled={active}
+              state={state}
+              onApprove={(id, approve) => session?.answerApproval(id, approve)}
+            />
+          )}
           <Panel title="About the pipelines" bodyClassName="grid gap-2.5 text-[13px] leading-5 text-muted-foreground">
             <p>
               <span className="text-foreground">Cascade</span> is speech to text, your language model, then text to

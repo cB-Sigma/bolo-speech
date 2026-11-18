@@ -85,6 +85,7 @@ from bolo.lid import LidResult, parse_routes, route_headers
 from bolo.lid import identify as identify_language
 from bolo.lifecycle import LoadedModel, ModelManager
 from bolo.llm import AudioLLMClient, LLMClient
+from bolo.mcp_tools import session_urls_allowed
 from bolo.obs import otel
 from bolo.obs.events import EventBus
 from bolo.obs.trace import Trace, TraceStore, preview
@@ -550,6 +551,13 @@ class Bolo:
                 },
                 "client_secrets": "/v1/realtime/client_secrets",
                 "transcript_deltas": True,
+                # MCP servers as session tools ({"type": "mcp", ...}; docs/voice-agents.md, "MCP tools")
+                "mcp": {
+                    "available": importlib.util.find_spec("mcp") is not None,
+                    "install": None if importlib.util.find_spec("mcp") else "pip install 'bolo-speech[mcp]'",
+                    "configured": sorted(str(k) for k in (s.mcp_servers or {})),
+                    "session_urls": session_urls_allowed(s, self.keys.enabled),
+                },
                 "turn_detection": ["server_vad", "semantic_vad"],
                 "semantic_vad": {
                     "model": turn.id if turn else None,

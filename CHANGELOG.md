@@ -178,6 +178,15 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - **Console: Analyse audio.** One recording through the sound-event taggers, the emotion models and the denoisers
   (listen to and download the cleaned audio). In the live demo the page tags sounds in the browser with CED tiny or
   mini on WebAssembly, nothing uploaded.
+- **MCP tools in Realtime sessions.** A `{"type": "mcp", "server_label", "server_url", ...}` entry in `session.tools`
+  connects the session to a Model Context Protocol server (Streamable HTTP, or SSE); servers set up by the operator
+  (`mcp_servers`, which may also start a local server over stdio) are named by label alone. bolo lists the tools,
+  offers them to the language model as functions and calls them itself, with OpenAI's events (`mcp_list_tools`,
+  `mcp_call`, `response.mcp_call.*`) and approvals (`require_approval`, `mcp_approval_request` /
+  `mcp_approval_response`); the model then answers with the result. A session may name a server by URL on a loopback
+  bind or when requests need an API key (`realtime_mcp_urls`). Needs `bolo-speech[mcp]` (the MCP Python SDK, MIT;
+  1.x and 2.x). The console's Conversation page picks servers, shows the calls and answers approvals. Tried against
+  a server built with the MCP SDK itself, over stdio and Streamable HTTP.
 - **Speech enhancement on its own: `POST /v1/audio/denoise`.** The recording comes back with its background noise
   removed (voice isolation), from any `denoise` model of the catalog, with `strength` (mixed with the original),
   `response_format` (WAV, MP3, FLAC, Opus, AAC, PCM, mu-law, A-law) and `sample_rate`. `stream=true` sends the audio

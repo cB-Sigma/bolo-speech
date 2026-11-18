@@ -148,7 +148,7 @@ WebSocket subprotocols `realtime` and `openai-insecure-api-key.<key>`.
 
 | Client event | Behaviour |
 | --- | --- |
-| `session.update` | `type` (`realtime` \| `transcription`), `instructions`, `output_modalities` (`["audio"]` or `["text"]`), `audio.input.format` / `audio.output.format` (`audio/pcm` at 24 kHz, `audio/pcmu`, `audio/pcma`), `audio.input.transcription` (`model`, `language`, `prompt`), `audio.input.noise_reduction` (`{"type": "near_field"}` or `"far_field"`: the default denoiser before transcription; `null`: the server's default; see below), `audio.input.denoise` (bolo extension: `true`, `false`, a strength between 0 and 1, a model id, or `{"model", "strength"}`; wins over `noise_reduction`), `audio.input.turn_detection` (`server_vad` with `threshold`, `silence_duration_ms`, `prefix_padding_ms`, `create_response`, `interrupt_response`; `semantic_vad` with `eagerness`, see below; or `null`; bolo extensions in either: `vad_model`, the voice-activity detector of the session, any `vad` model, default `default_vad`; `turn_model`, the end-of-turn model `semantic_vad` asks, any `turn` model, default `default_turn`), `audio.output.voice`, `audio.output.speed`, `tools` (functions), `tool_choice`, `max_output_tokens` |
+| `session.update` | `type` (`realtime` \| `transcription`), `instructions`, `output_modalities` (`["audio"]` or `["text"]`), `audio.input.format` / `audio.output.format` (`audio/pcm` at 24 kHz, `audio/pcmu`, `audio/pcma`), `audio.input.transcription` (`model`, `language`, `prompt`), `audio.input.noise_reduction` (`{"type": "near_field"}` or `"far_field"`: the default denoiser before transcription; `null`: the server's default; see below), `audio.input.denoise` (bolo extension: `true`, `false`, a strength between 0 and 1, a model id, or `{"model", "strength"}`; wins over `noise_reduction`), `audio.input.turn_detection` (`server_vad` with `threshold`, `silence_duration_ms`, `prefix_padding_ms`, `create_response`, `interrupt_response`; `semantic_vad` with `eagerness`, see below; or `null`; bolo extensions in either: `vad_model`, the voice-activity detector of the session, any `vad` model, default `default_vad`; `turn_model`, the end-of-turn model `semantic_vad` asks, any `turn` model, default `default_turn`), `audio.output.voice`, `audio.output.speed`, `tools` (functions, and MCP servers: below), `tool_choice`, `max_output_tokens` |
 | `input_audio_buffer.append` / `.commit` / `.clear` | base64 audio in the session's input format; manual commit when turn detection is off |
 | `conversation.item.create` | user/assistant/system messages (`input_text`, `input_audio` with base64 audio that is transcribed, `output_text`), `function_call`, `function_call_output` |
 | `conversation.item.delete` / `.retrieve` / `.truncate` | `truncate` cuts an assistant message's transcript to the sentences that had started playing before `audio_end_ms`, so the model does not "remember" words the user never heard |
@@ -243,6 +243,68 @@ the function, send its result as a `function_call_output` item and then
 `response.create`. This requires a model and server that support tool calls
 in streaming mode. It is tested with a scripted fake model only: **no real
 model's tool calling was exercised.**
+
+**MCP tools.** A `tools` entry of type `mcp` connects the session to a Model
+Context Protocol server; bolo calls its tools for the language model, so the
+client does not have to. It needs the MCP Python SDK
+(`pip install 'bolo-speech[mcp]'`, MIT; 1.x and 2.x both work).
+
+```jsonc
+// a server the client names (Streamable HTTP; SSE when the URL ends in /sse)
+{"type": "mcp", "server_label": "docs", "server_url": "https://example.com/mcp",
+ "allowed_tools": ["search"], "require_approval": "never",
+ "headers": {"X-Api-Key": "…"}, "authorization": "…"}     // authorization: sent as a bearer token
+// a server the operator configured (setting mcp_servers): the label alone
+{"type": "mcp", "server_label": "files"}
+```
+
+```toml
+# bolo.toml: servers for every session to use by label. A command starts a local server (stdio) per session;
+# a session can never start a process itself. require_approval defaults to "never" here.
+[mcp_servers.files]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-filesystem", "/srv/shared"]
+[mcp_servers.search]
+url = "https://search.internal/mcp"
+headers = { Authorization = "Bearer …" }
+allowed_tools = ["search"]
+```
+
+What happens, with OpenAI's event names:
+
+1. After `session.updated`, each server is opened: a `conversation.item.added`
+   with an `mcp_list_tools` item, `mcp_list_tools.in_progress`, then
+   `mcp_list_tools.completed` and `conversation.item.done` with the tools filled
+   in (or `mcp_list_tools.failed` and an `error`, code `mcp_list_tools_failed`).
+2. The tools are offered to the language model as functions, next to the
+   session's own (a name taken already becomes `<server_label>__<name>`).
+3. When the model calls one and no approval is needed, the response carries an
+   `mcp_call` item: `response.mcp_call_arguments.delta` / `.done`,
+   `response.mcp_call.in_progress`, then `.completed` (with `output`) or
+   `.failed` (with `error`). bolo then starts a new response by itself, in which
+   the model answers with the result. At most eight responses in a row end in MCP
+   calls; then bolo stops with an error (`mcp_rounds`).
+4. With `require_approval` `"always"` (the default for a session's own server,
+   as at OpenAI) or `{"never": {"tool_names": [...]}, "always": {...}}`, the
+   response carries an `mcp_approval_request` item instead. Answer with
+   `conversation.item.create` and `{"type": "mcp_approval_response",
+   "approval_request_id": "…", "approve": true}`: bolo runs the call in a response
+   of its own and lets the model go on. With `"approve": false` the model is told
+   the call was not allowed.
+
+A server is opened once per session and closed with it; a `session.update`
+with other tools closes the servers no longer named. A `server_url` given by a
+client makes bolo connect where the client says, so by default it is accepted
+only on a loopback bind or when requests need an API key; `realtime_mcp_urls`
+`true` or `false` decides it outright (`false`: only the configured servers). Headers are shown as `***` in
+`session.updated`. MCP tools work with the `cascade` and `audio-llm` pipelines,
+not with a speech-to-speech model. Not implemented: `connector_id` (OpenAI's own
+connectors). `capabilities.realtime.mcp` in `/api/v1/info` says whether the SDK
+is installed, which servers are configured and whether a session may give a
+URL. In the console, the Conversation page has a **Tools (MCP)** panel: tick
+configured servers or give one by URL, then follow each server's tools and each
+call, and allow or decline calls that need approval. Tested with a protocol-level fake
+MCP server over Streamable HTTP and stdio, with mcp 1.30 and 2.3.
 
 ### Pipelines: cascade, audio-in language model, speech-to-speech
 
@@ -606,11 +668,11 @@ WebSocket transport with `audio/pcmu` still works as before
   audio too. It can make transcripts worse on clean audio (configuration.md, "Denoising"). `semantic_vad` is an acoustic end-of-turn model added to
   silence detection (above), not OpenAI's.
 * Input transcription events are always sent (bolo has to transcribe anyway).
-* Not implemented: OpenAI's SIP connector (bolo has its own telephony, [telephony.md](telephony.md)), MCP tools, image input, `prompt`
+* Not implemented: OpenAI's SIP connector (bolo has its own telephony, [telephony.md](telephony.md)), MCP connectors (`connector_id`; MCP servers by URL work, above), image input, `prompt`
   templates, `reasoning`, `tracing`, `truncation` settings, log probabilities,
   DTMF, idle timeouts, rate-limit events, the realtime translation sessions.
   Unsupported settings in `session.update` are ignored unless they would
-  change behaviour silently (MCP tools and images are rejected with an error).
+  change behaviour silently (connectors and images are rejected with an error).
 * `model` in the URL is echoed back in the session; the language model that
   answers is the operator's `llm_model`.
 * Voices are those of bolo's text-to-speech model; OpenAI voice names are
@@ -768,5 +830,5 @@ session = AgentSession(
 )
 ```
 
-If a framework insists on features bolo does not have (MCP tools, image
-input), use the separate STT/TTS route.
+If a framework insists on features bolo does not have (image input), use the
+separate STT/TTS route.

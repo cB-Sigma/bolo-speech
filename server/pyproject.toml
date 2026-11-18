@@ -86,6 +86,9 @@ orpheus = ["onnxruntime>=1.17"]
 # LFM3-Audio in this process (speech-to-speech and text-to-speech without llama-server): the model's ONNX graphs
 # use MatMulNBits, GatherBlockQuantized and GroupQueryAttention, which need a recent onnxruntime
 s2s = ["onnxruntime>=1.20", "tokenizers>=0.20"]
+# MCP tools in Realtime sessions (the MCP Python SDK, MIT): bolo connects to MCP servers named in session.tools
+# or in the setting mcp_servers and calls their tools for the language model. 1.x and 2.x both work
+mcp = ["mcp>=1.10"]
 # inbound SIP endpoint for trunks and PBXs (sipmessage is BSD-2-Clause, pure Python: it parses and writes SIP messages)
 sip = ["sipmessage>=0.7"]
 text = ["whisper-normalizer>=0.1"]
@@ -132,6 +135,8 @@ dev = [
   "sphn>=0.2,<0.3",
   # python-socketio's server (MIT) stands in for Freeze-Omni's Flask-SocketIO server in the tests
   "python-socketio>=5.11",
+  # the MCP Python SDK (MIT): the MCP tool tests of Realtime sessions
+  "mcp>=1.10",
   "ruff>=0.8",
   "mypy>=1.13",
   "types-PyYAML",
@@ -197,6 +202,7 @@ module = [
   "onnxruntime.*", "tomli.*", "aiortc.*", "uccharan.*", "tokenizers.*", "sipmessage.*", "onnx.*", "pynvml.*",
   "opentelemetry.*", "webrtcvad.*", "sphn.*", "torch.*", "transformers.*", "mlx.*", "mlx_whisper.*", "parakeet_mlx.*",
   "mlx_audio.*",
+  "mcp.*", "mcp_types.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"

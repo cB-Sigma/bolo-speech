@@ -342,7 +342,8 @@ async def test_raw_websocket_g711_manual_commit_and_item_operations(agent: LiveS
             {"type": "session.update", "session": {"audio": {"input": {"format": {"type": "audio/flac"}}}}},
             "invalid_request",
         ),
-        ({"type": "session.update", "session": {"tools": [{"type": "mcp", "server_label": "x"}]}}, "unsupported"),
+        ({"type": "session.update", "session": {"tools": [{"type": "file_search"}]}}, "unsupported"),
+        ({"type": "session.update", "session": {"tools": [{"type": "mcp", "server_label": "x"}]}}, "invalid_request"),
     ]:
         await ws.send(json.dumps(bad))
         error = json.loads(await ws.recv())

@@ -209,6 +209,16 @@ class Settings:
     duplex_silence_ms: int = 800  # the model's speech is cut into responses at pauses this long
     duplex_jitter_ms: int = 200  # the caller's audio may lag the clock this much before the model is fed silence
 
+    #: MCP servers for Realtime sessions (bolo.mcp_tools; needs bolo-speech[mcp]): label -> {url | command, args, env,
+    #: headers, allowed_tools, require_approval (default "never"), description}. A session uses one with
+    #: {"type": "mcp", "server_label": "<label>"} in session.tools. In a file: [mcp_servers.<label>] tables; in the
+    #: environment: BOLO_MCP_SERVERS (JSON). Headers and env values are never returned by any API
+    mcp_servers: dict[str, Any] = field(default_factory=dict)
+    #: let Realtime sessions name MCP servers of their own (server_url); false: only the configured ones. Unset:
+    #: allowed on a loopback bind or when requests need an API key, never on an open non-loopback bind
+    realtime_mcp_urls: bool | None = None
+    mcp_timeout_s: float = 30.0  # connecting to an MCP server, and each tool call
+
     # -- other protocols --------------------------------------------------
     wyoming: bool = False
     wyoming_host: str = "127.0.0.1"
@@ -347,6 +357,14 @@ class Settings:
                 from bolo.providers import redact_provider
 
                 v = {str(name): redact_provider(entry) for name, entry in dict(v).items()}
+            elif f.name == "mcp_servers":
+                v = {
+                    str(label): {
+                        k: (dict.fromkeys(x, "***") if k in ("headers", "env") and isinstance(x, dict) else x)
+                        for k, x in (entry.items() if isinstance(entry, dict) else [])
+                    }
+                    for label, entry in dict(v).items()
+                }
             elif f.name == "telephony":
                 from bolo.telephony.config import redact_telephony
 
@@ -556,7 +574,7 @@ def load_settings(
         doc = _read_toml(path)
         flat: dict[str, Any] = {}
         for key, val in doc.items():
-            if key in ("providers", "telephony") and isinstance(val, dict):  # these tables stay nested
+            if key in ("providers", "telephony", "mcp_servers") and isinstance(val, dict):  # these tables stay nested
                 flat[key] = val
             elif isinstance(val, dict):  # allow [server] / [models] style sections
                 for sub_key, sub_val in val.items():

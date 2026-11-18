@@ -31,6 +31,43 @@ describe('conversation events', () => {
     expect(s.events.at(-1)).toBe('error')
   })
 
+  it('sends MCP tools and follows the servers, calls and approval requests', () => {
+    const tools = [{ type: 'mcp', server_label: 'files' }]
+    const u = sessionUpdate('cascade', undefined, 'websocket', undefined, undefined, { tools }) as {
+      session: { tools?: unknown }
+    }
+    expect(u.session.tools).toEqual(tools)
+    expect((sessionUpdate('cascade') as { session: { tools?: unknown } }).session.tools).toBeUndefined()
+
+    let s = emptyConversation('cascade')
+    const ev = (e: Record<string, unknown>) => (s = applyEvent(s, e as { type: string }))
+    const list = { id: 'l1', type: 'mcp_list_tools', server_label: 'files', tools: [] }
+    ev({ type: 'conversation.item.added', item: list })
+    expect(s.mcpServers.files).toEqual({ status: 'listing', tools: [], error: null })
+    ev({ type: 'conversation.item.done', item: { ...list, tools: [{ name: 'read' }, { name: 'list' }] } })
+    expect(s.mcpServers.files).toEqual({ status: 'ready', tools: ['read', 'list'], error: null })
+    ev({ type: 'conversation.item.done', item: { ...list, server_label: 'gone', error: 'refused' } })
+    expect(s.mcpServers.gone?.status).toBe('failed')
+
+    const call = { id: 'm1', type: 'mcp_call', server_label: 'files', name: 'read', arguments: '', output: null }
+    ev({ type: 'conversation.item.added', item: call })
+    expect(s.toolCalls[0]?.status).toBe('running')
+    ev({ type: 'conversation.item.done', item: { ...call, arguments: '{"p":1}', output: 'contents' } })
+    expect(s.toolCalls[0]).toMatchObject({ status: 'done', output: 'contents', arguments: '{"p":1}' })
+
+    const req = { id: 'r1', type: 'mcp_approval_request', server_label: 'files', name: 'list', arguments: '{}' }
+    ev({ type: 'conversation.item.added', item: req })
+    ev({ type: 'conversation.item.done', item: req })
+    expect(s.toolCalls.filter((c) => c.status === 'approval')).toHaveLength(1)
+    ev({ type: 'conversation.item.added', item: { ...call, id: 'm2', approval_request_id: 'r1' } })
+    expect(s.toolCalls.find((c) => c.id === 'r1')?.status).toBe('allowed')
+    ev({
+      type: 'conversation.item.done',
+      item: { ...call, id: 'm2', approval_request_id: 'r1', error: { message: 'boom' } },
+    })
+    expect(s.toolCalls.find((c) => c.id === 'm2')).toMatchObject({ status: 'failed', output: 'boom' })
+  })
+
   it('reports a failed response as an error', () => {
     const s = applyEvent(emptyConversation(), {
       type: 'response.done',

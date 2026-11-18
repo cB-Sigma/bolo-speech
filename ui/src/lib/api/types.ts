@@ -79,6 +79,8 @@ export interface Capabilities {
     webrtc?: { endpoint?: string; available?: boolean; install?: string | null; ice_servers?: string[] }
     /** The end-of-turn model `semantic_vad` asks by default; `input` says whether it hears audio or reads text. */
     semantic_vad?: { model?: string | null; available?: boolean; installed?: boolean; input?: 'audio' | 'text' | null }
+    /** MCP servers as session tools: whether the SDK is installed, the configured servers, whether a URL may be given. */
+    mcp?: { available?: boolean; install?: string | null; configured?: string[]; session_urls?: boolean }
     [k: string]: unknown
   }
   llm?: { configured?: boolean; base_url?: string | null; model?: string | null }
