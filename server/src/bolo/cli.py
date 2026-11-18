@@ -1947,12 +1947,12 @@ def _hardware_lines(hw: dict[str, Any]) -> list[str]:
     ct2 = rt.get("ctranslate2", {})
     # CTranslate2 has no GPU backend on macOS: a CUDA count of 0 there says nothing.
     ct2_devices = (
-        "CPU only on macOS"
-        if hw.get("system") == "macos"
-        else f"CUDA devices: {_unknown(ct2.get('cuda_devices'))}"
+        "CPU only on macOS" if hw.get("system") == "macos" else f"CUDA devices: {_unknown(ct2.get('cuda_devices'))}"
     )
     parts.append(
-        f"CTranslate2 {ct2.get('version') or ''} ({ct2_devices})" if ct2.get("installed") else "CTranslate2 not installed"
+        f"CTranslate2 {ct2.get('version') or ''} ({ct2_devices})"
+        if ct2.get("installed")
+        else "CTranslate2 not installed"
     )
     torch = rt.get("plugin:torch", {})
     if torch.get("installed"):
@@ -2740,8 +2740,9 @@ def build_parser() -> argparse.ArgumentParser:
     )  # fmt: skip
     s.add_argument(
         "--redact",
-        help="mask personal information: on (the default_pii model), off or a pii model (default: the model's "
-        "setting, else the `redact` setting)",
+        help="mask personal information: on (the default_pii model, pii-presidio-patterns unless set: telephone, "
+        "e-mail, card and ID numbers, not names), off, or a pii model (pii-gliner-multi or pii-presidio-spacy-en "
+        "also mask names); default: the model's setting, else the `redact` setting",
     )
     s.add_argument(
         "--redact-entities",
