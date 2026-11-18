@@ -2,6 +2,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import type { FinalSegment, TranscriptState } from '@/lib/stt/transcriber'
 import { cn } from '@/lib/utils'
 
+/** Words the recogniser was less sure of than this are underlined. */
+export const LOW_CONFIDENCE = 0.5
+
 function Words({ seg }: { seg: FinalSegment }) {
   if (!seg.words || seg.words.length === 0) {
     return (
@@ -33,14 +36,20 @@ function Words({ seg }: { seg: FinalSegment }) {
             <TooltipTrigger asChild>
               <span
                 tabIndex={0}
-                className="rounded-sm transition-colors duration-150 hover:bg-chart-1/15 focus-visible:bg-chart-1/15"
+                data-testid="transcript-word"
+                className={cn(
+                  'rounded-sm transition-colors duration-150 hover:bg-chart-1/15 focus-visible:bg-chart-1/15',
+                  w.p != null &&
+                    w.p < LOW_CONFIDENCE &&
+                    'underline decoration-warning decoration-dotted underline-offset-4',
+                )}
               >
                 {same ? display[i] : w.w}
               </span>
             </TooltipTrigger>
             <TooltipContent>
               <span className="num">
-                {w.t0.toFixed(2)}–{w.t1.toFixed(2)} s
+                {w.t0.toFixed(2)}–{w.t1.toFixed(2)} s{w.p != null && <> · confidence {Math.round(w.p * 100)} %</>}
               </span>
             </TooltipContent>
           </Tooltip>

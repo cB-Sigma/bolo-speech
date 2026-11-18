@@ -1,3 +1,4 @@
+import type { SttWord } from '@/lib/api/types'
 import { STT_RATE } from '@/lib/audio/capture'
 import { concatFloat } from '@/lib/audio/pcm'
 import type { BrowserSttEngine } from '@/lib/browser-stt/engine'
@@ -238,7 +239,7 @@ export class BrowserTranscriber implements Transcriber {
     this.utteranceSamples = 0
     this.generation += 1
     const language = this.guessed ?? this.language
-    void this.decode(audio, language, (decoded, ms, spoken) => {
+    void this.decode(audio, language, (decoded, ms, spoken, timed) => {
       const before = this.guard.removed
       const text = this.guard.apply(decoded)
       if (this.guard.removed > before) {
@@ -249,7 +250,10 @@ export class BrowserTranscriber implements Transcriber {
         )
         this.store.patch({ repeatsRemoved: this.guard.removed })
       }
-      this.tracker.final({ text, t0, t1: t, words: null, language: spoken, latencyMs: ms })
+      // word times from the model (CTC), from the utterance's start; only while the repetition guard left the text whole
+      const words =
+        timed?.length && text === decoded ? timed.map((w) => ({ ...w, t0: w.t0 + t0, t1: w.t1 + t0 })) : null
+      this.tracker.final({ text, t0, t1: t, words, language: spoken, latencyMs: ms })
       const finalMs = performance.now() - speechEndAt
       const endpointMs = Math.max(0, decidedAt - speechEndAt)
       recordBrowserTrace({
@@ -287,7 +291,7 @@ export class BrowserTranscriber implements Transcriber {
   private async decode(
     audio: Float32Array,
     language: string,
-    done: (text: string, ms: number, language: string | null) => void,
+    done: (text: string, ms: number, language: string | null, words?: SttWord[]) => void,
   ): Promise<void> {
     if (audio.length < STT_RATE * 0.1) {
       done('', 0, null)
@@ -295,13 +299,13 @@ export class BrowserTranscriber implements Transcriber {
     }
     this.decoding += 1
     try {
-      const { text, ms, language: spoken } = await this.engine.transcribe(audio, { language })
+      const { text, ms, language: spoken, words } = await this.engine.transcribe(audio, { language })
       if (this.cancelled) return
       this.processedMs += ms
       this.lastDecodeMs = ms
       this.processedAudio += audio.length / STT_RATE
       this.store.patch({ rtf: this.processedMs / 1000 / Math.max(0.001, this.tracker.clock.sentSeconds) })
-      done(text, ms, spoken)
+      done(text, ms, spoken, words)
     } catch (err) {
       if (!this.cancelled)
         this.store.patch({ status: 'error', error: err instanceof Error ? err.message : String(err) })

@@ -150,7 +150,21 @@ The console uses only: `GET /api/v1/info`, `/catalog`, `/stats`, `/requests`, `/
 `/samples/{file}`, `/jobs/{id}`, `/events` (SSE), `POST /api/v1/models/pull`,
 `/models/{id}/load|unload`, `DELETE /api/v1/models/{id}`, `POST /api/v1/bench`,
 `WS /api/v1/stt/stream`, `WS /api/v1/tts/stream`, `POST /v1/audio/speech` (the "Chunked HTTP"
-transport in the TTS playground, `response_format=wav`), and `GET /healthz` (round-trip timing).
+transport in the TTS playground, `response_format=wav`), `POST /v1/audio/alignments` (the Align panel on
+Speech to text, and the word captions on Text to speech), and `GET /healthz` (round-trip timing).
+
+- **Word timings.** Words of a live transcript show their times and, when the recogniser gives one, its
+  confidence on hover; words below 50 % confidence are underlined. The Align panel sends a recording
+  (the last file or sample transcribed, or one picked there) and a text (the last transcript) to the
+  forced aligner and plays the recording with the words highlighted; a click on a word plays from it,
+  and the words can be saved as WebVTT. "Word captions" on Text to speech aligns the synthesised audio
+  to the text once synthesis is done and highlights each word as it is played, during the first
+  playback and on replay.
+- **In the browser (the live demo).** A Wav2Vec2 model (IndicWav2Vec Hindi) gives word times of its own
+  in the page: the most likely letter of each 20 ms frame, repeats merged and blanks dropped, puts each
+  word on its frames (`lib/browser-stt/ctc-words.ts`), as the server's aligner does. Checked in Node
+  with transformers.js and the MMS-300m aligner's int8 ONNX export (the same Wav2Vec2ForCTC graph and
+  tokenizer class) on the `en-short` sample; Whisper and Moonshine in the page give no word times.
 
 - **Auth.** HTTP requests and the event stream send `Authorization: Bearer <key>` (the event
   stream is read with `fetch`, not `EventSource`, for that reason). WebSockets pass `?api_key=<key>`.

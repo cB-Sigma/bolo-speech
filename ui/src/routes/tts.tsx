@@ -60,6 +60,7 @@ import { ServerTranscriber } from '@/lib/stt/server'
 import { transcriptText } from '@/lib/stt/transcriber'
 import { emptyTts, TtsSession, type TtsState, type TtsTransport } from '@/lib/tts/session'
 import { RoundTripPanel, type RoundTrip } from '@/components/tts/round-trip'
+import { SpeechCaptions } from '@/components/tts/speech-captions'
 import { isDemo } from '@/lib/api/config'
 import { detectSupport } from '@/lib/support'
 import { BrowserTts } from './tts-browser'
@@ -158,6 +159,9 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
   const [cloning, setCloning] = useState(false)
   const [reference, setReference] = useState<CloneReference | null>(null)
   const [ssml, setSsml] = useState(false)
+  // word captions of the speech (forced alignment on the server), and the text they caption
+  const [captions, setCaptions] = useState(false)
+  const [spoken, setSpoken] = useState('')
   const [lists, setLists] = useState<string[]>([])
   const [romanised, setRomanised] = useState('')
   const [instructions, setInstructions] = useState('')
@@ -237,6 +241,7 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
       ...requestOptions,
     })
     setSession(s)
+    setSpoken(ssml ? '' : text.trim())
     setTrip(null)
     s.start()
     return s
@@ -579,6 +584,21 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
               </div>
             )}
             <div className="mt-3 flex flex-wrap items-center gap-2">
+              {!isDemo && (
+                <label
+                  className="flex h-8 items-center gap-2 rounded-lg border border-input px-2.5 text-xs dark:bg-input/30"
+                  title="Highlight each word as it is spoken: the audio is aligned to the text on the server"
+                >
+                  Word captions
+                  <Switch
+                    checked={captions}
+                    onCheckedChange={setCaptions}
+                    size="sm"
+                    aria-label="Highlight each word as it is spoken"
+                    data-testid="tts-captions"
+                  />
+                </label>
+              )}
               <label className="flex h-8 items-center gap-2 rounded-lg border border-input px-2.5 text-xs dark:bg-input/30">
                 SSML
                 <Switch
@@ -811,6 +831,9 @@ function ServerTts({ modeToggle }: { modeToggle: ReactNode }) {
             )}
           </Panel>
 
+          {captions && session && spoken && !isDemo && (
+            <SpeechCaptions session={session} text={spoken} language={lang || undefined} />
+          )}
           {trip && <RoundTripPanel trip={trip} />}
         </div>
 

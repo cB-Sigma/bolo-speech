@@ -16,6 +16,7 @@ export type Task =
   | 'audio-tagging'
   | 'emotion'
   | 'voice-conversion'
+  | 'align'
 export type Tier = 'realtime' | 'balanced' | 'accuracy'
 export type Validated = 'cpu' | 'untested'
 
@@ -827,6 +828,8 @@ export interface SttWord {
   w: string
   t0: number
   t1: number
+  /** How sure the recogniser was of the word (0..1), when it says. */
+  p?: number
 }
 export type SttServerMessage =
   | {
@@ -960,6 +963,24 @@ export interface SpeakerIdentification {
   candidates: { id: string; name: string; similarity: number; match: boolean }[]
   embedding_model: string
   calibrated: boolean
+}
+
+/** One word of `POST /v1/audio/alignments` or of captioned speech. */
+export interface AlignedWord {
+  word: string
+  start: number
+  end: number
+  /** Mean probability of the word's letters where the aligner put them (0..1); null for a word with no letter. */
+  score?: number | null
+}
+
+/** `POST /v1/audio/alignments`. */
+export interface Alignment {
+  model: string
+  text: string
+  language: string | null
+  duration: number
+  words: AlignedWord[]
 }
 
 export type SttEncoding = 'pcm_s16le' | 'pcm_f32le' | 'mulaw' | 'alaw'

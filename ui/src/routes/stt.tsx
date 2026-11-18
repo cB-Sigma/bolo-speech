@@ -46,7 +46,9 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { describeError, useCatalog, useInfo, useSamples, useSelectedModel } from '@/hooks/use-api'
 import { LanguageIdPanel } from '@/components/stt/language-id-panel'
+import { type Clip } from '@/components/voices/voice-compare'
 import { SpeakersPanel } from '@/components/stt/speakers-panel'
+import { AlignPanel } from '@/components/align/align-panel'
 import { DenoiseControl } from '@/components/stt/transcribe-options'
 import { defaultDenoise, type Denoise } from '@/lib/stt-options'
 import { usePing } from '@/hooks/use-ping'
@@ -250,6 +252,7 @@ export default function SttPage() {
   const rtt = serverState.rttMs ?? httpRtt
 
   const primary = mode === 'browser' ? browserState : serverState
+  const [lastClip, setLastClip] = useState<Clip | null>(null)
   const speechRef = useRef(primary.speech)
   useEffect(() => {
     speechRef.current = primary.speech
@@ -355,6 +358,8 @@ export default function SttPage() {
   }
 
   const startFile = async (name: string, data: ArrayBuffer, browserLanguage?: string) => {
+    // the Align panel starts from this recording (a copy: decoding may detach the buffer)
+    setLastClip({ blob: new Blob([data.slice(0)]), name, seconds: null })
     try {
       const audio = await decodeAudio(data)
       if (audio.samples.length === 0) throw new Error('The file contains no audio')
@@ -1099,6 +1104,14 @@ export default function SttPage() {
           )}
 
           {mode === 'server' && !isDemo && <LanguageIdPanel info={info.data} samples={samples.data?.samples ?? []} />}
+          {mode === 'server' && !isDemo && (
+            <AlignPanel
+              info={info.data}
+              samples={samples.data?.samples ?? []}
+              initialClip={running ? null : lastClip}
+              initialText={running ? '' : transcriptText(primary)}
+            />
+          )}
           {mode === 'server' && (
             <Panel title="Try it without the network" bodyClassName="flex items-start gap-3">
               <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/50 text-muted-foreground">

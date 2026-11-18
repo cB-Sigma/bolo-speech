@@ -1,3 +1,4 @@
+import type { SttWord } from '@/lib/api/types'
 import type { PlaceableModel } from '@/lib/placement'
 import type { GpuPower } from '@/lib/webgpu'
 
@@ -532,5 +533,5 @@ export type WorkerResponse =
       cacheKeys?: string[]
       bytes?: number
     }
-  | { type: 'result'; id: number; text: string; ms: number; language: string | null }
+  | { type: 'result'; id: number; text: string; ms: number; language: string | null; words?: SttWord[] }
   | { type: 'error'; id?: number; message: string }

@@ -1,12 +1,14 @@
 /// <reference lib="webworker" />
 import { env, pipeline, Tensor } from '@huggingface/transformers'
 import { setOrtGpuPower } from '@/lib/webgpu'
+import { wav2vec2Words, type CtcTokenizer } from './ctc-words'
 import type { FetchRecord, FileProgress, LoadStage, WorkerRequest, WorkerResponse } from './models'
 
 type AsrOptions = Record<string, unknown>
 interface Asr {
   (audio: Float32Array, options?: AsrOptions): Promise<{ text: string } | { text: string }[]>
   processor: (audio: Float32Array) => Promise<{ input_features: unknown }>
+  tokenizer?: CtcTokenizer
   model: {
     forward(inputs: Record<string, unknown>): Promise<{ logits: { data: Float32Array; dims: number[] } }>
     generation_config?: { lang_to_id?: Record<string, number>; decoder_start_token_id?: number }
@@ -269,6 +271,13 @@ async function transcribe(req: Extract<WorkerRequest, { type: 'transcribe' }>): 
     language = req.language && req.language !== 'auto' ? req.language : 'en'
     // Moonshine has no length penalty; cap tokens relative to the audio to avoid run-on hallucination.
     options = { max_new_tokens: Math.max(8, Math.ceil(seconds * 6.5)) }
+  }
+  if (family === 'Wav2Vec2') {
+    // A CTC model: one pass gives the text and, from the frame of each letter, the time of each word.
+    const words = await wav2vec2Words(asr, req.audio)
+    const text = words.map((w) => w.w).join(' ')
+    post({ type: 'result', id: req.id, text, ms: performance.now() - started, language, words })
+    return
   }
   const out = await asr(req.audio, options)
   const text = (Array.isArray(out) ? out.map((o) => o.text).join(' ') : out.text).trim()

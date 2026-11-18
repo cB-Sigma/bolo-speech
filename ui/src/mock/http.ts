@@ -342,6 +342,13 @@ export async function handleRequest(
       }
       return new Response(JSON.stringify({ text }), { headers })
     }
+    if (path === '/v1/audio/alignments' && method === 'POST') {
+      const form = init?.body instanceof FormData ? init.body : null
+      const text = String(form?.get('text') ?? '')
+      const model = String(form?.get('model') ?? '') || 'omnilingual-ctc-300m-align'
+      await sleep(300)
+      return json(mockAlignment(text, model))
+    }
     if (path === '/metrics') return new Response('# HELP bolo_requests_total Requests\nbolo_requests_total 18230\n')
     return json({ detail: 'Not found' }, 404)
   } catch (err) {
@@ -350,4 +357,20 @@ export async function handleRequest(
     }
     throw err
   }
+}
+
+/** Forced alignment in the mock: the words share out three seconds by their letters. */
+export function mockAlignment(text: string, model: string) {
+  const words = text.split(/\s+/).filter(Boolean)
+  const letters = words.map((w) => Math.max(1, w.replace(/[^\p{L}\p{N}]/gu, '').length))
+  const total = letters.reduce((a, b) => a + b, 0) || 1
+  const duration = 0.3 + total * 0.07
+  let t = 0.15
+  const out = words.map((word, i) => {
+    const length = ((letters[i] ?? 1) / total) * (duration - 0.3)
+    const w = { word, start: Number(t.toFixed(3)), end: Number((t + length * 0.85).toFixed(3)), score: 0.9 }
+    t += length
+    return w
+  })
+  return { model, text, language: null, duration: Number(duration.toFixed(3)), words: out }
 }

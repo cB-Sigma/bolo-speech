@@ -56,6 +56,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - **Captioned speech.** `POST /v1/audio/speech/captioned` returns the synthesised audio with the time of every word
   in it, and `/v1/audio/speech` with `stream_format: "sse"` and `timestamps: true` sends a `speech.words` event
   after each sentence. The words are the text the voice read (after normalisation), aligned to its audio.
+- Console: an Align panel on Speech to text (a recording and its text in, the words played back highlighted, WebVTT
+  out), word confidence on hover in transcripts, and "Word captions" on Text to speech (each word highlighted as it
+  is played). The live demo shows word times for the in-browser Wav2Vec2 recogniser, from its own frame scores.
 - **Word confidence.** Words in `verbose_json` carry `probability`: Whisper's word probability on faster-whisper,
   the mean token probability on whisper.cpp and on sherpa-onnx models whose decoder reports token log-probabilities,
   Deepgram's word confidence.

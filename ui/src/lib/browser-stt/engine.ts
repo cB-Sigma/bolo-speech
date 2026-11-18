@@ -1,3 +1,4 @@
+import type { SttWord } from '@/lib/api/types'
 import { Store } from '@/lib/store'
 import {
   claimRuntime,
@@ -93,6 +94,8 @@ export interface TranscribeResult {
   text: string
   ms: number
   language: string | null
+  /** Word timestamps (seconds from the start of the audio), from models that give them (CTC: Wav2Vec2). */
+  words?: SttWord[]
 }
 
 /**
@@ -412,7 +415,7 @@ export class BrowserSttEngine {
           })
           resolve()
         } else if (msg.type === 'result') {
-          this.pending.get(msg.id)?.resolve({ text: msg.text, ms: msg.ms, language: msg.language })
+          this.pending.get(msg.id)?.resolve({ text: msg.text, ms: msg.ms, language: msg.language, words: msg.words })
           this.pending.delete(msg.id)
         } else if (msg.type === 'error') {
           if (msg.id != null) {

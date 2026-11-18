@@ -115,6 +115,7 @@ const TASK_LABEL: Record<Task, string> = {
   'audio-tagging': 'Sound events',
   emotion: 'Speech emotion',
   'voice-conversion': 'Voice conversion',
+  align: 'Forced alignment',
 }
 const TASK_SHORT: Record<Task, string> = {
   stt: 'STT',
@@ -132,6 +133,7 @@ const TASK_SHORT: Record<Task, string> = {
   'audio-tagging': 'Tags',
   emotion: 'Emotion',
   'voice-conversion': 'Convert',
+  align: 'Align',
 }
 const TASK_ORDER: Task[] = [
   'stt',
@@ -139,6 +141,7 @@ const TASK_ORDER: Task[] = [
   'vad',
   'turn',
   'lid',
+  'align',
   'diarization',
   'speaker-embedding',
   'separation',

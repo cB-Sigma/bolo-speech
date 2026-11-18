@@ -34,6 +34,7 @@ import type {
   SetupUse,
   SimulationReport,
   LanguageId,
+  Alignment,
   SpeakerEmbedding,
   SpeakerIdentification,
   SpeakerList,
@@ -454,6 +455,22 @@ export const api = {
     if (opts.threshold != null) form.set('threshold', String(opts.threshold))
     const res = await request('v1/audio/speakers/identify', { method: 'POST', body: form })
     return res.json() as Promise<SpeakerIdentification>
+  },
+  /** Each word of `text` with when it is spoken in the recording (`POST /v1/audio/alignments`). */
+  async align(
+    file: Blob,
+    name: string,
+    text: string,
+    opts: { model?: string; language?: string } = {},
+    signal?: AbortSignal,
+  ): Promise<Alignment> {
+    const form = new FormData()
+    form.set('file', file, name)
+    form.set('text', text)
+    if (opts.model) form.set('model', opts.model)
+    if (opts.language) form.set('language', opts.language)
+    const res = await request('v1/audio/alignments', { method: 'POST', body: form, signal })
+    return res.json() as Promise<Alignment>
   },
   bench: (req: BenchRequest) => json<{ job_id: string }>('api/v1/bench', { method: 'POST', json: req }),
   benchJob: (jobId: string, signal?: AbortSignal) => api.job<BenchResult>(jobId, signal),
