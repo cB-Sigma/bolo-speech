@@ -466,6 +466,10 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   test keeps it so.
 ### Fixed
 
+- Telephony: a call whose caller hung up while the agent was still preparing an answer was never closed (its record
+  stayed "in progress" with no outcome, and its Realtime session stayed open): the turn waiting on the response
+  swallowed the cancellation, and the session then waited for another turn. Closing a Realtime session now ends its
+  turn loop.
 - `bolo telephony simulate` and `POST /api/v1/telephony/simulate` read the call's record 0.2 s after hanging up, so
   on a busy machine the report could miss the last turn and the outcome; they now wait until the server has closed
   the record.

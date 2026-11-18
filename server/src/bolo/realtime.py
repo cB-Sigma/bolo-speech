@@ -325,8 +325,10 @@ class RealtimeSession:
                 await bridge.close()
 
     async def _work(self) -> None:
-        """Turns (commit → transcribe → respond) run one at a time, in order."""
-        while True:
+        """Turns (commit → transcribe → respond) run one at a time, in order. Ends once the session is closed: a turn
+        waiting on its response (``_start_response``) swallows the cancellation :meth:`close` sends, so the loop must
+        not wait for another turn then."""
+        while not self._closed:
             job = await self._turns.get()
             if job is None:
                 return

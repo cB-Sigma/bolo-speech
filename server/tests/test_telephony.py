@@ -543,6 +543,18 @@ async def test_longest_call_length(phone: Phone) -> None:
     assert 1.5 <= record["duration_s"] < 5 and report["after"] == "hangup"
 
 
+async def test_hanging_up_while_the_agent_prepares_an_answer_ends_the_call(phone: Phone) -> None:
+    """The Realtime session closed with the call even when its turn was waiting on a response: that wait swallowed
+    the cancellation, the session's turn loop then waited for another turn, and the call was never closed."""
+    phone.llm.token_delay_s = 0.5  # an answer that takes seconds to write
+    scenario = {"steps": [{"wait_for_agent": True}, {"speech_s": 1.5}, {"silence": 1.2}, {"hangup": True}]}
+    report = await phone.run(scenario)
+    record = report["record"]
+    assert record["status"] == "ended" and record["outcome"] == "caller_hangup", record["timeline"]
+    assert events(record, "ended") and record["turns"][0]["user_text"]
+    assert phone.calls()[0]["status"] == "ended"
+
+
 async def test_recording_consent_comes_first_and_cannot_be_interrupted(phone: Phone) -> None:
     phone.server.core.telephony.config.default_agent = "consent"
     report = await phone.run({"steps": [{"silence": 0.3}, {"speech_s": 1.2}, {"silence": 2.0}, {"hangup": True}]})
