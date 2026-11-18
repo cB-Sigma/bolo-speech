@@ -23,6 +23,22 @@ NVIDIA_SMI = """Wed Nov 18 15:00:00 2026
 """
 
 
+@pytest.fixture(autouse=True)
+def _host(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Nothing here depends on the machine the tests run on: no uv on PATH and a Linux platform, unless a test
+    says otherwise."""
+    from bolo import tts_runtimes
+
+    monkeypatch.setattr(torch_envs, "which", lambda name: None)
+    monkeypatch.setattr(tts_runtimes, "platform_key", lambda: "linux-x86_64")
+
+
+def test_pip_or_uv() -> None:
+    assert torch_envs.pip_install("py") == ["py", "-m", "pip", "install"]
+    torch_envs.which = lambda name: "/usr/bin/uv" if name == "uv" else None  # (restored by the fixture)
+    assert torch_envs.pip_install("py") == ["/usr/bin/uv", "pip", "install", "--python", "py"]
+
+
 def page(index: str, package: str) -> str:
     """PyTorch index pages as they read: links to wheels, ``+`` written as ``%2B``."""
     versions = {
@@ -284,8 +300,7 @@ async def test_the_triton_component_on_windows(settings: Settings, monkeypatch: 
                 break
             await asyncio.sleep(0.02)
         assert job.state == "done", job.error
-        # pip (`python -m pip install ...`) or, where uv is installed, `uv pip install --python <python> ...`
-        assert ran[0][-1] == "triton-windows>=3.5,<3.6" and r"C:\data\moshi\Scripts\python.exe" in ran[0]
+        assert ran[0] == [r"C:\data\moshi\Scripts\python.exe", "-m", "pip", "install", "triton-windows>=3.5,<3.6"]
         (row,) = [c for c in manager.status() if c["id"] == "triton-windows"]
         assert row["installed"]
         monkeypatch.setattr(tts_runtimes, "platform_key", lambda: "linux-x86_64")

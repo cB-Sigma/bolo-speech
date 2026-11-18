@@ -107,10 +107,14 @@ def triton_windows_requirement(torch_version: str | None) -> str | None:
     return f"triton-windows>={major}.{minor},<{major}.{minor + 1}"
 
 
+#: finds programs on PATH (replaced in tests, so that they do not depend on what the host has)
+which: Callable[[str], str | None] = shutil.which
+
+
 def pip_install(python: str) -> list[str]:
     """How to install into the environment of ``python``: uv when it is there (bolo's own environments for the
     full-duplex servers have no pip), else that Python's pip."""
-    uv = shutil.which("uv")
+    uv = which("uv")
     return [uv, "pip", "install", "--python", python] if uv else [python, "-m", "pip", "install"]
 
 

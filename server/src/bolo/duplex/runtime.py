@@ -385,8 +385,9 @@ def compile_failed(output: str) -> bool:
     return any(marker in output for marker in COMPILE_FAILURES)
 
 
-def has_compiler() -> bool:
-    if os.name == "nt":
+def has_compiler(key: str) -> bool:
+    """A C++ compiler for torch.compile on the CPU, on the platform ``key`` names (``platform_key()``)."""
+    if key.startswith("windows"):
         return shutil.which("cl") is not None
     return any(shutil.which(c) for c in ("cc", "gcc", "clang"))
 
@@ -398,7 +399,7 @@ def compile_state(settings: Settings, server: str, gpu: bool = True) -> dict[str
         return None
     root = install_dir(settings, server, PYTORCH)
     triton = has_package(root, "triton")
-    _, reason = compile_plan(platform_key(), gpu, triton, has_compiler())
+    _, reason = compile_plan(platform_key(), gpu, triton, has_compiler(platform_key()))
     return {
         "triton": triton,
         "triton_version": package_version(root, "triton-windows") or package_version(root, "triton"),
@@ -889,7 +890,9 @@ def launch(settings: Settings, spec: ModelSpec, path: Path, port: int, extra_arg
         }  # fmt: skip
         if build in TORCH_BUILDS:
             root = install_dir(settings, server, build)
-            compile_env, reason = compile_plan(platform_key(), gpu, has_package(root, "triton"), has_compiler())
+            compile_env, reason = compile_plan(
+                platform_key(), gpu, has_package(root, "triton"), has_compiler(platform_key())
+            )
             env.update(compile_env)
             if reason:
                 notice = f"{spec.family or spec.id} speed-up off: {reason}; torch.compile is off, so it runs slower"

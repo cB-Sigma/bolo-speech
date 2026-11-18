@@ -29,9 +29,14 @@ def test_a_kind_that_is_not_a_transformers_model_is_skipped_not_passed(tmp_path:
     assert step["status"] == "skip"
 
 
-def test_orpheus_built_tiny_from_its_full_size_config_loads_with_a_split_and_runs(tmp_path: Path) -> None:
+def test_orpheus_built_tiny_from_its_full_size_config_loads_with_a_split_and_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A Llama 3B-sized config (as Orpheus' config.json says it), built with 2 heads and 2 layers: saved, planned
-    for a GPU/CPU split, loaded in bfloat16 and run once. Nothing of the real size is ever made."""
+    for a GPU/CPU split, loaded in bfloat16 and run once. Nothing of the real size is ever made. Without a GPU
+    whatever the host has: the plan's GPU share is loaded on the CPU."""
+    torch = pytest.importorskip("torch")
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
     transformers = pytest.importorskip("transformers")
     pytest.importorskip("accelerate")
     config = transformers.LlamaConfig(

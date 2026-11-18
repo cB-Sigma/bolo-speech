@@ -27,7 +27,12 @@ def head_for(spec: Any, status: int = 200, sizes: dict[str, int] | None = None) 
     return head
 
 
-def test_a_duplex_model_without_its_server_and_too_big_for_this_gpu(settings: Settings) -> None:
+def test_a_duplex_model_without_its_server_and_too_big_for_this_gpu(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from bolo.duplex import runtime as duplex_runtime
+
+    monkeypatch.setattr(duplex_runtime, "platform_key", lambda: "linux-x86_64")  # its PyTorch build runs here
     core = Bolo(settings)
     spec = core.catalog.resolve("moshiko-pytorch-q8")
     assert spec is not None
