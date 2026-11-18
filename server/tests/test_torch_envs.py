@@ -205,7 +205,7 @@ async def test_the_component_installs_the_gpu_build_and_restarts_the_plugin(sett
         manager.torch_runner, manager.torch_page = runner, page
         found = [env]
         manager.torch_state = lambda fresh=False: (found, torch_envs.detect_gpu(runner, lambda n: n))  # type: ignore[method-assign]
-        (row,) = [c for c in manager.status() if c["kind"] == "pytorch"]
+        (row,) = [c for c in manager.status() if c["id"] == "torch-cuda"]
         assert row["id"] == "torch-cuda" and not row["installed"] and row["installable"]
         assert row["envs"][0]["label"] == "CPU build, GPU not used" and row["size_bytes"] == torch_envs.DOWNLOAD_BYTES
         stopped: list[list[str]] = []
@@ -222,7 +222,7 @@ async def test_the_component_installs_the_gpu_build_and_restarts_the_plugin(sett
         assert job.state == "done", job.error
         assert stopped == [["plugin:torch"]]
         found[:] = [windows_env("2.9.0+cu128", "2.9.0+cu128")]
-        (row,) = [c for c in manager.status() if c["kind"] == "pytorch"]
+        (row,) = [c for c in manager.status() if c["id"] == "torch-cuda"]
         assert row["installed"] and row["envs"][0]["label"] == "CUDA 12.8 build"
     finally:
         await core.stop()
@@ -284,9 +284,8 @@ async def test_the_triton_component_on_windows(settings: Settings, monkeypatch: 
                 break
             await asyncio.sleep(0.02)
         assert job.state == "done", job.error
-        assert (ran[0][-1] == "triton-windows>=3.5,<3.6" and ran[0][-2] == r"C:\data\moshi\Scripts\python.exe") or (
-            "--python" in ran[0]
-        )
+        # pip (`python -m pip install ...`) or, where uv is installed, `uv pip install --python <python> ...`
+        assert ran[0][-1] == "triton-windows>=3.5,<3.6" and r"C:\data\moshi\Scripts\python.exe" in ran[0]
         (row,) = [c for c in manager.status() if c["id"] == "triton-windows"]
         assert row["installed"]
         monkeypatch.setattr(tts_runtimes, "platform_key", lambda: "linux-x86_64")
