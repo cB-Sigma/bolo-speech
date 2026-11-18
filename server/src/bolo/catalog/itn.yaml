@@ -1,0 +1,142 @@
+# Inverse text normalisation (task: itn): numbers, money, dates and times written as figures in a transcript after
+# recognition, when the request or the server asks for `itn` (bolo.itn). The runtime is `bolo-speech[itn]`.
+
+- id: itn-en-wetext
+  aliases: [itn-en]
+  task: itn
+  engine: wetext
+  kind: wetext_itn
+  family: WeTextProcessing
+  languages: [en]
+  tier: realtime
+  size_bytes: 2761996
+  license: Apache-2.0
+  license_url: https://github.com/pengzhendong/wetext/blob/main/LICENSE
+  description: 'English inverse text normalisation with WeTextProcessing''s grammars (weighted finite-state
+    transducers): "twenty five dollars on march third" -> "$25 on march 3"; cardinals, ordinals, decimals, money,
+    dates, times, measures, telephone numbers. Numbers under ten stay words, as English is written. The default.'
+  source_url: https://github.com/wenet-e2e/WeTextProcessing
+  validated: cpu
+  measured:
+    rtf: 0.002
+    rtf_note: seconds per second of the speech the text came from (a sentence of about 5 s)
+    load_s: 0.08
+    threads: 1
+    engine: wetext 0.2.1 (kaldifst 1.9.0)
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared
+    date: '2026-11-18'
+    test_text: "'i paid twenty five dollars on march third two thousand twenty four at five thirty pm' -> 'i paid $25 on march 3 2024 at 05:30 p.m.'"
+  options:
+    language: en
+  source:
+    urls:
+    - path: wetext-0.2.1-py3-none-any.whl
+      url: https://files.pythonhosted.org/packages/2a/6d/4732b4695b403d4a1800728447fa2f9943885e74d211c4403d3df673ffed/wetext-0.2.1-py3-none-any.whl
+      size: 34605218
+      sha256: 91d8e1a0fdac9dd59e1da5d57743d4c4ccc30dbb8264dee34501c5567966dfc2
+      extract: true
+      members: ['wetext/fsts/en/itn/*']
+
+- id: itn-zh-wetext
+  aliases: [itn-zh]
+  task: itn
+  engine: wetext
+  kind: wetext_itn
+  family: WeTextProcessing
+  languages: [zh]
+  tier: realtime
+  size_bytes: 14625928
+  license: Apache-2.0
+  license_url: https://github.com/pengzhendong/wetext/blob/main/LICENSE
+  description: 'Chinese inverse text normalisation with WeTextProcessing''s grammars: numbers, money, dates
+    ("二零二四年三月三日" -> "2024/03/03"), times, fractions and measures.'
+  source_url: https://github.com/wenet-e2e/WeTextProcessing
+  validated: cpu
+  measured:
+    rtf: 0.001
+    rtf_note: seconds per second of the speech the text came from (a sentence of about 5 s)
+    load_s: 0.07
+    threads: 1
+    engine: wetext 0.2.1 (kaldifst 1.9.0)
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared
+    date: '2026-11-18'
+    test_text: "'二零二四年三月三日' -> '2024/03/03', '我有二十五个苹果' -> '我有25个苹果'"
+  options:
+    language: zh
+  source:
+    urls:
+    - path: wetext-0.2.1-py3-none-any.whl
+      url: https://files.pythonhosted.org/packages/2a/6d/4732b4695b403d4a1800728447fa2f9943885e74d211c4403d3df673ffed/wetext-0.2.1-py3-none-any.whl
+      size: 34605218
+      sha256: 91d8e1a0fdac9dd59e1da5d57743d4c4ccc30dbb8264dee34501c5567966dfc2
+      extract: true
+      members: ['wetext/fsts/zh/itn/*']
+
+- id: itn-hi-wetext
+  aliases: [itn-hi]
+  task: itn
+  engine: wetext
+  kind: wetext_itn
+  family: WeTextProcessing
+  languages: [hi]
+  tier: realtime
+  size_bytes: 14153962
+  license: Apache-2.0
+  license_url: https://github.com/pengzhendong/wetext/blob/main/LICENSE
+  description: 'Hindi inverse text normalisation with WeTextProcessing''s grammars: numbers, money, dates, times and
+    measures written in Devanagari digits ("पच्चीस रुपये" -> "₹२५"). Compound numbers are not always joined: in our
+    test "पाँच सौ बीस" came out as "५ सौ बीस".'
+  source_url: https://github.com/wenet-e2e/WeTextProcessing
+  validated: cpu
+  measured:
+    rtf: 0.001
+    rtf_note: seconds per second of the speech the text came from (a sentence of about 5 s)
+    load_s: 0.48
+    threads: 1
+    engine: wetext 0.2.1 (kaldifst 1.9.0)
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared
+    date: '2026-11-18'
+    test_text: "'पच्चीस रुपये' -> '₹२५'"
+  options:
+    language: hi
+  source:
+    urls:
+    - path: wetext-0.2.1-py3-none-any.whl
+      url: https://files.pythonhosted.org/packages/2a/6d/4732b4695b403d4a1800728447fa2f9943885e74d211c4403d3df673ffed/wetext-0.2.1-py3-none-any.whl
+      size: 34605218
+      sha256: 91d8e1a0fdac9dd59e1da5d57743d4c4ccc30dbb8264dee34501c5567966dfc2
+      extract: true
+      members: ['wetext/fsts/hi/itn/*']
+
+- id: itn-zh-number
+  aliases: [itn-zh-number-sherpa]
+  task: itn
+  engine: kaldifst
+  kind: rule_fst
+  family: sherpa-onnx rule FSTs
+  languages: [zh]
+  tier: realtime
+  size_bytes: 25882
+  license: Apache-2.0
+  license_url: https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE
+  description: 'sherpa-onnx''s Chinese number rule FST (built with WeTextProcessing): spoken numbers in a Chinese
+    transcript written as digits ("二十五个" -> "25个", "三点五" -> "3点5"). Numbers only; 26 KB.'
+  source_url: https://github.com/k2-fsa/sherpa-onnx
+  validated: cpu
+  measured:
+    rtf: 0.0001
+    rtf_note: seconds per second of the speech the text came from (a sentence of about 5 s)
+    load_s: 0.01
+    threads: 1
+    engine: kaldifst 1.9.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared
+    date: '2026-11-18'
+    test_text: "'我有二十五个苹果，三点五公斤' -> '我有25个苹果，3点5公斤'"
+  options:
+    file: itn_zh_number.fst
+  source:
+    urls:
+    - path: itn_zh_number.fst
+      url: https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/itn_zh_number.fst
+      size: 25882
+      sha256: d2a2858bca72c9ba8ab940adad27454f4c686f4b8c5ac46ce274420dcb8c8185

@@ -77,6 +77,10 @@ from bolo.errors import (
     Overloaded,
     SynthesisFailed,
 )
+from bolo.itn import ItnOptions
+from bolo.itn import apply as apply_itn
+from bolo.itn import header as itn_header
+from bolo.itn import plan as itn_plan
 from bolo.jobs import Job, JobStore
 from bolo.keys import PERIODS as KEY_PERIODS
 from bolo.keys import SCOPES as KEY_SCOPES
@@ -99,6 +103,10 @@ from bolo.recommend import ALL_LEVELS as FIT_LEVELS
 from bolo.recommend import TASKS as RECOMMEND_TASKS
 from bolo.recommend import USES as RECOMMEND_USES
 from bolo.recommend import Advisor
+from bolo.redact import RedactOptions
+from bolo.redact import apply as apply_redact
+from bolo.redact import header as redact_header
+from bolo.redact import plan as redact_plan
 from bolo.s2s import S2SManager
 from bolo.separate import SeparateOptions, SeparationResult, check_request, is_narrowband, plan_chunks, split_long
 from bolo.separate import separate as run_separation
@@ -119,6 +127,9 @@ from bolo.stt_options import (
 from bolo.stt_options import check as check_decode_options
 from bolo.telephony.manager import TelephonyManager
 from bolo.text import langdetect, packs, phonemize
+from bolo.text.iso639 import name as language_name
+from bolo.text.iso639 import normalize as normalize_language
+from bolo.text.iso639 import same_language
 from bolo.text.phonemize import strip_overrides
 from bolo.text.prepare import prepare as prepare_text
 from bolo.text.romanised import status as romanised_status
@@ -155,6 +166,8 @@ class Transcript:
     separation: dict[str, Any] | None = None
     #: how sure the model was of ``language`` when it detected it (0..1), when it says
     language_probability: float | None = None
+    #: what redaction masked (bolo.redact: type, place of the placeholder in ``text``, score, time), when asked for
+    redactions: list[dict[str, Any]] | None = None
 
 
 @dataclass
@@ -175,6 +188,30 @@ class SynthChunk:
     seq: int
     text: str
     first_of_text: bool
+
+
+def translation_target(
+    model: str, stt: STTModel, task: str, target_language: str | None, language: str | None = None
+) -> str | None:
+    """The language a request translates into (None for a transcription), checked against what the model can
+    translate into (``STTModel.translate_targets``)."""
+    if task != "translate":
+        if target_language:
+            raise InvalidRequest(
+                "target_language is for translations (POST /v1/audio/translations)", param="target_language"
+            )
+        return None
+    target = normalize_language(target_language or "en")
+    if not any(same_language(code, target) for code in stt.translate_targets):
+        into = ", ".join(language_name(code) for code in stt.translate_targets) or "no language"
+        raise InvalidRequest(
+            f"model '{model}' cannot translate into {language_name(target)}; it translates into {into}",
+            param="target_language",
+        )
+    problem = stt.translation_problem(language, target)
+    if problem:
+        raise InvalidRequest(problem, param="target_language" if language else "language")
+    return target
 
 
 class Bolo:
@@ -1069,6 +1106,8 @@ class Bolo:
                 "emotion": s.default_emotion,
                 "voice-conversion": s.default_voice_conversion,
                 "punctuation": s.default_punctuation,
+                "itn": s.default_itn,
+                "pii": s.default_pii,
                 "echo-cancellation": s.default_echo_cancellation,
                 "wake-word": s.default_wake_word,
             }
@@ -1586,6 +1625,10 @@ class Bolo:
         record: bool = True,
         options: dict[str, Any] | None = None,
         punctuation: PunctuationOptions | None = None,
+        itn: ItnOptions | None = None,
+        target_language: str | None = None,
+        redact: RedactOptions | None = None,
+        redact_entities: tuple[str, ...] = (),
     ) -> Transcript:
         """Transcribe a complete recording. Long audio is split at pauses and decoded in batches.
 
@@ -1593,7 +1636,11 @@ class Bolo:
         fill in the ones not given.
         ``denoise`` (bolo.denoise) asks for noise suppression before recognition; None leaves it to the model's pin,
         its catalog entry and the ``denoise`` setting. ``punctuation`` (bolo.punctuation) asks for punctuation to be
-        restored afterwards; None leaves it to the model's pin and the ``punctuation`` setting.
+        restored afterwards; None leaves it to the model's pin and the ``punctuation`` setting. ``itn`` (bolo.itn)
+        asks for numbers, money, dates and times in written form, likewise. ``target_language`` is the language a
+        translation (``task="translate"``) goes into: English when None; models list theirs in
+        ``STTModel.translate_targets``. ``redact`` and ``redact_entities`` (bolo.redact) mask personal
+        information in the result; None leaves it to the model's pin and the ``redact`` setting.
 
         ``record=False`` keeps the trace out of the request log (interim decodes of a live utterance).
         When the model has a ``fallback`` list and is unavailable (its engine, an overloaded queue, a cloud
@@ -1610,7 +1657,8 @@ class Bolo:
                     language=language, task=task, prompt=prompt, word_timestamps=word_timestamps,
                     temperature=temperature, hotwords=hotwords, vad_filter=vad_filter, on_segment=on_segment,
                     diarize=diarize, separate=separate, denoise=denoise, record=record, options=options or {},
-                    punctuation=punctuation,
+                    punctuation=punctuation, itn=itn, target_language=target_language, redact=redact,
+                    redact_entities=redact_entities,
                 )  # fmt: skip
             except BoloError as exc:
                 if not (more and fallback_worthy(exc)) or trace.status != "running":
@@ -1640,6 +1688,10 @@ class Bolo:
         record: bool,
         options: dict[str, Any],
         punctuation: PunctuationOptions | None = None,
+        itn: ItnOptions | None = None,
+        target_language: str | None = None,
+        redact: RedactOptions | None = None,
+        redact_entities: tuple[str, ...] = (),
     ) -> Transcript:
         """One model's attempt. With ``more`` (a fallback is left), an availability error leaves the trace open."""
         handed_on = False
@@ -1661,6 +1713,10 @@ class Bolo:
                 self.resolve(separate.model, "separation")
             cleanup = self.denoise_plan(spec, denoise)
             punctuate = punctuation_plan(self, spec, punctuation)
+            written = itn_plan(self, spec, itn)
+            redaction = redact_plan(self, spec, redact, redact_entities)
+            if redaction is not None:
+                on_segment = None  # nothing leaves before it is redacted: no partial segments
             if diarize is not None and conditioned and not diarize.model and spec.options.get("diarization_model"):
                 # a speaker-conditioned model brings the diarizer it works best with, unless the request names one
                 diarize.model = str(spec.options["diarization_model"])
@@ -1671,6 +1727,7 @@ class Bolo:
                     raise InvalidRequest(
                         f"model '{spec.id}' cannot translate; use a multilingual Whisper model", param="model"
                     )
+                target = translation_target(spec.id, stt, task, target_language, language)
                 with trace.phase("resample"):
                     if sample_rate != stt.sample_rate:
                         if len(samples) > sample_rate * 30:
@@ -1780,15 +1837,25 @@ class Bolo:
                         language=language, task=task, prompt=prompt, word_timestamps=word_timestamps,
                         temperature=temperature, hotwords=hotwords, on_segment=on_segment, speakers=speakers,
                         overlapped=overlapped, sources=sources, diarize=native, options=engine_options,
-                        max_repeats=max_repeats,
+                        max_repeats=max_repeats, target_language=target,
                     )  # fmt: skip
                 if aligner is not None and not await self._align_transcript(transcript, samples, sr, aligner, trace):
                     ignored.append("timestamp_granularities")
                     self._note_ignored(trace, spec.id, ignored)
                 transcript.duration = duration
                 transcript.model = spec.id
+                if target:  # a translation is in the language it went into
+                    transcript.language = target
+                if written is not None and transcript.text.strip():  # before punctuation, which sees the figures
+                    await apply_itn(self, transcript, spec, written, trace)
                 if punctuate is not None and transcript.text.strip():
                     await apply_punctuation(self, transcript, punctuate, trace)
+                if redaction is not None:  # last, on the text as it is returned
+                    if transcript.text.strip():
+                        await apply_redact(self, transcript, *redaction, trace)
+                    else:
+                        transcript.redactions = []
+                        trace.extra["redact"] = {"model": redaction[1].id, "counts": {}}
                 if separation is not None and diarize is not None:
                     transcript.separation = separation.to_dict(diarize.label, duration)
                 trace.mark_final()
@@ -1836,6 +1903,7 @@ class Bolo:
         diarize: bool = False,
         options: dict[str, Any] | None = None,
         max_repeats: int = DEFAULT_MAX_REPEATS,
+        target_language: str | None = None,
     ) -> Transcript:
         """Decode ``chunks`` (sample ranges of ``samples``). ``sources[i]``, when given, is the audio to decode
         for chunk ``i`` instead of the mixture (a separated track); it is placed at the chunk's start. ``diarize``
@@ -1865,6 +1933,7 @@ class Bolo:
                         hotwords,
                         diarize,
                         options=dict(options or {}),
+                        target_language=target_language,
                     ),
                 )
             )
@@ -2773,6 +2842,12 @@ def fallback_headers(trace: Trace) -> dict[str, str]:
             headers["x-bolo-denoise"] = (
                 str(cleanup["model"]) if strength >= 1.0 else f"{cleanup['model']}; strength={strength:g}"
             )
+    redacted = redact_header(trace.extra.get("redact"))
+    if redacted:
+        headers["x-bolo-redact"] = redacted
+    written = itn_header(trace.extra.get("itn"))
+    if written:
+        headers["x-bolo-itn"] = written
     punctuated = punctuation_header(trace.extra.get("punctuation"))
     if punctuated:
         headers["x-bolo-punctuation"] = punctuated

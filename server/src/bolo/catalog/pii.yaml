@@ -1,0 +1,101 @@
+# Personal-information detection (task: pii), used to redact transcripts when the request or the server asks for
+# `redact` (bolo.redact). Presidio's entries need pip install 'bolo-speech[pii]'; GLiNER runs in ONNX Runtime.
+
+- id: pii-presidio-patterns
+  aliases: [presidio, presidio-patterns]
+  task: pii
+  engine: presidio
+  kind: presidio_patterns
+  family: Presidio
+  languages: [en]
+  tier: realtime
+  builtin: true
+  license: MIT
+  license_url: https://github.com/microsoft/presidio/blob/main/LICENSE
+  description: 'Microsoft Presidio''s pattern recognisers: regular expressions checked with checksums and context
+    words for e-mail addresses, telephone numbers, credit cards, IBANs, IP addresses, URLs, crypto wallets and
+    national ID numbers (US, UK, Indian, Australian, Singaporean, Spanish, Italian, Polish). Nothing to download; it
+    does not find names or places (use the spaCy or GLiNER entry for those). The default. Needs pip install
+    ''bolo-speech[pii]''.'
+  source_url: https://github.com/microsoft/presidio
+  validated: cpu
+  measured:
+    rtf: 0.001
+    rtf_note: seconds per second of the speech the text came from (sentences of 5 to 8 s)
+    load_s: 1.4
+    threads: 4
+    engine: presidio-analyzer 2.2.366
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average about 20)
+    date: '2026-11-18'
+    test_text: "an English sentence with a telephone number, an e-mail address and a card number: all three found"
+  options:
+    languages: [en]
+- id: pii-presidio-spacy-en
+  aliases: [presidio-spacy]
+  task: pii
+  engine: presidio
+  kind: presidio_spacy
+  family: Presidio
+  languages: [en]
+  tier: balanced
+  size_bytes: 56564977
+  license: MIT
+  license_url: https://github.com/explosion/spacy-models/blob/master/LICENSE
+  description: 'Presidio''s pattern recognisers with spaCy''s English pipeline (en_core_web_md 3.8, MIT; for spaCy 3.8) for names
+    (PERSON), places (LOCATION), organisations and dates. Needs pip install ''bolo-speech[pii]''.'
+  source_url: https://github.com/microsoft/presidio
+  validated: cpu
+  measured:
+    rtf: 0.02
+    rtf_note: seconds per second of the speech the text came from (sentences of 5 to 8 s)
+    load_s: 1.8
+    threads: 4
+    engine: presidio-analyzer 2.2.366, spaCy 3.8.18
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average about 20)
+    date: '2026-11-18'
+    test_text: "the same plus the name; in German it took 'Anna Müller und wohne' for a name: English only"
+  options:
+    languages: [en]
+  source:
+    urls:
+    - path: en_core_web_md-3.8.0-py3-none-any.whl
+      url: https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl
+      size: 33480380
+      sha256: 5e6329fe3fecedb1d1a02c3ea2172ee0fede6cea6e4aefb6a02d832dba78a310
+      extract: true
+- id: pii-gliner-multi
+  aliases: [gliner-pii, gliner_multi_pii-v1]
+  task: pii
+  engine: onnxruntime
+  kind: gliner_pii
+  family: GLiNER
+  languages: [en, de, fr, es, it, pt, nl]
+  tier: balanced
+  size_bytes: 596050323
+  params: 280000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/urchade/gliner_multi_pii-v1
+  description: 'GLiNER multi PII (urchade/gliner_multi_pii-v1, on mDeBERTa-v3): a span classifier told the entity
+    types in words, which finds names, telephone numbers, e-mail addresses, addresses, organisations, dates of birth,
+    card, account, passport and ID numbers in many languages; the onnx-community export (fp16 weights, run in
+    float32 on the CPU). Finds names a pattern cannot. Needs onnxruntime and tokenizers.'
+  source_url: https://huggingface.co/urchade/gliner_multi_pii-v1
+  validated: cpu
+  measured:
+    rtf: 0.1
+    rtf_note: seconds per second of the speech the text came from (sentences of 5 to 8 s)
+    load_s: 4.1
+    threads: 4
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average about 20)
+    date: '2026-11-18'
+    test_text: "the English sentence (name, telephone, e-mail, card) and a German one (name, street, telephone): all found"
+  options:
+    file: model_fp16.onnx
+  source:
+    repo: onnx-community/gliner_multi_pii-v1
+    revision: 2e0397a7e8a250d76c37122232b3cbde42c8d629
+    include:
+    - onnx/model_fp16.onnx
+    - tokenizer.json
+    - gliner_config.json

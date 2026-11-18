@@ -22,6 +22,8 @@ def _built_in() -> set[str]:
         ids.add("speex-aec")
     if importlib.util.find_spec("livekit") is not None:
         ids.add("webrtc-aec3")
+    if importlib.util.find_spec("presidio_analyzer") is not None:
+        ids.add("pii-presidio-patterns")
     if importlib.util.find_spec("pymicro_wakeword") is not None:
         ids |= {
             "microwakeword-okay-nabu",
@@ -75,6 +77,8 @@ def test_catalog_shape_and_filters(live: LiveServer) -> None:
             "voice-conversion",
             "align",
             "punctuation",
+            "itn",
+            "pii",
             "echo-cancellation",
             "wake-word",
             "watermark",
@@ -103,6 +107,8 @@ def test_catalog_shape_and_filters(live: LiveServer) -> None:
         "fake-lid",
         "fake-align",
         "fake-punctuation",
+        "fake-itn",
+        "fake-pii",
         "fake-stt-ta",
         "fake-tagging",
         "fake-emotion",

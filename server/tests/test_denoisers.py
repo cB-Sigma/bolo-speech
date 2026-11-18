@@ -81,6 +81,16 @@ def test_a_wheel_is_unpacked_like_a_zip(tmp_path: Path) -> None:
         assert rnnoise_library(dest).name == "librnnoise.so"
 
 
+def test_only_the_members_asked_for_are_unpacked(tmp_path: Path) -> None:
+    wheel = tmp_path / "wetext.whl"
+    with zipfile.ZipFile(wheel, "w") as z:
+        z.writestr("wetext/fsts/en/itn/tagger.fst", b"en")
+        z.writestr("wetext/fsts/zh/itn/tagger.fst", b"zh")
+        z.writestr("wetext/__init__.py", b"")
+    written = extract_archive(wheel, tmp_path / "model", "wetext.whl", ("wetext/fsts/en/itn/*",))
+    assert written == ["fsts/en/itn/tagger.fst"]  # the one top-level folder left is stripped
+
+
 # -- DeepFilterNet 3, one ONNX graph run frame by frame ----------------------------------------------------------
 class _DelayGraph:
     """Stands in for the torchDF graph: hands back its input ``delay`` samples late, keeps the delay in its state."""

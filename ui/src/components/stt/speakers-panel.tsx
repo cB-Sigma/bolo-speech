@@ -14,9 +14,18 @@ import type { CatalogModel, Sample, ServerInfo } from '@/lib/api/types'
 import { diarizerOptions, separationModels, speakerConditionedModels } from '@/lib/capabilities'
 import { speakerCountProblem, wavSampleRate, type DiarizedResult, type SpeakerCount } from '@/lib/diarize'
 import { cn } from '@/lib/utils'
+import { languageName } from '@/lib/format'
 import { defaultDenoise, emptyDecoding, type DecodingOptions, type Denoise } from '@/lib/stt-options'
 import { SpeakerResult } from './speaker-result'
-import { DecodingSection, DenoiseControl, HotwordsField, PunctuationControl, RunNotes } from './transcribe-options'
+import {
+  DecodingSection,
+  DenoiseControl,
+  HotwordsField,
+  ItnControl,
+  RedactControl,
+  PunctuationControl,
+  RunNotes,
+} from './transcribe-options'
 
 const PAGE_MODEL = '__page'
 /** `model=auto`: the language identifier hears the recording first and routes it to a recogniser for it. */
@@ -73,6 +82,10 @@ export function SpeakersPanel({
   const [denoise, setDenoise] = useState<Denoise>(defaultDenoise)
   const [hotwords, setHotwords] = useState('')
   const [punctuation, setPunctuation] = useState('')
+  const [itn, setItn] = useState('')
+  const [translateTo, setTranslateTo] = useState('')
+  const [redact, setRedact] = useState('')
+  const [redactEntities, setRedactEntities] = useState('')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<DiarizedResult | null>(null)
   const [error, setError] = useState<{ message: string; param: string | null } | null>(null)
@@ -139,6 +152,10 @@ export function SpeakersPanel({
         denoise,
         hotwords,
         punctuation,
+        itn,
+        translateTo: translateTo && !routed ? translateTo : undefined,
+        redact,
+        redactEntities,
       })
       setResult(r)
     } catch (err) {
@@ -395,6 +412,33 @@ export function SpeakersPanel({
         <DenoiseControl value={denoise} onChange={setDenoise} disabled={busy} />
         <HotwordsField value={hotwords} onChange={setHotwords} disabled={busy} className="max-w-md" />
         <PunctuationControl value={punctuation} onChange={setPunctuation} disabled={busy} />
+        <ItnControl value={itn} onChange={setItn} disabled={busy} />
+        <RedactControl
+          value={redact}
+          entities={redactEntities}
+          onChange={setRedact}
+          onEntitiesChange={setRedactEntities}
+          disabled={busy}
+        />
+        {usedModel && (usedModel.translate_into?.length ?? 0) > 0 && !routed && (
+          <label className="flex flex-wrap items-center gap-2 text-xs" data-testid="translate-into">
+            <span>Translate into</span>
+            <Select value={translateTo || 'none'} onValueChange={(v) => setTranslateTo(v === 'none' ? '' : v)}>
+              <SelectTrigger className="h-8 w-44" aria-label="Translate into" disabled={busy}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No translation</SelectItem>
+                {(usedModel.translate_into ?? []).map((code) => (
+                  <SelectItem key={code} value={code}>
+                    {languageName(code)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {translateTo && diarize && <span className="text-warning-text">Turn speaker labels off to translate.</span>}
+          </label>
+        )}
         <DecodingSection value={decoding} onChange={setDecoding} disabled={busy} />
 
         <div className="flex flex-wrap items-center gap-2">

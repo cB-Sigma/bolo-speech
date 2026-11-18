@@ -12,6 +12,8 @@ export type Task =
   | 'lid'
   | 'speaker-embedding'
   | 'punctuation'
+  | 'itn'
+  | 'pii'
   | 'speech-to-speech'
   | 'audio-llm'
   | 'audio-tagging'
@@ -353,6 +355,8 @@ export interface CatalogModel {
   license_note?: string | null
   /** Languages the model speaks but should not be used for, with the reason; `model=auto` never picks it for them. */
   not_recommended_for?: Record<string, string>
+  /** Languages a speech-to-text model translates into (`POST /v1/audio/translations`, `target_language`). */
+  translate_into?: string[]
   /** Wake-word models: the phrases they listen for by default, and whether they take phrases of your own. */
   wake_phrases?: string[]
   custom_keywords?: boolean

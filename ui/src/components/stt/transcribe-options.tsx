@@ -183,6 +183,163 @@ export function PunctuationControl({
   )
 }
 
+/**
+ * Inverse text normalisation after recognition: the server's default (off unless the server or the model's pin says
+ * otherwise), off, or on with an `itn` model (by default the one for the transcript's language).
+ */
+export function ItnControl({
+  value,
+  onChange,
+  disabled,
+  className,
+}: {
+  /** '' server default, 'off', 'on' or an itn model id (on with that model) */
+  value: string
+  onChange: (v: string) => void
+  disabled?: boolean
+  className?: string
+}) {
+  const id = useId()
+  const info = useInfo()
+  const models = useModels('itn').models
+  const mode = value === '' ? 'default' : value === 'off' ? 'off' : 'on'
+  const model = mode === 'on' && value !== 'on' ? value : ''
+  return (
+    <div className={cn('grid gap-1.5', className)} data-testid="itn-control">
+      <div className="flex flex-wrap items-center gap-2">
+        <Label className="text-xs" id={`${id}-label`}>
+          Numbers as figures
+        </Label>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          value={mode}
+          onValueChange={(v) => v && onChange(v === 'default' ? '' : v)}
+          aria-labelledby={`${id}-label`}
+          disabled={disabled}
+        >
+          <ToggleGroupItem value="default" className="px-2.5 text-xs">
+            Server default
+          </ToggleGroupItem>
+          <ToggleGroupItem value="off" className="px-2.5 text-xs">
+            Off
+          </ToggleGroupItem>
+          <ToggleGroupItem value="on" className="px-2.5 text-xs" data-testid="itn-on">
+            On
+          </ToggleGroupItem>
+        </ToggleGroup>
+        {mode === 'on' && (
+          <CatalogSelect
+            models={models}
+            value={model}
+            onChange={(m) => onChange(m || 'on')}
+            label="Inverse normalisation model"
+            defaultLabel="For the transcript's language"
+            disabled={disabled}
+            autoPull={autoPull(info.data)}
+            extra={(m) => m.languages.map(languageName).join(', ') || null}
+            className="w-56"
+            testId="itn-model"
+          />
+        )}
+      </div>
+      {mode === 'on' && (
+        <p className="text-xs leading-4 text-muted-foreground">
+          &ldquo;twenty five dollars&rdquo; becomes &ldquo;$25&rdquo;: numbers, money, dates and times, with
+          WeTextProcessing grammars (English, Chinese, Hindi; Apache-2.0). A transcript in another language is left as
+          it was.
+        </p>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Redaction of personal information after recognition: the server's default (off unless the server or the model's
+ * pin says otherwise), off, or on with a `pii` model and, optionally, the entity types to mask.
+ */
+export function RedactControl({
+  value,
+  entities,
+  onChange,
+  onEntitiesChange,
+  disabled,
+  className,
+}: {
+  /** '' server default, 'off', 'on' or a pii model id (on with that model) */
+  value: string
+  entities: string
+  onChange: (v: string) => void
+  onEntitiesChange: (v: string) => void
+  disabled?: boolean
+  className?: string
+}) {
+  const id = useId()
+  const info = useInfo()
+  const models = useModels('pii').models
+  const mode = value === '' ? 'default' : value === 'off' ? 'off' : 'on'
+  const model = mode === 'on' && value !== 'on' ? value : ''
+  return (
+    <div className={cn('grid gap-1.5', className)} data-testid="redact-control">
+      <div className="flex flex-wrap items-center gap-2">
+        <Label className="text-xs" id={`${id}-label`}>
+          Redact personal information
+        </Label>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          value={mode}
+          onValueChange={(v) => v && onChange(v === 'default' ? '' : v)}
+          aria-labelledby={`${id}-label`}
+          disabled={disabled}
+        >
+          <ToggleGroupItem value="default" className="px-2.5 text-xs">
+            Server default
+          </ToggleGroupItem>
+          <ToggleGroupItem value="off" className="px-2.5 text-xs">
+            Off
+          </ToggleGroupItem>
+          <ToggleGroupItem value="on" className="px-2.5 text-xs" data-testid="redact-on">
+            On
+          </ToggleGroupItem>
+        </ToggleGroup>
+        {mode === 'on' && (
+          <CatalogSelect
+            models={models}
+            value={model}
+            onChange={(m) => onChange(m || 'on')}
+            label="Personal-information model"
+            defaultLabel="Default model"
+            disabled={disabled}
+            autoPull={autoPull(info.data)}
+            className="w-56"
+            testId="redact-model"
+          />
+        )}
+      </div>
+      {mode === 'on' && (
+        <>
+          <Input
+            value={entities}
+            onChange={(e) => onEntitiesChange(e.target.value)}
+            placeholder="All types it finds (or e.g. PERSON, PHONE_NUMBER)"
+            aria-label="Entity types to mask"
+            disabled={disabled}
+            className="h-8 max-w-md text-xs"
+            data-testid="redact-entities"
+          />
+          <p className="text-xs leading-4 text-muted-foreground">
+            Each one found becomes [TYPE] in the text; the run notes say which model masked what. Patterns find numbers
+            and e-mail addresses; names need the spaCy or GLiNER model.
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
+
 /** Names and terms the recogniser should favour (`hotwords`). */
 export function HotwordsField({
   value,
@@ -390,6 +547,17 @@ export function RunNotes({ result }: { result: DiarizedResult }) {
   }
   if (result.languageHeader) {
     items.push({ label: 'x-bolo-language', value: result.languageHeader, testId: 'run-language-header' })
+  }
+  if (result.redactHeader) {
+    items.push({ label: 'Redacted', value: result.redactHeader, testId: 'run-redact' })
+  }
+  if (result.itnHeader) {
+    items.push({
+      label: 'Numbers as figures',
+      value: result.itnHeader,
+      warn: result.itnHeader.startsWith('skipped'),
+      testId: 'run-itn',
+    })
   }
   if (result.punctuationHeader) {
     items.push({

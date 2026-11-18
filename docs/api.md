@@ -28,7 +28,7 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `GET` | `/v1/models` | List installed models |
 | `GET` | `/v1/models/{model_id}` | Retrieve a model |
 | `POST` | `/v1/audio/transcriptions` | Transcribe audio |
-| `POST` | `/v1/audio/translations` | Translate audio to English |
+| `POST` | `/v1/audio/translations` | Translate audio (to English by default) |
 | `POST` | `/v1/audio/speech` | Synthesise speech |
 | `POST` | `/v1/audio/voices` | Create a custom voice from an audio sample |
 | `GET` | `/v1/audio/voice_consents` | List consent recordings |
@@ -244,6 +244,8 @@ Multipart form.
 | `separate_overlaps` | `false` | extension, with diarization: transcribe overlapped speech from one separated track per speaker (see [Separating overlapping speech](#speaker-diarization)); `separation_model`, `separation_context_s`, `separation_min_overlap_s`, `separation_allow_narrowband` |
 | `denoise` | server default (off) | extension: run a speech-enhancement model before recognition. `true`, `false`, a strength between 0 and 1 (the denoised audio mixed with the original at that weight) or a denoise model id (`gtcrn-simple`, or any `task: denoise` model of the catalog: `dpdfnet2`, `deepfilternet3`, `rnnoise`, `demucs-dns48`, `elevenlabs-voice-isolator`, ...); `denoise_strength` sets the strength separately. Unset: the model's pin, then the `denoise` setting. The response header `x-bolo-denoise` names what ran (`gtcrn-simple`, `gtcrn-simple; strength=0.5`, or `skipped; model=…` when the denoiser could not run and the original audio was used). Denoising can make clean audio and Whisper's transcripts worse: configuration.md, "Denoising" |
 | `punctuation` | server default (off) | extension: restore punctuation and capital letters after recognition. `auto` (only when the recogniser writes none), `on`, `off` or a punctuation model id (`punct-en-cnn-bilstm`, the default, English, punctuation and casing; `punct-zh-en-ct-transformer`, Chinese and English). Unset: the model's pin, then the `punctuation` setting. The response header `x-bolo-punctuation` names the model that ran, or `skipped; model=…` when the transcript's language is not one it knows: configuration.md, "Punctuation restoration" |
+| `itn` | server default (off) | extension: inverse text normalisation after recognition: numbers, money, dates, times and measures written as figures ("twenty five dollars" -> "$25") by an `itn` model of the catalog (`itn-en-wetext`, the default; `itn-zh-wetext`, `itn-hi-wetext`, `itn-zh-number`). `on`, `off` or a model id; unset: the model's pin, then the `itn` setting. The response header `x-bolo-itn` names the model that ran, or `skipped; model=…; language=…`: configuration.md, "Inverse text normalisation" |
+| `redact` | server default (off) | extension: mask personal information in the transcript with a `pii` model of the catalog (`pii-presidio-patterns`, the default: telephone, e-mail, card, account and ID numbers by pattern; `pii-presidio-spacy-en`: also names, places, organisations in English; `pii-gliner-multi`: names, numbers, addresses and more in many languages). `on`, `off` or a model id; `redact_entities` narrows it to some types (`PERSON,PHONE_NUMBER`; 400 for a type the model does not find). Each one found becomes `[TYPE]` in `text`, in the segments and in the words (the masked words merged into one, with the time they were said in). Audit trail: `x-bolo-redact: <model>; PERSON=2, PHONE_NUMBER=1` (or `none`), and with `verbose_json`, `redactions`: one object per mask with `type`, `start` and `end` (where its placeholder is in `text`), `score`, `segment`, and `time_start`/`time_end` when the words have times. The text that was masked is never returned or logged; partial segments are not streamed while redacting; a model that cannot run answers 503. Configuration.md, "Redacting personal information" |
 | `vad_filter` | auto | extension. `true` forces silence removal before decoding; by default VAD is used only to split audio longer than the model's window |
 | `vad_parameters` | - | extension. Tunes the silence removal, as a JSON object or as bracketed fields (`vad_parameters[threshold]=0.6`, which is how the OpenAI SDKs send a nested `extra_body` object): `threshold` (0 to 1, default 0.5), `min_speech_duration_ms`, `max_speech_duration_s`, `min_silence_duration_ms` (default 300), `speech_pad_ms` (default 150). Given without `vad_filter`, it switches the filter on. `neg_threshold` is accepted and ignored |
 | `chunk_length` | `30` | extension. Longest piece of audio decoded at once, in seconds (1 to 30): audio longer than this goes through silence removal and is cut at pauses into pieces of at most this length, for every engine; faster-whisper also uses it as its own window. With `vad_filter=false` nothing is cut, and faster-whisper decodes the audio in windows of this length: short windows of silence are where Whisper hallucinates most, so keep the filter on with a short `chunk_length` |
@@ -390,8 +392,21 @@ sent as `{"type":"error","error":{…}}`. Disconnecting cancels the remaining wo
 
 ### `POST /v1/audio/translations`
 
-Same form without `language` and `stream`; translates to English. Needs a
-multilingual Whisper model (feature `translate`); other models answer 400.
+Same form without `stream`; translates to English unless `target_language` (extension, ISO 639-1) names another
+language. Needs a model with the feature `translate`; others answer 400. The languages each model translates into
+are listed as `translate_into` in `GET /api/v1/models/{id}`:
+
+| models | translate into |
+| --- | --- |
+| multilingual Whisper (faster-whisper, whisper.cpp, sherpa-onnx, MLX) | English, from any language they recognise |
+| `canary-180m-flash` | English from Spanish, German or French; Spanish, German or French from English |
+| `canary-1b-v2` | English from any of its 24 other languages; any of them from English |
+| `voxtral-mini-3b-llamacpp`, `voxtral-small-24b-llamacpp` | any of English, Spanish, French, Portuguese, Hindi, German, Dutch, Italian |
+
+Canary does not detect the spoken language: give `language` too (400 with `param: language` otherwise), and one
+side of the translation must be English (400 with `param: target_language`). The response's `language` is the
+language translated into. From the command line: `bolo transcribe --target-language fr -l en file.wav`; in the
+console, "Translate into" on Speech to text (with speaker labels off).
 
 ### Word timestamps and forced alignment
 

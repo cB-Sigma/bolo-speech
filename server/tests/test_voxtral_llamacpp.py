@@ -52,6 +52,8 @@ def test_prompts_follow_the_transcription_and_chat_formats() -> None:
     translate = vox.build_prompt("<m>", "translate", "de")
     assert translate.startswith("[INST]<m>Translate this audio into English.") and translate.endswith("[/INST]")
     assert "[TRANSCRIBE]" not in translate and "<s>" not in translate  # the server adds BOS itself
+    into = vox.build_prompt("<m>", "translate", "en", "fr")
+    assert "Translate this audio into French. Reply with the French translation only" in into
     assert vox.token_budget(30.0, 12.0, 4096) == 392 and vox.token_budget(0.1, 12.0, 4096) == 33
     assert vox.token_budget(3600.0, 12.0, 4096) == 4096
 

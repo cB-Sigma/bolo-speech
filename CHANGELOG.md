@@ -137,6 +137,27 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   and the console list each environment's build ("CPU build, GPU not used"), and `bolo doctor` names each
   environment on a CPU build next to an NVIDIA or ROCm GPU with the command that fixes it. `bolo-torch install`
   puts a GPU build back (with a warning) if pip replaced it anyway.
+- **Redaction of personal information in transcripts.** A new model task, `pii`, finds personal information, and
+  `redact=on` or `redact=<model>` on a transcription (or the `redact` setting with `default_pii`, or a per-model
+  pin; off by default) replaces each piece with its type in brackets: "PLEASE CALL ME AT [PHONE_NUMBER]".
+  `redact_entities` (or the setting) narrows it to some types. Three entries: `pii-presidio-patterns` (Presidio's
+  pattern recognisers, MIT, nothing to download, the default), `pii-presidio-spacy-en` (with spaCy's English
+  pipeline for names, places and organisations, MIT) and `pii-gliner-multi` (GLiNER multi PII, Apache-2.0, run in
+  ONNX Runtime by bolo, for names and more in many languages). Every redacted response is auditable:
+  `x-bolo-redact` names the model and counts each type, and `verbose_json` lists each redaction with its type,
+  place, score and time. The masked text is never returned or logged, partial segments are not streamed while
+  redacting, and a model that cannot run fails the request (503). Console: "Redact personal information" with a
+  model picker on Speech to text; `bolo transcribe --redact`. All three run on CPU, on English and German text and
+  on a Zipformer transcript with `itn` (the telephone number masked).
+- **Translation into languages other than English: `target_language`.** `POST /v1/audio/translations` takes
+  `target_language` (default `en`). Canary translates from English into its other languages and from them into
+  English (`target_language` was ignored before: sherpa-onnx's Canary was always told to write the spoken
+  language), Voxtral into any of its eight languages (its instruction names the language), Whisper into English
+  only; a model that cannot answers 400 with `param: target_language`, and `translate_into` in the model
+  description lists what each can do. New catalog entry `canary-1b-v2` (NVIDIA Canary 1B v2, 25 European languages,
+  CC-BY-4.0, a community int8 export for sherpa-onnx, 1.4 GB, about 6.5 GB of memory), run on CPU: English
+  transcribed and translated into German, Italian and French, German translated into English. `canary-180m-flash`
+  now says it translates. Console: "Translate into" on Speech to text; `bolo transcribe --target-language`.
 - **Wake words and keyword spotting.** A new catalog task, `wake-word`: the sherpa-onnx keyword spotters
   `kws-zipformer-gigaspeech` (English, any phrase you type; the default) and `kws-zipformer-zh-en` (Chinese and
   English), openWakeWord's "hey jarvis", "alexa" and "hey mycroft" (the phrase models are CC BY-NC-SA 4.0,
@@ -165,6 +186,16 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   1.x and 2.x). The console's Conversation page picks servers, shows the calls and answers approvals. Tried against
   a server built with the MCP SDK itself, over stdio and Streamable HTTP.
 
+- **Numbers, money, dates and times as figures in transcripts (inverse text normalisation).** A new model task,
+  `itn`, runs on the transcript after recognition: `itn=on` or `itn=<model>` on a transcription (or the `itn`
+  setting with `default_itn`, or a per-model pin; off by default) turns "I PAID TWENTY FIVE DOLLARS ON MARCH THIRD"
+  from a Zipformer into "I PAID $25 ON MARCH 3". Four entries, all Apache-2.0: WeTextProcessing's grammars for
+  English (`itn-en-wetext`, the default), Chinese and Hindi, run by wetext, and sherpa-onnx's Chinese number rules
+  (`itn-zh-number`), run by kaldifst; the runtimes are `bolo-speech[itn]`. Words keep their timings, the figures
+  taking the time of the words they replace; `x-bolo-itn` names the model. Catalog archives can now be unpacked in
+  part (`members`), so each entry pulls only its language's grammars. Console: "Numbers as figures" with a model
+  picker on Speech to text; `bolo transcribe --itn on`. Run on CPU: all four entries, and the GigaSpeech Zipformer
+  with `itn-en-wetext` on synthesised sentences with prices, dates, times and a telephone number.
 - **`bolo doctor` on Windows says what ROCm means for a Radeon.** The card is listed through DirectML as before; a
   line now says either that llama-server's ROCm (HIP) build can use it (Radeon RX 6000, 7000 and 9000, Radeon PRO
   W6000/W7000) or "ROCm: not available on Windows for this GPU", with DirectML and Vulkan named as the routes bolo

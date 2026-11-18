@@ -168,6 +168,8 @@ class RemoteFile:
     sha256: str | None = None
     git_oid: str | None = None  # git blob SHA-1 for small non-LFS files
     extract: bool = False  # a .tar.gz / .tgz / .tar.bz2 / .tar / .zip archive to unpack into the model directory
+    #: unpack only the archive members matching one of these patterns (``fnmatch``, on the paths inside the archive)
+    members: tuple[str, ...] = ()
 
 
 @dataclass
@@ -220,12 +222,13 @@ def _safe_member(name: str) -> str | None:
     return str(path)
 
 
-def extract_archive(archive: Path, dest: Path, name: str) -> list[str]:
+def extract_archive(archive: Path, dest: Path, name: str, only: tuple[str, ...] = ()) -> list[str]:
     """Unpack a tar (optionally gzip- or bzip2-compressed) or zip archive into ``dest``; return the relative paths written.
 
     Only regular files and directories are accepted: links, devices and any path that is absolute or
     climbs out of ``dest`` make the whole archive invalid. A single top-level folder is stripped, so
-    ``voice/model.onnx`` and ``model.onnx`` both end up as ``dest/model.onnx``.
+    ``voice/model.onnx`` and ``model.onnx`` both end up as ``dest/model.onnx``. ``only`` (``fnmatch`` patterns)
+    keeps just the members that match one of them: one language's grammars out of a package holding many.
     """
     members: list[tuple[str, Any]] = []
     lower = name.lower()
@@ -251,6 +254,8 @@ def extract_archive(archive: Path, dest: Path, name: str) -> list[str]:
             members.append((member.name, member))
     else:
         raise DownloadError(f"{name}: unsupported archive type (use .tar.gz, .tgz, .tar.bz2, .tar, .zip or .whl)")
+    if only:
+        members = [(raw, m) for raw, m in members if any(fnmatch.fnmatch(raw.removeprefix("./"), p) for p in only)]
     try:
         cleaned: list[tuple[str, Any]] = []
         for raw, member in members:
@@ -426,7 +431,7 @@ class ModelStore:
     MODEL_SETTINGS = (
         "phonemizer", "text_normalizer", "wordlists", "fallback", "romanised", "device", "keep_alive",
         "num_parallel", "max_queue", "flash_attention", "kv_cache_type", "context_size", "batch_size", "denoise",
-        "allow_remote_code", "quantization", "punctuation",
+        "allow_remote_code", "quantization", "punctuation", "itn", "redact",
         *DECODE_SETTINGS,
     )  # fmt: skip
 
@@ -538,7 +543,14 @@ class ModelStore:
                 skipped.append(u["platform"])  # a file built for another platform (a native library)
                 continue
             files.append(
-                RemoteFile(u["path"], u["url"], u.get("size"), u.get("sha256"), extract=bool(u.get("extract")))
+                RemoteFile(
+                    u["path"],
+                    u["url"],
+                    u.get("size"),
+                    u.get("sha256"),
+                    extract=bool(u.get("extract")),
+                    members=tuple(str(m) for m in u.get("members") or ()),
+                )
             )
         if not files and skipped:
             published = ", ".join(sorted({t for s in skipped for t in ([s] if isinstance(s, str) else s)}))
@@ -763,7 +775,7 @@ class ModelStore:
                 blob, digest = self.fetch_blob(f, on_bytes=bump, cancelled=cancelled)
                 if f.extract:
                     # the unpacked files are what the model consists of; the archive itself is not kept
-                    for rel in extract_archive(blob, mdir, f.path):
+                    for rel in extract_archive(blob, mdir, f.path, f.members):
                         entries.append({"path": rel, "size": (mdir / rel).stat().st_size})
                     meta = {**(meta or {}), "archive": {"url": f.url, "sha256": digest, "size": blob.stat().st_size}}
                     blob.unlink(missing_ok=True)

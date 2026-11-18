@@ -251,7 +251,8 @@ def test_every_packaged_entry_is_well_formed() -> None:
             continue
         if s.builtin:  # nothing to download: code that is part of bolo or of a Python package (WebRTC VAD, the AECs)
             assert (
-                s.engine in ("builtin", "webrtcvad", "speexdsp", "webrtc-apm", "pymicro-wakeword") and s.size_bytes == 0
+                s.engine in ("builtin", "webrtcvad", "speexdsp", "webrtc-apm", "pymicro-wakeword", "presidio")
+                and s.size_bytes == 0
             ), s.id
             assert not (s.source.repo or s.source.urls), s.id
             assert s.description and s.source_url.startswith("https://"), s.id
@@ -264,11 +265,11 @@ def test_every_packaged_entry_is_well_formed() -> None:
             for u in s.source.urls:
                 assert re.search(r"/resolve/[0-9a-f]{40}/", u["url"]) or u.get("sha256"), s.id
                 assert u.get("sha256") or (u.get("size") or 0) < 1_000_000, f"{s.id}: {u['path']} needs a sha256"
-        assert s.size_bytes > 100_000, s.id
+        assert s.size_bytes > 100_000 or s.task == "itn", s.id  # a rule FST can be a few kilobytes
         assert s.description and s.source_url.startswith("https://"), s.id
         assert s.engine in (
             "sherpa-onnx", "faster-whisper", "onnxruntime", "plugin:torch", "tts-server", "rnnoise", "duplex",
-            "whisper.cpp", "builtin", "mlx",
+            "whisper.cpp", "builtin", "mlx", "wetext", "kaldifst", "presidio",
         ), s.id  # fmt: skip
         if s.task == "tts":
             assert s.sample_rate in (8000, 16000, 22050, 24000, 32000, 44100, 48000), s.id
@@ -294,6 +295,8 @@ def test_every_packaged_entry_is_well_formed() -> None:
         "voice-conversion",
         "align",
         "punctuation",
+        "itn",
+        "pii",
         "echo-cancellation",
         "wake-word",
         "watermark",

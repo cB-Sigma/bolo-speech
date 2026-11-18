@@ -119,6 +119,8 @@ class STTRequest:
     diarize: bool = False
     #: decoding options the model honours (``STTModel.decode_options``; names and meanings in bolo.stt_options)
     options: dict[str, Any] = field(default_factory=dict)
+    #: the language to translate into (``task`` "translate"); None: English
+    target_language: str | None = None
     #: set when the client that asked has gone (``ModelQueue.submit`` cancelled): an engine that can stop part-way
     #: checks it and returns what it has; its result is discarded either way
     abort: threading.Event = field(default_factory=threading.Event, compare=False, repr=False)
@@ -213,6 +215,8 @@ class STTModel(Model):
     #: languages the model can be told to use; empty means fixed or automatic
     languages: tuple[str, ...] = ()
     supports_translate: bool = False
+    #: the languages ``task="translate"`` can translate into (``STTRequest.target_language``); Whisper: English only
+    translate_targets: tuple[str, ...] = ("en",)
     supports_word_timestamps: bool = False
     #: the model labels speakers itself (a cloud recogniser with diarization): a request's ``diarize`` is then
     #: passed to it as ``STTRequest.diarize`` instead of cutting the audio at bolo's speaker turns
@@ -223,6 +227,11 @@ class STTModel(Model):
     #: request fields (:data:`REQUEST_FIELDS`) ``transcribe`` uses; a request that sets one the model does not use
     #: is told so (the response's ``x-bolo-ignored-options`` header), the same as an engine option it does not honour
     request_fields: tuple[str, ...] = ()
+
+    def translation_problem(self, source: str | None, target: str) -> str | None:
+        """Why this model cannot translate speech in ``source`` (None: not given) into ``target``, or None. The
+        target is already one of :attr:`translate_targets`."""
+        return None
 
     @abc.abstractmethod
     def transcribe(self, requests: list[STTRequest]) -> list[STTResult]:
@@ -634,6 +643,40 @@ class VoiceConversionModel(Model):
     @abc.abstractmethod
     def convert(self, source: bytes, reference: bytes | None, voice: str | None, options: dict[str, Any]) -> FloatArray:
         """``source`` and ``reference`` are mono PCM16 WAV; the converted speech, float32 at ``sample_rate``."""
+
+
+class ItnModel(Model):
+    """Inverse text normalisation: a transcript's spoken forms written as figures ("twenty five dollars" -> "$25")."""
+
+    task = "itn"
+
+    @abc.abstractmethod
+    def normalize(self, text: str) -> str:
+        """``text`` with numbers, money, dates, times and measures in written form; other words as they were."""
+
+
+@dataclass
+class PiiSpan:
+    """A piece of personal information found in a text: ``text[start:end]``, of ``type`` (``PERSON``,
+    ``PHONE_NUMBER``, ``EMAIL_ADDRESS``, ...), found with ``score`` (0..1)."""
+
+    type: str
+    start: int
+    end: int
+    score: float = 1.0
+
+
+class PiiModel(Model):
+    """Personal-information detection: where in a text names, numbers, addresses and the like are."""
+
+    task = "pii"
+    #: the entity types the model can find (bolo's names: PERSON, PHONE_NUMBER, EMAIL_ADDRESS, ...)
+    entities: tuple[str, ...] = ()
+
+    @abc.abstractmethod
+    def find(self, text: str, language: str | None, entities: tuple[str, ...]) -> list[PiiSpan]:
+        """The spans of ``text`` holding personal information of the ``entities`` asked for (all it knows when
+        empty), not overlapping, in order."""
 
 
 class PunctuationModel(Model):

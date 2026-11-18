@@ -42,6 +42,7 @@ import numpy as np
 
 from bolo.engines.base import FloatArray, LoadOptions, STTModel, STTRequest, STTResult
 from bolo.errors import EngineUnavailable, InvalidRequest
+from bolo.text.iso639 import name as language_name
 
 if TYPE_CHECKING:
     from bolo.engines.tts_server import ServerProcess, TTSServerEngine
@@ -53,7 +54,7 @@ SAMPLE_RATE = 16000
 #: llama.cpp's media marker before builds made it random; used when ``/props`` does not name one
 DEFAULT_MARKER = "<__media__>"
 TRANSLATE_INSTRUCTION = (
-    "Translate this audio into English. Reply with the English translation only, without any comment."
+    "Translate this audio into {language}. Reply with the {language} translation only, without any comment."
 )
 
 
@@ -69,10 +70,12 @@ def wav_bytes(samples: FloatArray, sample_rate: int = SAMPLE_RATE) -> bytes:
     return buf.getvalue()
 
 
-def build_prompt(marker: str, task: str, language: str | None) -> str:
-    """The prompt string of one request (the server adds BOS; libmtmd adds ``[BEGIN_AUDIO]``)."""
+def build_prompt(marker: str, task: str, language: str | None, target: str | None = None) -> str:
+    """The prompt string of one request (the server adds BOS; libmtmd adds ``[BEGIN_AUDIO]``). A translation goes
+    into ``target`` (English when None), named in words in the instruction."""
     if task == "translate":
-        return f"[INST]{marker}{TRANSLATE_INSTRUCTION}[/INST]"
+        into = language_name(target or "en")
+        return f"[INST]{marker}{TRANSLATE_INSTRUCTION.format(language=into)}[/INST]"
     lang = f"lang:{language}" if language else ""
     return f"[INST]{marker}[/INST]{lang}[TRANSCRIBE]"
 
@@ -111,6 +114,8 @@ class VoxtralLlamaCpp(STTModel):
         self.max_new_tokens = int(spec.get("max_new_tokens", 4096))
         self.translate = bool(spec.get("translate", True))
         self.supports_translate = self.translate
+        #: Voxtral follows the instruction into any of its languages
+        self.translate_targets = tuple(languages) or ("en",)
         self.request_extra = dict(spec.get("request") or {})
         self.marker = str(spec.get("media_marker") or "")
         #: llama.cpp's Voxtral can carry on after the transcript as if chatting ("Here's a breakdown..."), always
@@ -176,7 +181,7 @@ class VoxtralLlamaCpp(STTModel):
         seconds = len(req.samples) / self.sample_rate
         body: dict[str, Any] = {
             "prompt": {
-                "prompt_string": build_prompt(self.marker or DEFAULT_MARKER, req.task, language),
+                "prompt_string": build_prompt(self.marker or DEFAULT_MARKER, req.task, language, req.target_language),
                 "multimodal_data": [base64.b64encode(wav_bytes(req.samples, self.sample_rate)).decode("ascii")],
             },
             "n_predict": token_budget(seconds, self.tokens_per_s, self.max_new_tokens),
@@ -241,7 +246,7 @@ class VoxtralLlamaCpp(STTModel):
             text = str(doc.get("content") or "").strip()
             if doc.get("stop_type") == "limit":
                 log.warning("model '%s' reached its token budget; the text may be cut short", self.name)
-            language = "en" if req.task == "translate" else req.language
+            language = (req.target_language or "en") if req.task == "translate" else req.language
             out.append(STTResult(text, language))
         return out
 

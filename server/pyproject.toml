@@ -98,6 +98,13 @@ wake = ["sentencepiece>=0.2", "pymicro-wakeword>=2.0"]
 # inbound SIP endpoint for trunks and PBXs (sipmessage is BSD-2-Clause, pure Python: it parses and writes SIP messages)
 sip = ["sipmessage>=0.7"]
 text = ["whisper-normalizer>=0.1"]
+# inverse text normalisation of transcripts ("twenty five dollars" -> "$25", bolo.itn): the runtime of the itn
+# models, wetext (WeTextProcessing's grammars, Apache-2.0; it carries its own copy of every language's grammars,
+# about 300 MB installed) and kaldifst (rule FSTs, Apache-2.0)
+itn = ["wetext>=0.2.1", "kaldifst>=1.7"]
+# personal-information redaction of transcripts (bolo.redact): Presidio's analyzer (MIT; it brings spaCy, MIT, for
+# pii-presidio-spacy-en) and, for GLiNER, onnxruntime and tokenizers
+pii = ["presidio-analyzer>=2.2", "onnxruntime>=1.17", "tokenizers>=0.20"]
 # OpenTelemetry export of request traces (Apache-2.0): spans over OTLP/HTTP; off unless switched on (setting otel or
 # OTEL_EXPORTER_OTLP_ENDPOINT). For OTLP/gRPC add opentelemetry-exporter-otlp-proto-grpc
 otel = ["opentelemetry-sdk>=1.27", "opentelemetry-exporter-otlp-proto-http>=1.27"]
@@ -212,7 +219,7 @@ module = [
   "mlx_audio.*",
   "mcp.*", "mcp_types.*",
   "pyaec.*", "livekit.*",
-  "pypinyin.*", "pymicro_wakeword.*", "sentencepiece.*",
+  "pypinyin.*", "pymicro_wakeword.*", "sentencepiece.*", "wetext.*", "kaldifst.*", "presidio_analyzer.*", "spacy.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"

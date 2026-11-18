@@ -571,7 +571,9 @@ export const api = {
     signal?: AbortSignal,
   ): Promise<DiarizedResult> {
     const form = transcriptionForm(file, name, opts)
-    const res = await request('v1/audio/transcriptions', { method: 'POST', body: form, signal })
+    // a translation goes to the translations endpoint (into English, or the language asked for)
+    const route = opts.translateTo ? 'v1/audio/translations' : 'v1/audio/transcriptions'
+    const res = await request(route, { method: 'POST', body: form, signal })
     return parseTranscription(await res.json(), res.headers)
   },
 }

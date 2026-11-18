@@ -52,6 +52,11 @@ Booleans accept `1/0`, `true/false`, `yes/no`, `on/off`.
 | `denoise` | `off` | | denoise audio before speech recognition unless a request or a model pin says otherwise: `off`, `on`, a strength between 0 and 1 (the denoised audio mixed with the original at that weight) or a denoise model id. See "Denoising" below: it can make clean audio worse |
 | `default_punctuation` | `punct-en-cnn-bilstm` | | punctuation model used by `punctuation` when it names no model (pulled on first use, 36 MB) |
 | `punctuation` | `off` | | restore punctuation and capital letters in transcripts unless a request or a model pin says otherwise: `off`, `auto` (only for recognisers that write none), `on` or a punctuation model id. See "Punctuation restoration" below |
+| `default_itn` | `itn-en-wetext` | | inverse text normalisation model used by `itn=on` when it knows the transcript's language (else an installed one that does) |
+| `itn` | `off` | | write numbers, money, dates and times in transcripts as figures unless a request or a model pin says otherwise: `off`, `on` or an itn model id. See "Inverse text normalisation" below |
+| `default_pii` | `pii-presidio-patterns` | | personal-information model used by `redact=on` |
+| `redact` | `off` | | mask personal information in transcripts unless a request or a model pin says otherwise: `off`, `on` or a pii model id. See "Redacting personal information" below |
+| `redact_entities` | (all) | | the entity types `redact` masks when a request names none, comma separated (`PERSON,PHONE_NUMBER`) |
 | `default_lid` | `voxlingua107-ecapa` | | spoken-language identifier used by `POST /v1/audio/language` without a model and by language routing (pulled on first use, 87 MB, Apache-2.0). See "Language routing" below |
 | `default_audio_tagging` | `ced-mini` | | sound-event / audio-tagging model used by `POST /v1/audio/tags` without a model (pulled on first use, 10 MB, Apache-2.0; any `audio-tagging` model, models.md) |
 | `default_emotion` | `emotion2vec-plus-base` | | speech-emotion model used by `POST /v1/audio/emotion` without a model (pulled on first use, 373 MB; FunASR Model License 1.1, a custom licence: read it before commercial use; any `emotion` model, models.md) |
@@ -817,6 +822,73 @@ your own audio before turning it on for a model or the server; a strength
 below 1 (`0.5`) is a gentler middle way. A denoiser that cannot run is
 skipped with a warning and the original audio is transcribed; the response
 header `x-bolo-denoise` and the request's trace say what ran.
+
+## Redacting personal information
+
+`redact` masks personal information in transcripts: each name, telephone
+number, e-mail address, card, account or ID number found becomes its type
+in brackets ("CALL ME AT [PHONE_NUMBER]"), in the text, the segments and
+the words. It runs last, after `itn` and `punctuation`, on the text as it
+is returned. Ask for it on a transcription request (`redact=on` or
+`redact=<model>`, `redact_entities=PERSON,PHONE_NUMBER`; api.md), as a pin
+per speech-to-text model (`bolo models config whisper-base --set
+redact=on`), or for the whole server (`redact = "on"`,
+`redact_entities = "PERSON,PHONE_NUMBER"`); from the command line, `bolo
+transcribe --redact pii-gliner-multi`.
+
+| id | finds | languages | licence | size |
+| --- | --- | --- | --- | --- |
+| `pii-presidio-patterns` (default) | e-mail, telephone, credit card, IBAN, IP address, URL, crypto wallet, national ID numbers (US, UK, India, Australia and more), by pattern and checksum | any (patterns) | MIT | nothing to download |
+| `pii-presidio-spacy-en` | the same, and names, places, organisations, dates (spaCy's English pipeline) | English | MIT | 57 MB |
+| `pii-gliner-multi` | names, telephone, e-mail, addresses, organisations, dates of birth, card, bank account, IBAN, passport, ID and social security numbers | many (tested in English and German) | Apache-2.0 | 568 MB |
+
+The Presidio entries need `pip install "bolo-speech[pii]"` (Presidio's
+analyzer and spaCy, MIT); GLiNER runs in ONNX Runtime with tokenizers.
+`GET /api/v1/models/{id}` lists what a loaded model finds. Patterns alone
+miss names, and a telephone number read out digit by digit is a number only
+after `itn`. Every redacted response says what was done: the header
+`x-bolo-redact` names the model and counts each type, and `verbose_json`
+has a `redactions` list (type, place of the placeholder in `text`, score,
+time). The masked text is never returned, never logged in the request
+trace, and partial segments are not streamed while redacting. When the
+model cannot run, the request fails with 503 rather than return text that
+should have been redacted.
+
+## Inverse text normalisation
+
+Recognisers trained on spoken-form text write numbers as words: "I PAID
+TWENTY FIVE DOLLARS ON MARCH THIRD" from a Zipformer. `itn` runs an inverse
+text normalisation model (`task: itn` in the catalog) over the transcript
+after recognition, before punctuation is restored: "I PAID $25 ON MARCH 3".
+It is asked for on a transcription request (`itn=on` or `itn=<model>`;
+api.md), as a pin per speech-to-text model (`bolo models config
+zipformer-en-gigaspeech --set itn=on`, `PUT /api/v1/models/{id}/settings`
+with `{"itn": "on"}`) or for the whole server (`itn = "on"`,
+`BOLO_ITN=on`); from the command line, `bolo transcribe --itn on`. The
+first of request, pin and setting that says anything decides. With `on`,
+`default_itn` (`itn-en-wetext`) is used when it knows the transcript's
+language, else an installed `itn` model that does.
+
+| id | languages | licence | engine | size |
+| --- | --- | --- | --- | --- |
+| `itn-en-wetext` (default) | English | Apache-2.0 | wetext | 2.6 MB |
+| `itn-zh-wetext` | Chinese | Apache-2.0 | wetext | 14 MB |
+| `itn-hi-wetext` | Hindi (Devanagari digits) | Apache-2.0 | wetext | 13.5 MB |
+| `itn-zh-number` | Chinese, numbers only | Apache-2.0 | kaldifst | 26 KB |
+
+The wetext entries are WeTextProcessing's grammars (weighted finite-state
+transducers) for one language each, pulled from the `wetext` package and run
+by it; `itn-zh-number` is sherpa-onnx's Chinese number rule FST, run by
+kaldifst. Both runtimes come with `pip install "bolo-speech[itn]"` (wetext
+and kaldifst, Apache-2.0; wetext also carries its own copy of every
+language's grammars, about 300 MB installed). The grammars follow each
+language's written conventions: in English a number under ten stays a word
+("seven apples", "27 apples"). A transcript in a language the model does not
+know is returned as it was, and the response header `x-bolo-itn` says
+`skipped; model=…; language=…` (it names the model that ran otherwise).
+Words that do not change keep their timings; the figures take the time of
+the words they replace. NeMo's text-processing grammars are not in the
+catalog: they are built with pynini at first use.
 
 ## Punctuation restoration
 

@@ -132,6 +132,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | **Hardware-aware recommendations** | bolo looks at the machine and rates every model for it; it recommends and warns, and never hides or refuses a model | [recommendations.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/recommendations.md) |
 | **Text preparation** | numbers, dates, money, units and URLs read out in the voice's language; pronunciation word lists for names and jargon; an SSML subset; romanised input ("mujhe kal jana hai") written in the voice's script; phonemes without the GPL through [uccharan](https://github.com/cb-Sigma/uccharan) | [api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#text-preparation-ssml-and-pronunciation-word-lists), [models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md#phonemisers) |
 | **Word timestamps for every recogniser** | words with start, end and confidence in `verbose_json` from every speech-to-text model: from the model where it gives them, else by aligning the transcript to the audio with a CTC forced aligner (Omnilingual ASR, Apache-2.0, 1,600+ languages as written; or the non-commercial MMS-300m aligner). `POST /v1/audio/alignments` aligns your own text to your audio, and **captioned speech** gives the time of every word the voice reads | [api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#word-timestamps-and-forced-alignment), [models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md#word-timestamps) |
+| **Hotwords, punctuation, numbers, redaction** | names and terms to favour (`hotwords`) on Whisper models and on the Zipformer and Parakeet transducers; punctuation and capital letters restored for recognisers that write none; numbers, money, dates and times written as figures (`itn`); personal information masked with an audit trail (`redact`); each per request or as the server's default | [api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#post-v1audiotranscriptions), [configuration.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/configuration.md#redacting-personal-information) |
 | **Language identification and routing** | `POST /v1/audio/language` says which language a recording is in, with probabilities, from a choice of identifiers (VoxLingua107 ECAPA, Whisper's own detector, AmberNet, MMS-LID), each with its licence; a transcription with `model=auto` is sent to the best installed recogniser for the language it hears, and the response header says what was decided. Never overrides a model or language you name | [api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#language-identification-and-routing), [models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md#language-identification-1) |
 | **Speaker verification and identification** | enrol people from a few recordings, then check whether a recording is a given person or which of them it is, with any of seven speaker embedders, each with a threshold measured on real speech | [api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#enrolled-speakers-verify-and-identify) |
 | **Sound events and speech emotion** | `POST /v1/audio/tags` names the sounds in a recording (AudioSet's 527: speech, music and its instruments, laughter, alarms, animals, vehicles...) with CED and Zipformer taggers, over the whole recording or window by window; `POST /v1/audio/emotion` says how the speaker sounds (emotion2vec+, licence labelled); SenseVoice's own emotion and sound tags come back with its transcriptions; an audio language model answers questions about a recording, or captions it, through `/v1/chat/completions`. Background-noise removal on its own: `POST /v1/audio/denoise` | [api.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/api.md#sound-events-and-audio-tags-post-v1audiotags), [models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md#audio-tagging-and-sound-events) |
@@ -187,6 +188,8 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | ECHO-CANCELLATION | WebRTC AEC3 | 1 | - | 1 | 0.026 (`webrtc-aec3`) |
 | ECHO-CANCELLATION | DTLN-aec | 1 | - | 1 | 0.233 (`dtln-aec-128`) |
 | EMOTION | emotion2vec+ | 2 | - | 2 | 0.845 (`emotion2vec-plus-large`) |
+| ITN | WeTextProcessing | 3 | en, hi, zh | 3 | 0.001 (`itn-zh-wetext`) |
+| ITN | sherpa-onnx rule FSTs | 1 | zh | 1 | 0.000 (`itn-zh-number`) |
 | LID | VoxLingua107 ECAPA-TDNN | 2 | ab, af, am, ar, as, az, ba, be +99 | 2 | 0.106 (`voxlingua107-ecapa`) |
 | LID | Whisper | 2 | af, am, ar, as, az, ba, be, bg +91 | 2 | 0.301 (`whisper-tiny-lid`) |
 | LID | AmberNet | 1 | ab, af, am, ar, as, az, ba, be +99 | 1 | 0.104 (`ambernet-langid`) |
@@ -197,6 +200,8 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | STT | Whisper | 69 | af, am, ar, as, az, ba, be, bg +92 | 22 | 0.081 (`faster-whisper-tiny.en`) |
 | STT | Parakeet | 8 | bg, cs, da, de, el, en, es, et +17 | 5 | 0.030 (`parakeet-tdt-ctc-110m`) |
 | TTS | Kokoro | 3 | en, es, fr, hi, it, ja, pt, zh | 3 | 0.759 (`kokoro-v1.0`) |
+| PII | Presidio | 2 | en | 2 | 0.001 (`pii-presidio-patterns`) |
+| PII | GLiNER | 1 | de, en, es, fr, it, nl, pt | 1 | 0.100 (`pii-gliner-multi`) |
 | TTS | Parler-TTS | 2 | as, bn, brx, doi, en, gu, hi, hne +13 | 2 | 4.540 (`parler-tts-tiny-v1`) |
 | TTS | F5-TTS | 2 | as, bn, en, gu, hi, kn, ml, mr +5 | 1 | 119.700 (`indic-f5`) |
 | TTS | Veena | 1 | en, hi | 0 | - |
@@ -230,7 +235,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | STT | Voxtral | 2 | de, en, es, fr, hi, it, nl, pt | 1 | 1.980 (`voxtral-mini-3b-llamacpp`) |
 | STT | Moonshine | 11 | ar, en, es, ja, ko, uk, vi, zh | 4 | 0.033 (`moonshine-tiny-en`) |
 | STT | NeMo FastConformer | 8 | be, de, en, es, fr, hr, it, pl +2 | 3 | 0.334 (`nemo-fastconformer-ctc-en-streaming-480ms`) |
-| STT | Canary | 1 | de, en, es, fr | 1 | 0.358 (`canary-180m-flash`) |
+| STT | Canary | 2 | bg, cs, da, de, el, en, es, et +17 | 2 | 0.358 (`canary-180m-flash`) |
 | STT | Zipformer | 16 | ar, bn, de, en, es, fr, id, ja +5 | 7 | 0.028 (`zipformer-en-gigaspeech`) |
 | STT | SenseVoice | 1 | en, ja, ko, yue, zh | 1 | 0.039 (`sense-voice-small`) |
 | STT | Paraformer | 2 | en, zh | 1 | 0.091 (`paraformer-zh`) |
@@ -266,7 +271,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | WAKE-WORD | microWakeWord | 4 | en | 4 | 0.003 (`microwakeword-hey-jarvis`) |
 | WATERMARK | AudioSeal | 1 | - | 0 | - |
 
-**500 models in the catalog, 215 validated on CPU, 285 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md).
+**508 models in the catalog, 223 validated on CPU, 285 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

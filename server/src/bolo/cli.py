@@ -582,6 +582,24 @@ def _model_setting(key: str, raw: str) -> Any:
         except BoloError as exc:
             raise ValueError(exc.message) from exc
         value = raw.strip()
+    elif key == "redact":
+        from bolo.errors import BoloError
+        from bolo.redact import parse_redact
+
+        try:
+            parse_redact(raw)
+        except BoloError as exc:
+            raise ValueError(exc.message) from exc
+        value = raw.strip()
+    elif key == "itn":
+        from bolo.errors import BoloError
+        from bolo.itn import parse_itn
+
+        try:
+            parse_itn(raw)
+        except BoloError as exc:
+            raise ValueError(exc.message) from exc
+        value = raw.strip()
     elif key == "punctuation":
         from bolo.errors import BoloError
         from bolo.punctuation import parse_punctuation
@@ -834,8 +852,10 @@ def cmd_stop(args: argparse.Namespace) -> int:
 # -- one-shot inference ---------------------------------------------------
 def cmd_transcribe(args: argparse.Namespace) -> int:
     from bolo.audio import decode_audio
+    from bolo.itn import parse_itn
     from bolo.obs.trace import Trace
     from bolo.punctuation import parse_punctuation
+    from bolo.redact import parse_entities, parse_redact
     from bolo.text.formats import to_srt, to_vtt
 
     core = _core(args)
@@ -848,8 +868,12 @@ def cmd_transcribe(args: argparse.Namespace) -> int:
             trace = Trace("stt", "cli", "")
             t = await core.transcribe(
                 samples, rate, model=args.model, language=args.language, trace=trace,
-                task="translate" if args.translate else "transcribe", word_timestamps=args.format == "json",
+                task="translate" if args.translate or args.target_language else "transcribe", word_timestamps=args.format == "json",
                 hotwords=args.hotwords, punctuation=parse_punctuation(args.punctuation, "--punctuation"),
+                itn=parse_itn(args.itn, "--itn"),
+                target_language=args.target_language if args.translate or args.target_language else None,
+                redact=parse_redact(args.redact, "--redact"),
+                redact_entities=parse_entities(args.redact_entities, "--redact-entities"),
             )  # fmt: skip
             if args.format == "srt":
                 print(to_srt(t.segments))
@@ -1806,7 +1830,7 @@ _TASK_TITLES = {
     "denoise": "Denoising", "lid": "Language identification", "speech-to-speech": "Speech to speech",
     "speaker-embedding": "Speaker embedding", "audio-tagging": "Audio tagging", "emotion": "Speech emotion",
     "align": "Forced alignment",
-    "punctuation": "Punctuation restoration",
+    "punctuation": "Punctuation restoration", "itn": "Inverse text normalisation", "pii": "Personal information",
     "echo-cancellation": "Echo cancellation", "wake-word": "Wake words",
 }  # fmt: skip
 
@@ -2659,8 +2683,28 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--model", "-m")
     s.add_argument("--language", "-l")
     s.add_argument("--translate", action="store_true", help="translate to English (multilingual Whisper models)")
+    s.add_argument(
+        "--target-language",
+        dest="target_language",
+        help="translate into this language instead (implies --translate; Canary, Voxtral)",
+    )
     s.add_argument("--format", "-f", choices=["text", "json", "srt", "vtt"], default="text")
     s.add_argument("--hotwords", help="names and terms to favour, comma separated (models that take hotwords)")
+    s.add_argument(
+        "--redact",
+        help="mask personal information: on (the default_pii model), off or a pii model (default: the model's "
+        "setting, else the `redact` setting)",
+    )
+    s.add_argument(
+        "--redact-entities",
+        dest="redact_entities",
+        help="only these entity types, comma separated (PERSON,PHONE_NUMBER,...)",
+    )
+    s.add_argument(
+        "--itn",
+        help="write numbers, money, dates and times as figures: on, off or an itn model (default: the model's "
+        "setting, else the `itn` setting)",
+    )
     s.add_argument(
         "--punctuation",
         help="restore punctuation and capital letters: auto (only if the model writes none), on, off or a "

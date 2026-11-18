@@ -83,6 +83,8 @@ def settings(tmp_path: Path) -> Settings:
         default_vad="fake-vad",
         default_diarization="fake-diarization",
         default_punctuation="fake-punctuation",
+        default_itn="fake-itn",
+        default_pii="fake-pii",
         # the fake diarizer's "voices" are two-dimensional and its clips short: no folding of small speakers
         diarization_min_speaker_s=0.0,
         diarization_merge_similarity=0.0,

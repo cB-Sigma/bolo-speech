@@ -336,6 +336,17 @@ class ModelSettingsRequest(BaseModel):
         description="Repetition guard: a phrase (1 to 8 words) repeated back to back more often than this is cut to "
         "one copy, and so is a run of identical segments (default 4; 0 turns it off).",
     )
+    redact: bool | str | None = Field(
+        default=None,
+        description="Speech-to-text models: mask personal information in this model's transcripts unless the "
+        "request says otherwise: true, false or a pii model id; null removes the pin.",
+    )
+    itn: bool | str | None = Field(
+        default=None,
+        description="Speech-to-text models: write numbers, money, dates and times in this model's transcripts as "
+        "figures (inverse text normalisation) unless the request says otherwise: true, false or an itn model id; "
+        "null removes the pin.",
+    )
     punctuation: bool | str | None = Field(
         default=None,
         description="Speech-to-text models: restore punctuation and capital letters in this model's transcripts "
@@ -402,6 +413,26 @@ async def put_model_settings(request: Request, model_id: str, body: ModelSetting
                 core.resolve(opts.model, "denoise")
             except BoloError as exc:
                 exc.param = "denoise"
+                raise
+    if values.get("itn") is not None:
+        from bolo.itn import parse_itn
+
+        normalising = parse_itn(values["itn"])
+        if normalising is not None and normalising.model:
+            try:
+                core.resolve(normalising.model, "itn")
+            except BoloError as exc:
+                exc.param = "itn"
+                raise
+    if values.get("redact") is not None:
+        from bolo.redact import parse_redact
+
+        asked = parse_redact(values["redact"])
+        if asked is not None and asked.model:
+            try:
+                core.resolve(asked.model, "pii")
+            except BoloError as exc:
+                exc.param = "redact"
                 raise
     if values.get("punctuation") is not None:
         from bolo.punctuation import parse_punctuation

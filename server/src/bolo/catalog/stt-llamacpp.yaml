@@ -54,6 +54,7 @@
     revision: 20616573013f28229fff61de74359d3eeff61f6a
     include: [Voxtral-Mini-3B-2507-Q4_K_M.gguf, mmproj-Voxtral-Mini-3B-2507-Q8_0.gguf]
   options:
+    translate_into: [en, es, fr, pt, hi, de, nl, it]
     runtime: llama-server
     model_file: Voxtral-Mini-3B-2507-Q4_K_M.gguf
     mmproj_file: mmproj-Voxtral-Mini-3B-2507-Q8_0.gguf
@@ -93,6 +94,7 @@
     revision: c596289d4e0370c44a65cb4add1da125dd0a2342
     include: [mistralai_Voxtral-Small-24B-2507-Q4_K_M.gguf, mmproj-mistralai_Voxtral-Small-24B-2507-f16.gguf]
   options:
+    translate_into: [en, es, fr, pt, hi, de, nl, it]
     runtime: llama-server
     model_file: mistralai_Voxtral-Small-24B-2507-Q4_K_M.gguf
     mmproj_file: mmproj-mistralai_Voxtral-Small-24B-2507-f16.gguf

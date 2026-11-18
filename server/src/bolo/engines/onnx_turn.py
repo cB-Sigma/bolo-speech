@@ -131,7 +131,7 @@ class OnnxRuntimeEngine(Engine):
         "deepfilternet3_stream",
         "whisper_lid", "onnx_lid", "onnx_speaker_embedding", "fbank_speaker_embedding", "onnx_emotion",
         "ctc_align",
-        "dtln_aec", "openwakeword",
+        "dtln_aec", "openwakeword", "gliner_pii",
         "audioseal_onnx",
     )  # fmt: skip
 
@@ -174,6 +174,10 @@ class OnnxRuntimeEngine(Engine):
             from bolo.s2s_onnx import Lfm3Tts
 
             return Lfm3Tts.from_dir(path, spec, opts)
+        if kind == "gliner_pii":
+            from bolo.engines.pii import GlinerPii
+
+            return GlinerPii(path, spec, opts)
         if kind == "text_turn":
             from bolo.engines.text_turn import TextTurn
 

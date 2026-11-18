@@ -28,6 +28,14 @@ export interface TranscribeOptions {
   hotwords?: string
   /** Punctuation restoration afterwards: '' server default, 'off', 'auto', 'on' or a punctuation model id. */
   punctuation?: string
+  /** Numbers, money, dates and times written as figures afterwards: '' server default, 'off', 'on' or a model. */
+  itn?: string
+  /** Translate into this language instead of transcribing (`POST /v1/audio/translations`, `target_language`). */
+  translateTo?: string
+  /** Personal information masked afterwards: '' server default, 'off', 'on' or a pii model id. */
+  redact?: string
+  /** The entity types to mask (comma separated); empty: all the model finds. */
+  redactEntities?: string
 }
 
 export interface DiarizedSegment {
@@ -77,6 +85,10 @@ export interface DiarizedResult {
   denoiseHeader?: string | null
   /** `x-bolo-punctuation`: the punctuation model that ran (or `skipped; ...`). */
   punctuationHeader?: string | null
+  /** `x-bolo-itn`: the itn model that ran (or `skipped; ...`). */
+  itnHeader?: string | null
+  /** `x-bolo-redact`: the pii model and what it masked (`pii-gliner-multi; PERSON=2`). */
+  redactHeader?: string | null
   /** `x-bolo-separation` response header, when sent. */
   separationHeader?: string | null
   /** `x-request-id`, to find the trace. */
@@ -136,6 +148,13 @@ export function transcriptionForm(file: Blob, name: string, o: TranscribeOptions
   applyDenoise(f, o.denoise)
   if (o.hotwords?.trim()) f.set('hotwords', o.hotwords.trim())
   if (o.punctuation) f.set('punctuation', o.punctuation)
+  if (o.itn) f.set('itn', o.itn)
+  if (o.redact) f.set('redact', o.redact)
+  if (o.redact && o.redact !== 'off' && o.redactEntities?.trim()) f.set('redact_entities', o.redactEntities.trim())
+  if (o.translateTo) {
+    if (o.diarize) throw new Error('Translations are not split by speaker: turn speaker labels off to translate.')
+    f.set('target_language', o.translateTo)
+  }
   if (!o.diarize) return f
   f.set('diarize', 'true')
   if (o.diarizer) f.set('diarization_model', o.diarizer)
@@ -188,6 +207,8 @@ export function parseTranscription(body: unknown, headers?: Headers): DiarizedRe
     ignoredOptions: headers?.get('x-bolo-ignored-options') ?? null,
     denoiseHeader: headers?.get('x-bolo-denoise') ?? null,
     punctuationHeader: headers?.get('x-bolo-punctuation') ?? null,
+    itnHeader: headers?.get('x-bolo-itn') ?? null,
+    redactHeader: headers?.get('x-bolo-redact') ?? null,
     requestId: headers?.get('x-request-id') ?? null,
     routeHeader: headers?.get('x-bolo-route') ?? null,
     languageHeader: headers?.get('x-bolo-language') ?? null,

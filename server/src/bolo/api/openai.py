@@ -28,11 +28,13 @@ from bolo.denoise import parse_denoise
 from bolo.diarize import DiarizeOptions, KnownSpeaker
 from bolo.engines.base import FloatArray, Segment
 from bolo.errors import BoloError, InvalidRequest, ModelNotFound, ModelNotInstalled
+from bolo.itn import parse_itn
 from bolo.keepalive import request_keep_alive
 from bolo.lid import is_routing_request, route_headers
 from bolo.lid import route as route_language
 from bolo.obs.trace import Trace
 from bolo.punctuation import parse_punctuation
+from bolo.redact import parse_entities, parse_redact
 from bolo.separate import SeparateOptions
 from bolo.stt_options import OptionError
 from bolo.stt_options import from_form as decode_options_from_form
@@ -191,6 +193,8 @@ def _verbose(t: Transcript, task: str, word_level: bool, segment_level: bool) ->
     out["usage"] = _usage(t.duration)
     if t.separation is not None:
         out["separation"] = t.separation
+    if t.redactions is not None:
+        out["redactions"] = t.redactions
     return out
 
 
@@ -394,6 +398,21 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
         diarize = await _diarize_options(form, fmt, model, task)
         separate = separate_options(form)
         denoise = parse_denoise(form.get("denoise"), strength=form.get("denoise_strength"))
+        redact = parse_redact(form.get("redact"))
+        redact_entities = parse_entities(form.get("redact_entities") or None)
+        if redact is not None and redact.model:
+            try:
+                core.resolve(redact.model, "pii")  # unknown model: fail before reading the upload
+            except BoloError as exc:
+                exc.param = "redact"
+                raise
+        itn = parse_itn(form.get("itn"))
+        if itn is not None and itn.model:
+            try:
+                core.resolve(itn.model, "itn")  # unknown model: fail before reading the upload
+            except BoloError as exc:
+                exc.param = "itn"
+                raise
         punctuation = parse_punctuation(form.get("punctuation"))
         if punctuation is not None and punctuation.model:
             try:
@@ -450,6 +469,10 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
             "options": decode,
             "denoise": denoise,
             "punctuation": punctuation,
+            "itn": itn,
+            "target_language": str(form.get("target_language") or "").strip() or None,
+            "redact": redact,
+            "redact_entities": redact_entities,
         }
     except BoloError as exc:
         trace.finish("error", exc.message)
@@ -550,14 +573,24 @@ async def create_transcription(request: Request) -> Response:
     header ``x-bolo-denoise`` names what ran. Denoising can make clean audio worse.
     ``punctuation`` restores punctuation and capital letters afterwards: ``auto`` (only when the recogniser writes
     none), ``on``, ``off`` or a punctuation model id; unset: the model's pin, then the server's ``punctuation``
-    setting (off by default). The response header ``x-bolo-punctuation`` names what ran.
+    setting (off by default). The response header ``x-bolo-punctuation`` names what ran. ``itn`` (``true``,
+    ``false`` or an itn model id) writes numbers, money, dates and times as figures ("twenty five dollars" -> "$25";
+    the ``itn`` setting otherwise, off by default); ``x-bolo-itn`` names the model that ran. ``redact`` (``true``,
+    ``false`` or a pii model id) masks personal information (``[PERSON]``, ``[PHONE_NUMBER]``...), narrowed by
+    ``redact_entities``; ``x-bolo-redact`` names the model and counts what it masked, and ``verbose_json`` lists each
+    redaction (``redactions``).
     """
     return await _transcribe_endpoint(request, "transcribe")
 
 
-@router.post("/v1/audio/translations", tags=["openai"], summary="Translate audio to English")
+@router.post("/v1/audio/translations", tags=["openai"], summary="Translate audio (to English by default)")
 async def create_translation(request: Request) -> Response:
-    """Same form as transcriptions; needs a multilingual Whisper model."""
+    """Same form as transcriptions; needs a model that translates (multilingual Whisper, Canary, Voxtral).
+
+    Extension: ``target_language`` (ISO 639-1, default ``en``) is the language to translate into. Whisper translates
+    into English only; Canary from English into each of its languages and from each of them into English (it needs
+    the spoken ``language``); Voxtral into any of its languages. A model that cannot translate into the target
+    answers 400 with ``param: target_language``."""
     return await _transcribe_endpoint(request, "translate")
 
 

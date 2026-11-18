@@ -40,9 +40,11 @@ from bolo.engines.base import (
     AudioClassifierModel,
     DenoiseModel,
     DiarizationModel,
+    ItnModel,
     LidModel,
     LoadOptions,
     Model,
+    PiiModel,
     PunctuationModel,
     SeparationModel,
     SpeakerEmbeddingModel,
@@ -782,6 +784,14 @@ class ModelManager:
             converter = model
             handlers["convert"] = lambda items: [converter.convert(*item) for item in items]
             max_batch["convert"] = 1
+        elif isinstance(model, PiiModel):
+            finder = model
+            handlers["pii"] = lambda items: [finder.find(*item) for item in items]
+            max_batch["pii"] = 1
+        elif isinstance(model, ItnModel):
+            normalizer = model
+            handlers["itn"] = lambda items: [normalizer.normalize(item) for item in items]
+            max_batch["itn"] = 1
         elif isinstance(model, PunctuationModel):
             punctuator = model
             handlers["punctuate"] = lambda items: [punctuator.punctuate(item) for item in items]

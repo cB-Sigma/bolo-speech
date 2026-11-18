@@ -426,7 +426,10 @@ class SherpaOfflineSTT(STTModel):
         self.provider = sherpa_provider(opts.device)
         self.max_batch = int(spec.get("max_batch", 8))
         self.max_chunk_s = float(spec.get("max_chunk_s", 30.0 if kind in ("whisper", "canary") else 60.0))
-        self.supports_translate = kind == "whisper" and not spec.get("english_only", False)
+        self.supports_translate = (kind == "whisper" and not spec.get("english_only", False)) or kind == "canary"
+        if kind == "canary":
+            # Canary translates from English into each of its languages and from each of them into English
+            self.translate_targets = tuple(str(x) for x in spec.get("translate_into") or ("en",))
         # The stock Whisper exports have no cross-attention outputs, so no token times.
         # Whisper exports give token times only when they were exported with cross-attention outputs
         # (sherpa-onnx scripts/whisper/export-onnx-with-attention.py); such a model says so with the catalog
@@ -511,7 +514,8 @@ class SherpaOfflineSTT(STTModel):
                 decoder=find_file(p, "decoder*.onnx"),
                 tokens=find_file(p, "tokens.txt"),
                 src_lang=language or "en",
-                tgt_lang=language or "en",
+                # "translate:<target>" for a translation, else the transcript is in the language spoken
+                tgt_lang=task.partition(":")[2] if task.startswith("translate:") else language or "en",
                 **common,
             )
         model = find_file(p, "model*.onnx")
@@ -553,13 +557,36 @@ class SherpaOfflineSTT(STTModel):
                 rec = self._recognizers[key] = self._build(language, task, hot)
             return rec
 
+    def translation_problem(self, source: str | None, target: str) -> str | None:
+        if self.kind != "canary":
+            return None
+        source = (source or "").split("-")[0].lower()
+        if not source:
+            return "Canary does not detect the spoken language: give `language` to translate"
+        if source == target:
+            return f"the audio is already in {target}: nothing to translate"
+        if "en" not in (source, target):
+            return f"Canary translates into English or from English, not from {source} into {target}"
+        return None
+
+    def _canary_target(self, source: str, target: str | None) -> str:
+        """The language Canary translates ``source`` into (checked by :meth:`translation_problem` first)."""
+        target = (target or "en").split("-")[0].lower()
+        problem = self.translation_problem(source, target)
+        if problem:
+            raise ValueError(problem)
+        return target
+
     def transcribe(self, requests: list[STTRequest]) -> list[STTResult]:
         results: list[STTResult | None] = [None] * len(requests)
         groups: dict[tuple[str, str, bool], list[int]] = {}
         for i, r in enumerate(requests):
             lang = (r.language or self.default_language or "").split("-")[0].lower()
             hot = self.hotwords and bool(hotword_phrases(r.hotwords))
-            groups.setdefault((lang, r.task, hot), []).append(i)
+            task = r.task
+            if self.kind == "canary" and task == "translate":
+                task = f"translate:{self._canary_target(lang, r.target_language)}"
+            groups.setdefault((lang, task, hot), []).append(i)
         for (lang, task, hot), idxs in groups.items():
             rec = self._get(lang, task, hot)
             if self.kind == "whisper":

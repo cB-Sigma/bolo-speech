@@ -29,6 +29,9 @@ BUILTIN_ENGINES: dict[str, str] = {
     "webrtc-apm": "bolo.echo:WebRtcApmEngine",
     "speexdsp": "bolo.echo:SpeexDspEngine",
     "pymicro-wakeword": "bolo.wake:MicroWakeWordEngine",
+    "wetext": "bolo.engines.text_models:WetextEngine",
+    "kaldifst": "bolo.engines.text_models:KaldiFstEngine",
+    "presidio": "bolo.engines.pii:PresidioEngine",
     "remote": "bolo.engines.remote:RemoteEngine",
     "fake": "bolo.engines.fake:FakeEngine",
 }

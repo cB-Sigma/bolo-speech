@@ -1781,7 +1781,9 @@
   license: CC-BY-4.0
   features:
   - punctuation
-  description: NVIDIA Canary 180M Flash (English, Spanish, German, French), int8 encoder-decoder.
+  - translate
+  description: NVIDIA Canary 180M Flash (English, Spanish, German, French), int8 encoder-decoder. Translates English
+    into Spanish, German and French and each of them into English (`target_language`); give the spoken `language`.
   source_url: https://huggingface.co/nvidia/canary-180m-flash
   validated: cpu
   measured:
@@ -1811,6 +1813,50 @@
     - '*.mp4'
     - '*.mov'
     - '*.srt'
+  options:
+    translate_into: [en, es, de, fr]
+- id: canary-1b-v2
+  aliases:
+  - nvidia/canary-1b-v2
+  task: stt
+  engine: sherpa-onnx
+  kind: canary
+  family: Canary
+  languages: [en, de, fr, es, it, pt, nl, pl, ru, uk, bg, hr, cs, da, el, et, fi, hu, lv, lt, mt, ro, sk, sl, sv]
+  tier: accuracy
+  size_bytes: 1416509464
+  params: 978000000
+  license: CC-BY-4.0
+  license_url: https://huggingface.co/nvidia/canary-1b-v2
+  features:
+  - punctuation
+  - translate
+  description: 'NVIDIA Canary 1B v2: speech recognition in 25 European languages and translation from English into
+    each of the other 24 and from each of them into English (`target_language`; give the spoken `language`). A
+    community int8 export for sherpa-onnx (not by NVIDIA or k2-fsa), CC-BY-4.0 like the original. Needs about 6.5 GB
+    of memory.'
+  source_url: https://huggingface.co/nvidia/canary-1b-v2
+  validated: cpu
+  measured:
+    rtf: 1.6
+    rtf_note: on a shared machine (load average about 25); transcription and translation alike
+    audio_s: 11.8
+    load_s: 9.5
+    memory_mb: 6588
+    threads: 4
+    engine: sherpa-onnx 2.0.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared
+    date: '2026-11-18'
+    test_audio: bolo's en-long sample (English, translated into German and Italian) and FLEURS de_de dev (German, translated into English)
+  source:
+    repo: Sarphix/canary-1b-v2-sherpa-onnx-int8
+    revision: 7d513cd4f39f6c7dc75c13a284b5e345b37f6198
+    include:
+    - encoder.int8.onnx
+    - decoder.int8.onnx
+    - tokens.txt
+  options:
+    translate_into: [en, de, fr, es, it, pt, nl, pl, ru, uk, bg, hr, cs, da, el, et, fi, hu, lv, lt, mt, ro, sk, sl, sv]
 - id: zipformer-en-20m-streaming
   aliases:
   - zipformer-en-20m

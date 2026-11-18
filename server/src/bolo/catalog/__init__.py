@@ -20,7 +20,7 @@ from bolo.store import Source
 
 TASKS = (
     "stt", "tts", "vad", "diarization", "turn", "translation", "separation", "denoise", "lid", "speech-to-speech",
-    "audio-llm", "speaker-embedding", "audio-tagging", "emotion", "voice-conversion", "align", "punctuation",
+    "audio-llm", "speaker-embedding", "audio-tagging", "emotion", "voice-conversion", "align", "punctuation", "itn", "pii",
     "echo-cancellation", "wake-word", "watermark",
 )  # fmt: skip
 TIERS = ("realtime", "balanced", "accuracy")
@@ -102,6 +102,14 @@ class ModelSpec:
         from bolo.text.iso639 import same_language
 
         return next((str(why) for code, why in marks.items() if same_language(str(code), language)), None)
+
+    def translate_into(self) -> list[str]:
+        """The languages this recogniser translates into: ``options.translate_into``, else English for a model with
+        the ``translate`` feature (Whisper), else none."""
+        into = self.options.get("translate_into")
+        if isinstance(into, list):
+            return [str(x) for x in into]
+        return ["en"] if self.task == "stt" and "translate" in self.features else []
 
     @property
     def needs_phonemes(self) -> bool:
@@ -268,6 +276,8 @@ class ModelSpec:
             "license_note": self.options.get("license_note"),
             # languages it speaks but should not be used for, with the reason (options.not_recommended_for)
             "not_recommended_for": self.options.get("not_recommended_for") or {},
+            # the languages a speech-to-text model translates into (POST /v1/audio/translations, target_language)
+            "translate_into": self.translate_into(),
             # wake-word models: the phrases it listens for by default, and whether it takes phrases of your own
             **(
                 {
@@ -376,6 +386,16 @@ FAKE_MODELS: list[dict[str, Any]] = [
         "id": "fake-emotion", "task": "emotion", "engine": "fake", "kind": "fake-emotion", "family": "Fake",
         "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
         "description": "Test emotion model: a low pitch is neutral, a high one happy. Not real emotion recognition.",
+    },
+    {
+        "id": "fake-pii", "task": "pii", "engine": "fake", "kind": "fake-pii", "family": "Fake",
+        "languages": ["en"], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
+        "description": "Test personal information: fox and dog are PERSON, a run of digits is a PHONE_NUMBER.",
+    },
+    {
+        "id": "fake-itn", "task": "itn", "engine": "fake", "kind": "fake-itn", "family": "Fake",
+        "languages": ["en"], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
+        "description": "Test inverse normalisation: twenty seven -> 27, <n> dollars -> $<n>.",
     },
     {
         "id": "fake-punctuation", "task": "punctuation", "engine": "fake", "kind": "fake-punctuation",

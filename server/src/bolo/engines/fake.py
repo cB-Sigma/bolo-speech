@@ -34,9 +34,12 @@ from bolo.engines.base import (
     Engine,
     EngineStatus,
     FloatArray,
+    ItnModel,
     LidModel,
     LoadOptions,
     Model,
+    PiiModel,
+    PiiSpan,
     PunctuationModel,
     Segment,
     SeparationModel,
@@ -777,6 +780,53 @@ class FakeAligner(AlignModel):
         return out
 
 
+class FakeItn(ItnModel):
+    """Inverse normalisation for tests: "twenty seven" -> "27" and "<n> dollars" -> "$<n>"; nothing else."""
+
+    WORDS = {"twenty": 20, "seven": 7, "five": 5}
+
+    def __init__(self, opts: dict[str, Any]) -> None:
+        self.fail = bool(opts.get("fail", False))
+        self.calls: list[str] = []
+
+    def normalize(self, text: str) -> str:
+        if self.fail:
+            raise RuntimeError("fake itn failure requested")
+        self.calls.append(text)
+        out: list[str] = []
+        for word in text.split():
+            value = self.WORDS.get(word)
+            if value is not None and out and out[-1].isdigit() and int(out[-1]) % 10 == 0 and value < 10:
+                out[-1] = str(int(out[-1]) + value)
+            elif value is not None:
+                out.append(str(value))
+            elif word == "dollars" and out and out[-1].isdigit():
+                out[-1] = "$" + out[-1]
+            else:
+                out.append(word)
+        return " ".join(out)
+
+
+class FakePii(PiiModel):
+    """Personal information for tests: the words "fox" and "dog" are PERSON, a run of digits is PHONE_NUMBER."""
+
+    entities = ("PERSON", "PHONE_NUMBER")
+
+    def __init__(self, opts: dict[str, Any]) -> None:
+        self.fail = bool(opts.get("fail", False))
+        self.calls: list[tuple[str, str | None, tuple[str, ...]]] = []
+
+    def find(self, text: str, language: str | None, entities: tuple[str, ...]) -> list[PiiSpan]:
+        import re
+
+        if self.fail:
+            raise RuntimeError("fake pii failure requested")
+        self.calls.append((text, language, entities))
+        out = [PiiSpan("PERSON", m.start(), m.end(), 0.9) for m in re.finditer(r"\b(?:fox|dog)\b", text)]
+        out += [PiiSpan("PHONE_NUMBER", m.start(), m.end(), 0.8) for m in re.finditer(r"\d{3,}", text)]
+        return sorted((s for s in out if not entities or s.type in entities), key=lambda s: s.start)
+
+
 class FakePunctuation(PunctuationModel):
     """Punctuation for tests: a capital letter first, commas every four words and a full stop at the end."""
 
@@ -805,7 +855,7 @@ class FakeEngine(Engine):
         "fake-turn-text", "fake-separation", "fake-denoise", "fake-s2s", "fake-lid", "fake-speaker-embedding",
         "fake-tagging", "fake-emotion",
         "fake-align",
-        "fake-punctuation", "fake-echo", "fake-wake", "fake-watermark",
+        "fake-punctuation", "fake-echo", "fake-wake", "fake-watermark", "fake-itn", "fake-pii",
     )  # fmt: skip
 
     def __init__(self) -> None:
@@ -849,6 +899,10 @@ class FakeEngine(Engine):
             model = FakeEmotion()
         elif kind == "fake-align":
             model = FakeAligner(merged)
+        elif kind == "fake-pii":
+            model = FakePii(merged)
+        elif kind == "fake-itn":
+            model = FakeItn(merged)
         elif kind == "fake-punctuation":
             model = FakePunctuation(merged)
         elif kind == "fake-wake":

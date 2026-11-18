@@ -111,6 +111,20 @@ class Settings:
     #: restore punctuation and capital letters in transcripts unless a request or a model pin says otherwise: "off",
     #: "auto" (only for recognisers that write none), "on", or a punctuation model id (bolo.punctuation)
     punctuation: str = "off"
+    #: inverse-text-normalisation model used when transcription asks for ``itn`` without naming one (and it knows the
+    #: transcript's language; otherwise an installed one that does)
+    default_itn: str = "itn-en-wetext"
+    #: write numbers, money, dates and times in transcripts as figures ("twenty five" -> "25") unless a request or a
+    #: model pin says otherwise: "off", "on" or an itn model id (bolo.itn)
+    itn: str = "off"
+    #: personal-information model used when transcription asks for ``redact`` without naming one
+    default_pii: str = "pii-presidio-patterns"
+    #: mask personal information in transcripts unless a request or a model pin says otherwise: "off", "on" or a pii
+    #: model id (bolo.redact)
+    redact: str = "off"
+    #: the entity types ``redact`` masks when a request names none (comma separated, e.g. "PERSON,PHONE_NUMBER");
+    #: empty: every type the model finds
+    redact_entities: str = ""
     #: spoken-language identification model: POST /v1/audio/language without a model, and language routing
     default_lid: str = "voxlingua107-ecapa"
     #: sound-event / audio-tagging model: POST /v1/audio/tags without a model
@@ -672,11 +686,16 @@ def load_settings(
         raise ValueError(f"console_port must be between 0 and 65535, got {settings.console_port}")
     from bolo.denoise import parse_denoise
     from bolo.errors import BoloError
+    from bolo.itn import parse_itn
     from bolo.punctuation import parse_punctuation
+    from bolo.redact import parse_entities, parse_redact
 
     try:
         parse_denoise(settings.denoise)
         parse_punctuation(settings.punctuation)
+        parse_itn(settings.itn)
+        parse_redact(settings.redact)
+        parse_entities(settings.redact_entities or None)
     except BoloError as exc:
         raise ValueError(exc.message) from exc
     return settings
