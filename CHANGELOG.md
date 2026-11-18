@@ -30,6 +30,10 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   hotwords, DiCoW for hotwords and temperature) are now named in `x-bolo-ignored-options` and the request log, like
   the decoding options a model cannot honour. Plugin models say which they use (`request_fields`).
 
+- **`verbose_json` segments always said `temperature: 0.0`.** Each segment now reports the temperature it was
+  decoded at: faster-whisper's own (after a fallback to a higher temperature, the one that was kept), otherwise the
+  request's `temperature` for a model that samples, and 0 for a model that only decodes greedily.
+
 ### Added
 
 - **Speech enhancement on its own: `POST /v1/audio/denoise`.** The recording comes back with its background noise

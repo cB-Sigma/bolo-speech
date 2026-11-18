@@ -253,6 +253,8 @@ Responses:
 
 `verbose_json` also has `language_probability` (0 to 1) when the model detected the language itself and says how
 sure it was (faster-whisper; 1.0 when `language` was given to it).
+A segment's `temperature` is the one it was decoded at: faster-whisper's own (after a fallback, the temperature whose
+text was kept), otherwise the request's `temperature` for a model that samples, and 0 for one that decodes greedily.
 
 #### Decoding options and repetition loops
 

@@ -93,6 +93,9 @@ class Segment:
     speaker: str | None = None  # set when the request asked for diarization
     overlap: bool = False  # diarization found another speaker talking during this segment
     separated: bool = False  # decoded from this speaker's separated track, not from the mixture
+    #: the sampling temperature this segment was decoded at (a model that falls back to higher temperatures says
+    #: which); None: the model does not say (bolo then reports the request's temperature, or 0 for greedy decoding)
+    temperature: float | None = None
 
 
 @dataclass

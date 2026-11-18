@@ -173,7 +173,7 @@ def _verbose(t: Transcript, task: str, word_level: bool, segment_level: bool) ->
                 "end": round(s.end, 3),
                 "text": s.text,
                 "tokens": [],
-                "temperature": 0.0,
+                "temperature": s.temperature if s.temperature is not None else 0.0,
                 "avg_logprob": s.avg_logprob if s.avg_logprob is not None else 0.0,
                 "compression_ratio": 0.0,
                 "no_speech_prob": s.no_speech_prob if s.no_speech_prob is not None else 0.0,

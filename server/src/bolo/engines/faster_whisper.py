@@ -35,6 +35,12 @@ _NO_CUDA = re.compile(
 _BATCHABLE = ("repetition_penalty", "no_repeat_ngram_size")
 
 
+def _temperature(seg: Any) -> float | None:
+    """The temperature faster-whisper decoded ``seg``'s window at (after any fallback), when it says."""
+    value = getattr(seg, "temperature", None)
+    return float(value) if value is not None else None
+
+
 def _temperatures(start: float, increment: float | None) -> float | list[float]:
     """``temperature``, or with a fallback increment the temperatures faster-whisper retries at when a window fails
     ``compression_ratio_threshold`` or ``log_prob_threshold`` (as in OpenAI's Whisper: 0.0, 0.2, ... 1.0)."""
@@ -173,7 +179,13 @@ class FasterWhisperSTT(STTModel):
             words.extend(seg_words)
             out.append(
                 Segment(
-                    float(seg.start), float(seg.end), seg.text.strip(), seg_words, seg.avg_logprob, seg.no_speech_prob
+                    float(seg.start),
+                    float(seg.end),
+                    seg.text.strip(),
+                    seg_words,
+                    seg.avg_logprob,
+                    seg.no_speech_prob,
+                    temperature=_temperature(seg),
                 )
             )
         text = " ".join(s.text for s in out).strip()
@@ -230,6 +242,7 @@ class FasterWhisperSTT(STTModel):
                     [],
                     seg.avg_logprob,
                     seg.no_speech_prob,
+                    temperature=_temperature(seg),
                 )
             )
         return [

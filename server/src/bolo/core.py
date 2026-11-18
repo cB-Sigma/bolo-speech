@@ -1655,6 +1655,8 @@ class Bolo:
         pending: list[asyncio.Future[Any]] = [submit(i) for i in range(min(window, len(chunks)))]
         segments: list[Segment] = []
         words: list[Word] = []
+        #: the temperature a segment was decoded at when its model does not say: the request's, if it samples at all
+        used = temperature if "temperature" in stt.request_fields else 0.0
         detected: str | None = language
         probability: float | None = None
         trimmed = 0
@@ -1709,6 +1711,7 @@ class Bolo:
                         speakers[index] if speakers else seg.speaker,
                         bool(overlapped and overlapped[index]),
                         bool(sources and sources[index] is not None),
+                        used if seg.temperature is None else seg.temperature,
                     )
                     if not shifted.text:
                         continue
@@ -1780,6 +1783,7 @@ class Bolo:
         trace.add_phase("decode", info.started, info.finished)
         self.traces.observe_latency(entry.id, "stt", queue_ms=(info.started - submitted) * 1000.0)
         segments: list[Segment] = []
+        sampled = temperature if "temperature" in stt.request_fields else 0.0
         for k, result in enumerate(results):
             label = diarize.label(k)
             pieces = result.segments or ([Segment(0.0, duration, result.text)] if result.text.strip() else [])
@@ -1790,7 +1794,15 @@ class Bolo:
                 overlap = any(o.start < seg.end and o.end > seg.start and k in o.speakers for o in overlaps)
                 segments.append(
                     Segment(
-                        seg.start, seg.end, text, list(seg.words), seg.avg_logprob, seg.no_speech_prob, label, overlap
+                        seg.start,
+                        seg.end,
+                        text,
+                        list(seg.words),
+                        seg.avg_logprob,
+                        seg.no_speech_prob,
+                        label,
+                        overlap,
+                        temperature=sampled if seg.temperature is None else seg.temperature,
                     )
                 )
         segments.sort(key=lambda seg: (seg.start, seg.end))

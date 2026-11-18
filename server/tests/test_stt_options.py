@@ -236,6 +236,31 @@ def test_request_fields_a_model_does_not_use_are_named(live: LiveServer) -> None
     assert "x-bolo-ignored-options" not in _post(live, hotwords="Zintrava", temperature=0.4).headers
 
 
+def test_verbose_json_segments_report_the_temperature_used(live: LiveServer) -> None:
+    def temperatures(**fields: Any) -> list[float]:
+        r = _post(live, response_format="verbose_json", **fields)
+        assert r.status_code == 200, r.text
+        return [s["temperature"] for s in r.json()["segments"]]
+
+    assert temperatures() == [0.0]
+    assert temperatures(temperature=0.4) == [0.4]
+    model = live.core.manager.loaded["fake-stt"].model
+    model.request_fields = ("prompt",)  # type: ignore[misc]
+    try:  # a model that does not sample decoded greedily, whatever was asked
+        assert temperatures(temperature=0.4) == [0.0]
+    finally:
+        model.request_fields = ("prompt", "hotwords", "temperature")  # type: ignore[misc]
+
+
+def test_faster_whisper_segments_carry_the_temperature_of_their_window() -> None:
+    from types import SimpleNamespace
+
+    from bolo.engines.faster_whisper import _temperature
+
+    assert _temperature(SimpleNamespace(temperature=0.6)) == 0.6  # a window that fell back from 0.0
+    assert _temperature(SimpleNamespace()) is None
+
+
 def test_whispercpp_puts_hotwords_into_the_initial_prompt() -> None:
     from bolo.engines.whispercpp import WhisperCppSTT, initial_prompt
 
