@@ -466,6 +466,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   test keeps it so.
 ### Fixed
 
+- `bolo telephony simulate` and `POST /api/v1/telephony/simulate` read the call's record 0.2 s after hanging up, so
+  on a busy machine the report could miss the last turn and the outcome; they now wait until the server has closed
+  the record.
 - macOS: a plugin worker with a memory limit (`plugin_memory_limit_mb` > 0) did not start ("Exception occurred in
   preexec_fn"): macOS refuses an address-space limit below what every process reserves there and does not enforce
   one. On macOS the limit is now not applied (bolo logs that once) and the worker starts; Linux and Windows are

@@ -948,6 +948,19 @@ def simulator_agent(core: Bolo, name: str | None) -> AgentConfig:
     return AgentConfig(name="simulator", greeting="Hello, how can I help you?", silence_timeout_s=4.0, source="builtin")
 
 
+async def _until_ended(link: Link, sim: ProviderSim, timeout_s: float = 15.0) -> None:
+    """Wait until the server has closed the call's record (it does when it sees the stream end), so the report reads
+    the finished call: its last turn, the outcome and the "ended" event. A busy machine takes longer than any fixed
+    pause; after ``timeout_s`` the report reads the record as it is. No record (a call this link did not place):
+    nothing to wait for."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        record = await link.record(sim)
+        if record is None or record.get("status") == "ended":
+            return
+        await asyncio.sleep(0.05)
+
+
 async def run_scenario(
     core: Bolo, scenario: Any, *, agent: str | None = None, provider: str = "twilio", noise_db: Any = None,
     link: Link | None = None, caller_voice: str | None = None, caller_tts: str | None = None,
@@ -973,7 +986,7 @@ async def run_scenario(
     caller = Caller(link, sim, noise_db=None if noise is None else float(noise), speech=speech)
     started = time.perf_counter()
     await caller.run(doc, str(doc.get("from") or CALLER), str(doc.get("to") or CALLED))
-    await asyncio.sleep(0.2)  # the server closes the record when it sees the stream end
+    await _until_ended(caller.link, sim)  # the server closes the record when it sees the stream end
     after = await caller.link.after(sim)
     record = await caller.link.record(sim)
     checks = [_check(e, caller, record, after) for e in doc.get("expect") or []]
