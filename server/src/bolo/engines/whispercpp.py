@@ -4,11 +4,17 @@ Optional. Loads a single GGML/GGUF Whisper file (``ggml-*.bin``). Use it
 with ``bolo pull hf:ggerganov/whisper.cpp --kind whispercpp`` and an
 ``include`` for the file you want, or register a local directory.
 
-Untested by the maintainers in this release.
+It runs on the GPU when the installed pywhispercpp was built with one (its macOS arm64 wheels have Metal; the
+Linux and Windows wheels are CPU builds, ``GGML_CUDA=1`` / ``GGML_HIP=1`` / ``GGML_VULKAN=1 pip install
+pywhispercpp --no-binary pywhispercpp`` builds one): :func:`gpu_families` reads the build from whisper.cpp's system
+information, and the model asks for the GPU (``use_gpu``) only when it was placed on one.
 """
 
 from __future__ import annotations
 
+import functools
+import inspect
+import re
 import threading
 from pathlib import Path
 from typing import Any
@@ -38,6 +44,31 @@ def initial_prompt(prompt: str | None, hotwords: str | None) -> str:
     """The request's prompt with its hotwords after it: whisper.cpp has no hotword parameter, and terms in the
     initial prompt steer Whisper towards their spelling (faster-whisper puts its ``hotwords`` there too)."""
     return " ".join(part.strip() for part in (prompt, hotwords) if part and part.strip())
+
+
+#: whisper.cpp's system information names a GPU back end it was built with ("MTL : EMBED_LIBRARY = 1", "CUDA : ...")
+_BACKENDS = {"metal": ("MTL", "METAL"), "cuda": ("CUDA",), "rocm": ("HIP", "ROCM"), "vulkan": ("VULKAN",)}
+
+
+def families_of(system_info: str) -> frozenset[str]:
+    """The bolo ``device`` families a whisper.cpp build can use, from ``whisper_print_system_info()``."""
+    words = {w.upper() for w in re.findall(r"[A-Za-z]+(?=\s*:)", system_info or "")}
+    return frozenset(f for f, names in _BACKENDS.items() if words & set(names))
+
+
+@functools.lru_cache(maxsize=1)
+def gpu_families() -> frozenset[str]:
+    """:func:`families_of` the installed pywhispercpp (empty when it is not installed or is a CPU build)."""
+    try:
+        import _pywhispercpp as pw
+
+        return families_of(str(pw.whisper_print_system_info()))
+    except Exception:
+        return frozenset()
+
+
+def _on_gpu(device: str | None) -> bool:
+    return (device or "cpu").split(":", 1)[0].strip().lower() not in ("", "cpu", "auto")
 
 
 class WhisperCppSTT(STTModel):
@@ -82,6 +113,10 @@ class WhisperCppSTT(STTModel):
         else the top heads) and cannot run with flash attention, which is then off. A binding without context
         parameters loads the model without DTW; words then come from whisper.cpp's coarser token timestamps."""
         kwargs: dict[str, Any] = {"n_threads": opts.threads, "print_progress": False, "print_realtime": False}
+        # the GPU only when the model was placed on one (whisper.cpp's own default is to use it when it can)
+        gpu: dict[str, Any] = {"use_gpu": _on_gpu(opts.device)}
+        if gpu["use_gpu"] and opts.device.partition(":")[2].isdigit():
+            gpu["gpu_device"] = int(opts.device.partition(":")[2])
         #: word times come from DTW (True) or from the plain token timestamps
         self.dtw = False
         if spec.get("dtw", True):
@@ -89,12 +124,14 @@ class WhisperCppSTT(STTModel):
                 import _pywhispercpp as pw
 
                 preset = _aheads_preset(pw, file.name)
-                context = {"flash_attn": False, "dtw_token_timestamps": True, "dtw_aheads_preset": preset}
+                context = {"flash_attn": False, "dtw_token_timestamps": True, "dtw_aheads_preset": preset, **gpu}
                 model = cpp_model(str(file), context_params=context, **kwargs)
                 self.dtw = True
                 return model
             except TypeError:  # pywhispercpp before context_params
                 pass
+        if "context_params" in inspect.signature(cpp_model.__init__).parameters:
+            return cpp_model(str(file), context_params=gpu, **kwargs)
         return cpp_model(str(file), **kwargs)
 
     def transcribe(self, requests: list[STTRequest]) -> list[STTResult]:

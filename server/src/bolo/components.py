@@ -710,7 +710,7 @@ class ComponentManager:
 
     def install_runtime_blocking(self, runtime: str, job: Job | None = None, flavour: str | None = None) -> str | None:
         """Download the pinned release archive for this platform, check its SHA-256 and unpack it into the folder of
-        its build (``flavour``, else the one ``device`` asks for: ``<runtime>/<version>/cpu|cuda|vulkan``)."""
+        its build (``flavour``, else the one ``device`` asks for: ``<runtime>/<version>/cpu|cuda|vulkan|rocm``)."""
         from bolo.store import RemoteFile
 
         info = tts_runtimes.RUNTIME_INFO[runtime]
@@ -815,7 +815,7 @@ class ComponentManager:
 
     # -- install ----------------------------------------------------------
     def start_install(self, component: str, accept_license: bool, flavour: str | None = None) -> Job:
-        """Start installing ``component``; ``flavour`` (``cpu``, ``cuda``, ``vulkan``) picks the build of
+        """Start installing ``component``; ``flavour`` (``cpu``, ``cuda``, ``vulkan``, ``rocm``) picks the build of
         llama-server or audio.cpp, which is otherwise the one ``device`` asks for."""
         if component in duplex_runtime.COMPONENTS:
             blocked = self.duplex_blocked_reason(component, flavour)

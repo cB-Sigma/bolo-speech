@@ -1494,7 +1494,7 @@ def _server_build(entry: dict[str, Any]) -> str:
     flavour = entry.get("flavour")
     if devices:
         return "GPU build: " + "; ".join(devices)
-    if devices is not None and flavour in ("cuda", "vulkan"):
+    if devices is not None and flavour in ("cuda", "vulkan", "rocm"):
         return f"{flavour} build, but it found no GPU"
     return {True: "GPU build", False: "CPU build", None: "GPU support unknown"}[entry.get("gpu")]
 
@@ -1555,11 +1555,31 @@ def _hardware_lines(hw: dict[str, Any]) -> list[str]:
         else "CTranslate2 not installed"
     )
     torch = rt.get("plugin:torch", {})
-    parts.append(
-        f"torch plugin (device: {_unknown(torch.get('device'))})"
-        if torch.get("installed")
-        else "torch plugin not installed"
-    )
+    if torch.get("installed"):
+        extra = "".join(
+            f", {label}: {'yes' if torch[key] else 'no'}"
+            for key, label in (("mps", "MPS"), ("rocm", "ROCm build"))
+            if torch.get(key) is not None
+        )
+        parts.append(f"torch plugin (device: {_unknown(torch.get('device'))}{extra})")
+    else:
+        parts.append("torch plugin not installed")
+    wcpp = rt.get("whisper.cpp", {})
+    if wcpp.get("installed"):
+        backends = ", ".join(wcpp.get("backends") or []) or "CPU build"
+        parts.append(f"pywhispercpp {wcpp.get('version') or ''} ({backends})".replace("  ", " "))
+    mlx = rt.get("mlx", {})
+    if mlx.get("installed"):
+        on = "Metal" if mlx.get("metal") else "CPU only" if mlx.get("metal") is False else "Metal: unknown"
+        audio = f", mlx-audio {mlx['mlx_audio']}" if mlx.get("mlx_audio") else ", mlx-audio not installed"
+        parts.append(f"MLX {mlx.get('version') or ''} ({on}{audio})".replace("  ", " "))
+    rocm = rt.get("rocm")
+    if rocm is not None and (rocm.get("installed") or any(g["vendor"] == "amd" for g in hw["gpus"])):
+        parts.append(
+            f"ROCm {rocm.get('version') or ''} ({rocm.get('path')})".replace("  ", " ")
+            if rocm.get("installed")
+            else "ROCm not installed"
+        )
     for name in ("llama-server", "audio.cpp"):
         entry = rt.get(name, {})
         if entry.get("installed"):
@@ -2328,7 +2348,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.add_argument(
         "--flavour",
-        choices=["cpu", "cuda", "vulkan", "pytorch", "mlx", "candle"],
+        choices=["cpu", "cuda", "vulkan", "rocm", "pytorch", "mlx", "candle"],
         default=None,
         help="llama-server, audio.cpp: the build to install (default: the one `device` asks for; each build has its "
         "own folder, and the one matching `device` runs); moshi: pytorch (NVIDIA GPU, the default on Linux and "

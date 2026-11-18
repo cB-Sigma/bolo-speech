@@ -685,7 +685,7 @@ class InstallRequest(BaseModel):
     accept_license: bool = False
     flavour: str | None = Field(
         default=None,
-        description="llama-server, audio.cpp: the build, `cpu`, `cuda` or `vulkan` (default: `device`'s); moshi: "
+        description="llama-server, audio.cpp: the build, `cpu`, `cuda`, `vulkan` or `rocm` (default: `device`'s); moshi: "
         "`pytorch`, `mlx` or `candle` (default: the platform's); personaplex: `pytorch`",
     )
 

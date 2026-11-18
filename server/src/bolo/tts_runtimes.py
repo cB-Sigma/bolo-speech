@@ -111,6 +111,14 @@ RUNTIME_INFO: dict[str, Runtime] = {
                 "e5144c8499399c115c7f5319421942252e9e84bf7d78b46f968cd5dbc769df72",
                 36187166,
             ),
+            # the ROCm (HIP) build for AMD GPUs (gfx908 to gfx1201: Instinct MI100 to MI350, Radeon RX 5000 to 9000,
+            # the Radeon 780M / 890M / 8060S APUs); built against ROCm 10.0 (TheRock), it needs a ROCm runtime on
+            # the machine (libamdhip64, hipBLAS, rocBLAS: docs/rocm.md). Pinned, never run by bolo's CI
+            "linux-x86_64-rocm": Release(
+                "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-ubuntu-rocm-10.0-x64.tar.gz",
+                "5c497ae8b61166f05fbc252f1e80dd9c16c9c8207361907f979b6227c66f398b",
+                271139915,
+            ),
             "linux-aarch64": Release(
                 "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-ubuntu-arm64.tar.gz",
                 "122ae6ea1a24d713ca9a3e9094fcc1c766e6547373a7356f97668f24310daf13",
@@ -148,6 +156,14 @@ RUNTIME_INFO: dict[str, Runtime] = {
                 "8990615f25d4fa12a7f1d8fc9da995538ce739fec01838f003fa9ff099d643f0",
                 38113510,
             ),
+            # the ROCm (HIP) build for Radeon GPUs on Windows: brings its own HIP runtime DLLs (amdhip64_7.dll and
+            # the rest, next to llama-server.exe); needs an Adrenalin driver recent enough for ROCm 10. Pinned, never
+            # run by bolo's CI
+            "windows-x86_64-rocm": Release(
+                "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-win-rocm-10.0-x64.zip",
+                "8875fed51d3226f0e1dec7c35a01a96bec184dff355c5895ef176d6a66d2a58f",
+                280406784,
+            ),
             "windows-arm64": Release(
                 "https://github.com/ggml-org/llama.cpp/releases/download/b12375/llama-b12375-bin-win-cpu-arm64.zip",
                 "dcbbd1217956893f91714e58bba95fe87dda272a3e72aabe46513a1ce9113cac",
@@ -160,7 +176,7 @@ RUNTIME_INFO: dict[str, Runtime] = {
             "LFM3-Audio and Fish Drama 3 GGUF models. bolo starts it on a loopback port for the model in use, or "
             "connects to one you run (setting tts_servers). The prebuilt release is the CPU build (Metal on Apple "
             "Silicon); device = vulkan installs the Vulkan build on Linux x86-64 and Windows, device = cuda the CUDA 12 "
-            "build on Windows. llama.cpp publishes no CUDA build for Linux: there, use the Vulkan build or point "
+            "build on Windows, device = rocm the ROCm (HIP) build for AMD GPUs on Linux x86-64 and Windows. llama.cpp publishes no CUDA build for Linux: there, use the Vulkan build or point "
             "llama_server_bin at a CUDA build of your own."
         ),
     ),
@@ -286,13 +302,17 @@ def is_checkout(path: Path) -> bool:
 
 #: the builds of a release runtime: "cpu" is the platform's default build (on Apple Silicon it has Metal)
 CPU_FLAVOUR = "cpu"
-FLAVOURS = (CPU_FLAVOUR, "cuda", "vulkan")
+FLAVOURS = (CPU_FLAVOUR, "cuda", "vulkan", "rocm")
+#: the API each GPU build is written for, for messages
+_BUILD_NAMES = {"cuda": "CUDA", "vulkan": "Vulkan", "rocm": "ROCm (HIP)"}
 
 
 def _flavour(device: str | None) -> str | None:
-    """The build a GPU device asks for (``cuda:1`` → ``cuda``), when a platform has one; None: the default build."""
+    """The build a GPU device asks for (``cuda:1`` → ``cuda``, ``hip`` → ``rocm``), when a platform has one; None:
+    the default build."""
     kind = (device or "").split(":", 1)[0].strip().lower()
-    return kind if kind in ("cuda", "vulkan") else None
+    kind = {"hip": "rocm", "gpu": "cuda"}.get(kind, kind)
+    return kind if kind in ("cuda", "vulkan", "rocm") else None
 
 
 def _release_key(flavour: str) -> str:
@@ -326,7 +346,7 @@ def missing_build_note(runtime: str, device: str | None = None) -> str | None:
     return (
         f"device {device!r}: {info.name} {info.version} has no prebuilt {wanted} build for {platform_key()}, so the "
         f"CPU build is installed and runs on the CPU; for the GPU, {other}build {info.binary} with "
-        f"{'CUDA' if wanted == 'cuda' else 'Vulkan'} and set {info.setting} to it: see "
+        f"{_BUILD_NAMES[wanted]} and set {info.setting} to it: see "
         f"{GPU_BUILD_DOCS}"
     )
 
@@ -354,6 +374,8 @@ def detect_flavour(folder: Path, skip: tuple[str, ...] = ()) -> str:
         for p in folder.rglob("*")
         if p.is_file() and not (skip and p.relative_to(folder).parts[0] in skip)
     )
+    if "ggml-hip" in names or "amdhip" in names:
+        return "rocm"
     if "cuda" in names or "cublas" in names:
         return "cuda"
     if "vulkan" in names:
@@ -395,9 +417,9 @@ def _preference(runtime: str, device: str | None) -> list[str]:
     """The installed builds to start, best first: the one ``device`` asks for (with ``auto``, the GPU builds first:
     whichever one was installed); then the others, so that a model still runs on the build that is there."""
     if (device or "").strip().lower() == "auto":
-        return ["cuda", "vulkan", CPU_FLAVOUR]
+        return ["cuda", "rocm", "vulkan", CPU_FLAVOUR]
     wanted = flavour_for(runtime, device)
-    rest = ["vulkan", CPU_FLAVOUR] if wanted == "cuda" else [CPU_FLAVOUR, "vulkan", "cuda"]
+    rest = ["vulkan", CPU_FLAVOUR] if wanted in ("cuda", "rocm") else [CPU_FLAVOUR, "vulkan", "cuda", "rocm"]
     return [wanted, *(f for f in rest if f != wanted)]
 
 

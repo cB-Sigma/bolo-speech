@@ -43,6 +43,8 @@ ENGINE_FAMILIES: dict[str, frozenset[str]] = {
     "faster-whisper": frozenset({"cuda"}),
     "onnxruntime": _ORT,
     "tts-server": frozenset({"cuda", "metal", "rocm", "vulkan"}),
+    # MLX: Apple silicon's GPU through Metal (bolo.engines.mlx); elsewhere it runs on the CPU
+    "mlx": frozenset({"metal"}),
     "fake": frozenset({"cuda", "metal", "rocm", "vulkan", *_ORT}),
 }
 #: (engine, kind) -> device families that cannot run such a model although the engine can use them, and why: it is
@@ -84,8 +86,10 @@ def family(device: str | None) -> str:
     name = (device or "cpu").strip().lower().partition(":")[0]
     if name in ("cuda", "gpu"):
         return "cuda"
-    if name in ("coreml", "mps", "metal"):
+    if name in ("coreml", "mps", "metal", "mlx"):
         return "metal"
+    if name in ("hip", "migraphx"):
+        return "rocm"
     if name == "directml":
         return "dml"
     return name or "cpu"
@@ -98,7 +102,12 @@ def partly_on_cpu(engine_id: str, kind: str, device: str) -> str | None:
 
 def engine_families(engine_id: str) -> frozenset[str]:
     if engine_id.startswith("plugin:"):
-        return frozenset({"cuda", "metal"})
+        # PyTorch: CUDA, ROCm (a ROCm build of torch serves torch.cuda) and Apple's MPS
+        return frozenset({"cuda", "rocm", "metal"})
+    if engine_id == "whisper.cpp":  # what the installed pywhispercpp was built with (Metal in its macOS wheels)
+        from bolo.engines.whispercpp import gpu_families
+
+        return gpu_families()
     return ENGINE_FAMILIES.get(engine_id, frozenset())
 
 

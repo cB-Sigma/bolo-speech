@@ -28,7 +28,11 @@ CPU = "CPUExecutionProvider"
 PROVIDER_BY_DEVICE = {
     "cuda": "CUDAExecutionProvider",
     "gpu": "CUDAExecutionProvider",
-    "rocm": "ROCMExecutionProvider",
+    # AMD: ``rocm`` (and ``hip``) is MIGraphX where the build has it (onnxruntime-migraphx, the AMD build ONNX
+    # Runtime still publishes), else the older ROCm provider (onnxruntime-rocm, last released for ONNX Runtime 1.22):
+    # :func:`amd_provider`
+    "rocm": "MIGraphXExecutionProvider",
+    "hip": "MIGraphXExecutionProvider",
     "migraphx": "MIGraphXExecutionProvider",
     "dml": "DmlExecutionProvider",
     "directml": "DmlExecutionProvider",
@@ -39,7 +43,17 @@ PROVIDER_BY_DEVICE = {
 }
 
 #: tried in this order for ``device = "auto"``
-AUTO_ORDER = ("CUDAExecutionProvider", "ROCMExecutionProvider", "DmlExecutionProvider", "CoreMLExecutionProvider")
+AUTO_ORDER = (
+    "CUDAExecutionProvider", "MIGraphXExecutionProvider", "ROCMExecutionProvider", "DmlExecutionProvider",
+    "CoreMLExecutionProvider",
+)  # fmt: skip
+#: the providers that run on an AMD GPU, best first
+AMD_PROVIDERS = ("MIGraphXExecutionProvider", "ROCMExecutionProvider")
+#: how to get an ONNX Runtime that runs on an AMD GPU (Linux, with ROCm installed: docs/rocm.md)
+ROCM_RECIPE = (
+    "pip uninstall -y onnxruntime onnxruntime-gpu, then pip install onnxruntime-migraphx (Linux x86-64, with "
+    "ROCm and MIGraphX installed; docs/rocm.md)"
+)
 
 _WITH_DEVICE_ID = {
     "CUDAExecutionProvider",
@@ -47,6 +61,16 @@ _WITH_DEVICE_ID = {
     "MIGraphXExecutionProvider",
     "DmlExecutionProvider",
 }
+
+
+def amd_provider(name: str, have: list[str]) -> str:
+    """The provider ``device`` ``name`` asks for: for ``rocm`` and ``hip``, the AMD provider this build has
+    (MIGraphX first, else ROCm; MIGraphX when it has neither, for the message); else :data:`PROVIDER_BY_DEVICE`."""
+    if name in ("rocm", "hip"):
+        return next((p for p in AMD_PROVIDERS if p in have), AMD_PROVIDERS[0])
+    return PROVIDER_BY_DEVICE.get(name, "")
+
+
 _warned: set[str] = set()
 
 
@@ -94,12 +118,12 @@ def providers_for(device: str | None, available: list[str] | None = None) -> lis
         if chosen == "DmlExecutionProvider":
             return [_dml(default_dml_index()), CPU]
         return [chosen, CPU] if chosen else [CPU]
-    wanted = PROVIDER_BY_DEVICE.get(name)
+    wanted = amd_provider(name, have) or None
     if wanted is None:
         _warn_once(kind, f"device {device!r} is not known to ONNX Runtime engines; they run on the CPU")
         return [CPU]
     if wanted not in have:
-        hint = cuda_hint(have) if wanted == "CUDAExecutionProvider" else ""
+        hint = cuda_hint(have) if wanted == "CUDAExecutionProvider" else ROCM_RECIPE if wanted in AMD_PROVIDERS else ""
         _warn_once(
             kind,
             f"device {device!r} asks for {wanted}, which this ONNX Runtime build does not have "
@@ -107,7 +131,10 @@ def providers_for(device: str | None, available: list[str] | None = None) -> lis
         )
         from bolo import cuda_libs
 
-        recipe = {"CUDAExecutionProvider": cuda_hint(have), "DmlExecutionProvider": DIRECTML_RECIPE}
+        recipe = {
+            "CUDAExecutionProvider": cuda_hint(have), "DmlExecutionProvider": DIRECTML_RECIPE,
+            "MIGraphXExecutionProvider": ROCM_RECIPE, "ROCMExecutionProvider": ROCM_RECIPE,
+        }  # fmt: skip
         cuda_libs.record(
             cuda_libs.ProviderFallback(
                 "onnxruntime", wanted, CPU, [], f"this ONNX Runtime build has no {wanted}", recipe.get(wanted, "")
@@ -124,6 +151,7 @@ def providers_for(device: str | None, available: list[str] | None = None) -> lis
 #: the ``device`` that reaches each provider of :data:`AUTO_ORDER`
 DEVICE_BY_PROVIDER = {
     "CUDAExecutionProvider": "cuda",
+    "MIGraphXExecutionProvider": "rocm",
     "ROCMExecutionProvider": "rocm",
     "DmlExecutionProvider": "dml",
     "CoreMLExecutionProvider": "coreml",
@@ -133,17 +161,20 @@ DEVICE_BY_PROVIDER = {
 def auto_device(found: str | None, available: list[str] | None = None) -> str:
     """What ``device = "auto"`` means for the engines that open ONNX Runtime sessions themselves.
 
-    ``found`` is the accelerator bolo.accel found (``cuda:0``, ``coreml`` or None). The answer is the first provider
+    ``found`` is the accelerator bolo.accel found (``cuda:0``, ``rocm:0``, ``coreml`` or None). The answer is the first provider
     of :data:`AUTO_ORDER` this ONNX Runtime build has, as a ``device``: ``cuda`` only when an NVIDIA GPU was found
     (onnxruntime-gpu on a machine without one accelerates nothing), ``dml`` for onnxruntime-directml (Windows'
     high-performance adapter, as :func:`providers_for` runs ``dml``), ``rocm``, ``coreml``; ``cpu`` when the build
-    has none. So onnxruntime-directml on a laptop with an NVIDIA GPU runs on DirectML, not on the CPU for want of a
+    has none. ``rocm`` (MIGraphX, else the ROCm provider) only when an AMD GPU was found, as for CUDA. So
+    onnxruntime-directml on a laptop with an NVIDIA GPU runs on DirectML, not on the CPU for want of a
     CUDA provider it does not have; engines with their own CUDA (faster-whisper, sherpa-onnx) still get ``cuda``."""
     have = available if available is not None else available_providers()
     for provider in AUTO_ORDER:
         if provider not in have:
             continue
         if provider == "CUDAExecutionProvider" and not (found or "").startswith("cuda"):
+            continue
+        if provider in AMD_PROVIDERS and not (found or "").startswith("rocm"):
             continue
         return DEVICE_BY_PROVIDER[provider]
     return "cpu"
@@ -245,6 +276,8 @@ def create_session(
             recipe = cuda_libs.CUDA_RECIPE
         elif wanted == "DmlExecutionProvider":
             recipe = DIRECTML_RECIPE
+        elif wanted in AMD_PROVIDERS:
+            recipe = ROCM_RECIPE
         lines = [ln for ln in text.splitlines() if wanted.removesuffix("ExecutionProvider") in ln or "rror" in ln]
         fallback = cuda_libs.ProviderFallback(
             "onnxruntime", wanted, running[0] if running else CPU, missing, "\n".join(lines[-3:]), recipe, role
@@ -336,6 +369,13 @@ def sherpa_provider(device: str | None) -> str:
         return "cuda"
     if name in ("coreml", "mps", "metal"):
         return "coreml"
+    if name in ("rocm", "hip", "migraphx"):
+        _warn_once(
+            "sherpa-rocm",
+            f"device {device!r}: sherpa-onnx has no ROCm build, so its engines (most speech recognition and voices) "
+            "run on the CPU; the engines that use ONNX Runtime directly run on the AMD GPU with onnxruntime-migraphx, "
+            "llama.cpp voices with the ROCm build of llama-server (docs/rocm.md)",
+        )
     if name in ("dml", "directml"):
         _warn_once(
             "sherpa-dml",
@@ -348,7 +388,7 @@ def sherpa_provider(device: str | None) -> str:
 #: the PyPI distributions that each install the same ``onnxruntime`` module
 ORT_PACKAGES = (
     "onnxruntime", "onnxruntime-gpu", "onnxruntime-directml", "onnxruntime-openvino", "onnxruntime-qnn",
-    "onnxruntime-rocm", "onnxruntime-silicon",
+    "onnxruntime-rocm", "onnxruntime-migraphx", "onnxruntime-silicon",
 )  # fmt: skip
 
 DIRECTML_RECIPE = (
@@ -375,7 +415,8 @@ def installed_ort_packages(versions: dict[str, str | None] | None = None) -> dic
 _BUILD = {
     "onnxruntime": "the CPU build", "onnxruntime-directml": "the DirectML build",
     "onnxruntime-openvino": "the OpenVINO build", "onnxruntime-qnn": "the Qualcomm QNN build",
-    "onnxruntime-rocm": "the ROCm build", "onnxruntime-silicon": "the Apple silicon build",
+    "onnxruntime-rocm": "the ROCm build", "onnxruntime-migraphx": "the AMD MIGraphX build",
+    "onnxruntime-silicon": "the Apple silicon build",
 }  # fmt: skip
 
 
@@ -435,9 +476,14 @@ def ort_problems(device: str | None, packages: dict[str, str], providers: list[s
             "module and overwrite each other's files: keep one (uninstall all of them, then install the one you want)"
         )
     name = (device or "cpu").strip().lower().partition(":")[0]
-    wanted = PROVIDER_BY_DEVICE.get(name)
+    wanted = amd_provider(name, providers or []) or None
     if wanted and providers is not None and wanted not in providers and packages:
-        if wanted == "DmlExecutionProvider":
+        if wanted in AMD_PROVIDERS:
+            out.append(
+                f"device {device!r} needs ONNX Runtime's MIGraphX (or ROCm) provider, which this one lacks: "
+                f"{ROCM_RECIPE}"
+            )
+        elif wanted == "DmlExecutionProvider":
             out.append(f"device {device!r} needs DirectML in ONNX Runtime, which this one lacks: {DIRECTML_RECIPE}")
         elif wanted == "CUDAExecutionProvider":
             out.append(f"device {device!r}: {no_cuda_provider(packages)} (faster-whisper brings its own CUDA support)")

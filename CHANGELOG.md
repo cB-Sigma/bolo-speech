@@ -50,6 +50,18 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   `instruct` option (Maya1 gets a neutral voice description when a request has none), IndexTTS-2 and 2.5 as their
   emotion text, Parler-TTS and Indic Parler-TTS (bolo-torch) as the voice description, `openai-gpt-4o-mini-tts` as
   OpenAI's `instructions`. Other models speak as before; `x-bolo-instructions: applied | ignored` says which.
+- **AMD GPUs through ROCm (untested on real hardware).** `device = "rocm"` (also `hip`, `rocm:N`) runs the ONNX
+  Runtime engines on MIGraphX (`onnxruntime-migraphx`, else the older ROCm provider), installs and starts llama.cpp's
+  HIP build of llama-server (`bolo components install llama-server --flavour rocm`, Linux x86-64 and Windows, pinned
+  by SHA-256), gives the torch plugin a ROCm build of PyTorch's GPU, and whisper.cpp its HIP build when pywhispercpp
+  was built with one. `device = "auto"` picks an AMD GPU when there is no NVIDIA GPU. `bolo doctor` lists AMD GPUs
+  from the amdgpu driver (name, VRAM, busy percent, APUs as unified memory), finds ROCm and says when it is missing;
+  `bolo recommend` says which engines can use the GPU. sherpa-onnx and faster-whisper stay on the CPU (no ROCm
+  builds). bolo's CI has no AMD GPU: only the selection logic is tested. See docs/rocm.md.
+- **Apple Silicon: whisper.cpp on Metal, the torch plugin on MPS.** whisper.cpp models run on the GPU when the
+  installed pywhispercpp has Metal (its macOS arm64 wheels do) and `device` is not `cpu`; the torch plugin takes
+  bolo's `coreml` (what `auto` becomes on a Mac) as MPS, and falls back to the CPU with a warning when MPS is not
+  there. `bolo doctor` reports pywhispercpp's GPU back ends, MLX and the plugin's MPS.
 
 - **Sound events and audio tags: `POST /v1/audio/tags`.** Which of AudioSet's 527 sounds a recording holds
   (speech, music and its genres and instruments, singing, laughter, applause, alarms, animals, engines...), each with

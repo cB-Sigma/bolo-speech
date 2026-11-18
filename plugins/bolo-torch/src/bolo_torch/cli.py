@@ -78,6 +78,9 @@ def doctor() -> dict[str, Any]:
         "cuda_available": torch.cuda.is_available(),
         "cuda_devices": [torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())],
         "mps_available": bool(mps is not None and mps.is_available()),
+        # a ROCm build of torch: AMD GPUs through HIP, which serves torch.cuda (cuda_available then means AMD GPUs)
+        "hip_build": getattr(torch.version, "hip", None),
+        "mps_built": bool(mps is not None and mps.is_built()),
         "auto_device": pick_device("auto"),
         "threads": torch.get_num_threads(),
         "hf_token": bool(hf_token()),

@@ -9,6 +9,12 @@ server (and the processes it started) holds.
   ``own_bytes`` carries what DXGI says this process uses on the matching adapter (``IDXGIAdapter3::
   QueryVideoMemoryInfo``, the local segment's ``CurrentUsage``). bolo.lifecycle then measures a load by this
   process's DXGI usage (in-process runtimes) or by the device's used memory, loads serialised.
+* AMD on Linux (``device = "rocm:N"``): the amdgpu driver's counters in sysfs (``/sys/class/drm/card*/device``:
+  ``mem_info_vram_total``, ``mem_info_vram_used``, ``gpu_busy_percent``, ``product_name``), numbered as HIP numbers
+  them (PCI order, then ``HIP_VISIBLE_DEVICES`` / ``ROCR_VISIBLE_DEVICES``). The driver keeps no per-process figure
+  there, so ``process_bytes`` is None. An APU (Radeon 780M and the like: a small VRAM carve-out, the rest is the
+  machine's memory) is ``unified``. Read without ROCm installed; whether a runtime can use the GPU is bolo doctor's
+  business (bolo.hardware). Not run on a real AMD GPU in bolo's CI (docs/rocm.md).
 * Apple Silicon: the GPU shares the machine's memory. "Free" is the memory the system calls available and
   per-process GPU memory cannot be told apart from ordinary memory; the figures say so (``unified: true``,
   ``process_bytes: null``).
@@ -40,6 +46,7 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import psutil
@@ -59,7 +66,7 @@ class DeviceMemory:
     used_bytes: int | None = None
     #: the GPU shares the machine's memory (Apple Silicon): "used" and "free" are the machine's
     unified: bool = False
-    #: "cuda", "metal" or "dml": the ``device`` family that reaches it
+    #: "cuda", "rocm", "metal" or "dml": the ``device`` family that reaches it
     backend: str = "cuda"
     #: percent of time the GPU was busy over the last sample period, when the driver says
     utilization: float | None = None
@@ -97,10 +104,12 @@ class DeviceMemory:
 
 
 def _family(device: str) -> str:
-    """``cuda:1`` -> ``cuda``; ``mps``/``metal``/``coreml`` -> ``metal``."""
+    """``cuda:1`` -> ``cuda``; ``mps``/``metal``/``coreml`` -> ``metal``; ``hip``/``migraphx`` -> ``rocm``."""
     name = (device or "cpu").strip().lower().partition(":")[0]
     if name in ("cuda", "gpu"):
         return "cuda"
+    if name in ("rocm", "hip", "migraphx"):
+        return "rocm"
     if name in ("coreml", "mps", "metal"):
         return "metal"
     if name == "directml":
@@ -150,6 +159,7 @@ class Accelerators:
         adapters: Callable[[], list[Any] | None] | None = None,
         directml: bool = False,
         cuda_luids: Callable[[], dict[tuple[int, int, int, int], int] | None] | None = None,
+        drm_root: str = "/sys/class/drm",
     ) -> None:
         self._nvml = nvml
         self._nvml_tried = nvml is not None
@@ -176,8 +186,14 @@ class Accelerators:
             if "CUDA_VISIBLE_DEVICES" in env
             else None
         )
+        #: HIP_VISIBLE_DEVICES (else ROCR_VISIBLE_DEVICES) as a list of indices (None: every AMD GPU is visible)
+        hip = env.get("HIP_VISIBLE_DEVICES", env.get("ROCR_VISIBLE_DEVICES"))
+        self.hip_visible: list[str] | None = (
+            [x.strip() for x in hip.split(",") if x.strip()] if hip is not None else None
+        )
+        self._drm_root = drm_root
         self._lock = threading.Lock()
-        #: where the last reading came from: "nvml", "nvidia-smi", "unified", "dxgi", or "" (nothing to ask)
+        #: where the last reading came from: "nvml", "nvidia-smi", "unified", "dxgi", "sysfs", or "" (nothing to ask)
         self.source = ""
 
     # -- public ---------------------------------------------------------------------------------------------
@@ -209,12 +225,13 @@ class Accelerators:
         return _index(device)
 
     def default_device(self) -> str | None:
-        """What ``device = "auto"`` means here: ``cuda:0``, ``coreml``, or None (no accelerator found)."""
-        for d in self.devices():
-            if d.backend == "cuda":
-                return f"cuda:{d.index}"
-            if d.backend == "metal":
-                return "coreml"
+        """What ``device = "auto"`` means here: ``cuda:0`` (an NVIDIA GPU first), ``rocm:0`` (an AMD GPU),
+        ``coreml`` (Apple Silicon), or None (no accelerator found)."""
+        found = self.devices()
+        for backend, name in (("cuda", "cuda:{}"), ("rocm", "rocm:{}"), ("metal", "coreml")):
+            d = next((d for d in found if d.backend == backend), None)
+            if d is not None:
+                return name.format(d.index)
         return None
 
     def close(self) -> None:
@@ -270,8 +287,12 @@ class Accelerators:
         if need_own and adapters:
             self._attach_own(nvidia or [], adapters)
         dml = self._from_dxgi(adapters) if want_dml else []
+        amd = self._from_amd_sysfs() if self._system == "linux" else []
         if nvidia is not None:
-            return self._visible(nvidia) + dml
+            return self._visible(nvidia) + amd + dml
+        if amd:
+            self.source = "sysfs"
+            return amd
         if self._system == "darwin" and self._machine in ("arm64", "aarch64"):
             self.source = "unified"
             return [self._apple()]
@@ -449,6 +470,66 @@ class Accelerators:
                 d.process_bytes = _process_total(held.get(key, []), d.driver_model)
         return devices
 
+    def _from_amd_sysfs(self) -> list[DeviceMemory]:
+        """AMD GPUs the amdgpu driver lists, in PCI order (as HIP numbers them), with ``HIP_VISIBLE_DEVICES``
+        applied; [] when there are none or sysfs cannot be read."""
+        root = Path(self._drm_root)
+        try:
+            cards = sorted(
+                (c for c in root.iterdir() if c.name.startswith("card") and c.name[4:].isdigit()),
+                key=lambda c: int(c.name[4:]),
+            )
+        except OSError:
+            return []
+        found: list[tuple[str, DeviceMemory]] = []
+        for card in cards:
+            base = card / "device"
+            if _read(base / "vendor").lower() != "0x1002":
+                continue
+            total = _int(_read(base / "mem_info_vram_total"))
+            if total is None:  # not the amdgpu driver (or an old one): nothing to measure
+                continue
+            used = _int(_read(base / "mem_info_vram_used"))
+            name = _read(base / "product_name") or f"AMD GPU ({_read(base / 'device')})"
+            busy = _int(_read(base / "gpu_busy_percent"))
+            try:
+                bus = base.resolve().name
+            except OSError:
+                bus = ""
+            d = DeviceMemory(
+                index=len(found),
+                vendor="amd",
+                name=name,
+                total_bytes=total,
+                free_bytes=total - used if used is not None else None,
+                used_bytes=used,
+                backend="rocm",
+                utilization=float(busy) if busy is not None else None,
+                source="sysfs",
+                pci_bus_id=bus if ":" in bus else None,
+            )
+            if total < APU_VRAM_BYTES:  # an APU's carve-out: the GPU works from the machine's memory
+                d.unified = True
+                with contextlib.suppress(Exception):
+                    vm = self._vm()
+                    d.total_bytes, d.free_bytes = int(vm.total), int(vm.available)
+                    d.used_bytes = d.total_bytes - d.free_bytes
+            found.append((bus, d))
+        devices = [d for _, d in found]
+        for d in devices:
+            d.physical_index = d.index
+        if self.hip_visible is None:
+            return devices
+        out: list[DeviceMemory] = []
+        for entry in self.hip_visible:
+            if not entry.isdigit() or int(entry) >= len(devices):
+                break
+            if devices[int(entry)] not in out:
+                out.append(devices[int(entry)])
+        for i, d in enumerate(out):
+            d.index = i
+        return out
+
     def _apple(self) -> DeviceMemory:
         vm = None
         with contextlib.suppress(Exception):
@@ -466,6 +547,24 @@ class Accelerators:
             backend="metal",
             source="unified",
         )
+
+
+#: an AMD GPU with less VRAM than this is an APU's carve-out (512 MB to 1 GB by default), not a graphics card's memory
+APU_VRAM_BYTES = 2 * 1024**3
+
+
+def _read(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return ""
+
+
+def _int(text: str) -> int | None:
+    try:
+        return int(text)
+    except ValueError:
+        return None
 
 
 def _float(text: str) -> float | None:

@@ -689,7 +689,9 @@ def test_real_host_detects_without_raising(tmp_path: Path) -> None:
         "plugin:torch",
         "llama-server",
         "audio.cpp",
-    }
+        "whisper.cpp",
+        "mlx",
+    } | ({"rocm"} if sys.platform == "linux" else set())
 
 
 def test_benchmark_model_and_storage(tmp_path: Path) -> None:

@@ -36,6 +36,25 @@ def test_device_selection(monkeypatch: pytest.MonkeyPatch) -> None:
     assert runtime.pick_device("cpu") == "cuda"
 
 
+def test_bolo_device_names(monkeypatch: pytest.MonkeyPatch) -> None:
+    """bolo resolves ``auto`` to ``coreml`` on Apple silicon and ``rocm`` next to an AMD GPU: MPS and ROCm torch."""
+    monkeypatch.delenv("BOLO_TORCH_DEVICE", raising=False)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: True)
+    assert runtime.pick_device("coreml") == runtime.pick_device("metal") == "mps"
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    assert runtime.pick_device("coreml") == "cpu"  # given by bolo: the CPU, with a warning
+    with pytest.raises(InvalidRequest, match="Metal"):
+        runtime.pick_device("cpu", {"device": "coreml"})  # asked for by name: an error
+    monkeypatch.setattr(torch.version, "hip", None)
+    assert runtime.pick_device("rocm") == "cpu"  # a CUDA or CPU build of torch next to an AMD GPU
+    with pytest.raises(InvalidRequest, match="ROCm build"):
+        runtime.pick_device("cpu", {"device": "rocm"})
+    monkeypatch.setattr(torch.version, "hip", "6.4.43482")
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    assert runtime.pick_device("rocm") == "cuda" and runtime.pick_device("hip:1") == "cuda:1"
+
+
 def test_dtype_selection(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("BOLO_TORCH_DTYPE", raising=False)
     assert runtime.pick_dtype("cpu") == torch.float32

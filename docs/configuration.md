@@ -285,12 +285,16 @@ How a model can be split depends on its runtime:
 | sherpa-onnx | whole model on one device: sherpa-onnx builds its sessions itself, with one provider per model |
 | faster-whisper (CTranslate2) | whole model on one device (CTranslate2 cannot split a model); CUDA only, so `coreml` runs it on the CPU |
 | the SNAC decoder of Orpheus-family voices | whole, on the device of the voice's layers |
-| kokoro-onnx, Moonshine, whisper.cpp, cloud and operator-run servers | the CPU (or wherever the operator's server runs) |
+| whisper.cpp | whole, on the GPU its pywhispercpp was built for (Metal in the macOS arm64 wheels; a CUDA, HIP or Vulkan build of your own), else the CPU |
+| kokoro-onnx, Moonshine, cloud and operator-run servers | the CPU (or wherever the operator's server runs) |
 
-`device = "auto"` means the accelerator bolo can read: the first NVIDIA GPU (NVML or nvidia-smi) or Apple Silicon's
-GPU, else the CPU; for ROCm, DirectML or OpenVINO name the device. The ONNX Runtime engines (Nemotron diarization,
+`device = "auto"` means the accelerator bolo can read: the first NVIDIA GPU (NVML or nvidia-smi), then an AMD GPU
+(the amdgpu driver's counters in `/sys/class/drm`; it becomes `rocm`, see [rocm.md](rocm.md)), then Apple Silicon's
+GPU (it becomes `coreml`, see [apple-silicon.md](apple-silicon.md)), else the CPU; for DirectML or OpenVINO name the
+device. The ONNX Runtime engines (Nemotron diarization,
 DiCoW ONNX, the end-of-turn model, in-process speech-to-speech) take `auto` as the first provider the installed
-`onnxruntime` has, in the order CUDA (with an NVIDIA GPU found), ROCm, DirectML, Core ML: with `onnxruntime-directml`
+`onnxruntime` has, in the order CUDA (with an NVIDIA GPU found), MIGraphX and ROCm (with an AMD GPU found), DirectML,
+Core ML: with `onnxruntime-directml`
 that is `dml` on Windows' high-performance adapter (the discrete GPU of a laptop), even with an NVIDIA GPU, while
 faster-whisper and a CUDA build of sherpa-onnx still get `cuda`; with plain `onnxruntime` (no accelerator) they are
 placed on the CPU. A model placed on an accelerator its runtime does not start (a CUDA library missing, sherpa-onnx

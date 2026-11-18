@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
 from dataclasses import dataclass, field
@@ -10,6 +11,8 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import torch
+
+log = logging.getLogger("bolo_torch")
 
 HF_TOKEN_VARS = ("HF_TOKEN", "BOLO_HF_TOKEN", "HUGGING_FACE_HUB_TOKEN")
 DEVICES = ("auto", "cpu", "cuda", "mps")
@@ -117,30 +120,68 @@ def _torch() -> Any:
     return require("torch", "parler")
 
 
+#: bolo's own ``device`` names for an accelerator, and the torch device each one is: Apple silicon (bolo resolves
+#: ``auto`` to ``coreml`` there) is MPS; an AMD GPU is ``cuda`` in a ROCm build of torch (HIP serves torch.cuda)
+BOLO_ALIASES = {"coreml": "mps", "metal": "mps", "mlx": "mps", "rocm": "cuda", "hip": "cuda", "gpu": "cuda"}
+
+
+def _mps_available(torch: Any) -> bool:
+    mps = getattr(torch.backends, "mps", None)
+    return bool(mps is not None and mps.is_available())
+
+
 def pick_device(requested: str | None, options: dict[str, Any] | None = None) -> str:
-    """``BOLO_TORCH_DEVICE`` > the model's ``device`` option > bolo's ``device`` setting; ``auto`` detects."""
+    """``BOLO_TORCH_DEVICE`` > the model's ``device`` option > bolo's ``device`` setting; ``auto`` detects.
+
+    bolo's names for accelerators are accepted too: ``coreml`` / ``metal`` is MPS and ``rocm`` / ``hip`` is
+    ``cuda`` on a ROCm build of torch. Given by bolo (its ``auto`` resolved to the machine's GPU), a torch build
+    that cannot reach that GPU runs on the CPU with a warning instead of failing (a CPU-only torch next to an AMD
+    GPU, a virtual Mac without Metal); asked for by name in ``BOLO_TORCH_DEVICE`` or the model's option, it fails."""
     options = options or {}
-    choice = (os.environ.get("BOLO_TORCH_DEVICE") or options.get("device") or requested or "auto").strip().lower()
-    base = choice.split(":", 1)[0]
+    chosen = os.environ.get("BOLO_TORCH_DEVICE") or options.get("device")
+    from_bolo = not chosen
+    choice = (chosen or requested or "auto").strip().lower()
+    base, _, index = choice.partition(":")
+    alias = BOLO_ALIASES.get(base)
+    if alias is not None:
+        torch = _torch()
+        hip = getattr(torch.version, "hip", None)
+        if alias == "mps" and not _mps_available(torch):
+            if not from_bolo:
+                raise InvalidRequest(f"device {choice!r} was requested but Metal (MPS) is not available")
+            log.warning("bolo asked for %s, but this torch sees no Metal (MPS) device: running on the CPU", choice)
+            return "cpu"
+        if alias == "cuda" and base in ("rocm", "hip") and not (hip and torch.cuda.is_available()):
+            what = "a ROCm build of torch" if not hip else "an AMD GPU"
+            if not from_bolo:
+                raise InvalidRequest(
+                    f"device {choice!r} was requested but this torch {torch.__version__} has no {what} "
+                    "(install torch from https://download.pytorch.org/whl/rocm6.4 or newer: docs/rocm.md)"
+                )
+            log.warning("bolo asked for %s, but this torch (%s) has no %s: running on the CPU", choice,
+                        torch.__version__, what)  # fmt: skip
+            return "cpu"
+        choice = alias + (f":{index}" if index and alias == "cuda" else "")
+        base = alias
     if base not in DEVICES:
-        raise InvalidRequest(f"unknown device {choice!r} (use one of {', '.join(DEVICES)}, or cuda:N)")
+        raise InvalidRequest(f"unknown device {choice!r} (use one of {', '.join(DEVICES)}, rocm, coreml, or cuda:N)")
     torch = _torch()
     if base == "auto":
         if torch.cuda.is_available():
             return "cuda"
-        mps = getattr(torch.backends, "mps", None)
-        if mps is not None and mps.is_available():
+        if _mps_available(torch):
             return "mps"
         return "cpu"
     if base == "cuda" and not torch.cuda.is_available():
+        if from_bolo and alias is not None:
+            log.warning("bolo asked for %s, but this torch sees no GPU: running on the CPU", choice)
+            return "cpu"
         raise InvalidRequest(
             f"device {choice!r} was requested but this torch build sees no CUDA device "
             f"(torch {torch.__version__}; a CPU-only build cannot use a GPU)"
         )
-    if base == "mps":
-        mps = getattr(torch.backends, "mps", None)
-        if mps is None or not mps.is_available():
-            raise InvalidRequest("device 'mps' was requested but Metal is not available")
+    if base == "mps" and not _mps_available(torch):
+        raise InvalidRequest("device 'mps' was requested but Metal is not available")
     return choice
 
 

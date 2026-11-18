@@ -347,7 +347,8 @@ class Gpu:
     driver: str | None = None
     #: the GPU shares the machine's memory (Apple Silicon, integrated graphics)
     unified_memory: bool = False
-    #: how inference runtimes reach it: "cuda", "metal", "dml" (DirectML), or None when no runtime bolo uses can
+    #: how inference runtimes reach it: "cuda", "rocm" (an AMD GPU with ROCm installed), "metal", "dml" (DirectML),
+    #: or None when no runtime bolo uses can
     backend: str | None = None
     source: str = ""  # nvidia-smi | pynvml | sysfs | platform | dxgi
     #: integrated graphics in a PC (Intel UHD/Iris, an AMD APU's Radeon, <= 512 MB dedicated): never the best GPU
@@ -762,9 +763,36 @@ def _pynvml(host: Host) -> list[Gpu] | None:
     return gpus
 
 
+#: ROCm's version file, and the programs a ROCm installation puts on PATH
+_ROCM_VERSION_FILES = ("/opt/rocm/.info/version", "/opt/rocm/.info/version-dev")
+_ROCM_PROGRAMS = ("rocminfo", "amd-smi", "rocm-smi", "hipconfig")
+
+
+def rocm_runtime(host: Host) -> dict[str, Any]:
+    """Whether ROCm (AMD's GPU compute stack, Linux) is installed: ``{"installed", "version", "path"}``. Found from
+    ``/opt/rocm/.info/version`` or one of its programs on PATH; ROCM_PATH (or HIP_PATH) names another location."""
+    roots = [r for r in (host.env.get("ROCM_PATH"), host.env.get("HIP_PATH")) if r]
+    files = [f"{r.rstrip('/')}/.info/version" for r in roots] + list(_ROCM_VERSION_FILES)
+    for f in files:
+        text = host.read(f)
+        if text and text.strip():
+            return {"installed": True, "version": text.strip().splitlines()[0], "path": f.rsplit("/.info/", 1)[0]}
+    for name in _ROCM_PROGRAMS:
+        found = host.which(name)
+        if found:
+            return {"installed": True, "version": None, "path": found}
+    return {"installed": False, "version": None, "path": None}
+
+
+#: an AMD GPU with less VRAM than this is an APU's carve-out; its GPU works from the machine's memory
+_APU_VRAM_BYTES = 2 * 1024**3
+
+
 def _sysfs_gpus(host: Host, have_nvidia: bool) -> list[Gpu]:
-    """Graphics cards the kernel lists (/sys/class/drm): AMD with its VRAM counters, Intel, NVIDIA without tools."""
+    """Graphics cards the kernel lists (/sys/class/drm): AMD with its VRAM counters (reached through ROCm when it
+    is installed), Intel, NVIDIA without tools."""
     gpus: list[Gpu] = []
+    rocm: bool | None = None
     for card in host.listdir("/sys/class/drm"):
         if not card.startswith("card") or not card[4:].isdigit():
             continue
@@ -777,15 +805,22 @@ def _sysfs_gpus(host: Host, have_nvidia: bool) -> list[Gpu]:
         total = _int(host.read(f"{base}/mem_info_vram_total"))
         used = _int(host.read(f"{base}/mem_info_vram_used"))
         label = {"amd": "AMD graphics", "intel": "Intel graphics", "nvidia": "NVIDIA GPU (no driver tools found)"}
+        product = (host.read(f"{base}/product_name") or "").strip() if vendor == "amd" else ""
+        backend = None
+        if vendor == "amd" and total is not None:
+            if rocm is None:
+                rocm = bool(rocm_runtime(host)["installed"])
+            # ROCm builds of ONNX Runtime (MIGraphX), llama.cpp (HIP) and PyTorch use it; without ROCm only a
+            # Vulkan build of llama-server can (device = "vulkan")
+            backend = "rocm" if rocm else None
         gpus.append(
             Gpu(
                 vendor=vendor,
-                name=f"{label[vendor]}{f' ({device})' if device else ''}",
+                name=product or f"{label[vendor]}{f' ({device})' if device else ''}",
                 vram_total_bytes=total,
                 vram_free_bytes=total - used if total is not None and used is not None else None,
-                unified_memory=vendor == "intel",
-                # no runtime bolo starts uses these out of the box (Vulkan and ROCm builds exist; not detected)
-                backend=None,
+                unified_memory=vendor == "intel" or (vendor == "amd" and total is not None and total < _APU_VRAM_BYTES),
+                backend=backend,
                 source="sysfs",
             )
         )
@@ -931,7 +966,7 @@ def _server_runtime(host: Host, settings: Settings | None, runtime: str, deep: b
         builds = tts_runtimes.installed_flavours(settings, runtime) if settings is not None else {}
         out["flavour"] = next((f for f, p in builds.items() if p == path), None)
         metal = host.system() == "darwin" and _arch(host.machine()) == "arm64"
-        out["gpu"] = metal or out["flavour"] in ("cuda", "vulkan")
+        out["gpu"] = metal or out["flavour"] in ("cuda", "vulkan", "rocm")
     if deep:
         version = host.cached(("version", *_stamp(path)), lambda: host.run([str(path), "--version"], timeout=15.0))
         if version and version.strip():
@@ -985,6 +1020,9 @@ def _torch_plugin(host: Host, settings: Settings | None, deep: bool) -> dict[str
         # the device the plugin picks by itself ("auto"): cuda, mps or cpu; None until it was asked
         "device": None,
         "cuda": None,
+        # Apple's Metal (MPS) and AMD's ROCm (a ROCm build of torch, which serves torch.cuda) as the plugin sees them
+        "mps": None,
+        "rocm": None,
         "probed": False,
     }
     forced = host.env.get("BOLO_TORCH_DEVICE")
@@ -1002,6 +1040,8 @@ def _torch_plugin(host: Host, settings: Settings | None, deep: bool) -> dict[str
                 torch=doc.get("torch"),
                 device=out["device"] or doc.get("auto_device"),
                 cuda=bool(doc.get("cuda_available")),
+                mps=bool(doc.get("mps_available")),
+                rocm=bool(doc.get("hip_build")) if "hip_build" in doc else None,
                 probed=True,
             )
     return out
@@ -1059,7 +1099,63 @@ def detect_runtimes(host: Host, settings: Settings | None = None, deep: bool = F
             out[runtime] = _server_runtime(host, settings, runtime, deep)
         except Exception:
             out[runtime] = {"installed": None, "gpu": None}
+    try:
+        out["whisper.cpp"] = _whispercpp(host)
+    except Exception:
+        out["whisper.cpp"] = {"installed": None, "gpu": None}
+    try:
+        out["mlx"] = _mlx(host)
+    except Exception:
+        out["mlx"] = {"installed": None, "gpu": None}
+    if host.system() == "linux":
+        with contextlib.suppress(Exception):
+            out["rocm"] = rocm_runtime(host)
     return out
+
+
+def _whispercpp(host: Host) -> dict[str, Any]:
+    """pywhispercpp and the GPU back ends its whisper.cpp was built with (Metal in the macOS arm64 wheels)."""
+    from bolo.engines.whispercpp import families_of
+
+    pw = host.module("_pywhispercpp")
+    if pw is None:
+        return {"installed": False, "version": None, "gpu": False, "backends": []}
+    info = ""
+    with contextlib.suppress(Exception):
+        info = str(pw.whisper_print_system_info())
+    backends = sorted(families_of(info))
+    return {"installed": True, "version": _dist_version("pywhispercpp"), "gpu": bool(backends), "backends": backends}
+
+
+def _mlx(host: Host) -> dict[str, Any]:
+    """MLX (Apple's array framework) and whether it reaches the GPU through Metal; mlx-audio, the speech models on it
+    (``bolo-speech[mlx]``)."""
+    mx = host.module("mlx.core")
+    if mx is None:
+        return {"installed": False, "version": None, "gpu": False, "metal": False, "mlx_audio": None}
+    metal: bool | None = None
+    with contextlib.suppress(Exception):
+        metal = bool(mx.metal.is_available())
+    device = None
+    with contextlib.suppress(Exception):
+        device = str(mx.default_device())
+    return {
+        "installed": True,
+        "version": _version(mx) or _dist_version("mlx"),
+        "gpu": metal,
+        "metal": metal,
+        "device": device,
+        "mlx_audio": _dist_version("mlx-audio"),
+    }
+
+
+def _dist_version(name: str) -> str | None:
+    from importlib import metadata
+
+    try:
+        return metadata.version(name)
+    except Exception:
+        return None
 
 
 # -- everything -------------------------------------------------------------------------------------------------
@@ -1126,6 +1222,14 @@ def detect(
             f"the CPU quota allows about {_num(quota)} core(s) but bolo uses {hw.threads} inference threads; "
             f"`threads = {max(1, math.floor(quota))}` avoids throttling"
         )
+    amd = [g for g in hw.gpus if g.vendor == "amd" and g.source == "sysfs" and g.vram_total_bytes is not None]
+    if amd and all(g.backend is None for g in amd):
+        hw.notes.append(
+            f"an AMD GPU was found ({amd[0].name}) but ROCm is not installed, so only a Vulkan build of "
+            'llama-server can use it (device = "vulkan"); with ROCm, device = "rocm" runs ONNX Runtime '
+            "(onnxruntime-migraphx), llama.cpp (its HIP build) and the torch plugin (a ROCm build of PyTorch) on it: "
+            "docs/rocm.md"
+        )
     best = hw.best_gpu()
     if best is not None and hw.device == "cpu":
         example = device_for(best)
@@ -1145,10 +1249,12 @@ def detect(
 
 
 def device_for(gpu: Gpu) -> str:
-    """The ``device`` value that reaches ``gpu``: ``cuda`` (NVIDIA through CUDA), ``coreml`` (Apple), ``dml`` when
-    it is the adapter ``dml`` picks (Windows' high-performance GPU), else ``dml:N``."""
+    """The ``device`` value that reaches ``gpu``: ``cuda`` (NVIDIA through CUDA), ``rocm`` (AMD through ROCm),
+    ``coreml`` (Apple), ``dml`` when it is the adapter ``dml`` picks (Windows' high-performance GPU), else ``dml:N``."""
     if gpu.backend == "metal":
         return "coreml"
+    if gpu.backend == "rocm":
+        return "rocm"
     if gpu.backend != "dml":
         return "cuda"
     return "dml" if gpu.dml_preferred or gpu.dml_index is None else f"dml:{gpu.dml_index}"

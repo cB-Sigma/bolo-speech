@@ -289,9 +289,15 @@ GPU_MEASURED = {
 
 
 def gpu_for(spec: ModelSpec, hw: Hardware) -> tuple[Gpu | None, str | None]:
-    """The GPU this model would run on with the current settings, and a remark when one is present but unused."""
-    cuda, metal = hw.best_gpu("cuda"), hw.best_gpu("metal")
-    any_gpu = cuda or metal
+    """The GPU this model would run on with the current settings, and a remark when one is present but unused.
+
+    ``device = "auto"`` is the GPU bolo would pick (an NVIDIA GPU first, then an AMD GPU with ROCm, then Apple
+    silicon), as the server resolves it (bolo.lifecycle)."""
+    from bolo.hardware import device_for
+    from bolo.placement import family
+
+    cuda, rocm, metal = hw.best_gpu("cuda"), hw.best_gpu("rocm"), hw.best_gpu("metal")
+    any_gpu = cuda or rocm or metal
     if any_gpu is None:
         return None, None
     device = (hw.device or "cpu").lower()
@@ -302,28 +308,58 @@ def gpu_for(spec: ModelSpec, hw: Hardware) -> tuple[Gpu | None, str | None]:
             return None, "the torch plugin is set to the CPU"
         if cuda is not None and rt.get("cuda") is False:
             return None, "the torch plugin's PyTorch build has no CUDA support"
+        if cuda is None and rocm is not None and rt.get("rocm") is False:
+            return None, "the torch plugin's PyTorch build is not a ROCm build"
+        if cuda is None and rocm is None and rt.get("mps") is False:
+            return None, "the torch plugin's PyTorch sees no Metal (MPS) device"
         return any_gpu, None
-    if device in ("cpu", "", "auto"):
+    if device in ("cpu", ""):
         return None, 'a GPU was found, but the `device` setting is "cpu"'
+    if device == "auto":
+        device = device_for(any_gpu)
+    fam = family(device)
+    gpu = {"cuda": cuda, "rocm": rocm, "metal": metal}.get(fam)
+    if gpu is None:
+        return None, None
+    rt = hw.runtimes
     if spec.engine == "faster-whisper":
-        if cuda is None or hw.runtimes.get("ctranslate2", {}).get("gpu") is False:
+        if fam != "cuda":
+            return None, "CTranslate2 (faster-whisper) runs on NVIDIA GPUs only"
+        if rt.get("ctranslate2", {}).get("gpu") is False:
             return None, "CTranslate2 here has no CUDA support"
         return cuda, None
     if spec.engine == "tts-server":
         runtime = str(spec.options.get("runtime") or "llama-server")
-        if hw.runtimes.get(runtime, {}).get("gpu") is False:
+        if rt.get(runtime, {}).get("gpu") is False:
             return None, f"the installed {runtime} is a CPU build"
-        return any_gpu, None
-    if (
-        spec.engine == "sherpa-onnx"
-        and device.startswith("cuda")
-        and hw.runtimes.get("sherpa-onnx", {}).get("gpu") is False
-    ):
-        return None, "the installed sherpa-onnx is a CPU build"
-    if spec.engine == "sherpa-onnx" and hw.system == "windows" and device.startswith("cuda") and cuda is not None:
-        return None, SHERPA_WINDOWS_CUDA
-    if spec.engine in ("sherpa-onnx", "onnxruntime"):
-        return (cuda, None) if device.startswith("cuda") and cuda is not None else (None, None)
+        return gpu, None
+    if spec.engine == "mlx":
+        if fam != "metal":
+            return None, "MLX uses Apple silicon's GPU only"
+        return (gpu, None) if rt.get("mlx", {}).get("metal") else (None, "MLX here does not reach Metal")
+    if spec.engine == "whisper.cpp":
+        backends = rt.get("whisper.cpp", {}).get("backends")
+        if backends is not None and fam not in backends:
+            return None, "the installed pywhispercpp was built without this GPU"
+        return gpu, None
+    if spec.engine == "sherpa-onnx":
+        if fam == "rocm":
+            return None, "sherpa-onnx has no ROCm build"
+        if fam == "cuda" and rt.get("sherpa-onnx", {}).get("gpu") is False:
+            return None, "the installed sherpa-onnx is a CPU build"
+        if fam == "cuda" and hw.system == "windows":
+            return None, SHERPA_WINDOWS_CUDA
+        return gpu, None
+    if spec.engine == "onnxruntime":
+        providers = rt.get("onnxruntime", {}).get("providers")
+        wanted = {
+            "cuda": ("CUDAExecutionProvider",),
+            "rocm": ("MIGraphXExecutionProvider", "ROCMExecutionProvider"),
+            "metal": ("CoreMLExecutionProvider",),
+        }[fam]
+        if providers is not None and not any(p in providers for p in wanted):
+            return None, f"this ONNX Runtime has no {wanted[0].removesuffix('ExecutionProvider')} provider"
+        return gpu, None
     return None, None
 
 
