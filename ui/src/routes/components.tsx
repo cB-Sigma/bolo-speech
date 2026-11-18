@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { describeError, useComponents } from '@/hooks/use-api'
 import { isDemo } from '@/lib/api/config'
 
-const KIND_ORDER = ['phonemizer', 'language-pack', 'tts-server', 'engine-plugin', 'other']
+const KIND_ORDER = ['phonemizer', 'language-pack', 'tts-server', 'engine-plugin', 'pytorch', 'other']
 
 const KIND_NOTE: Record<string, string> = {
   phonemizer: 'Turn text into the phonemes many voices read. uccharan covers English and Hindi; eSpeak NG the rest.',
@@ -16,6 +16,8 @@ const KIND_NOTE: Record<string, string> = {
   'tts-server':
     'Separate speech servers for the voices marked llama.cpp or audio.cpp. bolo starts them itself, or connects to one you run (setting tts_servers).',
   'engine-plugin': 'Out-of-process engines for models that need PyTorch. Installed as Python packages by the operator.',
+  pytorch:
+    "The PyTorch build each bolo-torch environment has. PyPI's torch is CPU only on Windows and macOS: install the GPU version here to run its models on the GPU.",
   other: 'Other optional software.',
 }
 

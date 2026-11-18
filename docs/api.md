@@ -88,7 +88,7 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `DELETE` | `/api/v1/models/{model_id}` | Delete an installed model |
 | `GET` | `/api/v1/models/{model_id}` | One catalog entry |
 | `POST` | `/api/v1/diarize` | Speaker diarization: who spoke when |
-| `GET` | `/api/v1/components` | Optional components (uccharan, espeak-ng, TTS servers, engine plugins) |
+| `GET` | `/api/v1/components` | Optional components (uccharan, espeak-ng, TTS servers, engine plugins, PyTorch GPU builds) |
 | `POST` | `/api/v1/components/{component_id}/install` | Install an optional component |
 | `DELETE` | `/api/v1/components/{component_id}` | Remove a downloaded language pack |
 | `GET` | `/api/v1/stats` | Live server statistics |
@@ -2434,6 +2434,26 @@ checks that the binary starts here; the job and events are as below. `400` when
 no release is pinned for the platform (or no build of that flavour), the operator disabled installs or the
 server is exposed without an API key. A runtime is not needed for a model that
 `tts_servers` points at a running server (its `requires` is then `[]`).
+
+The `pytorch` component is the GPU build of PyTorch for the bolo-torch plugin, listed when a bolo-torch plugin is
+installed and the machine has a GPU it could use: `torch-cuda` (NVIDIA, found with `nvidia-smi`) or `torch-rocm`
+(AMD with ROCm, Linux); `torch-xpu` and `torch-cpu` can be installed by name too. PyPI's torch is CPU only on
+Windows and macOS, and a package extra cannot name another index, so bolo does it itself. Its item adds `gpu` (the
+GPU's name), `size_bytes` (about 2.5 GB to download) and `envs`, one per environment a bolo-torch plugin runs in
+(bolo's own when the plugin is installed there, and each in the `plugins` setting):
+`{"plugins": ["plugin:torch"], "python", "torch": "2.15.0+cpu", "torchaudio", "torchvision", "build": "cpu",
+"family": "cpu", "label": "CPU build, GPU not used"}`; `installed` is true when every environment has that build.
+`POST /api/v1/components/torch-cuda/install` (no body needed) → `202 {"job_id"}`; the job unloads the plugin's
+models and stops its process (it holds torch's libraries open, which Windows will not let pip replace), then, per
+environment, runs `pip install torch==<v>+cu128 [torchaudio==…] [torchvision==…] --index-url
+https://download.pytorch.org/whl/cu128`: the index folder is the newest CUDA the driver runs (`nvidia-smi`'s "CUDA
+Version"), the version the installed one when that index has it for the environment's Python and platform (else its
+newest), torchaudio and torchvision (only where installed) of the same release. It then imports torch there and
+checks `torch.cuda.is_available()` and the device's name; the job fails with what it found otherwise. The plugin
+starts again on the next request. The same from the command line: `bolo torch use cuda` (`--dry-run` prints the pip
+commands; `--latest` takes the index's newest torch) or `bolo components install torch-cuda`; with a server
+running at `--url` the server does it. `bolo torch` lists each environment's build, and `bolo doctor` warns of a
+CPU build next to a GPU, naming the environment and the command.
 
 `GET /api/v1/components`
 

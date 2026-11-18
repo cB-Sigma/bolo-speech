@@ -1415,7 +1415,94 @@ def cmd_voices(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_torch(args: argparse.Namespace) -> int:
+    """``bolo torch [status]`` and ``bolo torch use cuda|rocm|xpu|cpu [--dry-run] [--latest]``: the PyTorch build of
+    every bolo-torch environment, and a GPU build in one step (bolo.torch_envs). With a server running at --url the
+    server does it (it stops the plugin first); otherwise this command does."""
+    from bolo import torch_envs
+
+    settings = _settings(args)
+    target = getattr(args, "target", None)
+    if args.action == "use" and target not in torch_envs.TARGETS:
+        print(f"error: name the build: bolo torch use {'|'.join(torch_envs.TARGETS)}", file=sys.stderr)
+        return 1
+    commands = torch_envs.plugin_commands(settings.plugins, settings.plugin_entry_points)
+    envs = torch_envs.discover(commands)
+    gpu = torch_envs.detect_gpu()
+    where = f"{gpu.vendor} {gpu.name or ''}".strip() if gpu.vendor else "none found"
+    version = (
+        f", {'CUDA' if gpu.vendor == 'nvidia' else 'ROCm'} {gpu.version[0]}.{gpu.version[1]}" if gpu.version else ""
+    )
+    print(f"GPU: {where}{version}")
+    if not envs:
+        print("no environment with the bolo-torch plugin (pip install bolo-torch, or the plugins setting)")
+        return 0 if args.action == "status" else 1
+    for env in envs:
+        info = env.to_dict(gpu)
+        print(f"{', '.join(env.plugins)}: {env.python}: torch {env.torch or '-'} ({info['label']})")
+    if args.action == "status":
+        for line in torch_envs.doctor_lines(envs, gpu):
+            print(f"  WARNING: {line}")
+        return 0
+    assert target is not None
+    if not args.dry_run:
+        r = _server(args, "POST", f"/api/v1/components/torch-{target}/install", {})
+        if r is not None and r.status_code == 202:
+            print(f"the server at {args.url} is installing it (it stops the plugin first)")
+            return _follow_job(args, r.json()["job_id"])
+        if r is not None and r.status_code not in (404, 405):
+            print(f"error: {_error_of(r)}", file=sys.stderr)
+            return 1
+    plans = [torch_envs.plan(env, target, gpu, latest=args.latest) for env in envs]
+    for p in plans:
+        name = ", ".join(p.env.plugins)
+        if p.error:
+            print(f"{name}: cannot: {p.error}")
+        elif p.done:
+            print(f"{name}: nothing to do ({'; '.join(p.notes)})")
+        else:
+            print(f"{name}: " + " ".join(f'"{c}"' if " " in c else c for c in p.command()))
+            for note in p.notes:
+                print(f"  note: {note}")
+    if args.dry_run:
+        return 0 if all(p.error is None for p in plans) else 1
+    results = torch_envs.apply(plans, progress=lambda f, what: print(f"  {what}", file=sys.stderr))
+    for r in results:
+        print(f"{', '.join(r['plugins'])}: {'ok' if r['ok'] else 'FAILED'}: {r['detail']}")
+    return 0 if all(r["ok"] for r in results) else 1
+
+
+def _follow_job(args: argparse.Namespace, job_id: str) -> int:
+    """Print a server job's progress until it ends."""
+    import time
+
+    last = None
+    while True:
+        r = _server(args, "GET", f"/api/v1/jobs/{job_id}")
+        if r is None or r.status_code != 200:
+            print("error: lost the server while it was installing", file=sys.stderr)
+            return 1
+        job = r.json()
+        state = (job.get("state"), round(float(job.get("progress") or 0) * 100))
+        if state != last:
+            print(f"  {state[0]} {state[1]}%", file=sys.stderr)
+            last = state
+        if job.get("state") in ("done", "error", "cancelled"):
+            if job.get("state") != "done":
+                print(f"error: {job.get('error')}", file=sys.stderr)
+                return 1
+            return 0
+        time.sleep(1.0)
+
+
 def cmd_components(args: argparse.Namespace) -> int:
+    from bolo.components import TORCH_COMPONENTS, TORCH_PREFIX
+
+    if getattr(args, "action", None) == "install" and args.component in TORCH_COMPONENTS:
+        args.target, args.action = args.component[len(TORCH_PREFIX) :], "use"
+        args.dry_run = getattr(args, "dry_run", False)
+        args.latest = False
+        return cmd_torch(args)
     core = _core(args)
     manager = core.components
     if args.action == "list":
@@ -2102,45 +2189,19 @@ def _doctor_cuda(settings: Settings) -> None:
             print(line)
 
 
-#: how to get a CUDA build of torch for bolo-torch (PyPI's torch is CPU only on Windows and macOS)
-CUDA_TORCH_INDEX = "https://download.pytorch.org/whl/cu128"
+def _doctor_torch_build(settings: Settings) -> None:
+    """Each bolo-torch environment with a CPU build of torch while the machine has a GPU it could use: one loud line
+    naming the environment and the command that fixes it (bolo.torch_envs)."""
+    from bolo import torch_envs
 
-
-def torch_cpu_warning(torch_version: str | None, platform: str, nvidia: bool, plugin: bool) -> str | None:
-    """A warning when bolo-torch is installed with a CPU-only torch on a machine with an NVIDIA GPU: a ``+cpu``
-    build, or PyPI's torch without a local version on Windows or macOS (CPU only there; on Linux it is CUDA)."""
-    if not (plugin and nvidia and torch_version):
-        return None
-    local = torch_version.partition("+")[2]
-    cpu_only = local == "cpu" or (not local and platform in ("win32", "darwin"))
-    if not cpu_only:
-        return None
-    return (
-        f"bolo-torch is installed with torch {torch_version}, a CPU-only build, and this machine has an NVIDIA GPU: "
-        f"its models run on the CPU. For the GPU: pip install --force-reinstall torch torchaudio --index-url "
-        f"{CUDA_TORCH_INDEX} (then `bolo-torch install <extras>` keeps it when adding model families)"
-    )
-
-
-def _doctor_torch_build(which: Any = None) -> None:
-    """bolo-torch next to an NVIDIA GPU with a CPU-only torch: one loud line (read from the package metadata, so
-    torch is not imported)."""
-    import importlib.metadata
-
-    def version(name: str) -> str | None:
-        try:
-            return importlib.metadata.version(name)
-        except importlib.metadata.PackageNotFoundError:
-            return None
-
-    warning = torch_cpu_warning(
-        version("torch"),
-        sys.platform,
-        (which or shutil.which)("nvidia-smi") is not None,
-        version("bolo-torch") is not None,
-    )
-    if warning:
-        print(f"  WARNING: {warning}")
+    commands = torch_envs.plugin_commands(settings.plugins, settings.plugin_entry_points)
+    if not commands:
+        return
+    gpu = torch_envs.detect_gpu()
+    if gpu.target is None:
+        return
+    for line in torch_envs.doctor_lines(torch_envs.discover(commands), gpu):
+        print(f"  WARNING: {line}")
 
 
 def _doctor_gpu_health(settings: Settings, which: Any = None, checker: Any = None) -> None:
@@ -2305,7 +2366,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     _doctor_onnxruntime(settings)
     _doctor_gpu_health(settings)
     _doctor_cuda(settings)
-    _doctor_torch_build()
+    _doctor_torch_build(settings)
     _doctor_llm(settings)
     _doctor_providers(settings)
     _doctor_watermark(settings)
@@ -2763,7 +2824,23 @@ def build_parser() -> argparse.ArgumentParser:
         "own folder, and the one matching `device` runs); moshi: pytorch (NVIDIA GPU, the default on Linux and "
         "Windows), mlx (Apple silicon, the default there) or candle (Rust, built with cargo); personaplex: pytorch",
     )
+    s.add_argument("--url", default=os.environ.get("BOLO_URL", "http://127.0.0.1:8000"))
+    s.add_argument("--api-key", dest="api_key", default=os.environ.get("BOLO_API_KEY"))
+    s.add_argument("--dry-run", dest="dry_run", action="store_true", help="torch-*: print what would be done")
     s.set_defaults(func=cmd_components)
+
+    s = sub.add_parser(
+        "torch",
+        help="the PyTorch build of the bolo-torch plugin's environments: status, or `use cuda` for the GPU build",
+    )
+    _common(s)
+    s.add_argument("action", choices=["status", "use"], nargs="?", default="status")
+    s.add_argument("target", nargs="?", help="use: cuda, rocm, xpu or cpu")
+    s.add_argument("--dry-run", dest="dry_run", action="store_true", help="print the pip commands only")
+    s.add_argument("--latest", action="store_true", help="the newest torch of the index, not the installed version")
+    s.add_argument("--url", default=os.environ.get("BOLO_URL", "http://127.0.0.1:8000"))
+    s.add_argument("--api-key", dest="api_key", default=os.environ.get("BOLO_API_KEY"))
+    s.set_defaults(func=cmd_torch)
 
     s = sub.add_parser("providers", help="cloud providers (paid cloud APIs; docs/providers.md): list, test")
     _common(s)

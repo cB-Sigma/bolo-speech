@@ -107,6 +107,17 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   with it.
 ### Added
 
+- **GPU PyTorch for bolo-torch in one step.** `bolo torch use cuda` (also `rocm`, `xpu`, `cpu`; `--dry-run`),
+  `bolo components install torch-cuda`, `POST /api/v1/components/torch-cuda/install` and an "Install GPU version"
+  button on the console's Components page (with a confirmation, about 2.5 GB, and progress). PyPI's torch is CPU
+  only on Windows and macOS and an extra cannot name another index, so bolo does it: it reads the newest CUDA the
+  driver runs from `nvidia-smi`, picks PyTorch's index for it (`cu128`, ...), stops the plugin, and in every
+  bolo-torch environment (bolo's own and each in the `plugins` setting) reinstalls torch, and torchaudio and
+  torchvision where present, at the installed version when the index has it; then it checks
+  `torch.cuda.is_available()` and the GPU's name there, and the plugin starts again on the next request. `bolo torch`
+  and the console list each environment's build ("CPU build, GPU not used"), and `bolo doctor` names each
+  environment on a CPU build next to an NVIDIA or ROCm GPU with the command that fixes it. `bolo-torch install`
+  puts a GPU build back (with a warning) if pip replaced it anyway.
 - **Wake words and keyword spotting.** A new catalog task, `wake-word`: the sherpa-onnx keyword spotters
   `kws-zipformer-gigaspeech` (English, any phrase you type; the default) and `kws-zipformer-zh-en` (Chinese and
   English), openWakeWord's "hey jarvis", "alexa" and "hey mycroft" (the phrase models are CC BY-NC-SA 4.0,

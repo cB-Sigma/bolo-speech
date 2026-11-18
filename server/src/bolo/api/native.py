@@ -690,7 +690,9 @@ async def diarize(request: Request) -> JSONResponse:
 
 
 @router.get(
-    "/components", tags=["native"], summary="Optional components (uccharan, espeak-ng, TTS servers, engine plugins)"
+    "/components",
+    tags=["native"],
+    summary="Optional components (uccharan, espeak-ng, TTS servers, engine plugins, PyTorch GPU builds)",
 )
 async def components(request: Request) -> JSONResponse:
     return JSONResponse({"components": get_core(request).components.status()})

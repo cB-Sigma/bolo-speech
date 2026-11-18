@@ -820,6 +820,20 @@ export interface Component {
   /** language-pack components: a downloaded copy the server can delete. */
   removable?: boolean
   size_bytes?: number | null
+  /** pytorch components (torch-cuda, ...): the GPU and the build of each bolo-torch environment. */
+  gpu?: string | null
+  envs?: TorchEnvInfo[]
+}
+
+/** One environment a bolo-torch plugin runs in, and its PyTorch build. */
+export interface TorchEnvInfo {
+  plugins: string[]
+  python: string
+  torch: string | null
+  build: string | null
+  family: string | null
+  /** For people: "CUDA 12.8 build", "CPU build, GPU not used". */
+  label: string
 }
 
 /** Server-sent events on `/api/v1/events`. */

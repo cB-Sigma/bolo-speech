@@ -59,3 +59,14 @@ def test_the_cli_prints_the_command(monkeypatch: pytest.MonkeyPatch, capsys: pyt
     assert not ran
     assert main(["install", "nosuch"]) == 2 and "no extra nosuch" in capsys.readouterr().err
     assert sys.executable in install.install_command(["pyannote"], None)
+
+
+def test_a_gpu_build_lost_anyway_is_put_back() -> None:
+    before = {"torch": "2.9.0+cu128", "torchaudio": "2.9.0+cu128", "torchvision": None}
+    assert install.restore_command(before, "2.9.0+cu128") is None  # kept
+    assert install.restore_command(before, "2.15.0", python="py") == [
+        "py", "-m", "pip", "install", "torch==2.9.0+cu128", "torchaudio==2.9.0+cu128",
+        "--index-url", "https://download.pytorch.org/whl/cu128", "--extra-index-url", "https://pypi.org/simple",
+    ]  # fmt: skip
+    assert install.restore_command({"torch": "2.15.0+cpu"}, "2.16.0") is None  # a CPU build: nothing to keep
+    assert install.restore_command({"torch": None}, "2.15.0") is None

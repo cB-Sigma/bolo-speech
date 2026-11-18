@@ -536,12 +536,21 @@ environment).
   also works. Asking for `cuda` with a CPU-only torch answers `400` with that explanation.
 * `dtype` is automatic: float32 on CPU, bfloat16 on CUDA when supported (else float16), float16 on MPS. Override
   with `BOLO_TORCH_DTYPE` or the option `dtype` (`float32`, `float16`, `bfloat16`).
-* For CUDA install torch from PyTorch's CUDA index before the plugin:
+* **The GPU build of torch in one step**: `bolo torch use cuda` (or the console's Components page, "Install GPU
+  version", or `bolo components install torch-cuda`). It finds the GPU and the newest CUDA its driver runs
+  (`nvidia-smi`), picks PyTorch's index for it (`cu128`, ...), and in every environment a bolo-torch plugin runs in
+  (bolo's own and each in the `plugins` setting) reinstalls torch, and torchaudio and torchvision where present, at
+  the installed version when that index has it, checks `torch.cuda.is_available()` and the GPU's name there, and
+  restarts the plugin. `--dry-run` prints the pip commands; `bolo torch` shows each environment's build;
+  `bolo torch use rocm` (Linux), `xpu` and `cpu` work the same way. About 2.5 GB to download.
+* By hand, on Windows or Linux: install torch from PyTorch's CUDA index before the plugin:
   `pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128` (or the `cu12x` folder for your
   driver, https://pytorch.org/get-started/locally/). On Linux PyPI's default torch is a CUDA build too; **on Windows
   (and macOS) PyPI's torch is CPU only**, so a plain `pip install bolo-torch` there gets a CPU-only torch. Add model
   families with `bolo-torch install <extras>`, which keeps the torch you installed (see Install). `bolo doctor` warns
-  when bolo-torch has a CPU-only torch on a machine with an NVIDIA GPU.
+  when a bolo-torch environment has a CPU-only torch on a machine with an NVIDIA (or ROCm) GPU, naming the
+  environment and the command. `bolo-torch install` also checks after pip: if the GPU build was replaced anyway, it
+  reinstalls it from its index and says so.
 * A GPU this torch cannot reach (a CPU-only build with `device = "cuda"`, `rocm`, or bolo placing the model on its
   GPU while the model's option is `auto`) is not an error: the model loads on the CPU with a warning saying why and
   how to get a CUDA build, and bolo's placement (`bolo ps`, `/api/v1/ps`) says CPU with that notice.

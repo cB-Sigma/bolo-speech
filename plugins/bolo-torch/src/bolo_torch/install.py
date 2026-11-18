@@ -83,3 +83,17 @@ def install_command(
         if index:
             cmd += ["--extra-index-url", index]
     return cmd
+
+
+def restore_command(before: dict[str, str | None], after: str | None, python: str = sys.executable) -> list[str] | None:
+    """When an install replaced a torch from PyTorch's index (``before``: the torch, torchaudio and torchvision
+    installed then) with another build anyway, the pip command that puts that build back; None when it is still
+    there."""
+    torch = before.get("torch")
+    if not torch or after == torch:
+        return None
+    index = build_index(torch)
+    if index is None or index.endswith("/cpu"):
+        return None
+    reqs = [f"{name}=={version}" for name, version in before.items() if version]
+    return [python, "-m", "pip", "install", *reqs, "--index-url", index, "--extra-index-url", "https://pypi.org/simple"]

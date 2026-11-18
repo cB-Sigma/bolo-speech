@@ -1677,7 +1677,7 @@
     "tags": [
      "native"
     ],
-    "summary": "Optional components (uccharan, espeak-ng, TTS servers, engine plugins)",
+    "summary": "Optional components (uccharan, espeak-ng, TTS servers, engine plugins, PyTorch GPU builds)",
     "operationId": "components_api_v1_components_get",
     "responses": {
      "200": {

@@ -61,11 +61,13 @@ export function componentSentence(c: Component): string {
         ? 'uccharan turns English and Hindi text into the phonemes many voices read'
         : c.kind === 'language-pack'
           ? `${c.name} is data that lets voices read text typed in Latin letters: it is written in the language's own script first`
-          : c.kind === 'tts-server' || c.id === 'llama-server' || c.id === 'audio.cpp'
-            ? `${c.name} is a separate speech server that bolo starts for the voices that run on it`
-            : c.kind === 'engine-plugin'
-              ? `${c.name} runs models in a process of its own, for models that need PyTorch`
-              : `${c.name} is an extra piece of software that some models use`
+          : c.kind === 'pytorch'
+            ? `${c.name} lets the PyTorch models of the bolo-torch plugin use the ${c.gpu ?? 'GPU'} instead of the CPU`
+            : c.kind === 'tts-server' || c.id === 'llama-server' || c.id === 'audio.cpp'
+              ? `${c.name} is a separate speech server that bolo starts for the voices that run on it`
+              : c.kind === 'engine-plugin'
+                ? `${c.name} runs models in a process of its own, for models that need PyTorch`
+                : `${c.name} is an extra piece of software that some models use`
   const licence = c.license && !/^see /i.test(c.license) ? ` under ${c.license}` : ''
   return `${what}; it is optional, is not part of bolo, and is licensed separately${licence}.`
 }
@@ -91,6 +93,8 @@ export function installDescription(c: Component): string {
     const version = c.release?.version ? `${c.release.version} ` : ''
     return `The server downloads the prebuilt ${version}release${host ? ` from ${host}` : ''}, checks its SHA-256, unpacks it into its data directory and checks that the program starts on this machine. Nothing else on the machine changes, and the server keeps running.`
   }
+  if (c.kind === 'pytorch')
+    return `The server stops the bolo-torch plugin, reinstalls torch (and torchaudio and torchvision where present) from PyTorch's own index in each of its environments (${c.size_bytes ? `about ${fmtBytes(c.size_bytes)}` : 'a few GB'} to download), checks that it reaches the GPU, and starts the plugin again on the next request. Models of the plugin are unloaded meanwhile.`
   if (c.kind === 'language-pack')
     return "The server downloads the pack from uccharan's release, checks its SHA-256 and keeps it in uccharan's cache directory. Nothing else on the machine changes, and the server keeps running."
   return "A Python package is installed into the server's own environment. Nothing else on the machine changes, and the server keeps running."
@@ -393,6 +397,7 @@ export const KIND_LABEL: Record<string, string> = {
   'language-pack': 'Language packs',
   'tts-server': 'Speech servers',
   'engine-plugin': 'Engine plugins',
+  pytorch: 'PyTorch',
   other: 'Other components',
 }
 
@@ -411,6 +416,10 @@ function ComponentRow({ c, detailed }: { c: Component; detailed?: boolean }) {
         c.servers?.length ? ['Connected servers', c.servers.join(', ')] : null,
         !c.installed && c.release ? ['Would install', `${c.release.version} (prebuilt, checksum pinned)`] : null,
         c.languages?.length ? ['Languages', c.languages.join(', ')] : null,
+        ...(c.envs ?? []).map((e): [string, string] => [
+          `PyTorch (${e.plugins.join(', ')})`,
+          `${e.torch ?? 'not installed'}: ${e.label}`,
+        ]),
       ].filter(Boolean) as [string, string][])
     : []
   return (
@@ -467,7 +476,9 @@ function ComponentRow({ c, detailed }: { c: Component; detailed?: boolean }) {
           </dl>
         )}
       </div>
-      {!c.installed && <ComponentInstallButton component={c} label="Install" />}
+      {!c.installed && (
+        <ComponentInstallButton component={c} label={c.kind === 'pytorch' ? 'Install GPU version' : 'Install'} />
+      )}
       {!c.installed && !isDemo && !c.installable && (
         <div className="min-w-0 sm:col-span-2">
           <p className="mb-1.5 text-xs leading-5 text-muted-foreground">

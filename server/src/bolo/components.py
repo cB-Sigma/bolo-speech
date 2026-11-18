@@ -15,6 +15,9 @@
   ``tts-server`` engine starts for its models (bolo.tts_runtimes). Installable here as pinned upstream release
   archives checked against their SHA-256, or provided by the operator (a setting, PATH, or a running server
   named in ``tts_servers``, in which case the model does not need the binary at all).
+* **GPU builds of PyTorch** (``torch-cuda``, ``torch-rocm``, ``torch-xpu``, ``torch-cpu``): torch reinstalled from
+  PyTorch's own index in every environment a bolo-torch plugin runs in (bolo.torch_envs), since PyPI's torch is
+  CPU only on Windows and macOS. Listed for the GPU the machine has.
 * **Full-duplex model servers** (``moshi``: Kyutai's PyTorch, MLX and Rust servers, MIT / Apache-2.0;
   ``personaplex``: NVIDIA's PersonaPlex server, MIT): the servers of Moshi, Hibiki and PersonaPlex
   (bolo.duplex.runtime), each build in a virtual environment (or cargo root) of its own, pinned by version and
@@ -36,7 +39,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from bolo import tts_runtimes
+from bolo import torch_envs, tts_runtimes
 from bolo.duplex import runtime as duplex_runtime
 from bolo.errors import BoloError, InvalidRequest, ModelNotFound
 from bolo.jobs import Job
@@ -53,6 +56,11 @@ UCCHARAN_PACKAGE = phonemize.UCCHARAN_REQUIREMENT
 PACKAGES = {ESPEAK: ESPEAK_PACKAGE, UCCHARAN: UCCHARAN_PACKAGE}
 LOOPBACK = ("127.0.0.1", "localhost", "::1")
 PLUGIN_PREFIX = "plugin:"
+#: GPU builds of PyTorch for bolo-torch's environments: "torch-cuda" (bolo.torch_envs)
+TORCH_PREFIX = "torch-"
+TORCH_COMPONENTS = tuple(TORCH_PREFIX + t for t in torch_envs.TARGETS)
+#: how long the bolo-torch environments and the GPU, as last looked at, are taken as they are (seconds)
+TORCH_STATUS_TTL_S = 120.0
 #: uccharan's romanised-text packs as components: "uccharan-xlit-hi" (bolo.text.romanised)
 XLIT_PREFIX = romanised.COMPONENT_PREFIX + romanised.PACK_PREFIX
 #: every other uccharan pack as a component: "uccharan-de" (bolo.text.packs)
@@ -113,6 +121,10 @@ class ComponentManager:
         self.run_installer: Callable[[list[str]], tuple[int, str]] = self._run
         #: the steps of installing a full-duplex server (uv / pip / git / cargo); replaced in tests
         self.run_duplex_step: Callable[[list[str]], tuple[int, str]] = duplex_runtime.run_command
+        #: commands for the PyTorch builds (probes, pip, nvidia-smi) and PyTorch's index pages; replaced in tests
+        self.torch_runner: torch_envs.Runner = torch_envs.run
+        self.torch_page: Callable[[str, str], str] = torch_envs.fetch_page
+        self._torch_cache: tuple[float, list[torch_envs.TorchEnv], torch_envs.Gpu] | None = None
 
     @staticmethod
     def _run(cmd: list[str]) -> tuple[int, str]:
@@ -411,6 +423,7 @@ class ComponentManager:
         out.extend(self.pack_status())
         out.extend(self.runtime_status())
         out.extend(self.duplex_status())
+        out.extend(self.torch_status())
         for plugin in self.plugin_ids():
             st = self.core.engines.status(plugin)
             hint = next(
@@ -813,10 +826,132 @@ class ComponentManager:
             raise InvalidRequest(f"cannot remove {component}: {exc}") from exc
         self.core.events.publish("component", {"id": component, "event": "removed"})
 
+    # -- GPU builds of PyTorch (bolo.torch_envs) ----------------------------------------------------------
+    def torch_state(self, fresh: bool = False) -> tuple[list[torch_envs.TorchEnv], torch_envs.Gpu]:
+        """The bolo-torch environments and the GPU, looked at again at most every TORCH_STATUS_TTL_S."""
+        import time
+
+        cached = self._torch_cache
+        if cached is not None and not fresh and time.monotonic() - cached[0] < TORCH_STATUS_TTL_S:
+            return cached[1], cached[2]
+        s = self.core.settings
+        commands = torch_envs.plugin_commands(s.plugins, s.plugin_entry_points)
+        envs = torch_envs.discover(commands, self.torch_runner)
+        gpu = torch_envs.detect_gpu(self.torch_runner)
+        self._torch_cache = (time.monotonic(), envs, gpu)
+        return envs, gpu
+
+    def torch_status(self) -> list[dict[str, Any]]:
+        """``torch-<target>`` for the GPU this machine has, when a bolo-torch plugin is installed."""
+        try:
+            envs, gpu = self.torch_state()
+        except Exception as exc:  # a status page must not fail on it
+            log.debug("could not look at the bolo-torch environments: %s", exc)
+            return []
+        if not envs or gpu.target is None:
+            return []
+        target = gpu.target
+        blocked = self.torch_blocked_reason()
+        installed = all(torch_envs.family_of(e.build) == target for e in envs)
+        label = {"cuda": "CUDA", "rocm": "ROCm", "xpu": "Intel XPU"}.get(target, target)
+        lines = "; ".join(f"{', '.join(e.plugins)}: torch {e.torch or '-'}, {e.to_dict(gpu)['label']}" for e in envs)
+        return [
+            {
+                "id": TORCH_PREFIX + target,
+                "name": f"PyTorch, {label} build",
+                "kind": "pytorch",
+                "installed": installed,
+                "source": "python-package" if installed else None,
+                "version": ", ".join(sorted({e.torch for e in envs if e.torch})) or None,
+                "license": "BSD-3-Clause",
+                "license_url": "https://github.com/pytorch/pytorch/blob/main/LICENSE",
+                "required_by_count": sum(self.required_by(p) for p in {p for e in envs for p in e.plugins}),
+                "installable": blocked is None and not installed,
+                "install_blocked_reason": None if installed else blocked,
+                "manual_command": f"bolo torch use {target}",
+                "size_bytes": torch_envs.DOWNLOAD_BYTES,
+                "gpu": gpu.name or gpu.vendor,
+                "envs": [e.to_dict(gpu) for e in envs],
+                "description": (
+                    f"The {label} build of PyTorch for the bolo-torch plugin, so its models use the "
+                    f"{gpu.name or gpu.vendor or 'GPU'}. PyPI's torch is CPU only on Windows and macOS. Installing "
+                    "reinstalls torch (and torchaudio and torchvision where present) from PyTorch's index in every "
+                    f"bolo-torch environment, checks that it reaches the GPU and restarts the plugin. Now: {lines}."
+                ),
+            }
+        ]
+
+    def torch_blocked_reason(self) -> str | None:
+        s = self.core.settings
+        if s.host not in LOOPBACK and not s.api_key:
+            return "installing components is never allowed on a non-loopback address without an API key"
+        if s.allow_component_install is False:
+            return "the operator disabled component installation (allow_component_install = false)"
+        return None
+
+    async def stop_plugins(self, plugins: list[str]) -> None:
+        """Unload the models of ``plugins`` and stop their processes (started again by the next load)."""
+        for model_id, entry in list(self.core.manager.loaded.items()):
+            if entry.spec.engine in plugins:
+                await self.core.manager.unload(model_id, reason="the plugin's torch is being replaced")
+        for plugin in plugins:
+            engine = self.core.engines.get(plugin)
+            process = getattr(engine, "process", None)
+            if process is not None:
+                await asyncio.to_thread(process.stop)
+
+    async def _install_torch(self, job: Job, target: str) -> None:
+        core = self.core
+        loop = asyncio.get_running_loop()
+        job.state, job.progress = "running", 0.02
+        core.events.publish("job", {"job": job.to_dict()})
+
+        def stop(plugins: list[str]) -> None:
+            asyncio.run_coroutine_threadsafe(self.stop_plugins(plugins), loop).result(timeout=300)
+
+        def progress(fraction: float, what: str) -> None:
+            job.progress = 0.05 + 0.9 * fraction
+            core.events.publish("job", {"job": job.to_dict()})
+            core.log("info", f"PyTorch {target} build: {what}")
+
+        def work() -> list[dict[str, Any]]:
+            envs, gpu = self.torch_state(fresh=True)
+            plans = [torch_envs.plan(e, target, gpu, self.torch_page) for e in envs]
+            return torch_envs.apply(plans, self.torch_runner, stop, progress)
+
+        try:
+            results = await loop.run_in_executor(None, work)
+        except Exception as exc:
+            results = [{"ok": False, "detail": f"{type(exc).__name__}: {exc}", "plugins": []}]
+        self._torch_cache = None
+        failed = [r for r in results if not r["ok"]]
+        if not results:
+            job.state, job.error = "error", "no environment with the bolo-torch plugin was found"
+        elif failed:
+            job.state = "error"
+            job.error = "; ".join(f"{', '.join(r['plugins'])}: {r['detail']}" for r in failed)
+            core.log("error", f"installing the PyTorch {target} build failed: {job.error}")
+        else:
+            job.state, job.progress = "done", 1.0
+            core.events.publish("component", {"id": job.model, "event": "installed"})
+            core.log("info", "PyTorch " + target + " build: " + "; ".join(str(r["detail"]) for r in results))
+        core.events.publish("job", {"job": job.to_dict()})
+
     # -- install ----------------------------------------------------------
     def start_install(self, component: str, accept_license: bool, flavour: str | None = None) -> Job:
         """Start installing ``component``; ``flavour`` (``cpu``, ``cuda``, ``vulkan``, ``rocm``) picks the build of
         llama-server or audio.cpp, which is otherwise the one ``device`` asks for."""
+        if component in TORCH_COMPONENTS:
+            blocked = self.torch_blocked_reason()
+            if blocked:
+                raise InvalidRequest(f"cannot install {component}: {blocked}")
+            job = self.core.jobs.create("install", component)
+            task = asyncio.create_task(
+                self._install_torch(job, component[len(TORCH_PREFIX) :]), name=f"bolo-install-{component}"
+            )
+            self.core._tasks.append(task)
+            task.add_done_callback(lambda t: self.core._tasks.remove(t) if t in self.core._tasks else None)
+            return job
         if component in duplex_runtime.COMPONENTS:
             blocked = self.duplex_blocked_reason(component, flavour)
             if blocked:

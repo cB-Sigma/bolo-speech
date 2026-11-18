@@ -187,7 +187,18 @@ def install_command(names: list[str], package: str, dry_run: bool) -> int:
         print(" ".join(f'"{c}"' if "[" in c or " " in c else c for c in cmd))
         if dry_run:
             return 0
-        return subprocess.run(cmd, check=False).returncode
+        before = {name: install.installed(name) for name in ("torch", "torchaudio", "torchvision")}
+        code = subprocess.run(cmd, check=False).returncode
+        restore = install.restore_command(before, install.installed("torch"))
+        if restore is not None:  # the GPU build was replaced all the same: put it back
+            print(
+                f"warning: the install replaced torch {before['torch']} with {install.installed('torch')}; "
+                "reinstalling the GPU build",
+                file=sys.stderr,
+            )
+            print(" ".join(restore))
+            code = subprocess.run(restore, check=False).returncode or code
+        return code
 
 
 def main(argv: list[str] | None = None) -> int:

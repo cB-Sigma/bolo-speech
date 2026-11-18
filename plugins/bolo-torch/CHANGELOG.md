@@ -4,6 +4,12 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Added
+
+- **`bolo-torch install` keeps a GPU build of torch even when pip replaces it**: it reinstalls the build that was
+  there from its PyTorch index and says so. bolo itself installs the GPU build in one step (`bolo torch use cuda`,
+  bolo-speech's CHANGELOG).
+
 ### Fixed
 
 - **A CPU-only torch next to an NVIDIA GPU (PyPI's torch on Windows).** With `device = "cuda"` the

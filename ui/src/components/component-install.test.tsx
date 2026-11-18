@@ -221,3 +221,68 @@ describe('language packs', () => {
     )
   })
 })
+
+describe('PyTorch builds', () => {
+  const torch: Component = {
+    id: 'torch-cuda',
+    name: 'PyTorch, CUDA build',
+    kind: 'pytorch',
+    installed: false,
+    source: null,
+    version: '2.15.0+cpu',
+    license: 'BSD-3-Clause',
+    license_url: null,
+    required_by_count: 40,
+    installable: true,
+    install_blocked_reason: null,
+    manual_command: 'bolo torch use cuda',
+    description: 'The CUDA build of PyTorch for the bolo-torch plugin.',
+    size_bytes: 2_500_000_000,
+    gpu: 'NVIDIA GeForce RTX 4060 Laptop GPU',
+    envs: [
+      {
+        plugins: ['plugin:torch'],
+        python: 'C:\\bolo-env\\Scripts\\python.exe',
+        torch: '2.15.0+cpu',
+        build: 'cpu',
+        family: 'cpu',
+        label: 'CPU build, GPU not used',
+      },
+    ],
+  }
+
+  it("shows each environment's build and installs the GPU version after a confirmation", async () => {
+    const asked: string[] = []
+    setTransport({
+      fetch: async (input, init) => {
+        const url = String(input)
+        if (url.endsWith('api/v1/components'))
+          return new Response(JSON.stringify({ components: [torch] }), {
+            headers: { 'content-type': 'application/json' },
+          })
+        if (url.includes('api/v1/components/torch-cuda/install')) {
+          asked.push(url)
+          return new Response(JSON.stringify({ job_id: 'job-1' }), {
+            status: 202,
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        if (url.includes('api/v1/jobs/job-1'))
+          return new Response(JSON.stringify({ id: 'job-1', state: 'done', progress: 1 }), {
+            headers: { 'content-type': 'application/json' },
+          })
+        return handleRequest(server, input, init)
+      },
+      WebSocket: createMockWebSocket(server),
+    })
+    wrap(<ComponentsCard bare detailed kind="pytorch" />)
+    const row = await screen.findByTestId('component-torch-cuda')
+    expect(within(row).getByText(/2\.15\.0\+cpu: CPU build, GPU not used/)).toBeTruthy()
+    await userEvent.click(within(row).getByRole('button', { name: /Install GPU version/ }))
+    const dialog = screen.getByTestId('install-dialog')
+    expect(within(dialog).getByText(/about 2\.5 GB to download/)).toBeTruthy()
+    expect(componentSentence(torch)).toContain('use the NVIDIA GeForce RTX 4060 Laptop GPU instead of the CPU')
+    await userEvent.click(within(dialog).getByTestId('install-confirm'))
+    await waitFor(() => expect(asked).toHaveLength(1))
+  })
+})
