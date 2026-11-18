@@ -45,7 +45,9 @@ test('speak, then transcribe reports a word error rate with a diff', async ({ pa
 test('voice picker lists the model voices and previews one', async ({ page }) => {
   await open(page, '/tts', { storage: { 'bolo.prefs': JSON.stringify({ ttsModel: 'kokoro-82m' }) } })
   await page.getByRole('combobox', { name: 'Voice' }).click()
-  await expect(page.getByRole('option')).toHaveCount(7)
+  // The model's seven voices, and "From the text" (no voice named: the server picks one for the detected language).
+  await expect(page.getByRole('option')).toHaveCount(8)
+  await expect(page.getByRole('option', { name: /From the text/ })).toBeVisible()
   await page.getByRole('option', { name: /Alpha/ }).click()
   await page.getByRole('button', { name: 'Preview this voice' }).click()
   await expect(page.getByRole('combobox', { name: 'Voice' })).toContainText('Alpha')

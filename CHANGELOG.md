@@ -444,6 +444,12 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   test keeps it so.
 ### Fixed
 
+- Console: the Speech to text page scrolled sideways on a phone (178 px at 390 px wide): the folded "Advanced decoding"
+  header's one-line summary set the width of the "Who spoke when" panel. The console's mock suite failed on it
+  (four tests) and on three tests that had fallen behind the console: the in-browser recogniser list (it has 28
+  models now, and the switch dialog offers every model that speaks Hindi), the text-to-speech voice list ("From the
+  text" is an option) and the model drawer (two texts read "Measured on this server"; the test now asks for the
+  heading).
 - `test_gated_entries_explain_what_to_do` failed whenever bolo-torch was installed next to the server: the test's
   live server discovered the plugin through its entry point, so `plugin:torch` was available and the assertion that
   `indic-parler-tts` is unavailable failed. It now runs a server that does not discover installed plugins.

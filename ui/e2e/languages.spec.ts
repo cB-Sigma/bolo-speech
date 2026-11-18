@@ -15,14 +15,18 @@ test.describe('Indian languages', () => {
       const language = page.getByTestId('language-select')
       await expect(language).toContainText('English')
 
-      // The picker lists every in-browser model with coverage, size and licence.
+      // The picker lists every in-browser model with coverage, size and licence (the list grows; these stay).
       await picker.click()
-      await expect(page.getByRole('option')).toHaveText([
-        /Moonshine Tiny.*English · 32\.1 MB.*MIT/,
-        /Whisper Tiny Hindi.*Hindi · 124 MB.*Apache-2\.0/,
-        /Whisper Tiny.*99 languages · 43\.6 MB.*Apache-2\.0/,
-        /Whisper Base.*99 languages · 79\.7 MB.*Apache-2\.0/,
-      ])
+      const models = page.getByRole('option')
+      await expect(models.first()).toHaveText(/Moonshine Tiny.*English · 32\.1 MB.*MIT/)
+      for (const name of [
+        /^Whisper Tiny Hindi.*Hindi · 124 MB.*Apache-2\.0/,
+        /^Whisper Tiny99 languages · 43\.6 MB.*Apache-2\.0/,
+        /^Whisper Base99 languages · 79\.7 MB.*Apache-2\.0/,
+        /^Moonshine Tiny Arabic.*Moonshine Community License/,
+      ]) {
+        await expect(models.filter({ hasText: name })).toHaveCount(1)
+      }
       await page.keyboard.press('Escape')
 
       // Indian languages come first, under their own names.
@@ -49,11 +53,11 @@ test.describe('Indian languages', () => {
       await expect(dialog.getByRole('heading')).toHaveText('Hindi needs a different model')
       await expect(dialog).toContainText('Moonshine Tiny only understands English')
       const choices = dialog.locator('button[data-testid^="switch-to-"]')
-      await expect(choices).toHaveText([
-        /Whisper Tiny Hindi.*Suggested.*124 MB download.*Apache-2\.0/,
-        /Whisper Tiny.*43\.6 MB download/,
-        /Whisper Base.*79\.7 MB download/,
-      ])
+      // The suggestion first, then the smallest that can; every model that speaks Hindi is offered.
+      await expect(choices.nth(0)).toHaveText(/Whisper Tiny Hindi.*Suggested.*124 MB download.*Apache-2\.0/)
+      await expect(choices.nth(1)).toHaveText(/Whisper Tiny.*43\.6 MB download/)
+      await expect(choices.nth(2)).toHaveText(/Whisper Base.*79\.7 MB download/)
+      await expect(choices.filter({ hasText: /IndicWav2Vec Hindi \(AI4Bharat\)/ })).toHaveCount(1)
       await expectNoA11yViolations(page)
       await dialog.getByTestId('switch-to-whisper-tiny-hindi').click()
       await expect(picker).toContainText('Whisper Tiny Hindi')

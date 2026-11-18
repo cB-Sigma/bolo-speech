@@ -25,7 +25,7 @@ test.describe('Models', () => {
     await page.getByRole('button', { name: 'kokoro-82m', exact: true }).click()
     const drawer = page.getByRole('dialog')
     await expect(drawer.getByRole('heading', { name: 'kokoro-82m' })).toBeVisible()
-    await expect(drawer.getByText('Measured on this server')).toBeVisible()
+    await expect(drawer.getByRole('heading', { name: 'Measured on this server' })).toBeVisible()
     await expect(drawer.getByText('Real-time factor p50')).toBeVisible()
     await expect(drawer.getByText('Validated on CPU')).toBeVisible()
     await page.keyboard.press('Escape')

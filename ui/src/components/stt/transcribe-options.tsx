@@ -164,7 +164,7 @@ export function DecodingSection({
   const [open, setOpen] = useState(false)
   const count = decodingCount(value)
   return (
-    <div className="rounded-lg border border-border" data-testid="decoding-options">
+    <div className="min-w-0 rounded-lg border border-border" data-testid="decoding-options">
       <div className="flex items-center gap-2 pr-2">
         <button
           type="button"
