@@ -36,8 +36,8 @@ from bolo.catalog import Catalog, ModelSpec
 from bolo.config import Settings
 from bolo.engines import EngineRegistry
 from bolo.engines.base import (
-    AudioClassifierModel,
     AlignModel,
+    AudioClassifierModel,
     DenoiseModel,
     DiarizationModel,
     LidModel,

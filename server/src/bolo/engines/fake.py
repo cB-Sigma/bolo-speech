@@ -23,8 +23,8 @@ import numpy as np
 
 from bolo import __version__
 from bolo.engines.base import (
-    AudioTaggingModel,
     AlignModel,
+    AudioTaggingModel,
     ConversationChunk,
     ConversationRequest,
     DenoiseModel,

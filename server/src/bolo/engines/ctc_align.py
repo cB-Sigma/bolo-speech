@@ -49,7 +49,7 @@ def read_vocab(file: Path) -> dict[str, int]:
 
 def _uroman() -> Any:
     try:
-        import uroman  # type: ignore[import-not-found]
+        import uroman  # type: ignore[import-not-found,import-untyped,unused-ignore]
     except ImportError:
         return None
     romanizer = uroman.Uroman()

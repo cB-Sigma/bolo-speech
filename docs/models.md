@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-479 models: 195 validated on CPU by the maintainers, 284 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+481 models: 197 validated on CPU by the maintainers, 284 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -1121,6 +1121,20 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `seed-vc-audiocpp` (Seed-VC) | - | accuracy | - | 3.1 GB | GPL-3.0 · runs on audio.cpp · GPU recommended | untested |
+
+### Forced alignment (word timestamps)
+
+#### Omnilingual ASR
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `omnilingual-ctc-300m-align` | en, hi, bn, ta, te, mr +25 | balanced | - | 365 MB | Apache-2.0 | **CPU** · RTF 0.888 |
+
+#### MMS
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `mms-300m-forced-aligner` | - | balanced | - | 317 MB | CC-BY-NC-4.0 ⚠ | **CPU** · RTF 1.137 |
 
 ⚠ = the licence restricts commercial use. RTF = processing time / audio duration (lower is faster).
 <!-- END GENERATED: models -->
