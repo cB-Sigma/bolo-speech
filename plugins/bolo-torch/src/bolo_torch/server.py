@@ -13,7 +13,7 @@ import sys
 from typing import IO, Any
 
 from bolo.engines.base import Engine
-from bolo.plugin.sdk import _Server
+from bolo.plugin.sdk import _Server, protocol_streams
 
 
 def error_code(exc: BaseException) -> str:
@@ -62,11 +62,13 @@ class TorchServer(_Server):
 
 def serve(engine: Engine, stdin: IO[bytes] | None = None, stdout: IO[bytes] | None = None) -> int:
     """Like :func:`bolo.plugin.sdk.serve`, with :class:`TorchServer`."""
-    out = stdout or sys.stdout.buffer
-    if stdout is None:
-        sys.stdout = sys.stderr  # stray prints of model libraries must not corrupt the protocol stream
-    code = TorchServer(engine, stdin or sys.stdin.buffer, out).run()
-    if stdin is None:
+    standalone = stdin is None and stdout is None
+    if standalone:
+        # the protocol gets private copies of stdin and stdout; model libraries get an empty stdin (a first-use
+        # prompt ends at once instead of reading the protocol pipe forever) and stdout goes to stderr
+        stdin, stdout = protocol_streams()
+    code = TorchServer(engine, stdin or sys.stdin.buffer, stdout or sys.stdout.buffer).run()
+    if standalone:
         # bolo closed the pipe or asked for shutdown: leave now. Waiting for the worker pool would keep a
         # half-finished synthesis or separation running (and holding memory) after bolo has gone.
         sys.stderr.flush()

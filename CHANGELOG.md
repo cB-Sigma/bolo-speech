@@ -10,6 +10,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- **A plugin's model library can no longer stall the plugin by asking a question.** Engine plugins talk to bolo
+  over their stdin and stdout; a library that prompted on first use (a download or trust question) read the
+  protocol pipe and waited until the 10-minute request timeout (DiariZen's first request on Windows). The plugin
+  SDK now keeps private copies of both streams for the protocol; libraries get an empty stdin (a prompt ends at
+  once) and their stdout, including native libraries' output, goes to the plugin's log.
 - **A long recording is no longer refused with 429 by its own chunks.** A request cut into more chunks than the
   model's queue holds (a 25-minute file on Voxtral makes about 110 against the default `max_queue` of 64) queued
   them all at once and failed with "overloaded" after minutes of decoding. One request now keeps at most a few

@@ -319,10 +319,27 @@ def _rss_mb() -> float | None:
         return None
 
 
+def protocol_streams() -> tuple[IO[bytes], IO[bytes]]:
+    """Take the process's stdin and stdout for the protocol and give everything else harmless ones.
+
+    The protocol keeps private duplicates of file descriptors 0 and 1. Descriptor 0 then reads from the null
+    device and descriptor 1 writes to stderr (bolo's log), for Python code and native libraries alike: a model
+    library that asks a question on first use (a download or trust prompt) gets end-of-input at once instead
+    of waiting forever on the protocol pipe, and one that prints cannot corrupt the protocol stream."""
+    proto_in = os.fdopen(os.dup(0), "rb")
+    proto_out = os.fdopen(os.dup(1), "wb")
+    null = os.open(os.devnull, os.O_RDONLY)
+    os.dup2(null, 0)
+    os.close(null)
+    sys.stdout.flush()
+    os.dup2(2, 1)
+    sys.stdin = Path(os.devnull).open(encoding="utf-8")  # noqa: SIM115 - lives as long as the process
+    sys.stdout = sys.stderr
+    return proto_in, proto_out
+
+
 def serve(engine: Engine, stdin: IO[bytes] | None = None, stdout: IO[bytes] | None = None) -> int:
     """Run the plugin loop until bolo closes the pipe or asks for shutdown. Returns an exit code."""
-    out = stdout or sys.stdout.buffer
-    # Anything a library prints must not corrupt the protocol stream: send stray stdout to stderr.
-    if stdout is None:
-        sys.stdout = sys.stderr
-    return _Server(engine, stdin or sys.stdin.buffer, out).run()
+    if stdin is None and stdout is None:
+        stdin, stdout = protocol_streams()
+    return _Server(engine, stdin or sys.stdin.buffer, stdout or sys.stdout.buffer).run()

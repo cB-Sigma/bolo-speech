@@ -50,6 +50,12 @@ class ReferenceEngine(Engine):
         return EngineStatus(self.id, True, "1.0", None)
 
     def load(self, kind: str, task: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Model:
+        # what model libraries do on first use, for the tests: write to the process's stdout at the descriptor
+        # level, and ask a question on stdin (both must stay away from the protocol stream)
+        if spec.get("native_print_on_load"):
+            os.write(1, b"a native library writing to stdout\n")
+        if spec.get("ask_on_load"):
+            input("Download the model now? [y/N] ")
         model = self.fake.load(kind, task, path, spec, opts)
         return _CrashableTTS(model) if isinstance(model, TTSModel) else model
 

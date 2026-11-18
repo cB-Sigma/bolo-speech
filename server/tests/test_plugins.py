@@ -380,3 +380,21 @@ def test_plugin_commands_keep_windows_paths() -> None:
     windows = split_command(r'C:\Python312\python.exe -m bolo_torch "C:\Program Files\x"', windows=True)
     assert windows == [r"C:\Python312\python.exe", "-m", "bolo_torch", r"C:\Program Files\x"]
     assert split_command("python -m x 'a b'", windows=False) == ["python", "-m", "x", "a b"]
+
+
+def test_model_libraries_cannot_reach_the_protocol_stream() -> None:
+    """A library that prints at the descriptor level on load does not corrupt the protocol, and one that asks a
+    question on stdin gets end-of-input at once instead of reading the protocol pipe until the request times out."""
+    proc = PluginProcess(PluginConfig("ref", [sys.executable, "-m", "bolo.plugin.reference"]))
+    try:
+        load = {"op": "load", "kind": "fake-tts", "task": "tts", "path": "/nonexistent", "threads": 1}
+        model = host.PluginTTS(proc, {**load, "options": {"native_print_on_load": True}})
+        assert list(model.synthesize("Still speaking."))  # the protocol survived the stray output
+        model.close()
+        t0 = time.monotonic()
+        with pytest.raises(Exception, match="EOF"):
+            host.PluginTTS(proc, {**load, "options": {"ask_on_load": True}})
+        assert time.monotonic() - t0 < 10  # failed at once, not after the 600 s request timeout
+        assert proc.request({"op": "health"})["ok"] is True
+    finally:
+        proc.stop()

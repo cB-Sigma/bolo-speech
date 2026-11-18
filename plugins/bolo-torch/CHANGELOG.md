@@ -8,6 +8,9 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ### Fixed
 
+- **A model library that asks a question on first use no longer stalls the plugin** (DiariZen's first request
+  hung until bolo's 10-minute timeout): it gets an empty stdin and its output goes to the log (bolo-speech 0.6.8's
+  plugin SDK).
 - **GLM-4-Voice in 4-bit (`quantization = "int4"`) loads again.** The `glm-4-voice` extra pins transformers 4.44.1
   but left accelerate free, so accelerate 1.x was installed, and its dispatch refuses to move a bitsandbytes
   model ("`.to` is not supported for 4-bit or 8-bit bitsandbytes models"). The extras that pin transformers
