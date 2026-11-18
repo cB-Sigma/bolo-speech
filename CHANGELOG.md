@@ -6,6 +6,22 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Whisper through sherpa-onnx cut Tamil, Telugu, Bengali and other scripts short, and `model=auto` sent them
+  there.** sherpa-onnx stops Whisper after 6 tokens per second of audio, and Whisper's tokens of these scripts come
+  15 to 20 a second, so `whisper-large-v3-turbo` (and the other sherpa-onnx Whisper exports) stopped part-way through
+  the first sentence, or ran into repeated syllables. Each piece of audio is now padded so the limit is 174 tokens,
+  and a piece whose text still fills it is split at its quietest point and decoded again: on six FLEURS Tamil
+  utterances every sentence now comes back whole (it was cut after about a third). A regression test runs it on real
+  Tamil speech (`tests/test_real_tamil.py`). Language routing also changed: a catalog entry can name languages it
+  should not be used for (`options.not_recommended_for`, shown on the model and in `GET /api/v1/models/{id}`), which
+  `model=auto` and the recommendations then skip; and when the recogniser recommended for the detected language is
+  not installed, the server log says so and, with `auto_pull` on, it is downloaded and answers the request
+  (`x-bolo-route: ...; recommended=<id>; pulled=true`; the console's run notes say so too). Checked on a FLEURS
+  Tamil clip with only `whisper-large-v3-turbo` installed: `auto` pulled `indicconformer-ta-community` and answered
+  with it.
+
 ## [0.6.8] - 2026-11-18
 
 ### Fixed

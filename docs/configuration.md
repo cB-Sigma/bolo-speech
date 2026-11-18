@@ -817,10 +817,16 @@ transcribed by a recogniser for the language it heard:
    `bolo recommend` names first for the language on this machine, then a
    recogniser made for that language before one that covers many, then
    one measured here, then `default_stt`;
-3. else `default_stt`, not told the language. The response then names the
-   recogniser bolo recommends for the language (`recommended=` in
-   `x-bolo-route`): routing never starts a download of a recogniser you did
-   not name. Pull it (`bolo pull <id>`) and later requests use it.
+3. else `default_stt`, not told the language.
+
+A recogniser the catalog marks as not to be used for a language
+(`not_recommended_for`, with the reason) is never picked for it. When the
+recogniser bolo recommends for the language is not installed, the
+response names it (`recommended=` in `x-bolo-route`) and the server log
+says so. With `auto_pull` on (the default) it is downloaded then and
+answers the request (`pulled=true`; the first such request waits for the
+download); with `auto_pull` off, pull it (`bolo pull <id>`) and later
+requests use it.
 
 Below `lid_min_probability` (0.5) the detected language is not trusted
 and `default_stt` answers. When the language identifier cannot run (not

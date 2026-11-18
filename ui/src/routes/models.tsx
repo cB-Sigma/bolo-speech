@@ -172,7 +172,8 @@ function LicenceDetails({ m }: { m: CatalogModel }) {
   const info = useInfo().data
   const engine = isDemo ? null : engineMissing(info, m)
   const rc = m.remote_code
-  if (!m.license_note && !rc && !engine) return null
+  const poor = Object.entries(m.not_recommended_for ?? {})
+  if (!m.license_note && !rc && !engine && poor.length === 0) return null
   return (
     <div className="grid min-w-0 gap-3" data-testid="licence-details">
       {engine && (
@@ -182,6 +183,18 @@ function LicenceDetails({ m }: { m: CatalogModel }) {
             {m.id} can be pulled, but it cannot load until it is. {engine.reason}
           </p>
           {engine.install && <CopyCommand command={engine.install} className="mt-2" label="Install command" />}
+        </div>
+      )}
+      {poor.length > 0 && (
+        <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-[13px] leading-5">
+          <p className="font-medium text-warning-text">Not recommended for some languages</p>
+          <ul className="mt-1 grid gap-1 text-muted-foreground" data-testid="not-recommended-for">
+            {poor.map(([code, why]) => (
+              <li key={code}>
+                <span className="font-medium text-foreground">{languageName(code)}</span>: {why}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {m.license_note && (

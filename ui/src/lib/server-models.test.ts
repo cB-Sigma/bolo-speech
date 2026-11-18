@@ -45,8 +45,10 @@ describe('x-bolo-route', () => {
       probability: 0.987,
       lid: 'voxlingua107-ecapa',
       recommended: null,
+      pulled: false,
     })
     expect(parseRoute('auto -> whisper-base; reason=default; language=or; recommended=x')?.recommended).toBe('x')
+    expect(parseRoute('auto -> x; reason=recommended; language=ta; recommended=x; pulled=true')?.pulled).toBe(true)
     expect(parseRoute(null)).toBeNull()
   })
 })

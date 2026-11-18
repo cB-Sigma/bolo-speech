@@ -203,3 +203,71 @@ def test_routing_without_a_language_identifier(lid_settings: Settings) -> None:
     with serve(lid_settings) as live:
         r = transcribe(live, "ta", model="auto")
         assert r.headers["x-bolo-model"] == "fake-stt" and "x-bolo-route" not in r.headers
+
+
+def test_routing_skips_a_recogniser_not_recommended_for_the_language(lid_live: LiveServer) -> None:
+    spec = lid_live.core.catalog.resolve("fake-stt-ta")
+    assert spec is not None
+    spec.options["not_recommended_for"] = {"ta": "repeats itself on Tamil"}
+    try:
+        assert spec.not_recommended("ta-IN") == "repeats itself on Tamil" and spec.not_recommended("hi") is None
+        r = transcribe(lid_live, "ta", model="auto")
+        assert r.status_code == 200 and r.headers["x-bolo-model"] == "fake-stt"
+        assert "reason=default; language=ta" in r.headers["x-bolo-route"]
+        model = httpx.get(lid_live.url + "/api/v1/models/fake-stt-ta").json()
+        assert model["not_recommended_for"] == {"ta": "repeats itself on Tamil"}
+    finally:
+        spec.options.pop("not_recommended_for")
+
+
+def _routing_core(auto_pull: bool, fails: bool = False) -> tuple[object, list[str]]:
+    from types import SimpleNamespace
+
+    from bolo.engines.base import EngineStatus
+    from bolo.errors import ModelNotInstalled
+
+    pulled: list[str] = []
+
+    async def ensure_installed(spec: object) -> None:
+        if fails:
+            raise ModelNotInstalled("download failed")
+        pulled.append(spec.id)  # type: ignore[attr-defined]
+
+    core = SimpleNamespace(
+        settings=SimpleNamespace(auto_pull=auto_pull),
+        resolve=lambda name, task: SimpleNamespace(id=name, engine="sherpa-onnx"),
+        engines=SimpleNamespace(status=lambda engine: EngineStatus(engine, True)),
+        ensure_installed=ensure_installed,
+    )
+    return core, pulled
+
+
+def test_routing_pulls_the_recommended_recogniser_with_auto_pull(caplog: pytest.LogCaptureFixture) -> None:
+    import asyncio
+
+    from bolo.lid import _pull_recommended
+
+    def decision() -> Route:
+        return Route("auto", "whisper-large-v3-turbo", "recommended", language="ta", steer="ta",
+                     recommended="indicconformer-ta-community")  # fmt: skip
+
+    core, pulled = _routing_core(auto_pull=True)
+    d = decision()
+    asyncio.run(_pull_recommended(core, d))  # type: ignore[arg-type]
+    assert pulled == ["indicconformer-ta-community"]
+    assert d.model == "indicconformer-ta-community" and d.pulled and d.steer == "ta"
+    assert "recommended=indicconformer-ta-community; pulled=true" in d.header()
+    assert route_headers(d.to_dict())["x-bolo-route"] == d.header()
+
+    core, pulled = _routing_core(auto_pull=False)
+    d = decision()
+    with caplog.at_level("WARNING", logger="bolo"):
+        asyncio.run(_pull_recommended(core, d))  # type: ignore[arg-type]
+    assert not pulled and d.model == "whisper-large-v3-turbo" and not d.pulled
+    assert "recommended=indicconformer-ta-community" in d.header()
+    assert "indicconformer-ta-community is recommended for Tamil but is not installed" in caplog.text
+
+    core, pulled = _routing_core(auto_pull=True, fails=True)
+    d = decision()
+    asyncio.run(_pull_recommended(core, d))  # type: ignore[arg-type]
+    assert d.model == "whisper-large-v3-turbo" and not d.pulled and "download failed" in (d.detail or "")

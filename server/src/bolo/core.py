@@ -1133,6 +1133,12 @@ class Bolo:
             model=spec.id,
         )
 
+    async def ensure_installed(self, spec: ModelSpec) -> None:
+        """Download ``spec`` now unless it is installed (as using it would with ``auto_pull``); raises if it cannot."""
+        if spec.builtin or self.manager.is_installed(spec):
+            return
+        await self._auto_pull(spec)
+
     async def _auto_pull(self, spec: ModelSpec) -> None:
         if spec.cloud:
             self._require_provider(spec)

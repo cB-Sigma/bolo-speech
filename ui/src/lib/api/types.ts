@@ -337,6 +337,8 @@ export interface CatalogModel {
   remote_code?: RemoteCode | null
   /** A licence term to act on before use (for example a registration for commercial use). */
   license_note?: string | null
+  /** Languages the model speaks but should not be used for, with the reason; `model=auto` never picks it for them. */
+  not_recommended_for?: Record<string, string>
 }
 
 export interface RemoteCode {

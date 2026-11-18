@@ -10,9 +10,12 @@ first (``default_lid``); the audio then goes to a recogniser for that language (
 2. otherwise the best *installed* recogniser that speaks it: the one this machine's recommendations name for the
    language, then one made for that language over one that covers many, then the measured ones, then
    ``default_stt``;
-3. otherwise ``default_stt``, and the response names the recogniser bolo recommends for the language
-   (``recommended=``), which is not installed: a request never starts a download of a recogniser it was not
-   told to use.
+3. otherwise ``default_stt``.
+
+A recogniser the catalog marks as not to be used for a language (``options.not_recommended_for``, with the reason)
+is never chosen for it in step 2. When the recogniser bolo recommends for the language is not installed, the
+response names it (``recommended=``) and the server log says so; with ``auto_pull`` on, it is downloaded and
+answers the request (``pulled=true``), and the request falls back as above if the download fails.
 
 A detected language below ``lid_min_probability`` is not trusted: ``default_stt`` answers, not told the language.
 When the language identifier cannot run, the request still goes on, with ``default_stt``. A request that names a
@@ -103,6 +106,8 @@ class Route:
     detail: str | None = None
     candidates: list[str] = field(default_factory=list)
     lid_ms: float | None = None
+    #: the recommended recogniser was not installed and was downloaded for this request (auto_pull)
+    pulled: bool = False
 
     def header(self) -> str:
         """``x-bolo-route``: ``auto -> indicconformer-ta-community; reason=recommended; language=ta;
@@ -116,6 +121,8 @@ class Route:
             parts.append(f"lid={self.lid}")
         if self.recommended:
             parts.append(f"recommended={self.recommended}")
+        if self.pulled:
+            parts.append("pulled=true")
         return "; ".join(parts)
 
     def language_header(self) -> str | None:
@@ -138,6 +145,7 @@ class Route:
             "detail": self.detail,
             "candidates": self.candidates,
             "lid_ms": self.lid_ms,
+            "pulled": self.pulled,
         }
 
 
@@ -207,12 +215,16 @@ def _speaks(spec: ModelSpec, language: str) -> bool:
     return any(same_language(code, language) for code in spec.languages)
 
 
+def _works_for(spec: ModelSpec, language: str) -> bool:
+    return _speaks(spec, language) and spec.not_recommended(language) is None
+
+
 def recommended_for(core: Bolo, language: str) -> str | None:
     """The local recogniser this machine's recommendations name first for ``language`` (installed or not), from
     what the advisor already knows (never computed on the request path)."""
     best: str | None = None
     for spec in core.catalog.all():
-        if spec.task != "stt" or spec.cloud or spec.builtin or not _speaks(spec, language):
+        if spec.task != "stt" or spec.cloud or spec.builtin or not _works_for(spec, language):
             continue
         fit = core.advisor.cached_fit(spec)
         if fit is not None and any(same_language(m, language) for m in fit.default_for if m != "*"):
@@ -227,7 +239,9 @@ def installed_recognisers(core: Bolo, language: str) -> list[ModelSpec]:
     engines: dict[str, bool] = {}
     found: list[ModelSpec] = []
     for spec in core.catalog.all():
-        if spec.task != "stt" or spec.cloud or not spec.runnable or not spec.languages or not _speaks(spec, language):
+        if spec.task != "stt" or spec.cloud or not spec.runnable or not spec.languages:
+            continue
+        if not _works_for(spec, language):
             continue
         if spec.engine not in engines:
             try:
@@ -279,7 +293,42 @@ async def route(core: Bolo, samples: FloatArray, sample_rate: int, requested: st
         detail = f"{type(exc).__name__}: {exc}"
         log.warning("language routing: the language identifier failed, using %s: %s", default, detail)
         return Route(requested, default, "lid-failed", lid=s.default_lid, detail=detail)
-    return decide(core, result, requested)
+    decision = decide(core, result, requested)
+    if decision.recommended:
+        await _pull_recommended(core, decision)
+    return decision
+
+
+async def _pull_recommended(core: Bolo, decision: Route) -> None:
+    """The recogniser recommended for the detected language is not installed: say so, and with ``auto_pull``
+    download it and let it answer. A download that cannot start or fails leaves ``decision`` as it was."""
+    best = decision.recommended
+    assert best is not None
+    language = language_name(decision.language) if decision.language else decision.language
+    if not core.settings.auto_pull:
+        log.warning(
+            "language routing: %s is recommended for %s but is not installed (auto_pull is off), so %s answers; "
+            "run `bolo pull %s`",
+            best, language, decision.model, best,
+        )  # fmt: skip
+        return
+    log.warning("language routing: %s is recommended for %s and is not installed; pulling it now", best, language)
+    try:
+        spec = core.resolve(best, "stt")
+        status = core.engines.status(spec.engine)
+        if not status.available:
+            raise BoloError(f"its engine {spec.engine} is not available here ({status.reason or 'not installed'})")
+        await core.ensure_installed(spec)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        detail = exc.message if isinstance(exc, BoloError) else f"{type(exc).__name__}: {exc}"
+        log.warning("language routing: could not pull %s, %s answers: %s", best, decision.model, detail)
+        decision.detail = f"could not pull {best}: {detail}"
+        return
+    decision.model, decision.reason, decision.steer = spec.id, "recommended", decision.language
+    decision.pulled = True
+    decision.detail = None
 
 
 def decide(core: Bolo, result: LidResult, requested: str = "auto") -> Route:

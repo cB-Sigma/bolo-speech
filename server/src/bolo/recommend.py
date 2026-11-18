@@ -736,12 +736,21 @@ def rank(
             break
         if c.fit.level not in ("comfortable", "usable") or c.spec.builtin or c.spec.family in families:
             continue
+        if c.spec.not_recommended(q.language):
+            continue  # the catalog says it does not work well for this language
         families.add(c.spec.family)
         recommended.append(c.spec.id)
     default = recommended[0] if recommended else None
     if default is None:
         # nothing is expected to keep up: the best of what merely runs is still worth naming
-        default = next((c.spec.id for c in ordered if c.fit.level == "slow" and not c.spec.builtin), None)
+        default = next(
+            (
+                c.spec.id
+                for c in ordered
+                if c.fit.level == "slow" and not c.spec.builtin and not c.spec.not_recommended(q.language)
+            ),
+            None,
+        )
     return ordered, recommended, default
 
 

@@ -92,6 +92,8 @@ export interface RouteDecision {
   probability: number | null
   lid: string | null
   recommended: string | null
+  /** The recommended recogniser was not installed and was downloaded for this request (`pulled=true`). */
+  pulled: boolean
 }
 
 export function parseRoute(header: string | null | undefined): RouteDecision | null {
@@ -112,6 +114,7 @@ export function parseRoute(header: string | null | undefined): RouteDecision | n
     probability: probability != null && Number.isFinite(probability) ? probability : null,
     lid: kv.lid ?? null,
     recommended: kv.recommended ?? null,
+    pulled: kv.pulled === 'true',
   }
 }
 

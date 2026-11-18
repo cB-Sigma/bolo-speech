@@ -393,10 +393,14 @@ A transcription (not a translation) with `model=auto` and no `language` (or `lan
 `default_lid` first, then sent to a recogniser for the language it heard: the one the `language_routes` setting
 names for it, else the best **installed** local recogniser that speaks it (the one `bolo recommend` names first for
 the language on this machine, then one made for that language before one that covers many, then one measured
-here, then `default_stt`), else `default_stt`. The routed recogniser is told the language when it speaks it. A
-language heard with less than `lid_min_probability` (0.5) goes to `default_stt`, not told a language. Routing never
-downloads a recogniser it was not told to use and never picks a cloud model on its own, and a request that names a
-model or a language is never changed. `language_routing = false` makes `auto` mean `default_stt` again
+here, then `default_stt`), else `default_stt`. A recogniser the catalog marks as not to be used for the language
+(`not_recommended_for` in `GET /api/v1/models/{id}`, with the reason) is never picked for it. When the recogniser
+bolo recommends for the language is not installed, `x-bolo-route` names it (`recommended=<id>`) and the server log
+says so; with `auto_pull` on (the default) it is downloaded and answers the request (`pulled=true`), and if the
+download cannot be done the request is answered as without it. The routed recogniser is told the language when it
+speaks it. A language heard with less than `lid_min_probability` (0.5) goes to `default_stt`, not told a language.
+Routing never picks a cloud model on its own, and a request that names a model or a language is never changed.
+`language_routing = false` makes `auto` mean `default_stt` again
 ([configuration.md](configuration.md#language-routing)).
 
 The decision comes back in two headers (also on streamed responses) and in the trace's `route` field:
@@ -409,8 +413,8 @@ The decision comes back in two headers (also on streamed responses) and in the t
 | `reason` | Meaning |
 | --- | --- |
 | `route` | `language_routes` names the recogniser for the language |
-| `recommended` | the best installed recogniser that speaks the language |
-| `default` | no installed recogniser speaks it: `default_stt` answered on its own; `recommended=<id>` names one to pull |
+| `recommended` | the best installed recogniser that speaks the language (with `pulled=true`: the recommended one, downloaded for this request) |
+| `default` | no installed recogniser speaks it: `default_stt` answered on its own; `recommended=<id>` names one to pull (with `auto_pull` off) |
 | `unsure` | the language was heard with less than `lid_min_probability` |
 | `lid-failed` | the language identifier could not run (not installed with `auto_pull` off, engine missing, an error); `default_stt` answered |
 

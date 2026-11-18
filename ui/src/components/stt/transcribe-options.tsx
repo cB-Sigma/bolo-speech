@@ -270,7 +270,11 @@ export function RunNotes({ result }: { result: DiarizedResult }) {
       value: `${route.requested} → ${route.answered}${route.reason ? ` (${route.reason})` : ''}${
         route.language ? ` · heard ${languageName(route.language)}` : ''
       }${route.probability != null ? ` ${(route.probability * 100).toFixed(0)} %` : ''}${route.lid ? ` by ${route.lid}` : ''}${
-        route.recommended ? ` · better, not installed: ${route.recommended}` : ''
+        route.recommended
+          ? route.pulled
+            ? ` · ${route.recommended} was not installed and was downloaded for this`
+            : ` · better, not installed: ${route.recommended}`
+          : ''
       }`,
       warn: route.reason === 'unsure' || route.reason === 'lid-failed' || route.reason === 'default',
       testId: 'run-route',

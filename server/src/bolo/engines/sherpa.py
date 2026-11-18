@@ -176,6 +176,30 @@ def line_is_blank_only(symbols: set[str]) -> bool:
     return not any(s.strip() for s in symbols)
 
 
+#: Whisper hears 30 s at a time; sherpa-onnx counts the audio it is given to set the token limit (6 a second), so
+#: pieces are padded to just under that (from 29.5 s on it warns that it drops the rest)
+WHISPER_PAD_S = 29.0
+#: the token limit of a padded piece (6 per second of padded audio, in whole seconds)
+WHISPER_TOKEN_CAP = int(WHISPER_PAD_S) * 6
+#: when sherpa-onnx cannot hand the tokens over (one holds part of a character), their number is estimated from the
+#: text: Whisper's tokens of Tamil text carry about 3.2 bytes of UTF-8 each (measured on FLEURS); 3 errs towards
+#: splitting a piece that did not need it
+WHISPER_BYTES_PER_TOKEN = 3
+#: a piece shorter than twice this is not split again, even when its text fills the limit
+WHISPER_MIN_PIECE_S = 2.0
+
+
+def quietest_point(samples: FloatArray, a: int, b: int, sr: int) -> int:
+    """The sample in the middle half of ``samples[a:b]`` where 20 ms of audio is quietest: where to cut it."""
+    frame = max(1, int(0.02 * sr))
+    lo, hi = a + (b - a) // 4, a + 3 * (b - a) // 4
+    n = (hi - lo) // frame
+    if n < 2:
+        return (a + b) // 2
+    frames = np.asarray(samples[lo : lo + n * frame], dtype=np.float32).reshape(n, frame)
+    return int(lo + int(np.argmin((frames**2).mean(axis=1))) * frame + frame // 2)
+
+
 class SherpaOfflineSTT(STTModel):
     def __init__(self, kind: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> None:
         import sherpa_onnx
@@ -296,6 +320,10 @@ class SherpaOfflineSTT(STTModel):
             groups.setdefault((lang, r.task), []).append(i)
         for (lang, task), idxs in groups.items():
             rec = self._get(lang, task)
+            if self.kind == "whisper":
+                for i in idxs:
+                    results[i] = self._whisper(rec, requests[i], lang)
+                continue
             streams = []
             for i in idxs:
                 s = rec.create_stream()
@@ -305,6 +333,58 @@ class SherpaOfflineSTT(STTModel):
             for i, s in zip(idxs, streams):
                 results[i] = self._result(s.result, requests[i], lang)
         return [r for r in results if r is not None]
+
+    def _whisper(self, rec: Any, req: STTRequest, lang: str) -> STTResult:
+        """Whisper through sherpa-onnx, given room for every token the speech needs.
+
+        sherpa-onnx's Whisper decoder stops after 6 tokens per second of audio it was given (and 224 in all).
+        Whisper spends far more tokens than that on scripts its byte-level vocabulary splits finely: Tamil,
+        Telugu, Bengali and others take 15 to 20 a second, so their text was cut off part-way through the
+        sentence. Each piece is padded to just under 30 s of audio, which raises the limit to
+        :data:`WHISPER_TOKEN_CAP` tokens; a piece whose text still reaches the limit is split at its quietest
+        point and each half decoded again (down to :data:`WHISPER_MIN_PIECE_S`).
+        """
+        sr = self.sample_rate
+        pieces: list[tuple[str, list[str], list[float], float]] = []  # text, tokens, token starts (s), offset
+        detected = ""
+
+        def decode(a: int, b: int) -> None:
+            nonlocal detected
+            if req.abort.is_set():
+                return
+            audio = np.asarray(req.samples[a:b], dtype=np.float32)
+            padded = np.zeros(max(len(audio), int(WHISPER_PAD_S * sr)), dtype=np.float32)
+            padded[: len(audio)] = audio
+            stream = rec.create_stream()
+            stream.accept_waveform(sr, padded)
+            rec.decode_stream(stream)
+            res = stream.result
+            try:
+                tokens = [str(t) for t in res.tokens]
+                count = len(tokens)
+            except UnicodeDecodeError:  # a token holding part of a character (Whisper's byte-level vocabulary)
+                tokens = []
+                count = len(str(res.text).encode()) // WHISPER_BYTES_PER_TOKEN
+            if count >= WHISPER_TOKEN_CAP - 2 and (b - a) >= 2 * WHISPER_MIN_PIECE_S * sr:
+                cut = quietest_point(req.samples, a, b, sr)
+                decode(a, cut)
+                decode(cut, b)
+                return
+            detected = detected or str(getattr(res, "lang", "") or "")
+            starts = [float(t) for t in getattr(res, "timestamps", [])]
+            pieces.append((str(res.text).strip(), tokens, starts, a / sr))
+
+        decode(0, len(req.samples))
+        text = " ".join(p[0] for p in pieces if p[0]).strip()
+        duration = len(req.samples) / sr
+        words: list[Word] = []
+        if req.word_timestamps and self.supports_word_timestamps:
+            for i, (_, tokens, starts, offset) in enumerate(pieces):
+                end = pieces[i + 1][3] if i + 1 < len(pieces) else duration
+                if tokens and len(starts) >= len(tokens):
+                    words += tokens_to_words(tokens, [offset + t for t in starts], end)
+        language = (detected.strip("<|>") or lang) or None
+        return STTResult(text, language, [Segment(0.0, duration, text, words)] if text else [], words)
 
     def _result(self, res: Any, req: STTRequest, lang: str) -> STTResult:
         text = str(res.text).strip()

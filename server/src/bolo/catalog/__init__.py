@@ -92,6 +92,16 @@ class ModelSpec:
         spec.validate()
         return spec
 
+    def not_recommended(self, language: str | None) -> str | None:
+        """Why this model should not be used for ``language`` (``options.not_recommended_for``: language ->
+        reason, for a language it speaks but transcribes badly), or None."""
+        marks = self.options.get("not_recommended_for")
+        if not language or not isinstance(marks, dict):
+            return None
+        from bolo.text.iso639 import same_language
+
+        return next((str(why) for code, why in marks.items() if same_language(str(code), language)), None)
+
     @property
     def needs_phonemes(self) -> bool:
         # "espeak-ng" is how entries written by bolo 0.1 (custom.yaml) say the same thing
@@ -255,6 +265,8 @@ class ModelSpec:
             "remote_code": self._remote_code_api(settings or {}),
             # a licence term to act on before use (for example a registration for commercial use); else null
             "license_note": self.options.get("license_note"),
+            # languages it speaks but should not be used for, with the reason (options.not_recommended_for)
+            "not_recommended_for": self.options.get("not_recommended_for") or {},
         }
 
     def _remote_code_api(self, settings: dict[str, Any]) -> dict[str, Any] | None:
