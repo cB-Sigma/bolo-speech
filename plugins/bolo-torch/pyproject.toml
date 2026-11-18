@@ -42,7 +42,7 @@ parler = ["parler-tts>=0.2.3", "sentencepiece>=0.1.99,<0.2.1"]
 # IndicF5. The model repository ships its own copy of the f5_tts package; these are the libraries it imports.
 f5 = [
   "transformers>=4.46", "vocos>=0.1", "x-transformers>=1.31.14", "torchdiffeq", "ema-pytorch>=0.5.2",
-  "accelerate>=0.33", "cached-path", "pydub", "librosa", "matplotlib", "pypinyin", "jieba", "datasets", "wandb",
+  "accelerate>=0.33", "cached-path", "pydub", "librosa>=0.10.2", "matplotlib", "pypinyin", "jieba", "datasets", "wandb",
   "torchaudio>=2.1", "soundfile>=0.12.1",
 ]
 # The original F5-TTS checkpoints (SWivid/F5-TTS, CC-BY-NC-4.0 weights) on the f5-tts package (MIT code). It pins
@@ -70,7 +70,7 @@ omni = ["transformers>=4.57", "accelerate>=0.33", "torchvision"]
 # model) and of its token2wav decoder (github.com/stepfun-ai/Step-Audio2 at a pinned commit, installed by the plugin:
 # `bolo-torch code install step-audio-2`). The authors use transformers 4.49.0; keep it in its own environment.
 step-audio-2 = [
-  "transformers==4.49.0", "accelerate>=0.33", "torchaudio>=2.1", "librosa", "onnxruntime", "s3tokenizer",
+  "transformers==4.49.0", "accelerate>=0.33", "torchaudio>=2.1", "librosa>=0.10.2", "onnxruntime", "s3tokenizer",
   "hyperpyyaml", "diffusers", "einops", "scipy", "soundfile>=0.12.1",
 ]
 # GLM-4-Voice 9B (speech-to-speech): the libraries of ChatGLM's remote code (opt-in per model) and of the speech
@@ -80,20 +80,20 @@ step-audio-2 = [
 glm-4-voice = [
   "transformers==4.44.1", "accelerate>=0.33,<1.0", "huggingface-hub>=0.23,<0.26", "tiktoken", "torchaudio>=2.1",
   "conformer==0.3.2", "diffusers==0.27.2", "hyperpyyaml==1.2.2", "hydra-core==1.3.2", "lightning==2.2.4",
-  "omegaconf==2.3.0", "rich", "einops", "librosa", "soundfile>=0.12.1", "safetensors", "bitsandbytes",
+  "omegaconf==2.3.0", "rich", "einops", "librosa>=0.10.2", "soundfile>=0.12.1", "safetensors", "bitsandbytes",
 ]
 # Kimi-Audio 7B Instruct (speech-to-speech): the libraries of kimia_infer (github.com/MoonshotAI/Kimi-Audio at a pinned
 # commit, installed by the plugin: `bolo-torch code install kimi-audio`) and of its remote code. Not here: flash-attn,
 # which its Whisper encoder imports and which has no wheels on PyPI (`pip install flash-attn --no-build-isolation` on
 # Linux with the CUDA toolkit). transformers as when the code was published (spring 2025). NVIDIA GPUs only.
 kimi-audio = [
-  "transformers>=4.48,<4.52", "accelerate>=0.33", "torchaudio>=2.1", "librosa", "soundfile>=0.12.1", "tqdm", "loguru",
+  "transformers>=4.48,<4.52", "accelerate>=0.33", "torchaudio>=2.1", "librosa>=0.10.2", "soundfile>=0.12.1", "tqdm", "loguru",
   "tiktoken", "timm", "torchdyn==1.0.6", "safetensors", "pyyaml", "packaging", "ninja",
 ]
 # MiniCPM-o 2.6 (speech-to-speech): the model is Hugging Face remote code (opt in per model); these are the libraries
 # it imports, at the model card's versions (transformers 4.44.2, vector-quantize-pytorch 1.18.5, vocos 0.1.0).
 minicpm-o = [
-  "transformers==4.44.2", "accelerate>=0.33,<1.0", "torchaudio>=2.1", "torchvision", "Pillow", "librosa", "soundfile>=0.12.1",
+  "transformers==4.44.2", "accelerate>=0.33,<1.0", "torchaudio>=2.1", "torchvision", "Pillow", "librosa>=0.10.2", "soundfile>=0.12.1",
   "vector-quantize-pytorch==1.18.5", "vocos==0.1.0",
 ]
 # Voxlect's language identifiers for India (Whisper small or MMS-LID-256 encoders with LoRA; rebuilt from
@@ -119,7 +119,7 @@ spark-tts = [
 # pyopenjtalk-plus has wheels where pyopenjtalk has none. The GPL-licensed parts of the front end (phonemizer with
 # espeak-ng, pykakasi, Unidecode) are not here: install them yourself (README.md).
 maskgct = [
-  "transformers>=4.41,<4.48", "safetensors", "librosa", "soundfile>=0.12.1", "einops", "json5", "ruamel.yaml", "six",
+  "transformers>=4.41,<4.48", "safetensors", "librosa>=0.10.2", "soundfile>=0.12.1", "einops", "json5", "ruamel.yaml", "six",
   "tokenizers", "onnxruntime", "inflect", "jieba", "cn2an", "pypinyin", "LangSegment==0.2.0", "pyopenjtalk-plus",
   "scipy", "tqdm",
 ]

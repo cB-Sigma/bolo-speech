@@ -283,6 +283,9 @@ SERVERS[MINICPM_O] = Server(
                 "transformers==4.51.0",
                 "accelerate==1.10.1",
                 "minicpmo-utils[all]==1.0.6",
+                # minicpmo-utils 1.0.6 pins librosa 0.9.0, which imports pkg_resources: setuptools 81 dropped it,
+                # and a uv environment has no setuptools at all
+                "setuptools<81",
                 "sphn==0.2.1",
                 "websockets==15.0.1",
                 "soundfile==0.12.1",

@@ -25,6 +25,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Fixed
 
+- **`bolo components install minicpm-o` failed its own check on Windows (2 of 2).** minicpmo-utils 1.0.6 pins
+  librosa 0.9.0, which imports `pkg_resources`; setuptools 81 dropped it and the component's environment (made with
+  uv) had none, so `import librosa` failed and the install was removed. The environment now gets `setuptools<81`
+  (librosa cannot be newer there: minicpmo-utils pins it exactly). bolo-torch's extras that bring librosa ask for
+  0.10.2 or later, which no longer needs `pkg_resources`; Freeze-Omni's requirements already pin 0.10.2.
 - **A full-duplex model too big for the GPU started anyway and failed.** Moshi, Hibiki, PersonaPlex and the other
   full-duplex models load whole on one device (split across the GPU and the CPU they are 5 to 7 times too slow). The
   advisor now rates one that needs more GPU memory than the GPU has "won't fit this GPU" (`fit.gpu_too_small`; no
@@ -33,7 +38,6 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   of GPU memory; ... has 6.0 GB; full-duplex models can't be split across GPU and CPU"). A CUDA out-of-memory while
   the server starts reads the same way. Every other model keeps warn-never-restrict. The MLX entries got a GPU
   memory estimate too.
-
 ## [0.6.9] - 2026-11-18
 
 ### Security

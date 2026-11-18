@@ -70,3 +70,23 @@ def test_a_gpu_build_lost_anyway_is_put_back() -> None:
     ]  # fmt: skip
     assert install.restore_command({"torch": "2.15.0+cpu"}, "2.16.0") is None  # a CPU build: nothing to keep
     assert install.restore_command({"torch": None}, "2.15.0") is None
+
+
+def test_extras_take_a_librosa_without_pkg_resources() -> None:
+    """librosa before 0.10.2 imports pkg_resources, which setuptools 81 dropped (bolo-speech's MiniCPM-o component
+    failed on it): every extra that brings librosa asks for 0.10.2 or later."""
+    import re
+    import sys
+    from pathlib import Path
+
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:  # pragma: no cover
+        import tomli as tomllib
+    doc = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text(encoding="utf-8"))
+    extras = doc["project"]["optional-dependencies"]
+    with_librosa = {name: [r for r in reqs if re.match(r"librosa\b", r)] for name, reqs in extras.items()}
+    with_librosa = {name: reqs for name, reqs in with_librosa.items() if reqs}
+    assert {"f5", "step-audio-2", "glm-4-voice", "kimi-audio", "minicpm-o", "maskgct"} <= set(with_librosa)
+    for name, reqs in with_librosa.items():
+        assert reqs == ["librosa>=0.10.2"], name

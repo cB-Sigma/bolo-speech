@@ -1002,3 +1002,13 @@ def test_the_launcher_keeps_the_q8_scales_as_stored(tmp_path: Path) -> None:
             "lm.layer.weight": "bfloat16",
             "lm.layer.weight_scb": scales,
         }
+
+
+def test_minicpm_o_environment_keeps_pkg_resources() -> None:
+    """Windows, 2 of 2: `bolo components install minicpm-o` failed its own import check: minicpmo-utils 1.0.6 pins
+    librosa 0.9.0, whose librosa/util/files.py imports pkg_resources, which setuptools 81 dropped (and a uv
+    environment has no setuptools at all). The environment gets a setuptools that still has it."""
+    build = rt.SERVERS[rt.MINICPM_O].builds[rt.PYTORCH]
+    assert "minicpmo-utils[all]==1.0.6" in build.packages and "setuptools<81" in build.packages
+    # in the same pip command as the package that needs it (bolo.duplex.runtime._install_python)
+    assert build.packages.index("setuptools<81") > build.packages.index("minicpmo-utils[all]==1.0.6")
