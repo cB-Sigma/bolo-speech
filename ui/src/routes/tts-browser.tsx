@@ -6,7 +6,7 @@ import { DevicePanel, RiskDialog, useDevice, VerdictBadge, VerdictLine } from '@
 import { DownloadsPanel, InterruptedLoadNotice } from '@/components/downloads-panel'
 import { Page } from '@/components/layout/app-shell'
 import { Empty, Panel, Readout } from '@/components/panel'
-import { LoadProgress, LoadTrouble, ModelStatusChip } from '@/components/stt/model-status'
+import { LoadTrouble, ModelStatusChip } from '@/components/stt/model-status'
 import { ChunkTimeline } from '@/components/tts/chunk-timeline'
 import { PlaybackWave } from '@/components/tts/playback-wave'
 import { RoundTripPanel, type RoundTrip } from '@/components/tts/round-trip'
@@ -641,7 +641,6 @@ export function BrowserTts({ modeToggle }: { modeToggle?: ReactNode }) {
                 {voice.approximate}
               </p>
             )}
-            <LoadProgress className="mt-3" engine={engine} noun="voice" />
             <LoadTrouble className="mt-3" engine={engine} noun="voice" />
             {prepared && (prepared.rewritten || prepared.dropped.length > 0 || extra.missing.length > 0) && (
               <div

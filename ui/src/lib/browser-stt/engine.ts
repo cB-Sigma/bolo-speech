@@ -1,5 +1,7 @@
 import type { SttWord } from '@/lib/api/types'
 import { Store } from '@/lib/store'
+import { fmtBytes } from '@/lib/format'
+import { describeLoad } from '@/lib/load-progress'
 import {
   claimRuntime,
   isOutOfMemory,
@@ -343,7 +345,11 @@ export class BrowserSttEngine {
 
     // On WebKit only one model runtime fits in the page: this releases the synthesiser's, if it is loaded.
     claimRuntime('stt', () => this.dispose())
-    markLoading('stt', model.id, { label: `Speech to text: ${model.label}`, store: this.store })
+    markLoading('stt', model.id, {
+      label: `Speech to text: ${model.label}`,
+      store: this.store,
+      describe: () => describeLoad(this.store.get(), fmtBytes),
+    })
     const worker: SpeechWorker = workerFactory
       ? await workerFactory()
       : (new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }) as unknown as SpeechWorker)
@@ -503,28 +509,4 @@ export function sharedEngine(): BrowserSttEngine {
   return shared
 }
 
-/** Human description of where a load is, with bytes where they are known. */
-export function describeLoad(
-  s: Pick<EngineState, 'status' | 'stage' | 'runtime' | 'files'> & { model: { approxBytes: number } },
-  fmt: (bytes: number) => string,
-  noun = 'model',
-): string {
-  if (s.status !== 'loading') return ''
-  if (s.stage === 'runtime') {
-    return s.runtime && s.runtime.total > 0
-      ? `Downloading the runtime · ${fmt(s.runtime.loaded)} of ${fmt(s.runtime.total)}`
-      : 'Downloading the runtime'
-  }
-  if (s.stage === 'model') {
-    const loaded = s.files.reduce((a, f) => a + f.loaded, 0)
-    const seen = s.files.reduce((a, f) => a + f.total, 0)
-    // Files announce their size as they start; until most have, the listed size is the better denominator.
-    const total = seen >= s.model.approxBytes * 0.9 ? seen : s.model.approxBytes
-    return loaded > 0
-      ? `Downloading the ${noun} · ${fmt(loaded)} of ${fmt(Math.max(total, loaded))}`
-      : `Downloading the ${noun} · ${fmt(total)}`
-  }
-  if (s.stage === 'compiling') return `Compiling the ${noun}`
-  if (s.stage === 'warmup') return 'Warming up'
-  return 'Starting'
-}
+export { describeLoad }

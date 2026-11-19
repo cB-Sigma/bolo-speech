@@ -49,4 +49,31 @@ describe('downloads tray', () => {
     a.patch({ progress: 0.9 }) // the first watcher was dropped
     expect(activeLoads.get()[0]!.progress).toBe(0)
   })
+
+  it("carries the load's own words and steps, so no page needs a progress bar of its own", () => {
+    const st = new Store<{ status: string; progress: number; stage: string | null }>({
+      status: 'loading',
+      progress: 0,
+      stage: 'model',
+    })
+    render(<DownloadTray />)
+    act(() =>
+      markLoading('stt', 'whisper-base-en', {
+        label: 'Speech to text: Whisper Base (English)',
+        store: st,
+        describe: () => 'Downloading the model · 56.4 MB of 79.6 MB',
+      }),
+    )
+    const row = screen.getByTestId('download-whisper-base-en')
+    expect(row).toHaveAttribute('data-stage', 'model')
+    expect(row).toHaveTextContent('Downloading the model · 56.4 MB of 79.6 MB')
+    expect(screen.getAllByRole('listitem', { current: 'step' })).toHaveLength(1)
+    expect(screen.getByRole('listitem', { current: 'step' })).toHaveTextContent('Model')
+
+    // a loader that describes nothing still says which stage it is in
+    act(() => markLoading('audio', 'silero', { label: 'Voice activity: Silero', store: engine() }))
+    expect(screen.getByTestId('download-silero')).toHaveTextContent('Downloading')
+    act(() => st.patch({ stage: 'compiling' }))
+    expect(screen.getByTestId('download-whisper-base-en')).toHaveTextContent('on this device, quicker next time')
+  })
 })

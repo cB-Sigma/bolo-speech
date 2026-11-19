@@ -221,14 +221,18 @@ test.describe('in-browser model: loading', () => {
     await expect(note).toContainText('The microphone is on')
     await expect(page.getByTestId('stop')).toBeVisible()
 
-    // Real stages with bytes.
-    const stage = page.getByTestId('load-stage').first()
-    await expect(stage).toContainText(/Downloading the runtime · [\d.]+ MB of 14\.3 MB/)
-    await expect(stage).toContainText(/Downloading the model · [\d.]+ MB of [\d.]+ MB/)
-    await expect(page.getByTestId('load-progress').first()).toHaveAttribute('data-stage', 'compiling')
-    await expect(stage).toHaveText('Compiling the model')
-    await expect(chip).toContainText('Compiling the model')
-    await expect(page.getByTestId('load-progress').first().getByRole('listitem')).toHaveText([
+    // Real stages with bytes, in the downloads tray: the one place a download shows; the page says only "Loading".
+    const row = page
+      .getByTestId('download-tray')
+      .getByTestId(/^download-/)
+      .first()
+    await expect(row).toContainText(/Downloading the runtime · [\d.]+ MB of 14\.3 MB/)
+    await expect(row).toContainText(/Downloading the model · [\d.]+ MB of [\d.]+ MB/)
+    await expect(row).toHaveAttribute('data-stage', 'compiling')
+    await expect(row).toContainText('Compiling the model')
+    await expect(chip).toContainText('Getting the model ready')
+    await expect(page.getByTestId('load-progress')).toHaveCount(0)
+    await expect(row.getByRole('listitem')).toHaveText([
       /Runtime.*done/,
       /Model.*done/,
       /Compile.*in progress/,
@@ -249,6 +253,34 @@ test.describe('in-browser model: loading', () => {
     await expect(page.getByTestId('final-text').first()).toContainText('pretend transcript', { timeout: 20_000 })
     await page.getByTestId('stop').click()
     await expect(page.getByTestId('mic')).toBeVisible({ timeout: 10_000 })
+    expect(errors).toEqual([])
+  })
+
+  test('a download shows in the tray alone, with its stage and bytes; the page keeps one chip', async ({ page }) => {
+    const errors = watchErrors(page)
+    await open(page, '/stt', { storage: fakeModel({ loadMs: 6000 }) })
+    await page.getByTestId('mode-browser').click()
+    const chip = page.getByTestId('model-chip')
+    await expect(chip).toHaveCount(1)
+    await chip.click()
+    const row = page
+      .getByTestId('download-tray')
+      .getByTestId(/^download-/)
+      .first()
+    await expect(row).toContainText('Speech to text: Moonshine Tiny')
+    await expect(row).toContainText(/Downloading the (runtime|model) · [\d.]+ MB of [\d.]+ MB/)
+    await expect(row).toHaveAttribute('data-stage', 'compiling')
+    await expect(row.getByRole('listitem')).toHaveText([
+      /Runtime.*done/,
+      /Model.*done/,
+      /Compile.*in progress/,
+      /Warm up.*waiting/,
+    ])
+    await expect(chip).toContainText('Getting the model ready')
+    await expect(chip).not.toContainText('MB')
+    await expect(page.getByTestId('load-progress')).toHaveCount(0)
+    await expect(chip).toContainText('Ready', { timeout: 15_000 })
+    await expect(page.getByTestId('download-tray')).toHaveCount(0, { timeout: 5_000 })
     expect(errors).toEqual([])
   })
 

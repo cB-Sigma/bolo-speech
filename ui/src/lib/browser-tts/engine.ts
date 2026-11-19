@@ -23,6 +23,8 @@ import {
 } from '@/lib/downloads'
 import { readBrowserSttConfig, type BrowserDevice, type FileProgress, type LoadStage } from '@/lib/browser-stt/models'
 import { Store } from '@/lib/store'
+import { fmtBytes } from '@/lib/format'
+import { describeLoad } from '@/lib/load-progress'
 import { detectSupport } from '@/lib/support'
 import { readGpuPower } from '@/lib/webgpu'
 import { VOICE_CACHE, type TtsWorkerRequest, type TtsWorkerResponse } from './protocol'
@@ -384,7 +386,11 @@ export class BrowserTtsEngine {
     )
     // On WebKit and phones only one model runtime fits in the page: this releases the recogniser's, if it is loaded.
     claimRuntime('tts', () => this.dispose())
-    markLoading('tts', voice.downloadId, { label: voice.downloadLabel, store: this.store })
+    markLoading('tts', voice.downloadId, {
+      label: voice.downloadLabel,
+      store: this.store,
+      describe: () => describeLoad(this.store.get(), fmtBytes, 'voice'),
+    })
     const worker: TtsWorker = workerFactory
       ? await workerFactory()
       : (new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }) as unknown as TtsWorker)

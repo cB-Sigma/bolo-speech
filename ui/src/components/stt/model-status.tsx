@@ -1,24 +1,13 @@
-import { overallPercent } from '@/lib/load-progress'
 import { AlertTriangle, Download, Loader2, Play, RotateCcw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 import { useStore } from '@/hooks/use-store'
-import { describeLoad, sharedEngine, type EngineState } from '@/lib/browser-stt/engine'
+import { sharedEngine, type EngineState } from '@/lib/browser-stt/engine'
 import { isOutOfMemory } from '@/lib/browser-runtime'
 import { clearAllDownloads } from '@/lib/downloads'
 import type { Store } from '@/lib/store'
-import type { LoadStage } from '@/lib/browser-stt/models'
 import { fmtBytes } from '@/lib/format'
 import { cn } from '@/lib/utils'
-
-const STAGES: { id: LoadStage; label: string }[] = [
-  { id: 'runtime', label: 'Runtime' },
-  { id: 'model', label: 'Model' },
-  { id: 'compiling', label: 'Compile' },
-  { id: 'warmup', label: 'Warm up' },
-]
 
 /** The load-related state both in-browser engines (recogniser and synthesiser) share. */
 export { overallPercent } from '@/lib/load-progress'
@@ -45,7 +34,6 @@ export interface LoadEngine {
   retrySafe(): Promise<void>
 }
 
-/** 0..100 across the whole load: downloads take most of the bar, the rest is split between compile and warm-up. */
 function runsOn(s: LoadState): string {
   return s.device === 'webgpu' ? 'WebGPU' : `WebAssembly · ${s.threads} thread${s.threads === 1 ? '' : 's'}`
 }
@@ -56,7 +44,8 @@ export function modelStatusText(s: LoadState, noun = 'model'): string {
     case 'ready':
       return `Ready · ${runsOn(s)}`
     case 'loading':
-      return describeLoad(s, fmtBytes, noun)
+      // the stage and the bytes are in the downloads tray, the one place every download shows
+      return s.stage === 'compiling' || s.stage === 'warmup' ? `Getting the ${noun} ready` : 'Loading'
     case 'error':
       return 'Could not load'
     default:
@@ -124,76 +113,6 @@ export function ModelStatusChip({
     <span className={cls} role="status" data-testid="model-chip" data-status={s.status}>
       {body}
     </span>
-  )
-}
-
-/** Stage-by-stage progress of a load in flight. Renders nothing otherwise. */
-export function LoadProgress({
-  className,
-  engine = sharedEngine(),
-  noun = 'model',
-}: {
-  className?: string
-  engine?: LoadEngine
-  noun?: string
-}) {
-  const s = useStore(engine.store)
-  const [elapsed, setElapsed] = useState(0)
-  const loading = s.status === 'loading'
-  useEffect(() => {
-    if (!loading) return
-    const started = performance.now()
-    const timer = setInterval(() => setElapsed((performance.now() - started) / 1000), 500)
-    return () => {
-      clearInterval(timer)
-      setElapsed(0)
-    }
-  }, [loading])
-  if (!loading) return null
-  const at = STAGES.findIndex((x) => x.id === s.stage)
-  return (
-    <div className={cn('min-w-0', className)} data-testid="load-progress" data-stage={s.stage ?? ''}>
-      <div className="flex items-baseline justify-between gap-3 text-xs">
-        <span className="min-w-0 truncate font-medium" role="status" data-testid="load-stage">
-          {describeLoad(s, fmtBytes, noun)}
-        </span>
-        <span className="shrink-0 num text-muted-foreground">{elapsed.toFixed(0)} s</span>
-      </div>
-      <Progress
-        value={overallPercent(s)}
-        aria-label={`${noun[0]?.toUpperCase()}${noun.slice(1)} load progress`}
-        className="mt-1.5 h-1.5"
-      />
-      <ol className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground" aria-label="Load steps">
-        {STAGES.map((st, i) => (
-          <li
-            key={st.id}
-            aria-current={i === at ? 'step' : undefined}
-            className={cn(
-              'flex items-center gap-1',
-              i < at && 'text-foreground',
-              i === at && 'font-medium text-foreground',
-            )}
-          >
-            <span
-              aria-hidden
-              className={cn(
-                'size-1.5 rounded-full',
-                i < at ? 'bg-good' : i === at ? 'bg-chart-1' : 'border border-chart-axis',
-              )}
-            />
-            {st.id === 'model' ? `${noun[0]?.toUpperCase()}${noun.slice(1)}` : st.label}
-            <span className="sr-only">{i < at ? ' (done)' : i === at ? ' (in progress)' : ' (waiting)'}</span>
-          </li>
-        ))}
-      </ol>
-      {s.stage === 'compiling' && (
-        <p className="mt-1.5 text-[11px] leading-4 text-muted-foreground">
-          The download is finished. Compiling happens on this device and can take a while on a phone; it is quicker next
-          time.
-        </p>
-      )}
-    </div>
   )
 }
 

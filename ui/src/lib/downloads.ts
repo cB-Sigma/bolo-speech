@@ -335,8 +335,12 @@ export interface ActiveLoad {
   id: string
   kind: ModelKind
   label: string
-  /** 0..1 of the model's files. */
+  /** 0..1 of the whole load (its stages weighted, see `overallPercent`). */
   progress: number
+  /** What it is doing, in words ("Downloading the model · 56.4 MB of 79.6 MB"); empty when the loader says nothing. */
+  detail: string
+  /** The stage of a staged load (runtime, model, compiling, warmup); null for a load that reports only its files. */
+  stage: string | null
   /** Finished: kept on screen for a moment at 100 % so the tray does not vanish mid-glance. */
   done: boolean
 }
@@ -345,6 +349,24 @@ export interface ActiveLoad {
 export interface LoadWatch {
   label: string
   store: { get: () => StagedLoad; subscribe: (l: () => void) => () => void }
+  /** What it is doing right now, in words; without it the tray names the stage alone. */
+  describe?: () => string
+}
+
+/** The stage in words, for loaders that do not describe themselves. */
+function stageText(s: StagedLoad): string {
+  switch (s.stage) {
+    case 'runtime':
+      return 'Downloading the runtime'
+    case 'model':
+      return 'Downloading the model'
+    case 'compiling':
+      return 'Compiling on this device'
+    case 'warmup':
+      return 'Warming up'
+    default:
+      return s.stage === undefined ? 'Downloading' : 'Starting'
+  }
 }
 
 /** Every model loading in this page, in the order they started. */
@@ -366,7 +388,15 @@ function trackLoad(kind: ModelKind, id: string, watch: LoadWatch): void {
       const at = activeLoads.get().findIndex((l) => l.id === id)
       // never backwards: a stage that starts with its predecessor's figure would make the bar jump back
       const before = at < 0 ? 0 : activeLoads.get()[at]!.progress
-      const entry: ActiveLoad = { id, kind, label: watch.label, progress: Math.max(before, progress), done: false }
+      const entry: ActiveLoad = {
+        id,
+        kind,
+        label: watch.label,
+        progress: Math.max(before, progress),
+        detail: watch.describe?.() || stageText(st),
+        stage: st.stage ?? null,
+        done: false,
+      }
       activeLoads.set(at < 0 ? [...rest, entry] : activeLoads.get().map((l) => (l.id === id ? entry : l)))
       return
     }
@@ -376,7 +406,9 @@ function trackLoad(kind: ModelKind, id: string, watch: LoadWatch): void {
       activeLoads.set(rest) // failed or cancelled: the feature that asked says why
       return
     }
-    activeLoads.set(activeLoads.get().map((l) => (l.id === id ? { ...l, progress: 1, done: true } : l)))
+    activeLoads.set(
+      activeLoads.get().map((l) => (l.id === id ? { ...l, progress: 1, detail: 'Ready', done: true } : l)),
+    )
     setTimeout(() => {
       if (activeLoads.get().some((l) => l.id === id && l.done))
         activeLoads.set(activeLoads.get().filter((l) => l.id !== id))

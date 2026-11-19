@@ -33,7 +33,7 @@ import { resample } from '@/lib/audio/resample'
 import { routeByLanguage, type LidDecision } from '@/lib/stt/routing'
 import { BrowserModelPicker, LanguageSelect, SwitchModelDialog } from '@/components/stt/language-controls'
 import { MicHelpPanel, MicStatusLine } from '@/components/stt/mic-help'
-import { LoadProgress, LoadTrouble, ModelStatusChip } from '@/components/stt/model-status'
+import { LoadTrouble, ModelStatusChip } from '@/components/stt/model-status'
 import { Transcript } from '@/components/stt/transcript'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -60,7 +60,7 @@ import { cloudNotice, isCloud, notInstalledHint } from '@/lib/capabilities'
 import type { Sample } from '@/lib/api/types'
 import { isDemo } from '@/lib/api/config'
 import { STT_RATE } from '@/lib/audio/capture'
-import { describeLoad, sharedEngine } from '@/lib/browser-stt/engine'
+import { sharedEngine } from '@/lib/browser-stt/engine'
 import { browserModel, BROWSER_MODELS } from '@/lib/browser-stt/models'
 import { prefersLessData } from '@/lib/diagnostics'
 import { INDIC_LANGUAGES, supportsLanguage } from '@/lib/languages'
@@ -474,7 +474,7 @@ export default function SttPage() {
   }
 
   const hasTake = !running && session.input != null
-  const loadText = mode !== 'server' ? describeLoad(engineState, fmtBytes) : ''
+  const loadText = mode !== 'server' && engineState.status === 'loading' ? 'Loading the model' : ''
   const statusLine =
     session.phase === 'idle'
       ? session.input
@@ -768,9 +768,6 @@ export default function SttPage() {
             )}
           </div>
           <div className="mt-4 flex max-w-2xl flex-col gap-2">
-            <ModelStatusChip className="self-start" />
-            <LoadProgress />
-            <LoadTrouble onSample={playDefaultSample} />
             {lessData && engineState.status === 'idle' && !engineState.cached && (
               <p className="text-xs leading-5 text-muted-foreground" data-testid="data-saver-note">
                 Your browser asks sites to save data, so the model is not fetched in advance. It downloads (
@@ -906,11 +903,8 @@ export default function SttPage() {
                 )}
               </p>
             )}
-            {mode !== 'server' && (running || engineState.status === 'error') && (
-              <>
-                <LoadProgress className="mt-3" />
-                <LoadTrouble className="mt-3" onSample={audioSamples.length > 0 ? playDefaultSample : undefined} />
-              </>
+            {mode !== 'server' && (
+              <LoadTrouble className="mt-3" onSample={audioSamples.length > 0 ? playDefaultSample : undefined} />
             )}
 
             <div className="mt-3 flex flex-wrap items-center gap-1.5">

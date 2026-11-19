@@ -13,7 +13,7 @@ import { sharedEngine } from '@/lib/browser-stt/engine'
 import { fmtBytes, fmtMs, languageName } from '@/lib/format'
 import { isIndic } from '@/lib/languages'
 import { INSTALL_COMMAND } from '@/lib/api/config'
-import { LoadProgress, LoadTrouble } from './model-status'
+import { LoadTrouble } from './model-status'
 
 function Fact({ label, ok, children }: { label: string; ok: boolean | null; children: React.ReactNode }) {
   return (
@@ -139,7 +139,6 @@ export function BrowserEnginePanel({
         }}
       />
       {s.status !== 'ready' && <EngineVerdict />}
-      <LoadProgress className="mt-3" />
       <LoadTrouble className="mt-3" />
       {s.model.family === 'Whisper' && (
         <p
