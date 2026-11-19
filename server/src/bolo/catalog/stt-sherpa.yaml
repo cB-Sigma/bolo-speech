@@ -1003,6 +1003,9 @@
     - '*.mov'
     - '*.srt'
   options:
+    # the int8 decoder gives wrong text in some languages on x86 CPUs without AVX-512 VNNI (an AMD EPYC 7763:
+    # Telugu, Bengali and Tamil turned to nonsense); there the float32 decoder (636 MB) is fetched and loaded
+    float_decoder_without_vnni: '*-decoder.onnx'
     not_recommended_for:
       te: 'sherpa-onnx decodes Whisper greedily, with no fallback to a higher temperature: on FLEURS Telugu one
         utterance in six ran into a repeated syllable for its last third (character error rate 0.17 to 0.77);

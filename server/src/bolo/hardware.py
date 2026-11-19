@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime as dt
+import functools
 import importlib
 import json
 import math
@@ -577,7 +578,10 @@ def _mac_cpu(host: Host, cpu: Cpu) -> None:
         x for x in (_sysctl(host, "machdep.cpu.features"), _sysctl(host, "machdep.cpu.leaf7_features")) if x
     ).lower()
     if text:
-        names = {"sse4.2": "sse4.2", "avx1.0": "avx", "avx2": "avx2", "fma": "fma", "avx512f": "avx512"}
+        names = {
+            "sse4.2": "sse4.2", "avx1.0": "avx", "avx2": "avx2", "fma": "fma", "avx512f": "avx512",
+            "avx512vnni": "avx512_vnni",
+        }  # fmt: skip
         cpu.features = [label for token, label in names.items() if token in text.split()]
 
 
@@ -607,6 +611,25 @@ def detect_cpu(host: Host) -> tuple[Cpu, bool]:
     if cpu.features is None and cpu.architecture == "arm64":
         cpu.features = ["neon"]  # every 64-bit ARM core has it
     return cpu, hypervisor
+
+
+def int8_may_saturate(cpu: Cpu) -> bool:
+    """Whether ONNX Runtime may compute int8 matrix products wrongly here: an x86 CPU without AVX-512 VNNI, where
+    it multiplies with AVX2's saturating instructions (an x86 CPU whose features cannot be read counts as one).
+
+    Seen with sherpa-onnx's int8 Whisper turbo decoder: on an AMD EPYC 7763 (AVX2, no VNNI) it gave Telugu,
+    Bengali and Tamil text that turned to nonsense, while the same files gave the right text on Intel Xeons with
+    AVX-512 VNNI and on ARM."""
+    return cpu.architecture == "x86_64" and "avx512_vnni" not in (cpu.features or [])
+
+
+@functools.cache
+def this_cpu() -> Cpu:
+    """This machine's CPU (read once)."""
+    try:
+        return detect_cpu(Host())[0]
+    except Exception:
+        return Cpu(architecture=_arch(platform.machine()))
 
 
 # -- memory, cgroups, containers ----------------------------------------------------------------------------------

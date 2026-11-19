@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import math
 import re
 import tempfile
@@ -83,6 +84,8 @@ ONLINE_KINDS = (
     "online_paraformer",
     "online_t_one_ctc",
 )
+
+log = logging.getLogger(__name__)
 TTS_KINDS = ("vits", "kokoro", "matcha", "kitten")
 VAD_KINDS = ("silero_vad", "ten_vad")
 DIARIZATION_KINDS = ("pyannote_diarization",)
@@ -414,6 +417,26 @@ def _case_phrase(phrase: str, change: Callable[[str], str]) -> str:
     return change(words) + (f" :{score}" if score else "")
 
 
+def whisper_decoder(path: Path, options: dict[str, Any]) -> str:
+    """The Whisper decoder to load: the int8 one, unless the catalog entry names a float one for CPUs where int8
+    matrix products may saturate (``options.float_decoder_without_vnni``, a file pattern) and this is such a CPU."""
+    from bolo import hardware
+
+    int8 = find_file(path, "*decoder*.onnx")
+    pattern = options.get("float_decoder_without_vnni")
+    if not pattern or not hardware.int8_may_saturate(hardware.this_cpu()):
+        return int8
+    plain = sorted(f for f in path.glob(str(pattern)) if f.is_file() and ".int8." not in f.name)
+    if plain:
+        return str(plain[0])
+    log.warning(
+        "%s: this CPU has no AVX-512 VNNI, where the int8 decoder can give wrong text in some languages; pull the "
+        "model again (`bolo pull`) to fetch its float32 decoder",
+        path.name,
+    )
+    return int8
+
+
 class SherpaOfflineSTT(STTModel):
     def __init__(self, kind: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> None:
         import sherpa_onnx
@@ -475,7 +498,7 @@ class SherpaOfflineSTT(STTModel):
         if k == "whisper":
             return so.OfflineRecognizer.from_whisper(
                 encoder=find_file(p, "*encoder*.onnx"),
-                decoder=find_file(p, "*decoder*.onnx"),
+                decoder=whisper_decoder(p, self.spec),
                 tokens=find_file(p, "*tokens.txt"),
                 language=language,
                 task=task,

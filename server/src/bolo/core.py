@@ -113,7 +113,7 @@ from bolo.separate import SeparateOptions, SeparationResult, check_request, is_n
 from bolo.separate import separate as run_separation
 from bolo.speakers import SAME_FILE, SpeakerStore
 from bolo.speakers import THRESHOLDS as speaker_thresholds
-from bolo.store import HubClient, ModelStore, saved_hf_token
+from bolo.store import HubClient, ModelStore, Source, saved_hf_token
 from bolo.streaming.vad import EnergyVad, FallbackVad, detect_segments, merge_segments
 from bolo.stt_options import (
     DECODE_SETTINGS,
@@ -1294,7 +1294,7 @@ class Bolo:
                 self.events.publish_threadsafe("job", {"job": job.to_dict()})
 
         progress.last = 0.0  # type: ignore[attr-defined]
-        self.store.pull(spec.id, spec.source, progress=progress, cancelled=lambda: job.cancel_requested)
+        self.store.pull(spec.id, source_here(spec), progress=progress, cancelled=lambda: job.cancel_requested)
 
     async def _run_pull(self, spec: ModelSpec, job: Job) -> None:
         job.state = "running"
@@ -2943,3 +2943,15 @@ def _conditioned_separation(model_id: str) -> InvalidRequest:
         "combined with it",
         param="separate_overlaps",
     )
+
+
+def source_here(spec: ModelSpec) -> Source:
+    """The files of ``spec`` this machine needs: its source, plus the float Whisper decoder an entry names for CPUs
+    where int8 matrix products may saturate, on such a CPU (bolo.engines.sherpa.whisper_decoder loads it)."""
+    from bolo import hardware
+
+    assert spec.source is not None
+    pattern = spec.options.get("float_decoder_without_vnni")
+    if not pattern or not spec.source.include or not hardware.int8_may_saturate(hardware.this_cpu()):
+        return spec.source
+    return replace(spec.source, include=[*spec.source.include, str(pattern)])

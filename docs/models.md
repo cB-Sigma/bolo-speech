@@ -2894,6 +2894,12 @@ advice (`optional`, `recommended`, `required`) and an approximate memory need
 (weights x 1.3 + 0.5 GB, an estimate, not a measurement). The catalog API
 returns it as `hardware`. `options.cpu_only_on` names device families a model cannot run on (`metal: "why"`): it is placed on the CPU there with that reason as its notice (Soprano 1.1 on audio.cpp segfaults on Metal; its llama.cpp entry runs there). `measured.metal` is a speed measured on an Apple silicon GPU, which `bolo recommend` uses for a model placed on Metal.
 
+`options.float_decoder_without_vnni` (a file pattern, for sherpa-onnx Whisper exports) names a float decoder to use
+instead of the int8 one on x86 CPUs without AVX-512 VNNI, where ONNX Runtime's int8 matrix products may saturate.
+There it is downloaded with the model and loaded; elsewhere it is not downloaded. whisper-large-v3-turbo has it:
+on an AMD EPYC 7763 its int8 decoder turned Telugu, Bengali and Tamil into nonsense. A copy pulled before this
+option existed keeps the int8 decoder, with a warning in the log, until `bolo pull` fetches the float one.
+
 | Runtime | Entries | Licences (commercial use) |
 | --- | --- | --- |
 | llama-server | Chatterbox Multilingual V3 (23 languages incl. **Hindi**), Chatterbox Turbo, Qwen3-TTS 1.7B Base, Pocket TTS (en, de, es, fr, it, pt), LFM3-Audio 2B; Soprano 1.1 80M, Fish Drama 3, Kokoro-82M (English voices), tiny-voca, ZONOS3-Mini and Fish Audio S2 Pro (ggml-org's conversions) | MIT, Apache-2.0, CC-BY-4.0 (yes); LFM Open License (only under USD 10M revenue), Fish Audio Community License (revenue threshold) - marked `commercial_use: false` |
