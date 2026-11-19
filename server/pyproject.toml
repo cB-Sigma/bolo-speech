@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "bolo-speech"
 dynamic = ["version"]
-description = "A self-hosted speech server without PyTorch: speech-to-text, text-to-speech, diarization and voice agents (OpenAI audio and Realtime APIs, phone calls, Wyoming), with a model catalog, optional cloud providers and a web console."
+description = "Ollama for speech: the open speech stack, running privately on your own machine. Speech to text, text to speech, voice cloning, diarization and voice agents behind OpenAI-compatible APIs, with a model catalog and a web console. No PyTorch needed."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
@@ -14,6 +14,7 @@ authors = [{ name = "The bolo Authors" }]
 keywords = [
   "speech", "speech-to-text", "text-to-speech", "stt", "tts", "asr", "vad", "diarization", "voice-agent", "realtime",
   "whisper", "openai", "openai-compatible", "wyoming", "telephony", "sip", "indic", "hindi", "onnx", "self-hosted",
+  "voice-cloning", "local", "offline", "privacy", "apple-silicon", "mlx", "metal", "llama-cpp",
 ]
 classifiers = [
   "Development Status :: 5 - Production/Stable",

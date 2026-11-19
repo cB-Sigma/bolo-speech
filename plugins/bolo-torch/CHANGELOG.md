@@ -4,6 +4,12 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-19
+
+### Changed
+
+- Needs bolo 1.0.0 or later (below 2).
+
 ### Fixed
 
 - **Parler-TTS spoke noise on Apple silicon's GPU.** On MPS (torch 2.15, an M4 Pro) its speech came out as noise in
@@ -12,6 +18,11 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 - **bolo showed models on the CPU that the plugin ran on MPS.** With `BOLO_TORCH_DEVICE=mps`, demucs-dns48 loaded
   "on mps, float16" while `bolo ps` said "100% CPU on cpu": the load reply now carries the device (`info.device`) and
   bolo moves the placement there.
+- **GLM-4-Voice could not import its libraries in a new environment.** lightning 2.2 imports `pkg_resources`, which
+  setuptools 81 and later no longer have; the `glm-4-voice` extra now keeps setuptools below 81.
+- **`bolo check --tiny` could not load Step-Audio 2 mini.** Its model code rebuilds the text model's configuration
+  with `num_attention_groups` at its default and asserts it equals `num_key_value_heads`, which the tiny build had
+  reduced; the tiny configuration now names both.
 
 Checked on an M4 Pro with MPS (warm): pyannote speaker-diarization-community-1 0.83 s against 6.7 s on the CPU for
 22 s of audio, the same two speakers; SepFormer 3.4 s against 5.9 s, the same two clean tracks; demucs-dns48 works.

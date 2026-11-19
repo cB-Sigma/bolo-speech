@@ -6,6 +6,10 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-19
+
+The first stable release.
+
 ### Changed
 
 - **Apple silicon: MLX, whisper.cpp and llama.cpp models run on Metal by default.** With `device` left at its default
@@ -96,8 +100,17 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   switches under "Longest turn and interruptions" did not line up.
 - **Console: a model downloading into the browser was easy to miss.** Each feature showed its own progress in its
   own place, and some (the denoiser, punctuation and language identifier on Speech to text; the recogniser, voice and
-  voice-activity models of a conversation in the page) showed none. Every in-page download now shows in one tray at
-  the bottom left of every screen, with its progress, until the model is ready.
+  voice-activity models of a conversation in the page) showed none, while Speech to text showed the same download
+  three times (a bar at the top, a second status chip under the buttons, the tray) with different figures. Every
+  in-page download now shows only in one tray at the bottom left of every screen, with what it is doing ("Downloading
+  the model · 56.4 MB of 79.6 MB"), its steps and one percentage, until the model is ready; the pages keep one status
+  chip that says "Loading", and the notice when a load fails or stalls.
+- **whisper-large-v3-turbo wrote nonsense for Telugu, Bengali and Tamil on many x86 CPUs.** Its int8 decoder
+  (sherpa-onnx's export) goes wrong where ONNX Runtime multiplies int8 with AVX2 alone: on an AMD EPYC 7763 the first
+  FLEURS Telugu utterance came out as "సిరి బిదిం మిస్యంరిసిం బిద బ" while Intel Xeons with AVX-512 VNNI and Apple
+  silicon gave the sentence. On x86 CPUs without AVX-512 VNNI bolo now downloads the float32 decoder too (636 MB)
+  and loads it (the catalog option `float_decoder_without_vnni`); a copy pulled earlier says in the log to pull it
+  again.
 - **Console: the clone check's "same speaker" verdict was not coloured** (a colour class that does not exist).
 
 ## [0.6.10] - 2026-11-18
