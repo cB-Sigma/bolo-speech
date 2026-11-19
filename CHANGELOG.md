@@ -94,6 +94,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - **Console layout.** Speech to text left a tall empty gap above "This session" (it waited for the right-hand column);
   Connect stretched its client snippets to the height of the server column, with wide gaps between them; the two
   switches under "Longest turn and interruptions" did not line up.
+- **Console: a model downloading into the browser was easy to miss.** Each feature showed its own progress in its
+  own place, and some (the denoiser, punctuation and language identifier on Speech to text; the recogniser, voice and
+  voice-activity models of a conversation in the page) showed none. Every in-page download now shows in one tray at
+  the bottom left of every screen, with its progress, until the model is ready.
+- **Console: the clone check's "same speaker" verdict was not coloured** (a colour class that does not exist).
 
 ## [0.6.10] - 2026-11-18
 

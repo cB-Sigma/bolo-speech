@@ -152,7 +152,7 @@ export class BrowserDiarizer {
     const id = diarizerDownloadId(embedding)
     this.store.patch({ status: 'loading', files: [], progress: 0, error: null })
     claimRuntime('diarize', () => this.dispose())
-    markLoading('diarize', id)
+    markLoading('diarize', id, { label: `Speaker diarization: ${embedding.label}`, store: this.store })
     diag.event('diarize', `loading ${SEGMENTATION.id} + ${embedding.id}, ${threads} thread${threads === 1 ? '' : 's'}`)
     const worker =
       factory?.() ??

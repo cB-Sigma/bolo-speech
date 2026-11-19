@@ -384,7 +384,7 @@ export class BrowserTtsEngine {
     )
     // On WebKit and phones only one model runtime fits in the page: this releases the recogniser's, if it is loaded.
     claimRuntime('tts', () => this.dispose())
-    markLoading('tts', voice.downloadId)
+    markLoading('tts', voice.downloadId, { label: voice.downloadLabel, store: this.store })
     const worker: TtsWorker = workerFactory
       ? await workerFactory()
       : (new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }) as unknown as TtsWorker)

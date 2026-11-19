@@ -173,7 +173,7 @@ export class AudioModelEngine {
     }
     this.store.patch({ status: 'loading', model, device, progress: 0, error: null, loadMs: null })
     claimRuntime(this.holderKey, () => this.dispose())
-    markLoading('audio', downloadId(model))
+    markLoading('audio', downloadId(model), { label: `${TASK_NOUN[this.task]}: ${model.label}`, store: this.store })
     const worker =
       workerFactory?.() ??
       (new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }) as unknown as AudioWorkerLike)

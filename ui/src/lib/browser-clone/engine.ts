@@ -306,7 +306,7 @@ export class BrowserCloner {
       threads,
     })
     claimRuntime('clone', () => this.dispose())
-    markLoading('clone', id)
+    markLoading('clone', id, { label: `Voice cloning: ${model.label}`, store: this.store })
     diag.event('clone', `loading ${model.id} on ${device}, ${threads} thread${threads === 1 ? '' : 's'}`)
     this.runDevice = device
     const worker =
@@ -614,7 +614,10 @@ export class SimilarityScorer {
     if (this.loading) return this.loading
     this.store.patch({ status: 'loading', progress: 0, error: null })
     claimRuntime('clone-similarity', () => this.dispose())
-    markLoading('clone', SIMILARITY_DOWNLOAD_ID)
+    markLoading('clone', SIMILARITY_DOWNLOAD_ID, {
+      label: `Speaker similarity: ${SIMILARITY_MODEL.label}`,
+      store: this.store,
+    })
     const worker =
       embedFactory?.() ??
       (new Worker(new URL('./embed-worker.ts', import.meta.url), { type: 'module' }) as unknown as EmbedWorker)

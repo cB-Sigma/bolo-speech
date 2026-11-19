@@ -144,7 +144,7 @@ export class BrowserLlm implements ChatBackend {
     const id = `llm-${m.id}`
     this.store.patch({ status: 'loading', progress: 0, error: null, device: onGpu ? 'webgpu' : 'wasm' })
     claimRuntime('llm', () => this.dispose())
-    markLoading('llm', id)
+    markLoading('llm', id, { label: m.label, store: this.store })
     const worker =
       factory?.() ?? (new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }) as unknown as LlmWorker)
     if (generation !== this.generation) {

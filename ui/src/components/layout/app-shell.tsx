@@ -23,6 +23,7 @@ import { NAV, visibleNav, type NavItem } from '@/lib/nav'
 import { cn } from '@/lib/utils'
 import { openCommandPalette, PaletteHost } from './palette-host'
 import { ApiKeyDialog, ConnectionIndicator, OfflineBanner } from './connection'
+import { DownloadTray } from './download-tray'
 
 const DiagnosticsPanel = lazy(() =>
   import('@/components/diagnostics-panel').then((m) => ({ default: m.DiagnosticsPanel })),
@@ -281,6 +282,7 @@ export function AppShell() {
       </div>
       <PaletteHost />
       <ApiKeyDialog />
+      <DownloadTray />
     </div>
   )
 }

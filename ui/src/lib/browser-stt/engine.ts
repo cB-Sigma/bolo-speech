@@ -343,7 +343,7 @@ export class BrowserSttEngine {
 
     // On WebKit only one model runtime fits in the page: this releases the synthesiser's, if it is loaded.
     claimRuntime('stt', () => this.dispose())
-    markLoading('stt', model.id)
+    markLoading('stt', model.id, { label: `Speech to text: ${model.label}`, store: this.store })
     const worker: SpeechWorker = workerFactory
       ? await workerFactory()
       : (new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }) as unknown as SpeechWorker)

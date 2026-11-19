@@ -179,7 +179,7 @@ function SimilarityView({ s }: { s: Output['similarity'] }) {
       <span className="font-medium">Speaker similarity {s.score.toFixed(2)}</span>:{' '}
       <span
         className={cn(
-          v === 'same' ? 'text-success-text' : v === 'different' ? 'text-destructive' : 'text-warning-text',
+          v === 'same' ? 'text-good-text' : v === 'different' ? 'text-destructive' : 'text-warning-text',
           'font-medium',
         )}
       >

@@ -329,15 +329,71 @@ export async function storageUse(): Promise<StorageUse> {
   return { usage, quota, persisted }
 }
 
+/** A model being fetched into the page right now, for the one downloads tray every page shows. */
+export interface ActiveLoad {
+  id: string
+  kind: ModelKind
+  label: string
+  /** 0..1 of the model's files. */
+  progress: number
+  /** Finished: kept on screen for a moment at 100 % so the tray does not vanish mid-glance. */
+  done: boolean
+}
+
+/** What a loader passes to {@link markLoading} so its progress reaches the tray: its own state store. */
+export interface LoadWatch {
+  label: string
+  store: { get: () => { status: string; progress?: number }; subscribe: (l: () => void) => () => void }
+}
+
+/** Every model loading in this page, in the order they started. */
+export const activeLoads = new Store<ActiveLoad[]>([])
+
+/** How long a finished load stays in the tray. */
+export const DONE_LINGER_MS = 1500
+
+const stopWatching = new Map<string, () => void>()
+
+function trackLoad(kind: ModelKind, id: string, watch: LoadWatch): void {
+  stopWatching.get(id)?.()
+  const update = () => {
+    const st = watch.store.get()
+    const loading = st.status === 'loading'
+    const progress = loading ? Math.max(0, Math.min(1, st.progress ?? 0)) : 1
+    const rest = activeLoads.get().filter((l) => l.id !== id)
+    if (loading) {
+      const at = activeLoads.get().findIndex((l) => l.id === id)
+      const entry: ActiveLoad = { id, kind, label: watch.label, progress, done: false }
+      activeLoads.set(at < 0 ? [...rest, entry] : activeLoads.get().map((l) => (l.id === id ? entry : l)))
+      return
+    }
+    unsubscribe()
+    stopWatching.delete(id)
+    if (st.status !== 'ready') {
+      activeLoads.set(rest) // failed or cancelled: the feature that asked says why
+      return
+    }
+    activeLoads.set(activeLoads.get().map((l) => (l.id === id ? { ...l, progress: 1, done: true } : l)))
+    setTimeout(() => {
+      if (activeLoads.get().some((l) => l.id === id && l.done))
+        activeLoads.set(activeLoads.get().filter((l) => l.id !== id))
+    }, DONE_LINGER_MS)
+  }
+  const unsubscribe = watch.store.subscribe(update)
+  stopWatching.set(id, unsubscribe)
+  update()
+}
+
 /**
  * A load that never finished: set before a model starts loading, cleared when
  * it is ready, fails or is unloaded. Still set at the next start-up means the
  * page was closed mid-load, most likely by the browser for using too much
  * memory; the page then loads nothing by itself and offers to clear downloads.
  */
-export function markLoading(kind: ModelKind, id: string): void {
+export function markLoading(kind: ModelKind, id: string, watch?: LoadWatch): void {
   // The visitor asked for a model again: the notice about the last attempt has done its job.
   if (interrupted.get()) interrupted.set(null)
+  if (watch) trackLoad(kind, id, watch)
   try {
     globalThis.localStorage?.setItem(LOADING_KEY, JSON.stringify({ kind, id, at: Date.now() }))
   } catch {
