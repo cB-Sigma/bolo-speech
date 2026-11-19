@@ -1,4 +1,5 @@
 import { diag } from '@/lib/diagnostics'
+import { overallPercent, type StagedLoad } from '@/lib/load-progress'
 import { Store } from '@/lib/store'
 
 /**
@@ -343,7 +344,7 @@ export interface ActiveLoad {
 /** What a loader passes to {@link markLoading} so its progress reaches the tray: its own state store. */
 export interface LoadWatch {
   label: string
-  store: { get: () => { status: string; progress?: number }; subscribe: (l: () => void) => () => void }
+  store: { get: () => StagedLoad; subscribe: (l: () => void) => () => void }
 }
 
 /** Every model loading in this page, in the order they started. */
@@ -359,11 +360,13 @@ function trackLoad(kind: ModelKind, id: string, watch: LoadWatch): void {
   const update = () => {
     const st = watch.store.get()
     const loading = st.status === 'loading'
-    const progress = loading ? Math.max(0, Math.min(1, st.progress ?? 0)) : 1
+    const progress = loading ? overallPercent(st) / 100 : 1
     const rest = activeLoads.get().filter((l) => l.id !== id)
     if (loading) {
       const at = activeLoads.get().findIndex((l) => l.id === id)
-      const entry: ActiveLoad = { id, kind, label: watch.label, progress, done: false }
+      // never backwards: a stage that starts with its predecessor's figure would make the bar jump back
+      const before = at < 0 ? 0 : activeLoads.get()[at]!.progress
+      const entry: ActiveLoad = { id, kind, label: watch.label, progress: Math.max(before, progress), done: false }
       activeLoads.set(at < 0 ? [...rest, entry] : activeLoads.get().map((l) => (l.id === id ? entry : l)))
       return
     }

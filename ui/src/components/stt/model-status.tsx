@@ -1,3 +1,4 @@
+import { overallPercent } from '@/lib/load-progress'
 import { AlertTriangle, Download, Loader2, Play, RotateCcw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useEffect, useState } from 'react'
@@ -20,6 +21,8 @@ const STAGES: { id: LoadStage; label: string }[] = [
 ]
 
 /** The load-related state both in-browser engines (recogniser and synthesiser) share. */
+export { overallPercent } from '@/lib/load-progress'
+
 export type LoadState = Pick<
   EngineState,
   | 'status'
@@ -43,24 +46,6 @@ export interface LoadEngine {
 }
 
 /** 0..100 across the whole load: downloads take most of the bar, the rest is split between compile and warm-up. */
-export function overallPercent(s: LoadState): number {
-  if (s.status === 'ready') return 100
-  if (s.status !== 'loading') return 0
-  const runtime = s.runtime && s.runtime.total > 0 ? Math.min(1, s.runtime.loaded / s.runtime.total) : 0
-  switch (s.stage) {
-    case 'runtime':
-      return 2 + runtime * 28
-    case 'model':
-      return 30 + Math.min(1, s.progress) * 50
-    case 'compiling':
-      return 85
-    case 'warmup':
-      return 95
-    default:
-      return 1
-  }
-}
-
 function runsOn(s: LoadState): string {
   return s.device === 'webgpu' ? 'WebGPU' : `WebAssembly · ${s.threads} thread${s.threads === 1 ? '' : 's'}`
 }

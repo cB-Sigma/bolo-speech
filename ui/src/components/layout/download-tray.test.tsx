@@ -28,6 +28,8 @@ describe('downloads tray', () => {
     expect(screen.getByTestId('download-tray')).toHaveTextContent('Downloading 2 models into this browser')
     act(() => stt.patch({ progress: 0.42 }))
     expect(screen.getByTestId('download-moonshine-tiny')).toHaveTextContent('42 %')
+    act(() => stt.patch({ progress: 0.1 })) // a later stage starting low: the figure holds
+    expect(screen.getByTestId('download-moonshine-tiny')).toHaveTextContent('42 %')
 
     // ready: shown done for a moment, then gone; a failed load leaves at once (its feature says why)
     act(() => stt.patch({ status: 'ready', progress: 1 }))
