@@ -335,6 +335,8 @@ jobs:
         with:
           path: ${{ github.workspace }}/.bolo-cache
           key: bolo-models-${{ hashFiles('server/src/bolo/catalog/*.yaml') }}
+      - name: The runner's CPU (int8 results differ between CPUs with and without AVX-512 VNNI)
+        run: lscpu | grep -E "Model name|Flags" | sed -E 's/(Flags:).*/\1 '"$(grep -o -w -E 'avx2|avx512f|avx512_vnni|avx_vnni' /proc/cpuinfo | sort -u | tr '\n' ' ')"'/'
       - name: Run the small real-model tests
         run: pytest -q -m real -k "not large" --timeout 900
 
@@ -361,15 +363,34 @@ jobs:
           python -m pip install transformers accelerate snac
       - name: Check every entry --tiny can build (configuration and reviewed code only)
         run: |
-          bolo check --all --tiny --allow-remote-code --data-dir "$RUNNER_TEMP/bolo" --json > check-tiny.json || status=$?
+          bolo check --all --tiny --allow-remote-code --data-dir "$RUNNER_TEMP/bolo" --json > check-tiny.json || true
           python - <<'PY'
-          import json
+          import json, sys
+          # their extras pin a transformers of their own: checked in environments of their own (next step)
+          own = {"glm-4-voice-9b", "minicpm-o-2.6", "step-audio-2-mini"}
+          failed = []
           for r in json.load(open("check-tiny.json")):
+              if r["model"] in own:
+                  continue
               print(f"{r['model']}: {'ok' if r['ok'] else 'FAILED'}")
               for s in r["steps"]:
                   print(f"  [{s['status']}] {s['name']}: {s['detail'][:300]}")
+              if not r["ok"]:
+                  failed.append(r["model"])
+          sys.exit(f"failed: {', '.join(failed)}" if failed else 0)
           PY
-          exit ${status:-0}
+      - name: Check the models whose extras need an environment of their own
+        run: |
+          status=0
+          for pair in minicpm-o:minicpm-o-2.6 step-audio-2:step-audio-2-mini glm-4-voice:glm-4-voice-9b; do
+            extra="${pair%%:*}"; model="${pair#*:}"; env="$RUNNER_TEMP/env-$extra"
+            python -m venv "$env"
+            "$env/bin/pip" install -q torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+            "$env/bin/pip" install -q -e server -e "plugins/bolo-torch[$extra]"
+            "$env/bin/bolo" check "$model" --tiny --allow-remote-code --data-dir "$RUNNER_TEMP/bolo" || status=1
+            rm -rf "$env"
+          done
+          exit $status
       - uses: actions/upload-artifact@v7
         if: always()
         with:

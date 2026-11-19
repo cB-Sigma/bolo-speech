@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -59,6 +60,16 @@ def test_shrink_keeps_the_head_size_and_reaches_sub_configurations() -> None:
     changed = check.shrink(config)
     assert config.hidden_size == 256 and config.num_attention_heads == 2 and config.num_key_value_heads == 2
     assert config.num_hidden_layers == 2 and config.intermediate_size == 1024 and changed
+
+
+def test_shrink_keeps_step_audios_attention_groups_equal_to_its_key_value_heads() -> None:
+    # Step-Audio 2 holds its text model as a Qwen2 configuration (no num_attention_groups) and, loading the saved
+    # one, asserts num_attention_groups (default 4) == num_key_value_heads
+    sub = SimpleNamespace(hidden_size=3584, num_attention_heads=28, num_key_value_heads=4,
+                          num_hidden_layers=28, intermediate_size=18944, to_dict=dict)  # fmt: skip
+    config = SimpleNamespace(text_config=sub, to_dict=dict)
+    check.shrink(config)
+    assert sub.num_key_value_heads == sub.num_attention_groups == 2 and sub.num_attention_heads == 2
 
 
 def test_remote_code_is_built_only_after_opting_in(tmp_path: Path) -> None:

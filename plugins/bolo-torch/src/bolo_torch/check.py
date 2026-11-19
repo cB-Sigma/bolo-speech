@@ -103,9 +103,14 @@ def shrink(config: Any) -> list[str]:
                 for key in ("num_attention_heads", "n_head", "encoder_attention_heads", "decoder_attention_heads"):
                     if isinstance(attrs.get(key), int):
                         setattr(c, key, TINY_HEADS)
-                for key in ("num_key_value_heads", "multi_query_group_num", "num_kv_heads"):
+                for key in ("num_key_value_heads", "multi_query_group_num", "num_kv_heads", "num_attention_groups"):
                     if isinstance(attrs.get(key), int):
                         setattr(c, key, min(int(attrs[key]), TINY_HEADS) if attrs[key] > 1 else 1)
+                if isinstance(attrs.get("num_key_value_heads"), int):
+                    # Step-Audio 2 keeps its text model as a Qwen2 configuration without num_attention_groups and
+                    # rebuilds it from the saved one with that field at its default (4), asserting it equals
+                    # num_key_value_heads: the saved configuration names both
+                    c.num_attention_groups = c.num_key_value_heads
                 if "head_dim" in attrs and attrs.get("head_dim") is None:
                     c.head_dim = head_dim
                 for key in FFN:
