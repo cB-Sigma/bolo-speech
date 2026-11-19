@@ -23,22 +23,23 @@
 <tr>
 <td width="58%" valign="top">
 
-**bolo** (बोलो, "speak") pulls speech models by name, like Ollama does for language models, and serves
-them over the OpenAI audio and Realtime APIs. One server, a few hundred open models, a web console.
+**bolo** is Ollama for speech: pull an open speech model by name and run it on your own machine, behind the
+same API as OpenAI's.
 
-- **Speech to text**, live or from a file, with word times, speaker labels, hotwords and redaction.
-- **Text to speech** in dozens of languages, streamed as it is made, with cloning from a saved,
-  consented voice and directions in plain words ("calm, a little amused").
-- **Voice agents and phone calls**: your language model behind a voice, with turn taking and
-  interruptions, over the Realtime API, WebRTC, Twilio, Plivo, Telnyx, Exotel or SIP.
-- **Indian languages**: recognition for all 22 scheduled languages, voices for 15 of them,
-  romanised input ("mujhe kal jana hai") written in the right script.
-- **Your hardware, used well**: each model on the GPU when it fits and on the CPU when it does
-  not, as Ollama does; NVIDIA, Apple silicon (Metal and MLX) and plain CPUs.
-- **Cloud models alongside**: OpenAI, Sarvam, ElevenLabs, Deepgram and Soniox behind the same
-  API, with fallback either way.
+- **Speech to text**: live or from files, with word timings and translation
+- **Text to speech**: dozens of languages, streamed, with voice cloning
+- **Diarization**: who spoke when, and speaker verification
+- **Voice agents and phone calls**: Realtime API, WebRTC, SIP and phone providers
+- **Audio tools**: noise removal, wake words, alignment, emotion, sound events, watermarks
+- **Indian languages**: speech to text and voices for the major ones, with romanised input written in the right script
+- **Cloud models alongside**: OpenAI, ElevenLabs, Deepgram, Sarvam and more, through the same API
 
-No PyTorch needed. Apache-2.0. [What was tested where](#status).
+Runs on NVIDIA, Apple silicon or a plain CPU. No PyTorch. Comes with a web console.
+
+```bash
+bolo pull whisper-large-v3-turbo
+bolo transcribe meeting.wav --model whisper-large-v3-turbo
+```
 
 </td>
 <td width="42%" valign="top">
@@ -47,33 +48,12 @@ No PyTorch needed. Apache-2.0. [What was tested where](#status).
 
 ```bash
 uv tool install "bolo-speech[all]"
-```
-
-or `pipx install "bolo-speech[all]"`
-
-Homebrew
-
-```bash
-brew install cb-sigma/tap/bolo
-```
-
-Docker
-
-```bash
-docker run -p 8000:8000 \
-  -v bolo-data:/data \
-  ghcr.io/cb-sigma/bolo-speech
-```
-
-**Run**
-
-```bash
 bolo serve
 ```
 
 then open <http://127.0.0.1:8000>.
 
-Apple silicon: add `[mlx]` for MLX models. More: [installing in detail](#installing-in-more-detail).
+Mac with Apple silicon, NVIDIA GPU, PyTorch models, Homebrew or Docker: see [Install](#install).
 
 </td>
 </tr>
@@ -152,7 +132,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | **Language identification and routing** | `POST /v1/audio/language` says which language a recording is in, with probabilities, from a choice of identifiers (VoxLingua107 ECAPA, Whisper's own detector, AmberNet, MMS-LID), each with its licence; a transcription with `model=auto` is sent to the best installed recogniser for the language it hears, and the response header says what was decided. Never overrides a model or language you name | [api.md](docs/api.md#language-identification-and-routing), [models.md](docs/models.md#language-identification-1) |
 | **Speaker verification and identification** | enrol people from a few recordings, then check whether a recording is a given person or which of them it is, with any of seven speaker embedders, each with a threshold measured on real speech | [api.md](docs/api.md#enrolled-speakers-verify-and-identify) |
 | **Sound events and speech emotion** | `POST /v1/audio/tags` names the sounds in a recording (AudioSet's 527: speech, music and its instruments, laughter, alarms, animals, vehicles...) with CED and Zipformer taggers, over the whole recording or window by window; `POST /v1/audio/emotion` says how the speaker sounds (emotion2vec+, licence labelled); SenseVoice's own emotion and sound tags come back with its transcriptions; an audio language model answers questions about a recording, or captions it, through `/v1/chat/completions`. Background-noise removal on its own: `POST /v1/audio/denoise` | [api.md](docs/api.md#sound-events-and-audio-tags-post-v1audiotags), [models.md](docs/models.md#audio-tagging-and-sound-events) |
-| **Indian languages** | recognition for all 22 scheduled languages, voices for 15 of them and for Bhojpuri, Magahi and Chhattisgarhi, 8 kHz G.711 in and out | [indic-telephony.md](docs/indic-telephony.md) |
+| **Indian languages** | recognition and voices for the major Indian languages, Bhojpuri, Magahi and Chhattisgarhi among them, 8 kHz G.711 in and out | [indic-telephony.md](docs/indic-telephony.md) |
 | **A web console** | playgrounds, the catalog, latency dashboards, benchmarks, conversations, calls, served by the same process | [below](#the-console) |
 | **Engine plugins** | models that need another runtime run out of process behind the same API: [bolo-torch](plugins/bolo-torch/README.md) for PyTorch models | [plugins.md](docs/plugins.md) |
 | **Wake words** | keyword spotting for any phrase you type (sherpa-onnx), openWakeWord and microWakeWord models, on a recording or a live stream, over Wyoming and from the console | [api.md](docs/api.md#wake-words-post-apiv1wake-ws-apiv1wakestream) |
@@ -438,23 +418,55 @@ All tables, the method and what batching does and does not buy on CPU: [docs/per
 
 The full list, with what *was* run of each: [docs/status.md](docs/status.md).
 
-## Installing in more detail
+## Install
 
-The double quotes work in bash, zsh, PowerShell and cmd (cmd.exe does not treat single quotes as quotes).
+Pick the line for your machine. [uv](https://docs.astral.sh/uv/) installs bolo as a command of its own; `pipx
+install` takes the same arguments, and `pip install` works in a virtual environment. Python 3.10 or newer. The double
+quotes work in bash, zsh, PowerShell and cmd.
 
-- Upgrading: `uv tool upgrade bolo-speech`. Right after a release uv may still offer the previous version from its cache: add `--refresh`.
-- Run it once without installing: `uvx --from "bolo-speech[all]" bolo serve`.
-- Without uv: `pipx install "bolo-speech[all]"`, or `pip install "bolo-speech[all]"` into a virtual environment.
-- With Homebrew (macOS 14 or later, Linux): `brew install cb-sigma/tap/bolo`, then `brew services start bolo` to run it in the background (console at http://127.0.0.1:8000/). It installs `all`; the [tap's README](https://github.com/cB-Sigma/homebrew-tap#bolo) shows how to add the opt-in extras.
-- On Windows (PowerShell or cmd), the same command. Models go to `%USERPROFILE%\.cache\bolo`; DirectML, services and the other differences: [docs/configuration.md](docs/configuration.md#windows). On Windows, install natively. With an NVIDIA GPU, add the CUDA wheels (see [CUDA on Windows](docs/configuration.md#cuda-on-windows)): speech-to-text runs on the GPU natively as fast as under WSL2. Use WSL2 only for Tontaube and other Linux-only runtimes.
-- With an NVIDIA GPU on Windows: `uv tool install "bolo-speech[all,cuda]"`, then swap `onnxruntime` for `onnxruntime-gpu[cuda,cudnn]` in the tool's environment (`uv pip uninstall --python <tool python> onnxruntime`, then `uv pip install --python <tool python> "onnxruntime-gpu[cuda,cudnn]" nvidia-cublas-cu12 "nvidia-cudnn-cu12>=9,<10"`, about 2.5 GB for CUDA 12 and 13) and set `BOLO_DEVICE=cuda`; `bolo doctor` loads both CUDA runtimes and names what is missing. faster-whisper is the GPU route for speech-to-text there (sherpa-onnx's CUDA build cannot run inside bolo on Windows). The recipe: [CUDA on Windows](docs/configuration.md#cuda-on-windows).
-- On a Mac with Apple Silicon: `uv tool install "bolo-speech[all,whispercpp,mlx]"` and `device = "auto"`: Core ML for sherpa-onnx and ONNX Runtime, Metal for llama-server and whisper.cpp, MLX models (Whisper, Parakeet, Kokoro), MPS for the torch plugin: [docs/apple-silicon.md](docs/apple-silicon.md).
-- With an AMD GPU (Linux, ROCm): `onnxruntime-migraphx` for the ONNX Runtime engines, `bolo components install llama-server --flavour rocm`, a ROCm build of torch for the plugin, `device = "rocm"`. Untested on real hardware: [docs/rocm.md](docs/rocm.md).
-- As a container (CPU image): `docker run -p 8000:8000 -v bolo-data:/data ghcr.io/cb-sigma/bolo-speech:latest`. Compose, systemd and Kubernetes examples, and what was run of each: [deploy/README.md](deploy/README.md).
+| Your machine | Install | Runs on |
+| --- | --- | --- |
+| Any computer | `uv tool install "bolo-speech[all]"` | CPU |
+| Mac with Apple silicon | `uv tool install "bolo-speech[all,mlx,whispercpp]"` | GPU (Metal and MLX) for MLX, whisper.cpp and llama.cpp models; CPU for the rest. [docs/apple-silicon.md](docs/apple-silicon.md) |
+| NVIDIA GPU, Linux | `uv tool install "bolo-speech[all,cuda]"`, and run with `BOLO_DEVICE=cuda` | GPU for faster-whisper, llama.cpp and audio.cpp models; CPU for the rest. [GPU and CPU placement](docs/configuration.md#gpu-and-cpu-placement) |
+| NVIDIA GPU, Windows | `uv tool install "bolo-speech[all,cuda]"`, swap ONNX Runtime for its GPU build ([CUDA on Windows](docs/configuration.md#cuda-on-windows)), and run with `BOLO_DEVICE=cuda` | GPU for faster-whisper, ONNX Runtime, llama.cpp and audio.cpp models |
+| AMD GPU, Linux | `uv tool install "bolo-speech[all]"`, then [docs/rocm.md](docs/rocm.md) | ROCm (not yet run on real hardware) |
+| Homebrew, macOS 14+ or Linux | `brew install cb-sigma/tap/bolo`, then `brew services start bolo` to run it in the background | as above: Apple silicon gets the MLX and whisper.cpp extras |
+| Docker | `docker run -p 8000:8000 -v bolo-data:/data ghcr.io/cb-sigma/bolo-speech` | CPU. Compose, systemd and Kubernetes: [deploy/README.md](deploy/README.md) |
 
-The PyPI distribution is `bolo-speech`; the command and the Python package are `bolo`. Python 3.10 or newer.
+Then `bolo serve` and open <http://127.0.0.1:8000>. `bolo doctor` says which engines found the GPU, and `bolo
+recommend` ranks the models for this machine.
 
-The base install has no engine at all; extras add what you want. `all` is `sherpa` (most models), `faster-whisper`, `uccharan` (phonemes and text normalisation), `av` (M4A/WebM/AAC through bundled FFmpeg) and `wyoming`. Opt-in extras: `webrtc`, `otel` (OpenTelemetry export of request traces), `turn` (end-of-turn model), `lid` (spoken-language identification; `all` has ONNX Runtime through faster-whisper already), `align` (forced alignment, with uroman for the MMS aligner), `orpheus`, `s2s` (in-process speech-to-speech), `sip`, `moonshine`, `whispercpp`, `mlx` (MLX models on Apple Silicon; installs nothing elsewhere), `cuda` (CUDA 12's cuBLAS and cuDNN for faster-whisper on an NVIDIA GPU, Windows and Linux), and `espeak` (eSpeak NG, GPL-3.0-or-later, never part of `all`; see [Licences](#licences)).
+**PyTorch models** (Indic Parler-TTS, F5-TTS, pyannote, SepFormer, Qwen-Omni and about 30 more) come with the
+bolo-torch plugin. Add it to the same install with the model families you want:
+
+```bash
+uv tool install "bolo-speech[all]" --with "bolo-torch[parler,pyannote,sepformer]"
+bolo torch use cuda      # NVIDIA: the GPU build of torch (also rocm, xpu); a Mac uses its GPU (MPS) as it is
+```
+
+The families are the plugin's extras (`parler`, `f5`, `indic-speak`, `orpheus`, `sepformer`, `pyannote`,
+`demucs-denoiser`, `omni`, `voxlect`, `speechbrain`, `spark-tts` and more), listed with their models in
+[plugins/bolo-torch/README.md](plugins/bolo-torch/README.md). A few pin a version of transformers of their own
+(`step-audio-2`, `glm-4-voice`, `minicpm-o`, `kimi-audio`, `dicow`, `maskgct`, `diarizen`): install each of those
+in an environment of its own, as that README shows.
+
+**Native servers** for llama.cpp and audio.cpp voices, and the full-duplex models, are downloaded by bolo itself:
+`bolo components install llama-server` (or `audio.cpp`, `moshi`); `bolo components list` shows them all. They
+pick the build that matches `device` (Metal on a Mac, CUDA with an NVIDIA GPU).
+
+**Other extras**, added the same way (`"bolo-speech[all,webrtc]"`): `all` is `sherpa` (most models),
+`faster-whisper`, `uccharan` (phonemes and text normalisation), `av` (M4A, WebM and AAC) and `wyoming`. Opt in to
+`webrtc`, `sip` (phone calls), `turn` (end-of-turn model), `lid` (spoken-language identification), `align` (forced
+alignment), `wake` (wake words), `pii` (redaction), `itn` (numbers written as digits), `aec` (echo cancellation),
+`orpheus`, `s2s` (in-process speech to speech), `moonshine`, `whispercpp`, `mlx`, `cuda`, `otel` (OpenTelemetry),
+`mcp`, and `espeak` (eSpeak NG, GPL-3.0-or-later, never part of `all`; see [Licences](#licences)).
+
+Upgrading: `uv tool upgrade bolo-speech` (add `--refresh` right after a release). Running once without installing:
+`uvx --from "bolo-speech[all]" bolo serve`. On Windows, models go to `%USERPROFILE%\.cache\bolo`; install natively
+rather than under WSL2: [docs/configuration.md](docs/configuration.md#windows).
+
+The PyPI distribution is `bolo-speech`; the command and the Python package are `bolo`.
 
 On Windows, from PowerShell or cmd:
 
