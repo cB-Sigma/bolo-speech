@@ -38,7 +38,7 @@ them over the OpenAI audio and Realtime APIs. One server, a few hundred open mod
 - **Cloud models alongside**: OpenAI, Sarvam, ElevenLabs, Deepgram and Soniox behind the same
   API, with fallback either way.
 
-No PyTorch needed. Apache-2.0. Alpha: [what was tested where](#status).
+No PyTorch needed. Apache-2.0. [What was tested where](#status).
 
 </td>
 <td width="42%" valign="top">
@@ -426,7 +426,7 @@ All tables, the method and what batching does and does not buy on CPU: [docs/per
 
 ## What has not been validated
 
-- **GPUs, Apple Silicon, arm64, Windows.** One GPU machine was used: a hybrid Windows 11 laptop with an RTX 3060 Laptop GPU and integrated AMD Radeon graphics, natively (CPU; CUDA, DirectML and Vulkan on the NVIDIA GPU; DirectML and WebGPU on the Radeon) and under WSL2; the GPU figures in the documentation come from it, and only for the models named in [docs/status.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/status.md#a-windows-11-laptop). Apple Silicon (Metal, CoreML), ROCm and discrete Radeon cards, a discrete GPU under native Linux, arm64 and spreading models or layers over several NVIDIA GPUs (`gpus`, `cuda:0` and `cuda:1`) were not run; CI runs the server's and the bolo-torch plugin's tests on `windows-latest` (CPU, Python 3.12) and starts `bolo serve` there. A GPU Dockerfile exists and was not built. Apart from whole models placed on the laptop's GPU, GPU/CPU placement, several NVIDIA GPUs, llama.cpp offload and tensor splits, the ONNX graph cut and bolo-torch's `device_map` splits are tested only with fake NVML readings, made-up memory figures and command lines that are built but not run (the cut graph with both halves on the CPU).
+- **GPUs, arm64, Windows.** Two GPU machines were used. A MacBook Pro with an M4 Pro: MLX, whisper.cpp and llama.cpp on Metal, the Core ML provider, and the torch plugin on MPS (speech to text, text to speech, diarization, separation, the voice agent and full-duplex Moshi). And a hybrid Windows 11 laptop with an RTX 3060 Laptop GPU and integrated AMD Radeon graphics, natively (CPU; CUDA, DirectML and Vulkan on the NVIDIA GPU; DirectML and WebGPU on the Radeon) and under WSL2; the GPU figures in the documentation come from it, and only for the models named in [docs/status.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/status.md#a-windows-11-laptop). ROCm and discrete Radeon cards, a discrete GPU under native Linux, arm64 and spreading models or layers over several NVIDIA GPUs (`gpus`, `cuda:0` and `cuda:1`) were not run; CI runs the server's and the bolo-torch plugin's tests on `windows-latest` (CPU, Python 3.12) and starts `bolo serve` there. A GPU Dockerfile exists and was not built. Apart from whole models placed on the laptop's GPU, GPU/CPU placement, several NVIDIA GPUs, llama.cpp offload and tensor splits, the ONNX graph cut and bolo-torch's `device_map` splits are tested only with fake NVML readings, made-up memory figures and command lines that are built but not run (the cut graph with both halves on the CPU).
 - **The live demo on phones.** Its tests run in headless Chromium on a desktop CPU, and it was run in Chrome and Edge (WebGPU included) on the Windows laptop; the GPU/CPU split and phone limits are tested with a faked device, not on an iPhone or an Android phone.
 - **Voice cloning beyond 14 models on CPU.** Cloning was measured on CPU for 14 models (Pocket TTS, Chatterbox Turbo, Qwen3-TTS, MOSS-TTS Nano, XTTS v2, Plapre 3, OmniVoice) with two LibriSpeech speakers; the other cloning entries and Tontaube were not run; on a GPU only Pocket TTS was cloned (llama.cpp's CUDA build, on the Windows laptop); and the speaker-similarity thresholds are calibrated on read English speech only.
 - **Phone providers.** No real call was made and no provider account was used: Twilio, Plivo, Telnyx and Exotel are implemented from their documentation and tested against fake providers; SIP against the test-suite's own user agent.
@@ -471,7 +471,7 @@ Windows PowerShell 5.1 drops the double quotes inside an argument it passes to a
 
 ## Status
 
-**Alpha.** Developed on Linux x86-64; measured on one Windows 11 laptop natively and under WSL2, on its CPU, its NVIDIA GPU (CUDA, DirectML, Vulkan), its integrated AMD Radeon (DirectML) and in Chrome and Edge ([the numbers](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/status.md#a-windows-11-laptop)); CI runs the test suite on Linux and Windows. Apple Silicon, ROCm and discrete Radeon cards, native Linux GPUs, several NVIDIA GPUs, arm64 and phones are untested; the phone and cloud integrations have not met a real account. [What has not been validated](#what-has-not-been-validated) says so plainly.
+Developed on Linux x86-64; measured on a Windows 11 laptop natively and under WSL2, on its CPU, its NVIDIA GPU (CUDA, DirectML, Vulkan), its integrated AMD Radeon (DirectML) and in Chrome and Edge ([the numbers](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/status.md#a-windows-11-laptop)), and on a MacBook Pro with an M4 Pro (Metal, MLX, Core ML and MPS); CI runs the test suite on Linux, Windows and macOS. ROCm and discrete Radeon cards, native Linux GPUs, several NVIDIA GPUs, arm64 and phones are untested; the phone and cloud integrations have not met a real account. [What has not been validated](#what-has-not-been-validated) says so plainly.
 
 ## Documentation
 
@@ -508,7 +508,7 @@ bolo itself is [Apache-2.0](https://github.com/cB-Sigma/bolo-speech/blob/main/LI
 
 - Phone calls on real provider accounts and a real SIP trunk; WebRTC in Chrome, Edge, Firefox and Safari themselves (headless Chromium only so far) and behind NAT.
 - Cloud providers checked against real accounts.
-- GPU and Apple Silicon validation.
+- GPU validation beyond one NVIDIA laptop and one Apple silicon Mac.
 - A Bhojpuri recogniser better than the Hindi fallback; models trained for 8 kHz telephone speech.
 - Overlap-aware live diarization; a diarization error rate on more real recordings.
 - MCP tools in Realtime sessions; authentication beyond a single shared key.
