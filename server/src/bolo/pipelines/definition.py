@@ -140,6 +140,13 @@ STEP_TYPES: dict[str, StepType] = {
         StepType("audio-tagging", "audio-tagging", "model", "Sound events and tags (music, speech, applause, ...).",
                  (AUDIO,), (Option("top_k", "integer"), Option("threshold", "number"), Option("labels", "list")),
                  {"tags": "list", "top": "text"}),
+        StepType("classify", "audio-classify", "model",
+                 "Score the audio against labels in plain words (zero-shot, CLAP), or with a trained classifier "
+                 "(its id as the model, or the classifier option).", (AUDIO,),
+                 (Option("labels", "list", "the classes in plain words (zero-shot)"),
+                  Option("classifier", "text", "a classifier trained with /v1/audio/classifiers"),
+                  Option("prompt", "text", "the sentence a label is put into, {} marking where")),
+                 {"label": "text", "score": "number", "scores": "list"}, live=True),
         StepType("emotion", "emotion", "model", "How the speaker sounds.", (AUDIO,), (),
                  {"emotion": "text", "score": "number", "emotions": "list"}, live=True),
         StepType("audio-llm", "audio-llm", "model", "Ask an audio language model about the recording.",

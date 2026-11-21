@@ -112,6 +112,11 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `POST` | `/v1/audio/tags` | Sound events and audio tags (music, speech, ...) |
 | `POST` | `/v1/audio/emotion` | Speech emotion |
 | `POST` | `/v1/audio/decisions` | Typed questions about a recording or a text (decision models) |
+| `POST` | `/v1/audio/classify` | Classify audio against your own labels (zero-shot) or a trained classifier |
+| `GET` | `/v1/audio/classifiers` | List trained classifiers |
+| `POST` | `/v1/audio/classifiers` | Train a classifier from labelled examples |
+| `GET` | `/v1/audio/classifiers/{classifier_id}` | One trained classifier |
+| `DELETE` | `/v1/audio/classifiers/{classifier_id}` | Delete a trained classifier |
 | `POST` | `/v1/audio/dialogue` | Speak a multi-speaker dialogue |
 | `POST` | `/v1/audio/voice-conversion` | Say the same words in another voice |
 | `POST` | `/v1/speech-to-speech/{voice_id}` | Voice conversion (ElevenLabs' route) |
@@ -689,6 +694,95 @@ assistant: what kind of utterance, its topic, what the speaker wants. The probab
 calibrated for your data: check them on your own recordings before you act on them. From the command line:
 `bolo decide FILE --questions @questions.json`, `bolo decide --text "..." --ask "Is the customer asking for a
 refund?"` (yes/no questions), `--json` for the response above.
+
+### Classify against your own labels: `POST /v1/audio/classify`
+
+Extension: score a recording against classes you name, in plain words ("angry voice", "hold music", "a dog
+barking", "a voicemail greeting"), with no training (zero-shot), or with a classifier trained here from a few dozen
+examples per class (below). Multipart form.
+
+| Field | | |
+| --- | --- | --- |
+| `file` | required | audio, as for transcriptions |
+| `labels` | - | the classes: a JSON array (`["hold music", "a person talking"]`), one per line, comma-separated, or the field repeated; 2 to 100 |
+| `model` | `default_audio_classify` (`clap-htsat-unfused`) | an `audio-classify` model (CLAP, below), or the id of a trained classifier |
+| `classifier` | - | a trained classifier (instead of `labels`) |
+| `prompt` | the model's (`This is a sound of {}.`) | the sentence each label is put into, `{}` marking where; an empty prompt uses the labels as they are |
+| `top_k` | all | scores listed |
+| `window`, `hop` | - | seconds (0.5 to 60): also classify window by window (`hop` defaults to `window`) |
+| `keep_alive` | - | how long the model stays loaded |
+
+```jsonc
+{"object": "audio.classification", "model": "clap-htsat-unfused", "classifier": null, "duration": 3.0,
+ "label": "a woman speaking", "score": 0.9791, "prompt": "This is a sound of {}.",
+ "scores": [{"label": "a woman speaking", "score": 0.9791, "similarity": 0.5128},
+            {"label": "a man speaking", "score": 0.0073, "similarity": 0.2436}, ...],
+ "segments": [{"start": 0.0, "end": 5.0, "label": "...", "score": 0.9, "scores": [...]}, ...]}  // with window
+```
+
+Zero-shot works with CLAP (contrastive language-audio pretraining): an audio tower and a text tower trained so that
+a recording and a sentence describing it land close together. Each label is put into the prompt and embedded by
+the text tower (cached: a label is embedded once per loaded model), the recording by the audio tower, and
+`similarity` is their cosine; `score` is the softmax over your labels of the similarities times the model's learned
+temperature, so the scores sum to 1 and say which of your labels fits best, not whether any fits. Compare
+`similarity` across requests, or add a catch-all label ("something else", "silence"), to notice when none does.
+The models hear 10 s at once (MS-CLAP: 7 s); a longer recording is heard in pieces whose embeddings are averaged.
+Labels in English work best. Headers: `x-bolo-model`, and `x-bolo-classifier` for a trained classifier; the trace
+has kind `audio-classify`. From the command line: `bolo classify FILE --labels "hold music,a person talking"
+[-m model] [--prompt "{}"] [--window 5] [--json]`.
+
+| Model | Audio encoder, text encoder | Licence | Size | RTF, memory (CPU) |
+| --- | --- | --- | --- | --- |
+| `clap-htsat-unfused` (default) | LAION CLAP: HTSAT-tiny, RoBERTa; 48 kHz, 10 s | Apache-2.0 | 542 MB | 0.26, 750 MB |
+| `larger-clap-general` | LAION CLAP: HTSAT-base, RoBERTa; general audio, music and speech | Apache-2.0 | 586 MB | 0.38, 910 MB |
+| `larger-clap-music-and-speech` | LAION CLAP: HTSAT-base, RoBERTa; music and speech | Apache-2.0 | 586 MB | 0.41, 930 MB |
+| `msclap-2023` | Microsoft CLAP 2023: HTSAT, GPT-2; 44.1 kHz, 7 s | MS-PL | 548 MB | 0.29, 890 MB |
+
+Measured one request at a time on a busy 4-vCPU machine (docs/measurements/audio-classify.json, with each model's
+top labels for bolo's sample clips and synthetic music, noise and a tone). The models differ: on the same English
+speech MS-CLAP put "an angry voice" first where the LAION models said "a woman speaking", so try your labels on
+your own audio. LAION's `larger_clap_music` is not offered: as published in transformers its scores come out
+uniform.
+
+All run on ONNX Runtime from bolo's exports (`codebucketsolutions/*-onnx` on Hugging Face, made and checked against
+the PyTorch originals with `server/tools/export_clap_onnx.py`; each model card has the parity numbers). No PyTorch.
+
+#### Classifiers trained from your examples: `/v1/audio/classifiers`
+
+When zero-shot labels are not enough (a voicemail greeting against a person answering, your own product's jingle,
+one machine's fault noise), train a classifier: give a few dozen labelled clips per class, and bolo trains a small
+head on frozen embeddings from an encoder in seconds on the CPU, saves it as a local model (it shows in `bolo list`
+and `GET /api/v1/catalog`, task `audio-classify`, kind `classifier_head`) and serves it on `/v1/audio/classify`.
+
+`POST /v1/audio/classifiers` (multipart, scope `manage`): `name` (its id: lowercase letters, digits, `.`, `-`, `_`),
+the examples as `file` fields each paired with a `label` field (in order: the first `label` is the first file's
+class), `encoder` (an `audio-classify` CLAP model, a `speaker-embedding` model or an `audio-tagging` model, whose
+527 class probabilities become the features; default `default_audio_classify`), `head` (`logistic`: multinomial
+logistic regression, the default; `mlp`: one hidden layer of 64), `replace` (`true` to overwrite) and
+`description`. The answer (201) is the classifier with its stratified k-fold cross-validated accuracy (5 folds, fewer
+when a class has fewer examples), accuracy per class and confusion matrix, and warnings: fewer than 10 examples in
+a class, one class with more than three times the examples of another, accuracy under 70 %. Training the head takes
+well under a second; embedding the clips takes most of the time (a CLAP model hears every clip as 10 s, about 1 to 2
+s per clip on a busy 4-vCPU machine; speaker embedders and taggers are quicker).
+
+```jsonc
+{"object": "audio.classifier", "id": "voicemail", "labels": ["person", "voicemail"], "encoder": "clap-htsat-unfused",
+ "encoder_task": "audio-classify", "head": "logistic", "dim": 512, "examples": {"person": 30, "voicemail": 30},
+ "cross_validation": {"accuracy": 0.9667, "folds": 5, "per_class": {"person": 0.9667, "voicemail": 0.9667},
+                      "confusion": [[29, 1], [1, 29]]},
+ "train_accuracy": 1.0, "warnings": [], "embed_s": 12.4, "train_s": 0.31, "created_at": "2026-11-21T20:40:00Z"}
+```
+
+`GET /v1/audio/classifiers` lists them (`{"object": "list", "data": [...]}`), `GET /v1/audio/classifiers/{id}`
+shows one, `DELETE /v1/audio/classifiers/{id}` deletes it (as `bolo rm` does). Classify with
+`classifier=<id>` (or `model=<id>`): the scores are the head's probabilities (no `similarity`), `model` names the
+encoder. A long clip is embedded as the average of its pieces, as in zero-shot. Each example is embedded whole, so
+clips of a few seconds that are all sound of their class teach best. The classifier keeps the encoder's licence.
+From the command line: `bolo classifier train voicemail --class voicemail=./clips/voicemail --class
+person=./clips/person [--encoder clap-htsat-unfused] [--head mlp]` (every audio file in each folder), `bolo
+classifier list`, `bolo classifier show NAME`, `bolo classifier rm NAME`, then `bolo classify FILE --classifier
+voicemail`.
+
 
 ### Wake words: `POST /api/v1/wake`, `WS /api/v1/wake/stream`
 

@@ -558,6 +558,14 @@ class Bolo:
             "lid": self._lid_capability(),
             # sound events and speech emotion (docs/api.md, "Sound events and audio tags", "Speech emotion")
             "audio_tagging": {"endpoint": "/v1/audio/tags", "default_model": s.default_audio_tagging, "windows": True},
+            # zero-shot classification against the caller's labels, and classifiers trained from examples
+            "audio_classify": {
+                "endpoint": "/v1/audio/classify",
+                "classifiers_endpoint": "/v1/audio/classifiers",
+                "default_model": s.default_audio_classify,
+                "windows": True,
+                "encoder_tasks": ["audio-classify", "speaker-embedding", "audio-tagging"],
+            },
             "emotion": {
                 "endpoint": "/v1/audio/emotion",
                 "default_model": s.default_emotion,
@@ -1150,6 +1158,7 @@ class Bolo:
                 "audio-tagging": s.default_audio_tagging,
                 "emotion": s.default_emotion,
                 "decision": s.default_decision,
+                "audio-classify": s.default_audio_classify,
                 "voice-conversion": s.default_voice_conversion,
                 "punctuation": s.default_punctuation,
                 "itn": s.default_itn,

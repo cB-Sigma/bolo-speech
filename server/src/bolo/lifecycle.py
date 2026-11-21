@@ -39,6 +39,7 @@ from bolo.engines import EngineRegistry
 from bolo.engines.base import (
     AlignModel,
     AudioClassifierModel,
+    AudioTextModel,
     DecisionModel,
     DenoiseModel,
     DiarizationModel,
@@ -799,6 +800,12 @@ class ModelManager:
             decider = model
             handlers["decide"] = lambda items: [decider.decide(item) for item in items]
             max_batch["decide"] = 1
+        elif isinstance(model, AudioTextModel):
+            clap = model
+            handlers["embed_audio"] = lambda items: list(clap.embed_audio(items))
+            handlers["embed_text"] = lambda items: [clap.embed_text(item) for item in items]
+            max_batch["embed_audio"] = 4
+            max_batch["embed_text"] = 1
         elif isinstance(model, AudioClassifierModel):
             classifier = model
             handlers["classify"] = lambda items: [classifier.classify(item) for item in items]

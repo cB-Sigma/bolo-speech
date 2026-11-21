@@ -80,6 +80,27 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   sha256, runs only after `allow_remote_code`). Not on llama.cpp: the pinned b12521 runs the dense Clef only, and
   Clef-Omni's architecture is an unmerged branch. Added, not yet run (`options.not_yet_run`; it needs about 64 GB of
   GPU memory). Plugins can now serve decision models (plugin protocol op `decide`).
+- **Classify audio against your own labels (zero-shot), and classifiers trained from your clips** (new task
+  `audio-classify`). `POST /v1/audio/classify` takes a clip and labels in plain words ("hold music", "an angry
+  voice", "a dog barking") and gives each a score (softmax over the labels) and the raw similarity, for the whole
+  clip and, with `window`, window by window. Four CLAP models on ONNX Runtime, no PyTorch, from new exports of both
+  towers made and checked against the PyTorch originals (`server/tools/export_clap_onnx.py`; hosted as
+  `codebucketsolutions/*-onnx` with model cards and parity numbers): `clap-htsat-unfused` (LAION, the default),
+  `larger-clap-general` and `larger-clap-music-and-speech` (LAION, Apache-2.0), and `msclap-2023` (Microsoft, MS-PL).
+  The full-precision graphs are within 1.2e-5 of PyTorch on every audio embedding; the int8 audio towers the entries
+  use keep the same top label on every test clip. Label embeddings are cached per loaded model. LAION's
+  `larger_clap_music` is left out: as published in transformers its scores come out uniform. Classifiers: `POST
+  /v1/audio/classifiers` trains a logistic-regression (or small MLP) head on frozen embeddings from a CLAP model, a
+  speaker-embedding model or an audio tagger, reports stratified cross-validated accuracy and warns about too little
+  or unbalanced data; the classifier is saved as a local model (in `bolo list` and the catalog) and served by the same
+  endpoint (`classifier=<id>`); `GET`/`DELETE /v1/audio/classifiers[/{id}]` list and remove them. CLI: `bolo
+  classify FILE --labels "..."` and `bolo classifier train NAME --class LABEL=FOLDER ... | list | show | rm`; a
+  Classify page in the console (upload or record, labels or a trained classifier, scores; a training form that takes
+  a dropped folder per class); a `classify` pipeline step (labels, or a trained classifier as its model); the setting
+  `default_audio_classify`; `audio_classify` in `/api/v1/info`'s capabilities. Run here on a busy 4-vCPU CPU (docs/measurements/audio-classify.json): RTF 0.26 to 0.41, 750 to 930
+  MB loaded; each model put the speech samples among speakers, white noise as white noise and the synthetic music as
+  music or hold music, and a classifier on its embeddings told 8 speech, 8 music and 8 noise clips apart at 100 %
+  cross-validated (training the head took under 0.5 s; embedding the 24 clips 21 to 53 s).
 - **Decisions: typed questions about a recording or a text** (new task `decision`). `POST /v1/audio/decisions`
   takes a recording (at most 30 s), a text or both, and named questions of three types: yes/no, one option of a list,
   or a level on a scale; each comes back with its answer and probabilities. Also `bolo decide FILE --questions

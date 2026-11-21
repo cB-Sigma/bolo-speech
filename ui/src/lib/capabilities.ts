@@ -281,6 +281,11 @@ export function recommendationsOffered(info: ServerInfo | undefined): boolean {
 
 /** Whether the server has cloud providers (the Providers screen and cost estimates). */
 /** Whether the server spots wake words (`/api/v1/wake`, the Wake word screen). */
+/** Whether the server classifies audio against your own labels and trains classifiers (the Classify screen). */
+export function classifyOffered(info: ServerInfo | undefined): boolean {
+  return Boolean(info?.capabilities?.audio_classify)
+}
+
 /** Whether the server answers typed questions about a recording or a text (the Decisions screen). */
 export function decisionsOffered(info: ServerInfo | undefined): boolean {
   return Boolean(info?.capabilities?.decision)

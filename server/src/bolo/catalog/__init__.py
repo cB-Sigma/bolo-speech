@@ -21,7 +21,7 @@ from bolo.store import Source
 TASKS = (
     "stt", "tts", "vad", "diarization", "turn", "translation", "separation", "denoise", "lid", "speech-to-speech",
     "audio-llm", "speaker-embedding", "audio-tagging", "emotion", "voice-conversion", "align", "punctuation", "itn", "pii",
-    "echo-cancellation", "wake-word", "watermark", "decision",
+    "echo-cancellation", "wake-word", "watermark", "decision", "audio-classify",
 )  # fmt: skip
 TIERS = ("realtime", "balanced", "accuracy")
 VALIDATED = ("cpu", "untested")
@@ -388,6 +388,11 @@ FAKE_MODELS: list[dict[str, Any]] = [
         "id": "fake-tagging", "task": "audio-tagging", "engine": "fake", "kind": "fake-tagging", "family": "Fake",
         "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
         "description": "Test audio tagger: silence, a low tone (music) or a high tone (speech). Not real tagging.",
+    },
+    {
+        "id": "fake-clap", "task": "audio-classify", "engine": "fake", "kind": "fake-clap", "family": "Fake",
+        "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
+        "description": "Test zero-shot classifier: band energies against pitch words. Not real CLAP.",
     },
     {
         "id": "fake-emotion", "task": "emotion", "engine": "fake", "kind": "fake-emotion", "family": "Fake",

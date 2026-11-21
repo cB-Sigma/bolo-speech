@@ -1,0 +1,181 @@
+# Zero-shot audio classification (task audio-classify): the caller names the classes in plain words ("angry
+# voice", "hold music", "a dog barking") and gets a score per label, from CLAP models (contrastive language-audio
+# pretraining: an audio tower and a text tower in one embedding space). Used by POST /v1/audio/classify, which also
+# serves classifiers trained from examples on these models' audio embeddings (bolo.classifiers).
+# All run on ONNX Runtime (bolo.engines.clap_onnx) from bolo's own exports (codebucketsolutions/*-onnx on Hugging
+# Face, made with server/tools/export_clap_onnx.py): the audio tower with its log-mel front end inside the graph,
+# the text tower, and the tokenizer. Each export was checked against the PyTorch original (the model cards and
+# parity.json have the numbers). The entries use the audio tower with int8 weights (about three times faster on a
+# CPU than full precision, the same top label on every test clip) and the full-precision text tower (int8 moves
+# text embeddings too far; label embeddings are cached anyway). No PyTorch needed.
+# * LAION CLAP (LAION, Apache-2.0 as published in transformers; the original LAION-AI/CLAP code and checkpoints
+#   are CC0-1.0): HTSAT audio encoder, RoBERTa text encoder, 48 kHz, 10 s at once. laion/larger_clap_music is not
+#   here: as published in transformers its logit scale is 1.03 and its label scores come out uniform (1/15 for 15
+#   labels, in PyTorch as in ONNX).
+# * MS-CLAP 2023 (Microsoft, MS-PL): HTSAT audio encoder, GPT-2 text encoder, 44.1 kHz, 7 s at once.
+
+- id: clap-htsat-unfused
+  aliases: [laion/clap-htsat-unfused, laion-clap, clap]
+  task: audio-classify
+  engine: onnxruntime
+  kind: clap_onnx
+  family: LAION CLAP
+  languages: [en]
+  tier: realtime
+  sample_rate: 48000
+  size_bytes: 541983379
+  params: 155000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/laion/clap-htsat-unfused
+  features: [zero-shot, embeddings, music, sound-events]
+  description: 'LAION CLAP with the HTSAT-tiny audio encoder (the transformers "clap-htsat-unfused" checkpoint,
+    trained on LAION-Audio-630K): zero-shot audio classification against labels in plain English, and audio
+    embeddings for classifiers trained here. The default. ONNX export (codebucketsolutions/clap-htsat-unfused-onnx)
+    checked against the PyTorch original: full precision within 1.1e-5 on every audio embedding; the int8 audio tower
+    used here within 0.014 on label probabilities, same top label on every test clip.'
+  source_url: https://github.com/LAION-AI/CLAP
+  validated: cpu
+  measured:
+    rtf: 0.2622
+    audio_s: 37.0
+    load_s: 14.45
+    memory_mb: 747
+    threads: 4
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, load average about 12
+    note: 'zero-shot against 14 labels on the three speech samples and three synthetic clips (music, white noise, a
+      tone); the text tower took 1.2 s for the 14 labels, then they came from the cache. A
+      classifier trained on its embeddings of 8 speech, 8 music and 8 noise clips: cross-validated accuracy
+      100%, 29 s to embed the clips, 0.30 s to train'
+    date: '2026-11-21'
+  source:
+    repo: codebucketsolutions/clap-htsat-unfused-onnx
+    revision: 59c01294eefe1dec2978aebbd6494c7eb1def888
+    include: [audio.int8.onnx, text.onnx, tokenizer.json, clap.json, LICENSE]
+  options:
+    audio: audio.int8.onnx
+    text: text.onnx
+
+- id: larger-clap-general
+  aliases: [laion/larger_clap_general]
+  task: audio-classify
+  engine: onnxruntime
+  kind: clap_onnx
+  family: LAION CLAP
+  languages: [en]
+  tier: balanced
+  sample_rate: 48000
+  size_bytes: 585702273
+  params: 197000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/laion/larger_clap_general
+  features: [zero-shot, embeddings, music, speech, sound-events]
+  description: 'LAION''s larger CLAP for general audio (HTSAT-base audio encoder), trained on general audio, music and
+    speech. ONNX export (codebucketsolutions/larger-clap-general-onnx) checked against the PyTorch original: full
+    precision within 1.2e-5 on every audio embedding; the int8 audio tower used here within 0.034 on label
+    probabilities, same top label on every test clip.'
+  source_url: https://huggingface.co/laion/larger_clap_general
+  validated: cpu
+  measured:
+    rtf: 0.3804
+    audio_s: 37.0
+    load_s: 16.7
+    memory_mb: 907
+    threads: 4
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, load average about 16
+    note: 'zero-shot against 14 labels on the three speech samples and three synthetic clips (music, white noise, a
+      tone); the text tower took 1.6 s for the 14 labels, then they came from the cache. A
+      classifier trained on its embeddings of 8 speech, 8 music and 8 noise clips: cross-validated accuracy
+      100%, 53 s to embed the clips, 0.49 s to train'
+    date: '2026-11-21'
+  source:
+    repo: codebucketsolutions/larger-clap-general-onnx
+    revision: 3f10d61a961b1581549bc89111f35b449b109404
+    include: [audio.int8.onnx, text.onnx, tokenizer.json, clap.json, LICENSE]
+  options:
+    audio: audio.int8.onnx
+    text: text.onnx
+
+- id: larger-clap-music-and-speech
+  aliases: [laion/larger_clap_music_and_speech]
+  task: audio-classify
+  engine: onnxruntime
+  kind: clap_onnx
+  family: LAION CLAP
+  languages: [en]
+  tier: balanced
+  sample_rate: 48000
+  size_bytes: 585702274
+  params: 197000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/laion/larger_clap_music_and_speech
+  features: [zero-shot, embeddings, music, speech]
+  description: 'LAION''s larger CLAP trained on music and speech (HTSAT-base audio encoder): for telling music, voices
+    and their kinds apart. ONNX export (codebucketsolutions/larger-clap-music-and-speech-onnx) checked against the
+    PyTorch original: full precision within 8.9e-5 on label probabilities; the int8 audio tower used here within
+    0.053, same top label on every test clip.'
+  source_url: https://huggingface.co/laion/larger_clap_music_and_speech
+  validated: cpu
+  measured:
+    rtf: 0.4051
+    audio_s: 37.0
+    load_s: 17.61
+    memory_mb: 931
+    threads: 4
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, load average about 17
+    note: 'zero-shot against 14 labels on the three speech samples and three synthetic clips (music, white noise, a
+      tone); the text tower took 1.6 s for the 14 labels, then they came from the cache. A
+      classifier trained on its embeddings of 8 speech, 8 music and 8 noise clips: cross-validated accuracy
+      100%, 36 s to embed the clips, 0.16 s to train'
+    date: '2026-11-21'
+  source:
+    repo: codebucketsolutions/larger-clap-music-and-speech-onnx
+    revision: 02f1323bfd1363e2c74de5f4da73d84e324afd00
+    include: [audio.int8.onnx, text.onnx, tokenizer.json, clap.json, LICENSE]
+  options:
+    audio: audio.int8.onnx
+    text: text.onnx
+
+- id: msclap-2023
+  aliases: [microsoft/msclap, ms-clap, msclap]
+  task: audio-classify
+  engine: onnxruntime
+  kind: clap_onnx
+  family: MS-CLAP
+  languages: [en]
+  tier: realtime
+  sample_rate: 44100
+  size_bytes: 548272801
+  params: 158000000
+  license: MS-PL
+  license_url: https://huggingface.co/microsoft/msclap
+  features: [zero-shot, embeddings, music, speech, sound-events]
+  description: 'Microsoft CLAP 2023 (HTSAT audio encoder, GPT-2 text encoder, 1024-number embeddings), trained on 4.6 M
+    audio-text pairs; hears 7 s at once at 44.1 kHz. Weights under the Microsoft Public License (permissive; the code
+    is MIT). ONNX export (codebucketsolutions/msclap-2023-onnx) checked against the msclap package in PyTorch: full
+    precision within 3.3e-6 on every audio embedding; the int8 audio tower used here within 0.021 on label
+    probabilities, same top label on every test clip.'
+  source_url: https://github.com/microsoft/CLAP
+  validated: cpu
+  measured:
+    rtf: 0.2946
+    audio_s: 37.0
+    load_s: 12.01
+    memory_mb: 887
+    threads: 4
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, load average about 15
+    note: 'zero-shot against 14 labels on the three speech samples and three synthetic clips (music, white noise, a
+      tone); the text tower took 1.6 s for the 14 labels, then they came from the cache. A
+      classifier trained on its embeddings of 8 speech, 8 music and 8 noise clips: cross-validated accuracy
+      100%, 21 s to embed the clips, 0.48 s to train'
+    date: '2026-11-21'
+  source:
+    repo: codebucketsolutions/msclap-2023-onnx
+    revision: 59488022da170205188a2348d7f6ec44cffd0049
+    include: [audio.int8.onnx, text.onnx, tokenizer.json, clap.json, LICENSE]
+  options:
+    audio: audio.int8.onnx
+    text: text.onnx

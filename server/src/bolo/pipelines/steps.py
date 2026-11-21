@@ -318,6 +318,28 @@ async def _tags(r: Runner, run: Run, e: Entry, i: Inputs, o: Options, scope: Sco
     return {"tags": tags, "top": tags[0]["label"] if tags else ""}
 
 
+@handler("classify")
+async def _zero_shot(r: Runner, run: Run, e: Entry, i: Inputs, o: Options, scope: Scope, d: int) -> dict[str, Any]:
+    from bolo.classifiers import TASK, body, classify_request
+
+    audio = need_audio(i)
+    classifier = as_text(_opt(r, run, o, "classifier", scope) or "").strip() or None
+    prompt = _opt(r, run, o, "prompt", scope)
+    trace = _trace(TASK, classifier or e["model"])
+    try:
+        result = await classify_request(
+            r.core, audio.samples, audio.rate, trace, model=e["model"] or None, classifier=classifier,
+            labels=text_list(_opt(r, run, o, "labels", scope)), prompt=None if prompt is None else as_text(prompt),
+        )  # fmt: skip
+    except Exception as exc:
+        _record(r.core, trace, "error", str(exc))
+        raise
+    _record(r.core, trace)
+    out = body(result)
+    return {"label": out["label"] or "", "score": out["score"], "scores": out["scores"],
+            "_model": result.classifier or result.model}  # fmt: skip
+
+
 @handler("emotion")
 async def _emotion(r: Runner, run: Run, e: Entry, i: Inputs, o: Options, scope: Scope, d: int) -> dict[str, Any]:
     from bolo.classify import emotion_body

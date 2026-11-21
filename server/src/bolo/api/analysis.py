@@ -1,6 +1,8 @@
 """Audio analysis routes: speech enhancement on its own (``/v1/audio/denoise``, with ElevenLabs' voice-isolation
-route as an alias), sound-event tags (``/v1/audio/tags``), speech emotion (``/v1/audio/emotion``) and decisions
-(``/v1/audio/decisions``: typed questions about a recording or a text).
+route as an alias), sound-event tags (``/v1/audio/tags``), speech emotion (``/v1/audio/emotion``), decisions
+(``/v1/audio/decisions``: typed questions about a recording or a text), and classification against the caller's
+own classes (``/v1/audio/classify``: zero-shot with CLAP, or a classifier trained from examples with
+``/v1/audio/classifiers``).
 """
 
 from __future__ import annotations
@@ -375,6 +377,131 @@ async def audio_decisions(request: Request) -> JSONResponse:
     finally:
         core.traces.record(trace)
     return JSONResponse(body(result), headers={"x-request-id": trace.id, "x-bolo-model": spec.id})
+
+
+@router.post(
+    "/v1/audio/classify",
+    tags=["native"],
+    summary="Classify audio against your own labels (zero-shot) or a trained classifier",
+)
+async def audio_classify(request: Request) -> JSONResponse:
+    """Extension. Score a recording against classes the caller names. Multipart form: ``file``; then either
+    ``labels`` (the classes in plain words: a JSON array, one per line, comma-separated, or the field repeated;
+    "angry voice", "hold music", "a dog barking") with ``model`` (an ``audio-classify`` CLAP model; default
+    ``default_audio_classify``) and ``prompt`` (the sentence each label is put into, ``{}`` marking where; default
+    the model's, "This is a sound of {}."; an empty prompt uses the labels as they are), or ``classifier`` (a
+    classifier trained with ``POST /v1/audio/classifiers``; its id also works as ``model``). Also ``top_k`` (scores
+    listed, default all), ``window`` and ``hop`` (seconds: classify window by window too) and ``keep_alive``.
+    Zero-shot scores are a softmax over the labels (they sum to 1) with ``similarity``, the cosine between the
+    audio and the label's sentence; a trained classifier gives its head's probabilities."""
+    from bolo.classifiers import TASK, body, classify_request, parse_labels
+
+    core = get_core(request)
+    form = await request.form()
+    file = _upload(form, "file")
+    request_keep_alive(form.get("keep_alive"), (TASK,))
+    labels = parse_labels(form.getlist("labels") + form.getlist("label"))
+    classifier = str(form.get("classifier") or "").strip() or None
+    model = str(form.get("model") or "").strip() or None
+    prompt = form.get("prompt")
+    window, hop = _float(form, "window"), _float(form, "hop")
+    samples, rate = await read_upload(core, file)
+    trace = Trace(TASK, "http", classifier or model or core.settings.default_audio_classify)
+    trace.audio_seconds = len(samples) / rate if rate else 0.0
+    try:
+        result = await classify_request(
+            core, samples, rate, trace, model=model, classifier=classifier, labels=labels,
+            prompt=None if prompt is None else str(prompt), window=window, hop=hop,
+        )  # fmt: skip
+        trace.model = result.classifier or result.model
+        trace.extra[TASK] = result.scores[0][0] if result.scores else None
+        trace.finish("ok")
+    except Exception as exc:
+        trace.finish("error", exc.message if isinstance(exc, BoloError) else f"{type(exc).__name__}: {exc}")
+        raise
+    finally:
+        core.traces.record(trace)
+    headers = {"x-request-id": trace.id, "x-bolo-model": result.model}
+    if result.classifier:
+        headers["x-bolo-classifier"] = result.classifier
+    top_k = _top_k(form, 1000) if form.get("top_k") not in (None, "") else None
+    return JSONResponse(body(result, top_k), headers=headers)
+
+
+@router.post("/v1/audio/classifiers", tags=["native"], summary="Train a classifier from labelled examples")
+async def train_classifier(request: Request) -> JSONResponse:
+    """Extension. Train an audio classifier from examples and save it as a local model. Multipart form: ``name``
+    (its id), ``file`` fields (the example clips) each followed by its ``label`` field (the class; the labels pair
+    with the files in order), ``encoder`` (the model whose embeddings it learns from: an ``audio-classify`` CLAP
+    model, a ``speaker-embedding`` model or an ``audio-tagging`` model; default ``default_audio_classify``),
+    ``head`` (``logistic``, the default, or ``mlp``), ``replace`` (true: overwrite a classifier with that name) and
+    ``description``. Returns the classifier with its cross-validated accuracy and warnings (fewer than 10 examples
+    in a class, unbalanced classes, low accuracy). A few dozen clips per class train in seconds on a CPU."""
+    from bolo.audio import decode_audio
+    from bolo.classifiers import train
+
+    core = get_core(request)
+    form = await request.form()
+    name = str(form.get("name") or "").strip()
+    if not name:
+        raise InvalidRequest("a 'name' for the classifier is required", param="name")
+    files = [f for f in form.getlist("file") if not isinstance(f, str)]
+    labels = [str(x).strip() for x in form.getlist("label")]
+    if not files:
+        raise InvalidRequest("no examples: send 'file' fields, each with a 'label'", param="file")
+    if len(labels) != len(files) or not all(labels):
+        raise InvalidRequest(
+            f"{len(files)} files and {len(labels)} labels: give one non-empty 'label' per 'file'", param="label"
+        )
+    limit = core.settings.max_upload_mb * 1024 * 1024
+    examples = []
+    total = 0
+    for f, label in zip(files, labels):
+        data = await f.read()
+        total += len(data)
+        if total > limit:
+            raise InvalidRequest(
+                f"the examples are larger than the {core.settings.max_upload_mb} MB limit", param="file"
+            )
+        try:
+            samples, rate = await asyncio.to_thread(
+                decode_audio, data, filename=f.filename, content_type=f.content_type
+            )
+        except BoloError as exc:
+            raise InvalidRequest(f"{f.filename}: {exc.message}", param="file") from exc
+        examples.append((label, samples, rate))
+    result = await train(
+        core, name, examples, encoder=str(form.get("encoder") or "").strip() or None,
+        kind=str(form.get("head") or "logistic").strip().lower(), replace=parse_bool(form.get("replace")),
+        description=str(form.get("description") or "").strip() or None,
+    )  # fmt: skip
+    return JSONResponse(result, status_code=201)
+
+
+@router.get("/v1/audio/classifiers", tags=["native"], summary="List trained classifiers")
+async def list_classifiers(request: Request) -> JSONResponse:
+    """Extension. The classifiers trained with ``POST /v1/audio/classifiers``: classes, encoder, examples per class,
+    cross-validated accuracy and warnings."""
+    from bolo.classifiers import list_classifiers as listing
+
+    return JSONResponse({"object": "list", "data": listing(get_core(request))})
+
+
+@router.get("/v1/audio/classifiers/{classifier_id}", tags=["native"], summary="One trained classifier")
+async def get_classifier(request: Request, classifier_id: str) -> JSONResponse:
+    """Extension. One trained classifier (as in the list)."""
+    from bolo.classifiers import describe
+
+    return JSONResponse(describe(get_core(request), classifier_id))
+
+
+@router.delete("/v1/audio/classifiers/{classifier_id}", tags=["native"], summary="Delete a trained classifier")
+async def delete_classifier(request: Request, classifier_id: str) -> JSONResponse:
+    """Extension. Delete a trained classifier (its files and its catalog entry)."""
+    from bolo.classifiers import delete
+
+    await delete(get_core(request), classifier_id)
+    return JSONResponse({"id": classifier_id, "object": "audio.classifier", "deleted": True})
 
 
 __all__ = ["router"]

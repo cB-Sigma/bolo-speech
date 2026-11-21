@@ -130,6 +130,7 @@ Model steps (the kind is the catalog task the `model` must have):
 | `pii` | pii | `text` | `entities` (`PERSON`, `PHONE_NUMBER`, ...) | `text`, `transcript`, `redactions`, `count` |
 | `lid` | lid | `audio` | | `language`, `probability`, `languages` |
 | `audio-tagging` | audio-tagging | `audio` | `top_k`, `threshold`, `labels` | `tags` (`[{label, score}]`), `top` |
+| `classify` | audio-classify (a CLAP model, or a trained classifier's id) | `audio` | `labels` (zero-shot classes in plain words), `classifier` (a trained classifier), `prompt` | `label`, `score`, `scores` (`[{label, score, similarity}]`) |
 | `emotion` | emotion | `audio` | | `emotion`, `score`, `emotions` |
 | `audio-llm` | audio-llm | `audio`, `prompt` | `max_tokens`, `temperature` | `text` |
 | `decision` | decision | `text` or `audio` | `question`, `choices` (list; left out: yes/no), `instructions` | `answer`, `confidence`, `reason` |

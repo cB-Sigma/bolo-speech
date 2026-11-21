@@ -9,6 +9,7 @@ import {
   Gauge,
   KeyRound,
   ListChecks,
+  Tags,
   Radio,
   MessagesSquare,
   Mic,
@@ -42,6 +43,8 @@ export interface NavFeatures {
   decisions?: boolean
   /** Pipelines (`/api/v1/pipelines`). */
   pipelines?: boolean
+  /** Classification against your own labels, and trained classifiers (`/v1/audio/classify`). */
+  classify?: boolean
 }
 
 export interface NavItem {
@@ -146,6 +149,15 @@ export const NAV: NavItem[] = [
     icon: Cloud,
     group: 'Server',
     when: (f) => Boolean(f.providers),
+  },
+  {
+    to: '/classify',
+    label: 'Classify',
+    short: 'Classify',
+    description: 'Score audio against labels you write, or train a classifier from your own clips',
+    icon: Tags,
+    group: 'Playground',
+    when: (f) => Boolean(f.classify),
   },
   {
     to: '/decisions',

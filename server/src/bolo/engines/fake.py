@@ -25,6 +25,7 @@ from bolo import __version__
 from bolo.engines.base import (
     AlignModel,
     AudioTaggingModel,
+    AudioTextModel,
     ConversationChunk,
     ConversationRequest,
     DecisionModel,
@@ -718,6 +719,50 @@ class FakeDecision(DecisionModel):
         return {"answers": answers, "usage": {"input_tokens": 10 * len(answers), "output_tokens": 0}}
 
 
+class FakeClap(AudioTextModel):
+    """A CLAP stand-in (tests only). An audio embedding is the square root of the share of the power in each of 16
+    equal bands from 0 to 8 kHz; a text's is one band for a pitch word ("low", "hum", "music": the lowest band;
+    "high", "whistle": band 8, 4 to 4.5 kHz), every band alike for "noise" or "static", and a fixed pseudo-random
+    vector from its words otherwise. So a low tone matches "a low hum", white noise matches "noise"."""
+
+    sample_rate = 16000
+    clip_s = 2.0
+    dim = 16
+    logit_scale = 20.0
+    prompt = "the sound of {}"
+
+    def __init__(self) -> None:
+        self.text_runs = 0  # texts the text tower embedded (for the cache tests)
+
+    def embed_audio(self, clips: list[FloatArray]) -> FloatArray:
+        out = np.zeros((len(clips), self.dim), dtype=np.float32)
+        for i, clip in enumerate(clips):
+            x = np.asarray(clip, dtype=np.float64)[: int(self.clip_s * self.sample_rate)]
+            power = np.abs(np.fft.rfft(x, n=4096)) ** 2 if len(x) else np.zeros(2049)
+            bands = np.array([b.sum() for b in np.array_split(power[1:], self.dim)])
+            total = bands.sum()
+            v = np.sqrt(bands / total) if total > 1e-12 else np.full(self.dim, 1.0)
+            out[i] = v / np.linalg.norm(v)
+        return out
+
+    def embed_text(self, texts: list[str]) -> FloatArray:
+        out = np.zeros((len(texts), self.dim), dtype=np.float32)
+        for i, text in enumerate(texts):
+            self.text_runs += 1
+            words = set(text.lower().replace(".", " ").split())
+            if words & {"low", "hum", "music"}:
+                v = np.eye(self.dim)[0]
+            elif words & {"high", "whistle"}:
+                v = np.eye(self.dim)[8]
+            elif words & {"noise", "static"}:
+                v = np.ones(self.dim)
+            else:
+                seed = int.from_bytes(text.lower().encode("utf-8")[:8].ljust(8, b"\0"), "little")
+                v = np.random.default_rng(seed).random(self.dim)
+            out[i] = v / np.linalg.norm(v)
+        return out
+
+
 class FakeWatermark(WatermarkModel):
     """A watermark for tests: a quiet 7 kHz tone (16 kHz audio); detected frame by frame from that tone's energy.
     The payload it reports is the one it last embedded."""
@@ -882,7 +927,7 @@ class FakeEngine(Engine):
     kinds = (
         "fake-stt", "fake-stt-streaming", "fake-stt-speakers", "fake-tts", "fake-vad", "fake-diarization", "fake-turn",
         "fake-turn-text", "fake-separation", "fake-denoise", "fake-s2s", "fake-lid", "fake-speaker-embedding",
-        "fake-tagging", "fake-emotion", "fake-decision",
+        "fake-tagging", "fake-emotion", "fake-decision", "fake-clap",
         "fake-align",
         "fake-punctuation", "fake-echo", "fake-wake", "fake-watermark", "fake-itn", "fake-pii",
     )  # fmt: skip
@@ -926,6 +971,8 @@ class FakeEngine(Engine):
             model = FakeTagging()
         elif kind == "fake-emotion":
             model = FakeEmotion()
+        elif kind == "fake-clap":
+            model = FakeClap()
         elif kind == "fake-decision":
             model = FakeDecision()
         elif kind == "fake-align":

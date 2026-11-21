@@ -7,6 +7,7 @@ import type { Catalog, CatalogModel, Component, Task } from '@/lib/api/types'
 import {
   keysOffered,
   wakeOffered,
+  classifyOffered,
   decisionsOffered,
   pipelinesOffered,
   providersOffered,
@@ -135,6 +136,7 @@ export function useNavFeatures(): NavFeatures {
     wake: wakeOffered(info) && !isDemo,
     decisions: decisionsOffered(info) && !isDemo,
     pipelines: pipelinesOffered(info) && !isDemo,
+    classify: classifyOffered(info) && !isDemo,
   }
 }
 

@@ -131,6 +131,9 @@ class Settings:
     default_audio_tagging: str = "ced-mini"
     #: speech-emotion model: POST /v1/audio/emotion without a model
     default_emotion: str = "emotion2vec-plus-base"
+    #: zero-shot audio classification (CLAP): POST /v1/audio/classify with labels and no model, and the encoder of a
+    #: classifier trained without one
+    default_audio_classify: str = "clap-htsat-unfused"
     #: decision model (typed questions about a recording or a text): POST /v1/audio/decisions without a model
     default_decision: str = "d1-omni-600m-llamacpp"
     #: live decisions (bolo.decision_hook): where the answers asked after each user turn of a Realtime session or a

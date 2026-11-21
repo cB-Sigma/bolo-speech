@@ -20,6 +20,7 @@ const PhonePage = lazy(() => import('./routes/phone'))
 const KeysPage = lazy(() => import('./routes/keys'))
 const WakePage = lazy(() => import('./routes/wake'))
 const DecisionsPage = lazy(() => import('./routes/decisions'))
+const ClassifyPage = lazy(() => import('./routes/classify'))
 const ComparePage = lazy(() => import('./routes/compare'))
 const DiarizePage = lazy(() => import('./routes/diarize'))
 const CloneBrowserPage = lazy(() => import('./routes/clone-browser'))
@@ -187,6 +188,14 @@ export function App() {
             element={
               <Suspense fallback={<PageFallback />}>
                 <KeysPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="classify"
+            element={
+              <Suspense fallback={<PageFallback />}>
+                <ClassifyPage />
               </Suspense>
             }
           />

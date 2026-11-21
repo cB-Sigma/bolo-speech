@@ -124,6 +124,7 @@ const TASK_LABEL: Record<Task, string> = {
   'wake-word': 'Wake words',
   watermark: 'Watermarking',
   decision: 'Decisions',
+  'audio-classify': 'Zero-shot classification',
 }
 const TASK_SHORT: Record<Task, string> = {
   stt: 'STT',
@@ -149,6 +150,7 @@ const TASK_SHORT: Record<Task, string> = {
   'wake-word': 'Wake',
   watermark: 'Watermark',
   decision: 'Decide',
+  'audio-classify': 'Classify',
 }
 const TASK_ORDER: Task[] = [
   'stt',
@@ -163,6 +165,7 @@ const TASK_ORDER: Task[] = [
   'denoise',
   'audio-tagging',
   'emotion',
+  'audio-classify',
   'decision',
   'voice-conversion',
   'punctuation',

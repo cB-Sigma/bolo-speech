@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-552 models: 249 validated on CPU by the maintainers, 303 untested. 34 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+556 models: 253 validated on CPU by the maintainers, 303 untested. 34 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -1245,6 +1245,22 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `zipformer-audio-tagging` | - | balanced | - | 68 MB | Apache-2.0 | **CPU** · RTF 0.201 |
 | `zipformer-small-audio-tagging` | - | realtime | - | 27 MB | Apache-2.0 | **CPU** · RTF 0.126 |
+
+### Zero-shot audio classification (CLAP)
+
+#### LAION CLAP
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `clap-htsat-unfused` | en | realtime | - | 542 MB | Apache-2.0 | **CPU** · RTF 0.262 |
+| `larger-clap-general` | en | balanced | - | 586 MB | Apache-2.0 | **CPU** · RTF 0.380 |
+| `larger-clap-music-and-speech` | en | balanced | - | 586 MB | Apache-2.0 | **CPU** · RTF 0.405 |
+
+#### MS-CLAP
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `msclap-2023` | en | realtime | - | 548 MB | MS-PL | **CPU** · RTF 0.295 |
 
 ### Speech emotion
 

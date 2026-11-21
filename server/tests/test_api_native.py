@@ -83,6 +83,7 @@ def test_catalog_shape_and_filters(live: LiveServer) -> None:
             "wake-word",
             "watermark",
             "decision",
+            "audio-classify",
         )
         assert isinstance(m["requires"], list) and isinstance(m["available"], bool)
     tts = httpx.get(live.url + "/api/v1/catalog", params={"task": "tts"}).json()["models"]
@@ -114,6 +115,7 @@ def test_catalog_shape_and_filters(live: LiveServer) -> None:
         "fake-tagging",
         "fake-emotion",
         "fake-decision",
+        "fake-clap",
         "fake-echo",
         "fake-wake",
         "fake-watermark",

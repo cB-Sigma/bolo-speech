@@ -134,6 +134,7 @@ class OnnxRuntimeEngine(Engine):
         "ctc_align",
         "dtln_aec", "openwakeword", "gliner_pii",
         "audioseal_onnx", "perth_onnx", "wavmark_onnx", "tiny_voca_onnx", "paradee_onnx", "pivo_onnx", "kitten2_onnx", "kale_onnx",
+        "clap_onnx",
     )  # fmt: skip
 
     def status(self) -> EngineStatus:
@@ -146,7 +147,7 @@ class OnnxRuntimeEngine(Engine):
                 self.id, False, None,
                 f"{type(exc).__name__}: {exc}. Optional (end-of-turn detection, MarbleNet VAD, Nemotron diarization, DiCoW, Canary-Qwen, LFM3-Audio, "
                 "DeepFilterNet 3, SepFormer, MetricGAN+, SpeechBrain CTC recognisers, language identification, speech emotion, forced alignment, DTLN-aec, openWakeWord, "
-                "watermarking): "
+                "watermarking, CLAP zero-shot audio classification): "
                 "pip install onnxruntime",
             )  # fmt: skip
 
@@ -163,6 +164,10 @@ class OnnxRuntimeEngine(Engine):
         return {}
 
     def load(self, kind: str, task: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Model:
+        if kind == "clap_onnx":
+            from bolo.engines.clap_onnx import ClapOnnx
+
+            return ClapOnnx(path, spec, opts)
         if kind == "nemotron_diarization":
             from bolo.engines.nemotron import NemotronDiarization
 

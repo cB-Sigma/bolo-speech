@@ -1071,6 +1071,159 @@ def cmd_decide(args: argparse.Namespace) -> int:
     return asyncio.run(run())
 
 
+def _class_line(scores: list[dict[str, Any]]) -> str:
+    return (
+        ", ".join(
+            f"{t['label']} {t['score']:.2f}" + (f" (sim {t['similarity']:.2f})" if "similarity" in t else "")
+            for t in scores
+        )
+        or "-"
+    )
+
+
+def cmd_zero_shot(args: argparse.Namespace) -> int:
+    """``bolo classify FILE --labels "a dog barking,hold music"`` (zero-shot, CLAP) or ``bolo classify FILE
+    --classifier NAME`` (a classifier trained with ``bolo classifier train``)."""
+    from bolo.audio import decode_audio
+    from bolo.classifiers import TASK, body, classify_request, parse_labels
+    from bolo.obs.trace import Trace
+
+    core = _core(args)
+    path = Path(args.file)
+    samples, rate = decode_audio(path.read_bytes(), filename=path.name)
+    labels = parse_labels(list(args.labels or []))
+
+    async def run() -> int:
+        await core.start()
+        try:
+            result = await classify_request(
+                core, samples, rate, Trace(TASK, "cli", args.classifier or args.model or ""), model=args.model,
+                classifier=args.classifier, labels=labels, prompt=args.prompt, window=args.window, hop=args.hop,
+            )  # fmt: skip
+            out = body(result, args.top_k)
+            if args.json:
+                print(json.dumps(out, indent=2, ensure_ascii=False))
+                return 0
+            who = f"{result.classifier} (on {result.model})" if result.classifier else result.model
+            print(f"{who}: {_class_line(out['scores'])}")
+            for seg in out.get("segments", []):
+                print(f"  {seg['start']:7.2f}-{seg['end']:7.2f}  {_class_line(seg['scores'])}")
+            return 0
+        finally:
+            await core.stop()
+
+    return asyncio.run(run())
+
+
+_AUDIO_SUFFIXES = (".wav", ".flac", ".mp3", ".ogg", ".opus", ".m4a", ".aac", ".webm", ".aiff", ".aif", ".mka")
+
+
+def _examples(spec: str) -> tuple[str, list[Path]]:
+    """``LABEL=PATH``: the audio files of a folder (searched through) or one file."""
+    label, sep, where = spec.partition("=")
+    if not sep or not label.strip() or not where.strip():
+        raise ValueError(f"--class {spec!r}: write LABEL=FOLDER (or LABEL=FILE)")
+    root = Path(where.strip()).expanduser()
+    if root.is_dir():
+        files = sorted(p for p in root.rglob("*") if p.is_file() and p.suffix.lower() in _AUDIO_SUFFIXES)
+    elif root.is_file():
+        files = [root]
+    else:
+        raise ValueError(f"--class {spec!r}: {root} does not exist")
+    if not files:
+        raise ValueError(f"--class {spec!r}: no audio files in {root}")
+    return label.strip(), files
+
+
+def cmd_classifier(args: argparse.Namespace) -> int:
+    """``bolo classifier train NAME --class LABEL=FOLDER ...``, ``list``, ``show NAME``, ``rm NAME``: classifiers
+    trained on an encoder's embeddings from your own labelled clips, kept as local models."""
+    from bolo import classifiers
+
+    core = _core(args)
+    action = "list" if args.action == "ls" else args.action
+    if action in ("list", "show"):
+        if action == "list":
+            items = classifiers.list_classifiers(core)
+        else:
+            if not args.name:
+                print("usage: bolo classifier show NAME", file=sys.stderr)
+                return 2
+            items = [classifiers.describe(core, args.name)]
+        if args.json:
+            print(json.dumps(items if action == "list" else items[0], indent=2, ensure_ascii=False))
+            return 0
+        if not items:
+            print("no trained classifiers (bolo classifier train NAME --class LABEL=FOLDER --class LABEL=FOLDER)")
+            return 0
+        rows = [
+            [
+                c["id"], ", ".join(f"{k} ({v})" for k, v in c["examples"].items()), c["encoder"], c["head"],
+                f"{c['cross_validation']['accuracy']:.0%}" if c.get("cross_validation") else "-",
+            ]
+            for c in items
+        ]  # fmt: skip
+        print(_table(rows, ["ID", "CLASSES (EXAMPLES)", "ENCODER", "HEAD", "CV ACCURACY"]))
+        for c in items:
+            for w in c.get("warnings") or []:
+                print(f"warning: {c['id']}: {w}")
+        return 0
+    if not args.name:
+        print(f"usage: bolo classifier {action} NAME", file=sys.stderr)
+        return 2
+    if action == "rm":
+
+        async def remove() -> int:
+            await core.start()
+            try:
+                await classifiers.delete(core, args.name)
+            finally:
+                await core.stop()
+            print(f"removed classifier {args.name}")
+            return 0
+
+        return asyncio.run(remove())
+    from bolo.audio import decode_audio
+
+    try:
+        groups = [_examples(spec) for spec in args.classes or []]
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    if len(groups) < 2:
+        print("error: give at least two classes: --class LABEL=FOLDER --class LABEL=FOLDER", file=sys.stderr)
+        return 2
+    examples = []
+    for label, files in groups:
+        for f in files:
+            samples, rate = decode_audio(f.read_bytes(), filename=f.name)
+            examples.append((label, samples, rate))
+
+    async def run() -> int:
+        await core.start()
+        try:
+            out = await classifiers.train(
+                core, args.name, examples, encoder=args.encoder, kind=args.head, replace=args.replace
+            )
+        finally:
+            await core.stop()
+        if args.json:
+            print(json.dumps(out, indent=2, ensure_ascii=False))
+            return 0
+        cv = out.get("cross_validation")
+        counts = ", ".join(f"{k} {v}" for k, v in out["examples"].items())
+        print(f"trained classifier {out['id']} on {out['encoder']} embeddings ({counts} examples, {out['head']} head)")
+        if cv:
+            print(f"cross-validated accuracy: {cv['accuracy']:.1%} ({cv['folds']} folds); per class: "
+                  + ", ".join(f"{k} {v:.0%}" for k, v in cv["per_class"].items()))  # fmt: skip
+        for w in out["warnings"]:
+            print(f"warning: {w}")
+        print(f"use it: bolo classify FILE --classifier {out['id']}")
+        return 0
+
+    return asyncio.run(run())
+
+
 def cmd_speakers(args: argparse.Namespace) -> int:
     """``bolo speakers list | enrol NAME FILE... | verify SPEAKER FILE | identify FILE | rm SPEAKER``."""
     from bolo import speakers
@@ -2086,6 +2239,7 @@ _TASK_TITLES = {
     "vad": "Voice-activity detection", "turn": "End-of-turn detection", "separation": "Overlapped-speech separation",
     "denoise": "Denoising", "lid": "Language identification", "speech-to-speech": "Speech to speech",
     "speaker-embedding": "Speaker embedding", "audio-tagging": "Audio tagging", "emotion": "Speech emotion",
+    "audio-classify": "Zero-shot audio classification",
     "decision": "Decisions", "align": "Forced alignment",
     "punctuation": "Punctuation restoration", "itn": "Inverse text normalisation", "pii": "Personal information",
     "echo-cancellation": "Echo cancellation", "wake-word": "Wake words",
@@ -3018,6 +3172,47 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--model", "-m", help="a decision model (default: default_decision)")
     s.add_argument("--json", action="store_true")
     s.set_defaults(func=cmd_decide)
+
+    s = sub.add_parser(
+        "classify",
+        help="classify an audio file against your own labels (zero-shot, CLAP) or with a trained classifier",
+    )
+    _common(s)
+    s.add_argument("file")
+    s.add_argument(
+        "--labels", "-l", action="append",
+        help='the classes in plain words, comma-separated or repeated: --labels "a dog barking,hold music,speech"',
+    )  # fmt: skip
+    s.add_argument("--model", "-m", help="a CLAP model (default: default_audio_classify) or a trained classifier")
+    s.add_argument("--classifier", "-c", help="a classifier trained with `bolo classifier train`")
+    s.add_argument(
+        "--prompt", help='the sentence a label is put into, {} marking where (default "This is a sound of {}.")'
+    )
+    s.add_argument("--window", type=float, help="seconds: also window by window")
+    s.add_argument("--hop", type=float, help="seconds between windows (default: the window)")
+    s.add_argument("--top-k", dest="top_k", type=int)
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(func=cmd_zero_shot)
+
+    s = sub.add_parser(
+        "classifier",
+        help="classifiers trained from your own labelled clips: train NAME --class LABEL=FOLDER ..., list, show, rm",
+        description="A small head (logistic regression or an MLP) trained in seconds on the embeddings of an encoder "
+        "(a CLAP model, a speaker-embedding model or an audio tagger), saved as a local model and used with "
+        "`bolo classify FILE --classifier NAME` or POST /v1/audio/classify.",
+    )
+    _common(s)
+    s.add_argument("action", choices=["train", "list", "ls", "show", "rm"])
+    s.add_argument("name", nargs="?")
+    s.add_argument(
+        "--class", dest="classes", action="append", metavar="LABEL=FOLDER",
+        help="train: a class and the folder (or file) of its example clips; repeat per class",
+    )  # fmt: skip
+    s.add_argument("--encoder", "-e", help="train: the embedding model (default: default_audio_classify)")
+    s.add_argument("--head", choices=["logistic", "mlp"], default="logistic")
+    s.add_argument("--replace", action="store_true", help="train: overwrite a classifier with the same name")
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(func=cmd_classifier)
 
     s = sub.add_parser(
         "speakers", help="enrolled speakers: list, enrol NAME FILE..., verify SPEAKER FILE, identify FILE, rm"

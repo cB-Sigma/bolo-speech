@@ -19,6 +19,8 @@ import type {
   ApiKeyInfo,
   ApiKeyList,
   ApiKeyUpdate,
+  AudioClassification,
+  AudioClassifier,
   AudioDecision,
   AudioEmotion,
   AudioTags,
@@ -459,6 +461,50 @@ export const api = {
     if (opts.window) form.set('window', String(opts.window))
     const res = await request('v1/audio/emotion', { method: 'POST', body: form, signal })
     return res.json() as Promise<AudioEmotion>
+  },
+  /** Scores against your own labels (zero-shot, CLAP) or a trained classifier (`POST /v1/audio/classify`). */
+  async audioClassify(
+    file: Blob,
+    name: string,
+    opts: { labels?: string[]; classifier?: string; model?: string; prompt?: string; window?: number } = {},
+    signal?: AbortSignal,
+  ): Promise<AudioClassification> {
+    const form = new FormData()
+    form.set('file', file, name)
+    if (opts.labels?.length) form.set('labels', JSON.stringify(opts.labels))
+    if (opts.classifier) form.set('classifier', opts.classifier)
+    if (opts.model) form.set('model', opts.model)
+    if (opts.prompt !== undefined) form.set('prompt', opts.prompt)
+    if (opts.window) form.set('window', String(opts.window))
+    const res = await request('v1/audio/classify', { method: 'POST', body: form, signal })
+    return res.json() as Promise<AudioClassification>
+  },
+  /** Classifiers trained from examples (`GET /v1/audio/classifiers`). */
+  async classifiers(signal?: AbortSignal): Promise<AudioClassifier[]> {
+    const res = await request('v1/audio/classifiers', { signal })
+    return ((await res.json()) as { data: AudioClassifier[] }).data
+  },
+  /** Train a classifier from labelled clips (`POST /v1/audio/classifiers`): each file paired with its class. */
+  async trainClassifier(
+    name: string,
+    examples: { label: string; file: File }[],
+    opts: { encoder?: string; head?: 'logistic' | 'mlp'; replace?: boolean } = {},
+    signal?: AbortSignal,
+  ): Promise<AudioClassifier> {
+    const form = new FormData()
+    form.set('name', name)
+    for (const e of examples) {
+      form.append('file', e.file, e.file.name)
+      form.append('label', e.label)
+    }
+    if (opts.encoder) form.set('encoder', opts.encoder)
+    if (opts.head) form.set('head', opts.head)
+    if (opts.replace) form.set('replace', 'true')
+    const res = await request('v1/audio/classifiers', { method: 'POST', body: form, signal })
+    return res.json() as Promise<AudioClassifier>
+  },
+  async deleteClassifier(id: string): Promise<void> {
+    await request(`v1/audio/classifiers/${encodeURIComponent(id)}`, { method: 'DELETE' })
   },
   /** Typed questions about a recording and/or a text, answered by a decision model (`POST /v1/audio/decisions`). */
   async audioDecisions(

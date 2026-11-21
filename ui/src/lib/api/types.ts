@@ -24,6 +24,7 @@ export type Task =
   | 'wake-word'
   | 'watermark'
   | 'decision'
+  | 'audio-classify'
 export type Tier = 'realtime' | 'balanced' | 'accuracy'
 export type Validated = 'cpu' | 'untested'
 
@@ -122,6 +123,14 @@ export interface Capabilities {
     windows?: boolean
     transcription_tags?: string[]
     [k: string]: unknown
+  }
+  /** Classification against your own labels (zero-shot, CLAP) and classifiers trained from examples. */
+  audio_classify?: {
+    endpoint?: string
+    classifiers_endpoint?: string
+    default_model?: string | null
+    windows?: boolean
+    encoder_tasks?: string[]
   }
   /** Decisions: typed questions about a recording or a text (`POST /v1/audio/decisions`). */
   decision?: { endpoint?: string; default_model?: string | null; types?: string[]; models?: string[] }
@@ -978,6 +987,50 @@ export type DecisionQuestion =
   | { type: 'yes_no'; question: string }
   | { type: 'choice'; question: string; options: string[] | Record<string, string | null> }
   | { type: 'score'; question: string; levels: string[] }
+
+/** One label's score (`POST /v1/audio/classify`); `similarity` (the cosine) for zero-shot only. */
+export interface ClassScore {
+  label: string
+  score: number
+  similarity?: number
+}
+
+/** `POST /v1/audio/classify`: the best label, every label's score, and window by window with `window`. */
+export interface AudioClassification {
+  object: 'audio.classification'
+  model: string
+  classifier: string | null
+  duration: number
+  label: string | null
+  score: number
+  prompt?: string
+  scores: ClassScore[]
+  segments?: { start: number; end: number; label: string | null; score: number; scores: ClassScore[] }[]
+}
+
+/** A classifier trained from examples (`/v1/audio/classifiers`). */
+export interface AudioClassifier {
+  object: 'audio.classifier'
+  id: string
+  labels: string[]
+  encoder: string
+  encoder_task: string
+  head: 'logistic' | 'mlp'
+  dim: number
+  examples: Record<string, number>
+  cross_validation: {
+    accuracy: number
+    folds: number
+    per_class: Record<string, number>
+    confusion: number[][]
+  } | null
+  train_accuracy: number
+  warnings: string[]
+  embed_s: number
+  train_s: number
+  created_at: string
+  description?: string
+}
 
 /** A typed answer (`POST /v1/audio/decisions`). */
 export type DecisionAnswer =

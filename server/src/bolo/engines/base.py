@@ -658,6 +658,31 @@ class DecisionModel(Model):
         ``probabilities`` and ``confidence``."""
 
 
+class AudioTextModel(Model):
+    """Audio and text in one embedding space (CLAP: contrastive language-audio pretraining), for zero-shot audio
+    classification against labels written in plain words (task ``audio-classify``, :mod:`bolo.classifiers`).
+
+    Both towers give L2-normalised vectors of ``dim`` numbers, so a dot product is a cosine similarity, and
+    ``logit_scale`` (the model's learned temperature) times it is the logit a softmax over labels takes. The audio
+    tower hears ``clip_s`` seconds at ``sample_rate`` at once."""
+
+    task = "audio-classify"
+    clip_s: float = 10.0
+    dim: int = 512
+    logit_scale: float = 1.0
+    #: how a label becomes a sentence for the text tower when the caller gives no prompt
+    prompt: str = "This is a sound of {}."
+
+    @abc.abstractmethod
+    def embed_audio(self, clips: list[FloatArray]) -> FloatArray:
+        """One embedding per clip (``[len(clips), dim]``); each clip mono float32 at ``sample_rate``, at most
+        ``clip_s`` long (a shorter one is repeated or padded the way the model was trained)."""
+
+    @abc.abstractmethod
+    def embed_text(self, texts: list[str]) -> FloatArray:
+        """One embedding per text (``[len(texts), dim]``)."""
+
+
 class VoiceConversionModel(Model):
     """Voice conversion: speech in, the same words out in another voice (bolo.voice_conversion).
 

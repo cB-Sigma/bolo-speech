@@ -52,6 +52,7 @@ TASK_TITLES = {
     "audio-llm": "Audio-in language models (Realtime audio-llm pipeline)",
     "speaker-embedding": "Speaker embedding",
     "audio-tagging": "Audio tagging and sound events",
+    "audio-classify": "Zero-shot audio classification (CLAP)",
     "emotion": "Speech emotion",
     "decision": "Decisions (typed questions about a recording or a text)",
     "voice-conversion": "Voice conversion",

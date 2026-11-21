@@ -133,6 +133,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | **Language identification and routing** | `POST /v1/audio/language` says which language a recording is in, with probabilities, from a choice of identifiers (VoxLingua107 ECAPA, Whisper's own detector, AmberNet, MMS-LID), each with its licence; a transcription with `model=auto` is sent to the best installed recogniser for the language it hears, and the response header says what was decided. Never overrides a model or language you name | [api.md](docs/api.md#language-identification-and-routing), [models.md](docs/models.md#language-identification-1) |
 | **Speaker verification and identification** | enrol people from a few recordings, then check whether a recording is a given person or which of them it is, with any of seven speaker embedders, each with a threshold measured on real speech | [api.md](docs/api.md#enrolled-speakers-verify-and-identify) |
 | **Sound events and speech emotion** | `POST /v1/audio/tags` names the sounds in a recording (AudioSet's 527: speech, music and its instruments, laughter, alarms, animals, vehicles...) with CED and Zipformer taggers, over the whole recording or window by window; `POST /v1/audio/emotion` says how the speaker sounds (emotion2vec+, licence labelled); SenseVoice's own emotion and sound tags come back with its transcriptions; an audio language model answers questions about a recording, or captions it, through `/v1/chat/completions`. Background-noise removal on its own: `POST /v1/audio/denoise` | [api.md](docs/api.md#sound-events-and-audio-tags-post-v1audiotags), [models.md](docs/models.md#audio-tagging-and-sound-events) |
+| **Classify audio your way** | `POST /v1/audio/classify` scores a clip against labels you write in plain words ("hold music", "an angry voice", "a dog barking") with CLAP models (LAION, Microsoft) on ONNX Runtime, whole or window by window; or train a classifier from a few dozen clips per class (`POST /v1/audio/classifiers`, `bolo classifier train`), kept as a local model with its cross-validated accuracy | [api.md](docs/api.md#classify-against-your-own-labels-post-v1audioclassify) |
 | **Indian languages** | recognition and voices for the major Indian languages, Bhojpuri, Magahi and Chhattisgarhi among them, 8 kHz G.711 in and out | [indic-telephony.md](docs/indic-telephony.md) |
 | **A web console** | playgrounds, the catalog, latency dashboards, benchmarks, conversations, calls, served by the same process | [below](#the-console) |
 | **Engine plugins** | models that need another runtime run out of process behind the same API: [bolo-torch](plugins/bolo-torch/README.md) for PyTorch models | [plugins.md](docs/plugins.md) |
@@ -149,6 +150,8 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | --- | --- | --- | --- | --- | --- |
 | ALIGN | Omnilingual ASR | 1 | ar, as, bn, de, en, es, fr, gu +23 | 1 | 0.888 (`omnilingual-ctc-300m-align`) |
 | ALIGN | MMS | 1 | - | 1 | 1.137 (`mms-300m-forced-aligner`) |
+| AUDIO-CLASSIFY | LAION CLAP | 3 | en | 3 | 0.262 (`clap-htsat-unfused`) |
+| AUDIO-CLASSIFY | MS-CLAP | 1 | en | 1 | 0.295 (`msclap-2023`) |
 | AUDIO-LLM | LFM2.5-Audio 1.5B | 1 | en | 0 | - |
 | AUDIO-LLM | Ultravox 0.5 | 1 | ar, de, en, es, fr, hi, it, ja +7 | 0 | - |
 | AUDIO-LLM | Qwen2.5-Omni 3B | 1 | en, zh | 0 | - |
@@ -295,7 +298,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | WATERMARK | Perth | 1 | - | 1 | 0.033 (`perth-onnx`) |
 | WATERMARK | WavMark | 1 | - | 1 | 2.300 (`wavmark-onnx`) |
 
-**552 models in the catalog, 249 validated on CPU, 303 untested**, plus 34 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**556 models in the catalog, 253 validated on CPU, 303 untested**, plus 34 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

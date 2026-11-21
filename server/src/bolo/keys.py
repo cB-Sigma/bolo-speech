@@ -601,6 +601,7 @@ _STT = (
     "/api/v1/stt/stream", "/api/v1/wake", "/v1/audio/diarize", "/v1/audio/denoise", "/v1/audio-isolation",
     "/v1/audio/tags", "/v1/audio/emotion", "/v1/audio/speakers/verify", "/v1/audio/speakers/identify",
     "/v1/pipelines/",
+    "/v1/audio/classify",
 )  # fmt: skip
 _TTS = ("/v1/audio/speech", "/api/v1/tts/stream")
 _REALTIME = ("/v1/realtime", "/v1/chat/completions", "/api/v1/telephony", "/api/v1/agents")

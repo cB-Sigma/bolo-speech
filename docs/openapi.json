@@ -3081,6 +3081,144 @@
     }
    }
   },
+  "/v1/audio/classify": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Classify audio against your own labels (zero-shot) or a trained classifier",
+    "description": "Extension. Score a recording against classes the caller names. Multipart form: ``file``; then either\n``labels`` (the classes in plain words: a JSON array, one per line, comma-separated, or the field repeated;\n\"angry voice\", \"hold music\", \"a dog barking\") with ``model`` (an ``audio-classify`` CLAP model; default\n``default_audio_classify``) and ``prompt`` (the sentence each label is put into, ``{}`` marking where; default\nthe model's, \"This is a sound of {}.\"; an empty prompt uses the labels as they are), or ``classifier`` (a\nclassifier trained with ``POST /v1/audio/classifiers``; its id also works as ``model``). Also ``top_k`` (scores\nlisted, default all), ``window`` and ``hop`` (seconds: classify window by window too) and ``keep_alive``.\nZero-shot scores are a softmax over the labels (they sum to 1) with ``similarity``, the cosine between the\naudio and the label's sentence; a trained classifier gives its head's probabilities.",
+    "operationId": "audio_classify_v1_audio_classify_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio/classifiers": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "List trained classifiers",
+    "description": "Extension. The classifiers trained with ``POST /v1/audio/classifiers``: classes, encoder, examples per class,\ncross-validated accuracy and warnings.",
+    "operationId": "list_classifiers_v1_audio_classifiers_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Train a classifier from labelled examples",
+    "description": "Extension. Train an audio classifier from examples and save it as a local model. Multipart form: ``name``\n(its id), ``file`` fields (the example clips) each followed by its ``label`` field (the class; the labels pair\nwith the files in order), ``encoder`` (the model whose embeddings it learns from: an ``audio-classify`` CLAP\nmodel, a ``speaker-embedding`` model or an ``audio-tagging`` model; default ``default_audio_classify``),\n``head`` (``logistic``, the default, or ``mlp``), ``replace`` (true: overwrite a classifier with that name) and\n``description``. Returns the classifier with its cross-validated accuracy and warnings (fewer than 10 examples\nin a class, unbalanced classes, low accuracy). A few dozen clips per class train in seconds on a CPU.",
+    "operationId": "train_classifier_v1_audio_classifiers_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio/classifiers/{classifier_id}": {
+   "get": {
+    "tags": [
+     "native"
+    ],
+    "summary": "One trained classifier",
+    "description": "Extension. One trained classifier (as in the list).",
+    "operationId": "get_classifier_v1_audio_classifiers__classifier_id__get",
+    "parameters": [
+     {
+      "name": "classifier_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Classifier Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Delete a trained classifier",
+    "description": "Extension. Delete a trained classifier (its files and its catalog entry).",
+    "operationId": "delete_classifier_v1_audio_classifiers__classifier_id__delete",
+    "parameters": [
+     {
+      "name": "classifier_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Classifier Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/v1/audio/dialogue": {
    "post": {
     "tags": [
