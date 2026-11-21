@@ -773,6 +773,9 @@ def test_a_full_duplex_model_that_does_not_fit_the_gpu_wont_fit() -> None:
     big = machine(gpus=[nvidia(24)], device="auto")
     fit = rec.assess(q8, big, rec.heuristic_speed(big))
     assert fit.level != "unlikely" and not fit.gpu_too_small and fit.device == "gpu"
+    # a cloud full-duplex model runs at its provider: no GPU assessment
+    nova = catalog.resolve("amazon-nova-2.5-sonic")
+    assert nova is not None and "full-duplex" in nova.features and not rec.is_full_duplex(nova)
     # every full-duplex entry says it needs a GPU and how much memory
     for entry in catalog.all():
         if rec.is_full_duplex(entry):

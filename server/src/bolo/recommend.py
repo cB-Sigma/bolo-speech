@@ -549,8 +549,9 @@ def _assess_metal(
 
 def is_full_duplex(spec: ModelSpec) -> bool:
     """A full-duplex model (Moshi, Hibiki, PersonaPlex, FLM-Audio, Freeze-Omni, MiniCPM-o's duplex mode): it hears
-    and speaks at once in 80 ms frames, and cannot be split across the GPU and the CPU."""
-    return spec.engine == "duplex" or "full-duplex" in spec.features
+    and speaks at once in 80 ms frames, and cannot be split across the GPU and the CPU. A cloud model (Amazon Nova
+    Sonic) runs at its provider: nothing of it is placed on this machine."""
+    return not spec.cloud and (spec.engine == "duplex" or "full-duplex" in spec.features)
 
 
 def full_duplex_too_big(spec: ModelSpec, need: int, total: int | None, name: str) -> str:
