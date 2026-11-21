@@ -101,6 +101,14 @@ minicpm-o = [
 # Salesforce SOV-Transcribe-1 (speech to text): the model is Hugging Face remote code (opt in per model) written for
 # transformers 5.19 to 5.22, as on the model card; accelerate to split it between the GPU and the CPU.
 sov-transcribe = ["transformers>=5.19,<5.23", "accelerate>=1.0"]
+# speech-to-text through a transformers automatic-speech-recognition pipeline (kind hf-asr-pipeline)
+hf-asr = ["transformers>=4.46", "accelerate>=0.33"]
+# Jais-ASR (IFM, Apache-2.0): its remote code is written for transformers 5.16.1 (model card); soundfile and soxr are
+# what its pipeline and processor import
+jais-asr = ["transformers==5.16.1", "accelerate>=1.0", "soundfile>=0.12.1", "soxr>=0.5"]
+# Rev's Reverb ASR from its TorchScript export: torchaudio's Kaldi filterbanks and PyYAML (Rev's own rev-reverb package
+# pins torch 2.2.2 and is not needed)
+reverb = ["torchaudio>=2.4", "pyyaml>=6.0"]
 # Voxlect's language identifiers for India (Whisper small or MMS-LID-256 encoders with LoRA; rebuilt from
 # transformers' encoder classes, without the Voxlect code)
 voxlect = ["transformers>=4.46", "safetensors>=0.4"]

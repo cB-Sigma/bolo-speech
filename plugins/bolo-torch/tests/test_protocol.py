@@ -140,7 +140,9 @@ def test_catalog_entries_use_kinds_the_plugin_knows() -> None:
     seps = {s.id for s in entries if s.task == "separation"}
     assert {"sepformer-whamr16k", "sepformer-whamr", "pixit-ami"} <= seps
     diarizers = {s.id: s for s in entries if s.task == "diarization" and s.kind == "pyannote-diarization"}
-    assert set(diarizers) == {"pyannote-speaker-diarization-3.1", "pyannote-speaker-diarization-community-1"}
+    assert set(diarizers) == {
+        "pyannote-speaker-diarization-3.1", "pyannote-speaker-diarization-community-1", "reverb-diarization-v2-torch",
+    }  # fmt: skip
     diarizen = next(s for s in entries if s.kind == "diarizen")
     # the authors' code at the commit the loader accepts, and nothing that is not runnable
     assert diarizen.runnable and diarizen.source.revision and len(diarizen.source.revision) == 40
@@ -154,6 +156,9 @@ def test_catalog_entries_use_kinds_the_plugin_knows() -> None:
     for spec in [*diarizers.values(), *(s for s in entries if s.id == "pixit-ami")]:
         # pinned pipeline and sub-models, with the hashes the plugin checks again before pyannote reads anything
         assert spec.gated and len(spec.source.revision or "") == 40, spec.id
-        assert all(len(h) == 64 for h in spec.options["sha256"].values()) and "config.yaml" in spec.options["sha256"]
+        assert all(len(h) == 64 for h in spec.options["sha256"].values())
+        # the pipeline file is pinned too; an entry not yet run whose gated repository could not be read yet
+        # (reverb-diarization-v2-torch) still has its config parsed with safe_load and checked class by class
+        assert "config.yaml" in spec.options["sha256"] or spec.options.get("not_yet_run") is True, spec.id
         for url in spec.source.urls:
             assert "/resolve/main/" not in url["url"] and url["sha256"] == spec.options["sha256"][url["path"]]

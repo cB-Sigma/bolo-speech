@@ -8,6 +8,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Jais-ASR, Reverb ASR and Reverb diarization v2 through the torch plugin, added, not yet run.** IFM's Jais-ASR
+  (`jais-asr`, Apache-2.0, Arabic with its dialects plus English, French, Spanish and Italian, 11.4 GB) on a new
+  generic transformers pipeline loader, its remote code pinned and run only after the per-model opt-in. Rev's
+  Reverb ASR (`reverb-asr`, English) from its TorchScript export, and Rev's Reverb diarization v2
+  (`reverb-diarization-v2-torch`, Rev's pyannote pipeline): both under the Rev Model Non-Production License (not for
+  commercial use, labelled so) and gated (accept Rev's conditions and set `hf_token`). Their loaders are tested with
+  fakes; the models are marked not yet run.
 - **Canary-Qwen 2.5B without NeMo or PyTorch** (`canary-qwen-2.5b-onnx`): NVIDIA's English recogniser (a
   FastConformer encoder feeding Qwen3-1.7B, CC-BY-4.0), run by bolo in ONNX Runtime from OpenVoiceOS's int8 export
   (2.9 GB): the prompt around the audio embeddings, a key/value cache and greedy decoding, written for it (kind

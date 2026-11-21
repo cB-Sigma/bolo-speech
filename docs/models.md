@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-532 models: 233 validated on CPU by the maintainers, 299 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+535 models: 233 validated on CPU by the maintainers, 302 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -247,6 +247,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `indicconformer-te` | te | balanced | pseudo | 138 MB | MIT | **CPU** · RTF 0.262 · WER 21.7% · CER 10.5% |
 | `indicconformer-ml` | ml | balanced | pseudo | 138 MB | MIT | **CPU** · RTF 0.174 · WER 34.3% · CER 9.8% |
 
+#### Reverb
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `reverb-asr` | en | accuracy | pseudo | 1.2 GB | Rev Model Non-Production License (non-commercial) ⚠ · needs plugin torch · gated | untested |
+
 #### DiCoW
 
 | id | languages | tier | streaming | download | licence | validated |
@@ -260,6 +266,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `sov-transcribe-1` | en, fr, de, es, it, pt +1 | accuracy | pseudo | 53.3 GB | Apache-2.0 · needs plugin torch | untested |
+
+#### Jais-ASR
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `jais-asr` | ar, en, fr, es, it | accuracy | pseudo | 11.5 GB | Apache-2.0 · needs plugin torch | untested |
 
 #### Whistle
 
@@ -820,6 +832,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `pyannote-speaker-diarization-3.1` | - | balanced | - | 33 MB | MIT (pipeline, segmentation-3.0) + CC-BY-4.0 (WeSpeaker e… · needs plugin torch · gated | **CPU** · RTF 0.906 · DER 6.0% on a two-voice test clip |
 | `pyannote-speaker-diarization-community-1` | - | balanced | - | 33 MB | CC-BY-4.0 · needs plugin torch · gated | **CPU** · RTF 0.876 · DER 6.0% on a two-voice test clip |
+| `reverb-diarization-v2-torch` | - | accuracy | - | 450 MB | Rev Model Non-Production License (segmentation, non-comme… ⚠ · needs plugin torch · gated | untested |
 
 #### DiariZen
 
