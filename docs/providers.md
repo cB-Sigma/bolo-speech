@@ -10,7 +10,8 @@ unless a request names a cloud model, a cloud model is set as a default, or a mo
 list names one.
 
 What is on this page was read from each provider's documentation on **2026-11-14** (Soniox's on
-**2026-11-17**, AssemblyAI's on **2026-11-21**). Nothing was run against a real account: there
+**2026-11-17**; AssemblyAI's, xAI's, Rime's, Microsoft's for MAI, and ElevenLabs' for Scribe v3 and
+Scribe v3 Live on **2026-11-21**). Nothing was run against a real account: there
 were no keys where bolo is developed, and the test-suite uses stand-ins written from the same
 documentation (`server/tests/fake_providers.py`, `server/tests/fake_cloud_apis.py`). The opt-in real tests are
 described at the end. Where the documentation left something open, it says so under
@@ -41,11 +42,15 @@ A provider has a name, a `kind`, a base URL, an API key, options and an optional
 | `deepgram` | Deepgram (Nova) | `https://api.deepgram.com` | `Authorization: Token <key>` |
 | `soniox` | Soniox (speech-to-text: async API and live WebSocket) | `https://api.soniox.com` (the live socket: `wss://stt-rt.soniox.com`) | `Authorization: Bearer <key>` |
 | `assemblyai` | AssemblyAI (speech-to-text: pre-recorded API and Streaming API v3, both with speaker labels) | `https://api.assemblyai.com` (the live socket: `wss://streaming.assemblyai.com/v3/ws`) | `Authorization: <key>` (no prefix) |
+| `azure-mai` | Microsoft's MAI models in Azure: MAI-Transcribe-2-Streaming (the realtime socket of a Foundry resource) and MAI-Voice-2.1 (Azure Speech's text-to-speech route) | none: set it to your resource, `https://<resource>.services.ai.azure.com`; the voices need the option `region` (or `tts_url`) | `api-key: <key>` (socket), `Ocp-Apim-Subscription-Key: <key>` (voices) |
+| `xai` | xAI (speech-to-speech only: the Voice Agent API, `s2s_model`) | `https://api.x.ai/v1` (`wss://api.x.ai/v1/realtime`) | `Authorization: Bearer <key>` |
+| `rime` | Rime (speech-to-speech only: Prism, `s2s_model`) | `https://prism.api.rime.ai/v1` (`wss://prism.api.rime.ai/v1/realtime`) | `Authorization: Bearer <key>` |
 
 In the configuration file, one table per provider:
 
 ```toml
-[providers.openai]                 # the names openai, sarvam, elevenlabs, deepgram, soniox and assemblyai imply their kind
+[providers.openai]                 # the names openai, sarvam, elevenlabs, deepgram, soniox, assemblyai,
+                                   # azure-mai, xai and rime imply their kind
 api_key = "…"
 
 [providers.sarvam]
@@ -63,6 +68,11 @@ base_url = "http://10.0.0.5:8000/v1"
 
 [providers.office-bolo.options]
 timeout_s = 20
+
+[providers.azure-mai]              # Microsoft's MAI models: an Azure resource of your own
+api_key = "…"
+base_url = "https://my-resource.services.ai.azure.com"   # BOLO_PROVIDER_AZURE_MAI_BASE_URL
+options = { region = "eastus", deployments = { "MAI-Transcribe-2-Streaming" = "my-transcribe" } }
 ```
 
 In the environment:
@@ -124,16 +134,22 @@ soon as its provider is configured**, and `GET /v1/models` lists it from then on
 | `sarvam-saaras-v4-streaming` | `saaras:v4` | STT | Sarvam's streaming socket (one transcript per utterance) |
 | `sarvam-bulbul-v4-flash`, `sarvam-bulbul-v3`, `sarvam-bulbul-v2` | `bulbul:…` | TTS | 11 languages; 222, 37 and 7 voices |
 | `elevenlabs-flash-v2.5`, `elevenlabs-multilingual-v2`, `elevenlabs-v3` | `eleven_…` | TTS | the voices of your account, by id or name; the catalog entry lists them once the model has been loaded |
-| `elevenlabs-scribe-v3`, `elevenlabs-scribe-v2` | `scribe_…` | STT | word timestamps, hotwords (billed at a surcharge by ElevenLabs) |
+| `elevenlabs-scribe-v3` | `scribe_v3` | STT | recorded audio (released 2026-11-10): word timestamps, speaker labels from ElevenLabs (`diarize=true`, up to 32 speakers), hotwords (billed at a surcharge by ElevenLabs); the 101 languages ElevenLabs' documentation names (it measured 102 on FLEURS) |
+| `elevenlabs-scribe-v3-live` | `scribe_v3_live` | STT | live (ElevenLabs' realtime socket, released 2026-11-10): interim text, turn prediction, speaker labels on the socket; recorded audio and Realtime turns go to `scribe_v3` |
+| `elevenlabs-scribe-v2` | `scribe_v2` | STT | word timestamps, speaker labels, hotwords |
 | `elevenlabs-voice-isolator` | `audio-isolation` | denoise | Voice Isolator (`POST /v1/audio-isolation`, 16 kHz PCM up): `denoise=elevenlabs-voice-isolator` on a transcription sends the recording there first and transcribes the isolated voice. One request per recording, so not for live streams. Billed per minute of audio |
 | `deepgram-nova-3`, `deepgram-nova-2` | `nova-…` | STT | batch and live (Deepgram's streaming socket, with interim text) |
 | `soniox-stt-async-v6` | `stt-async-v6` | STT | recorded audio (Soniox's async API): word timestamps, speaker labels, language identification, translation to English |
 | `soniox-stt-rt-v6` | `stt-rt-v6` | STT | live (Soniox's WebSocket, with interim text); recorded audio and Realtime turns go to `stt-async-v6` |
 | `assemblyai-stt-3.7` | `assemblyai-stt-3-7` | STT | recorded audio (AssemblyAI's pre-recorded API, released 2026-11-17): 32 languages, word timestamps, speaker labels, language detection, keyterms and prompt |
+| `mai-transcribe-2-streaming` | `MAI-Transcribe-2-Streaming` (your deployment) | STT | live (the realtime socket of your Foundry resource; public preview): 60 languages detected as they change, interim text, a final at each pause (bolo commits; MAI detects no speech itself). Recorded audio and Realtime turns go over the same socket with one commit. Text only |
+| `mai-voice-2.1`, `mai-voice-2.1-flash` | `MAI-Voice-2.1`, `MAI-Voice-2.1-Flash` | TTS | 97 voices in 23 languages through Azure Speech (public preview); `en-US-Harper` unless the request names one |
+| `xai-grok-voice-3.0` | `grok-voice-3.0` | speech-to-speech | `s2s_model` (see [Cloud speech-to-speech](#cloud-speech-to-speech-openai-realtime)) |
+| `rime-prism` | `prism` | speech-to-speech | `s2s_model` (see [Cloud speech-to-speech](#cloud-speech-to-speech-openai-realtime)) |
 | `assemblyai-stt-3.7-realtime`, `assemblyai-stt-3.7-realtime-agent` | `assemblyai-stt-3-7-realtime`, `…-realtime-agent` | STT | live (AssemblyAI's Streaming API v3, with interim text and AssemblyAI's turn detection) with speaker labels on the socket; the `-agent` model is the one tuned for voice agents. Recorded audio and Realtime turns go to `assemblyai-stt-3-7` |
 
 An entry looks for a provider with the name in its `options.provider` (`openai`, `sarvam`,
-`elevenlabs`, `deepgram`, `soniox`, `assemblyai`). If you called the account something else, the first configured
+`elevenlabs`, `deepgram`, `soniox`, `assemblyai`, `azure-mai`, `xai`, `rime`). If you called the account something else, the first configured
 provider of the same kind at the vendor's own address is used.
 
 ### Any other model: `provider:model`
@@ -176,7 +192,8 @@ Catalog `options` of an `engine: remote` entry (and of `options.models.<model>` 
 | `request` | extra fields merged into every request to the provider |
 | `openai-compatible`: `response_format`, `word_timestamps`, `translate`, `stream`, `prompt`, `hotwords_field`, `instructions`, `speed`, `send_language`, `pcm_sample_rate` | see `bolo/remote/openai_compat.py` |
 | `sarvam`: `mode`, `keyterms`, `with_timestamps`, `legacy_translate`, `live`, `language_field`, `enable_preprocessing`, `max_chars` | see `bolo/remote/sarvam.py` |
-| `elevenlabs`: `send_language`, `apply_text_normalization`, `provider_sample_rate` | see `bolo/remote/elevenlabs.py` |
+| `elevenlabs`: `send_language`, `apply_text_normalization`, `provider_sample_rate`, `async_model`, `speaker_labels`, `num_speakers`, `live`, `live_speaker_labels`, `commit_strategy`, `realtime_url`, `live_request` | see `bolo/remote/elevenlabs.py` |
+| `azure-mai`: `deployment` (or the provider option `deployments`), `region`, `tts_url`, `output_format`, `realtime_url`, `commit_silence_s` (0.5), `max_segment_s` (30), `live` | see `bolo/remote/azure_mai.py` and [Microsoft MAI](#microsoft-mai) below (these also work as provider options) |
 | `deepgram`: `language`, `detect_language`, `smart_format`, `hotwords_field`, `live`, `endpointing_ms` | see `bolo/remote/deepgram.py` |
 | `assemblyai`: `async_model`, `live_model`, `live`, `speaker_labels`, `speakers_expected`, `live_speaker_labels`, `max_speakers`, `language_codes`, `min_turn_silence`, `max_turn_silence`, `mode`, `poll_interval_s`, `poll_timeout_s`, `keep_files`, `realtime_url`, `live_request` | see `bolo/remote/assemblyai.py` and [AssemblyAI](#assemblyai) below (these also work as provider options) |
 | `soniox`: `async_model`, `live_model`, `live`, `language_hints`, `language_hints_strict`, `language_identification`, `speaker_diarization`, `provider_diarization`, `context`, `translate`, `translate_to`, `poll_interval_s`, `poll_timeout_s`, `keep_files`, `realtime_url`, `endpoint_delay_ms`, `live_request` | see `bolo/remote/soniox.py` and [Soniox](#soniox) below (these also work as provider options) |
@@ -195,10 +212,11 @@ ones local models use:
   bolo's VAD and sent in pieces (several at a time), with segment times of the whole recording.
 - **Diarization.** `diarize=true` / `diarized_json` cut the recording at bolo's speaker turns and
   send each turn to the provider, so any cloud recogniser gets speaker labels, known speakers and
-  overlap marks. Soniox and AssemblyAI label speakers themselves: for their models the request is
-  passed on (`enable_speaker_diarization`, `speaker_labels`) and the provider's labels are used (see
-  [Soniox](#soniox), [AssemblyAI](#assemblyai)). On the STT WebSocket, AssemblyAI's realtime entries
-  label speakers on their live socket too (`diarize=true`).
+  overlap marks. Soniox, AssemblyAI and ElevenLabs label speakers themselves: for their models the
+  request is passed on (`enable_speaker_diarization`, `speaker_labels`, `diarize`) and the provider's
+  labels are used (see [Soniox](#soniox), [AssemblyAI](#assemblyai), [ElevenLabs Scribe](#elevenlabs-scribe)).
+  On the STT WebSocket, AssemblyAI's realtime entries and `elevenlabs-scribe-v3-live` label speakers
+  on their live socket too (`diarize=true`).
 - **Word lists and text normalisation.** Text for a cloud voice is prepared like text for any
   voice that reads text: SSML subset, pronunciation word lists (as spoken forms or respellings),
   and uccharan's normalisation of numbers, dates, money and so on (bolo's light normaliser without
@@ -213,8 +231,9 @@ ones local models use:
   conversation sessions (`STT → language model → TTS`) take cloud models: set
   `default_realtime_stt` / `default_realtime_tts`, or name the model in the session
   (`audio.input.transcription.model`). bolo keeps turn detection, barge-in and the codecs.
-  Deepgram, Soniox (`soniox-stt-rt-v6`), AssemblyAI's realtime entries and Sarvam's streaming
-  entry use the provider's live socket on the STT WebSocket, with interim text. Other cloud recognisers get one request per utterance, when bolo's VAD hears
+  Deepgram, Soniox (`soniox-stt-rt-v6`), AssemblyAI's realtime entries, `elevenlabs-scribe-v3-live`,
+  `mai-transcribe-2-streaming` and Sarvam's streaming entry use the provider's live socket on the STT
+  WebSocket, with interim text. Other cloud recognisers get one request per utterance, when bolo's VAD hears
   it end: bolo's usual interim text (repeated decodes of the growing utterance) is switched off
   for cloud models, because every decode would be billed. The model option `interim_decodes`
   switches it back on. Realtime sessions use the batch route too: one request per turn (plus the
@@ -325,6 +344,54 @@ transcript that ends in `error` answers 502 with AssemblyAI's message.
   another address (AssemblyAI's EU socket is `wss://streaming.eu.assemblyai.com/v3/ws`).
 - **Realtime sessions** use the pre-recorded route, one transcript per turn, as for Soniox.
 
+### ElevenLabs Scribe
+
+`elevenlabs-scribe-v3` sends recorded audio to `POST /v1/speech-to-text` (`model_id: scribe_v3`).
+With `diarize=true` or `diarized_json`, ElevenLabs is asked to label speakers (`diarize`; the model
+option `num_speakers` caps them, up to 32) and its `speaker_0`, `speaker_1`, … become `A`, `B`, … on
+segments (one per run of the same speaker) and words; the trace says `diarization_model: provider`.
+
+`elevenlabs-scribe-v3-live` opens `wss://api.elevenlabs.io/v1/speech-to-text/realtime` with the key in
+the `xi-api-key` header and `model_id=scribe_v3_live`, `audio_format=pcm_16000`,
+`commit_strategy=turn_prediction` (ElevenLabs commits a segment when the model predicts the speaker has
+finished; `vad` and `manual` through the model option `commit_strategy`), `include_timestamps=true`,
+the session's language and, with `diarize=true`, `diarize=true`. Audio goes as JSON
+`input_audio_chunk` messages; the end of input sends one with `commit: true`. `partial_transcript`
+is the interim text and `committed_transcript_with_timestamps` the final with its words. With speaker
+labels the final waits for the segment's `diarized_transcript` (ElevenLabs sends it after the committed
+text, with the final speakers; `speakers_merged` is applied), and is handed on without a speaker if the
+next segment is committed first.
+
+### Microsoft MAI
+
+Microsoft's MAI models run in your own Azure resource, so the provider needs its address as
+`base_url` (`https://<resource>.services.ai.azure.com`; until then the provider counts as not
+configured and a request answers 503 naming `BOLO_PROVIDER_AZURE_MAI_BASE_URL`), the key, and for the
+voices the region of the Speech resource (option `region`, or the whole address as `tts_url`).
+Both are public previews (Microsoft's preview terms are the licence link).
+
+- **MAI-Transcribe-2-Streaming** (released 2026-10-01) is reached at
+  `wss://<resource>.services.ai.azure.com/mai/v1/realtime?intent=transcription` with an `api-key`
+  header. bolo configures the session before any audio (`session.type: transcription`, 16 kHz PCM,
+  `transcription.model`: the deployment, which is the model's name unless the provider option
+  `deployments` maps it; `transcription.language`: the session's language or `null` to detect it;
+  `turn_detection` and `noise_reduction` `null`, the only values MAI takes), then sends
+  `input_audio_buffer.append` messages. `delta` (finalised text) and `intermediate` (the provisional
+  rest) make the interim text. MAI detects no speech itself and finalises only on
+  `input_audio_buffer.commit`, so bolo commits when it hears a pause of `commit_silence_s` (0.5 s) after
+  speech, at the latest every `max_segment_s` (30 s), and at the end of input; each `completed` is a
+  final. Recorded audio goes over the same socket: the whole recording, one commit, the `completed`
+  transcript. `prompt`, `hotwords` and `temperature` answer 400 (MAI has no equivalent). A session lasts
+  at most an hour.
+- **MAI-Voice-2.1** and **MAI-Voice-2.1-Flash** use Azure Speech's text-to-speech route
+  (`POST https://<region>.tts.speech.microsoft.com/cognitiveservices/v1`, `Ocp-Apim-Subscription-Key`):
+  bolo sends SSML naming the voice with the model as suffix (`es-MX-Valeria:MAI-Voice-2.1-Flash`,
+  `xml:lang` from the voice), asks for Microsoft's example format `audio-24khz-160kbitrate-mono-mp3`
+  (option `output_format`, for example `raw-24khz-16bit-mono-pcm`) and decodes the answer. The catalog
+  lists the 97 managed voices; `speed` other than 1 answers 400.
+- **MAI Realtime 1** (Microsoft's speech-to-speech model, announced 2026-11-17) is in limited-access
+  preview and has no public API reference yet, so it has no catalog entry.
+
 ## Errors
 
 | The provider answered | bolo answers | `code` |
@@ -428,6 +495,26 @@ bolo's backend interface, from the API reference as typed in openai-python 3.51.
 | voice | the model's own | `audio.output.voice` (OpenAI's voice names are passed on) |
 | tools, `response.cancel`, `response.done` usage | same events | same events |
 
+Two more Realtime services have catalog entries, named directly in `s2s_model` (their providers
+are configured like any other: `BOLO_PROVIDER_XAI_API_KEY`, `BOLO_PROVIDER_RIME_API_KEY`):
+
+```toml
+realtime_pipeline = "speech-to-speech"
+s2s_model = "xai-grok-voice-3.0"           # or "rime-prism"
+```
+
+| | xAI Grok Voice 3.0 (`xai-grok-voice-3.0`) | Rime Prism (`rime-prism`) |
+| --- | --- | --- |
+| address | `wss://api.x.ai/v1/realtime?model=grok-voice-3.0`, `Authorization: Bearer` | `wss://prism.api.rime.ai/v1/realtime` (no query), `Authorization: Bearer` |
+| session | `voice`, `instructions`, `turn_detection: {"type": null}` (bolo commits turns), `audio.input` / `audio.output` `format` (16 kHz up, 24 kHz back), `tools` nested under `function` | only `voice`, `instructions`, `tools` (flat) and `turn_detection: null`: Prism refuses a session with any field it does not know. 16 kHz up, 24 kHz back (fixed) |
+| a response | `response.create` with `modalities`; audio with its transcript (`response.output_audio_transcript.delta`), or text (`response.output_text.delta`) | always text (`response.text.delta`) and audio (`response.audio.delta`); bolo leaves the audio out of a text-only response |
+| typed turns, tool results | `conversation.item.create` | a typed turn is `response.create` with `prism_input_text`; after tool results bolo waits for Prism's `conversation.item.created` and asks for a `tool_continuation` naming the reply that made the calls |
+| voices | `eve` (the entry's default when a client sends an OpenAI voice name), `ara`, … and custom voice ids | `astra` (Prism's default), `aurora`, `brando` and the other Coda voices; English only |
+| not passed on | `tool_choice`, `max_output_tokens` (xAI's `response.create` has neither) | `tool_choice` (Prism takes only `auto`), `max_output_tokens` |
+
+Microsoft's MAI Realtime 1 is not offered: it is in limited-access preview without a public API
+reference.
+
 Not done: Gemini Live (a different protocol: `BidiGenerateContent` over WebSocket with its own
 setup, audio and tool messages; it would be a third backend class), cost estimates for
 token-priced Realtime usage (the provider's `usage` is passed to the client in `response.done`),
@@ -456,7 +543,7 @@ and OpenAI's Realtime *transcription* sessions as a live socket for the STT WebS
 | `GET /api/v1/providers/{name}` | one provider |
 | `PUT /api/v1/providers/{name}` `{kind?, base_url?, api_key?, clear_api_key?, options?, prices?}` | adds or changes a stored provider. `api_key` is write-only: absent or empty keeps the stored key, `clear_api_key: true` removes it. Loaded models of the provider are unloaded so the change takes effect. `400` for a provider that comes from the configuration, an unknown kind or field, or when editing is not allowed |
 | `DELETE /api/v1/providers/{name}` | `204`; `400` for a provider from the configuration |
-| `POST /api/v1/providers/{name}/test` | one cheap request with the stored key: `{name, ok, message, code, checked: "credentials"\|"reachability", latency_ms}`. `credentials`: the key was accepted (OpenAI-compatible: `GET /models`; ElevenLabs: `GET /v2/voices`; Deepgram: `GET /v1/projects`; Soniox: `GET /v1/models`). `reachability`: the address answered and did not refuse the key, but nothing proves the key (Sarvam documents no free read-only request; a refused key is still reported as a failure). AssemblyAI: `GET /v2/transcript?limit=1` (`credentials`) |
+| `POST /api/v1/providers/{name}/test` | one cheap request with the stored key: `{name, ok, message, code, checked: "credentials"\|"reachability", latency_ms}`. `credentials`: the key was accepted (OpenAI-compatible: `GET /models`; ElevenLabs: `GET /v2/voices`; Deepgram: `GET /v1/projects`; Soniox: `GET /v1/models`). `reachability`: the address answered and did not refuse the key, but nothing proves the key (Sarvam documents no free read-only request; a refused key is still reported as a failure). AssemblyAI: `GET /v2/transcript?limit=1`; xAI: `GET /v1/tts/voices`; Rime and Azure MAI: the WebSocket handshake, closed right after `session.created`, before any configuration or audio (all `credentials`) |
 
 Events: `provider` `{name, event: "saved"|"removed"}` on `GET /api/v1/events`.
 
@@ -471,6 +558,10 @@ Read on 2026-11-14:
 | ElevenLabs | `elevenlabs.io/docs/api-reference/` (text-to-speech/stream, speech-to-text/convert, voices/search, audio-isolation/convert), `elevenlabs.io/docs/overview/models` | routes, `xi-api-key`, `output_format` values, body fields, `scribe_v3` / `scribe_v2`, word objects, the voice listing, model ids, the 32 language codes of Flash v2.5, the voice isolator's `audio` and `file_format` fields (the reference does not name the format of its answer: bolo decodes WAV, MP3 or anything else its decoder reads) |
 | Soniox (read 2026-11-17) | `docs.soniox.com` (API reference: files, transcriptions, models, the WebSocket API, errors; guides: async transcription, models, supported languages, context, manual finalization, endpoint detection, connection keepalive, WebSocket authentication) | the three-step async flow and its routes, `Authorization: Bearer` for REST and the live socket, `stt-async-v6` / `stt-rt-v6` (v5 deprecated for 2026-12-15), the 60 language codes, request fields, token fields (`start_ms`, `end_ms`, `speaker`, `language`, `translation_status`), the start message, `finalize` / `keepalive` / empty-frame messages, `<end>` and `<fin>`, error codes and bodies |
 | AssemblyAI (read 2026-11-21) | `assemblyai.com/docs` (pre-recorded: files/upload, transcripts/submit, get, list and delete, select-the-speech-model, the assemblyai-stt-3-7 migration guide, label-speakers, supported-languages; streaming: select-the-speech-model, message-sequence, turn-detection, label-speakers-and-separate-channels, and the AsyncAPI description `api-reference/specs/streaming.yaml`) | the three-step pre-recorded flow and its routes, `Authorization` without a prefix, `assemblyai-stt-3-7` and the two realtime models (released 2026-11-17), the 32 language codes, request fields (`speech_models`, `language_code`, `language_detection`, `speaker_labels`, `speakers_expected`, `keyterms_prompt`, `prompt`), word and utterance fields (times in ms, `speaker`), the socket's address, query parameters, binary frames of 20 ms to 1 s, `ForceEndpoint` / `Terminate`, `Begin` / `Turn` / `Termination` / `Error`, `speaker_label` per turn and `speaker` per final word |
+| ElevenLabs Scribe v3 and v3 Live (read 2026-11-21) | `elevenlabs.io/docs` (api-reference/speech-to-text/convert and v-1-speech-to-text-realtime, overview/models, overview/capabilities/speech-to-text, the server-side streaming guide) | `diarize`, `num_speakers`, `speaker_id` on words, `scribe_v3` / `scribe_v3_live`, the realtime socket's address, query parameters (`commit_strategy` with `turn_prediction`, `include_timestamps`, `diarize`), `input_audio_chunk`, the message types (`partial_transcript`, `committed_transcript_with_timestamps`, `diarized_transcript`, `speakers_merged`, the error types), the language list |
+| xAI (read 2026-11-21) | `docs.x.ai` (model-capabilities/audio/speech-to-speech, voice, text-to-speech; rest-api-reference/inference/voice; `voice-realtime.ws.json`) | `grok-voice-3.0` (`grok-voice-latest`; 2.0 deprecated, the same endpoint, session and events), the address and header, the session fields and their JSON schema (nested function tools, `turn_detection.type` null for manual turns, PCM rates), `response.create` with `modalities`, every server event name, the languages, `GET /v1/tts/voices` |
+| Rime (read 2026-11-21) | `docs.rime.ai` (api-reference/prism/websocket, prism/migrate-from-openai) | the address, Bearer on the upgrade, no query, the strict session fields, 16 kHz in and 24 kHz out, `turn_detection: null`, `response.create` and `prism_cause` (typed turns, tool continuations, acknowledgement by `conversation.item.created`), the beta event names, `response.done` statuses, voices |
+| Microsoft MAI (read 2026-11-21) | `learn.microsoft.com/azure/ai-services/speech-service/` (mai-transcribe-2-streaming, mai-transcribe-2-streaming-realtime, mai-voices) | the socket's address, `api-key`, the transcription session, `append` / `commit`, `delta` / `intermediate` / `completed`, the 60 languages; the Speech route, SSML with the model suffix, the output format of Microsoft's example, the 97 voices and 23 languages, the regions |
 | Deepgram | `developers.deepgram.com` (reference: listen-pre-recorded, listen-streaming, manage/projects/list; the pre-recorded guide; models and languages overview) | routes, `Authorization: Token`, the raw-audio upload, query parameters, `keyterm` against `keywords`, the response paths, the live socket's parameters and messages, Nova-3 and Nova-2 language codes |
 
 Not verified, or taken from memory:
@@ -502,6 +593,18 @@ Not verified, or taken from memory:
   message, and the error bodies beyond the documented `error` field. The 32 languages of
   STT-3.7 are the streaming reference's list (`language_codes`); the pre-recorded page names the
   same count.
+- ElevenLabs: whether words in `committed_transcript_with_timestamps` already carry speakers (bolo
+  waits for `diarized_transcript`, which the reference says carries the final ones). "102 languages"
+  is ElevenLabs' FLEURS figure; its documentation names 101, which the catalog lists.
+- xAI: the voice list beyond `eve` and `ara` (it is published in the console and through
+  `GET /v1/tts/voices`, not on the page); whether `response.create` with `modalities: ["text", "audio"]`
+  also sends `response.output_text.delta` (bolo takes the transcript events for a spoken response).
+  The terms link (`x.ai/legal/terms-of-service`) refused automated reading.
+- Rime: whether Prism takes the conversation's `function_call` items from a reply as the parent of a
+  continuation when several replies made calls (bolo names the last reply).
+- Microsoft MAI: whether one key serves both the Foundry socket and the Speech route (give the voices
+  a second provider of kind `azure-mai` if not), the shape of `error` events, whether `completed`
+  carries a language, and SSML `prosody` with MAI voices (bolo sends none).
 - Prices: none are shipped; providers change them.
 
 ## Real tests

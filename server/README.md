@@ -163,10 +163,14 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | TTS | Sarvam (cloud) | 3 | bn, en, gu, hi, kn, ml, mr, or +3 | 0 | - |
 | TTS | ElevenLabs (cloud) | 3 | ar, bg, cs, da, de, el, en, es +24 | 0 | - |
 | DENOISE | ElevenLabs (cloud) | 1 | - | 0 | - |
-| STT | ElevenLabs (cloud) | 2 | af, am, ar, as, az, ba, be, bg +92 | 0 | - |
+| STT | ElevenLabs (cloud) | 3 | af, am, ar, as, ast, az, ba, be +111 | 0 | - |
 | STT | Deepgram (cloud) | 2 | af, ar, as, be, bg, bn, bs, ca +53 | 0 | - |
 | STT | Soniox (cloud) | 2 | af, ar, az, be, bg, bn, bs, ca +52 | 0 | - |
 | STT | AssemblyAI (cloud) | 3 | af, ar, ca, da, de, en, es, et +24 | 0 | - |
+| SPEECH-TO-SPEECH | xAI (cloud) | 1 | ar, bn, de, en, es, fr, hi, id +8 | 0 | - |
+| SPEECH-TO-SPEECH | Rime (cloud) | 1 | en | 0 | - |
+| STT | Microsoft MAI (cloud) | 1 | af, ar, as, az, bg, bn, bs, ca +52 | 0 | - |
+| TTS | Microsoft MAI (cloud) | 2 | cs, da, de, en, es, fi, fr, hi +15 | 0 | - |
 | DENOISE | GTCRN | 1 | - | 1 | 0.060 (`gtcrn-simple`) |
 | DENOISE | DPDFNet | 8 | - | 8 | 0.080 (`dpdfnet-baseline`) |
 | DENOISE | DeepFilterNet | 1 | - | 1 | 0.259 (`deepfilternet3`) |
@@ -279,7 +283,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | WATERMARK | Perth | 1 | - | 1 | 0.033 (`perth-onnx`) |
 | WATERMARK | WavMark | 1 | - | 1 | 2.300 (`wavmark-onnx`) |
 
-**532 models in the catalog, 233 validated on CPU, 299 untested**, plus 26 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md).
+**532 models in the catalog, 233 validated on CPU, 299 untested**, plus 32 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

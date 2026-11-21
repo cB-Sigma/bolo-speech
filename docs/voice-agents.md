@@ -492,7 +492,11 @@ server. bolo resamples each turn to the 24 kHz that API takes, switches its
 server-side turn detection off (bolo detects turns and barge-in itself), and
 asks for audio responses whose transcript is the text (that API answers with
 audio or text, never both). See [providers.md](providers.md#cloud-speech-to-speech-openai-realtime).
-Gemini Live is not supported.
+Two more cloud models have catalog entries and answer the same way:
+`s2s_model = "xai-grok-voice-3.0"` (xAI's Voice Agent API; key
+`BOLO_PROVIDER_XAI_API_KEY`) and `s2s_model = "rime-prism"` (Rime's Prism;
+key `BOLO_PROVIDER_RIME_API_KEY`), both with instructions, function tools and
+the provider's voices. Gemini Live is not supported.
 
 How a turn maps onto the upstream protocol: when bolo's turn detection hears
 speech start, the audio from `prefix_padding_ms` before it is sent upstream

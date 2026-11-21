@@ -2258,7 +2258,8 @@ It adds one embedding computation to each final (about 90 ms in our runs;
 visible as the `diarize` phase and included in `latency_ms`).
 
 A cloud recogniser whose live socket labels speakers itself
-(`assemblyai-stt-3.7-realtime` and `assemblyai-stt-3.7-realtime-agent`) is asked
+(`assemblyai-stt-3.7-realtime`, `assemblyai-stt-3.7-realtime-agent` and
+`elevenlabs-scribe-v3-live`) is asked
 to label them instead: `ready` reports `"diarization": "provider"`, each `final`
 carries the provider's label for that utterance (the speaker of most of it), no
 embedding is computed, and no `speakers` revision is sent at the end.

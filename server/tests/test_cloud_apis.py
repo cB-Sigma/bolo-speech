@@ -5,6 +5,7 @@ error mapping. Nothing here talks to a real provider."""
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 from collections.abc import Callable, Iterator
 from typing import Any
@@ -18,6 +19,8 @@ from bolo.catalog import Catalog
 from bolo.config import Settings
 from conftest import LiveServer, speechlike, wav_bytes
 from fake_cloud_apis import KEY, FakeCloudHTTP, FakeCloudSockets
+from test_realtime import b64_pcm24
+from test_s2s import TOOLS, connect, until, update
 from test_ws import pcm16, stream_audio
 
 
@@ -41,8 +44,14 @@ def sockets() -> Iterator[FakeCloudSockets]:
 
 @pytest.fixture
 def srv(settings: Settings, http: FakeCloudHTTP, sockets: FakeCloudSockets) -> Iterator[LiveServer]:
+    ws_url = sockets.url.replace("http", "ws")
     settings.providers = {
-        "assemblyai": {"base_url": http.url, "api_key": KEY, "options": {"realtime_url": sockets.url.replace("http", "ws") + "/v3/ws"}},
+        "assemblyai": {"base_url": http.url, "api_key": KEY, "options": {"realtime_url": ws_url + "/v3/ws"}},
+        "elevenlabs": {"base_url": http.url, "api_key": KEY,
+                       "options": {"realtime_url": ws_url + "/v1/speech-to-text/realtime"}},
+        "azure-mai": {"base_url": http.url, "api_key": KEY,
+                      "options": {"realtime_url": ws_url + "/mai/v1/realtime?intent=transcription",
+                                  "tts_url": http.url + "/cognitiveservices/v1"}},
     }  # fmt: skip
     server = LiveServer(settings)
     server.start()
@@ -89,6 +98,13 @@ NEW_ENTRIES = {
     "assemblyai-stt-3.7": ("assemblyai", "assemblyai-stt-3-7", False),
     "assemblyai-stt-3.7-realtime": ("assemblyai", "assemblyai-stt-3-7-realtime", True),
     "assemblyai-stt-3.7-realtime-agent": ("assemblyai", "assemblyai-stt-3-7-realtime-agent", True),
+    "elevenlabs-scribe-v3": ("elevenlabs", "scribe_v3", False),
+    "elevenlabs-scribe-v3-live": ("elevenlabs", "scribe_v3_live", True),
+    "xai-grok-voice-3.0": ("xai", "grok-voice-3.0", True),
+    "rime-prism": ("rime", "prism", True),
+    "mai-transcribe-2-streaming": ("azure-mai", "MAI-Transcribe-2-Streaming", True),
+    "mai-voice-2.1": ("azure-mai", "MAI-Voice-2.1", False),
+    "mai-voice-2.1-flash": ("azure-mai", "MAI-Voice-2.1-Flash", False),
 }
 
 
@@ -205,3 +221,307 @@ async def test_assemblyai_live_socket_without_diarization(srv: LiveServer, socke
     path = sockets.paths[0]
     assert "speech_model=assemblyai-stt-3-7-realtime-agent" in path and "speaker_labels" not in path
     assert "language_codes" not in path
+
+
+# -- ElevenLabs Scribe v3 and Scribe v3 Live ---------------------------------------------------------------------------
+def test_scribe_v3_labels_speakers_itself(srv: LiveServer, http: FakeCloudHTTP) -> None:
+    r = transcribe(srv, "elevenlabs-scribe-v3", language="en", response_format="diarized_json")
+    assert r.status_code == 200, r.text
+    segments = r.json()["segments"]
+    assert [(s["speaker"], s["text"]) for s in segments] == [("A", "Heard"), ("B", "2.0 seconds.")]
+    form = http.last("/v1/speech-to-text", "POST")["form"]
+    assert form["model_id"] == "scribe_v3" and form["diarize"] == "true" and form["language_code"] == "en"
+    assert http.last("/v1/speech-to-text", "POST")["headers"]["xi-api-key"] == KEY
+    assert trace_of(srv, r)["diarization_model"] == "provider"
+    # without diarization nothing about speakers is asked for or answered
+    r = transcribe(srv, "elevenlabs-scribe-v3", language="en", response_format="verbose_json")
+    assert r.status_code == 200 and "diarize" not in http.last("/v1/speech-to-text", "POST")["form"]
+    assert all("speaker" not in s for s in r.json()["segments"])
+    # the live entry sends recorded audio (and Realtime turns) to scribe_v3
+    r = transcribe(srv, "elevenlabs-scribe-v3-live", language="en")
+    assert r.status_code == 200 and http.last("/v1/speech-to-text", "POST")["form"]["model_id"] == "scribe_v3"
+
+
+async def test_scribe_v3_live_with_turn_prediction_and_speakers(srv: LiveServer, sockets: FakeCloudSockets) -> None:
+    gap = np.zeros(8000, dtype=np.float32)
+    audio = np.concatenate([speechlike(1.5), gap, speechlike(1.0), gap])
+    messages = await run_live(srv, "elevenlabs-scribe-v3-live", audio, "&language=en&diarize=true")
+    partials = [m["text"] for m in messages if m["type"] == "partial"]
+    finals = [m for m in messages if m["type"] == "final"]
+    assert partials and partials[0].startswith("hearing ")
+    # each segment waited for its diarized transcript; the merge made the second speaker B
+    assert [(f["text"], f["speaker"]) for f in finals] == [("Heard 1.5 seconds.", "A"), ("Heard 1.0 seconds.", "B")]
+    path = sockets.paths[0]
+    assert path.startswith("/v1/speech-to-text/realtime?model_id=scribe_v3_live&audio_format=pcm_16000")
+    assert "commit_strategy=turn_prediction" in path and "include_timestamps=true" in path
+    assert "language_code=en" in path and "diarize=true" in path and KEY not in path
+    assert sockets.headers[0]["xi-api-key"] == KEY
+    sent = sockets.messages[0]
+    assert all(m["message_type"] == "input_audio_chunk" and m["sample_rate"] == 16000 for m in sent)
+    assert sent[-1]["commit"] is True and not any(m["commit"] for m in sent[:-1])  # bolo commits at the end only
+
+
+async def test_scribe_v3_live_without_speakers(srv: LiveServer, sockets: FakeCloudSockets) -> None:
+    audio = np.concatenate([speechlike(1.2), np.zeros(8000, dtype=np.float32)])
+    messages = await run_live(srv, "elevenlabs-scribe-v3-live", audio)
+    finals = [m for m in messages if m["type"] == "final"]
+    assert [f["text"] for f in finals] == ["Heard 1.2 seconds."] and "speaker" not in finals[0]
+    assert "diarize" not in sockets.paths[0] and "language_code" not in sockets.paths[0]
+
+
+# -- cloud speech-to-speech: xAI Grok Voice 3.0 and Rime Prism ------------------------------------------------------
+@contextlib.contextmanager
+def s2s_server(settings: Settings, dialect: str, model: str) -> Iterator[tuple[LiveServer, FakeCloudSockets]]:
+    upstream = FakeCloudSockets(realtime=dialect).start()
+    settings.providers = {dialect: {"base_url": upstream.url + "/v1", "api_key": KEY}}
+    settings.s2s_model = model
+    server = LiveServer(settings)
+    server.start()
+    try:
+        yield server, upstream
+    finally:
+        server.stop()
+        upstream.stop()
+
+
+async def spoken_turn(server: LiveServer, voice: str) -> list[dict[str, Any]]:
+    ws = await connect(server)
+    try:
+        updated = await update(
+            ws,
+            {
+                "type": "realtime", "pipeline": "speech-to-speech", "instructions": "Be brief.", "tools": TOOLS,
+                "audio": {"input": {"transcription": {"model": "fake-stt"},
+                                    "turn_detection": {"type": "server_vad", "silence_duration_ms": 300}},
+                          "output": {"voice": voice}},
+            },
+        )  # fmt: skip
+        assert updated["type"] == "session.updated", updated
+        for chunk in b64_pcm24(2.0):
+            await ws.send(json.dumps({"type": "input_audio_buffer.append", "audio": chunk}))
+        return await until(ws, "response.done")
+    finally:
+        await ws.close()
+
+
+async def tool_round(server: LiveServer) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    ws = await connect(server)
+    try:
+        await update(
+            ws, {"type": "realtime", "pipeline": "speech-to-speech", "tools": TOOLS, "output_modalities": ["text"]}
+        )
+        item = {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "the weather in Pune?"}]}
+        await ws.send(json.dumps({"type": "conversation.item.create", "item": item}))
+        await ws.send(json.dumps({"type": "response.create"}))
+        first = await until(ws, "response.done")
+        output = {"type": "function_call_output", "call_id": "call_7", "output": "sunny"}
+        await ws.send(json.dumps({"type": "conversation.item.create", "item": output}))
+        await ws.send(json.dumps({"type": "response.create"}))
+        second = await until(ws, "response.done")
+        return first, second
+    finally:
+        await ws.close()
+
+
+def spoken_text(events: list[dict[str, Any]]) -> str:
+    done = next(e for e in events if e["type"] == "response.done")["response"]
+    assert done["status"] == "completed", done
+    return str(done["output"][0]["content"][0]["transcript"])
+
+
+async def test_xai_grok_voice_speech_to_speech(settings: Settings) -> None:
+    with s2s_server(settings, "xai", "xai-grok-voice-3.0") as (server, upstream):
+        caps = httpx.get(f"{server.url}/api/v1/info", timeout=30).json()["capabilities"]["realtime"]["pipelines"]
+        assert caps["speech-to-speech"]["configured"] is True and caps["speech-to-speech"]["available"] is True
+        events = await spoken_turn(server, "marin")
+        transcript = spoken_text(events)
+        # the stand-in measured what it was sent at the 16 kHz bolo declared: the turn's speech
+        assert transcript.startswith("I heard ") and 2.0 <= float(transcript.split()[2]) <= 2.8, transcript
+        assert any(e["type"] == "response.output_audio.delta" for e in events)
+        assert upstream.paths == ["/v1/realtime?model=grok-voice-3.0"]
+        assert upstream.headers[0]["Authorization"] == f"Bearer {KEY}"
+        session = upstream.messages[0][0]["session"]
+        # xAI's session shape: OpenAI's voice name is not xAI's, so the entry's default voice; bolo commits turns
+        assert session["voice"] == "eve" and session["turn_detection"] == {"type": None}
+        assert session["audio"]["input"]["format"] == {"type": "audio/pcm", "rate": 16000}
+        assert session["audio"]["output"]["format"] == {"type": "audio/pcm", "rate": 24000}
+        assert session["tools"][0] == {
+            "type": "function",
+            "function": {k: v for k, v in TOOLS[0].items() if k != "type"},
+        }
+        kinds = [e["type"] for e in upstream.messages[0]]
+        assert kinds.index("input_audio_buffer.commit") < kinds.index("response.create")
+        create = next(e for e in upstream.messages[0] if e["type"] == "response.create")
+        assert create["response"] == {"modalities": ["text", "audio"]}
+        described = httpx.get(f"{server.url}/api/v1/info", timeout=30).json()["capabilities"]["realtime"]["pipelines"]
+        assert described["speech-to-speech"]["backend"] == "xai-realtime" and KEY not in json.dumps(described)
+        test = httpx.post(f"{server.url}/api/v1/providers/xai/test", timeout=30).json()
+        assert test["ok"] and test["checked"] == "credentials" and "2 voices" in test["message"]
+
+
+async def test_xai_text_turns_and_tool_calls(settings: Settings) -> None:
+    with s2s_server(settings, "xai", "xai-grok-voice-3.0") as (server, upstream):
+        first, second = await tool_round(server)
+        call = next(e for e in first if e["type"] == "response.function_call_arguments.done")
+        assert call["name"] == "get_weather" and call["call_id"] == "call_7"
+        # one call, though xAI announces it twice (arguments.done and output_item.done)
+        assert sum(e["type"] == "response.function_call_arguments.done" for e in first) == 1
+        text = "".join(e["delta"] for e in second if e["type"] == "response.output_text.delta")
+        assert text == "The tool said: sunny." and not any(e["type"] == "response.output_audio.delta" for e in second)
+        creates = [e for e in upstream.messages[-1] if e["type"] == "response.create"]
+        assert creates[0]["response"] == {"modalities": ["text"]}
+
+
+async def test_rime_prism_speech_to_speech(settings: Settings) -> None:
+    with s2s_server(settings, "rime", "rime-prism") as (server, upstream):
+        events = await spoken_turn(server, "aurora")
+        transcript = spoken_text(events)
+        assert transcript.startswith("I heard ") and 2.0 <= float(transcript.split()[2]) <= 2.8, transcript
+        assert any(e["type"] == "response.output_audio.delta" for e in events)
+        # no query string, the key in the upgrade's Authorization header, and only fields Prism knows
+        assert upstream.paths == ["/v1/realtime"] and upstream.headers[0]["Authorization"] == f"Bearer {KEY}"
+        session = upstream.messages[0][0]["session"]
+        assert session == {"turn_detection": None, "tools": [TOOLS[0]], "voice": "aurora", "instructions": "Be brief."}
+        assert not any(e["type"] == "error" for e in events)
+        create = next(e for e in upstream.messages[0] if e["type"] == "response.create")
+        assert set(create) == {"type", "event_id"}  # turn detection off: a plain request answers the turn
+        test = httpx.post(f"{server.url}/api/v1/providers/rime/test", timeout=30).json()
+        assert test["ok"] and test["checked"] == "credentials"
+        upstream.key = "another-key"
+        test = httpx.post(f"{server.url}/api/v1/providers/rime/test", timeout=30).json()
+        assert not test["ok"] and test["code"] == "provider_auth" and KEY not in json.dumps(test)
+
+
+async def test_rime_prism_typed_turns_and_tool_continuations(settings: Settings) -> None:
+    with s2s_server(settings, "rime", "rime-prism") as (server, upstream):
+        first, second = await tool_round(server)
+        call = next(e for e in first if e["type"] == "response.function_call_arguments.done")
+        assert call["name"] == "get_weather" and call["call_id"] == "call_7"
+        text = "".join(e["delta"] for e in second if e["type"] == "response.output_text.delta")
+        # Prism always speaks; a text-only response leaves its audio out
+        assert text == "The tool said: sunny." and not any(e["type"] == "response.output_audio.delta" for e in second)
+        creates = [e for e in upstream.messages[-1] if e["type"] == "response.create"]
+        assert creates[0]["response"] == {
+            "prism_input_text": "the weather in Pune?",
+            "metadata": {"prism_cause": "user_text"},
+        }
+        # the continuation waited for Prism's acknowledgement of the result and names the reply that made the call
+        assert creates[1]["response"] == {
+            "metadata": {"prism_cause": "tool_continuation", "prism_parent_response_id": "resp_1"}
+        }
+        # the typed text is never sent as a conversation item (Prism takes typed turns in response.create)
+        assert not any(
+            e["type"] == "conversation.item.create" and e["item"]["type"] == "message" for e in upstream.messages[-1]
+        )
+
+
+async def test_cloud_speech_to_speech_without_its_provider(settings: Settings) -> None:
+    settings.providers = {}
+    settings.s2s_model = "rime-prism"
+    server = LiveServer(settings)
+    server.start()
+    try:
+        caps = httpx.get(f"{server.url}/api/v1/info", timeout=30).json()["capabilities"]["realtime"]["pipelines"]
+        s2s = caps["speech-to-speech"]
+        assert s2s["configured"] is False and s2s["available"] is False
+        assert "BOLO_PROVIDER_RIME_API_KEY" in s2s["reason"]
+        r = httpx.post(f"{server.url}/v1/audio/transcriptions", data={"model": "rime-prism"},
+                       files={"file": ("a.wav", wav_bytes(1.0), "audio/wav")}, timeout=30)  # fmt: skip
+        assert r.status_code >= 400
+    finally:
+        server.stop()
+
+
+# -- Microsoft MAI-Transcribe-2-Streaming and MAI-Voice-2.1 ----------------------------------------------------------
+async def test_mai_transcribe_streaming_commits_at_pauses(srv: LiveServer, sockets: FakeCloudSockets) -> None:
+    gap = np.zeros(8000, dtype=np.float32)
+    audio = np.concatenate([speechlike(1.5), gap, speechlike(1.0), gap])
+    messages = await run_live(srv, "mai-transcribe-2-streaming", audio, "&language=en")
+    partials = [m["text"] for m in messages if m["type"] == "partial"]
+    finals = [m["text"] for m in messages if m["type"] == "final"]
+    assert partials and partials[0].startswith("hearing ")
+    # MAI has no speech detection of its own: bolo committed at each pause, and each commit came back as a final
+    assert finals == ["Heard 1.5 seconds.", "Heard 1.0 seconds."]
+    assert sockets.paths[0] == "/mai/v1/realtime?intent=transcription" and sockets.headers[0]["api-key"] == KEY
+    sent = sockets.messages[0]
+    assert sent[0] == {
+        "type": "session.update",
+        "session": {"type": "transcription", "audio": {"input": {
+            "format": {"type": "audio/pcm", "rate": 16000},
+            "transcription": {"model": "MAI-Transcribe-2-Streaming", "language": "en"},
+            "turn_detection": None, "noise_reduction": None}}},
+    }  # fmt: skip
+    kinds = [m["type"] for m in sent]
+    assert set(kinds[1:]) <= {"input_audio_buffer.append", "input_audio_buffer.commit"}
+    assert kinds.count("input_audio_buffer.commit") >= 2
+
+
+def test_mai_transcribe_recorded_audio_and_deployments(
+    settings: Settings, srv: LiveServer, sockets: FakeCloudSockets
+) -> None:
+    r = transcribe(srv, "mai-transcribe-2-streaming", language="hi")
+    assert r.status_code == 200, r.text
+    assert r.json()["text"] == "Heard 2.0 seconds."
+    sent = sockets.messages[-1]
+    assert sent[0]["session"]["audio"]["input"]["transcription"] == {
+        "model": "MAI-Transcribe-2-Streaming",
+        "language": "hi",
+    }
+    assert sent[-1] == {"type": "input_audio_buffer.commit"} and sent[1]["type"] == "input_audio_buffer.append"
+    # options a socket recogniser has no use for are refused, not dropped silently
+    r = transcribe(srv, "mai-transcribe-2-streaming", prompt="About bolo.")
+    assert r.status_code == 400 and r.json()["error"]["param"] == "prompt"
+    test = httpx.post(f"{srv.url}/api/v1/providers/azure-mai/test", timeout=30).json()
+    assert test["ok"] and test["checked"] == "credentials"
+
+
+def test_mai_needs_the_address_of_the_resource(settings: Settings) -> None:
+    settings.providers = {"azure-mai": {"api_key": KEY, "options": {"region": "eastus"}}}
+    server = LiveServer(settings)
+    server.start()
+    try:
+        listed = {m["id"]: m for m in httpx.get(f"{server.url}/api/v1/catalog", timeout=60).json()["models"]}
+        mai = listed["mai-transcribe-2-streaming"]
+        assert mai["installed"] is False and mai["provider"]["configured"] is False
+        assert mai["provider"]["key_env"] == "BOLO_PROVIDER_AZURE_MAI_API_KEY"
+        r = transcribe(server, "mai-transcribe-2-streaming")
+        assert r.status_code == 503 and r.json()["error"]["code"] == "provider_not_configured"
+        assert "BOLO_PROVIDER_AZURE_MAI_BASE_URL" in r.json()["error"]["message"]
+    finally:
+        server.stop()
+
+
+def test_mai_voice(srv: LiveServer, http: FakeCloudHTTP) -> None:
+    import io
+
+    import soundfile as sf
+
+    r = httpx.post(
+        f"{srv.url}/v1/audio/speech",
+        json={"model": "mai-voice-2.1-flash", "input": "Hola, buenos días.", "voice": "es-MX-Valeria",
+              "response_format": "wav"},
+        timeout=60,
+    )  # fmt: skip
+    assert r.status_code == 200, r.text
+    call = http.last("/cognitiveservices/v1", "POST")
+    assert call["voice"] == "es-MX-Valeria:MAI-Voice-2.1-Flash" and call["lang"] == "es-MX"
+    assert call["headers"]["Ocp-Apim-Subscription-Key"] == KEY
+    assert call["headers"]["X-Microsoft-OutputFormat"] == "audio-24khz-160kbitrate-mono-mp3"
+    with sf.SoundFile(io.BytesIO(r.content)) as f:
+        seconds = len(f) / f.samplerate
+    assert seconds == pytest.approx(0.05 * len(call["text"]), rel=0.1)  # the MP3 was decoded whole
+    # the default voice, the long-form model, text that needs escaping in SSML
+    r = httpx.post(f"{srv.url}/v1/audio/speech", json={"model": "mai-voice-2.1", "input": "Fish & chips <now>."},
+                   timeout=60)  # fmt: skip
+    assert r.status_code == 200, r.text
+    call = http.last("/cognitiveservices/v1", "POST")
+    assert call["voice"] == "en-US-Harper:MAI-Voice-2.1" and "&amp;" in call["text"] and "&lt;now&gt;" in call["text"]
+    voices = {
+        v["id"]
+        for v in httpx.get(f"{srv.url}/v1/audio/voices", params={"model": "mai-voice-2.1"}, timeout=30).json()["voices"]
+    }
+    assert {"en-US-Harper", "hi-IN-Kavya", "es-MX-Valeria"} <= voices and len(voices) == 97
+    r = httpx.post(
+        f"{srv.url}/v1/audio/speech", json={"model": "mai-voice-2.1", "input": "Hi.", "speed": 1.5}, timeout=60
+    )
+    assert r.status_code == 400 and r.json()["error"]["param"] == "speed"

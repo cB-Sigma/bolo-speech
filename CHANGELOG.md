@@ -78,6 +78,22 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - **Speaker labels from a provider's live socket.** `diarize=true` on the STT WebSocket with a cloud recogniser that
   labels speakers live (the AssemblyAI realtime entries) asks the provider for them: each `final` carries the
   provider's label, `ready` says `"diarization": "provider"`, and bolo computes no speaker embeddings.
+- **ElevenLabs Scribe v3 and Scribe v3 Live** (released 2026-11-10). `elevenlabs-scribe-v3` now has ElevenLabs label
+  speakers (`diarize=true`, up to 32 speakers) and lists the 101 languages ElevenLabs' documentation names; the new
+  `elevenlabs-scribe-v3-live` recognises live audio over ElevenLabs' realtime socket, with interim text, turn
+  prediction and speaker labels on the socket. Both use the existing ElevenLabs provider
+  (`BOLO_PROVIDER_ELEVENLABS_API_KEY`).
+- **xAI Grok Voice 3.0 and Rime Prism as cloud speech-to-speech models**: `s2s_model = "xai-grok-voice-3.0"` (xAI's
+  Voice Agent API; provider kind `xai`, `BOLO_PROVIDER_XAI_API_KEY`) or `s2s_model = "rime-prism"` (Rime's Prism;
+  kind `rime`, `BOLO_PROVIDER_RIME_API_KEY`) answer Realtime and WebRTC sessions of the speech-to-speech pipeline,
+  with instructions, function tools and the provider's voices. Each speaks its own variant of the Realtime protocol
+  (xAI's session and `response.create`; Prism's strict session fields, typed turns and tool continuations), which
+  bolo follows. A cloud speech-to-speech model can now be a catalog entry, not only `<provider>:<model>`.
+- **Microsoft MAI-Transcribe-2-Streaming, MAI-Voice-2.1 and MAI-Voice-2.1-Flash** (provider kind `azure-mai`, key
+  `BOLO_PROVIDER_AZURE_MAI_API_KEY`, the Azure resource's address as `base_url`): live recognition in 60 languages
+  over the realtime socket of a Microsoft Foundry resource (bolo commits at pauses, since MAI detects no speech
+  itself; recorded audio goes over the same socket), and 97 voices in 23 languages through Azure Speech. All public
+  previews. MAI Realtime 1 is not included: it is in limited-access preview without a public API reference.
 - **Every cloud entry names the environment variable of its key**: `provider.key_env` in `GET /api/v1/catalog`
   (`BOLO_PROVIDER_<NAME>_API_KEY`), and the cloud rows of docs/models.md.
 

@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-532 models: 233 validated on CPU by the maintainers, 299 untested. 26 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+532 models: 233 validated on CPU by the maintainers, 299 untested. 32 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -90,7 +90,8 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `elevenlabs-scribe-v3` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` (key: `BOLO_PROVIDER_ELEVENLABS_API_KEY`) | untested |
+| `elevenlabs-scribe-v3` | af, am, ar, hy, as, ast +95 | accuracy | pseudo | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` (key: `BOLO_PROVIDER_ELEVENLABS_API_KEY`) | untested |
+| `elevenlabs-scribe-v3-live` | af, am, ar, hy, as, ast +95 | realtime | native | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` (key: `BOLO_PROVIDER_ELEVENLABS_API_KEY`) | untested |
 | `elevenlabs-scribe-v2` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` (key: `BOLO_PROVIDER_ELEVENLABS_API_KEY`) | untested |
 
 #### Deepgram (cloud)
@@ -114,6 +115,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `assemblyai-stt-3.7` | af, ar, yue, ca, da, nl +26 | accuracy | pseudo | none (cloud API) | AssemblyAI Terms of Service (paid cloud API) · [terms](https://www.assemblyai.com/legal/terms-of-service) · needs provider `assemblyai` (key: `BOLO_PROVIDER_ASSEMBLYAI_API_KEY`) | untested |
 | `assemblyai-stt-3.7-realtime` | af, ar, yue, ca, da, nl +26 | realtime | native | none (cloud API) | AssemblyAI Terms of Service (paid cloud API) · [terms](https://www.assemblyai.com/legal/terms-of-service) · needs provider `assemblyai` (key: `BOLO_PROVIDER_ASSEMBLYAI_API_KEY`) | untested |
 | `assemblyai-stt-3.7-realtime-agent` | af, ar, yue, ca, da, nl +26 | realtime | native | none (cloud API) | AssemblyAI Terms of Service (paid cloud API) · [terms](https://www.assemblyai.com/legal/terms-of-service) · needs provider `assemblyai` (key: `BOLO_PROVIDER_ASSEMBLYAI_API_KEY`) | untested |
+
+#### Microsoft MAI (cloud)
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `mai-transcribe-2-streaming` | af, ar, as, az, bg, bn +54 | realtime | native | none (cloud API) | Microsoft Azure terms; preview (paid cloud API) · [terms](https://azure.microsoft.com/support/legal/preview-supplemental-terms/) · needs provider `azure-mai` (key: `BOLO_PROVIDER_AZURE_MAI_API_KEY`) | untested |
 
 #### Whisper
 
@@ -413,6 +420,13 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `elevenlabs-flash-v2.5` | en, ja, zh, de, hi, fr +26 | realtime | - | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` (key: `BOLO_PROVIDER_ELEVENLABS_API_KEY`) | untested |
 | `elevenlabs-multilingual-v2` | en, ja, zh, de, hi, fr +23 | balanced | - | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` (key: `BOLO_PROVIDER_ELEVENLABS_API_KEY`) | untested |
 | `elevenlabs-v3` | en, ja, zh, de, hi, fr +26 | balanced | - | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` (key: `BOLO_PROVIDER_ELEVENLABS_API_KEY`) | untested |
+
+#### Microsoft MAI (cloud)
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `mai-voice-2.1` | cs, da, de, en, es, fi +17 | accuracy | - | none (cloud API) | Microsoft Azure terms; preview (paid cloud API) · [terms](https://azure.microsoft.com/support/legal/preview-supplemental-terms/) · needs provider `azure-mai` (key: `BOLO_PROVIDER_AZURE_MAI_API_KEY`) | untested |
+| `mai-voice-2.1-flash` | cs, da, de, en, es, fi +17 | realtime | - | none (cloud API) | Microsoft Azure terms; preview (paid cloud API) · [terms](https://azure.microsoft.com/support/legal/preview-supplemental-terms/) · needs provider `azure-mai` (key: `BOLO_PROVIDER_AZURE_MAI_API_KEY`) | untested |
 
 #### Kokoro
 
@@ -963,6 +977,18 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `indic-slid-mhubert-task2` | as, bn, brx, doi, gu, hi +16 | balanced | - | 378 MB | CC-BY-NC-SA-4.0 ⚠ · needs plugin torch | **CPU** · RTF 0.226 |
 
 ### Speech to speech (Realtime speech-to-speech pipeline)
+
+#### xAI (cloud)
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `xai-grok-voice-3.0` | en, ar, bn, zh, fr, de +10 | realtime | native | none (cloud API) | xAI Terms of Service (paid cloud API) · [terms](https://x.ai/legal/terms-of-service) · needs provider `xai` (key: `BOLO_PROVIDER_XAI_API_KEY`) | untested |
+
+#### Rime (cloud)
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `rime-prism` | en | realtime | native | none (cloud API) | Rime Terms of Service (paid cloud API) · [terms](https://www.rime.ai/terms) · needs provider `rime` (key: `BOLO_PROVIDER_RIME_API_KEY`) | untested |
 
 #### Moshi
 

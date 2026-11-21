@@ -9,7 +9,20 @@ voices/search) and the models overview on 2026-11-14:
   streamed; ``pcm_*`` formats are 16-bit mono (8, 16, 22.05, 24, 32, 44.1 and 48 kHz; 44.1 kHz needs a Pro plan).
 * ``POST https://api.elevenlabs.io/v1/speech-to-text`` (multipart): ``model_id`` (``scribe_v3``,
   ``scribe_v2``), ``file``, ``language_code``, ``timestamps_granularity`` (``word``), ``keyterms``,
-  ``temperature``. Answer: ``text``, ``language_code``, ``words`` (``text``, ``start``, ``end``, ``type``).
+  ``temperature``, ``diarize`` and ``num_speakers`` (up to 32). Answer: ``text``, ``language_code``, ``words``
+  (``text``, ``start``, ``end``, ``type``, and with ``diarize`` ``speaker_id``: ``speaker_0``, ``speaker_1``, …).
+* ``wss://api.elevenlabs.io/v1/speech-to-text/realtime`` (checked against the API reference and the models
+  overview on 2026-11-21): the key in the ``xi-api-key`` header, the session as query parameters (``model_id``:
+  ``scribe_v3_live`` or ``scribe_v2_realtime``; ``audio_format`` ``pcm_16000``, ``language_code``,
+  ``commit_strategy`` ``manual`` / ``vad`` / ``turn_prediction`` (the last for models that predict turns, Scribe v3
+  Live), ``include_timestamps``, ``diarize``, ``keyterms``), audio as JSON ``input_audio_chunk`` messages
+  (``audio_base_64``, ``commit``, ``sample_rate``; ``commit: true`` ends the segment). Answers: ``session_started``,
+  ``partial_transcript``, ``committed_transcript`` and, with ``include_timestamps``,
+  ``committed_transcript_with_timestamps`` (``text``, ``words`` with ``start`` / ``end`` in seconds); with
+  ``diarize``, ``diarized_transcript`` after each commit (``segment_index``, ``text``, ``words`` with their final
+  ``speaker_id``; the committed transcript never waits for it) and ``speakers_merged`` (``from_speaker_id``,
+  ``to_speaker_id``: apply in order); errors as ``message_type`` ``error``, ``auth_error``, ``quota_exceeded``, …
+  with ``error``.
 * ``GET https://api.elevenlabs.io/v2/voices`` lists the account's voices (``voice_id``, ``name``, ``labels``).
 * ``POST https://api.elevenlabs.io/v1/audio-isolation`` (multipart): ``audio``, ``file_format`` (``pcm_s16le_16``:
   raw 16-bit mono 16 kHz PCM, lower latency; or ``other``). The answer is the isolated voice as an audio file
@@ -24,21 +37,77 @@ of the account are read when the model is loaded, and a voice can be named by id
 
 from __future__ import annotations
 
+import base64
+import json
+from collections import Counter
 from collections.abc import Callable, Iterator
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
-from bolo.engines.base import FloatArray, STTResult, Voice, Word
+from bolo.diarize import speaker_label
+from bolo.engines.base import FloatArray, Segment, STTResult, Voice, Word
 from bolo.errors import BoloError, InvalidRequest, ProviderError
 from bolo.providers import Usage
-from bolo.remote.base import Adapter, RemoteRequest, base_language, decode_whole, float_to_pcm16, read_pcm_stream
+from bolo.remote.base import (
+    Adapter,
+    LiveEvent,
+    LiveProtocol,
+    RemoteRequest,
+    base_language,
+    decode_whole,
+    float_to_pcm16,
+    read_pcm_stream,
+)
 
 PCM_RATES = (8000, 16000, 22050, 24000, 32000, 44100, 48000)
+#: recorded audio of a live model goes to the recorded model of the same generation
+ASYNC_OF_LIVE = {"scribe_v3_live": "scribe_v3", "scribe_v2_realtime": "scribe_v2"}
+#: message types of the realtime socket that report a failure
+LIVE_ERRORS = ("error", "auth_error", "quota_exceeded")
+
+
+def scribe_speaker(value: Any, merged: dict[str, str] | None = None) -> str | None:
+    """ElevenLabs' ``speaker_0``, ``speaker_1`` -> bolo's ``A``, ``B`` (after merges); other labels are kept."""
+    if value is None or value == "":
+        return None
+    text = str(value)
+    while merged and text in merged:
+        text = merged[text]
+    number = text.rsplit("_", 1)[-1]
+    return speaker_label(int(number)) if text.startswith("speaker_") and number.isdigit() else text
+
+
+def scribe_words(items: Any) -> list[tuple[Word, str | None]]:
+    """The ``word`` items of a Scribe answer (spacing and audio events left out), each with its raw speaker id."""
+    out: list[tuple[Word, str | None]] = []
+    for w in items or []:
+        if not isinstance(w, dict) or w.get("type", "word") != "word" or not str(w.get("text", "")).strip():
+            continue
+        word = Word(str(w["text"]).strip(), float(w.get("start") or 0.0), float(w.get("end") or 0.0))
+        out.append((word, str(w["speaker_id"]) if w.get("speaker_id") is not None else None))
+    return out
+
+
+def speaker_segments(words: list[tuple[Word, str | None]]) -> list[Segment]:
+    """Words with speakers -> one segment per run of the same speaker."""
+    segments: list[Segment] = []
+    for word, raw in words:
+        speaker = scribe_speaker(raw)
+        if not segments or segments[-1].speaker != speaker:
+            segments.append(Segment(word.t0, word.t1, "", [], speaker=speaker))
+        seg = segments[-1]
+        seg.words.append(word)
+        seg.text = f"{seg.text} {word.w}".strip()
+        seg.end = max(seg.end, word.t1)
+    return segments
 
 
 class ElevenLabs(Adapter):
     kind = "elevenlabs"
     supports_word_timestamps = True
+    #: Scribe labels speakers (``diarize``), in recorded audio and on its realtime socket
+    supports_diarization = True
+    supports_live_diarization = True
 
     def auth_headers(self) -> dict[str, str]:
         return {"xi-api-key": self.provider.api_key} if self.provider.api_key else {}
@@ -123,7 +192,13 @@ class ElevenLabs(Adapter):
             raise InvalidRequest(f"'{self.model}' at {self.where} cannot translate", param="model")
         if req.prompt:
             self.unsupported("prompt", "a prompt")
-        data: dict[str, Any] = {"model_id": self.model, "timestamps_granularity": "word"}
+        model = str(self.spec.get("async_model") or ASYNC_OF_LIVE.get(self.model, self.model))
+        data: dict[str, Any] = {"model_id": model, "timestamps_granularity": "word"}
+        diarize = req.diarize or bool(self.spec.get("speaker_labels"))
+        if diarize:
+            data["diarize"] = "true"
+            if self.spec.get("num_speakers"):
+                data["num_speakers"] = str(int(self.spec["num_speakers"]))
         code = base_language(req.language)
         if code:
             data["language_code"] = code
@@ -135,14 +210,17 @@ class ElevenLabs(Adapter):
         data.update(self.spec.get("request") or {})
         files = {"file": (req.filename, req.audio, req.content_type)}
         doc = self.json(self.request("POST", self.base_url + "/v1/speech-to-text", usage, data=data, files=files))
-        words = [
-            Word(str(w.get("text", "")).strip(), float(w.get("start") or 0.0), float(w.get("end") or 0.0))
-            for w in doc.get("words") or []
-            if isinstance(w, dict) and w.get("type", "word") == "word" and str(w.get("text", "")).strip()
-        ]
+        words = scribe_words(doc.get("words"))
         language = base_language(str(doc.get("language_code") or "")) or base_language(req.language)
         # ISO 639-3 answers ("eng", "hin") stay as they are; clients that need 639-1 send the language
-        return STTResult(str(doc.get("text") or "").strip(), language, [], words)
+        segments = speaker_segments(words) if diarize and any(raw for _, raw in words) else []
+        return STTResult(str(doc.get("text") or "").strip(), language, segments, [w for w, _ in words])
+
+    # -- live (the realtime socket) -------------------------------------------------------------------------
+    def live(self, language: str | None, diarize: bool = False) -> LiveProtocol | None:
+        if self.spec.get("live") is False or (self.model not in ASYNC_OF_LIVE and not self.spec.get("live")):
+            return None
+        return ElevenLabsLive(self, language, diarize)
 
     # -- voice isolation ----------------------------------------------------------------------------------
     def isolate(self, samples: FloatArray, rate: int, usage: Usage) -> FloatArray:
@@ -155,3 +233,94 @@ class ElevenLabs(Adapter):
         if not resp.content:
             raise ProviderError(f"{self.where} answered the voice isolation with no audio")
         return decode_whole(resp.content, rate)
+
+
+class ElevenLabsLive(LiveProtocol):
+    """ElevenLabs' realtime speech-to-text socket (Scribe v3 Live, Scribe v2 Realtime). ``partial_transcript`` is
+    interim text; a segment is final with its ``committed_transcript_with_timestamps`` (asked for always), which
+    ElevenLabs sends when its commit strategy ends the segment (``turn_prediction`` for Scribe v3 Live: the model
+    predicts that the speaker finished their turn) or when bolo commits at the end of input. With speaker labels
+    the segment is held until its ``diarized_transcript`` (the final speakers) arrives, and handed on unlabelled if
+    the next segment is committed first."""
+
+    def __init__(self, adapter: ElevenLabs, language: str | None, diarize: bool) -> None:
+        spec, provider = adapter.spec, adapter.provider
+        url = spec.get("realtime_url") or provider.options.get("realtime_url")
+        if not url:
+            base = adapter.base_url.replace("https://", "wss://", 1).replace("http://", "ws://", 1)
+            url = base + "/v1/speech-to-text/realtime"
+        self.sample_rate = 16000
+        strategy = spec.get("commit_strategy") or ("turn_prediction" if adapter.model == "scribe_v3_live" else "vad")
+        params: dict[str, Any] = {
+            "model_id": adapter.model,
+            "audio_format": f"pcm_{self.sample_rate}",
+            "commit_strategy": strategy,
+            "include_timestamps": "true",
+        }
+        code = base_language(language)
+        if code:
+            params["language_code"] = code
+        self.diarize = diarize or bool(spec.get("live_speaker_labels"))
+        if self.diarize:
+            params["diarize"] = "true"
+        params.update(spec.get("live_request") or {})
+        self.url = f"{url}?{urlencode(params)}"
+        self.headers = adapter.auth_headers()
+        self.params = params
+        self._held: tuple[str, list[tuple[str, float, float]]] | None = None
+        self._merged: dict[str, str] = {}
+
+    def _chunk(self, pcm: bytes, commit: bool) -> str:
+        return json.dumps(
+            {
+                "message_type": "input_audio_chunk",
+                "audio_base_64": base64.b64encode(pcm).decode("ascii"),
+                "commit": commit,
+                "sample_rate": self.sample_rate,
+            }
+        )
+
+    def audio(self, pcm: bytes) -> str:
+        return self._chunk(pcm, False)
+
+    def finalize(self) -> str:
+        return self._chunk(b"", True)  # commit what was sent so far
+
+    def _flush_held(self, speaker: str | None = None) -> list[LiveEvent]:
+        held, self._held = self._held, None
+        if held is None:
+            return []
+        return [LiveEvent("final", held[0], held[1], speaker), LiveEvent("endpoint")]
+
+    def parse(self, message: bytes | str) -> list[LiveEvent]:
+        try:
+            doc = json.loads(message)
+        except ValueError:
+            return []
+        if not isinstance(doc, dict):
+            return []
+        kind = str(doc.get("message_type") or "")
+        if kind in LIVE_ERRORS or (kind.endswith("_error") or kind.endswith("_exceeded")):
+            return [LiveEvent("error", f"{kind}: {doc.get('error') or doc.get('message') or ''}".strip())]
+        if kind == "partial_transcript":
+            text = str(doc.get("text") or "").strip()
+            return [LiveEvent("interim", text)] if text else []
+        if kind == "speakers_merged":
+            if doc.get("from_speaker_id") and doc.get("to_speaker_id"):
+                self._merged[str(doc["from_speaker_id"])] = str(doc["to_speaker_id"])
+            return []
+        if kind == "committed_transcript_with_timestamps":
+            text = str(doc.get("text") or "").strip()
+            words = [(w.w, w.t0, w.t1) for w, _ in scribe_words(doc.get("words"))]
+            events = self._flush_held()  # its diarized transcript did not come: handed on unlabelled
+            if not text:
+                return [*events, LiveEvent("endpoint")]
+            if self.diarize:
+                self._held = (text, words)
+                return events
+            return [*events, LiveEvent("final", text, words), LiveEvent("endpoint")]
+        if kind == "diarized_transcript" and self._held is not None:
+            speakers = [scribe_speaker(raw, self._merged) for _, raw in scribe_words(doc.get("words"))]
+            counted = Counter(s for s in speakers if s)
+            return self._flush_held(counted.most_common(1)[0][0] if counted else None)
+        return []

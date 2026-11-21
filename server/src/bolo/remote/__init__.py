@@ -15,6 +15,9 @@ ADAPTERS: dict[str, str] = {
     "deepgram": "bolo.remote.deepgram:Deepgram",
     "soniox": "bolo.remote.soniox:Soniox",
     "assemblyai": "bolo.remote.assemblyai:AssemblyAI",
+    "xai": "bolo.remote.realtime_only:XAI",
+    "rime": "bolo.remote.realtime_only:RimePrism",
+    "azure-mai": "bolo.remote.azure_mai:AzureMAI",
 }
 
 

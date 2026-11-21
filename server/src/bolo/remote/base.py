@@ -191,8 +191,9 @@ class LiveProtocol(abc.ABC):
     keepalive_s: float | None = None
 
     @abc.abstractmethod
-    def audio(self, pcm: bytes) -> bytes | str:
-        """The frame to send for a piece of audio (bytes: a binary frame; str: a text frame)."""
+    def audio(self, pcm: bytes) -> bytes | str | list[bytes | str]:
+        """The frame to send for a piece of audio (bytes: a binary frame; str: a text frame; empty: nothing yet),
+        or several (a protocol that also ends the segment at a pause it heard)."""
 
     def keepalive(self) -> str | None:
         return None

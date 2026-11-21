@@ -65,6 +65,7 @@ import numpy as np
 
 from bolo.engines.base import ConversationChunk, ConversationRequest, ConversationTurn, FloatArray
 from bolo.errors import ComponentMissing, EngineUnavailable, InvalidRequest
+from bolo.providers import key_env
 
 if TYPE_CHECKING:
     from bolo.catalog import ModelSpec
@@ -235,6 +236,7 @@ class LlamaRealtimeConversation(S2SConversation):
                 if not isinstance(event, dict):
                     continue
                 kind = str(event.get("type", ""))
+                self._on_event(event)
                 if kind.startswith("response.") or kind == "error":
                     if kind == "error" and not self._active and not self._stale:
                         log.warning("%s: %s", self.where, (event.get("error") or {}).get("message"))
@@ -247,6 +249,26 @@ class LlamaRealtimeConversation(S2SConversation):
         finally:
             self._closed = True
             await self._events.put(None)
+
+    def _on_event(self, event: dict[str, Any]) -> None:
+        """Every event the server sends, as it arrives (a dialect that waits for acknowledgements reads them here)."""
+
+    def _response_create(self, modalities: list[str], max_output_tokens: Any, tool_choice: Any) -> dict[str, Any]:
+        """The ``response.create`` event that asks for a response."""
+        both = ["audio"] if self.audio_or_text else ["text", "audio"]
+        params: dict[str, Any] = {"output_modalities": both if "audio" in modalities else ["text"]}
+        if max_output_tokens is not None:
+            params["max_output_tokens"] = max_output_tokens
+        if tool_choice in ("auto", "none", "required"):
+            params["tool_choice"] = tool_choice
+        return {"type": "response.create", "response": params}
+
+    def _text_kinds(self, audio: bool) -> tuple[str, ...]:
+        """The events whose ``delta`` is the response's text (``audio``: the response was asked for audio)."""
+        return self._text_events
+
+    #: the events whose ``delta`` is the response's audio (base64 PCM16 at ``output_rate``)
+    audio_events: tuple[str, ...] = ("response.output_audio.delta",)
 
     async def _send(self, event: dict[str, Any]) -> None:
         if self._closed:
@@ -278,15 +300,12 @@ class LlamaRealtimeConversation(S2SConversation):
     async def respond(
         self, *, modalities: list[str], max_output_tokens: Any = None, tool_choice: Any = None
     ) -> AsyncGenerator[S2SEvent, None]:
-        both = ["audio"] if self.audio_or_text else ["text", "audio"]
-        params: dict[str, Any] = {"output_modalities": both if "audio" in modalities else ["text"]}
-        if max_output_tokens is not None:
-            params["max_output_tokens"] = max_output_tokens
-        if tool_choice in ("auto", "none", "required"):
-            params["tool_choice"] = tool_choice
+        create = self._response_create(modalities, max_output_tokens, tool_choice)
+        text_kinds = self._text_kinds("audio" in modalities)
         self._active = True
-        await self._send({"type": "response.create", "response": params})
+        await self._send(create)
         started = False
+        calls: set[str] = set()  # a tool call can come as function_call_arguments.done and as output_item.done
         try:
             while True:
                 event = await self._events.get()
@@ -304,18 +323,19 @@ class LlamaRealtimeConversation(S2SConversation):
                     return
                 if kind == "response.created":
                     started = True
-                elif kind in self._text_events and event.get("delta"):
+                elif kind in text_kinds and event.get("delta"):
                     yield TextDelta(str(event["delta"]))
-                elif kind == "response.output_audio.delta" and event.get("delta"):
-                    yield AudioDelta(_pcm16(base64.b64decode(str(event["delta"]))), self.output_rate)
-                elif kind == "response.output_item.done":
-                    item = event.get("item") or {}
-                    if item.get("type") == "function_call":
-                        yield ToolCall(
-                            str(item.get("call_id") or item.get("id") or ""),
-                            str(item.get("name") or ""),
-                            str(item.get("arguments") or "{}"),
-                        )
+                elif kind in self.audio_events and event.get("delta"):
+                    if "audio" in modalities:
+                        yield AudioDelta(_pcm16(base64.b64decode(str(event["delta"]))), self.output_rate)
+                elif kind in ("response.output_item.done", "response.function_call_arguments.done"):
+                    item = (event.get("item") or {}) if kind == "response.output_item.done" else event
+                    call_id = str(item.get("call_id") or item.get("id") or "")
+                    if (
+                        kind != "response.output_item.done" or item.get("type") == "function_call"
+                    ) and call_id not in calls:
+                        calls.add(call_id)
+                        yield ToolCall(call_id, str(item.get("name") or ""), str(item.get("arguments") or "{}"))
                 elif kind == "response.done":
                     response = event.get("response") or {}
                     usage = {k: int(v) for k, v in (response.get("usage") or {}).items() if isinstance(v, int)}
@@ -531,6 +551,169 @@ class OpenAIRealtimeBackend(LlamaRealtimeBackend):
         return update
 
 
+def _function_tools(tools: list[dict[str, Any]], nested: bool) -> list[dict[str, Any]]:
+    """Realtime function tools, flat (``{type, name, description, parameters}``, OpenAI's Realtime shape) or nested
+    (``{type, function: {name, description, parameters}}``, as xAI's Voice Agent API describes them)."""
+    out = []
+    for t in tools:
+        fn = {
+            "name": t.get("name"),
+            "description": t.get("description") or "",
+            "parameters": t.get("parameters") or {"type": "object", "properties": {}},
+        }
+        out.append({"type": "function", "function": fn} if nested else {"type": "function", **fn})
+    return out
+
+
+# -- xAI's Grok Voice Agent API (Grok Voice 3.0) --------------------------------------------------------------------
+XAI_DEFAULT_VOICE = "eve"
+
+
+class XAIRealtimeConversation(LlamaRealtimeConversation):
+    """A session of xAI's Voice Agent API. The GA event names, with xAI's own ``response.create`` (``modalities``;
+    no ``tool_choice`` or ``max_output_tokens``) and both text event names it documents."""
+
+    audio_events = ("response.output_audio.delta", "response.audio.delta")
+
+    def _response_create(self, modalities: list[str], max_output_tokens: Any, tool_choice: Any) -> dict[str, Any]:
+        return {
+            "type": "response.create",
+            "response": {"modalities": ["text", "audio"] if "audio" in modalities else ["text"]},
+        }
+
+    def _text_kinds(self, audio: bool) -> tuple[str, ...]:
+        # a spoken response's text is its transcript; a written one's is output_text (text.delta is its older name)
+        return (
+            ("response.output_audio_transcript.delta",)
+            if audio
+            else ("response.output_text.delta", "response.text.delta")
+        )
+
+
+class XAIRealtimeBackend(OpenAIRealtimeBackend):
+    """xAI's Voice Agent API (``wss://api.x.ai/v1/realtime?model=grok-voice-3.0``), from docs.x.ai (the speech to
+    speech guide and the realtime WebSocket reference, read 2026-11-21): the session takes ``voice``,
+    ``instructions``, ``turn_detection`` (``{"type": null}``: the client commits turns), ``audio.input`` /
+    ``audio.output`` ``format`` (PCM at 8 to 48 kHz; bolo sends 16 kHz and takes 24 kHz) and ``tools`` (function
+    tools nested under ``function``). Grok Voice 3.0 keeps Grok Voice 2.0's endpoint, session and events."""
+
+    name = "xai-realtime"
+
+    def _conversation(self, ws: Any, output_rate: int, url: str) -> S2SConversation:
+        where = realtime_url(str(self.url))
+        return XAIRealtimeConversation(ws, OPENAI_RATE, where, input_rate=INPUT_RATE, audio_or_text=True)
+
+    def _session_update(self, config: S2SConfig) -> dict[str, Any]:
+        voice = config.voice if config.voice and config.voice.lower() not in OPENAI_VOICES else self.default_voice
+        update: dict[str, Any] = {
+            "turn_detection": {"type": None},  # bolo detects turns and barge-in itself
+            "audio": {
+                "input": {"format": {"type": "audio/pcm", "rate": INPUT_RATE}},
+                "output": {"format": {"type": "audio/pcm", "rate": OPENAI_RATE}},
+            },
+            "tools": _function_tools(config.tools, nested=True),
+        }
+        if voice:
+            update["voice"] = voice
+        if config.instructions:
+            update["instructions"] = config.instructions
+        return update
+
+    default_voice: str | None = XAI_DEFAULT_VOICE
+
+
+# -- Rime's Prism ------------------------------------------------------------------------------------------------
+class RimePrismConversation(LlamaRealtimeConversation):
+    """A Prism conversation. Prism uses OpenAI's beta event names (``response.text.delta``,
+    ``response.audio.delta``) and its own rules for ``response.create``: with turn detection off, a plain request
+    answers the conversation as it is; a typed turn is a request with ``prism_input_text``
+    (``prism_cause: user_text``); the answer to tool results is a ``tool_continuation`` naming the reply that made
+    the calls, sent once Prism has acknowledged each result (``conversation.item.created``)."""
+
+    audio_events = ("response.audio.delta",)
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._typed: list[str] = []
+        self._tool_results = 0  # tool results sent since the last reply
+        self._acknowledged = asyncio.Condition()
+        self._items_created = 0
+        self._last_response: str | None = None
+
+    def _on_event(self, event: dict[str, Any]) -> None:
+        kind = event.get("type")
+        if kind == "conversation.item.created":
+            self._items_created += 1
+            asyncio.get_running_loop().create_task(self._notify())
+        elif kind == "response.created":
+            self._last_response = str((event.get("response") or {}).get("id") or "") or self._last_response
+
+    async def _notify(self) -> None:
+        async with self._acknowledged:
+            self._acknowledged.notify_all()
+
+    async def add_text(self, text: str) -> None:
+        self._typed.append(text)  # sent with the next response.create (a typed turn)
+
+    async def add_tool_output(self, call_id: str, output: str) -> None:
+        before = self._items_created
+        await super().add_tool_output(call_id, output)
+        self._tool_results += 1
+        # Prism refuses a continuation before every result is acknowledged (tool_continuation_not_ready)
+        async with self._acknowledged:
+            with contextlib.suppress(asyncio.TimeoutError):
+                await asyncio.wait_for(self._acknowledged.wait_for(lambda: self._items_created > before), 5.0)
+
+    def _response_create(self, modalities: list[str], max_output_tokens: Any, tool_choice: Any) -> dict[str, Any]:
+        event: dict[str, Any] = {"type": "response.create", "event_id": f"evt_{secrets.token_hex(6)}"}
+        if self._tool_results and self._last_response:
+            event["response"] = {
+                "metadata": {"prism_cause": "tool_continuation", "prism_parent_response_id": self._last_response}
+            }
+        elif self._typed:
+            event["response"] = {"prism_input_text": "\n".join(self._typed), "metadata": {"prism_cause": "user_text"}}
+        self._typed, self._tool_results = [], 0
+        return event
+
+    def _text_kinds(self, audio: bool) -> tuple[str, ...]:
+        return ("response.text.delta",)
+
+
+class RimePrismBackend(OpenAIRealtimeBackend):
+    """Rime's Prism (``wss://prism.api.rime.ai/v1/realtime``), from docs.rime.ai (the Prism WebSocket reference,
+    read 2026-11-21): ``Authorization: Bearer``, no query parameters, 16 kHz PCM16 in and 24 kHz out, and a
+    ``session.update`` that Prism refuses whole if a field is unknown: bolo sends ``voice``, ``instructions``,
+    ``tools`` (OpenAI's flat shape) and ``turn_detection: null`` (bolo commits turns). Prism always answers with
+    text and audio, takes only ``tool_choice: auto`` and has no output-token limit to set."""
+
+    name = "rime-prism"
+
+    @property
+    def ws_url(self) -> str:
+        return realtime_url(str(self.url))
+
+    def _conversation(self, ws: Any, output_rate: int, url: str) -> S2SConversation:
+        return RimePrismConversation(ws, OPENAI_RATE, self.ws_url, input_rate=INPUT_RATE, audio_or_text=True)
+
+    def _session_update(self, config: S2SConfig) -> dict[str, Any]:
+        update: dict[str, Any] = {"turn_detection": None, "tools": _function_tools(config.tools, nested=False)}
+        if config.voice and config.voice.lower() not in OPENAI_VOICES:
+            update["voice"] = config.voice
+        if config.instructions:
+            update["instructions"] = config.instructions
+        return update
+
+
+#: cloud speech-to-speech backends by dialect (a catalog entry's ``options.dialect``, else the provider's kind)
+CLOUD_BACKENDS: dict[str, type[OpenAIRealtimeBackend]] = {
+    "openai": OpenAIRealtimeBackend,
+    "xai": XAIRealtimeBackend,
+    "rime": RimePrismBackend,
+}
+#: provider kinds whose Realtime dialect is known
+DIALECT_OF_KIND = {"openai-compatible": "openai", "xai": "xai", "rime": "rime"}
+
+
 # -- a turn-based model loaded by bolo's model manager (plugins) ---------------------------------------------------
 class ModelS2SConversation(S2SConversation):
     """A conversation bolo keeps for a :class:`~bolo.engines.base.SpeechToSpeechModel`, which is stateless."""
@@ -738,11 +921,25 @@ class S2SManager:
             out["placement"] = self.placement.to_dict()
         return out
 
-    def _cloud(self) -> tuple[Any, str] | None:
-        """``s2s_model = "<provider>:<model>"`` -> (provider, model), when the prefix names a provider."""
-        prefix, sep, model = (self.core.settings.s2s_model or "").partition(":")
+    def _cloud(self) -> tuple[Any, str, str, dict[str, Any]] | None:
+        """A cloud speech-to-speech ``s2s_model`` -> (provider or None, the provider's model, the dialect, options):
+        ``"<provider>:<model>"`` when the prefix names a provider, or a catalog entry of task speech-to-speech on
+        the ``remote`` engine (its provider may not be configured yet: None)."""
+        name = self.core.settings.s2s_model or ""
+        spec = self.core.catalog.resolve(name) if name else None
+        if spec is not None and spec.cloud and spec.task == S2S_TASK:
+            options = dict(spec.options)
+            provider = self.core.providers.find(
+                str(options.get("provider") or "") or None, str(options.get("provider_kind") or "") or None
+            )
+            kind = provider.kind if provider is not None else str(options.get("provider_kind") or "")
+            dialect = str(options.get("dialect") or DIALECT_OF_KIND.get(kind, ""))
+            return provider, str(options.get("model") or ""), dialect, options
+        prefix, sep, model = name.partition(":")
         provider = self.core.providers.get(prefix) if sep and model else None
-        return (provider, model) if provider is not None else None
+        if provider is None:
+            return None
+        return provider, model, DIALECT_OF_KIND.get(provider.kind, ""), {}
 
     def _readiness(self) -> tuple[bool, bool, str | None]:
         from bolo.tts_runtimes import LLAMA, find_binary
@@ -757,11 +954,14 @@ class S2SManager:
             return True, True, None
         cloud = self._cloud()
         if cloud is not None:
-            provider, _model = cloud
-            if provider.kind != "openai-compatible":
-                return False, False, f"provider '{provider.name}' is not of kind openai-compatible"
+            provider, _model, dialect, options = cloud
+            if provider is None:
+                name = str(options.get("provider") or "")
+                return False, False, f"the cloud provider '{name}' is not configured (set {key_env(name)})"
+            if dialect not in CLOUD_BACKENDS:
+                return False, False, f"provider '{provider.name}' (kind {provider.kind}) has no Realtime backend"
             ok = bool(provider.configured)
-            return ok, ok, None if ok else f"provider '{provider.name}' has no API key"
+            return ok, ok, None if ok else f"provider '{provider.name}' has no API key ({key_env(provider.name)})"
         spec = self.core.catalog.resolve(s.s2s_model) if s.s2s_model else None
         if spec is None:
             return False, False, "s2s_model does not name a catalog model or a <provider>:<model>"
@@ -797,17 +997,28 @@ class S2SManager:
             return LlamaRealtimeBackend(s.s2s_server_url, api_key=s.s2s_server_api_key, model=s.s2s_model or None)
         cloud = self._cloud()
         if cloud is not None:
-            provider, model = cloud
-            if provider.kind != "openai-compatible":
+            provider, model, dialect, options = cloud
+            if provider is None:  # a catalog entry whose provider is not configured: say what to set
+                self.core.providers.require(
+                    str(options.get("provider") or "") or None,
+                    str(options.get("provider_kind") or "") or None,
+                    model=s.s2s_model,
+                )
+            assert provider is not None
+            backend_cls = CLOUD_BACKENDS.get(dialect)
+            if backend_cls is None:
                 raise InvalidRequest(
-                    f"provider '{provider.name}' is of kind {provider.kind}; the cloud speech-to-speech backend speaks "
-                    "OpenAI's Realtime API and needs a provider of kind openai-compatible",
+                    f"provider '{provider.name}' is of kind {provider.kind}; the cloud speech-to-speech backends speak "
+                    f"the Realtime dialects of {', '.join(sorted(DIALECT_OF_KIND))} providers",
                     param="s2s_model",
                 )
             self.core.providers.require(provider.name, model=s.s2s_model)
-            return OpenAIRealtimeBackend(
+            cloud_backend = backend_cls(
                 provider.base_url, api_key=provider.api_key, model=model, provider=provider.name
             )
+            if options.get("default_voice") and isinstance(cloud_backend, XAIRealtimeBackend):
+                cloud_backend.default_voice = str(options["default_voice"])
+            return cloud_backend
         if not s.s2s_model:
             raise EngineUnavailable(
                 "the speech-to-speech pipeline needs a model: set s2s_model (lfm3-audio-2b-onnx, which runs in this "

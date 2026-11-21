@@ -1548,7 +1548,108 @@
   engine: remote
   kind: remote-stt
   family: ElevenLabs (cloud)
-  languages: *id001
+  languages: &scribe3
+  - af
+  - am
+  - ar
+  - hy
+  - as
+  - ast
+  - az
+  - be
+  - bn
+  - bs
+  - bg
+  - my
+  - yue
+  - ca
+  - ceb
+  - ny
+  - hr
+  - cs
+  - da
+  - nl
+  - en
+  - et
+  - fil
+  - fi
+  - fr
+  - ff
+  - gl
+  - lg
+  - ka
+  - de
+  - el
+  - gu
+  - ha
+  - he
+  - hi
+  - hu
+  - is
+  - ig
+  - id
+  - ga
+  - it
+  - ja
+  - jv
+  - kea
+  - kn
+  - kk
+  - km
+  - ko
+  - ku
+  - ky
+  - lo
+  - lv
+  - ln
+  - lt
+  - luo
+  - lb
+  - mk
+  - ms
+  - ml
+  - mt
+  - zh
+  - mi
+  - mr
+  - mn
+  - ne
+  - nso
+  - 'no'
+  - oc
+  - or
+  - ps
+  - fa
+  - pl
+  - pt
+  - pa
+  - ro
+  - ru
+  - sr
+  - sn
+  - sd
+  - si
+  - sk
+  - sl
+  - so
+  - es
+  - sw
+  - sv
+  - ta
+  - tg
+  - te
+  - th
+  - tr
+  - uk
+  - umb
+  - ur
+  - uz
+  - vi
+  - cy
+  - wo
+  - xh
+  - zu
+  - yo
   tier: accuracy
   streaming: false
   sample_rate: 16000
@@ -1559,14 +1660,45 @@
   - timestamps
   - telephony
   - hotwords
-  description: 'ElevenLabs Scribe (scribe_v3): 90+ languages (the catalog lists Whisper''s codes), word timestamps,
-    hotwords (keyterms, which ElevenLabs bills at a surcharge). Paid cloud API: the audio leaves this server.'
-  source_url: https://elevenlabs.io/docs/api-reference/speech-to-text/convert
+  - speaker-labels
+  description: 'ElevenLabs Scribe v3 (scribe_v3, released 2026-11-10), recorded audio: 90+ languages (ElevenLabs
+    measured 102 on FLEURS; the catalog lists the 101 its documentation names), word timestamps, speaker labels from
+    ElevenLabs (diarize=true, up to 32 speakers), hotwords (keyterms, which ElevenLabs bills at a surcharge). Key:
+    BOLO_PROVIDER_ELEVENLABS_API_KEY. Paid cloud API: the audio leaves this server.'
+  source_url: https://elevenlabs.io/docs/overview/models#scribe-v3
   validated: untested
   options:
     provider: elevenlabs
     provider_kind: elevenlabs
     model: scribe_v3
+    workers: 4
+- id: elevenlabs-scribe-v3-live
+  task: stt
+  engine: remote
+  kind: remote-stt
+  family: ElevenLabs (cloud)
+  languages: *scribe3
+  tier: realtime
+  streaming: true
+  sample_rate: 16000
+  license: ElevenLabs Terms of Use (paid cloud API)
+  license_url: https://elevenlabs.io/terms-of-use
+  cloud: true
+  features:
+  - timestamps
+  - telephony
+  - speaker-labels
+  description: 'ElevenLabs Scribe v3 Live (scribe_v3_live, released 2026-11-10): live recognition over ElevenLabs''
+    realtime socket, with interim text, turn prediction (a segment ends when the model predicts the speaker has
+    finished) and speaker labels on the socket (diarize=true on the STT WebSocket); recorded audio and Realtime turns
+    go to scribe_v3. Key: BOLO_PROVIDER_ELEVENLABS_API_KEY. Paid cloud API: the audio leaves this server.'
+  source_url: https://elevenlabs.io/docs/overview/models#scribe-v3-live
+  validated: untested
+  options:
+    provider: elevenlabs
+    provider_kind: elevenlabs
+    model: scribe_v3_live
+    async_model: scribe_v3
     workers: 4
 - id: elevenlabs-scribe-v2
   task: stt
@@ -2038,4 +2170,1055 @@
     provider_kind: assemblyai
     model: assemblyai-stt-3-7-realtime-agent
     async_model: assemblyai-stt-3-7
+    workers: 4
+- id: xai-grok-voice-3.0
+  task: speech-to-speech
+  engine: remote
+  kind: remote-speech-to-speech
+  family: xAI (cloud)
+  languages:
+  - en
+  - ar
+  - bn
+  - zh
+  - fr
+  - de
+  - hi
+  - id
+  - it
+  - ja
+  - ko
+  - pt
+  - ru
+  - es
+  - tr
+  - vi
+  tier: realtime
+  streaming: true
+  sample_rate: 24000
+  license: xAI Terms of Service (paid cloud API)
+  license_url: https://x.ai/legal/terms-of-service
+  cloud: true
+  features:
+  - speech-to-speech
+  - tools
+  description: 'xAI Grok Voice 3.0 (grok-voice-3.0) through xAI''s Voice Agent API: a speech-to-speech model for
+    Realtime and WebRTC sessions of the speech-to-speech pipeline (s2s_model = "xai-grok-voice-3.0"). bolo keeps turn
+    detection, barge-in, codecs and transcripts of the caller, and sends each turn to xAI (16 kHz PCM up, 24 kHz
+    back); instructions, function tools and xAI''s voices (eve by default, or a custom voice id). 20+ languages
+    (the catalog lists xAI''s table by language). Key: BOLO_PROVIDER_XAI_API_KEY. Paid cloud API: the conversation''s
+    audio leaves this server.'
+  source_url: https://docs.x.ai/developers/model-capabilities/audio/speech-to-speech
+  validated: untested
+  voices:
+  - id: eve
+    name: Eve
+  - id: ara
+    name: Ara
+  options:
+    provider: xai
+    provider_kind: xai
+    model: grok-voice-3.0
+    dialect: xai
+    default_voice: eve
+- id: rime-prism
+  task: speech-to-speech
+  engine: remote
+  kind: remote-speech-to-speech
+  family: Rime (cloud)
+  languages:
+  - en
+  tier: realtime
+  streaming: true
+  sample_rate: 24000
+  license: Rime Terms of Service (paid cloud API)
+  license_url: https://www.rime.ai/terms
+  cloud: true
+  features:
+  - speech-to-speech
+  - tools
+  description: 'Rime Prism (released 2026-10-28) through its WebSocket: a speech-to-speech model that writes each
+    reply as text before speaking it, for Realtime and WebRTC sessions of the speech-to-speech pipeline
+    (s2s_model = "rime-prism"). bolo keeps turn detection, barge-in, codecs and transcripts of the caller and sends
+    each turn to Prism (16 kHz PCM up, 24 kHz back); instructions, function tools (with Prism''s tool continuations)
+    and typed turns. English voices: astra (Prism''s default), aurora, brando and the other Coda voices. Key:
+    BOLO_PROVIDER_RIME_API_KEY. Paid cloud API: the conversation''s audio leaves this server.'
+  source_url: https://docs.rime.ai/api-reference/prism/websocket
+  validated: untested
+  voices:
+  - id: astra
+    name: Astra
+  - id: aurora
+    name: Aurora
+  - id: brando
+    name: Brando
+  options:
+    provider: rime
+    provider_kind: rime
+    model: prism
+    dialect: rime
+- id: mai-transcribe-2-streaming
+  task: stt
+  engine: remote
+  kind: remote-stt
+  family: Microsoft MAI (cloud)
+  languages:
+  - af
+  - ar
+  - as
+  - az
+  - bg
+  - bn
+  - bs
+  - ca
+  - cs
+  - da
+  - de
+  - el
+  - en
+  - es
+  - et
+  - fa
+  - fi
+  - fil
+  - fr
+  - gl
+  - gu
+  - he
+  - hi
+  - hu
+  - hy
+  - id
+  - is
+  - it
+  - ja
+  - kk
+  - kn
+  - ko
+  - lt
+  - lv
+  - mk
+  - ml
+  - mr
+  - ms
+  - nb
+  - ne
+  - nl
+  - or
+  - pa
+  - pl
+  - pt
+  - ro
+  - ru
+  - sk
+  - sl
+  - sv
+  - sw
+  - ta
+  - te
+  - th
+  - tr
+  - uk
+  - ur
+  - vi
+  - yue
+  - zh
+  tier: realtime
+  streaming: true
+  sample_rate: 16000
+  license: Microsoft Azure terms; preview (paid cloud API)
+  license_url: https://azure.microsoft.com/support/legal/preview-supplemental-terms/
+  cloud: true
+  features:
+  - telephony
+  - language-detect
+  description: 'Microsoft MAI-Transcribe-2-Streaming (public preview, released 2026-10-01) through the realtime
+    socket of your Microsoft Foundry resource: live recognition in 60 languages with the language detected as it
+    changes, interim text, and a final at each pause (MAI has no server-side speech detection: bolo commits when it
+    hears a pause, and at the end of input). Recorded audio and Realtime turns are sent over the same socket with one
+    commit. Text only (no word times). Needs the resource''s address as base_url and a deployment of the model; key
+    BOLO_PROVIDER_AZURE_MAI_API_KEY, address BOLO_PROVIDER_AZURE_MAI_BASE_URL. Preview: no SLA. Paid cloud API: the
+    audio leaves this server.'
+  source_url: https://learn.microsoft.com/en-us/azure/ai-services/speech-service/mai-transcribe-2-streaming-realtime
+  validated: untested
+  options:
+    provider: azure-mai
+    provider_kind: azure-mai
+    model: MAI-Transcribe-2-Streaming
+    workers: 4
+- id: mai-voice-2.1
+  task: tts
+  engine: remote
+  kind: remote-tts
+  family: Microsoft MAI (cloud)
+  languages:
+  - cs
+  - da
+  - de
+  - en
+  - es
+  - fi
+  - fr
+  - hi
+  - hu
+  - id
+  - it
+  - ko
+  - nb
+  - nl
+  - pl
+  - pt
+  - ro
+  - ru
+  - sv
+  - th
+  - tr
+  - vi
+  - zh
+  tier: accuracy
+  streaming: false
+  sample_rate: 24000
+  license: Microsoft Azure terms; preview (paid cloud API)
+  license_url: https://azure.microsoft.com/support/legal/preview-supplemental-terms/
+  cloud: true
+  features:
+  - telephony
+  description: 'Microsoft MAI-Voice-2.1 (public preview, released 2026-10-01), the expressive, long-form model (audiobooks, lectures, voice-overs): 97 managed voices in 23
+    languages through Azure Speech''s text-to-speech route (the voice id with the model as suffix, en-US-Harper:MAI-Voice-2.1).
+    Needs the region of your Speech resource as the provider option region; key BOLO_PROVIDER_AZURE_MAI_API_KEY.
+    Preview: no SLA. Paid cloud API: the text leaves this server.'
+  source_url: https://learn.microsoft.com/en-us/azure/ai-services/speech-service/mai-voices
+  validated: untested
+  voices:
+  - id: en-US-Harper
+    name: Harper (en-US)
+    language: en-US
+    gender: f
+  - id: cs-CZ-Grant
+    name: Grant (cs-CZ)
+    language: cs-CZ
+    gender: m
+  - id: cs-CZ-Harper
+    name: Harper (cs-CZ)
+    language: cs-CZ
+    gender: f
+  - id: da-DK-Grant
+    name: Grant (da-DK)
+    language: da-DK
+    gender: m
+  - id: da-DK-Harper
+    name: Harper (da-DK)
+    language: da-DK
+    gender: f
+  - id: de-DE-Grant
+    name: Grant (de-DE)
+    language: de-DE
+    gender: m
+  - id: de-DE-Harper
+    name: Harper (de-DE)
+    language: de-DE
+    gender: f
+  - id: de-DE-Klaus
+    name: Klaus (de-DE)
+    language: de-DE
+    gender: m
+  - id: de-DE-Mia
+    name: Mia (de-DE)
+    language: de-DE
+    gender: f
+  - id: en-AU-Isla
+    name: Isla (en-AU)
+    language: en-AU
+    gender: f
+  - id: en-GB-Emily
+    name: Emily (en-GB)
+    language: en-GB
+    gender: f
+  - id: en-GB-Harry
+    name: Harry (en-GB)
+    language: en-GB
+    gender: m
+  - id: en-IN-Dhruv
+    name: Dhruv (en-IN)
+    language: en-IN
+    gender: m
+  - id: en-IN-Priya
+    name: Priya (en-IN)
+    language: en-IN
+    gender: f
+  - id: en-US-Ethan
+    name: Ethan (en-US)
+    language: en-US
+    gender: m
+  - id: en-US-Grant
+    name: Grant (en-US)
+    language: en-US
+    gender: m
+  - id: en-US-Iris
+    name: Iris (en-US)
+    language: en-US
+    gender: f
+  - id: en-US-Jasper
+    name: Jasper (en-US)
+    language: en-US
+    gender: m
+  - id: en-US-Olivia
+    name: Olivia (en-US)
+    language: en-US
+    gender: f
+  - id: en-US-Sage
+    name: Sage (en-US)
+    language: en-US
+    gender: m
+  - id: es-ES-Marta
+    name: Marta (es-ES)
+    language: es-ES
+    gender: f
+  - id: es-MX-Alejo
+    name: Alejo (es-MX)
+    language: es-MX
+    gender: m
+  - id: es-MX-Grant
+    name: Grant (es-MX)
+    language: es-MX
+    gender: m
+  - id: es-MX-Harper
+    name: Harper (es-MX)
+    language: es-MX
+    gender: f
+  - id: es-MX-Valeria
+    name: Valeria (es-MX)
+    language: es-MX
+    gender: f
+  - id: fi-FI-Grant
+    name: Grant (fi-FI)
+    language: fi-FI
+    gender: m
+  - id: fi-FI-Harper
+    name: Harper (fi-FI)
+    language: fi-FI
+    gender: f
+  - id: fr-FR-Grant
+    name: Grant (fr-FR)
+    language: fr-FR
+    gender: m
+  - id: fr-FR-Harper
+    name: Harper (fr-FR)
+    language: fr-FR
+    gender: f
+  - id: fr-FR-Marc
+    name: Marc (fr-FR)
+    language: fr-FR
+    gender: m
+  - id: fr-FR-Soleil
+    name: Soleil (fr-FR)
+    language: fr-FR
+    gender: f
+  - id: hi-IN-Arjun
+    name: Arjun (hi-IN)
+    language: hi-IN
+    gender: m
+  - id: hi-IN-Dhruv
+    name: Dhruv (hi-IN)
+    language: hi-IN
+    gender: m
+  - id: hi-IN-Grant
+    name: Grant (hi-IN)
+    language: hi-IN
+    gender: m
+  - id: hi-IN-Harper
+    name: Harper (hi-IN)
+    language: hi-IN
+    gender: f
+  - id: hi-IN-Kavya
+    name: Kavya (hi-IN)
+    language: hi-IN
+    gender: f
+  - id: hi-IN-Priya
+    name: Priya (hi-IN)
+    language: hi-IN
+    gender: f
+  - id: hu-HU-Bence
+    name: Bence (hu-HU)
+    language: hu-HU
+    gender: m
+  - id: hu-HU-Grant
+    name: Grant (hu-HU)
+    language: hu-HU
+    gender: m
+  - id: hu-HU-Harper
+    name: Harper (hu-HU)
+    language: hu-HU
+    gender: f
+  - id: hu-HU-Levente
+    name: Levente (hu-HU)
+    language: hu-HU
+    gender: m
+  - id: hu-HU-Lilla
+    name: Lilla (hu-HU)
+    language: hu-HU
+    gender: f
+  - id: hu-HU-Reka
+    name: Reka (hu-HU)
+    language: hu-HU
+    gender: f
+  - id: id-ID-Grant
+    name: Grant (id-ID)
+    language: id-ID
+    gender: m
+  - id: id-ID-Harper
+    name: Harper (id-ID)
+    language: id-ID
+    gender: f
+  - id: it-IT-Grant
+    name: Grant (it-IT)
+    language: it-IT
+    gender: m
+  - id: it-IT-Harper
+    name: Harper (it-IT)
+    language: it-IT
+    gender: f
+  - id: it-IT-Luca
+    name: Luca (it-IT)
+    language: it-IT
+    gender: m
+  - id: it-IT-Rosa
+    name: Rosa (it-IT)
+    language: it-IT
+    gender: f
+  - id: ko-KR-Grant
+    name: Grant (ko-KR)
+    language: ko-KR
+    gender: m
+  - id: ko-KR-Haena
+    name: Haena (ko-KR)
+    language: ko-KR
+    gender: f
+  - id: ko-KR-Harper
+    name: Harper (ko-KR)
+    language: ko-KR
+    gender: f
+  - id: ko-KR-Junho
+    name: Junho (ko-KR)
+    language: ko-KR
+    gender: m
+  - id: nb-NO-Grant
+    name: Grant (nb-NO)
+    language: nb-NO
+    gender: m
+  - id: nb-NO-Harper
+    name: Harper (nb-NO)
+    language: nb-NO
+    gender: f
+  - id: nl-NL-Grant
+    name: Grant (nl-NL)
+    language: nl-NL
+    gender: m
+  - id: nl-NL-Harper
+    name: Harper (nl-NL)
+    language: nl-NL
+    gender: f
+  - id: nl-NL-Sander
+    name: Sander (nl-NL)
+    language: nl-NL
+    gender: m
+  - id: pl-PL-Grant
+    name: Grant (pl-PL)
+    language: pl-PL
+    gender: m
+  - id: pl-PL-Harper
+    name: Harper (pl-PL)
+    language: pl-PL
+    gender: f
+  - id: pt-BR-Caio
+    name: Caio (pt-BR)
+    language: pt-BR
+    gender: m
+  - id: pt-BR-Grant
+    name: Grant (pt-BR)
+    language: pt-BR
+    gender: m
+  - id: pt-BR-Harper
+    name: Harper (pt-BR)
+    language: pt-BR
+    gender: f
+  - id: pt-BR-Luana
+    name: Luana (pt-BR)
+    language: pt-BR
+    gender: f
+  - id: pt-BR-Pedro
+    name: Pedro (pt-BR)
+    language: pt-BR
+    gender: m
+  - id: pt-BR-Rafael
+    name: Rafael (pt-BR)
+    language: pt-BR
+    gender: m
+  - id: pt-PT-Grant
+    name: Grant (pt-PT)
+    language: pt-PT
+    gender: m
+  - id: pt-PT-Harper
+    name: Harper (pt-PT)
+    language: pt-PT
+    gender: f
+  - id: pt-PT-Rui
+    name: Rui (pt-PT)
+    language: pt-PT
+    gender: m
+  - id: ro-RO-Andrei
+    name: Andrei (ro-RO)
+    language: ro-RO
+    gender: m
+  - id: ro-RO-Elena
+    name: Elena (ro-RO)
+    language: ro-RO
+    gender: f
+  - id: ro-RO-Grant
+    name: Grant (ro-RO)
+    language: ro-RO
+    gender: m
+  - id: ro-RO-Harper
+    name: Harper (ro-RO)
+    language: ro-RO
+    gender: f
+  - id: ro-RO-Ioana
+    name: Ioana (ro-RO)
+    language: ro-RO
+    gender: f
+  - id: ro-RO-Radu
+    name: Radu (ro-RO)
+    language: ro-RO
+    gender: m
+  - id: ru-RU-Grant
+    name: Grant (ru-RU)
+    language: ru-RU
+    gender: m
+  - id: ru-RU-Harper
+    name: Harper (ru-RU)
+    language: ru-RU
+    gender: f
+  - id: ru-RU-Lev
+    name: Lev (ru-RU)
+    language: ru-RU
+    gender: m
+  - id: ru-RU-Masha
+    name: Masha (ru-RU)
+    language: ru-RU
+    gender: f
+  - id: sv-SE-Grant
+    name: Grant (sv-SE)
+    language: sv-SE
+    gender: m
+  - id: sv-SE-Harper
+    name: Harper (sv-SE)
+    language: sv-SE
+    gender: f
+  - id: th-TH-Grant
+    name: Grant (th-TH)
+    language: th-TH
+    gender: m
+  - id: th-TH-Harper
+    name: Harper (th-TH)
+    language: th-TH
+    gender: f
+  - id: th-TH-Krit
+    name: Krit (th-TH)
+    language: th-TH
+    gender: f
+  - id: th-TH-Nattapong
+    name: Nattapong (th-TH)
+    language: th-TH
+    gender: m
+  - id: tr-TR-Aydin
+    name: Aydin (tr-TR)
+    language: tr-TR
+    gender: m
+  - id: tr-TR-Elif
+    name: Elif (tr-TR)
+    language: tr-TR
+    gender: f
+  - id: tr-TR-Grant
+    name: Grant (tr-TR)
+    language: tr-TR
+    gender: m
+  - id: tr-TR-Harper
+    name: Harper (tr-TR)
+    language: tr-TR
+    gender: f
+  - id: vi-VN-Grant
+    name: Grant (vi-VN)
+    language: vi-VN
+    gender: m
+  - id: vi-VN-Harper
+    name: Harper (vi-VN)
+    language: vi-VN
+    gender: f
+  - id: zh-CN-Bo
+    name: Bo (zh-CN)
+    language: zh-CN
+    gender: m
+  - id: zh-CN-Grant
+    name: Grant (zh-CN)
+    language: zh-CN
+    gender: m
+  - id: zh-CN-Harper
+    name: Harper (zh-CN)
+    language: zh-CN
+    gender: f
+  - id: zh-CN-Lan
+    name: Lan (zh-CN)
+    language: zh-CN
+    gender: f
+  - id: zh-CN-Mei
+    name: Mei (zh-CN)
+    language: zh-CN
+    gender: f
+  - id: zh-CN-Wei
+    name: Wei (zh-CN)
+    language: zh-CN
+    gender: m
+  options:
+    provider: azure-mai
+    provider_kind: azure-mai
+    model: MAI-Voice-2.1
+    default_voice: en-US-Harper
+    workers: 4
+- id: mai-voice-2.1-flash
+  task: tts
+  engine: remote
+  kind: remote-tts
+  family: Microsoft MAI (cloud)
+  languages:
+  - cs
+  - da
+  - de
+  - en
+  - es
+  - fi
+  - fr
+  - hi
+  - hu
+  - id
+  - it
+  - ko
+  - nb
+  - nl
+  - pl
+  - pt
+  - ro
+  - ru
+  - sv
+  - th
+  - tr
+  - vi
+  - zh
+  tier: realtime
+  streaming: false
+  sample_rate: 24000
+  license: Microsoft Azure terms; preview (paid cloud API)
+  license_url: https://azure.microsoft.com/support/legal/preview-supplemental-terms/
+  cloud: true
+  features:
+  - telephony
+  description: 'Microsoft MAI-Voice-2.1-Flash (public preview, released 2026-10-01), the low-latency model for voice agents and IVR: 97 managed voices in 23
+    languages through Azure Speech''s text-to-speech route (the voice id with the model as suffix, en-US-Harper:MAI-Voice-2.1-Flash).
+    Needs the region of your Speech resource as the provider option region; key BOLO_PROVIDER_AZURE_MAI_API_KEY.
+    Preview: no SLA. Paid cloud API: the text leaves this server.'
+  source_url: https://learn.microsoft.com/en-us/azure/ai-services/speech-service/mai-voices
+  validated: untested
+  voices:
+  - id: en-US-Harper
+    name: Harper (en-US)
+    language: en-US
+    gender: f
+  - id: cs-CZ-Grant
+    name: Grant (cs-CZ)
+    language: cs-CZ
+    gender: m
+  - id: cs-CZ-Harper
+    name: Harper (cs-CZ)
+    language: cs-CZ
+    gender: f
+  - id: da-DK-Grant
+    name: Grant (da-DK)
+    language: da-DK
+    gender: m
+  - id: da-DK-Harper
+    name: Harper (da-DK)
+    language: da-DK
+    gender: f
+  - id: de-DE-Grant
+    name: Grant (de-DE)
+    language: de-DE
+    gender: m
+  - id: de-DE-Harper
+    name: Harper (de-DE)
+    language: de-DE
+    gender: f
+  - id: de-DE-Klaus
+    name: Klaus (de-DE)
+    language: de-DE
+    gender: m
+  - id: de-DE-Mia
+    name: Mia (de-DE)
+    language: de-DE
+    gender: f
+  - id: en-AU-Isla
+    name: Isla (en-AU)
+    language: en-AU
+    gender: f
+  - id: en-GB-Emily
+    name: Emily (en-GB)
+    language: en-GB
+    gender: f
+  - id: en-GB-Harry
+    name: Harry (en-GB)
+    language: en-GB
+    gender: m
+  - id: en-IN-Dhruv
+    name: Dhruv (en-IN)
+    language: en-IN
+    gender: m
+  - id: en-IN-Priya
+    name: Priya (en-IN)
+    language: en-IN
+    gender: f
+  - id: en-US-Ethan
+    name: Ethan (en-US)
+    language: en-US
+    gender: m
+  - id: en-US-Grant
+    name: Grant (en-US)
+    language: en-US
+    gender: m
+  - id: en-US-Iris
+    name: Iris (en-US)
+    language: en-US
+    gender: f
+  - id: en-US-Jasper
+    name: Jasper (en-US)
+    language: en-US
+    gender: m
+  - id: en-US-Olivia
+    name: Olivia (en-US)
+    language: en-US
+    gender: f
+  - id: en-US-Sage
+    name: Sage (en-US)
+    language: en-US
+    gender: m
+  - id: es-ES-Marta
+    name: Marta (es-ES)
+    language: es-ES
+    gender: f
+  - id: es-MX-Alejo
+    name: Alejo (es-MX)
+    language: es-MX
+    gender: m
+  - id: es-MX-Grant
+    name: Grant (es-MX)
+    language: es-MX
+    gender: m
+  - id: es-MX-Harper
+    name: Harper (es-MX)
+    language: es-MX
+    gender: f
+  - id: es-MX-Valeria
+    name: Valeria (es-MX)
+    language: es-MX
+    gender: f
+  - id: fi-FI-Grant
+    name: Grant (fi-FI)
+    language: fi-FI
+    gender: m
+  - id: fi-FI-Harper
+    name: Harper (fi-FI)
+    language: fi-FI
+    gender: f
+  - id: fr-FR-Grant
+    name: Grant (fr-FR)
+    language: fr-FR
+    gender: m
+  - id: fr-FR-Harper
+    name: Harper (fr-FR)
+    language: fr-FR
+    gender: f
+  - id: fr-FR-Marc
+    name: Marc (fr-FR)
+    language: fr-FR
+    gender: m
+  - id: fr-FR-Soleil
+    name: Soleil (fr-FR)
+    language: fr-FR
+    gender: f
+  - id: hi-IN-Arjun
+    name: Arjun (hi-IN)
+    language: hi-IN
+    gender: m
+  - id: hi-IN-Dhruv
+    name: Dhruv (hi-IN)
+    language: hi-IN
+    gender: m
+  - id: hi-IN-Grant
+    name: Grant (hi-IN)
+    language: hi-IN
+    gender: m
+  - id: hi-IN-Harper
+    name: Harper (hi-IN)
+    language: hi-IN
+    gender: f
+  - id: hi-IN-Kavya
+    name: Kavya (hi-IN)
+    language: hi-IN
+    gender: f
+  - id: hi-IN-Priya
+    name: Priya (hi-IN)
+    language: hi-IN
+    gender: f
+  - id: hu-HU-Bence
+    name: Bence (hu-HU)
+    language: hu-HU
+    gender: m
+  - id: hu-HU-Grant
+    name: Grant (hu-HU)
+    language: hu-HU
+    gender: m
+  - id: hu-HU-Harper
+    name: Harper (hu-HU)
+    language: hu-HU
+    gender: f
+  - id: hu-HU-Levente
+    name: Levente (hu-HU)
+    language: hu-HU
+    gender: m
+  - id: hu-HU-Lilla
+    name: Lilla (hu-HU)
+    language: hu-HU
+    gender: f
+  - id: hu-HU-Reka
+    name: Reka (hu-HU)
+    language: hu-HU
+    gender: f
+  - id: id-ID-Grant
+    name: Grant (id-ID)
+    language: id-ID
+    gender: m
+  - id: id-ID-Harper
+    name: Harper (id-ID)
+    language: id-ID
+    gender: f
+  - id: it-IT-Grant
+    name: Grant (it-IT)
+    language: it-IT
+    gender: m
+  - id: it-IT-Harper
+    name: Harper (it-IT)
+    language: it-IT
+    gender: f
+  - id: it-IT-Luca
+    name: Luca (it-IT)
+    language: it-IT
+    gender: m
+  - id: it-IT-Rosa
+    name: Rosa (it-IT)
+    language: it-IT
+    gender: f
+  - id: ko-KR-Grant
+    name: Grant (ko-KR)
+    language: ko-KR
+    gender: m
+  - id: ko-KR-Haena
+    name: Haena (ko-KR)
+    language: ko-KR
+    gender: f
+  - id: ko-KR-Harper
+    name: Harper (ko-KR)
+    language: ko-KR
+    gender: f
+  - id: ko-KR-Junho
+    name: Junho (ko-KR)
+    language: ko-KR
+    gender: m
+  - id: nb-NO-Grant
+    name: Grant (nb-NO)
+    language: nb-NO
+    gender: m
+  - id: nb-NO-Harper
+    name: Harper (nb-NO)
+    language: nb-NO
+    gender: f
+  - id: nl-NL-Grant
+    name: Grant (nl-NL)
+    language: nl-NL
+    gender: m
+  - id: nl-NL-Harper
+    name: Harper (nl-NL)
+    language: nl-NL
+    gender: f
+  - id: nl-NL-Sander
+    name: Sander (nl-NL)
+    language: nl-NL
+    gender: m
+  - id: pl-PL-Grant
+    name: Grant (pl-PL)
+    language: pl-PL
+    gender: m
+  - id: pl-PL-Harper
+    name: Harper (pl-PL)
+    language: pl-PL
+    gender: f
+  - id: pt-BR-Caio
+    name: Caio (pt-BR)
+    language: pt-BR
+    gender: m
+  - id: pt-BR-Grant
+    name: Grant (pt-BR)
+    language: pt-BR
+    gender: m
+  - id: pt-BR-Harper
+    name: Harper (pt-BR)
+    language: pt-BR
+    gender: f
+  - id: pt-BR-Luana
+    name: Luana (pt-BR)
+    language: pt-BR
+    gender: f
+  - id: pt-BR-Pedro
+    name: Pedro (pt-BR)
+    language: pt-BR
+    gender: m
+  - id: pt-BR-Rafael
+    name: Rafael (pt-BR)
+    language: pt-BR
+    gender: m
+  - id: pt-PT-Grant
+    name: Grant (pt-PT)
+    language: pt-PT
+    gender: m
+  - id: pt-PT-Harper
+    name: Harper (pt-PT)
+    language: pt-PT
+    gender: f
+  - id: pt-PT-Rui
+    name: Rui (pt-PT)
+    language: pt-PT
+    gender: m
+  - id: ro-RO-Andrei
+    name: Andrei (ro-RO)
+    language: ro-RO
+    gender: m
+  - id: ro-RO-Elena
+    name: Elena (ro-RO)
+    language: ro-RO
+    gender: f
+  - id: ro-RO-Grant
+    name: Grant (ro-RO)
+    language: ro-RO
+    gender: m
+  - id: ro-RO-Harper
+    name: Harper (ro-RO)
+    language: ro-RO
+    gender: f
+  - id: ro-RO-Ioana
+    name: Ioana (ro-RO)
+    language: ro-RO
+    gender: f
+  - id: ro-RO-Radu
+    name: Radu (ro-RO)
+    language: ro-RO
+    gender: m
+  - id: ru-RU-Grant
+    name: Grant (ru-RU)
+    language: ru-RU
+    gender: m
+  - id: ru-RU-Harper
+    name: Harper (ru-RU)
+    language: ru-RU
+    gender: f
+  - id: ru-RU-Lev
+    name: Lev (ru-RU)
+    language: ru-RU
+    gender: m
+  - id: ru-RU-Masha
+    name: Masha (ru-RU)
+    language: ru-RU
+    gender: f
+  - id: sv-SE-Grant
+    name: Grant (sv-SE)
+    language: sv-SE
+    gender: m
+  - id: sv-SE-Harper
+    name: Harper (sv-SE)
+    language: sv-SE
+    gender: f
+  - id: th-TH-Grant
+    name: Grant (th-TH)
+    language: th-TH
+    gender: m
+  - id: th-TH-Harper
+    name: Harper (th-TH)
+    language: th-TH
+    gender: f
+  - id: th-TH-Krit
+    name: Krit (th-TH)
+    language: th-TH
+    gender: f
+  - id: th-TH-Nattapong
+    name: Nattapong (th-TH)
+    language: th-TH
+    gender: m
+  - id: tr-TR-Aydin
+    name: Aydin (tr-TR)
+    language: tr-TR
+    gender: m
+  - id: tr-TR-Elif
+    name: Elif (tr-TR)
+    language: tr-TR
+    gender: f
+  - id: tr-TR-Grant
+    name: Grant (tr-TR)
+    language: tr-TR
+    gender: m
+  - id: tr-TR-Harper
+    name: Harper (tr-TR)
+    language: tr-TR
+    gender: f
+  - id: vi-VN-Grant
+    name: Grant (vi-VN)
+    language: vi-VN
+    gender: m
+  - id: vi-VN-Harper
+    name: Harper (vi-VN)
+    language: vi-VN
+    gender: f
+  - id: zh-CN-Bo
+    name: Bo (zh-CN)
+    language: zh-CN
+    gender: m
+  - id: zh-CN-Grant
+    name: Grant (zh-CN)
+    language: zh-CN
+    gender: m
+  - id: zh-CN-Harper
+    name: Harper (zh-CN)
+    language: zh-CN
+    gender: f
+  - id: zh-CN-Lan
+    name: Lan (zh-CN)
+    language: zh-CN
+    gender: f
+  - id: zh-CN-Mei
+    name: Mei (zh-CN)
+    language: zh-CN
+    gender: f
+  - id: zh-CN-Wei
+    name: Wei (zh-CN)
+    language: zh-CN
+    gender: m
+  options:
+    provider: azure-mai
+    provider_kind: azure-mai
+    model: MAI-Voice-2.1-Flash
+    default_voice: en-US-Harper
     workers: 4

@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("bolo.providers")
 
-KINDS = ("openai-compatible", "sarvam", "elevenlabs", "deepgram", "soniox", "assemblyai")
+KINDS = ("openai-compatible", "sarvam", "elevenlabs", "deepgram", "soniox", "assemblyai", "xai", "rime", "azure-mai")
 DEFAULT_BASE_URLS = {
     "openai-compatible": "https://api.openai.com/v1",
     "sarvam": "https://api.sarvam.ai",
@@ -42,7 +42,14 @@ DEFAULT_BASE_URLS = {
     "deepgram": "https://api.deepgram.com",
     "soniox": "https://api.soniox.com",
     "assemblyai": "https://api.assemblyai.com",
+    "xai": "https://api.x.ai/v1",
+    "rime": "https://prism.api.rime.ai/v1",
+    # an Azure resource has its own address: the placeholder is never contacted (the provider is not configured
+    # until base_url names the resource)
+    "azure-mai": "https://your-resource.services.ai.azure.com",
 }
+#: kinds whose default base_url is a placeholder for the operator's own resource
+NEEDS_BASE_URL = ("azure-mai",)
 #: provider names whose kind need not be spelled out
 KIND_BY_NAME = {
     "openai": "openai-compatible",
@@ -51,6 +58,9 @@ KIND_BY_NAME = {
     "deepgram": "deepgram",
     "soniox": "soniox",
     "assemblyai": "assemblyai",
+    "xai": "xai",
+    "rime": "rime",
+    "azure-mai": "azure-mai",
 }
 TERMS = {
     "openai-compatible": "https://openai.com/policies/services-agreement/",
@@ -59,6 +69,9 @@ TERMS = {
     "deepgram": "https://deepgram.com/terms",
     "soniox": "https://soniox.com/policies/terms-of-service",
     "assemblyai": "https://www.assemblyai.com/legal/terms-of-service",
+    "xai": "https://x.ai/legal/terms-of-service",
+    "rime": "https://www.rime.ai/terms",
+    "azure-mai": "https://azure.microsoft.com/support/legal/preview-supplemental-terms/",
 }
 LOOPBACK = ("127.0.0.1", "localhost", "::1")
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,39}$")
@@ -155,7 +168,10 @@ class ProviderConfig:
 
     @property
     def configured(self) -> bool:
-        """Usable: a key is set, or it is a self-hosted OpenAI-compatible server (those often need none)."""
+        """Usable: a key is set (and, for an Azure resource, its address), or it is a self-hosted OpenAI-compatible
+        server (those often need none)."""
+        if self.kind in NEEDS_BASE_URL and self.is_default_host:
+            return False
         return bool(self.api_key) or (self.kind == "openai-compatible" and not self.is_default_host)
 
     def public(self) -> dict[str, Any]:
@@ -408,7 +424,15 @@ class ProviderRegistry:
                 "console's Providers page"
             )
         if not cfg.configured:
-            raise ProviderNotConfigured(f"{what}needs the cloud provider '{cfg.name}', which has no API key yet")
+            if cfg.kind in NEEDS_BASE_URL and cfg.is_default_host:
+                env = key_env(cfg.name).replace("_API_KEY", "_BASE_URL")
+                raise ProviderNotConfigured(
+                    f"{what}needs the cloud provider '{cfg.name}', which has no base_url yet: set it to your Azure "
+                    f"resource, https://<resource>.services.ai.azure.com ({env})"
+                )
+            raise ProviderNotConfigured(
+                f"{what}needs the cloud provider '{cfg.name}', which has no API key yet ({key_env(cfg.name)})"
+            )
         return cfg
 
     def public(self) -> list[dict[str, Any]]:

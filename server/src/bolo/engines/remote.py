@@ -2,8 +2,8 @@
 
 A catalog entry with ``engine: remote`` names a provider (``options.provider``, an entry of the ``providers``
 setting) and the provider's model (``options.model``). The provider's ``kind`` picks the adapter
-(:mod:`bolo.remote`): ``openai-compatible``, ``sarvam``, ``elevenlabs``, ``deepgram`` or ``soniox``. Nothing is
-downloaded: such a model counts as installed as soon as its provider is configured.
+(:mod:`bolo.remote`): ``openai-compatible``, ``sarvam``, ``elevenlabs``, ``deepgram``, ``soniox`` or ``assemblyai``
+(``xai`` and ``rime`` serve only cloud speech-to-speech, :mod:`bolo.s2s`). Nothing is downloaded: such a model counts as installed as soon as its provider is configured.
 
 To the rest of bolo these are ordinary models. Recognition gets 16 kHz audio (bolo decoded, resampled and, for
 long recordings or diarization, cut it first) and sends each piece as a WAV file; synthesis gets the prepared
@@ -294,9 +294,10 @@ class RemoteStream(STTStream):
             return
         self._ensure()
         self._sent += len(samples)
-        frame = self.protocol.audio(float_to_pcm16(np.asarray(samples, dtype=np.float32)))
-        if frame:  # a protocol that sends pieces of a minimum length holds short ones back
-            self._out.put(frame)
+        frames = self.protocol.audio(float_to_pcm16(np.asarray(samples, dtype=np.float32)))
+        for frame in frames if isinstance(frames, list) else [frames]:
+            if frame:  # a protocol that sends pieces of a minimum length holds short ones back
+                self._out.put(frame)
 
     def finish(self) -> None:
         self._finishing = True
@@ -461,7 +462,7 @@ class RemoteDenoise(DenoiseModel):
 
 class RemoteEngine(Engine):
     id = ENGINE_ID
-    name = "Cloud speech APIs (OpenAI-compatible, Sarvam, ElevenLabs, Deepgram, Soniox)"
+    name = "Cloud speech APIs (OpenAI-compatible, Sarvam, ElevenLabs, Deepgram, Soniox, AssemblyAI, xAI, Rime)"
     license = "Apache-2.0 (bolo's client); each provider's terms apply to its API"
     url = "https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md"
     kinds = ("remote-stt", "remote-tts", "remote-denoise")
@@ -492,6 +493,12 @@ class RemoteEngine(Engine):
     def load(self, kind: str, task: str, path: Path, spec: dict[str, Any], opts: LoadOptions) -> Model:
         registry = self._registry()
         name = str(spec.get("model_id") or path.name)
+        if task == "speech-to-speech":
+            raise EngineUnavailable(
+                f"'{name}' is a cloud speech-to-speech model: it answers Realtime and WebRTC sessions of the "
+                f'speech-to-speech pipeline (set s2s_model = "{name}" and realtime_pipeline = "speech-to-speech"); '
+                'docs/providers.md, "Cloud speech-to-speech"'
+            )
         if task not in ("stt", "tts", "denoise"):
             raise EngineUnavailable(
                 f"the remote engine serves speech-to-text, text-to-speech and denoising, not {task!r}"
