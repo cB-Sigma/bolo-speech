@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-521 models: 225 validated on CPU by the maintainers, 296 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+522 models: 226 validated on CPU by the maintainers, 296 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -688,6 +688,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `tiny-voca-onnx` | en | realtime | - | 27 MB | Apache-2.0 | untested |
+
+#### little-tts
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `little-tts-onnx` | en | realtime | - | 25 MB | CC-BY-NC-4.0 ⚠ | **CPU** · RTF 0.025 · round-trip WER 0.0% |
 
 ### Voice-activity detection
 
@@ -2950,6 +2956,14 @@ texts (numbers, money, dates, times, codes, addresses, homographs, chat spelling
 `dizione.test.ts`, its fixture written by `ui/scripts/parity/dizione_cases.py`) and on 3,000 lines of bolo's docs. The
 first use fetches the model (21 MB) and the phonemiser data (5 MB); in headless Chromium on a 4-core CPU a two-clause
 sentence came back as 3.5 to 3.8 s of non-silent 24 kHz audio in 2 to 6 s, downloads included.
+
+**little-tts in process** (`little-tts-onnx`, TuringLogic; weights CC BY-NC 4.0, not for commercial use): a 4.6
+M-parameter English voice trained from scratch on HiFi-TTS, with a DDSP harmonic-plus-noise head. Its ONNX graph takes
+the same inputs as tiny-voca's and its phonemiser is dizione at the commit bolo carries, so it runs on the tiny-voca
+engine (which reads little-tts's flat `onnx/model.json` as well as tiny-voca's `config.json`, and refuses a graph whose
+phoneme table is not dizione's). Run on the 4-vCPU Xeon with 2 threads (2026-11-21): one sentence per voice came back
+as non-silent 24 kHz audio (median pitch 210 Hz for voice 92, 121 Hz for 6097) at 0.026 of real time, load 0.3 s, and
+faster-whisper-small transcribed both back word for word.
 
 **What was run**: `pocket-tts-en-llamacpp` on the upstream llama-server b12375
 release, started by bolo (`bolo components install llama-server`), on the

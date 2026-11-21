@@ -13,6 +13,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   and Portuguese ones (`gradium-phonon-40m-<lang>-audiocpp`), about 122 MB each, with the checkpoint's default voice.
   CC BY-NC 4.0 (not for commercial use) and gated: accept Gradium's access form on Hugging Face and set `hf_token`.
   Catalogued as added, not yet run: the download needs that access.
+- **little-tts** (`little-tts-onnx`, TuringLogic): a 4.6 M-parameter English voice (92 female, 6097 male, 24 kHz) in
+  process on ONNX Runtime, through the tiny-voca engine: same graph inputs, same phonemiser. Weights CC BY-NC 4.0, so
+  not for commercial use. On a 4-vCPU Xeon with 2 threads it speaks at 0.026 of real time and faster-whisper-small
+  transcribed both voices back word for word. The tiny-voca engine now also reads little-tts's flat `onnx/model.json`,
+  and refuses a graph whose phoneme table is not dizione's instead of speaking noise.
 
 ## [1.0.0] - 2026-11-19
 

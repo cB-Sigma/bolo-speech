@@ -1929,3 +1929,49 @@
   voices:
   - {id: F2, name: F2 (female), language: en-US, gender: f}
   - {id: M2, name: M2 (male), language: en-US, gender: m}
+
+- id: little-tts-onnx
+  aliases: [little-tts, TuringLogic/little-tts]
+  task: tts
+  engine: onnxruntime
+  kind: tiny_voca_onnx
+  family: little-tts
+  languages: [en]
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 24935563
+  params: 4648907
+  license: CC-BY-NC-4.0
+  license_url: https://huggingface.co/TuringLogic/little-tts/blob/main/LICENSE-WEIGHTS
+  commercial_use: false
+  description: 'little-tts (TuringLogic): a 4.6 M-parameter English voice trained from scratch on HiFi-TTS, voices 92
+    (female) and 6097 (male), 24 kHz, with a DDSP harmonic-plus-noise waveform head. The authors'' ONNX export on ONNX
+    Runtime, in process: no server, no PyTorch. It is tiny-voca''s graph interface and phonemiser (dizione, the same
+    commit bolo carries) with its own weights, so it runs on the same engine. Weights CC BY-NC 4.0: not for commercial
+    use (the code is Apache-2.0). English only.'
+  source_url: https://huggingface.co/TuringLogic/little-tts
+  validated: cpu
+  measured:
+    rtf: 0.0255
+    round_trip_wer: 0.0
+    round_trip_stt: faster-whisper-small
+    audio_s: 6.1
+    load_s: 0.31
+    memory_mb: 280
+    threads: 2
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-21'
+    note: 'One English sentence in each voice through bolo''s HTTP API, transcribed back word for word by
+      faster-whisper-small; median pitch 210 Hz (92) and 121 Hz (6097). RTF from three repeats per voice in process.'
+  source:
+    repo: TuringLogic/little-tts
+    revision: 550ce03fe781da74272d3103cfac5d282d819704
+    include: [onnx/model.onnx, onnx/model.json, LICENSE-WEIGHTS, NOTICE, phonemizer/*]
+  options:
+    model: onnx/model.onnx
+    config: onnx/model.json
+    phonemizer: phonemizer
+  voices:
+  - {id: '92', name: 92 (female), language: en-US, gender: f}
+  - {id: '6097', name: 6097 (male), language: en-US, gender: m}
