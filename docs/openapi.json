@@ -3767,7 +3767,7 @@
      "pipelines"
     ],
     "summary": "Validate a pipeline without saving it",
-    "description": "Always 200 for a readable body: ``valid``, ``errors`` and ``warnings`` (each with the ``path`` of the field),\nand ``steps``: each step's resolved model, inputs (with the defaults they take) and outputs.",
+    "description": "Always 200 for a readable body: ``valid``, ``errors`` and ``warnings`` (each with the ``path`` of the field),\n``steps``: each step's resolved model, inputs (with the defaults they take) and outputs, and ``pipeline``: the\ndefinition as read (a YAML body comes back as JSON).",
     "operationId": "validate_pipeline_api_v1_pipelines_validate_post",
     "responses": {
      "200": {
@@ -4166,6 +4166,26 @@
         "schema": {
          "$ref": "#/components/schemas/HTTPValidationError"
         }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/pipelines/simulate": {
+   "post": {
+    "tags": [
+     "pipelines"
+    ],
+    "summary": "Play a typed or recorded conversation through a live pipeline",
+    "description": "Multipart: ``pipeline`` (a live definition, JSON or YAML) or ``pipeline_id`` (a saved one); ``turns`` (a JSON\nlist of what the caller says, turn by turn) or ``file`` (a recording of the caller, cut into turns at pauses and\ntranscribed); ``instructions`` (the session's instructions, for ``respond`` steps) and ``language``. Each turn\nruns through the pipeline as in a call: the answer is every turn's run (steps, outputs, actions), what the agent\nsaid, and how the conversation ended. ``respond`` steps ask the language model without streaming here.",
+    "operationId": "simulate_live_v1_pipelines_simulate_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
        }
       }
      }

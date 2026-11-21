@@ -147,6 +147,27 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `GET` | `/api/v1/telephony/scenarios` | Built-in call-simulator scenarios |
 | `POST` | `/api/v1/telephony/simulate` | Simulate a call to an agent through a fake provider |
 
+**pipelines**
+
+| Method | Path | Summary |
+| --- | --- | --- |
+| `GET` | `/api/v1/pipelines` | List pipelines |
+| `POST` | `/api/v1/pipelines` | Create a pipeline (JSON or YAML) |
+| `POST` | `/api/v1/pipelines/validate` | Validate a pipeline without saving it |
+| `GET` | `/api/v1/pipelines/step-types` | Step types with their inputs, options and outputs |
+| `GET` | `/api/v1/pipelines/templates` | Ready-made pipelines |
+| `GET` | `/api/v1/pipelines/runs` | Pipeline run history, newest first |
+| `GET` | `/api/v1/pipelines/runs/{run_id}` | One pipeline run |
+| `POST` | `/api/v1/pipelines/runs/{run_id}/cancel` | Stop a queued or running pipeline run |
+| `GET` | `/api/v1/pipelines/runs/{run_id}/files/{name}` | A file a pipeline run wrote |
+| `GET` | `/api/v1/pipelines/{pipeline_id}` | One pipeline (?version= for an older one) |
+| `PUT` | `/api/v1/pipelines/{pipeline_id}` | Save a new version of a pipeline |
+| `DELETE` | `/api/v1/pipelines/{pipeline_id}` | Delete a pipeline |
+| `GET` | `/api/v1/pipelines/{pipeline_id}/versions` | A pipeline's versions |
+| `POST` | `/v1/pipelines/simulate` | Play a typed or recorded conversation through a live pipeline |
+| `POST` | `/v1/pipelines/run` | Run a pipeline sent with the request (not saved) |
+| `POST` | `/v1/pipelines/{pipeline_id}/run` | Run a saved pipeline |
+
 **operations**
 
 | Method | Path | Summary |

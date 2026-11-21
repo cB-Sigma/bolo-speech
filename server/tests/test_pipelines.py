@@ -290,6 +290,22 @@ async def test_decision_outside_the_choices_fails(core: Bolo, with_llm: FakeLLM)
     assert run.status == "error" and "not one of yes, no" in run.error["message"]  # type: ignore[index]
 
 
+async def test_decision_models_answer_decision_steps(core: Bolo) -> None:
+    definition = {"steps": [
+        {"id": "yn", "type": "decision", "model": "fake-decision", "options": {"question": "Is there a text?"}},
+        {"id": "pick", "type": "decision", "model": "fake-decision",
+         "options": {"question": "Which team?", "choices": ["sales", "support"]}},
+    ]}  # fmt: skip
+    assert validate(definition, core).valid
+    run = core.pipelines.runner.prepare(definition, text="hello there")
+    await core.pipelines.run(run)
+    by = {s["id"]: s for s in run.to_dict()["steps"]}
+    assert by["yn"]["output"]["answer"] == "yes" and by["yn"]["output"]["confidence"] == 0.9
+    assert by["pick"]["output"]["answer"] == "sales" and by["pick"]["model"] == "fake-decision"
+    bad = validate({"steps": [{"type": "decision", "model": "fake-stt", "options": {"question": "x"}}]}, core)
+    assert "cannot be used for decision" in bad.errors[0].message
+
+
 def test_signature_round_trip(tmp_path: Path) -> None:
     s = Settings(data_dir=tmp_path)
     key = webhooks.secret(s)

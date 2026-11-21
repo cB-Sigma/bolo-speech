@@ -153,9 +153,12 @@ Utility steps (no model):
 | `stop` | | `reason` | ends the run successfully here |
 
 `llm` uses the configured language model (`llm_base_url`, `llm_model`); `audio-llm` the audio language model
-(`audio_llm_model`, or a catalog `audio-llm` model given as `model`). `decision` asks the configured language model
-for a JSON answer about a text (about a recording when it has no text: the audio language model) and fails when the
-answer is not one of `choices`. `translation` of a text uses the language model; of a recording, a recogniser that
+(`audio_llm_model`, or a catalog `audio-llm` model given as `model`). `decision` uses a decision model of the catalog
+(`POST /v1/audio/decisions`; `model`, or with `auto` the `default_decision` model when it is installed): it reads the
+text and the recording in one pass and its answer is always one of `choices` (yes/no without them), with its
+probability as `confidence`. Otherwise (and with `model: llm`) the configured language model answers in JSON about
+the text (about a recording when there is no text: the audio language model), and an answer that is not one of
+`choices` fails the step. `translation` of a text uses the language model; of a recording, a recogniser that
 translates (`model`: Whisper, Canary, Voxtral, ...).
 
 `webhook` steps sign their body ([below](#webhooks-and-signatures)); an answer of HTTP 400 or more fails the

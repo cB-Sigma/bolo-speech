@@ -219,7 +219,7 @@ def routes_table(schema: dict[str, Any]) -> str:
             tag = (op.get("tags") or ["other"])[0]
             groups[tag].append(f"| `{method.upper()}` | `{path}` | {op.get('summary', '')} |")
     out: list[str] = []
-    for tag in ("openai", "speaches", "native", "operations"):
+    for tag in ("openai", "speaches", "native", "pipelines", "operations"):
         if tag not in groups:
             continue
         out += [f"**{tag}**\n", "| Method | Path | Summary |", "| --- | --- | --- |", *groups[tag], ""]

@@ -355,12 +355,57 @@ def _choose(answer: Any, choices: list[str]) -> str | None:
     return None
 
 
+def _decision_model(r: Runner, wanted: str | None) -> str | None:
+    """The decision model a step uses: the one named; for ``auto``, ``default_decision`` when it is installed (else
+    None: the language model answers); ``llm``: always the language model."""
+    if wanted == "llm":
+        return None
+    if wanted:
+        return r.core.resolve(wanted, "decision").id
+    default = r.core.settings.default_decision
+    if not default:
+        return None
+    try:
+        spec = r.core.resolve(default, "decision")
+        return spec.id if spec.builtin or r.core.manager.is_installed(spec) else None
+    except Exception:
+        return None
+
+
+async def _decide_with_model(
+    r: Runner, model: str, question: str, choices: list[str], text: Any, audio: Audio | None
+) -> dict[str, Any]:
+    """One question to a decision model (bolo.decide): yes/no, or one of the choices, with its probability."""
+    from bolo.decide import decide
+
+    yes_no = [c.lower() for c in choices] == ["yes", "no"]
+    q: dict[str, Any] = {"type": "noul", "instructions": question}
+    if not yes_no:
+        q = {"type": "choice", "instructions": question, "criteria": dict.fromkeys(choices)}
+    content = as_text(text).strip() or None
+    trace = _trace("decision", model)
+    result = await decide(r.core, model, content, audio.samples if audio else None, audio.rate if audio else None,
+                          {"q": q}, trace)  # fmt: skip
+    _record(r.core, trace)
+    a = result.answers["q"]
+    if yes_no:
+        p = float(a["probability"])
+        return {"answer": "yes" if a["answer"] else "no", "confidence": round(max(p, 1 - p), 4), "reason": "",
+                "_model": model}  # fmt: skip
+    return {"answer": str(a["answer"]), "confidence": float(a["confidence"]), "reason": "", "_model": model}
+
+
 @handler("decision")
 async def _decision(r: Runner, run: Run, e: Entry, i: Inputs, o: Options, scope: Scope, d: int) -> dict[str, Any]:
     question = as_text(_opt(r, run, o, "question", scope)).strip()
     if not question:
         raise InvalidRequest("the decision's question is empty")
     choices = text_list(_opt(r, run, o, "choices", scope)) or ["yes", "no"]
+    model = _decision_model(r, e["model"])
+    if model is not None:
+        text = i.get("text")
+        heard = i.get("audio") if "audio" in e["inputs"] or text in (None, "") else None
+        return await _decide_with_model(r, model, question, choices, text, heard if isinstance(heard, Audio) else None)
     instructions = as_text(_opt(r, run, o, "instructions", scope)).strip()
     text = i.get("text")
     audio = i.get("audio") if "audio" in e["inputs"] or text in (None, "") else None
@@ -385,8 +430,8 @@ async def _decision(r: Runner, run: Run, e: Entry, i: Inputs, o: Options, scope:
         content = need_text(i)
         user = f"Question: {question}\n\nText:\n{content}"
         reply = await llm_complete(r.core, [{"role": "system", "content": system}, {"role": "user", "content": user}],
-                                   model=e["model"], json_mode=True)  # fmt: skip
-        used = e["model"] or r.core.settings.llm_model or "llm"
+                                   json_mode=True)  # fmt: skip
+        used = r.core.settings.llm_model or "llm"
     doc = parse_json_object(reply)
     answer = _choose(doc.get("answer") if doc else reply, choices)
     if answer is None:

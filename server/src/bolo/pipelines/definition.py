@@ -150,7 +150,7 @@ STEP_TYPES: dict[str, StepType] = {
                  (Slot("text", "text", required=False, default="text"),
                   Slot("audio", "audio", required=False, default="audio")),
                  (Option("question", "text", required=True), Option("choices", "list", "default: yes, no"),
-                  Option("instructions", "text")),
+                  Option("instructions", "text", "for the language model")),
                  {"answer": "text", "confidence": "number", "reason": "text"}, live=True),
         StepType("tts", "tts", "model", "Text to speech.", (TEXT,),
                  (Option("voice", "text", "a model voice or a saved (cloned) voice"), Option("speed", "number"),
@@ -450,15 +450,8 @@ class Validator:
             return wanted
         if st.name == "translation" and wanted is None:
             return None  # the language model (text) or the default recogniser (audio)
-        if st.kind == "decision":
-            from bolo.catalog import TASKS
-
-            if "decision" not in TASKS:
-                if wanted:
-                    self.error(path, "this server has no decision models: leave model out to use the language model")
-                return None
-            if wanted is None:
-                return None
+        if st.kind == "decision" and wanted in (None, "llm"):
+            return wanted  # chosen when it runs: the default decision model if installed, else the language model
         if st.kind == "audio-llm" and wanted is None:
             return None  # the audio_llm_* settings
         try:
