@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-529 models: 233 validated on CPU by the maintainers, 296 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+531 models: 233 validated on CPU by the maintainers, 298 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -252,6 +252,13 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `voxtral-mini-3b-llamacpp` (Voxtral) | en, es, fr, pt, hi, de +2 | accuracy | pseudo | 3.2 GB | Apache-2.0 · runs on llama-server · GPU recommended | **CPU** · RTF 1.980 · WER 2.8% |
 | `voxtral-small-24b-llamacpp` (Voxtral) | en, es, fr, pt, hi, de +2 | accuracy | pseudo | 15.7 GB | Apache-2.0 · runs on llama-server · GPU required | untested |
+
+#### Nemotron 3.5 Transcribe
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `nemotron-3.5-transcribe-30b-a4b-iq4nl-llamacpp` (Nemotron 3.5 Transcribe) | cs, nl, en, fr, de, hi +34 | accuracy | pseudo | 20.2 GB | OpenMDW-1.1 · runs on llama-server · GPU recommended | untested |
+| `nemotron-3.5-transcribe-30b-a4b-q8-llamacpp` (Nemotron 3.5 Transcribe) | cs, nl, en, fr, de, hi +34 | accuracy | pseudo | 36.5 GB | OpenMDW-1.1 · runs on llama-server · GPU recommended | untested |
 
 #### Canary-Qwen
 
@@ -3237,6 +3244,39 @@ answered the 3 s question ("To provide an accurate estimate ... I need a bit
 more information") instead of transcribing it, in transcription mode and with
 a "transcribe" instruction alike; ggml-org's Q4_K_M transcribed it. That is why
 the entry uses ggml-org's files although they are 0.2 GB larger.
+
+### NVIDIA Nemotron 3.5 Transcribe on the same client
+
+Nemotron 3.5 Transcribe (OpenMDW-1.1, commercial use allowed; 30B-A4B, a
+Mamba-2 and Transformer mixture-of-experts language model behind a speech
+encoder with a speaker branch, 40 languages for transcription, translation
+between English and 31 of them) runs on llama.cpp from the pinned b12521:
+libmtmd has its `nemotron_transcribe` projector and llama.cpp the
+`nemotron_h_moe` architecture. The same `voxtral-llamacpp` client sends it,
+with the model's own prompts from the catalog entry (`options.prompts`:
+`transcribe`, optionally `transcribe_language`, and `translate`, with
+`{audio}`, `{language}` and `{language_name}`). They are NVIDIA's chat
+template written out for one user turn with reasoning off
+(`<|im_start|>assistant\n<think></think>`) and the instructions of its card's
+Prompt Guide: a readable transcript ("Audio transcription. Language: as
+spoken. ..."), and "Please translate the given speech to <language>.".
+
+| id | files | notes |
+| --- | --- | --- |
+| `nemotron-3.5-transcribe-30b-a4b-iq4nl-llamacpp` | IQ4_NL language model + F16 audio encoder (maternion), 20.2 GB | about 24 GB of GPU memory |
+| `nemotron-3.5-transcribe-30b-a4b-q8-llamacpp` | Q8_0 language model + the same encoder, 36.5 GB | about 44 GB |
+
+**Added, not yet run** (`options.not_yet_run: true`; too large for this
+machine's disk). Checked without downloading the weights: the GGUF headers
+(read with HTTP range requests) name the architecture `nemotron_h_moe` and the
+projector `nemotron_transcribe` with an audio encoder, the sizes and revision
+come from the Hugging Face API. IQ4_NL rather than Q4_K_M: the model's matrix
+widths (2688, 1856, 3712) are not multiples of 256, so a Q4_K_M file falls back
+to larger types for most matrices (mradermacher's is 25.4 GB against 18.7 GB).
+NVIDIA's own GGUF repository is for NeMo-Speech.cpp, its encoder file is not a
+llama.cpp mmproj, so it is not used. The model's speaker tags and word
+timestamps (CTC head) are not used here: segments are the pieces bolo cut the
+audio into (at most 30 s each).
 
 ## Indian languages
 

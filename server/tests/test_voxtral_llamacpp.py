@@ -58,6 +58,38 @@ def test_prompts_follow_the_transcription_and_chat_formats() -> None:
     assert vox.token_budget(3600.0, 12.0, 4096) == 4096
 
 
+NEMOTRON_PROMPTS = {
+    "transcribe": "<|im_start|>user\nAudio transcription. {audio}<|im_end|>\n<|im_start|>assistant\n<think></think>",
+    "translate": "<|im_start|>user\nPlease translate the given speech to {language_name}. {audio}<|im_end|>\n",
+}
+
+
+def test_a_catalog_entry_can_bring_its_own_prompts(server: FakeVoxtralServer) -> None:
+    p = NEMOTRON_PROMPTS
+    assert vox.custom_prompt(p, "<m>", "transcribe", "fr").startswith("<|im_start|>user\nAudio transcription. <m>")
+    assert vox.custom_prompt(p, "<m>", "transcribe", None) == vox.custom_prompt(p, "<m>", "transcribe", "de")
+    with_lang = {**p, "transcribe_language": "{language}/{language_name}: {audio}"}
+    assert vox.custom_prompt(with_lang, "<m>", "transcribe", "de") == "de/German: <m>"
+    assert vox.custom_prompt(with_lang, "<m>", "transcribe", None).startswith("<|im_start|>user\nAudio")
+    assert "to French. <m>" in vox.custom_prompt(p, "<m>", "translate", "en", "fr")
+    assert "to English. <m>" in vox.custom_prompt(p, "<m>", "translate", "de")
+
+    model = model_for(server, prompts=p, translate_into=["en", "fr"], stop=[])
+    assert model.supports_translate and model.translate_targets == ("en", "fr")
+    model.transcribe([STTRequest(tone(1.0), language="fr")])
+    body = server.requests[-1]["body"]
+    assert body["prompt"]["prompt_string"] == p["transcribe"].format(audio=MARKER) and "stop" not in body
+    model.close()
+
+    only = model_for(server, prompts={"transcribe": p["transcribe"]})
+    assert not only.supports_translate  # no translation template: no translation
+    with pytest.raises(InvalidRequest, match="cannot translate"):
+        only.transcribe([STTRequest(tone(1.0), task="translate")])
+    only.close()
+    with pytest.raises(EngineUnavailable, match="no 'transcribe' template"):
+        vox.VoxtralLlamaCpp("v", {"prompts": {"translate": "x"}}, base_url=server.url)
+
+
 def test_audio_goes_as_a_16khz_pcm16_wav() -> None:
     data = vox.wav_bytes(np.array([0.0, 0.5, -1.5], dtype=np.float32))
     with wave.open(io.BytesIO(data)) as w:
@@ -247,8 +279,23 @@ def test_managed_llama_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_catalog_entries() -> None:
-    specs = {s.id: s for s in Catalog.load(None).all() if s.kind == "voxtral-llamacpp"}
+    every = {s.id: s for s in Catalog.load(None).all() if s.kind == "voxtral-llamacpp"}
+    specs = {k: s for k, s in every.items() if s.family == "Voxtral"}
     assert set(specs) == {"voxtral-mini-3b-llamacpp", "voxtral-small-24b-llamacpp"}
+    nemotron = {k: s for k, s in every.items() if s.family == "Nemotron 3.5 Transcribe"}
+    assert set(nemotron) == {
+        "nemotron-3.5-transcribe-30b-a4b-iq4nl-llamacpp",
+        "nemotron-3.5-transcribe-30b-a4b-q8-llamacpp",
+    }
+    assert set(every) == set(specs) | set(nemotron)
+    for s in nemotron.values():
+        assert s.license == "OpenMDW-1.1" and s.commercial_use and len(s.languages) == 40
+        assert s.options["not_yet_run"] is True and s.source.revision == "5965081f1dc2f58eacdb65f594c43a0ec2fa0ee1"
+        assert {s.options["model_file"], s.options["mmproj_file"]} == set(s.source.include)
+        prompts = s.options["prompts"]
+        assert prompts["transcribe"].count("{audio}") == 1 and prompts["translate"].count("{audio}") == 1
+        assert prompts["transcribe"].endswith("<|im_start|>assistant\n<think></think>")
+        assert len(s.options["translate_into"]) == 32 and "tr" not in s.options["translate_into"]
     for s in specs.values():
         assert s.task == "stt" and s.engine == "tts-server" and s.requires == ["llama-server"]
         assert s.license == "Apache-2.0" and s.commercial_use and not s.gated and s.sample_rate == 16000

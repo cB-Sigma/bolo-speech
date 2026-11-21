@@ -58,6 +58,12 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   not for commercial use. On a 4-vCPU Xeon with 2 threads it speaks at 0.026 of real time and faster-whisper-small
   transcribed both voices back word for word. The tiny-voca engine now also reads little-tts's flat `onnx/model.json`,
   and refuses a graph whose phoneme table is not dizione's instead of speaking noise.
+- **NVIDIA Nemotron 3.5 Transcribe on llama.cpp** (`nemotron-3.5-transcribe-30b-a4b-iq4nl-llamacpp`, 20.2 GB, and
+  `nemotron-3.5-transcribe-30b-a4b-q8-llamacpp`, 36.5 GB; OpenMDW-1.1, commercial use allowed): transcription in 40
+  languages and translation between English and 31 of them, on the pinned llama-server b12521 (its `nemotron_transcribe`
+  audio projector). Added, not yet run (`options.not_yet_run`): too large for the test machine. The llama.cpp
+  speech-to-text client (`voxtral-llamacpp` kind) takes a model's own prompt templates from its catalog entry
+  (`options.prompts`).
 
 ### Changed
 

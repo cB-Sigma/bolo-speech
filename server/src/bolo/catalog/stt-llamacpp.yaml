@@ -102,3 +102,106 @@
     max_chunk_s: 15.0
     queue_timeout_s: 0
     hardware: {gpu: required, vram_gb: 20.9, note: 'approximate: weights x 1.3 + 0.5 GB'}
+# NVIDIA Nemotron 3.5 Transcribe on llama.cpp: the same client with the model's own prompts (options.prompts; see
+# bolo/engines/voxtral_llamacpp.py). Sources, read 2026-11-21: NVIDIA's model card (revision c176676), llama.cpp
+# b12521 (libmtmd has the nemotron_transcribe projector and llama.cpp the nemotron_h_moe architecture), the GGUF
+# headers of the files below (read with HTTP range requests: architecture nemotron_h_moe, mmproj projector
+# nemotron_transcribe with clip.has_audio_encoder) and the Hugging Face API (sizes, revision). NVIDIA's own GGUF
+# repository is for NeMo-Speech.cpp: its encoder file (architecture "pee") is not a llama.cpp mmproj. The prompts are
+# NVIDIA's chat template rendered for one user turn with enable_thinking false, the instructions from the card's
+# Prompt Guide, and llama.cpp's media marker where the template puts <|audio|>.
+- id: nemotron-3.5-transcribe-30b-a4b-iq4nl-llamacpp
+  aliases: [nemotron-3.5-transcribe]
+  task: stt
+  engine: tts-server
+  kind: voxtral-llamacpp
+  family: Nemotron 3.5 Transcribe
+  languages: [cs, nl, en, fr, de, hi, it, ko, pl, pt, ru, sk, es, bg, hr, da, et, fi, hu, ja, lv, lt, ro, sl, sv, th,
+    tr, uk, ar, bn, zh, el, he, id, mt, mr, tl, ta, te, vi]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 20212681696
+  params: 34000000000
+  license: OpenMDW-1.1
+  license_url: https://openmdw.ai/license/1-1/
+  commercial_use: true
+  gated: false
+  features: [punctuation, translate, long-form]
+  description: 'NVIDIA Nemotron 3.5 Transcribe (30B-A4B: a Mamba-2 and Transformer mixture-of-experts language model,
+    about 4.3 B parameters active, behind a Transformer speech encoder with a speaker branch; 34 B in all): transcription
+    in 40 languages with punctuation and casing, and translation between English and 31 of them. On llama.cpp (b12521
+    and later) with maternion''s IQ4_NL conversion and the F16 audio encoder (20.2 GB), in a llama-server that bolo
+    starts or one you run (setting tts_servers). bolo asks for a readable transcript (the card''s instruction) with
+    reasoning off; the model''s speaker tags and word timestamps are not used here, so segments are the stretches of
+    speech bolo cut the audio into. A GPU with 24 GB or more is recommended; a CPU with enough memory works, slowly.
+    OpenMDW-1.1: commercial use allowed. Added, not yet run here.'
+  source_url: https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: maternion/Nemotron-3.5-Transcribe-30B-A4B-IQ-GGUF
+    revision: 5965081f1dc2f58eacdb65f594c43a0ec2fa0ee1
+    include: [NVIDIA-Nemotron-3.5-Transcribe-30B-A4B-IQ4_NL.gguf, mmproj-NVIDIA-Nemotron-3.5-Transcribe-30B-A4B-F16.gguf]
+  options:
+    translate_into: [en, cs, nl, fr, de, hi, it, ko, pl, pt, ru, sk, es, bg, hr, da, et, fi, hu, ja, lv, lt, ro, sl, sv,
+      th, uk, ar, zh, el, he, mt]
+    runtime: llama-server
+    model_file: NVIDIA-Nemotron-3.5-Transcribe-30B-A4B-IQ4_NL.gguf
+    mmproj_file: mmproj-NVIDIA-Nemotron-3.5-Transcribe-30B-A4B-F16.gguf
+    prompts:
+      transcribe: "<|im_start|>system\n<|im_end|>\n<|im_start|>user\nAudio transcription. Language: as spoken. Wording:
+        omit fillers and accidental repetitions; keep the remaining spoken wording unchanged. Formatting: punctuation
+        and capitalization. Output: transcript only. {audio}<|im_end|>\n<|im_start|>assistant\n<think></think>"
+      translate: "<|im_start|>system\n<|im_end|>\n<|im_start|>user\nPlease translate the given speech to
+        {language_name}. {audio}<|im_end|>\n<|im_start|>assistant\n<think></think>"
+    # the speech encoder works in 30 s windows; a piece of 30 s is a few hundred tokens of context
+    context_size: 8192
+    max_chunk_s: 30.0
+    stop: []
+    queue_timeout_s: 0
+    not_yet_run: true
+    hardware: {gpu: recommended, vram_gb: 24, note: 'approximate: weights x 1.2; mixture of experts, so a CPU with enough memory also works'}
+- id: nemotron-3.5-transcribe-30b-a4b-q8-llamacpp
+  task: stt
+  engine: tts-server
+  kind: voxtral-llamacpp
+  family: Nemotron 3.5 Transcribe
+  languages: [cs, nl, en, fr, de, hi, it, ko, pl, pt, ru, sk, es, bg, hr, da, et, fi, hu, ja, lv, lt, ro, sl, sv, th,
+    tr, uk, ar, bn, zh, el, he, id, mt, mr, tl, ta, te, vi]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 36473189088
+  params: 34000000000
+  license: OpenMDW-1.1
+  license_url: https://openmdw.ai/license/1-1/
+  commercial_use: true
+  gated: false
+  features: [punctuation, translate, long-form]
+  description: 'NVIDIA Nemotron 3.5 Transcribe (see nemotron-3.5-transcribe-30b-a4b-iq4nl-llamacpp) with Q8_0 weights,
+    close to the full-precision model, and the F16 audio encoder (36.5 GB). Needs about 44 GB of GPU or system memory.
+    OpenMDW-1.1: commercial use allowed. Added, not yet run here.'
+  source_url: https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B
+  validated: untested
+  requires: [llama-server]
+  source:
+    repo: maternion/Nemotron-3.5-Transcribe-30B-A4B-IQ-GGUF
+    revision: 5965081f1dc2f58eacdb65f594c43a0ec2fa0ee1
+    include: [NVIDIA-Nemotron-3.5-Transcribe-30B-A4B-Q8_0.gguf, mmproj-NVIDIA-Nemotron-3.5-Transcribe-30B-A4B-F16.gguf]
+  options:
+    translate_into: [en, cs, nl, fr, de, hi, it, ko, pl, pt, ru, sk, es, bg, hr, da, et, fi, hu, ja, lv, lt, ro, sl, sv,
+      th, uk, ar, zh, el, he, mt]
+    runtime: llama-server
+    model_file: NVIDIA-Nemotron-3.5-Transcribe-30B-A4B-Q8_0.gguf
+    mmproj_file: mmproj-NVIDIA-Nemotron-3.5-Transcribe-30B-A4B-F16.gguf
+    prompts:
+      transcribe: "<|im_start|>system\n<|im_end|>\n<|im_start|>user\nAudio transcription. Language: as spoken. Wording:
+        omit fillers and accidental repetitions; keep the remaining spoken wording unchanged. Formatting: punctuation
+        and capitalization. Output: transcript only. {audio}<|im_end|>\n<|im_start|>assistant\n<think></think>"
+      translate: "<|im_start|>system\n<|im_end|>\n<|im_start|>user\nPlease translate the given speech to
+        {language_name}. {audio}<|im_end|>\n<|im_start|>assistant\n<think></think>"
+    context_size: 8192
+    max_chunk_s: 30.0
+    stop: []
+    queue_timeout_s: 0
+    not_yet_run: true
+    hardware: {gpu: recommended, vram_gb: 44, note: 'approximate: weights x 1.2; mixture of experts, so a CPU with enough memory also works'}

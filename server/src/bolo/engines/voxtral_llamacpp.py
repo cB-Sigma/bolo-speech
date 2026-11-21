@@ -19,6 +19,12 @@ encoding, without the BOS the server adds itself, and libmtmd adds ``[BEGIN_AUDI
 The prompts are built here rather than with ``/v1/chat/completions`` because the chat template inside a GGUF is
 whatever its converter put there (one widely used conversion carries another model's template).
 
+Other speech-to-text models on llama-server use the same client with their own prompts, given by the catalog entry
+(option ``prompts``, :func:`custom_prompt`): ``transcribe`` (and ``transcribe_language`` for a request that names
+its language; ``transcribe`` otherwise) and ``translate``, each a template with ``{audio}`` (the media marker),
+``{language}`` (the code) and ``{language_name}`` (in English words; for a translation, those of the target). NVIDIA
+Nemotron 3.5 Transcribe is one: its chat format written out with reasoning off, the instruction from its card.
+
 What the model does not give: timestamps. Segment times are those of the pieces bolo hands the model (long audio is
 cut at pauses by voice-activity detection into pieces of at most ``max_chunk_s``), and word timestamps are
 unavailable. The OpenAI ``prompt`` is not used (transcription mode takes no text). Decoding is greedy unless the
@@ -97,6 +103,21 @@ def build_prompt(marker: str, task: str, language: str | None, target: str | Non
     return f"[INST]{marker}[/INST]{lang}[TRANSCRIBE]"
 
 
+def custom_prompt(
+    prompts: dict[str, str], marker: str, task: str, language: str | None, target: str | None = None
+) -> str:
+    """The prompt string of one request from a catalog entry's ``prompts`` templates (see the module docstring)."""
+    if task == "translate":
+        code = target or "en"
+        template = prompts.get("translate")
+        if not template:
+            raise InvalidRequest("this model has no translation prompt", param="task")
+    else:
+        code = language or ""
+        template = (prompts.get("transcribe_language") if language else None) or prompts["transcribe"]
+    return template.format(audio=marker, language=code, language_name=language_name(code) if code else "")
+
+
 def token_budget(seconds: float, tokens_per_s: float, max_new_tokens: int) -> int:
     return max(16, min(max_new_tokens, int(seconds * tokens_per_s) + 32))
 
@@ -132,9 +153,15 @@ class VoxtralLlamaCpp(STTModel):
         self.translate = bool(spec.get("translate", True))
         self.supports_translate = self.translate
         #: Voxtral follows the instruction into any of its languages
-        self.translate_targets = tuple(languages) or ("en",)
+        self.translate_targets = tuple(str(x) for x in spec.get("translate_into") or ()) or tuple(languages) or ("en",)
         self.request_extra = dict(spec.get("request") or {})
         self.marker = str(spec.get("media_marker") or "")
+        #: the model's own prompt templates (non-Voxtral models); Voxtral's formats when empty
+        self.prompts = {str(k): str(v) for k, v in (spec.get("prompts") or {}).items()}
+        if self.prompts and "transcribe" not in self.prompts:
+            raise EngineUnavailable(f"model '{name}': the catalog entry's prompts name no 'transcribe' template")
+        if self.prompts and "translate" not in self.prompts:
+            self.supports_translate = self.translate = False
         #: llama.cpp's Voxtral can carry on after the transcript as if chatting ("Here's a breakdown..."), always
         #: after a blank line or in markdown; a transcript has neither, so generation stops there
         self.stop = [str(x) for x in spec.get("stop", ["\n\n", "```", "**"]) or []]
@@ -196,9 +223,14 @@ class VoxtralLlamaCpp(STTModel):
     def completion_request(self, req: STTRequest, language_hint: str | None = None) -> dict[str, Any]:
         language = (req.language or language_hint or "").strip().lower().split("-", 1)[0] or None
         seconds = len(req.samples) / self.sample_rate
+        marker = self.marker or DEFAULT_MARKER
+        if self.prompts:
+            prompt = custom_prompt(self.prompts, marker, req.task, language, req.target_language)
+        else:
+            prompt = build_prompt(marker, req.task, language, req.target_language)
         body: dict[str, Any] = {
             "prompt": {
-                "prompt_string": build_prompt(self.marker or DEFAULT_MARKER, req.task, language, req.target_language),
+                "prompt_string": prompt,
                 "multimodal_data": [base64.b64encode(wav_bytes(req.samples, self.sample_rate)).decode("ascii")],
             },
             "n_predict": token_budget(seconds, self.tokens_per_s, self.max_new_tokens),
