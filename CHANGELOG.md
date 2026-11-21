@@ -64,7 +64,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   English, French, German, Spanish and Portuguese in one set of weights) and the English, French, German, Spanish
   and Portuguese ones (`gradium-phonon-40m-<lang>-audiocpp`), about 122 MB each, with the checkpoint's default voice.
   CC BY-NC 4.0 (not for commercial use) and gated: accept Gradium's access form on Hugging Face and set `hf_token`.
-  Catalogued as added, not yet run: the download needs that access.
+  The multilingual, English and German ones were run on audio.cpp (read back right); French, Spanish and
+  Portuguese are still marked not yet run.
 - **little-tts** (`little-tts-onnx`, TuringLogic): a 4.6 M-parameter English voice (92 female, 6097 male, 24 kHz) in
   process on ONNX Runtime, through the tiny-voca engine: same graph inputs, same phonemiser. Weights CC BY-NC 4.0, so
   not for commercial use. On a 4-vCPU Xeon with 2 threads it speaks at 0.026 of real time and faster-whisper-small

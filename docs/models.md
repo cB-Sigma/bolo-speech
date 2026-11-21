@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-546 models: 240 validated on CPU by the maintainers, 306 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+546 models: 243 validated on CPU by the maintainers, 303 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -694,10 +694,10 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `irodori-tts-audiocpp` (Irodori-TTS) | ja | accuracy | - | 1.4 GB | MIT · runs on audio.cpp · GPU recommended | untested |
 | `miotts-1.7b-audiocpp` (MioTTS 1.7B) | en, ja | accuracy | - | 2.2 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
 | `gradium-phonon-31m-audiocpp` (Gradium Phonon 31M) | en | balanced | - | 95 MB | Apache-2.0 · runs on audio.cpp | **CPU** · RTF 0.952 · round-trip WER 0.0% |
-| `gradium-phonon-40m-multilingual-audiocpp` (Gradium Phonon 40M) | en, de, es, fr, pt | balanced | - | 148 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
-| `gradium-phonon-40m-en-audiocpp` (Gradium Phonon 40M) | en | balanced | - | 132 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
+| `gradium-phonon-40m-multilingual-audiocpp` (Gradium Phonon 40M) | en, de, es, fr, pt | balanced | - | 148 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | **CPU** · RTF 2.190 |
+| `gradium-phonon-40m-en-audiocpp` (Gradium Phonon 40M) | en | balanced | - | 132 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | **CPU** · RTF 2.620 |
 | `gradium-phonon-40m-fr-audiocpp` (Gradium Phonon 40M) | fr | balanced | - | 126 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
-| `gradium-phonon-40m-de-audiocpp` (Gradium Phonon 40M) | de | balanced | - | 125 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
+| `gradium-phonon-40m-de-audiocpp` (Gradium Phonon 40M) | de | balanced | - | 125 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | **CPU** · RTF 0.674 |
 | `gradium-phonon-40m-es-audiocpp` (Gradium Phonon 40M) | es | balanced | - | 128 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
 | `gradium-phonon-40m-pt-audiocpp` (Gradium Phonon 40M) | pt | balanced | - | 125 MB | CC-BY-NC-4.0 ⚠ · runs on audio.cpp · gated | untested |
 | `audio8-tts-0.6b-audiocpp` (Audio8 TTS Preview 0.6B) | en, de, es, fr, it, ja +5 | accuracy | - | 1.4 GB | Apache-2.0 · runs on audio.cpp · GPU recommended | untested |
@@ -3070,14 +3070,16 @@ Face, voices and options from llama.cpp's docs/multimodal/tts.md, architectures 
 `zonos3-mini-llamacpp` (ZONOS3-Mini, Apache-2.0, 27 voices of the release, 2.0 GB) and `fish-audio-s2-pro-llamacpp`
 (Fish Audio S2 Pro, Fish Audio Research License: not for commercial use, 6.3 GB).
 
-**Added, not yet run, on audio.cpp** (`options.not_yet_run: true`): Gradium Phonon 40M, the multilingual checkpoint
-(`gradium-phonon-40m-multilingual-audiocpp`: English, French, German, Spanish and Portuguese in one set of weights)
-and the one-language ones (`gradium-phonon-40m-en-audiocpp`, `-fr-`, `-de-`, `-es-`, `-pt-`), each about 122 MB.
-CC BY-NC 4.0, not for commercial use, and gated: Gradium grants access automatically after a form on Hugging Face,
-then bolo needs a token (`hf_token`). audio.cpp v0.9.4's `gradium_phonon` family documents these checkpoints as
-loading the way the 31M one does (nine layers instead of six) from the published safetensors, config.json and
-tokenizer.model, which is what the entries pull; files, sizes and revisions were checked against Hugging Face's
-listing, but the download needs that access, which the machine that runs bolo's checks does not have. The 102 voices of
+**Gradium Phonon 40M on audio.cpp**: the multilingual checkpoint (`gradium-phonon-40m-multilingual-audiocpp`:
+English, French, German, Spanish and Portuguese in one set of weights) and the one-language ones
+(`gradium-phonon-40m-en-audiocpp`, `-fr-`, `-de-`, `-es-`, `-pt-`), each about 122 MB. CC BY-NC 4.0, not for
+commercial use, and gated: Gradium grants access automatically after a form on Hugging Face, then bolo needs a token
+(`hf_token`). audio.cpp v0.9.4's `gradium_phonon` family loads them from the published safetensors, config.json and
+tokenizer.model, which is what the entries pull. Run on the 4-vCPU Xeon (2026-11-21, audio.cpp built here, bolo's
+test suite running alongside): the multilingual model in all five languages and the English and German ones came back
+as non-silent 24 kHz audio that faster-whisper-small read back right (French with one word wrong, German with one
+letter). The French, Spanish and Portuguese one-language models are still marked not run (French: access not
+granted yet when tried). The 102 voices of
 `gradium/phonon-voices` (Apache-2.0) work with every Phonon checkpoint, and each Phonon entry carries those of its
 languages (the 31M and the English 40M the 37 English ones, the multilingual 40M all 102) next to the checkpoint's
 default voice: bolo puts each voice's file in the model's `embeddings/` folder, where audio.cpp finds it by name. On

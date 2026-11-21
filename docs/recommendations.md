@@ -220,7 +220,7 @@ written by `server/tools/gen_docs.py` from the catalog, with the heuristic
 speed factor (no benchmark) and every engine taken as installed:
 
 <!-- BEGIN GENERATED: example-machines -->
-**The reference machine: 4 x86-64 cores with AVX-512 and AMX, 16 GB, no GPU** (speed factor 1.00; of 579 entries: 282 comfortable, 102 usable, 103 slow, 59 unlikely to fit, 33 cloud)
+**The reference machine: 4 x86-64 cores with AVX-512 and AMX, 16 GB, no GPU** (speed factor 1.00; of 579 entries: 282 comfortable, 99 usable, 106 slow, 59 unlikely to fit, 33 cloud)
 
 | For | Default pick | Fit | Expected RTF (range) | Basis |
 | --- | --- | --- | --- | --- |
@@ -231,7 +231,7 @@ speed factor (no benchmark) and every engine taken as installed:
 | Text to speech, Hindi, voice-over | `kokoro-v1.0` | usable | 0.76 (0.38 to 1.52) | measured, scaled |
 | Speaker diarization | `nemotron-3-diarization` | comfortable | 0.039 (0.019 to 0.078) | measured, scaled |
 
-**A small board: 4 ARM cores with NEON only, 4 GB (Raspberry Pi 4 class)** (speed factor 0.30; of 579 entries: 132 comfortable, 155 usable, 137 slow, 122 unlikely to fit, 33 cloud)
+**A small board: 4 ARM cores with NEON only, 4 GB (Raspberry Pi 4 class)** (speed factor 0.30; of 579 entries: 132 comfortable, 149 usable, 140 slow, 125 unlikely to fit, 33 cloud)
 
 | For | Default pick | Fit | Expected RTF (range) | Basis |
 | --- | --- | --- | --- | --- |
@@ -242,7 +242,7 @@ speed factor (no benchmark) and every engine taken as installed:
 | Text to speech, Hindi, voice-over | `piper-hi-in-rohan-medium` | comfortable | 0.31 (0.15 to 0.61) | measured, scaled |
 | Speaker diarization | `nemotron-3-diarization` | comfortable | 0.13 (0.065 to 0.26) | measured, scaled |
 
-**A container: 1.5 cores of an AVX2 server, 2 GB memory limit** (speed factor 0.32; of 579 entries: 152 comfortable, 140 usable, 103 slow, 151 unlikely to fit, 33 cloud)
+**A container: 1.5 cores of an AVX2 server, 2 GB memory limit** (speed factor 0.32; of 579 entries: 152 comfortable, 134 usable, 106 slow, 154 unlikely to fit, 33 cloud)
 
 | For | Default pick | Fit | Expected RTF (range) | Basis |
 | --- | --- | --- | --- | --- |

@@ -2538,7 +2538,15 @@
     in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU
     optional, about 0.7 GB.'
   source_url: https://huggingface.co/gradium/phonon-40m-multilingual
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 2.19
+    audio_s: 4.1
+    threads: 2
+    engine: audio.cpp v0.9.4 audiocpp_server built from source here (CPU, Release, model specs compiled in), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (bolo''s test suite running)
+    date: '2026-11-21'
+    note: 'Through bolo''s HTTP API, one sentence each in English (Easton), French (Noemie), German (Nele), Spanish (Noa) and Portuguese (Manuela-Lu), read back by faster-whisper-small: English and German word for word, Spanish and Portuguese right (times written as digits), French with one word wrong ("Le 30 du matin" for "Le train du matin"). RTF over those five sentences while the test suite ran on the same machine.'
   requires: [audio.cpp]
   source:
     repo: gradium/phonon-40m-multilingual
@@ -2960,7 +2968,6 @@
     cloning: false
     send_language: false
     hardware: {gpu: optional, vram_gb: 0.7, note: small enough for a CPU}
-    not_yet_run: true
   voices:
   - {id: default, name: Model default, server_voice: ''}
   - {id: zoey, name: 'Zoey (en-US)', language: en-US, gender: f, server_voice: zoey}
@@ -3087,7 +3094,15 @@
     in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU
     optional, about 0.7 GB.'
   source_url: https://huggingface.co/gradium/phonon-40m-en
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 2.62
+    audio_s: 5.8
+    threads: 2
+    engine: audio.cpp v0.9.4 audiocpp_server built from source here (CPU, Release, model specs compiled in), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (bolo''s test suite running)
+    date: '2026-11-21'
+    note: 'Through bolo''s HTTP API, one English sentence in the voice Maeve, read back word for word by faster-whisper-small. RTF of that one sentence while the test suite ran on the same machine.'
   requires: [audio.cpp]
   source:
     repo: gradium/phonon-40m-en
@@ -3249,7 +3264,6 @@
     cloning: false
     send_language: false
     hardware: {gpu: optional, vram_gb: 0.7, note: small enough for a CPU}
-    not_yet_run: true
   voices:
   - {id: default, name: Model default, server_voice: ''}
   - {id: zoey, name: 'Zoey (en-US)', language: en-US, gender: f, server_voice: zoey}
@@ -3425,7 +3439,15 @@
     in an audiocpp_server that bolo starts (bolo components install audio.cpp) or one you run (setting tts_servers). GPU
     optional, about 0.7 GB.'
   source_url: https://huggingface.co/gradium/phonon-40m-de
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 0.674
+    audio_s: 4.3
+    threads: 2
+    engine: audio.cpp v0.9.4 audiocpp_server built from source here (CPU, Release, model specs compiled in), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (bolo''s test suite running)
+    date: '2026-11-21'
+    note: 'Through bolo''s HTTP API, one German sentence in the voice Henrik, read back by faster-whisper-small with one letter off ("verließt"). RTF of that one sentence while the test suite ran on the same machine.'
   requires: [audio.cpp]
   source:
     repo: gradium/phonon-40m-de
@@ -3491,7 +3513,6 @@
     cloning: false
     send_language: false
     hardware: {gpu: optional, vram_gb: 0.7, note: small enough for a CPU}
-    not_yet_run: true
   voices:
   - {id: default, name: Model default, server_voice: ''}
   - {id: nele, name: 'Nele (de-DE)', language: de-DE, gender: f, server_voice: nele}
