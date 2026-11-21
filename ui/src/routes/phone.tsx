@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Check,
   CircleCheck,
@@ -36,9 +36,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { describeError, useCall, useCalls, useTelephony } from '@/hooks/use-api'
+import { describeError, useCall, useCalls, useInfo, useTelephony } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { isDemo } from '@/lib/api/config'
+import { pipelinesOffered } from '@/lib/capabilities'
 import type {
   CallRecord,
   CallSummary,
@@ -262,6 +263,7 @@ function AgentDialog({
               </Select>
             )}
           </Field>
+          <LivePipelineField value={form.pipelineId} onChange={(v) => set('pipelineId', v)} />
           <Field label="Longest call (seconds)" hint="0: no limit.">
             {textInput('maxDurationS')}
           </Field>
@@ -977,3 +979,37 @@ export default function PhonePage() {
     </Page>
   )
 }
+
+/** A saved live pipeline as the agent's behaviour: it runs on each turn of the caller (docs/pipelines.md). */
+function LivePipelineField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const info = useInfo().data
+  const q = useQuery({
+    queryKey: ['pipelines'],
+    queryFn: ({ signal }) => api.pipelines(signal),
+    enabled: pipelinesOffered(info),
+  })
+  if (!pipelinesOffered(info)) return null
+  const live = (q.data?.data ?? []).filter((p) => p.mode === 'live')
+  return (
+    <Field label="Behaviour" hint="A live pipeline from the Pipelines page runs on each turn of the caller.">
+      {(id) => (
+        <Select value={value || NO_LIVE} onValueChange={(v) => onChange(v === NO_LIVE ? '' : v)}>
+          <SelectTrigger id={id} className="w-full" data-testid="agent-behaviour">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NO_LIVE}>The language model answers each turn</SelectItem>
+            {live.map((p) => (
+              <SelectItem key={p.id} value={p.id ?? ''}>
+                Live pipeline: {p.name || p.id}
+              </SelectItem>
+            ))}
+            {value && !live.some((p) => p.id === value) && <SelectItem value={value}>{value}</SelectItem>}
+          </SelectContent>
+        </Select>
+      )}
+    </Field>
+  )
+}
+
+const NO_LIVE = '__none'

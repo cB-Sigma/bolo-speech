@@ -170,6 +170,8 @@ export function sessionUpdate(
     audio: { input, output },
   }
   if (extras.tools?.length) session.tools = extras.tools
+  // bolo's extension: a saved live pipeline answers each turn (docs/pipelines.md, "Live pipelines")
+  if (extras.pipelineId) session.pipeline_id = extras.pipelineId
   return { type: 'session.update', session }
 }
 
@@ -177,6 +179,8 @@ export function sessionUpdate(
 export interface SessionExtras {
   tools?: Record<string, unknown>[]
   echo?: RealtimeEcho
+  /** A saved live pipeline that answers each turn (cascade only). */
+  pipelineId?: string
 }
 
 /** `audio.input.echo_cancellation`: off, or a canceller (none named: the server's default). */
@@ -412,12 +416,13 @@ export class ConversationSession {
       tools?: Record<string, unknown>[]
       echo?: RealtimeEcho
       capture?: CaptureProcessing
+      pipelineId?: string
     } = {},
   ) {
     this.store = new Store(emptyConversation(pipeline, transport))
     this.denoise = denoise
     this.listening = opts.listening
-    this.extras = { tools: opts.tools, echo: opts.echo }
+    this.extras = { tools: opts.tools, echo: opts.echo, pipelineId: opts.pipelineId }
     this.fullDuplex = Boolean(opts.fullDuplex)
     this.capture = opts.capture
   }

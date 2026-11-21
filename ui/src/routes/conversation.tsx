@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { Info, MessagesSquare, Mic, MicOff, PhoneOff, Square } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { BrowserConversation } from '@/components/conversation/browser-conversation'
@@ -14,14 +15,16 @@ import { MicHelpPanel } from '@/components/stt/mic-help'
 import { DenoiseControl } from '@/components/stt/transcribe-options'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useComponents, useInfo } from '@/hooks/use-api'
 import { useStore } from '@/hooks/use-store'
 import { useSupport } from '@/hooks/use-support'
+import { api } from '@/lib/api/client'
 import { isDemo } from '@/lib/api/config'
 import { BROWSER_PROCESSING, type CaptureProcessing } from '@/lib/audio/capture'
-import { defaultPipeline, hasPipelines, pipelineOptions, type PipelineId } from '@/lib/capabilities'
+import { defaultPipeline, hasPipelines, pipelineOptions, pipelinesOffered, type PipelineId } from '@/lib/capabilities'
 import { fmtMs } from '@/lib/format'
 import {
   ConversationSession,
@@ -68,6 +71,7 @@ function ServerConversation() {
   const [mcp, setMcp] = useState<McpChoice>(noMcp)
   const [echo, setEcho] = useState<Echo>(defaultEcho)
   const [capture, setCapture] = useState<CaptureProcessing>(BROWSER_PROCESSING)
+  const [behaviour, setBehaviour] = useState<string>('')
   const [session, setSession] = useState<ConversationSession | null>(null)
   const state = useStore(session?.store ?? idle)
   const active = state.status === 'starting' || state.status === 'live'
@@ -96,6 +100,7 @@ function ServerConversation() {
       tools: pipeline === 'speech-to-speech' ? [] : mcpTools(mcp),
       echo: realtimeEcho(echo),
       capture,
+      pipelineId: pipeline === 'cascade' && behaviour ? behaviour : undefined,
     })
     void s.start()
     setSession(s)
@@ -130,6 +135,7 @@ function ServerConversation() {
           }
         >
           <PipelinePicker options={options} value={pipeline} onChange={setChosen} locked={active} />
+          {pipeline === 'cascade' && <BehaviourPicker value={behaviour} onChange={setBehaviour} locked={active} />}
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
             <span id="transport-label">Transport</span>
             <ToggleGroup
@@ -379,3 +385,48 @@ function Indicator({ on, label, idleLabel }: { on: boolean; label: string; idleL
     </span>
   )
 }
+
+/** A saved live pipeline as the behaviour of the conversation (session.pipeline_id), or the language model alone. */
+function BehaviourPicker({
+  value,
+  onChange,
+  locked,
+}: {
+  value: string
+  onChange: (id: string) => void
+  locked: boolean
+}) {
+  const info = useInfo().data
+  const q = useQuery({
+    queryKey: ['pipelines'],
+    queryFn: ({ signal }) => api.pipelines(signal),
+    enabled: pipelinesOffered(info),
+  })
+  const live = (q.data?.data ?? []).filter((p) => p.mode === 'live')
+  if (!pipelinesOffered(info)) return null
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+      <span>Behaviour</span>
+      <Select
+        value={value || NO_PIPELINE}
+        onValueChange={(v) => onChange(v === NO_PIPELINE ? '' : v)}
+        disabled={locked}
+      >
+        <SelectTrigger className="h-8 w-64" aria-label="Behaviour" data-testid="conversation-behaviour">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent position="popper" align="start">
+          <SelectItem value={NO_PIPELINE}>The language model answers each turn</SelectItem>
+          {live.map((p) => (
+            <SelectItem key={p.id} value={p.id ?? ''}>
+              Live pipeline: {p.name || p.id}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {live.length === 0 && <span>Live pipelines you save on the Pipelines page can answer here.</span>}
+    </div>
+  )
+}
+
+const NO_PIPELINE = '__none'

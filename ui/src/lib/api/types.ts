@@ -127,6 +127,8 @@ export interface Capabilities {
   decision?: { endpoint?: string; default_model?: string | null; types?: string[]; models?: string[] }
   /** Wake words (`POST /api/v1/wake`, `WS /api/v1/wake/stream`, the Wyoming wake service). */
   wake?: { endpoint?: string; stream?: string; wyoming?: boolean; default_model?: string | null }
+  /** Pipelines (`/api/v1/pipelines`), newer servers. */
+  pipelines?: { endpoint?: string; run?: string; step_types?: string; templates?: string }
   /** Enrolled speakers: verification and identification (`/v1/audio/speakers`), newer servers. */
   speakers?: {
     endpoint?: string
@@ -1217,6 +1219,8 @@ export interface PhoneAgent {
   tts_model: string | null
   llm_model: string | null
   pipeline: string | null
+  /** A saved live pipeline that answers each turn (newer servers). */
+  pipeline_id?: string | null
   tools: AgentTool[]
   max_duration_s: number
   max_duration_message: string | null

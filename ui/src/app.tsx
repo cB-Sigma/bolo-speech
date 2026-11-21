@@ -28,6 +28,7 @@ const DialoguePage = lazy(() => import('./routes/dialogue'))
 const ConvertPage = lazy(() => import('./routes/convert'))
 const SpeakersPage = lazy(() => import('./routes/speakers'))
 const WatermarkPage = lazy(() => import('./routes/watermark'))
+const PipelinesPage = lazy(() => import('./routes/pipelines'))
 
 function PageFallback() {
   return (
@@ -114,6 +115,14 @@ export function App() {
             element={
               <Suspense fallback={<PageFallback />}>
                 <ConnectPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="pipelines"
+            element={
+              <Suspense fallback={<PageFallback />}>
+                <PipelinesPage />
               </Suspense>
             }
           />

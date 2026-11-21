@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Puzzle,
   ScanSearch,
+  Workflow,
   Users,
   type LucideIcon,
 } from 'lucide-react'
@@ -39,6 +40,8 @@ export interface NavFeatures {
   wake?: boolean
   /** Typed questions about a recording or a text (`/v1/audio/decisions`). */
   decisions?: boolean
+  /** Pipelines (`/api/v1/pipelines`). */
+  pipelines?: boolean
 }
 
 export interface NavItem {
@@ -241,6 +244,15 @@ export const NAV: NavItem[] = [
     icon: Users,
     group: 'Playground',
     when: (f) => !isDemo && Boolean(f.speakers),
+  },
+  {
+    to: '/pipelines',
+    label: 'Pipelines',
+    short: 'Pipelines',
+    description: 'Chain models into one job: build, test and run pipelines',
+    icon: Workflow,
+    group: 'Server',
+    when: (f) => Boolean(f.pipelines),
   },
 ]
 

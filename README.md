@@ -372,6 +372,7 @@ Served at `/` by the same process, and as a browser-only [live demo](https://cb-
 | API keys | a key for each client, with scopes, a rate limit, a quota and its usage |
 | Wake word | listen to the microphone for wake words or phrases you type, with any wake-word model |
 | Word lists | edit pronunciation lists and preview what each voice receives |
+| Pipelines | build a pipeline step by step with the same model pickers, checked as you type; test it on a clip, see each step's output and time, run history, JSON import and export, templates; a live pipeline is played through the conversation simulator |
 | Components | optional software (uccharan, its language packs, eSpeak NG, llama-server, audio.cpp, plugins): what is installed, what needs it, one-click install |
 | Connect | client snippets and server details |
 

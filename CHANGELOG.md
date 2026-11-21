@@ -8,6 +8,25 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Live pipelines and pipeline triggers** ([docs/pipelines.md](docs/pipelines.md#live-pipelines)). A pipeline
+  with `mode: live` is the behaviour of a phone number (the agent's `pipeline_id`) or a Realtime session
+  (`session.pipeline_id`, cascade only): it runs on each user turn, with the turn's transcript, audio and the
+  conversation so far, and acts through `reply` (a fixed text, streamed by the session's voice), `respond` (the
+  session's language model answers as usual, streamed and with its tools, with extra instructions for the turn),
+  `transfer` and `hangup` (done by bolo on a call; a `pipeline.action` event in a Realtime session). Only the steps
+  before the first answer add latency. `POST /v1/pipelines/simulate` plays a typed or recorded conversation through
+  a live pipeline. Triggers: `call_end` (each call's transcript, by agent), `session_end`, `folder` (new recordings
+  in a folder under the new `pipeline_watch_dirs` setting, polled every `pipeline_watch_interval_s`), and
+  `pipeline=<id>` on `POST /v1/audio/transcriptions` (runs on the upload as a job, `x-bolo-pipeline-run`).
+  Templates: a support line that routes by department and transfers angry callers, an appointment line, and the
+  after-call summary now runs at the end of every call. Tested end to end with a simulated call on the fake
+  engines.
+- **Pipelines in the console**: a Pipelines page with a step-list builder (add, reorder, configure each step with
+  the catalog model pickers; inputs chosen from earlier steps' outputs; checked by the server as you type, problems
+  shown on their step), a test run on an uploaded or recorded clip with each step's output, time and audio, run
+  history, templates, JSON (or YAML) import and JSON export; for a live pipeline only per-turn steps are offered and
+  a simulator plays typed turns or a recording. The Phone page's agent editor and the Conversation page can choose
+  a live pipeline as the behaviour.
 - **Pipelines**: chain bolo's models into one job, declared as JSON or YAML ([docs/pipelines.md](docs/pipelines.md)).
   Steps of every model kind (denoise, VAD, diarization, separation, speaker identification and enrolment, STT,
   translation, alignment, punctuation, ITN, PII redaction, language ID, audio tags, emotion, audio-LLM questions,

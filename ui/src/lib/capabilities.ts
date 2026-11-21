@@ -290,6 +290,11 @@ export function wakeOffered(info: ServerInfo | undefined): boolean {
   return Boolean(info?.capabilities?.wake)
 }
 
+/** Whether the server has pipelines (the Pipelines screen). */
+export function pipelinesOffered(info: ServerInfo | undefined): boolean {
+  return Boolean(info?.capabilities?.pipelines)
+}
+
 /** Whether the server keeps API keys with scopes, rate limits and quotas (the Keys screen). */
 export function keysOffered(info: ServerInfo | undefined): boolean {
   return Boolean(info?.capabilities?.api_keys)

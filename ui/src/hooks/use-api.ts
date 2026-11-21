@@ -8,6 +8,7 @@ import {
   keysOffered,
   wakeOffered,
   decisionsOffered,
+  pipelinesOffered,
   providersOffered,
   recommendationsOffered,
   telephonyOffered,
@@ -133,6 +134,7 @@ export function useNavFeatures(): NavFeatures {
     keys: keysOffered(info) && !isDemo,
     wake: wakeOffered(info) && !isDemo,
     decisions: decisionsOffered(info) && !isDemo,
+    pipelines: pipelinesOffered(info) && !isDemo,
   }
 }
 

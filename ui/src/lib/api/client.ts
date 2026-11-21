@@ -1,6 +1,7 @@
 import { apiUrl, authHeaders, getTransport } from './config'
 import { parseTranscription, transcriptionForm, type DiarizedResult, type TranscribeOptions } from '@/lib/diarize'
 import type { DialogueBody } from '@/lib/dialogue'
+import type { Pipeline, PipelineRun, PipelineSimulation, StepType, Validation } from '@/lib/pipelines'
 
 /** The answer of `POST /v1/audio/watermark/detect`. */
 export interface WatermarkDetection {
@@ -154,6 +155,25 @@ async function json<T>(path: string, opts?: RequestOptions): Promise<T> {
   return (text ? JSON.parse(text) : undefined) as T
 }
 
+/** A pipeline run: a saved pipeline by id, or a definition sent with the request. */
+export interface PipelineRunRequest {
+  file?: Blob
+  filename?: string
+  text?: string
+  vars?: Record<string, unknown>
+  async?: boolean
+}
+
+function pipelineForm(r: PipelineRunRequest, definition?: Pipeline): FormData {
+  const form = new FormData()
+  if (definition) form.append('pipeline', JSON.stringify(definition))
+  if (r.file) form.append('file', r.file, r.filename ?? 'audio.wav')
+  if (r.text) form.append('text', r.text)
+  if (r.vars && Object.keys(r.vars).length) form.append('vars', JSON.stringify(r.vars))
+  if (r.async) form.append('async', 'true')
+  return form
+}
+
 export interface CatalogQuery {
   task?: Task | ''
   q?: string
@@ -162,6 +182,48 @@ export interface CatalogQuery {
 
 export const api = {
   info: (signal?: AbortSignal) => json<ServerInfo>('api/v1/info', { signal }),
+  /** Pipelines (docs/pipelines.md). */
+  pipelines: (signal?: AbortSignal) => json<{ data: Pipeline[] }>('api/v1/pipelines', { signal }),
+  pipeline: (id: string, version?: number, signal?: AbortSignal) =>
+    json<Pipeline>(`api/v1/pipelines/${encodeURIComponent(id)}`, { query: { version }, signal }),
+  createPipeline: (p: Pipeline) => json<Pipeline>('api/v1/pipelines', { method: 'POST', json: p }),
+  updatePipeline: (id: string, p: Pipeline) =>
+    json<Pipeline>(`api/v1/pipelines/${encodeURIComponent(id)}`, { method: 'PUT', json: p }),
+  deletePipeline: (id: string) => json<void>(`api/v1/pipelines/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  /** Check a definition (JSON, or YAML text) without saving it; `pipeline` is the definition as the server read it. */
+  validatePipeline: (p: Pipeline | string, signal?: AbortSignal) =>
+    json<Validation & { pipeline: unknown }>(
+      'api/v1/pipelines/validate',
+      typeof p === 'string'
+        ? { method: 'POST', body: p, headers: { 'Content-Type': 'application/yaml' }, signal }
+        : { method: 'POST', json: p, signal },
+    ),
+  pipelineStepTypes: (signal?: AbortSignal) => json<{ data: StepType[] }>('api/v1/pipelines/step-types', { signal }),
+  pipelineTemplates: (signal?: AbortSignal) => json<{ data: Pipeline[] }>('api/v1/pipelines/templates', { signal }),
+  pipelineRuns: (pipeline?: string, signal?: AbortSignal) =>
+    json<{ data: PipelineRun[] }>('api/v1/pipelines/runs', { query: { pipeline, limit: 30 }, signal }),
+  pipelineRun: (id: string, signal?: AbortSignal) =>
+    json<PipelineRun>(`api/v1/pipelines/runs/${encodeURIComponent(id)}`, { signal }),
+  /** Run a saved pipeline (`id`) or, with `definition`, one that is not saved. */
+  runPipeline: (r: PipelineRunRequest, id?: string, definition?: Pipeline) =>
+    json<PipelineRun>(id ? `v1/pipelines/${encodeURIComponent(id)}/run` : 'v1/pipelines/run', {
+      method: 'POST',
+      body: pipelineForm(r, id ? undefined : definition),
+    }),
+  /** Play typed turns (or a recording of the caller) through a live pipeline. */
+  simulatePipeline: (
+    definition: Pipeline,
+    r: { turns?: string[]; file?: Blob; filename?: string; instructions?: string },
+  ) => {
+    const form = new FormData()
+    form.append('pipeline', JSON.stringify(definition))
+    if (r.turns?.length) form.append('turns', JSON.stringify(r.turns))
+    if (r.file) form.append('file', r.file, r.filename ?? 'conversation.wav')
+    if (r.instructions) form.append('instructions', r.instructions)
+    return json<PipelineSimulation>('v1/pipelines/simulate', { method: 'POST', body: form })
+  },
+  /** A file a run wrote (audio outputs, saved files), as a blob (the request carries the API key). */
+  pipelineFile: async (url: string): Promise<Blob> => (await request(url.replace(/^\//, ''))).blob(),
   catalog: (q: CatalogQuery = {}, signal?: AbortSignal) =>
     json<Catalog>('api/v1/catalog', { query: { task: q.task, q: q.q, installed: q.installed }, signal }),
   pull: (id: string) =>

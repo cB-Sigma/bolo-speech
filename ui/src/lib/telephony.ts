@@ -61,6 +61,8 @@ export interface AgentForm {
   ttsModel: string
   llmModel: string
   pipeline: string
+  /** A saved live pipeline that answers each turn (docs/pipelines.md). */
+  pipelineId: string
   maxDurationS: string
   maxDurationMessage: string
   silenceTimeoutS: string
@@ -86,6 +88,7 @@ export function agentForm(agent: PhoneAgent | null): AgentForm {
     ttsModel: agent?.tts_model ?? '',
     llmModel: agent?.llm_model ?? '',
     pipeline: agent?.pipeline ?? '',
+    pipelineId: agent?.pipeline_id ?? '',
     maxDurationS: String(agent?.max_duration_s ?? 600),
     maxDurationMessage: agent?.max_duration_message ?? '',
     silenceTimeoutS: String(agent?.silence_timeout_s ?? 10),
@@ -114,6 +117,7 @@ export function agentUpdate(form: AgentForm): { body: PhoneAgentUpdate; problem:
     tts_model: text(form.ttsModel),
     llm_model: text(form.llmModel),
     pipeline: text(form.pipeline),
+    pipeline_id: text(form.pipelineId),
     max_duration_message: text(form.maxDurationMessage),
     silence_prompt: form.silencePrompt.trim() || 'Are you still there?',
     goodbye: text(form.goodbye),
