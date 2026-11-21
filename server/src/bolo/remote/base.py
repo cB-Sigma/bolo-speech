@@ -176,6 +176,8 @@ class LiveEvent:
     kind: str
     text: str = ""
     words: list[tuple[str, float, float]] | None = None
+    #: the speaker of a "final" (``A``, ``B``, ...) from a provider that labels speakers on its live socket
+    speaker: str | None = None
 
 
 class LiveProtocol(abc.ABC):
@@ -199,6 +201,11 @@ class LiveProtocol(abc.ABC):
         """The first frame after connecting (a provider's start or configuration message), if it needs one."""
         return None
 
+    def flush(self) -> bytes | str | None:
+        """Audio the protocol held back (a provider that wants pieces of a minimum length), sent before
+        :meth:`finalize` and before the socket closes."""
+        return None
+
     def finalize(self) -> str | None:
         """Ask for the text of everything sent so far (end of input)."""
         return None
@@ -218,6 +225,8 @@ class Adapter(abc.ABC):
     supports_word_timestamps: bool = False
     #: the provider labels speakers itself (a request's diarization is then left to it)
     supports_diarization: bool = False
+    #: the provider's live socket labels speakers when asked (``live(language, diarize=True)``)
+    supports_live_diarization: bool = False
 
     def __init__(self, provider: ProviderConfig, model: str, spec: dict[str, Any], *, timeout_s: float = 60.0) -> None:
         self.provider = provider
@@ -363,8 +372,9 @@ class Adapter(abc.ABC):
         """Voices the account can use, when the provider lists them (else none: the catalog's are used)."""
         return []
 
-    def live(self, language: str | None) -> LiveProtocol | None:
-        """The provider's streaming speech-to-text socket for this model, if it has one."""
+    def live(self, language: str | None, diarize: bool = False) -> LiveProtocol | None:
+        """The provider's streaming speech-to-text socket for this model, if it has one (``diarize``: ask it to
+        label speakers; only for adapters with ``supports_live_diarization``)."""
         return None
 
     @abc.abstractmethod

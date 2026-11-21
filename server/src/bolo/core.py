@@ -95,7 +95,7 @@ from bolo.obs import otel
 from bolo.obs.events import EventBus
 from bolo.obs.trace import Trace, TraceStore, preview
 from bolo.providers import KINDS as PROVIDER_KINDS
-from bolo.providers import TERMS, ProviderRegistry, Usage
+from bolo.providers import TERMS, ProviderRegistry, Usage, key_env
 from bolo.punctuation import PunctuationOptions
 from bolo.punctuation import apply as apply_punctuation
 from bolo.punctuation import header as punctuation_header
@@ -904,6 +904,8 @@ class Bolo:
                 "model": remote_model,
                 "configured": bool(provider and provider.configured),
                 "price": provider.price_for(remote_model) if provider else None,
+                # where the key goes in the environment (it can also go in the configuration file or on the console)
+                "key_env": key_env(name),
             }
             entry["adhoc"] = spec.adhoc
             # voices read from the provider's account when the model was loaded (ElevenLabs) are listed from then on

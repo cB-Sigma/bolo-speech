@@ -34,13 +34,14 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("bolo.providers")
 
-KINDS = ("openai-compatible", "sarvam", "elevenlabs", "deepgram", "soniox")
+KINDS = ("openai-compatible", "sarvam", "elevenlabs", "deepgram", "soniox", "assemblyai")
 DEFAULT_BASE_URLS = {
     "openai-compatible": "https://api.openai.com/v1",
     "sarvam": "https://api.sarvam.ai",
     "elevenlabs": "https://api.elevenlabs.io",
     "deepgram": "https://api.deepgram.com",
     "soniox": "https://api.soniox.com",
+    "assemblyai": "https://api.assemblyai.com",
 }
 #: provider names whose kind need not be spelled out
 KIND_BY_NAME = {
@@ -49,6 +50,7 @@ KIND_BY_NAME = {
     "elevenlabs": "elevenlabs",
     "deepgram": "deepgram",
     "soniox": "soniox",
+    "assemblyai": "assemblyai",
 }
 TERMS = {
     "openai-compatible": "https://openai.com/policies/services-agreement/",
@@ -56,12 +58,19 @@ TERMS = {
     "elevenlabs": "https://elevenlabs.io/terms-of-use",
     "deepgram": "https://deepgram.com/terms",
     "soniox": "https://soniox.com/policies/terms-of-service",
+    "assemblyai": "https://www.assemblyai.com/legal/terms-of-service",
 }
 LOOPBACK = ("127.0.0.1", "localhost", "::1")
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,39}$")
 _SECRET_RE = re.compile(r"key|token|secret|password|authorization", re.IGNORECASE)
 #: price units: what one unit of each is measured in
 PRICE_UNITS = ("per_minute", "per_hour", "per_1k_chars", "per_1m_chars", "per_request")
+
+
+def key_env(name: str) -> str:
+    """The environment variable that holds the API key of the provider called ``name``
+    (``elevenlabs`` -> ``BOLO_PROVIDER_ELEVENLABS_API_KEY``; ``-`` in a name is ``_`` in the variable)."""
+    return f"BOLO_PROVIDER_{name.upper().replace('-', '_')}_API_KEY"
 
 
 def redact_provider(entry: Any) -> dict[str, Any]:
@@ -395,7 +404,7 @@ class ProviderRegistry:
             raise ProviderNotConfigured(
                 f"{what}needs the cloud provider '{name or kind}', which is not configured: add a "
                 f"[providers.{name or kind}] table with its api_key to the configuration (or set "
-                f"BOLO_PROVIDER_{(name or kind or '').upper().replace('-', '_')}_API_KEY), or add it on the "
+                f"{key_env(name or kind or '')}), or add it on the "
                 "console's Providers page"
             )
         if not cfg.configured:

@@ -10,8 +10,9 @@ unless a request names a cloud model, a cloud model is set as a default, or a mo
 list names one.
 
 What is on this page was read from each provider's documentation on **2026-11-14** (Soniox's on
-**2026-11-17**). Nothing was run against a real account: there were no keys where bolo is
-developed, and the test-suite uses stand-ins for the five APIs (`server/tests/fake_providers.py`). The opt-in real tests are
+**2026-11-17**, AssemblyAI's on **2026-11-21**). Nothing was run against a real account: there
+were no keys where bolo is developed, and the test-suite uses stand-ins written from the same
+documentation (`server/tests/fake_providers.py`, `server/tests/fake_cloud_apis.py`). The opt-in real tests are
 described at the end. Where the documentation left something open, it says so under
 "Not verified".
 
@@ -39,11 +40,12 @@ A provider has a name, a `kind`, a base URL, an API key, options and an optional
 | `elevenlabs` | ElevenLabs (text to speech, Scribe) | `https://api.elevenlabs.io` | `xi-api-key: <key>` |
 | `deepgram` | Deepgram (Nova) | `https://api.deepgram.com` | `Authorization: Token <key>` |
 | `soniox` | Soniox (speech-to-text: async API and live WebSocket) | `https://api.soniox.com` (the live socket: `wss://stt-rt.soniox.com`) | `Authorization: Bearer <key>` |
+| `assemblyai` | AssemblyAI (speech-to-text: pre-recorded API and Streaming API v3, both with speaker labels) | `https://api.assemblyai.com` (the live socket: `wss://streaming.assemblyai.com/v3/ws`) | `Authorization: <key>` (no prefix) |
 
 In the configuration file, one table per provider:
 
 ```toml
-[providers.openai]                 # the names openai, sarvam, elevenlabs, deepgram and soniox imply their kind
+[providers.openai]                 # the names openai, sarvam, elevenlabs, deepgram, soniox and assemblyai imply their kind
 api_key = "…"
 
 [providers.sarvam]
@@ -73,7 +75,10 @@ BOLO_PROVIDERS='{"deepgram": {"api_key": "…"}}'     # or the whole table as JS
 ```
 
 (`_` in the environment name is `-` in the provider's name. The `BOLO_PROVIDER_…` variables add
-to, and override, the same provider's table from the file.)
+to, and override, the same provider's table from the file.) Every cloud entry of the catalog
+names the variable its key goes in: `provider.key_env` in `GET /api/v1/catalog`
+(`BOLO_PROVIDER_ASSEMBLYAI_API_KEY` for the AssemblyAI entries), and the tables in
+[models.md](models.md).
 
 Or at run time, on the console's **Providers** page or with `PUT /api/v1/providers/{name}`; those
 are stored in `<data_dir>/providers.json` (see [Keys](#keys)).
@@ -105,7 +110,8 @@ soon as its provider is configured**, and `GET /v1/models` lists it from then on
 - the provider's terms in the licence field (`license`, with the link in `license_url`). Terms
   are labelled, as licences are everywhere in bolo; they are never a reason to leave a model out;
 - languages and voices as the provider documents them;
-- `provider: {name, kind, model, configured, price}` in the API.
+- `provider: {name, kind, model, configured, price, key_env}` in the API (`key_env`: the
+  environment variable of the key, `BOLO_PROVIDER_<NAME>_API_KEY`).
 
 | id | Provider model | Task | Notes |
 | --- | --- | --- | --- |
@@ -123,9 +129,11 @@ soon as its provider is configured**, and `GET /v1/models` lists it from then on
 | `deepgram-nova-3`, `deepgram-nova-2` | `nova-…` | STT | batch and live (Deepgram's streaming socket, with interim text) |
 | `soniox-stt-async-v6` | `stt-async-v6` | STT | recorded audio (Soniox's async API): word timestamps, speaker labels, language identification, translation to English |
 | `soniox-stt-rt-v6` | `stt-rt-v6` | STT | live (Soniox's WebSocket, with interim text); recorded audio and Realtime turns go to `stt-async-v6` |
+| `assemblyai-stt-3.7` | `assemblyai-stt-3-7` | STT | recorded audio (AssemblyAI's pre-recorded API, released 2026-11-17): 32 languages, word timestamps, speaker labels, language detection, keyterms and prompt |
+| `assemblyai-stt-3.7-realtime`, `assemblyai-stt-3.7-realtime-agent` | `assemblyai-stt-3-7-realtime`, `…-realtime-agent` | STT | live (AssemblyAI's Streaming API v3, with interim text and AssemblyAI's turn detection) with speaker labels on the socket; the `-agent` model is the one tuned for voice agents. Recorded audio and Realtime turns go to `assemblyai-stt-3-7` |
 
 An entry looks for a provider with the name in its `options.provider` (`openai`, `sarvam`,
-`elevenlabs`, `deepgram`, `soniox`). If you called the account something else, the first configured
+`elevenlabs`, `deepgram`, `soniox`, `assemblyai`). If you called the account something else, the first configured
 provider of the same kind at the vendor's own address is used.
 
 ### Any other model: `provider:model`
@@ -170,6 +178,7 @@ Catalog `options` of an `engine: remote` entry (and of `options.models.<model>` 
 | `sarvam`: `mode`, `keyterms`, `with_timestamps`, `legacy_translate`, `live`, `language_field`, `enable_preprocessing`, `max_chars` | see `bolo/remote/sarvam.py` |
 | `elevenlabs`: `send_language`, `apply_text_normalization`, `provider_sample_rate` | see `bolo/remote/elevenlabs.py` |
 | `deepgram`: `language`, `detect_language`, `smart_format`, `hotwords_field`, `live`, `endpointing_ms` | see `bolo/remote/deepgram.py` |
+| `assemblyai`: `async_model`, `live_model`, `live`, `speaker_labels`, `speakers_expected`, `live_speaker_labels`, `max_speakers`, `language_codes`, `min_turn_silence`, `max_turn_silence`, `mode`, `poll_interval_s`, `poll_timeout_s`, `keep_files`, `realtime_url`, `live_request` | see `bolo/remote/assemblyai.py` and [AssemblyAI](#assemblyai) below (these also work as provider options) |
 | `soniox`: `async_model`, `live_model`, `live`, `language_hints`, `language_hints_strict`, `language_identification`, `speaker_diarization`, `provider_diarization`, `context`, `translate`, `translate_to`, `poll_interval_s`, `poll_timeout_s`, `keep_files`, `realtime_url`, `endpoint_delay_ms`, `live_request` | see `bolo/remote/soniox.py` and [Soniox](#soniox) below (these also work as provider options) |
 
 ## What bolo adds on top
@@ -186,8 +195,10 @@ ones local models use:
   bolo's VAD and sent in pieces (several at a time), with segment times of the whole recording.
 - **Diarization.** `diarize=true` / `diarized_json` cut the recording at bolo's speaker turns and
   send each turn to the provider, so any cloud recogniser gets speaker labels, known speakers and
-  overlap marks. Soniox labels speakers itself: for its models the request is passed on as
-  `enable_speaker_diarization` and Soniox's labels are used (see [Soniox](#soniox)).
+  overlap marks. Soniox and AssemblyAI label speakers themselves: for their models the request is
+  passed on (`enable_speaker_diarization`, `speaker_labels`) and the provider's labels are used (see
+  [Soniox](#soniox), [AssemblyAI](#assemblyai)). On the STT WebSocket, AssemblyAI's realtime entries
+  label speakers on their live socket too (`diarize=true`).
 - **Word lists and text normalisation.** Text for a cloud voice is prepared like text for any
   voice that reads text: SSML subset, pronunciation word lists (as spoken forms or respellings),
   and uccharan's normalisation of numbers, dates, money and so on (bolo's light normaliser without
@@ -202,8 +213,8 @@ ones local models use:
   conversation sessions (`STT → language model → TTS`) take cloud models: set
   `default_realtime_stt` / `default_realtime_tts`, or name the model in the session
   (`audio.input.transcription.model`). bolo keeps turn detection, barge-in and the codecs.
-  Deepgram, Soniox (`soniox-stt-rt-v6`) and Sarvam's streaming entry use the provider's live
-  socket on the STT WebSocket, with interim text. Other cloud recognisers get one request per utterance, when bolo's VAD hears
+  Deepgram, Soniox (`soniox-stt-rt-v6`), AssemblyAI's realtime entries and Sarvam's streaming
+  entry use the provider's live socket on the STT WebSocket, with interim text. Other cloud recognisers get one request per utterance, when bolo's VAD hears
   it end: bolo's usual interim text (repeated decodes of the growing utterance) is switched off
   for cloud models, because every decode would be billed. The model option `interim_decodes`
   switches it back on. Realtime sessions use the batch route too: one request per turn (plus the
@@ -219,16 +230,16 @@ one request per turn; the transcript arrives when the turn ends).
 
 Speech to text (`/v1/audio/transcriptions`, the STT WebSocket, Realtime sessions):
 
-| bolo | openai-compatible | sarvam | elevenlabs | deepgram | soniox |
-| --- | --- | --- | --- | --- | --- |
-| `language` (`hi`, `hi-IN`) | `language` (`hi`) | `language_code` (`hi-IN`; `unknown` when absent; `or` → `od-IN`); **400** for a language Sarvam lacks | `language_code` (`hi`) | `language` as given (`en-IN` stays); none → `detect_language=true` | `language_hints: ["hi"]`; language identification on, and the answer's language is the one most of the text is in |
-| `prompt` | `prompt` | **400** (only the older translate route takes one) | **400** | **400** | `context.text` |
-| `hotwords` (comma or line separated) | appended to `prompt`; `keywords[]` for `gpt-transcribe` | `keyterms` (JSON, 50 × 64 characters) with `saaras:v4`; **400** otherwise | `keyterms` | `keyterm` (Nova-3) or `keywords` | `context.terms` |
-| `timestamp_granularities[]=word` | `verbose_json` + `timestamp_granularities[]` (`whisper-1`); **400** for the `gpt-4o` models | **400**: phrase-level times only (`with_timestamps`, returned as segments) | always returned | always returned | always returned (Soniox's tokens joined into words) |
-| `temperature` | `temperature` | not sent | `temperature` | not sent | not sent |
-| `diarize`, `diarized_json` | bolo's speaker turns | same | same | same | `enable_speaker_diarization`; Soniox's labels (`1`, `2` → `A`, `B`) |
-| translation (`/v1/audio/translations`) | `/audio/translations` (`whisper-1`); **400** otherwise | `mode=translate` | **400** | **400** | `translation: {type: one_way, target_language: en}` |
-| `response_format` (json, text, srt, vtt, verbose_json, diarized_json), `stream` | rendered by bolo from the provider's text, segments and words | same | same | same | same |
+| bolo | openai-compatible | sarvam | elevenlabs | deepgram | soniox | assemblyai |
+| --- | --- | --- | --- | --- | --- | --- |
+| `language` (`hi`, `hi-IN`) | `language` (`hi`) | `language_code` (`hi-IN`; `unknown` when absent; `or` → `od-IN`); **400** for a language Sarvam lacks | `language_code` (`hi`) | `language` as given (`en-IN` stays); none → `detect_language=true` | `language_hints: ["hi"]`; language identification on, and the answer's language is the one most of the text is in | `language_code` (`hi`); none → `language_detection: true` (live: `language_codes`) |
+| `prompt` | `prompt` | **400** (only the older translate route takes one) | **400** | **400** | `context.text` | `prompt` (recorded audio) |
+| `hotwords` (comma or line separated) | appended to `prompt`; `keywords[]` for `gpt-transcribe` | `keyterms` (JSON, 50 × 64 characters) with `saaras:v4`; **400** otherwise | `keyterms` | `keyterm` (Nova-3) or `keywords` | `context.terms` | `keyterms_prompt` (up to 1000 terms) |
+| `timestamp_granularities[]=word` | `verbose_json` + `timestamp_granularities[]` (`whisper-1`); **400** for the `gpt-4o` models | **400**: phrase-level times only (`with_timestamps`, returned as segments) | always returned | always returned | always returned (Soniox's tokens joined into words) | always returned |
+| `temperature` | `temperature` | not sent | `temperature` | not sent | not sent | **400** |
+| `diarize`, `diarized_json` | bolo's speaker turns | same | same | same | `enable_speaker_diarization`; Soniox's labels (`1`, `2` → `A`, `B`) | `speaker_labels`; AssemblyAI's labels (`A`, `B`); live: `speaker_labels=true` on the socket |
+| translation (`/v1/audio/translations`) | `/audio/translations` (`whisper-1`); **400** otherwise | `mode=translate` | **400** | **400** | `translation: {type: one_way, target_language: en}` | **400** |
+| `response_format` (json, text, srt, vtt, verbose_json, diarized_json), `stream` | rendered by bolo from the provider's text, segments and words | same | same | same | same | same |
 
 Text to speech (`/v1/audio/speech`, the TTS WebSocket, voice agents):
 
@@ -281,6 +292,38 @@ on the trace (`provider.requests`); the deletes are not counted.
 - **Realtime sessions** use the async route, one transcription per turn: three requests and a
   short wait for every turn. For conversations, a recogniser with a single-request batch route
   (OpenAI, Deepgram) answers sooner; `soniox-stt-rt-v6` on the STT WebSocket is the live option.
+
+### AssemblyAI
+
+Recorded audio goes through AssemblyAI's pre-recorded API in three steps: the WAV is uploaded as
+it is (`POST /v2/upload`, `application/octet-stream`), a transcript is requested
+(`POST /v2/transcript` with `speech_models: ["assemblyai-stt-3-7"]`) and polled
+(`GET /v2/transcript/{id}`, every 0.25 s at first, then up to every 3 s; AssemblyAI allows 60
+looks a minute per transcript) until it is `completed`. bolo then deletes the transcript at
+AssemblyAI (`keep_files` leaves it). The wait is bounded by `poll_timeout_s` as for Soniox; a
+transcript that ends in `error` answers 502 with AssemblyAI's message.
+
+- **Speakers.** With `diarize=true` or `diarized_json`, AssemblyAI is asked for speaker labels
+  (`speaker_labels`; the model option `speakers_expected` sends a count) and its utterances
+  become segments with their speakers (`A`, `B`, …, as bolo labels them). The trace says
+  `diarization_model: provider`; bolo's own diarizer is used when the request names one, gives
+  known speakers or asks for overlap separation, exactly as for Soniox.
+- **Languages.** `language` is sent as `language_code`; without one, AssemblyAI detects the
+  language (`language_detection: true`). STT-3.7 handles 32 languages and switches between them
+  within a recording; a language it lacks falls back to AssemblyAI's Universal-2 at AssemblyAI.
+- **Filler words.** STT-3.7 keeps them (and repetitions and false starts) by default; set the
+  model option `request: {"disfluencies": false}` to drop most of them.
+- **Live.** `assemblyai-stt-3.7-realtime` and `-realtime-agent` open
+  `wss://streaming.assemblyai.com/v3/ws` with the key in the `Authorization` header and the
+  settings as query parameters (`speech_model`, `sample_rate=16000`, `encoding=pcm_s16le`,
+  `language_codes` when the session names a language, `speaker_labels=true` when it asks for
+  diarization). Audio goes in binary frames of 50 ms to 1 s (AssemblyAI refuses frames under
+  20 ms, so short pieces are joined). Each `Turn` replaces the interim text; the turn's last
+  message (`end_of_turn` and `turn_is_formatted`) is the final, with its words and speaker. The
+  end of input sends `ForceEndpoint`, and the session ends with `Terminate`. The model options
+  `min_turn_silence`, `max_turn_silence` and `mode` are passed on; `realtime_url` points at
+  another address (AssemblyAI's EU socket is `wss://streaming.eu.assemblyai.com/v3/ws`).
+- **Realtime sessions** use the pre-recorded route, one transcript per turn, as for Soniox.
 
 ## Errors
 
@@ -413,7 +456,7 @@ and OpenAI's Realtime *transcription* sessions as a live socket for the STT WebS
 | `GET /api/v1/providers/{name}` | one provider |
 | `PUT /api/v1/providers/{name}` `{kind?, base_url?, api_key?, clear_api_key?, options?, prices?}` | adds or changes a stored provider. `api_key` is write-only: absent or empty keeps the stored key, `clear_api_key: true` removes it. Loaded models of the provider are unloaded so the change takes effect. `400` for a provider that comes from the configuration, an unknown kind or field, or when editing is not allowed |
 | `DELETE /api/v1/providers/{name}` | `204`; `400` for a provider from the configuration |
-| `POST /api/v1/providers/{name}/test` | one cheap request with the stored key: `{name, ok, message, code, checked: "credentials"\|"reachability", latency_ms}`. `credentials`: the key was accepted (OpenAI-compatible: `GET /models`; ElevenLabs: `GET /v2/voices`; Deepgram: `GET /v1/projects`; Soniox: `GET /v1/models`). `reachability`: the address answered and did not refuse the key, but nothing proves the key (Sarvam documents no free read-only request; a refused key is still reported as a failure) |
+| `POST /api/v1/providers/{name}/test` | one cheap request with the stored key: `{name, ok, message, code, checked: "credentials"\|"reachability", latency_ms}`. `credentials`: the key was accepted (OpenAI-compatible: `GET /models`; ElevenLabs: `GET /v2/voices`; Deepgram: `GET /v1/projects`; Soniox: `GET /v1/models`). `reachability`: the address answered and did not refuse the key, but nothing proves the key (Sarvam documents no free read-only request; a refused key is still reported as a failure). AssemblyAI: `GET /v2/transcript?limit=1` (`credentials`) |
 
 Events: `provider` `{name, event: "saved"|"removed"}` on `GET /api/v1/events`.
 
@@ -427,6 +470,7 @@ Read on 2026-11-14:
 | Sarvam | `docs.sarvam.ai/api-reference-docs/` (speech-to-text/transcribe, speech-to-text-translate/translate, text-to-speech/convert, the two WebSocket references) | routes, `api-subscription-key`, `saaras:v4` and `saaras:v3`, modes, the 23 and 11 language codes, `keyterms`, phrase-level timestamps, the 30-second note, `bulbul:v2` / `v3` / `v4-flash`, all speaker names, `pace` ranges, sample rates, character limits, the streaming message shapes |
 | ElevenLabs | `elevenlabs.io/docs/api-reference/` (text-to-speech/stream, speech-to-text/convert, voices/search, audio-isolation/convert), `elevenlabs.io/docs/overview/models` | routes, `xi-api-key`, `output_format` values, body fields, `scribe_v3` / `scribe_v2`, word objects, the voice listing, model ids, the 32 language codes of Flash v2.5, the voice isolator's `audio` and `file_format` fields (the reference does not name the format of its answer: bolo decodes WAV, MP3 or anything else its decoder reads) |
 | Soniox (read 2026-11-17) | `docs.soniox.com` (API reference: files, transcriptions, models, the WebSocket API, errors; guides: async transcription, models, supported languages, context, manual finalization, endpoint detection, connection keepalive, WebSocket authentication) | the three-step async flow and its routes, `Authorization: Bearer` for REST and the live socket, `stt-async-v6` / `stt-rt-v6` (v5 deprecated for 2026-12-15), the 60 language codes, request fields, token fields (`start_ms`, `end_ms`, `speaker`, `language`, `translation_status`), the start message, `finalize` / `keepalive` / empty-frame messages, `<end>` and `<fin>`, error codes and bodies |
+| AssemblyAI (read 2026-11-21) | `assemblyai.com/docs` (pre-recorded: files/upload, transcripts/submit, get, list and delete, select-the-speech-model, the assemblyai-stt-3-7 migration guide, label-speakers, supported-languages; streaming: select-the-speech-model, message-sequence, turn-detection, label-speakers-and-separate-channels, and the AsyncAPI description `api-reference/specs/streaming.yaml`) | the three-step pre-recorded flow and its routes, `Authorization` without a prefix, `assemblyai-stt-3-7` and the two realtime models (released 2026-11-17), the 32 language codes, request fields (`speech_models`, `language_code`, `language_detection`, `speaker_labels`, `speakers_expected`, `keyterms_prompt`, `prompt`), word and utterance fields (times in ms, `speaker`), the socket's address, query parameters, binary frames of 20 ms to 1 s, `ForceEndpoint` / `Terminate`, `Begin` / `Turn` / `Termination` / `Error`, `speaker_label` per turn and `speaker` per final word |
 | Deepgram | `developers.deepgram.com` (reference: listen-pre-recorded, listen-streaming, manage/projects/list; the pre-recorded guide; models and languages overview) | routes, `Authorization: Token`, the raw-audio upload, query parameters, `keyterm` against `keywords`, the response paths, the live socket's parameters and messages, Nova-3 and Nova-2 language codes |
 
 Not verified, or taken from memory:
@@ -454,19 +498,24 @@ Not verified, or taken from memory:
 - The terms links in the licence field: Sarvam's, ElevenLabs' and Deepgram's pages were opened
   today; OpenAI's (`openai.com/policies/services-agreement/`) refused automated reading and is
   from memory.
+- AssemblyAI: whether the live socket refuses a bad key at the handshake or with an `Error`
+  message, and the error bodies beyond the documented `error` field. The 32 languages of
+  STT-3.7 are the streaming reference's list (`language_codes`); the pre-recorded page names the
+  same count.
 - Prices: none are shipped; providers change them.
 
 ## Real tests
 
 `server/tests/test_real.py` has one test per provider (`test_cloud_openai`, `test_cloud_sarvam`,
-`test_cloud_elevenlabs`, `test_cloud_deepgram`, `test_cloud_soniox`): the connection test, a
+`test_cloud_elevenlabs`, `test_cloud_deepgram`, `test_cloud_soniox`, `test_cloud_assemblyai`): the connection test, a
 speak-then-transcribe round trip with a word-error-rate bound, word timestamps, translation, and
 Deepgram's and Soniox's live sockets. They are skipped unless both are true:
 
 ```bash
 export BOLO_TEST_REAL=1
 export OPENAI_API_KEY=…        # or BOLO_PROVIDER_OPENAI_API_KEY; likewise SARVAM_API_KEY,
-                               # ELEVENLABS_API_KEY, DEEPGRAM_API_KEY, SONIOX_API_KEY
+                               # ELEVENLABS_API_KEY, DEEPGRAM_API_KEY, SONIOX_API_KEY,
+                               # ASSEMBLYAI_API_KEY
 pytest -m real -k cloud
 ```
 

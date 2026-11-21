@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-532 models: 233 validated on CPU by the maintainers, 299 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+532 models: 233 validated on CPU by the maintainers, 299 untested. 26 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -73,39 +73,47 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `openai-whisper-1` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` | untested |
-| `openai-gpt-4o-transcribe` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` | untested |
-| `openai-gpt-4o-mini-transcribe` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` | untested |
-| `openai-gpt-transcribe` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` | untested |
+| `openai-whisper-1` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` (key: `BOLO_PROVIDER_OPENAI_API_KEY`) | untested |
+| `openai-gpt-4o-transcribe` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` (key: `BOLO_PROVIDER_OPENAI_API_KEY`) | untested |
+| `openai-gpt-4o-mini-transcribe` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` (key: `BOLO_PROVIDER_OPENAI_API_KEY`) | untested |
+| `openai-gpt-transcribe` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` (key: `BOLO_PROVIDER_OPENAI_API_KEY`) | untested |
 
 #### Sarvam (cloud)
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `sarvam-saaras-v4` | hi, bn, kn, ml, mr, or +17 | accuracy | pseudo | none (cloud API) | Sarvam AI Terms of Service (paid cloud API) · [terms](https://www.sarvam.ai/terms-of-service) · needs provider `sarvam` | untested |
-| `sarvam-saaras-v3` | hi, bn, kn, ml, mr, or +17 | accuracy | pseudo | none (cloud API) | Sarvam AI Terms of Service (paid cloud API) · [terms](https://www.sarvam.ai/terms-of-service) · needs provider `sarvam` | untested |
-| `sarvam-saaras-v4-streaming` | hi, bn, kn, ml, mr, or +17 | realtime | native | none (cloud API) | Sarvam AI Terms of Service (paid cloud API) · [terms](https://www.sarvam.ai/terms-of-service) · needs provider `sarvam` | untested |
+| `sarvam-saaras-v4` | hi, bn, kn, ml, mr, or +17 | accuracy | pseudo | none (cloud API) | Sarvam AI Terms of Service (paid cloud API) · [terms](https://www.sarvam.ai/terms-of-service) · needs provider `sarvam` (key: `BOLO_PROVIDER_SARVAM_API_KEY`) | untested |
+| `sarvam-saaras-v3` | hi, bn, kn, ml, mr, or +17 | accuracy | pseudo | none (cloud API) | Sarvam AI Terms of Service (paid cloud API) · [terms](https://www.sarvam.ai/terms-of-service) · needs provider `sarvam` (key: `BOLO_PROVIDER_SARVAM_API_KEY`) | untested |
+| `sarvam-saaras-v4-streaming` | hi, bn, kn, ml, mr, or +17 | realtime | native | none (cloud API) | Sarvam AI Terms of Service (paid cloud API) · [terms](https://www.sarvam.ai/terms-of-service) · needs provider `sarvam` (key: `BOLO_PROVIDER_SARVAM_API_KEY`) | untested |
 
 #### ElevenLabs (cloud)
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `elevenlabs-scribe-v3` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` | untested |
-| `elevenlabs-scribe-v2` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` | untested |
+| `elevenlabs-scribe-v3` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` (key: `BOLO_PROVIDER_ELEVENLABS_API_KEY`) | untested |
+| `elevenlabs-scribe-v2` | af, am, ar, as, az, ba +94 | accuracy | pseudo | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` (key: `BOLO_PROVIDER_ELEVENLABS_API_KEY`) | untested |
 
 #### Deepgram (cloud)
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `deepgram-nova-3` | af, ar, hy, as, eu, be +55 | realtime | native | none (cloud API) | Deepgram Terms of Service (paid cloud API) · [terms](https://deepgram.com/terms) · needs provider `deepgram` | untested |
-| `deepgram-nova-2` | bg, ca, zh, cs, da, nl +27 | realtime | native | none (cloud API) | Deepgram Terms of Service (paid cloud API) · [terms](https://deepgram.com/terms) · needs provider `deepgram` | untested |
+| `deepgram-nova-3` | af, ar, hy, as, eu, be +55 | realtime | native | none (cloud API) | Deepgram Terms of Service (paid cloud API) · [terms](https://deepgram.com/terms) · needs provider `deepgram` (key: `BOLO_PROVIDER_DEEPGRAM_API_KEY`) | untested |
+| `deepgram-nova-2` | bg, ca, zh, cs, da, nl +27 | realtime | native | none (cloud API) | Deepgram Terms of Service (paid cloud API) · [terms](https://deepgram.com/terms) · needs provider `deepgram` (key: `BOLO_PROVIDER_DEEPGRAM_API_KEY`) | untested |
 
 #### Soniox (cloud)
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `soniox-stt-async-v6` | af, sq, ar, az, eu, be +54 | accuracy | pseudo | none (cloud API) | Soniox Terms of Service (paid cloud API) · [terms](https://soniox.com/policies/terms-of-service) · needs provider `soniox` | untested |
-| `soniox-stt-rt-v6` | af, sq, ar, az, eu, be +54 | realtime | native | none (cloud API) | Soniox Terms of Service (paid cloud API) · [terms](https://soniox.com/policies/terms-of-service) · needs provider `soniox` | untested |
+| `soniox-stt-async-v6` | af, sq, ar, az, eu, be +54 | accuracy | pseudo | none (cloud API) | Soniox Terms of Service (paid cloud API) · [terms](https://soniox.com/policies/terms-of-service) · needs provider `soniox` (key: `BOLO_PROVIDER_SONIOX_API_KEY`) | untested |
+| `soniox-stt-rt-v6` | af, sq, ar, az, eu, be +54 | realtime | native | none (cloud API) | Soniox Terms of Service (paid cloud API) · [terms](https://soniox.com/policies/terms-of-service) · needs provider `soniox` (key: `BOLO_PROVIDER_SONIOX_API_KEY`) | untested |
+
+#### AssemblyAI (cloud)
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `assemblyai-stt-3.7` | af, ar, yue, ca, da, nl +26 | accuracy | pseudo | none (cloud API) | AssemblyAI Terms of Service (paid cloud API) · [terms](https://www.assemblyai.com/legal/terms-of-service) · needs provider `assemblyai` (key: `BOLO_PROVIDER_ASSEMBLYAI_API_KEY`) | untested |
+| `assemblyai-stt-3.7-realtime` | af, ar, yue, ca, da, nl +26 | realtime | native | none (cloud API) | AssemblyAI Terms of Service (paid cloud API) · [terms](https://www.assemblyai.com/legal/terms-of-service) · needs provider `assemblyai` (key: `BOLO_PROVIDER_ASSEMBLYAI_API_KEY`) | untested |
+| `assemblyai-stt-3.7-realtime-agent` | af, ar, yue, ca, da, nl +26 | realtime | native | none (cloud API) | AssemblyAI Terms of Service (paid cloud API) · [terms](https://www.assemblyai.com/legal/terms-of-service) · needs provider `assemblyai` (key: `BOLO_PROVIDER_ASSEMBLYAI_API_KEY`) | untested |
 
 #### Whisper
 
@@ -386,25 +394,25 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `openai-tts-1` | af, am, ar, as, az, ba +94 | realtime | - | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` | untested |
-| `openai-tts-1-hd` | af, am, ar, as, az, ba +94 | balanced | - | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` | untested |
-| `openai-gpt-4o-mini-tts` | af, am, ar, as, az, ba +94 | balanced | - | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` | untested |
+| `openai-tts-1` | af, am, ar, as, az, ba +94 | realtime | - | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` (key: `BOLO_PROVIDER_OPENAI_API_KEY`) | untested |
+| `openai-tts-1-hd` | af, am, ar, as, az, ba +94 | balanced | - | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` (key: `BOLO_PROVIDER_OPENAI_API_KEY`) | untested |
+| `openai-gpt-4o-mini-tts` | af, am, ar, as, az, ba +94 | balanced | - | none (cloud API) | OpenAI Services Agreement (paid cloud API) · [terms](https://openai.com/policies/services-agreement/) · needs provider `openai` (key: `BOLO_PROVIDER_OPENAI_API_KEY`) | untested |
 
 #### Sarvam (cloud)
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `sarvam-bulbul-v3` | hi, bn, en, gu, kn, ml +5 | balanced | - | none (cloud API) | Sarvam AI Terms of Service (paid cloud API) · [terms](https://www.sarvam.ai/terms-of-service) · needs provider `sarvam` | untested |
-| `sarvam-bulbul-v2` | hi, bn, en, gu, kn, ml +5 | balanced | - | none (cloud API) | Sarvam AI Terms of Service (paid cloud API) · [terms](https://www.sarvam.ai/terms-of-service) · needs provider `sarvam` | untested |
-| `sarvam-bulbul-v4-flash` | hi, bn, en, gu, kn, ml +5 | realtime | - | none (cloud API) | Sarvam AI Terms of Service (paid cloud API) · [terms](https://www.sarvam.ai/terms-of-service) · needs provider `sarvam` | untested |
+| `sarvam-bulbul-v3` | hi, bn, en, gu, kn, ml +5 | balanced | - | none (cloud API) | Sarvam AI Terms of Service (paid cloud API) · [terms](https://www.sarvam.ai/terms-of-service) · needs provider `sarvam` (key: `BOLO_PROVIDER_SARVAM_API_KEY`) | untested |
+| `sarvam-bulbul-v2` | hi, bn, en, gu, kn, ml +5 | balanced | - | none (cloud API) | Sarvam AI Terms of Service (paid cloud API) · [terms](https://www.sarvam.ai/terms-of-service) · needs provider `sarvam` (key: `BOLO_PROVIDER_SARVAM_API_KEY`) | untested |
+| `sarvam-bulbul-v4-flash` | hi, bn, en, gu, kn, ml +5 | realtime | - | none (cloud API) | Sarvam AI Terms of Service (paid cloud API) · [terms](https://www.sarvam.ai/terms-of-service) · needs provider `sarvam` (key: `BOLO_PROVIDER_SARVAM_API_KEY`) | untested |
 
 #### ElevenLabs (cloud)
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `elevenlabs-flash-v2.5` | en, ja, zh, de, hi, fr +26 | realtime | - | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` | untested |
-| `elevenlabs-multilingual-v2` | en, ja, zh, de, hi, fr +23 | balanced | - | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` | untested |
-| `elevenlabs-v3` | en, ja, zh, de, hi, fr +26 | balanced | - | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` | untested |
+| `elevenlabs-flash-v2.5` | en, ja, zh, de, hi, fr +26 | realtime | - | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` (key: `BOLO_PROVIDER_ELEVENLABS_API_KEY`) | untested |
+| `elevenlabs-multilingual-v2` | en, ja, zh, de, hi, fr +23 | balanced | - | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` (key: `BOLO_PROVIDER_ELEVENLABS_API_KEY`) | untested |
+| `elevenlabs-v3` | en, ja, zh, de, hi, fr +26 | balanced | - | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` (key: `BOLO_PROVIDER_ELEVENLABS_API_KEY`) | untested |
 
 #### Kokoro
 
@@ -863,7 +871,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `elevenlabs-voice-isolator` | - | accuracy | - | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` | untested |
+| `elevenlabs-voice-isolator` | - | accuracy | - | none (cloud API) | ElevenLabs Terms of Use (paid cloud API) · [terms](https://elevenlabs.io/terms-of-use) · needs provider `elevenlabs` (key: `BOLO_PROVIDER_ELEVENLABS_API_KEY`) | untested |
 
 #### GTCRN
 

@@ -24,7 +24,7 @@ import websockets
 from bolo.catalog import Catalog, ModelSpec
 from bolo.config import Settings, load_settings
 from bolo.core import parse_fallbacks
-from bolo.providers import ProviderConfig, ProviderRegistry, redact_provider, scrub
+from bolo.providers import KIND_BY_NAME, KINDS, ProviderConfig, ProviderRegistry, redact_provider, scrub
 from bolo.remote.sarvam import guess_language, sarvam_language
 from conftest import LiveServer, speechlike, two_speakers, wav_bytes
 from fake_providers import KEY, FakeLiveServer, FakeProviders
@@ -187,13 +187,17 @@ def test_provider_validation_and_redaction() -> None:
 
 
 # -- the catalog ----------------------------------------------------------------------------------------------
+#: the provider names the catalog's cloud entries look for
+PROVIDER_NAMES = KIND_BY_NAME.keys()
+
+
 def test_cloud_entries_of_the_catalog() -> None:
     cloud_models = [m for m in Catalog.load().all() if m.cloud]
     assert len(cloud_models) >= 18
     for m in cloud_models:
         assert m.engine == "remote" and m.kind == f"remote-{m.task}" and m.validated == "untested"
         assert m.license_url and m.license_url.startswith("https://") and "cloud API" in m.license
-        assert m.options["provider"] in ("openai", "sarvam", "elevenlabs", "deepgram", "soniox") and m.options["model"]
+        assert m.options["provider"] in PROVIDER_NAMES and m.options["model"]
         api = m.to_api()
         assert api["cloud"] is True and api["notice"] == "paid cloud API; audio leaves this server"
         assert "leaves this server" in m.description and (m.languages or m.task == "denoise")
@@ -213,7 +217,7 @@ def test_cloud_models_are_installed_when_their_provider_is_configured(
     assert whisper["installed"] is True and whisper["cloud"] is True and whisper["size_bytes"] == 0
     assert whisper["provider"] == {
         "name": "openai", "kind": "openai-compatible", "model": "whisper-1", "configured": True,
-        "price": {"per_minute": 0.006},
+        "price": {"per_minute": 0.006}, "key_env": "BOLO_PROVIDER_OPENAI_API_KEY",
     }  # fmt: skip
     assert whisper["license_url"] == "https://openai.com/policies/services-agreement/"
     assert listed["fake-stt"]["cloud"] is False and listed["fake-stt"]["provider"] is None
@@ -1116,7 +1120,9 @@ def test_console_flags(live: LiveServer, settings: Settings, tmp_path: Path, llm
     caps = info["capabilities"]
     assert caps["wordlists"]["endpoint"] == "/api/v1/wordlists" and isinstance(caps["wordlists"]["available"], bool)
     assert caps["wordlists"]["request_fields"] == ["wordlists", "pronunciations"]
-    assert caps["providers"]["kinds"] == ["openai-compatible", "sarvam", "elevenlabs", "deepgram", "soniox"]
+    assert caps["providers"]["kinds"] == list(KINDS) and KINDS[:5] == (
+        "openai-compatible", "sarvam", "elevenlabs", "deepgram", "soniox",
+    )  # fmt: skip
     assert caps["providers"]["editable"] is True and caps["providers"]["configured"] == []
     pipelines = caps["realtime"]["pipelines"]
     assert pipelines["cascade"] == {"configured": False, "available": False}

@@ -269,7 +269,7 @@ class Soniox(Adapter):
                 self.request("DELETE", f"{self.base_url}/v1/files/{file_id}")
 
     # -- live -----------------------------------------------------------------------------------------------
-    def live(self, language: str | None) -> LiveProtocol | None:
+    def live(self, language: str | None, diarize: bool = False) -> LiveProtocol | None:
         if self.spec.get("live") is False:
             return None
         return SonioxLive(self, language)

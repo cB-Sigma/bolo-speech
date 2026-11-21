@@ -69,6 +69,17 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   torch plugin (`bolo-torch[sov-transcribe]`, transformers 5.19 to 5.22). Its model code is remote code: it runs only
   after `allow_remote_code` for this model, pinned by sha256 at the reviewed commit. No GGUF conversion exists, so
   there is no llama.cpp route. Added, not yet run (`options.not_yet_run`; wiring tested with a fake network).
+- **AssemblyAI as a cloud provider** (kind `assemblyai`, key `BOLO_PROVIDER_ASSEMBLYAI_API_KEY`), with three catalog
+  entries for the models AssemblyAI released on 2026-11-17: `assemblyai-stt-3.7` (recorded audio through the
+  pre-recorded API: 32 languages, word timestamps, speaker labels, language detection, keyterms and prompt) and
+  `assemblyai-stt-3.7-realtime` / `assemblyai-stt-3.7-realtime-agent` (live recognition over AssemblyAI's Streaming
+  API v3, with interim text, AssemblyAI's turn detection and speaker labels on the socket). Written from AssemblyAI's
+  public documentation and tested against a stand-in; not yet run against a real account (`validated: untested`).
+- **Speaker labels from a provider's live socket.** `diarize=true` on the STT WebSocket with a cloud recogniser that
+  labels speakers live (the AssemblyAI realtime entries) asks the provider for them: each `final` carries the
+  provider's label, `ready` says `"diarization": "provider"`, and bolo computes no speaker embeddings.
+- **Every cloud entry names the environment variable of its key**: `provider.key_env` in `GET /api/v1/catalog`
+  (`BOLO_PROVIDER_<NAME>_API_KEY`), and the cloud rows of docs/models.md.
 
 ### Changed
 

@@ -171,7 +171,7 @@ class Sarvam(Adapter):
         language = "en" if translate else (bolo_language(doc.get("language_code")) or base_language(req.language))
         return STTResult(text, language, segments)
 
-    def live(self, language: str | None) -> LiveProtocol | None:
+    def live(self, language: str | None, diarize: bool = False) -> LiveProtocol | None:
         if not self.spec.get("live"):
             return None
         return SarvamLive(self, self._stt_language(language))

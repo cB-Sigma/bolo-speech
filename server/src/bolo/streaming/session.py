@@ -153,6 +153,8 @@ class STTSession:
         self._diarizer: LoadedModel | None = None
         self._labeler: OnlineSpeakerLabeler | None = None
         self._embedded: list[int | None] = []  # per final: index of its embedding in the labeler, if it has one
+        #: the model's live stream labels speakers itself (STTModel.live_speakers): its labels go on the finals
+        self._live_speakers = False
         #: decoding options pinned for the model (or in its catalog entry): a live session has no request form, so
         #: these are how its Whisper options and the repetition guard are set
         self.decode_options = core.decode_options(self.spec)
@@ -223,7 +225,9 @@ class STTSession:
                 if self.cfg.vad:
                     params = VadParams(min_silence_s=endpoint_ms / 1000.0, max_speech_s=core.settings.max_utterance_s)
                     detector, vad_name = await core.vad_detector(params, fallback=True)
-                if self.cfg.diarize:
+                if self.cfg.diarize and stt.streaming and stt.live_speakers:
+                    self._live_speakers = True  # the provider labels speakers on its socket: no embeddings here
+                elif self.cfg.diarize:
                     await stack.enter_async_context(self._speakers(core))
                 proc: _Processor
                 if stt.streaming:
@@ -247,7 +251,9 @@ class STTSession:
                         "mode": "native" if stt.streaming else "pseudo",
                         "vad": vad_name,
                         "endpoint_ms": round(endpoint_ms),
-                        "diarization": self._diarizer.id if self._diarizer else None,
+                        "diarization": "provider"
+                        if self._live_speakers
+                        else (self._diarizer.id if self._diarizer else None),
                         "denoise": self._denoise_info,
                     }
                 )
@@ -468,7 +474,9 @@ class STTSession:
         words: list[Word],
         language: str | None,
         audio: FloatArray | None = None,
+        speaker: str | None = None,
     ) -> None:
+        """One finished utterance to the client. ``speaker``: the model's own label (``_live_speakers``)."""
         trace = self.trace
         assert trace is not None
         text, words = self.guard.apply(text, words)
@@ -482,7 +490,8 @@ class STTSession:
             text, words, spelt = self.spelling.text(text, words)
             if spelt:
                 trace.extra.setdefault("hotword_spelling", []).extend(spelt)
-        speaker = await self.speaker_for(audio) if audio is not None else None
+        if not self._live_speakers:
+            speaker = await self.speaker_for(audio) if audio is not None else None
         t_fin = trace.now()
         latency = (time.perf_counter() - recv_t) * 1000.0
         msg: dict[str, Any] = {
@@ -496,7 +505,7 @@ class STTSession:
             or self.cfg.language
             or (self.spec.languages[0] if len(self.spec.languages) == 1 else None),
         }
-        if self._diarizer is not None:
+        if self._diarizer is not None or self._live_speakers:
             msg["speaker"] = speaker
         if spelt:
             msg["hotword_spelling"] = spelt
@@ -887,7 +896,11 @@ class _NativeProcessor(_Processor):
 
     def __init__(self, session: STTSession, entry: LoadedModel, stt: STTModel, detector: VadDetector | None) -> None:
         super().__init__(session, entry, stt, detector)
-        self.stream: STTStream = stt.create_stream(session.cfg.language)
+        if session.cfg.diarize and stt.live_speakers:
+            # a provider's live socket that labels speakers is asked to (an option of the connection)
+            self.stream: STTStream = stt.create_stream(session.cfg.language, diarize=True)  # type: ignore[call-arg]
+        else:
+            self.stream = stt.create_stream(session.cfg.language)
         self.gated = detector is not None and stt.stream_preroll_s > 0
         # a model whose encoder chunk is known decodes each utterance twice: from a pre-roll aligned to a chunk (the
         # main stream) and from the pre-roll asked for (this one); the result whose start is fuller is taken
@@ -1044,7 +1057,7 @@ class _NativeProcessor(_Processor):
             samples = np.clip(samples * self.gain, -1.0, 1.0).astype(np.float32)
         self.stream.accept(samples)
         self.fed += len(samples)
-        if self.s.cfg.diarize:
+        if self.s.cfg.diarize and not self.s._live_speakers:  # kept for bolo's speaker embeddings
             self.kept.append(samples)
 
     async def _feed(self, samples: FloatArray, recv_t: float, vad_end: bool) -> None:
@@ -1077,14 +1090,14 @@ class _NativeProcessor(_Processor):
             text, words = without_stray_letter(text, words)
         if text:
             audio = None
-            if self.s.cfg.diarize and self.kept:
+            if self.s.cfg.diarize and self.kept and not self.s._live_speakers:
                 audio = np.concatenate(self.kept)
                 if self.speech_start is not None:  # drop the silence before the speaker started
                     audio = audio[max(0, self.speech_start - self.base) :]
             end = (
                 self.speech_end if self.speech_end is not None and self.base < self.speech_end < self.fed else self.fed
             )
-            await self.s.send_final(text, self._t0(), end / SR, recv_t, words, None, audio)
+            await self.s.send_final(text, self._t0(), end / SR, recv_t, words, None, audio, result.speaker)
         self.kept = []
         self.stream.reset()
         if self.alt is not None:

@@ -14,6 +14,7 @@ ADAPTERS: dict[str, str] = {
     "elevenlabs": "bolo.remote.elevenlabs:ElevenLabs",
     "deepgram": "bolo.remote.deepgram:Deepgram",
     "soniox": "bolo.remote.soniox:Soniox",
+    "assemblyai": "bolo.remote.assemblyai:AssemblyAI",
 }
 
 

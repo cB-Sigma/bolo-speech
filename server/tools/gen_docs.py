@@ -27,6 +27,7 @@ from bolo.api import create_app  # noqa: E402
 from bolo.catalog import Catalog, ModelSpec  # noqa: E402
 from bolo.config import Settings  # noqa: E402
 from bolo.hardware import Cpu, Gpu, Hardware, Memory  # noqa: E402
+from bolo.providers import key_env  # noqa: E402
 from bolo.recommend import (  # noqa: E402
     LEVEL_LABEL,
     Candidate,
@@ -124,7 +125,8 @@ def licence(spec: ModelSpec) -> str:
         gpu = (spec.options.get("hardware") or {}).get("gpu")
         extra += f" · runs on {spec.options.get('runtime')}" + (f" · GPU {gpu}" if gpu and gpu != "optional" else "")
     if spec.cloud:
-        extra += f" · [terms]({spec.license_url}) · needs provider `{spec.options.get('provider')}`"
+        name = str(spec.options.get("provider") or "")
+        extra += f" · [terms]({spec.license_url}) · needs provider `{name}` (key: `{key_env(name)}`)"
     if spec.gated:
         extra += " · gated"
     return text + ("" if spec.commercial_use else " ⚠") + extra

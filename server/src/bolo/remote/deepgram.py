@@ -104,7 +104,7 @@ class Deepgram(Adapter):
         language = base_language(str(channel.get("detected_language") or "")) or base_language(req.language)
         return STTResult(str(alt.get("transcript") or "").strip(), language, segments, words)
 
-    def live(self, language: str | None) -> LiveProtocol | None:
+    def live(self, language: str | None, diarize: bool = False) -> LiveProtocol | None:
         if self.spec.get("live") is False:
             return None
         return DeepgramLive(self, language)

@@ -1918,3 +1918,124 @@
     model: stt-rt-v6
     async_model: stt-async-v6
     workers: 4
+- id: assemblyai-stt-3.7
+  task: stt
+  engine: remote
+  kind: remote-stt
+  family: AssemblyAI (cloud)
+  languages: &aai37
+  - af
+  - ar
+  - yue
+  - ca
+  - da
+  - nl
+  - en
+  - et
+  - fi
+  - fr
+  - gl
+  - de
+  - he
+  - hi
+  - it
+  - ja
+  - ko
+  - zh
+  - mr
+  - 'no'
+  - nn
+  - fa
+  - pt
+  - ro
+  - ru
+  - es
+  - sv
+  - tr
+  - ur
+  - vi
+  - xh
+  - zu
+  tier: accuracy
+  streaming: false
+  sample_rate: 16000
+  license: AssemblyAI Terms of Service (paid cloud API)
+  license_url: https://www.assemblyai.com/legal/terms-of-service
+  cloud: true
+  features:
+  - timestamps
+  - telephony
+  - hotwords
+  - language-detect
+  - speaker-labels
+  description: 'AssemblyAI-STT-3.7 (recorded audio, AssemblyAI''s pre-recorded API; released 2026-11-17): 32
+    languages with code-switching, word timestamps, speaker labels from AssemblyAI (diarize=true), language
+    detection, hotwords as keyterms and the prompt as context. Keeps filler words by default. Key:
+    BOLO_PROVIDER_ASSEMBLYAI_API_KEY. Paid cloud API: the audio leaves this server.'
+  source_url: https://www.assemblyai.com/docs/pre-recorded-audio/select-the-speech-model
+  validated: untested
+  options:
+    provider: assemblyai
+    provider_kind: assemblyai
+    model: assemblyai-stt-3-7
+    live: false
+    workers: 4
+- id: assemblyai-stt-3.7-realtime
+  task: stt
+  engine: remote
+  kind: remote-stt
+  family: AssemblyAI (cloud)
+  languages: *aai37
+  tier: realtime
+  streaming: true
+  sample_rate: 16000
+  license: AssemblyAI Terms of Service (paid cloud API)
+  license_url: https://www.assemblyai.com/legal/terms-of-service
+  cloud: true
+  features:
+  - timestamps
+  - telephony
+  - hotwords
+  - speaker-labels
+  description: 'AssemblyAI-STT-3.7-Realtime (released 2026-11-17), for meetings, calls and captions: live recognition over
+    AssemblyAI''s streaming socket (interim text, AssemblyAI''s turn detection) with speaker labels on the socket
+    (diarize=true on the STT WebSocket), 32 languages; recorded audio and Realtime turns go to assemblyai-stt-3-7. Key: BOLO_PROVIDER_ASSEMBLYAI_API_KEY.
+    Paid cloud API: the audio leaves this server.'
+  source_url: https://www.assemblyai.com/docs/streaming/select-the-speech-model
+  validated: untested
+  options:
+    provider: assemblyai
+    provider_kind: assemblyai
+    model: assemblyai-stt-3-7-realtime
+    async_model: assemblyai-stt-3-7
+    workers: 4
+- id: assemblyai-stt-3.7-realtime-agent
+  task: stt
+  engine: remote
+  kind: remote-stt
+  family: AssemblyAI (cloud)
+  languages: *aai37
+  tier: realtime
+  streaming: true
+  sample_rate: 16000
+  license: AssemblyAI Terms of Service (paid cloud API)
+  license_url: https://www.assemblyai.com/legal/terms-of-service
+  cloud: true
+  features:
+  - timestamps
+  - telephony
+  - hotwords
+  - speaker-labels
+  description: 'AssemblyAI-STT-3.7-Realtime-Agent (released 2026-11-17), for voice agents: live recognition over
+    AssemblyAI''s streaming socket with its punctuation-based turn detection (interim text, finals at the end of
+    each turn), speaker labels on the socket (diarize=true), 32 languages; recorded audio and Realtime turns go
+    to assemblyai-stt-3-7. Key: BOLO_PROVIDER_ASSEMBLYAI_API_KEY.
+    Paid cloud API: the audio leaves this server.'
+  source_url: https://www.assemblyai.com/docs/streaming/select-the-speech-model
+  validated: untested
+  options:
+    provider: assemblyai
+    provider_kind: assemblyai
+    model: assemblyai-stt-3-7-realtime-agent
+    async_model: assemblyai-stt-3-7
+    workers: 4

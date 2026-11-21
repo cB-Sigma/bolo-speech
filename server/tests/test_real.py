@@ -1091,6 +1091,7 @@ CLOUD_KEYS = {
     "elevenlabs": ("ELEVENLABS_API_KEY", "BOLO_PROVIDER_ELEVENLABS_API_KEY"),
     "deepgram": ("DEEPGRAM_API_KEY", "BOLO_PROVIDER_DEEPGRAM_API_KEY"),
     "soniox": ("SONIOX_API_KEY", "BOLO_PROVIDER_SONIOX_API_KEY"),
+    "assemblyai": ("ASSEMBLYAI_API_KEY", "BOLO_PROVIDER_ASSEMBLYAI_API_KEY"),
 }
 
 
@@ -1212,6 +1213,32 @@ async def test_cloud_soniox(cloud_core: Bolo) -> None:
             stream.close()
     print(f"\nsoniox live: {live_text!r}")
     assert word_error_rate(LIBRISPEECH_REF, live_text) < 0.25
+
+
+@needs_cloud("assemblyai")
+async def test_cloud_assemblyai(cloud_core: Bolo) -> None:
+    check = await asyncio.to_thread(cloud_core.providers.test, "assemblyai")
+    assert check["ok"] and check["checked"] == "credentials", check
+    samples, rate = librispeech(real_settings().data_dir)
+    heard = await cloud_core.transcribe(samples, rate, model="assemblyai-stt-3.7", word_timestamps=True)
+    print(f"\nassemblyai: {heard.text!r} ({heard.language})")
+    assert word_error_rate(LIBRISPEECH_REF, heard.text) < 0.15 and len(heard.words) > 10
+    assert heard.language == "en" and heard.words[-1].t1 <= len(samples) / rate + 0.5
+    # the live socket, at the pace of a microphone, with speaker labels
+    async with cloud_core.manager.use("assemblyai-stt-3.7-realtime") as entry:
+        stream = entry.model.create_stream("en", diarize=True)  # type: ignore[attr-defined]
+        try:
+            audio = resample(samples, rate, 16000)
+            for off in range(0, len(audio), 1600):
+                stream.accept(audio[off : off + 1600])
+                await asyncio.sleep(0.1)
+            stream.finish()
+            await asyncio.to_thread(stream.settle)
+            live = stream.result()
+        finally:
+            stream.close()
+    print(f"\nassemblyai live: {live.text!r} (speaker {live.speaker})")
+    assert word_error_rate(LIBRISPEECH_REF, live.text) < 0.25 and live.speaker == "A"
 
 
 # -- LFM3-Audio in ONNX Runtime (in-process speech-to-speech) ---------------------------------------------------------

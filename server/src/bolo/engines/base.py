@@ -147,6 +147,8 @@ class STTResult:
 class StreamResult:
     text: str
     words: list[Word] = field(default_factory=list)
+    #: who spoke, from a model that labels speakers on its own stream (``STTModel.live_speakers``)
+    speaker: str | None = None
 
 
 class STTStream(abc.ABC):
@@ -221,6 +223,10 @@ class STTModel(Model):
     #: the model labels speakers itself (a cloud recogniser with diarization): a request's ``diarize`` is then
     #: passed to it as ``STTRequest.diarize`` instead of cutting the audio at bolo's speaker turns
     native_diarization: bool = False
+    #: the model's live stream labels speakers itself when asked (``create_stream(language, diarize=True)``; a
+    #: cloud provider's live socket): a streaming session's ``diarize`` then takes its labels (``StreamResult.speaker``)
+    #: instead of running bolo's own speaker embeddings
+    live_speakers: bool = False
     #: decoding options (``bolo.stt_options.ENGINE_OPTIONS``) ``transcribe`` honours in ``STTRequest.options``;
     #: bolo passes only these and reports the others as ignored
     decode_options: tuple[str, ...] = ()

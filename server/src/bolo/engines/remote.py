@@ -92,6 +92,8 @@ class RemoteSTT(STTModel):
             self.streaming = adapter.live(None) is not None
         except BoloError:
             self.streaming = False
+        #: the provider's live socket labels speakers when a streaming session asks for diarization
+        self.live_speakers = self.streaming and adapter.supports_live_diarization
 
     @property
     def provider(self) -> ProviderConfig:
@@ -129,8 +131,8 @@ class RemoteSTT(STTModel):
             out.append(result)
         return out
 
-    def create_stream(self, language: str | None = None) -> STTStream:
-        protocol = self.adapter.live(language)
+    def create_stream(self, language: str | None = None, diarize: bool = False) -> STTStream:
+        protocol = self.adapter.live(language, diarize=diarize and self.live_speakers)
         if protocol is None:
             raise NotImplementedError("this model has no streaming socket")
         return RemoteStream(self, protocol)
@@ -154,6 +156,7 @@ class RemoteStream(STTStream):
         self._finals: list[str] = []
         self._words: list[Word] = []
         self._interim = ""
+        self._speakers: list[str] = []  # the provider's speaker label of each final of the open utterance
         self._endpoint = False
         self._error: str | None = None
         self._finishing = False
@@ -248,13 +251,15 @@ class RemoteStream(STTStream):
             for message in ws:
                 self._usage.bytes_received += len(message)
                 for event in self.protocol.parse(message):
-                    self._on_event(event.kind, event.text, event.words)
+                    self._on_event(event.kind, event.text, event.words, event.speaker)
         except Exception as exc:  # the socket closed or broke; the writer reports what matters
             log.debug("live socket of %s ended: %s", self.model.name, exc)
         finally:
             self._settled.set()
 
-    def _on_event(self, kind: str, text: str, words: list[tuple[str, float, float]] | None) -> None:
+    def _on_event(
+        self, kind: str, text: str, words: list[tuple[str, float, float]] | None, speaker: str | None = None
+    ) -> None:
         with self._lock:
             if kind == "error":
                 self._error = f"{self.model.adapter.where}: {text}"
@@ -267,6 +272,8 @@ class RemoteStream(STTStream):
             elif kind == "final":
                 self._finals.append(text)
                 self._interim = ""
+                if speaker:
+                    self._speakers.append(speaker)
                 base = self._base / self.protocol.sample_rate
                 self._words.extend(Word(w, max(0.0, a - base), max(0.0, b - base)) for w, a, b in words or [])
             elif kind == "endpoint":
@@ -287,12 +294,17 @@ class RemoteStream(STTStream):
             return
         self._ensure()
         self._sent += len(samples)
-        self._out.put(self.protocol.audio(float_to_pcm16(np.asarray(samples, dtype=np.float32))))
+        frame = self.protocol.audio(float_to_pcm16(np.asarray(samples, dtype=np.float32)))
+        if frame:  # a protocol that sends pieces of a minimum length holds short ones back
+            self._out.put(frame)
 
     def finish(self) -> None:
         self._finishing = True
         self._settled.clear()
         if self._thread is not None and self._thread.is_alive():
+            held = self.protocol.flush()
+            if held:
+                self._out.put(held)
             frame = self.protocol.finalize()
             if frame:
                 self._out.put(frame)
@@ -308,7 +320,9 @@ class RemoteStream(STTStream):
     def result(self) -> StreamResult:
         with self._lock:
             text = " ".join(p for p in [*self._finals, self._interim] if p).strip()
-            return StreamResult(text, list(self._words))
+            # the utterance's speaker: the one who said most of its finals (the first of them on a tie)
+            speaker = max(self._speakers, key=self._speakers.count) if self._speakers else None
+            return StreamResult(text, list(self._words), speaker)
 
     def is_endpoint(self) -> bool:
         return self._endpoint
@@ -317,6 +331,7 @@ class RemoteStream(STTStream):
         with self._lock:
             self._discard = bool(self._interim)
             self._finals, self._words, self._interim = [], [], ""
+            self._speakers = []
             self._endpoint = False
             self._base = self._sent
 
