@@ -8,6 +8,12 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Cloudflare Clef-Omni as a decision model** (`clef-omni`, 70.8 GB, Apache-2.0): Qwen3-Omni 30B-A3B's thinker with
+  Cloudflare's joint head, answering yes/no, choice and score questions about a text and a recording, through the
+  torch plugin (`bolo-torch[clef-omni]`) and the model repository's `joint_schema_model.py` (remote code: pinned by
+  sha256, runs only after `allow_remote_code`). Not on llama.cpp: the pinned b12521 runs the dense Clef only, and
+  Clef-Omni's architecture is an unmerged branch. Added, not yet run (`options.not_yet_run`; it needs about 64 GB of
+  GPU memory). Plugins can now serve decision models (plugin protocol op `decide`).
 - **Decisions: typed questions about a recording or a text** (new task `decision`). `POST /v1/audio/decisions`
   takes a recording (at most 30 s), a text or both, and named questions of three types: yes/no, one option of a list,
   or a level on a scale; each comes back with its answer and probabilities. Also `bolo decide FILE --questions

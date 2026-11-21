@@ -30,6 +30,7 @@ the console, the OpenAI-compatible API) works as for bolo's own engines.
 | `dicow-v3.3` | STT, diarization-conditioned | BUT-FIT DiCoW v3.3: Whisper large-v3-turbo told who talks when | `dicow` | CC-BY-4.0 | no | CPU, see below |
 | `se-dicow` | STT, diarization-conditioned | BUT-FIT SE-DiCoW: DiCoW with self-enrolment | `dicow` | Apache-2.0 | no | CPU, see below |
 | `sov-transcribe-1` | STT | Salesforce SOV-Transcribe-1: Whisper large-v3 encoder + Gemma 4 26B A4B, English, French, German, Spanish, Italian, Portuguese, Dutch | `sov-transcribe` + remote code opt-in | Apache-2.0 | no | **no** (fakes only; 53 GB) |
+| `clef-omni` | decision | Cloudflare Clef-Omni: Qwen3-Omni 30B-A3B with a joint head; yes/no, choice and score answers about a text and a recording | `clef-omni` + remote code opt-in | Apache-2.0 | no | **no** (fakes only; 70.8 GB) |
 | `jais-asr` | STT | IFM Jais-ASR: Arabic (MSA and 19 dialects) with English, French, Spanish, Italian; transformers pipeline from the model repository | `jais-asr` + remote code opt-in | Apache-2.0 | no | **no** (fakes only; 11.4 GB) |
 | `reverb-asr` | STT | Rev Reverb ASR: English WeNet Conformer from its TorchScript export, greedy CTC, verbatimicity | `reverb` | Rev Model Non-Production License (non-commercial) | yes | CPU (RTF 0.05) |
 | `reverb-diarization-v2-torch` | diarization | Rev Reverb diarization v2: Rev's pyannote 3.1 pipeline with a WavLM-based segmentation model | `pyannote` + torchaudio | Rev Model Non-Production License (non-commercial; embedding and PLDA CC-BY-4.0) | yes | CPU, very slow (RTF 16); see the entry's note |
@@ -290,7 +291,7 @@ pip install ./server "./plugins/bolo-torch[parler,sepformer]"
 Extras: `parler` (Parler-TTS), `f5` (IndicF5), `f5-original` (the original F5-TTS checkpoints, on the `f5-tts`
 package, which pins its own libraries: give it its own environment), `indic-speak` (transformers 5 and SNAC),
 `orpheus` (Veena, Svara), `sepformer`, `pyannote` (PixIT, pyannote speaker diarization),
-`dicow` (DiCoW, SE-DiCoW: transformers 4.55 and pandas), `sov-transcribe` (SOV-Transcribe-1: transformers 5.19 to 5.22, accelerate), `hf-asr` (speech recognition through a transformers pipeline: transformers, accelerate), `jais-asr` (Jais-ASR: transformers 5.16.1, accelerate, soundfile, soxr), `reverb` (Reverb ASR: torchaudio, PyYAML), `diarizen` (DiariZen: toml, accelerate, scipy, torchaudio
+`dicow` (DiCoW, SE-DiCoW: transformers 4.55 and pandas), `sov-transcribe` (SOV-Transcribe-1: transformers 5.19 to 5.22, accelerate), `clef-omni` (Clef-Omni: transformers 5.10.2 or later, accelerate; decision models need bolo's `decide` op, the release after 1.0.0), `hf-asr` (speech recognition through a transformers pipeline: transformers, accelerate), `jais-asr` (Jais-ASR: transformers 5.16.1, accelerate, soundfile, soxr), `reverb` (Reverb ASR: torchaudio, PyYAML), `diarizen` (DiariZen: toml, accelerate, scipy, torchaudio
 below 2.9; with the authors' two packages from GitHub, see above), `spark-tts` (Spark-TTS: transformers, einops, einx,
 omegaconf, soxr, torchaudio; the BiCodec code is the bundle `spark-tts`), `maskgct` (MaskGCT: transformers before 4.48,
 librosa, onnxruntime, jieba, cn2an, pypinyin, LangSegment, pyopenjtalk-plus and the rest of Amphion's front end

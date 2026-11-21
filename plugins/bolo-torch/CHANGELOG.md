@@ -6,6 +6,11 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ### Added
 
+- **Cloudflare Clef-Omni** (kind `clef-omni`, extra `clef-omni`, task `decision`): typed answers (yes/no, a choice, a
+  score) about a text and a recording from Qwen3-Omni 30B-A3B's thinker and Cloudflare's joint head, through the
+  model repository's `joint_schema_model.py` (remote code, opt in per model). Served on the plugin protocol's new
+  `decide` op. Wiring tested with a stand-in for its `systemone`; the model itself (70.8 GB) not run yet.
+
 - **A generic transformers speech-recognition loader** (kind `hf-asr-pipeline`, extra `hf-asr`): a model's
   `automatic-speech-recognition` pipeline, the repository's own one through remote code (opt in per model), with the
   language passed under a name and mapping the catalog gives. First user: **IFM Jais-ASR** (`jais-asr`, extra

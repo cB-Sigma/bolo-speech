@@ -3,7 +3,7 @@
 ``python -m bolo.plugin.reference`` speaks the plugin protocol on stdio. It is what the test-suite
 uses, and the smallest example of a plugin. It loads the kinds ``fake-stt``, ``fake-tts``, ``fake-separation``,
 ``fake-stt-speakers`` (a speaker-conditioned recogniser), ``fake-diarization``, ``fake-denoise``, ``fake-s2s`` (a
-turn-based speech-to-speech model) and ``fake-lid`` (a language identifier).
+turn-based speech-to-speech model), ``fake-lid`` (a language identifier) and ``fake-decision`` (a decision model).
 
 For tests of the host's crash handling, text containing "plugin crash test" makes the process exit at once
 during synthesis; the option ``fail_on_load`` makes a load fail.
@@ -41,7 +41,7 @@ class ReferenceEngine(Engine):
     license = "Apache-2.0"
     kinds = (
         "fake-stt", "fake-tts", "fake-separation", "fake-stt-speakers", "fake-diarization", "fake-denoise", "fake-s2s",
-        "fake-lid",
+        "fake-lid", "fake-decision",
     )  # fmt: skip
 
     def __init__(self) -> None:

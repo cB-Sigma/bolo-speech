@@ -173,6 +173,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | TTS | Microsoft MAI (cloud) | 2 | cs, da, de, en, es, fi, fr, hi +15 | 0 | - |
 | SPEECH-TO-SPEECH | Amazon Nova (cloud) | 1 | de, en, es, fr, hi, it, pt | 0 | - |
 | DECISION | d1-omni | 1 | en | 0 | - |
+| DECISION | Clef-Omni | 1 | en | 0 | - |
 | DENOISE | GTCRN | 1 | - | 1 | 0.060 (`gtcrn-simple`) |
 | DENOISE | DPDFNet | 8 | - | 8 | 0.080 (`dpdfnet-baseline`) |
 | DENOISE | DeepFilterNet | 1 | - | 1 | 0.259 (`deepfilternet3`) |
@@ -292,7 +293,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | WATERMARK | Perth | 1 | - | 1 | 0.033 (`perth-onnx`) |
 | WATERMARK | WavMark | 1 | - | 1 | 2.300 (`wavmark-onnx`) |
 
-**547 models in the catalog, 245 validated on CPU, 302 untested**, plus 33 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**548 models in the catalog, 245 validated on CPU, 303 untested**, plus 33 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

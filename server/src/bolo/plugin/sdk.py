@@ -24,6 +24,8 @@ import numpy as np
 
 from bolo.engines.base import (
     ConversationRequest,
+    DecisionModel,
+    DecisionRequest,
     DenoiseModel,
     DiarizationModel,
     Engine,
@@ -122,6 +124,8 @@ class _Server:
                 self.lid(rid, message, payload)
             elif op == "respond":
                 self.respond(rid, message, payload)
+            elif op == "decide":
+                self.decide(rid, message, payload)
             else:
                 self.fail(rid, "unknown_op", f"unknown op {op!r}")
         except Exception as exc:
@@ -261,6 +265,15 @@ class _Server:
             raise TypeError("this model does not identify languages")
         found = model.identify(audio_from_bytes(payload))
         self.reply(rid, languages=[[str(code), float(p)] for code, p in found])
+
+    def decide(self, rid: str, m: dict[str, Any], payload: bytes) -> None:
+        model = self.model(m)
+        if not isinstance(model, DecisionModel):
+            raise TypeError("this model does not answer decision questions")
+        samples = audio_from_bytes(payload) if m.get("audio") else None
+        text = m.get("text")
+        out = model.decide(DecisionRequest(str(text) if text is not None else None, samples, dict(m["questions"])))
+        self.reply(rid, answers=out.get("answers") or {}, usage=out.get("usage") or {})
 
     def respond(self, rid: str, m: dict[str, Any], payload: bytes) -> None:
         model = self.model(m)

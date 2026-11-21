@@ -44,6 +44,8 @@ from bolo.engines.base import (
     REQUEST_FIELDS,
     ConversationChunk,
     ConversationRequest,
+    DecisionModel,
+    DecisionRequest,
     DenoiseModel,
     DiarizationModel,
     DiarizationResult,
@@ -694,6 +696,28 @@ class PluginLid(_PluginModelMixin, LidModel):
         return [(str(code), float(p)) for code, p in reply.get("languages") or []]
 
 
+class PluginDecision(_PluginModelMixin, DecisionModel):
+    """A decision model in a plugin: op ``decide``, the text and questions in the message, the recording (16 kHz) as
+    the payload when there is one; the answers in ``/v1/systemone``'s shape (bolo 1.1)."""
+
+    def __init__(self, process: PluginProcess, load_message: dict[str, Any]) -> None:
+        self.process, self._load_message, self._handle, self._generation = process, load_message, None, 0
+        self._ensure_loaded()
+
+    def _apply_load_reply(self, reply: dict[str, Any]) -> None:
+        info = reply.get("info") or {}
+        self.sample_rate = int(reply.get("sample_rate") or 16000)
+        self.max_audio_s = float(info.get("max_audio_s") or 30.0)
+
+    def decide(self, request: DecisionRequest) -> dict[str, Any]:
+        handle = self._ensure_loaded()
+        message = {"op": "decide", "handle": handle, "text": request.text, "questions": request.questions,
+                   "audio": request.samples is not None}  # fmt: skip
+        payload = audio_bytes(request.samples) if request.samples is not None else None
+        reply = self.process.request(message, payload)
+        return {"answers": dict(reply.get("answers") or {}), "usage": dict(reply.get("usage") or {})}
+
+
 class PluginS2S(_PluginModelMixin, SpeechToSpeechModel):
     """A speech-to-speech model in a plugin: op ``respond`` (the whole conversation in, the answer streamed back)."""
 
@@ -772,8 +796,11 @@ class PluginEngine(Engine):
             return PluginS2S(self.process, message)
         if task == "lid":
             return PluginLid(self.process, message)
+        if task == "decision":
+            return PluginDecision(self.process, message)
         raise EngineUnavailable(
-            f"plugins can serve stt, tts, separation, diarization, denoise, speech-to-speech and lid models, not {task!r}"
+            "plugins can serve stt, tts, separation, diarization, denoise, speech-to-speech, lid and decision models, "
+            f"not {task!r}"
         )
 
     def shutdown(self) -> None:

@@ -126,6 +126,7 @@ messages before their final reply. Replies to different requests may interleave.
 | `embed` | `handle` + one voice (16 kHz) | the unit-length speaker embedding (float32) |
 | `denoise` | `handle` + the recording (at the model's `sample_rate`) | the enhanced recording, as long as the input |
 | `respond` | `handle`, `turns: [{role, text, n, call_id, tool_calls}]`, `instructions`, `tools`, `tool_choice`, `voice`, `max_output_tokens`, `audio_out` + the audio of the turns (16 kHz), concatenated (`n` samples each) | chunks (`text`, `tool_call`, audio at the model's rate), then `sample_rate`, `chunks`, `cancelled` |
+| `decide` | `handle`, `text` (or null), `questions` (`/v1/systemone`'s shape: `{id: {type: noul \| choice \| score, instructions, criteria}}`), `audio` (true when the payload holds a recording) + the recording (16 kHz) | `answers` (`/v1/systemone`'s: `{id: {type, noul \| choice, probabilities, confidence \| score, legend, probabilities, confidence}}`), `usage`; `info.max_audio_s` with the load |
 | `cancel` | `target` (id of a running request) | - |
 | `shutdown` | - | - (the process exits) |
 
@@ -189,7 +190,7 @@ name; bolo-torch sends the code of its own errors instead. A failed `load` may a
 could (optional; without it bolo assumes memory is held after any failed GPU load).
 
 Compatibility: new optional members, and new ops that bolo sends only to models announcing them in
-`info` (`speakers`) or loaded for a new task (`diarize`, `embed`, `respond`), can appear within version 1; an incompatible change gets
+`info` (`speakers`) or loaded for a new task (`diarize`, `embed`, `respond`, `decide`), can appear within version 1; an incompatible change gets
 version 2, and bolo will keep speaking version 1 to plugins that answer `hello` with 1. The exact
 definitions are in `server/src/bolo/plugin/protocol.py`.
 

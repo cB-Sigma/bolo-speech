@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-547 models: 245 validated on CPU by the maintainers, 302 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+548 models: 245 validated on CPU by the maintainers, 303 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -1259,6 +1259,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `d1-omni-600m-llamacpp` (d1-omni) | en | realtime | - | 670 MB | LFM Open License v1.0 ⚠ · runs on llama-server | ran once here (shared CPU), not measured |
 
+#### Clef-Omni
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `clef-omni` | en | accuracy | - | 70.8 GB | Apache-2.0 · needs plugin torch | untested |
+
 ### Voice conversion
 
 #### OpenVoice v2 tone colour converter
@@ -1541,7 +1547,8 @@ What the opt-in allows, and nothing more:
 
 Models in the catalog with remote code: `minicpm-o-2.6` (the whole model), `step-audio-2-mini`, `glm-4-voice-9b`
 and `kimi-audio-7b-instruct` (their language models; the rest of their code comes from GitHub, below), and
-`sov-transcribe-1` (its model and processor; the repository's `vllm_plugin/` folder is not downloaded). The same
+`sov-transcribe-1` (its model and processor; the repository's `vllm_plugin/` folder is not downloaded), and
+`clef-omni` (Cloudflare's `joint_schema_model.py`: its decision head and request encoding). The same
 mechanism serves any other model with remote code: add the `remote_code` block to its catalog entry (for
 your own entries, `<data_dir>/custom.yaml`). `bolo-torch pin-remote-code <downloaded folder> --revision <commit>`
 prints it; read every file it lists before you trust it.

@@ -58,3 +58,49 @@
     max_audio_s: 30.0
     queue_timeout_s: 0
     hardware: {gpu: optional, ram_gb: 1.5, note: 'built for CPUs and phones'}
+# Cloudflare Clef-Omni through the torch plugin: transformers' Qwen3-Omni thinker and the repository's own
+# joint_schema_model.py (remote code, pinned). Not on llama.cpp: b12521's decision server has the dense clef only, and
+# the clef_omni architecture is an unmerged branch (a community GGUF, gecBurton/clef-omni-gguf, needs that fork).
+- id: clef-omni
+  task: decision
+  engine: plugin:torch
+  kind: clef-omni
+  family: Clef-Omni
+  languages: [en]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 70755879415
+  params: 30000000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/Cloudflare/clef-omni/blob/189097bdeaaaea246bd876310d4ae30f9a50415a/LICENSE
+  commercial_use: true
+  gated: false
+  features: [audio-in]
+  description: 'Cloudflare Clef-Omni (Qwen3-Omni 30B-A3B''s thinker, post-trained, with a joint head that scores every
+    option of every question at once): yes/no, choice and score questions about a text and a recording, in one pass,
+    without generating text. Through the torch plugin (bolo-torch[clef-omni], transformers 5.10.2 or later) and the
+    model repository''s joint_schema_model.py, which runs only after you opt in for this model (allow_remote_code,
+    pinned by sha256; docs/models.md, "Remote code"). bfloat16, 70.8 GB with the base model''s unused speech-output
+    weights: about 64 GB of GPU memory (Cloudflare''s card: one H200). Apache-2.0. Added, not yet run here: too large
+    for this machine. Not on llama.cpp yet (its decision server runs the dense Clef only).'
+  source_url: https://huggingface.co/Cloudflare/clef-omni
+  validated: untested
+  source:
+    repo: Cloudflare/clef-omni
+    revision: 189097bdeaaaea246bd876310d4ae30f9a50415a
+    exclude: [README.md, .gitattributes, '.eval_results/*']
+  options:
+    plugin_install: pip install "bolo-torch[clef-omni]" (the bolo PyTorch engine plugin, plugins/bolo-torch), then opt
+      in to the model's remote code with bolo models config clef-omni --set allow_remote_code=true
+    dtype: bfloat16
+    max_audio_s: 60.0
+    remote_code:
+      revision: 189097bdeaaaea246bd876310d4ae30f9a50415a
+      reviewed: '2026-11-21: joint_schema_model.py (record encoding, image, audio and video decoding with Pillow and
+        PyAV, the joint schema head, load_release_model and systemone). Imports torch, numpy, transformers,
+        safetensors and huggingface_hub; it downloads only when given a repository id or a media URL (bolo gives a
+        local folder and 16 kHz samples) and writes no files.'
+      files:
+        joint_schema_model.py: 21d05ebb8cbea26a26af65eca3d16cf4b69bf80a320e2d5b203e86f0d632a670
+    not_yet_run: true
+    hardware: {gpu: required, vram_gb: 64, note: 'bfloat16; Cloudflare tested one H200'}

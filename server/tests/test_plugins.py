@@ -88,6 +88,7 @@ async def test_plugin_models_through_the_scheduler(plugin_settings: Settings) ->
                 "fake-denoise",
                 "fake-s2s",
                 "fake-lid",
+                "fake-decision",
             ]
         )
         assert len(proc.handles) == 2
@@ -154,6 +155,42 @@ async def test_plugin_language_identification(plugin_settings: Settings) -> None
         model = core.manager.loaded["plug-lid"].model
         assert type(model).__name__ == "PluginLid" and model.labels == ["en", "hi", "ta", "fr"] and model.max_s == 12
         assert result.heard_s == 2.0
+    finally:
+        await core.stop()
+
+
+async def test_plugin_decisions(plugin_settings: Settings) -> None:
+    """A decision model in a plugin (op ``decide``): the text, the questions and the recording go to the plugin,
+    the answers come back in /v1/systemone's shape and bolo.decide words them."""
+    from bolo.decide import decide, parse_questions
+    from bolo.obs.trace import Trace
+
+    core = Bolo(plugin_settings)
+    core.catalog.add(
+        ModelSpec.from_dict(
+            {
+                "id": "plug-decision", "task": "decision", "engine": "plugin:ref", "kind": "fake-decision",
+                "family": "Fake", "languages": ["en"], "license": "Apache-2.0", "builtin": True,
+            }
+        )
+    )  # fmt: skip
+    await core.start()
+    try:
+        q = parse_questions({"loud": {"type": "yes_no", "question": "?"},
+                             "team": {"type": "choice", "question": "?", "options": ["a", "b"]}})  # fmt: skip
+        t = np.arange(16000) / 16000
+        tone = (0.3 * np.sin(2 * np.pi * 300 * t)).astype(np.float32)
+        heard = await decide(core, "plug-decision", None, tone, 16000, q, Trace("decision", "test", "plug-decision"))
+        assert heard.answers["loud"]["answer"] is True and heard.answers["team"]["answer"] == "a"
+        assert heard.duration == 1.0 and heard.usage["input_tokens"] == 20
+        quiet = await decide(
+            core, "plug-decision", None, tone * 0, 16000, q, Trace("decision", "test", "plug-decision")
+        )
+        assert quiet.answers["loud"]["answer"] is False
+        text = await decide(core, "plug-decision", "words", None, None, q, Trace("decision", "test", "plug-decision"))
+        assert text.answers["loud"]["answer"] is True and text.duration is None
+        model = core.manager.loaded["plug-decision"].model
+        assert type(model).__name__ == "PluginDecision" and model.max_audio_s == 30.0
     finally:
         await core.stop()
 
