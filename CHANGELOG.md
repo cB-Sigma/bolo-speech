@@ -45,6 +45,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   transcribed both voices back word for word. The tiny-voca engine now also reads little-tts's flat `onnx/model.json`,
   and refuses a graph whose phoneme table is not dizione's instead of speaking noise.
 
+### Changed
+
+- **nemotron-3.5-streaming-560ms says what it is and where it falls short.** It is NVIDIA's multilingual Nemotron
+  3.5 streaming model; the entry now links its OpenMDW-1.1 licence (commercial use allowed, as the model card says)
+  and marks Greek, Hebrew, Lithuanian, Latvian, Slovenian and Thai as not recommended: NVIDIA lists them as
+  adaptation-ready only, needing fine-tuning before they transcribe well.
+
 ## [1.0.0] - 2026-11-19
 
 The first stable release.

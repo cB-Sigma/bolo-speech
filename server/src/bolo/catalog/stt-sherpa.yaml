@@ -3865,9 +3865,11 @@
   streaming: true
   size_bytes: 682215356
   license: OpenMDW-1.1
-  description: 'NVIDIA Nemotron 3.5 ASR streaming (0.6 B parameters, cache-aware FastConformer transducer, 560 ms
-    chunks), int8 ONNX export by the sherpa-onnx project. Natively streaming with punctuation; Hindi is its only
-    Indian language. Pass language= to fix the language (otherwise the model detects it). Large (680 MB) for a CPU.'
+  license_url: https://openmdw.ai/license/1-1/
+  description: 'NVIDIA Nemotron 3.5 ASR streaming, the multilingual model (0.6 B parameters, cache-aware FastConformer
+    transducer, 560 ms chunks), int8 ONNX export by the sherpa-onnx project. OpenMDW-1.1, which allows commercial
+    use. Natively streaming with punctuation; Hindi is its only Indian language. Pass language= to fix the language
+    (otherwise the model detects it). Large (680 MB) for a CPU.'
   source_url: https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b
   validated: cpu
   measured:
@@ -3905,6 +3907,19 @@
   options:
     stream_language: true
     lowercase: false
+    not_recommended_for:
+      el: 'NVIDIA lists it as adaptation-ready only: the tokenizer covers it, but transcription needs
+        fine-tuning on in-domain data first (model card)'
+      he: 'NVIDIA lists it as adaptation-ready only: the tokenizer covers it, but transcription needs
+        fine-tuning on in-domain data first (model card)'
+      lt: 'NVIDIA lists it as adaptation-ready only: the tokenizer covers it, but transcription needs
+        fine-tuning on in-domain data first (model card)'
+      lv: 'NVIDIA lists it as adaptation-ready only: the tokenizer covers it, but transcription needs
+        fine-tuning on in-domain data first (model card)'
+      sl: 'NVIDIA lists it as adaptation-ready only: the tokenizer covers it, but transcription needs
+        fine-tuning on in-domain data first (model card)'
+      th: 'NVIDIA lists it as adaptation-ready only: the tokenizer covers it, but transcription needs
+        fine-tuning on in-domain data first (model card)'
 - id: rumble-2-flash
   aliases:
   - Reson8/Rumble-2-Flash
