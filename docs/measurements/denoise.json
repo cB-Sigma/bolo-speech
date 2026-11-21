@@ -2336,6 +2336,282 @@
       "stateful": false
      }
     }
+   },
+   "sepformer-dns4-16k": {
+    "sample_rate": 16000,
+    "license": "Apache-2.0",
+    "size_bytes": 105800134,
+    "results": {
+     "moonshine-v2-tiny-en": {
+      "clean": {
+       "on": 0.064,
+       "half": 0.064
+      },
+      "white@10dB": {
+       "on": 0.128,
+       "half": 0.191
+      },
+      "white@5dB": {
+       "on": 0.34,
+       "half": 0.191
+      },
+      "white@0dB": {
+       "on": 0.532,
+       "half": 0.638
+      },
+      "pink@10dB": {
+       "on": 0.043,
+       "half": 0.085
+      },
+      "pink@5dB": {
+       "on": 0.085,
+       "half": 0.149
+      },
+      "pink@0dB": {
+       "on": 0.362,
+       "half": 0.426
+      },
+      "applause@10dB": {
+       "on": 0.106,
+       "half": 0.106
+      },
+      "applause@5dB": {
+       "on": 0.213,
+       "half": 0.255
+      },
+      "applause@0dB": {
+       "on": 0.298,
+       "half": 0.426
+      },
+      "train@10dB": {
+       "on": 0.277,
+       "half": 0.128
+      },
+      "train@5dB": {
+       "on": 0.34,
+       "half": 0.17
+      },
+      "train@0dB": {
+       "on": 0.638,
+       "half": 0.426
+      }
+     },
+     "whisper-base": {
+      "clean": {
+       "on": 0.0,
+       "half": 0.0
+      },
+      "white@10dB": {
+       "on": 0.064,
+       "half": 0.064
+      },
+      "white@5dB": {
+       "on": 0.277,
+       "half": 0.149
+      },
+      "white@0dB": {
+       "on": 0.511,
+       "half": 0.383
+      },
+      "pink@10dB": {
+       "on": 0.064,
+       "half": 0.021
+      },
+      "pink@5dB": {
+       "on": 0.106,
+       "half": 0.043
+      },
+      "pink@0dB": {
+       "on": 0.489,
+       "half": 0.213
+      },
+      "applause@10dB": {
+       "on": 0.0,
+       "half": 0.0
+      },
+      "applause@5dB": {
+       "on": 0.043,
+       "half": 0.043
+      },
+      "applause@0dB": {
+       "on": 0.277,
+       "half": 0.191
+      },
+      "train@10dB": {
+       "on": 0.043,
+       "half": 0.043
+      },
+      "train@5dB": {
+       "on": 0.128,
+       "half": 0.064
+      },
+      "train@0dB": {
+       "on": 0.532,
+       "half": 0.128
+      }
+     }
+    },
+    "mean_over_noisy_conditions": {
+     "moonshine-v2-tiny-en": {
+      "on": 0.28,
+      "half": 0.266
+     },
+     "whisper-base": {
+      "on": 0.211,
+      "half": 0.112
+     }
+    },
+    "speed": {
+     "audio_s": 74.1,
+     "rtf_cpu": 3.7834,
+     "rtf_wall": 3.8272,
+     "live_20ms": {
+      "chunks": 150,
+      "mean_ms": 1594.84,
+      "p95_ms": 1846.06,
+      "max_ms": 1930.67,
+      "held_ms": 0.0,
+      "stateful": false
+     }
+    }
+   },
+   "metricgan-plus": {
+    "sample_rate": 16000,
+    "license": "Apache-2.0",
+    "size_bytes": 7588879,
+    "results": {
+     "moonshine-v2-tiny-en": {
+      "clean": {
+       "on": 0.043,
+       "half": 0.021
+      },
+      "white@10dB": {
+       "on": 0.362,
+       "half": 0.277
+      },
+      "white@5dB": {
+       "on": 0.915,
+       "half": 0.362
+      },
+      "white@0dB": {
+       "on": 0.979,
+       "half": 0.787
+      },
+      "pink@10dB": {
+       "on": 0.128,
+       "half": 0.085
+      },
+      "pink@5dB": {
+       "on": 0.553,
+       "half": 0.234
+      },
+      "pink@0dB": {
+       "on": 1.043,
+       "half": 0.596
+      },
+      "applause@10dB": {
+       "on": 0.234,
+       "half": 0.106
+      },
+      "applause@5dB": {
+       "on": 0.468,
+       "half": 0.362
+      },
+      "applause@0dB": {
+       "on": 0.809,
+       "half": 0.553
+      },
+      "train@10dB": {
+       "on": 0.362,
+       "half": 0.085
+      },
+      "train@5dB": {
+       "on": 0.596,
+       "half": 0.17
+      },
+      "train@0dB": {
+       "on": 0.979,
+       "half": 0.468
+      }
+     },
+     "whisper-base": {
+      "clean": {
+       "on": 0.0,
+       "half": 0.0
+      },
+      "white@10dB": {
+       "on": 0.34,
+       "half": 0.043
+      },
+      "white@5dB": {
+       "on": 0.936,
+       "half": 0.191
+      },
+      "white@0dB": {
+       "on": 1.0,
+       "half": 0.915
+      },
+      "pink@10dB": {
+       "on": 0.149,
+       "half": 0.021
+      },
+      "pink@5dB": {
+       "on": 0.553,
+       "half": 0.064
+      },
+      "pink@0dB": {
+       "on": 0.809,
+       "half": 0.34
+      },
+      "applause@10dB": {
+       "on": 0.149,
+       "half": 0.021
+      },
+      "applause@5dB": {
+       "on": 0.191,
+       "half": 0.043
+      },
+      "applause@0dB": {
+       "on": 0.277,
+       "half": 0.149
+      },
+      "train@10dB": {
+       "on": 0.213,
+       "half": 0.064
+      },
+      "train@5dB": {
+       "on": 0.468,
+       "half": 0.064
+      },
+      "train@0dB": {
+       "on": 0.83,
+       "half": 0.106
+      }
+     }
+    },
+    "mean_over_noisy_conditions": {
+     "moonshine-v2-tiny-en": {
+      "on": 0.619,
+      "half": 0.34
+     },
+     "whisper-base": {
+      "on": 0.493,
+      "half": 0.168
+     }
+    },
+    "speed": {
+     "audio_s": 74.1,
+     "rtf_cpu": 0.0057,
+     "rtf_wall": 0.0058,
+     "live_20ms": {
+      "chunks": 150,
+      "mean_ms": 3.14,
+      "p95_ms": 4.12,
+      "max_ms": 6.86,
+      "held_ms": 0.0,
+      "stateful": false
+     }
+    }
    }
   }
  }

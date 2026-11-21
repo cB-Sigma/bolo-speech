@@ -92,3 +92,208 @@
     - decoder_int8.onnx
     - config.json
     - vocab.json
+
+# SpeechBrain wav2vec 2.0 CTC recognisers for languages bolo had no strong local recogniser for (docs/models.md,
+# "SpeechBrain recognisers"): EncoderASR exported to one graph by server/tools/export_speechbrain_onnx.py (asr),
+# published under codebucketsolutions/ with parity checks; greedy CTC as SpeechBrain decodes (bolo.engines.speechbrain_onnx).
+- id: wav2vec2-dvoice-fongbe
+  aliases: [speechbrain/asr-wav2vec2-dvoice-fongbe]
+  task: stt
+  engine: onnxruntime
+  kind: speechbrain_ctc
+  family: SpeechBrain wav2vec 2.0
+  languages: [fon]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 1275060576
+  params: 319000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/speechbrain/asr-wav2vec2-dvoice-fongbe
+  description: 'SpeechBrain''s Fongbe (Fon) recogniser: wav2vec 2.0 (XLSR-53, fine-tuned), a small DNN and a CTC
+    layer, trained by the SpeechBrain team on the Fongbe speech of the ALFFA project as packaged by DVoice 2.0.
+    SpeechBrain reports WER 9.00 %, CER 3.98 % on the DVoice 2.0 Fongbe test set; bolo''s only other local option for
+    Fon is omnilingual-ctc-300m. Read speech in its training domain; no punctuation or capitals, greedy CTC without a
+    language model. Runs in ONNX Runtime without PyTorch (an unchanged export,
+    codebucketsolutions/asr-wav2vec2-dvoice-fongbe-onnx). Weights Apache-2.0.'
+  source_url: https://huggingface.co/speechbrain/asr-wav2vec2-dvoice-fongbe
+  validated: cpu
+  measured:
+    rtf: 0.219
+    load_s: 2.69
+    audio_s: 3.04
+    memory_mb: 2137
+    threads: 4
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 2-5)
+    date: '2026-11-21'
+    test_audio: the example clip of speechbrain/asr-wav2vec2-dvoice-fongbe
+    note: 'The example clip of the original repository (3.04 s): the ONNX graph gave the same best path and text as
+      SpeechBrain 1.1.2 (identical), "távo è un xɔ ɔ́ cí glijaà". There is no reference transcript for the clip, so no
+      error rate was measured here.'
+  source:
+    repo: codebucketsolutions/asr-wav2vec2-dvoice-fongbe-onnx
+    revision: ac405efcd4f034902ccc1170c60c9f7ae66f07d4
+    include: [asr.onnx, tokens.txt, speechbrain_onnx.json]
+  options:
+    language: fon
+- id: wav2vec2-dvoice-wolof
+  aliases: [speechbrain/asr-wav2vec2-dvoice-wolof]
+  task: stt
+  engine: onnxruntime
+  kind: speechbrain_ctc
+  family: SpeechBrain wav2vec 2.0
+  languages: [wo]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 1274998977
+  params: 319000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/speechbrain/asr-wav2vec2-dvoice-wolof
+  description: 'SpeechBrain''s Wolof recogniser: wav2vec 2.0 (XLSR-53, fine-tuned), a small DNN and a CTC layer,
+    trained by the SpeechBrain team on the ALFFA Wolof corpus as packaged by DVoice 2.0. SpeechBrain reports WER 16.05
+    %, CER 4.83 % on the DVoice 2.0 Wolof test set; Whisper has no Wolof; bolo''s only other local option is
+    omnilingual-ctc-300m. Read speech in its training domain; no punctuation or capitals, greedy CTC without a
+    language model. Runs in ONNX Runtime without PyTorch (an unchanged export,
+    codebucketsolutions/asr-wav2vec2-dvoice-wolof-onnx). Weights Apache-2.0.'
+  source_url: https://huggingface.co/speechbrain/asr-wav2vec2-dvoice-wolof
+  validated: cpu
+  measured:
+    rtf: 0.219
+    load_s: 2.68
+    audio_s: 5.85
+    memory_mb: 2208
+    threads: 4
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 3-5)
+    date: '2026-11-21'
+    test_audio: the example clip of speechbrain/asr-wav2vec2-dvoice-wolof
+    note: 'The example clip of the original repository (5.85 s): the ONNX graph gave the same best path and text as
+      SpeechBrain 1.1.2 (identical), "Naka la ubbi bunt bi rekk mu fekk ruum bi laloo ay niiw". There is no reference
+      transcript for the clip, so no error rate was measured here.'
+  source:
+    repo: codebucketsolutions/asr-wav2vec2-dvoice-wolof-onnx
+    revision: ac4717871127bb481e6c0639dc231fb75f4bb6b8
+    include: [asr.onnx, tokens.txt, speechbrain_onnx.json]
+  options:
+    language: wo
+- id: wav2vec2-dvoice-darija
+  aliases: [speechbrain/asr-wav2vec2-dvoice-darija]
+  task: stt
+  engine: onnxruntime
+  kind: speechbrain_ctc
+  family: SpeechBrain wav2vec 2.0
+  languages: [ary]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 1274999004
+  params: 319000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/speechbrain/asr-wav2vec2-dvoice-darija
+  description: 'SpeechBrain''s Moroccan Arabic (Darija) recogniser: wav2vec 2.0 (XLSR-53, fine-tuned), a small DNN and a
+    CTC layer, trained by the SpeechBrain team on DVoice 2.0 Darija (crowd-sourced Moroccan Arabic). SpeechBrain
+    reports WER 18.28 %, CER 5.85 % on the DVoice 2.0 Darija test set. Whisper and bolo''s other local Arabic
+    recognisers are trained mostly on Modern Standard Arabic (jais-asr, 11.4 GB and not yet run, covers dialects).
+    Read speech in its training domain; no punctuation, greedy CTC without a
+    language model. Runs in ONNX Runtime without PyTorch (an unchanged export,
+    codebucketsolutions/asr-wav2vec2-dvoice-darija-onnx). Weights Apache-2.0.'
+  source_url: https://huggingface.co/speechbrain/asr-wav2vec2-dvoice-darija
+  validated: cpu
+  measured:
+    rtf: 0.088
+    load_s: 2.86
+    audio_s: 2.25
+    memory_mb: 2103
+    threads: 4
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 2-5)
+    date: '2026-11-21'
+    test_audio: the example clip of speechbrain/asr-wav2vec2-dvoice-darija
+    note: 'The example clip of the original repository (2.25 s): the ONNX graph gave the same best path and text as
+      SpeechBrain 1.1.2 (identical), "ممكن تعيطي ليها في لبورطابل". There is no reference transcript for the clip, so
+      no error rate was measured here.'
+  source:
+    repo: codebucketsolutions/asr-wav2vec2-dvoice-darija-onnx
+    revision: 6b8271fddcb0cdabeae89693ed94af7e3e84eab8
+    include: [asr.onnx, tokens.txt, speechbrain_onnx.json]
+  options:
+    language: ary
+- id: wav2vec2-dvoice-amharic
+  aliases: [speechbrain/asr-wav2vec2-dvoice-amharic]
+  task: stt
+  engine: onnxruntime
+  kind: speechbrain_ctc
+  family: SpeechBrain wav2vec 2.0
+  languages: [am]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 1275771280
+  params: 319000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/speechbrain/asr-wav2vec2-dvoice-amharic
+  description: 'SpeechBrain''s Amharic recogniser: wav2vec 2.0 (XLSR-53, fine-tuned), a small DNN and a CTC layer,
+    trained by the SpeechBrain team on the ALFFA Amharic corpus as packaged by DVoice 2.0. SpeechBrain reports WER
+    24.92 %, CER 6.57 % on the DVoice 2.0 Amharic test set; Whisper lists Amharic but is far from usable on it;
+    bolo''s only other local option is omnilingual-ctc-300m. Read speech in its training domain; no punctuation or
+    capitals, greedy CTC without a language model. Runs in ONNX Runtime without PyTorch (an unchanged export,
+    codebucketsolutions/asr-wav2vec2-dvoice-amharic-onnx). Weights Apache-2.0.'
+  source_url: https://huggingface.co/speechbrain/asr-wav2vec2-dvoice-amharic
+  validated: cpu
+  measured:
+    rtf: 0.17
+    load_s: 2.65
+    audio_s: 6.14
+    memory_mb: 2216
+    threads: 4
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 3-4)
+    date: '2026-11-21'
+    test_audio: the example clip of speechbrain/asr-wav2vec2-dvoice-amharic
+    note: 'The example clip of the original repository (6.14 s): the ONNX graph gave the same best path and text as
+      SpeechBrain 1.1.2 (identical), "ተጋጣሚ ያችን ቡና በ አገር ውስጥ እና በ ኢንተርናሽናል ውድድር ጥሩ ስ ም እንዳለው እናውቃለን". There is no
+      reference transcript for the clip, so no error rate was measured here.'
+  source:
+    repo: codebucketsolutions/asr-wav2vec2-dvoice-amharic-onnx
+    revision: dab69b5850cd94cf50fdd43cc06fbeaf7ea72dd6
+    include: [asr.onnx, tokens.txt, speechbrain_onnx.json]
+  options:
+    language: am
+- id: wav2vec2-commonvoice-14-rw
+  aliases: [speechbrain/asr-wav2vec2-commonvoice-14-rw]
+  task: stt
+  engine: onnxruntime
+  kind: speechbrain_ctc
+  family: SpeechBrain wav2vec 2.0
+  languages: [rw]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 1278962102
+  params: 320000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/speechbrain/asr-wav2vec2-commonvoice-14-rw
+  description: 'SpeechBrain''s Kinyarwanda recogniser: wav2vec 2.0 (XLSR-53, fine-tuned), a small DNN and a CTC layer,
+    trained by the SpeechBrain team on Common Voice 14.0 Kinyarwanda (CC0). SpeechBrain reports WER 23.71 %, CER 7.59
+    % on the Common Voice 14.0 Kinyarwanda test set; Whisper has no Kinyarwanda; bolo''s only other local option is
+    omnilingual-ctc-300m. Read speech in its training domain; no punctuation or capitals, greedy CTC without a
+    language model. Runs in ONNX Runtime without PyTorch (an unchanged export,
+    codebucketsolutions/asr-wav2vec2-commonvoice-14-rw-onnx). Weights Apache-2.0.'
+  source_url: https://huggingface.co/speechbrain/asr-wav2vec2-commonvoice-14-rw
+  validated: cpu
+  measured:
+    rtf: 0.202
+    load_s: 2.6
+    audio_s: 5.07
+    memory_mb: 2192
+    threads: 4
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 3-4)
+    date: '2026-11-21'
+    test_audio: the example clip of speechbrain/asr-wav2vec2-commonvoice-14-rw
+    note: 'The example clip of the original repository (5.07 s): the ONNX graph gave the same best path and text as
+      SpeechBrain 1.1.2 (identical), "ABAMUGARIYE KU RUGAMBA BAFASHWA KUBONA INSIMBURANGINGO". There is no reference
+      transcript for the clip, so no error rate was measured here.'
+  source:
+    repo: codebucketsolutions/asr-wav2vec2-commonvoice-14-rw-onnx
+    revision: 681fff0f317db9662f4811cb9f6f57c97bc26a7a
+    include: [asr.onnx, tokens.txt, speechbrain_onnx.json]
+  options:
+    language: rw

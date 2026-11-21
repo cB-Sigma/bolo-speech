@@ -139,3 +139,17 @@ def test_ctc_recogniser(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
     model = sb.SpeechBrainCtc(tmp_path, {"language": "rw"}, LoadOptions(device="cpu", threads=1))
     r = model.transcribe([STTRequest(np.zeros(100, np.float32)), STTRequest(np.zeros(0, np.float32))])
     assert r[0].text == "muraho" and r[0].language == "rw" and r[1].text == ""
+
+
+def test_recogniser_and_denoiser_entries() -> None:
+    catalog = Catalog.load(None)
+    langs = {"wav2vec2-dvoice-fongbe": "fon", "wav2vec2-dvoice-wolof": "wo", "wav2vec2-dvoice-darija": "ary",
+             "wav2vec2-dvoice-amharic": "am", "wav2vec2-commonvoice-14-rw": "rw"}  # fmt: skip
+    for name, lang in langs.items():
+        spec = catalog.resolve(name)
+        assert spec is not None and spec.task == "stt" and spec.kind == "speechbrain_ctc" and spec.languages == [lang]
+        assert spec.options["language"] == lang and spec.license == "Apache-2.0" and spec.validated == "cpu"
+        assert set(spec.source.include) == {"asr.onnx", "tokens.txt", "speechbrain_onnx.json"}
+    for name, kind in (("sepformer-dns4-16k", "sepformer_onnx"), ("metricgan-plus", "metricgan_onnx")):
+        spec = catalog.resolve(name)
+        assert spec is not None and spec.task == "denoise" and spec.kind == kind and spec.sample_rate == 16000

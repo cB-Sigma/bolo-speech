@@ -608,3 +608,94 @@
     stride: 2
     resample: 2
     plugin_install: pip install "bolo-torch[demucs-denoiser]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+
+# SpeechBrain's enhancement models in ONNX Runtime (bolo.engines.speechbrain_onnx): the checkpoints exported unchanged
+# by server/tools/export_speechbrain_onnx.py and published under codebucketsolutions/ with their parity checks.
+- id: sepformer-dns4-16k
+  aliases: [speechbrain/sepformer-dns4-16k-enhancement, sepformer-dns4]
+  task: denoise
+  engine: onnxruntime
+  kind: sepformer_onnx
+  family: SepFormer
+  languages: []
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 105800134
+  license: Apache-2.0
+  license_url: https://huggingface.co/speechbrain/sepformer-dns4-16k-enhancement
+  description: 'SpeechBrain SepFormer trained for speech enhancement on the ICASSP 2022 Deep Noise Suppression
+    Challenge data (DNS4, 1300 hours at 16 kHz, Microsoft; CC BY 4.0, parts under their own sources'' licences): a
+    dual-path transformer that keeps the voice and drops the noise. SpeechBrain reports DNSMOS SIG 3.00, BAK 3.08,
+    OVRL 2.44 on the DNS4 dev set. Runs in ONNX Runtime without PyTorch (an unchanged export of the weights,
+    codebucketsolutions/sepformer-dns4-16k-enhancement-onnx); long recordings are enhanced in 10 s windows that
+    overlap by 1 s. Non-causal: a live stream enhances each piece with the half second before it. Weights Apache-2.0.'
+  source_url: https://huggingface.co/speechbrain/sepformer-dns4-16k-enhancement
+  validated: cpu
+  measured:
+    wer_ratio: 0.712
+    rtf: 3.7834
+    rtf_note: 'CPU seconds per second of audio on one thread, at 16 kHz; machine shared (load average 6-12); live stream: 1594.84 ms per 20 ms chunk (p95 1846.06): no streaming form, each chunk is enhanced with the half second before it, far slower than real time'
+    wer_note: 'mean WER over 12 noisy mixes (off: moonshine-v2-tiny-en 0.344, whisper-base 0.172): moonshine 0.28 on, 0.266 at strength 0.5; whisper-base 0.211 on, 0.112 at strength 0.5'
+    audio_s: 74.1
+    threads: 1
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 6-12)
+    date: '2026-11-21'
+    test_audio: bolo's en-short and en-long samples with white, pink, applause and train noise at 10, 5 and 0 dB SNR
+      (docs/measurements/denoise.json, catalog_comparison)
+  source:
+    urls:
+    - path: sepformer.onnx
+      url: https://huggingface.co/codebucketsolutions/sepformer-dns4-16k-enhancement-onnx/resolve/6a996c2d0717570c141a924e81717dc55f6dabe4/sepformer.onnx
+      size: 105799520
+      sha256: 08bd6e775bdf214a9d9f618702cf4c6ebc78914e9dbf4147611afe5d20f3ade5
+    - path: speechbrain_onnx.json
+      url: https://huggingface.co/codebucketsolutions/sepformer-dns4-16k-enhancement-onnx/resolve/6a996c2d0717570c141a924e81717dc55f6dabe4/speechbrain_onnx.json
+      size: 614
+      sha256: ae73369b5dfea28cc02db6d71218a42a750ff21fbde8a6cb7890f2ba448d5c6e
+  options:
+    model_sample_rate: 16000
+    window_s: 10
+    overlap_s: 1
+- id: metricgan-plus
+  aliases: [speechbrain/metricgan-plus-voicebank, metricgan-plus-voicebank]
+  task: denoise
+  engine: onnxruntime
+  kind: metricgan_onnx
+  family: MetricGAN+
+  languages: []
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 7588879
+  license: Apache-2.0
+  license_url: https://huggingface.co/speechbrain/metricgan-plus-voicebank
+  description: 'SpeechBrain MetricGAN+ (Fu et al., Interspeech 2021): a bidirectional LSTM that masks the log
+    magnitude spectrum, trained on VoiceBank-DEMAND (University of Edinburgh, CC BY 4.0; read English speech with
+    recorded noise) to maximise PESQ. SpeechBrain reports PESQ 3.15, STOI 93.0 on its test set. 7.6 MB, in ONNX
+    Runtime without PyTorch (codebucketsolutions/metricgan-plus-voicebank-onnx; the STFT runs in NumPy, as in
+    SpeechBrain, without its final peak normalisation). Non-causal: a live stream enhances each piece with the half
+    second before it. Weights Apache-2.0.'
+  source_url: https://huggingface.co/speechbrain/metricgan-plus-voicebank
+  validated: cpu
+  measured:
+    wer_ratio: 0.983
+    rtf: 0.0057
+    rtf_note: 'CPU seconds per second of audio on one thread, at 16 kHz; machine shared (load average 6-12); live stream: 3.14 ms per 20 ms chunk (p95 4.12): no streaming form, each chunk is enhanced with the half second before it'
+    wer_note: 'mean WER over 12 noisy mixes (off: moonshine-v2-tiny-en 0.344, whisper-base 0.172): moonshine 0.619 on, 0.34 at strength 0.5; whisper-base 0.493 on, 0.168 at strength 0.5'
+    audio_s: 74.1
+    threads: 1
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 6-12)
+    date: '2026-11-21'
+    test_audio: bolo's en-short and en-long samples with white, pink, applause and train noise at 10, 5 and 0 dB SNR
+      (docs/measurements/denoise.json, catalog_comparison)
+  source:
+    urls:
+    - path: metricgan.onnx
+      url: https://huggingface.co/codebucketsolutions/metricgan-plus-voicebank-onnx/resolve/ba7aa4f2ecf5aa7436a09782bd2e3581e3c991d1/metricgan.onnx
+      size: 7588437
+      sha256: 0d8c47668ccdf1e8ea60a84b5e6458d1673840616cac10aae3cfc31dbfb269b3
+    - path: speechbrain_onnx.json
+      url: https://huggingface.co/codebucketsolutions/metricgan-plus-voicebank-onnx/resolve/ba7aa4f2ecf5aa7436a09782bd2e3581e3c991d1/speechbrain_onnx.json
+      size: 442
+      sha256: 876288213550b9f990d6ac321e5abd876159ba3453020e3691d5d05161f36476

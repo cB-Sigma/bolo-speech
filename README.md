@@ -184,6 +184,8 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | DENOISE | DeepFilterNet | 1 | - | 1 | 0.259 (`deepfilternet3`) |
 | DENOISE | RNNoise | 1 | - | 1 | 0.068 (`rnnoise`) |
 | DENOISE | Demucs denoiser | 4 | - | 4 | 0.194 (`demucs-dns48`) |
+| DENOISE | SepFormer | 1 | - | 1 | 3.783 (`sepformer-dns4-16k`) |
+| DENOISE | MetricGAN+ | 1 | - | 1 | 0.006 (`metricgan-plus`) |
 | DIARIZATION | pyannote + speaker embeddings | 4 | - | 2 | 0.106 (`pyannote-3.0-eres2net`) |
 | DIARIZATION | Nemotron diarization | 1 | - | 1 | 0.039 (`nemotron-3-diarization`) |
 | SPEECH-TO-SPEECH | Moshi | 14 | en | 0 | - |
@@ -248,6 +250,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | STT | Voxtral | 2 | de, en, es, fr, hi, it, nl, pt | 1 | 1.980 (`voxtral-mini-3b-llamacpp`) |
 | STT | Nemotron 3.5 Transcribe | 2 | ar, bg, bn, cs, da, de, el, en +32 | 0 | - |
 | STT | Canary-Qwen | 1 | en | 1 | 3.194 (`canary-qwen-2.5b-onnx`) |
+| STT | SpeechBrain wav2vec 2.0 | 5 | am, ary, fon, rw, wo | 5 | 0.088 (`wav2vec2-dvoice-darija`) |
 | STT | Moonshine | 11 | ar, en, es, ja, ko, uk, vi, zh | 4 | 0.033 (`moonshine-tiny-en`) |
 | STT | NeMo FastConformer | 8 | be, de, en, es, fr, hr, it, pl +2 | 3 | 0.334 (`nemo-fastconformer-ctc-en-streaming-480ms`) |
 | STT | Canary | 2 | bg, cs, da, de, el, en, es, et +17 | 2 | 0.358 (`canary-180m-flash`) |
@@ -298,7 +301,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | WATERMARK | Perth | 1 | - | 1 | 0.033 (`perth-onnx`) |
 | WATERMARK | WavMark | 1 | - | 1 | 2.300 (`wavmark-onnx`) |
 
-**556 models in the catalog, 253 validated on CPU, 303 untested**, plus 34 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**563 models in the catalog, 260 validated on CPU, 303 untested**, plus 34 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

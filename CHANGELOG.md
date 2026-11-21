@@ -6,6 +6,24 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+### Added
+
+- **Speech recognition in Fon, Wolof, Moroccan Arabic, Amharic and Kinyarwanda without PyTorch**: SpeechBrain's
+  wav2vec 2.0 CTC recognisers (`wav2vec2-dvoice-fongbe`, `wav2vec2-dvoice-wolof`, `wav2vec2-dvoice-darija`,
+  `wav2vec2-dvoice-amharic`, `wav2vec2-commonvoice-14-rw`; Apache-2.0, 1.28 GB each) on a new onnxruntime kind
+  `speechbrain_ctc`, exported unchanged and published under codebucketsolutions/ with parity checks (the same text as
+  SpeechBrain on each example clip). Chosen after comparing every SpeechBrain recogniser with bolo's models language
+  by language; the others, and why they were left out, are in models.md, "SpeechBrain recognisers". RTF 0.09 to 0.22
+  on 4 CPU threads, about 2.2 GB of memory.
+- **SpeechBrain's SepFormer DNS4 and MetricGAN+ denoisers without PyTorch** (`sepformer-dns4-16k`,
+  `metricgan-plus`; Apache-2.0), usable wherever `denoise` is (a transcription, a Realtime session, the live
+  speech-to-text WebSocket, `POST /v1/audio/denoise`, a pipeline's `denoise` step). Exported unchanged to ONNX and
+  published under codebucketsolutions/ with parity checks; MetricGAN+'s STFT runs in NumPy, without SpeechBrain's
+  final peak normalisation so that `denoise` strengths below 1 mix like with like; SepFormer's output is fitted to
+  the input's level and long recordings are enhanced in 10 s windows. Measured with `measure_denoise.py`
+  (models.md, "Every denoiser compared"): SepFormer DNS4 helped Whisper at strength 0.5 (17.2% to 11.2% WER) but
+  needs 3.8 s of CPU per second of audio; MetricGAN+ (7.6 MB, the cheapest) hurt both recognisers at full strength.
+
 ## [1.0.1] - 2026-11-21
 
 ### Added

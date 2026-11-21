@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-556 models: 253 validated on CPU by the maintainers, 303 untested. 34 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+563 models: 260 validated on CPU by the maintainers, 303 untested. 34 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -300,6 +300,16 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `canary-qwen-2.5b-onnx` | en | accuracy | pseudo | 2.9 GB | CC-BY-4.0 | **CPU** · RTF 3.194 · WER 0.0% |
+
+#### SpeechBrain wav2vec 2.0
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `wav2vec2-dvoice-fongbe` | fon | accuracy | pseudo | 1.3 GB | Apache-2.0 | **CPU** · RTF 0.219 |
+| `wav2vec2-dvoice-wolof` | wo | accuracy | pseudo | 1.3 GB | Apache-2.0 | **CPU** · RTF 0.219 |
+| `wav2vec2-dvoice-darija` | ary | accuracy | pseudo | 1.3 GB | Apache-2.0 | **CPU** · RTF 0.088 |
+| `wav2vec2-dvoice-amharic` | am | accuracy | pseudo | 1.3 GB | Apache-2.0 | **CPU** · RTF 0.170 |
+| `wav2vec2-commonvoice-14-rw` | rw | accuracy | pseudo | 1.3 GB | Apache-2.0 | **CPU** · RTF 0.202 |
 
 #### Moonshine
 
@@ -979,6 +989,18 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `demucs-dns64` | - | balanced | - | 134 MB | CC-BY-NC-4.0 ⚠ · needs plugin torch | **CPU** · RTF 0.294 |
 | `demucs-master64` | - | balanced | - | 134 MB | CC-BY-NC-4.0 ⚠ · needs plugin torch | **CPU** · RTF 0.285 |
 | `demucs-valentini-nc` | - | accuracy | - | 243 MB | CC-BY-NC-4.0 ⚠ · needs plugin torch | **CPU** · RTF 3.713 |
+
+#### SepFormer
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `sepformer-dns4-16k` | - | accuracy | - | 106 MB | Apache-2.0 | **CPU** · RTF 3.783 |
+
+#### MetricGAN+
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `metricgan-plus` | - | balanced | - | 8 MB | Apache-2.0 | **CPU** · RTF 0.006 |
 
 ### Language identification
 
@@ -2711,6 +2733,8 @@ two or three points is one word.
 | `demucs-dns64` | CC-BY-NC-4.0 ⚠ | 16 kHz | 134.1 MB | 0.294 | 134.7 (p95 167.6) | 24.3% / 23.8% | 20.0% / 10.3% | 6.4% / 0.0% |
 | `demucs-master64` | CC-BY-NC-4.0 ⚠ | 16 kHz | 134.1 MB | 0.285 | 133.0 (p95 166.7) | 28.0% / 25.4% | 25.5% / 8.0% | 8.5% / 2.1% |
 | `demucs-valentini-nc` | CC-BY-NC-4.0 ⚠ | 16 kHz | 243.3 MB | 3.713 | 1923.4 (p95 2250.7) | 88.5% / 33.2% | 91.0% / 15.2% | 19.1% / 0.0% |
+| `sepformer-dns4-16k` | Apache-2.0 | 16 kHz | 105.8 MB | 3.783 | 1594.8 (p95 1846.1) | 28.0% / 26.6% | 21.1% / 11.2% | 6.4% / 0.0% |
+| `metricgan-plus` | Apache-2.0 | 16 kHz | 7.6 MB | 0.006 | 3.1 (p95 4.1) | 61.9% / 34.0% | 49.3% / 16.8% | 4.3% / 0.0% |
 
 ⚠ = not for commercial use. `elevenlabs-voice-isolator` (cloud) was not run:
 no account.
@@ -2731,6 +2755,14 @@ What it shows, on this small synthetic test:
 * **DeepFilterNet 3 and RNNoise**, tuned for listening, were among the
   weakest at full strength; at 0.5 they helped Whisper less than the others
   (12.8% and 13.3%).
+* **SpeechBrain's SepFormer DNS4** (`sepformer-dns4-16k`, Apache-2.0, ONNX Runtime) helped
+  Moonshine (28.0%, less than GTCRN) and Whisper at strength 0.5 (11.2%), but it is the slowest denoiser in the
+  table after `demucs-valentini-nc` (3.8 s of CPU per second of audio; a live stream cannot keep up).
+  **MetricGAN+** (`metricgan-plus`, Apache-2.0, 7.6 MB, the cheapest in CPU time here) was trained to
+  please PESQ on VoiceBank-DEMAND and hurt both recognisers badly at full strength (Moonshine 61.9%, Whisper
+  49.3%); at 0.5 it did nothing for them. Both are SpeechBrain checkpoints exported unchanged to ONNX
+  (`server/tools/export_speechbrain_onnx.py`, published under codebucketsolutions/ with parity checks: SepFormer
+  52 to 90 dB SI-SNR from SpeechBrain's output, MetricGAN+ about 130 dB). Measured 2026-11-21, load average 6 to 12.
 * The **Demucs** denoiser (PyTorch, non-commercial) did no better than the
   DPDFNets and costs more: it has no streaming form here, so a live stream
   enhances every 20 ms chunk with the half second before it, which is
@@ -3538,6 +3570,52 @@ NVIDIA's own GGUF repository is for NeMo-Speech.cpp, its encoder file is not a
 llama.cpp mmproj, so it is not used. The model's speaker tags and word
 timestamps (CTC head) are not used here: segments are the pieces bolo cut the
 audio into (at most 30 s each).
+
+## SpeechBrain recognisers for languages without a strong option
+
+SpeechBrain publishes about sixty recognisers. Each was compared, language by language, with what bolo already has
+(Whisper, Parakeet, Canary, Omnilingual, the Indian-language models), from SpeechBrain's own test numbers on its
+model cards; five were added, for languages where bolo had no strong local recogniser. They run in ONNX Runtime
+without PyTorch (`speechbrain_ctc`, bolo.engines.speechbrain_onnx): SpeechBrain's `EncoderASR` (wav2vec 2.0 XLSR-53
+fine-tuned, a DNN, a CTC layer) exported unchanged by `server/tools/export_speechbrain_onnx.py asr` and published
+under codebucketsolutions/ with parity checks, decoded greedily as SpeechBrain does. On each repository's example
+clip the ONNX graph gave the same best path and the same text as SpeechBrain 1.1.2. The clips come without a
+reference transcript, so no error rate was measured here: the error rates below are the cards'. All Apache-2.0;
+1.28 GB each; 4 threads on the shared 4-vCPU machine (load average 2 to 5).
+
+| model | language | card (test set) | RTF | memory | output on the example clip |
+| --- | --- | --- | --- | --- | --- |
+| `wav2vec2-dvoice-fongbe` | Fon (fon) | DVoice 2.0: WER 9.0 %, CER 4.0 % | 0.219 | 2137 MB | távo è un xɔ ɔ́ cí glijaà |
+| `wav2vec2-dvoice-wolof` | Wolof (wo) | DVoice 2.0: WER 16.1 %, CER 4.8 % | 0.219 | 2208 MB | Naka la ubbi bunt bi rekk mu fekk ruum bi laloo ay niiw |
+| `wav2vec2-dvoice-darija` | Moroccan Arabic (ary) | DVoice 2.0: WER 18.3 %, CER 5.9 % | 0.088 | 2103 MB | ممكن تعيطي ليها في لبورطابل |
+| `wav2vec2-dvoice-amharic` | Amharic (am) | DVoice 2.0: WER 24.9 %, CER 6.6 % | 0.17 | 2216 MB | ተጋጣሚ ያችን ቡና በ አገር ውስጥ እና በ ኢንተርናሽናል ውድድር ጥሩ ስ ም እንዳለው እናውቃለን |
+| `wav2vec2-commonvoice-14-rw` | Kinyarwanda (rw) | Common Voice 14: WER 23.7 %, CER 7.6 % | 0.202 | 2192 MB | ABAMUGARIYE KU RUGAMBA BAFASHWA KUBONA INSIMBURANGINGO |
+
+Why these five: Whisper has no Fon, Wolof or Kinyarwanda and is far from usable on Amharic; it and bolo's other
+Arabic recognisers are trained mostly on Modern Standard Arabic, not Darija; the only other local candidate for all
+five is `omnilingual-ctc-300m`, one small model for 1,600 languages. The DVoice and Common Voice test sets are read
+speech close to the training data: expect more errors on conversations, phone audio and other domains.
+
+Not added, with the reason:
+
+* **English** (LibriSpeech, Switchboard, TED-LIUM, GigaSpeech, Common Voice, Loquacious; CRDNN, Conformer,
+  Transformer, Branchformer, wav2vec 2.0, streaming Conformer): SpeechBrain's best LibriSpeech numbers (1.90 / 3.96
+  % WER clean / other) are behind Parakeet and Canary, which bolo has.
+* **French, German, Spanish, Italian, Portuguese** (Common Voice 14 wav2vec 2.0: 10.2, 8.9, 13.3, 8.4, 22.4 % WER;
+  CRDNN, Transformer and transducer models are worse): Whisper large-v3, Canary and Parakeet v3 are as good or
+  better on these languages. French MEDIA (an SLU corpus) is a narrow domain.
+* **Chinese** (AISHELL, Common Voice): SenseVoice, Paraformer and FireRedASR in bolo are far better on AISHELL.
+* **Arabic, Persian, Hindi, Serbian, Mongolian, Italian, French** (Whisper large-v2 and medium fine-tuned on Common
+  Voice: Arabic 17.0, Persian 31.8, Hindi 15.3, Serbian 23.6, Mongolian 64.9 % WER): not clearly better than
+  Whisper large-v3, Jais-ASR or the Indian-language models bolo has; the Mongolian model is not usable.
+* **Korean** (KsponSpeech Conformer, 7.3 % CER on KsponSpeech): an in-domain number for Korean spontaneous speech;
+  Korean is well served by Whisper and SenseVoice.
+* **Swahili** (DVoice 2.0: 23.2 % WER): Whisper and `omnilingual-ctc-300m` both know Swahili, and the card's test set
+  is not comparable with theirs; not clearly better.
+* **Kinyarwanda, older release** (`asr-wav2vec2-commonvoice-rw`, Common Voice 7 test): superseded by the Common
+  Voice 14 model above.
+* Noisy-speech models (`whisper_rescuespeech`, `noisy-whisper-rescuespeech`) are for a German search-and-rescue
+  corpus.
 
 ## Indian languages
 

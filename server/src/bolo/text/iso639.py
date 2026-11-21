@@ -55,7 +55,7 @@ OTHER_NAMES: dict[str, str] = {
     "doi": "Dogri", "kok": "Konkani", "gom": "Konkani (Goan)", "mni": "Manipuri", "sat": "Santali", "raj": "Rajasthani",
     "awa": "Awadhi", "bgc": "Haryanvi", "tcy": "Tulu", "kfy": "Kumaoni", "gbm": "Garhwali", "bns": "Bundeli",
     "lus": "Mizo", "kha": "Khasi", "bpy": "Bishnupriya", "sck": "Sadri", "unr": "Mundari", "hoc": "Ho",
-    "khn": "Khandeshi", "wbr": "Wagdi", "mup": "Malvi", "bhb": "Bhili",
+    "khn": "Khandeshi", "wbr": "Wagdi", "mup": "Malvi", "bhb": "Bhili", "fon": "Fon", "ary": "Moroccan Arabic",
 }  # fmt: skip
 
 #: two-letter codes and names, for codes that come without a name
