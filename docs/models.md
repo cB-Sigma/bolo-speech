@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-526 models: 230 validated on CPU by the maintainers, 296 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+527 models: 231 validated on CPU by the maintainers, 296 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -759,6 +759,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `pyannote-3.0-eres2net` | - | balanced | - | 32 MB | MIT (segmentation) + Apache-2.0 (embedding) | **CPU** · RTF 0.106 · DER 5.2% on a two-voice test clip |
 | `pyannote-3.0-titanet-small` | - | balanced | - | 46 MB | MIT (segmentation) + CC-BY-4.0 (embedding) | untested |
 | `pyannote-3.0-wespeaker-resnet34` | - | balanced | - | 33 MB | MIT (segmentation) + CC-BY-4.0 (embedding) | untested |
+| `reverb-diarization-v1` | - | balanced | - | 36 MB | Rev Model Non-Production License (segmentation, non-comme… ⚠ | **CPU** · RTF 0.258 · DER 5.0% on a two-voice test clip |
 
 #### Nemotron diarization
 

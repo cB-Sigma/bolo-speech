@@ -8,6 +8,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Rev's Reverb diarization v1** (`reverb-diarization-v1`) without PyTorch: Rev's fine-tune of the pyannote
+  segmentation model (the sherpa-onnx project's ONNX export, not gated) with 3D-Speaker ERes2Net embeddings, 36 MB.
+  Rev Model Non-Production License: not for commercial use, labelled so. On the console's two-voice dialogue it found
+  both speakers with no confusion (DER 5.0 %, pyannote-3.0-eres2net 5.9 %) at 0.26 of real time.
+
 - **Cohere Transcribe 03-2026** (`cohere-transcribe-03-2026`): Cohere Labs' 2 B recogniser for 14 languages with
   punctuation, Apache-2.0, on sherpa-onnx (the sherpa-onnx project's int8 export, 2.9 GB, which unlike Cohere's own
   repository is not gated). It does not detect the language: pass `language` (English otherwise). On the 4-vCPU

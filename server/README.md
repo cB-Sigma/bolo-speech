@@ -171,7 +171,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | DENOISE | DeepFilterNet | 1 | - | 1 | 0.259 (`deepfilternet3`) |
 | DENOISE | RNNoise | 1 | - | 1 | 0.068 (`rnnoise`) |
 | DENOISE | Demucs denoiser | 4 | - | 4 | 0.194 (`demucs-dns48`) |
-| DIARIZATION | pyannote + speaker embeddings | 3 | - | 1 | 0.106 (`pyannote-3.0-eres2net`) |
+| DIARIZATION | pyannote + speaker embeddings | 4 | - | 2 | 0.106 (`pyannote-3.0-eres2net`) |
 | DIARIZATION | Nemotron diarization | 1 | - | 1 | 0.039 (`nemotron-3-diarization`) |
 | SPEECH-TO-SPEECH | Moshi | 14 | en | 0 | - |
 | SPEECH-TO-SPEECH | Hibiki | 4 | en, fr | 0 | - |
@@ -274,7 +274,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | WATERMARK | Perth | 1 | - | 1 | 0.033 (`perth-onnx`) |
 | WATERMARK | WavMark | 1 | - | 1 | 2.300 (`wavmark-onnx`) |
 
-**526 models in the catalog, 230 validated on CPU, 296 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md).
+**527 models in the catalog, 231 validated on CPU, 296 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.
