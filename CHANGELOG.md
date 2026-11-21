@@ -64,6 +64,11 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   audio projector). Added, not yet run (`options.not_yet_run`): too large for the test machine. The llama.cpp
   speech-to-text client (`voxtral-llamacpp` kind) takes a model's own prompt templates from its catalog entry
   (`options.prompts`).
+- **Salesforce SOV-Transcribe-1** (`sov-transcribe-1`, 53.3 GB, Apache-2.0): speech to text in English, French,
+  German, Spanish, Italian, Portuguese and Dutch (a Whisper large-v3 encoder in front of Gemma 4 26B A4B) through the
+  torch plugin (`bolo-torch[sov-transcribe]`, transformers 5.19 to 5.22). Its model code is remote code: it runs only
+  after `allow_remote_code` for this model, pinned by sha256 at the reviewed commit. No GGUF conversion exists, so
+  there is no llama.cpp route. Added, not yet run (`options.not_yet_run`; wiring tested with a fake network).
 
 ### Changed
 

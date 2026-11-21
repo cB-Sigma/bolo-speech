@@ -98,6 +98,9 @@ minicpm-o = [
   "transformers==4.44.2", "accelerate>=0.33,<1.0", "torchaudio>=2.1", "torchvision", "Pillow", "librosa>=0.10.2", "soundfile>=0.12.1",
   "vector-quantize-pytorch==1.18.5", "vocos==0.1.0",
 ]
+# Salesforce SOV-Transcribe-1 (speech to text): the model is Hugging Face remote code (opt in per model) written for
+# transformers 5.19 to 5.22, as on the model card; accelerate to split it between the GPU and the CPU.
+sov-transcribe = ["transformers>=5.19,<5.23", "accelerate>=1.0"]
 # Voxlect's language identifiers for India (Whisper small or MMS-LID-256 encoders with LoRA; rebuilt from
 # transformers' encoder classes, without the Voxlect code)
 voxlect = ["transformers>=4.46", "safetensors>=0.4"]

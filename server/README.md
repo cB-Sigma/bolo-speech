@@ -208,6 +208,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | SEPARATION | PixIT | 1 | en | 1 | 5.690 (`pixit-ami`) |
 | DIARIZATION | pyannote (PyTorch) | 2 | - | 2 | 0.876 (`pyannote-speaker-diarization-community-1`) |
 | STT | DiCoW | 3 | en | 3 | 0.453 (`dicow-v3.3`) |
+| STT | SOV-Transcribe | 1 | de, en, es, fr, it, nl, pt | 0 | - |
 | TTS | Indic-Speak | 1 | as, bn, brx, doi, en, gu, hi, kn +15 | 0 | - |
 | TTS | Spark-TTS | 1 | en, zh | 0 | - |
 | TTS | MaskGCT | 1 | de, en, fr, ja, ko, zh | 0 | - |
@@ -277,7 +278,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | WATERMARK | Perth | 1 | - | 1 | 0.033 (`perth-onnx`) |
 | WATERMARK | WavMark | 1 | - | 1 | 2.300 (`wavmark-onnx`) |
 
-**531 models in the catalog, 233 validated on CPU, 298 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md).
+**532 models in the catalog, 233 validated on CPU, 299 untested**, plus 23 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

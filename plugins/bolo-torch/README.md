@@ -29,6 +29,7 @@ the console, the OpenAI-compatible API) works as for bolo's own engines.
 | `diarizen-wavlm-large-s80-md-v2` | diarization | BUT-FIT DiariZen v2: pruned WavLM Large + Conformer, VBx clustering (the authors' pipeline) | `diarizen` + the authors' code (see below) | CC-BY-NC-4.0 (non-commercial; PLDA CC-BY-4.0) | no | CPU, see below |
 | `dicow-v3.3` | STT, diarization-conditioned | BUT-FIT DiCoW v3.3: Whisper large-v3-turbo told who talks when | `dicow` | CC-BY-4.0 | no | CPU, see below |
 | `se-dicow` | STT, diarization-conditioned | BUT-FIT SE-DiCoW: DiCoW with self-enrolment | `dicow` | Apache-2.0 | no | CPU, see below |
+| `sov-transcribe-1` | STT | Salesforce SOV-Transcribe-1: Whisper large-v3 encoder + Gemma 4 26B A4B, English, French, German, Spanish, Italian, Portuguese, Dutch | `sov-transcribe` + remote code opt-in | Apache-2.0 | no | **no** (fakes only; 53 GB) |
 | `qwen2.5-omni-3b-torch` | speech-to-speech | Qwen2.5-Omni 3B, text and speech out (voices Chelsie, Ethan) | `omni` | Qwen Research License (non-commercial) | no | **no** (fakes only) |
 | `qwen2.5-omni-7b-torch` | speech-to-speech | Qwen2.5-Omni 7B | `omni` | Apache-2.0 | no | **no** (fakes only) |
 | `qwen3-omni-30b-a3b-instruct-torch` | speech-to-speech | Qwen3-Omni 30B-A3B Instruct, speech out in 10 languages (voices Ethan, Chelsie, Aiden) | `omni` | Apache-2.0 | no | **no** (fakes only) |
@@ -286,7 +287,7 @@ pip install ./server "./plugins/bolo-torch[parler,sepformer]"
 Extras: `parler` (Parler-TTS), `f5` (IndicF5), `f5-original` (the original F5-TTS checkpoints, on the `f5-tts`
 package, which pins its own libraries: give it its own environment), `indic-speak` (transformers 5 and SNAC),
 `orpheus` (Veena, Svara), `sepformer`, `pyannote` (PixIT, pyannote speaker diarization),
-`dicow` (DiCoW, SE-DiCoW: transformers 4.55 and pandas), `diarizen` (DiariZen: toml, accelerate, scipy, torchaudio
+`dicow` (DiCoW, SE-DiCoW: transformers 4.55 and pandas), `sov-transcribe` (SOV-Transcribe-1: transformers 5.19 to 5.22, accelerate), `diarizen` (DiariZen: toml, accelerate, scipy, torchaudio
 below 2.9; with the authors' two packages from GitHub, see above), `spark-tts` (Spark-TTS: transformers, einops, einx,
 omegaconf, soxr, torchaudio; the BiCodec code is the bundle `spark-tts`), `maskgct` (MaskGCT: transformers before 4.48,
 librosa, onnxruntime, jieba, cn2an, pypinyin, LangSegment, pyopenjtalk-plus and the rest of Amphion's front end

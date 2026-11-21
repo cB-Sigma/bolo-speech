@@ -4,6 +4,13 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Added
+
+- **Salesforce SOV-Transcribe-1** (kind `sov-transcribe`, extra `sov-transcribe`): speech to text in English, French,
+  German, Spanish, Italian, Portuguese and Dutch through transformers 5.19 to 5.22 and the model's own code (remote
+  code, opt in per model), with the prompts of its card (language hint, hotwords as words the audio may contain).
+  Wiring tested with a fake network; the model itself (53 GB) not run yet.
+
 ## [0.1.9] - 2026-11-19
 
 ### Changed

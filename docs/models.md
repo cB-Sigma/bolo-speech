@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-531 models: 233 validated on CPU by the maintainers, 298 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+532 models: 233 validated on CPU by the maintainers, 299 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -239,6 +239,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `dicow-v3.3` | en | accuracy | pseudo | 3.6 GB | CC-BY-4.0 · needs plugin torch | **CPU** · RTF 0.453 |
 | `se-dicow` | en | accuracy | pseudo | 4.4 GB | Apache-2.0 · needs plugin torch | **CPU** · RTF 0.589 |
 | `dicow-v3.3-onnx` | en | accuracy | pseudo | 1.5 GB | CC-BY-4.0 | **CPU** · RTF 0.725 |
+
+#### SOV-Transcribe
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `sov-transcribe-1` | en, fr, de, es, it, pt +1 | accuracy | pseudo | 53.3 GB | Apache-2.0 · needs plugin torch | untested |
 
 #### Whistle
 
@@ -1437,7 +1443,8 @@ What the opt-in allows, and nothing more:
   what runs.
 
 Models in the catalog with remote code: `minicpm-o-2.6` (the whole model), `step-audio-2-mini`, `glm-4-voice-9b`
-and `kimi-audio-7b-instruct` (their language models; the rest of their code comes from GitHub, below). The same
+and `kimi-audio-7b-instruct` (their language models; the rest of their code comes from GitHub, below), and
+`sov-transcribe-1` (its model and processor; the repository's `vllm_plugin/` folder is not downloaded). The same
 mechanism serves any other model with remote code: add the `remote_code` block to its catalog entry (for
 your own entries, `<data_dir>/custom.yaml`). `bolo-torch pin-remote-code <downloaded folder> --revision <commit>`
 prints it; read every file it lists before you trust it.

@@ -629,6 +629,60 @@
     plugin_install: pip install "bolo-torch[dicow]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
     diarization_model: nemotron-3-diarization
     conditioning: turns
+- id: sov-transcribe-1
+  task: stt
+  engine: plugin:torch
+  kind: sov-transcribe
+  family: SOV-Transcribe
+  languages: [en, fr, de, es, it, pt, nl]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 53315624721
+  params: 26600000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/salesforce-sovereign-intelligence/SOV-Transcribe-1
+  commercial_use: true
+  gated: false
+  features: [punctuation, long-form]
+  description: 'Salesforce SOV-Transcribe-1 (26.6 B parameters, about 4.6 B active: a Whisper large-v3 encoder and a
+    projector in front of Gemma 4 26B A4B, a mixture of experts), speech to text in English, French, German, Spanish,
+    Italian, Portuguese and Dutch with punctuation and casing, through the torch plugin (transformers). bolo sends the
+    card''s prompts: the language when the request names one, and hotwords as "words or phrases" the audio may
+    contain. No timestamps from the model: segments are the pieces of at most 30 s bolo cut the audio into; no
+    translation. Remote code: its modelling and processing code is Python in the model repository, which runs only
+    after you opt in for this model (allow_remote_code, pinned files; docs/models.md, "Remote code"). Apache-2.0.
+    bfloat16, 53.3 GB of weights: a GPU with about 64 GB, or a split between GPU and CPU memory. Added, not yet run
+    here (wiring tested with fakes).'
+  source_url: https://huggingface.co/salesforce-sovereign-intelligence/SOV-Transcribe-1
+  validated: untested
+  source:
+    repo: salesforce-sovereign-intelligence/SOV-Transcribe-1
+    revision: 505d8fae243924c0d8acdc622f7f0abab344eba3
+    # vllm_plugin/ holds Python files for vLLM that the plugin does not run (and the remote-code check would refuse)
+    exclude: ['assets/*', 'vllm_plugin/*', .gitattributes]
+  options:
+    plugin_install: pip install "bolo-torch[sov-transcribe]" (the bolo PyTorch engine plugin, plugins/bolo-torch;
+      transformers 5.19 to 5.22, in an environment of its own if your other models need another transformers), then
+      opt in to the model's remote code with bolo models config sov-transcribe-1 --set allow_remote_code=true
+    dtype: bfloat16
+    max_chunk_s: 30.0
+    remote_code:
+      revision: 505d8fae243924c0d8acdc622f7f0abab344eba3
+      reviewed: '2026-11-21: configuration_sovereignai_transcribe.py (a Gemma 4 text configuration with a Whisper
+        encoder configuration), modeling_sovereignai_transcribe.py (Whisper encoder, a two-layer projector over 4
+        stacked frames, Gemma 4 text model with its router in float32, GenerationMixin) and
+        processing_sovereignai_transcribe.py (Whisper features in 30 s windows, 375 audio tokens each, and the chat
+        template). Imports torch, transformers and huggingface_hub only; no downloads, no file writes, no
+        subprocesses.'
+      files:
+        config.json: 9fbba9e824a3f985896ab2ef6484e7201b68c157a72af88427e6d834d64d103b
+        configuration_sovereignai_transcribe.py: b2eacdf70c7b309a5c22dd76da1230e101ecac7b62baaeaca3fc97baddaa52d0
+        modeling_sovereignai_transcribe.py: 4e0a56f1a45a37d7433adaaf428102a474072542a54e597e9030a19938357659
+        processing_sovereignai_transcribe.py: 11ea543dc2a2727328d9efec93be7e8750bfdcafcf1d1b104b56aab08eea7e09
+        processor_config.json: 1d12c0f3f9db7bba54b99e9a8a58b47c6fc2458040d36a8e416a1fe1a2febbc7
+    not_yet_run: true
+    hardware: {gpu: required, vram_gb: 64, note: 'bfloat16 weights (53.3 GB); a smaller GPU with the rest of the
+      weights in CPU memory works, slower'}
 - id: f5-tts-v1-base
   task: tts
   engine: plugin:torch

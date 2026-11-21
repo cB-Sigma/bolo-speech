@@ -36,6 +36,7 @@ LOADERS: dict[str, tuple[str, str]] = {
     "sepformer": ("bolo_torch.models.separation", "load_sepformer"),
     "pixit": ("bolo_torch.models.separation", "load_pixit"),
     "dicow": ("bolo_torch.models.dicow", "load"),
+    "sov-transcribe": ("bolo_torch.models.sov_transcribe", "load"),
     "pyannote-diarization": ("bolo_torch.models.diarization", "load"),
     "diarizen": ("bolo_torch.models.diarizen", "load"),
     "spark-tts": ("bolo_torch.models.spark_tts", "load"),
