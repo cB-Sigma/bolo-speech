@@ -231,7 +231,7 @@ def test_an_older_uccharan_is_not_used_for_languages_it_lacks(fake: Any, monkeyp
     old = phonemize.UccharanPhonemizer(fake)
     monkeypatch.setattr(phonemize, "get_uccharan", lambda: old)
     assert phonemize.select("piper", "en-us") is old and phonemize.select("piper", "de") is None
-    with pytest.raises(ComponentMissing, match=r"uccharan>=0\.6\.4,<0\.7"):
+    with pytest.raises(ComponentMissing, match=r"uccharan>=1\.0,<2"):
         phonemize.resolve("piper", "de", "uccharan")
 
 

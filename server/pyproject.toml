@@ -62,7 +62,7 @@ kokoro-onnx = ["kokoro-onnx>=0.4"]
 # Latin-script languages other than English in the language itself (0.6.0 read them in English); 0.6.2 writes
 # Sinhala and Sindhi numbers as words (0.6.1 wrote lookup keys); 0.6.3 and 0.6.4 read dates, ordinals and clock
 # times in full and put currency words in the plural.
-uccharan = ["uccharan>=0.6.4,<0.7"]
+uccharan = ["uccharan>=1.0,<2"]
 # eSpeak NG (GPL-3.0-or-later) as a prebuilt shared library with its data. Optional, never part of `all`:
 # phoneme-based voices in languages uccharan does not cover need it; everything else does not.
 espeak = ["espeakng-loader>=0.2.4"]
@@ -136,11 +136,11 @@ mlx = [
   "mlx-whisper>=0.4.2; sys_platform == 'darwin' and platform_machine == 'arm64'",
   "parakeet-mlx>=0.3; sys_platform == 'darwin' and platform_machine == 'arm64'",
   "mlx-audio>=0.6.6; sys_platform == 'darwin' and platform_machine == 'arm64'",
-  "uccharan>=0.6.4,<0.7; sys_platform == 'darwin' and platform_machine == 'arm64'",
+  "uccharan>=1.0,<2; sys_platform == 'darwin' and platform_machine == 'arm64'",
 ]
 all = [
   "sherpa-onnx>=2.0,<3",
-  "uccharan>=0.6.4,<0.7",
+  "uccharan>=1.0,<2",
   "faster-whisper>=1.1",
   "av>=12",
   "wyoming>=1.6",

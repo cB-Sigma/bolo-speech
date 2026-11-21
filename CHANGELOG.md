@@ -262,6 +262,7 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Changed
 
+- **uccharan 1.0.** The `uccharan` extra (and the MLX and `all` extras) now ask for `uccharan>=1.0,<2`; bolo 1.0.0 still capped it below 0.7, so `bolo-speech[uccharan]` could not be installed with uccharan 1.0.
 - **nemotron-3.5-streaming-560ms says what it is and where it falls short.** It is NVIDIA's multilingual Nemotron
   3.5 streaming model; the entry now links its OpenMDW-1.1 licence (commercial use allowed, as the model card says)
   and marks Greek, Hebrew, Lithuanian, Latvian, Slovenian and Thai as not recommended: NVIDIA lists them as

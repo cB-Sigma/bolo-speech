@@ -3576,10 +3576,10 @@ sherpa-onnx 2.x expects the caller to supply them. bolo has two phonemisers:
 
 | Phonemiser | Licence | Covers | How it gets there |
 | --- | --- | --- | --- |
-| **uccharan** (default) | Apache-2.0 | Piper and Mimic 3 voices in uccharan's 39 languages (below); Kokoro voices in English (US, British), Spanish, French, Italian, Brazilian Portuguese and Hindi; Kitten and Matcha (US English). For Kokoro English it is a port of misaki, the front end Kokoro was trained with, with misaki's dictionaries | `bolo-speech[uccharan]` (uccharan 0.6.4 or a later 0.6 release), part of `bolo-speech[all]` and the Docker image; `bolo components install uccharan` |
+| **uccharan** (default) | Apache-2.0 | Piper and Mimic 3 voices in uccharan's 39 languages (below); Kokoro voices in English (US, British), Spanish, French, Italian, Brazilian Portuguese and Hindi; Kitten and Matcha (US English). For Kokoro English it is a port of misaki, the front end Kokoro was trained with, with misaki's dictionaries | `bolo-speech[uccharan]` (uccharan 1.0 or a later 1.x release), part of `bolo-speech[all]` and the Docker image; `bolo components install uccharan` |
 | **espeak-ng** | GPL-3.0-or-later | every language espeak-ng has | optional component, never installed by default (next section) |
 
-uccharan 0.6 phonemises **English** (US `en-us`, British `en-gb`), **Hindi** and the other South Asian
+uccharan phonemises **English** (US `en-us`, British `en-gb`), **Hindi** and the other South Asian
 languages (Bengali, Marathi, Telugu, Nepali, Kannada, Tamil, Malayalam, Assamese, Gujarati,
 Bhojpuri, Maithili, Magahi, Punjabi, Odia, Konkani, Sinhala, Sanskrit), **Urdu** and **Sindhi**, and
 **Spanish** (Spain), **German**, **Dutch**, **French** (also Belgian `fr-be` and Swiss `fr-ch`),

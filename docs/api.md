@@ -928,7 +928,7 @@ South Asian languages uccharan reads, Urdu and Sindhi; Latin-script English insi
 Indic text is kept. Since uccharan 0.6.1 the same
 holds for its Latin-script languages (Spanish, German, French …): `25 €` is read
 "fünfundzwanzig Euro" for a German voice; since 0.6.2 Sinhala and Sindhi
-numbers are words too, and 0.6.4 (the minimum the extra asks for) reads clock times,
+numbers are words too, and 0.6.4 reads clock times,
 ordinals and dates and puts currency words in the plural. (uccharan 0.6.0 read digits in English in
 the Latin-script languages and 0.6.1 wrote Sinhala and Sindhi numbers as lookup keys
 that are no words. bolo asks the installed uccharan to write out a few numbers in the
@@ -1022,7 +1022,7 @@ normaliser and the word lists.
 It needs two optional pieces, and bolo never fails a request because one is missing unless that
 request itself said `"on"`:
 
-* uccharan with its transliterator (`uccharan.transliterate`; bolo asks for uccharan 0.6;
+* uccharan with its transliterator (`uccharan.transliterate`; bolo asks for uccharan 1.0 or a later 1.x release;
   0.3.0 and older have none); `capabilities.romanised.available` in `GET /api/v1/info` says what is installed;
 * the language's pack, `xlit-<language>` (uccharan lists Hindi, Marathi, Bengali, Tamil, Telugu,
   Gujarati, Punjabi, Kannada and Malayalam; the installed release decides, see
