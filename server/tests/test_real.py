@@ -1092,6 +1092,20 @@ CLOUD_KEYS = {
     "deepgram": ("DEEPGRAM_API_KEY", "BOLO_PROVIDER_DEEPGRAM_API_KEY"),
     "soniox": ("SONIOX_API_KEY", "BOLO_PROVIDER_SONIOX_API_KEY"),
     "assemblyai": ("ASSEMBLYAI_API_KEY", "BOLO_PROVIDER_ASSEMBLYAI_API_KEY"),
+    "xai": ("XAI_API_KEY", "BOLO_PROVIDER_XAI_API_KEY"),
+    "rime": ("RIME_API_KEY", "BOLO_PROVIDER_RIME_API_KEY"),
+    # Microsoft MAI also needs the Foundry resource's address, and the Speech region for the voices (CLOUD_SETTINGS)
+    "azure-mai": ("AZURE_MAI_API_KEY", "BOLO_PROVIDER_AZURE_MAI_API_KEY"),
+    # Amazon Bedrock: <access key id>:<secret access key>; or AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (cloud_ready)
+    "bedrock": ("BOLO_PROVIDER_BEDROCK_API_KEY",),
+}
+#: provider settings besides the key, from the environment: (field, option or None, variables)
+CLOUD_SETTINGS: dict[str, list[tuple[str, str | None, tuple[str, ...]]]] = {
+    "azure-mai": [
+        ("base_url", None, ("AZURE_MAI_ENDPOINT", "BOLO_PROVIDER_AZURE_MAI_BASE_URL")),
+        ("options", "region", ("AZURE_SPEECH_REGION", "SPEECH_REGION")),
+    ],
+    "bedrock": [("options", "region", ("AWS_REGION", "AWS_DEFAULT_REGION"))],
 }
 
 
@@ -1099,14 +1113,44 @@ def cloud_key(provider: str) -> str | None:
     return next((os.environ[name] for name in CLOUD_KEYS[provider] if os.environ.get(name)), None)
 
 
+def _env(names: tuple[str, ...]) -> str | None:
+    return next((os.environ[name] for name in names if os.environ.get(name)), None)
+
+
+def cloud_ready(provider: str) -> bool:
+    """The provider's key (and, for MAI, the resource's address) is in the environment."""
+    if provider == "bedrock" and not cloud_key(provider):
+        return bool(os.environ.get("AWS_ACCESS_KEY_ID") and os.environ.get("AWS_SECRET_ACCESS_KEY"))
+    if provider == "azure-mai" and not _env(CLOUD_SETTINGS["azure-mai"][0][2]):
+        return False
+    return cloud_key(provider) is not None
+
+
 def needs_cloud(provider: str) -> pytest.MarkDecorator:
     names = " or ".join(CLOUD_KEYS[provider])
-    return pytest.mark.skipif(cloud_key(provider) is None, reason=f"needs a real {provider} key in {names}")
+    extra = {
+        "azure-mai": " and the resource in AZURE_MAI_ENDPOINT",
+        "bedrock": " (or AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY)",
+    }
+    return pytest.mark.skipif(
+        not cloud_ready(provider), reason=f"needs a real {provider} key in {names}{extra.get(provider, '')}"
+    )
+
+
+def cloud_provider(name: str) -> dict[str, Any]:
+    entry: dict[str, Any] = {"api_key": key} if (key := cloud_key(name)) else {}
+    for field, option, names in CLOUD_SETTINGS.get(name, []):
+        if (value := _env(names)) is not None:
+            if option is None:
+                entry[field] = value
+            else:
+                entry.setdefault("options", {})[option] = value
+    return entry
 
 
 @pytest.fixture
 async def cloud_core(tmp_path: Path) -> AsyncIterator[Bolo]:
-    providers = {name: {"api_key": key} for name in CLOUD_KEYS if (key := cloud_key(name))}
+    providers = {name: cloud_provider(name) for name in CLOUD_KEYS if cloud_ready(name)}
     c = Bolo(Settings(data_dir=tmp_path / "data", auto_pull=False, providers=providers))
     await c.start()
     try:
@@ -1239,6 +1283,157 @@ async def test_cloud_assemblyai(cloud_core: Bolo) -> None:
             stream.close()
     print(f"\nassemblyai live: {live.text!r} (speaker {live.speaker})")
     assert word_error_rate(LIBRISPEECH_REF, live.text) < 0.25 and live.speaker == "A"
+
+
+async def live_transcript(core: Bolo, model: str, samples: np.ndarray, rate: int, diarize: bool = False) -> Any:
+    """A cloud model's live socket, fed at the pace of a microphone; the stream's result."""
+    async with core.manager.use(model) as entry:
+        stt: Any = entry.model
+        stream = stt.create_stream("en", diarize=True) if diarize else stt.create_stream("en")
+        try:
+            audio = resample(samples, rate, 16000)
+            for off in range(0, len(audio), 1600):
+                stream.accept(audio[off : off + 1600])
+                await asyncio.sleep(0.1)
+            stream.accept(np.zeros(16000, dtype=np.float32))  # a pause, for providers that end a segment at one
+            stream.finish()
+            await asyncio.to_thread(stream.settle)
+            return stream.result()
+        finally:
+            stream.close()
+
+
+@needs_cloud("elevenlabs")
+async def test_cloud_elevenlabs_scribe_v3(cloud_core: Bolo) -> None:
+    from bolo.diarize import DiarizeOptions
+
+    samples, rate = librispeech(real_settings().data_dir)
+    heard = await cloud_core.transcribe(samples, rate, model="elevenlabs-scribe-v3", word_timestamps=True)
+    print(f"\nscribe v3: {heard.text!r}")
+    assert word_error_rate(LIBRISPEECH_REF, heard.text) < 0.15 and len(heard.words) > 10
+    # ElevenLabs labels the speakers itself: one speaker here
+    labelled = await cloud_core.transcribe(samples, rate, model="elevenlabs-scribe-v3", diarize=DiarizeOptions())
+    assert labelled.segments and {seg.speaker for seg in labelled.segments} == {"A"}
+    live = await live_transcript(cloud_core, "elevenlabs-scribe-v3-live", samples, rate, diarize=True)
+    print(f"\nscribe v3 live: {live.text!r} (speaker {live.speaker})")
+    assert word_error_rate(LIBRISPEECH_REF, live.text) < 0.25 and live.speaker == "A"
+
+
+@needs_cloud("azure-mai")
+async def test_cloud_microsoft_mai(cloud_core: Bolo) -> None:
+    check = await asyncio.to_thread(cloud_core.providers.test, "azure-mai")
+    assert check["ok"] and check["checked"] == "credentials", check
+    samples, rate = librispeech(real_settings().data_dir)
+    heard = await cloud_core.transcribe(samples, rate, model="mai-transcribe-2-streaming", language="en")
+    print(f"\nmai-transcribe-2-streaming: {heard.text!r}")
+    assert word_error_rate(LIBRISPEECH_REF, heard.text) < 0.15
+    live = await live_transcript(cloud_core, "mai-transcribe-2-streaming", samples, rate)
+    print(f"\nmai-transcribe-2-streaming live: {live.text!r}")
+    assert word_error_rate(LIBRISPEECH_REF, live.text) < 0.25
+    if cloud_provider("azure-mai").get("options", {}).get("region"):  # the voices need the Speech region
+        for voice in ("mai-voice-2.1", "mai-voice-2.1-flash"):
+            assert await cloud_round_trip(cloud_core, voice, "mai-transcribe-2-streaming", EN_TEXT, "en") < 0.2
+
+
+async def cloud_s2s(core: Bolo, model: str, voice: str) -> None:
+    """A typed question and a spoken turn through a cloud speech-to-speech model (bolo's backend, as a Realtime
+    session drives it): each answer is completed, with its text and its speech."""
+    from bolo.s2s import AudioDelta, ResponseEnd, S2SConfig, TextDelta
+
+    core.settings.s2s_model = model
+    described = core.s2s.describe()
+    assert described["available"], described
+    backend = await core.s2s.backend()
+    conversation = await backend.open(S2SConfig(instructions="Answer in one short sentence.", voice=voice))
+
+    async def answer() -> tuple[str, float, str]:
+        text, seconds, status = "", 0.0, "none"
+        async for event in conversation.respond(modalities=["text", "audio"]):
+            if isinstance(event, TextDelta):
+                text += event.text
+            elif isinstance(event, AudioDelta):
+                seconds += len(event.samples) / event.sample_rate
+            elif isinstance(event, ResponseEnd):
+                status = event.status
+        return text, seconds, status
+
+    try:
+        await conversation.add_text("What is the capital of France?")
+        text, seconds, status = await answer()
+        print(f"\n{model}: {text!r} ({seconds:.1f} s of speech, {status})")
+        assert status == "completed" and "paris" in text.lower() and seconds > 0.5
+        samples, rate = librispeech(real_settings().data_dir)
+        audio = resample(samples, rate, 16000)
+        for off in range(0, len(audio), 1600):  # at the pace of a microphone
+            await conversation.append_audio(audio[off : off + 1600])
+            await asyncio.sleep(0.1)
+        await conversation.commit()
+        text, seconds, status = await answer()
+        print(f"\n{model} (spoken turn): {text!r} ({seconds:.1f} s of speech, {status})")
+        assert status == "completed" and text.strip() and seconds > 0.5
+    finally:
+        await conversation.close()
+
+
+@needs_cloud("xai")
+async def test_cloud_xai_grok_voice(cloud_core: Bolo) -> None:
+    check = await asyncio.to_thread(cloud_core.providers.test, "xai")
+    assert check["ok"] and check["checked"] == "credentials", check
+    await cloud_s2s(cloud_core, "xai-grok-voice-3.0", "eve")
+
+
+@needs_cloud("rime")
+async def test_cloud_rime_prism(cloud_core: Bolo) -> None:
+    check = await asyncio.to_thread(cloud_core.providers.test, "rime")
+    assert check["ok"] and check["checked"] == "credentials", check
+    await cloud_s2s(cloud_core, "rime-prism", "astra")
+
+
+@needs_cloud("bedrock")
+async def test_cloud_amazon_nova_sonic(cloud_core: Bolo) -> None:
+    """A spoken turn and the pause after it: Nova Sonic decides itself to answer, with its plan as text and speech.
+    Needs AWS's SDK too (bolo-speech[nova], Python 3.12 or newer)."""
+    from bolo.duplex.base import DuplexAudio, DuplexConfig, DuplexEnd, DuplexText
+    from bolo.duplex.nova_sonic import sdk_missing
+
+    missing = sdk_missing()
+    if missing:
+        pytest.skip(missing)
+    cloud_core.settings.s2s_model = "amazon-nova-2.5-sonic"
+    described = cloud_core.s2s.describe()
+    assert described["available"] and described["full_duplex"], described
+    backend = await cloud_core.s2s.duplex()
+    session = await backend.open(DuplexConfig(instructions="Answer in one short sentence.", voice="matthew"))
+    text, seconds = "", 0.0
+
+    async def listen() -> None:
+        nonlocal text, seconds
+        async for event in session.events():
+            if isinstance(event, DuplexText):
+                text += event.text
+            elif isinstance(event, DuplexAudio) and float(np.abs(event.samples).max(initial=0.0)) > 0.0:
+                seconds += len(event.samples) / event.sample_rate
+            elif isinstance(event, DuplexEnd):
+                assert event.reason in ("closed", "ended"), event
+                return
+
+    reader = asyncio.create_task(listen())
+    try:
+        samples, rate = librispeech(real_settings().data_dir)
+        audio = np.concatenate([resample(samples, rate, 16000), np.zeros(16000 * 6, dtype=np.float32)])
+        for off in range(0, len(audio), 512):  # 32 ms at a time, in real time: Nova hears the pause and answers
+            await session.push(audio[off : off + 512])
+            await asyncio.sleep(0.032)
+        for _ in range(200):
+            if text and seconds > 0.5:
+                break
+            await session.push(np.zeros(1600, dtype=np.float32))
+            await asyncio.sleep(0.1)
+    finally:
+        await session.close()
+        await asyncio.wait_for(reader, 30)
+    print(f"\nnova 2.5 sonic: {text!r} ({seconds:.1f} s of speech)")
+    assert text.strip() and seconds > 0.5
 
 
 # -- LFM3-Audio in ONNX Runtime (in-process speech-to-speech) ---------------------------------------------------------

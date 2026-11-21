@@ -650,7 +650,9 @@ Not verified, or taken from memory:
 ## Real tests
 
 `server/tests/test_real.py` has one test per provider (`test_cloud_openai`, `test_cloud_sarvam`,
-`test_cloud_elevenlabs`, `test_cloud_deepgram`, `test_cloud_soniox`, `test_cloud_assemblyai`): the connection test, a
+`test_cloud_elevenlabs`, `test_cloud_deepgram`, `test_cloud_soniox`, `test_cloud_assemblyai`,
+`test_cloud_elevenlabs_scribe_v3`, `test_cloud_microsoft_mai`, `test_cloud_xai_grok_voice`,
+`test_cloud_rime_prism`, `test_cloud_amazon_nova_sonic`): the connection test, a
 speak-then-transcribe round trip with a word-error-rate bound, word timestamps, translation, and
 Deepgram's and Soniox's live sockets. They are skipped unless both are true:
 
@@ -658,7 +660,10 @@ Deepgram's and Soniox's live sockets. They are skipped unless both are true:
 export BOLO_TEST_REAL=1
 export OPENAI_API_KEY=…        # or BOLO_PROVIDER_OPENAI_API_KEY; likewise SARVAM_API_KEY,
                                # ELEVENLABS_API_KEY, DEEPGRAM_API_KEY, SONIOX_API_KEY,
-                               # ASSEMBLYAI_API_KEY
+                               # ASSEMBLYAI_API_KEY, XAI_API_KEY, RIME_API_KEY,
+                               # AZURE_MAI_API_KEY with AZURE_MAI_ENDPOINT (and AZURE_SPEECH_REGION
+                               # for the voices), BOLO_PROVIDER_BEDROCK_API_KEY or AWS_ACCESS_KEY_ID
+                               # and AWS_SECRET_ACCESS_KEY (Nova also needs bolo-speech[nova])
 pytest -m real -k cloud
 ```
 

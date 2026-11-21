@@ -111,6 +111,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   barge-in itself), with instructions and Nova's voices. Provider kind `bedrock`: `BOLO_PROVIDER_BEDROCK_API_KEY` as
   `<access key id>:<secret access key>`, or AWS's own variables; the option `region`. Needs AWS's SDK, the new extra
   `bolo-speech[nova]` (Python 3.12 or newer). Function tools are not passed on.
+- **Opt-in real-account tests** for Scribe v3 and v3 Live, MAI-Transcribe-2-Streaming and MAI-Voice-2.1, Grok
+  Voice 3.0, Rime Prism and Nova 2.5 Sonic (`pytest -m real -k cloud` with `BOLO_TEST_REAL=1` and the provider's
+  key; skipped otherwise), so that the entries can be marked as run.
 - **The console's Providers page names the new provider kinds** (AssemblyAI, Microsoft MAI, xAI, Rime, Amazon
   Bedrock) and says what each needs.
 - **Every cloud entry names the environment variable of its key**: `provider.key_env` in `GET /api/v1/catalog`
