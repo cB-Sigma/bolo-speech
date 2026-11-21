@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-523 models: 227 validated on CPU by the maintainers, 296 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+525 models: 229 validated on CPU by the maintainers, 296 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -341,6 +341,13 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `rumble-2-flash` | af, ar, bn, bs, ca, ceb +39 | accuracy | pseudo | 656 MB | Apache-2.0 | **CPU** · RTF 0.463 · WER 0.0% |
+
+#### Qwen3-ASR
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `qwen3-asr-0.6b` | zh, en, yue, ar, de, fr +24 | accuracy | pseudo | 987 MB | Apache-2.0 | **CPU** · RTF 0.723 · WER 5.6% |
+| `qwen3-asr-1.7b` | zh, en, yue, ar, de, fr +24 | accuracy | pseudo | 2.4 GB | Apache-2.0 | **CPU** · RTF 1.820 · WER 5.6% |
 
 ### Text to speech
 

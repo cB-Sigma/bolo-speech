@@ -3996,3 +3996,151 @@
     - decoder.int8.onnx
     - tokenizer/*
     - LICENSE
+- id: qwen3-asr-0.6b
+  aliases:
+  - Qwen/Qwen3-ASR-0.6B
+  - csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25
+  task: stt
+  engine: sherpa-onnx
+  kind: qwen3_asr
+  family: Qwen3-ASR
+  languages:
+  - zh
+  - en
+  - yue
+  - ar
+  - de
+  - fr
+  - es
+  - pt
+  - id
+  - it
+  - ko
+  - ru
+  - th
+  - vi
+  - ja
+  - tr
+  - hi
+  - ms
+  - nl
+  - sv
+  - da
+  - fi
+  - pl
+  - cs
+  - tl
+  - fa
+  - el
+  - hu
+  - mk
+  - ro
+  tier: accuracy
+  size_bytes: 987015347
+  params: 600000000
+  license: Apache-2.0
+  features:
+  - punctuation
+  description: 'Alibaba Qwen3-ASR 0.6B: recognition in 30 languages and 22 Chinese dialects with punctuation. Without
+    language= it transcribes the language it hears, but this export does not say which. Int8 ONNX export
+    (Wasser1462/Qwen3-ASR-onnx) published by the sherpa-onnx project. No word timestamps; audio is decoded in pieces
+    of up to 20 s.'
+  source_url: https://huggingface.co/Qwen/Qwen3-ASR-0.6B
+  validated: cpu
+  measured:
+    rtf: 0.7232
+    wer: 0.056
+    audio_s: 23.0
+    load_s: 4.11
+    memory_mb: 1148
+    threads: 4
+    engine: sherpa-onnx 2.0.2
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-21'
+    test_audio: bolo's en-long sample (English, Kokoro, 11.8 s); es1.wav and fr1.wav of csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25
+      test_wavs
+    note: 'Through bolo (core.transcribe), English and French with language=, Spanish without: English and French
+      word for word, Spanish "Esta prenda es amplia. Recomiendo elegir una talla menor al habitual." (al for a la).
+      The machine was shared (load average 5-6).'
+  source:
+    repo: csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25
+    revision: 68818b2313fe77bd06f6a7c5068ff3ef59d02b8a
+    include:
+    - conv_frontend.onnx
+    - encoder.int8.onnx
+    - decoder.int8.onnx
+    - tokenizer/*
+- id: qwen3-asr-1.7b
+  aliases:
+  - Qwen/Qwen3-ASR-1.7B
+  - thieunv-asilla/sherpa-onnx-qwen3-asr-1.7B-int8
+  task: stt
+  engine: sherpa-onnx
+  kind: qwen3_asr
+  family: Qwen3-ASR
+  languages:
+  - zh
+  - en
+  - yue
+  - ar
+  - de
+  - fr
+  - es
+  - pt
+  - id
+  - it
+  - ko
+  - ru
+  - th
+  - vi
+  - ja
+  - tr
+  - hi
+  - ms
+  - nl
+  - sv
+  - da
+  - fi
+  - pl
+  - cs
+  - tl
+  - fa
+  - el
+  - hu
+  - mk
+  - ro
+  tier: accuracy
+  size_bytes: 2404222421
+  params: 1700000000
+  license: Apache-2.0
+  features:
+  - punctuation
+  description: 'Alibaba Qwen3-ASR 1.7B, the larger and more accurate of the two Qwen3-ASR models: 30 languages and 22
+    Chinese dialects with punctuation. Without language= it transcribes the language it hears, but this export does
+    not say which. Community int8 ONNX export in sherpa-onnx''s layout (thieunv-asilla, with the exporter of the
+    sherpa-onnx 0.6B release; not by Qwen). No word timestamps; audio is decoded in pieces of up to 20 s. Slow on a
+    CPU (2.4 GB).'
+  source_url: https://huggingface.co/Qwen/Qwen3-ASR-1.7B
+  validated: cpu
+  measured:
+    rtf: 1.82
+    wer: 0.056
+    audio_s: 23.0
+    load_s: 6.92
+    memory_mb: 2878
+    threads: 4
+    engine: sherpa-onnx 2.0.2
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-21'
+    test_audio: bolo's en-long sample (English, Kokoro, 11.8 s); es1.wav and fr1.wav of csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25
+      test_wavs
+    note: 'Through bolo (core.transcribe), English and French with language=, Spanish without: English and French
+      word for word, Spanish with al for a la. Slower than real time here; the machine was shared (load average 5-8).'
+  source:
+    repo: thieunv-asilla/sherpa-onnx-qwen3-asr-1.7B-int8
+    revision: 69eb686fd94a4a865bb5340a3d6ac0d7f1fec0d5
+    include:
+    - conv_frontend.onnx
+    - encoder.int8.onnx
+    - decoder.int8.onnx
+    - tokenizer/*

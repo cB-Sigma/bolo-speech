@@ -8,6 +8,12 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Qwen3-ASR 0.6B and 1.7B** (`qwen3-asr-0.6b`, `qwen3-asr-1.7b`): Alibaba's recognisers for 30 languages and 22
+  Chinese dialects with punctuation, Apache-2.0, on sherpa-onnx (int8: the sherpa-onnx project's 0.6B export, 987 MB,
+  and a community 1.7B export in the same layout, 2.4 GB). Without `language` they transcribe the language they hear
+  but do not say which. On the 4-vCPU reference machine, busy with other jobs, English and French test clips came out
+  word for word and a Spanish one with one word wrong, at 0.72 (0.6B) and 1.82 (1.7B) of real time.
+
 - **Rumble-2-Flash** (`rumble-2-flash`): Reson8's 0.5 B recogniser built on Qwen3-ASR, 45 languages with punctuation,
   Apache-2.0. It detects the language when none is given and says which. Runs in sherpa-onnx (an int8 export by
   TypeWhisper, 656 MB); on the 4-vCPU reference machine it transcribed English, Spanish and French test clips word for
