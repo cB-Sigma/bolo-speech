@@ -13,6 +13,7 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 * [Speaker diarization](#speaker-diarization)
 * [Realtime API and chat completions](#realtime-api-and-chat-completions)
 * [Phone calls](#phone-calls)
+* [Pipelines](#pipelines)
 * [Optional components](#optional-components)
 * [Latency definitions](#latency-definitions)
 * [Wyoming protocol](#wyoming-protocol)
@@ -2488,6 +2489,27 @@ The operator's API:
 `/metrics` has `bolo_telephony_active_calls` and
 `bolo_telephony_calls_total{provider,outcome}`; `GET /api/v1/events` sends
 `{"type": "call", "event": "started" | "ended" | "summary" | "dialing", "call": {…}}`.
+
+## Pipelines
+
+A pipeline chains steps (any model kind, plus templates, the language model, conditions, per-speaker fan-out,
+webhooks and saved files) into one job; the full reference is [pipelines.md](pipelines.md).
+
+* `GET`, `POST /api/v1/pipelines`; `GET`, `PUT`, `DELETE /api/v1/pipelines/{id}` (`PUT` saves a new version;
+  `GET ?version=` reads an older one); `GET /api/v1/pipelines/{id}/versions`. Bodies are JSON or YAML
+  (`Content-Type: application/yaml`). A definition that does not validate is a 400 whose `validation.errors` lists
+  every problem with its path.
+* `POST /api/v1/pipelines/validate`: the check alone, with each step's resolved model, inputs and outputs.
+* `GET /api/v1/pipelines/step-types`, `GET /api/v1/pipelines/templates`.
+* `POST /v1/pipelines/{id}/run` (multipart `file` or `url`, `text`, `vars`, `version`, `async`, `callback_url`) and
+  `POST /v1/pipelines/run` (the definition in the `pipeline` field, not saved). The answer is the run: each step's
+  model, status, time and outputs; with `async=true` a 202 with the queued run, also a job at `/api/v1/jobs/{id}`,
+  and the finished run POSTed to `callback_url` signed with `X-Bolo-Signature` (HMAC-SHA256, `webhook_secret`).
+  This is also the asynchronous transcription job: a one-step `stt` pipeline with a callback.
+* `GET /api/v1/pipelines/runs[?pipeline=]`, `GET /api/v1/pipelines/runs/{run_id}`,
+  `GET /api/v1/pipelines/runs/{run_id}/files/{name}`, `POST /api/v1/pipelines/runs/{run_id}/cancel`.
+
+With API keys, saving pipelines needs `manage` and running them `stt`.
 
 ## Optional components
 

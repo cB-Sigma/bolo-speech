@@ -49,7 +49,6 @@ Suggestions and pull requests are welcome; open an issue first for anything mark
 
 | Feature | Today | Effort | Likely approach |
 |---|---|---|---|
-| Async transcription jobs with a webhook callback | missing | S | The existing job runner plus signed webhooks |
 | Air-gapped install bundle | partial (`auto_pull = false`, local wheels) | S | `bolo pull --export` / `--import` of the data directory |
 | Helm chart | missing | S | A chart around `deploy/kubernetes/bolo.yaml` |
 | Horizontal autoscaling with shared state | missing (one replica) | L | Shared session state and autoscaling on the existing Prometheus metrics |

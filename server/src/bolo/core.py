@@ -263,6 +263,10 @@ class Bolo:
         self.telephony = TelephonyManager(self)
         #: what this machine is and which models suit it; it recommends and warns, it never restricts
         self.advisor = Advisor(self)
+        #: saved pipelines, their runs and asynchronous pipeline jobs (bolo.pipelines)
+        from bolo.pipelines import PipelineService
+
+        self.pipelines = PipelineService(self)
         self.manager.on_loaded = self._on_model_loaded
         self.sip: Any = None  # the inbound SIP endpoint, when the setting sip is on (bolo.telephony.sip)
         self.active_streams = 0
@@ -343,6 +347,8 @@ class Bolo:
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await t
         self._tasks.clear()
+        with contextlib.suppress(Exception):
+            await self.pipelines.close()
         for call in list(self.calls.values()):
             with contextlib.suppress(Exception):
                 await call.close()

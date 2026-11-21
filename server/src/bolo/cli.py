@@ -1882,6 +1882,169 @@ def cmd_keys(args: argparse.Namespace) -> int:
         store.flush()
 
 
+def _pipeline_file(path: str) -> Any:
+    from bolo.pipelines import parse_text
+
+    p = Path(path)
+    return parse_text(p.read_text(encoding="utf-8"), p.name)
+
+
+def _print_pipeline_report(report: Any) -> None:
+    for e in report.errors:
+        print(f"error: {e.path}: {e.message}", file=sys.stderr)
+    for w in report.warnings:
+        print(f"warning: {w.path}: {w.message}", file=sys.stderr)
+
+
+def cmd_pipeline(args: argparse.Namespace) -> int:
+    """Pipelines (docs/pipelines.md): kept in <data_dir>/pipelines, with the server running or not; ``run`` runs in
+    this process."""
+    from bolo.pipelines import PipelineStore, validate
+    from bolo.pipelines.templates import all_templates, template
+
+    settings = _settings(args)
+    store = PipelineStore(settings.data_dir, settings.pipeline_runs_keep)
+    try:
+        if args.action == "templates":
+            for t in all_templates():
+                print(f"{t['id']:<20} {t['description']}")
+            return 0
+        if args.action == "secret":
+            from bolo.pipelines.webhooks import secret
+
+            print(secret(settings))
+            return 0
+        if args.action == "list":
+            items = store.all()
+            if args.json:
+                print(json.dumps(items, indent=1, ensure_ascii=False))
+                return 0
+            if not items:
+                print("no pipelines (bolo pipeline create <file> | --template <name>)")
+                return 0
+            print(f"{'ID':<24} {'VERSION':>7}  {'STEPS':>5}  {'UPDATED':<20} NAME")
+            for p in items:
+                print(f"{p['id']:<24} {p.get('version', 0):>7}  {len(p.get('steps') or []):>5}  "
+                      f"{p.get('updated_at', ''):<20} {p.get('name') or ''}")  # fmt: skip
+            return 0
+        if args.action in ("create", "update", "validate"):
+            if args.template:
+                definition = template(args.template)
+            elif args.target:
+                definition = _pipeline_file(args.target)
+            else:
+                print(f"error: bolo pipeline {args.action} <file> (or --template <name>)", file=sys.stderr)
+                return 1
+            if not isinstance(definition, dict):
+                print("error: a pipeline is an object with steps", file=sys.stderr)
+                return 1
+            if args.id:
+                definition["id"] = args.id
+            core = _core(args)
+            report = validate(definition, core)
+            _print_pipeline_report(report)
+            if args.action == "validate":
+                if args.json:
+                    print(json.dumps(report.to_dict(), indent=1, ensure_ascii=False))
+                else:
+                    print("valid" if report.valid else f"not valid: {len(report.errors)} error(s)")
+                return 0 if report.valid else 1
+            if not report.valid:
+                return 1
+            doc = store.save(definition, create=args.action == "create")
+            print(f"{'created' if doc.get('version') == 1 else 'saved'} {doc['id']} version {doc['version']}")
+            return 0
+        if not args.target:
+            print(f"error: bolo pipeline {args.action} <id>", file=sys.stderr)
+            return 1
+        if args.action == "show":
+            doc = store.get(args.target, args.version)
+            if args.json or args.format == "json":
+                print(json.dumps(doc, indent=1, ensure_ascii=False))
+            else:
+                import yaml
+
+                print(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True).rstrip())
+            return 0
+        if args.action == "rm":
+            store.delete(args.target)
+            print(f"deleted {args.target}")
+            return 0
+        if args.action == "run":
+            return _pipeline_run(args, store)
+    except BoloError as exc:
+        print(f"error: {exc.message}", file=sys.stderr)
+        return 1
+    return 1
+
+
+def _pipeline_run(args: argparse.Namespace, store: Any) -> int:
+    from bolo.audio import decode_audio
+    from bolo.pipelines import Audio, PipelineInvalid
+
+    target = Path(args.target)
+    definition = _pipeline_file(args.target) if target.suffix in (".json", ".yaml", ".yml") and target.is_file() \
+        else store.get(args.target, args.version)  # fmt: skip
+    variables: dict[str, Any] = {}
+    for item in args.var or []:
+        if "=" not in item:
+            print(f"error: --var takes name=value, not {item!r}", file=sys.stderr)
+            return 1
+        name, value = item.split("=", 1)
+        variables[name.strip()] = value
+    audio = None
+    if args.input:
+        path = Path(args.input)
+        samples, rate = decode_audio(path.read_bytes(), filename=path.name)
+        audio = Audio(samples, rate)
+    if audio is None and args.text is None:
+        print("error: give a recording, or --text", file=sys.stderr)
+        return 1
+    core = _core(args)
+
+    async def go() -> int:
+        await core.start()
+        try:
+            try:
+                run = core.pipelines.runner.prepare(
+                    definition, audio=audio, text=args.text, variables=variables,
+                    filename=Path(args.input).name if args.input else None,
+                )  # fmt: skip
+            except PipelineInvalid as exc:
+                _print_pipeline_report(exc.report)
+                return 1
+
+            def progress(r: Any) -> None:
+                last = r.steps[-1] if r.steps else None
+                if last and last["status"] != "running" and not args.json:
+                    ms = f"{last['ms']:.0f} ms" if last.get("ms") is not None else ""
+                    pad = "  " * int(last.get("depth", 0))
+                    print(f"{pad}{last['id']:<20} {last['status']:<8} {last.get('model') or '':<28} {ms}",
+                          file=sys.stderr)  # fmt: skip
+                    if last.get("error"):
+                        print(f"{pad}  {last['error']['message']}", file=sys.stderr)
+
+            run.on_step = progress
+            await core.pipelines.run(run)
+            doc = run.to_dict()
+            if args.json:
+                print(json.dumps(doc, indent=1, ensure_ascii=False))
+            else:
+                for name, value in (doc.get("outputs") or {}).items():
+                    shown = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, indent=1)
+                    print(f"{name}: {shown}")
+                if doc.get("files"):
+                    print(f"files: {run.folder}", file=sys.stderr)
+            if doc["status"] != "ok":
+                print(f"error: {doc['error']['step']}: {doc['error']['message']}", file=sys.stderr)
+                return 1
+            return 0
+        finally:
+            await core.stop()
+
+    return asyncio.run(go())
+
+
 def cmd_telephony(args: argparse.Namespace) -> int:
     """Phone calls (docs/telephony.md): what is configured, and the call simulator."""
     if args.action == "simulate":
@@ -3077,6 +3240,25 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--expires-in-days", dest="expires_in_days", type=float)
     s.add_argument("--json", action="store_true")
     s.set_defaults(func=cmd_keys)
+
+    s = sub.add_parser(
+        "pipeline",
+        aliases=["pipelines"],
+        help="pipelines (docs/pipelines.md): create, list, show, validate, run, rm, templates",
+    )
+    _common(s)
+    s.add_argument("action", choices=["create", "update", "list", "show", "validate", "run", "rm", "templates",
+                                      "secret"])  # fmt: skip
+    s.add_argument("target", nargs="?", help="a pipeline file (JSON or YAML) or a saved pipeline's id")
+    s.add_argument("input", nargs="?", help="run: the recording")
+    s.add_argument("--template", help="create, validate: start from a template (bolo pipeline templates)")
+    s.add_argument("--id", help="create, update: the pipeline's id (default: the file's, else from its name)")
+    s.add_argument("--version", type=int, help="show, run: an older version")
+    s.add_argument("--text", help="run: a text input (input.text)")
+    s.add_argument("--var", action="append", help="run: name=value, overriding the pipeline's vars (repeatable)")
+    s.add_argument("--format", choices=["yaml", "json"], default="yaml", help="show: the format")
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(func=cmd_pipeline)
 
     s = sub.add_parser("telephony", help="phone calls (docs/telephony.md): status, simulate")
     _common(s)

@@ -260,6 +260,16 @@ class Settings:
     realtime_mcp_urls: bool | None = None
     mcp_timeout_s: float = 30.0  # connecting to an MCP server, and each tool call
 
+    # -- pipelines (bolo.pipelines; docs/pipelines.md) ---------------------
+    pipeline_runs_keep: int = 200  # pipeline runs kept in the history (with their files)
+    pipeline_max_jobs: int = 2  # asynchronous pipeline runs at once; more wait
+    #: let a pipeline run name a recording to fetch (url) or a callback_url. Unset: allowed on a loopback bind or when
+    #: requests need an API key, never on an open non-loopback bind
+    pipeline_remote_urls: bool | None = None
+    #: the secret pipeline webhooks and callbacks are signed with (unset: generated into <data_dir>/webhook-secret)
+    webhook_secret: str | None = None
+    pipeline_webhook_timeout_s: float = 10.0  # a webhook step or a run's callback
+
     # -- other protocols --------------------------------------------------
     wyoming: bool = False
     wyoming_host: str = "127.0.0.1"
@@ -395,6 +405,7 @@ class Settings:
                 "tts_server_api_key",
                 "audio_llm_api_key",
                 "s2s_server_api_key",
+                "webhook_secret",
             }:
                 v = "***" if v else None
             elif f.name == "providers":

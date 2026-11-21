@@ -8,6 +8,20 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Pipelines**: chain bolo's models into one job, declared as JSON or YAML ([docs/pipelines.md](docs/pipelines.md)).
+  Steps of every model kind (denoise, VAD, diarization, separation, speaker identification and enrolment, STT,
+  translation, alignment, punctuation, ITN, PII redaction, language ID, audio tags, emotion, audio-LLM questions,
+  decisions, TTS, voice conversion, watermarks) and utility steps (templates, the configured language model,
+  conditions, switches, filters, per-speaker fan-out, stop, signed webhooks, saved files), wired together with
+  references such as `{{steps.stt.text}}`. A definition is validated completely before it runs (unknown types and
+  models, missing inputs, type mismatches, each with the path of the field). Each step calls the same core operation
+  as its endpoint, so models load and unload through the scheduler as usual; a run keeps each step's timing, outputs
+  and error, and the outputs made before a failure. Routes: `/api/v1/pipelines` (CRUD with versions, `validate`,
+  `step-types`, `templates`, run history and files) and `POST /v1/pipelines/{id}/run` (a file or URL; at once, or
+  `async=true` as a job with a callback signed with `X-Bolo-Signature`; this is also the asynchronous transcription
+  job of the roadmap). CLI: `bolo pipeline create|list|show|validate|run|rm|templates|secret`. Templates: meeting
+  notes, call QA, podcast chapters, dubbing, voicemail triage, after-call summary. Settings: `pipeline_runs_keep`,
+  `pipeline_max_jobs`, `pipeline_remote_urls`, `webhook_secret`, `pipeline_webhook_timeout_s`.
 - **Google's Gemini Decision 1 as a cloud decision model** (`gemini-decision-1`, provider kind `gemini`, key
   `BOLO_PROVIDER_GEMINI_API_KEY`): the Gemini Decisions API answers the same yes/no, choice and score questions as
   the local decision models, through `POST /v1/audio/decisions` and `bolo decide`; the recording goes as a 16 kHz

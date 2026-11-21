@@ -2,7 +2,7 @@
  "openapi": "3.1.0",
  "info": {
   "title": "bolo",
-  "description": "\nbolo serves speech-to-text, text-to-speech and voice-activity detection.\n\n* **openai** - drop-in `/v1/audio/*` and `/v1/models`\n* **speaches** - model-management routes compatible with speaches\n* **native** - `/api/v1/*`: catalog, pulls, cloud providers, stats, request traces, events, benchmark\n* **voices** - `/api/v1/voices`: saved voices for the models that clone voices (consent required)\n* WebSockets (not shown by OpenAPI): `/api/v1/stt/stream`, `/api/v1/tts/stream` - see docs/api.md\n",
+  "description": "\nbolo serves speech-to-text, text-to-speech and voice-activity detection.\n\n* **openai** - drop-in `/v1/audio/*` and `/v1/models`\n* **speaches** - model-management routes compatible with speaches\n* **native** - `/api/v1/*`: catalog, pulls, cloud providers, stats, request traces, events, benchmark\n* **voices** - `/api/v1/voices`: saved voices for the models that clone voices (consent required)\n* **pipelines** - `/api/v1/pipelines` and `/v1/pipelines/{id}/run`: chains of steps, run at once or as jobs\n* WebSockets (not shown by OpenAPI): `/api/v1/stt/stream`, `/api/v1/tts/stream` - see docs/api.md\n",
   "license": {
    "name": "Apache-2.0",
    "url": "https://www.apache.org/licenses/LICENSE-2.0"
@@ -3718,6 +3718,531 @@
       "content": {
        "application/json": {
         "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/pipelines": {
+   "get": {
+    "tags": [
+     "pipelines"
+    ],
+    "summary": "List pipelines",
+    "operationId": "list_pipelines_api_v1_pipelines_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "pipelines"
+    ],
+    "summary": "Create a pipeline (JSON or YAML)",
+    "description": "The body is a pipeline definition (docs/pipelines.md), as JSON or YAML (``Content-Type: application/yaml``).\nThe definition is validated first: a 400 lists every problem (``validation.errors``). 409 when the id is taken.",
+    "operationId": "create_pipeline_api_v1_pipelines_post",
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/pipelines/validate": {
+   "post": {
+    "tags": [
+     "pipelines"
+    ],
+    "summary": "Validate a pipeline without saving it",
+    "description": "Always 200 for a readable body: ``valid``, ``errors`` and ``warnings`` (each with the ``path`` of the field),\nand ``steps``: each step's resolved model, inputs (with the defaults they take) and outputs.",
+    "operationId": "validate_pipeline_api_v1_pipelines_validate_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/pipelines/step-types": {
+   "get": {
+    "tags": [
+     "pipelines"
+    ],
+    "summary": "Step types with their inputs, options and outputs",
+    "operationId": "step_types_api_v1_pipelines_step_types_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/pipelines/templates": {
+   "get": {
+    "tags": [
+     "pipelines"
+    ],
+    "summary": "Ready-made pipelines",
+    "operationId": "templates_api_v1_pipelines_templates_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/pipelines/runs": {
+   "get": {
+    "tags": [
+     "pipelines"
+    ],
+    "summary": "Pipeline run history, newest first",
+    "operationId": "list_runs_api_v1_pipelines_runs_get",
+    "parameters": [
+     {
+      "name": "pipeline",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Pipeline"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "default": 50,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/pipelines/runs/{run_id}": {
+   "get": {
+    "tags": [
+     "pipelines"
+    ],
+    "summary": "One pipeline run",
+    "operationId": "get_run_api_v1_pipelines_runs__run_id__get",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Run Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/pipelines/runs/{run_id}/cancel": {
+   "post": {
+    "tags": [
+     "pipelines"
+    ],
+    "summary": "Stop a queued or running pipeline run",
+    "operationId": "cancel_run_api_v1_pipelines_runs__run_id__cancel_post",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Run Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/pipelines/runs/{run_id}/files/{name}": {
+   "get": {
+    "tags": [
+     "pipelines"
+    ],
+    "summary": "A file a pipeline run wrote",
+    "operationId": "run_file_api_v1_pipelines_runs__run_id__files__name__get",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Name"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/pipelines/{pipeline_id}": {
+   "get": {
+    "tags": [
+     "pipelines"
+    ],
+    "summary": "One pipeline (?version= for an older one)",
+    "operationId": "get_pipeline_api_v1_pipelines__pipeline_id__get",
+    "parameters": [
+     {
+      "name": "pipeline_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Pipeline Id"
+      }
+     },
+     {
+      "name": "version",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Version"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "pipelines"
+    ],
+    "summary": "Save a new version of a pipeline",
+    "operationId": "update_pipeline_api_v1_pipelines__pipeline_id__put",
+    "parameters": [
+     {
+      "name": "pipeline_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Pipeline Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "pipelines"
+    ],
+    "summary": "Delete a pipeline",
+    "operationId": "delete_pipeline_api_v1_pipelines__pipeline_id__delete",
+    "parameters": [
+     {
+      "name": "pipeline_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Pipeline Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/pipelines/{pipeline_id}/versions": {
+   "get": {
+    "tags": [
+     "pipelines"
+    ],
+    "summary": "A pipeline's versions",
+    "operationId": "get_versions_api_v1_pipelines__pipeline_id__versions_get",
+    "parameters": [
+     {
+      "name": "pipeline_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Pipeline Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/pipelines/run": {
+   "post": {
+    "tags": [
+     "pipelines"
+    ],
+    "summary": "Run a pipeline sent with the request (not saved)",
+    "description": "Multipart: ``pipeline`` (the definition, JSON or YAML) and the fields of ``POST /v1/pipelines/{id}/run``.",
+    "operationId": "run_adhoc_v1_pipelines_run_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/pipelines/{pipeline_id}/run": {
+   "post": {
+    "tags": [
+     "pipelines"
+    ],
+    "summary": "Run a saved pipeline",
+    "description": "Multipart: ``file`` (the recording) or ``url`` (fetched by the server), ``text`` (``input.text``), ``vars``\n(a JSON object), ``version`` (an older version), ``async`` (``true``: answer 202 at once with the queued run;\npoll ``GET /api/v1/pipelines/runs/{run_id}``) and ``callback_url`` (with ``async``: the finished run is POSTed\nthere, signed with ``X-Bolo-Signature``). The answer is the run: each step's model, status, time in ms and\noutputs, and the pipeline's ``outputs``. A step that fails stops the run (``status: error``) and keeps every\noutput made before it.",
+    "operationId": "run_pipeline_v1_pipelines__pipeline_id__run_post",
+    "parameters": [
+     {
+      "name": "pipeline_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Pipeline Id"
+      }
+     },
+     {
+      "name": "version",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Version"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
        }
       }
      }
