@@ -118,6 +118,10 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   Bedrock) and says what each needs.
 - **Every cloud entry names the environment variable of its key**: `provider.key_env` in `GET /api/v1/catalog`
   (`BOLO_PROVIDER_<NAME>_API_KEY`), and the cloud rows of docs/models.md.
+- **Paradee-8M** (`paradee-8m-onnx`, Apache-2.0): a 7.9 M-parameter student of Kokoro-82M with two American and two
+  British voices in one 8.5 MB int8 graph, in process on ONNX Runtime, phonemised like Kokoro (uccharan or espeak-ng).
+  0.084 of real time on a 4-vCPU Xeon with 2 threads; all four voices transcribed back word for word. A catalog voice
+  with a `language` of its own is now phonemised in that language, so the British voices read British English.
 
 ### Changed
 

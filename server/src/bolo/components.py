@@ -142,7 +142,7 @@ class ComponentManager:
     def phoneme_target(spec: ModelSpec, voice_id: str | None = None) -> tuple[str, str] | None:
         """``(profile, language)`` of a voice that reads phonemes, or None (characters or lexicon only)."""
         if spec.needs_phonemes:
-            return spec.phoneme_target()
+            return spec.phoneme_target(voice_id)
         if spec.kind == "kokoro" and spec.engine in ("sherpa-onnx", "mlx"):
             prefix = (voice_id or "a")[:1] if spec.options.get("multi_lang") else "a"
             language = KOKORO_LANGUAGES.get(prefix)

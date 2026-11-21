@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-537 models: 233 validated on CPU by the maintainers, 304 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+538 models: 234 validated on CPU by the maintainers, 304 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -774,6 +774,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `little-tts-onnx` | en | realtime | - | 25 MB | CC-BY-NC-4.0 ⚠ | **CPU** · RTF 0.025 · round-trip WER 0.0% |
+
+#### Paradee
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `paradee-8m-onnx` | en | realtime | - | 8 MB | Apache-2.0 · phonemes: uccharan | **CPU** · RTF 0.084 · round-trip WER 0.0% |
 
 ### Voice-activity detection
 
@@ -3065,6 +3071,14 @@ engine (which reads little-tts's flat `onnx/model.json` as well as tiny-voca's `
 phoneme table is not dizione's). Run on the 4-vCPU Xeon with 2 threads (2026-11-21): one sentence per voice came back
 as non-silent 24 kHz audio (median pitch 210 Hz for voice 92, 121 Hz for 6097) at 0.026 of real time, load 0.3 s, and
 faster-whisper-small transcribed both back word for word.
+
+**Paradee-8M in process** (`paradee-8m-onnx`, Sahil Mahendrakar, Apache-2.0): 7.9 M parameters distilled from
+Kokoro-82M, four voices in one int8 graph of 8.5 MB (af_heart, am_puck American; bf_isabella, bm_fable British). It
+reads Kokoro's phoneme ids, so bolo phonemises it as it does Kokoro (profile `kokoro`: uccharan's port of misaki, or
+espeak-ng), each voice in its own accent: a catalog voice with a `language` of its own now reads in that language.
+ONNX Runtime 1.32's extended graph fusions fail on this int8 graph with bolo's exact int8 products, so it loads with
+the basic ones. Run on the 4-vCPU Xeon with 2 threads (2026-11-21): one sentence per voice, 24 kHz, non-silent, all
+four transcribed back word for word by faster-whisper-small, at 0.084 of real time.
 
 **What was run**: `pocket-tts-en-llamacpp` on the upstream llama-server b12375
 release, started by bolo (`bolo components install llama-server`), on the

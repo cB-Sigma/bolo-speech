@@ -1975,3 +1975,52 @@
   voices:
   - {id: '92', name: 92 (female), language: en-US, gender: f}
   - {id: '6097', name: 6097 (male), language: en-US, gender: m}
+
+- id: paradee-8m-onnx
+  aliases: [paradee, sahilmahendrakar/Paradee-8M-v1.2]
+  task: tts
+  engine: onnxruntime
+  kind: paradee_onnx
+  family: Paradee
+  languages: [en]
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 8475304
+  params: 7880000
+  license: Apache-2.0
+  license_url: https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.2
+  commercial_use: true
+  description: 'Paradee-8M v1.2 (Sahil Mahendrakar, Apache-2.0): 7.9 M parameters distilled from Kokoro-82M, four voices
+    in one int8 graph of 8.5 MB, two American (af_heart, am_puck) and two British (bf_isabella, bm_fable), 24 kHz. ONNX
+    Runtime in process: no server, no PyTorch. It reads Kokoro''s phonemes, which bolo''s phonemiser gives (uccharan''s
+    port of misaki, the front end Kokoro was trained with): American English for the American voices, British for the
+    British ones. English only.'
+  source_url: https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.2
+  validated: cpu
+  measured:
+    rtf: 0.0839
+    round_trip_wer: 0.0
+    round_trip_stt: faster-whisper-small
+    audio_s: 5.9
+    load_s: 0.39
+    memory_mb: 368
+    threads: 2
+    engine: onnxruntime 1.32.0, phonemes from uccharan 0.6
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-21'
+    note: 'One English sentence in each of the four voices through bolo''s HTTP API, all transcribed back word for word
+      by faster-whisper-small; median pitch 202 Hz (af_heart, bf_isabella), 110 Hz (am_puck), 126 Hz (bm_fable). The
+      British voices got British phonemes ("bath" bˈɑːθ, "go" ɡˌQ). RTF from three repeats per voice in process.'
+  requires: [phonemizer]
+  source:
+    repo: sahilmahendrakar/Paradee-8M-v1.2
+    revision: ed2934d4df8a4fd891e29584c5e1104649409765
+    include: [onnx/paradee_int8.onnx, config.json, LICENSE]
+  options:
+    model: onnx/paradee_int8.onnx
+    config: config.json
+  voices:
+  - {id: af_heart, name: Heart (American, female), language: en-US, gender: f}
+  - {id: bf_isabella, name: Isabella (British, female), language: en-GB, gender: f}
+  - {id: am_puck, name: Puck (American, male), language: en-US, gender: m}
+  - {id: bm_fable, name: Fable (British, male), language: en-GB, gender: m}

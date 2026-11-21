@@ -66,7 +66,13 @@ INSTALL_HINT = (
 
 
 #: Output profile a voice family was trained on, by catalog ``kind``.
-PROFILE_BY_KIND = {"vits": "piper", "kokoro": "kokoro", "kitten": "kitten", "matcha": "matcha"}
+PROFILE_BY_KIND = {
+    "vits": "piper",
+    "kokoro": "kokoro",
+    "kitten": "kitten",
+    "matcha": "matcha",
+    "paradee_onnx": "kokoro",
+}
 
 #: The language tags uccharan 0.6 phonemises (``uccharan.LANGUAGES``). An older uccharan that lacks one of them is
 #: not used for it (:meth:`UccharanPhonemizer.supports`).

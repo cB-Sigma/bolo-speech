@@ -116,10 +116,17 @@ class ModelSpec:
         # "espeak-ng" is how entries written by bolo 0.1 (custom.yaml) say the same thing
         return "phonemizer" in self.requires or "espeak-ng" in self.requires
 
-    def phoneme_target(self) -> tuple[str, str]:
-        """``(profile, language)`` of a voice that reads phonemes, for choosing the phonemiser."""
+    def phoneme_target(self, voice_id: str | None = None) -> tuple[str, str]:
+        """``(profile, language)`` of a voice that reads phonemes, for choosing the phonemiser. A catalog voice
+        with a ``language`` of its own (Paradee's British voices next to its American ones) reads in that one."""
         from bolo.text.phonemize import PROFILE_BY_KIND
 
+        own = next(
+            (v.get("language") for v in self.voices if voice_id and str(v.get("id", "")).lower() == voice_id.lower()),
+            None,
+        )
+        if own:
+            return PROFILE_BY_KIND.get(self.kind, "piper"), str(own)
         language = str(self.options.get("espeak_voice") or self.options.get("language") or "")
         if not language and self.voices:
             language = str(self.voices[0].get("language", ""))
