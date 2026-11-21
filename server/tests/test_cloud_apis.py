@@ -511,8 +511,10 @@ def test_mai_voice(srv: LiveServer, http: FakeCloudHTTP) -> None:
     with sf.SoundFile(io.BytesIO(r.content)) as f:
         seconds = len(f) / f.samplerate
     assert seconds == pytest.approx(0.05 * len(call["text"]), rel=0.1)  # the MP3 was decoded whole
-    # the default voice, the long-form model, text that needs escaping in SSML
-    r = httpx.post(f"{srv.url}/v1/audio/speech", json={"model": "mai-voice-2.1", "input": "Fish & chips <now>."},
+    # the default voice, the long-form model, text that needs escaping in SSML. normalize "none": the text reaches
+    # the provider as written (with uccharan installed, bolo's default normaliser would say "&" as "and")
+    r = httpx.post(f"{srv.url}/v1/audio/speech",
+                   json={"model": "mai-voice-2.1", "input": "Fish & chips <now>.", "normalize": "none"},
                    timeout=60)  # fmt: skip
     assert r.status_code == 200, r.text
     call = http.last("/cognitiveservices/v1", "POST")

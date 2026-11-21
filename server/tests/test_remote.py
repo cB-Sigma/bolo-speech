@@ -837,19 +837,20 @@ def test_fallback_from_cloud_to_local_and_back(settings: Settings, cloud: FakePr
 
 # -- the providers API --------------------------------------------------------------------------------------------
 def test_providers_api(settings: Settings, cloud: FakeProviders) -> None:
+    web = httpx.Client(timeout=60.0)  # the default 5 s is too short on a busy machine
     settings.providers = {"sarvam": {"base_url": cloud.url, "api_key": KEY}}
     server = LiveServer(settings)
     server.start()
     api = f"{server.url}/api/v1/providers"
     try:
-        listing = httpx.get(api).json()
+        listing = web.get(api).json()
         assert listing["editable"] is True and listing["kinds"][0]["kind"] == "openai-compatible"
         assert listing["providers"][0]["source"] == "settings" and listing["providers"][0]["editable"] is False
-        assert httpx.get(f"{server.url}/api/v1/catalog").json()["models"] and listing["notice"].startswith(
+        assert web.get(f"{server.url}/api/v1/catalog").json()["models"] and listing["notice"].startswith(
             "paid cloud API"
         )
         # add: the key goes in, and never comes back
-        r = httpx.put(f"{api}/openai", json={"base_url": cloud.url + "/v1", "api_key": KEY, "prices": PRICES})
+        r = web.put(f"{api}/openai", json={"base_url": cloud.url + "/v1", "api_key": KEY, "prices": PRICES})
         assert r.status_code == 200, r.text
         assert r.json() == {
             "name": "openai", "kind": "openai-compatible", "base_url": cloud.url + "/v1", "configured": True,
@@ -860,36 +861,37 @@ def test_providers_api(settings: Settings, cloud: FakeProviders) -> None:
         assert json.loads(stored.read_text(encoding="utf-8"))["openai"]["api_key"] == KEY
         # owner-only on POSIX; Windows has no mode bits (the file inherits the folder's ACL, the user's profile)
         assert sys.platform == "win32" or stat.S_IMODE(stored.stat().st_mode) == 0o600
-        assert KEY not in httpx.get(api).text and KEY not in httpx.get(f"{api}/openai").text
-        assert httpx.get(f"{server.url}/api/v1/info").json()["providers"] == [
+        assert KEY not in web.get(api).text and KEY not in web.get(f"{api}/openai").text
+        assert web.get(f"{server.url}/api/v1/info").json()["providers"] == [
             {"name": "sarvam", "kind": "sarvam", "configured": True},
             {"name": "openai", "kind": "openai-compatible", "configured": True},
         ]
         # test: one cheap request with the stored key
-        test = httpx.post(f"{api}/openai/test").json()
+        test = web.post(f"{api}/openai/test").json()
         assert test["ok"] is True and test["checked"] == "credentials" and "2 models" in test["message"]
         assert cloud.last("/v1/models")["headers"]["Authorization"] == f"Bearer {KEY}"
-        assert httpx.post(f"{api}/sarvam/test").json()["checked"] == "reachability"
+        assert web.post(f"{api}/sarvam/test").json()["checked"] == "reachability"
         assert transcribe(server, "openai-whisper-1").status_code == 200
         # edit without a key keeps the key; the loaded model is dropped so the change takes effect
-        r = httpx.put(f"{api}/openai", json={"options": {"timeout_s": 30}})
+        r = web.put(f"{api}/openai", json={"options": {"timeout_s": 30}})
         assert r.json()["api_key_set"] is True and r.json()["options"] == {"timeout_s": 30}
         assert r.json()["base_url"] == cloud.url + "/v1"
-        assert httpx.get(f"{server.url}/api/v1/models/openai-whisper-1").json()["loaded"] is False
+        assert web.get(f"{server.url}/api/v1/models/openai-whisper-1").json()["loaded"] is False
         assert transcribe(server, "openai-whisper-1").status_code == 200
-        r = httpx.put(f"{api}/openai", json={"clear_api_key": True})
+        r = web.put(f"{api}/openai", json={"clear_api_key": True})
         assert r.json()["api_key_set"] is False
         assert transcribe(server, "openai-whisper-1").status_code in (200, 502)  # a keyless self-hosted address
         # what the API refuses
-        assert httpx.put(f"{api}/sarvam", json={"api_key": "x"}).status_code == 400  # from the configuration
-        assert httpx.put(f"{api}/new", json={"kind": "nope"}).status_code == 400
-        assert httpx.put(f"{api}/new", json={"kind": "sarvam", "surprise": 1}).status_code == 400
-        assert httpx.delete(f"{api}/sarvam").status_code == 400 and httpx.delete(f"{api}/ghost").status_code == 404
-        assert httpx.post(f"{api}/ghost/test").status_code == 404
-        assert httpx.delete(f"{api}/openai").status_code == 204
+        assert web.put(f"{api}/sarvam", json={"api_key": "x"}).status_code == 400  # from the configuration
+        assert web.put(f"{api}/new", json={"kind": "nope"}).status_code == 400
+        assert web.put(f"{api}/new", json={"kind": "sarvam", "surprise": 1}).status_code == 400
+        assert web.delete(f"{api}/sarvam").status_code == 400 and web.delete(f"{api}/ghost").status_code == 404
+        assert web.post(f"{api}/ghost/test").status_code == 404
+        assert web.delete(f"{api}/openai").status_code == 204
         assert "openai" not in json.loads(stored.read_text(encoding="utf-8"))
-        assert httpx.get(f"{server.url}/api/v1/models/openai-whisper-1").json()["installed"] is False
+        assert web.get(f"{server.url}/api/v1/models/openai-whisper-1").json()["installed"] is False
     finally:
+        web.close()
         server.stop()
     # a stored provider is there again after a restart
     settings.providers = {}
