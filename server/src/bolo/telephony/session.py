@@ -246,6 +246,9 @@ class CallSession:
             config["pipeline"] = agent.pipeline
         if agent.pipeline_id:
             config["pipeline_id"] = agent.pipeline_id
+        if agent.decisions:
+            config["decisions"] = agent.decisions
+        rt.decision_webhook_url = agent.decision_webhook_url
         try:
             rt.configure(config)
         except (RealtimeError, BoloError) as exc:
@@ -442,6 +445,10 @@ class CallSession:
                     heard.status = "no_speech"
             if text:
                 record.say("caller", text)
+        elif kind == "conversation.item.decisions.completed":
+            self._on_decisions(event)
+        elif kind == "conversation.item.decisions.failed":
+            record.event("decisions_failed", message=str((event.get("error") or {}).get("message") or "failed"))
         elif kind == "conversation.item.input_audio_transcription.failed":
             record.event("error", message=str((event.get("error") or {}).get("message") or "transcription failed"))
         elif kind == "response.created":
@@ -576,6 +583,47 @@ class CallSession:
                 await rt.handle({"type": "response.create"})
         finally:
             self._busy -= 1
+
+    def _on_decisions(self, event: dict[str, Any]) -> None:
+        """The answers of the agent's decision questions about a caller turn (bolo.decision_hook): on the record,
+        tags added, and the first ``end_call`` or ``transfer`` rule that matched carried out."""
+        record, agent = self.record, self.agent
+        assert record is not None and agent is not None
+        actions = [a for a in event.get("actions") or [] if isinstance(a, dict)]
+        record.event("decisions", answers=event.get("answers"), actions=actions)
+        tags = record.metadata.setdefault("tags", [])
+        for a in actions:
+            if a.get("do") == "tag" and a.get("value") and a["value"] not in tags:
+                tags.append(str(a["value"]))
+        if self._ending or self._finalized:
+            return
+        for a in actions:
+            if a.get("do") == "end_call":
+                self._ending = True
+                self._spawn(self._decided_end(), "decision-end")
+                return
+            if a.get("do") == "transfer":
+                number = str(a.get("value") or agent.transfer_number or "")
+                if not number or not self.adapter.can_transfer:
+                    record.event("error", message="a decision asked for a transfer, but this line cannot transfer")
+                    continue
+                self._ending = True
+                self._spawn(self._decided_transfer(number), "decision-transfer")
+                return
+
+    async def _decided_end(self) -> None:
+        agent = self.agent
+        if agent is not None and agent.goodbye:
+            await self.say(agent.goodbye, kind="goodbye", interruptible=False)
+        await self._drain()
+        await self.end("decision_end")
+
+    async def _decided_transfer(self, number: str) -> None:
+        agent = self.agent
+        if agent is not None and agent.transfer_message:
+            await self.say(agent.transfer_message, kind="transfer_message", interruptible=False)
+        await self._drain()
+        await self.transfer(number)
 
     async def _call_tool(self, name: str, arguments: str) -> str:
         agent, record = self.agent, self.record

@@ -1,4 +1,5 @@
 import type { CallTurn, PhoneAgent, PhoneAgentUpdate, TelephonyProvider } from './api/types'
+import { hookConfig, hookForm, type HookForm } from './decisions'
 
 export const DOCS_TELEPHONY = 'https://github.com/cB-Sigma/bolo-speech/blob/main/docs/telephony.md'
 export const AGENT_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,39}$/
@@ -6,6 +7,7 @@ export const AGENT_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,39}$/
 export const OUTCOME_LABEL: Record<string, string> = {
   caller_hangup: 'Caller hung up',
   agent_hangup: 'Agent hung up',
+  decision_end: 'Ended by a decision rule',
   transferred: 'Transferred',
   max_duration: 'Reached the longest call length',
   no_response: 'Caller went silent',
@@ -75,6 +77,8 @@ export interface AgentForm {
   voicemail: string
   voicemailMessage: string
   tools: string
+  decisions: HookForm
+  decisionWebhookUrl: string
 }
 
 export function agentForm(agent: PhoneAgent | null): AgentForm {
@@ -101,6 +105,8 @@ export function agentForm(agent: PhoneAgent | null): AgentForm {
     voicemail: agent?.voicemail ?? 'hangup',
     voicemailMessage: agent?.voicemail_message ?? '',
     tools: agent?.tools.length ? JSON.stringify(agent.tools, null, 2) : '',
+    decisions: hookForm(agent?.decisions as Parameters<typeof hookForm>[0]),
+    decisionWebhookUrl: agent?.decision_webhook_url ?? '',
   }
 }
 
@@ -153,6 +159,17 @@ export function agentUpdate(form: AgentForm): { body: PhoneAgentUpdate; problem:
     } catch {
       problem ??= 'Tools are not valid JSON.'
     }
+  }
+  const decisions = hookConfig(form.decisions)
+  if (typeof decisions === 'string') problem ??= `Live decisions: ${decisions}`
+  else body.decisions = decisions
+  body.decision_webhook_url = text(form.decisionWebhookUrl)
+  if (body.decision_webhook_url && !/^https?:\/\//.test(body.decision_webhook_url))
+    problem ??= 'The decision webhook must be an http:// or https:// address.'
+  if (decisions && typeof decisions !== 'string') {
+    const rules = (decisions.actions ?? []) as { do: string; value?: string }[]
+    if (rules.some((r) => r.do === 'transfer' && !r.value) && !body.transfer_number)
+      problem ??= "A transfer rule needs a number, or the agent's transfer number."
   }
   return { body, problem }
 }

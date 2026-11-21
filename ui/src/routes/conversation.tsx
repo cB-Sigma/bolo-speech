@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Info, MessagesSquare, Mic, MicOff, PhoneOff, Square } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 import { BrowserConversation } from '@/components/conversation/browser-conversation'
 import { CaptureControl } from '@/components/conversation/capture-control'
 import { PipelineModelPanel } from '@/components/conversation/pipeline-model'
@@ -8,6 +9,7 @@ import { PipelinePicker } from '@/components/conversation/pipeline-picker'
 import { ServerListeningPanel } from '@/components/conversation/server-listening'
 import { defaultEcho, EchoControl, realtimeEcho, type Echo } from '@/components/conversation/echo-control'
 import { AgentToolsPanel, mcpTools, noMcp, type McpChoice } from '@/components/conversation/agent-tools'
+import { HookEditor } from '@/components/decisions/hook-editor'
 import { NeedsServer } from '@/components/demo'
 import { Page } from '@/components/layout/app-shell'
 import { Empty, Panel } from '@/components/panel'
@@ -24,7 +26,15 @@ import { useSupport } from '@/hooks/use-support'
 import { api } from '@/lib/api/client'
 import { isDemo } from '@/lib/api/config'
 import { BROWSER_PROCESSING, type CaptureProcessing } from '@/lib/audio/capture'
-import { defaultPipeline, hasPipelines, pipelineOptions, pipelinesOffered, type PipelineId } from '@/lib/capabilities'
+import {
+  decisionsOffered,
+  defaultPipeline,
+  hasPipelines,
+  pipelineOptions,
+  pipelinesOffered,
+  type PipelineId,
+} from '@/lib/capabilities'
+import { answerText, emptyHook, hookConfig, type HookForm } from '@/lib/decisions'
 import { fmtMs } from '@/lib/format'
 import {
   ConversationSession,
@@ -72,6 +82,8 @@ function ServerConversation() {
   const [echo, setEcho] = useState<Echo>(defaultEcho)
   const [capture, setCapture] = useState<CaptureProcessing>(BROWSER_PROCESSING)
   const [behaviour, setBehaviour] = useState<string>('')
+  const [hook, setHook] = useState<HookForm>(emptyHook)
+  const decisionsOn = decisionsOffered(info.data)
   const [session, setSession] = useState<ConversationSession | null>(null)
   const state = useStore(session?.store ?? idle)
   const active = state.status === 'starting' || state.status === 'live'
@@ -94,7 +106,13 @@ function ServerConversation() {
 
   const start = () => {
     // Everything that needs the tap happens inside start(): the microphone prompt first.
+    const decisions = decisionsOn ? hookConfig(hook) : null
+    if (typeof decisions === 'string') {
+      toast.error('The live decisions are not complete', { description: decisions })
+      return
+    }
     const s = new ConversationSession(pipeline, transport, realtimeDenoise(denoise), {
+      decisions: decisions ?? undefined,
       listening,
       fullDuplex,
       tools: pipeline === 'speech-to-speech' ? [] : mcpTools(mcp),
@@ -351,6 +369,37 @@ function ServerConversation() {
               state={state}
               onApprove={(id, approve) => session?.answerApproval(id, approve)}
             />
+          )}
+          {decisionsOn && (
+            <Panel
+              title="Live decisions"
+              description="Questions a decision model answers after each of your turns (session.decisions)"
+              bodyClassName="grid gap-3"
+              data-testid="live-decisions"
+            >
+              <HookEditor value={hook} onChange={setHook} disabled={active} />
+              {state.decisions.length > 0 && (
+                <ol className="grid gap-2 text-[13px]" data-testid="live-decision-answers">
+                  {state.decisions
+                    .slice(-3)
+                    .reverse()
+                    .map((d) => (
+                      <li key={d.itemId} className="grid gap-0.5">
+                        {Object.entries(d.answers).map(([id, a]) => (
+                          <span key={id}>
+                            <span className="text-muted-foreground">{id}:</span> {answerText(a)}
+                          </span>
+                        ))}
+                        {d.actions.length > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            rules matched: {d.actions.map((a) => a.do + (a.value ? ` ${a.value}` : '')).join(', ')}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                </ol>
+              )}
+            </Panel>
           )}
           <Panel title="About the pipelines" bodyClassName="grid gap-2.5 text-[13px] leading-5 text-muted-foreground">
             <p>

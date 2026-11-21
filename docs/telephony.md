@@ -175,6 +175,8 @@ in `<data_dir>/telephony.json`, mode 0600).
 | `voicemail` | `hangup` | outbound calls answered by a machine: `hangup`, `leave_message` (says `voicemail_message`) or `ignore` (no detection) |
 | `dtmf` | `message` | key presses are given to the agent as a user message; `ignore` only records them |
 | `summary` | `true` | write a summary with the language model when the call ends |
+| `decisions` | none | questions asked after every caller turn, and rules that end, transfer or tag the call: see "Live decisions" below |
+| `decision_webhook_url` | the setting `decision_webhook_url` | where those answers are POSTed |
 
 **Tools.** Two are built in and offered to the language model on every call:
 `hang_up` (ends the call once what the agent said has been played) and, when
@@ -198,6 +200,41 @@ to the URL (10 s timeout, `timeout_s` to change it) and gives the response
 body to the model as the tool's output; the model then answers the caller.
 The URL is never shown to the model. A tool without a `url` answers "not
 available".
+
+### Live decisions
+
+An agent can ask a decision model (docs/api.md, "Decisions") questions after every caller turn, and act on the
+answers without waiting for the language model: escalate to a person, send the call to a department, mark it for
+review. The questions run in the background on the turn's transcript and audio, so the agent's answer is not held
+up.
+
+```toml
+[telephony.agents.front-desk.decisions]
+model = "d1-omni-600m-llamacpp"            # default: default_decision
+audio = true                               # also send the turn's audio (default)
+questions.escalate = { type = "yes_no", question = "Does the caller ask to speak to a person?" }
+questions.department = { type = "choice", question = "Which department is it for?", options = ["billing", "technical", "sales"] }
+actions = [
+  { question = "escalate", answer = true, min_probability = 0.8, do = "transfer" },
+  { question = "department", answer = "billing", do = "tag", value = "billing" },
+]
+```
+
+A rule matches when its question's answer is `answer` (yes_no: true or false; choice: an option; score: a level's
+label or index), if given, with at least `min_probability` for that answer, if given (`min_score` asks a score
+question for at least that expected level). What it does:
+
+* `transfer`: to the rule's `value` or the agent's `transfer_number` (`transfer_message` is said first); the outcome
+  is `transferred`;
+* `end_call`: `goodbye` is said and the call ends with the outcome `decision_end`;
+* `tag`: the rule's `value` goes into the record's `metadata.tags`;
+* `notify`: nothing on the call; the rule is listed in the event and the webhook.
+
+The first `transfer` or `end_call` that matches is carried out, once. Every turn's answers are on the record's
+timeline (`decisions`, with the answers and the rules that matched) and are POSTed to the agent's
+`decision_webhook_url` or the server's, signed like pipeline webhooks (`X-Bolo-Signature` with `webhook_secret`,
+`X-Bolo-Event: decisions`; docs/pipelines.md, "Webhooks and signatures"). The same hook works in any Realtime session (voice-agents.md,
+"Live decisions"), where the client receives the answers as events.
 
 ## Numbers
 
@@ -446,7 +483,7 @@ the path.
 
 **Outcomes:** `caller_hangup`, `agent_hangup`, `transferred`, `max_duration`,
 `no_response`, `voicemail`, `no_answer`, `busy`, `failed`, `canceled`,
-`error`.
+`error`, `decision_end` (a decision rule ended the call, see "Live decisions").
 
 **Summary:** when a language model is configured and the agent's `summary`
 is on, the transcript is summarised once the call ends (`summary`, or

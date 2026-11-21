@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { useId, useState } from 'react'
 import { toast } from 'sonner'
+import { HookEditor } from '@/components/decisions/hook-editor'
 import { NeedsServer } from '@/components/demo'
 import { Page } from '@/components/layout/app-shell'
 import { Empty, ErrorState, Panel } from '@/components/panel'
@@ -39,7 +40,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { describeError, useCall, useCalls, useInfo, useTelephony } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { isDemo } from '@/lib/api/config'
-import { pipelinesOffered } from '@/lib/capabilities'
+import { decisionsOffered, pipelinesOffered } from '@/lib/capabilities'
 import type {
   CallRecord,
   CallSummary,
@@ -167,6 +168,7 @@ function AgentDialog({
   onClose: () => void
 }) {
   const qc = useQueryClient()
+  const info = useInfo()
   const [form, setForm] = useState<AgentForm>(() => agentForm(existing))
   const [saving, setSaving] = useState(false)
   const set = <K extends keyof AgentForm>(key: K, value: AgentForm[K]) => setForm((f) => ({ ...f, [key]: value }))
@@ -178,7 +180,7 @@ function AgentDialog({
         ? 'An agent with this name exists.'
         : null
   const { body, problem } = agentUpdate(form)
-  const textInput = (key: keyof AgentForm, placeholder?: string) => (id: string) => (
+  const textInput = (key: Exclude<keyof AgentForm, 'decisions'>, placeholder?: string) => (id: string) => (
     <Input id={id} value={form[key]} placeholder={placeholder} onChange={(e) => set(key, e.target.value)} />
   )
 
@@ -314,6 +316,17 @@ function AgentDialog({
               )}
             </Field>
           </div>
+          {decisionsOffered(info.data) && (
+            <div className="grid gap-2 sm:col-span-2" data-testid="agent-decisions">
+              <span className="text-xs font-medium">Live decisions</span>
+              <HookEditor value={form.decisions} onChange={(v) => set('decisions', v)} call testId="agent-hook" />
+              {form.decisions.enabled && (
+                <Field label="Webhook for the answers" hint="Left empty: the server's decision_webhook_url.">
+                  {textInput('decisionWebhookUrl', 'https://example.org/bolo/decisions')}
+                </Field>
+              )}
+            </div>
+          )}
         </div>
         {problem && (
           <p className="text-xs text-critical-text" role="alert">

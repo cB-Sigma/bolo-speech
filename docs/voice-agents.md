@@ -148,7 +148,7 @@ WebSocket subprotocols `realtime` and `openai-insecure-api-key.<key>`.
 
 | Client event | Behaviour |
 | --- | --- |
-| `session.update` | `type` (`realtime` \| `transcription`), `instructions`, `output_modalities` (`["audio"]` or `["text"]`), `audio.input.format` / `audio.output.format` (`audio/pcm` at 24 kHz, `audio/pcmu`, `audio/pcma`), `audio.input.transcription` (`model`, `language`, `prompt`; bolo extensions: `hotwords`, names and terms to favour, whose near-misses in the transcripts are spelt their way unless `hotword_spelling` is `false`, see api.md), `audio.input.noise_reduction` (`{"type": "near_field"}` or `"far_field"`: the default denoiser before transcription; `null`: the server's default; see below), `audio.input.denoise` (bolo extension: `true`, `false`, a strength between 0 and 1, a model id, or `{"model", "strength"}`; wins over `noise_reduction`), `audio.input.echo_cancellation` (bolo extension: `true`, `false`, a model id or `{"model", "delay_ms"}`; see "Echo cancellation" below), `audio.input.turn_detection` (`server_vad` with `threshold`, `silence_duration_ms`, `prefix_padding_ms`, `create_response`, `interrupt_response`; `semantic_vad` with `eagerness`, see below; or `null`; bolo extensions in either: `vad_model`, the voice-activity detector of the session, any `vad` model, default `default_vad`; `turn_model`, the end-of-turn model `semantic_vad` asks, any `turn` model, default `default_turn`; `max_turn_seconds` and `noise_plateau_ms`, which end a turn a steady noise keeps open (see "Turns that never end" below; 0: off); `barge_in_threshold`, the lower voice-activity threshold that may start a turn while the agent's audio is playing (default the `barge_in_threshold` setting, 0.3; 0: off; see "Interrupting the agent in a browser"); a model named in either is pulled on first use with `auto_pull`, as anywhere else, and never replaced by another: when it cannot be used (its engine is missing, or it is not installed and `auto_pull` is off) `session.update` answers with an `error` naming the parameter, with the code and message loading the model gives), `audio.output.voice`, `audio.output.speed`, `tools` (functions, and MCP servers: below), `tool_choice`, `max_output_tokens` |
+| `session.update` | `type` (`realtime` \| `transcription`), `instructions`, `output_modalities` (`["audio"]` or `["text"]`), `audio.input.format` / `audio.output.format` (`audio/pcm` at 24 kHz, `audio/pcmu`, `audio/pcma`), `audio.input.transcription` (`model`, `language`, `prompt`; bolo extensions: `hotwords`, names and terms to favour, whose near-misses in the transcripts are spelt their way unless `hotword_spelling` is `false`, see api.md), `audio.input.noise_reduction` (`{"type": "near_field"}` or `"far_field"`: the default denoiser before transcription; `null`: the server's default; see below), `audio.input.denoise` (bolo extension: `true`, `false`, a strength between 0 and 1, a model id, or `{"model", "strength"}`; wins over `noise_reduction`), `audio.input.echo_cancellation` (bolo extension: `true`, `false`, a model id or `{"model", "delay_ms"}`; see "Echo cancellation" below), `audio.input.turn_detection` (`server_vad` with `threshold`, `silence_duration_ms`, `prefix_padding_ms`, `create_response`, `interrupt_response`; `semantic_vad` with `eagerness`, see below; or `null`; bolo extensions in either: `vad_model`, the voice-activity detector of the session, any `vad` model, default `default_vad`; `turn_model`, the end-of-turn model `semantic_vad` asks, any `turn` model, default `default_turn`; `max_turn_seconds` and `noise_plateau_ms`, which end a turn a steady noise keeps open (see "Turns that never end" below; 0: off); `barge_in_threshold`, the lower voice-activity threshold that may start a turn while the agent's audio is playing (default the `barge_in_threshold` setting, 0.3; 0: off; see "Interrupting the agent in a browser"); a model named in either is pulled on first use with `auto_pull`, as anywhere else, and never replaced by another: when it cannot be used (its engine is missing, or it is not installed and `auto_pull` is off) `session.update` answers with an `error` naming the parameter, with the code and message loading the model gives), `audio.output.voice`, `audio.output.speed`, `tools` (functions, and MCP servers: below), `tool_choice`, `max_output_tokens`, `decisions` (bolo extension: questions asked after every user turn, see "Live decisions" below) |
 | `input_audio_buffer.append` / `.commit` / `.clear` | base64 audio in the session's input format; manual commit when turn detection is off |
 | `conversation.item.create` | user/assistant/system messages (`input_text`, `input_audio` with base64 audio that is transcribed, `output_text`), `function_call`, `function_call_output` |
 | `conversation.item.delete` / `.retrieve` / `.truncate` | `truncate` cuts an assistant message's transcript to the sentences that had started playing before `audio_end_ms`, so the model does not "remember" words the user never heard |
@@ -520,6 +520,33 @@ the voice reach the model only when its session opens (the first turn);
 voice names are not sent (LFM3's voices are `female` and `male`); upstream
 token usage is output tokens only. Tested against a scripted fake
 llama-server, **not against a real LFM3-Audio model.**
+
+### Live decisions
+
+`session.decisions` (bolo extension) asks a decision model named questions after every user turn: yes/no, a choice
+or a score, about the turn's transcript and audio (docs/api.md, "Decisions"). They run in the background, so the
+answer to the user is not held up, and the answers arrive as an event of their own:
+
+```jsonc
+// session.update
+{"type": "session.update", "session": {"decisions": {
+  "model": "d1-omni-600m-llamacpp",
+  "questions": {"escalate": {"type": "yes_no", "question": "Does the user ask for a person?"},
+                "topic": {"type": "choice", "question": "What is it about?", "options": ["billing", "technical"]}},
+  "actions": [{"question": "escalate", "answer": true, "min_probability": 0.8, "do": "notify"}]}}}
+// after each user turn, once its transcript is final
+{"type": "conversation.item.decisions.completed", "item_id": "item_...", "model": "d1-omni-600m-llamacpp",
+ "answers": {"escalate": {"type": "yes_no", "answer": true, "probability": 0.93},
+             "topic": {"type": "choice", "answer": "billing", "confidence": 0.9, "probabilities": {...}}},
+ "actions": [{"question": "escalate", "answer": true, "min_probability": 0.8, "do": "notify"}]}
+```
+
+`conversation.item.decisions.failed` carries an `error` instead. `actions` lists the rules that matched; in a
+Realtime session bolo carries out `tag` (the session's traces get `tags`) and reports the others for the client to
+act on; on a phone call `transfer` and `end_call` move the call (telephony.md, "Live decisions"). The answers are
+also POSTed to the server's `decision_webhook_url`, if set (a client cannot choose where). `null` turns the hook off.
+Live decisions never answer the user; a live pipeline (`session.pipeline_id`, docs/pipelines.md) does, and its
+`decision` steps use the same models. The two can run in one session.
 
 ### Echo cancellation
 

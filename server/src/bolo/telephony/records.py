@@ -23,7 +23,7 @@ from typing import Any
 
 OUTCOMES = (
     "caller_hangup", "agent_hangup", "transferred", "max_duration", "no_response", "voicemail", "no_answer",
-    "busy", "failed", "canceled", "error",
+    "busy", "failed", "canceled", "error", "decision_end",
 )  # fmt: skip
 #: the pieces of a turn's latency, in the order they happen
 LATENCY_PARTS = ("endpoint_ms", "stt_ms", "llm_first_token_ms", "tts_first_audio_ms", "send_ms")

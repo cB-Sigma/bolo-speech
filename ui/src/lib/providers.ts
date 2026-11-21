@@ -12,6 +12,7 @@ export const PROVIDER_KIND_LABEL: Record<string, string> = {
   xai: 'xAI',
   rime: 'Rime',
   bedrock: 'Amazon Bedrock',
+  gemini: 'Google Gemini',
 }
 
 export const PROVIDER_KIND_NOTE: Record<string, string> = {
@@ -27,6 +28,8 @@ export const PROVIDER_KIND_NOTE: Record<string, string> = {
   rime: 'Prism for speech-to-speech sessions (s2s_model).',
   bedrock:
     'Nova 2.5 Sonic for speech-to-speech sessions (s2s_model). The key is <access key id>:<secret access key>; needs bolo-speech[nova].',
+  gemini:
+    'Gemini Decision 1: typed answers (yes/no, a choice, a score) about a recording or a text, on the Decisions page.',
 }
 
 export const PROVIDER_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,39}$/

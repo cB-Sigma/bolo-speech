@@ -1236,6 +1236,9 @@ export interface PhoneAgent {
   dtmf: 'message' | 'ignore' | string
   summary: boolean
   turn_detection: Record<string, unknown> | null
+  /** Live decisions after every caller turn (bolo.decision_hook); null: none. */
+  decisions?: Record<string, unknown> | null
+  decision_webhook_url?: string | null
   source: 'settings' | 'stored' | string
   editable: boolean
 }

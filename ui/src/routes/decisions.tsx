@@ -11,51 +11,18 @@ import { Textarea } from '@/components/ui/textarea'
 import { ClipSlot, type Clip } from '@/components/voices/voice-compare'
 import { describeError, useInfo, useModels } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
-import type { AudioDecision, DecisionAnswer, DecisionQuestion } from '@/lib/api/types'
+import type { AudioDecision } from '@/lib/api/types'
 import { autoPull } from '@/lib/capabilities'
+import {
+  answerText,
+  buildQuestions,
+  confidence,
+  KIND_LABEL,
+  type DecisionKind,
+  type DraftQuestion,
+} from '@/lib/decisions'
 
-type Kind = DecisionQuestion['type']
-
-/** One question as typed on the page: the answers are one per line (options of a choice, levels of a score). */
-export interface DraftQuestion {
-  type: Kind
-  question: string
-  answers: string
-}
-
-const KIND_LABEL: Record<Kind, string> = { yes_no: 'Yes or no', choice: 'One of these', score: 'A level on a scale' }
-
-/** The page's questions as the request's `questions` (ids q1, q2, ...); an error message when one is incomplete. */
-export function buildQuestions(drafts: DraftQuestion[]): Record<string, DecisionQuestion> | string {
-  const out: Record<string, DecisionQuestion> = {}
-  for (const [i, d] of drafts.entries()) {
-    const question = d.question.trim()
-    if (!question) return `Question ${i + 1} is empty`
-    const lines = d.answers
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean)
-    if (d.type === 'yes_no') out[`q${i + 1}`] = { type: 'yes_no', question }
-    else if (lines.length < 2)
-      return `Question ${i + 1} needs at least two ${d.type === 'choice' ? 'options' : 'levels'}`
-    else if (d.type === 'choice') out[`q${i + 1}`] = { type: 'choice', question, options: lines }
-    else if (lines.length > 10) return `Question ${i + 1}: a scale has at most 10 levels`
-    else out[`q${i + 1}`] = { type: 'score', question, levels: lines }
-  }
-  return out
-}
-
-/** "yes (0.93)", "billing (0.98)", "Today (level 1.2 of 0–2)". */
-export function answerText(a: DecisionAnswer): string {
-  if (a.type === 'yes_no') return `${a.answer ? 'yes' : 'no'} (probability of yes ${a.probability.toFixed(2)})`
-  if (a.type === 'choice') return `${a.answer} (${(a.probabilities[a.answer] ?? 0).toFixed(2)})`
-  return `${a.label} (level ${a.score.toFixed(2)} of 0–${a.probabilities.length - 1})`
-}
-
-function confidence(a: DecisionAnswer): number {
-  if (a.type === 'yes_no') return Math.abs(a.probability - 0.5) * 2
-  return a.confidence
-}
+type Kind = DecisionKind
 
 /** Typed questions about a recording or a text (`POST /v1/audio/decisions`), with any decision model. */
 export default function DecisionsPage() {

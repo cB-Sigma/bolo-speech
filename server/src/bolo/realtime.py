@@ -56,6 +56,7 @@ from bolo.agents import speak_stream
 from bolo.audio.codecs import alaw_decode, alaw_encode, float_to_pcm16, mulaw_decode, mulaw_encode, pcm16_to_float
 from bolo.audio.encode import encode_audio
 from bolo.audio.resample import StreamResampler, resample
+from bolo.decision_hook import Hook, evaluate, event_fields, parse_hook, spawn_webhook
 from bolo.denoise import DenoiseOptions, parse_denoise
 from bolo.echo import EchoCanceller, EchoCancellerModel, EchoOptions, parse_echo
 from bolo.engines.base import FloatArray, VadDetector, VadParams
@@ -206,6 +207,14 @@ class RealtimeSession:
         self.pipeline_id: str | None = None
         self.live_pipeline: dict[str, Any] | None = None
         self._live_turns = 0
+        #: session.decisions (bolo extension, bolo.decision_hook): questions asked after every user turn
+        self.decisions: Hook | None = None
+        self._decision_tasks: set[asyncio.Task[None]] = set()
+        #: where this session's decision answers are POSTed instead of decision_webhook_url (a phone agent's URL;
+        #: set by the server, never by a client)
+        self.decision_webhook_url: str | None = None
+        #: tags the decision rules added (also in every trace of the session)
+        self.tags: list[str] = []
         self.in_codec, self.in_rate, self.in_format = _format(None, "")
         self.out_codec, self.out_rate, self.out_format = _format(None, "")
         self.transcription: dict[str, Any] = {"model": s.default_realtime_stt, "language": None, "prompt": None}
@@ -313,6 +322,7 @@ class RealtimeSession:
                 "object": "realtime.transcription_session",
                 "audio": {"input": audio_in},
                 "include": [],
+                "decisions": self.decisions.to_dict() if self.decisions is not None else None,  # bolo extension
             }
         return {
             "type": "realtime",
@@ -340,6 +350,7 @@ class RealtimeSession:
             # bolo extension: the speech-to-speech model hears and speaks at once (no turns; bolo.duplex.bridge)
             "full_duplex": self.full_duplex,
             "duplex": self.duplex_options,
+            "decisions": self.decisions.to_dict() if self.decisions is not None else None,  # bolo extension
         }
 
     async def start(self) -> None:
@@ -358,7 +369,7 @@ class RealtimeSession:
                 self.core.pipelines.triggers.session_ended(
                     {"id": self.id, "transport": self.transport, **self.trace_extra}, self.transcript_text()
                 )
-        for task in (self._partial_task, self._response, self._worker):
+        for task in (self._partial_task, self._response, self._worker, *self._decision_tasks):
             if task is not None and not task.done():
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError, Exception):
@@ -457,6 +468,11 @@ class RealtimeSession:
             self.in_codec, self.in_rate, self.in_format = codec, rate, fmt
         if "format" in audio_out:
             self.out_codec, self.out_rate, self.out_format = _format(audio_out["format"], "session.audio.output.format")
+        if "decisions" in session:
+            hook = parse_hook(session["decisions"], param="session.decisions")
+            if hook is not None:
+                hook.model = self.core.resolve(hook.model, "decision").id  # validates; the default when unnamed
+            self.decisions = hook
         if "transcription" in audio_in:
             cfg = audio_in["transcription"] or {}
             model = cfg.get("model")
@@ -1265,7 +1281,43 @@ class RealtimeSession:
             "conversation.item.input_audio_transcription.completed", item_id=item["id"], content_index=0, transcript=text,
             usage={"type": "duration", "seconds": round(len(audio) / SR, 2)},
         )  # fmt: skip
+        if self.decisions is not None and text.strip():
+            task = asyncio.create_task(self._decide(str(item["id"]), text, audio), name=f"bolo-decisions-{self.id}")
+            self._decision_tasks.add(task)
+            task.add_done_callback(self._decision_tasks.discard)
         return bool(text.strip())
+
+    async def _decide(self, item_id: str, text: str, audio: FloatArray) -> None:
+        """The session's decision questions about one user turn (bolo.decision_hook), in the background: the answers
+        as ``conversation.item.decisions.completed``, to the server's webhook, and the matched rules' tags."""
+        hook = self.decisions
+        if hook is None:
+            return
+        trace = Trace("decision", self.transport, hook.model or "")
+        trace.extra.update(self.trace_extra)
+        try:
+            result, rules = await evaluate(self.core, hook, text, audio, trace)
+        except BoloError as exc:
+            trace.finish("error", exc.message)
+            self.core.traces.record(trace)
+            await self.send(
+                "conversation.item.decisions.failed", item_id=item_id,
+                error={"type": "decision_error", "code": exc.code, "message": exc.message, "param": None},
+            )  # fmt: skip
+            return
+        trace.finish("ok")
+        self.core.traces.record(trace)
+        for rule in rules:
+            if rule.do == "tag" and rule.value and rule.value not in self.tags:
+                self.tags.append(rule.value)
+                self.trace_extra["tags"] = list(self.tags)
+        fields = event_fields(item_id, result, rules)
+        await self.send("conversation.item.decisions.completed", **fields)
+        s = self.core.settings
+        url = self.decision_webhook_url or s.decision_webhook_url or ""
+        payload = {"type": "conversation.item.decisions.completed", "session_id": self.id, "transcript": text,
+                   **self.trace_extra, **fields}  # fmt: skip
+        spawn_webhook(s, url, payload, self.id)
 
     def _guarded(self, model: str, text: str) -> str:
         """``text`` through the session's repetition guard (bolo.stt_options.RepeatGuard): each utterance's transcript

@@ -124,6 +124,10 @@ class AgentConfig:
     turn_detection: dict[str, Any] | None = None
     #: romanised text in what the agent says ("off" | "auto" | "on"; unset: the voice's default), bolo.text.romanised
     romanised: str | None = None
+    #: questions asked after every caller turn, and the rules that end, transfer or tag the call (bolo.decision_hook)
+    decisions: dict[str, Any] | None = None
+    #: where those answers are POSTed (instead of the setting decision_webhook_url)
+    decision_webhook_url: str | None = None
     source: str = "settings"
 
     @classmethod
@@ -165,6 +169,18 @@ class AgentConfig:
                 from bolo.text.romanised import parse_mode
 
                 values[key] = parse_mode(raw)
+            elif key == "decisions":
+                from bolo.decision_hook import parse_hook
+
+                hook = parse_hook(raw, param="decisions")  # validates; stored as given
+                values[key] = dict(raw) if hook is not None else None
+            elif key == "decision_webhook_url":
+                url = str(raw).strip()
+                if url and not url.startswith(("http://", "https://")):
+                    raise InvalidRequest(
+                        f"agent '{name}': decision_webhook_url must start with http:// or https://", param=key
+                    )
+                values[key] = url or None
             else:
                 values[key] = str(raw).strip() or None
         agent = cls(name=name, source=source, **values)

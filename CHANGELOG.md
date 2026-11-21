@@ -41,6 +41,15 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   job of the roadmap). CLI: `bolo pipeline create|list|show|validate|run|rm|templates|secret`. Templates: meeting
   notes, call QA, podcast chapters, dubbing, voicemail triage, after-call summary. Settings: `pipeline_runs_keep`,
   `pipeline_max_jobs`, `pipeline_remote_urls`, `webhook_secret`, `pipeline_webhook_timeout_s`.
+- **Live decisions in conversations and phone calls.** A Realtime session (`session.decisions`) or a phone agent
+  (`decisions`) can ask a decision model questions after every user turn, about the turn's transcript and audio, in
+  the background so the answer is not held up. The answers arrive as `conversation.item.decisions.completed` (or
+  `.failed`), are POSTed to the setting `decision_webhook_url` (or the agent's own; signed with
+  `webhook_secret`, as pipeline webhooks are), and rules act on them: on a call `transfer`, `end_call` (new
+  outcome `decision_end`) and `tag` (the record's `metadata.tags`); in a session `tag` goes on its traces and the
+  rest are reported. A client never chooses the webhook's address. The console's Conversation page and the phone
+  agent dialog edit the questions and rules, and the Conversation page shows the answers; the providers page names
+  Google Gemini. The hook (`bolo.decision_hook`) is independent of the transport, for use as a pipeline step.
 - **Google's Gemini Decision 1 as a cloud decision model** (`gemini-decision-1`, provider kind `gemini`, key
   `BOLO_PROVIDER_GEMINI_API_KEY`): the Gemini Decisions API answers the same yes/no, choice and score questions as
   the local decision models, through `POST /v1/audio/decisions` and `bolo decide`; the recording goes as a 16 kHz

@@ -4,6 +4,7 @@ import { floatToInt16, int16ToFloat } from '@/lib/audio/pcm'
 import { GaplessPlayer } from '@/lib/audio/player'
 import { Resampler } from '@/lib/audio/resample'
 import type { PipelineId } from '@/lib/capabilities'
+import type { LiveDecision } from '@/lib/decisions'
 import { diag } from '@/lib/diagnostics'
 import type { MicFailure } from '@/lib/mic-help'
 import { MicrophoneError } from '@/lib/audio/capture'
@@ -86,6 +87,8 @@ export interface ConversationState {
   toolCalls: ToolCall[]
   /** Recent server event types, newest last (for the debug panel). */
   events: string[]
+  /** Answers of the session's live decisions (`conversation.item.decisions.completed`), newest last. */
+  decisions: LiveDecision[]
 }
 
 export interface McpServerState {
@@ -129,6 +132,7 @@ export const emptyConversation = (
   mcpServers: {},
   toolCalls: [],
   events: [],
+  decisions: [],
 })
 
 /**
@@ -172,6 +176,8 @@ export function sessionUpdate(
   if (extras.tools?.length) session.tools = extras.tools
   // bolo's extension: a saved live pipeline answers each turn (docs/pipelines.md, "Live pipelines")
   if (extras.pipelineId) session.pipeline_id = extras.pipelineId
+  // bolo's extension: questions a decision model answers after every user turn
+  if (extras.decisions) session.decisions = extras.decisions
   return { type: 'session.update', session }
 }
 
@@ -181,6 +187,8 @@ export interface SessionExtras {
   echo?: RealtimeEcho
   /** A saved live pipeline that answers each turn (cascade only). */
   pipelineId?: string
+  /** `session.decisions` (bolo.decision_hook); left out, none. */
+  decisions?: Record<string, unknown>
 }
 
 /** `audio.input.echo_cancellation`: off, or a canceller (none named: the server's default). */
@@ -252,6 +260,15 @@ export function applyEvent(s: ConversationState, ev: Ev): ConversationState {
         events,
         turns: upsert(s.turns, id, 'user', (t) => ({ ...t, text: t.final ? t.text : t.text + str(ev.delta) })),
       }
+    }
+    case 'conversation.item.decisions.completed': {
+      const decision: LiveDecision = {
+        itemId: str(ev.item_id),
+        model: str(ev.model),
+        answers: (ev.answers ?? {}) as LiveDecision['answers'],
+        actions: (Array.isArray(ev.actions) ? ev.actions : []) as LiveDecision['actions'],
+      }
+      return { ...s, events, decisions: [...s.decisions, decision].slice(-20) }
     }
     case 'conversation.item.input_audio_transcription.completed': {
       const id = str(ev.item_id)
@@ -417,12 +434,13 @@ export class ConversationSession {
       echo?: RealtimeEcho
       capture?: CaptureProcessing
       pipelineId?: string
+      decisions?: Record<string, unknown>
     } = {},
   ) {
     this.store = new Store(emptyConversation(pipeline, transport))
     this.denoise = denoise
     this.listening = opts.listening
-    this.extras = { tools: opts.tools, echo: opts.echo, pipelineId: opts.pipelineId }
+    this.extras = { tools: opts.tools, echo: opts.echo, pipelineId: opts.pipelineId, decisions: opts.decisions }
     this.fullDuplex = Boolean(opts.fullDuplex)
     this.capture = opts.capture
   }
