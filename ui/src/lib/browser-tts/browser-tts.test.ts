@@ -258,10 +258,12 @@ describe('voice catalogue', () => {
       expect(v.source, v.id).toMatch(/^https:\/\/huggingface\.co\//)
       expect(v.sample.length, v.id).toBeLessThan(110)
       expect(v.notes.length, v.id).toBeGreaterThan(0)
-      expect(v.approxBytes, v.id).toBeGreaterThan(10e6)
+      expect(v.approxBytes, v.id).toBeGreaterThan(5e6)
       expect(v.peakBytes, v.id).toBeGreaterThan(v.approxBytes)
       if (v.files.from !== 'published')
-        expect(v.files.model, v.id).toMatch(/^https:\/\/huggingface\.co\/.+\/resolve\/[0-9a-f]{40}\//)
+        expect('model' in v.files ? v.files.model : v.files.base, v.id).toMatch(
+          /^https:\/\/huggingface\.co\/.+\/resolve\/[0-9a-f]{40}\//,
+        )
     }
     // The build list's sample for each voice is the console's sample.
     for (const s of spec.voices) {
@@ -312,6 +314,6 @@ describe('voice catalogue', () => {
     for (const l of ['বাংলা · Bengali', 'తెలుగు · Telugu', 'ગુજરાતી · Gujarati', 'English (US)', 'Deutsch · German'])
       expect(labels).toContain(l)
     const hindi = voicesByLanguage()[0]?.voices.map((v) => v.kind)
-    expect(new Set(hindi)).toEqual(new Set(['coqui', 'piper', 'kokoro']))
+    expect(new Set(hindi)).toEqual(new Set(['coqui', 'piper', 'kokoro', 'kitten']))
   })
 })

@@ -1,5 +1,6 @@
 import { isDemo } from '@/lib/api/config'
 import type { NumberLanguage } from './numbers'
+import { KALE_BASE, KITTEN_PICO_BASE, LITTLE_TTS_BASE, PARADEE_BASE } from './small-voices'
 import { TINY_VOCA_BASE } from './tiny-voca'
 
 /**
@@ -14,10 +15,13 @@ import { TINY_VOCA_BASE } from './tiny-voca'
  *   the licence of its training data, from its model card.
  * - Kokoro-82M (phonemes from uccharan): onnx-community's ONNX export, in
  *   8-, 16- or 32-bit, with the voice's style vector.
+ * - tiny-voca and little-tts (phonemes from dizione's TypeScript port), Paradee-8M and Kitten TTS 2 Pico
+ *   (Kokoro-style phonemes from uccharan) and kale-tts-1-nano (its own JavaScript front end, carried in
+ *   src/vendor/kale): the authors' ONNX exports, from Hugging Face at pinned revisions.
  */
 export interface BrowserVoice {
   id: string
-  kind: 'coqui' | 'piper' | 'kokoro' | 'tiny-voca'
+  kind: 'coqui' | 'piper' | 'kokoro' | 'tiny-voca' | 'paradee' | 'kitten' | 'kale'
   /** BCP-47 tag. */
   language: string
   /** Name of the language in its own script, and in English. */
@@ -44,7 +48,7 @@ export interface BrowserVoice {
   /** Honest notes shown next to the voice. */
   notes: string[]
   /** Text to phonemes, for voices that read phonemes. */
-  phonemizer: 'uccharan' | 'dizione' | null
+  phonemizer: 'uccharan' | 'dizione' | 'kale' | null
   /** uccharan's language for the phonemes (Piper and Kokoro voices). */
   phonemeLanguage?: string
   /** Weights as downloaded: '8-bit', '16-bit', '32-bit'. */
@@ -56,7 +60,10 @@ export interface BrowserVoice {
     | { from: 'published' }
     | { from: 'remote'; model: string; config: string; configFormat: 'bolo' | 'piper' }
     | { from: 'kokoro'; model: string; style: string }
-    | { from: 'tiny-voca'; model: string; config: string }
+    | { from: 'tiny-voca'; model: string; config: string; speaker?: string }
+    | { from: 'paradee'; model: string; config: string; speaker: string }
+    | { from: 'kitten'; model: string; voices: string; speaker: string }
+    | { from: 'kale'; base: string; speaker: string }
   /** Id under which its download is listed (Kokoro voices share one model per precision). */
   downloadId: string
   downloadLabel: string
@@ -431,6 +438,184 @@ function tinyVoca(speaker: 'F2' | 'M2'): BrowserVoice {
   }
 }
 
+function littleTts(speaker: '92' | '6097'): BrowserVoice {
+  const l = lang('en-US')
+  return {
+    ...tinyVoca('F2'),
+    id: `little-tts-${speaker}`,
+    gender: speaker === '92' ? 'female' : 'male',
+    label: `little-tts ${speaker}`,
+    approxBytes: 19_523_380 + 5_400_000,
+    sample: 'Hello! This is little TTS, a small voice that runs in your browser. The meeting moved to 3:30 pm.',
+    roundTrip: l.roundTrip,
+    credit: 'little-tts by TuringLogic, its ONNX export; phonemes by dizione (ported to TypeScript), as for tiny-voca',
+    license: 'CC-BY-NC-4.0 (weights; non-commercial), code Apache-2.0',
+    dataLicense: 'HiFi-TTS (CC-BY-4.0), trained from scratch',
+    source: 'https://huggingface.co/TuringLogic/little-tts',
+    notes: [
+      'A 4.6 M-parameter English voice (20 MB) with a harmonic-plus-noise waveform head, 24 kHz. Weights for non-commercial use only.',
+      'It reads the same phonemes as tiny-voca (dizione at the same commit, the same data files), so it shares that phonemiser download.',
+    ],
+    files: {
+      from: 'tiny-voca',
+      model: `${LITTLE_TTS_BASE}onnx/model.onnx`,
+      config: `${LITTLE_TTS_BASE}onnx/model.json`,
+      speaker,
+    },
+    downloadId: 'little-tts',
+    downloadLabel: 'little-tts (and its phonemiser)',
+  }
+}
+
+function paradee(speaker: string, code: 'en-US' | 'en-GB', gender: 'female' | 'male'): BrowserVoice {
+  const l = lang(code)
+  const name = speaker.split('_')[1] ?? speaker
+  return {
+    id: `paradee-${speaker.replace('_', '-')}`,
+    kind: 'paradee',
+    language: l.language,
+    nativeName: l.nativeName,
+    englishName: l.englishName,
+    gender,
+    label: `Paradee ${name.replace(/^\w/, (c) => c.toUpperCase())}`,
+    approxBytes: 8_462_119 + 1_827,
+    peakBytes: 250e6,
+    sample: l.sample,
+    numbers: null,
+    roundTrip: l.roundTrip,
+    credit: 'Paradee-8M v1.2 by Sahil Mahendrakar (distilled from Kokoro-82M); phonemes by uccharan',
+    license: 'Apache-2.0',
+    dataLicense: 'Apache-2.0 (trained on Kokoro-82M reading WikiText-103 sentences)',
+    source: 'https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.2',
+    notes: [
+      'A 7.9 M-parameter student of Kokoro-82M: four voices in one 8.5 MB 8-bit graph, 24 kHz.',
+      'It reads Kokoro’s phonemes, from uccharan’s port of misaki: American English for the American voices, British for the British ones.',
+    ],
+    phonemizer: 'uccharan',
+    phonemeLanguage: code === 'en-GB' ? 'en-gb' : 'en-us',
+    precision: '8-bit',
+    files: {
+      from: 'paradee',
+      model: `${PARADEE_BASE}onnx/paradee_int8.onnx`,
+      config: `${PARADEE_BASE}config.json`,
+      speaker,
+    },
+    downloadId: 'paradee-8m',
+    downloadLabel: 'Paradee-8M',
+  }
+}
+
+const KITTEN_APPROX =
+  'Approximate: Kitten learnt this language from eSpeak NG phonemes; uccharan writes them in the same style but not identically.'
+
+function kittenPico(speaker: string, code: string, gender: 'female' | 'male'): BrowserVoice {
+  const l = lang(code)
+  const file = { 'en-US': 'en', hi: 'hi', 'es-ES': 'es', fr: 'fr', it: 'it', 'pt-BR': 'pt' }[code] ?? 'en'
+  const phonemeLanguage =
+    { 'en-US': 'en-us', hi: 'hi', 'es-ES': 'es', fr: 'fr', it: 'it', 'pt-BR': 'pt-br' }[code] ?? 'en-us'
+  const approximate = code !== 'en-US'
+  return {
+    id: `kitten-pico-${file}-${speaker}`,
+    kind: 'kitten',
+    language: l.language,
+    nativeName: l.nativeName,
+    englishName: l.englishName,
+    gender,
+    label: `Kitten Pico ${speaker.replace(/^\w/, (c) => c.toUpperCase())}`,
+    approxBytes: 7_953_526 + 2_089_952 + 1_313,
+    peakBytes: 250e6,
+    sample: l.sample,
+    numbers: null,
+    roundTrip: l.roundTrip,
+    credit: 'Kitten TTS 2 Pico by KittenML; phonemes by uccharan (Kokoro style), with Kitten’s folds',
+    license: 'Apache-2.0',
+    dataLicense: 'Apache-2.0 (the models, voice packs and G2P files)',
+    source: 'https://huggingface.co/KittenML/kitten-tts-2-pico',
+    notes: [
+      'A 7.2 M-parameter model per language (8 MB, 8-bit), 24 kHz, with the language’s voice pack.',
+      approximate
+        ? KITTEN_APPROX
+        : 'English phonemes come from uccharan with misaki’s dictionaries, the front end Kitten was trained with.',
+    ],
+    phonemizer: 'uccharan',
+    phonemeLanguage,
+    precision: '8-bit',
+    approximate: approximate ? KITTEN_APPROX : undefined,
+    files: {
+      from: 'kitten',
+      model: `${KITTEN_PICO_BASE}kitten_tts_2_pico_${file}.onnx`,
+      voices: `${KITTEN_PICO_BASE}voices_${file}.npz`,
+      speaker,
+    },
+    downloadId: `kitten-tts-2-pico-${file}`,
+    downloadLabel: `Kitten TTS 2 Pico (${l.englishName})`,
+  }
+}
+
+/** Kitten TTS 2 Pico voices offered (pack key, language, gender): the languages uccharan's Kokoro profile reads. */
+const KITTEN_PICO_VOICES: [string, string, 'female' | 'male'][] = [
+  ['eleanor', 'en-US', 'female'],
+  ['edith', 'en-US', 'female'],
+  ['otis', 'en-US', 'male'],
+  ['frank', 'en-US', 'male'],
+  ['priya', 'hi', 'female'],
+  ['arjun', 'hi', 'male'],
+  ['sofia', 'es-ES', 'female'],
+  ['pablo', 'es-ES', 'male'],
+  ['amelie', 'fr', 'female'],
+  ['theo', 'fr', 'male'],
+  ['francesca', 'it', 'female'],
+  ['alessandro', 'it', 'male'],
+  ['juliana', 'pt-BR', 'female'],
+  ['gustavo', 'pt-BR', 'male'],
+]
+
+function kale(speaker: string, name: string, code: 'en-US' | 'en-GB', gender: 'female' | 'male' | null): BrowserVoice {
+  const l = lang(code)
+  return {
+    id: `kale-${name.toLowerCase()}`,
+    kind: 'kale',
+    language: l.language,
+    nativeName: l.nativeName,
+    englishName: l.englishName,
+    gender,
+    label: `kale ${name}`,
+    approxBytes: 14_767_138 + 523_000 + (code === 'en-GB' ? 4_589_000 : 4_637_000) + 1_789 + 4_069,
+    peakBytes: 300e6,
+    sample: l.sample,
+    numbers: null,
+    roundTrip: l.roundTrip,
+    credit: 'kale-tts-1-nano by Kale Computer (from Kokoro-82M, voices designed with Maya-1); its own text front end',
+    license: 'Apache-2.0',
+    dataLicense: 'kale-tts-1-data (CC-BY-4.0): synthetic Maya-1 speech; follow the Maya-1 use policy',
+    source: 'https://huggingface.co/KaleComputer/kale-tts-1-nano',
+    notes: [
+      'A 7.5 M-parameter English voice in one 14.8 MB 8-bit graph, 24 kHz. Every voice is synthetic: no impersonation.',
+      'Its text front end is Kale’s own JavaScript (carried with the console, Apache-2.0), over its checked word list and guesser.',
+    ],
+    phonemizer: 'kale',
+    phonemeLanguage: code === 'en-GB' ? 'en-gb' : 'en-us',
+    precision: '8-bit',
+    files: { from: 'kale', base: KALE_BASE, speaker },
+    downloadId: `kale-tts-1-nano-${code === 'en-GB' ? 'gb' : 'us'}`,
+    downloadLabel: `kale-tts-1-nano (${code === 'en-GB' ? 'British' : 'American'} front end)`,
+  }
+}
+
+/** kale-tts-1-nano voices (id, name, accent, gender from the voice's description). */
+const KALE_VOICES: [string, string, 'en-US' | 'en-GB', 'female' | 'male' | null][] = [
+  ['s057b', 'Kenzie', 'en-US', 'female'],
+  ['f06', 'Simone', 'en-US', 'female'],
+  ['d03', 'Amy', 'en-GB', 'female'],
+  ['w165', 'Frankie', 'en-US', null],
+  ['w602', 'Darlene', 'en-US', 'female'],
+  ['m3', 'Owen', 'en-US', null],
+  ['t071', 'Toby', 'en-US', null],
+  ['d13', 'Jack', 'en-GB', 'male'],
+  ['x328', 'Earl', 'en-US', 'male'],
+  ['h013f', 'Magnus', 'en-US', null],
+]
+
 export const BROWSER_VOICES: BrowserVoice[] = [
   ...syspin('hi', 'female'),
   ...syspin('hi', 'male'),
@@ -594,6 +779,14 @@ export const BROWSER_VOICES: BrowserVoice[] = [
   ...KOKORO_VOICES.map(([style, code, gender, approx]) => kokoro(style, code, gender, approx)),
   tinyVoca('F2'),
   tinyVoca('M2'),
+  littleTts('92'),
+  littleTts('6097'),
+  paradee('af_heart', 'en-US', 'female'),
+  paradee('am_puck', 'en-US', 'male'),
+  paradee('bf_isabella', 'en-GB', 'female'),
+  paradee('bm_fable', 'en-GB', 'male'),
+  ...KITTEN_PICO_VOICES.map(([speaker, code, gender]) => kittenPico(speaker, code, gender)),
+  ...KALE_VOICES.map(([speaker, name, code, gender]) => kale(speaker, name, code, gender)),
 ]
 
 export const DEFAULT_BROWSER_VOICE = BROWSER_VOICES[0] as BrowserVoice

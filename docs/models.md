@@ -3190,6 +3190,16 @@ texts (numbers, money, dates, times, codes, addresses, homographs, chat spelling
 first use fetches the model (21 MB) and the phonemiser data (5 MB); in headless Chromium on a 4-core CPU a two-clause
 sentence came back as 3.5 to 3.8 s of non-silent 24 kHz audio in 2 to 6 s, downloads included.
 
+**In the browser demo, beside tiny-voca**: little-tts (voices 92 and 6097, the tiny-voca path with its own weights;
+its phonemiser data is byte for byte tiny-voca's, so the two share that download), Paradee-8M (its four voices, from
+uccharan's Kokoro phonemes in the page, American or British by voice), Kitten TTS 2 Pico (two voices each in
+English, Hindi, Spanish, French, Italian and Brazilian Portuguese: the languages uccharan's Kokoro profile reads in
+the page; the non-English ones marked approximate, as for Kokoro) and kale-tts-1-nano (its ten voices, with Kale's
+own JavaScript front end carried in `ui/src/vendor/kale`, Apache-2.0, over its word lists fetched from the model
+repository). All from Hugging Face at pinned revisions. In headless Chromium (2026-11-21) one sentence from each of
+little-tts 92, Paradee Heart and Isabella, Kitten Pico Eleanor and Priya (Hindi), and kale Kenzie and Jack came back as
+non-silent 24 kHz audio (`ui/e2e-demo/tts-small-voices.spec.ts`).
+
 **little-tts in process** (`little-tts-onnx`, TuringLogic; weights CC BY-NC 4.0, not for commercial use): a 4.6
 M-parameter English voice trained from scratch on HiFi-TTS, with a DDSP harmonic-plus-noise head. Its ONNX graph takes
 the same inputs as tiny-voca's and its phonemiser is dizione at the commit bolo carries, so it runs on the tiny-voca

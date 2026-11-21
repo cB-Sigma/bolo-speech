@@ -207,6 +207,17 @@ Web console: speech synthesis in the browser
     text is in ui/src/vendor/uccharan/NOTICE. uccharan contains no eSpeak NG
     code or data; no GPL component is used for speech synthesis in the browser.
 
+    ui/src/vendor/kale is a copy of the text front end of kale-tts-1
+    (frontend/words/kaleTts.js and enGb.js with their type declarations, and
+    frontend/dizione: Kale's JavaScript port of dizione's text rules and homograph
+    picker), Copyright Kale Computer, Apache License 2.0, unchanged from
+    https://huggingface.co/KaleComputer/kale-tts-1-nano at revision
+    b6ce1887268c3667994fc3b0b2c82887c069915c, with its LICENSE and
+    THIRD_PARTY_NOTICES.md. Its word lists (derived from CMUdict) and guesser are
+    fetched from that repository in the visitor's browser. Paradee-8M, Kitten TTS 2
+    Pico, little-tts (weights CC-BY-NC-4.0) and kale-tts-1-nano themselves are
+    downloaded from Hugging Face in the browser, not distributed with bolo.
+
     The live demo serves, next to the page (under voices/), copies of these
     voices with their weights stored at reduced precision (8-bit and 16-bit;
     not retrained), made by ui/scripts/voices/build.py:

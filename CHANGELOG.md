@@ -233,6 +233,10 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - **VoiceTut-TTS** (`voicetut-tts-audiocpp`, Egyptian Arabic and English): its author's GGUF on audio.cpp's omnivoice
   family, always sent the `arz` language id; added, not yet run usefully (on a CPU it came back as noise; a GPU is
   what its author used). Marked not for commercial use until the licence of its audio tokenizer is clear.
+- **Browser demo: little-tts, Paradee-8M, Kitten TTS 2 Pico and kale-tts-1-nano** on the Text to speech page, in the
+  page with ONNX Runtime Web: little-tts on the tiny-voca path, Paradee and Kitten Pico (English, Hindi, Spanish,
+  French, Italian, Portuguese) from uccharan's Kokoro phonemes, kale with its own JavaScript front end (carried in
+  `ui/src/vendor/kale`, Apache-2.0).
 - **eSpeak NG can write tied phonemes** (`a^ɪ`) for front ends that need them (`Phonemizer.phonemize(..., tie="^")`).
 
 ### Changed

@@ -47,7 +47,22 @@ export interface TinyVocaVoiceConfig {
   inference: { noise_scale: number; length_scale: number; noise_scale_w: number }
 }
 
-export type VoiceConfig = (CoquiVoiceConfig | PiperVoiceConfig | KokoroVoiceConfig | TinyVocaVoiceConfig) & {
+/**
+ * Paradee-8M, Kitten TTS 2 Pico and kale-tts-1-nano: Kokoro's phoneme table (from uccharan, or kale's own front end),
+ * one model each, the voice by index (Paradee) or by its style table (Kitten, kale).
+ */
+export interface SmallKokoroVoiceConfig {
+  kind: 'paradee' | 'kitten' | 'kale'
+  sample_rate: number
+  phoneme_language: string
+  /** Paradee's voice index. */
+  speaker: number
+  inference: { noise_scale: number; length_scale: number; noise_scale_w: number }
+}
+
+export type VoiceConfig = (
+  CoquiVoiceConfig | PiperVoiceConfig | KokoroVoiceConfig | TinyVocaVoiceConfig | SmallKokoroVoiceConfig
+) & {
   id: string
 }
 
@@ -229,7 +244,7 @@ export interface PreparedText {
  * applies to them.
  */
 export function prepareText(text: string, cfg: VoiceConfig, numbers: NumberLanguage | null): PreparedText {
-  if (cfg.kind === 'piper' || cfg.kind === 'kokoro' || cfg.kind === 'tiny-voca') {
+  if (cfg.kind !== 'coqui') {
     const chunks = splitSentences(text.replace(/\s+/g, ' ').trim())
     return { spoken: chunks.join(' '), chunks, dropped: [], rewritten: false }
   }

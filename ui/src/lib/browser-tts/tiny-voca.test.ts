@@ -25,7 +25,7 @@ describe('tiny-voca in the browser', () => {
   })
 
   it('offers F2 and M2, with pinned files and the licence', () => {
-    const voices = BROWSER_VOICES.filter((v) => v.kind === 'tiny-voca')
+    const voices = BROWSER_VOICES.filter((v) => v.id.startsWith('tiny-voca-'))
     expect(voices.map((v) => v.id)).toEqual(['tiny-voca-f2', 'tiny-voca-m2'])
     const m2 = browserVoice('tiny-voca-m2')
     expect(m2.gender).toBe('male')

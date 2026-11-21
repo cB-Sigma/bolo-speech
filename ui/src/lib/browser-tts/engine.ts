@@ -495,6 +495,8 @@ export class BrowserTtsEngine {
         config: located.config,
         configFormat: located.configFormat,
         style: located.style,
+        speaker: located.speaker,
+        assets: located.assets,
         phonemizer: voice.phonemizer,
         phonemeLanguage: voice.phonemeLanguage,
         uccharanBase: `${base}uccharan/`,
@@ -526,10 +528,56 @@ export class BrowserTtsEngine {
     bytes: number
     /** The graph cut in two at build time, when published: front for WebGPU, back for the CPU. */
     halves?: Halves
+    speaker?: string
+    assets?: Record<string, string>
   }> {
     const files = voice.files
     if (files.from === 'tiny-voca')
-      return { model: hubUrl(files.model), config: hubUrl(files.config), configFormat: null, bytes: voice.approxBytes }
+      return {
+        model: hubUrl(files.model),
+        config: hubUrl(files.config),
+        configFormat: null,
+        bytes: voice.approxBytes,
+        speaker: files.speaker,
+      }
+    if (files.from === 'paradee')
+      return {
+        model: hubUrl(files.model),
+        config: hubUrl(files.config),
+        configFormat: null,
+        bytes: voice.approxBytes,
+        speaker: files.speaker,
+      }
+    if (files.from === 'kitten')
+      return {
+        model: hubUrl(files.model),
+        config: null,
+        configFormat: null,
+        bytes: voice.approxBytes,
+        speaker: files.speaker,
+        assets: { voices: hubUrl(files.voices) },
+      }
+    if (files.from === 'kale') {
+      const words = `${files.base}frontend/words/${voice.phonemeLanguage === 'en-gb' ? 'en-gb/' : ''}`
+      return {
+        model: hubUrl(`${files.base}kale-tts-1-nano.onnx`),
+        config: hubUrl(`${files.base}voices.json`),
+        configFormat: null,
+        bytes: voice.approxBytes,
+        speaker: files.speaker,
+        assets: Object.fromEntries(
+          Object.entries({
+            tokenizer: `${files.base}tokenizer.json`,
+            style: `${files.base}voices/${files.speaker}.bin`,
+            extra: `${files.base}voices/${files.speaker}.extra.bin`,
+            lexicon: `${words}lexicon.tsv`,
+            override: `${words}override.public.tsv`,
+            terms: `${words}terms.tsv`,
+            g2p: `${words}g2p.bin`,
+          }).map(([k, v]) => [k, hubUrl(v)]),
+        ),
+      }
+    }
     if (files.from === 'kokoro')
       return {
         model: hubUrl(files.model),

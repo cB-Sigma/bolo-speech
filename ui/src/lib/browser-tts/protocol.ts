@@ -8,14 +8,18 @@ export type TtsWorkerRequest =
       /** Absolute URL of the voices directory (ends in a slash). */
       base: string
       voice: string
-      kind: 'coqui' | 'piper' | 'kokoro' | 'tiny-voca'
+      kind: 'coqui' | 'piper' | 'kokoro' | 'tiny-voca' | 'paradee' | 'kitten' | 'kale'
       /** Absolute URLs of the files (published ones carry a version query, so a stale cached copy is not used). */
       model: string
       config: string | null
       configFormat: 'bolo' | 'piper' | null
       /** Kokoro's style vectors for the voice. */
       style?: string
-      phonemizer: 'uccharan' | 'dizione' | null
+      phonemizer: 'uccharan' | 'dizione' | 'kale' | null
+      /** The voice's name in its model (tiny-voca, little-tts, Paradee, Kitten, kale). */
+      speaker?: string
+      /** Further files by role: Kitten's voice pack (`voices`); kale's front end and voice files. */
+      assets?: Record<string, string>
       /** uccharan's language for the phonemes. */
       phonemeLanguage?: string
       /** Directory with uccharan's language data (ends in a slash). */
