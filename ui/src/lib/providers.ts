@@ -7,6 +7,11 @@ export const PROVIDER_KIND_LABEL: Record<string, string> = {
   elevenlabs: 'ElevenLabs',
   deepgram: 'Deepgram',
   soniox: 'Soniox',
+  assemblyai: 'AssemblyAI',
+  'azure-mai': 'Microsoft MAI (Azure)',
+  xai: 'xAI',
+  rime: 'Rime',
+  bedrock: 'Amazon Bedrock',
 }
 
 export const PROVIDER_KIND_NOTE: Record<string, string> = {
@@ -15,6 +20,13 @@ export const PROVIDER_KIND_NOTE: Record<string, string> = {
   elevenlabs: 'Voices and Scribe recognition.',
   deepgram: 'Nova recognition, batch and live.',
   soniox: 'Recognition of recordings and live audio, with speaker labels.',
+  assemblyai: 'STT-3.7 recognition of recordings and live audio, with speaker labels.',
+  'azure-mai':
+    'MAI-Transcribe-2-Streaming and MAI-Voice-2.1 in your Azure resource: set the base URL to the resource, and the option region for the voices.',
+  xai: 'Grok Voice 3.0 for speech-to-speech sessions (s2s_model).',
+  rime: 'Prism for speech-to-speech sessions (s2s_model).',
+  bedrock:
+    'Nova 2.5 Sonic for speech-to-speech sessions (s2s_model). The key is <access key id>:<secret access key>; needs bolo-speech[nova].',
 }
 
 export const PROVIDER_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,39}$/

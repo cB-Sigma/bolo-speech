@@ -85,6 +85,23 @@ const PROVIDER_KINDS = [
     default_base_url: 'https://api.soniox.com',
     terms_url: 'https://soniox.com/policies/terms-of-service',
   },
+  {
+    kind: 'assemblyai',
+    default_base_url: 'https://api.assemblyai.com',
+    terms_url: 'https://www.assemblyai.com/legal/terms-of-service',
+  },
+  { kind: 'xai', default_base_url: 'https://api.x.ai/v1', terms_url: 'https://x.ai/legal/terms-of-service' },
+  { kind: 'rime', default_base_url: 'https://prism.api.rime.ai/v1', terms_url: 'https://www.rime.ai/terms' },
+  {
+    kind: 'azure-mai',
+    default_base_url: 'https://your-resource.services.ai.azure.com',
+    terms_url: 'https://azure.microsoft.com/support/legal/preview-supplemental-terms/',
+  },
+  {
+    kind: 'bedrock',
+    default_base_url: 'https://bedrock-runtime.us-east-1.amazonaws.com',
+    terms_url: 'https://aws.amazon.com/service-terms/',
+  },
 ]
 
 /** uccharan 0.6's packs: name, size, catalog models that need it, installed models that need it. */

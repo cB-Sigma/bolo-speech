@@ -99,6 +99,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   barge-in itself), with instructions and Nova's voices. Provider kind `bedrock`: `BOLO_PROVIDER_BEDROCK_API_KEY` as
   `<access key id>:<secret access key>`, or AWS's own variables; the option `region`. Needs AWS's SDK, the new extra
   `bolo-speech[nova]` (Python 3.12 or newer). Function tools are not passed on.
+- **The console's Providers page names the new provider kinds** (AssemblyAI, Microsoft MAI, xAI, Rime, Amazon
+  Bedrock) and says what each needs.
 - **Every cloud entry names the environment variable of its key**: `provider.key_env` in `GET /api/v1/catalog`
   (`BOLO_PROVIDER_<NAME>_API_KEY`), and the cloud rows of docs/models.md.
 
