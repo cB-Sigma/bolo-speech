@@ -244,6 +244,8 @@ class CallSession:
             config["instructions"] = agent.instructions
         if agent.pipeline:
             config["pipeline"] = agent.pipeline
+        if agent.pipeline_id:
+            config["pipeline_id"] = agent.pipeline_id
         try:
             rt.configure(config)
         except (RealtimeError, BoloError) as exc:
@@ -462,6 +464,8 @@ class CallSession:
             await self._on_response_done(event.get("response") or {})
         elif kind == "error":
             record.event("error", message=str((event.get("error") or {}).get("message") or "error"))
+        elif kind == "pipeline.action":
+            self._spawn(self._pipeline_action(event), "pipeline-action")
 
     async def _on_response_audio(self, event: dict[str, Any], now: float) -> None:
         rt, turn = self.rt, self._turn
@@ -600,6 +604,26 @@ class CallSession:
         if resp.status_code >= 400:
             return f"The tool failed with HTTP {resp.status_code}."
         return resp.text[:4000]
+
+    async def _pipeline_action(self, event: dict[str, Any]) -> None:
+        """A live pipeline's transfer or hangup step (bolo.pipelines.live): after what was said has played."""
+        record, agent = self.record, self.agent
+        assert record is not None and agent is not None
+        action = str(event.get("action") or "")
+        record.event("pipeline_action", action=action, to=event.get("to"))
+        if action == "transfer":
+            number = event.get("to") or agent.transfer_number
+            if not number or not self.adapter.can_transfer:
+                record.event("error", message="the pipeline asked for a transfer, and this line cannot transfer"
+                                              + ("" if number else " (no transfer_number)"))  # fmt: skip
+                return
+            self._ending = True
+            await self._drain()
+            await self.transfer(str(number))
+        elif action == "hangup":
+            self._ending = True
+            await self._drain()
+            await self.end("agent_hangup")
 
     # -- key presses --------------------------------------------------------------------------------------
     async def _on_dtmf(self, digit: str) -> None:

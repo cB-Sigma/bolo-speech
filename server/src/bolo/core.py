@@ -298,6 +298,7 @@ class Bolo:
         self._tasks.append(asyncio.create_task(self._check_ort_cuda(), name="bolo-ort-cuda"))
         if self.settings.preload:
             self._tasks.append(asyncio.create_task(self._preload(), name="bolo-preload"))
+        self.pipelines.start_background()
 
     async def _check_ort_cuda(self) -> None:
         """Say once, at start, when ``device`` wants CUDA on a machine with an NVIDIA GPU but the installed ONNX
@@ -590,6 +591,13 @@ class Bolo:
                 "identify": "/v1/audio/speakers/identify",
                 "embedding_model": SAME_FILE.get(*[s.voice_similarity_model or s.default_diarization] * 2),
                 "thresholds": dict(speaker_thresholds),
+            },
+            # pipelines (docs/pipelines.md)
+            "pipelines": {
+                "endpoint": "/api/v1/pipelines",
+                "run": "/v1/pipelines/{id}/run",
+                "step_types": "/api/v1/pipelines/step-types",
+                "templates": "/api/v1/pipelines/templates",
             },
             # wake words (docs/api.md, "Wake words")
             "wake": {

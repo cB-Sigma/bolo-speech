@@ -14,6 +14,8 @@ on the server, with the intermediate audio never leaving it.
 * [Running](#running): synchronous, asynchronous jobs, webhooks, results and files
 * [API](#api) and [CLI](#cli)
 * [Templates](#templates)
+* [Triggers](#triggers): after an upload, a call, a Realtime session, or a new file in a folder
+* [Live pipelines](#live-pipelines): a pipeline as the behaviour of a phone number or a Realtime session
 * [Settings](#settings)
 
 ## A first pipeline
@@ -51,7 +53,8 @@ sent as `application/yaml`).
 | --- | --- |
 | `id` | Lower-case letters, digits, `-` and `_` (taken from `name` when left out). `runs`, `templates`, `validate` and `step-types` are reserved. |
 | `name`, `description` | For people. |
-| `mode` | `file` (the default and, for now, the only mode): runs on a recording or a text. |
+| `mode` | `file` (default): runs on a recording or a text. `live`: runs once per user turn of a call or Realtime session ([live pipelines](#live-pipelines)). |
+| `triggers` | When a `file` pipeline also runs on its own ([triggers](#triggers)). |
 | `vars` | Default values the steps can use as `{{vars.name}}`; a run can override them. |
 | `steps` | The steps, in order (required, at least one). |
 | `outputs` | What the run returns, by name: references or templates. Left out: the last step's outputs. |
@@ -81,13 +84,16 @@ Inside `{{ }}`:
 
 | Reference | Value |
 | --- | --- |
-| `input.audio` | The audio the run was given (file upload or URL). |
+| `input.audio` | The audio the run was given (file upload, URL, a watched folder's file, the caller's turn). |
 | `input.text` | The text the run was given (`text` field). |
 | `input.filename`, `input.duration` | The upload's file name and length in seconds. |
 | `vars.<name>` | A variable (the definition's `vars`, overridden by the run's). |
 | `steps.<id>.<output>` | An output of an earlier step. A path goes deeper: `steps.stt.segments.0.text`, `steps.decide.answer`. |
 | `speaker.audio`, `speaker.label`, `speaker.seconds`, `speaker.turns` | Inside a [split-speakers](#per-speaker-fan-out) step. |
 | `item` | Inside a [filter](#filters): the element being tested (`item.speaker`). |
+| `input.call` | In a run started by the end of a call: `id`, `agent`, `from`, `to`, `direction`, `outcome`, `duration_s`, `provider`. |
+| `input.session` | In a live run, or one started by the end of a Realtime session: the session's `id`, `transport` (and `call_id`, `agent` on a call). |
+| `input.history`, `input.turn` | In a live run: the conversation so far (`[{role, content}]`) and the turn's number (from 0). |
 | `run.id`, `pipeline.id`, `pipeline.version` | The run and the pipeline. |
 
 A value that is a single reference keeps its type (audio stays audio, a list stays a list). A reference inside a longer
@@ -214,6 +220,8 @@ runs, and lists every problem at once, each with the path of the field (`steps[2
 
 * unknown step types, duplicate or malformed ids, unknown options and options of the wrong type;
 * models that are not in the catalog, or not of the step's kind (`whisper-small` in a `tts` step);
+* steps a `live` pipeline cannot run per turn, and live actions in a `file` pipeline;
+* triggers that are not known, and folders outside `pipeline_watch_dirs`;
 * references to steps that do not exist or come later, to outputs the step does not have, and to unknown namespaces;
 * type mismatches (a `transcript` into an `audio` slot; audio written into a text);
 * required inputs with nothing to default to (an `align` step with no text anywhere before it);
@@ -306,6 +314,7 @@ Runs are kept in `<data_dir>/pipelines/runs/` (the newest `pipeline_runs_keep`, 
 | `GET` | `/api/v1/pipelines/templates` | Ready-made pipelines |
 | `POST` | `/v1/pipelines/{id}/run` | Run a saved pipeline |
 | `POST` | `/v1/pipelines/run` | Run a definition without saving it |
+| `POST` | `/v1/pipelines/simulate` | Play a typed or recorded conversation through a live pipeline |
 | `GET` | `/api/v1/pipelines/runs` | Run history |
 | `GET` | `/api/v1/pipelines/runs/{run_id}` | One run |
 | `GET` | `/api/v1/pipelines/runs/{run_id}/files/{name}` | A file a run wrote |
@@ -340,9 +349,64 @@ in the CLI's own process, like `bolo transcribe`.
 | `podcast-chapters` | STT → punctuation → LLM chapters as JSON (`title`, `start`) → save as JSON |
 | `dub` | STT → translation → TTS with a saved (cloned) voice → save |
 | `voicemail-triage` | STT → decision (route: sales, support, billing, urgent, spam) → switch → webhook |
-| `after-call-summary` | STT → PII redaction → LLM summary → decisions (resolved? follow-up needed?) → webhook |
+| `after-call-summary` | at the end of every call (`call_end` trigger), on its transcript: PII redaction → LLM summary → decisions (resolved? follow-up needed?) → webhook |
+| `support-line` (live) | per turn: decision (angry? → transfer to a person, said kindly) → decision (department) → the language model answers as that desk |
+| `appointment-line` (live) | per turn: decision (book, change, cancel, other) → switch: free slots from a webhook and the language model offers them; a fixed reply for anything else |
 
 `GET /api/v1/pipelines/templates` lists them; `bolo pipeline create --template <name>` saves one to edit.
+
+## Triggers
+
+A `file` pipeline also runs on its own when its `triggers` say so. Triggered runs are jobs: they appear in the run
+history with `trigger` set, and do not hold up what started them.
+
+| Trigger | Runs |
+| --- | --- |
+| `{"type": "call_end", "agents": ["support"]}` | At the end of each phone call (of those agents; every agent when left out), on the call's transcript (`input.text`, as `Caller: ...` and `Agent: ...` lines) with `input.call`. |
+| `{"type": "session_end"}` | At the end of each Realtime session (not a call's: calls have `call_end`), on its transcript with `input.session`. |
+| `{"type": "folder", "path": "/srv/inbox", "pattern": "*.wav", "move_to": "done"}` | On each new recording in a watched folder, once it has stopped growing. It is moved into `move_to` (default `done`) inside the folder first, so it never runs twice. The folder must be under one of `pipeline_watch_dirs`. |
+
+And on an upload: `POST /v1/audio/transcriptions` with `pipeline=<id>` answers with the transcript as usual and
+then runs that pipeline on the recording as a job (`input.audio`; `input.text` is the transcript); the response's
+`x-bolo-pipeline-run` header names the run.
+
+## Live pipelines
+
+A pipeline with `"mode": "live"` is the behaviour of a phone number or a Realtime session: it runs once per user turn
+instead of the language model answering on its own.
+
+* On a phone call: the agent's `pipeline_id` ([telephony.md](telephony.md#agents)); on the Phone page, the agent's
+  "Behaviour".
+* In a Realtime session: `session.pipeline_id` in `session.update` (a bolo extension, cascade pipeline only); on the
+  Conversation page, "Behaviour".
+
+Each turn's run gets the turn's transcript as `input.text`, its audio as `input.audio`, the conversation so far as
+`input.history`, the turn's number as `input.turn` and the session as `input.session`. Live pipelines take the step
+types that make sense per turn: `decision`, `llm`, `template`, `condition`, `switch`, `filter`, `webhook`, `pii`,
+`punctuation`, `itn`, `emotion`, `lid`, `translation` (of a text), `stop`, and four actions:
+
+| Action | Does |
+| --- | --- |
+| `reply` | says a text (its `text` input), synthesised and streamed by the session's voice |
+| `respond` | lets the session's language model answer, streamed as usual and with the session's tools; `instructions` add to the session's own for this turn (`"Answer as the {{steps.dept.answer}} desk"`) |
+| `transfer` | transfers the call (`to`: a number or SIP address; default the agent's `transfer_number`), after `say` if given; the run stops |
+| `hangup` | ends the call after `say` if given; the run stops |
+
+In a Realtime session `transfer` and `hangup` reach the client as a `pipeline.action` event; on a call bolo does them.
+A turn that reaches no `reply` or `respond` gets no answer.
+
+Latency: the session transcribes the turn as it always does. Only the steps before the first `reply` or `respond`
+add to the time before the caller hears the answer (a `decision` is one language-model call, typically 0.2 to 1 s
+with a small local model); the answer itself streams exactly as the session's own answers do. Each turn's run is in
+the run history (`trigger: "turn"`), and the turn's request trace names it (`pipeline_run`).
+
+### Simulating a conversation
+
+`POST /v1/pipelines/simulate` plays a conversation through a live pipeline without a call: `pipeline` (the
+definition) or `pipeline_id`, and `turns` (a JSON list of what the caller says) or `file` (a recording of the caller,
+cut into turns at its pauses and transcribed), plus `instructions` (the session's, for `respond`). The answer lists
+each turn: what the caller said, what the agent said, and the turn's run with its steps and actions. `respond` asks
+the language model without streaming here. The Pipelines page has the same simulator for live pipelines.
 
 ## Settings
 
@@ -353,3 +417,5 @@ in the CLI's own process, like `bolo transcribe`.
 | `pipeline_remote_urls` | unset | Whether a run may name a `url` to fetch or a `callback_url` (unset: on a loopback bind, or when requests need an API key). |
 | `webhook_secret` | unset | The secret webhooks are signed with (unset: generated into the data directory). |
 | `pipeline_webhook_timeout_s` | 10 | Timeout of a webhook step or callback. |
+| `pipeline_watch_dirs` | `[]` | Folders (and the folders under them) that `folder` triggers may watch. Empty: no folder triggers. |
+| `pipeline_watch_interval_s` | 5 | How often watched folders are looked at. |

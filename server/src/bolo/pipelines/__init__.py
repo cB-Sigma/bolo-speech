@@ -35,6 +35,9 @@ class PipelineService:
         self.active: dict[str, Run] = {}
         self._tasks: dict[str, asyncio.Task[Any]] = {}
         self._slots: asyncio.Semaphore | None = None
+        from bolo.pipelines.triggers import Triggers
+
+        self.triggers = Triggers(core)
 
     def _semaphore(self) -> asyncio.Semaphore:
         if self._slots is None:
@@ -138,7 +141,12 @@ class PipelineService:
             await task
         return self.store.get_run(run_id)
 
+    def start_background(self) -> None:
+        """Watch the folders of folder triggers (called when the server starts)."""
+        self.triggers.start()
+
     async def close(self) -> None:
+        await self.triggers.close()
         for task in list(self._tasks.values()):
             task.cancel()
         for task in list(self._tasks.values()):

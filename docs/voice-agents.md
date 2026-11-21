@@ -363,7 +363,11 @@ MCP server over Streamable HTTP and stdio, with mcp 1.30 and 2.3.
 What answers a conversation turn is the session's *pipeline*: the setting
 `realtime_pipeline`, or per session the bolo extension field
 `session.pipeline` in `session.update` (`session.created` reports it). It
-can change until the first audio or item. In every pipeline bolo keeps the
+can change until the first audio or item. With the cascade pipeline, `session.pipeline_id`
+(also a bolo extension) names a saved live pipeline that answers each turn
+instead of the language model alone: it can route, branch on a decision,
+call webhooks, transfer or hang up, and let the language model answer with
+more instructions ([pipelines.md](pipelines.md#live-pipelines)). In every pipeline bolo keeps the
 session itself: authentication and client secrets, the event set,
 `audio/pcmu` / `audio/pcma` and resampling, turn detection (`server_vad`,
 `semantic_vad`, manual commits), barge-in, conversation items, tool-call

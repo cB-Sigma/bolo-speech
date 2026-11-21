@@ -24,7 +24,7 @@ PIPELINE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 RESERVED_IDS = ("runs", "templates", "validate", "step-types", "run")
 REF_RE = re.compile(r"\{\{\s*([^{}]*?)\s*\}\}")
 PATH_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*$")
-MODES = ("file",)
+MODES = ("file", "live")
 MAX_STEPS = 200
 
 
@@ -189,6 +189,17 @@ STEP_TYPES: dict[str, StepType] = {
                  {"status": "number", "ok": "boolean", "body": "text", "json": "object"}, live=True),
         StepType("save", None, "action", "Write a value to a file of the run.", (Slot("value", "any", default="any"),),
                  (Option("name", "text", required=True),), {"file": "text", "url": "text"}),
+        StepType("reply", None, "action", "Say a text to the caller.", (TEXT,), (), {"text": "text"},
+                 live=True, live_only=True),
+        StepType("respond", None, "action",
+                 "Let the session's language model answer (streamed, with its tools), with more instructions for "
+                 "this turn if given.", (), (Option("instructions", "text"),), {"text": "text"},
+                 live=True, live_only=True),
+        StepType("transfer", None, "action", "Transfer the call to a person (a number or SIP address).", (),
+                 (Option("to", "text", "default: the agent's transfer_number"), Option("say", "text")), {},
+                 live=True, live_only=True),
+        StepType("hangup", None, "action", "End the call or session.", (), (Option("say", "text"),), {},
+                 live=True, live_only=True),
     )
 }  # fmt: skip
 
@@ -340,7 +351,8 @@ class Validator:
         parts = ref.split(".")
         ns = parts[0]
         if ns == "input":
-            known = {"audio": "audio", "text": "text", "filename": "text", "duration": "number"}
+            known = {"audio": "audio", "text": "text", "filename": "text", "duration": "number", "call": "object",
+                     "session": "object"}  # fmt: skip
             if scope.live:
                 known.update(history="list", turn="number", session="object")
             if len(parts) < 2 or parts[1] not in known:
@@ -744,7 +756,8 @@ def validate(definition: Any, core: Bolo | None = None) -> Report:
     if triggers is not None:
         from bolo.pipelines.triggers import check_triggers
 
-        for problem in check_triggers(triggers, mode):
+        watch = list(core.settings.pipeline_watch_dirs) if core is not None else None
+        for problem in check_triggers(triggers, mode, watch):
             v.error(problem.path, problem.message)
     return v.report
 

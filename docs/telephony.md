@@ -163,6 +163,7 @@ in `<data_dir>/telephony.json`, mode 0600).
 | `voice`, `language` | server defaults | the voice; a language hint for speech recognition |
 | `stt_model`, `tts_model`, `llm_model` | `default_realtime_stt`, `default_realtime_tts`, `llm_model` | models for this agent |
 | `pipeline` | `realtime_pipeline` | `cascade`, `audio-llm` or `speech-to-speech` |
+| `pipeline_id` | none | a saved live pipeline that answers each turn of the caller instead of the language model alone: it can route, escalate (transfer), hang up, call webhooks and let the language model answer with extra instructions ([pipelines.md](pipelines.md#live-pipelines)). Needs the `cascade` pipeline |
 | `romanised` | the voice's setting | `off`, `auto` or `on`: romanised text in what the agent says (the greeting, prompts, the language model's answers) is written in the voice's script first; never an error on a call, see api.md, "Romanised text" |
 | `turn_detection` | server VAD | passed to the Realtime session, e.g. `{ type = "semantic_vad" }` or `{ silence_duration_ms = 400 }` |
 | `tools` | `[]` | function tools, see below |

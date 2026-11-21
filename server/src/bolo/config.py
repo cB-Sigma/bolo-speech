@@ -269,6 +269,9 @@ class Settings:
     #: the secret pipeline webhooks and callbacks are signed with (unset: generated into <data_dir>/webhook-secret)
     webhook_secret: str | None = None
     pipeline_webhook_timeout_s: float = 10.0  # a webhook step or a run's callback
+    #: folders (and the folders under them) that pipelines may watch for new recordings (triggers of type folder)
+    pipeline_watch_dirs: list[str] = field(default_factory=list)
+    pipeline_watch_interval_s: float = 5.0  # how often watched folders are looked at
 
     # -- other protocols --------------------------------------------------
     wyoming: bool = False

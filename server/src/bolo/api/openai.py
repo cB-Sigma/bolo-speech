@@ -424,6 +424,12 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
                 exc.param = "punctuation"
                 raise
         language = str(form.get("language") or "") or None
+        # extension: a saved pipeline to run on the upload afterwards, as a job (docs/pipelines.md, "Triggers")
+        then_pipeline: dict[str, Any] | None = None
+        if form.get("pipeline") and task == "transcribe":
+            then_pipeline = core.pipelines.definition(str(form.get("pipeline")))
+            if then_pipeline.get("mode", "file") != "file":
+                raise InvalidRequest("a live pipeline runs in calls and sessions, not on an upload", param="pipeline")
         # extension: model "auto" without a language identifies the language and picks the recogniser (bolo.lid)
         routing = task == "transcribe" and is_routing_request(core, model, language)
         spec = core.resolve(None if routing else model, "stt")
@@ -494,6 +500,18 @@ async def _transcribe_endpoint(request: Request, task: str) -> Response:
             return Response(status_code=499)  # the client went away; nobody reads this
         headers["openai-processing-ms"] = str(round(trace.total_ms or 0))
         headers.update(fallback_headers(trace))
+        if then_pipeline is not None:
+            from bolo.pipelines import Audio
+
+            try:
+                then_run = core.pipelines.runner.prepare(
+                    then_pipeline, audio=Audio(samples, rate), text=transcript.text, filename=file.filename,
+                    trigger="upload",
+                )  # fmt: skip
+                core.pipelines.start(then_run)
+                headers["x-bolo-pipeline-run"] = then_run.id
+            except BoloError as exc:  # the transcript stands; the pipeline says why it did not start
+                headers["x-bolo-pipeline-run"] = f"error; {exc.message[:200]}"
         return _render(transcript, fmt, task, granularities, headers)
 
     queue: asyncio.Queue[bytes | None] = asyncio.Queue()

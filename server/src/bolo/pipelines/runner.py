@@ -90,6 +90,8 @@ class Run:
     callback: dict[str, Any] | None = None
     job_id: str | None = None
     stop_reason: str | None = None
+    #: what a live run did to its session (reply, respond, transfer, hangup), in order
+    actions: list[dict[str, Any]] = field(default_factory=list)
     report: Report | None = None
     #: called after each step (progress for jobs and the console)
     on_step: Callable[[Run], None] | None = None
@@ -109,7 +111,11 @@ class Run:
             "started_at": _iso(self.started) or None,
             "finished_at": _iso(self.finished) or None,
             "ms": round(ms, 1) if ms is not None else None,
-            "input": {k: v for k, v in self.inputs.items() if k != "audio" and v is not None},
+            "input": {
+                k: v
+                for k, v in self.inputs.items()
+                if k not in ("audio", "history") and not k.startswith("_") and v is not None
+            },
             "steps": self.steps,
             "outputs": self.outputs,
             "error": self.error,
@@ -127,6 +133,8 @@ class Run:
             out["job_id"] = self.job_id
         if self.stop_reason:
             out["stopped"] = self.stop_reason
+        if self.actions:
+            out["actions"] = self.actions
         if self.report is not None and self.report.warnings:
             out["warnings"] = [w.to_dict() for w in self.report.warnings]
         return out
@@ -608,4 +616,5 @@ def media_type(name: str) -> str:
 
 
 # the handlers register themselves
+from bolo.pipelines import live as _live  # noqa: E402,F401
 from bolo.pipelines import steps as _steps  # noqa: E402,F401

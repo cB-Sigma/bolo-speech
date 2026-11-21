@@ -69,9 +69,11 @@ async def create_pipeline(request: Request) -> Response:
 @router.post("/api/v1/pipelines/validate", tags=[TAG], summary="Validate a pipeline without saving it")
 async def validate_pipeline(request: Request) -> JSONResponse:
     """Always 200 for a readable body: ``valid``, ``errors`` and ``warnings`` (each with the ``path`` of the field),
-    and ``steps``: each step's resolved model, inputs (with the defaults they take) and outputs."""
+    ``steps``: each step's resolved model, inputs (with the defaults they take) and outputs, and ``pipeline``: the
+    definition as read (a YAML body comes back as JSON)."""
     core = get_core(request)
-    return JSONResponse(validate(await _body(request), core).to_dict())
+    definition = await _body(request)
+    return JSONResponse({**validate(definition, core).to_dict(), "pipeline": definition})
 
 
 @router.get("/api/v1/pipelines/step-types", tags=[TAG], summary="Step types with their inputs, options and outputs")
@@ -215,6 +217,11 @@ async def _run(request: Request, definition: dict[str, Any] | None, pipeline_id:
         url = str(form.get("url"))
         data, content_type = await _fetch(core, url)
         filename = url.rsplit("/", 1)[-1].split("?", maxsplit=1)[0] or None
+    if definition.get("mode") == "live":
+        raise InvalidRequest(
+            "a live pipeline runs per turn of a call or Realtime session: simulate it (POST /v1/pipelines/simulate)",
+            param="pipeline",
+        )
     try:
         run = core.pipelines.runner.prepare(definition, text=text, filename=filename, variables=variables)
     except PipelineInvalid as exc:
@@ -233,6 +240,73 @@ async def _run(request: Request, definition: dict[str, Any] | None, pipeline_id:
     except BoloError:
         raise
     return JSONResponse(run.to_dict())
+
+
+async def _conversation_turns(core: Bolo, data: bytes, filename: str | None, language: str | None) -> list[str]:
+    """A recorded conversation as the caller's turns: cut at pauses (voice activity), each one transcribed."""
+    from bolo.audio.resample import resample
+    from bolo.engines.base import VadParams
+    from bolo.streaming.vad import detect_segments
+
+    samples, rate = await asyncio.to_thread(decode_audio, data, filename=filename)
+    x = await asyncio.to_thread(resample, samples, rate, 16000)
+    detector, _ = await core.vad_detector(VadParams(min_silence_s=0.8, max_speech_s=30.0))
+    turns = []
+    for a, b in await asyncio.to_thread(detect_segments, detector, x):
+        if b - a < 16000 * 0.3:
+            continue
+        t = await core.transcribe(x[a:b], 16000, language=language)
+        if t.text.strip():
+            turns.append(t.text.strip())
+    return turns
+
+
+@router.post(
+    "/v1/pipelines/simulate", tags=[TAG], summary="Play a typed or recorded conversation through a live pipeline"
+)
+async def simulate_live(request: Request) -> Response:
+    """Multipart: ``pipeline`` (a live definition, JSON or YAML) or ``pipeline_id`` (a saved one); ``turns`` (a JSON
+    list of what the caller says, turn by turn) or ``file`` (a recording of the caller, cut into turns at pauses and
+    transcribed); ``instructions`` (the session's instructions, for ``respond`` steps) and ``language``. Each turn
+    runs through the pipeline as in a call: the answer is every turn's run (steps, outputs, actions), what the agent
+    said, and how the conversation ended. ``respond`` steps ask the language model without streaming here."""
+    from bolo.pipelines.live import simulate
+
+    core = get_core(request)
+    form = await request.form()
+    if form.get("pipeline_id"):
+        definition = core.pipelines.definition(str(form.get("pipeline_id")))
+    else:
+        raw = form.get("pipeline")
+        if raw is None:
+            raise InvalidRequest(
+                "send the pipeline (pipeline) or the id of a saved one (pipeline_id)", param="pipeline"
+            )
+        source = raw if isinstance(raw, str) else (await raw.read()).decode("utf-8")
+        definition = parse_text(source)
+    if not isinstance(definition, dict) or definition.get("mode") != "live":
+        raise InvalidRequest("only a live pipeline (mode: live) can be simulated", param="pipeline")
+    turns: list[str] = []
+    if form.get("turns"):
+        try:
+            parsed = json.loads(str(form.get("turns")))
+        except ValueError as exc:
+            raise InvalidRequest("turns must be a JSON list of texts", param="turns") from exc
+        if not isinstance(parsed, list) or not all(isinstance(t, str) for t in parsed):
+            raise InvalidRequest("turns must be a JSON list of texts", param="turns")
+        turns = [t for t in parsed if t.strip()]
+    file = form.get("file")
+    language = str(form.get("language") or "") or None
+    if not turns and file is not None and not isinstance(file, str):
+        turns = await _conversation_turns(core, await file.read(), file.filename, language)
+    if len(turns) > 50:
+        raise InvalidRequest("a simulation has at most 50 turns", param="turns")
+    instructions = str(form.get("instructions") or "") or None
+    try:
+        result = await simulate(core, definition, turns, instructions=instructions)
+    except PipelineInvalid as exc:
+        return _invalid(exc)
+    return JSONResponse(result)
 
 
 @router.post("/v1/pipelines/run", tags=[TAG], summary="Run a pipeline sent with the request (not saved)")

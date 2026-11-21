@@ -96,6 +96,8 @@ class AgentConfig:
     tts_model: str | None = None
     llm_model: str | None = None
     pipeline: str | None = None
+    #: a saved live pipeline (docs/pipelines.md, "Live pipelines") that answers each turn of the caller
+    pipeline_id: str | None = None
     #: function tools: {name, description, parameters, url}; a tool with a url is called with an HTTP POST
     tools: list[dict[str, Any]] = field(default_factory=list)
     #: longest call in seconds (0: no limit) and what is said before hanging up at the limit

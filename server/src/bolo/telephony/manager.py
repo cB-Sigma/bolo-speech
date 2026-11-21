@@ -271,6 +271,10 @@ class TelephonyManager:
         )
         if pending.agent.summary and record.transcript and self.core.llm.configured:
             self._spawn(self._summarise(record, pending.agent))
+        try:  # pipelines with a call_end trigger (bolo.pipelines.triggers)
+            self.core.pipelines.triggers.call_ended(record)
+        except Exception:
+            log.exception("call %s: the call_end pipelines did not start", record.id)
 
     def _spawn(self, coro: Any) -> None:
         with contextlib.suppress(RuntimeError):  # no running loop (a record closed during shutdown)

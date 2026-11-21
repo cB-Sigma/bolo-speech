@@ -117,6 +117,7 @@ def create_app(settings: Settings | None = None, core: Bolo | None = None) -> Fa
                 "x-bolo-cloned",
                 "x-bolo-blend",
                 "x-bolo-language",
+                "x-bolo-pipeline-run",
             ],
         )
 

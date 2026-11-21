@@ -2506,6 +2506,10 @@ webhooks and saved files) into one job; the full reference is [pipelines.md](pip
   model, status, time and outputs; with `async=true` a 202 with the queued run, also a job at `/api/v1/jobs/{id}`,
   and the finished run POSTed to `callback_url` signed with `X-Bolo-Signature` (HMAC-SHA256, `webhook_secret`).
   This is also the asynchronous transcription job: a one-step `stt` pipeline with a callback.
+* `POST /v1/pipelines/simulate`: a typed or recorded conversation through a live pipeline (`mode: live`, the
+  behaviour of a phone agent's `pipeline_id` or a Realtime session's `session.pipeline_id`).
+* `POST /v1/audio/transcriptions` with `pipeline=<id>` also runs that pipeline on the upload as a job
+  (`x-bolo-pipeline-run`).
 * `GET /api/v1/pipelines/runs[?pipeline=]`, `GET /api/v1/pipelines/runs/{run_id}`,
   `GET /api/v1/pipelines/runs/{run_id}/files/{name}`, `POST /api/v1/pipelines/runs/{run_id}/cancel`.
 

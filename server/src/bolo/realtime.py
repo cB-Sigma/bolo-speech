@@ -202,6 +202,10 @@ class RealtimeSession:
         self.tts_model: str | None = None
         self.llm_model: str | None = None
         self.trace_extra: dict[str, Any] = {}
+        #: a live pipeline that answers each user turn instead of the language model alone (bolo.pipelines.live)
+        self.pipeline_id: str | None = None
+        self.live_pipeline: dict[str, Any] | None = None
+        self._live_turns = 0
         self.in_codec, self.in_rate, self.in_format = _format(None, "")
         self.out_codec, self.out_rate, self.out_format = _format(None, "")
         self.transcription: dict[str, Any] = {"model": s.default_realtime_stt, "language": None, "prompt": None}
@@ -332,6 +336,7 @@ class RealtimeSession:
             "max_output_tokens": self.max_output_tokens,
             "truncation": "auto",
             "pipeline": self.pipeline,  # bolo extension
+            "pipeline_id": self.pipeline_id,  # bolo extension: a live pipeline answers each turn
             # bolo extension: the speech-to-speech model hears and speaks at once (no turns; bolo.duplex.bridge)
             "full_duplex": self.full_duplex,
             "duplex": self.duplex_options,
@@ -348,6 +353,11 @@ class RealtimeSession:
             return
         self._closed = True
         self.core.active_streams -= 1
+        if self.kind == "realtime" and self.transport != "telephony":  # calls have call_end pipelines
+            with contextlib.suppress(Exception):
+                self.core.pipelines.triggers.session_ended(
+                    {"id": self.id, "transport": self.transport, **self.trace_extra}, self.transcript_text()
+                )
         for task in (self._partial_task, self._response, self._worker):
             if task is not None and not task.done():
                 task.cancel()
@@ -563,6 +573,8 @@ class RealtimeSession:
                         "the pipeline cannot change after audio or items were sent", param="session.pipeline"
                     )
                 self.pipeline = pipeline
+            if "pipeline_id" in session:
+                self._configure_live(session["pipeline_id"])
             if self._s2s is not None and any(k in session for k in ("instructions", "tools", "tool_choice")):
                 log.info(
                     "session %s: instructions and tools reach the speech-to-speech model only before the first turn",
@@ -621,6 +633,25 @@ class RealtimeSession:
                         "the full-duplex model's options are fixed once audio has started", param="session.duplex"
                     )
                 self.duplex_options = dict(options)
+
+    def _configure_live(self, pipeline_id: Any) -> None:
+        """``session.pipeline_id`` (bolo extension): a saved live pipeline answers each user turn."""
+        if pipeline_id in (None, ""):
+            self.pipeline_id, self.live_pipeline = None, None
+            return
+        if not isinstance(pipeline_id, str):
+            raise RealtimeError("pipeline_id must be the id of a saved live pipeline", param="session.pipeline_id")
+        try:
+            definition = self.core.pipelines.definition(pipeline_id)
+        except BoloError as exc:
+            raise RealtimeError(exc.message, param="session.pipeline_id") from exc
+        if definition.get("mode") != "live":
+            raise RealtimeError(
+                f"pipeline '{pipeline_id}' is not a live pipeline (mode: live)", param="session.pipeline_id"
+            )
+        if self.pipeline != "cascade":
+            raise RealtimeError("a live pipeline needs the cascade pipeline", param="session.pipeline_id")
+        self.pipeline_id, self.live_pipeline = pipeline_id, definition
 
     def _configure_denoise(self, audio_in: dict[str, Any]) -> None:
         """``noise_reduction`` (OpenAI: any type turns the default denoiser on; null leaves the server's default) and
@@ -1180,7 +1211,9 @@ class RealtimeSession:
                     self.core.traces.record(trace)
                 return
             ok = await self._transcribe(item, audio, trace)
-            if ok and respond and self.kind == "realtime":
+            if ok and respond and self.kind == "realtime" and self.live_pipeline is not None:
+                await self._live_turn(item, audio, trace)
+            elif ok and respond and self.kind == "realtime":
                 await self._start_response({}, trace)
             elif self.kind == "transcription" or not respond:
                 trace.kind, trace.model = "stt", self.transcription["model"]
@@ -1407,6 +1440,54 @@ class RealtimeSession:
         with contextlib.suppress(asyncio.CancelledError, Exception):
             await task
 
+    async def _live_turn(self, item: dict[str, Any], audio: FloatArray, trace: Trace) -> None:
+        """A user turn through the session's live pipeline (bolo.pipelines.live)."""
+        from bolo.pipelines.live import run_turn
+        from bolo.pipelines.runner import Audio
+
+        assert self.live_pipeline is not None
+        target = _SessionTarget(self, trace)
+        history = [
+            {"role": m["role"], "content": m["content"]}
+            for m in self._messages(None, None)
+            if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str)
+        ][:-1]
+        text = str(item["content"][0].get("transcript") or "")
+        info = {"id": self.id, "transport": self.transport, **self.trace_extra}
+        turn = self._live_turns
+        self._live_turns += 1
+        run = await run_turn(self.core, self.live_pipeline, target, text=text, audio=Audio(audio, SR),
+                             history=history, turn=turn, session=info)  # fmt: skip
+        trace.extra["pipeline_run"] = run.id
+        if run.status != "ok" and run.error:
+            await self.error(f"pipeline {self.pipeline_id}: {run.error['message']}", code="pipeline_failed")
+        if not target.spoke:  # the turn got no answer: its trace ends here
+            trace.extra["pipeline_id"] = self.pipeline_id
+            trace.finish("ok" if run.status == "ok" else "error", (run.error or {}).get("message"))
+            self.core.traces.record(trace)
+
+    def transcript_text(self) -> str:
+        """The conversation as "User: ..." and "Assistant: ..." lines."""
+        lines = []
+        for item in self.items:
+            if item.get("type") != "message" or item.get("role") not in ("user", "assistant"):
+                continue
+            for part in item.get("content") or []:
+                text = part.get("transcript") or part.get("text")
+                if text:
+                    lines.append(f"{'User' if item['role'] == 'user' else 'Assistant'}: {str(text).strip()}")
+        return "\n".join(lines)
+
+    def _last_assistant_text(self) -> str:
+        for item in reversed(self.items):
+            if item.get("role") == "assistant" and item.get("type") == "message":
+                for part in item.get("content") or []:
+                    text = part.get("transcript") or part.get("text")
+                    if text:
+                        return str(text)
+                return ""
+        return ""
+
     def _audio_part(self, item_id: str) -> dict[str, Any]:
         wav = encode_audio(self._user_audio[item_id], SR, "wav")
         return {"type": "input_audio", "input_audio": {"data": base64.b64encode(wav).decode(), "format": "wav"}}
@@ -1551,6 +1632,11 @@ class RealtimeSession:
 
         async def text_deltas() -> AsyncIterator[str]:
             nonlocal first_token, finish_reason
+            if isinstance(params.get("_say"), str):  # a live pipeline's reply: said as written
+                first_token = trace.now()
+                trace.extra["first_token_ms"] = round(trace.elapsed_ms(), 1)
+                yield params["_say"]
+                return
             async for chunk in llm.stream_chat(body):
                 if chunk.get("usage"):
                     usage.update(chunk["usage"])
@@ -1949,6 +2035,36 @@ class RealtimeSession:
 
 # -- ephemeral client secrets -------------------------------------------------
 SECRET_PREFIX = "ek_"
+
+
+class _SessionTarget:
+    """What a live pipeline's actions do to a Realtime session: speak, let the language model answer, or tell the
+    client (and a phone call, through its event handler) to transfer or hang up."""
+
+    def __init__(self, session: RealtimeSession, trace: Trace) -> None:
+        self.session = session
+        self.trace = trace
+        self.spoke = False
+
+    def _trace(self) -> Trace:
+        if not self.spoke:
+            self.spoke = True
+            return self.trace
+        return self.session._agent_trace()
+
+    async def say(self, text: str) -> str:
+        await self.session._start_response({"_say": text}, self._trace())
+        return text
+
+    async def respond(self, instructions: str | None) -> str:
+        params: dict[str, Any] = {}
+        if instructions:
+            params["instructions"] = "\n\n".join(x for x in (self.session.instructions, instructions) if x)
+        await self.session._start_response(params, self._trace())
+        return self.session._last_assistant_text()
+
+    async def action(self, kind: str, **fields: Any) -> None:
+        await self.session.send("pipeline.action", action=kind, **{k: v for k, v in fields.items() if v is not None})
 
 
 def mint_client_secret(core: Bolo, session: dict[str, Any] | None, seconds: int = 600) -> dict[str, Any]:

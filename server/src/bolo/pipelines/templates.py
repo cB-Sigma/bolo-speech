@@ -120,12 +120,12 @@ TEMPLATES: list[dict[str, Any]] = [
     {
         "id": "after-call-summary",
         "name": "After-call summary and QA",
-        "description": "After a call: redact it, summarise it, check whether the issue was resolved and whether a "
-        "follow-up is needed, and post it all to a webhook.",
+        "description": "At the end of every phone call, on its transcript: redact it, summarise it, check whether "
+        "the issue was resolved and whether a follow-up is needed, and post it all to a webhook.",
         "vars": {"webhook_url": "https://example.com/hooks/after-call"},
+        "triggers": [{"type": "call_end"}],
         "steps": [
-            {"id": "stt", "type": "stt"},
-            {"id": "redact", "type": "pii"},
+            {"id": "redact", "type": "pii", "inputs": {"text": "{{input.text}}"}},
             {"id": "summary", "type": "llm", "options": {
                 "prompt": "Summarise this support call in three sentences:\n\n{{steps.redact.text}}"}},
             {"id": "resolved", "type": "decision", "inputs": {"text": "{{steps.redact.text}}"},
@@ -135,10 +135,64 @@ TEMPLATES: list[dict[str, Any]] = [
             {"id": "post", "type": "webhook", "options": {"url": "{{vars.webhook_url}}"}, "inputs": {"body": {
                 "summary": "{{steps.summary.text}}", "resolved": "{{steps.resolved.answer}}",
                 "follow_up": "{{steps.follow_up.answer}}", "transcript": "{{steps.redact.text}}",
+                "call": "{{input.call}}",
             }}},
         ],
         "outputs": {"summary": "{{steps.summary.text}}", "resolved": "{{steps.resolved.answer}}",
                     "follow_up": "{{steps.follow_up.answer}}"},
+    },
+    {
+        "id": "support-line",
+        "name": "Support line",
+        "mode": "live",
+        "description": "Per caller turn: an angry or upset caller is passed to a person at once; otherwise the "
+        "question is routed to a department and the language model answers as that desk (streamed, with the agent's "
+        "tools).",
+        "steps": [
+            {"id": "mood", "type": "decision", "options": {
+                "question": "Is the caller angry, very upset or asking for a human?"}},
+            {"id": "escalate", "type": "condition", "options": {
+                "if": {"value": "{{steps.mood.answer}}", "equals": "yes"},
+                "then": [{"id": "to_person", "type": "transfer", "options": {
+                    "say": "I am sorry about this. Let me put you through to a colleague right away."}}],
+            }},
+            {"id": "department", "type": "decision", "options": {
+                "question": "Which department should answer the caller?",
+                "choices": ["billing", "technical", "sales", "other"]}},
+            {"id": "answer", "type": "respond", "options": {
+                "instructions": "You are answering for the {{steps.department.answer}} desk. Answer briefly; if the "
+                                "question belongs to another desk, say which one."}},
+        ],
+    },
+    {
+        "id": "appointment-line",
+        "name": "Appointment booking line",
+        "mode": "live",
+        "description": "Per caller turn: what the caller wants (book, change, cancel); for a booking the free "
+        "slots come from your scheduling webhook and the language model offers them and confirms one.",
+        "vars": {"slots_url": "https://example.com/hooks/slots"},
+        "steps": [
+            {"id": "intent", "type": "decision", "options": {
+                "question": "What does the caller want?", "choices": ["book", "change", "cancel", "other"]}},
+            {"id": "route", "type": "switch", "inputs": {"value": "{{steps.intent.answer}}"}, "options": {
+                "cases": {
+                    "book": [
+                        {"id": "slots", "type": "webhook", "on_error": "continue",
+                         "options": {"url": "{{vars.slots_url}}"},
+                         "inputs": {"body": {"request": "{{input.text}}", "turn": "{{input.turn}}"}}},
+                        {"id": "offer", "type": "respond", "options": {
+                            "instructions": "Free slots (JSON from the calendar; empty if it did not answer): "
+                                            "{{steps.slots.body}}. Offer two or three and confirm the one the caller "
+                                            "picks. Never invent a slot."}},
+                    ],
+                    "other": [{"id": "explain", "type": "reply", "inputs": {
+                        "text": "I can book, move or cancel appointments. What would you like to do?"}}],
+                },
+                "default": [{"id": "manage", "type": "respond", "options": {
+                    "instructions": "The caller wants to {{steps.intent.answer}} an appointment. Ask for the date "
+                                    "and name it was booked under, then confirm the change."}}],
+            }},
+        ],
     },
 ]  # fmt: skip
 
