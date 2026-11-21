@@ -85,6 +85,7 @@ Loader kinds:
 | `sherpa-onnx` (text-to-speech) | `vits` (Piper format, MMS, Coqui, MeloTTS), `kokoro`, `kitten`, `matcha` |
 | `sherpa-onnx` (VAD) | `silero_vad`, `ten_vad` |
 | `faster-whisper` | `ct2-whisper` |
+| `cactus` (`bolo-speech[cactus]`) | `cactus-whistle` |
 
 Steps:
 

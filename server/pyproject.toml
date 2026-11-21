@@ -50,6 +50,9 @@ sherpa = ["sherpa-onnx>=2.0,<3"]
 faster-whisper = ["faster-whisper>=1.1"]
 moonshine = ["useful-moonshine-onnx"]
 whispercpp = ["pywhispercpp>=1.3"]
+# Cactus Compute's runtime (Apache-2.0) for Whistle: the package fetches its native engine (libcactus, Apache-2.0)
+# from its pinned, checksummed release on Hugging Face the first time a model loads
+cactus = ["cactus-compute>=4.2.6,<5"]
 # kokoro-onnx itself is MIT but depends on `phonemizer` (GPL-3.0-or-later).
 # It is deliberately NOT part of `all`; Kokoro runs through sherpa-onnx by default.
 kokoro-onnx = ["kokoro-onnx>=0.4"]
@@ -217,7 +220,7 @@ warn_unused_ignores = false
 [[tool.mypy.overrides]]
 module = [
   "sherpa_onnx.*", "faster_whisper.*", "ctranslate2.*", "soundfile.*", "soxr.*", "av.*",
-  "moonshine_onnx.*", "kokoro_onnx.*", "pywhispercpp.*", "_pywhispercpp", "wyoming.*", "whisper_normalizer.*",
+  "moonshine_onnx.*", "kokoro_onnx.*", "cactus", "cactus.*", "pywhispercpp.*", "_pywhispercpp", "wyoming.*", "whisper_normalizer.*",
   "onnxruntime.*", "tomli.*", "aiortc.*", "uccharan.*", "tokenizers.*", "sipmessage.*", "onnx.*", "pynvml.*",
   "opentelemetry.*", "webrtcvad.*", "sphn.*", "torch.*", "transformers.*", "mlx.*", "mlx_whisper.*", "parakeet_mlx.*",
   "mlx_audio.*",

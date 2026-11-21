@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-527 models: 231 validated on CPU by the maintainers, 296 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+528 models: 232 validated on CPU by the maintainers, 296 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -239,6 +239,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | `dicow-v3.3` | en | accuracy | pseudo | 3.6 GB | CC-BY-4.0 · needs plugin torch | **CPU** · RTF 0.453 |
 | `se-dicow` | en | accuracy | pseudo | 4.4 GB | Apache-2.0 · needs plugin torch | **CPU** · RTF 0.589 |
 | `dicow-v3.3-onnx` | en | accuracy | pseudo | 1.5 GB | CC-BY-4.0 | **CPU** · RTF 0.725 |
+
+#### Whistle
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `whistle` | en, de, fr, es, it, nl +1 | realtime | pseudo | 17 MB | Apache-2.0 | **CPU** · RTF 0.244 · WER 22.8% |
 
 #### Voxtral
 
@@ -3487,6 +3493,7 @@ it, and what you download, carry their own terms.
 | onnxruntime | MIT | runs the optional end-of-turn model (Smart Turn v3, BSD-2-Clause); installed with faster-whisper anyway |
 | aiortc | BSD-3-Clause | optional (`bolo-speech[webrtc]`): the WebRTC transport of the Realtime API; brings PyAV |
 | pywhispercpp / whisper.cpp | MIT / MIT | optional |
+| cactus-compute / libcactus | Apache-2.0 / Apache-2.0 | optional (`bolo-speech[cactus]`): runs Whistle's `.cact` weights in process; the package downloads its engine library on first use, and bolo turns its anonymous usage counts off (`CACTUS_TELEMETRY=0`) |
 | kokoro-onnx | MIT, **but depends on `phonemizer` (GPL-3.0-or-later)** and loads espeak-ng in process | optional, deliberately not in `bolo-speech[all]` |
 | piper-tts (`piper1-gpl`) | GPL-3.0 | **not used and not supported**: Piper-format voices run through sherpa-onnx instead |
 | llama.cpp (`llama-server`) | MIT | optional, a separate process: the `tts-server` engine starts it or connects to one (`bolo components install llama-server` downloads the upstream release) |

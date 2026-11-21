@@ -45,6 +45,7 @@ KINDS: dict[str, tuple[str, str, bool]] = {
     "matcha": ("sherpa-onnx", "tts", False),
     "moonshine-onnx": ("moonshine", "stt", False),
     "whispercpp": ("whisper.cpp", "stt", False),
+    "cactus-whistle": ("cactus", "stt", False),
     "kokoro-onnx": ("kokoro-onnx", "tts", False),
     "silero_vad": ("sherpa-onnx", "vad", False),
     "ten_vad": ("sherpa-onnx", "vad", False),
@@ -77,6 +78,8 @@ def detect_kind(repo: str, paths: list[str]) -> str | None:
         return "dicow_onnx"
     if "nemotron" in name and "diar" in name and has(r"\.onnx$"):
         return "nemotron_diarization"
+    if has(r"\.cact$") and "whistle" in name:
+        return "cactus-whistle"
     if has(r"silero_vad.*\.onnx$"):
         return "silero_vad"
     if has(r"ten-vad.*\.onnx$"):

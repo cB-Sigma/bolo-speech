@@ -1,0 +1,54 @@
+# Speech-to-text models run by Cactus Compute's runtime (engine cactus, bolo.engines.cactus): pip install
+# "bolo-speech[cactus]".
+
+- id: whistle
+  aliases:
+  - Cactus-Compute/whistle
+  task: stt
+  engine: cactus
+  kind: cactus-whistle
+  family: Whistle
+  languages:
+  - en
+  - de
+  - fr
+  - es
+  - it
+  - nl
+  - pl
+  tier: realtime
+  size_bytes: 16931368
+  license: Apache-2.0
+  features:
+  - timestamps
+  - punctuation
+  - language-detect
+  description: 'Cactus Compute Whistle (October 2026): a 16.9 MB on-device recogniser for English, German, French,
+    Spanish, Italian, Dutch and Polish with punctuation, word times with probabilities, language detection and
+    keyword biasing (a request''s hotwords). Its 2- and 4-bit "Cactus Quants" weights run only in Cactus''s own
+    engine: install it with pip install "bolo-speech[cactus]" (the package downloads its engine library, about
+    20 MB, the first time a model loads).'
+  source_url: https://huggingface.co/Cactus-Compute/whistle
+  validated: cpu
+  measured:
+    rtf: 0.2442
+    wer: 0.228
+    audio_s: 23.0
+    load_s: 0.11
+    memory_mb: 20
+    threads: 4
+    engine: cactus 4.2.6
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-21'
+    test_audio: bolo's en-long sample (English, Kokoro, 11.8 s); es1.wav and fr1.wav of csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25
+    note: Through bolo (core.transcribe), English and French with language=, Spanish without (detected as es). English
+      word for word but for a full stop for a comma; Spanish "Esta prende asamplia, recomiendo elegir una talla menor
+      al habitual."; French "Annie ses mois sont allés à Paris ..." for "Alice et moi sommes allés". Loads in 0.1 s
+      and uses about 20 MB. The machine was shared (load average 4-7).
+  source:
+    repo: Cactus-Compute/whistle
+    revision: 88cb00eeb8928ddbcd410b491584f938ba030b07
+    include:
+    - whistle.cact
+    - config.json
+    - LICENSE

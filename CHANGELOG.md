@@ -8,6 +8,14 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Whistle** (`whistle`) and a `cactus` engine: Cactus Compute's 16.9 MB on-device recogniser (Apache-2.0) for
+  English, German, French, Spanish, Italian, Dutch and Polish, with language detection, word times with probabilities
+  and keyword biasing through a request's `hotwords`. Its 2- and 4-bit weights run only in Cactus's own engine, which
+  bolo now loads in process: `pip install "bolo-speech[cactus]"` (the package fetches its pinned engine library on
+  first use; bolo turns the package's anonymous usage counts off). On the 4-vCPU reference machine it read English,
+  Spanish and French test clips at 0.24 of real time with 20 MB of memory; the English one came out word for word,
+  the others with two or three words wrong.
+
 - **Rev's Reverb diarization v1** (`reverb-diarization-v1`) without PyTorch: Rev's fine-tune of the pyannote
   segmentation model (the sherpa-onnx project's ONNX export, not gated) with 3D-Speaker ERes2Net embeddings, 36 MB.
   Rev Model Non-Production License: not for commercial use, labelled so. On the console's two-voice dialogue it found
