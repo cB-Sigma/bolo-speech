@@ -563,16 +563,34 @@
   license_url: https://huggingface.co/Revai/reverb-diarization-v2/blob/main/LICENSE
   commercial_use: false
   gated: true
-  description: 'Rev''s Reverb diarization v2, Rev''s own pyannote 3.1 pipeline: a segmentation model on WavLM
+  description: 'Rev''s Reverb diarization v2, Rev''s own pyannote 3.1 pipeline: a segmentation model on WavLM Base+
     features (Rev reports 22.25 % lower word diarization error than pyannote 3.0), WeSpeaker ResNet34 embeddings and
-    agglomerative clustering, through pyannote.audio in the torch plugin. Its WavLM front end may fetch the WavLM
-    Base+ weights through torchaudio the first time it loads. bolo''s sherpa-onnx route cannot run v2 (its ONNX
-    export gave one turn for a whole two-speaker clip); v1 runs there as reverb-diarization-v1. NOT FOR COMMERCIAL
-    USE: the Rev Model Non-Production License allows only research, testing, evaluation and personal use outside
-    production. Gated: accept the conditions of Revai/reverb-diarization-v2 and (pyannote.audio 4 loads its PLDA
-    files for every pipeline) pyannote/speaker-diarization-community-1, and set HF_TOKEN. Added, not yet run here.'
+    agglomerative clustering, through pyannote.audio in the torch plugin. On first load torchaudio downloads the
+    WavLM Base+ weights (378 MB) to build the model, which the checkpoint then overwrites. Very slow on a CPU (about
+    16 times real time here): give the plugin a GPU. bolo''s sherpa-onnx route cannot run v2 (its ONNX export gave one
+    turn for a whole two-speaker clip); v1 runs there as reverb-diarization-v1. NOT FOR COMMERCIAL USE: the Rev Model
+    Non-Production License allows only research, testing, evaluation and personal use outside production. Gated:
+    accept the conditions of Revai/reverb-diarization-v2 and (pyannote.audio 4 loads its PLDA files for every
+    pipeline) pyannote/speaker-diarization-community-1, and set HF_TOKEN.'
   source_url: https://huggingface.co/Revai/reverb-diarization-v2
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 16.16
+    der: 0.6152
+    der_collar_250ms: 0.4796
+    load_s: 20.6
+    audio_s: 27.2
+    threads: 4
+    engine: bolo-torch (unreleased, after 0.1.9), torch 2.15.0+cpu, torchaudio 2.11.1+cpu, pyannote.audio 4.1.1
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-21'
+    test_audio: the console's two-voice dialogue (server/src/bolo/_ui/diarization/two-speakers-en)
+    note: 'Pulled through bolo (gated files with the token), then run by the plugin''s loader on those files: the
+      whole clip came back as one speaker (missed 0 %, false alarm 19.8 %, confusion 41.7 %); the segmentation
+      model itself labels every frame of the two synthetic voices as one local speaker, and the sherpa-onnx export
+      of it does the same. On two real read-speech clips of different speakers joined end to end, its labels did change between them. Through
+      bolo''s HTTP path the request ran past the plugin''s 600 s limit on this machine, which was heavily loaded
+      (load average 10-13); on an idle CPU or a GPU it fits.'
   source:
     repo: Revai/reverb-diarization-v2
     revision: f08664832352c36c72c194c5ff5e1305ec75126c
@@ -599,13 +617,13 @@
     repo: Revai/reverb-diarization-v2
     also_gated: [pyannote/speaker-diarization-community-1]
     sha256:
+      config.yaml: 4602a771bd90a7270e366f1ed0485f9ddd5f6620356fd1b5cfaa919951eab6e2
       segmentation/pytorch_model.bin: e4d31b37661ccdfd38855da20dae491bf0a98c6fa21650aa4e3a75b846e0f41e
       embedding/pytorch_model.bin: 366edf44f4c80889a3eb7a9d7bdf02c4aede3127f7dd15e274dcdb826b143c56
       plda/plda.npz: 9b77bcd840692710dd3496f62ecfeed8d8e5f002fd991b785079b244eab7d255
       plda/xvec_transform.npz: 325f1ce8e48f7e55e9c8aa47e05d2766b7c48c4b25b8de8dd751e7a4cc5fbe8f
     license_note: 'Rev Model Non-Production License: research, testing, evaluation and personal use in non-production
       settings only; no commercial use, hosted services included. Ask Rev (licensing@rev.com) for other uses.'
-    not_yet_run: true
 - id: reverb-asr
   aliases: [Revai/reverb-asr]
   task: stt
@@ -627,9 +645,23 @@
     plugin runs the repository''s TorchScript export with greedy CTC decoding (Rev''s own package pins torch 2.2.2 and
     is not used). No timestamps; no translation. NOT FOR COMMERCIAL USE: the Rev Model Non-Production License allows
     only research, testing, evaluation and personal use outside production. Gated: accept Rev''s conditions on the
-    model page and set HF_TOKEN. Added, not yet run here (wiring tested with a small scripted model).'
+    model page and set HF_TOKEN. Writes lower case without punctuation.'
   source_url: https://huggingface.co/Revai/reverb-asr
-  validated: untested
+  validated: cpu
+  measured:
+    rtf: 0.0503
+    wer: 0.0
+    audio_s: 11.8
+    load_s: 2.63
+    memory_mb: 1490
+    threads: 4
+    engine: bolo-torch (unreleased, after 0.1.9), torch 2.15.0+cpu, torchaudio 2.11.1+cpu
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-21'
+    test_audio: bolo's en-long sample (English, Kokoro, 11.8 s)
+    note: 'Through bolo and the torch plugin, verbatimicity 1.0: word for word, in lower case without punctuation,
+      as Reverb writes. The download is the gated TorchScript file (1.16 GB); about 1.5 GB of memory. The machine was
+      shared (load average 9-12).'
   source:
     repo: Revai/reverb-asr
     revision: fc269766a3ea15d72e513a897d30397d77f325f7
@@ -645,7 +677,6 @@
     max_chunk_s: 20.0
     license_note: 'Rev Model Non-Production License: research, testing, evaluation and personal use in non-production
       settings only; no commercial use, hosted services included. Ask Rev (licensing@rev.com) for other uses.'
-    not_yet_run: true
 - id: dicow-v3.3
   aliases: [dicow]
   task: stt

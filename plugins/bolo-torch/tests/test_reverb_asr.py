@@ -112,9 +112,9 @@ def test_kind_and_catalog_entries() -> None:
     catalog = Catalog.load()
     asr = catalog.resolve("reverb-asr")
     assert asr is not None and asr.kind == "reverb-asr" and asr.engine == "plugin:torch" and asr.languages == ["en"]
-    assert asr.gated and not asr.commercial_use and asr.options["not_yet_run"] is True
+    assert asr.gated and not asr.commercial_use and asr.validated == "cpu" and "not_yet_run" not in asr.options
     jit = [u for u in asr.source.urls if u["path"] == rv.JIT_FILE]
     assert jit and len(jit[0]["sha256"]) == 64 and asr.source.revision in jit[0]["url"]
     v2 = catalog.resolve("reverb-diarization-v2-torch")
     assert v2 is not None and v2.kind == "pyannote-diarization" and v2.gated and not v2.commercial_use
-    assert v2.options["not_yet_run"] is True and v2.options["repo"] == "Revai/reverb-diarization-v2"
+    assert "not_yet_run" not in v2.options and v2.options["repo"] == "Revai/reverb-diarization-v2"

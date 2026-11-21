@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-547 models: 243 validated on CPU by the maintainers, 304 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+547 models: 245 validated on CPU by the maintainers, 302 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -259,7 +259,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
-| `reverb-asr` | en | accuracy | pseudo | 1.2 GB | Rev Model Non-Production License (non-commercial) ⚠ · needs plugin torch · gated | untested |
+| `reverb-asr` | en | accuracy | pseudo | 1.2 GB | Rev Model Non-Production License (non-commercial) ⚠ · needs plugin torch · gated | **CPU** · RTF 0.050 · WER 0.0% |
 
 #### DiCoW
 
@@ -868,7 +868,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `pyannote-speaker-diarization-3.1` | - | balanced | - | 33 MB | MIT (pipeline, segmentation-3.0) + CC-BY-4.0 (WeSpeaker e… · needs plugin torch · gated | **CPU** · RTF 0.906 · DER 6.0% on a two-voice test clip |
 | `pyannote-speaker-diarization-community-1` | - | balanced | - | 33 MB | CC-BY-4.0 · needs plugin torch · gated | **CPU** · RTF 0.876 · DER 6.0% on a two-voice test clip |
-| `reverb-diarization-v2-torch` | - | accuracy | - | 450 MB | Rev Model Non-Production License (segmentation, non-comme… ⚠ · needs plugin torch · gated | untested |
+| `reverb-diarization-v2-torch` | - | accuracy | - | 450 MB | Rev Model Non-Production License (segmentation, non-comme… ⚠ · needs plugin torch · gated | **CPU** · RTF 16.160 · DER 61.5% on a two-voice test clip |
 
 #### DiariZen
 

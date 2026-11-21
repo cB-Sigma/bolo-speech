@@ -23,13 +23,16 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   mlx-audio's own port of the model (no code from the model repository runs), on a new MLX kind `mlx-audio-stt` whose
   instructions come from the catalog entry (`options.prompts`). The `mlx` extra now needs mlx-audio 0.6.6, the first
   release with the model. Added, not yet run (`options.not_yet_run`).
-- **Jais-ASR, Reverb ASR and Reverb diarization v2 through the torch plugin, added, not yet run.** IFM's Jais-ASR
+- **Jais-ASR, Reverb ASR and Reverb diarization v2 through the torch plugin.** IFM's Jais-ASR
   (`jais-asr`, Apache-2.0, Arabic with its dialects plus English, French, Spanish and Italian, 11.4 GB) on a new
   generic transformers pipeline loader, its remote code pinned and run only after the per-model opt-in. Rev's
   Reverb ASR (`reverb-asr`, English) from its TorchScript export, and Rev's Reverb diarization v2
   (`reverb-diarization-v2-torch`, Rev's pyannote pipeline): both under the Rev Model Non-Production License (not for
-  commercial use, labelled so) and gated (accept Rev's conditions and set `hf_token`). Their loaders are tested with
-  fakes; the models are marked not yet run.
+  commercial use, labelled so) and gated (accept Rev's conditions and set `hf_token`). Reverb ASR ran through bolo on
+  the 4-vCPU reference machine: an English clip word for word (lower case, no punctuation) at 0.05 of real time.
+  Reverb diarization v2 ran in the plugin at 16 times real time and put both voices of the console's two-voice clip
+  in one speaker; through bolo's HTTP path it ran past the plugin's 600 s limit on the loaded machine. Jais-ASR is
+  marked not yet run: its 11.4 GB did not fit on this machine's disk.
 - **Canary-Qwen 2.5B without NeMo or PyTorch** (`canary-qwen-2.5b-onnx`): NVIDIA's English recogniser (a
   FastConformer encoder feeding Qwen3-1.7B, CC-BY-4.0), run by bolo in ONNX Runtime from OpenVoiceOS's int8 export
   (2.9 GB): the prompt around the audio embeddings, a key/value cache and greedy decoding, written for it (kind

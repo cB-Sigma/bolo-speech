@@ -156,9 +156,6 @@ def test_catalog_entries_use_kinds_the_plugin_knows() -> None:
     for spec in [*diarizers.values(), *(s for s in entries if s.id == "pixit-ami")]:
         # pinned pipeline and sub-models, with the hashes the plugin checks again before pyannote reads anything
         assert spec.gated and len(spec.source.revision or "") == 40, spec.id
-        assert all(len(h) == 64 for h in spec.options["sha256"].values())
-        # the pipeline file is pinned too; an entry not yet run whose gated repository could not be read yet
-        # (reverb-diarization-v2-torch) still has its config parsed with safe_load and checked class by class
-        assert "config.yaml" in spec.options["sha256"] or spec.options.get("not_yet_run") is True, spec.id
+        assert all(len(h) == 64 for h in spec.options["sha256"].values()) and "config.yaml" in spec.options["sha256"]
         for url in spec.source.urls:
             assert "/resolve/main/" not in url["url"] and url["sha256"] == spec.options["sha256"][url["path"]]

@@ -12,9 +12,10 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
   `jais-asr`, transformers 5.16.1). Wiring tested with a fake pipeline; the model (11.4 GB) not run yet.
 - **Rev's Reverb ASR** (kind `reverb-asr`, extra `reverb`): the repository's TorchScript export through WeNet's export
   interface (encoder, CTC), greedy CTC over its BPE units, Kaldi filterbanks from torchaudio and Rev's
-  verbatimicity. Rev's own package pins torch 2.2.2 and is not used. Tested with a small scripted model; the gated
-  model not run yet.
-- **Rev's Reverb diarization v2** (`reverb-diarization-v2-torch`) on the existing pyannote loader; not run yet.
+  verbatimicity. Rev's own package pins torch 2.2.2 and is not used. Run on CPU: an English clip word for word at 0.05
+  of real time.
+- **Rev's Reverb diarization v2** (`reverb-diarization-v2-torch`) on the existing pyannote loader. Runs on CPU, very
+  slowly (16 times real time); torchaudio downloads the WavLM Base+ weights on its first load.
 - **Salesforce SOV-Transcribe-1** (kind `sov-transcribe`, extra `sov-transcribe`): speech to text in English, French,
   German, Spanish, Italian, Portuguese and Dutch through transformers 5.19 to 5.22 and the model's own code (remote
   code, opt in per model), with the prompts of its card (language hint, hotwords as words the audio may contain).
