@@ -8,6 +8,12 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Cohere Transcribe 03-2026** (`cohere-transcribe-03-2026`): Cohere Labs' 2 B recogniser for 14 languages with
+  punctuation, Apache-2.0, on sherpa-onnx (the sherpa-onnx project's int8 export, 2.9 GB, which unlike Cohere's own
+  repository is not gated). It does not detect the language: pass `language` (English otherwise). On the 4-vCPU
+  reference machine, busy with other jobs, English, Spanish and French test clips came out word for word at 0.86 of
+  real time.
+
 - **Qwen3-ASR 0.6B and 1.7B** (`qwen3-asr-0.6b`, `qwen3-asr-1.7b`): Alibaba's recognisers for 30 languages and 22
   Chinese dialects with punctuation, Apache-2.0, on sherpa-onnx (int8: the sherpa-onnx project's 0.6B export, 987 MB,
   and a community 1.7B export in the same layout, 2.4 GB). Without `language` they transcribe the language they hear

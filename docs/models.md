@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-525 models: 229 validated on CPU by the maintainers, 296 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+526 models: 230 validated on CPU by the maintainers, 296 untested. 23 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -348,6 +348,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `qwen3-asr-0.6b` | zh, en, yue, ar, de, fr +24 | accuracy | pseudo | 987 MB | Apache-2.0 | **CPU** · RTF 0.723 · WER 5.6% |
 | `qwen3-asr-1.7b` | zh, en, yue, ar, de, fr +24 | accuracy | pseudo | 2.4 GB | Apache-2.0 | **CPU** · RTF 1.820 · WER 5.6% |
+
+#### Cohere Transcribe
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `cohere-transcribe-03-2026` | en, fr, de, it, es, pt +8 | accuracy | pseudo | 2.9 GB | Apache-2.0 | **CPU** · RTF 0.859 · WER 0.0% |
 
 ### Text to speech
 

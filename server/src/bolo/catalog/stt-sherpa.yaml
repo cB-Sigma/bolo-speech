@@ -4144,3 +4144,62 @@
     - encoder.int8.onnx
     - decoder.int8.onnx
     - tokenizer/*
+- id: cohere-transcribe-03-2026
+  aliases:
+  - CohereLabs/cohere-transcribe-03-2026
+  - csukuangfj2/sherpa-onnx-cohere-transcribe-14-lang-int8-2026-04-01
+  task: stt
+  engine: sherpa-onnx
+  kind: cohere_transcribe
+  family: Cohere Transcribe
+  languages:
+  - en
+  - fr
+  - de
+  - it
+  - es
+  - pt
+  - el
+  - nl
+  - pl
+  - zh
+  - ja
+  - ko
+  - vi
+  - ar
+  tier: accuracy
+  size_bytes: 2888052036
+  params: 2000000000
+  license: Apache-2.0
+  features:
+  - punctuation
+  description: 'Cohere Labs Cohere Transcribe 03-2026 (2 B parameters, Conformer encoder with a Transformer decoder):
+    recognition in 14 languages with punctuation. It does not detect the language: pass language= (English is
+    assumed without it, and speech in another language then comes out partly translated). Int8 ONNX export published
+    by the sherpa-onnx project; unlike the original repository (Apache-2.0, gated: accept the conditions on the model
+    page) it is not gated. No word timestamps. Slow on a CPU (2.9 GB).'
+  source_url: https://huggingface.co/CohereLabs/cohere-transcribe-03-2026
+  validated: cpu
+  measured:
+    rtf: 0.859
+    wer: 0.0
+    audio_s: 23.0
+    load_s: 7.73
+    memory_mb: 2888
+    threads: 4
+    engine: sherpa-onnx 2.0.2
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    date: '2026-11-21'
+    test_audio: bolo's en-long sample (English, Kokoro, 11.8 s); es1.wav and fr1.wav of csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25
+      test_wavs
+    note: 'Through bolo (core.transcribe) with language= en, es and fr: all three word for word. French with the language
+      left at English came out half translated ("Alice and I are going to Paris to voyage en train"). The machine
+      was shared (load average 6-8).'
+  source:
+    repo: csukuangfj2/sherpa-onnx-cohere-transcribe-14-lang-int8-2026-04-01
+    revision: 156a470cf08eefe706a0004f3c52d9ee567ca7a0
+    include:
+    - encoder.int8.onnx
+    - encoder.int8.onnx.data
+    - decoder.int8.onnx
+    - tokens.txt
