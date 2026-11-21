@@ -129,7 +129,7 @@ class OnnxRuntimeEngine(Engine):
     kinds = (
         "smart_turn", "text_turn", "nemotron_diarization", "dicow_onnx", "canary_qwen_onnx", "lfm3_audio_onnx",
         "marblenet_vad",
-        "deepfilternet3_stream",
+        "deepfilternet3_stream", "sepformer_onnx", "metricgan_onnx", "speechbrain_ctc",
         "whisper_lid", "onnx_lid", "onnx_speaker_embedding", "fbank_speaker_embedding", "onnx_emotion",
         "ctc_align",
         "dtln_aec", "openwakeword", "gliner_pii",
@@ -145,7 +145,7 @@ class OnnxRuntimeEngine(Engine):
             return EngineStatus(
                 self.id, False, None,
                 f"{type(exc).__name__}: {exc}. Optional (end-of-turn detection, MarbleNet VAD, Nemotron diarization, DiCoW, Canary-Qwen, LFM3-Audio, "
-                "DeepFilterNet 3, language identification, speech emotion, forced alignment, DTLN-aec, openWakeWord, "
+                "DeepFilterNet 3, SepFormer, MetricGAN+, SpeechBrain CTC recognisers, language identification, speech emotion, forced alignment, DTLN-aec, openWakeWord, "
                 "watermarking): "
                 "pip install onnxruntime",
             )  # fmt: skip
@@ -203,6 +203,18 @@ class OnnxRuntimeEngine(Engine):
             from bolo.engines.denoisers import DeepFilterNetStream
 
             return DeepFilterNetStream(path, spec, opts)
+        if kind == "sepformer_onnx":
+            from bolo.engines.speechbrain_onnx import SepFormerDenoiser, SepFormerSeparation
+
+            return SepFormerDenoiser(path, spec, opts) if task == "denoise" else SepFormerSeparation(path, spec, opts)
+        if kind == "speechbrain_ctc":
+            from bolo.engines.speechbrain_onnx import SpeechBrainCtc
+
+            return SpeechBrainCtc(path, spec, opts)
+        if kind == "metricgan_onnx":
+            from bolo.engines.speechbrain_onnx import MetricGanPlus
+
+            return MetricGanPlus(path, spec, opts)
         if kind == "whisper_lid":
             from bolo.engines.lid_onnx import WhisperLid
 

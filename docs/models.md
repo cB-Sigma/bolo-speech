@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-548 models: 245 validated on CPU by the maintainers, 303 untested. 34 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+552 models: 249 validated on CPU by the maintainers, 303 untested. 34 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -915,6 +915,10 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `sepformer-whamr16k` | en | accuracy | - | 113 MB | Apache-2.0 · needs plugin torch | **CPU** · RTF 3.690 |
 | `sepformer-whamr` | en | balanced | - | 113 MB | Apache-2.0 · needs plugin torch | **CPU** · RTF 1.440 |
+| `sepformer-wsj02mix` | en | balanced | - | 106 MB | Apache-2.0 | **CPU** · RTF 3.507 |
+| `sepformer-wsj03mix` | en | balanced | - | 106 MB | Apache-2.0 | **CPU** · RTF 3.597 |
+| `sepformer-libri2mix` | en | accuracy | - | 106 MB | Apache-2.0 | **CPU** · RTF 1.860 |
+| `sepformer-libri3mix` | en | accuracy | - | 106 MB | Apache-2.0 | **CPU** · RTF 3.823 |
 
 #### PixIT
 
@@ -2383,6 +2387,40 @@ defaults zero a speaker's track wherever that speaker is judged silent;
 `leakage_removal: false` (a bolo-torch option) did better here. A
 check with perfect tracks handed over in the wrong order confirmed that
 bolo gives each diarized speaker their own track, aligned to the sample.
+
+**SepFormer without PyTorch** (2026-11-21). SpeechBrain's SepFormers trained on
+WSJ0-2mix, WSJ0-3mix, Libri2Mix and Libri3Mix run in ONNX Runtime
+(`sepformer_onnx`, bolo.engines.speechbrain_onnx): the weights exported
+unchanged by `server/tools/export_speechbrain_onnx.py` and published under
+`codebucketsolutions/<model>-onnx` with the parity check (the graph's tracks
+against SpeechBrain 1.1.2's `separate_batch`: 65 to 97 dB SI-SNR apart, the
+same model to float precision). All four are 8 kHz models (SpeechBrain
+publishes no 16 kHz version of them); the three-speaker ones are the first
+in the catalog. SI-SNR improvement on equal-power mixtures of bolo's three
+sample voices (en-long, a man; en-short and hi-short, two women; all starting
+together, 3 to 4 s), references band-limited to 8 kHz, best permutation;
+RTF through bolo's class, 2 threads, on the shared machine (load average 8
+to 15):
+
+| model | voices | card (test set) | man + woman (en) | man + woman (hi) | woman + woman | all three | RTF |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `sepformer-wsj02mix` | 2 | 22.4 dB | +4.9 | +7.3 | +3.7 | +0.6 | 3.5 |
+| `sepformer-libri2mix` | 2 | 20.6 dB | +9.6 | +12.1 | +10.8 | +2.0 | 1.9 |
+| `sepformer-wsj03mix` | 3 | 19.8 dB | +6.3 | +7.6 | -1.3 | +2.7 | 3.6 |
+| `sepformer-libri3mix` | 3 | 19.0 dB | +5.9 | +11.1 | +7.8 | +12.0 | 3.8 |
+
+A two-voice model given three voices returns two tracks (scored against the
+best two voices). The LibriMix models did much better on these voices than
+the WSJ0 ones, and `sepformer-libri3mix` is the only one that separated
+three voices usefully (+12 dB). Synthetic speech from one TTS engine is not a
+recording: this says which model to try first, not what it does on your
+audio; it was not run through the cpWER evaluation above. Through
+`separate_overlaps` on a three-voice synthetic dialogue the pipeline ran
+(`applied`), but the diarizer heard the two women as one speaker, so only
+two tracks were used: separation can only help as far as diarization finds
+the speakers. The WSJ0 models' training data is LDC-licensed (WSJ0), a
+provenance risk for commercial use; LibriMix is built from LibriSpeech
+(CC BY 4.0).
 
 ## Voice-activity detection
 

@@ -40,3 +40,171 @@
   options:
     enroll_model: enroll.onnx
     chunk_model: chunk_int8.onnx
+
+# SepFormer in ONNX Runtime (bolo.engines.speechbrain_onnx): SpeechBrain's checkpoints exported unchanged by
+# server/tools/export_speechbrain_onnx.py and published under codebucketsolutions/ with their parity checks.
+# The WHAMR! SepFormers run on the torch plugin (plugin-torch.yaml).
+- id: sepformer-wsj02mix
+  task: separation
+  engine: onnxruntime
+  kind: sepformer_onnx
+  family: SepFormer
+  languages: [en]
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 106064377
+  license: Apache-2.0
+  license_url: https://huggingface.co/speechbrain/sepformer-wsj02mix
+  description: 'SpeechBrain SepFormer trained on WSJ0-2mix (8 kHz, clean read English): blind separation of two
+    overlapping voices, used by separate_overlaps. bolo hands it 16 kHz audio, resampled to 8 kHz and back.
+    SpeechBrain reports 22.4 dB SI-SNRi on the WSJ0-2mix test set. Runs in ONNX Runtime without PyTorch (an unchanged
+    export of the weights, codebucketsolutions/sepformer-wsj02mix-onnx). Weights Apache-2.0; WSJ0-2mix is built from
+    WSJ0 (LDC93S6A, Linguistic Data Consortium licence): a provenance risk for commercial use. Slower than real time
+    on CPU.'
+  source_url: https://huggingface.co/speechbrain/sepformer-wsj02mix
+  validated: cpu
+  measured:
+    rtf: 3.507
+    load_s: 0.8
+    audio_s: 13.15
+    memory_mb: 610
+    threads: 2
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 13-14)
+    date: '2026-11-21'
+    test_audio: bolo samples en-long, en-short and hi-short mixed two and three at a time (3.0-4.1 s each)
+    note: 'Synthetic equal-power mixtures of bolo''s three sample voices (en-long male, en-short and hi-short female;
+      all starting together, 16 kHz), references band-limited to 8 kHz, best permutation. Mean SI-SNR improvement per
+      two-voice mix: en-long m + en-short f +4.9 dB; en-long m + hi-short f +7.3 dB; en-short f + hi-short f +3.7 dB;
+      three voices: +0.6 dB (per voice +0.9, -0.2, +1.2) from the two-speaker model''s two tracks. The ONNX graph
+      matches SpeechBrain''s PyTorch model (parity.json in the repository).'
+  source:
+    repo: codebucketsolutions/sepformer-wsj02mix-onnx
+    revision: cc60bde1bb1117aa6304e0217d82b5f57b53900d
+    include: [sepformer.onnx, speechbrain_onnx.json]
+  options:
+    model_sample_rate: 8000
+    speakers: 2
+- id: sepformer-wsj03mix
+  task: separation
+  engine: onnxruntime
+  kind: sepformer_onnx
+  family: SepFormer
+  languages: [en]
+  tier: balanced
+  sample_rate: 16000
+  size_bytes: 106328439
+  license: Apache-2.0
+  license_url: https://huggingface.co/speechbrain/sepformer-wsj03mix
+  description: 'SpeechBrain SepFormer trained on WSJ0-3mix (8 kHz, clean read English): blind separation of three
+    overlapping voices, used by separate_overlaps. bolo hands it 16 kHz audio, resampled to 8 kHz and back.
+    SpeechBrain reports 19.8 dB SI-SNRi on the WSJ0-3mix test set. Runs in ONNX Runtime without PyTorch (an unchanged
+    export of the weights, codebucketsolutions/sepformer-wsj03mix-onnx). Weights Apache-2.0; WSJ0-3mix is built from
+    WSJ0 (LDC93S6A, Linguistic Data Consortium licence): a provenance risk for commercial use. Slower than real time
+    on CPU.'
+  source_url: https://huggingface.co/speechbrain/sepformer-wsj03mix
+  validated: cpu
+  measured:
+    rtf: 3.597
+    load_s: 0.77
+    audio_s: 13.15
+    memory_mb: 611
+    threads: 2
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 14-15)
+    date: '2026-11-21'
+    test_audio: bolo samples en-long, en-short and hi-short mixed two and three at a time (3.0-4.1 s each)
+    note: 'Synthetic equal-power mixtures of bolo''s three sample voices (en-long male, en-short and hi-short female;
+      all starting together, 16 kHz), references band-limited to 8 kHz, best permutation. Mean SI-SNR improvement per
+      two-voice mix: en-long m + en-short f +6.3 dB; en-long m + hi-short f +7.6 dB; en-short f + hi-short f -1.3 dB;
+      three voices: +2.7 dB (per voice +4.7, +2.1, +1.4). The ONNX graph matches SpeechBrain''s PyTorch model
+      (parity.json in the repository).'
+  source:
+    repo: codebucketsolutions/sepformer-wsj03mix-onnx
+    revision: 9b0e207becb3d975dc6891f698708749686ecd41
+    include: [sepformer.onnx, speechbrain_onnx.json]
+  options:
+    model_sample_rate: 8000
+    speakers: 3
+- id: sepformer-libri2mix
+  task: separation
+  engine: onnxruntime
+  kind: sepformer_onnx
+  family: SepFormer
+  languages: [en]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 106064378
+  license: Apache-2.0
+  license_url: https://huggingface.co/speechbrain/sepformer-libri2mix
+  description: 'SpeechBrain SepFormer trained on Libri2Mix (8 kHz, clean read English): blind separation of two
+    overlapping voices, used by separate_overlaps. bolo hands it 16 kHz audio, resampled to 8 kHz and back.
+    SpeechBrain reports 20.6 dB SI-SNRi on the Libri2Mix test set. Runs in ONNX Runtime without PyTorch (an unchanged
+    export of the weights, codebucketsolutions/sepformer-libri2mix-onnx). Weights Apache-2.0; Libri2Mix is built from
+    LibriSpeech (CC BY 4.0); LibriMix''s noisy variants add WHAM! noise (CC BY-NC 4.0), and the card does not say
+    which was used. Slower than real time on CPU.'
+  source_url: https://huggingface.co/speechbrain/sepformer-libri2mix
+  validated: cpu
+  measured:
+    rtf: 1.86
+    load_s: 0.86
+    audio_s: 13.15
+    memory_mb: 610
+    threads: 2
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 9-13)
+    date: '2026-11-21'
+    test_audio: bolo samples en-long, en-short and hi-short mixed two and three at a time (3.0-4.1 s each)
+    note: 'Synthetic equal-power mixtures of bolo''s three sample voices (en-long male, en-short and hi-short female;
+      all starting together, 16 kHz), references band-limited to 8 kHz, best permutation. Mean SI-SNR improvement per
+      two-voice mix: en-long m + en-short f +9.6 dB; en-long m + hi-short f +12.1 dB; en-short f + hi-short f +10.8
+      dB; three voices: +2.0 dB (per voice +3.8, +4.3, -2.0) from the two-speaker model''s two tracks. The ONNX graph
+      matches SpeechBrain''s PyTorch model (parity.json in the repository).'
+  source:
+    repo: codebucketsolutions/sepformer-libri2mix-onnx
+    revision: f8c3c60de6155dbe3828717ac89db246bd792d07
+    include: [sepformer.onnx, speechbrain_onnx.json]
+  options:
+    model_sample_rate: 8000
+    speakers: 2
+- id: sepformer-libri3mix
+  task: separation
+  engine: onnxruntime
+  kind: sepformer_onnx
+  family: SepFormer
+  languages: [en]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 106328440
+  license: Apache-2.0
+  license_url: https://huggingface.co/speechbrain/sepformer-libri3mix
+  description: 'SpeechBrain SepFormer trained on Libri3Mix (8 kHz, clean read English): blind separation of three
+    overlapping voices, used by separate_overlaps. bolo hands it 16 kHz audio, resampled to 8 kHz and back.
+    SpeechBrain reports 19.0 dB SI-SNRi on the Libri3Mix test set. Runs in ONNX Runtime without PyTorch (an unchanged
+    export of the weights, codebucketsolutions/sepformer-libri3mix-onnx). Weights Apache-2.0; Libri3Mix is built from
+    LibriSpeech (CC BY 4.0); LibriMix''s noisy variants add WHAM! noise (CC BY-NC 4.0), and the card does not say
+    which was used. Slower than real time on CPU.'
+  source_url: https://huggingface.co/speechbrain/sepformer-libri3mix
+  validated: cpu
+  measured:
+    rtf: 3.823
+    load_s: 1.12
+    audio_s: 13.15
+    memory_mb: 611
+    threads: 2
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 11-12)
+    date: '2026-11-21'
+    test_audio: bolo samples en-long, en-short and hi-short mixed two and three at a time (3.0-4.1 s each)
+    note: 'Synthetic equal-power mixtures of bolo''s three sample voices (en-long male, en-short and hi-short female;
+      all starting together, 16 kHz), references band-limited to 8 kHz, best permutation. Mean SI-SNR improvement per
+      two-voice mix: en-long m + en-short f +5.9 dB; en-long m + hi-short f +11.1 dB; en-short f + hi-short f +7.8 dB;
+      three voices: +12.0 dB (per voice +11.4, +11.3, +13.2). The ONNX graph matches SpeechBrain''s PyTorch model
+      (parity.json in the repository).'
+  source:
+    repo: codebucketsolutions/sepformer-libri3mix-onnx
+    revision: 5c81d94214440c8acb244e7cc6818b9d7f2dca5e
+    include: [sepformer.onnx, speechbrain_onnx.json]
+  options:
+    model_sample_rate: 8000
+    speakers: 3

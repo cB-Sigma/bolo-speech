@@ -8,6 +8,17 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **SpeechBrain's SepFormer separators without PyTorch, three-speaker separation among them.** SepFormer trained on
+  WSJ0-2mix (`sepformer-wsj02mix`), WSJ0-3mix (`sepformer-wsj03mix`), Libri2Mix (`sepformer-libri2mix`) and Libri3Mix
+  (`sepformer-libri3mix`), blind separators for `separate_overlaps` (`separation_model`), run in ONNX Runtime by a new
+  kind `sepformer_onnx` (bolo.engines.speechbrain_onnx). The weights are SpeechBrain's, exported unchanged by the new
+  `server/tools/export_speechbrain_onnx.py` and published under `codebucketsolutions/<model>-onnx` with their parity
+  checks (65 to 97 dB SI-SNR from SpeechBrain 1.1.2's own output). All four are 8 kHz models (no 16 kHz versions are
+  published) and Apache-2.0; the WSJ0 ones were trained on LDC-licensed data (WSJ0), the LibriMix ones on
+  LibriSpeech (CC BY 4.0). Run on CPU through bolo's class on equal-power mixtures of bolo's three sample voices:
+  `sepformer-libri3mix` improved three voices at once by 12.0 dB SI-SNR, `sepformer-libri2mix` two voices by 9.6 to
+  12.1 dB; the WSJ0 models did less (models.md, "Overlapping speech"). RTF 1.9 to 3.8 on 2 threads of a shared
+  4-vCPU machine, about 610 MB of memory.
 - **Live decisions are a shortcut for a live pipeline.** `session.decisions` and an agent's `decisions` now run as a
   live pipeline through the pipeline runner: a `decisions` step and one action step per rule, with the rule as its
   `when` (rules that end the call run last). Their actions arrive as `pipeline.action` events (`"source":
