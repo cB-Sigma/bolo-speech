@@ -543,10 +543,13 @@ answer to the user is not held up, and the answers arrive as an event of their o
 
 `conversation.item.decisions.failed` carries an `error` instead. `actions` lists the rules that matched; in a
 Realtime session bolo carries out `tag` (the session's traces get `tags`) and reports the others for the client to
-act on; on a phone call `transfer` and `end_call` move the call (telephony.md, "Live decisions"). The answers are
+act on (each as a `pipeline.action` event too); on a phone call `transfer` and `end_call` move the call
+(telephony.md, "Live decisions"). The answers are
 also POSTed to the server's `decision_webhook_url`, if set (a client cannot choose where). `null` turns the hook off.
-Live decisions never answer the user; a live pipeline (`session.pipeline_id`, docs/pipelines.md) does, and its
-`decision` steps use the same models. The two can run in one session.
+Live decisions are a shortcut for a live pipeline (docs/pipelines.md, "Live decisions: the shortcut"): bolo runs
+them as a `decisions` step and one action step per rule, through the pipeline runner, so the matched rules also
+arrive as `pipeline.action` events (`"source": "decisions"`). Unlike a live pipeline (`session.pipeline_id`) they never
+answer the user; the two can run in one session.
 
 ### Echo cancellation
 

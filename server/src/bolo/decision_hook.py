@@ -1,5 +1,10 @@
 """Live decisions: questions asked after every user turn of a Realtime session or a phone call (bolo.decide).
 
+Live decisions are a shortcut for a live pipeline (bolo.pipelines.live): :func:`definition` turns a hook into a
+pipeline of one ``decisions`` step and one action step per rule (``tag``, ``notify``, ``transfer``, ``hangup``), and
+:func:`run` runs it with the same runner, conditions and ``pipeline.action`` events as a saved live pipeline. The one
+difference is when: a live pipeline answers the turn, a hook runs beside the answer and never speaks of its own.
+
 A hook is a decision model, named questions (as for ``POST /v1/audio/decisions``) and optional rules that turn an
 answer into an action. After each user turn has its final transcript, the questions are asked about that turn (the
 transcript and, unless ``audio`` is false, the turn's audio, at most the model's limit) in the background, so the
@@ -22,8 +27,7 @@ The configuration (Realtime: ``session.decisions``; phone agents: ``decisions``)
 A rule matches when its question's answer is ``answer`` (yes_no: true or false; choice: an option; score: a level's
 label or index), when given, and the probability of that answer is at least ``min_probability`` (yes_no: of the
 answer given; choice: of the chosen option), when given; ``min_score`` asks a score question for a level of at
-least this value instead. The module is independent of the transport (a pipeline step can use :func:`evaluate` and
-:func:`matched` the same way).
+least this value instead. Each rule becomes the ``when`` of its step; rules that end the call run after the others.
 
 Webhooks: ``decision_webhook_url`` (a setting; phone agents can name their own) receives a POST of the event as
 JSON, signed like pipeline webhooks (``X-Bolo-Signature`` with ``webhook_secret``, ``X-Bolo-Event: decisions``).
@@ -40,14 +44,13 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from bolo.decide import Decision, decide, parse_questions
+from bolo.decide import parse_questions
 from bolo.engines.base import FloatArray
-from bolo.errors import InvalidRequest
+from bolo.errors import BoloError, InvalidRequest
 
 if TYPE_CHECKING:
     from bolo.config import Settings
     from bolo.core import Bolo
-    from bolo.obs.trace import Trace
 
 log = logging.getLogger("bolo.decisions")
 
@@ -142,56 +145,117 @@ def parse_hook(raw: Any, *, param: str = "decisions") -> Hook | None:
         rules.append(rule)
     model = raw.get("model")
     given = raw.get("questions")
-    shown: dict[str, Any] = json.loads(given) if isinstance(given, (str, bytes)) else dict(given or {})
-    return Hook(questions, shown, str(model) if model else None, raw.get("audio") is not False, rules)
+    shown_q: dict[str, Any] = json.loads(given) if isinstance(given, (str, bytes)) else dict(given or {})
+    hook = Hook(questions, shown_q, str(model) if model else None, raw.get("audio") is not False, rules)
+    from bolo.pipelines.definition import validate
+
+    report = validate(definition(hook))
+    if not report.valid:
+        first = report.errors[0]
+        raise InvalidRequest(f"{param}: {first.message} ({first.path})", param=param)
+    return hook
 
 
-def matched(hook: Hook, answers: dict[str, dict[str, Any]]) -> list[Rule]:
-    """The rules whose condition holds for ``answers`` (bolo.decide's shape), in order."""
-    out: list[Rule] = []
-    for rule in hook.rules:
-        a = answers.get(rule.question)
-        if not a:
-            continue
-        if a["type"] == "yes_no":
-            if rule.answer is not None and a["answer"] is not rule.answer:
-                continue
-            p = a["probability"] if a["answer"] else 1.0 - a["probability"]
-        elif a["type"] == "choice":
-            if rule.answer is not None and a["answer"] != str(rule.answer):
-                continue
-            p = float(a["probabilities"].get(a["answer"], 0.0))
+#: what each rule action is in the implicit live pipeline
+STEP_FOR = {"end_call": "hangup", "transfer": "transfer", "tag": "tag", "notify": "notify"}
+#: rules that end the call run after the others, so that tags and notices of the same turn are not lost
+ENDING = ("end_call", "transfer")
+DECISIONS_STEP = "decisions"
+
+
+def _condition(hook: Hook, rule: Rule) -> dict[str, Any] | None:
+    """The ``when`` of a rule's step: the pipeline condition the rule's answer, probability and score make."""
+    q, kind = rule.question, hook.questions[rule.question]["type"]
+    ref = f"{{{{steps.{DECISIONS_STEP}.answers.{q}."
+    parts: list[dict[str, Any]] = []
+    if rule.answer is not None:
+        if kind == "score":
+            field_ = "level" if isinstance(rule.answer, int) and not isinstance(rule.answer, bool) else "label"
+            parts.append({"value": ref + field_ + "}}", "equals": rule.answer})
         else:
-            if rule.answer is not None and rule.answer not in (a["label"], a["level"]):
-                continue
-            if rule.min_score is not None and a["score"] < rule.min_score:
-                continue
-            p = float(a["probabilities"][a["level"]]) if a["probabilities"] else 0.0
-        if rule.min_probability is not None and p < rule.min_probability:
-            continue
-        out.append(rule)
-    return out
+            parts.append({"value": ref + "answer}}", "equals": rule.answer if kind == "noul" else str(rule.answer)})
+    if rule.min_probability is not None:
+        parts.append({"value": f"{{{{steps.{DECISIONS_STEP}.probabilities.{q}}}}}", "gte": rule.min_probability})
+    if rule.min_score is not None:
+        parts.append({"value": ref + "score}}", "gte": rule.min_score})
+    if not parts:
+        return None
+    return parts[0] if len(parts) == 1 else {"all": parts}
 
 
-async def evaluate(
-    core: Bolo, hook: Hook, text: str | None, audio: FloatArray | None, trace: Trace
-) -> tuple[Decision, list[Rule]]:
-    """Ask the hook's questions about one turn: its transcript and, when the hook sends audio, its last seconds."""
-    spec = core.resolve(hook.model, "decision")
-    samples = None
-    if hook.audio and audio is not None and len(audio) >= SR // 10:
-        spec_max = float(spec.options.get("max_audio_s") or 30.0)
-        samples = np.ascontiguousarray(audio[-int(spec_max * SR) :], dtype=np.float32)
-    result = await decide(core, spec.id, text or None, samples, SR if samples is not None else None,
-                          hook.questions, trace)  # fmt: skip
-    return result, matched(hook, result.answers)
+def ordered_rules(hook: Hook) -> list[tuple[int, Rule]]:
+    """The rules in the order their steps run: tags and notices first, then those that end the call."""
+    indexed = list(enumerate(hook.rules))
+    return [x for x in indexed if x[1].do not in ENDING] + [x for x in indexed if x[1].do in ENDING]
 
 
-def event_fields(item_id: str, result: Decision, rules: list[Rule]) -> dict[str, Any]:
+def definition(hook: Hook) -> dict[str, Any]:
+    """The live pipeline a hook is a shortcut for: a ``decisions`` step with the hook's questions, then one action
+    step per rule (``tag``, ``notify``, ``transfer``, ``hangup``), each with the rule as its ``when``."""
+    inputs: dict[str, Any] = {"text": "{{input.text}}"}
+    if hook.audio:
+        inputs["audio"] = "{{input.audio}}"
+    steps: list[dict[str, Any]] = [
+        {"id": DECISIONS_STEP, "type": "decisions", "model": hook.model, "inputs": inputs,
+         "options": {"questions": hook.raw_questions}},
+    ]  # fmt: skip
+    for i, rule in ordered_rules(hook):
+        step: dict[str, Any] = {"id": f"rule-{i}", "type": STEP_FOR[rule.do]}
+        when = _condition(hook, rule)
+        if when is not None:
+            step["when"] = when
+        if rule.do == "tag":
+            step["options"] = {"value": rule.value}
+        elif rule.do == "transfer" and rule.value:
+            step["options"] = {"to": rule.value}
+        steps.append(step)
+    return {"id": "session-decisions", "name": "Live decisions", "mode": "live", "steps": steps}
+
+
+@dataclass
+class HookResult:
+    model: str
+    answers: dict[str, dict[str, Any]]
+    #: the rules whose step ran (their condition held), in the hook's order
+    matched: list[Rule]
+    run: Any
+
+
+async def run(
+    core: Bolo, hook: Hook, target: Any, *, text: str, audio: FloatArray | None, session: dict[str, Any], turn: int
+) -> HookResult:
+    """One turn through the hook's live pipeline (bolo.pipelines.live.run_turn): the same runner, steps and
+    ``pipeline.action`` events as a saved live pipeline. ``target`` carries out the actions."""
+    from bolo.pipelines.live import run_turn
+    from bolo.pipelines.runner import Audio
+
+    if hook.model is None:
+        hook.model = core.resolve(None, "decision").id
+    heard = Audio(np.ascontiguousarray(audio, dtype=np.float32), SR) if audio is not None and len(audio) else None
+    if heard is not None:
+        spec = core.resolve(hook.model, "decision")
+        longest = float(spec.options.get("max_audio_s") or 30.0)
+        heard = Audio(heard.samples[-int(longest * SR) :], SR)
+    result = await run_turn(core, definition(hook), target, text=text, audio=heard, history=[], turn=turn,
+                            session=session, keep=False)  # fmt: skip
+    steps = {s["id"]: s for s in result.steps}
+    first = steps.get(DECISIONS_STEP) or {}
+    if first.get("status") != "ok":
+        message = (result.error or {}).get("message") or "the decision model gave no answers"
+        code = (result.error or {}).get("code") or "decision_failed"
+        error = BoloError(message)
+        error.code = str(code)
+        raise error
+    output = first.get("output") or {}
+    ran = [rule for i, rule in enumerate(hook.rules) if (steps.get(f"rule-{i}") or {}).get("status") == "ok"]
+    return HookResult(str(output.get("model") or hook.model), dict(output.get("answers") or {}), ran, result)
+
+
+def event_fields(item_id: str, result: HookResult) -> dict[str, Any]:
     """The fields of ``conversation.item.decisions.completed`` (and the webhook's body)."""
     return {
         "item_id": item_id, "model": result.model, "answers": result.answers,
-        "actions": [r.to_dict() for r in rules],
+        "actions": [r.to_dict() for r in result.matched],
     }  # fmt: skip
 
 

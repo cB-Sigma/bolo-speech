@@ -395,6 +395,38 @@ async def _decide_with_model(
     return {"answer": str(a["answer"]), "confidence": float(a["confidence"]), "reason": "", "_model": model}
 
 
+@handler("decisions")
+async def _decisions(r: Runner, run: Run, e: Entry, i: Inputs, o: Options, scope: Scope, d: int) -> dict[str, Any]:
+    """Several questions in one pass of a decision model (bolo.decide): ``answers`` in its shape, and the probability
+    of each answer given (yes/no: of the answer, a choice: of the option, a score: of the nearest level)."""
+    from bolo.decide import decide, parse_questions
+
+    questions = parse_questions(r.resolve(run, o.get("questions"), scope))
+    model = r.core.resolve(e["model"] or None, "decision").id
+    text = as_text(i.get("text")).strip() or None
+    audio = i.get("audio") if isinstance(i.get("audio"), Audio) else None
+    trace = _trace("decision", model)
+    result = await decide(r.core, model, text, audio.samples if audio else None, audio.rate if audio else None,
+                          questions, trace)  # fmt: skip
+    _record(r.core, trace)
+    return {"answers": result.answers, "probabilities": answer_probabilities(result.answers), "model": result.model}
+
+
+def answer_probabilities(answers: dict[str, dict[str, Any]]) -> dict[str, float]:
+    """The probability of each answer given, by question (bolo.decide's answers)."""
+    out: dict[str, float] = {}
+    for qid, a in answers.items():
+        if a["type"] == "yes_no":
+            p = float(a["probability"])
+            out[qid] = p if a["answer"] else round(1.0 - p, 4)
+        elif a["type"] == "choice":
+            out[qid] = float(a["probabilities"].get(a["answer"], 0.0))
+        else:
+            probs = a.get("probabilities") or []
+            out[qid] = float(probs[a["level"]]) if len(probs) > a["level"] else 0.0
+    return out
+
+
 @handler("decision")
 async def _decision(r: Runner, run: Run, e: Entry, i: Inputs, o: Options, scope: Scope, d: int) -> dict[str, Any]:
     question = as_text(_opt(r, run, o, "question", scope)).strip()

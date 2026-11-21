@@ -585,45 +585,12 @@ class CallSession:
             self._busy -= 1
 
     def _on_decisions(self, event: dict[str, Any]) -> None:
-        """The answers of the agent's decision questions about a caller turn (bolo.decision_hook): on the record,
-        tags added, and the first ``end_call`` or ``transfer`` rule that matched carried out."""
-        record, agent = self.record, self.agent
-        assert record is not None and agent is not None
+        """The answers of the agent's live decisions about a caller turn (bolo.decision_hook), on the record. Their
+        actions arrive as ``pipeline.action`` events (``source: "decisions"``), as a live pipeline's do."""
+        record = self.record
+        assert record is not None
         actions = [a for a in event.get("actions") or [] if isinstance(a, dict)]
         record.event("decisions", answers=event.get("answers"), actions=actions)
-        tags = record.metadata.setdefault("tags", [])
-        for a in actions:
-            if a.get("do") == "tag" and a.get("value") and a["value"] not in tags:
-                tags.append(str(a["value"]))
-        if self._ending or self._finalized:
-            return
-        for a in actions:
-            if a.get("do") == "end_call":
-                self._ending = True
-                self._spawn(self._decided_end(), "decision-end")
-                return
-            if a.get("do") == "transfer":
-                number = str(a.get("value") or agent.transfer_number or "")
-                if not number or not self.adapter.can_transfer:
-                    record.event("error", message="a decision asked for a transfer, but this line cannot transfer")
-                    continue
-                self._ending = True
-                self._spawn(self._decided_transfer(number), "decision-transfer")
-                return
-
-    async def _decided_end(self) -> None:
-        agent = self.agent
-        if agent is not None and agent.goodbye:
-            await self.say(agent.goodbye, kind="goodbye", interruptible=False)
-        await self._drain()
-        await self.end("decision_end")
-
-    async def _decided_transfer(self, number: str) -> None:
-        agent = self.agent
-        if agent is not None and agent.transfer_message:
-            await self.say(agent.transfer_message, kind="transfer_message", interruptible=False)
-        await self._drain()
-        await self.transfer(number)
 
     async def _call_tool(self, name: str, arguments: str) -> str:
         agent, record = self.agent, self.record
@@ -658,7 +625,19 @@ class CallSession:
         record, agent = self.record, self.agent
         assert record is not None and agent is not None
         action = str(event.get("action") or "")
-        record.event("pipeline_action", action=action, to=event.get("to"))
+        decided = event.get("source") == "decisions"  # the agent's live decisions (bolo.decision_hook)
+        record.event(
+            "pipeline_action", action=action, to=event.get("to"), **({"source": "decisions"} if decided else {})
+        )
+        if action == "tag":
+            tags = record.metadata.setdefault("tags", [])
+            if event.get("value") and event["value"] not in tags:
+                tags.append(str(event["value"]))
+            return
+        if action == "notify":
+            return
+        if self._ending or self._finalized:
+            return
         if action == "transfer":
             number = event.get("to") or agent.transfer_number
             if not number or not self.adapter.can_transfer:
@@ -666,12 +645,16 @@ class CallSession:
                                               + ("" if number else " (no transfer_number)"))  # fmt: skip
                 return
             self._ending = True
+            if decided and agent.transfer_message:
+                await self.say(agent.transfer_message, kind="transfer_message", interruptible=False)
             await self._drain()
             await self.transfer(str(number))
         elif action == "hangup":
             self._ending = True
+            if decided and agent.goodbye:
+                await self.say(agent.goodbye, kind="goodbye", interruptible=False)
             await self._drain()
-            await self.end("agent_hangup")
+            await self.end("decision_end" if decided else "agent_hangup")
 
     # -- key presses --------------------------------------------------------------------------------------
     async def _on_dtmf(self, digit: str) -> None:

@@ -133,6 +133,7 @@ Model steps (the kind is the catalog task the `model` must have):
 | `emotion` | emotion | `audio` | | `emotion`, `score`, `emotions` |
 | `audio-llm` | audio-llm | `audio`, `prompt` | `max_tokens`, `temperature` | `text` |
 | `decision` | decision | `text` or `audio` | `question`, `choices` (list; left out: yes/no), `instructions` | `answer`, `confidence`, `reason` |
+| `decisions` | decision | `text` and/or `audio` | `questions` (as for `POST /v1/audio/decisions`: id -> `{type: yes_no \| choice \| score, question, options \| levels}`) | `answers` (by question, as that endpoint gives them), `probabilities` (by question: the probability of the answer given), `model` |
 | `tts` | tts | `text` | `voice` (a model voice or a saved, cloned voice), `speed`, `language`, `instructions`, `watermark` | `audio` |
 | `voice-conversion` | voice-conversion | `audio` | `voice` | `audio` |
 | `watermark` | watermark | `audio` | | `audio` |
@@ -156,7 +157,8 @@ Utility steps (no model):
 (`audio_llm_model`, or a catalog `audio-llm` model given as `model`). `decision` uses a decision model of the catalog
 (`POST /v1/audio/decisions`; `model`, or with `auto` the `default_decision` model when it is installed): it reads the
 text and the recording in one pass and its answer is always one of `choices` (yes/no without them), with its
-probability as `confidence`. Otherwise (and with `model: llm`) the configured language model answers in JSON about
+probability as `confidence`. `decisions` asks several questions in that one pass (a decision model only), including
+scores. Otherwise, for `decision` (and with `model: llm`) the configured language model answers in JSON about
 the text (about a recording when there is no text: the audio language model), and an answer that is not one of
 `choices` fails the step. `translation` of a text uses the language model; of a recording, a recogniser that
 translates (`model`: Whisper, Canary, Voxtral, ...).
@@ -385,8 +387,8 @@ instead of the language model answering on its own.
 
 Each turn's run gets the turn's transcript as `input.text`, its audio as `input.audio`, the conversation so far as
 `input.history`, the turn's number as `input.turn` and the session as `input.session`. Live pipelines take the step
-types that make sense per turn: `decision`, `llm`, `template`, `condition`, `switch`, `filter`, `webhook`, `pii`,
-`punctuation`, `itn`, `emotion`, `lid`, `translation` (of a text), `stop`, and four actions:
+types that make sense per turn: `decision`, `decisions`, `llm`, `template`, `condition`, `switch`, `filter`, `webhook`, `pii`,
+`punctuation`, `itn`, `emotion`, `lid`, `translation` (of a text), `stop`, and six actions:
 
 | Action | Does |
 | --- | --- |
@@ -394,14 +396,27 @@ types that make sense per turn: `decision`, `llm`, `template`, `condition`, `swi
 | `respond` | lets the session's language model answer, streamed as usual and with the session's tools; `instructions` add to the session's own for this turn (`"Answer as the {{steps.dept.answer}} desk"`) |
 | `transfer` | transfers the call (`to`: a number or SIP address; default the agent's `transfer_number`), after `say` if given; the run stops |
 | `hangup` | ends the call after `say` if given; the run stops |
+| `tag` | adds `value` to the call record's `metadata.tags` (and the session's traces) |
+| `notify` | nothing on the call: tells the client, with `message` if given |
 
-In a Realtime session `transfer` and `hangup` reach the client as a `pipeline.action` event; on a call bolo does them.
+In a Realtime session the actions reach the client as `pipeline.action` events; on a call bolo carries them out.
 A turn that reaches no `reply` or `respond` gets no answer.
 
 Latency: the session transcribes the turn as it always does. Only the steps before the first `reply` or `respond`
 add to the time before the caller hears the answer (a `decision` is one language-model call, typically 0.2 to 1 s
 with a small local model); the answer itself streams exactly as the session's own answers do. Each turn's run is in
 the run history (`trigger: "turn"`), and the turn's request trace names it (`pipeline_run`).
+
+### Live decisions: the shortcut
+
+`session.decisions` (a Realtime session) and an agent's `decisions` (a call) are a shortcut for a live pipeline
+(voice-agents.md and telephony.md, "Live decisions"). bolo turns them into one: a `decisions` step with the questions,
+then one action step per rule (`tag`, `notify`, `transfer`, or `hangup` for `end_call`), each with the rule as its
+`when`, and the rules that end the call last. That pipeline runs through the same runner and sends the same
+`pipeline.action` events (with `"source": "decisions"`), with one difference: it runs beside the turn's answer, in
+the background, and never speaks, so it can be used together with a live pipeline that answers (`pipeline_id`). The
+answers also arrive as `conversation.item.decisions.completed`, and go to `decision_webhook_url`, signed as pipeline
+webhooks are. For anything more than questions and rules (a reply, branches, other steps), write a live pipeline.
 
 ### Simulating a conversation
 

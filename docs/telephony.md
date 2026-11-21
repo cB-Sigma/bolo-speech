@@ -204,7 +204,8 @@ available".
 ### Live decisions
 
 An agent can ask a decision model (docs/api.md, "Decisions") questions after every caller turn, and act on the
-answers without waiting for the language model: escalate to a person, send the call to a department, mark it for
+answers without waiting for the language model (a shortcut for a live pipeline that runs beside the answer:
+docs/pipelines.md, "Live decisions: the shortcut"): escalate to a person, send the call to a department, mark it for
 review. The questions run in the background on the turn's transcript and audio, so the agent's answer is not held
 up.
 

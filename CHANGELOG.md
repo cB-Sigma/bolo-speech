@@ -8,6 +8,13 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Live decisions are a shortcut for a live pipeline.** `session.decisions` and an agent's `decisions` now run as a
+  live pipeline through the pipeline runner: a `decisions` step and one action step per rule, with the rule as its
+  `when` (rules that end the call run last). Their actions arrive as `pipeline.action` events (`"source":
+  "decisions"`) like a live pipeline's, and still as `conversation.item.decisions.completed`, with the webhook
+  unchanged; they run beside the answer and never speak, so they combine with `pipeline_id`. Pipelines gain three
+  step types: `decisions` (several yes/no, choice and score questions in one pass of a decision model, any mode),
+  and the live actions `tag` (the call record's `metadata.tags`) and `notify`.
 - **Live pipelines and pipeline triggers** ([docs/pipelines.md](docs/pipelines.md#live-pipelines)). A pipeline
   with `mode: live` is the behaviour of a phone number (the agent's `pipeline_id`) or a Realtime session
   (`session.pipeline_id`, cascade only): it runs on each user turn, with the turn's transcript, audio and the

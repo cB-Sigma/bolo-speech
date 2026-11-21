@@ -56,7 +56,8 @@ from bolo.agents import speak_stream
 from bolo.audio.codecs import alaw_decode, alaw_encode, float_to_pcm16, mulaw_decode, mulaw_encode, pcm16_to_float
 from bolo.audio.encode import encode_audio
 from bolo.audio.resample import StreamResampler, resample
-from bolo.decision_hook import Hook, evaluate, event_fields, parse_hook, spawn_webhook
+from bolo.decision_hook import Hook, event_fields, parse_hook, spawn_webhook
+from bolo.decision_hook import run as run_hook
 from bolo.denoise import DenoiseOptions, parse_denoise
 from bolo.echo import EchoCanceller, EchoCancellerModel, EchoOptions, parse_echo
 from bolo.engines.base import FloatArray, VadDetector, VadParams
@@ -210,6 +211,7 @@ class RealtimeSession:
         #: session.decisions (bolo extension, bolo.decision_hook): questions asked after every user turn
         self.decisions: Hook | None = None
         self._decision_tasks: set[asyncio.Task[None]] = set()
+        self._decision_turns = 0
         #: where this session's decision answers are POSTed instead of decision_webhook_url (a phone agent's URL;
         #: set by the server, never by a client)
         self.decision_webhook_url: str | None = None
@@ -1288,15 +1290,20 @@ class RealtimeSession:
         return bool(text.strip())
 
     async def _decide(self, item_id: str, text: str, audio: FloatArray) -> None:
-        """The session's decision questions about one user turn (bolo.decision_hook), in the background: the answers
-        as ``conversation.item.decisions.completed``, to the server's webhook, and the matched rules' tags."""
+        """The session's live decisions about one user turn (bolo.decision_hook), in the background: the hook's live
+        pipeline through the pipeline runner (its actions as ``pipeline.action`` events with ``source:
+        "decisions"``), then ``conversation.item.decisions.completed`` and the server's webhook."""
         hook = self.decisions
         if hook is None:
             return
         trace = Trace("decision", self.transport, hook.model or "")
         trace.extra.update(self.trace_extra)
+        info = {"id": self.id, "transport": self.transport, **self.trace_extra}
+        turn = self._decision_turns
+        self._decision_turns += 1
         try:
-            result, rules = await evaluate(self.core, hook, text, audio, trace)
+            result = await run_hook(self.core, hook, _HookTarget(self), text=text,
+                                    audio=audio if hook.audio else None, session=info, turn=turn)  # fmt: skip
         except BoloError as exc:
             trace.finish("error", exc.message)
             self.core.traces.record(trace)
@@ -1305,13 +1312,11 @@ class RealtimeSession:
                 error={"type": "decision_error", "code": exc.code, "message": exc.message, "param": None},
             )  # fmt: skip
             return
+        trace.model = result.model
+        trace.extra["decision_answers"] = {k: v.get("answer", v.get("label")) for k, v in result.answers.items()}
         trace.finish("ok")
         self.core.traces.record(trace)
-        for rule in rules:
-            if rule.do == "tag" and rule.value and rule.value not in self.tags:
-                self.tags.append(rule.value)
-                self.trace_extra["tags"] = list(self.tags)
-        fields = event_fields(item_id, result, rules)
+        fields = event_fields(item_id, result)
         await self.send("conversation.item.decisions.completed", **fields)
         s = self.core.settings
         url = self.decision_webhook_url or s.decision_webhook_url or ""
@@ -2117,6 +2122,28 @@ class _SessionTarget:
 
     async def action(self, kind: str, **fields: Any) -> None:
         await self.session.send("pipeline.action", action=kind, **{k: v for k, v in fields.items() if v is not None})
+
+
+class _HookTarget:
+    """What the actions of a session's live decisions do (bolo.decision_hook): the same ``pipeline.action`` events as
+    a live pipeline's, marked ``source: "decisions"``; a phone call carries them out. They never speak on their own."""
+
+    def __init__(self, session: RealtimeSession) -> None:
+        self.session = session
+
+    async def say(self, text: str) -> str:
+        raise RealtimeError("live decisions do not speak; use a live pipeline (session.pipeline_id) to answer")
+
+    async def respond(self, instructions: str | None) -> str:
+        raise RealtimeError("live decisions do not answer; use a live pipeline (session.pipeline_id) to answer")
+
+    async def action(self, kind: str, **fields: Any) -> None:
+        session = self.session
+        if kind == "tag" and fields.get("value") and fields["value"] not in session.tags:
+            session.tags.append(str(fields["value"]))
+            session.trace_extra["tags"] = list(session.tags)
+        await session.send("pipeline.action", action=kind, source="decisions",
+                           **{k: v for k, v in fields.items() if v is not None})  # fmt: skip
 
 
 def mint_client_secret(core: Bolo, session: dict[str, Any] | None, seconds: int = 600) -> dict[str, Any]:

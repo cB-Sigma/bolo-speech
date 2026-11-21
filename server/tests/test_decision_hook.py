@@ -14,8 +14,11 @@ from typing import Any
 import pytest
 
 from bolo.config import Settings
-from bolo.decision_hook import matched, parse_hook
+from bolo.core import Bolo
+from bolo.decision_hook import definition, parse_hook
+from bolo.decision_hook import run as run_hook
 from bolo.errors import InvalidRequest
+from bolo.pipelines.definition import validate
 from bolo.pipelines.webhooks import verify
 from conftest import FakeLLM, LiveServer, speechlike
 from test_realtime import raw, recv_until
@@ -66,23 +69,35 @@ def receiver() -> Iterator[Receiver]:
     r.stop()
 
 
-def test_hooks_are_checked_and_rules_match() -> None:
+def test_hooks_are_checked_and_become_live_pipelines() -> None:
     hook = parse_hook(HOOK)
     assert hook is not None and hook.model == "fake-decision" and hook.audio and len(hook.rules) == 2
     assert hook.questions["escalate"]["type"] == "noul" and hook.to_dict()["questions"] == HOOK["questions"]
     assert parse_hook(None) is None and parse_hook({}) is None
-    yes = {"escalate": {"type": "yes_no", "answer": True, "probability": 0.9},
-           "department": {"type": "choice", "answer": "technical", "probabilities": {"billing": 0.2, "technical": 0.8},
-                          "confidence": 0.6}}  # fmt: skip
-    assert [r.do for r in matched(hook, yes)] == ["transfer"]
-    unsure = {**yes, "escalate": {"type": "yes_no", "answer": True, "probability": 0.7}}
-    assert matched(hook, unsure) == []  # below min_probability
+    pipe = definition(hook)
+    assert pipe["mode"] == "live" and validate(pipe).valid
+    first, tag, transfer = pipe["steps"]
+    assert first["type"] == "decisions" and first["options"]["questions"] == HOOK["questions"]
+    assert first["inputs"] == {"text": "{{input.text}}", "audio": "{{input.audio}}"}
+    assert tag == {"id": "rule-0", "type": "tag", "options": {"value": "billing"},
+                   "when": {"value": "{{steps.decisions.answers.department.answer}}", "equals": "billing"}}  # fmt: skip
+    assert transfer["type"] == "transfer" and transfer["when"]["all"][1] == {
+        "value": "{{steps.decisions.probabilities.escalate}}", "gte": 0.8,
+    }  # fmt: skip
+    # rules that end the call run last, whatever their order in the hook
+    ending_first = parse_hook({**HOOK, "actions": list(reversed(HOOK["actions"]))})
+    assert ending_first is not None and [s["type"] for s in definition(ending_first)["steps"]] == [
+        "decisions", "tag", "transfer",
+    ]  # fmt: skip
     scored = parse_hook({"questions": {"s": {"type": "score", "question": "?", "levels": ["a", "b", "c"]}},
-                         "actions": [{"question": "s", "min_score": 1.5, "do": "end_call"}]})  # fmt: skip
+                         "audio": False, "actions": [{"question": "s", "min_score": 1.5, "do": "end_call"},
+                                                     {"question": "s", "answer": 2, "do": "notify"}]})  # fmt: skip
     assert scored is not None
-    level = {"s": {"type": "score", "score": 1.6, "level": 2, "label": "c", "probabilities": [0.1, 0.2, 0.7]}}
-    assert [r.do for r in matched(scored, level)] == ["end_call"]
-    assert matched(scored, {"s": {**level["s"], "score": 1.2}}) == []
+    steps = definition(scored)["steps"]
+    assert "audio" not in steps[0]["inputs"] and steps[1]["when"] == {"value": "{{steps.decisions.answers.s.level}}",
+                                                                      "equals": 2}  # fmt: skip
+    assert steps[2] == {"id": "rule-0", "type": "hangup",
+                        "when": {"value": "{{steps.decisions.answers.s.score}}", "gte": 1.5}}  # fmt: skip
     for bad in (
         "x", {"questions": {}}, {**HOOK, "extra": 1},
         {**HOOK, "actions": [{"question": "nope", "do": "tag", "value": "x"}]},
@@ -94,6 +109,53 @@ def test_hooks_are_checked_and_rules_match() -> None:
     ):  # fmt: skip
         with pytest.raises(InvalidRequest):
             parse_hook(bad)
+
+
+class Recorder:
+    """A live target that records the actions it is asked for."""
+
+    def __init__(self) -> None:
+        self.actions: list[dict[str, Any]] = []
+
+    async def say(self, text: str) -> str:
+        raise AssertionError("live decisions never speak")
+
+    async def respond(self, instructions: str | None) -> str:
+        raise AssertionError("live decisions never answer")
+
+    async def action(self, kind: str, **fields: Any) -> None:
+        self.actions.append({"action": kind, **fields})
+
+
+async def test_a_hook_runs_through_the_live_pipeline_runner(core: Bolo) -> None:
+    hook = parse_hook(HOOK)
+    assert hook is not None
+    target = Recorder()
+    result = await run_hook(core, hook, target, text="I want a person", audio=None, session={"id": "s"}, turn=0)
+    assert result.model == "fake-decision" and result.answers["escalate"] == {
+        "type": "yes_no", "answer": True, "probability": 0.9,
+    }  # fmt: skip
+    assert [r.do for r in result.matched] == ["tag", "transfer"]
+    assert [(a["action"], a.get("value")) for a in target.actions] == [("tag", "billing"), ("transfer", None)]
+    assert result.run.status == "ok" and result.run.actions[-1]["action"] == "transfer"
+    unsure = parse_hook({**HOOK, "actions": [{**HOOK["actions"][1], "min_probability": 0.95}]})
+    assert unsure is not None
+    again = await run_hook(core, unsure, Recorder(), text="x", audio=None, session={"id": "s"}, turn=1)
+    assert again.matched == []  # 0.9 is below 0.95: the rule's step is skipped
+
+
+async def test_the_decisions_step_in_any_pipeline(core: Bolo) -> None:
+    definition_ = {"steps": [{"id": "ask", "type": "decisions", "model": "fake-decision",
+                              "options": {"questions": {"urgent": {"type": "yes_no", "question": "Urgent?"},
+                                                        "level": {"type": "score", "question": "How angry?",
+                                                                  "levels": ["calm", "upset", "furious"]}}}}],
+                   "outputs": {"answers": "{{steps.ask.answers}}", "p": "{{steps.ask.probabilities}}"}}  # fmt: skip
+    run = core.pipelines.runner.prepare(definition_, text="The server is down")
+    await core.pipelines.run(run)
+    assert run.status == "ok", run.error
+    assert run.outputs is not None and run.outputs["answers"]["urgent"]["answer"] is True
+    assert run.outputs["p"] == {"urgent": 0.9, "level": pytest.approx(1 / 3, abs=1e-3)}
+    assert run.outputs["answers"]["level"]["label"] == "upset"
 
 
 @pytest.fixture
@@ -126,7 +188,12 @@ async def test_a_realtime_session_gets_its_answers_after_each_turn(hooked: LiveS
         assert done["item_id"] == heard["item_id"] and done["model"] == "fake-decision"
         assert done["answers"]["escalate"] == {"type": "yes_no", "answer": True, "probability": 0.9}
         assert done["answers"]["department"]["answer"] == "billing"
-        assert [a["do"] for a in done["actions"]] == ["tag", "transfer"]  # reported; a session has no call to move
+        assert [a["do"] for a in done["actions"]] == ["tag", "transfer"]
+        # the actions went out as a live pipeline's do, marked as the session's live decisions
+        acted = [e for e in got if e["type"] == "pipeline.action"]
+        assert [(e["action"], e.get("value"), e["source"]) for e in acted] == [
+            ("tag", "billing", "decisions"), ("transfer", None, "decisions"),
+        ]  # fmt: skip
         # a bad hook is refused with the parameter named
         await ws.send(json.dumps({"type": "session.update", "session": {"decisions": {"questions": "{"}}}))
         error = (await recv_until(ws, "error"))[-1]

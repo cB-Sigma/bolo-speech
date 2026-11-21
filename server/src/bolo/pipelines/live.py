@@ -8,7 +8,12 @@ and the conversation so far (``input.history``). Its actions act on the session 
 * ``respond`` lets the session's language model answer as usual (streamed, with its tools), optionally with more
   instructions for this turn;
 * ``transfer`` and ``hangup`` end the call (in a Realtime session, the client is told with a ``pipeline.action``
-  event).
+  event);
+* ``tag`` adds a tag to the call's record (and the session's traces), ``notify`` only tells the client (both as
+  ``pipeline.action``).
+
+A session's live decisions (``session.decisions``, bolo.decision_hook) are a shortcut for a live pipeline of a
+``decisions`` step and one action step per rule, run through :func:`run_turn` beside the answer.
 
 The steps before the first speaking action are the only ones that add to the time before the caller hears the
 answer; the answer itself streams.
@@ -75,6 +80,26 @@ async def _respond(r: Runner, run: Run, e: dict[str, Any], i: dict[str, Any], o:
     said = await _target(run).respond(extra or None)
     _act(run, "respond", text=said, **({"instructions": extra} if extra else {}))
     return {"text": said}
+
+
+@handler("tag")
+async def _tag(r: Runner, run: Run, e: dict[str, Any], i: dict[str, Any], o: dict[str, Any], scope: Scope,
+               d: int) -> dict[str, Any]:  # fmt: skip
+    value = r.text(run, o.get("value"), scope).strip()
+    if not value:
+        raise InvalidRequest("the tag is empty")
+    await _target(run).action("tag", value=value, reason=f"pipeline step {e['id']}")
+    _act(run, "tag", value=value)
+    return {}
+
+
+@handler("notify")
+async def _notify(r: Runner, run: Run, e: dict[str, Any], i: dict[str, Any], o: dict[str, Any], scope: Scope,
+                  d: int) -> dict[str, Any]:  # fmt: skip
+    message = r.text(run, o.get("message"), scope).strip() if o.get("message") else None
+    await _target(run).action("notify", message=message, reason=f"pipeline step {e['id']}")
+    _act(run, "notify", **({"message": message} if message else {}))
+    return {}
 
 
 @handler("transfer")
