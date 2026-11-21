@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-538 models: 234 validated on CPU by the maintainers, 304 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+539 models: 235 validated on CPU by the maintainers, 304 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -780,6 +780,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `paradee-8m-onnx` | en | realtime | - | 8 MB | Apache-2.0 · phonemes: uccharan | **CPU** · RTF 0.084 · round-trip WER 0.0% |
+
+#### PiVo
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `pivo-1.4m-onnx` | en | realtime | - | 9 MB | Apache-2.0 | **CPU** · RTF 0.659 · round-trip WER 0.0% |
 
 ### Voice-activity detection
 
@@ -3079,6 +3085,16 @@ espeak-ng), each voice in its own accent: a catalog voice with a `language` of i
 ONNX Runtime 1.32's extended graph fusions fail on this int8 graph with bolo's exact int8 products, so it loads with
 the basic ones. Run on the 4-vCPU Xeon with 2 threads (2026-11-21): one sentence per voice, 24 kHz, non-silent, all
 four transcribed back word for word by faster-whisper-small, at 0.084 of real time.
+
+**PiVo-1.4M in process** (`pivo-1.4m-onnx`, Empero Research, Apache-2.0; its vocoder derives from Xiph/Opus FARGAN,
+BSD-3-Clause): two English voices, Pi and Vo, at 16 kHz from 1.4 M parameters in four ONNX graphs (encoder, a decoder
+with a key/value cache, FARGAN's conditioning and a vocoder step run four times per 10 ms frame). bolo's engine
+(`engines/pivo.py`) follows the model's reference code and gives the same token ids and the same audio, bit for bit,
+on the sentences compared; it differs in two ways a server needs: a word CMUdict lacks is spelled letter by letter
+instead of refusing the request, and characters it cannot say are left out. Run on the 4-vCPU Xeon with 2 threads
+(2026-11-21, other jobs keeping the load near 12): one sentence per voice, non-silent 16 kHz audio (median pitch 193
+Hz for Pi, 142 Hz for Vo), both transcribed back word for word by faster-whisper-small, at 0.66 of real time: the
+vocoder is called 400 times per second of audio, so the time goes to ONNX Runtime's per-call cost.
 
 **What was run**: `pocket-tts-en-llamacpp` on the upstream llama-server b12375
 release, started by bolo (`bolo components install llama-server`), on the

@@ -122,6 +122,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   British voices in one 8.5 MB int8 graph, in process on ONNX Runtime, phonemised like Kokoro (uccharan or espeak-ng).
   0.084 of real time on a 4-vCPU Xeon with 2 threads; all four voices transcribed back word for word. A catalog voice
   with a `language` of its own is now phonemised in that language, so the British voices read British English.
+- **PiVo-1.4M** (`pivo-1.4m-onnx`, Apache-2.0): two English voices at 16 kHz from 1.4 M parameters, in process on
+  ONNX Runtime with its own CMUdict front end (numbers, money, dates written out; unknown words spelled). bolo's
+  engine gives the reference code's audio bit for bit; both voices transcribed back word for word.
 
 ### Changed
 

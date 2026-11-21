@@ -2024,3 +2024,49 @@
   - {id: bf_isabella, name: Isabella (British, female), language: en-GB, gender: f}
   - {id: am_puck, name: Puck (American, male), language: en-US, gender: m}
   - {id: bm_fable, name: Fable (British, male), language: en-GB, gender: m}
+
+- id: pivo-1.4m-onnx
+  aliases: [pivo, empero-ai/PiVo-1.4M]
+  task: tts
+  engine: onnxruntime
+  kind: pivo_onnx
+  family: PiVo
+  languages: [en]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 9480690
+  params: 1401562
+  license: Apache-2.0
+  license_url: https://huggingface.co/empero-ai/PiVo-1.4M/blob/main/LICENSE
+  commercial_use: true
+  description: 'PiVo-1.4M (Empero Research, Apache-2.0; the vocoder derives from Xiph/Opus FARGAN, BSD-3-Clause): two
+    English voices, Pi and Vo, from 1.4 M learned parameters, vocoder included, 16 kHz. Four ONNX graphs on ONNX
+    Runtime in process: no server, no PyTorch. Its own text front end, in bolo''s port: CMUdict (ARPAbet) after numbers,
+    money, ordinals and ISO dates are written out; a word CMUdict lacks is spelled letter by letter. A research model:
+    very intelligible, with a metallic texture on some sentences.'
+  source_url: https://huggingface.co/empero-ai/PiVo-1.4M
+  validated: cpu
+  measured:
+    rtf: 0.6591
+    round_trip_wer: 0.0
+    round_trip_stt: faster-whisper-small
+    audio_s: 5.1
+    load_s: 0.65
+    memory_mb: 127
+    threads: 2
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load near 12)
+    date: '2026-11-21'
+    note: 'One English sentence in each voice through bolo''s HTTP API, both transcribed back word for word by
+      faster-whisper-small; median pitch 193 Hz (Pi), 142 Hz (Vo). The same token ids and audio as the reference code.
+      The vocoder step runs 400 times per second of audio, so ONNX Runtime''s per-call cost dominates.'
+  source:
+    repo: empero-ai/PiVo-1.4M
+    revision: 515d84fc3420da6ae138f1b81017fcbc24d622a8
+    include: [onnx/*, pivo/resources/cmudict.dict, LICENSE, NOTICE, THIRD_PARTY.md, LICENSES/*]
+  options:
+    onnx_dir: onnx
+    lexicon: pivo/resources/cmudict.dict
+  voices:
+  - {id: Pi, name: Pi, language: en-US}
+  - {id: Vo, name: Vo, language: en-US}

@@ -95,6 +95,14 @@ or optional extras and keep their own licences:
   (Kokoro, English) does not. See docs/models.md, "Licences and the
   espeak-ng question".
 
+Speech models run by bolo's own code
+    server/src/bolo/engines/pivo.py follows the reference inference code of
+    PiVo-1.4M (pivo/text.py, runtime.py, phase.py and audio.py at model revision
+    515d84fc3420da6ae138f1b81017fcbc24d622a8, https://huggingface.co/empero-ai/PiVo-1.4M),
+    Copyright 2026 Empero Research, Apache License 2.0; the PiVo model itself,
+    with its FARGAN-derived vocoder (Xiph/Opus, BSD-3-Clause) and CMUdict data,
+    is downloaded by the user and not distributed with bolo.
+
 API compatibility
     The routes under "speaches-compatible" mirror the HTTP interface of
     speaches (https://github.com/speaches-ai/speaches, MIT licence,
