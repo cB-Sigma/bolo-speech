@@ -125,6 +125,7 @@ const TASK_LABEL: Record<Task, string> = {
   watermark: 'Watermarking',
   decision: 'Decisions',
   'audio-classify': 'Zero-shot classification',
+  intent: 'Spoken intent',
 }
 const TASK_SHORT: Record<Task, string> = {
   stt: 'STT',
@@ -151,6 +152,7 @@ const TASK_SHORT: Record<Task, string> = {
   watermark: 'Watermark',
   decision: 'Decide',
   'audio-classify': 'Classify',
+  intent: 'Intent',
 }
 const TASK_ORDER: Task[] = [
   'stt',
@@ -167,6 +169,7 @@ const TASK_ORDER: Task[] = [
   'emotion',
   'audio-classify',
   'decision',
+  'intent',
   'voice-conversion',
   'punctuation',
   'itn',

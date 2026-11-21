@@ -1,0 +1,58 @@
+# Spoken intent (task intent): spoken language understanding straight from the audio, without a transcript in
+# between (bolo.intent; POST /v1/audio/intent, bolo intent). Sources, read 2026-11-21: the model card, the Hugging
+# Face API (sizes, revision) and the files themselves (hyperparams.yaml, custom_interface.py).
+- id: slu-slurp-hubert
+  aliases: [speechbrain/SLU-direct-SLURP-hubert-enc, slurp-hubert]
+  task: intent
+  engine: plugin:torch
+  kind: speechbrain-slu
+  family: SpeechBrain SLU
+  languages: [en]
+  tier: accuracy
+  sample_rate: 16000
+  size_bytes: 410539705
+  params: 102000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/speechbrain/SLU-direct-SLURP-hubert-enc
+  description: 'SpeechBrain''s direct spoken-language-understanding model for SLURP: a HuBERT base encoder (from
+    facebook/hubert-base-ls960, fine-tuned) and an attentional LSTM decoder that writes the scenario, the action and
+    the slots of one English utterance to a home assistant (alarms, calendar, music, weather, lists, email, IoT, ...;
+    18 scenarios). SpeechBrain reports SLU-F1 75.1 % on the SLURP test set. Weights
+    Apache-2.0; trained on SLURP (Bastianelli et al., 2020, CC BY 4.0). Needs PyTorch: it runs on the torch engine
+    plugin (pip install "bolo-torch[slu]"); the repository''s own Python interface (custom_interface.py) is not
+    run, bolo-torch decodes with SpeechBrain''s classes.'
+  source_url: https://huggingface.co/speechbrain/SLU-direct-SLURP-hubert-enc
+  validated: cpu
+  measured:
+    rtf: 10.58
+    rtf_note: 'seconds per second of audio with beam 8 (the catalog default): 26-59 s for each 2-3 s command; with the
+      model''s own beam of 80, RTF 60.9 (2.5 to 5 minutes per command) and the same answers on all 11 clips'
+    load_s: 20.5
+    audio_s: 37.5
+    memory_mb: 1199
+    threads: 4
+    engine: bolo-torch 0.1.9, torch 2.15.0+cpu, speechbrain 1.1.2, transformers 5.24.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared (load average 6-11)
+    date: '2026-11-21'
+    test_audio: eight English commands synthesised with espeak-ng, the SLURP recording shipped with the model, and
+      bolo samples en-short and en-long
+    note: 'All eight synthetic commands got the intent a person would give them, with sensible slots: "wake me up at
+      seven tomorrow morning" alarm_set (date tomorrow, timeofday morning; the time was missed), "what is the weather
+      like in paris today" weather_query (place_name paris, twice), "play some jazz music" play_music (music_genre
+      jazz), "add milk to my shopping list" lists_createoradd (list_name shopping), "turn off the lights in the
+      kitchen" iot_hue_lightoff (house_place kitchen), "remind me about the dentist appointment on friday"
+      calendar_set (event_name dentist appointment, date friday), "how much is fifty dollars in euros" qa_currency,
+      "send an email to john about the meeting" email_sendemail (person john, event_name meeting). The SLURP clip:
+      calendar_set (relation wife, event_name birthday). Out of domain: en-short (a question about an order)
+      takeaway_query, en-long (a talk) general_quirky.'
+  source:
+    repo: speechbrain/SLU-direct-SLURP-hubert-enc
+    revision: 6644fb49e209d2c4c3ea6bfd8accbe06b2df28c4
+    include: [hyperparams.yaml, hubert.ckpt, model.ckpt, tokenizer_58_unigram.model]
+    urls:
+    - {path: hub/config.json, url: 'https://huggingface.co/facebook/hubert-base-ls960/resolve/dba3bb02fda4248b6e082697eee756de8fe8aa8a/config.json', size: 1385, sha256: 56be398848bbd9cbc720172b0d45b2f01cac7652f2968f0f31f5faf9f2986acc}
+    - {path: hub/preprocessor_config.json, url: 'https://huggingface.co/facebook/hubert-base-ls960/resolve/dba3bb02fda4248b6e082697eee756de8fe8aa8a/preprocessor_config.json', size: 213, sha256: 4a93853b74278b7c769d07f5a861e5d12ceb5db2bced5620d335f87238cb9e86}
+  options:
+    plugin_install: pip install "bolo-torch[slu]" (the bolo PyTorch engine plugin, plugins/bolo-torch)
+    max_s: 30
+    beam_size: 8

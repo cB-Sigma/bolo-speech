@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-563 models: 260 validated on CPU by the maintainers, 303 untested. 34 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+564 models: 261 validated on CPU by the maintainers, 303 untested. 34 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -1312,6 +1312,14 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `clef-omni` | en | accuracy | - | 70.8 GB | Apache-2.0 · needs plugin torch | untested |
+
+### Spoken intent (spoken language understanding)
+
+#### SpeechBrain SLU
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `slu-slurp-hubert` | en | accuracy | - | 411 MB | Apache-2.0 · needs plugin torch | **CPU** · RTF 10.580 |
 
 ### Voice conversion
 

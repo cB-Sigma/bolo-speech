@@ -172,6 +172,7 @@ async def test_run_every_audio_step_and_keep_files(core: Bolo) -> None:
             {"type": "pii"},
             {"type": "lid", "model": "fake-lid"},
             {"type": "emotion", "model": "fake-emotion"},
+            {"type": "intent", "model": "fake-intent"},
             {"type": "audio-tagging", "model": "fake-tagging"},
             {"type": "vad"},
             {"type": "split-speakers", "options": {"steps": [{"id": "per", "type": "stt"}]}},
@@ -192,6 +193,7 @@ async def test_run_every_audio_step_and_keep_files(core: Bolo) -> None:
     assert "[PERSON]" in doc["outputs"]["text"] and "fox" not in doc["outputs"]["text"]
     assert doc["outputs"]["speakers"] == ["A", "B"]
     assert by["lid"]["output"]["language"] == "en" and by["emotion"]["output"]["emotion"]
+    assert by["intent"]["output"]["intent"] == "alarm_set" and by["intent"]["output"]["slots"][0]["type"] == "date"
     assert [s["speaker"] for s in by["split_speakers"]["output"]["speakers"]] == ["A", "B"]
     assert [s["speaker"] for s in doc["steps"] if s.get("speaker")] == ["A", "B"]
     assert doc["outputs"]["voice"]["sample_rate"] == 24000

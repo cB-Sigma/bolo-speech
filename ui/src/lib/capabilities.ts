@@ -291,6 +291,11 @@ export function decisionsOffered(info: ServerInfo | undefined): boolean {
   return Boolean(info?.capabilities?.decision)
 }
 
+/** Whether the server understands spoken intents (the Intent screen). */
+export function intentOffered(info: ServerInfo | undefined): boolean {
+  return Boolean(info?.capabilities?.intent)
+}
+
 export function wakeOffered(info: ServerInfo | undefined): boolean {
   return Boolean(info?.capabilities?.wake)
 }

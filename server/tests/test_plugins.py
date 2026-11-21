@@ -89,6 +89,7 @@ async def test_plugin_models_through_the_scheduler(plugin_settings: Settings) ->
                 "fake-s2s",
                 "fake-lid",
                 "fake-decision",
+                "fake-intent",
             ]
         )
         assert len(proc.handles) == 2
@@ -155,6 +156,34 @@ async def test_plugin_language_identification(plugin_settings: Settings) -> None
         model = core.manager.loaded["plug-lid"].model
         assert type(model).__name__ == "PluginLid" and model.labels == ["en", "hi", "ta", "fr"] and model.max_s == 12
         assert result.heard_s == 2.0
+    finally:
+        await core.stop()
+
+
+async def test_plugin_spoken_intent(plugin_settings: Settings) -> None:
+    """A spoken-intent model in a plugin (op ``intent``): the intent, scenario, action and slots come back whole."""
+    from bolo.intent import understand
+    from bolo.obs.trace import Trace
+
+    core = Bolo(plugin_settings)
+    core.catalog.add(
+        ModelSpec.from_dict(
+            {
+                "id": "plug-intent", "task": "intent", "engine": "plugin:ref", "kind": "fake-intent", "family": "Fake",
+                "languages": ["en"], "license": "Apache-2.0", "builtin": True,
+            }
+        )
+    )  # fmt: skip
+    await core.start()
+    try:
+        t = np.arange(16000) / 16000
+        loud = (0.3 * np.sin(2 * np.pi * 300 * t)).astype(np.float32)
+        result, duration = await understand(core, loud, 16000, "plug-intent", Trace("intent", "test", "plug-intent"))
+        assert result.intent == "alarm_set" and result.scenario == "alarm" and result.action == "set"
+        assert result.slots == [{"type": "date", "value": "tomorrow"}, {"type": "time", "value": "seven"}]
+        assert duration == 1.0 and "'scenario': 'alarm'" in result.text
+        model = core.manager.loaded["plug-intent"].model
+        assert type(model).__name__ == "PluginIntent" and model.max_audio_s == 30.0
     finally:
         await core.stop()
 

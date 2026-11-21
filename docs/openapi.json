@@ -3219,6 +3219,26 @@
     }
    }
   },
+  "/v1/audio/intent": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Spoken intent and slots (spoken language understanding)",
+    "description": "Extension. What the speaker of one short utterance wants, straight from the audio: ``intent``\n(``alarm_set``), ``scenario`` and ``action`` (SLURP's two halves of the intent, ``alarm`` and ``set``), ``slots``\n(``[{\"type\": \"time\", \"value\": \"seven\"}]``, as the model filled them) and ``text`` (the model's own output).\nMultipart form: ``file`` (one utterance, at most 30 s), ``model`` (an ``intent`` model: ``slu-slurp-hubert``;\ndefault ``default_intent``) and ``keep_alive``. See docs/api.md, \"Spoken intent\".",
+    "operationId": "audio_intent_v1_audio_intent_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
   "/v1/audio/dialogue": {
    "post": {
     "tags": [

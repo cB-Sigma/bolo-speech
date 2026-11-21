@@ -29,6 +29,7 @@ from bolo.engines.base import (
     DenoiseModel,
     DiarizationModel,
     Engine,
+    IntentModel,
     LidModel,
     LoadOptions,
     Model,
@@ -122,6 +123,8 @@ class _Server:
                 self.denoise(rid, message, payload)
             elif op == "lid":
                 self.lid(rid, message, payload)
+            elif op == "intent":
+                self.intent(rid, message, payload)
             elif op == "respond":
                 self.respond(rid, message, payload)
             elif op == "decide":
@@ -157,6 +160,8 @@ class _Server:
             info.update(voices=[v.to_dict() for v in model.voices], supports_tools=bool(model.supports_tools))
         if isinstance(model, LidModel):
             info.update(labels=list(model.labels), max_s=float(model.max_s))
+        if isinstance(model, IntentModel):
+            info["max_s"] = float(model.max_audio_s)
         if isinstance(model, STTModel):
             info.update(
                 languages=list(model.languages), max_batch=model.max_batch,
@@ -274,6 +279,12 @@ class _Server:
         text = m.get("text")
         out = model.decide(DecisionRequest(str(text) if text is not None else None, samples, dict(m["questions"])))
         self.reply(rid, answers=out.get("answers") or {}, usage=out.get("usage") or {})
+
+    def intent(self, rid: str, m: dict[str, Any], payload: bytes) -> None:
+        model = self.model(m)
+        if not isinstance(model, IntentModel):
+            raise TypeError("this model does not understand spoken intents")
+        self.reply(rid, intent=model.understand(audio_from_bytes(payload)).to_dict())
 
     def respond(self, rid: str, m: dict[str, Any], payload: bytes) -> None:
         model = self.model(m)

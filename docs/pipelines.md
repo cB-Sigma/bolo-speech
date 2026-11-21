@@ -132,6 +132,7 @@ Model steps (the kind is the catalog task the `model` must have):
 | `audio-tagging` | audio-tagging | `audio` | `top_k`, `threshold`, `labels` | `tags` (`[{label, score}]`), `top` |
 | `classify` | audio-classify (a CLAP model, or a trained classifier's id) | `audio` | `labels` (zero-shot classes in plain words), `classifier` (a trained classifier), `prompt` | `label`, `score`, `scores` (`[{label, score, similarity}]`) |
 | `emotion` | emotion | `audio` | | `emotion`, `score`, `emotions` |
+| `intent` | intent | `audio` (one utterance) | | `intent` (`alarm_set`; empty when not understood), `scenario`, `action`, `slots` (`[{type, value}]`), `text` (the model's output) |
 | `audio-llm` | audio-llm | `audio`, `prompt` | `max_tokens`, `temperature` | `text` |
 | `decision` | decision | `text` or `audio` | `question`, `choices` (list; left out: yes/no), `instructions` | `answer`, `confidence`, `reason` |
 | `decisions` | decision | `text` and/or `audio` | `questions` (as for `POST /v1/audio/decisions`: id -> `{type: yes_no \| choice \| score, question, options \| levels}`) | `answers` (by question, as that endpoint gives them), `probabilities` (by question: the probability of the answer given), `model` |

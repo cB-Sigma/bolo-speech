@@ -117,6 +117,9 @@ clef-omni = ["transformers>=5.10.2,<6", "accelerate>=1.0"]
 voxlect = ["transformers>=4.46", "safetensors>=0.4"]
 # SpeechBrain ECAPA-TDNN language classifiers (lid-indic-vaani)
 speechbrain = ["speechbrain>=1.0", "torchaudio>=2.1"]
+# SpeechBrain's direct spoken-language-understanding models (task intent: slu-slurp-hubert): its HuBERT encoder is
+# transformers' class, its decoder's units a SentencePiece model
+slu = ["speechbrain>=1.1", "torchaudio>=2.1", "transformers>=4.46", "sentencepiece>=0.1.99"]
 # DiariZen diarization (BUT Speech@FIT): the libraries its pipeline imports besides the two packages that come from
 # the authors' repository at a pinned commit (diarizen and their pyannote.audio 3.1.1 fork, not on PyPI): install
 # those in the same command, in an environment of their own (the fork replaces pyannote.audio), see README.md.

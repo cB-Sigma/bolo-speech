@@ -55,6 +55,7 @@ TASK_TITLES = {
     "audio-classify": "Zero-shot audio classification (CLAP)",
     "emotion": "Speech emotion",
     "decision": "Decisions (typed questions about a recording or a text)",
+    "intent": "Spoken intent (spoken language understanding)",
     "voice-conversion": "Voice conversion",
     "align": "Forced alignment (word timestamps)",
     "echo-cancellation": "Echo cancellation (voice agents)",

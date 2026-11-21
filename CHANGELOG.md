@@ -8,6 +8,17 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Spoken intent: what a speaker wants, straight from the audio** (new task `intent`). `POST /v1/audio/intent`
+  takes one utterance (at most 30 s) and answers with the intent (`alarm_set`), its scenario and action, the slots
+  the model filled (`[{"type": "date", "value": "friday"}]`) and the model's own output. Also `bolo intent FILE`,
+  a Spoken intent section on the console's Classify page, an `intent` pipeline step, the setting `default_intent`,
+  `intent` in `/api/v1/info`'s capabilities, and a plugin op `intent`. The first model is SpeechBrain's direct SLU model for
+  SLURP (`slu-slurp-hubert`, Apache-2.0, trained on SLURP, CC BY 4.0; 0.41 GB) on the torch plugin
+  (`bolo-torch[slu]`), built from SpeechBrain's own classes (the repository's Python interface is not run) and read
+  without evaluating its output as code. Run here on CPU: eight synthetic English commands all got the expected
+  intent with sensible slots ("remind me about the dentist appointment on friday": calendar_set, event_name
+  "dentist appointment", date "friday"); slow, RTF 10.6 with its catalog beam of 8 (the model's own beam of 80
+  gave the same answers at RTF 61).
 - **Speech recognition in Fon, Wolof, Moroccan Arabic, Amharic and Kinyarwanda without PyTorch**: SpeechBrain's
   wav2vec 2.0 CTC recognisers (`wav2vec2-dvoice-fongbe`, `wav2vec2-dvoice-wolof`, `wav2vec2-dvoice-darija`,
   `wav2vec2-dvoice-amharic`, `wav2vec2-commonvoice-14-rw`; Apache-2.0, 1.28 GB each) on a new onnxruntime kind

@@ -139,6 +139,8 @@ class Settings:
     #: live decisions (bolo.decision_hook): where the answers asked after each user turn of a Realtime session or a
     #: call are POSTed (empty: nowhere; a phone agent can name its own), signed with webhook_secret
     decision_webhook_url: str = ""
+    #: spoken-intent model (spoken language understanding): POST /v1/audio/intent without a model
+    default_intent: str = "slu-slurp-hubert"
     #: voice-conversion model: POST /v1/audio/voice-conversion without a model (OpenVoice v2, MIT, 66 MB)
     default_voice_conversion: str = "openvoice-v2-tone-color-audiocpp"
     #: forced-alignment model (task align): POST /v1/audio/alignments without a model, word times for recognisers

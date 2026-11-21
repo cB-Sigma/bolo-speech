@@ -50,6 +50,7 @@ FAMILIES = {
     "f5": ["transformers", "vocos", "x_transformers", "torchdiffeq", "pydub", "jieba", "pypinyin"],
     "orpheus": ["transformers", "snac"],
     "sepformer": ["speechbrain", "torchaudio"],
+    "slu": ["speechbrain", "transformers", "sentencepiece"],
     "pyannote": ["pyannote.audio"],
     "omni": ["transformers", "accelerate"],
     "step-audio-2": ["transformers", "s3tokenizer", "hyperpyyaml", "onnxruntime", "librosa", "torchaudio"],

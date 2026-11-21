@@ -579,6 +579,12 @@ class Bolo:
                 "types": ["yes_no", "choice", "score"],
                 "models": [m.id for m in self.catalog.all() if m.task == "decision" and not m.builtin],
             },
+            # spoken intent and slots straight from the audio (docs/api.md, "Spoken intent")
+            "intent": {
+                "endpoint": "/v1/audio/intent",
+                "default_model": s.default_intent,
+                "models": [m.id for m in self.catalog.all() if m.task == "intent" and not m.builtin],
+            },
             # watermarks (docs/api.md, "Watermarks"): opt-in per request unless the policy says otherwise
             "watermark": {
                 "endpoint": "/v1/audio/watermark/detect",
@@ -1159,6 +1165,7 @@ class Bolo:
                 "emotion": s.default_emotion,
                 "decision": s.default_decision,
                 "audio-classify": s.default_audio_classify,
+                "intent": s.default_intent,
                 "voice-conversion": s.default_voice_conversion,
                 "punctuation": s.default_punctuation,
                 "itn": s.default_itn,

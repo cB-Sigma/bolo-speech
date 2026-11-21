@@ -117,6 +117,7 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `POST` | `/v1/audio/classifiers` | Train a classifier from labelled examples |
 | `GET` | `/v1/audio/classifiers/{classifier_id}` | One trained classifier |
 | `DELETE` | `/v1/audio/classifiers/{classifier_id}` | Delete a trained classifier |
+| `POST` | `/v1/audio/intent` | Spoken intent and slots (spoken language understanding) |
 | `POST` | `/v1/audio/dialogue` | Speak a multi-speaker dialogue |
 | `POST` | `/v1/audio/voice-conversion` | Say the same words in another voice |
 | `POST` | `/v1/speech-to-speech/{voice_id}` | Voice conversion (ElevenLabs' route) |
@@ -783,6 +784,32 @@ person=./clips/person [--encoder clap-htsat-unfused] [--head mlp]` (every audio 
 classifier list`, `bolo classifier show NAME`, `bolo classifier rm NAME`, then `bolo classify FILE --classifier
 voicemail`.
 
+### Spoken intent: `POST /v1/audio/intent`
+
+Extension: what the speaker of one short utterance wants, read straight from the audio by a spoken-language-
+understanding model (no transcript in between). Multipart form: `file` (one utterance, at most 30 s), `model` (an
+`intent` model; default `default_intent`, `slu-slurp-hubert`) and `keep_alive`.
+
+```bash
+curl -s localhost:8000/v1/audio/intent -F file=@command.wav
+```
+
+```jsonc
+{"object": "audio.intent", "model": "slu-slurp-hubert", "duration": 3.51,
+ "intent": "calendar_set", "scenario": "calendar", "action": "set",
+ "slots": [{"type": "event_name", "value": "dentist appointment"}, {"type": "date", "value": "friday"}],
+ "text": "{'scenario': 'calendar'| 'action': 'set'| 'entities': [{'type': 'event_name'| 'filler': 'dentist appointment'}| {'type': 'date'| 'filler': 'friday'}]}"}
+```
+
+`intent` is SLURP's `scenario_action`; `slots` are the model's own (`type` and the words it heard, as it spells
+them), in the order it wrote them; `text` is the model's raw output. bolo reads that output without running it as
+code; a model that writes something unreadable gives `"intent": null` and its `text`. `slu-slurp-hubert`
+(SpeechBrain, Apache-2.0, on the torch plugin: `pip install "bolo-torch[slu]"`) knows SLURP's English commands to a
+home assistant in 18 scenarios (alarm, calendar, play, weather, lists, email, iot, transport, ...) with their
+actions and slot types; anything else is mapped to the nearest of them. It is slow on a CPU: half a minute for a
+two-second command with its catalog beam of 8 (`options.beam_size`; the model's own 80 took several minutes), so it
+suits offline use, not a live turn. `x-bolo-model` names the model; the trace has kind
+`intent`. From the command line: `bolo intent FILE [-m model] [--json]`.
 
 ### Wake words: `POST /api/v1/wake`, `WS /api/v1/wake/stream`
 
@@ -2406,9 +2433,13 @@ and separated anyway, and the report says `"narrowband": true` (also set when
 16 kHz audio has nothing above 4 kHz, i.e. an upsampled phone call).
 
 When to use it, and what it costs, is in models.md, "Overlapping speech":
-measured results by type of audio. It is off by default. A blind separator in
-an engine plugin can be named in `separation_model` as well (its tracks are
-given to the diarized speakers by voice similarity).
+measured results by type of audio. It is off by default. A blind separator can be named in `separation_model` as
+well: SpeechBrain's SepFormers in ONNX Runtime (`sepformer-wsj02mix`,
+`sepformer-libri2mix` for two voices, `sepformer-wsj03mix`,
+`sepformer-libri3mix` for three, all 8 kHz models), or one in an engine plugin
+(`sepformer-whamr16k`, `pixit-ami`). Its tracks are given to the diarized
+speakers by voice similarity, so a window where three people talk at once gets
+three tracks from a three-speaker model.
 
 **Live** (`WS /api/v1/stt/stream?diarize=true`, optional `max_speakers`):
 every `final` gets a `"speaker"` field and `ready` reports

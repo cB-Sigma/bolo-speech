@@ -55,6 +55,8 @@ class TorchServer(_Server):
                 self.denoise(rid, message, payload)
             elif op == "lid" and hasattr(self, "lid"):  # bolo 0.6.7 and later
                 self.lid(rid, message, payload)
+            elif op == "intent" and hasattr(self, "intent"):  # bolo with the intent task
+                self.intent(rid, message, payload)
             else:
                 self.fail(rid, "unknown_op", f"unknown op {op!r}")
         except Exception as exc:

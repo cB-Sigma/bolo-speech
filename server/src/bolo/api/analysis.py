@@ -504,4 +504,33 @@ async def delete_classifier(request: Request, classifier_id: str) -> JSONRespons
     return JSONResponse({"id": classifier_id, "object": "audio.classifier", "deleted": True})
 
 
+@router.post("/v1/audio/intent", tags=["native"], summary="Spoken intent and slots (spoken language understanding)")
+async def audio_intent(request: Request) -> JSONResponse:
+    """Extension. What the speaker of one short utterance wants, straight from the audio: ``intent``
+    (``alarm_set``), ``scenario`` and ``action`` (SLURP's two halves of the intent, ``alarm`` and ``set``), ``slots``
+    (``[{"type": "time", "value": "seven"}]``, as the model filled them) and ``text`` (the model's own output).
+    Multipart form: ``file`` (one utterance, at most 30 s), ``model`` (an ``intent`` model: ``slu-slurp-hubert``;
+    default ``default_intent``) and ``keep_alive``. See docs/api.md, "Spoken intent"."""
+    from bolo.intent import body, understand
+
+    core = get_core(request)
+    form = await request.form()
+    file = _upload(form, "file")
+    request_keep_alive(form.get("keep_alive"), ("intent",))
+    spec = core.resolve(str(form.get("model") or "") or None, "intent")
+    samples, rate = await read_upload(core, file)
+    trace = Trace("intent", "http", spec.id)
+    trace.audio_seconds = len(samples) / rate if rate else 0.0
+    try:
+        result, duration = await understand(core, samples, rate, spec.id, trace)
+        trace.extra["intent"] = result.intent
+        trace.finish("ok")
+    except Exception as exc:
+        trace.finish("error", exc.message if isinstance(exc, BoloError) else f"{type(exc).__name__}: {exc}")
+        raise
+    finally:
+        core.traces.record(trace)
+    return JSONResponse(body(result, spec.id, duration), headers={"x-request-id": trace.id, "x-bolo-model": spec.id})
+
+
 __all__ = ["router"]

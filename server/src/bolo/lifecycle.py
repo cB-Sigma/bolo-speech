@@ -43,6 +43,7 @@ from bolo.engines.base import (
     DecisionModel,
     DenoiseModel,
     DiarizationModel,
+    IntentModel,
     ItnModel,
     LidModel,
     LoadOptions,
@@ -806,6 +807,10 @@ class ModelManager:
             handlers["embed_text"] = lambda items: [clap.embed_text(item) for item in items]
             max_batch["embed_audio"] = 4
             max_batch["embed_text"] = 1
+        elif isinstance(model, IntentModel):
+            understander = model
+            handlers["intent"] = lambda items: [understander.understand(item) for item in items]
+            max_batch["intent"] = 1
         elif isinstance(model, AudioClassifierModel):
             classifier = model
             handlers["classify"] = lambda items: [classifier.classify(item) for item in items]

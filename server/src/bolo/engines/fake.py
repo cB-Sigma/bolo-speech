@@ -37,6 +37,8 @@ from bolo.engines.base import (
     Engine,
     EngineStatus,
     FloatArray,
+    IntentModel,
+    IntentResult,
     ItnModel,
     LidModel,
     LoadOptions,
@@ -692,6 +694,23 @@ class FakeEmotion(EmotionModel):
         return sorted(((label, 0.8 if label == top else rest) for label in self.LABELS), key=lambda t: -t[1])
 
 
+class FakeIntent(IntentModel):
+    """Spoken intent for tests: a loud recording sets an alarm for tomorrow at seven, a quiet one is
+    ``general_quirky`` with no slots."""
+
+    def understand(self, samples: FloatArray) -> IntentResult:
+        if len(samples) and float(np.max(np.abs(samples))) > 0.01:
+            text = (
+                "{'scenario': 'alarm', 'action': 'set', 'entities': [{'type': 'date', 'filler': 'tomorrow'}, "
+                "{'type': 'time', 'filler': 'seven'}]}"
+            )
+            slots = [{"type": "date", "value": "tomorrow"}, {"type": "time", "value": "seven"}]
+            return IntentResult("alarm_set", "alarm", "set", slots, text)
+        return IntentResult(
+            "general_quirky", "general", "quirky", [], "{'scenario': 'general', 'action': 'quirky', 'entities': []}"
+        )
+
+
 class FakeDecision(DecisionModel):
     """Decisions for tests, in ``/v1/systemone``'s shape: yes (0.9) when there is text or a loud recording, else no
     (0.1); the first option of a choice (0.7, the rest share 0.3); the middle level of a scale."""
@@ -927,7 +946,7 @@ class FakeEngine(Engine):
     kinds = (
         "fake-stt", "fake-stt-streaming", "fake-stt-speakers", "fake-tts", "fake-vad", "fake-diarization", "fake-turn",
         "fake-turn-text", "fake-separation", "fake-denoise", "fake-s2s", "fake-lid", "fake-speaker-embedding",
-        "fake-tagging", "fake-emotion", "fake-decision", "fake-clap",
+        "fake-tagging", "fake-emotion", "fake-decision", "fake-clap", "fake-intent",
         "fake-align",
         "fake-punctuation", "fake-echo", "fake-wake", "fake-watermark", "fake-itn", "fake-pii",
     )  # fmt: skip
@@ -975,6 +994,8 @@ class FakeEngine(Engine):
             model = FakeClap()
         elif kind == "fake-decision":
             model = FakeDecision()
+        elif kind == "fake-intent":
+            model = FakeIntent()
         elif kind == "fake-align":
             model = FakeAligner(merged)
         elif kind == "fake-pii":

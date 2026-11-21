@@ -1017,6 +1017,39 @@ def cmd_classify(args: argparse.Namespace) -> int:
     return asyncio.run(run())
 
 
+def cmd_intent(args: argparse.Namespace) -> int:
+    """``bolo intent FILE``: the speaker's intent and its slots, straight from the audio."""
+    from bolo.audio import decode_audio
+    from bolo.intent import body, understand
+    from bolo.obs.trace import Trace
+
+    path = Path(args.file)
+    samples, rate = decode_audio(path.read_bytes(), filename=path.name)
+    core = _core(args)
+
+    async def run() -> int:
+        await core.start()
+        try:
+            spec = core.resolve(args.model, "intent")
+            result, duration = await understand(core, samples, rate, spec.id, Trace("intent", "cli", spec.id))
+            out = body(result, spec.id, duration)
+            if args.json:
+                print(json.dumps(out, indent=2, ensure_ascii=False))
+                return 0
+            print(f"{spec.id}: {out['intent'] or '(not understood)'}")
+            if out["scenario"] or out["action"]:
+                print(f"  scenario {out['scenario'] or '-'}, action {out['action'] or '-'}")
+            for slot in out["slots"]:
+                print(f"  {slot['type']}: {slot['value']}")
+            if not out["intent"]:
+                print(f"  model output: {out['text']}")
+            return 0
+        finally:
+            await core.stop()
+
+    return asyncio.run(run())
+
+
 def cmd_decide(args: argparse.Namespace) -> int:
     """``bolo decide [FILE] --questions JSON | --ask QUESTION``: typed answers about a recording and/or a text."""
     from bolo.audio import decode_audio
@@ -2240,7 +2273,7 @@ _TASK_TITLES = {
     "denoise": "Denoising", "lid": "Language identification", "speech-to-speech": "Speech to speech",
     "speaker-embedding": "Speaker embedding", "audio-tagging": "Audio tagging", "emotion": "Speech emotion",
     "audio-classify": "Zero-shot audio classification",
-    "decision": "Decisions", "align": "Forced alignment",
+    "decision": "Decisions", "intent": "Spoken intent", "align": "Forced alignment",
     "punctuation": "Punctuation restoration", "itn": "Inverse text normalisation", "pii": "Personal information",
     "echo-cancellation": "Echo cancellation", "wake-word": "Wake words",
 }  # fmt: skip
@@ -3172,6 +3205,15 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--model", "-m", help="a decision model (default: default_decision)")
     s.add_argument("--json", action="store_true")
     s.set_defaults(func=cmd_decide)
+
+    s = sub.add_parser(
+        "intent", help="the speaker's intent and slots in one spoken utterance (spoken language understanding)"
+    )
+    _common(s)
+    s.add_argument("file", help="an audio file: one utterance, at most 30 s")
+    s.add_argument("--model", "-m", help="an intent model (default: default_intent)")
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(func=cmd_intent)
 
     s = sub.add_parser(
         "classify",

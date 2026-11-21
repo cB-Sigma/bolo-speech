@@ -23,6 +23,7 @@ import type {
   AudioClassifier,
   AudioDecision,
   AudioEmotion,
+  AudioIntent,
   AudioTags,
   BenchRequest,
   BenchResult,
@@ -519,6 +520,18 @@ export const api = {
     if (opts.model) form.set('model', opts.model)
     const res = await request('v1/audio/decisions', { method: 'POST', body: form, signal })
     return res.json() as Promise<AudioDecision>
+  },
+  /** The speaker's intent and slots in one utterance, from a spoken-intent model (`POST /v1/audio/intent`). */
+  async audioIntent(
+    file: Blob,
+    opts: { name?: string; model?: string } = {},
+    signal?: AbortSignal,
+  ): Promise<AudioIntent> {
+    const form = new FormData()
+    form.set('file', file, opts.name ?? 'audio.wav')
+    if (opts.model) form.set('model', opts.model)
+    const res = await request('v1/audio/intent', { method: 'POST', body: form, signal })
+    return res.json() as Promise<AudioIntent>
   },
   /** A question about a recording, answered by an audio language model that hears it (`/v1/chat/completions`). */
   async askAudio(file: Blob, format: string, question: string, model: string, signal?: AbortSignal): Promise<string> {

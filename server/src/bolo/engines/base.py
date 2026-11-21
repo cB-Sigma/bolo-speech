@@ -633,6 +633,43 @@ class EmotionModel(AudioClassifierModel):
 
 
 @dataclass
+class IntentResult:
+    """What a spoken-language-understanding model understood of an utterance: ``intent`` (``scenario_action`` for
+    SLURP: ``alarm_set``), its ``scenario`` and ``action`` when the model gives them apart, the ``slots`` it filled
+    (``{"type": "date", "value": "tomorrow"}``, in the order the model wrote them) and ``text``, the model's own
+    output as it wrote it."""
+
+    intent: str | None
+    scenario: str | None = None
+    action: str | None = None
+    slots: list[dict[str, str]] = field(default_factory=list)
+    text: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"intent": self.intent, "scenario": self.scenario, "action": self.action,
+                "slots": [dict(s) for s in self.slots], "text": self.text}  # fmt: skip
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> IntentResult:
+        slots = [{"type": str(s.get("type", "")), "value": str(s.get("value", ""))} for s in d.get("slots") or []]
+        return cls(
+            d.get("intent"), d.get("scenario"), d.get("action"), slots, str(d.get("text") or "")
+        )  # fmt: skip
+
+
+class IntentModel(Model):
+    """Spoken language understanding: speech in (mono float32 at ``sample_rate``, 16 kHz), the speaker's intent and
+    its slots out, straight from the audio (no transcript in between)."""
+
+    task = "intent"
+    #: the longest stretch the model hears at once, in seconds
+    max_audio_s: float = 30.0
+
+    @abc.abstractmethod
+    def understand(self, samples: FloatArray) -> IntentResult: ...
+
+
+@dataclass
 class DecisionRequest:
     """Typed questions about a state: ``text``, a recording (``samples``, mono float32 at 16 kHz) or both.
     ``questions`` maps an id to ``{"type": "noul" | "choice" | "score", "instructions": str, "criteria": ...}`` in

@@ -47,6 +47,9 @@ denoise    ``handle``; the recording follows (at the model's            the enha
 lid        ``handle``; the recording follows (16 kHz)                     ``languages``: list of
                                                                         ``[code, probability]``, most
                                                                         likely first
+intent     ``handle``; one utterance follows (16 kHz)                   ``intent``: ``{intent, scenario,
+                                                                        action, slots, text}``, slots
+                                                                        a list of ``{type, value}``
 respond    ``handle``, ``turns``: list of ``{role, text, n, call_id,     ``sample_rate``, ``chunks``,
            tool_calls}``, ``instructions``, ``tools``,                    ``cancelled`` (chunks before)
            ``tool_choice``, ``voice``, ``max_output_tokens``,
@@ -65,7 +68,8 @@ conditioned recognition of a whole recording, bolo sends it only to such models)
 ``min_sample_s`` (seconds of voice a target model needs); a diarization model (task ``diarization``, bolo 0.6.7)
 gives ``consolidate_default`` (false: bolo does not merge or drop its speakers); a speech-to-speech model (task
 ``speech-to-speech``, bolo 0.6.7) gives ``voices`` and ``supports_tools``; a language identifier (task ``lid``,
-bolo 0.6.7) gives ``labels`` (the language codes it can answer) and ``max_s`` (the seconds of audio it looks at). The model keeps no conversation: each
+bolo 0.6.7) gives ``labels`` (the language codes it can answer) and ``max_s`` (the seconds of audio it looks at); a
+spoken-intent model (task ``intent``) may give ``max_s`` (the longest utterance it takes, default 30). The model keeps no conversation: each
 ``respond`` carries the whole conversation (user turns as audio or text, the model's earlier answers as text, tool
 results), and the answer streams back as chunks at the model's ``sample_rate``. ``placement`` in a ``load``
 request (bolo 0.5) is
@@ -82,7 +86,7 @@ with ``ok: false``. New optional members may be added within a version, and new 
 only sends to models announcing them in ``info`` (``speakers``, added in bolo 0.3; ``diarize`` and ``embed`` are sent only to models loaded with task
 ``diarization``, bolo 0.6.7; ``denoise`` only to models loaded with task ``denoise``, bolo 0.6.7; ``respond`` only
 to models loaded with task ``speech-to-speech``, bolo 0.6.7; ``lid`` only to models loaded with task ``lid``, bolo
-0.6.7); anything
+0.6.7; ``intent`` only to models loaded with task ``intent``); anything
 incompatible gets a new version number.
 """
 

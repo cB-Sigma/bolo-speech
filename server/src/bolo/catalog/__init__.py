@@ -21,7 +21,7 @@ from bolo.store import Source
 TASKS = (
     "stt", "tts", "vad", "diarization", "turn", "translation", "separation", "denoise", "lid", "speech-to-speech",
     "audio-llm", "speaker-embedding", "audio-tagging", "emotion", "voice-conversion", "align", "punctuation", "itn", "pii",
-    "echo-cancellation", "wake-word", "watermark", "decision", "audio-classify",
+    "echo-cancellation", "wake-word", "watermark", "decision", "audio-classify", "intent",
 )  # fmt: skip
 TIERS = ("realtime", "balanced", "accuracy")
 VALIDATED = ("cpu", "untested")
@@ -404,6 +404,12 @@ FAKE_MODELS: list[dict[str, Any]] = [
         "languages": ["en"], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
         "description": "Test decision model: yes when the text or a loud recording is there, the first option, the "
         "middle level. Not real decisions.",
+    },
+    {
+        "id": "fake-intent", "task": "intent", "engine": "fake", "kind": "fake-intent", "family": "Fake",
+        "languages": ["en"], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
+        "description": "Test spoken intent model: a loud recording sets an alarm for tomorrow, a quiet one is "
+        "general_quirky. Not real understanding.",
     },
     {
         "id": "fake-pii", "task": "pii", "engine": "fake", "kind": "fake-pii", "family": "Fake",

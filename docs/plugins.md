@@ -208,6 +208,7 @@ definitions are in `server/src/bolo/plugin/protocol.py`.
 | `svara-tts-v1` (Kenpath) | TTS, 3B Llama + SNAC, 19 languages | `orpheus` | Apache-2.0 | no | not run (only the SNAC decoder) |
 | `sepformer-whamr16k` | separation (blind, 2 speakers, 16 kHz) | `sepformer` | Apache-2.0, WSJ0-derived data | no | RTF 3.7 |
 | `sepformer-whamr` | separation (blind, 2 speakers, 8 kHz) | `sepformer` | Apache-2.0, WSJ0-derived data | no | RTF 1.4 |
+| `slu-slurp-hubert` (SpeechBrain SLURP) | spoken intent and slots (op `intent`) | `slu` | Apache-2.0 | no | RTF 10.6 at beam 8 (4 threads); 8 of 8 synthetic commands understood |
 | `pixit-ami` (pyannote PixIT) | separation with diarization | `pyannote` | MIT | yes (two repositories) | RTF 5.7; little gain on a synthetic mix |
 | `pyannote-speaker-diarization-3.1` | diarization (pyannote's PyTorch pipeline) | `pyannote` | MIT + CC-BY-4.0 (embedding, PLDA) | yes (three repositories) | RTF 0.9; DER 6.0 % on the demo dialogue (ONNX default 5.9 %) |
 | `pyannote-speaker-diarization-community-1` | diarization (VBx clustering) | `pyannote` | CC-BY-4.0 | yes | RTF 0.9; DER 6.0 % on the demo dialogue |

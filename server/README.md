@@ -199,6 +199,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | ECHO-CANCELLATION | WebRTC AEC3 | 1 | - | 1 | 0.026 (`webrtc-aec3`) |
 | ECHO-CANCELLATION | DTLN-aec | 1 | - | 1 | 0.233 (`dtln-aec-128`) |
 | EMOTION | emotion2vec+ | 2 | - | 2 | 0.845 (`emotion2vec-plus-large`) |
+| INTENT | SpeechBrain SLU | 1 | en | 1 | 10.580 (`slu-slurp-hubert`) |
 | ITN | WeTextProcessing | 3 | en, hi, zh | 3 | 0.001 (`itn-zh-wetext`) |
 | ITN | sherpa-onnx rule FSTs | 1 | zh | 1 | 0.000 (`itn-zh-number`) |
 | LID | VoxLingua107 ECAPA-TDNN | 2 | ab, af, am, ar, as, az, ba, be +99 | 2 | 0.106 (`voxlingua107-ecapa`) |
@@ -301,7 +302,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | WATERMARK | Perth | 1 | - | 1 | 0.033 (`perth-onnx`) |
 | WATERMARK | WavMark | 1 | - | 1 | 2.300 (`wavmark-onnx`) |
 
-**563 models in the catalog, 260 validated on CPU, 303 untested**, plus 34 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md).
+**564 models in the catalog, 261 validated on CPU, 303 untested**, plus 34 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/providers.md)). Full list: [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](https://github.com/cB-Sigma/bolo-speech/blob/main/docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

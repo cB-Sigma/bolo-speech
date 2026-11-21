@@ -52,6 +52,7 @@ LOADERS: dict[str, tuple[str, str]] = {
     "minicpm-o": ("bolo_torch.models.minicpm_o", "load"),
     "voxlect-lid": ("bolo_torch.models.lid", "load_voxlect"),
     "speechbrain-lid": ("bolo_torch.models.lid", "load_speechbrain"),
+    "speechbrain-slu": ("bolo_torch.models.slu", "load"),
     "hf-audio-classification": ("bolo_torch.models.lid", "load_hf_classifier"),
 }
 #: kinds the catalog lists for this plugin that are not implemented yet

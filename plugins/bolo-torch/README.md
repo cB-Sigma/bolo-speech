@@ -23,6 +23,7 @@ the console, the OpenAI-compatible API) works as for bolo's own engines.
 | `maskgct` | TTS | Amphion MaskGCT, voice cloning in English, Chinese, Japanese, Korean, French and German | `maskgct` + GPL front-end packages + the authors' code (bundle `maskgct`) | CC-BY-NC-4.0 (non-commercial) | no | **no** (fakes; the authors' pipeline with tiny random networks) |
 | `sepformer-whamr16k` | separation | SpeechBrain SepFormer, WHAMR!, 16 kHz, 2 speakers | `sepformer` | Apache-2.0 (WSJ0 data, see below) | no | CPU, see below |
 | `sepformer-whamr` | separation | SpeechBrain SepFormer, WHAMR!, 8 kHz, 2 speakers | `sepformer` | Apache-2.0 (WSJ0 data, see below) | no | CPU, see below |
+| `slu-slurp-hubert` | intent | SpeechBrain direct SLU for SLURP: HuBERT base + attentional decoder, the intent and slots of one English command (op `intent`) | `slu` | Apache-2.0 (SLURP data CC-BY-4.0) | no | CPU, see below |
 | `pixit-ami` | separation | pyannote PixIT `speech-separation-ami-1.0`, diarization + separation | `pyannote` | MIT | yes (two repositories) | CPU, see below |
 | `pyannote-speaker-diarization-3.1` | diarization | pyannote `speaker-diarization-3.1`, the original PyTorch pipeline | `pyannote` | MIT (pipeline, segmentation) + CC-BY-4.0 (WeSpeaker embedding, PLDA files) | yes (three repositories) | CPU, see below |
 | `pyannote-speaker-diarization-community-1` | diarization | pyannote `speaker-diarization-community-1` (VBx clustering) | `pyannote` | CC-BY-4.0 | yes | CPU, see below |

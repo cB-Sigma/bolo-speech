@@ -348,6 +348,23 @@ async def _emotion(r: Runner, run: Run, e: Entry, i: Inputs, o: Options, scope: 
     return {"emotion": body["emotion"], "score": body["score"], "emotions": body["emotions"]}
 
 
+@handler("intent")
+async def _intent(r: Runner, run: Run, e: Entry, i: Inputs, o: Options, scope: Scope, d: int) -> dict[str, Any]:
+    from bolo.intent import understand
+
+    audio = need_audio(i)
+    model = r.core.resolve(e["model"], "intent").id
+    trace = _trace("intent", model)
+    try:
+        result, _ = await understand(r.core, audio.samples, audio.rate, model, trace)
+    except Exception as exc:
+        _record(r.core, trace, "error", str(exc))
+        raise
+    _record(r.core, trace)
+    return {"intent": result.intent or "", "scenario": result.scenario or "", "action": result.action or "",
+            "slots": [dict(s) for s in result.slots], "text": result.text}  # fmt: skip
+
+
 @handler("audio-llm")
 async def _audio_llm(r: Runner, run: Run, e: Entry, i: Inputs, o: Options, scope: Scope, d: int) -> dict[str, Any]:
     from bolo.audio_llm import client_for

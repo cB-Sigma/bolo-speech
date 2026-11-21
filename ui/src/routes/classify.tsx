@@ -13,7 +13,8 @@ import { ClipSlot, type Clip } from '@/components/voices/voice-compare'
 import { describeError, useInfo, useModels } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import type { AudioClassification, AudioClassifier, ClassScore } from '@/lib/api/types'
-import { autoPull } from '@/lib/capabilities'
+import { IntentPanels } from '@/components/classify/intent-panels'
+import { autoPull, intentOffered } from '@/lib/capabilities'
 import { audioFiles, filesFromDrop, folderName, parseLabels } from '@/lib/classify'
 import { cn } from '@/lib/utils'
 
@@ -514,6 +515,7 @@ export default function ClassifyPage() {
             </Empty>
           )}
         </Panel>
+        {intentOffered(info.data) && <IntentPanels />}
       </div>
     </Page>
   )

@@ -52,6 +52,8 @@ from bolo.engines.base import (
     Engine,
     EngineStatus,
     FloatArray,
+    IntentModel,
+    IntentResult,
     LidModel,
     LoadOptions,
     Model,
@@ -696,6 +698,25 @@ class PluginLid(_PluginModelMixin, LidModel):
         return [(str(code), float(p)) for code, p in reply.get("languages") or []]
 
 
+class PluginIntent(_PluginModelMixin, IntentModel):
+    """A spoken-intent model in a plugin: op ``intent``, one 16 kHz utterance in, ``{intent, scenario, action, slots,
+    text}`` out."""
+
+    def __init__(self, process: PluginProcess, load_message: dict[str, Any]) -> None:
+        self.process, self._load_message, self._handle, self._generation = process, load_message, None, 0
+        self._ensure_loaded()
+
+    def _apply_load_reply(self, reply: dict[str, Any]) -> None:
+        info = reply.get("info") or {}
+        self.sample_rate = int(reply.get("sample_rate") or 16000)
+        self.max_audio_s = float(info.get("max_s") or 30.0)
+
+    def understand(self, samples: FloatArray) -> IntentResult:
+        handle = self._ensure_loaded()
+        reply = self.process.request({"op": "intent", "handle": handle}, audio_bytes(samples))
+        return IntentResult.from_dict(dict(reply.get("intent") or {}))
+
+
 class PluginDecision(_PluginModelMixin, DecisionModel):
     """A decision model in a plugin: op ``decide``, the text and questions in the message, the recording (16 kHz) as
     the payload when there is one; the answers in ``/v1/systemone``'s shape (bolo 1.1)."""
@@ -798,8 +819,11 @@ class PluginEngine(Engine):
             return PluginLid(self.process, message)
         if task == "decision":
             return PluginDecision(self.process, message)
+        if task == "intent":
+            return PluginIntent(self.process, message)
         raise EngineUnavailable(
-            "plugins can serve stt, tts, separation, diarization, denoise, speech-to-speech, lid and decision models, "
+            "plugins can serve stt, tts, separation, diarization, denoise, speech-to-speech, lid, decision and intent "
+            "models, "
             f"not {task!r}"
         )
 

@@ -25,6 +25,7 @@ export type Task =
   | 'watermark'
   | 'decision'
   | 'audio-classify'
+  | 'intent'
 export type Tier = 'realtime' | 'balanced' | 'accuracy'
 export type Validated = 'cpu' | 'untested'
 
@@ -134,6 +135,8 @@ export interface Capabilities {
   }
   /** Decisions: typed questions about a recording or a text (`POST /v1/audio/decisions`). */
   decision?: { endpoint?: string; default_model?: string | null; types?: string[]; models?: string[] }
+  /** Spoken intent and slots straight from the audio (`POST /v1/audio/intent`). */
+  intent?: { endpoint?: string; default_model?: string | null; models?: string[] }
   /** Wake words (`POST /api/v1/wake`, `WS /api/v1/wake/stream`, the Wyoming wake service). */
   wake?: { endpoint?: string; stream?: string; wyoming?: boolean; default_model?: string | null }
   /** Pipelines (`/api/v1/pipelines`), newer servers. */
@@ -1051,6 +1054,20 @@ export interface AudioDecision {
   duration?: number
   answers: Record<string, DecisionAnswer>
   usage?: { input_tokens: number }
+}
+
+/** What a spoken-intent model understood of one utterance (`POST /v1/audio/intent`). */
+export interface AudioIntent {
+  object: 'audio.intent'
+  model: string
+  duration: number
+  /** `alarm_set`; null when the model wrote nothing bolo could read */
+  intent: string | null
+  scenario: string | null
+  action: string | null
+  slots: { type: string; value: string }[]
+  /** the model's own output */
+  text: string
 }
 
 /** An enrolled speaker (`/v1/audio/speakers`). */

@@ -4,6 +4,14 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+### Added
+
+- **SpeechBrain direct spoken-language understanding** (kind `speechbrain-slu`, extra `slu`, op `intent`):
+  `slu-slurp-hubert` built from its `hyperparams.yaml` with SpeechBrain's classes, HuBERT from its configuration
+  only (`config_only_encoders`: SpeechBrain's wrapper would download facebook/hubert-base-ls960's weights just for
+  the checkpoint to replace them), decoded as the repository's interface does, `beam_size` option. Run on CPU:
+  8 of 8 synthetic commands understood, RTF 10.6 at beam 8.
+
 ## [0.1.10] - 2026-11-21
 
 ### Added
