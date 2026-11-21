@@ -53,6 +53,7 @@ TASK_TITLES = {
     "speaker-embedding": "Speaker embedding",
     "audio-tagging": "Audio tagging and sound events",
     "emotion": "Speech emotion",
+    "decision": "Decisions (typed questions about a recording or a text)",
     "voice-conversion": "Voice conversion",
     "align": "Forced alignment (word timestamps)",
     "echo-cancellation": "Echo cancellation (voice agents)",

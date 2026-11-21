@@ -21,7 +21,7 @@ from bolo.store import Source
 TASKS = (
     "stt", "tts", "vad", "diarization", "turn", "translation", "separation", "denoise", "lid", "speech-to-speech",
     "audio-llm", "speaker-embedding", "audio-tagging", "emotion", "voice-conversion", "align", "punctuation", "itn", "pii",
-    "echo-cancellation", "wake-word", "watermark",
+    "echo-cancellation", "wake-word", "watermark", "decision",
 )  # fmt: skip
 TIERS = ("realtime", "balanced", "accuracy")
 VALIDATED = ("cpu", "untested")
@@ -393,6 +393,12 @@ FAKE_MODELS: list[dict[str, Any]] = [
         "id": "fake-emotion", "task": "emotion", "engine": "fake", "kind": "fake-emotion", "family": "Fake",
         "languages": [], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
         "description": "Test emotion model: a low pitch is neutral, a high one happy. Not real emotion recognition.",
+    },
+    {
+        "id": "fake-decision", "task": "decision", "engine": "fake", "kind": "fake-decision", "family": "Fake",
+        "languages": ["en"], "tier": "realtime", "license": "Apache-2.0", "builtin": True,
+        "description": "Test decision model: yes when the text or a loud recording is there, the first option, the "
+        "middle level. Not real decisions.",
     },
     {
         "id": "fake-pii", "task": "pii", "engine": "fake", "kind": "fake-pii", "family": "Fake",

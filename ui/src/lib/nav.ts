@@ -8,6 +8,7 @@ import {
   Columns3,
   Gauge,
   KeyRound,
+  ListChecks,
   Radio,
   MessagesSquare,
   Mic,
@@ -36,6 +37,8 @@ export interface NavFeatures {
   speakers?: boolean
   /** Wake words and keyword spotting (`/api/v1/wake`). */
   wake?: boolean
+  /** Typed questions about a recording or a text (`/v1/audio/decisions`). */
+  decisions?: boolean
 }
 
 export interface NavItem {
@@ -140,6 +143,15 @@ export const NAV: NavItem[] = [
     icon: Cloud,
     group: 'Server',
     when: (f) => Boolean(f.providers),
+  },
+  {
+    to: '/decisions',
+    label: 'Decisions',
+    short: 'Decide',
+    description: 'Ask yes/no, choice and score questions about a recording or a text',
+    icon: ListChecks,
+    group: 'Playground',
+    when: (f) => Boolean(f.decisions),
   },
   {
     to: '/speakers',

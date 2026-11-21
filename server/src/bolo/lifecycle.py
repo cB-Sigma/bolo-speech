@@ -39,6 +39,7 @@ from bolo.engines import EngineRegistry
 from bolo.engines.base import (
     AlignModel,
     AudioClassifierModel,
+    DecisionModel,
     DenoiseModel,
     DiarizationModel,
     ItnModel,
@@ -794,6 +795,10 @@ class ModelManager:
             denoiser = model
             handlers["denoise"] = lambda items: [denoiser.denoise(item) for item in items]
             max_batch["denoise"] = 1
+        elif isinstance(model, DecisionModel):
+            decider = model
+            handlers["decide"] = lambda items: [decider.decide(item) for item in items]
+            max_batch["decide"] = 1
         elif isinstance(model, AudioClassifierModel):
             classifier = model
             handlers["classify"] = lambda items: [classifier.classify(item) for item in items]

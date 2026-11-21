@@ -18,12 +18,14 @@ import type {
   ApiKeyInfo,
   ApiKeyList,
   ApiKeyUpdate,
+  AudioDecision,
   AudioEmotion,
   AudioTags,
   BenchRequest,
   BenchResult,
   CallRecord,
   CallSummary,
+  DecisionQuestion,
   Catalog,
   Component,
   ModelCheck,
@@ -395,6 +397,20 @@ export const api = {
     if (opts.window) form.set('window', String(opts.window))
     const res = await request('v1/audio/emotion', { method: 'POST', body: form, signal })
     return res.json() as Promise<AudioEmotion>
+  },
+  /** Typed questions about a recording and/or a text, answered by a decision model (`POST /v1/audio/decisions`). */
+  async audioDecisions(
+    questions: Record<string, DecisionQuestion>,
+    opts: { file?: Blob; name?: string; text?: string; model?: string } = {},
+    signal?: AbortSignal,
+  ): Promise<AudioDecision> {
+    const form = new FormData()
+    form.set('questions', JSON.stringify(questions))
+    if (opts.file) form.set('file', opts.file, opts.name ?? 'audio.wav')
+    if (opts.text) form.set('text', opts.text)
+    if (opts.model) form.set('model', opts.model)
+    const res = await request('v1/audio/decisions', { method: 'POST', body: form, signal })
+    return res.json() as Promise<AudioDecision>
   },
   /** A question about a recording, answered by an audio language model that hears it (`/v1/chat/completions`). */
   async askAudio(file: Blob, format: string, question: string, model: string, signal?: AbortSignal): Promise<string> {

@@ -411,7 +411,9 @@ def test_catalog_entries() -> None:
         assert len(s.source.revision) == 40 and s.voices and s.license
     svara = next(s for s in specs if s.id == "svara-tts-v1-llamacpp")
     assert "IndicTTS" in svara.description and svara.options["model_file"].endswith("Q4_K_M.gguf")
-    assert TTSServerEngine.kinds == ("tts-server", "orpheus-llamacpp", "voxtral-llamacpp", "ten-turn-llamacpp")
+    assert TTSServerEngine.kinds == (
+        "tts-server", "orpheus-llamacpp", "voxtral-llamacpp", "ten-turn-llamacpp", "llama-decision",
+    )  # fmt: skip
 
 
 def test_audio_token_range_is_the_reference_one() -> None:

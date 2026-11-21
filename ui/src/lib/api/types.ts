@@ -23,6 +23,7 @@ export type Task =
   | 'echo-cancellation'
   | 'wake-word'
   | 'watermark'
+  | 'decision'
 export type Tier = 'realtime' | 'balanced' | 'accuracy'
 export type Validated = 'cpu' | 'untested'
 
@@ -122,6 +123,8 @@ export interface Capabilities {
     transcription_tags?: string[]
     [k: string]: unknown
   }
+  /** Decisions: typed questions about a recording or a text (`POST /v1/audio/decisions`). */
+  decision?: { endpoint?: string; default_model?: string | null; types?: string[]; models?: string[] }
   /** Wake words (`POST /api/v1/wake`, `WS /api/v1/wake/stream`, the Wyoming wake service). */
   wake?: { endpoint?: string; stream?: string; wyoming?: boolean; default_model?: string | null }
   /** Enrolled speakers: verification and identification (`/v1/audio/speakers`), newer servers. */
@@ -966,6 +969,33 @@ export interface AudioEmotion {
   score: number
   emotions: LabelScore[]
   segments?: { start: number; end: number; emotion: string | null; score: number; emotions: LabelScore[] }[]
+}
+
+/** One question of a decision request: yes/no, one option of a list, or a level on a scale. */
+export type DecisionQuestion =
+  | { type: 'yes_no'; question: string }
+  | { type: 'choice'; question: string; options: string[] | Record<string, string | null> }
+  | { type: 'score'; question: string; levels: string[] }
+
+/** A typed answer (`POST /v1/audio/decisions`). */
+export type DecisionAnswer =
+  | { type: 'yes_no'; answer: boolean; probability: number }
+  | { type: 'choice'; answer: string; confidence: number; probabilities: Record<string, number> }
+  | {
+      type: 'score'
+      score: number
+      level: number
+      label: string
+      confidence: number
+      probabilities: number[]
+    }
+
+export interface AudioDecision {
+  object: 'audio.decision'
+  model: string
+  duration?: number
+  answers: Record<string, DecisionAnswer>
+  usage?: { input_tokens: number }
 }
 
 /** An enrolled speaker (`/v1/audio/speakers`). */

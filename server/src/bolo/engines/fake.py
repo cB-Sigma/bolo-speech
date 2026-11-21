@@ -27,6 +27,8 @@ from bolo.engines.base import (
     AudioTaggingModel,
     ConversationChunk,
     ConversationRequest,
+    DecisionModel,
+    DecisionRequest,
     DenoiseModel,
     DiarizationModel,
     DiarizationResult,
@@ -689,6 +691,33 @@ class FakeEmotion(EmotionModel):
         return sorted(((label, 0.8 if label == top else rest) for label in self.LABELS), key=lambda t: -t[1])
 
 
+class FakeDecision(DecisionModel):
+    """Decisions for tests, in ``/v1/systemone``'s shape: yes (0.9) when there is text or a loud recording, else no
+    (0.1); the first option of a choice (0.7, the rest share 0.3); the middle level of a scale."""
+
+    def decide(self, request: DecisionRequest) -> dict[str, Any]:
+        heard = bool(request.text) or (
+            request.samples is not None and len(request.samples) and float(np.max(np.abs(request.samples))) > 0.01
+        )
+        answers: dict[str, Any] = {}
+        for qid, q in request.questions.items():
+            if q["type"] == "noul":
+                answers[qid] = {"type": "noul", "noul": 0.9 if heard else 0.1}
+            elif q["type"] == "choice":
+                options = list(q["criteria"])
+                rest = 0.3 / max(1, len(options) - 1)
+                probs = {o: (0.7 if i == 0 else rest) for i, o in enumerate(options)}
+                answers[qid] = {"type": "choice", "choice": options[0], "probabilities": probs, "confidence": 0.6}
+            else:
+                levels = list(q["criteria"])
+                mid = (len(levels) - 1) / 2
+                answers[qid] = {
+                    "type": "score", "score": mid, "legend": {str(i): t for i, t in enumerate(levels)},
+                    "probabilities": {str(i): 1.0 / len(levels) for i in range(len(levels))}, "confidence": 0.0,
+                }  # fmt: skip
+        return {"answers": answers, "usage": {"input_tokens": 10 * len(answers), "output_tokens": 0}}
+
+
 class FakeWatermark(WatermarkModel):
     """A watermark for tests: a quiet 7 kHz tone (16 kHz audio); detected frame by frame from that tone's energy.
     The payload it reports is the one it last embedded."""
@@ -853,7 +882,7 @@ class FakeEngine(Engine):
     kinds = (
         "fake-stt", "fake-stt-streaming", "fake-stt-speakers", "fake-tts", "fake-vad", "fake-diarization", "fake-turn",
         "fake-turn-text", "fake-separation", "fake-denoise", "fake-s2s", "fake-lid", "fake-speaker-embedding",
-        "fake-tagging", "fake-emotion",
+        "fake-tagging", "fake-emotion", "fake-decision",
         "fake-align",
         "fake-punctuation", "fake-echo", "fake-wake", "fake-watermark", "fake-itn", "fake-pii",
     )  # fmt: skip
@@ -897,6 +926,8 @@ class FakeEngine(Engine):
             model = FakeTagging()
         elif kind == "fake-emotion":
             model = FakeEmotion()
+        elif kind == "fake-decision":
+            model = FakeDecision()
         elif kind == "fake-align":
             model = FakeAligner(merged)
         elif kind == "fake-pii":

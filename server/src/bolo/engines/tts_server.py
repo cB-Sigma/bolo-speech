@@ -1005,7 +1005,7 @@ class TTSServerEngine(Engine):
     name = "External TTS server (llama-server, audio.cpp)"
     license = "MIT (llama.cpp) / Apache-2.0 (audio.cpp)"
     url = "https://github.com/ggml-org/llama.cpp"
-    kinds = ("tts-server", "orpheus-llamacpp", "voxtral-llamacpp", "ten-turn-llamacpp")
+    kinds = ("tts-server", "orpheus-llamacpp", "voxtral-llamacpp", "ten-turn-llamacpp", "llama-decision")
 
     def __init__(self) -> None:
         self.settings: Settings | None = None
@@ -1038,6 +1038,13 @@ class TTSServerEngine(Engine):
             from bolo.engines.voxtral_llamacpp import load_model as load_voxtral
 
             return load_voxtral(self, path, spec, opts)
+        if kind == "llama-decision":
+            # decision models (d1-omni): typed answers from llama-server's /v1/systemone (bolo.engines.decision_llamacpp)
+            if task != "decision":
+                raise EngineUnavailable(f"the llama-decision kind is a decision model, not {task!r}")
+            from bolo.engines.decision_llamacpp import load_model as load_decision
+
+            return load_decision(self, path, spec, opts)
         if kind == "ten-turn-llamacpp":
             # TEN Turn Detection: an end-of-turn model that reads text, on llama-server (bolo.engines.ten_turn_llamacpp)
             if task != "turn":

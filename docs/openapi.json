@@ -3061,6 +3061,26 @@
     }
    }
   },
+  "/v1/audio/decisions": {
+   "post": {
+    "tags": [
+     "native"
+    ],
+    "summary": "Typed questions about a recording or a text (decision models)",
+    "description": "Extension. Ask a decision model named questions about a recording, a text or both, and get typed answers:\n``yes_no`` (true or false, with the probability of yes), ``choice`` (one of the ``options``, with each option's\nprobability) or ``score`` (a level of ``levels``, lowest first, with the expected level). The model reads the\nstate and the questions in one pass and answers from its distribution over the options: it writes no text, so an\nanswer is always one of the options.\n\nJSON body or multipart form. ``questions`` (required): an object mapping an id to ``{\"type\": \"yes_no\" | \"choice\"\n| \"score\", \"question\": \"...\", \"options\": [...] | {name: description}, \"levels\": [...]}`` (in a form, as JSON\ntext). ``file`` (multipart) or ``audio`` (JSON: base64 of an audio file): the recording, at most 30 s for\n``d1-omni-600m-llamacpp``. ``text``: text about which the questions are asked (a transcript, a message, JSON),\nalone or with the recording. ``model`` (a ``decision`` model; default ``default_decision``) and ``keep_alive``.\nSee docs/api.md, \"Decisions\".",
+    "operationId": "audio_decisions_v1_audio_decisions_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
   "/v1/audio/dialogue": {
    "post": {
     "tags": [

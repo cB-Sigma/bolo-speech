@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-546 models: 243 validated on CPU by the maintainers, 303 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+547 models: 243 validated on CPU by the maintainers, 304 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -1250,6 +1250,14 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | --- | --- | --- | --- | --- | --- | --- |
 | `emotion2vec-plus-base` | - | balanced | - | 373 MB | FunASR Model License 1.1 (custom) | **CPU** · RTF 0.925 |
 | `emotion2vec-plus-large` | - | accuracy | - | 649 MB | FunASR Model License 1.1 (custom) | **CPU** · RTF 0.845 |
+
+### Decisions (typed questions about a recording or a text)
+
+#### d1-omni
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `d1-omni-600m-llamacpp` (d1-omni) | en | realtime | - | 670 MB | LFM Open License v1.0 ⚠ · runs on llama-server | ran once here (shared CPU), not measured |
 
 ### Voice conversion
 

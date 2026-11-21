@@ -123,6 +123,7 @@ const TASK_LABEL: Record<Task, string> = {
   'echo-cancellation': 'Echo cancellation',
   'wake-word': 'Wake words',
   watermark: 'Watermarking',
+  decision: 'Decisions',
 }
 const TASK_SHORT: Record<Task, string> = {
   stt: 'STT',
@@ -147,6 +148,7 @@ const TASK_SHORT: Record<Task, string> = {
   'echo-cancellation': 'Echo',
   'wake-word': 'Wake',
   watermark: 'Watermark',
+  decision: 'Decide',
 }
 const TASK_ORDER: Task[] = [
   'stt',
@@ -161,6 +163,7 @@ const TASK_ORDER: Task[] = [
   'denoise',
   'audio-tagging',
   'emotion',
+  'decision',
   'voice-conversion',
   'punctuation',
   'itn',

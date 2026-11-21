@@ -1,0 +1,60 @@
+# Decision models (task decision): typed questions about a recording, a text or both, answered from the model's
+# distribution over the options, with no text generated (bolo.decide; POST /v1/audio/decisions, bolo decide). They
+# run on llama.cpp's server (kind llama-decision of the tts-server engine, bolo.engines.decision_llamacpp), which
+# serves them on POST /v1/systemone; bolo starts it (bolo components install llama-server) or uses one you run
+# (setting tts_servers). Sources, read 2026-11-21: Liquid's model card, the LICENSE, the Hugging Face API (sizes,
+# revision) and llama.cpp b12521 (libmtmd has the d1omni_a and d1omni_v projectors; the server answers a decision
+# model's /v1/chat/completions with 501 and serves /v1/systemone).
+- id: d1-omni-600m-llamacpp
+  aliases: [d1-omni-600m, d1-omni]
+  task: decision
+  engine: tts-server
+  kind: llama-decision
+  family: d1-omni
+  languages: [en]
+  tier: realtime
+  sample_rate: 16000
+  size_bytes: 669998816
+  params: 587000000
+  license: LFM Open License v1.0
+  license_url: https://huggingface.co/LiquidAI/d1-omni-600M-GGUF/blob/8eb2d2a1c5404bba8a34a88bd8e159c242197d51/LICENSE
+  commercial_use: false
+  gated: false
+  features: [audio-in]
+  description: 'Liquid d1-omni-600M (587 M parameters: an LFM2.5 encoder trunk with a decision head, a FastConformer
+    audio encoder and a SigLIP2 vision encoder): answers yes/no, choice and score questions about up to 30 s of
+    speech and a text, in one pass, without generating text. Its speech training was English requests to an
+    assistant (what kind of utterance, its topic, what the speaker wants). Q8_0 weights and encoders from Liquid
+    (0.67 GB) on llama.cpp, in a llama-server that bolo starts or one you run (setting tts_servers). Commercial use
+    is conditional: the LFM Open License allows it only to organisations under USD 10M yearly revenue (non-profits
+    for research too), so it is treated here as non-commercial.'
+  source_url: https://huggingface.co/LiquidAI/d1-omni-600M
+  validated: untested
+  measured:
+    audio_s: 3.0
+    engine: llama.cpp b12521 llama-server (upstream release build, CPU), started by bolo
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU
+    threads: 4
+    date: '2026-11-21'
+    note: 'Through bolo (bolo decide and POST /v1/audio/decisions) on bolo''s samples, four questions each (kind of
+      utterance, topic, politeness, urgency): en-short ("Good morning. Could you tell me when my order will
+      arrive?") a question (0.99) about a delivery (0.99); en-long (a talk about speech servers, 11.8 s) a speech
+      (to an audience); a text refund request was one (yes, 1.00) from an unhappy customer (happy: 0.07). Times not
+      representative: with the machine at a load of 11 to 17 from other jobs a warm request took 77 to 138 s, and
+      the same request sent straight to llama-server 32 s; on a quieter moment, llama-server alone answered three
+      questions about en-short in 2.7 s.'
+  requires: [llama-server]
+  source:
+    repo: LiquidAI/d1-omni-600M-GGUF
+    revision: 8eb2d2a1c5404bba8a34a88bd8e159c242197d51
+    include: [d1-omni-600M-Q8_0.gguf, mmproj-d1-omni-600M-Q8_0.gguf]
+  options:
+    runtime: llama-server
+    model_file: d1-omni-600M-Q8_0.gguf
+    mmproj_file: mmproj-d1-omni-600M-Q8_0.gguf
+    # a d1-omni prompt is evaluated in one batch: it must fit in -ub (Liquid's README: 4096 holds any image and a
+    # state of a few thousand tokens)
+    server_args: ['-b', '4096', '-ub', '4096']
+    max_audio_s: 30.0
+    queue_timeout_s: 0
+    hardware: {gpu: optional, ram_gb: 1.5, note: 'built for CPUs and phones'}

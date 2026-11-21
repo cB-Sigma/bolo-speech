@@ -557,6 +557,13 @@ class Bolo:
                 "windows": True,
                 "transcription_tags": [m.id for m in self.catalog.all() if m.kind == "sense_voice"],
             },
+            # typed questions about a recording or a text (docs/api.md, "Decisions")
+            "decision": {
+                "endpoint": "/v1/audio/decisions",
+                "default_model": s.default_decision,
+                "types": ["yes_no", "choice", "score"],
+                "models": [m.id for m in self.catalog.all() if m.task == "decision" and not m.builtin],
+            },
             # watermarks (docs/api.md, "Watermarks"): opt-in per request unless the policy says otherwise
             "watermark": {
                 "endpoint": "/v1/audio/watermark/detect",
@@ -1128,6 +1135,7 @@ class Bolo:
                 "speaker-embedding": "eres2net-voxceleb",
                 "audio-tagging": s.default_audio_tagging,
                 "emotion": s.default_emotion,
+                "decision": s.default_decision,
                 "voice-conversion": s.default_voice_conversion,
                 "punctuation": s.default_punctuation,
                 "itn": s.default_itn,

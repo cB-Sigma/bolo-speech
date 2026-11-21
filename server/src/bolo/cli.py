@@ -1017,6 +1017,60 @@ def cmd_classify(args: argparse.Namespace) -> int:
     return asyncio.run(run())
 
 
+def cmd_decide(args: argparse.Namespace) -> int:
+    """``bolo decide [FILE] --questions JSON | --ask QUESTION``: typed answers about a recording and/or a text."""
+    from bolo.audio import decode_audio
+    from bolo.decide import body, decide, parse_questions
+    from bolo.errors import InvalidRequest
+    from bolo.obs.trace import Trace
+
+    raw: dict[str, Any] = {}
+    if args.questions:
+        text = args.questions
+        if text.startswith("@"):
+            text = Path(text[1:]).read_text(encoding="utf-8")
+        loaded = json.loads(text)
+        if not isinstance(loaded, dict):
+            raise InvalidRequest("--questions must be a JSON object that maps an id to a question")
+        raw.update(loaded)
+    for i, question in enumerate(args.ask or [], 1):
+        raw[f"q{i}"] = {"type": "yes_no", "question": question}
+    questions = parse_questions(raw)
+    samples, rate = (None, None)
+    if args.file:
+        path = Path(args.file)
+        samples, rate = decode_audio(path.read_bytes(), filename=path.name)
+    state = args.text
+    if state and state.startswith("@"):
+        state = Path(state[1:]).read_text(encoding="utf-8")
+    core = _core(args)
+
+    async def run() -> int:
+        await core.start()
+        try:
+            spec = core.resolve(args.model, "decision")
+            result = await decide(core, spec.id, state, samples, rate, questions, Trace("decision", "cli", spec.id))
+            out = body(result)
+            if args.json:
+                print(json.dumps(out, indent=2, ensure_ascii=False))
+                return 0
+            print(spec.id)
+            for qid, a in out["answers"].items():
+                ask = questions[qid]["instructions"]
+                if a["type"] == "yes_no":
+                    said = f"{'yes' if a['answer'] else 'no'} (p(yes) {a['probability']:.2f})"
+                elif a["type"] == "choice":
+                    said = f"{a['answer']} ({a['probabilities'].get(a['answer'], 0):.2f})"
+                else:
+                    said = f"{a['label']} (level {a['score']:.2f} of 0-{len(a['probabilities']) - 1})"
+                print(f"  {qid}: {ask} -> {said}")
+            return 0
+        finally:
+            await core.stop()
+
+    return asyncio.run(run())
+
+
 def cmd_speakers(args: argparse.Namespace) -> int:
     """``bolo speakers list | enrol NAME FILE... | verify SPEAKER FILE | identify FILE | rm SPEAKER``."""
     from bolo import speakers
@@ -1869,7 +1923,7 @@ _TASK_TITLES = {
     "vad": "Voice-activity detection", "turn": "End-of-turn detection", "separation": "Overlapped-speech separation",
     "denoise": "Denoising", "lid": "Language identification", "speech-to-speech": "Speech to speech",
     "speaker-embedding": "Speaker embedding", "audio-tagging": "Audio tagging", "emotion": "Speech emotion",
-    "align": "Forced alignment",
+    "decision": "Decisions", "align": "Forced alignment",
     "punctuation": "Punctuation restoration", "itn": "Inverse text normalisation", "pii": "Personal information",
     "echo-cancellation": "Echo cancellation", "wake-word": "Wake words",
 }  # fmt: skip
@@ -2791,6 +2845,16 @@ def build_parser() -> argparse.ArgumentParser:
         s.add_argument("--threshold", type=float, default=0.1, help="tags: leave out tags below this probability")
         s.add_argument("--json", action="store_true")
         s.set_defaults(func=cmd_classify)
+
+    s = sub.add_parser("decide", help="typed answers (yes/no, a choice, a score) about a recording or a text")
+    _common(s)
+    s.add_argument("file", nargs="?", help="an audio file (at most 30 s for d1-omni); optional with --text")
+    s.add_argument("--text", help="text the questions are about (a transcript, a message); @FILE reads a file")
+    s.add_argument("--questions", help='JSON object of questions, or @FILE: {"id": {"type": "choice", ...}}')
+    s.add_argument("--ask", action="append", help="a yes/no question (repeatable)")
+    s.add_argument("--model", "-m", help="a decision model (default: default_decision)")
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(func=cmd_decide)
 
     s = sub.add_parser(
         "speakers", help="enrolled speakers: list, enrol NAME FILE..., verify SPEAKER FILE, identify FILE, rm"

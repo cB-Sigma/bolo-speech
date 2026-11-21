@@ -8,6 +8,16 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ### Added
 
+- **Decisions: typed questions about a recording or a text** (new task `decision`). `POST /v1/audio/decisions`
+  takes a recording (at most 30 s), a text or both, and named questions of three types: yes/no, one option of a list,
+  or a level on a scale; each comes back with its answer and probabilities. Also `bolo decide FILE --questions
+  @questions.json` (or `--ask` for yes/no questions, `--text` for a text), a Decisions page in the console, the
+  setting `default_decision`, and `decision` in `/api/v1/info`'s capabilities. The first model is Liquid's
+  d1-omni-600M (`d1-omni-600m-llamacpp`, 0.67 GB; LFM Open License v1.0: commercial use only under USD 10M yearly
+  revenue, so marked non-commercial) on llama-server's `/v1/systemone` (new tts-server kind `llama-decision`). Run
+  here through bolo on the CPU: on en-short ("Good morning. Could you tell me when my order will arrive?") a
+  question (0.99) about a delivery (0.99); a refund request in text was a refund request (1.00) from an unhappy
+  customer (0.07).
 - **SOV-Transcribe-1 on MLX for Apple silicon** (`sov-transcribe-1-mlx-4bit`, 15.6 GB, and
   `sov-transcribe-1-mlx-8bit`, 28.2 GB; Apache-2.0): nativ-community's conversions of the official revision, through
   mlx-audio's own port of the model (no code from the model repository runs), on a new MLX kind `mlx-audio-stt` whose

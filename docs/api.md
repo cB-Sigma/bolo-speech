@@ -110,6 +110,7 @@ interface; the machine-readable schema is [`openapi.json`](openapi.json)
 | `POST` | `/v1/audio-isolation/stream` | Voice isolation, streamed (ElevenLabs' route) |
 | `POST` | `/v1/audio/tags` | Sound events and audio tags (music, speech, ...) |
 | `POST` | `/v1/audio/emotion` | Speech emotion |
+| `POST` | `/v1/audio/decisions` | Typed questions about a recording or a text (decision models) |
 | `POST` | `/v1/audio/dialogue` | Speak a multi-speaker dialogue |
 | `POST` | `/v1/audio/voice-conversion` | Say the same words in another voice |
 | `POST` | `/v1/speech-to-speech/{voice_id}` | Voice conversion (ElevenLabs' route) |
@@ -621,6 +622,51 @@ most speech), `emotions` and `audio_events` (seconds of segments each was heard 
  "emotion": "happy", "emotions": {"happy": 3.0}, "audio_events": {"speech": 3.0}, ...}
 ```
 
+
+### Decisions: `POST /v1/audio/decisions`
+
+Extension: named questions about a recording, a text or both, answered by a decision model with typed answers. The
+model reads the state and every question in one pass and answers from its distribution over the options: it writes
+no text, so an answer is always one of the options, with its probability. Three types:
+
+* `yes_no`: `answer` true or false, `probability` of yes (the answer is yes from 0.5);
+* `choice`: `options`, a list of names or names mapped to a description (2 to 255); `answer` is the most likely, with
+  `probabilities` of every option and `confidence` (0 when every option is as likely, 1 when one has it all);
+* `score`: `levels`, 2 to 10 descriptions, lowest first; `score` is the expected level (it can lie between two),
+  `level` the nearest one and `label` its description, with `probabilities` per level and `confidence`.
+
+JSON body, or a multipart form with the recording as `file` and `questions` as JSON text. `questions` (required)
+maps an id (letters, digits, `_`, `-`, `.`; at most 32 questions) to a question; `text` is what the questions are
+about besides the recording (a transcript, a message; a JSON value is given to the model as JSON text); the
+recording is `file` (multipart) or `audio` (JSON: base64 or a `data:` URL of an audio file). At least one of them.
+`model` (a `decision` model; default `default_decision`, `d1-omni-600m-llamacpp`) and `keep_alive`. The names of
+llama.cpp's `/v1/systemone` are accepted too (`instructions`, `criteria`, type `noul`).
+
+```bash
+curl -s localhost:8000/v1/audio/decisions -F file=@call.wav -F questions='{
+  "kind":    {"type": "choice", "question": "What kind of utterance is this?",
+              "options": {"request": "A request to do something", "question": "A question", "speech": "A talk"}},
+  "polite":  {"type": "yes_no", "question": "Is the speaker polite?"},
+  "urgency": {"type": "score", "question": "How urgent is this?", "levels": ["Can wait", "Today", "Right now"]}}'
+```
+
+```jsonc
+{"object": "audio.decision", "model": "d1-omni-600m-llamacpp", "duration": 3.004,
+ "answers": {
+   "kind":    {"type": "choice", "answer": "question", "confidence": 0.98,
+               "probabilities": {"request": 0.0085, "question": 0.9889, "speech": 0.0027}},
+   "polite":  {"type": "yes_no", "answer": false, "probability": 0.2421},
+   "urgency": {"type": "score", "score": 1.51, "level": 2, "label": "Right now", "confidence": 0.31,
+               "probabilities": [0.12, 0.25, 0.63]}},
+ "usage": {"input_tokens": 307}}
+```
+
+`d1-omni-600m-llamacpp` (Liquid d1-omni-600M on llama.cpp; LFM Open License, commercial use only under USD 10M
+yearly revenue) hears at most 30 s; a longer recording is refused. Its speech training was English requests to an
+assistant: what kind of utterance, its topic, what the speaker wants. The probabilities are the model's, not
+calibrated for your data: check them on your own recordings before you act on them. From the command line:
+`bolo decide FILE --questions @questions.json`, `bolo decide --text "..." --ask "Is the customer asking for a
+refund?"` (yes/no questions), `--json` for the response above.
 
 ### Wake words: `POST /api/v1/wake`, `WS /api/v1/wake/stream`
 

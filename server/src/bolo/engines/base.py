@@ -632,6 +632,32 @@ class EmotionModel(AudioClassifierModel):
     task = "emotion"
 
 
+@dataclass
+class DecisionRequest:
+    """Typed questions about a state: ``text``, a recording (``samples``, mono float32 at 16 kHz) or both.
+    ``questions`` maps an id to ``{"type": "noul" | "choice" | "score", "instructions": str, "criteria": ...}`` in
+    the shape of llama.cpp's ``/v1/systemone`` (bolo.decide builds it from bolo's request)."""
+
+    text: str | None
+    samples: FloatArray | None
+    questions: dict[str, dict[str, Any]]
+
+
+class DecisionModel(Model):
+    """Decision models: typed answers (yes or no, one option of a list, a level on a scale) read from the model's
+    distribution over the options, with no generated text (bolo.decide)."""
+
+    task = "decision"
+    #: the longest recording the model hears, in seconds
+    max_audio_s: float = 30.0
+
+    @abc.abstractmethod
+    def decide(self, request: DecisionRequest) -> dict[str, Any]:
+        """``{"answers": {id: answer}, "usage": {...}}``, each answer as ``/v1/systemone`` gives it: ``noul``
+        (the probability of yes), ``choice`` with ``probabilities`` and ``confidence``, ``score`` with ``legend``,
+        ``probabilities`` and ``confidence``."""
+
+
 class VoiceConversionModel(Model):
     """Voice conversion: speech in, the same words out in another voice (bolo.voice_conversion).
 

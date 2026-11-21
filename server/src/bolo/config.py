@@ -131,6 +131,8 @@ class Settings:
     default_audio_tagging: str = "ced-mini"
     #: speech-emotion model: POST /v1/audio/emotion without a model
     default_emotion: str = "emotion2vec-plus-base"
+    #: decision model (typed questions about a recording or a text): POST /v1/audio/decisions without a model
+    default_decision: str = "d1-omni-600m-llamacpp"
     #: voice-conversion model: POST /v1/audio/voice-conversion without a model (OpenVoice v2, MIT, 66 MB)
     default_voice_conversion: str = "openvoice-v2-tone-color-audiocpp"
     #: forced-alignment model (task align): POST /v1/audio/alignments without a model, word times for recognisers

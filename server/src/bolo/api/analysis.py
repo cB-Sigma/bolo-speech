@@ -1,11 +1,13 @@
 """Audio analysis routes: speech enhancement on its own (``/v1/audio/denoise``, with ElevenLabs' voice-isolation
-route as an alias), sound-event tags (``/v1/audio/tags``) and speech emotion (``/v1/audio/emotion``).
+route as an alias), sound-event tags (``/v1/audio/tags``), speech emotion (``/v1/audio/emotion``) and decisions
+(``/v1/audio/decisions``: typed questions about a recording or a text).
 """
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 from collections.abc import AsyncGenerator, AsyncIterator
 from typing import Any
 
@@ -303,6 +305,76 @@ async def audio_emotion(request: Request) -> JSONResponse:
     from bolo.classify import emotion_body
 
     return JSONResponse(emotion_body(result, _top_k(form, 1000)), headers=headers)
+
+
+@router.post(
+    "/v1/audio/decisions", tags=["native"], summary="Typed questions about a recording or a text (decision models)"
+)
+async def audio_decisions(request: Request) -> JSONResponse:
+    """Extension. Ask a decision model named questions about a recording, a text or both, and get typed answers:
+    ``yes_no`` (true or false, with the probability of yes), ``choice`` (one of the ``options``, with each option's
+    probability) or ``score`` (a level of ``levels``, lowest first, with the expected level). The model reads the
+    state and the questions in one pass and answers from its distribution over the options: it writes no text, so an
+    answer is always one of the options.
+
+    JSON body or multipart form. ``questions`` (required): an object mapping an id to ``{"type": "yes_no" | "choice"
+    | "score", "question": "...", "options": [...] | {name: description}, "levels": [...]}`` (in a form, as JSON
+    text). ``file`` (multipart) or ``audio`` (JSON: base64 of an audio file): the recording, at most 30 s for
+    ``d1-omni-600m-llamacpp``. ``text``: text about which the questions are asked (a transcript, a message, JSON),
+    alone or with the recording. ``model`` (a ``decision`` model; default ``default_decision``) and ``keep_alive``.
+    See docs/api.md, "Decisions"."""
+    import asyncio
+    import base64
+    import binascii
+
+    from bolo.api.common import read_upload
+    from bolo.decide import body, decide, parse_questions
+
+    core = get_core(request)
+    samples: FloatArray | None = None
+    rate: int | None = None
+    if "application/json" in (request.headers.get("content-type") or ""):
+        try:
+            doc = await request.json()
+        except ValueError as exc:
+            raise InvalidRequest(f"the body is not valid JSON: {exc}") from exc
+        if not isinstance(doc, dict):
+            raise InvalidRequest("the body must be a JSON object")
+        fields: dict[str, Any] = doc
+        if doc.get("audio"):
+            try:
+                data = base64.b64decode(str(doc["audio"]).split(",", 1)[-1], validate=True)
+            except (binascii.Error, ValueError) as exc:
+                raise InvalidRequest("audio must be base64 (or a data: URL) of an audio file", param="audio") from exc
+            if len(data) > core.settings.max_upload_mb * 1024 * 1024:
+                raise InvalidRequest(f"the audio is larger than the {core.settings.max_upload_mb} MB limit",
+                                     param="audio")  # fmt: skip
+            from bolo.audio import decode_audio
+
+            samples, rate = await asyncio.to_thread(decode_audio, data)
+    else:
+        form = await request.form()
+        fields = {k: form.get(k) for k in ("questions", "text", "model", "keep_alive")}
+        file = form.get("file")
+        if file is not None and not isinstance(file, str):
+            samples, rate = await read_upload(core, file)
+    questions = parse_questions(fields.get("questions"))
+    request_keep_alive(fields.get("keep_alive"), ("decision",))
+    spec = core.resolve(str(fields.get("model") or "") or None, "decision")
+    text = fields.get("text")
+    if text is not None and not isinstance(text, str):
+        text = json.dumps(text, ensure_ascii=False)  # a JSON state is given to the model as JSON text
+    trace = Trace("decision", "http", spec.id)
+    trace.audio_seconds = len(samples) / rate if samples is not None and rate else 0.0
+    try:
+        result = await decide(core, spec.id, text, samples, rate, questions, trace)
+        trace.finish("ok")
+    except Exception as exc:
+        trace.finish("error", exc.message if isinstance(exc, BoloError) else f"{type(exc).__name__}: {exc}")
+        raise
+    finally:
+        core.traces.record(trace)
+    return JSONResponse(body(result), headers={"x-request-id": trace.id, "x-bolo-model": spec.id})
 
 
 __all__ = ["router"]
