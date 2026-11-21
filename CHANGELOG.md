@@ -6,6 +6,8 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-21
+
 ### Added
 
 - **SpeechBrain's SepFormer separators without PyTorch, three-speaker separation among them.** SepFormer trained on

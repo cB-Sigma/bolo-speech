@@ -4,6 +4,8 @@ The PyTorch engine plugin of bolo. The format follows [Keep a Changelog](https:/
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-11-21
+
 ### Added
 
 - **Cloudflare Clef-Omni** (kind `clef-omni`, extra `clef-omni`, task `decision`): typed answers (yes/no, a choice, a
