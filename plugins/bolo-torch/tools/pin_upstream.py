@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 #: name -> bundle: the parts (repository, commit, licence, where its files go, which files) and the import roots
+# fmt: off
 BUNDLES: dict[str, dict[str, Any]] = {
     "step-audio-2": {
         "about": "Step-Audio 2 mini: audio feature extraction (utils.py), the token2wav decoder (CosyVoice 2 flow "
@@ -39,7 +40,7 @@ BUNDLES: dict[str, dict[str, Any]] = {
                 ],
             },
         ],
-    },  # fmt: skip
+    },
     "glm-4-voice": {
         "about": "GLM-4-Voice: the Whisper-based speech tokenizer, the flow-matching decoder with HiFi-GAN "
         "(CosyVoice code) and the Matcha-TTS modules it imports (a git submodule of GLM-4-Voice)",
@@ -61,7 +62,7 @@ BUNDLES: dict[str, dict[str, Any]] = {
                 "include": ["LICENSE", "matcha/__init__.py", "matcha/models/**.py", "matcha/utils/**.py"],
             },
         ],
-    },  # fmt: skip
+    },
     "spark-tts": {
         "about": "Spark-TTS: the BiCodec audio tokenizer and decoder (wav2vec 2.0 features, ECAPA speaker encoder, "
         "Vocos-style decoder) and its token maps; the language model is a plain Qwen2.5 checkpoint for transformers",
@@ -76,7 +77,7 @@ BUNDLES: dict[str, dict[str, Any]] = {
                 "include": ["LICENSE", "sparktts/**.py"],
             },
         ],
-    },  # fmt: skip
+    },
     "maskgct": {
         "about": "MaskGCT (Amphion): the text-to-semantic and semantic-to-acoustic models, the semantic (RepCodec) and "
         "acoustic codecs, the inference pipeline (maskgct_utils.py), its configuration and wav2vec 2.0-BERT feature "
@@ -104,7 +105,7 @@ BUNDLES: dict[str, dict[str, Any]] = {
                 ],
             },
         ],
-    },  # fmt: skip
+    },
     "kimi-audio": {
         "about": "Kimi-Audio: kimia_infer (prompt format, Whisper features, the streaming flow-matching detokenizer "
         "and BigVGAN vocoder) with the GLM-4-Voice speech tokenizer it imports (a git submodule of Kimi-Audio)",
@@ -127,8 +128,9 @@ BUNDLES: dict[str, dict[str, Any]] = {
                 "include": ["LICENSE", "speech_tokenizer/*.py"],
             },
         ],
-    },  # fmt: skip
+    },
 }
+# fmt: on
 
 
 def tracked(checkout: Path) -> list[str]:
@@ -174,7 +176,7 @@ def main() -> int:
     data = build(args.name, checkouts)
     out = Path(__file__).resolve().parents[1] / "src" / "bolo_torch" / "upstream" / f"{args.name}.json"
     out.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"wrote {out} ({sum(len(p['files']) for p in data['parts'])} files)", file=sys.stderr)
+    sys.stderr.write(f"wrote {out} ({sum(len(p['files']) for p in data['parts'])} files)\n")
     return 0
 
 
