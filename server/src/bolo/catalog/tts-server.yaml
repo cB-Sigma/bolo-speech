@@ -1164,6 +1164,45 @@
   - {id: alpha-hi, name: Alpha (Hindi reference clip), gender: f, reference: hi-short}
   - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
   - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
+- id: cilla-lite-audiocpp
+  task: tts
+  engine: tts-server
+  kind: tts-server
+  family: Cilla (Persian)
+  languages: [fa]
+  tier: balanced
+  sample_rate: 24000
+  size_bytes: 438805318
+  license: CC-BY-NC-4.0
+  license_url: https://huggingface.co/mehdi-hf/cilla-lite
+  commercial_use: false
+  gated: true
+  features: [voice-cloning]
+  description: 'Cilla Lite (Oncilla AI, mehdi-hf): Persian text to speech, a 6-layer Pocket TTS (100 M parameters,
+    guidance baked in), 24 kHz, cloning the voice of a short prompt. The published safetensors on audio.cpp''s pocket_tts
+    family, which loads that layout. CC BY-NC 4.0: free for non-commercial use, commercial use needs a paid plan from
+    Oncilla AI. Gated: accept the terms on the model page and give bolo a token (hf_token). The authors read one
+    sentence at a time after their own Persian normaliser (normalize_fa.py), and turn off Pocket TTS''s capitalisation
+    and final full stop; bolo''s audio.cpp path has neither. Runs in an audiocpp_server that bolo starts (bolo
+    components install audio.cpp) or one you run (setting tts_servers).'
+  source_url: https://huggingface.co/mehdi-hf/cilla-lite
+  validated: untested
+  requires: [audio.cpp]
+  source:
+    repo: mehdi-hf/cilla-lite
+    revision: c0d04f8025d39e0afa1314d6ec276adc0d805a24
+    include: [model.safetensors, config.yaml, tokenizer.model, prompts/*, README.md, normalize_fa.py]
+  options:
+    runtime: audio.cpp
+    family: pocket_tts
+    server_model: cilla-lite-audiocpp
+    cloning: true
+    send_language: false
+    hardware: {gpu: optional, vram_gb: 0.8, note: built for CPUs}
+    not_yet_run: true
+  voices:
+  - {id: heart, name: Heart (English reference clip), gender: f, reference: en-short}
+  - {id: michael, name: Michael (English reference clip), gender: m, reference: en-long}
 - id: pocket-tts-en-audiocpp
   task: tts
   engine: tts-server
