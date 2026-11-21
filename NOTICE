@@ -127,6 +127,12 @@ Speech models run by bolo's own code
     Copyright 2026 Empero Research, Apache License 2.0; the PiVo model itself,
     with its FARGAN-derived vocoder (Xiph/Opus, BSD-3-Clause) and CMUdict data,
     is downloaded by the user and not distributed with bolo.
+    server/src/bolo/engines/kale.py is a Python port of the text front end of
+    kale-tts-1 (frontend/words/kaleTts.js and python/kale_tts.py at model
+    revision b6ce1887268c3667994fc3b0b2c82887c069915c,
+    https://huggingface.co/KaleComputer/kale-tts-1-nano), Copyright Kale
+    Computer, Apache License 2.0; the model, its word lists (derived from
+    CMUdict) and guesser are downloaded by the user and not distributed with bolo.
 
 API compatibility
     The routes under "speaches-compatible" mirror the HTTP interface of

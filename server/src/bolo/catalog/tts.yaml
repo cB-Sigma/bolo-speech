@@ -2071,6 +2071,64 @@
   - {id: Pi, name: Pi, language: en-US}
   - {id: Vo, name: Vo, language: en-US}
 
+- id: kale-tts-1-nano-onnx
+  aliases: [kale-tts-1-nano, KaleComputer/kale-tts-1-nano]
+  task: tts
+  engine: onnxruntime
+  kind: kale_onnx
+  family: kale-tts-1
+  languages: [en]
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 29278681
+  params: 7500000
+  license: Apache-2.0
+  license_url: https://huggingface.co/KaleComputer/kale-tts-1-nano/blob/main/LICENSE
+  commercial_use: true
+  description: 'kale-tts-1-nano (Kale Computer, Apache-2.0; derived from Kokoro-82M, voices designed with Maya-1): ten
+    synthetic English voices, eight American and two British (Amy, Jack), 24 kHz, 7.5 M parameters in one 14.8 MB int8
+    graph, in process on ONNX Runtime: no server, no PyTorch. Kale''s own text front end, in bolo''s Python port: its
+    technical terms, dizione''s text rules, its checked word list and homograph rules, and its small guesser for unknown
+    words. Every voice is synthetic: follow the Maya-1 use policy (no impersonation, never present the audio as a human
+    recording).'
+  source_url: https://huggingface.co/KaleComputer/kale-tts-1-nano
+  validated: cpu
+  measured:
+    rtf: 0.028
+    round_trip_wer: 0.0
+    round_trip_stt: faster-whisper-small
+    audio_s: 5.7
+    load_s: 0.48
+    memory_mb: 378
+    threads: 2
+    engine: onnxruntime 1.32.0
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared
+    date: '2026-11-21'
+    note: 'Kenzie, Jack (British) and Earl through bolo''s HTTP API, all transcribed back word for word by
+      faster-whisper-small. The front-end port gives Kale''s own front end''s sentences and IPA on 212 of Kale''s 214
+      test texts in both accents (the two others: British homograph readings, written American); the audio matches
+      Kale''s Python runtime to 4.5e-4 on the same ids. RTF from three repeats per voice in process.'
+  source:
+    repo: KaleComputer/kale-tts-1-nano
+    revision: b6ce1887268c3667994fc3b0b2c82887c069915c
+    include: [kale-tts-1-nano.onnx, voices.json, tokenizer.json, voices/*, frontend/words/lexicon.tsv,
+      frontend/words/override.public.tsv, frontend/words/terms.tsv, frontend/words/g2p.bin, frontend/words/en-gb/lexicon.tsv,
+      frontend/words/en-gb/override.public.tsv, frontend/words/en-gb/terms.tsv, frontend/words/en-gb/g2p.bin,
+      frontend/dizione/homographs.data.js, frontend/dizione/LICENSE, LICENSE, THIRD_PARTY_NOTICES.md]
+  options:
+    graph: int8
+  voices:
+  - {id: s057b, name: 'Kenzie (esports hype woman)', language: en-US, gender: f}
+  - {id: f06, name: 'Simone (deep and confident woman)', language: en-US, gender: f}
+  - {id: d03, name: 'Amy (british woman, crisp news-style)', language: en-GB, gender: f}
+  - {id: w165, name: 'Frankie (hard-boiled detective''s partner)', language: en-US}
+  - {id: w602, name: 'Darlene (rough low-voiced old trucker woman)', language: en-US, gender: f}
+  - {id: m3, name: 'Owen (bright young host)', language: en-US}
+  - {id: t071, name: 'Toby (mischievous prankster)', language: en-US}
+  - {id: d13, name: 'Jack (british man, crisp news-style)', language: en-GB, gender: m}
+  - {id: x328, name: 'Earl (African American jazz granddad)', language: en-US, gender: m}
+  - {id: h013f, name: 'Magnus (deep dramatic trailer narrator)', language: en-US}
+
 - id: kitten-tts-2-pico-onnx
   aliases: [kitten-tts-2-pico, KittenML/kitten-tts-2-pico]
   task: tts

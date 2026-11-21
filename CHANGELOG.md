@@ -130,6 +130,9 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   ONNX Runtime, Hindi among them. Phonemised as Kitten's own front end does, without its GPL and PyTorch dependencies:
   uccharan's misaki port where it covers the language, else eSpeak NG with misaki's conversion, then Kitten's folds.
   Pico runs at 0.12 of real time and Mini at 0.61 on a 4-vCPU Xeon with 2 threads.
+- **kale-tts-1-nano** (`kale-tts-1-nano-onnx`, Apache-2.0): ten synthetic English voices (two British) in one 14.8 MB
+  graph, in process on ONNX Runtime with a Python port of Kale's own text front end (the same IPA as Kale's on 212 of
+  its 214 test texts). 0.028 of real time on a 4-vCPU Xeon with 2 threads; transcribed back word for word.
 - **eSpeak NG can write tied phonemes** (`a^ɪ`) for front ends that need them (`Phonemizer.phonemize(..., tie="^")`).
 
 ### Changed

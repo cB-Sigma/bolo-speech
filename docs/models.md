@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-541 models: 237 validated on CPU by the maintainers, 304 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+542 models: 238 validated on CPU by the maintainers, 304 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -786,6 +786,12 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `pivo-1.4m-onnx` | en | realtime | - | 9 MB | Apache-2.0 | **CPU** · RTF 0.659 · round-trip WER 0.0% |
+
+#### kale-tts-1
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `kale-tts-1-nano-onnx` | en | realtime | - | 29 MB | Apache-2.0 | **CPU** · RTF 0.028 · round-trip WER 0.0% |
 
 #### Kitten TTS 2 Pico
 
@@ -3119,6 +3125,17 @@ Spanish, French, Italian, Portuguese, Hindi), else eSpeak NG (the optional compo
 English front end falls back to CMUdict and a small BART for words misaki lacks; uccharan's port of misaki uses its
 own fallback. Run on the 4-vCPU Xeon with 2 threads (2026-11-21): Pico at 0.12 of real time, Mini at 0.61; English,
 German and French came back word for word from faster-whisper-small, Hindi and Swahili recognisably.
+
+**kale-tts-1-nano in process** (`kale-tts-1-nano-onnx`, Kale Computer, Apache-2.0): ten synthetic English voices
+(eight American, two British) designed with Maya-1, 7.5 M parameters in one 14.8 MB int8 graph, distilled from a
+Kokoro-82M fine-tune. Its text front end is Kale's own, in JavaScript; bolo runs a Python port of it
+(`engines/kale.py`): Kale's technical terms, dizione's text rules (the Python dizione bolo carries; Kale uses its
+JavaScript port), Kale's size suffixes, dotted names and letter spelling, sentences with one-word ones joined, then
+its checked word list, dizione's homograph picker with Kale's sense rules, stems, spelling and its GRU guesser for
+unknown words, and the IPA as Kokoro-native ids. On Kale's 214 test texts in both accents, the port gives the same
+sentences and IPA as Kale's released front end (run in Node) on 212; the other two are British homograph readings,
+which Kale rewrites from American and bolo leaves American. Run on the 4-vCPU Xeon with 2 threads (2026-11-21): three
+voices transcribed back word for word by faster-whisper-small, at 0.028 of real time.
 
 **What was run**: `pocket-tts-en-llamacpp` on the upstream llama-server b12375
 release, started by bolo (`bolo components install llama-server`), on the
