@@ -65,7 +65,7 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 ## The catalog
 
 <!-- BEGIN GENERATED: models -->
-539 models: 235 validated on CPU by the maintainers, 304 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
+541 models: 237 validated on CPU by the maintainers, 304 untested. 33 more are cloud models (engine `remote`: paid cloud APIs; audio leaves this server; none was run against a real account, see [providers.md](providers.md)).
 
 ### Speech to text
 
@@ -786,6 +786,18 @@ can still be used on the realtime WebSocket through pseudo-streaming; see
 | id | languages | tier | streaming | download | licence | validated |
 | --- | --- | --- | --- | --- | --- | --- |
 | `pivo-1.4m-onnx` | en | realtime | - | 9 MB | Apache-2.0 | **CPU** · RTF 0.659 · round-trip WER 0.0% |
+
+#### Kitten TTS 2 Pico
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `kitten-tts-2-pico-onnx` | en, de, es, it, pt, ru +2 | realtime | - | 79 MB | Apache-2.0 · phonemes: uccharan | **CPU** · RTF 0.124 · round-trip WER 0.0% |
+
+#### Kitten TTS 2 Mini
+
+| id | languages | tier | streaming | download | licence | validated |
+| --- | --- | --- | --- | --- | --- | --- |
+| `kitten-tts-2-mini-onnx` | en, de, es, it, pt, ru +9 | realtime | - | 142 MB | Apache-2.0 · phonemes: uccharan | **CPU** · RTF 0.608 · round-trip WER 0.0% |
 
 ### Voice-activity detection
 
@@ -3095,6 +3107,18 @@ instead of refusing the request, and characters it cannot say are left out. Run 
 (2026-11-21, other jobs keeping the load near 12): one sentence per voice, non-silent 16 kHz audio (median pitch 193
 Hz for Pi, 142 Hz for Vo), both transcribed back word for word by faster-whisper-small, at 0.66 of real time: the
 vocoder is called 400 times per second of audio, so the time goes to ONNX Runtime's per-call cost.
+
+**Kitten TTS 2 Pico and Mini in process** (`kitten-tts-2-pico-onnx`, `kitten-tts-2-mini-onnx`, KittenML, Apache-2.0):
+Pico has one 8 MB int8 graph per language (8 languages, 30 voices), Mini one 83 MB graph for 16 languages (bolo offers
+15: Japanese needs misaki's Japanese front end, which bolo does not have). Both read Kokoro's phoneme ids with an end
+token and a style row per input length from each voice's pack. Kitten's own front end (kittenml) is misaki for
+English and misaki's eSpeak NG conversion for the other languages, through the GPL `phonemizer` package and PyTorch;
+bolo gives the same kind of phonemes without either: uccharan's `kokoro` profile where it covers the language (English,
+Spanish, French, Italian, Portuguese, Hindi), else eSpeak NG (the optional component) asked for tied phonemes
+(`a^ɪ`) and converted with misaki's table, then Kitten's folds (its phonemizer v1 for Pico, v2 for Mini). Kitten's
+English front end falls back to CMUdict and a small BART for words misaki lacks; uccharan's port of misaki uses its
+own fallback. Run on the 4-vCPU Xeon with 2 threads (2026-11-21): Pico at 0.12 of real time, Mini at 0.61; English,
+German and French came back word for word from faster-whisper-small, Hindi and Swahili recognisably.
 
 **What was run**: `pocket-tts-en-llamacpp` on the upstream llama-server b12375
 release, started by bolo (`bolo components install llama-server`), on the

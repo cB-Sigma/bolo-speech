@@ -2070,3 +2070,228 @@
   voices:
   - {id: Pi, name: Pi, language: en-US}
   - {id: Vo, name: Vo, language: en-US}
+
+- id: kitten-tts-2-pico-onnx
+  aliases: [kitten-tts-2-pico, KittenML/kitten-tts-2-pico]
+  task: tts
+  engine: onnxruntime
+  kind: kitten2_onnx
+  family: Kitten TTS 2 Pico
+  languages: [en, de, es, it, pt, ru, hi, fr]
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 79324497
+  params: 7200000
+  license: Apache-2.0
+  license_url: https://huggingface.co/KittenML/kitten-tts-2-pico
+  commercial_use: true
+  description: 'Kitten TTS 2 Pico (KittenML, Apache-2.0): 30 voices in 8 languages, 24 kHz, one 8 MB int8 graph per language,
+    in process on ONNX Runtime: no server, no PyTorch. It reads Kokoro''s phoneme ids: bolo phonemises it as Kitten''s own
+    front end does, misaki''s spelling for English (uccharan''s port) and misaki''s eSpeak NG conversion for the other
+    languages (uccharan where it covers the language, else eSpeak NG, an optional component), then Kitten''s folds.'
+  source_url: https://huggingface.co/KittenML/kitten-tts-2-pico
+  validated: cpu
+  measured:
+    rtf: 0.1242
+    round_trip_wer: 0.0
+    round_trip_stt: faster-whisper-small
+    audio_s: 5.3
+    load_s: 0.63
+    memory_mb: 190
+    threads: 2
+    engine: onnxruntime 1.32.0, phonemes from uccharan 0.6 and eSpeak NG (espeakng-loader)
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared
+    date: '2026-11-21'
+    note: 'Through bolo''s HTTP API: English (Eleanor, Otis) and German (Anna, through eSpeak NG with ties) transcribed back word for word by faster-whisper-small, Hindi (Priya, uccharan) nearly (the recogniser''s spellings of two words). RTF on English from three repeats in process; load_s is the first sentence, graph included.'
+  requires: [phonemizer]
+  source:
+    repo: KittenML/kitten-tts-2-pico
+    revision: a5632deac7d92f6178db814d933eba746a97f2dc
+    include: [config.json, kitten_tts_2_pico_de.onnx, kitten_tts_2_pico_en.onnx, kitten_tts_2_pico_es.onnx, kitten_tts_2_pico_fr.onnx, kitten_tts_2_pico_hi.onnx, kitten_tts_2_pico_it.onnx, kitten_tts_2_pico_pt.onnx, kitten_tts_2_pico_ru.onnx, vocab.json, voices_de.npz, voices_en.npz, voices_es.npz, voices_fr.npz, voices_hi.npz, voices_it.npz, voices_pt.npz, voices_ru.npz]
+  options:
+    languages: [en, de, es, it, pt, ru, hi, fr]
+  voices:
+  - {id: en-eleanor, name: 'Eleanor (English, Somber historian (female))', language: en-US, gender: f}
+  - {id: en-edith, name: 'Edith (English, Elderly grandmother soft (female))', language: en-US, gender: f}
+  - {id: en-otis, name: 'Otis (English, Rumbling blues musician (male))', language: en-US, gender: m}
+  - {id: en-frank, name: 'Frank (English, Grizzled war veteran gravelly (male))', language: en-US, gender: m}
+  - {id: de-anna, name: 'Anna (German, Female 1)', language: de, gender: f}
+  - {id: de-mia, name: 'Mia (German, Female 2)', language: de, gender: f}
+  - {id: de-lukas, name: 'Lukas (German, Male 1)', language: de, gender: m}
+  - {id: de-paul, name: 'Paul (German, Male 2)', language: de, gender: m}
+  - {id: es-sofia, name: 'Sofia (Spanish, Female 1)', language: es-ES, gender: f}
+  - {id: es-elena, name: 'Elena (Spanish, Female 2)', language: es-ES, gender: f}
+  - {id: es-pablo, name: 'Pablo (Spanish, Male 1)', language: es-ES, gender: m}
+  - {id: es-mateo, name: 'Mateo (Spanish, Male 2)', language: es-ES, gender: m}
+  - {id: it-francesca, name: 'Francesca (Italian, Female 1)', language: it, gender: f}
+  - {id: it-alessandro, name: 'Alessandro (Italian, Male 1)', language: it, gender: m}
+  - {id: it-giorgio, name: 'Giorgio (Italian, Male 2)', language: it, gender: m}
+  - {id: it-davide, name: 'Davide (Italian, Male 3)', language: it, gender: m}
+  - {id: pt-juliana, name: 'Juliana (Portuguese (Brazil), Female 1)', language: pt-BR, gender: f}
+  - {id: pt-larissa, name: 'Larissa (Portuguese (Brazil), Female 2)', language: pt-BR, gender: f}
+  - {id: pt-gustavo, name: 'Gustavo (Portuguese (Brazil), Male 1)', language: pt-BR, gender: m}
+  - {id: pt-caio, name: 'Caio (Portuguese (Brazil), Male 2)', language: pt-BR, gender: m}
+  - {id: ru-olga, name: 'Olga (Russian, Female 1)', language: ru, gender: f}
+  - {id: ru-tatiana, name: 'Tatiana (Russian, Female 2)', language: ru, gender: f}
+  - {id: ru-sergei, name: 'Sergei (Russian, Male 1)', language: ru, gender: m}
+  - {id: ru-alexei, name: 'Alexei (Russian, Male 2)', language: ru, gender: m}
+  - {id: hi-priya, name: 'Priya (Hindi, Female 1)', language: hi, gender: f}
+  - {id: hi-arjun, name: 'Arjun (Hindi, Male 1)', language: hi, gender: m}
+  - {id: fr-amelie, name: 'Amelie (French, Female 1)', language: fr-FR, gender: f}
+  - {id: fr-lea, name: 'Lea (French, Female 2)', language: fr-FR, gender: f}
+  - {id: fr-theo, name: 'Theo (French, Male 1)', language: fr-FR, gender: m}
+  - {id: fr-baptiste, name: 'Baptiste (French, Male 2)', language: fr-FR, gender: m}
+
+- id: kitten-tts-2-mini-onnx
+  aliases: [kitten-tts-2-mini, KittenML/kitten-tts-2-mini]
+  task: tts
+  engine: onnxruntime
+  kind: kitten2_onnx
+  family: Kitten TTS 2 Mini
+  languages: [en, de, es, it, pt, ru, hi, da, fi, fr, ko, nl, sv, sw, tr]
+  tier: realtime
+  sample_rate: 24000
+  size_bytes: 141772071
+  params: 82000000
+  license: Apache-2.0
+  license_url: https://huggingface.co/KittenML/kitten-tts-2-mini
+  commercial_use: true
+  description: 'Kitten TTS 2 Mini (KittenML, Apache-2.0): 113 voices in 15 languages, 24 kHz, one 83 MB int8 graph for every language,
+    in process on ONNX Runtime: no server, no PyTorch. It reads Kokoro''s phoneme ids: bolo phonemises it as Kitten''s own
+    front end does, misaki''s spelling for English (uccharan''s port) and misaki''s eSpeak NG conversion for the other
+    languages (uccharan where it covers the language, else eSpeak NG, an optional component), then Kitten''s folds. Japanese (ja) is left out: it needs misaki''s Japanese front end, which bolo does not have.'
+  source_url: https://huggingface.co/KittenML/kitten-tts-2-mini
+  validated: cpu
+  measured:
+    rtf: 0.6083
+    round_trip_wer: 0.0
+    round_trip_stt: faster-whisper-small
+    audio_s: 6.0
+    load_s: 1.62
+    memory_mb: 550
+    threads: 2
+    engine: onnxruntime 1.32.0, phonemes from uccharan 0.6 and eSpeak NG (espeakng-loader)
+    hardware: 4 vCPU x86_64 (Intel(R) Xeon(R) Processor @ 2.10GHz), no GPU, shared
+    date: '2026-11-21'
+    note: 'Through bolo''s HTTP API: English (Eleanor, Max) and French (Camille) transcribed back word for word by faster-whisper-small; Swahili (Zawadi, eSpeak NG) and Hindi (Arjun) recognisable, with the weak recogniser''s slips. RTF on English from three repeats in process; load_s is the first sentence, graph included.'
+  requires: [phonemizer]
+  source:
+    repo: KittenML/kitten-tts-2-mini
+    revision: 8e89ae2a718ee4bb893c67d67657e520e6112faf
+    include: [config.json, kitten_tts_2_mini.onnx, vocab.json, voices_da.npz, voices_de.npz, voices_en.npz, voices_es.npz, voices_fi.npz, voices_fr.npz, voices_hi.npz, voices_it.npz, voices_ko.npz, voices_nl.npz, voices_pt.npz, voices_ru.npz, voices_sv.npz, voices_sw.npz, voices_tr.npz]
+  options:
+    languages: [en, de, es, it, pt, ru, hi, da, fi, fr, ko, nl, sv, sw, tr]
+  voices:
+  - {id: en-eleanor, name: 'Eleanor (English, Somber historian (female))', language: en-US, gender: f}
+  - {id: en-martha, name: 'Martha (English, Weathered radio journalist (female))', language: en-US, gender: f}
+  - {id: en-serena, name: 'Serena (English, Gentle yoga instructor (female))', language: en-US, gender: f}
+  - {id: en-iris, name: 'Iris (English, Hushed museum guide (female))', language: en-US, gender: f}
+  - {id: en-grace, name: 'Grace (English, Soothing nurse (female))', language: en-US, gender: f}
+  - {id: en-edith, name: 'Edith (English, Elderly grandmother soft (female))', language: en-US, gender: f}
+  - {id: en-diana, name: 'Diana (English, Stern military officer (female))', language: en-US, gender: f}
+  - {id: en-otis, name: 'Otis (English, Rumbling blues musician (male))', language: en-US, gender: m}
+  - {id: en-vincent, name: 'Vincent (English, Hushed museum guide (male))', language: en-US, gender: m}
+  - {id: en-max, name: 'Max (English, Energetic sports announcer (male))', language: en-US, gender: m}
+  - {id: en-danny, name: 'Danny (English, Cheerful podcast host (male))', language: en-US, gender: m}
+  - {id: de-lena, name: 'Lena (German, Female 1)', language: de, gender: f}
+  - {id: de-greta, name: 'Greta (German, Female 2)', language: de, gender: f}
+  - {id: de-jonas, name: 'Jonas (German, Male 1)', language: de, gender: m}
+  - {id: de-felix, name: 'Felix (German, Male 2)', language: de, gender: m}
+  - {id: de-eleanor, name: 'Eleanor (German, Somber historian (female))', language: de, gender: f}
+  - {id: de-martha, name: 'Martha (German, Weathered radio journalist (female))', language: de, gender: f}
+  - {id: de-serena, name: 'Serena (German, Gentle yoga instructor (female))', language: de, gender: f}
+  - {id: de-iris, name: 'Iris (German, Hushed museum guide (female))', language: de, gender: f}
+  - {id: de-grace, name: 'Grace (German, Soothing nurse (female))', language: de, gender: f}
+  - {id: de-edith, name: 'Edith (German, Elderly grandmother soft (female))', language: de, gender: f}
+  - {id: de-diana, name: 'Diana (German, Stern military officer (female))', language: de, gender: f}
+  - {id: de-otis, name: 'Otis (German, Rumbling blues musician (male))', language: de, gender: m}
+  - {id: de-vincent, name: 'Vincent (German, Hushed museum guide (male))', language: de, gender: m}
+  - {id: es-lucia, name: 'Lucia (Spanish, Female 1)', language: es-ES, gender: f}
+  - {id: es-carmen, name: 'Carmen (Spanish, Female 2)', language: es-ES, gender: f}
+  - {id: es-javier, name: 'Javier (Spanish, Male 1)', language: es-ES, gender: m}
+  - {id: es-diego, name: 'Diego (Spanish, Male 2)', language: es-ES, gender: m}
+  - {id: es-eleanor, name: 'Eleanor (Spanish, Somber historian (female))', language: es-ES, gender: f}
+  - {id: es-martha, name: 'Martha (Spanish, Weathered radio journalist (female))', language: es-ES, gender: f}
+  - {id: es-serena, name: 'Serena (Spanish, Gentle yoga instructor (female))', language: es-ES, gender: f}
+  - {id: es-iris, name: 'Iris (Spanish, Hushed museum guide (female))', language: es-ES, gender: f}
+  - {id: es-grace, name: 'Grace (Spanish, Soothing nurse (female))', language: es-ES, gender: f}
+  - {id: es-edith, name: 'Edith (Spanish, Elderly grandmother soft (female))', language: es-ES, gender: f}
+  - {id: es-diana, name: 'Diana (Spanish, Stern military officer (female))', language: es-ES, gender: f}
+  - {id: es-otis, name: 'Otis (Spanish, Rumbling blues musician (male))', language: es-ES, gender: m}
+  - {id: es-vincent, name: 'Vincent (Spanish, Hushed museum guide (male))', language: es-ES, gender: m}
+  - {id: it-giulia, name: 'Giulia (Italian, Female 1)', language: it, gender: f}
+  - {id: it-chiara, name: 'Chiara (Italian, Female 2)', language: it, gender: f}
+  - {id: it-marco, name: 'Marco (Italian, Male 1)', language: it, gender: m}
+  - {id: it-luca, name: 'Luca (Italian, Male 2)', language: it, gender: m}
+  - {id: it-eleanor, name: 'Eleanor (Italian, Somber historian (female))', language: it, gender: f}
+  - {id: it-martha, name: 'Martha (Italian, Weathered radio journalist (female))', language: it, gender: f}
+  - {id: it-serena, name: 'Serena (Italian, Gentle yoga instructor (female))', language: it, gender: f}
+  - {id: it-iris, name: 'Iris (Italian, Hushed museum guide (female))', language: it, gender: f}
+  - {id: it-grace, name: 'Grace (Italian, Soothing nurse (female))', language: it, gender: f}
+  - {id: it-edith, name: 'Edith (Italian, Elderly grandmother soft (female))', language: it, gender: f}
+  - {id: it-diana, name: 'Diana (Italian, Stern military officer (female))', language: it, gender: f}
+  - {id: it-otis, name: 'Otis (Italian, Rumbling blues musician (male))', language: it, gender: m}
+  - {id: it-vincent, name: 'Vincent (Italian, Hushed museum guide (male))', language: it, gender: m}
+  - {id: pt-beatriz, name: 'Beatriz (Portuguese (Brazil), Female 1)', language: pt-BR, gender: f}
+  - {id: pt-camila, name: 'Camila (Portuguese (Brazil), Female 2)', language: pt-BR, gender: f}
+  - {id: pt-rafael, name: 'Rafael (Portuguese (Brazil), Male 1)', language: pt-BR, gender: m}
+  - {id: pt-thiago, name: 'Thiago (Portuguese (Brazil), Male 2)', language: pt-BR, gender: m}
+  - {id: pt-eleanor, name: 'Eleanor (Portuguese (Brazil), Somber historian (female))', language: pt-BR, gender: f}
+  - {id: pt-martha, name: 'Martha (Portuguese (Brazil), Weathered radio journalist (female))', language: pt-BR, gender: f}
+  - {id: pt-serena, name: 'Serena (Portuguese (Brazil), Gentle yoga instructor (female))', language: pt-BR, gender: f}
+  - {id: pt-iris, name: 'Iris (Portuguese (Brazil), Hushed museum guide (female))', language: pt-BR, gender: f}
+  - {id: pt-grace, name: 'Grace (Portuguese (Brazil), Soothing nurse (female))', language: pt-BR, gender: f}
+  - {id: pt-edith, name: 'Edith (Portuguese (Brazil), Elderly grandmother soft (female))', language: pt-BR, gender: f}
+  - {id: pt-diana, name: 'Diana (Portuguese (Brazil), Stern military officer (female))', language: pt-BR, gender: f}
+  - {id: pt-otis, name: 'Otis (Portuguese (Brazil), Rumbling blues musician (male))', language: pt-BR, gender: m}
+  - {id: pt-vincent, name: 'Vincent (Portuguese (Brazil), Hushed museum guide (male))', language: pt-BR, gender: m}
+  - {id: ru-anastasia, name: 'Anastasia (Russian, Female 1)', language: ru, gender: f}
+  - {id: ru-natasha, name: 'Natasha (Russian, Female 2)', language: ru, gender: f}
+  - {id: ru-dmitri, name: 'Dmitri (Russian, Male 1)', language: ru, gender: m}
+  - {id: ru-ivan, name: 'Ivan (Russian, Male 2)', language: ru, gender: m}
+  - {id: ru-eleanor, name: 'Eleanor (Russian, Somber historian (female))', language: ru, gender: f}
+  - {id: ru-martha, name: 'Martha (Russian, Weathered radio journalist (female))', language: ru, gender: f}
+  - {id: ru-serena, name: 'Serena (Russian, Gentle yoga instructor (female))', language: ru, gender: f}
+  - {id: ru-iris, name: 'Iris (Russian, Hushed museum guide (female))', language: ru, gender: f}
+  - {id: ru-grace, name: 'Grace (Russian, Soothing nurse (female))', language: ru, gender: f}
+  - {id: ru-edith, name: 'Edith (Russian, Elderly grandmother soft (female))', language: ru, gender: f}
+  - {id: ru-diana, name: 'Diana (Russian, Stern military officer (female))', language: ru, gender: f}
+  - {id: ru-otis, name: 'Otis (Russian, Rumbling blues musician (male))', language: ru, gender: m}
+  - {id: ru-vincent, name: 'Vincent (Russian, Hushed museum guide (male))', language: ru, gender: m}
+  - {id: hi-priya, name: 'Priya (Hindi, Female 1)', language: hi, gender: f}
+  - {id: hi-ananya, name: 'Ananya (Hindi, Female 2)', language: hi, gender: f}
+  - {id: hi-arjun, name: 'Arjun (Hindi, Male 1)', language: hi, gender: m}
+  - {id: hi-vikram, name: 'Vikram (Hindi, Male 2)', language: hi, gender: m}
+  - {id: da-freja, name: 'Freja (Danish, Female 1)', language: da, gender: f}
+  - {id: da-mads, name: 'Mads (Danish, Male 1)', language: da, gender: m}
+  - {id: da-rasmus, name: 'Rasmus (Danish, Male 2)', language: da, gender: m}
+  - {id: fi-aino, name: 'Aino (Finnish, Female 1)', language: fi, gender: f}
+  - {id: fi-helmi, name: 'Helmi (Finnish, Female 2)', language: fi, gender: f}
+  - {id: fi-eero, name: 'Eero (Finnish, Male 1)', language: fi, gender: m}
+  - {id: fi-juho, name: 'Juho (Finnish, Male 2)', language: fi, gender: m}
+  - {id: fi-ville, name: 'Ville (Finnish, Male 3)', language: fi, gender: m}
+  - {id: fr-camille, name: 'Camille (French, Female 1)', language: fr-FR, gender: f}
+  - {id: fr-chloe, name: 'Chloe (French, Female 2)', language: fr-FR, gender: f}
+  - {id: fr-manon, name: 'Manon (French, Female 3)', language: fr-FR, gender: f}
+  - {id: fr-louis, name: 'Louis (French, Male 1)', language: fr-FR, gender: m}
+  - {id: fr-antoine, name: 'Antoine (French, Male 2)', language: fr-FR, gender: m}
+  - {id: fr-julien, name: 'Julien (French, Male 3)', language: fr-FR, gender: m}
+  - {id: fr-mathis, name: 'Mathis (French, Male 4)', language: fr-FR, gender: m}
+  - {id: fr-etienne, name: 'Etienne (French, Male 5)', language: fr-FR, gender: m}
+  - {id: ko-seoyeon, name: 'Seoyeon (Korean, Female 1)', language: ko, gender: f}
+  - {id: ko-minjun, name: 'Minjun (Korean, Male 1)', language: ko, gender: m}
+  - {id: ko-jihoon, name: 'Jihoon (Korean, Male 2)', language: ko, gender: m}
+  - {id: nl-sanne, name: 'Sanne (Dutch, Female 1)', language: nl, gender: f}
+  - {id: nl-fenna, name: 'Fenna (Dutch, Female 2)', language: nl, gender: f}
+  - {id: nl-daan, name: 'Daan (Dutch, Male 1)', language: nl, gender: m}
+  - {id: nl-bram, name: 'Bram (Dutch, Male 2)', language: nl, gender: m}
+  - {id: nl-joris, name: 'Joris (Dutch, Male 3)', language: nl, gender: m}
+  - {id: sv-astrid, name: 'Astrid (Swedish, Female 1)', language: sv, gender: f}
+  - {id: sv-elsa, name: 'Elsa (Swedish, Female 2)', language: sv, gender: f}
+  - {id: sv-oskar, name: 'Oskar (Swedish, Male 1)', language: sv, gender: m}
+  - {id: sw-zawadi, name: 'Zawadi (Swahili, Female 1)', language: sw, gender: f}
+  - {id: sw-neema, name: 'Neema (Swahili, Female 2)', language: sw, gender: f}
+  - {id: sw-baraka, name: 'Baraka (Swahili, Male 1)', language: sw, gender: m}
+  - {id: sw-juma, name: 'Juma (Swahili, Male 2)', language: sw, gender: m}
+  - {id: tr-elif, name: 'Elif (Turkish, Female 1)', language: tr, gender: f}
+  - {id: tr-zeynep, name: 'Zeynep (Turkish, Female 2)', language: tr, gender: f}

@@ -72,6 +72,7 @@ PROFILE_BY_KIND = {
     "kitten": "kitten",
     "matcha": "matcha",
     "paradee_onnx": "kokoro",
+    "kitten2_onnx": "kokoro",
 }
 
 #: The language tags uccharan 0.6 phonemises (``uccharan.LANGUAGES``). An older uccharan that lacks one of them is
@@ -160,11 +161,12 @@ class Phonemizer:
     def version(self) -> str | None:
         return None
 
-    def clause(self, text: str, voice: str) -> str:
-        """IPA phonemes for one clause of text (no punctuation handling)."""
+    def clause(self, text: str, voice: str, tie: str | None = None) -> str:
+        """IPA phonemes for one clause of text (no punctuation handling). ``tie`` (espeak-ng): a character written
+        inside multi-letter phonemes (``a^ɪ``), as misaki's espeak conversion expects."""
         raise NotImplementedError
 
-    def phonemize(self, text: str, voice: str) -> list[str]:
+    def phonemize(self, text: str, voice: str, tie: str | None = None) -> list[str]:
         """Phonemise ``text`` into sentences of IPA symbols, keeping punctuation.
 
         The result follows Piper's conventions: NFD-normalised symbols with
@@ -184,7 +186,8 @@ class Phonemizer:
                 chunk = parts[i].strip()
                 if not chunk:
                     continue
-                phones = _LANG_FLAG.sub("", self.clause(chunk, voice)).strip()
+                phones = _LANG_FLAG.sub("", self.clause(chunk, voice, tie) if tie else self.clause(chunk, voice))
+                phones = phones.strip()
                 if not phones:
                     continue
                 sep = parts[i + 1].strip()[:1] if i + 1 < len(parts) else ""
@@ -218,9 +221,9 @@ class EspeakExecutable(Phonemizer):
             return None
 
     @lru_cache(maxsize=4096)  # noqa: B019 - one instance per process
-    def clause(self, text: str, voice: str) -> str:
+    def clause(self, text: str, voice: str, tie: str | None = None) -> str:
         proc = subprocess.run(
-            [self.exe, "-q", "--ipa", "-v", voice, "--", text],
+            [self.exe, "-q", "--ipa", *([f"--tie={tie}"] if tie else []), "-v", voice, "--", text],
             capture_output=True,
             check=False,
             timeout=30,
@@ -266,8 +269,10 @@ class EspeakLibrary(Phonemizer):
         except Exception:
             return None
 
-    def clause(self, text: str, voice: str) -> str:
-        key = (voice, text)
+    def clause(self, text: str, voice: str, tie: str | None = None) -> str:
+        key = (voice + (tie or ""), text)
+        # phoneme mode: IPA (bit 1); with a tie, bit 7 and the tie character in bits 8-23
+        mode = self._IPA | ((0x80 | (ord(tie) << 8)) if tie else 0)
         hit = self._cache.get(key)
         if hit is not None:
             return hit
@@ -279,7 +284,7 @@ class EspeakLibrary(Phonemizer):
             buf = ctypes.c_char_p(text.encode("utf-8"))
             pieces: list[str] = []
             while buf.value:
-                out = self._lib.espeak_TextToPhonemes(ctypes.byref(buf), self._UTF8, self._IPA)
+                out = self._lib.espeak_TextToPhonemes(ctypes.byref(buf), self._UTF8, mode)
                 if out:
                     pieces.append(out.decode("utf-8", errors="replace"))
             result = " ".join(" ".join(pieces).split())
@@ -332,12 +337,12 @@ class UccharanPhonemizer(Phonemizer):
                 raise
             raise packs.PackMissing(f"uccharan is missing a language pack: {exc}") from exc
 
-    def clause(self, text: str, voice: str) -> str:
+    def clause(self, text: str, voice: str, tie: str | None = None) -> str:
         plain = strip_overrides(text)
         lang = self._lang("piper", voice, plain)
         return str(self._call(self.module.phonemize, plain, lang, "espeak-ipa", punctuation=False))
 
-    def phonemize(self, text: str, voice: str) -> list[str]:
+    def phonemize(self, text: str, voice: str, tie: str | None = None) -> list[str]:
         plain = strip_overrides(text)
         lang = self._lang("piper", voice, plain)
         return list(self._call(self.module.phonemize, plain, lang, "piper"))

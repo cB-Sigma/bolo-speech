@@ -267,6 +267,8 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | TTS | little-tts | 1 | en | 1 | 0.025 (`little-tts-onnx`) |
 | TTS | Paradee | 1 | en | 1 | 0.084 (`paradee-8m-onnx`) |
 | TTS | PiVo | 1 | en | 1 | 0.659 (`pivo-1.4m-onnx`) |
+| TTS | Kitten TTS 2 Pico | 1 | de, en, es, fr, hi, it, pt, ru | 1 | 0.124 (`kitten-tts-2-pico-onnx`) |
+| TTS | Kitten TTS 2 Mini | 1 | da, de, en, es, fi, fr, hi, it +7 | 1 | 0.608 (`kitten-tts-2-mini-onnx`) |
 | TURN | Smart Turn | 5 | ar, bn, da, de, en, es, fi, fr +15 | 5 | 0.043 (`smart-turn-v3.0`) |
 | TURN | Namo Turn Detector | 2 | ar, bn, da, de, en, es, fi, fr +15 | 2 | 0.011 (`namo-turn-en`) |
 | TURN | Silence only | 1 | - | 1 | 0.000 (`silence-only`) |
@@ -288,7 +290,7 @@ More clients (curl, Python, Node, WebSockets, Pipecat, LiveKit Agents, Wyoming):
 | WATERMARK | Perth | 1 | - | 1 | 0.033 (`perth-onnx`) |
 | WATERMARK | WavMark | 1 | - | 1 | 2.300 (`wavmark-onnx`) |
 
-**539 models in the catalog, 235 validated on CPU, 304 untested**, plus 33 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
+**541 models in the catalog, 237 validated on CPU, 304 untested**, plus 33 cloud models (paid cloud APIs; audio leaves this server; [docs/providers.md](docs/providers.md)). Full list: [docs/models.md](docs/models.md).
 <!-- END GENERATED: models-summary -->
 
 "Validated on CPU" means downloaded and run by `server/tools/validate_models.py` on the machine described under [Performance](#performance); everything else says *untested*. The full table, with each model's licence and measured real-time factor, is [docs/models.md](docs/models.md). Anything else that sherpa-onnx or faster-whisper can load is added with `bolo pull hf:<owner>/<repo>`.

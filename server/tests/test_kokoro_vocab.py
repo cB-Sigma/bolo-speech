@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from bolo.catalog import ModelSpec
 from bolo.engines.kokoro_vocab import fit, ids, kokoro_voice
 
@@ -43,3 +45,46 @@ def test_a_voice_with_its_own_language_reads_in_it() -> None:
     assert spec.phoneme_target("af_heart") == ("kokoro", "en-US")
     assert spec.phoneme_target() == ("kokoro", "en-US")
     assert spec.phoneme_target("unknown") == ("kokoro", "en-US")
+
+
+def test_kitten_reads_espeak_ties_and_folds_as_its_training_lists() -> None:
+    from bolo.engines.kokoro_vocab import espeak_to_misaki, kitten_fold, kitten_text
+
+    assert espeak_to_misaki("va^ɪs t^ʃa-o") == "vIs ʧao"
+    assert kitten_fold("ɬ̪l ɫ", "ar", "v1") == "ɬl l"
+    assert kitten_fold("'g ab", "de", "v1") == "'g ab"
+    assert kitten_fold("'g ab", "de", "v2") == "ɡ ab"
+    assert kitten_fold("bʰiːr.h ɡər.", "hi", "v2", "भीड़") == "bʰiːɽʰ ɡəɽ"
+    assert kitten_text("यह है।", "hi", "v2") == "यह है." and kitten_text("यह है।", "hi", "v1") == "यह है।"
+
+
+def test_kitten_tokens_and_trim() -> None:
+    import numpy as np
+
+    from bolo.engines.kokoro_vocab import kitten_tokens, kitten_trim
+
+    assert kitten_tokens("a(b)", {"a": 5, "b": 6, ",": 3}) == [0, 5, 3, 6, 3, 10, 0]
+    wave = np.ones(1000, dtype=np.float32)
+    first = kitten_trim(wave, np.array([3, 4, 3]), keep_start=True)  # 100 samples per frame: the end token's 2 go
+    later = kitten_trim(wave, np.array([3, 4, 3]), keep_start=False)  # and the start pause's 2
+    assert len(first) == 800 and len(later) == 600
+    assert first[0] == 0.0 and first[400] == 1.0
+
+
+def test_espeak_ng_writes_ties_when_asked(monkeypatch: Any) -> None:
+    import subprocess
+
+    from bolo.text import phonemize
+
+    calls: list[list[str]] = []
+
+    def run(argv: list[str], **_kw: Any) -> subprocess.CompletedProcess[bytes]:
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, 0, "v^aɪs".encode(), b"")
+
+    monkeypatch.setattr(phonemize.subprocess, "run", run)
+    exe = phonemize.EspeakExecutable("espeak-ng")
+    assert exe.phonemize("weiß.", "de", tie="^") == ["v^aɪs."]
+    assert "--tie=^" in calls[-1]
+    exe.clause("ja", "de")
+    assert not any(a.startswith("--tie") for a in calls[-1])

@@ -372,7 +372,7 @@ def test_catalog_aliases_defaults_and_search() -> None:
     assert cat.resolve(s.default_realtime_stt).tier == "realtime"  # type: ignore[union-attr]
     assert cat.resolve("MOONSHINE-TINY").id == "moonshine-tiny-en"  # type: ignore[union-attr]
     assert cat.resolve("nope") is None
-    assert {m.id for m in cat.search(q="kitten int8")} == {"kitten-nano-0.8-int8"}
+    assert {m.id for m in cat.search(q="kitten nano int8")} == {"kitten-nano-0.8-int8"}
     assert all(m.task == "vad" for m in cat.search(task="vad"))
     api = cat.resolve("kokoro-v1.0-int8").to_api(installed=True)  # type: ignore[union-attr]
     assert api["voices"][0]["id"] == "af_heart" and len(api["voices"]) == 54

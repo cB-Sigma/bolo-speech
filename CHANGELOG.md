@@ -125,6 +125,12 @@ aims to follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - **PiVo-1.4M** (`pivo-1.4m-onnx`, Apache-2.0): two English voices at 16 kHz from 1.4 M parameters, in process on
   ONNX Runtime with its own CMUdict front end (numbers, money, dates written out; unknown words spelled). bolo's
   engine gives the reference code's audio bit for bit; both voices transcribed back word for word.
+- **Kitten TTS 2 Pico and Mini** (`kitten-tts-2-pico-onnx`, `kitten-tts-2-mini-onnx`, Apache-2.0): 30 voices in 8
+  languages (Pico, 8 MB per language) and 113 voices in 15 languages (Mini, 83 MB; Japanese left out), in process on
+  ONNX Runtime, Hindi among them. Phonemised as Kitten's own front end does, without its GPL and PyTorch dependencies:
+  uccharan's misaki port where it covers the language, else eSpeak NG with misaki's conversion, then Kitten's folds.
+  Pico runs at 0.12 of real time and Mini at 0.61 on a 4-vCPU Xeon with 2 threads.
+- **eSpeak NG can write tied phonemes** (`a^ɪ`) for front ends that need them (`Phonemizer.phonemize(..., tie="^")`).
 
 ### Changed
 
